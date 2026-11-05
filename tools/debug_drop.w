@@ -84,7 +84,7 @@ fn stdout_mismatch(expected: &List[str], stdout: &str) -> str:
     var actual: List[str] = List.new()
     for line in stdout.split("\n"): actual.push(line.clone())
     // print ends every line: the text after the last newline is empty.
-    if actual.len() > 0 and actual[actual.len() - 1].len() == 0: let _ = actual.pop()
+    if actual.len() > 0 and actual[actual.len() - 1].len() == 0: actual.pop()
     let n = if expected.len() < actual.len(): expected.len() else: actual.len()
     for k in 0..n as i32:
         if expected[k] != actual[k]:

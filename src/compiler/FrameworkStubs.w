@@ -160,7 +160,7 @@ fn fs_open_cache() -> DscCache:
 
 fn fs_close_cache(cache: &DscCache):
     for i in 0..cache.fds.len():
-        let _ = rt_close(cache.fds[i])
+        rt_close(cache.fds[i])
 
 // `len` bytes at VM address `address`, from the file its mapping lies in.
 fn fs_read_vm(cache: &DscCache, address: i64, len: i64) -> str:

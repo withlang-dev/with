@@ -254,8 +254,8 @@ fn build_cache_binary_self_id(path: &str) -> str:
     argv = build_graph_argv_append(argv, "--self-id")
     let rc = build_graph_rt_exec_argv_capture(argv, base ++ ".out", base ++ ".err", 30000)
     let text = if rc == 0: build_graph_rt_read_file(base ++ ".out").trim() else: ""
-    let _ = build_graph_rt_remove_file(base ++ ".out")
-    let _ = build_graph_rt_remove_file(base ++ ".err")
+    build_graph_rt_remove_file(base ++ ".out")
+    build_graph_rt_remove_file(base ++ ".err")
     if build_cache_is_hex_digest(text): text else: ""
 
 fn build_cache_compiler_binary_fingerprint(path: &str) -> str:
@@ -402,7 +402,7 @@ fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
 fn build_cache_sorted_unique_strings(items: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()
     for i in 0..items.len():
-        sorted = tracked_input_insert_unique(move sorted, items[i])
+        sorted = tracked_input_insert_unique(sorted, items[i])
     sorted
 
 fn build_cache_last_colon(text: &str) -> isize:
@@ -972,7 +972,7 @@ fn build_cache_check_fresh(root: &str, target: &BuildGraphTarget, dep_rebuilt: b
 fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &List[str], effects: &List[str]):
     build_cache_forget_fingerprints()
     let state_dir = build_cache_state_dir(root)
-    let _ = build_graph_rt_mkdir_p(state_dir)
+    build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
     // #1654: an input that changed while the action ran was not what the
     // action compiled. Recording the post-edit fingerprint would call the
@@ -981,7 +981,7 @@ fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &L
     let moved = build_cache_input_moved_during_run(root, target)
     if moved.len() > 0:
         with_eprint("warning: build.w target '" ++ target.name ++ "': input '" ++ moved ++ "' changed while it ran; its output is not recorded and it will run again")
-        let _ = build_cache_invalidate_target(root, target.name)
+        build_cache_invalidate_target(root, target.name)
         build_cache_prerun_inputs.remove(with_str_clone_ref(target.name))
         return
     build_cache_prerun_inputs.remove(with_str_clone_ref(target.name))
@@ -1030,7 +1030,7 @@ fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &L
         let path = output_paths[idx]
         let hash = build_cache_fingerprint_file(path)
         content = content ++ "out:" ++ path ++ ":" ++ hash ++ "\n"
-    let _ = build_graph_rt_write_file(state_path, content)
+    build_graph_rt_write_file(state_path, content)
     build_cache_store_publish(root, target, content, effects_text)
 
 // ── Machine-wide build store (#1899) ──────────────────────────────────
@@ -1196,8 +1196,8 @@ fn build_cache_store_names_root(root: &str, rels: &List[str]) -> str:
             return rel
     ""
 
-fn build_cache_store_touch(entry: &str):
-    let _ = build_graph_rt_write_file(entry ++ "/used", f"{build_graph_rt_time_now()}\n")
+fn build_cache_store_touch(entry: &str) -> Unit:
+    build_graph_rt_write_file(entry ++ "/used", f"{build_graph_rt_time_now()}\n")
 
 fn build_cache_store_publish(root: &str, target: &BuildGraphTarget, state_text: &str, effects_text: &str):
     let dir = build_cache_store_dir()
@@ -1401,7 +1401,7 @@ fn build_cache_store_restore(root: &str, target: &BuildGraphTarget) -> bool:
 
 fn build_cache_record_build_effects(root: &str, effects: &List[str]):
     let state_dir = build_cache_state_dir(root)
-    let _ = build_graph_rt_mkdir_p(state_dir)
+    build_graph_rt_mkdir_p(state_dir)
     let effects_text = build_cache_effects_text(effects)
     let path = build_cache_build_effects_path(root)
     if effects_text.len() > 0:
@@ -1650,7 +1650,7 @@ fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
         t.action_source_paths = r.read_list()
         if not r.ok:
             return empty_build_graph()
-        graph.targets.push(move t)
+        graph.targets.push(t)
     let gheader = r.read_line()
     if not r.ok or gheader.len() == 0 or gheader[0] != 103:
         return empty_build_graph()

@@ -102,7 +102,7 @@ int64_t with_vec_get_i64(with_vec *v, int64_t index);
 void with_vec_push_str(uint8_t *v, with_str val);
 with_str with_vec_get_str(with_vec *v, int64_t index);
 void with_vec_push_bool(with_vec *v, bool val);
-bool with_vec_get_bool(with_vec *v, int64_t index);
+int32_t with_vec_get_bool(with_vec *v, int64_t index);
 void with_vec_set_i32(with_vec *v, int64_t index, int32_t val);
 void with_vec_set_i64(with_vec *v, int64_t index, int64_t val);
 with_str with_vec_str_join(with_vec *v, with_str sep);
@@ -147,9 +147,9 @@ void *with_hashmap_new_keyed(int64_t key_size, int64_t val_size, int64_t key_kin
 void with_hashmap_new_out(void **out, int64_t key_size, int64_t val_size);
 void with_hashmap_new_at(void *base, int64_t offset, int64_t key_size, int64_t val_size);
 void with_hashmap_insert(void *handle, const void *key, const void *val, int64_t is_str_key);
-int64_t with_hashmap_get(void *handle, const void *key, void *out_val, int64_t is_str_key);
-int64_t with_hashmap_contains(void *handle, const void *key, int64_t is_str_key);
-int64_t with_hashmap_remove(void *handle, const void *key, void *out_val, int64_t is_str_key);
+int32_t with_hashmap_get(void *handle, const void *key, void *out_val, int64_t is_str_key);
+int32_t with_hashmap_contains(void *handle, const void *key, int64_t is_str_key);
+int32_t with_hashmap_remove(void *handle, const void *key, void *out_val, int64_t is_str_key);
 int64_t with_hashmap_len(void *handle);
 void with_set_memory_limit_bytes(int64_t limit);
 void with_hashmap_clear(void *handle);
@@ -228,7 +228,7 @@ int32_t with_fs_remove_tree(with_str path);
 int32_t with_fs_copy_tree(with_str src, with_str dst);
 int32_t with_fs_symlink(with_str target, with_str link_path);
 with_str with_fs_list_files(with_str path);
-int64_t with_str_hash(with_str s);
+uint64_t with_str_hash(with_str s);
 with_str with_getenv_str(with_str name);
 int32_t with_setenv_str(with_str name, with_str value);
 int32_t with_getpid(void);
@@ -246,9 +246,6 @@ int32_t with_net_udp_bind(int32_t port);
 
 // Extract a .tgz archive to dest directory. Returns 0 on success.
 
-// String builder helpers (used by compiler debug dumps).
-int64_t with_sb_new(void);
-with_str with_sb_build(int64_t handle);
 
 // ── Assert ─────────────────────────────────────────────────────────
 

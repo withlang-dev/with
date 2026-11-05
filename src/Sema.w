@@ -4456,7 +4456,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     return s
 
 fn Sema.placeholder(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
-    return sema_empty_state(pool, move diags, ast)
+    return sema_empty_state(pool, diags, ast)
 
 // #602: mark param `idx` of extern/c_import fn `name_sym` as retaining its ptr.
 impl Sema:
@@ -4543,7 +4543,7 @@ impl Sema:
             self.register_retains_entry(self.ast.get_extra(ep + i))
 
 fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
-    var s = sema_empty_state(pool, move diags, ast)
+    var s = sema_empty_state(pool, diags, ast)
 
     // Index 0 = error type (sentinel).
     s.add_type(TypeKind.TY_ERR, 0, 0, 0)
@@ -4668,11 +4668,11 @@ impl Sema:
 
     mut fn record_tracked_input(path: &str):
         var paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
+        self.tracked_input_paths = tracked_input_insert_unique(paths, path)
 
     mut fn merge_tracked_inputs(paths: &List[str]):
         var tracked_paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, paths)
+        self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, paths)
 
     mut fn read_tracked_embed_file(source_path: &str, raw_path: &str) -> TrackedReadResult:
         let result = tracked_embed_read(source_path, raw_path, self.tracked_input_root)
@@ -5120,7 +5120,7 @@ impl Sema:
     // (resolved without a node).
     mut fn record_name_use(node: i32, kind: &str, path: str, name_sym: i32):
         if path.len() == 0: return
-        let name: str = self.pool_resolve(name_sym)
+        let name = self.pool_resolve(name_sym)
         self.name_use_nodes.push(node)
         self.name_use_kinds.push(kind)
         self.name_use_paths.push(path)
@@ -6977,11 +6977,11 @@ impl Sema:
                 if self.type_d0[ti] == list_sym and self.type_d2[ti] >= 1:
                     let vi_args: List[i32] = List.new()
                     vi_args.push(self.type_extra[self.type_d1[ti]])
-                    let _ = self.ensure_generic_inst_type(vi_sym, vi_args, 1)
+                    self.ensure_generic_inst_type(vi_sym, vi_args, 1)
                 if self.type_d0[ti] == hashmap_sym and self.type_d2[ti] >= 2:
                     let opt_args: List[i32] = List.new()
                     opt_args.push(self.type_extra[self.type_d1[ti] + 1])
-                    let _ = self.ensure_generic_inst_type(option_sym, opt_args, 1)
+                    self.ensure_generic_inst_type(option_sym, opt_args, 1)
 
         // List[str] for str.split(), and ListIter[str] for its .iter().
         let str_args: List[i32] = List.new()
@@ -8410,13 +8410,13 @@ impl Sema:
                     return self.moved_field_path_syms[(start + count - 1)]
         0
 
-    mut fn clear_moved_fields_for_binding(sym: i32):
+    mut fn clear_moved_fields_for_binding(sym: i32) -> Unit:
         var i = self.moved_field_base_syms.len() as i32 - 1
         while i >= 0:
             if self.moved_field_base_syms[i] == sym:
                 self.remove_moved_field_entry(i)
             i = i - 1
-        let _ = self.explicitly_partial_syms.remove(sym)
+        self.explicitly_partial_syms.remove(sym)
 
     mut fn clear_moved_fields_for_place_expr(node: i32):
         let path = self.field_move_path_for_expr(node)
@@ -8687,10 +8687,10 @@ impl Sema:
             base.push(b.base[i])
             for k in 0..bc:
                 path_syms.push(b.syms[(bs + k)])
-        self.moved_field_base_syms = move base
-        self.moved_field_path_starts = move starts
-        self.moved_field_path_counts = move counts
-        self.moved_field_path_syms = move path_syms
+        self.moved_field_base_syms = base
+        self.moved_field_path_starts = starts
+        self.moved_field_path_counts = counts
+        self.moved_field_path_syms = path_syms
         // Poisoned at the join iff poisoned at some non-divergent exit.
         var poison_syms: List[i32] = List.new()
         var poison_nodes: List[i32] = List.new()
@@ -8987,9 +8987,9 @@ impl Sema:
         var merged: List[i32] = List.new()
         let existing = self.binding_view_dep_count(sym)
         for i in 0..existing:
-            merged = self.push_unique_i32(move merged, self.binding_view_dep_at(sym, i))
+            merged = self.push_unique_i32(merged, self.binding_view_dep_at(sym, i))
         for i in 0..deps.len():
-            merged = self.push_unique_i32(move merged, deps[i])
+            merged = self.push_unique_i32(merged, deps[i])
         let merged_mask = self.binding_view_origin_mask(sym) | param_mask
         self.set_binding_view_deps(sym, merged_mask, merged)
         self.note_view_fact(sym, 0, 2)
@@ -9267,7 +9267,7 @@ impl Sema:
                             result = 1
                             break
                     vidx = vidx + 1
-        let _ = self.needs_drop_visit.remove(resolved as i32)
+        self.needs_drop_visit.remove(resolved as i32)
         result
 
     // D72 (§2.5.1, #1431): a `Drop` struct whose all-zero storage can be a
@@ -9531,7 +9531,7 @@ impl Sema:
                         result = 1
                         break
                 vidx = vidx + 1
-        let _ = self.needs_drop_visit.remove(resolved as i32)
+        self.needs_drop_visit.remove(resolved as i32)
         result
 
     mut fn type_carries_user_drop(tid: i32) -> i32:
@@ -9578,7 +9578,7 @@ impl Sema:
                             result = 1
                             break
                     vidx = vidx + 1
-        let _ = self.needs_drop_visit.remove(resolved as i32)
+        self.needs_drop_visit.remove(resolved as i32)
         result
 
     // `moved`: `origin_node` moves or consumes the origin (a `move`, a
@@ -9603,8 +9603,8 @@ impl Sema:
         else:
             diag.add_help("declare `" ++ view_name ++ "` after `" ++ origin_name ++ "`, or clear/drop `" ++ view_name ++ "` before `" ++ origin_name ++ "` goes out of scope")
         // §8, §57: a facade resource that depends on the origin says why.
-        diag = self.with_facade_dependency_notes(move diag, self.scope_lookup(view_sym))
-        self.diags.emit(move diag)
+        diag = self.with_facade_dependency_notes(diag, self.scope_lookup(view_sym))
+        self.diags.emit(diag)
 
     // D51 stage 7 (ruling §38, spec §16.2b.7): a view a foreign call
     // invalidated — a resource it received without `preserves param N`, or a
@@ -9614,7 +9614,7 @@ impl Sema:
     mut fn emit_facade_invalidated_view_error(view_sym: i32, origin_sym: i32, call_node: i32, binding_node: i32, use_node: i32):
         let view_name = self.pool_resolve(view_sym)
         let fx: i32 = self.facade_touch_nodes.get(call_node).unwrap()
-        let fname: str = self.pool_resolve(self.facade_call_effects[fx].fn_sym)
+        let fname = self.pool_resolve(self.facade_call_effects[fx].fn_sym)
         let ci = self.facade_call_effects[fx].contract
         let pi: i32 = if self.facade_touch_hit_params.contains(view_sym): self.facade_touch_hit_params.get(view_sym).unwrap() else: -1
         let is_domain = self.facade_domain_origin_index.contains(origin_sym)
@@ -9622,7 +9622,7 @@ impl Sema:
         var clause = f"preserves param {pi}"
         if is_domain:
             let di: i32 = self.facade_domain_origin_index.get(origin_sym).unwrap()
-            let dn: str = self.pool_resolve(self.facade_domain_list[di].name)
+            let dn = self.pool_resolve(self.facade_domain_list[di].name)
             origin_text = "foreign-state domain `" ++ dn ++ "`"
             clause = "preserves domain " ++ dn
         let primary_start = if use_node != 0: self.ast.get_start(use_node) else: 0
@@ -9635,11 +9635,11 @@ impl Sema:
         if use_node != 0:
             diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(use_node), end: self.ast.get_end(use_node) }, "used here after the call")
         if ci >= 0:
-            let facade: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+            let facade = self.pool_resolve(self.foreign_contracts[ci].facade)
             diag.add_help("state `" ++ clause ++ "` on fn " ++ fname ++ " in facade " ++ facade ++ " if it leaves that storage valid, or copy `" ++ view_name ++ "` out (`to_owned()`) before the call")
         else:
             diag.add_help("describe " ++ fname ++ " with an fn item in a facade and state `" ++ clause ++ "` if it leaves that storage valid, or copy `" ++ view_name ++ "` out (`to_owned()`) before the call")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn emit_returned_view_origin_use_error(view_sym: i32, use_node: i32):
         let origin_sym = self.binding_poisoned_origin_sym(view_sym)
@@ -9662,8 +9662,8 @@ impl Sema:
         if use_node != 0:
             diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(use_node), end: self.ast.get_end(use_node) }, "view is used here after a possible origin died")
         diag.add_help("copy the data out before the origin's scope ends, or declare `" ++ origin_name ++ "` in the outer scope")
-        diag = self.with_facade_dependency_notes(move diag, self.scope_lookup(view_sym))
-        self.diags.emit(move diag)
+        diag = self.with_facade_dependency_notes(diag, self.scope_lookup(view_sym))
+        self.diags.emit(diag)
 
     fn binding_decl_node(sym: i32) -> i32:
         if self.binding_decl_nodes.contains(sym):
@@ -9723,9 +9723,9 @@ impl Sema:
                 let start = self.ast.get_start(err_node)
                 let end = self.ast.get_end(err_node)
                 var diag = Diagnostic.err("view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'", Span { file: self.local_file_id, start: start, end: end })
-                diag = self.with_copy_view_fixit(move diag, view_sym, true)
-                diag = self.with_facade_dependency_notes(move diag, view_ty)
-                self.diags.emit(move diag)
+                diag = self.with_copy_view_fixit(diag, view_sym, true)
+                diag = self.with_facade_dependency_notes(diag, view_ty)
+                self.diags.emit(diag)
                 return
 
     mut fn set_expr_view_deps(expr_node: i32, param_mask: i32, deps: &List[i32]):
@@ -10800,8 +10800,6 @@ impl Sema:
             // #714 (D5 supersession, spec §3.8): a plain call is always legal;
             // the transfer was marked moved at check time and later uses diagnose
             // there. This pass keeps recording sites for move-sites analytics.
-            let _ = arg_node
-            let _ = file_id
             if self.sig_param_uses_value_ref_abi(callee_sig, callee_pi) != 0:
                 continue
 
@@ -11322,7 +11320,7 @@ impl Sema:
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         if suggestion.len() > 0:
             diag.add_help("did you mean '" ++ suggestion ++ "'?")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     // ── Type compatibility ───────────────────────────────────────────
 
@@ -12003,7 +12001,7 @@ impl Sema:
             else: // TypeKind.TY_RANGE
                 out = self.is_copy(self.get_type_d0(resolved))
 
-            let _ = self.copy_visit_stack.remove(resolved as i32)
+            self.copy_visit_stack.remove(resolved as i32)
             return out
         if tk == TypeKind.TY_ENUM:
             let enum_name = self.get_type_d0(resolved)
@@ -12091,8 +12089,8 @@ impl Sema:
             self.copy_cycle_hits += 1
             return 0
         self.copy_visit_stack.insert(resolved)
-        let incomplete_before: i32 = self.copy_walk_incomplete
-        let hits_before: i32 = self.copy_cycle_hits
+        let incomplete_before = self.copy_walk_incomplete
+        let hits_before = self.copy_cycle_hits
         self.copy_walk_incomplete = 0
         var out: i32 = 1
         let field_count = self.type_reflection_field_count(resolved)

@@ -51,7 +51,6 @@ pub fn read_all() -> str:
 // shifted every remaining line once per line, quadratic in the line count
 // (#1352: `with -n` ran over two minutes on 16 MB).
 pub fn Stdin.lines(self: &Self) -> List[str]:
-    let _ = self
     var out = lines(read_all())
     for i in 0..out.len():
         let n = out[i].len()

@@ -183,14 +183,14 @@ fn foreign_pair_flow(blocks: &List[ForeignPairBlock], edges: &List[ForeignPairEd
                 incoming = foreign_pair_join(incoming, along_edge)
             let outgoing = foreign_pair_transfer(incoming, blocks[bi])
             if not foreign_pair_equal(outgoing, outputs[bi]): changed = true
-            inputs[bi] = move incoming
+            inputs[bi] = incoming
             outputs[bi] = outgoing
     let violations: List[i32] = List.new()
     for bi in 0..blocks.len():
         let block = &blocks[bi]
         if (block.action == FOREIGN_PAIR_INVOKE or block.invokes) and not foreign_pair_can_invoke(inputs[bi]):
             violations.push(bi as i32)
-    ForeignPairFlow { inputs: move inputs, violations }
+    ForeignPairFlow { inputs: inputs, violations }
 
 // A row over canonical owned places. References name possible storage
 // places; binding a reference replaces its targets instead of unifying
@@ -257,7 +257,7 @@ impl ForeignPairPlaces:
             let key: i32 = self.references[place][i]
             if (block.action == FOREIGN_PAIR_INVOKE or block.invokes) and not foreign_pair_can_invoke(self.values[key]): valid = false
             let after = foreign_pair_transfer(self.values[key], block)
-            self.values[key] = if count == 1: move after else: foreign_pair_join(self.values[key], after)
+            self.values[key] = if count == 1: after else: foreign_pair_join(self.values[key], after)
         valid
 
 fn foreign_pair_origin_live(places: &ForeignPairPlaces, origin: i32) -> bool:
@@ -320,7 +320,7 @@ fn foreign_pair_execute_step(places: &ForeignPairPlaces, step: &ForeignPairStep)
         valid = not foreign_pair_place_retains_any(places, step.place)
     else:
         panic("invalid foreign pair transfer action")
-    (move after, valid)
+    (after, valid)
 
 fn foreign_pair_places_edge(source: &ForeignPairPlaces, edge: &ForeignPairEdge) -> (ForeignPairPlaces, bool):
     var result = foreign_pair_places_clone(source)
@@ -328,7 +328,7 @@ fn foreign_pair_places_edge(source: &ForeignPairPlaces, edge: &ForeignPairEdge) 
     for key in 0..result.values.len():
         result.values[key] = foreign_pair_on_edge(source.values[key], edge.guard, edge.succeeded)
         if result.values[key].alternatives.len() == 0: reachable = false
-    (move result, reachable)
+    (result, reachable)
 
 fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &List[ForeignPairStep], edges: &List[ForeignPairEdge], entry: &ForeignPairPlaces) -> ForeignPairPlaceFlow:
     assert(starts.len() == counts.len())
@@ -350,17 +350,17 @@ fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &List[
                 if edge.to != bi or not reachable[edge.from]: continue
                 let (along, possible) = foreign_pair_places_edge(outputs[edge.from], edge)
                 if not possible: continue
-                incoming = if reached: foreign_pair_places_join(incoming, along) else: move along
+                incoming = if reached: foreign_pair_places_join(incoming, along) else: along
                 reached = true
             if not reached: continue
             var outgoing = foreign_pair_places_clone(incoming)
             for si in starts[bi]..starts[bi] + counts[bi]:
                 let (after, valid) = foreign_pair_execute_step(outgoing, steps[si])
-                outgoing = move after
+                outgoing = after
             if not reachable[bi] or not foreign_pair_places_equal(outgoing, outputs[bi]): changed = true
             reachable[bi] = true
-            inputs[bi] = move incoming
-            outputs[bi] = move outgoing
+            inputs[bi] = incoming
+            outputs[bi] = outgoing
     let violations: List[i32] = List.new()
     for bi in 0..starts.len():
         if not reachable[bi]: continue
@@ -368,5 +368,5 @@ fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &List[
         for si in starts[bi]..starts[bi] + counts[bi]:
             let (after, valid) = foreign_pair_execute_step(current, steps[si])
             if not valid: violations.push(si)
-            current = move after
-    ForeignPairPlaceFlow { inputs: move inputs, reachable: move reachable, violations }
+            current = after
+    ForeignPairPlaceFlow { inputs: inputs, reachable: reachable, violations }

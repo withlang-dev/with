@@ -166,7 +166,7 @@ fn resolution_violation(mut report: AnalysisReport, sema: &Sema, site: &Resoluti
         fact.end = sema.ast.get_end(node)
         fact.line = resolution_line(site.source, fact.start)
         fact.column = resolution_column(site.source, fact.start)
-    report.add(move fact)
+    report.add(fact)
     report.fail("resolution: " ++ fn_name ++ " at " ++ resolution_where(sema, site, node) ++ ": " ++ message)
 
 // Rule 1–4: every MIR call terminator against Sema's answer for its node.

@@ -86,13 +86,13 @@ pub fn run_to_files(argv: &List[str], stdout_path: &str, stderr_path: &str, time
         if elapsed >= deadline:
             // The runtime's timed wait, already past due, kills the child's
             // process group (TERM, then KILL) and reaps it.
-            let _ = with_exec_wait(pid, 1)
+            with_exec_wait(pid, 1)
             return finished(-1, true)
         // Poll at a thousandth of the time run so far, between 20 µs and 1 ms.
         var nap = elapsed / 1000
         if nap < 20000: nap = 20000
         if nap > 1000000: nap = 1000000
-        let _ = with_nanosleep(nap)
+        with_nanosleep(nap)
     finished(-1, false)
 
 /// Run an argument vector from the directory `cwd`, with its stdout and

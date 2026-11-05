@@ -46,7 +46,7 @@ fn sweep(path: &str, owner: &HashMap[str, str]) -> str:
                 continue
             removed = removed + 1
             // The pin above it moved onto the definition (step 2).
-            if out.len() > 0 and out[out.len() - 1].starts_with("@[effect("): let _ = out.pop()
+            if out.len() > 0 and out[out.len() - 1].starts_with("@[effect("): out.pop()
             if first_extern < 0: first_extern = out.len() as i32
             continue
         if line.starts_with("use ") and modules.len() == 0 and removed == 0: last_use = out.len() as i32
@@ -62,7 +62,7 @@ fn sweep(path: &str, owner: &HashMap[str, str]) -> str:
         result.push(out[i] ++ "")
     if at >= out.len() as i32:
         for m in modules: result.push("use " ++ m)
-    let _ = write_file(path, result.join("\n"))
+    write_file(path, result.join("\n"))
     f"{path}: -{removed} externs, +use " ++ modules.join(" ") ++ (if missing.len() > 0: "  KEPT (not the runtime's):" ++ missing else: "")
 
 var total = 0

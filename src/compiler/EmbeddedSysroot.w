@@ -163,16 +163,16 @@ fn es_materialize(pack: &str, kind: &str, what: &str) -> str:
         let tmp = root ++ f".tmp.{runtime_getpid()}.{runtime_clock_nanos()}"
         let problem = es_unpack(pack, tmp)
         if problem.len() > 0:
-            let _ = runtime_remove_tree(tmp)
+            runtime_remove_tree(tmp)
             runtime_eprint("error: could not materialize " ++ what ++ " at " ++ root ++ ": " ++ problem)
             return ""
         if with_fs_write_file(tmp ++ "/.with-sysroot-ready", "ok\n") != 0:
-            let _ = runtime_remove_tree(tmp)
+            runtime_remove_tree(tmp)
             runtime_eprint("error: could not write " ++ tmp ++ "/.with-sysroot-ready")
             return ""
         if runtime_rename(tmp, root) != 0:
             // Another build won the rename; its copy is complete.
-            let _ = runtime_remove_tree(tmp)
+            runtime_remove_tree(tmp)
             if with_fs_file_exists(stamp) == 0:
                 runtime_eprint("error: could not move " ++ what ++ " into " ++ root)
                 return ""
@@ -208,17 +208,17 @@ fn embedded_windows_sysroot_dir() -> str:
         let tmp = root ++ f".tmp.{runtime_getpid()}.{runtime_clock_nanos()}"
         let problem = tar_gz_extract_data(pack, tmp, 0)
         if problem.len() > 0:
-            let _ = runtime_remove_tree(tmp)
+            runtime_remove_tree(tmp)
             runtime_eprint("error: could not materialize the Windows toolchain at " ++ root ++ ": " ++ problem)
             return ""
         if with_fs_write_file(tmp ++ "/.with-sysroot-ready", "ok\n") != 0:
-            let _ = runtime_remove_tree(tmp)
+            runtime_remove_tree(tmp)
             runtime_eprint("error: could not write " ++ tmp ++ "/.with-sysroot-ready")
             return ""
         let _parent = runtime_mkdir_p(es_dirname(root))
         if runtime_rename(tmp, root) != 0:
             // Another build won the rename; its copy is complete.
-            let _ = runtime_remove_tree(tmp)
+            runtime_remove_tree(tmp)
             if with_fs_file_exists(stamp) == 0:
                 runtime_eprint("error: could not move the Windows toolchain into " ++ root)
                 return ""

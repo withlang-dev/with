@@ -621,7 +621,7 @@ fn rt_allocator_lock():
     while rt_alloc_lock_word.swap(1, .Acquire) != 0:
         spins = spins + 1
         if spins >= 1024:
-            let _ = rt_nanosleep(1000)
+            rt_nanosleep(1000)
             spins = 0
 
 fn rt_allocator_unlock():
@@ -1170,13 +1170,13 @@ fn dbg_filter_mode() -> i32:
 // a length exist (an origin tag, a payload).
 fn dbg_puts(s: &str): dbg_put_bytes(str_data(s), s.len())
 
-fn dbg_put_bytes(s: *const u8, n: i64):
-    let _ = rt_write(2, s, n)
+fn dbg_put_bytes(s: *const u8, n: i64) -> Unit:
+    rt_write(2, s, n)
 
-fn dbg_put_i64(v: i64):
+fn dbg_put_i64(v: i64) -> Unit:
     var buf: [24]u8 = [0 as u8; 24]
     let len = i64_to_buf(v, &buf as *mut u8)
-    let _ = rt_write(2, &buf as *const u8, len)
+    rt_write(2, &buf as *const u8, len)
 
 fn rt_parse_limit_cstr(p: *const c_char) -> i64:
     if p as i64 == 0:
@@ -1385,7 +1385,7 @@ pub fn with_set_memory_limit_bytes(limit: i64) -> Unit:
         rt_alloc_limit_bytes = 0
         rt_alloc_limit_state = 1
     if limit > 0:
-        let _ = rt_set_process_memory_limit_bytes(limit)
+        rt_set_process_memory_limit_bytes(limit)
     rt_allocator_unlock()
 
 fn dbg_ledger_init():
@@ -1857,11 +1857,9 @@ fn rt_free_with_drop_origin(ptr: *mut u8, drop_origin: *const u8, drop_origin_le
     rt_allocator_unlock()
 
 fn rt_free_sized(ptr: *mut u8, size_arg: i64):
-    let _ = size_arg
     rt_free(ptr)
 
 fn rt_free_sized_with_drop_origin(ptr: *mut u8, size_arg: i64, drop_origin: *const u8, drop_origin_len: i64):
-    let _ = size_arg
     rt_free_with_drop_origin(ptr, drop_origin, drop_origin_len)
 
 // D63 (§12.4 "The callable type"): a callable's context word is tagged in
@@ -1878,7 +1876,7 @@ fn rt_closure_env_release(ctx: *mut u8):
     let cell = (bits - 2) as *mut u8
     let raw = RtThreadClosureRaw { fn_ptr: unsafe *(cell as *const *mut u8), ctx: cell }
     let release: RtThreadClosureFn = unsafe transmute[RtThreadClosureFn](raw)
-    let _ = release(0 as *mut u8)
+    release(0 as *mut u8)
     // The pair was never an owned callable: hand it back as raw words so no
     // drop glue runs on it (a runtime compiled with the callable glue would
     // otherwise release the cell a second time).
@@ -1931,7 +1929,6 @@ fn rt_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
     if ptr as i64 == 0:
         return rt_alloc(new_size)
     if new_size <= 0:
-        let _ = old_size
         rt_free(ptr)
         return 0 as *mut u8
 
@@ -2167,19 +2164,19 @@ pub fn with_println_str(s: &str):
     let n = s.len()
     if p as i64 != 0 and n > 0:
         write_all(1, p, n)
-    let _ = rt_write(1, "\n" as *const u8, 1)
+    write_all(1, "\n" as *const u8, 1)
 
 pub fn with_println_i32(n: i32):
     var buf: [16]u8 = [0 as u8; 16]
     let len = i64_to_buf(n as i64, &buf as *mut u8)
     write_all(1, &buf as *const u8, len)
-    let _ = rt_write(1, "\n" as *const u8, 1)
+    write_all(1, "\n" as *const u8, 1)
 
 pub fn with_println_i64(n: i64):
     var buf: [24]u8 = [0 as u8; 24]
     let len = i64_to_buf(n, &buf as *mut u8)
     write_all(1, &buf as *const u8, len)
-    let _ = rt_write(1, "\n" as *const u8, 1)
+    write_all(1, "\n" as *const u8, 1)
 
 pub fn with_println_bool(b: bool):
     if b:
@@ -2201,7 +2198,7 @@ pub fn with_eprint(s: &str):
     let n = s.len()
     if p as i64 != 0 and n > 0:
         write_all(2, p, n)
-    let _ = rt_write(2, "\n" as *const u8, 1)
+    write_all(2, "\n" as *const u8, 1)
 
 // ── Panic / assert ─────────────────────────────────────────────────
 
@@ -2226,7 +2223,7 @@ fn with_panic_core(msg: str, file: str, line: i32):
             var buf: [16]u8 = [0 as u8; 16]
             let len = i64_to_buf(line as i64, &buf as *mut u8)
             write_all(2, &buf as *const u8, len)
-    let _ = rt_write(2, "\n" as *const u8, 1)
+    write_all(2, "\n" as *const u8, 1)
     rt_backtrace_print()
     rt_exit(134)
 
@@ -2566,7 +2563,6 @@ fn fmt_spec_base(mode: i32) -> i32:
 // bit-pattern base a narrow signed value prints its own bits, never its
 // 64-bit extension (`i8` -2 under `:x` is `fe`, #1907).
 pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32) -> str:
-    let _ = precision
     var bits = val_arg as u64
     // A negative decimal prints its magnitude after '-'; ~x + 1 cannot
     // overflow for a negative x, i64::MIN included (#1922).
@@ -2580,7 +2576,6 @@ pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32,
 // A 128-bit integer under a spec, passed as its low and high 64-bit words
 // so no target's 128-bit calling convention is involved (#1922).
 pub fn with_fmt_int128_spec(lo: u64, hi: u64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32) -> str:
-    let _ = precision
     if is_unsigned == 0 and (hi >> 63) != 0 and fmt_spec_base(mode) == 10:
         // Two's-complement negation of hi:lo, with the carry out of the low
         // word; neither add overflows for a negative value.
@@ -3966,7 +3961,7 @@ fn hash_seed_init():
     if hash_seed_ready.load(.Acquire) != 0:
         return
     while hash_seed_lock.swap(1, .Acquire) != 0:
-        let _ = rt_nanosleep(1000)
+        rt_nanosleep(1000)
     if hash_seed_ready.load(.Acquire) == 0:
         var keys: [2]u64 = [0 as u64; 2]
         rt_fill_random((&raw mut keys) as *mut [2]u64 as *mut u8, 16)
@@ -4270,7 +4265,7 @@ pub fn with_hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_
 // D22 lookup primitive: a nullable pointer observes map-owned value storage.
 // The compiler wraps it as Option[&V]; this function never transfers ownership.
 pub fn with_hashmap_get_ptr(map: *mut u8, key: *const u8, is_str_key: i64) -> *mut u8:
-    let _ = is_str_key  // key type already stored in struct
+    // key type already stored in struct
     let m = map as i64
     let slot = hm_find_slot(m, key)
     if slot < 0: return 0 as *mut u8
@@ -4293,7 +4288,7 @@ pub fn with_hashmap_contains(map: *mut u8, key: *const u8, is_str_key: i64) -> i
 // Removes `key`'s entry: its value's bytes go to `val_out`, its slot becomes
 // a removed one and its entry dead, the others keep their order.
 pub fn with_hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i64) -> i32:
-    let _ = is_str_key  // key type already stored in struct
+    // key type already stored in struct
     let m = map as i64
     let slot = hm_find_slot(m, key)
     if slot < 0: return 0
@@ -4515,25 +4510,25 @@ fn fs_read_file_status_c(cpath: *const c_char, status: *mut i32) -> str:
         return ""
     let size = rt_seek(fd, 0, 2)  // SEEK_END
     if size < 0:
-        let _ = rt_close(fd)
+        rt_close(fd)
         unsafe *status = size as i32
         return ""
     if size == 0:
-        let _ = rt_close(fd)
+        rt_close(fd)
         return ""
-    let _ = rt_seek(fd, 0, 0)  // SEEK_SET
+    rt_seek(fd, 0, 0)  // SEEK_SET
     let buf = rt_alloc(size + 1)
     var total: i64 = 0
     while total < size:
         let r = rt_read(fd, (buf as i64 + total) as *mut u8, size - total)
         if r < 0:
-            let _ = rt_close(fd)
+            rt_close(fd)
             rt_free(buf)
             unsafe *status = r as i32
             return ""
         if r == 0: break
         total = total + r
-    let _ = rt_close(fd)
+    rt_close(fd)
     if total < size:
         rt_free(buf)
         unsafe *status = -rt_err_short_read()
@@ -4566,7 +4561,7 @@ fn fs_write_file_c(cpath: *const c_char, data: &str) -> i32:
         let r = rt_write(fd, (dp as i64 + written) as *const u8, dl - written)
         if r <= 0: break
         written = written + r
-    let _ = rt_close(fd)
+    rt_close(fd)
     if written < dl: -1 else: 0
 
 pub fn with_fs_write_file(path: &str, data: &str) -> i32:
@@ -4802,7 +4797,7 @@ pub fn with_write_stdout(s: &str):
 
 pub fn with_flush_stdout():
     // No buffering in rt_write
-    let _ = 0
+    {}
 
 // ── String split/lines ─────────────────────────────────────────────
 
@@ -4815,12 +4810,12 @@ fn with_lines_data_out(out: *mut u8, sp: *const u8, sl: i64) -> Unit:
     while i < sl:
         if (unsafe sp[i]) == 10:  // '\n'
             let line = alloc_str((sp as i64 + start) as *const u8, i - start)
-            with_vec_push_str(out, move line)
+            with_vec_push_str(out, line)
             start = i + 1
         i = i + 1
     if start < sl:
         let line = alloc_str((sp as i64 + start) as *const u8, sl - start)
-        with_vec_push_str(out, move line)
+        with_vec_push_str(out, line)
 
 pub fn with_lines_out_ref(out: *mut u8, s: &str) -> Unit:
     with_lines_data_out(out, unsafe *(s as *const str as *const *const u8), s.len())
@@ -4872,7 +4867,7 @@ fn str_split_list_ref(out: *mut u8, s: &str, delim: &str):
     let dl = str_length(delim)
     if dl == 0:
         let whole = alloc_str(str_data(s), sl)
-        with_vec_push_str(out, move whole)
+        with_vec_push_str(out, whole)
         return
     let sp = str_data(s)
     let dp = str_data(delim)
@@ -4881,13 +4876,13 @@ fn str_split_list_ref(out: *mut u8, s: &str, delim: &str):
     while i <= sl - dl:
         if rt_memcmp((sp as i64 + i) as *const u8, dp, dl) == 0:
             let part = alloc_str((sp as i64 + start) as *const u8, i - start)
-            with_vec_push_str(out, move part)
+            with_vec_push_str(out, part)
             start = i + dl
             i = start
         else:
             i = i + 1
     let last = alloc_str((sp as i64 + start) as *const u8, sl - start)
-    with_vec_push_str(out, move last)
+    with_vec_push_str(out, last)
 
 pub fn with_str_split_vec_ref(out: *mut u8, s: &str, delim: &str) -> Unit:
     str_split_list_ref(out, s, delim)
@@ -5266,7 +5261,6 @@ fn scope_cleanup_await_capture_panic(fiber_id: i32, first_panic_msg: *mut *const
             &raw mut cancelled_return as *mut i32
         ) }
         if took != 0:
-            let _ = cancelled_return
             let existing_panic_msg = unsafe *first_panic_msg
             if panic_msg as i64 != 0 and panic_msg_len > 0 and existing_panic_msg as i64 == 0:
                 unsafe:

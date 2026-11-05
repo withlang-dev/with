@@ -155,7 +155,7 @@ type InterpolatedExprParseAttempt {
 }
 
 fn Parser.init(tokens: TokenList, source: &str, file_id: i32, intern: &InternPool, diags: DiagnosticList) -> Parser:
-    Parser.init_with_pool(move tokens, source, file_id, intern, move diags, AstPool.new())
+    Parser.init_with_pool(tokens, source, file_id, intern, diags, AstPool.new())
 
 // The parser owns the node pool it fills (the caller takes it back from
 // parse_module) and holds the caller's intern pool as another holder
@@ -304,7 +304,7 @@ impl Parser:
         let span = Span { file: self.file_id, start: self.pool.get_start(stmt), end: self.pool.get_end(stmt) }
         var diag = Diagnostic.err("module '" ++ self.module_label ++ "' holds an executable statement at its top level; a module file holds declarations, and only an entry source runs statements (§18.5b, D74)", span)
         diag.add_help("move the statement into a function the entry source calls, or make this file the entry source")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     // D39 interface mode: the body slot of a declaration. A body in a `.wi`
     // is an error (the object holds the code); the recovery still parses it
@@ -401,7 +401,7 @@ impl Parser:
             let main_span = Span { file: self.file_id, start: self.pool.get_start(self.explicit_main_decl as NodeId), end: self.pool.get_end(self.explicit_main_decl as NodeId) }
             diag.add_label(main_span, "`fn main` defined here")
         diag.add_help("move the statement inside `fn main`, or remove `fn main` to use implicit main mode")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn synthesize_implicit_main():
         if self.implicit_main_mode == 0:
@@ -500,7 +500,7 @@ impl Parser:
         let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
         var diag = Diagnostic.err(msg, span)
         diag.add_help(help)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn expect_use_path_segment() -> i32:
         let t = self.peek()
@@ -514,7 +514,7 @@ impl Parser:
             let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
             var diag = Diagnostic.err("'" ++ keyword ++ "' is a reserved keyword and cannot be used as a module name", span)
             diag.add_help("rename the module to avoid the keyword, e.g. '" ++ keyword ++ "s'")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
             return 0
         self.emit_error("expected identifier")
         0
@@ -588,7 +588,7 @@ impl Parser:
         let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
         var diag = Diagnostic.err(msg, span)
         diag.set_code(code)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     fn effect_name_bit(name: &str) -> i32:
         if name == "read":
@@ -1083,7 +1083,7 @@ impl Parser:
     // `comptime:` block, a target selection, or (implicit main) a statement.
     mut fn parse_top_level_item():
         if self.peek() == TokenKind.TK_KW_PUB:
-            let saved_pos: i32 = self.pos
+            let saved_pos = self.pos
             self.advance()
             if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
                 self.parse_impl_block(Visibility.Public)
@@ -1243,7 +1243,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             let inner = self.parse_target_condition()
-            let _ = self.expect(TokenKind.TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
             return inner
         let field = self.parse_target_field()
         if field.len() == 0:
@@ -1337,7 +1337,7 @@ impl Parser:
             self.pool.truncate_decls(decl_start)
             self.pending_post_decls = List.new()
             self.explicit_main_decl = main_before
-            while self.top_level_stmts.len() > stmts_before: let _ = self.top_level_stmts.pop()
+            while self.top_level_stmts.len() > stmts_before: self.top_level_stmts.pop()
 
     // ── Declaration parsing ──────────────────────────────────────────
 
@@ -1654,7 +1654,7 @@ impl Parser:
                 break
 
             if self.peek() == TokenKind.TK_KW_PUB:
-                let saved_pos: i32 = self.pos
+                let saved_pos = self.pos
                 self.advance()
                 if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
                     let decl_start = self.pool.decl_count()
@@ -1700,7 +1700,7 @@ impl Parser:
     mut fn parse_fn_decl(is_pub: i32, start: i32, is_async: i32, is_gen: i32, is_comptime: i32) -> NodeId:
         // Capture the @[target("arch")] guard up front — parsing the body may run
         // skip_attributes for nested constructs and clear pending_target.
-        let fn_target_guard: i32 = self.pending_target
+        let fn_target_guard = self.pending_target
         self.pending_target = 0
         if self.expect(TokenKind.TK_KW_FN) == 0:
             return self.poisoned_expr()
@@ -2277,7 +2277,7 @@ impl Parser:
             // Check for per-field @[align(N)] attribute
             var field_align: i32 = 0
             if self.peek() == TokenKind.TK_AT:
-                let saved: i32 = self.pos
+                let saved = self.pos
                 self.advance()
                 if self.peek() == TokenKind.TK_L_BRACKET:
                     self.advance()
@@ -2346,7 +2346,7 @@ impl Parser:
 
             var field_align: i32 = 0
             if self.peek() == TokenKind.TK_AT:
-                let saved: i32 = self.pos
+                let saved = self.pos
                 self.advance()
                 if self.peek() == TokenKind.TK_L_BRACKET:
                     self.advance()
@@ -2403,7 +2403,7 @@ impl Parser:
         extra_start
 
     mut fn is_enum_def() -> bool:
-        let saved: i32 = self.pos
+        let saved = self.pos
         self.advance()  // skip identifier
         self.skip_newlines()
         if self.peek() == TokenKind.TK_PIPE:
@@ -2467,7 +2467,7 @@ impl Parser:
                         self.advance()
                         self.skip_newlines()
 
-                    let before_payload: i32 = self.pos
+                    let before_payload = self.pos
                     let pty = self.parse_type_expr()
                     payloads.push(pty as i32)
                     if self.peek() == TokenKind.TK_COMMA:
@@ -2556,7 +2556,7 @@ impl Parser:
                         self.advance()
                         self.advance()
                         self.skip_newlines()
-                    let before_payload: i32 = self.pos
+                    let before_payload = self.pos
                     let pty = self.parse_type_expr()
                     payloads_flat.push(pty as i32)
                     pcount = pcount + 1
@@ -2628,7 +2628,7 @@ impl Parser:
                         self.advance()
                         self.advance()
                         self.skip_newlines()
-                    let before_payload: i32 = self.pos
+                    let before_payload = self.pos
                     let pty = self.parse_type_expr()
                     payloads_flat.push(pty as i32)
                     pcount = pcount + 1
@@ -3010,7 +3010,7 @@ impl Parser:
                     self.advance()
                     self.skip_newlines()
                     if self.peek() == TokenKind.TK_COMMA:
-                        let cp: i32 = self.pos
+                        let cp = self.pos
                         self.advance()
                         self.skip_newlines()
                         if self.peek() == TokenKind.TK_STRING_LIT:
@@ -3499,7 +3499,7 @@ impl Parser:
                     diag.add_help("a ':' that ends the line introduces an indented body (§29.13): indent the members under the header, write `{}` for an empty body, or drop the ':' for a bodyless " ++ construct)
                 else:
                     diag.add_help("a ':' that ends the line introduces an indented body (§29.13): indent the members under the header, or write `{}` for an empty body")
-                self.diags.emit(move diag)
+                self.diags.emit(diag)
             return DeclBody.Indented
         if bodyless_ok and (t == TokenKind.TK_NEWLINE or t == TokenKind.TK_EOF):
             let header = Span { file: self.file_id, start, end: self.prev_end() }
@@ -3510,7 +3510,7 @@ impl Parser:
                 var diag = Diagnostic.err("`" ++ header_text ++ "` has no ':' or '{', so it is a bodyless " ++ construct ++ " that ends at its newline; the indented lines below it are not its members (§29.13)", span)
                 diag.add_label(header, "bodyless header")
                 diag.add_help("add ':' to the end of the header to make them its body: `" ++ header_text ++ ":`")
-                self.diags.emit(move diag)
+                self.diags.emit(diag)
             return DeclBody.Bodyless
         self.emit_error("expected ':' or '{' after the " ++ construct ++ " header")
         DeclBody.Missing
@@ -3532,13 +3532,13 @@ impl Parser:
             var diag = Diagnostic.err("an inline " ++ construct ++ " body is a single member: it ended at the end of the header line, so this member is outside it (§29.13)", span)
             diag.add_label(Span { file: self.file_id, start: introducer_end - 1, end: introducer_end }, "inline body starts after this ':'")
             diag.add_help("end the line after `" ++ header_text ++ "` and indent the first member like the rest, one member per line")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
         true
 
     // A trait/impl method's colon body: the members are the declaration's
     // indented list, so the body sits deeper than the member's line (#1391).
     mut fn parse_member_body(member_start: i32) -> NodeId:
-        let saved_block_indent: i32 = self.block_indent
+        let saved_block_indent = self.block_indent
         self.block_indent = line_indent_of(self.source, member_start)
         let body = self.parse_block_or_expr()
         self.block_indent = saved_block_indent
@@ -4106,7 +4106,7 @@ impl Parser:
             let span = Span { file: self.file_id, start: self.pool.get_start(rhs), end: self.pool.get_end(rhs) }
             var diag = Diagnostic.err("a pipeline stage is one call, and this stage is an operator expression: `|>` binds looser than the operator after the stage (§9.9)", span)
             diag.add_help("parenthesize the pipeline to apply the operator to its result: `(xs |> sum()) * 2`")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
         self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.pool.get_end(rhs), lhs, rhs, 0)
 
     mut fn parse_precedence(min_prec: i32) -> NodeId:
@@ -4416,7 +4416,7 @@ impl Parser:
                         return node
             // move (params) => expr
             if self.peek() == TokenKind.TK_L_PAREN:
-                let save: i32 = self.pos
+                let save = self.pos
                 self.advance()
                 self.skip_newlines()
                 var is_closure = false
@@ -5989,7 +5989,7 @@ impl Parser:
         let sub_tokens = lexer.tokenize()
         let parse_diags = if use_shared_diags != 0: move self.diags else: DiagnosticList.init()
         let first_node = self.pool.node_count()
-        var sub_parser = Parser.init_with_pool(move sub_tokens, source_text, self.file_id, self.intern, move parse_diags, self.pool.clone())
+        var sub_parser = Parser.init_with_pool(sub_tokens, source_text, self.file_id, self.intern, parse_diags, self.pool.clone())
         sub_parser.implicit_it_depth = self.implicit_it_depth
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
@@ -6274,7 +6274,7 @@ impl Parser:
         // Already consumed `(`. Parse `value , pattern )` and desugar to
         //   match value: pattern => () ; _ => assert_matches_failed()
         let start = self.pool.get_start(callee)
-        let saved_sb: i32 = self.suppress_brace
+        let saved_sb = self.suppress_brace
         self.suppress_brace = 0
         self.skip_newlines()
         let value = self.parse_expr()
@@ -6307,7 +6307,7 @@ impl Parser:
         // be read as partial application). Desugar it at parse time into a match.
         if self.pool.kind(callee) == NodeKind.NK_IDENT and self.intern.resolve(self.pool.get_data0(callee)) == "assert_matches":
             return self.parse_assert_matches(callee)
-        let saved_suppress_brace: i32 = self.suppress_brace
+        let saved_suppress_brace = self.suppress_brace
         self.suppress_brace = 0
         self.skip_newlines()
         var args: List[i32] = List.new()
@@ -6320,7 +6320,7 @@ impl Parser:
                 // Named argument: name: value
                 var arg_name_sym: i32 = 0
                 if self.peek() == TokenKind.TK_IDENT:
-                    let save: i32 = self.pos
+                    let save = self.pos
                     let name_sym = self.intern_current()
                     self.advance()
                     if self.peek() == TokenKind.TK_COLON:
@@ -6334,8 +6334,8 @@ impl Parser:
                 if arg_name_sym == 0 and seen_named == 1:
                     self.emit_error("positional argument cannot follow named argument")
                 arg_names.push(arg_name_sym)
-                let outer_it: i32 = self.saw_implicit_it
-                let outer_depth: i32 = self.implicit_it_depth
+                let outer_it = self.saw_implicit_it
+                let outer_depth = self.implicit_it_depth
                 self.saw_implicit_it = 0
                 let it_mark = self.it_args_unparented.len()
                 var arg = self.parse_expr()
@@ -6490,7 +6490,7 @@ impl Parser:
             // A field that is no expression (`left: n` after a positional
             // field) is reported once, never spun on: a parse that consumes
             // nothing would otherwise loop here forever (#1746 found it).
-            let before: i32 = self.pos
+            let before = self.pos
             let val = self.parse_expr()
             if self.pos == before:
                 self.emit_error("expected a field value in a positional struct literal")
@@ -6536,7 +6536,7 @@ impl Parser:
                 fields.push(ident_node as i32)
             field_count = field_count + 1
             if self.peek() == TokenKind.TK_NEWLINE:
-                let save: i32 = self.pos
+                let save = self.pos
                 self.skip_newlines()
                 if self.peek() == TokenKind.TK_EOF:
                     break
@@ -6608,7 +6608,7 @@ impl Parser:
 
         // Comma-separated: check if multi-index or two-arg subscript
         if self.peek() == TokenKind.TK_COMMA:
-            let save: i32 = self.pos
+            let save = self.pos
             self.advance()
             self.skip_newlines()
             // If next is ':' or '...', definitely multi-index
@@ -6817,7 +6817,7 @@ impl Parser:
                 // Keep shorthand construction aligned with normal call parsing:
                 // `.Fatal(code: 99)` should behave like `Fatal(code: 99)`.
                 if self.peek() == TokenKind.TK_IDENT:
-                    let save: i32 = self.pos
+                    let save = self.pos
                     self.advance()
                     if self.peek() == TokenKind.TK_COLON:
                         self.advance()
@@ -6840,7 +6840,7 @@ impl Parser:
 
     mut fn parse_grouped_or_tuple() -> NodeId:
         let start = self.current_start()
-        let open_paren_pos: i32 = self.pos
+        let open_paren_pos = self.pos
         self.advance()  // consume (
         self.skip_newlines()
 
@@ -7002,7 +7002,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_KW_LET:
             return self.parse_if_let(start, chain_col, chain_is_stmt)
 
-        let saved_sb: i32 = self.suppress_brace
+        let saved_sb = self.suppress_brace
         self.suppress_brace = 1
         let cond = self.parse_expr()
         self.suppress_brace = saved_sb
@@ -7011,7 +7011,7 @@ impl Parser:
         let is_stmt_if = chain_is_stmt != 0
         let then_body = self.parse_body()
         var else_body: NodeId = 0 as NodeId
-        let save: i32 = self.pos
+        let save = self.pos
         self.skip_newlines()
         let crossed_newline = self.pos != save
         if self.peek() == TokenKind.TK_KW_ELSE:
@@ -7031,7 +7031,7 @@ impl Parser:
         let pat = self.parse_pattern()
         if self.expect(TokenKind.TK_EQ) == 0:
             return self.poisoned_expr()
-        let saved_sb: i32 = self.suppress_brace
+        let saved_sb = self.suppress_brace
         self.suppress_brace = 1
         let subject = self.parse_expr()
         self.suppress_brace = saved_sb
@@ -7053,7 +7053,7 @@ impl Parser:
                 let p = self.parse_pattern()
                 if self.expect(TokenKind.TK_EQ) == 0:
                     return self.poisoned_expr()
-                let saved_chain_sb: i32 = self.suppress_brace
+                let saved_chain_sb = self.suppress_brace
                 self.suppress_brace = 1
                 let s = self.parse_expr()
                 self.suppress_brace = saved_chain_sb
@@ -7061,7 +7061,7 @@ impl Parser:
                 clauses.push(p as i32)
                 clauses.push(s as i32)
             else:
-                let saved_chain_sb: i32 = self.suppress_brace
+                let saved_chain_sb = self.suppress_brace
                 self.suppress_brace = 1
                 let cond = self.parse_expr()
                 self.suppress_brace = saved_chain_sb
@@ -7074,7 +7074,7 @@ impl Parser:
         let then_body = self.parse_body()
 
         var else_body: NodeId = 0 as NodeId
-        let save: i32 = self.pos
+        let save = self.pos
         self.skip_newlines()
         let crossed_newline = self.pos != save
         if self.peek() == TokenKind.TK_KW_ELSE:
@@ -7487,7 +7487,7 @@ impl Parser:
                 if self.peek() == TokenKind.TK_R_BRACE:
                     break
             else:
-                let save: i32 = self.pos
+                let save = self.pos
                 self.skip_newlines()
                 if self.peek() == TokenKind.TK_IDENT and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_EQ:
                     let next_col = column_of(self.source, self.current_start())
@@ -7513,7 +7513,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_KW_LET:
             return self.parse_while_let(start)
 
-        let saved_sb: i32 = self.suppress_brace
+        let saved_sb = self.suppress_brace
         self.suppress_brace = 1
         let cond = self.parse_expr()
         self.suppress_brace = saved_sb
@@ -7526,7 +7526,7 @@ impl Parser:
         self.advance()
         let body = self.parse_body()
 
-        let save: i32 = self.pos
+        let save = self.pos
         self.skip_newlines()
         if self.peek() == TokenKind.TK_KW_WHILE:
             let while_col = column_of(self.source, self.current_start())
@@ -7544,7 +7544,7 @@ impl Parser:
         let pat = self.parse_pattern()
         if self.expect(TokenKind.TK_EQ) == 0:
             return self.poisoned_expr()
-        let saved_sb: i32 = self.suppress_brace
+        let saved_sb = self.suppress_brace
         self.suppress_brace = 1
         let subject = self.parse_expr()
         self.suppress_brace = saved_sb
@@ -7587,7 +7587,7 @@ impl Parser:
             if first >= 65 and first <= 90:
                 return true
 
-        let saved_pos: i32 = self.pos
+        let saved_pos = self.pos
         self.advance()
         let next = self.peek()
         self.pos = saved_pos
@@ -7615,7 +7615,7 @@ impl Parser:
         if self.expect(TokenKind.TK_KW_IN) == 0:
             return self.poisoned_expr()
         self.skip_newlines()
-        let saved_sb: i32 = self.suppress_brace
+        let saved_sb = self.suppress_brace
         self.suppress_brace = 1
         let iterable = self.parse_expr()
         self.suppress_brace = saved_sb
@@ -7635,7 +7635,7 @@ impl Parser:
         // Only match else: at the same column as the for keyword.
         // Desugar to: { var __for_ran = false; for x in iter: { __for_ran = true; body }; if not __for_ran: else_body }
         let for_col = column_of(self.source, start)
-        let save_pos: i32 = self.pos
+        let save_pos = self.pos
         self.skip_newlines()
         let else_col = column_of(self.source, self.current_start())
         if self.peek() == TokenKind.TK_KW_ELSE and else_col == for_col:
@@ -7701,7 +7701,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_KW_IF:
                 self.advance()
                 self.skip_newlines()
-                let saved_guard_sb: i32 = self.suppress_brace
+                let saved_guard_sb = self.suppress_brace
                 self.suppress_brace = 1
                 let guard_expr = self.parse_expr()
                 self.suppress_brace = saved_guard_sb
@@ -7714,7 +7714,7 @@ impl Parser:
             if self.expect(TokenKind.TK_KW_IN) == 0:
                 return self.poisoned_expr()
             self.skip_newlines()
-            let saved_sb: i32 = self.suppress_brace
+            let saved_sb = self.suppress_brace
             self.suppress_brace = 1
             let bexpr = self.parse_expr()
             self.suppress_brace = saved_sb
@@ -7874,7 +7874,7 @@ impl Parser:
         let start = self.current_start()
         self.advance()
         self.skip_newlines()
-        let saved_suppress_brace: i32 = self.suppress_brace
+        let saved_suppress_brace = self.suppress_brace
         self.suppress_brace = 1
         let subject = self.parse_expr()
         self.suppress_brace = saved_suppress_brace
@@ -7896,7 +7896,7 @@ impl Parser:
     mut fn parse_match_arms() -> i32:
         var arms: List[i32] = List.new()
         var arm_col: i32 = -1
-        let saved_block_indent: i32 = self.block_indent
+        let saved_block_indent = self.block_indent
 
         while self.peek() != TokenKind.TK_EOF:
             let t = self.peek()
@@ -7945,7 +7945,7 @@ impl Parser:
                 guard = in_guard_expr
             else if self.peek() == TokenKind.TK_KW_IF:
                 self.advance()
-                let saved_sfa: i32 = self.suppress_fat_arrow_closure
+                let saved_sfa = self.suppress_fat_arrow_closure
                 self.suppress_fat_arrow_closure = 1
                 guard = self.parse_expr()
                 self.suppress_fat_arrow_closure = saved_sfa
@@ -7967,7 +7967,7 @@ impl Parser:
             let arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, arm_start, self.prev_end(), pattern, body, guard)
             arms.push(arm as i32)
 
-            let save: i32 = self.pos
+            let save = self.pos
             self.skip_newlines()
             if self.peek() == TokenKind.TK_EOF:
                 break
@@ -8016,7 +8016,7 @@ impl Parser:
                 guard = in_guard_expr
             else if self.peek() == TokenKind.TK_KW_IF:
                 self.advance()
-                let saved_sfa2: i32 = self.suppress_fat_arrow_closure
+                let saved_sfa2 = self.suppress_fat_arrow_closure
                 self.suppress_fat_arrow_closure = 1
                 guard = self.parse_expr()
                 self.suppress_fat_arrow_closure = saved_sfa2
@@ -8431,7 +8431,7 @@ impl Parser:
             let span = Span { file: self.file_id, start: self.prev_start(), end: self.prev_end() }
             var diag = Diagnostic.err("expected ':' after 'else': a let-else branch on the next line is a body (§9.7)", span)
             diag.add_help("write `else:` to introduce the indented block; only a single diverging expression may follow a bare `else`, on the same line")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
         self.parse_block_or_expr()
 
     // Whether the tokens after `let`/`var` begin a pattern rather than a
@@ -8550,7 +8550,7 @@ impl Parser:
         self.skip_newlines()
         // New syntax: with name(expr): body → NK_WITH_IMPLICIT
         if self.peek() == TokenKind.TK_IDENT:
-            let save: i32 = self.pos
+            let save = self.pos
             let binding_name = self.intern_current()
             self.advance()
             if self.peek() == TokenKind.TK_L_PAREN:
@@ -8763,7 +8763,7 @@ impl Parser:
                             if self.expect(TokenKind.TK_KW_IN) == 0:
                                 return self.poisoned_expr()
                             self.skip_newlines()
-                            let saved_sb: i32 = self.suppress_brace
+                            let saved_sb = self.suppress_brace
                             self.suppress_brace = 1
                             let iterable = self.parse_expr()
                             self.suppress_brace = saved_sb
@@ -8838,7 +8838,7 @@ impl Parser:
                     if self.expect(TokenKind.TK_KW_IN) == 0:
                         return self.poisoned_expr()
                     self.skip_newlines()
-                    let saved_sb: i32 = self.suppress_brace
+                    let saved_sb = self.suppress_brace
                     self.suppress_brace = 1
                     let iterable = self.parse_expr()
                     self.suppress_brace = saved_sb
@@ -9088,7 +9088,7 @@ impl Parser:
             return true
         let intro_start = self.prev_start()
         let intro_end = self.prev_end()
-        let save: i32 = self.pos
+        let save = self.pos
         self.skip_newlines()
         if self.peek() != TokenKind.TK_EOF and column_of(self.source, self.current_start()) > self.block_indent:
             return true
@@ -9096,7 +9096,7 @@ impl Parser:
         let intro = self.source.slice(intro_start as i64, intro_end as i64)
         var diag = Diagnostic.err("expected an indented block after '" ++ intro ++ "'", Span { file: self.file_id, start: intro_start, end: intro_end })
         diag.add_help("a '" ++ intro ++ "' that ends the line opens a body on the lines below it, indented deeper than the line that holds the '" ++ intro ++ "' (§29.13)")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
         false
 
     mut fn parse_block_or_expr() -> NodeId:
@@ -9106,7 +9106,7 @@ impl Parser:
             return self.poisoned_expr()
 
         let block_col = column_of(self.source, self.current_start())
-        let saved_block_indent: i32 = self.block_indent
+        let saved_block_indent = self.block_indent
         self.block_indent = block_col
         let body = self.parse_indented_block(block_col)
         self.block_indent = saved_block_indent
@@ -9130,7 +9130,7 @@ impl Parser:
                     continue
                 break
 
-            let save: i32 = self.pos
+            let save = self.pos
             self.skip_separators()
             if self.peek() == TokenKind.TK_EOF:
                 break
@@ -9151,7 +9151,7 @@ impl Parser:
                 let bad_start = self.current_start()
                 var diag = Diagnostic.err(f"unexpected indentation: this line is indented to column {next_col}, which is no enclosing block's indentation (the block here starts at column {block_col})", Span { file: self.file_id, start: bad_start, end: self.current_end() })
                 diag.add_help("a block's statements all start at its column; a line indented deeper than the statement before it belongs to a body that statement opens with ':' at the end of its line (§29.13)")
-                self.diags.emit(move diag)
+                self.diags.emit(diag)
 
             stmts.push(last_expr as i32)
             last_expr = self.parse_expr()
@@ -9178,7 +9178,7 @@ impl Parser:
         // Indentation inside braces is insignificant (§29.13 Form 3), so a
         // statement's own line is the level a colon body inside it must
         // exceed (#1391).
-        let saved_block_indent: i32 = self.block_indent
+        let saved_block_indent = self.block_indent
         var stmts: List[i32] = List.new()
         self.block_indent = line_indent_of(self.source, self.current_start())
         var last_expr = self.parse_expr()
@@ -9552,7 +9552,7 @@ impl Parser:
     // contextual keyword before it (`once fn() -> T`) is a keyword, not a
     // type of that name ending the parameter.
     mut fn next_token_starts_type() -> bool:
-        let saved_pos: i32 = self.pos
+        let saved_pos = self.pos
         self.advance()
         let next = self.peek()
         self.pos = saved_pos
@@ -9578,7 +9578,7 @@ impl Parser:
             if first >= 65 and first <= 90:
                 return true
 
-        let saved_pos: i32 = self.pos
+        let saved_pos = self.pos
         self.advance()
         let next = self.peek()
         self.pos = saved_pos
@@ -9604,7 +9604,7 @@ impl Parser:
     // method form (`mut fn m -> R:`), where parse_param_list is never called.
     mut fn flush_receiver_only_param() -> i32:
         let pattern_start = self.pool.fn_param_patterns_len()
-        let rmode: i32 = self.pending_receiver_mode
+        let rmode = self.pending_receiver_mode
         self.pending_receiver_mode = 0
         let rflags = self.build_synth_receiver(rmode)
         self.pool.add_extra(self.intern.intern("self"))
@@ -9658,7 +9658,7 @@ impl Parser:
             if has_explicit_self:
                 self.pending_receiver_mode = 0
             else:
-                let rmode: i32 = self.pending_receiver_mode
+                let rmode = self.pending_receiver_mode
                 self.pending_receiver_mode = 0
                 let rflags = self.build_synth_receiver(rmode)
                 params.push(self.intern.intern("self"))

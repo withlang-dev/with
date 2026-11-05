@@ -160,7 +160,7 @@ fn emit_indent(indent: i32) -> str:
 // same fill), until none is left (`[[[T; 4]; 3]; 2]` → `[T; 2, 3, 4]`). An
 // outer `[` that indexes (after a name, `]` or `)`) is not an array.
 fn flatten_nested_arrays(source: &str) -> str:
-    var text: str = source
+    var text = source
     for _ in 0..16:
         let next = flatten_nested_arrays_once(text)
         if next == text: return text
@@ -274,7 +274,7 @@ fn format_source_styled(input: &str, style: i32) -> str:
         if style == 1 and tag == TokenKind.TK_R_BRACE and not at_line_start:
             let inline_after = brace_depth - 1
             if suppress_stack.len() > 0 and suppress_stack[suppress_stack.len() - 1] == inline_after:
-                let _ = suppress_stack.pop()
+                suppress_stack.pop()
                 brace_depth = inline_after
                 i = i + 1
                 continue
@@ -313,7 +313,7 @@ fn format_source_styled(input: &str, style: i32) -> str:
                     let top: i32 = close_stack[close_stack.len() - 1]
                     if line_indent > top:
                         break
-                    let _ = close_stack.pop()
+                    close_stack.pop()
                     if tag == TokenKind.TK_KW_ELSE and top == line_indent:
                         if blank_lines > 0 and prev_tag != 0:
                             out = out ++ "\n"
@@ -331,7 +331,7 @@ fn format_source_styled(input: &str, style: i32) -> str:
             if style == 1 and at_line_start and tag == TokenKind.TK_R_BRACE:
                 let after_brace = brace_depth - 1
                 if suppress_stack.len() > 0 and suppress_stack[suppress_stack.len() - 1] == after_brace:
-                    let _ = suppress_stack.pop()
+                    suppress_stack.pop()
                     brace_depth = after_brace
                     var j = i + 1
                     while j < count and (tokens.get_tag(j) == TokenKind.TK_NEWLINE or tokens.get_tag(j) == TokenKind.TK_SEMICOLON):

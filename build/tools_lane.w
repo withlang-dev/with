@@ -93,6 +93,6 @@ pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
     let total = jobs.len()
     if failures > 0:
         ctx.diagnostics().error(f"tools-tests: {failures} of {total} tool(s) failed to compile; a tool tracks the current language like any program (#1335)")
-    let _ = fs.write_text(tl_join(out_dir, ".stamp"), f"ok: {total} tools\n")
+    fs.write_text(tl_join(out_dir, ".stamp"), f"ok: {total} tools\n")
     print(f"tools-tests: {total} tools compile")
     0

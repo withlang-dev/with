@@ -1622,7 +1622,7 @@ impl AstPool:
     // of a module-level target selection that is not taken).
     fn truncate_decls(count: i32):
         let st = self.state
-        while st.decls.len() > count: let _ = st.decls.pop()
+        while st.decls.len() > count: st.decls.pop()
 
     fn decl_count() -> i32:
         self.state.decls.len() as i32

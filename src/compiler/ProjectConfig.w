@@ -169,7 +169,7 @@ fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
                         pending_value = pending_value ++ " "
                     pending_value = pending_value ++ line
                     if project_config_value_complete(pending_value):
-                        cfg = project_config_apply_manifest_entry(move cfg, section, pending_key, pending_value)
+                        cfg = project_config_apply_manifest_entry(cfg, section, pending_key, pending_value)
                         pending_key = ""
                         pending_value = ""
                 else if line[0] == 91 and line[line.len() as i64 - 1] == 93:
@@ -184,7 +184,7 @@ fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
                             cfg.manifest_error = forbidden
                         if project_config_wants_key(section, key):
                             if project_config_value_complete(value):
-                                cfg = project_config_apply_manifest_entry(move cfg, section, key, value)
+                                cfg = project_config_apply_manifest_entry(cfg, section, key, value)
                             else:
                                 pending_key = key
                                 pending_value = value
@@ -192,15 +192,15 @@ fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
         i = i + 1
 
     if pending_key.len() > 0 and project_config_value_complete(pending_value):
-        cfg = project_config_apply_manifest_entry(move cfg, section, pending_key, pending_value)
+        cfg = project_config_apply_manifest_entry(cfg, section, pending_key, pending_value)
 
     cfg
 
 fn project_config_apply_manifest_entry(cfg: ProjectConfig, section: &str, key: &str, value: &str) -> ProjectConfig:
     let manual_c_dep = project_config_manual_c_dep_name(section)
     if manual_c_dep.len() > 0:
-        return project_config_apply_manual_c_dep_entry(move cfg, manual_c_dep, key, value)
-    project_config_apply_entry(move cfg, section, key, value)
+        return project_config_apply_manual_c_dep_entry(cfg, manual_c_dep, key, value)
+    project_config_apply_entry(cfg, section, key, value)
 
 fn project_config_apply_entry(cfg: ProjectConfig, section: &str, key: &str, value: &str) -> ProjectConfig:
     var out = cfg
@@ -317,7 +317,7 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: &str, key: &str, valu
                     else:
                         if not project_config_list_contains(out.c_dep_metadata_names, pkg_name):
                             out.c_dep_metadata_names.push(with_str_clone_ref(pkg_name))
-                        out = project_config_load_dep_metadata(move out, pkg_name, constraint)
+                        out = project_config_load_dep_metadata(out, pkg_name, constraint)
             else if out.manifest_error.len() == 0:
                 out.manifest_error = "With package dependency '" ++ key ++ "' is declared in with.toml but the With package registry is not available yet; remove it or use a C package (c.<name>)"
     out
@@ -479,13 +479,13 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
             let slash = project_config_find_char(req, 47)
             if slash <= 0:
                 // A sibling component.
-                out = project_config_load_dep_component(move out, name, version, req)
+                out = project_config_load_dep_component(out, name, version, req)
                 continue
             let colon = project_config_find_char(req, 58)
             let req_name = req.slice(0, slash)
             let req_version = req.slice(slash + 1, if colon > slash: colon else: req.len())
             let req_component = if colon > slash: req.slice((colon + 1) as i64, req.len()) else: ""
-            out = project_config_load_dep_component(move out, req_name, req_version, req_component)
+            out = project_config_load_dep_component(out, req_name, req_version, req_component)
     out
 
 fn project_config_json_str_array(json: &str, key: &str) -> List[str]:

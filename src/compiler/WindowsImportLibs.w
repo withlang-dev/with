@@ -62,7 +62,7 @@ fn wil_crt_dir(libc_root: &str) -> str:
     var fetched = false
     for attempt in 1..4:
         if not fetched and https_download(url.to_owned(), archive.to_owned()) == 0: fetched = true
-        if not fetched and attempt < 3: let _ = runtime_nanosleep(attempt as i64 * 1000000000)
+        if not fetched and attempt < 3: runtime_nanosleep(attempt as i64 * 1000000000)
     if not fetched: return "error: could not download " ++ url
     let actual = wil_sha256_file(archive)
     if actual != sha:

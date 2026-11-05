@@ -388,16 +388,16 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     // Each cross compiler embeds every corpus bundle compiled for its own
     // target by the release compiler (#946).
     for pi in 0..plans.len():
-        out = cross_wo_bundle_targets(move out, ctx, plans[pi])
-        cross_embedded = target_with_wo_blobs(move cross_embedded, plans[pi])
+        out = cross_wo_bundle_targets(out, ctx, plans[pi])
+        cross_embedded = target_with_wo_blobs(cross_embedded, plans[pi])
     // A cross compiler carries no wasm32 runtime yet (#2131: empty slots).
     // The bundle index names the wasm32 bundle slots in every compiler
     // (#2390): empty here, as in the bootstrap embedding.
     for carried in carried_bundle_tags():
         for pi in 0..plans.len():
             let slot = plans[pi].name ++ "_" ++ carried
-            out = add_empty_wo_blob_targets(move out, p, dir, slot)
-            cross_embedded = target_with_empty_wo_blobs(move cross_embedded, p, dir, slot)
+            out = add_empty_wo_blob_targets(out, p, dir, slot)
+            cross_embedded = target_with_empty_wo_blobs(cross_embedded, p, dir, slot)
     // The target's runtime bundle is the one stage2 built (`rt-bundle-<tag>`,
     // which the release embeds as its `rt@<tag>` slot): the cross
     // compiler's `rt` slot carries the same bytes.
@@ -406,7 +406,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     // slot is empty, as its corpus wasm32 slots are).
     out = add_empty_rt_bundle_slot_targets(out, p, dir)
     cross_embedded = target_with_empty_rt_bundle_slots(cross_embedded, p, dir)
-    out = add_empty_darwin_sysroot_blob_target(move out, p, dir)
+    out = add_empty_darwin_sysroot_blob_target(out, p, dir)
     // #1915 (D81): the target's sysroot, compiler-rt and libc++ (a pack the
     // cross compiler embeds, and an unpacked copy the cross links read) and
     // its SDK's cmake and ninja, from the target's SDK (cross_llvm_prefix).
@@ -462,7 +462,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     compiler.action = run_with_compiler_build_action
     compiler = compiler.compiler(release_compiler_bin("with"))
     compiler = compiler.input("out/gen/main.w")
-    compiler = target_with_compiler_source_inputs(move compiler, ctx)
+    compiler = target_with_compiler_source_inputs(compiler, ctx)
     compiler = compiler.arg("-O1").arg("--target=" ++ triple)
     compiler = compiler.arg("embedded-object=" ++ dir ++ "/embedded_objects.o")
     // Link selects cross/<target> beneath the producer's native root
@@ -474,7 +474,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     compiler = compiler.extra_output("out/command/" ++ p ++ "link-compiler")
     compiler = compiler.timeout(1800000)
     for pi in 0..plans.len():
-        compiler = target_with_link_bundle(move compiler, ctx, plans[pi])
+        compiler = target_with_link_bundle(compiler, ctx, plans[pi])
     out = out.add_target(compiler)
 
     var stamp = target_new(.Action, p ++ "compiler", "").output(build_owned_text(bin))
@@ -483,8 +483,8 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     stamp = stamp.arg("runtime-producer=" ++ dir ++ "/.producer")
     stamp = stamp.input(dir ++ "/.producer")
     stamp = stamp.dep(p ++ "link-compiler").dep("abi-hash-check")
-    stamp = target_with_generation_inputs(move stamp, ctx)
-    stamp = target_with_version_inputs(move stamp, ctx)
+    stamp = target_with_generation_inputs(stamp, ctx)
+    stamp = target_with_version_inputs(stamp, ctx)
     stamp = stamp.write_scope(build_owned_text(bin_dir))
     stamp = stamp.extra_output("out/command/" ++ p ++ "compiler")
     out.add_target(stamp)
@@ -557,11 +557,11 @@ fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRu
     for oi in 0..objects.len():
         embedded = embedded.dep(build_owned_text(objects[oi]))
     for pi in 0..corpus_plans.len():
-        embedded = target_with_wo_blobs(move embedded, corpus_plans[pi])
+        embedded = target_with_wo_blobs(embedded, corpus_plans[pi])
     // #2131: the wasm32 bundles beside the host's, under their own symbols,
     // and the wasm32 runtime objects stage1 compiles beside the native ones.
     for pi in 0..wasm_plans.len():
-        embedded = target_with_wo_blobs_as(move embedded, wasm_plans[pi], wasm_plans[pi].name ++ "_wasm32")
+        embedded = target_with_wo_blobs_as(embedded, wasm_plans[pi], wasm_plans[pi].name ++ "_wasm32")
     // #2703: and every other carried target's, stage1's too: a link carries
     // what its compiler embeds, so the release's come from here.
     for carried in carried_bundle_tags():
@@ -569,7 +569,7 @@ fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRu
         let tag_plans = cross_wo_plans(ctx, corpus_plans, carried)
         for pi in 0..tag_plans.len():
             embedded = target_with_wo_blobs_as(embedded, tag_plans[pi], tag_plans[pi].name ++ "_" ++ carried)
-    embedded = target_with_darwin_sysroot_blob(move embedded)
+    embedded = target_with_darwin_sysroot_blob(embedded)
     let embedded_obj = embedded_objects_object("stage-embedded-objects-object", &embedded, "")
     out = out.add_target(embedded)
     out = out.add_target(embedded_obj)
@@ -1139,7 +1139,7 @@ fn gate_measured_targets(ctx: &BuildCtx, graph: &Build, fixed: &List[str]) -> Li
         if not lanes.contains(name) or fixed.contains(name) or out.contains(name): continue
         let secs = gate_whole_seconds(cols[1])
         if secs >= 0 and secs < 60: out.push(name.clone())
-    comp_sort_strings(move out)
+    comp_sort_strings(out)
 
 // The gate's shape, printed at its end. It re-runs when the ledger or the
 // measured list changed (its input and args); `with build --explain gate`
@@ -1356,7 +1356,7 @@ fn package_platform_target(name: &str, platform: &str, ctx: &BuildCtx) -> Target
     target = target.write_scope("out/release")
     target = target.write_scope("out/command/" ++ name)
     target = target.timeout(600000)
-    target = target_with_version_inputs(move target, ctx)
+    target = target_with_version_inputs(target, ctx)
     if supported_release_platform_tag() == platform:
         target = target.dep("build")
         target = target.dep("fixpoint")
@@ -2073,7 +2073,7 @@ fn run_validate_all_async_action(ctx: ActionCtx) -> i32:
     if vr.rc != 0:
         ctx.diagnostics().error(f"validate-all-async: {count} files, rc={vr.rc}\n" ++ fs.read_text(build_project_join(out_dir, "validate.stderr")))
     print(f"validate-all-async: {count} files ok")
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
@@ -2119,7 +2119,7 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let cr = ctx.process_runner().run_capture_cwd(check_args, cout, cerr, lane_timeout_ms, root)
     if cr.rc != 0:
         ctx.diagnostics().error(f"debug-alloc-tests: lane failed rc={cr.rc}\n" ++ cr.stdout)
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 // D51 stage 10 (ruling §63): the foreign-contract view over
@@ -2232,7 +2232,7 @@ fn run_uat_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("uat-tests: missing compiler input")
     let fs = ctx.fs()
     let out_dir = ctx.output()
-    let _ = fs.remove_tree(out_dir)
+    fs.remove_tree(out_dir)
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("uat-tests: could not create output dir: " ++ out_dir)
     if fs.copy_tree("test/uat/uat", build_project_join(out_dir, "uat")) != 0:
@@ -2245,7 +2245,7 @@ fn run_uat_tests_action(ctx: ActionCtx) -> i32:
         eprint(f"error: uat-tests: `with uat` exited {rc}; the planted failures make 1 the expected status:\n" ++ report)
         errors = errors + 1
     let normalized = uat_tests_normalize_host(uat_tests_strip_timings(report))
-    let _ = fs.write_text(build_project_join(out_dir, "report.normalized"), normalized)
+    fs.write_text(build_project_join(out_dir, "report.normalized"), normalized)
     let expected = fs.read_text("test/uat/expected.txt")
     if normalized != expected:
         eprint("error: uat-tests: the report differs from test/uat/expected.txt; actual: " ++ build_project_abs(root, build_project_join(out_dir, "report.normalized")))
@@ -2272,8 +2272,8 @@ fn run_release_uat_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let report_rel = ctx.output()
     let out_dir = build_project_dirname(report_rel)
-    let _ = fs.remove_tree(out_dir)
-    let _ = fs.remove_tree("out/uat")
+    fs.remove_tree(out_dir)
+    fs.remove_tree("out/uat")
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("release-uat: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
@@ -2306,7 +2306,7 @@ fn run_release_uat_action(ctx: ActionCtx) -> i32:
         if verdict.contains(" FAIL "):
             failed = failed + 1
         if stamp.len() > 0:
-            let _ = fs.write_text(build_project_join(out_dir, name ++ stamp), verdict.trim() ++ "\n")
+            fs.write_text(build_project_join(out_dir, name ++ stamp), verdict.trim() ++ "\n")
     if result.rc != 0 or failed > 0:
         eprint(f"error: release-uat: `with uat` exited {result.rc} with {failed} failing scenario(s); stderr: " ++ build_project_abs(root, build_project_join(out_dir, "report.stderr")))
         return 1
@@ -2372,7 +2372,7 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     if errors > 0:
         return 1
     print(f"contract-view-tests: {checked} fixtures; every audit verdict, needle and snapshot agreed")
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 // Drop-exactly-once audit matrix (tools/drop_audit.w — the repo-committed
@@ -2404,8 +2404,7 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     let report = fs.read_text(aout_rel)
     if ar.rc != 0:
         ctx.diagnostics().error(f"drop-audit: regressions vs baseline (rc={ar.rc})\n" ++ report)
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
-    let _ = report
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 // tools/rt_decl_audit.w: every `extern fn with_*` declaration in the tree
@@ -2540,7 +2539,7 @@ fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     if ar.rc != 0:
         ctx.diagnostics().error(f"rt-decl-audit: runtime declarations diverge (rc={ar.rc})\n" ++ fs.read_text(aout_rel) ++ fs.read_text(aerr_rel))
     print("rt-decl-audit: " ++ build_trim_trailing_line_endings(fs.read_text(aout_rel)))
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 // Move-checker verdict matrix (tools/move_audit.w — the compile-time analog of
@@ -2574,8 +2573,7 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
     let report = fs.read_text(aout_rel)
     if ar.rc != 0:
         ctx.diagnostics().error(f"move-audit: cells disagree with ground truth (rc={ar.rc})\n" ++ report)
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
-    let _ = report
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 fn complexity_allocation_count(report: &str, span: &str) -> i32:
@@ -3101,7 +3099,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // this unit is a red lane, not a note.
     if deep_debug_analyze_expect(ctx, root, compiler, ownership_abs, out_dir, "analyze-receiver-surface", "audit:receiver-surface", "receiver-surface-audit: facts=") != 0:
         return 1
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 pub fn build(ctx: BuildCtx) -> Build:
@@ -3130,7 +3128,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_version_sources = compiler_version_sources.extra_output("out/gen/versioned_main.w")
     compiler_version_sources = compiler_version_sources.extra_output("out/gen/bootstrap_main.w")
     compiler_version_sources = compiler_version_sources.extra_output("out/gen/version.txt")
-    compiler_version_sources = target_with_version_inputs(move compiler_version_sources, ctx)
+    compiler_version_sources = target_with_version_inputs(compiler_version_sources, ctx)
     out = out.add_target(compiler_version_sources)
 
     var compiler_sources = target_new(.Group, "compiler-sources", "")
@@ -3141,7 +3139,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var print_version = target_new(.Action, "print-version", "").output("out/.build-state/print-version.txt")
     print_version.action = run_print_version_action
     print_version = print_version.input("src/version")
-    print_version = target_with_version_inputs(move print_version, ctx)
+    print_version = target_with_version_inputs(print_version, ctx)
     out = out.add_target(print_version)
 
     // The release compiler emits the package's C as a subprocess (the
@@ -3170,7 +3168,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var package_bootstrap_c = target_new(.Action, "package-bootstrap-c", "").output("out/release/with-bootstrap-c-" ++ release_version ++ ".tar.gz")
     package_bootstrap_c.action = run_package_bootstrap_c_action
     package_bootstrap_c = package_bootstrap_c.arg(release_compiler_bin("with"))
-    package_bootstrap_c = target_with_version_inputs(move package_bootstrap_c, ctx)
+    package_bootstrap_c = target_with_version_inputs(package_bootstrap_c, ctx)
     package_bootstrap_c = package_bootstrap_c.dep("build")
     package_bootstrap_c = package_bootstrap_c.dep("bootstrap-c-emit-sources")
     package_bootstrap_c = package_bootstrap_c.input("src/version")
@@ -3236,7 +3234,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     if os() == "Linux":
         out = out.add_target(sdk_runtimes_target(ctx))
     if os() == "Linux" and arch() == "x86_64":
-        out = add_sdk_cross_aarch64_targets(move out, ctx)
+        out = add_sdk_cross_aarch64_targets(out, ctx)
     out = out.add_target(sdk_ninja_target(ctx))
     out = out.add_target(sdk_cmake_target(ctx))
     out = out.add_target(sdk_llvm_target(ctx))
@@ -3272,10 +3270,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     for tag in stage_rt_bundle_tags():
         compat_runtime = compat_runtime.arg("rt@" ++ tag)
     // ...and the corpus directories the embedded stdlib leaves out.
-    compat_runtime = corpora_exclude_args(move compat_runtime)
+    compat_runtime = corpora_exclude_args(compat_runtime)
     compat_runtime = compat_runtime.input(build_owned_text(host_runtime.compat_source))
-    compat_runtime = target_with_embedded_stdlib_inputs(move compat_runtime, ctx)
-    compat_runtime = target_with_embedded_runtime_inputs(move compat_runtime, ctx)
+    compat_runtime = target_with_embedded_stdlib_inputs(compat_runtime, ctx)
+    compat_runtime = target_with_embedded_runtime_inputs(compat_runtime, ctx)
     compat_runtime.action = generate_compat_runtime_action
     out = out.add_target(compat_runtime)
 
@@ -3379,7 +3377,7 @@ pub fn build(ctx: BuildCtx) -> Build:
         linux_sysroot = linux_sysroot.input("build/sdk.w")
         linux_sysroot = linux_sysroot.input("sdk.lock")
         if sdk_linux_arch_supported(arch()):
-            linux_sysroot = linux_sysroot_fetches(move linux_sysroot, arch())
+            linux_sysroot = linux_sysroot_fetches(linux_sysroot, arch())
         linux_sysroot = linux_sysroot.write_scope(sdk_linux_sysroot_dir())
         linux_sysroot = linux_sysroot.write_scope("out/command/linux-sysroot")
         linux_sysroot = linux_sysroot.timeout(1200000)
@@ -3395,7 +3393,7 @@ pub fn build(ctx: BuildCtx) -> Build:
         linux_sysroot_arm = linux_sysroot_arm.arg(build_owned_text(other))
         linux_sysroot_arm = linux_sysroot_arm.input("build/sdk.w")
         linux_sysroot_arm = linux_sysroot_arm.input("sdk.lock")
-        linux_sysroot_arm = linux_sysroot_fetches(move linux_sysroot_arm, other)
+        linux_sysroot_arm = linux_sysroot_fetches(linux_sysroot_arm, other)
         linux_sysroot_arm = linux_sysroot_arm.write_scope(sdk_linux_sysroot_dir_for(other))
         linux_sysroot_arm = linux_sysroot_arm.write_scope("out/command/" ++ name)
         linux_sysroot_arm = linux_sysroot_arm.timeout(1200000)
@@ -3416,7 +3414,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var compiler_no_c_export = target_new(.Action, "compiler-no-c-export", "").output("out/.build-state/compiler-no-c-export.txt")
     compiler_no_c_export.action = run_check_compiler_no_new_c_export_action
     compiler_no_c_export = compiler_no_c_export.write_scope("out/.build-state")
-    compiler_no_c_export = target_with_compiler_c_export_audit_inputs(move compiler_no_c_export, ctx)
+    compiler_no_c_export = target_with_compiler_c_export_audit_inputs(compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
     // #2043 (D65): MirLower holds no name-text decision.
@@ -3588,17 +3586,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     // Stage1 precedes the tree's bundle, so only its embedding keeps empty
     // slots. The populated stage object has its own producer and output.
     for pi in 0..corpus_plans.len():
-        out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
-        bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
+        out = add_empty_wo_blob_targets(out, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
+        bootstrap_embedded_objects = target_with_empty_wo_blobs(bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
     // #2131, #2703: the carried slots the index names, empty in stage1 as
     // the host's are.
     for carried in carried_bundle_tags():
         for pi in 0..corpus_plans.len():
             let slot = corpus_plans[pi].name ++ "_" ++ carried
-            out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", slot)
-            bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", slot)
+            out = add_empty_wo_blob_targets(out, "bootstrap-", "out/bootstrap-lib", slot)
+            bootstrap_embedded_objects = target_with_empty_wo_blobs(bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", slot)
     // stage1 links programs (the stage1 tests, `:dev`): it carries the sysroot.
-    bootstrap_embedded_objects = target_with_darwin_sysroot_blob(move bootstrap_embedded_objects)
+    bootstrap_embedded_objects = target_with_darwin_sysroot_blob(bootstrap_embedded_objects)
     let bootstrap_embedded_objects_obj = embedded_objects_object("bootstrap-embedded-objects-object", &bootstrap_embedded_objects, "")
     out = out.add_target(bootstrap_embedded_objects)
     out = out.add_target(bootstrap_embedded_objects_obj)
@@ -3665,12 +3663,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(llvm_link_metadata)
 
     var stage1 = target_new(.Action, "stage1", "").output(bootstrap_compiler_bin("with-stage1"))
-    stage1 = target_with_dsym(move stage1, &ctx, bootstrap_compiler_bin("with-stage1"))
+    stage1 = target_with_dsym(stage1, &ctx, bootstrap_compiler_bin("with-stage1"))
     stage1.action = run_with_compiler_build_action
     stage1 = stage1.compiler("seed")
     stage1 = stage1.dep("sdk-clang-main")
     stage1 = stage1.input("out/gen/main.w")
-    stage1 = target_with_compiler_source_inputs(move stage1, ctx)
+    stage1 = target_with_compiler_source_inputs(stage1, ctx)
     stage1 = stage1.arg("-O1")
     stage1 = stage1.extra_output("out/command/stage1")
     stage1 = stage1.extra_output("out/.build-state/seed-input.json")
@@ -3706,10 +3704,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     // out/bootstrap/lib beside it. stage2 links them (stage1 compiled its
     // code), stage2 and stage3 embed them, and stage1 run by hand finds them
     // as <compiler_dir>/../lib — its own embedded runtime is the seed's.
-    out = add_stage1_runtime_targets(move out, ctx, &host_runtime, &corpus_plans, &corpus_plans_wasm32)
+    out = add_stage1_runtime_targets(out, ctx, &host_runtime, &corpus_plans, &corpus_plans_wasm32)
 
     for pi in 0..corpus_plans.len():
-        out = wo_bundle_targets(move out, ctx, corpus_plans[pi], bootstrap_compiler_bin("with-stage1"), "stage1-rt-bundle", "out/bootstrap/lib/rt.manifest")
+        out = wo_bundle_targets(out, ctx, corpus_plans[pi], bootstrap_compiler_bin("with-stage1"), "stage1-rt-bundle", "out/bootstrap/lib/rt.manifest")
 
     // Dev tier (D14): the sanctioned iterate loop. One self-compile —
     // seed → stage1 — yields a testable compiler at out/bootstrap/bin/
@@ -3722,11 +3720,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(dev)
 
     var stage2 = target_new(.Action, "stage2", "").output(stage_compiler_bin("with-stage2"))
-    stage2 = target_with_dsym(move stage2, &ctx, stage_compiler_bin("with-stage2"))
+    stage2 = target_with_dsym(stage2, &ctx, stage_compiler_bin("with-stage2"))
     stage2.action = run_with_compiler_build_action
     stage2 = stage2.compiler(bootstrap_compiler_bin("with-stage1"))
     stage2 = stage2.input("out/gen/main.w")
-    stage2 = target_with_compiler_source_inputs(move stage2, ctx)
+    stage2 = target_with_compiler_source_inputs(stage2, ctx)
     stage2 = stage2.arg("-O1")
     stage2 = stage2.extra_output("out/command/stage2")
     stage2 = stage2.timeout(1800000)
@@ -3737,7 +3735,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.dep("compat-runtime-source")
     stage2 = stage2.dep("embedded-clang-resource-source")
     for pi in 0..corpus_plans.len():
-        stage2 = target_with_link_bundle(move stage2, ctx, corpus_plans[pi])
+        stage2 = target_with_link_bundle(stage2, ctx, corpus_plans[pi])
     stage2 = stage2.input("out/stage/lib/embedded_objects.o")
     stage2 = stage2.arg("embedded-object=out/stage/lib/embedded_objects.o")
     stage2 = stage2.dep("stage-embedded-objects-object")
@@ -3760,7 +3758,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3.action = run_with_compiler_build_action
     stage3 = stage3.compiler(stage_compiler_bin("with-stage2"))
     stage3 = stage3.input("out/gen/main.w")
-    stage3 = target_with_compiler_source_inputs(move stage3, ctx)
+    stage3 = target_with_compiler_source_inputs(stage3, ctx)
     stage3 = stage3.arg("-O1")
     stage3 = stage3.extra_output("out/command/stage3")
     stage3 = stage3.timeout(1800000)
@@ -3771,7 +3769,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.dep("compat-runtime-source")
     stage3 = stage3.dep("embedded-clang-resource-source")
     for pi in 0..corpus_plans.len():
-        stage3 = target_with_link_bundle(move stage3, ctx, corpus_plans[pi])
+        stage3 = target_with_link_bundle(stage3, ctx, corpus_plans[pi])
     stage3 = stage3.input("out/stage/lib/embedded_objects.o")
     stage3 = stage3.arg("embedded-object=out/stage/lib/embedded_objects.o")
     stage3 = stage3.dep("stage-embedded-objects-object")
@@ -3788,7 +3786,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2_fixpoint.action = run_with_compiler_build_action
     stage2_fixpoint = stage2_fixpoint.compiler(bootstrap_compiler_bin("with-stage1"))
     stage2_fixpoint = stage2_fixpoint.input("out/gen/main.w")
-    stage2_fixpoint = target_with_compiler_source_inputs(move stage2_fixpoint, ctx)
+    stage2_fixpoint = target_with_compiler_source_inputs(stage2_fixpoint, ctx)
     stage2_fixpoint = stage2_fixpoint.arg("--emit-obj")
     stage2_fixpoint = stage2_fixpoint.arg("-O1")
     stage2_fixpoint = stage2_fixpoint.extra_output("out/command/stage2-fixpoint-object")
@@ -3799,14 +3797,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2_fixpoint = stage2_fixpoint.dep("compat-runtime-source")
     stage2_fixpoint = stage2_fixpoint.dep("embedded-clang-resource-source")
     for pi in 0..corpus_plans.len():
-        stage2_fixpoint = target_with_link_bundle(move stage2_fixpoint, ctx, corpus_plans[pi])
+        stage2_fixpoint = target_with_link_bundle(stage2_fixpoint, ctx, corpus_plans[pi])
     out = out.add_target(stage2_fixpoint)
 
     var stage3_fixpoint = target_new(.Action, "stage3-fixpoint-object", "").output(stage_compiler_obj("with-stage3-fixpoint.o"))
     stage3_fixpoint.action = run_with_compiler_build_action
     stage3_fixpoint = stage3_fixpoint.compiler(stage_compiler_bin("with-stage2"))
     stage3_fixpoint = stage3_fixpoint.input("out/gen/main.w")
-    stage3_fixpoint = target_with_compiler_source_inputs(move stage3_fixpoint, ctx)
+    stage3_fixpoint = target_with_compiler_source_inputs(stage3_fixpoint, ctx)
     stage3_fixpoint = stage3_fixpoint.arg("--emit-obj")
     stage3_fixpoint = stage3_fixpoint.arg("-O1")
     stage3_fixpoint = stage3_fixpoint.extra_output("out/command/stage3-fixpoint-object")
@@ -3817,7 +3815,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3_fixpoint = stage3_fixpoint.dep("compat-runtime-source")
     stage3_fixpoint = stage3_fixpoint.dep("embedded-clang-resource-source")
     for pi in 0..corpus_plans.len():
-        stage3_fixpoint = target_with_link_bundle(move stage3_fixpoint, ctx, corpus_plans[pi])
+        stage3_fixpoint = target_with_link_bundle(stage3_fixpoint, ctx, corpus_plans[pi])
     out = out.add_target(stage3_fixpoint)
 
     var selfcheck = guarded_check("selfcheck", stage_compiler_bin("with-stage2"))
@@ -3944,9 +3942,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     // The release binary embeds the tree's bundles (D38), and the wasm32
     // ones beside them under their own symbols (#2131).
     for pi in 0..corpus_plans.len():
-        embedded_objects = target_with_wo_blobs(move embedded_objects, corpus_plans[pi])
+        embedded_objects = target_with_wo_blobs(embedded_objects, corpus_plans[pi])
     for pi in 0..corpus_plans_wasm32.len():
-        embedded_objects = target_with_wo_blobs_as(move embedded_objects, corpus_plans_wasm32[pi], corpus_plans_wasm32[pi].name ++ "_wasm32")
+        embedded_objects = target_with_wo_blobs_as(embedded_objects, corpus_plans_wasm32[pi], corpus_plans_wasm32[pi].name ++ "_wasm32")
     // #2703: and every other carried target's, so a cross build finds its
     // engines outside a checkout.
     for carried in carried_bundle_tags():
@@ -3956,7 +3954,7 @@ pub fn build(ctx: BuildCtx) -> Build:
             embedded_objects = target_with_wo_blobs_as(embedded_objects, tag_plans[pi], tag_plans[pi].name ++ "_" ++ carried)
     // ...and the wasm32 runtime objects (`:cross-rt-wasm`, compiled by
     // stage2), so `--target wasm32` links outside the repository (#2131).
-    embedded_objects = target_with_darwin_sysroot_blob(move embedded_objects)
+    embedded_objects = target_with_darwin_sysroot_blob(embedded_objects)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
     embedded_objects = embedded_objects.dep("fiber-asm-object")
@@ -3994,8 +3992,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     // it into out/wo/<tag>/ and its store slot.
     let corpus_plans_linux_x86_64 = cross_wo_plans(ctx, &corpus_plans, "linux_x86_64")
     let corpus_plans_linux_aarch64 = cross_wo_plans(ctx, &corpus_plans, "linux_aarch64")
-    out = add_cross_rt_targets(move out, ctx, "linux_x86_64", "cross-", "cross-rt", &corpus_plans_linux_x86_64)
-    out = add_cross_rt_targets(move out, ctx, "linux_aarch64", "cross-arm-", "cross-rt-arm", &corpus_plans_linux_aarch64)
+    out = add_cross_rt_targets(out, ctx, "linux_x86_64", "cross-", "cross-rt", &corpus_plans_linux_x86_64)
+    out = add_cross_rt_targets(out, ctx, "linux_aarch64", "cross-arm-", "cross-rt-arm", &corpus_plans_linux_aarch64)
 
     // ── Cross-target runtime (wasm32) ───────────────────────────────
     // `with build :cross-rt-wasm` builds the wasm32 program runtime into
@@ -4006,8 +4004,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     // compiler can carry them beside its own and a `--target wasm32` link
     // finds a bundle of its target.
     for pi in 0..corpus_plans_wasm32.len():
-        out = wo_bundle_targets(move out, ctx, corpus_plans_wasm32[pi], bootstrap_compiler_bin("with-stage1"), "stage1-rt-bundle-wasm32", "out/bootstrap/lib/cross/wasm32/rt.manifest")
-    out = add_cross_wasm_rt_targets(move out, "wasm32", "cross-wasm-", "cross-rt-wasm", &corpus_plans_wasm32)
+        out = wo_bundle_targets(out, ctx, corpus_plans_wasm32[pi], bootstrap_compiler_bin("with-stage1"), "stage1-rt-bundle-wasm32", "out/bootstrap/lib/cross/wasm32/rt.manifest")
+    out = add_cross_wasm_rt_targets(out, "wasm32", "cross-wasm-", "cross-rt-wasm", &corpus_plans_wasm32)
 
     // ── Cross-target runtime (windows_x86_64) ───────────────────────
     // `with build :cross-rt-windows` builds the full windows_x86_64
@@ -4032,20 +4030,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-asm-object")
     let corpus_plans_windows_x86_64 = cross_wo_plans(ctx, &corpus_plans, "windows_x86_64")
     for pi in 0..corpus_plans_windows_x86_64.len():
-        out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi])
-        cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, corpus_plans_windows_x86_64[pi])
+        out = cross_wo_bundle_targets(out, ctx, corpus_plans_windows_x86_64[pi])
+        cross_win_embedded = target_with_wo_blobs(cross_win_embedded, corpus_plans_windows_x86_64[pi])
     // The bundle index names the wasm32 bundle slots in every compiler
     // (#2390): empty here, as in the bootstrap embedding.
     for carried in carried_bundle_tags():
         for pi in 0..corpus_plans_windows_x86_64.len():
             let slot = corpus_plans_windows_x86_64[pi].name ++ "_" ++ carried
-            out = add_empty_wo_blob_targets(move out, "cross-win-", cross_windows_dir(), slot)
-            cross_win_embedded = target_with_empty_wo_blobs(move cross_win_embedded, "cross-win-", cross_windows_dir(), slot)
+            out = add_empty_wo_blob_targets(out, "cross-win-", cross_windows_dir(), slot)
+            cross_win_embedded = target_with_empty_wo_blobs(cross_win_embedded, "cross-win-", cross_windows_dir(), slot)
     cross_win_embedded = target_with_rt_bundle_blobs(cross_win_embedded, cross_windows_dir(), "rt-bundle-windows_x86_64")
     out = add_empty_rt_bundle_slot_targets(out, "cross-win-", cross_windows_dir())
     cross_win_embedded = target_with_empty_rt_bundle_slots(cross_win_embedded, "cross-win-", cross_windows_dir())
-    out = add_empty_darwin_sysroot_blob_target(move out, "cross-win-", cross_windows_dir())
-    cross_win_embedded = target_with_empty_darwin_sysroot_blob(move cross_win_embedded, "cross-win-", cross_windows_dir())
+    out = add_empty_darwin_sysroot_blob_target(out, "cross-win-", cross_windows_dir())
+    cross_win_embedded = target_with_empty_darwin_sysroot_blob(cross_win_embedded, "cross-win-", cross_windows_dir())
     let cross_win_embedded_obj = embedded_objects_object("cross-win-embedded-objects-object", &cross_win_embedded, cross_windows_triple())
     out = out.add_target(cross_win_embedded)
     out = out.add_target(cross_win_embedded_obj)
@@ -4087,20 +4085,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-asm-object")
     let corpus_plans_windows_aarch64 = cross_wo_plans(ctx, &corpus_plans, "windows_aarch64")
     for pi in 0..corpus_plans_windows_aarch64.len():
-        out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi])
-        cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
+        out = cross_wo_bundle_targets(out, ctx, corpus_plans_windows_aarch64[pi])
+        cross_winarm_embedded = target_with_wo_blobs(cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
     // The bundle index names the wasm32 bundle slots in every compiler
     // (#2390): empty here, as in the bootstrap embedding.
     for carried in carried_bundle_tags():
         for pi in 0..corpus_plans_windows_aarch64.len():
             let slot = corpus_plans_windows_aarch64[pi].name ++ "_" ++ carried
-            out = add_empty_wo_blob_targets(move out, "cross-winarm-", cross_windows_aarch64_dir(), slot)
-            cross_winarm_embedded = target_with_empty_wo_blobs(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), slot)
+            out = add_empty_wo_blob_targets(out, "cross-winarm-", cross_windows_aarch64_dir(), slot)
+            cross_winarm_embedded = target_with_empty_wo_blobs(cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), slot)
     cross_winarm_embedded = target_with_rt_bundle_blobs(cross_winarm_embedded, cross_windows_aarch64_dir(), "rt-bundle-windows_aarch64")
     out = add_empty_rt_bundle_slot_targets(out, "cross-winarm-", cross_windows_aarch64_dir())
     cross_winarm_embedded = target_with_empty_rt_bundle_slots(cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
-    out = add_empty_darwin_sysroot_blob_target(move out, "cross-winarm-", cross_windows_aarch64_dir())
-    cross_winarm_embedded = target_with_empty_darwin_sysroot_blob(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
+    out = add_empty_darwin_sysroot_blob_target(out, "cross-winarm-", cross_windows_aarch64_dir())
+    cross_winarm_embedded = target_with_empty_darwin_sysroot_blob(cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
     let cross_winarm_embedded_obj = embedded_objects_object("cross-winarm-embedded-objects-object", &cross_winarm_embedded, cross_windows_aarch64_triple())
     out = out.add_target(cross_winarm_embedded)
     out = out.add_target(cross_winarm_embedded_obj)
@@ -4172,11 +4170,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     // (its units against stage2's). Nothing else depends on it, so it builds
     // beside the tests; the release is stage2's image (see stage2 above).
     var compiler = target_new(.Action, "link-compiler", "").output(stage_compiler_bin("with-stage3") ++ ".unstamped")
-    compiler = target_with_dsym(move compiler, &ctx, stage_compiler_bin("with-stage3") ++ ".unstamped")
+    compiler = target_with_dsym(compiler, &ctx, stage_compiler_bin("with-stage3") ++ ".unstamped")
     compiler.action = run_with_compiler_build_action
     compiler = compiler.compiler(stage_compiler_bin("with-stage2"))
     compiler = compiler.input("out/gen/main.w")
-    compiler = target_with_compiler_source_inputs(move compiler, ctx)
+    compiler = target_with_compiler_source_inputs(compiler, ctx)
     compiler = compiler.arg("-O1")
     // stage2's compile of the compiler, unit by unit (see fixpoint-compare).
     compiler = compiler.arg("unit-digests=" ++ FIXPOINT_STAGE3_UNITS).extra_output(build_owned_text(FIXPOINT_STAGE3_UNITS))
@@ -4192,7 +4190,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.input("out/lib/.producer")
     compiler = compiler.dep("runtime-producer")
     for pi in 0..corpus_plans.len():
-        compiler = target_with_link_bundle(move compiler, ctx, corpus_plans[pi])
+        compiler = target_with_link_bundle(compiler, ctx, corpus_plans[pi])
     out = out.add_target(compiler)
 
     // Post-link version stamp: keeps the name `build` and the output path so every
@@ -4213,8 +4211,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     stamp = stamp.arg("runtime-producer=out/bootstrap/lib/.producer")
     stamp = stamp.input("out/bootstrap/lib/.producer")
     stamp = stamp.dep("runtime-producer")
-    stamp = target_with_generation_inputs(move stamp, ctx)
-    stamp = target_with_version_inputs(move stamp, ctx)
+    stamp = target_with_generation_inputs(stamp, ctx)
+    stamp = target_with_version_inputs(stamp, ctx)
     stamp = stamp.extra_output("out/command/build")
     stamp = stamp.write_scope("out/release/bin")
     stamp = stamp.dep("stage2")
@@ -4956,7 +4954,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_checks = release_checks.dep("wo-drift")
     // The corpora lane (stdlib_sourcing_plan.md): every migrated
     // container corpus runs its upstream test programs under With.
-    release_checks = corpora_test_deps(move release_checks)
+    release_checks = corpora_test_deps(release_checks)
     // D112: a migrator change is gated on every corpus migrated afresh and
     // tested; nothing is promoted.
     release_checks = release_checks.dep("corpus-migrator-gate")
@@ -5002,7 +5000,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // D131: a release runs the seed-cut tier the battery no longer does.
     release_uat = release_uat.dep("release-checks")
     release_uat = release_uat.dep("user-programs-safe")
-    release_uat = release_uat_platform_asset_dep(move release_uat)
+    release_uat = release_uat_platform_asset_dep(release_uat)
     out = out.add_target(release_uat)
 
     var check_committed = target_new(.Action, "check-committed-state", "").output("out/command/check-committed-state/ok")
@@ -5129,7 +5127,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // generic pipeline per registered corpus.
     for ci in 0..corpus_count():
         let corpus = corpus_at(ci)
-        out = corpus_pipeline(move out, ctx, corpus, release_compiler_bin("with"))
+        out = corpus_pipeline(out, ctx, corpus, release_compiler_bin("with"))
     out = out.add_target(corpora_drift_group(ctx))
     out = out.add_target(corpora_integrity_group())
     out = out.add_target(corpora_promote_guard_target())
@@ -5141,7 +5139,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     prune = prune.arg("dry-run")
     prune = prune.arg("live-target=prune")
     prune = prune.arg("live-target=prune-apply")
-    prune = target_with_live_targets(move prune, out)
+    prune = target_with_live_targets(prune, out)
     prune = prune.write_scope("out/bin")
     prune = prune.write_scope("out/bootstrap/bin")
     prune = prune.write_scope("out/stage/bin")
@@ -5160,7 +5158,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     prune_apply = prune_apply.arg("apply")
     prune_apply = prune_apply.arg("live-target=prune")
     prune_apply = prune_apply.arg("live-target=prune-apply")
-    prune_apply = target_with_live_targets(move prune_apply, out)
+    prune_apply = target_with_live_targets(prune_apply, out)
     prune_apply = prune_apply.write_scope("out/bin")
     prune_apply = prune_apply.write_scope("out/bootstrap/bin")
     prune_apply = prune_apply.write_scope("out/stage/bin")
@@ -5206,6 +5204,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // so it is the same binary in every worktree and the build store serves it.
     sha256_tool = sha256_tool.with_env("WITH_FILE_PREFIX_MAP", compiler_file_prefix_map(ctx.project_info().project_root()))
     sha256_tool = sha256_tool.dep("prepare-bootstrap-link-root")
-    out = out.add_target(move sha256_tool)
+    out = out.add_target(sha256_tool)
 
     out.default("build")

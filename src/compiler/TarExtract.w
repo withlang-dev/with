@@ -145,7 +145,7 @@ fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &List[str]) -
             if runtime_write_file(out, runtime_read_file(dest ++ "/" ++ target)) != 0: return "could not write " ++ out
         else if kind == '0' or kind == 0 or kind == '7':
             if runtime_write_file(out, payload) != 0: return "could not write " ++ out
-            if mode > 0: let _ = with_fs_chmod(out, (mode % 4096) as i32)
+            if mode > 0: with_fs_chmod(out, (mode % 4096) as i32)
         // Device, fifo and other entries have no place in a package.
     ""
 

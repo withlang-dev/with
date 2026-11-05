@@ -86,8 +86,8 @@ fn ci_array_text_elem(ty: &str) -> str:
     let (semi, close) = ci_array_text_split(ty)
     if semi <= 0:
         return if close > 0: ty.slice(close + 1, ty.len()).trim() else: ""
-    let base: str = ty.slice(1, semi).trim()
-    let dims: str = ty.slice(semi + 1, close).trim()
+    let base = ty.slice(1, semi).trim()
+    let dims = ty.slice(semi + 1, close).trim()
     let comma = ci_array_dims_comma(dims)
     if comma < 0: base else: "[" ++ base ++ "; " ++ dims.slice(comma + 1, dims.len()).trim() ++ "]"
 

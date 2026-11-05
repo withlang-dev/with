@@ -127,8 +127,8 @@ fn contract_fact(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, p
         fact.end = sema.ast.get_end(node)
         fact.line = contract_line(site.source, fact.start)
         fact.column = contract_column(site.source, fact.start)
-    let id: i32 = fact.id
-    report.add(move fact)
+    let id = fact.id
+    report.add(fact)
     id
 
 // A fact row: `key: value  [provenance]`, flagged CONTRACT_DEFAULT when the
@@ -302,8 +302,8 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
         for pi in 0..sema.sig_get_param_count(sig):
             let recv = sema.facade_param_receives(e.fn_sym, pi)
             if recv.len() != 1 or recv[0] != ri: continue
-            if (e.touch_params & sema_param_origin_bit(pi)) != 0: invalidators = contract_push_unique(move invalidators, sema.safe_symbol_text(e.fn_sym))
-            else: preservers = contract_push_unique(move preservers, sema.safe_symbol_text(e.fn_sym))
+            if (e.touch_params & sema_param_origin_bit(pi)) != 0: invalidators = contract_push_unique(invalidators, sema.safe_symbol_text(e.fn_sym))
+            else: preservers = contract_push_unique(preservers, sema.safe_symbol_text(e.fn_sym))
     if sema.facade_call_effects.len() == 0 and sema.diags.has_errors():
         contract_row(report, sema, site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "invalidation", "not indexed; diagnostics stopped the call-effect index", "default:diagnostics present")
     else:
@@ -548,13 +548,13 @@ fn contract_collect_domain(mut report: AnalysisReport, sema: &Sema, di: i32, sou
         let c = &sema.foreign_contracts[ci]
         if c.returns_borrow_domain == d.name: views.push(sema.safe_symbol_text(c.fn_sym))
         for k in 0..c.preserves_domains.len():
-            if c.preserves_domains[k] == d.name: preservers = contract_push_unique(move preservers, sema.safe_symbol_text(c.fn_sym))
+            if c.preserves_domains[k] == d.name: preservers = contract_push_unique(preservers, sema.safe_symbol_text(c.fn_sym))
     var invalidators: List[str] = List.new()
     for ei in 0..sema.facade_call_effects.len():
         let e = &sema.facade_call_effects[ei]
         if e.sig != sema.get_sig(e.fn_sym): continue
         for k in 0..e.touch_domains.len():
-            if e.touch_domains[k] == di: invalidators = contract_push_unique(move invalidators, sema.safe_symbol_text(e.fn_sym))
+            if e.touch_domains[k] == di: invalidators = contract_push_unique(invalidators, sema.safe_symbol_text(e.fn_sym))
     let borrowed = if views.len() > 0: "CStr borrowed by " ++ contract_join(views, ", ") else: "none borrowed"
     contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "views", borrowed, "default:a view names its domain with `returns borrow CStr from domain` (§16.2b.7)")
     if sema.facade_call_effects.len() == 0 and sema.diags.has_errors():

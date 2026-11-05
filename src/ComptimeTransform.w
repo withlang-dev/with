@@ -25,7 +25,7 @@ impl Sema:
     mut fn ct_emit_error_help(ast: &AstPool, node: i32, msg: &str, help: &str):
         var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: ast.get_start(node), end: ast.get_end(node) })
         diag.add_help(help)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
 fn astpool_clone_deep(src: &AstPool) -> AstPool:
     var out = AstPool.new()
@@ -269,7 +269,7 @@ impl AstPool:
             let decl = self.get_decl(di)
             if self.kind(decl) == NodeKind.NK_TRAIT_DECL: traits.push(decl as i32)
         if traits.len() == 0: return
-        let saved_file: i32 = st.current_file_id
+        let saved_file = st.current_file_id
         for di in 0..self.decl_count():
             let impl_node = self.get_decl(di) as i32
             if self.kind(impl_node) != NodeKind.NK_IMPL_DECL: continue
@@ -2141,7 +2141,7 @@ impl Sema:
         let before = out.decl_count()
         var lexer = Lexer.init(source, self.local_file_id)
         let tokens = lexer.tokenize()
-        var parser = Parser.init_with_pool(move tokens, source, self.local_file_id, intern, move self.diags, out.clone())
+        var parser = Parser.init_with_pool(tokens, source, self.local_file_id, intern, move self.diags, out.clone())
         let parsed = parser.parse_module()
         self.diags = move parser.diags
         if parsed.decl_count() <= before:
@@ -3379,7 +3379,7 @@ impl Sema:
         // A derive diagnostic is rendered against the declaring file, not
         // whichever file the pre-sema last checked (it pointed a module's
         // derive error at a `use` line of the importer).
-        let saved_file_id: i32 = self.local_file_id
+        let saved_file_id = self.local_file_id
 
         for di in 0..base_decl_count:
             let decl = out.get_decl(di)

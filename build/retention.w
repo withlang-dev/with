@@ -714,28 +714,28 @@ fn ret_require_pinned_driver(ctx: &ActionCtx, asset: &str) -> str:
     let fs = ctx.fs()
     let lock = seed_lock_read(fs)
     if lock.len() == 0:
-        let _ = ret_fail(ctx, "seed.lock is missing: the tree has no pinned seed")
+        ret_fail(ctx, "seed.lock is missing: the tree has no pinned seed")
         return ""
     if asset.len() == 0:
-        let _ = ret_fail(ctx, "no host seed asset (release_asset_for_host) for " ++ os() ++ "/" ++ arch())
+        ret_fail(ctx, "no host seed asset (release_asset_for_host) for " ++ os() ++ "/" ++ arch())
         return ""
     let expected = seed_lock_value(lock, asset)
     let version = seed_lock_version_for(lock, asset)
     if version.len() == 0 or expected.len() != 64:
-        let _ = ret_fail(ctx, "seed.lock has no version or no 64-hex digest for " ++ asset)
+        ret_fail(ctx, "seed.lock has no version or no 64-hex digest for " ++ asset)
         return ""
     let capture_dir = ret_join("out/command", ctx.target_name())
     if fs.mkdir_all(capture_dir) != 0:
-        let _ = ret_fail(ctx, "could not create " ++ capture_dir)
+        ret_fail(ctx, "could not create " ++ capture_dir)
         return ""
     let driver_arg = compiler_resolve_seed(ctx)
     let driver = compiler_resolve_command_file(ctx, capture_dir, driver_arg)
     let actual = ret_sha256_file(ctx, "driver", driver)
     if actual.len() == 0:
-        let _ = ret_fail(ctx, "could not hash the driving compiler: " ++ driver)
+        ret_fail(ctx, "could not hash the driving compiler: " ++ driver)
         return ""
     if actual != expected:
-        let _ = ret_fail(ctx, ret_pinned_driver_fix("the driving compiler " ++ driver ++ " (sha256 " ++ actual ++ ") is not the pinned seed " ++ version ++ " (" ++ expected ++ ")"))
+        ret_fail(ctx, ret_pinned_driver_fix("the driving compiler " ++ driver ++ " (sha256 " ++ actual ++ ") is not the pinned seed " ++ version ++ " (" ++ expected ++ ")"))
         return ""
     if ret_driver_ancestry_verdict(ctx, expected, version) != 0:
         return ""
@@ -1158,9 +1158,9 @@ fn ret_add_old_release_artifacts(fs: &ToolFs, candidates: List[str]) -> List[str
 fn ret_small_prune_candidates(ctx: &ActionCtx) -> List[str]:
     let fs = ctx.fs()
     var candidates: List[str] = List.new()
-    candidates = ret_add_stale_state_files(fs, ret_live_targets(ctx.args()), move candidates)
-    candidates = ret_add_old_seed_archives(fs, move candidates)
-    candidates = ret_add_old_release_artifacts(fs, move candidates)
+    candidates = ret_add_stale_state_files(fs, ret_live_targets(ctx.args()), candidates)
+    candidates = ret_add_old_seed_archives(fs, candidates)
+    candidates = ret_add_old_release_artifacts(fs, candidates)
     ret_sorted_strings(candidates)
 
 fn ret_apply_small_prune(ctx: &ActionCtx, candidates: List[str]) -> i32:
@@ -1251,11 +1251,11 @@ fn ret_apply_large_prune(ctx: &ActionCtx) -> i32:
     let issue61 = ret_issue61_stale_candidates(fs)
     let embedded = ret_embedded_compiler_candidates(fs)
     var all: List[str] = List.new()
-    all = ret_append_all_prune_candidates(move all, bin)
-    all = ret_append_all_prune_candidates(move all, lib)
-    all = ret_append_all_prune_candidates(move all, bootstrap)
-    all = ret_append_all_prune_candidates(move all, issue61)
-    all = ret_append_all_prune_candidates(move all, embedded)
+    all = ret_append_all_prune_candidates(all, bin)
+    all = ret_append_all_prune_candidates(all, lib)
+    all = ret_append_all_prune_candidates(all, bootstrap)
+    all = ret_append_all_prune_candidates(all, issue61)
+    all = ret_append_all_prune_candidates(all, embedded)
     if ret_remove_prune_candidates(ctx, all) != 0:
         return 1
     print(f"[prune] removed temp out/bin entries: {bin.len()}")
@@ -1289,11 +1289,11 @@ fn ret_report_large_prune(ctx: &ActionCtx):
     print(f"[prune] stale issue61 regression directories: {issue61.len()}")
     print(f"[prune] retained embedded runtime compiler copies: {embedded.len()}")
     var examples: List[str] = List.new()
-    examples = ret_append_all_prune_candidates(move examples, bin)
-    examples = ret_append_all_prune_candidates(move examples, lib)
-    examples = ret_append_all_prune_candidates(move examples, bootstrap)
-    examples = ret_append_all_prune_candidates(move examples, issue61)
-    examples = ret_append_all_prune_candidates(move examples, embedded)
+    examples = ret_append_all_prune_candidates(examples, bin)
+    examples = ret_append_all_prune_candidates(examples, lib)
+    examples = ret_append_all_prune_candidates(examples, bootstrap)
+    examples = ret_append_all_prune_candidates(examples, issue61)
+    examples = ret_append_all_prune_candidates(examples, embedded)
     examples = ret_sorted_strings(examples)
     var shown = 0
     for i in 0..examples.len():

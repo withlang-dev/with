@@ -493,7 +493,6 @@ impl Codegen:
         ty
 
     fn mir_llvm_type_can_live_in_value(ty: i64) -> bool:
-        let _ = self
         if ty == 0:
             return false
         let kind = wl_get_type_kind(ty)
@@ -526,7 +525,6 @@ impl Codegen:
             self.mir_memory_locals.insert(local_id, 1)
 
     fn mir_i32_list_fill(count: i32, value: i32) -> List[i32]:
-        let _ = self
         let out: List[i32] = List.new()
         for _ in 0..count:
             out.push(value)
@@ -570,7 +568,7 @@ impl MirBlockStack:
         let st = self.state
         unsafe {
             let top: i32 = st.xs[st.xs.len() - 1]
-            let _ = st.xs.pop()
+            st.xs.pop()
             top
         }
 
@@ -650,7 +648,6 @@ impl MirValueScan:
 
 impl Codegen:
     fn mir_place_direct_local(body: &MirBody, place_id: i32) -> i32:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return -1
         if body.place_proj_counts[place_id] != 0:
@@ -658,7 +655,6 @@ impl Codegen:
         body.place_locals[place_id]
 
     fn mir_stmt_block(body: &MirBody, stmt_id: i32) -> i32:
-        let _ = self
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -673,7 +669,6 @@ impl Codegen:
         stmt_id - body.bb_stmt_starts[bb]
 
     fn mir_add_successor(body: &MirBody, stack: MirBlockStack, visited: &List[i32], succ: i32):
-        let _ = self
         if succ < 0 or succ >= body.block_count():
             return
         if visited[succ] != 0:
@@ -722,7 +717,6 @@ impl Codegen:
 
     // The successors of a block, in terminator order.
     fn mir_block_successors(body: &MirBody, bb: i32) -> List[i32]:
-        let _ = self
         var out: List[i32] = List.new()
         if bb < 0 or bb >= body.block_count():
             return out
@@ -810,7 +804,6 @@ impl Codegen:
         not self.mir_reaches_block_avoiding(body, use_bb, def_bb)
 
     fn mir_record_value_local_read(body: &MirBody, local_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
-        let _ = self
         if local_id < 0 or local_id >= scan.local_limit():
             return
         let count = scan.read_count(local_id)
@@ -1472,7 +1465,7 @@ impl Codegen:
                 cur_ptr = self.mir_get_or_create_local_ptr(base_local, create_type)
                 let alloc_ty = self.mir_storage_type_for_value(create_type)
                 self.mir_local_types.insert(base_local, alloc_ty)
-                let _ = self.mir_try_init_const_local(body, base_local, cur_ptr, alloc_ty)
+                self.mir_try_init_const_local(body, base_local, cur_ptr, alloc_ty)
             else:
                 return 0
 
@@ -2597,10 +2590,10 @@ impl Codegen:
         let walk = wl_add_function(self.llmod, fn_name, self.mir_eq_fn_type())
         wl_set_linkage(walk, wl_internal_linkage())
 
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = walk
         self.current_function_name_sym = 0
@@ -2611,9 +2604,9 @@ impl Codegen:
         let differ = wl_append_bb(self.context, walk, "differ")
         wl_position_at_end(self.builder, entry)
         self.mir_emit_eq_walk(wl_get_param(walk, 0), wl_get_param(walk, 1), ty, resolved, differ)
-        let _ = wl_build_ret(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0))
+        wl_build_ret(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0))
         wl_position_at_end(self.builder, differ)
-        let _ = wl_build_ret(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0))
+        wl_build_ret(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0))
 
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -2918,10 +2911,10 @@ impl Codegen:
             return existing
         let walk = wl_add_function(self.llmod, fn_name, self.mir_cmp_fn_type())
         wl_set_linkage(walk, wl_internal_linkage())
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = walk
         self.current_function_name_sym = 0
@@ -2935,7 +2928,7 @@ impl Codegen:
         self.mir_emit_cmp_walk(wl_get_param(walk, 0), wl_get_param(walk, 1), ty, resolved, decided, result_slot)
         wl_build_br(self.builder, decided)
         wl_position_at_end(self.builder, decided)
-        let _ = wl_build_ret(self.builder, wl_build_load(self.builder, wl_i32_type(self.context), result_slot))
+        wl_build_ret(self.builder, wl_build_load(self.builder, wl_i32_type(self.context), result_slot))
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
         self.current_function_node = saved_fn_node
@@ -3142,10 +3135,10 @@ impl Codegen:
         let params: List[i64] = [ptr_ty]
         let helper = wl_add_function(self.llmod, fn_name, wl_function_type(i64_ty, list_data_i64(params), 1, 0))
         wl_set_linkage(helper, wl_internal_linkage())
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = helper
         self.current_function_name_sym = 0
@@ -3156,10 +3149,10 @@ impl Codegen:
         let state = self.create_entry_alloca(wl_array_type(i64_ty, 7))
         let init_params: List[i64] = [ptr_ty]
         let init_args: List[i64] = [state]
-        let _ = self.call_runtime_checked("with_hasher_init", wl_void_type(self.context), init_params, init_args)
+        self.call_runtime_checked("with_hasher_init", wl_void_type(self.context), init_params, init_args)
         self.mir_emit_hash_ptrs(wl_get_param(helper, 0), key_ty, key_sema, state)
         let finish_args: List[i64] = [state]
-        let _ = wl_build_ret(self.builder, self.call_runtime_checked("with_hasher_finish", i64_ty, init_params, finish_args))
+        wl_build_ret(self.builder, self.call_runtime_checked("with_hasher_finish", i64_ty, init_params, finish_args))
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
         self.current_function_node = saved_fn_node
@@ -3179,10 +3172,10 @@ impl Codegen:
         let params: List[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
         let helper = wl_add_function(self.llmod, fn_name, wl_function_type(i32_ty, list_data_i64(params), 2, 0))
         wl_set_linkage(helper, wl_internal_linkage())
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = helper
         self.current_function_name_sym = 0
@@ -3190,7 +3183,7 @@ impl Codegen:
         self.current_ret_type = i32_ty
         wl_position_at_end(self.builder, wl_append_bb(self.context, helper, "entry"))
         let equal = self.mir_emit_eq_ptrs(wl_get_param(helper, 0), wl_get_param(helper, 1), key_ty, key_sema)
-        let _ = wl_build_ret(self.builder, wl_build_zext(self.builder, equal, i32_ty))
+        wl_build_ret(self.builder, wl_build_zext(self.builder, equal, i32_ty))
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
         self.current_function_node = saved_fn_node
@@ -3200,12 +3193,12 @@ impl Codegen:
         helper
 
     // Feeds the `size` bytes at `p` to the hasher.
-    mut fn mir_hash_write(state: i64, p: i64, size: i64):
+    mut fn mir_hash_write(state: i64, p: i64, size: i64) -> Unit:
         let ptr_ty = wl_ptr_type(self.context)
         let i64_ty = wl_i64_type(self.context)
         let params: List[i64] = [ptr_ty, ptr_ty, i64_ty]
         let args: List[i64] = [state, p, wl_const_int(i64_ty, size, 0)]
-        let _ = self.call_runtime_checked("with_hasher_write", wl_void_type(self.context), params, args)
+        self.call_runtime_checked("with_hasher_write", wl_void_type(self.context), params, args)
 
     // Feeds a value (a tag, a length, a marker) to the hasher.
     mut fn mir_hash_write_value(state: i64, value: i64):
@@ -3243,7 +3236,7 @@ impl Codegen:
             let fn_sym = self.intern.intern("with_hasher_write_str")
             let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
             let args: List[i64] = [state, self.str_view_arg(v)]
-            let _ = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_hasher_write_str", 0)
+            self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_hasher_write_str", 0)
             return
         if tk == TypeKind.TY_REF:
             let pointee = self.sema.get_type_d0(resolved as TypeId)
@@ -3255,7 +3248,7 @@ impl Codegen:
             let walk = self.mir_hash_fn(resolved, ty)
             if walk != 0:
                 let args: List[i64] = [p, state]
-                let _ = wl_build_call(self.builder, self.mir_hash_fn_type(), walk, list_data_i64(args), 2)
+                wl_build_call(self.builder, self.mir_hash_fn_type(), walk, list_data_i64(args), 2)
                 return
         let size = self.abi_size_of(ty)
         self.mir_hash_write(state, p, size)
@@ -3276,10 +3269,10 @@ impl Codegen:
             return existing
         let walk = wl_add_function(self.llmod, fn_name, self.mir_hash_fn_type())
         wl_set_linkage(walk, wl_internal_linkage())
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = walk
         self.current_function_name_sym = 0
@@ -3287,7 +3280,7 @@ impl Codegen:
         self.current_ret_type = wl_void_type(self.context)
         wl_position_at_end(self.builder, wl_append_bb(self.context, walk, "entry"))
         self.mir_emit_hash_walk(wl_get_param(walk, 0), ty, resolved, wl_get_param(walk, 1))
-        let _ = wl_build_ret_void(self.builder)
+        wl_build_ret_void(self.builder)
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
         self.current_function_node = saved_fn_node
@@ -3534,7 +3527,6 @@ impl Codegen:
         wl_build_trunc(self.builder, ms_clamped, wider_ty)
 
     fn mir_checked_overflow_intrinsic_name(op: i32, is_unsigned: bool) -> str:
-        let _ = self
         if op == BinaryOp.OP_ADD:
             return if is_unsigned: "llvm.uadd.with.overflow" else: "llvm.sadd.with.overflow"
         if op == BinaryOp.OP_SUB:
@@ -3680,7 +3672,7 @@ impl Codegen:
         // `key:value` words: a query splits on `=`, so `detail~fn:main` and
         // `detail~route:float` select.
         fact.detail = f"route:{self.binop_route} fn:{self.sema.pool_resolve(body.fn_sym)} span:{self.cur_stmt_span} lhs:{lhs_name} rhs:{rhs_name} llvm-lhs-kind:{wl_get_type_kind(wl_type_of(lhs))} llvm-rhs-kind:{wl_get_type_kind(wl_type_of(rhs))}"
-        self.analysis_add(move fact)
+        self.analysis_add(fact)
 
     mut fn mir_build_bin_op(op: i32, lhs: i64, rhs: i64, is_unsigned: bool, lhs_sema: i32, rhs_sema: i32) -> i64:
         let lk = wl_get_type_kind(wl_type_of(lhs))
@@ -4204,7 +4196,7 @@ impl Codegen:
         let has_sret = abi.ret.pass == PM_INDIRECT
         let sret_ty = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_attr_types(abi_index)
-        let fn_type: i64 = abi.llvm_ty
+        let fn_type = abi.llvm_ty
         let func = wl_add_function(self.llmod, name, fn_type)
         if has_sret:
             wl_add_sret_attr(self.context, func, 0, sret_ty)
@@ -4656,7 +4648,7 @@ impl Codegen:
             func = wl_add_function(self.llmod, intrinsic_name, ft)
         let call_args: List[i64] = List.new()
         call_args.push(args[0])
-        let _ = wl_build_call(self.builder, ft, func, list_data_i64(call_args), 1)
+        wl_build_call(self.builder, ft, func, list_data_i64(call_args), 1)
         if next_bb >= 0 and next_bb < self.mir_bb_values.len():
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
@@ -5591,14 +5583,14 @@ impl Codegen:
             args.push(ptr)
             args.push(self.current_drop_origin_ptr)
             args.push(self.current_drop_origin_len)
-            let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(args), 3)
+            wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(args), 3)
             return
         let free_fn = self.ensure_box_free_fn()
         if free_fn == 0:
             return
         let args2: List[i64] = List.new()
         args2.push(ptr)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(args2), 1)
+        wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(args2), 1)
 
     // Reset-on-move niche guard (spec §2.5.1). A moved-out value is zeroed; a user
     // `Drop` body may deref fields the reset nulled (e.g. `*self.slot`), so running
@@ -6083,7 +6075,7 @@ impl Codegen:
             let retain_fn = self.ensure_with_str_retain_fn()
             let args: List[i64] = List.new()
             args.push(ptr)
-            let _ = wl_build_call(self.builder, wl_global_get_value_type(retain_fn), retain_fn, list_data_i64(args), 1)
+            wl_build_call(self.builder, wl_global_get_value_type(retain_fn), retain_fn, list_data_i64(args), 1)
             return
         // D120 stage 2: a HashMap or HashSet of values shares its table —
         // one more holder.
@@ -6168,10 +6160,10 @@ impl Codegen:
         let fn_val = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(fn_val, wl_internal_linkage())
 
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = fn_val
         self.current_function_name_sym = 0
@@ -6218,10 +6210,10 @@ impl Codegen:
         let fn_val = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(fn_val, wl_internal_linkage())
 
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = fn_val
         self.current_function_name_sym = 0
@@ -6270,10 +6262,10 @@ impl Codegen:
         self.bind_fn_abi(self.intern.intern(fn_name), abi_index, copy_fn)
         wl_set_linkage(copy_fn, wl_internal_linkage())
 
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = copy_fn
         self.current_function_name_sym = 0
@@ -6372,7 +6364,7 @@ impl Codegen:
             return
         let args: List[i64] = List.new()
         args.push(ptr)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(args), 1)
+        wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(args), 1)
 
     // #606: free a List's heap buffer via the runtime helper.
     // `push` inline: when len < cap, store the element at buffer[len] and
@@ -6411,7 +6403,7 @@ impl Codegen:
         args.push(recv_ptr)
         args.push(elem_alloca)
         args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-        let _ = wl_build_call(self.builder, push_ty, push_fn, list_data_i64(args), 3)
+        wl_build_call(self.builder, push_ty, push_fn, list_data_i64(args), 3)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
 
@@ -6442,11 +6434,11 @@ impl Codegen:
         args.push(data)
         args.push(n)
         if elem_is_str:
-            let _ = self.mir_list_helper_call("with_vec_extend_str", params, args)
+            self.mir_list_helper_call("with_vec_extend_str", params, args)
             return
         params.push(i64_ty)
         args.push(wl_const_int(i64_ty, es, 0))
-        let _ = self.mir_list_helper_call("with_vec_extend_bits_es", params, args)
+        self.mir_list_helper_call("with_vec_extend_bits_es", params, args)
         if glue_from != 0:
             self.mir_emit_list_element_copy_glue_from(out_ptr, list_sema, glue_from)
 
@@ -6481,7 +6473,7 @@ impl Codegen:
             let new_args: List[i64] = List.new()
             new_args.push(out_ptr)
             new_args.push(wl_const_int(i64_ty, es, 0))
-            let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(new_args), 2)
+            wl_build_call(self.builder, new_ty, new_fn, list_data_i64(new_args), 2)
         let first = (in_place) as i32
         for i in first..2:
             let op = body.call_arg_operands[(arg_start + i)]
@@ -6509,7 +6501,7 @@ impl Codegen:
                     args.push(out_ptr)
                     args.push(hptr)
                     args.push(wl_const_int(i64_ty, es, 0))
-                    let _ = self.mir_list_helper_call("with_vec_take_into_es", params, args)
+                    self.mir_list_helper_call("with_vec_take_into_es", params, args)
                 else:
                     let data = wl_build_load(self.builder, ptr_ty, hptr)
                     let n = wl_build_load(self.builder, i64_ty, self.mir_list_header_word_ptr(hptr, 8))
@@ -6585,7 +6577,7 @@ impl Codegen:
         let free_ty = wl_function_type(void_ty, list_data_i64(params), params.len() as i32, 0)
         if free_fn == 0:
             free_fn = wl_add_function(self.llmod, name, free_ty)
-        let _ = wl_build_call(self.builder, free_ty, free_fn, list_data_i64(args), args.len())
+        wl_build_call(self.builder, free_ty, free_fn, list_data_i64(args), args.len())
         // Blank the header as the runtime did: a freed List reads as empty.
         wl_build_store(self.builder, wl_const_null(ptr_ty), ptr)
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_list_header_word_ptr(ptr, 8))
@@ -6927,7 +6919,7 @@ impl Codegen:
         let free_ty = wl_function_type(wl_void_type(self.context), list_data_i64(self.make_ptr_list()), 1, 0)
         let free_args: List[i64] = List.new()
         free_args.push(handle)
-        let _ = wl_build_call(self.builder, free_ty, free_fn, list_data_i64(free_args), 1)
+        wl_build_call(self.builder, free_ty, free_fn, list_data_i64(free_args), 1)
         true
 
     mut fn mir_emit_drop_ptr_for_sema_type(ptr: i64, ty: i64, sema_ty: i32) -> Unit:
@@ -7021,7 +7013,7 @@ impl Codegen:
                 let edf_params: List[i64] = List.new()
                 edf_params.push(wl_ptr_type(self.context))
                 let edf_ty = wl_function_type(wl_void_type(self.context), list_data_i64(edf_params), 1, 0)
-                let _ = wl_build_call(self.builder, edf_ty, enum_drop_fn, list_data_i64(edf_args), 1)
+                wl_build_call(self.builder, edf_ty, enum_drop_fn, list_data_i64(edf_args), 1)
             else:
                 self.mir_emit_drop_enum_ptr(ptr, ty, resolved)
 
@@ -7056,7 +7048,7 @@ impl Codegen:
             release_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         let args: List[i64] = List.new()
         args.push(handle)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(release_fn), release_fn, list_data_i64(args), 1)
+        wl_build_call(self.builder, wl_global_get_value_type(release_fn), release_fn, list_data_i64(args), 1)
         true
 
     mut fn ensure_channel_drop_fn_for_type(sema_ty: i32, llvm_ty: i64) -> i64:
@@ -7073,12 +7065,12 @@ impl Codegen:
         let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(params), 1, 0)
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
 
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_member_depth: i32 = self.member_drop_depth
+        let saved_member_depth = self.member_drop_depth
 
         self.current_function = drop_fn
         self.current_function_name_sym = 0
@@ -7091,7 +7083,7 @@ impl Codegen:
         let entry = wl_append_bb(self.context, drop_fn, "entry")
         wl_position_at_end(self.builder, entry)
         self.mir_emit_drop_ptr_for_sema_type(wl_get_param(drop_fn, 0), llvm_ty, sema_ty)
-        let _ = wl_build_ret_void(self.builder)
+        wl_build_ret_void(self.builder)
 
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -7126,15 +7118,15 @@ impl Codegen:
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_needs_guard: bool = self.current_drop_needs_guard
-        let saved_member_depth: i32 = self.member_drop_depth
-        let saved_origin_ptr: i64 = self.current_drop_origin_ptr
-        let saved_origin_len: i64 = self.current_drop_origin_len
+        let saved_needs_guard = self.current_drop_needs_guard
+        let saved_member_depth = self.member_drop_depth
+        let saved_origin_ptr = self.current_drop_origin_ptr
+        let saved_origin_len = self.current_drop_origin_len
 
         self.current_function = drop_fn
         self.current_function_name_sym = 0
@@ -7149,7 +7141,7 @@ impl Codegen:
         let entry = wl_append_bb(self.context, drop_fn, "entry")
         wl_position_at_end(self.builder, entry)
         self.mir_emit_drop_enum_ptr(wl_get_param(drop_fn, 0), llvm_ty, sema_ty)
-        let _ = wl_build_ret_void(self.builder)
+        wl_build_ret_void(self.builder)
 
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -7198,15 +7190,15 @@ impl Codegen:
         self.bind_fn_abi(self.intern.intern(fn_name), abi_index, drop_fn)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_needs_guard: bool = self.current_drop_needs_guard
-        let saved_member_depth: i32 = self.member_drop_depth
-        let saved_origin_ptr: i64 = self.current_drop_origin_ptr
-        let saved_origin_len: i64 = self.current_drop_origin_len
+        let saved_needs_guard = self.current_drop_needs_guard
+        let saved_member_depth = self.member_drop_depth
+        let saved_origin_ptr = self.current_drop_origin_ptr
+        let saved_origin_len = self.current_drop_origin_len
 
         self.current_function = drop_fn
         self.current_function_name_sym = 0
@@ -7229,7 +7221,7 @@ impl Codegen:
         let entry = wl_append_bb(self.context, drop_fn, "entry")
         wl_position_at_end(self.builder, entry)
         self.mir_emit_drop_ptr_for_sema_type(wl_get_param(drop_fn, 0), llvm_ty, sema_ty)
-        let _ = wl_build_ret_void(self.builder)
+        wl_build_ret_void(self.builder)
 
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -7400,7 +7392,7 @@ impl Codegen:
         let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(params), 1, 0)
         let args: List[i64] = List.new()
         args.push(data_ptr)
-        let _ = wl_build_call(self.builder, fn_ty, drop_fn, list_data_i64(args), 1)
+        wl_build_call(self.builder, fn_ty, drop_fn, list_data_i64(args), 1)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
 
@@ -7531,7 +7523,7 @@ impl Codegen:
         ms_args.push(wl_const_int(wl_i8_type(self.context), 0, 0))
         ms_args.push(wl_const_int(wl_i64_type(self.context), size_bytes, 0))
         ms_args.push(wl_const_int(wl_i1_type(self.context), 0, 0))
-        let _ = wl_build_call(self.builder, ms_ft, ms_func, list_data_i64(ms_args), 4)
+        wl_build_call(self.builder, ms_ft, ms_func, list_data_i64(ms_args), 4)
 
     // True if rvalue `rval_id` is `RK_USE` of a `CK_ZERO_SIZED` constant (the
     // reset-on-move / default zero value).
@@ -7796,9 +7788,9 @@ impl Codegen:
             return true
 
         if sk == StmtKind.Drop:
-            let saved_origin_ptr: i64 = self.current_drop_origin_ptr
-            let saved_origin_len: i64 = self.current_drop_origin_len
-            let saved_needs_guard: bool = self.current_drop_needs_guard
+            let saved_origin_ptr = self.current_drop_origin_ptr
+            let saved_origin_len = self.current_drop_origin_len
+            let saved_needs_guard = self.current_drop_needs_guard
             self.mir_set_current_drop_origin(d1)
             // Stage 4 (§2.5.2): a local never recorded as moved can never be the
             // reset sentinel, so drop it unconditionally; otherwise keep the guard.
@@ -8240,7 +8232,7 @@ impl Codegen:
             if not src_unsigned:
                 src_unsigned = self.mir_operand_is_str_byte(body, operand_id)
             out = self.mir_coerce_value_to_sema_type(out, expected_ty, expected_sema_ty, src_unsigned)
-        let had_error_before: i32 = self.had_error
+        let had_error_before = self.had_error
         let coerced = self.enforce_coerced_type(out, expected_ty, "wrong argument type")
         if self.had_error != had_error_before:
             self.debug_call_coerce_failure(call_context, 0, arg_index, 0, out, expected_ty)
@@ -9148,7 +9140,7 @@ impl Codegen:
                 let live_base_sym = self.sema_sym_to_codegen_sym(self.sema.get_type_d0(live_resolved))
                 if live_base_sym == 0 or self.generic_type_decl_node(live_base_sym) == 0:
                     return 0
-                let _ = self.sema_type_to_llvm(live_resolved)
+                self.sema_type_to_llvm(live_resolved)
                 let live_enum_sym = self.generic_enum_inst_syms.get(live_resolved)
                 if live_enum_sym.is_some():
                     return live_enum_sym.unwrap()
@@ -9184,7 +9176,7 @@ impl Codegen:
             let base_sym = self.sema_sym_to_codegen_sym(self.mir_type_d0_at(resolved))
             if base_sym == 0 or self.generic_type_decl_node(base_sym) == 0:
                 return 0
-            let _ = self.mir_sema_type_to_llvm(resolved)
+            self.mir_sema_type_to_llvm(resolved)
             let enum_sym = self.generic_enum_inst_syms.get(resolved)
             if enum_sym.is_some():
                 return enum_sym.unwrap()
@@ -9284,7 +9276,7 @@ impl Codegen:
             tp_pos = tp_pos + 2 + bound_count
 
         let mono_sym = self.intern.intern(mangled)
-        let _ = self.mir_sema_type_to_llvm(owner_sema_ty)
+        self.mir_sema_type_to_llvm(owner_sema_ty)
         let enum_sym = self.generic_enum_inst_syms.get(live_resolved)
         if enum_sym.is_some():
             return enum_sym.unwrap()
@@ -9306,11 +9298,10 @@ impl Codegen:
         wl_get_undef(wl_i32_type(self.context))
 
     mut fn mir_build_multi_index_specs_ref(body: &MirBody, args_id: i32, mi_node: i32, is_set: i32) -> i64:
-        let _ = is_set
         let mi_kind = self.pool.kind(mi_node)
         let specs_start = if mi_kind == NodeKind.NK_MULTI_INDEX: self.pool.get_data1(mi_node) else: 0
         let specs_count = if mi_kind == NodeKind.NK_INDEX: 2 else: self.pool.get_data2(mi_node)
-        let ctx: i64 = self.context
+        let ctx = self.context
         let spec_fields: List[i64] = List.new()
         spec_fields.push(wl_i32_type(ctx))
         spec_fields.push(wl_i64_type(ctx))
@@ -10205,7 +10196,7 @@ impl Codegen:
             return false
         let free_args: List[i64] = List.new()
         free_args.push(box_ptr)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(free_args), 1)
+        wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(free_args), 1)
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, payload)
         true
 
@@ -10241,7 +10232,7 @@ impl Codegen:
             let args: List[i64] = List.new()
             args.push(alloca)
             args.push(wl_const_int(i64_ty, elem_size, 0))
-            let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(args), 2)
+            wl_build_call(self.builder, new_ty, new_fn, list_data_i64(args), 2)
             result = wl_build_load(self.builder, list_ty, alloca)
 
         else if intrinsic == MirIntrinsic.FIXED_STRING_NEW:
@@ -10280,7 +10271,7 @@ impl Codegen:
             let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
             let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
-            let _ = wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), fs_len_ptr)
+            wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), fs_len_ptr)
             result = wl_get_undef(void_ty)
 
         else if intrinsic == MirIntrinsic.FIXED_STRING_PUSH_BYTE:
@@ -10295,7 +10286,7 @@ impl Codegen:
             let ok_bb = wl_append_bb(self.context, self.current_function, "fixed.push.byte.ok")
             let done_bb = wl_append_bb(self.context, self.current_function, "fixed.push.byte.done")
             let out_ptr = self.create_entry_alloca(wl_i1_type(self.context))
-            let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
             let fits = wl_build_icmp(self.builder, wl_int_ult(), fs_len, wl_const_int(i64_ty, fs_cap, 0))
             wl_build_cond_br(self.builder, fits, ok_bb, done_bb)
             wl_position_at_end(self.builder, ok_bb)
@@ -10305,9 +10296,9 @@ impl Codegen:
             elem_indices.push(fs_len)
             let byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, list_data_i64(elem_indices), 2)
             let byte_val = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), wl_i8_type(self.context))
-            let _ = wl_build_store(self.builder, byte_val, byte_ptr)
-            let _ = wl_build_store(self.builder, wl_build_add(self.builder, fs_len, wl_const_int(i64_ty, 1, 0)), fs_len_ptr)
-            let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
+            wl_build_store(self.builder, byte_val, byte_ptr)
+            wl_build_store(self.builder, wl_build_add(self.builder, fs_len, wl_const_int(i64_ty, 1, 0)), fs_len_ptr)
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
             wl_build_br(self.builder, done_bb)
             wl_position_at_end(self.builder, done_bb)
             result = wl_build_load(self.builder, wl_i1_type(self.context), out_ptr)
@@ -10332,11 +10323,11 @@ impl Codegen:
             let done_bb = wl_append_bb(self.context, self.current_function, "fixed.push.str.done")
             let out_ptr = self.create_entry_alloca(wl_i1_type(self.context))
             let idx_ptr = self.create_entry_alloca(i64_ty)
-            let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
             let fits = wl_build_icmp(self.builder, wl_int_ule(), end_len, wl_const_int(i64_ty, fs_cap, 0))
             wl_build_cond_br(self.builder, fits, copy_bb, done_bb)
             wl_position_at_end(self.builder, copy_bb)
-            let _ = wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), idx_ptr)
+            wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), idx_ptr)
             wl_build_br(self.builder, loop_bb)
             wl_position_at_end(self.builder, loop_bb)
             let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
@@ -10353,12 +10344,12 @@ impl Codegen:
             dst_indices.push(wl_const_int(i32_ty, 0, 0))
             dst_indices.push(dst_index)
             let dst_byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, list_data_i64(dst_indices), 2)
-            let _ = wl_build_store(self.builder, src_byte, dst_byte_ptr)
-            let _ = wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
+            wl_build_store(self.builder, src_byte, dst_byte_ptr)
+            wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
             wl_build_br(self.builder, loop_bb)
             wl_position_at_end(self.builder, copied_bb)
-            let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
-            let _ = wl_build_store(self.builder, end_len, fs_len_ptr)
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
+            wl_build_store(self.builder, end_len, fs_len_ptr)
             wl_build_br(self.builder, done_bb)
             wl_position_at_end(self.builder, done_bb)
             result = wl_build_load(self.builder, wl_i1_type(self.context), out_ptr)
@@ -10396,12 +10387,12 @@ impl Codegen:
             let done_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.done")
             let out_ptr = self.create_entry_alloca(wl_i1_type(self.context))
             let idx_ptr = self.create_entry_alloca(i64_ty)
-            let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
             let same_len = wl_build_icmp(self.builder, wl_int_eq(), fs_len, text_len)
             wl_build_cond_br(self.builder, same_len, prep_bb, done_bb)
             wl_position_at_end(self.builder, prep_bb)
-            let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
-            let _ = wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), idx_ptr)
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
+            wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), idx_ptr)
             wl_build_br(self.builder, loop_bb)
             wl_position_at_end(self.builder, loop_bb)
             let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
@@ -10422,10 +10413,10 @@ impl Codegen:
             let eq_next_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.next")
             wl_build_cond_br(self.builder, bytes_same, eq_next_bb, mismatch_bb)
             wl_position_at_end(self.builder, eq_next_bb)
-            let _ = wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
+            wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
             wl_build_br(self.builder, loop_bb)
             wl_position_at_end(self.builder, mismatch_bb)
-            let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
             wl_build_br(self.builder, done_bb)
             wl_position_at_end(self.builder, done_bb)
             result = wl_build_load(self.builder, wl_i1_type(self.context), out_ptr)
@@ -10456,7 +10447,7 @@ impl Codegen:
             wc_args.push(wc_al)
             wc_args.push(wl_const_int(i64_ty, wc_esz, 0))
             wc_args.push(wc_cap64)
-            let _ = wl_build_call(self.builder, wc_ft, wc_fn, list_data_i64(wc_args), 3)
+            wl_build_call(self.builder, wc_ft, wc_fn, list_data_i64(wc_args), 3)
             result = wl_build_load(self.builder, wc_vty, wc_al)
 
         else if intrinsic == MirIntrinsic.LIST_PUSH:
@@ -10571,7 +10562,7 @@ impl Codegen:
             rm_args.push(recv_ptr)
             rm_args.push(idx64)
             rm_args.push(rm_es)
-            let _ = wl_build_call(self.builder, remove_ty, remove_fn, list_data_i64(rm_args), 3)
+            wl_build_call(self.builder, remove_ty, remove_fn, list_data_i64(rm_args), 3)
 
         else if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE:
             // D120: copy-on-write before a mutation of a value List. The
@@ -10659,7 +10650,7 @@ impl Codegen:
             let tf_args: List[i64] = List.new()
             tf_args.push(recv_ptr)
             tf_args.push(tf_es)
-            let _ = self.mir_list_helper_call("with_vec_take_front_es", tf_params, tf_args)
+            self.mir_list_helper_call("with_vec_take_front_es", tf_params, tf_args)
 
         else if intrinsic == MirIntrinsic.LIST_RESTORE_FRONT:
             // #2289: the head goes back through the prefix its take left.
@@ -10674,7 +10665,7 @@ impl Codegen:
             rf_args.push(recv_ptr)
             rf_args.push(elem_ptr)
             rf_args.push(rf_es)
-            let _ = self.mir_list_helper_call("with_vec_restore_front_es", rf_params, rf_args)
+            self.mir_list_helper_call("with_vec_restore_front_es", rf_params, rf_args)
 
         else if intrinsic == MirIntrinsic.LIST_CONCAT or intrinsic == MirIntrinsic.LIST_EXTEND:
             let cat = self.mir_emit_list_concat(body, args_id, dest_place, intrinsic)
@@ -10714,7 +10705,7 @@ impl Codegen:
             rm_args.push(recv_ptr)
             rm_args.push(last_idx)
             rm_args.push(pop_es)
-            let _ = wl_build_call(self.builder, remove_ty, remove_fn, list_data_i64(rm_args), 3)
+            wl_build_call(self.builder, remove_ty, remove_fn, list_data_i64(rm_args), 3)
             let some_val = self.build_option_some(popped, opt_ty)
             wl_build_br(self.builder, merge_bb)
             let some_end = wl_get_insert_block(self.builder)
@@ -11469,7 +11460,7 @@ impl Codegen:
             oi_i_args.push(oi_key_alloca)
             oi_i_args.push(oi_val_alloca)
             oi_i_args.push(oi_is_str)
-            let _ = wl_build_call(self.builder, oi_i_fn_ty, oi_ins_fn, list_data_i64(oi_i_args), 4)
+            wl_build_call(self.builder, oi_i_fn_ty, oi_ins_fn, list_data_i64(oi_i_args), 4)
             wl_build_br(self.builder, oi_get_bb)
             // already present: drop unused default
             wl_position_at_end(self.builder, oi_found_bb)
@@ -11493,7 +11484,7 @@ impl Codegen:
             oi_g_args.push(oi_key_alloca)
             oi_g_args.push(oi_out_alloca)
             oi_g_args.push(oi_is_str)
-            let _ = wl_build_call(self.builder, oi_g_fn_ty, oi_get_fn, list_data_i64(oi_g_args), 4)
+            wl_build_call(self.builder, oi_g_fn_ty, oi_get_fn, list_data_i64(oi_g_args), 4)
             if dest_place >= 0:
                 self.mir_emit_copy_glue_ptr(oi_out_alloca, oi_val_ty, oi_val_tid)
             result = wl_build_load(self.builder, oi_val_ty, oi_out_alloca)
@@ -11544,7 +11535,7 @@ impl Codegen:
             eg_g_args.push(eg_key_alloca)
             eg_g_args.push(eg_out_alloca)
             eg_g_args.push(eg_is_str)
-            let _ = wl_build_call(self.builder, eg_g_fn_ty, eg_get_fn, list_data_i64(eg_g_args), 4)
+            wl_build_call(self.builder, eg_g_fn_ty, eg_get_fn, list_data_i64(eg_g_args), 4)
             let eg_copy_sema = if eg_dest_sema > 0: eg_dest_sema else: eg_val_tid
             if dest_place >= 0:
                 self.mir_emit_copy_glue_ptr(eg_out_alloca, eg_val_ty, eg_copy_sema)
@@ -12904,7 +12895,7 @@ impl Codegen:
             a6.push(out6)
             a6.push(self.str_view_arg(r6))
             a6.push(self.str_view_arg(d6))
-            let _ = self.call_internal_runtime_fn("with_str_split_vec_ref", p6, a6, 3, wl_void_type(self.context))
+            self.call_internal_runtime_fn("with_str_split_vec_ref", p6, a6, 3, wl_void_type(self.context))
             result = wl_build_load(self.builder, vt6, out6)
 
         else if intrinsic == MirIntrinsic.STR_INDEX_OF:
@@ -12936,7 +12927,7 @@ impl Codegen:
             a7.push(mp7)
             a7.push(ka7)
             a7.push(is7)
-            let _ = wl_build_call(self.builder, ft7, f7, list_data_i64(a7), 3)
+            wl_build_call(self.builder, ft7, f7, list_data_i64(a7), 3)
             result = 0
 
         else if intrinsic == MirIntrinsic.MAP_UPDATE:
@@ -13014,7 +13005,7 @@ impl Codegen:
             upd_insert_args.push(upd_key_alloca)
             upd_insert_args.push(upd_val_alloca)
             upd_insert_args.push(upd_is_str)
-            let _ = wl_build_call(self.builder, upd_insert_ty, upd_insert_fn, list_data_i64(upd_insert_args), 4)
+            wl_build_call(self.builder, upd_insert_ty, upd_insert_fn, list_data_i64(upd_insert_args), 4)
             result = 0
 
         else if intrinsic == MirIntrinsic.STR_REPEAT:
@@ -13901,10 +13892,10 @@ impl Codegen:
         let fn_ty = wl_function_type(ptr_ty, list_data_i64(params), 1, 0)
         let clone_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(clone_fn, wl_internal_linkage())
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = clone_fn
         self.current_function_name_sym = 0
@@ -13926,7 +13917,7 @@ impl Codegen:
                 let old_slot = self.tuple_elem_ptr(cap_struct_type, old_env, ci)
                 let new_slot = self.tuple_elem_ptr(cap_struct_type, new_env, ci)
                 wl_build_store(self.builder, self.gen_str_clone_ref(wl_build_load(self.builder, self.str_llvm_type(), old_slot)), new_slot)
-        let _ = wl_build_ret(self.builder, new_cell)
+        wl_build_ret(self.builder, new_cell)
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
         self.current_function_node = saved_fn_node
@@ -15579,7 +15570,7 @@ impl Codegen:
                 let place = if self.fn_abi_byval(call_abi): self.mir_try_place_ptr_for_ref(body, operand_id) else: 0
                 let val = if place == 0: self.mir_eval_operand(body, operand_id, 0) else: 0
                 let arg_ptr = self.push_call_arg(call_abi, ai, val, place)
-                let byval_strategy: AnalysisMarshalStrategy = self.analysis_last_marshal_strategy
+                let byval_strategy = self.analysis_last_marshal_strategy
                 self.record_codegen_call_argument(body, args_id, operand_id, ai, byval_strategy, arg_ptr, arg_ptr)
                 args.push(arg_ptr)
                 continue
@@ -15675,9 +15666,9 @@ impl Codegen:
             // the function's result; the MIR continuation block becomes
             // unreachable and is left well-formed.
             if wl_get_return_type(call_ft) == wl_void_type(self.context):
-                let _ = wl_build_ret_void(self.builder)
+                wl_build_ret_void(self.builder)
             else:
-                let _ = wl_build_ret(self.builder, call_val)
+                wl_build_ret(self.builder, call_val)
             return true
         self.free_call_temp_ptrs(call_temp_cleanups)
 
@@ -15787,10 +15778,10 @@ impl Codegen:
                         wl_build_store(self.builder, ab_ret_val, self.async_block_rbuf)
                         wl_build_br(self.builder, ab_wg_after)
                         wl_position_at_end(self.builder, ab_wg_after)
-                let _ = wl_build_ret_void(self.builder)
+                wl_build_ret_void(self.builder)
                 return true
             if self.current_ret_type == wl_void_type(self.context):
-                let _ = wl_build_ret_void(self.builder)
+                wl_build_ret_void(self.builder)
                 return true
             let fn_has_sret_opt = self.fn_abi_has_sret(self.current_function_name_sym)
             let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
@@ -15801,7 +15792,7 @@ impl Codegen:
                 let sret_ptr = wl_get_param(self.current_function, 0)
                 let ret_val = wl_build_load(self.builder, ret_ptr_ty, ret_ptr)
                 wl_build_store(self.builder, self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch"), sret_ptr)
-                let _ = wl_build_ret_void(self.builder)
+                wl_build_ret_void(self.builder)
                 return true
             let fn_direct_ret_ty_opt = self.fn_abi_direct_ret_type(self.current_function_name_sym)
             let fn_direct_ret_ty = if fn_direct_ret_ty_opt.is_some(): fn_direct_ret_ty_opt.unwrap() as i64 else: 0
@@ -15810,7 +15801,7 @@ impl Codegen:
             let ret_val = wl_build_load(self.builder, ret_ptr_ty, ret_ptr)
             let semantic_ret = self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch")
             let final_ret = if fn_direct_ret_ty != 0: self.c_abi_pack_direct_value(semantic_ret, fn_abi_ret_ty) else: semantic_ret
-            let _ = wl_build_ret(self.builder, final_ret)
+            wl_build_ret(self.builder, final_ret)
             return true
 
         if tk == TermKind.TK_UNREACHABLE:
@@ -15913,7 +15904,6 @@ impl Codegen:
         true
 
     fn mir_cleanup_dump_enabled(name_str: &str) -> bool:
-        let _ = self
         let raw = with_getenv_str("WITH_DUMP_MIR_CLEANUP_FN")
         if raw.len() == 0:
             return false
@@ -15990,8 +15980,8 @@ impl Codegen:
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
         let saved_tb_sema = move self.type_binding_sema
-        let saved_tb_len: i32 = self.type_bindings_len
-        let saved_body_owner_sym: i32 = self.current_body_owner_sym
+        let saved_tb_len = self.type_bindings_len
+        let saved_body_owner_sym = self.current_body_owner_sym
         self.current_body_owner_sym = name_sym
         self.set_mono_type_bindings(name_sym)
         let fn_has_sret_opt = self.fn_abi_has_sret(name_sym)
@@ -16031,18 +16021,18 @@ impl Codegen:
         self.enum_local_types = fresh_enum_local_types
         self.scope_local_count = 0
 
-        let saved_expected: i64 = self.expected_type
-        let saved_expected_node: i32 = self.expected_type_node
+        let saved_expected = self.expected_type
+        let saved_expected_node = self.expected_type_node
         self.expected_type = self.current_ret_type
         self.expected_type_node = 0
-        let saved_result_err: i32 = self.current_result_err_symbol
-        let saved_returns_result: bool = self.current_fn_returns_result
-        let saved_saw_return: bool = self.current_fn_saw_explicit_return
+        let saved_result_err = self.current_result_err_symbol
+        let saved_returns_result = self.current_fn_returns_result
+        let saved_saw_return = self.current_fn_saw_explicit_return
         self.current_result_err_symbol = 0
         self.current_fn_returns_result = false
         self.current_fn_saw_explicit_return = false
-        let saved_tailrec_bb: i64 = self.tailrec_body_bb
-        let saved_tailrec_sym: i32 = self.tailrec_fn_sym
+        let saved_tailrec_bb = self.tailrec_body_bb
+        let saved_tailrec_sym = self.tailrec_fn_sym
         self.tailrec_body_bb = 0
         self.tailrec_fn_sym = 0
 
@@ -16274,7 +16264,7 @@ impl Codegen:
             self.mir_emit_failed("a body with no block", name_str, fn_node, 0)
 
         let reachable_bbs = self.mir_reachable_blocks(body)
-        let saved_fn_scope: i64 = self.di_current_scope
+        let saved_fn_scope = self.di_current_scope
         for bb in self.mir_emit_order(body):
             if bb < 0 or bb >= self.mir_bb_values.len():
                 continue
@@ -16370,11 +16360,11 @@ impl Codegen:
         let fn_type = ft.unwrap() as i64
 
         // Save all codegen state (will be restored at end)
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret: i64 = self.current_ret_type
-        let saved_owner: i32 = self.current_method_owner_sym
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret = self.current_ret_type
+        let saved_owner = self.current_method_owner_sym
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
         let saved_muts = move self.local_muts
@@ -16385,18 +16375,18 @@ impl Codegen:
         let saved_scope_syms = move self.scope_local_syms
         let saved_scope_allocas = move self.scope_local_allocas
         let saved_scope_types = move self.scope_local_types
-        let saved_scope_count: i32 = self.scope_local_count
+        let saved_scope_count = self.scope_local_count
         let saved_defer = move self.defer_stack
         let saved_errdefer = move self.errdefer_stack
         let saved_enum_local_types = move self.enum_local_types
         let saved_sema_local_types = move self.local_sema_types
-        let saved_expected: i64 = self.expected_type
-        let saved_expected_node: i32 = self.expected_type_node
-        let saved_result_err: i32 = self.current_result_err_symbol
-        let saved_returns_result: bool = self.current_fn_returns_result
-        let saved_saw_return: bool = self.current_fn_saw_explicit_return
-        let saved_tail_bb: i64 = self.tailrec_body_bb
-        let saved_tail_sym: i32 = self.tailrec_fn_sym
+        let saved_expected = self.expected_type
+        let saved_expected_node = self.expected_type_node
+        let saved_result_err = self.current_result_err_symbol
+        let saved_returns_result = self.current_fn_returns_result
+        let saved_saw_return = self.current_fn_saw_explicit_return
+        let saved_tail_bb = self.tailrec_body_bb
+        let saved_tail_sym = self.tailrec_fn_sym
         let saved_tail_allocas = move self.tailrec_param_allocas
         let saved_loops = self.capture_loop_state()
         let saved_bb = wl_get_insert_block(self.builder)
@@ -16406,7 +16396,7 @@ impl Codegen:
         self.current_function = function
         self.current_function_name_sym = mono_sym
         self.current_function_node = fn_node
-        let saved_tier_node: i32 = self.current_function_tier_node
+        let saved_tier_node = self.current_function_tier_node
         var tier_node = if fn_node > 0: fn_node else: self.debug_decl_node_for(body.fn_sym)
         if tier_node <= 0: tier_node = self.debug_decl_node_for(mono_sym)
         self.current_function_tier_node = tier_node
@@ -16429,8 +16419,8 @@ impl Codegen:
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
         let saved_tb_sema = move self.type_binding_sema
-        let saved_tb_len: i32 = self.type_bindings_len
-        let saved_body_owner_sym: i32 = self.current_body_owner_sym
+        let saved_tb_len = self.type_bindings_len
+        let saved_body_owner_sym = self.current_body_owner_sym
         self.current_body_owner_sym = mono_sym
         self.set_mono_type_bindings(mono_sym)
         let fn_has_sret_opt = self.fn_abi_has_sret(mono_sym)
@@ -16718,7 +16708,7 @@ impl Codegen:
             self.mir_emit_failed("a body with no block", name_str, fn_node, 0)
 
         let reachable_bbs = self.mir_reachable_blocks(body)
-        let mono_fn_scope: i64 = self.di_current_scope
+        let mono_fn_scope = self.di_current_scope
         for bb in self.mir_emit_order(body):
             if bb < 0 or bb >= self.mir_bb_values.len():
                 continue
@@ -17385,7 +17375,7 @@ impl Codegen:
         let drop_ft = wl_function_type(wl_void_type(self.context), list_data_i64(params), 1, 0)
         let args: List[i64] = List.new()
         args.push(cell)
-        let _ = wl_build_call(self.builder, drop_ft, drop_fn, list_data_i64(args), 1)
+        wl_build_call(self.builder, drop_ft, drop_fn, list_data_i64(args), 1)
         wl_build_store(self.builder, wl_const_null(ptr_ty), ctx_slot)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
@@ -17403,15 +17393,15 @@ impl Codegen:
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
-        let saved_fn: i64 = self.current_function
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_fn_node: i32 = self.current_function_node
-        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_needs_guard: bool = self.current_drop_needs_guard
-        let saved_member_depth: i32 = self.member_drop_depth
-        let saved_origin_ptr: i64 = self.current_drop_origin_ptr
-        let saved_origin_len: i64 = self.current_drop_origin_len
+        let saved_needs_guard = self.current_drop_needs_guard
+        let saved_member_depth = self.member_drop_depth
+        let saved_origin_ptr = self.current_drop_origin_ptr
+        let saved_origin_len = self.current_drop_origin_len
         self.current_function = drop_fn
         self.current_function_name_sym = 0
         self.current_function_node = 0
@@ -17432,7 +17422,7 @@ impl Codegen:
                 let slot = self.tuple_elem_ptr(cap_struct_type, env_ptr, ci as i32)
                 self.mir_emit_drop_ptr_for_sema_type(slot, cap_llvm_types[ci], cap_sema_ty)
         self.mir_emit_with_free_ptr(cell)
-        let _ = wl_build_ret_void(self.builder)
+        wl_build_ret_void(self.builder)
 
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -17588,10 +17578,10 @@ impl Codegen:
         let closure_byval_types = self.fn_abi_byval_attr_types(closure_abi_index)
         self.apply_c_abi_byval_attrs(closure_fn, closure_byval_types, param_count, closure_param_offset)
         // Save current state
-        let saved_fn: i64 = self.current_function
-        let saved_ret: i64 = self.current_ret_type
-        let saved_fn_name_sym: i32 = self.current_function_name_sym
-        let saved_async_rbuf: i64 = self.async_block_rbuf
+        let saved_fn = self.current_function
+        let saved_ret = self.current_ret_type
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_async_rbuf = self.async_block_rbuf
         self.async_block_rbuf = 0
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_allocas = move self.local_allocas
@@ -17794,7 +17784,7 @@ impl Codegen:
             self.mir_emit_failed("a body with no block", closure_name, node, 0)
 
         // Emit MIR statements and terminators
-        let closure_scope: i64 = self.di_current_scope
+        let closure_scope = self.di_current_scope
         for cl_bb in 0..closure_body.block_count():
             if cl_bb < 0 or cl_bb >= self.mir_bb_values.len():
                 continue
@@ -18502,7 +18492,7 @@ impl Codegen:
     // is emitted with it as the current function.
     mut fn emit_runtime_panic_value(msg: i64, loc: i64) -> Unit:
         let str_ty = self.str_llvm_type()
-        let saved_fn: i64 = self.current_function
+        let saved_fn = self.current_function
         self.current_function = wl_get_insert_function(self.builder)
         let params: List[i64] = List.new()
         params.push(str_ty)
@@ -19063,7 +19053,7 @@ impl Codegen:
             wl_build_store(self.builder, result, rbuf_arg)
             wl_build_br(self.builder, wg_after)
             wl_position_at_end(self.builder, wg_after)
-        let _ = wl_build_ret_void(self.builder)
+        wl_build_ret_void(self.builder)
 
         // Restore builder position
         if saved_bb != 0:
@@ -19075,7 +19065,7 @@ impl Codegen:
 
     mut fn gen_async_block(node: i32, parent: &MirBody) -> i64:
         let ab_body = self.prepared_anonymous_body(parent, node, ConstKind.CK_ASYNC_BLOCK)
-        let ctx: i64 = self.context
+        let ctx = self.context
         let ptr_ty = wl_ptr_type(ctx)
         let i32_ty = wl_i32_type(ctx)
         let i64_ty = wl_i64_type(ctx)
@@ -19114,9 +19104,9 @@ impl Codegen:
         let tramp_fn = wl_add_function(self.llmod, tramp_name, tramp_ft)
 
         // 4. Save codegen state
-        let saved_fn: i64 = self.current_function
-        let saved_ret: i64 = self.current_ret_type
-        let saved_async_rbuf: i64 = self.async_block_rbuf
+        let saved_fn = self.current_function
+        let saved_ret = self.current_ret_type
+        let saved_async_rbuf = self.async_block_rbuf
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
@@ -19213,7 +19203,7 @@ impl Codegen:
         // program compiled); TK_RETURN's intercept stores into rbuf.
         for bi in 0..bb_count:
             wl_position_at_end(self.builder, self.mir_bb_values[bi])
-            let _ = self.mir_emit_block_or_report(ab_body, bi, ab_name, node)
+            self.mir_emit_block_or_report(ab_body, bi, ab_name, node)
 
         // 7. Restore codegen state
         self.async_block_rbuf = saved_async_rbuf

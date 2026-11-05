@@ -191,7 +191,7 @@ impl DiagnosticList:
                existing.message == diag.message and
                existing.code == diag.code:
                 return
-        self.items.push(move diag)
+        self.items.push(diag)
 
     // The diagnostics from `start` on in source order: file, then offset,
     // then message; equal keys keep their emission order. A phase whose
@@ -212,7 +212,7 @@ impl DiagnosticList:
     // was to hear something reports nothing.
     mut fn truncate(count: i32):
         while self.items.len() > count:
-            let _ = self.items.remove(count)
+            self.items.remove(count)
 
     fn count() -> i32:
         self.items.len() as i32

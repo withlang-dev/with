@@ -537,7 +537,7 @@ impl Regex:
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
-                            out.push(move captures)
+                            out.push(captures)
                             if found.end == found.start:
                                 if found.end >= text.len():
                                     break

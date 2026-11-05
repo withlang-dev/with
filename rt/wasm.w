@@ -228,8 +228,8 @@ fn wasm_cstr_len(s: *const u8) -> i64:
 fn wasm_align_up(x: i64, a: i64) -> i64:
     ((x + a - 1) / a) * a
 
-fn wasm_write_cstr(fd: i32, s: *const u8):
-    let _ = rt_write(fd, s, wasm_cstr_len(s))
+fn wasm_write_cstr(fd: i32, s: *const u8) -> Unit:
+    rt_write(fd, s, wasm_cstr_len(s))
 
 // ── page allocator behind rt_mmap ─────────────────────────────────────
 //
@@ -275,7 +275,7 @@ pub fn rt_mmap(size: i64) -> *mut u8:
             wasm_free_count = wasm_free_count - 1
             wasm_free_ptrs[best] = wasm_free_ptrs[wasm_free_count]
             wasm_free_sizes[best] = wasm_free_sizes[wasm_free_count]
-        let _ = with_memset(p as *mut u8, 0, need)
+        with_memset(p as *mut u8, 0, need)
         return p as *mut u8
     let start = wasm_align_up(wasm_heap_cur, WASM_MMAP_ALIGN)
     if start + need > wasm_heap_end:
@@ -333,8 +333,6 @@ pub fn rt_exit(code: i32) -> Never:
 pub fn rt_getpid() -> i32: 1
 
 pub fn rt_kill(pid: i32, sig: i32) -> i32:
-    let _ = pid
-    let _ = sig
     wasm_fail(WASI_ENOSYS)
 
 pub fn rt_raise(sig: i32) -> i32:
@@ -342,36 +340,27 @@ pub fn rt_raise(sig: i32) -> i32:
         abort()
     proc_exit(128 + sig)
 
-pub fn rt_backtrace_print() -> Unit:
-    let _ = 0
+pub fn rt_backtrace_print() {}
 
 pub fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64:
-    let _ = start_routine
-    let _ = arg
     -1
 
 pub fn rt_thread_join(handle: i64) -> i32:
-    let _ = handle
     -1
 
 pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32:
-    let _ = resource
-    let _ = lim
     wasm_fail(WASI_ENOSYS)
 
 pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32:
-    let _ = resource
-    let _ = lim
     wasm_fail(WASI_ENOSYS)
 
 pub fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
-    let _ = limit
     -1
 
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32:
     if len < 5:
         return wasm_fail(WASI_EINVAL)
-    let _ = with_memcpy(name, c"wasm".ptr, 5)
+    with_memcpy(name, c"wasm".ptr, 5)
     0
 
 // ── stdio handles ─────────────────────────────────────────────────────
@@ -443,9 +432,6 @@ pub fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
     pos
 
 pub fn rt_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
-    let _ = fd
-    let _ = cmd
-    let _ = arg
     0
 
 // ── preopens, cwd, path resolution ────────────────────────────────────
@@ -492,7 +478,7 @@ fn wasm_normalize_into(src: *const u8, len: i64, out: *mut u8, cap: i64) -> i64:
             return -1
         wasm_store_u8(ob, n, 47)
         n = n + 1
-        let _ = with_memcpy((ob + n) as *mut u8, (sb + i) as *const u8, seg_len)
+        with_memcpy((ob + n) as *mut u8, (sb + i) as *const u8, seg_len)
         n = n + seg_len
         i = j
     if n == 0:
@@ -513,16 +499,16 @@ fn wasm_absolute_into(path: *const u8, out: *mut u8, cap: i64) -> i64:
         return -1
     var joined: [4096]u8 = [0 as u8; 4096]
     let jb = (&raw mut joined) as *mut [4096]u8 as i64
-    let _ = with_memcpy(jb as *mut u8, wasm_cwd as *const u8, wasm_cwd_len)
+    with_memcpy(jb as *mut u8, wasm_cwd as *const u8, wasm_cwd_len)
     wasm_store_u8(jb, wasm_cwd_len, 47)
-    let _ = with_memcpy((jb + wasm_cwd_len + 1) as *mut u8, path, plen)
+    with_memcpy((jb + wasm_cwd_len + 1) as *mut u8, path, plen)
     wasm_normalize_into(jb as *const u8, wasm_cwd_len + 1 + plen, out, cap)
 
 fn wasm_dup_bytes(src: *const u8, len: i64) -> i64:
     let p = with_alloc(len + 1)
     if p as i64 == 0:
         return 0
-    let _ = with_memcpy(p, src, len)
+    with_memcpy(p, src, len)
     wasm_store_u8(p as i64, len, 0)
     p as i64
 
@@ -624,7 +610,7 @@ fn wasm_resolve(path: *const u8, out: *mut u8, cap: i64, fd_out: *mut i32) -> i6
         return 1
     if rel_len + 1 > cap:
         return wasm_fail(37) as i64
-    let _ = with_memcpy(out, (ab as i64 + start) as *const u8, rel_len)
+    with_memcpy(out, (ab as i64 + start) as *const u8, rel_len)
     wasm_store_u8(out as i64, rel_len, 0)
     rel_len
 
@@ -632,7 +618,7 @@ pub fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
     wasm_init_cwd()
     if size < wasm_cwd_len + 1:
         return wasm_fail(68)
-    let _ = with_memcpy(buf, wasm_cwd as *const u8, wasm_cwd_len + 1)
+    with_memcpy(buf, wasm_cwd as *const u8, wasm_cwd_len + 1)
     0
 
 pub fn rt_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char:
@@ -669,7 +655,6 @@ fn wasm_open_wasi(path: *const u8, oflags: i32, fdflags: i32, rights: i64) -> i3
     wasm_open_rel(dirfd, rb as *const u8, n, oflags, fdflags, rights, 1)
 
 pub fn rt_open(path: *const c_char, flags: i32, mode: i32) -> i32:
-    let _ = mode
     var oflags = 0
     var fdflags = 0
     if (flags & RT_O_CREAT) != 0: oflags = oflags | WASI_O_CREAT
@@ -681,7 +666,6 @@ pub fn rt_open(path: *const c_char, flags: i32, mode: i32) -> i32:
 // The cimport_stubs spelling of open(2): its flag bits are
 // O_APPEND=0x0008, O_CREAT=0x0200, O_TRUNC=0x0400, O_EXCL=0x0800.
 pub fn __open(path: *const c_char, flags: i32, mode: i32) -> i32:
-    let _ = mode
     var oflags = 0
     var fdflags = 0
     if (flags & 0x0200) != 0: oflags = oflags | WASI_O_CREAT
@@ -736,7 +720,6 @@ fn wasm_lstat_is_dir(path: *const u8) -> bool:
     mode >= 0 and (mode & RT_S_IFMT) == RT_S_IFDIR
 
 pub fn rt_access(path: *const c_char, mode: i32) -> i32:
-    let _ = mode
     var st: [64]u8 = [0 as u8; 64]
     let base = (&raw mut st) as *mut [64]u8 as i64
     wasm_path_stat(path, 1, base)
@@ -744,8 +727,6 @@ pub fn rt_access(path: *const c_char, mode: i32) -> i32:
 pub fn rt_chmod(path: *const c_char, mode: i32) -> i32:
     // WASI preview1 has no permission bits to set; the file keeps the
     // host's defaults.
-    let _ = path
-    let _ = mode
     0
 
 // A resolved path plus the WASI directory it lives in, for the
@@ -769,7 +750,6 @@ fn wasm_path_call(path: *const u8, op: i32) -> i32:
     0
 
 pub fn rt_mkdir(path: *const c_char, mode: i32) -> i32:
-    let _ = mode
     wasm_path_call(path, 0)
 
 pub fn rt_unlink(path: *const c_char) -> i32:
@@ -831,7 +811,7 @@ pub fn rt_readlink(path: *const c_char) -> str:
     var used: i32 = 0
     let rc = path_readlink(dirfd, rb as *const u8, n as i32, bb, 4095, &raw mut used)
     if rc != 0:
-        let _ = wasm_fail(rc)
+        wasm_fail(rc)
         return rt_empty_str()
     with_str_from_bytes(bb as *const u8, used as i64)
 
@@ -853,8 +833,8 @@ fn wasm_read_dir_names(path: *const u8, len_out: *mut i64) -> *mut u8:
         var used: i32 = 0
         let rc = fd_readdir(fd, bb as *mut u8, 4096, cookie, &raw mut used)
         if rc != 0:
-            let _ = wasm_fail(rc)
-            let _ = fd_close(fd)
+            wasm_fail(rc)
+            fd_close(fd)
             with_free(out)
             return 0 as *mut u8
         var pos: i64 = 0
@@ -873,11 +853,11 @@ fn wasm_read_dir_names(path: *const u8, len_out: *mut i64) -> *mut u8:
                     while used_out + name_len + 1 > new_cap:
                         new_cap = new_cap * 2
                     let grown = with_alloc(new_cap)
-                    let _ = with_memcpy(grown, out as *const u8, used_out)
+                    with_memcpy(grown, out as *const u8, used_out)
                     with_free(out)
                     out = grown
                     cap = new_cap
-                let _ = with_memcpy((out as i64 + used_out) as *mut u8, name_ptr as *const u8, name_len)
+                with_memcpy((out as i64 + used_out) as *mut u8, name_ptr as *const u8, name_len)
                 used_out = used_out + name_len
                 wasm_store_u8(out as i64, used_out, 0)
                 used_out = used_out + 1
@@ -886,7 +866,7 @@ fn wasm_read_dir_names(path: *const u8, len_out: *mut i64) -> *mut u8:
             progressed = true
         if (used as i64) < 4096 or not progressed:
             done = true
-    let _ = fd_close(fd)
+    fd_close(fd)
     unsafe *len_out = used_out
     out
 
@@ -896,12 +876,12 @@ fn wasm_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) ->
     if plen + 1 + nlen + 1 > cap:
         return -1
     let ob = out as i64
-    let _ = with_memcpy(out, parent, plen)
+    with_memcpy(out, parent, plen)
     var at = plen
     if plen > 0 and wasm_load_u8(parent as i64, plen - 1) != 47:
         wasm_store_u8(ob, at, 47)
         at = at + 1
-    let _ = with_memcpy((ob + at) as *mut u8, name, nlen)
+    with_memcpy((ob + at) as *mut u8, name, nlen)
     wasm_store_u8(ob, at + nlen, 0)
     0
 
@@ -920,7 +900,7 @@ fn rt_list_push(acc: *mut i64, text: *const u8, n: i64):
         cap = new_cap
         unsafe *(acc as *mut *mut u8) = buf
         unsafe *((acc as i64 + 16) as *mut i64) = cap
-    let _ = with_memcpy((buf as i64 + len) as *mut u8, text, n)
+    with_memcpy((buf as i64 + len) as *mut u8, text, n)
     unsafe *((buf as i64 + len + n) as *mut u8) = 10 as u8
     unsafe *((acc as i64 + 8) as *mut i64) = len + n + 1
 
@@ -1008,7 +988,7 @@ fn rt_copy_file(src: *const u8, dst: *const u8) -> i32:
         return in_fd
     let out_fd = wasm_open_wasi(dst, WASI_O_CREAT | WASI_O_TRUNC, 0, wasm_open_rights(RT_O_WRONLY))
     if out_fd < 0:
-        let _ = fd_close(in_fd)
+        fd_close(in_fd)
         return out_fd
     let cap: i64 = 65536
     let buf = with_alloc(cap)
@@ -1025,8 +1005,8 @@ fn rt_copy_file(src: *const u8, dst: *const u8) -> i32:
             rc = if w < 0: w as i32 else: -5
             break
     with_free(buf)
-    let _ = fd_close(in_fd)
-    let _ = fd_close(out_fd)
+    fd_close(in_fd)
+    fd_close(out_fd)
     rc
 
 pub fn rt_copy_tree(src: *const c_char, dst: *const c_char) -> i32:
@@ -1142,9 +1122,9 @@ pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     if entry as i64 == 0:
         return -1
     let eb = entry as i64
-    let _ = with_memcpy(entry, wasm_str_data(name), nlen)
+    with_memcpy(entry, wasm_str_data(name), nlen)
     wasm_store_u8(eb, nlen, 61)
-    let _ = with_memcpy((eb + nlen + 1) as *mut u8, wasm_str_data(value), vlen)
+    with_memcpy((eb + nlen + 1) as *mut u8, wasm_str_data(value), vlen)
     wasm_store_u8(eb, nlen + 1 + vlen, 0)
     var i: i64 = 0
     while i < wasm_env_count:
@@ -1159,7 +1139,7 @@ pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     if wasm_env_count + 1 >= wasm_env_cap:
         let new_cap = wasm_env_cap * 2
         let grown = with_alloc(new_cap * WASM_PTR)
-        let _ = with_memcpy(grown, wasm_env as *const u8, wasm_env_count * WASM_PTR)
+        with_memcpy(grown, wasm_env as *const u8, wasm_env_count * WASM_PTR)
         wasm_env = grown as i64
         wasm_env_cap = new_cap
     wasm_store_ptr(wasm_env, wasm_env_count * WASM_PTR, entry as *const u8)
@@ -1274,51 +1254,33 @@ pub fn rt_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens:
 fn rt_net_empty_str() -> str: rt_empty_str()
 
 pub fn with_net_tcp_connect(host: &str, port: i32) -> i32:
-    let _ = host
-    let _ = port
     wasm_fail(WASI_ENOSYS)
 
 pub fn with_net_tcp_connect_timeout(host: &str, port: i32, timeout_ms: i32) -> i32:
-    let _ = host
-    let _ = port
-    let _ = timeout_ms
     wasm_fail(WASI_ENOSYS)
 
 pub fn with_net_set_timeout(sock: i32, timeout_ms: i32) -> i32:
-    let _ = sock
-    let _ = timeout_ms
     wasm_fail(WASI_ENOSYS)
 
 pub fn with_net_udp_connect(host: &str, port: i32) -> i32:
-    let _ = host
-    let _ = port
     wasm_fail(WASI_ENOSYS)
 
 pub fn with_net_tcp_listen(port: i32, backlog: i32) -> i32:
-    let _ = port
-    let _ = backlog
     wasm_fail(WASI_ENOSYS)
 
 pub fn with_net_tcp_accept(sock: i32) -> i32:
-    let _ = sock
     wasm_fail(WASI_ENOSYS)
 
 pub fn with_net_udp_bind(port: i32) -> i32:
-    let _ = port
     wasm_fail(WASI_ENOSYS)
 
 pub fn with_net_sock_port(sock: i32) -> i32:
-    let _ = sock
     wasm_fail(WASI_ENOSYS)
 
 pub fn with_net_send(sock: i32, data: &str) -> i64:
-    let _ = sock
-    let _ = data
     wasm_fail(WASI_ENOSYS) as i64
 
 pub fn with_net_recv(sock: i32, max_len: i64) -> str:
-    let _ = sock
-    let _ = max_len
     rt_net_empty_str()
 
 pub fn with_net_close(sock: i32) -> i32:
@@ -1330,63 +1292,37 @@ pub fn with_net_close(sock: i32) -> i32:
 // Every exec reports failure (-1) the way a failed fork does natively;
 // the interrupt/limit hooks are no-ops.
 
-pub fn rt_compat_install_interrupt_handlers() -> Unit:
-    let _ = 0
+pub fn rt_compat_install_interrupt_handlers() {}
 
-pub fn rt_compat_raise_stack_limit() -> Unit:
-    let _ = 0
+pub fn rt_compat_raise_stack_limit() {}
 
 pub fn rt_compat_interrupt_requested() -> i32: 0
 
 pub fn rt_compat_exec_binary(path: &str) -> i32:
-    let _ = path
     -1
 
 pub fn rt_compat_exec_argv(args: &str) -> i32:
-    let _ = args
     -1
 
 pub fn rt_compat_exec_argv_cwd(args: &str, cwd: &str) -> i32:
-    let _ = args
-    let _ = cwd
     -1
 
 pub fn rt_compat_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
-    let _ = args
-    let _ = stdout_path
-    let _ = stderr_path
-    let _ = timeout_ms
     -1
 
 pub fn rt_compat_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32:
-    let _ = args
-    let _ = stdout_path
-    let _ = stderr_path
-    let _ = timeout_ms
-    let _ = stdin_path
     -1
 
 pub fn rt_compat_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32:
-    let _ = args
-    let _ = stdout_path
-    let _ = stderr_path
-    let _ = timeout_ms
-    let _ = cwd
     -1
 
 pub fn rt_compat_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32:
-    let _ = args
-    let _ = stdout_path
-    let _ = stderr_path
     -1
 
 pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
-    let _ = pid
-    let _ = timeout_ms
     -1
 
 pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
-    let _ = pid
     -1
 
 pub fn rt_compat_exec_child_maxrss() -> i64: 0

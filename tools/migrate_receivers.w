@@ -202,7 +202,7 @@ fn migrate_file(path: &str) -> i32:
         result = result ++ text.slice(prev as i64, s as i64) ++ r
         prev = en
     result = result ++ text.slice(prev as i64, text.len() as i64)
-    let _ = unsafe { with_fs_write_file(path, result) }
+    unsafe { with_fs_write_file(path, result) }
     methods
 
 fn path_excluded(path: &str, excludes: &List[str]) -> bool:

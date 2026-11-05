@@ -128,7 +128,7 @@ fn ar_sort_symbols(items: List[ArSymbol]) -> List[ArSymbol]:
         let tail: List[ArSymbol] = List.new()
         while result.len() > pos:
             tail.push(result.remove(pos as i64))
-        result.push(move item)
+        result.push(item)
         while tail.len() > 0:
             result.push(tail.remove(0))
     result
@@ -437,7 +437,7 @@ fn create_static_archive(output_path: &str, member_paths: &List[str]) -> i32:
             extract_macho_symbols(data)
         for si in 0..syms.len():
             let sym = ArSymbol { name: with_str_clone_ref(syms[si]), member_index: i as i32 }
-            all_symbols.push(move sym)
+            all_symbols.push(sym)
     let sorted = ar_sort_symbols(all_symbols)
     if gnu_index:
         return create_gnu_indexed_archive(output_path, member_names, member_data, sorted)

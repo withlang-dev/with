@@ -36,16 +36,16 @@ var stuck = 0
 let list_text = read_file(list_file).unwrap_or("".clone())
 for f in list_text.split("\n"):
     if f.len() == 0: continue
-    let _ = sh(stage1 ++ " check " ++ f ++ " 2> " ++ diag_tmp)
+    sh(stage1 ++ " check " ++ f ++ " 2> " ++ diag_tmp)
     var n = gate_count(diag_tmp)
     if n == 0: continue
     affected = affected + 1
     if d_corpus.len() > 0:
-        let _ = sh("mkdir -p " ++ d_corpus ++ " && cp " ++ f ++ " " ++ d_corpus ++ "/")
+        sh("mkdir -p " ++ d_corpus ++ " && cp " ++ f ++ " " ++ d_corpus ++ "/")
     var pass = 0
     while n > 0 and pass < 4:
-        let _ = sh("with run tools/insert_std_uses.w --apply " ++ diag_tmp ++ " > /dev/null 2>&1")
-        let _ = sh(stage1 ++ " check " ++ f ++ " 2> " ++ diag_tmp)
+        sh("with run tools/insert_std_uses.w --apply " ++ diag_tmp ++ " > /dev/null 2>&1")
+        sh(stage1 ++ " check " ++ f ++ " 2> " ++ diag_tmp)
         n = gate_count(diag_tmp)
         pass = pass + 1
     if n == 0:

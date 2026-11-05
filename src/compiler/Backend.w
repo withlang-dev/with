@@ -68,7 +68,7 @@ impl Zcu:
         var backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         var tracked_paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, cg.tracked_input_paths)
+        self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, cg.tracked_input_paths)
         self.last_bundle_unlowered_globals = sema_clone_str_list(cg.bundle_unlowered_globals)
         self.last_bundle_carried_paths = sema_clone_str_list(cg.bundle_carried_paths)
         if result != 0:
@@ -159,20 +159,20 @@ impl Zcu:
             if do_profile:
                 runtime_eprint(f"[profile] llvm.unit{k}.symbols_added {cg.intern.symbol_count() - unit_symbols_before}")
             var tracked = move self.tracked_input_paths
-            self.tracked_input_paths = tracked_input_merge_unique(move tracked, cg.tracked_input_paths)
+            self.tracked_input_paths = tracked_input_merge_unique(tracked, cg.tracked_input_paths)
             if rc != 0:
                 self.last_sema = cg.take_sema()
                 runtime_eprint(codegen_failure_message(f"error: code generation failed for unit {k}", cg.codegen_error_detail))
-                let _ = pipeline.finish()
+                pipeline.finish()
                 return 1
             codegen_units_apply_global_ownership(cg.llmod, k)
             if keep_bitcode and wl_write_bitcode(cg.llmod, f"{output_path}.u{k}.gen.bc") != 0:
                 self.last_sema = cg.take_sema()
                 runtime_eprint(f"error: unit bitcode write failed for unit {k}")
-                let _ = pipeline.finish()
+                pipeline.finish()
                 return 1
-            let unit_context: i64 = cg.context
-            let unit_module: i64 = cg.llmod
+            let unit_context = cg.context
+            let unit_module = cg.llmod
             cg.release_llvm_module()
             pipeline.submit(k, unit_context, unit_module)
             self.last_sema = cg.take_sema()
@@ -221,7 +221,7 @@ impl Zcu:
         var backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         var tracked_paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, cg.tracked_input_paths)
+        self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, cg.tracked_input_paths)
         self.last_sema = cg.take_sema()
         if result != 0:
             runtime_eprint(codegen_failure_message("error: code generation failed", cg.codegen_error_detail))
@@ -268,7 +268,7 @@ impl Zcu:
         if rc != 0:
             cg.analysis_fail("code generation failed during integrated analysis")
         let status = if rc != 0: 1 else: cg.analysis_status()
-        self.last_mir_module = move backend_mir
+        self.last_mir_module = backend_mir
         self.last_sema = cg.take_sema()
         AnalysisBackendResult { report: move cg.analysis_report, status }
 

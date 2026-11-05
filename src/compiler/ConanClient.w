@@ -741,8 +741,8 @@ fn conan_scan_libraries(dep_dir: &str) -> ConanLibraryScan:
         if conan_is_link_library_path(path):
             let lib = conan_library_name_from_path(path)
             if lib.len() > 0:
-                libs = conan_sorted_insert_unique(move libs, lib)
-                lib_paths = conan_sorted_insert_unique(move lib_paths, conan_relative_path(dep_dir, conan_path_dirname(path)))
+                libs = conan_sorted_insert_unique(libs, lib)
+                lib_paths = conan_sorted_insert_unique(lib_paths, conan_relative_path(dep_dir, conan_path_dirname(path)))
     ConanLibraryScan { lib_paths, libs }
 
 // ── What a consumer links ────────────────────────────────────────────
@@ -967,16 +967,16 @@ fn conan_known_link_metadata(name: &str, version: &str, libs: List[str], link_ar
     var out_libs = libs
     var out_args = link_args
     if version == "system" and conan_system_package_lib(name).len() > 0:
-        out_libs = conan_sorted_insert_unique(move out_libs, conan_system_package_lib(name))
+        out_libs = conan_sorted_insert_unique(out_libs, conan_system_package_lib(name))
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
     if name == "opengl" and version == "system":
         if os == "Macos":
             out_args.push("-framework")
             out_args.push("OpenGL")
         else if os == "Windows":
-            out_libs = conan_sorted_insert_unique(move out_libs, "opengl32")
+            out_libs = conan_sorted_insert_unique(out_libs, "opengl32")
         else if os == "Linux":
-            out_libs = conan_sorted_insert_unique(move out_libs, "GL")
+            out_libs = conan_sorted_insert_unique(out_libs, "GL")
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
     if name == "xorg" and version == "system" and os == "Linux":
@@ -989,7 +989,7 @@ fn conan_known_link_metadata(name: &str, version: &str, libs: List[str], link_ar
         xlibs.push("Xext")
         xlibs.push("Xfixes")
         for i in 0..xlibs.len():
-            out_libs = conan_sorted_insert_unique(move out_libs, xlibs[i])
+            out_libs = conan_sorted_insert_unique(out_libs, xlibs[i])
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
     ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
@@ -1009,7 +1009,7 @@ fn conan_write_known_system_package(name: &str, version: &str, project_root: &st
     var defines: List[str] = List.new()
     var link_args: List[str] = List.new()
     if name == "opengl" and conan_detect_os() == "Macos":
-        defines = conan_sorted_insert_unique(move defines, "GL_SILENCE_DEPRECATION=1")
+        defines = conan_sorted_insert_unique(defines, "GL_SILENCE_DEPRECATION=1")
     let known = conan_known_link_metadata(name, version, libs, link_args)
     // Names only: which host file a name means is the link's to find
     // (compiler.HostLibs), on the machine that links.
@@ -1074,7 +1074,7 @@ fn conan_built_package_link(dep_dir: &str, requirements: &List[str], pc_texts: &
         for w in pc_link.warnings: out.warnings.push(w)
         for c in recipe_link.components:
             var merged = ConanComponentLink { name: c.name, libs: c.libs.clone(), lib_paths: c.lib_paths.clone(), link_args: c.link_args.clone(), defines: c.defines.clone(), include_paths: c.include_paths.clone(), requires: c.requires.clone() }
-            if c.libs.len() > 0: merged = conan_component_add_links(move merged, extra_libs, pc_link.components[0].link_args)
+            if c.libs.len() > 0: merged = conan_component_add_links(merged, extra_libs, pc_link.components[0].link_args)
             out.components.push(merged)
         return out
     // The build did not produce the libraries the recipe names: the build's
@@ -1088,13 +1088,13 @@ fn conan_built_package_link(dep_dir: &str, requirements: &List[str], pc_texts: &
         for fw in info.root.frameworks:
             frameworks.push("-framework")
             frameworks.push(fw)
-        whole = conan_component_add_links(move whole, info.root.system_libs, frameworks)
+        whole = conan_component_add_links(whole, info.root.system_libs, frameworks)
         for c in info.components:
             var component_frameworks: List[str] = List.new()
             for fw in c.frameworks:
                 component_frameworks.push("-framework")
                 component_frameworks.push(fw)
-            whole = conan_component_add_links(move whole, c.system_libs, component_frameworks)
+            whole = conan_component_add_links(whole, c.system_libs, component_frameworks)
         for n in info.notes: out.warnings.push("recipe " ++ n)
     out.components.push(whole)
     out
@@ -1515,7 +1515,7 @@ fn conan_cmake_collect(project_root: &str, reference: &str, set: ConanCMakeLinkS
         out.options = conan_cmake_push_unique(move out.options, arg)
         i = i + 1
     for required in project_config_json_str_array(meta, "requires"):
-        out = conan_cmake_collect(project_root, required, move out, depth + 1)
+        out = conan_cmake_collect(project_root, required, out, depth + 1)
     out
 
 // One element of a CMake list inside a quoted argument; "" when it cannot be

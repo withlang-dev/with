@@ -722,14 +722,14 @@ fn ci_migrate_merge_shared_fragment_text(text: &str):
             if sep > 0:
                 let kind = marker.slice(0, sep as i64)
                 let name = marker.slice((sep + 1) as i64, marker.len())
-                let _ = ci_migrate_shared_decl_add(kind, name, body)
+                ci_migrate_shared_decl_add(kind, name, body)
         else if ci_starts_with(line, "@@PENDING|"):
             let marker = line.slice(10, line.len())
             let sep = ci_find_str(marker, "|")
             if sep > 0:
                 let kind = marker.slice(0, sep as i64)
                 let name = marker.slice((sep + 1) as i64, marker.len())
-                let _ = ci_migrate_shared_ownerless_extern_add(kind, name, body)
+                ci_migrate_shared_ownerless_extern_add(kind, name, body)
         else if line == "@@USES":
             ci_migrate_merge_usage_keys(body)
         pos = body_end + 7
@@ -1110,7 +1110,7 @@ impl CiProject:
     // Every unit of the migration is a module before any file is scanned,
     // so a header's owner resolves whatever the scan order.
     mut fn register_modules(files: &List[str]):
-        for path in files: let _ = self.ensure_module(path)
+        for path in files: self.ensure_module(path)
 
     // A unit the scan cannot use: the reason is said, kept for a report that
     // names unread units (D121 step 5), and the session released.
@@ -3027,10 +3027,10 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
                 let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
                 if is_const != 0 or ci_starts_with(resolved_type, "List["):
                     let rendered = tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
-                    let _ = ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered)
+                    ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered)
                 else:
                     let rendered = tl_attr ++ "extern var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
-                    let _ = ci_migrate_shared_ownerless_extern_add("extern_var", safe_name, rendered)
+                    ci_migrate_shared_ownerless_extern_add("extern_var", safe_name, rendered)
         return ""
     if want_definitions and not emits_definition:
         return ""

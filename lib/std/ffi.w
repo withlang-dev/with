@@ -34,7 +34,7 @@ use rt.rt_core
 /// refuses it (§5.1: "an ephemeral value cannot be stored on the heap"), as it
 /// refuses `Box.new` of one (#987).
 pub fn box_ctx[T](value: T) -> *mut c_void:
-    Box.new(move value) as *mut c_void
+    Box.new(value) as *mut c_void
 
 /// Borrow the boxed context immutably. The caller recovers the type by casting
 /// (`ctx_ref(cb.ctx as *mut State)`) and asserts the pointer is a live `T`.

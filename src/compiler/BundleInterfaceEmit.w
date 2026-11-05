@@ -1317,7 +1317,7 @@ impl BundleEmitter:
             if kind == NodeKind.NK_FN_DECL:
                 if sema.impl_node_for_method_decl(decl) != 0:
                     continue
-                let _ = self.fn_text(sema, di, decl, false, false)
+                self.fn_text(sema, di, decl, false, false)
                 continue
             if kind == NodeKind.NK_EXTERN_FN:
                 self.emit_extern(sema, di, decl)

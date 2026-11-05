@@ -314,16 +314,16 @@ fn emitc_collect_exports_from_text(ctx: &ActionCtx, text: &str, source_path: &st
             if line.starts_with("pub fn ") or line.starts_with("pub unsafe fn "):
                 let fn_sig = emitc_parse_export_function(pending_symbol, line)
                 if fn_sig.ok == 0:
-                    let _ = emitc_fail(ctx, "could not parse c_export signature for " ++ pending_symbol ++ " in " ++ source_path)
+                    emitc_fail(ctx, "could not parse c_export signature for " ++ pending_symbol ++ " in " ++ source_path)
                     return List.new()
                 exports.push(fn_sig)
                 pending_symbol = ""
                 continue
             if line.len() > 0 and not line.starts_with("//"):
-                let _ = emitc_fail(ctx, "c_export is not followed by a function in " ++ source_path ++ ": " ++ pending_symbol)
+                emitc_fail(ctx, "c_export is not followed by a function in " ++ source_path ++ ": " ++ pending_symbol)
                 return List.new()
     if pending_symbol.len() > 0:
-        let _ = emitc_fail(ctx, "unterminated c_export in " ++ source_path ++ ": " ++ pending_symbol)
+        emitc_fail(ctx, "unterminated c_export in " ++ source_path ++ ": " ++ pending_symbol)
         return List.new()
     exports
 
@@ -358,7 +358,7 @@ fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: 
             continue
         let fn_sig = emitc_parse_export_function(name, line)
         if fn_sig.ok == 0:
-            let _ = emitc_fail(ctx, "could not parse public ABI signature for " ++ name ++ " in " ++ source_path)
+            emitc_fail(ctx, "could not parse public ABI signature for " ++ name ++ " in " ++ source_path)
             return (false, List.new())
         exports.push(fn_sig)
     (true, exports)
@@ -372,7 +372,7 @@ fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> (bool, List[
         let source_path = sources[si]
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
-            let _ = emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
+            emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
             return (false, List.new())
         let (ok, found) = emitc_collect_public_abi_from_text(ctx, text, source_path)
         if not ok:
@@ -389,7 +389,7 @@ fn emitc_collect_exports(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunct
         let source_path = sources[si]
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
-            let _ = emitc_fail(ctx, "could not read source for export scan: " ++ source_path)
+            emitc_fail(ctx, "could not read source for export scan: " ++ source_path)
             return List.new()
         var exports = emitc_collect_exports_from_text(ctx, text, source_path)
         if exports.len() == 0:
@@ -560,13 +560,13 @@ fn emitc_compile_c_compiler(ctx: &ActionCtx, compiler_path: &str, main_c: &str, 
     if not fs.exists(llvm_rsp) or fs.read_text(llvm_rsp).len() == 0:
         return emitc_fail(ctx, "missing LLVM link metadata: " ++ llvm_rsp)
     var argv: List[str] = List.new()
-    argv = emitc_push_c_compiler(move argv, root, compiler_path)
+    argv = emitc_push_c_compiler(argv, root, compiler_path)
     argv |> push("-O1")
-    argv = emitc_push_host_c_flags(move argv)
+    argv = emitc_push_host_c_flags(argv)
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
-    argv = emitc_push_c_source(move argv, emitc_abs(root, main_c))
-    argv = emitc_compile_runtime_args(root, move argv)
+    argv = emitc_push_c_source(argv, emitc_abs(root, main_c))
+    argv = emitc_compile_runtime_args(root, argv)
     argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
@@ -585,12 +585,12 @@ fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_p
     var argv: List[str] = List.new()
     argv |> push(emitc_abs(root, cc_path))
     argv |> push("-O1")
-    argv = emitc_push_host_c_flags(move argv)
+    argv = emitc_push_host_c_flags(argv)
     argv |> push("-fuse-ld=lld")
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
-    argv = emitc_push_c_source(move argv, emitc_abs(root, main_c))
-    argv = emitc_compile_runtime_args(root, move argv)
+    argv = emitc_push_c_source(argv, emitc_abs(root, main_c))
+    argv = emitc_compile_runtime_args(root, argv)
     argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
@@ -690,16 +690,16 @@ fn emitc_build_hello_c(ctx: &ActionCtx, compiler_path: &str, hello_c: &str) -> i
 fn emitc_compile_hello(ctx: &ActionCtx, compiler_path: &str, hello_c: &str, output_path: &str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: List[str] = List.new()
-    argv = emitc_push_c_compiler(move argv, root, compiler_path)
+    argv = emitc_push_c_compiler(argv, root, compiler_path)
     argv |> push("-O1")
-    argv = emitc_push_host_c_flags(move argv)
+    argv = emitc_push_host_c_flags(argv)
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
-    argv = emitc_push_c_source(move argv, emitc_abs(root, hello_c))
-    argv = emitc_compile_runtime_args(root, move argv)
+    argv = emitc_push_c_source(argv, emitc_abs(root, hello_c))
+    argv = emitc_compile_runtime_args(root, argv)
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
-    argv = emitc_push_system_libs(move argv)
+    argv = emitc_push_system_libs(argv)
     emitc_run_capture(ctx, "compile-hello", argv, 600000)
 
 fn emitc_run_hello(ctx: &ActionCtx, hello_path: &str) -> i32:

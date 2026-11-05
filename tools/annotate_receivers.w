@@ -204,7 +204,7 @@ fn annotate_file(path: &str, exact_facts: &ReceiverModeFacts) -> i32:
         result = result ++ slice(text, prev, starts[e]) ++ repls[e]
         prev = ends[e]
     result = result ++ slice(text, prev, tlen)
-    let _ = unsafe { with_fs_write_file(path, result) }
+    unsafe { with_fs_write_file(path, result) }
     print(f"{path}: annotated {count}")
     count
 

@@ -47,9 +47,9 @@ fn wait_or_kill(pid: i32, timeout_ms: i32) -> i32:
     unsafe:
         with_exec_wait(pid, timeout_ms)
 
-fn nap_us(us: i32):
+fn nap_us(us: i32) -> Unit:
     unsafe:
-        let _ = with_usleep(us)
+        with_usleep(us)
 
 fn clock_ns() -> i64:
     unsafe:
@@ -1015,7 +1015,7 @@ fn last_int_line(s: str) -> str:
 // verdict is read by classify_cell once the child exits.
 fn start_cell(with_bin: &str, dir: &str, idx: isize, source: &str) -> i32:
     let path = dir ++ f"/cell_{idx}.w"
-    let _ = write_file(path, source)
+    write_file(path, source)
     spawn_capture(argv4(with_bin, "run", "--debug-alloc", path), dir ++ f"/cell_{idx}.out", dir ++ f"/cell_{idx}.err")
 
 fn classify_cell(dir: &str, idx: isize, rc: i32, expect_sum: i32, expect_clean: bool) -> str:
@@ -1100,7 +1100,7 @@ fn main:
             let cell = job / sides
             verdicts[job] = if job % sides == 1: classify_cell(&baseline_dir, cell, rc, cells[cell].expect_sum, cells[cell].expect_clean) else: classify_cell(&candidate_dir, cell, rc, cells[cell].expect_sum, cells[cell].expect_clean)
             live[li] = live[live.len() - 1]
-            let _ = live.pop()
+            live.pop()
             finished = finished + 1
             reaped = true
         if not reaped and live.len() > 0:

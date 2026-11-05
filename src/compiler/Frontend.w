@@ -48,7 +48,7 @@ fn frontend_cimport_lock():
     while frontend_cimport_lock_word.swap(1, .Acquire) != 0:
         spins = spins + 1
         if spins >= 1024:
-            let _ = runtime_nanosleep(1000)
+            runtime_nanosleep(1000)
             spins = 0
 
 fn frontend_cimport_unlock():
@@ -166,7 +166,7 @@ impl Zcu:
         // memory (release-lane c_import SEGV: quoted-path text read as a
         // str header in tracked_input_str_compare).
         var paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
+        self.tracked_input_paths = tracked_input_insert_unique(paths, path)
 
 fn count_non_use_decls_frontend(pool: &AstPool) -> i32:
     var count: i32 = 0
@@ -262,7 +262,6 @@ fn c_import_str_contains(text: &str, needle: &str) -> bool:
 
 impl Zcu:
     fn read_trace_c_import_cache_frontend() -> bool:
-        let _ = self
         let raw = runtime_getenv("WITH_TRACE_CIMPORT_CACHE")
         if raw.len() == 0:
             return false
@@ -506,7 +505,7 @@ impl Zcu:
                     let view_types = facade_render_record_view_names(out, self.pool, 0)
                     for vi in 0..view_types.len():
                         nm_types.push(frontend_owned_text(view_types[vi]))
-                    ci_set_no_methods(c_import_no_methods_all(nm_packed), move nm_types)
+                    ci_set_no_methods(c_import_no_methods_all(nm_packed), nm_types)
                     let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines, self.c_import_is_cxx_frontend(out, decl))
                     ci_clear_no_methods()
                     if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
@@ -559,12 +558,12 @@ impl Zcu:
             // c_import error and warning). Its decls keep the importer's
             // module path — ownership is the importer's — but carry this file
             // id, so span reasoning never crosses the two coordinate spaces.
-            let ci_file_id: i32 = self.next_file_id
+            let ci_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(ci_file_id, "<c_import " ++ header_spec ++ ">", synthetic)
             var lexer = Lexer.init(synthetic, ci_file_id)
             let tokens = lexer.tokenize()
-            var parser = Parser.init_with_pool(move tokens, synthetic, ci_file_id, self.pool, move self.diagnostics, out)
+            var parser = Parser.init_with_pool(tokens, synthetic, ci_file_id, self.pool, move self.diagnostics, out)
             out = parser.parse_module()
             self.diagnostics = move parser.diags
 
@@ -672,7 +671,7 @@ impl Zcu:
                 // took `domain environ` out of its text while its getenv row
                 // still named it ("unknown domain 'environ'").
                 if not self.decl_source_path_frontend(i).starts_with("<embedded-rt>/"):
-                    claimed = self.collect_facade_claims_frontend(out, decl as i32, move claimed)
+                    claimed = self.collect_facade_claims_frontend(out, decl as i32, claimed)
                 continue
             if i >= self.decl_is_c_import.len() or self.decl_is_c_import[i] == 0:
                 continue
@@ -689,13 +688,13 @@ impl Zcu:
     // of decl `owner`, like a `<c_import …>` translation.
     mut fn splice_facade_text_frontend(pool: AstPool, text: &str, file_name: &str, owner: i32) -> AstPool:
         var out = pool
-        let file_id: i32 = self.next_file_id
+        let file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(file_id, file_name, text)
         let before = out.decl_count()
         var lexer = Lexer.init(text, file_id)
         let tokens = lexer.tokenize()
-        var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, out)
+        var parser = Parser.init_with_pool(tokens, text, file_id, self.pool, move self.diagnostics, out)
         out = parser.parse_module()
         self.diagnostics = move parser.diags
         self.append_decl_source_paths(out.decl_count() - before, self.decl_source_path_frontend(owner), file_id)
@@ -1205,7 +1204,6 @@ impl Zcu:
             pos = line_end + 1
 
     mut fn c_import_emit_header_error_detail_frontend(decl: i32, header_spec: &str, detail: &str):
-        let _ = decl
         let span = Span {
             file: 0,
             start: self.current_source_text.len() as i32,
@@ -2049,7 +2047,7 @@ impl Zcu:
             let synthetic = "use " ++ prelude_module ++ "\n"
             var plexer = Lexer.init(synthetic, 0)
             let ptokens = plexer.tokenize()
-            var pparser = Parser.init(move ptokens, synthetic, 0, self.pool, move self.diagnostics)
+            var pparser = Parser.init(ptokens, synthetic, 0, self.pool, move self.diagnostics)
             pool = pparser.parse_module()
             self.diagnostics = move pparser.diags
             self.seed_decl_source_paths(pool, name, file_id)
@@ -2063,7 +2061,7 @@ impl Zcu:
             let before_user = pool.decl_count()
             var ulexer = Lexer.init(normalized_text, file_id)
             let utokens = ulexer.tokenize()
-            var uparser = Parser.init_with_pool(move utokens, normalized_text, file_id, self.pool, move self.diagnostics, pool)
+            var uparser = Parser.init_with_pool(utokens, normalized_text, file_id, self.pool, move self.diagnostics, pool)
             if implicit_main_mode != 0:
                 if implicit_main_mode == 2: uparser.enable_statement_main_mode() else: uparser.enable_implicit_main_mode()
             if interface_root:
@@ -2074,7 +2072,7 @@ impl Zcu:
         else:
             var lexer = Lexer.init(normalized_text, file_id)
             let tokens = lexer.tokenize()
-            var parser = Parser.init(move tokens, normalized_text, file_id, self.pool, move self.diagnostics)
+            var parser = Parser.init(tokens, normalized_text, file_id, self.pool, move self.diagnostics)
             if implicit_main_mode != 0:
                 if implicit_main_mode == 2: parser.enable_statement_main_mode() else: parser.enable_implicit_main_mode()
             if interface_root:
@@ -2085,13 +2083,13 @@ impl Zcu:
         for extra_i in 0..self.extra_source_names.len():
             let extra_name: str = with_str_clone_ref(self.extra_source_names[extra_i])
             let extra_text = frontend_normalize_source_text(self.extra_source_texts[extra_i])
-            let extra_file_id: i32 = self.next_file_id
+            let extra_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(extra_file_id, extra_name, extra_text)
             let before = pool.decl_count()
             var extra_lexer = Lexer.init(extra_text, extra_file_id)
             let extra_tokens = extra_lexer.tokenize()
-            var extra_parser = Parser.init_with_pool(move extra_tokens, extra_text, extra_file_id, self.pool, move self.diagnostics, pool)
+            var extra_parser = Parser.init_with_pool(extra_tokens, extra_text, extra_file_id, self.pool, move self.diagnostics, pool)
             pool = extra_parser.parse_module()
             self.diagnostics = move extra_parser.diags
             self.append_decl_source_paths(pool.decl_count() - before, extra_name, extra_file_id)
@@ -2114,7 +2112,7 @@ impl Zcu:
         // Wave 4: sidecar resolved artifact.
         let t_resolve = runtime_clock_nanos()
         var _sp_diag = move self.diagnostics
-        var artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, move _sp_diag, false, self.prelude_prefix_decls, self.next_file_id, self.import_root_dir)
+        var artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, _sp_diag, false, self.prelude_prefix_decls, self.next_file_id, self.import_root_dir)
         if do_profile:
             let resolve_ns = runtime_clock_nanos() - t_resolve
             runtime_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")
@@ -2249,7 +2247,7 @@ impl Zcu:
             self.source_texts = sema_clone_str_list(pre_sema.source_texts)
             self.c_import_omitted_symbols = sema_clone_str_str_hashmap(pre_sema.ci_omitted_symbols)
             var tracked_paths = move self.tracked_input_paths
-            self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, pre_sema.tracked_input_paths)
+            self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, pre_sema.tracked_input_paths)
             if self.diagnostics.has_errors() and self.analysis_partial_semantics == 0:
                 self.render_all_diagnostics_frontend()
                 self.set_typed_snapshot("", AstPool.new())
@@ -2333,7 +2331,7 @@ impl Zcu:
             runtime_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}  int-local-rechecks={sema.int_local_rechecks}")
             for rechecked in sema.int_local_recheck_names: runtime_eprint(f"[profile] int-local-recheck {rechecked}")
         self.diagnostics = move sema.diags
-        self.sync_from_sema(move sema)
+        self.sync_from_sema(sema)
         frontend_dump_type_decl_names("post-sema", self.last_sema.ast, self.last_sema.pool)
         self.last_typed_dump = ""
 
@@ -2402,7 +2400,7 @@ impl Zcu:
             var lexer = Lexer.init(text, file_id)
             let tokens = lexer.tokenize()
             let before = merged_pool.decl_count()
-            var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, merged_pool)
+            var parser = Parser.init_with_pool(tokens, text, file_id, self.pool, move self.diagnostics, merged_pool)
             if src.interface:
                 parser.enable_interface_mode()
             merged_pool = parser.parse_module()
@@ -2708,13 +2706,13 @@ impl Zcu:
 
     mut fn parse_interface_chunk(pool: AstPool, path: &str, chunk: &str) -> AstPool:
         var out = pool
-        let chunk_file_id: i32 = self.next_file_id
+        let chunk_file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         var lexer = Lexer.init(chunk, chunk_file_id)
         let tokens = lexer.tokenize()
         let before_decls = out.decl_count()
         let before_nodes = out.node_count()
-        var parser = Parser.init_with_pool(move tokens, chunk, chunk_file_id, self.pool, move self.diagnostics, out)
+        var parser = Parser.init_with_pool(tokens, chunk, chunk_file_id, self.pool, move self.diagnostics, out)
         parser.enable_interface_mode()
         out = parser.parse_module()
         self.diagnostics = move parser.diags
@@ -2859,7 +2857,7 @@ impl Zcu:
             // use-expansion above deduped to a no-op); otherwise (legacy
             // entries) the closure was just appended from initial_count on.
             // Nested USE decls get expanded transitively either way.
-            let prefix_decls: i32 = self.prelude_prefix_decls
+            let prefix_decls = self.prelude_prefix_decls
             var pi = if prefix_decls > 0: 1 else: initial_count
             while (prefix_decls > 0 and pi < prefix_decls) or (prefix_decls == 0 and pi < merged_pool.decl_count()):
                 let decl = merged_pool.get_decl(pi)
@@ -3057,7 +3055,7 @@ impl Zcu:
                 if ik == NodeKind.NK_FN_DECL:
                     let shadowed_name = merged_pool.get_data0(id)
                     if frontend_name_shadowed_by_extern(root_ordered, merged_pool, shadowed_name):
-                        let sname: str = self.pool.resolve(shadowed_name)
+                        let sname = self.pool.resolve(shadowed_name)
                         self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
                         continue
                 // A runtime ABI symbol (FnAbi's codegen_is_runtime_abi_symbol:
@@ -3549,7 +3547,7 @@ impl Zcu:
         // declarations are parsed on demand once every source module is in.
         let on_demand = src.interface and not (self.interface_eager or self.bundle_corpus.len() > 0)
         if on_demand:
-            let section_file_id: i32 = self.next_file_id
+            let section_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(section_file_id, path, full_text)
             // Path and text go in together, before the imports below recurse
@@ -3580,14 +3578,14 @@ impl Zcu:
         let text = full_text
 
         let before = target_pool.decl_count()
-        let file_id: i32 = self.next_file_id
+        let file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(file_id, path, text)
 
         var lexer = Lexer.init(text, file_id)
         let tokens = lexer.tokenize()
 
-        var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, target_pool)
+        var parser = Parser.init_with_pool(tokens, text, file_id, self.pool, move self.diagnostics, target_pool)
         parser.enable_module_mode(path)
         if src.interface:
             parser.enable_interface_mode()

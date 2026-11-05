@@ -245,7 +245,7 @@ fn sdk_build_linux_zlib(ctx: &ActionCtx, root: &str, cmake: &str, bootstrap_pref
     build.push(sdk_abs(root, build_dir))
     build.push("--target")
     build.push("zlibstatic")
-    build = sdk_append_jobs(move build, jobs)
+    build = sdk_append_jobs(build, jobs)
     rc = sdk_run_capture(ctx, "zlib-build", build, 600000)
     if rc != 0: return rc
     if fs.mkdir_all(sdk_join(output_prefix, "lib")) != 0 or fs.mkdir_all(sdk_join(output_prefix, "include")) != 0:
@@ -298,10 +298,10 @@ fn sdk_add_unique(items: List[str], item: &str) -> List[str]:
     out
 
 fn sdk_add_parent_dirs(dirs: List[str], top_dir: &str, rel_path: &str) -> List[str]:
-    var out = sdk_add_unique(move dirs, top_dir)
+    var out = sdk_add_unique(dirs, top_dir)
     for i in 0..rel_path.len():
         if rel_path[i] == 47:
-            out = sdk_add_unique(move out, top_dir ++ "/" ++ rel_path.slice(0, i as i64))
+            out = sdk_add_unique(out, top_dir ++ "/" ++ rel_path.slice(0, i as i64))
     out
 
 fn sdk_file_exists(fs: &ToolFs, path: &str) -> bool:
@@ -646,7 +646,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
     var dirs: List[str] = List.new()
     for i in 0..files.len():
         let rel = sdk_rel_path(prefix, files[i])
-        dirs = sdk_add_parent_dirs(move dirs, sdk_base, rel)
+        dirs = sdk_add_parent_dirs(dirs, sdk_base, rel)
     if not sdk_platform_is_windows(platform):
         let aliases: List[str] = List.new()
         aliases.push("ld.lld")
@@ -656,7 +656,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         for i in 0..aliases.len():
             let alias = aliases[i]
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
-                dirs = sdk_add_parent_dirs(move dirs, sdk_base, "bin/" ++ alias)
+                dirs = sdk_add_parent_dirs(dirs, sdk_base, "bin/" ++ alias)
     dirs = sdk_merge_sort_strings(dirs)
     // #1915, #2062: a darwin or linux SDK carries its sysroot, as its
     // sysroot/; a build that pins it reads the sysroot there and fetches no
@@ -664,7 +664,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
     let sysroot_tree = sdk_packaged_sysroot_dir(platform)
     let sysroot_files = if sysroot_tree.len() > 0: sdk_merge_sort_strings(fs.list_files(sysroot_tree)) else: List.new()
     for i in 0..sysroot_files.len():
-        dirs = sdk_add_parent_dirs(move dirs, sdk_base, "sysroot/" ++ sdk_rel_path(sysroot_tree, sysroot_files[i]))
+        dirs = sdk_add_parent_dirs(dirs, sdk_base, "sysroot/" ++ sdk_rel_path(sysroot_tree, sysroot_files[i]))
     dirs = sdk_merge_sort_strings(dirs)
     let entries: List[ArchiveEntry] = List.new()
     for i in 0..dirs.len():
@@ -1000,10 +1000,10 @@ fn sdk_run_capture(ctx: &ActionCtx, label: &str, argv: List[str], timeout_ms: i3
         return sdk_fail(ctx, label ++ ": empty command")
     var spec = process_spec(argv[0].clone()).timeout(timeout_ms)
     for i in 1..argv.len():
-        spec = (move spec).arg(argv[i].clone())
+        spec = (spec).arg(argv[i].clone())
     for name in sdk_scrubbed_env_names():
-        spec = (move spec).env_var(name.clone(), "")
-    let result = ctx.process_runner().run_spec(move spec, sdk_abs(root, sdk_join(command_dir, label ++ ".stdout")), sdk_abs(root, sdk_join(command_dir, label ++ ".stderr")))
+        spec = (spec).env_var(name.clone(), "")
+    let result = ctx.process_runner().run_spec(spec, sdk_abs(root, sdk_join(command_dir, label ++ ".stdout")), sdk_abs(root, sdk_join(command_dir, label ++ ".stderr")))
     if result.rc != 0:
         return sdk_fail(ctx, label ++ f" failed with exit code {result.rc}: " ++ result.stdout ++ result.stderr)
     0
@@ -1075,7 +1075,7 @@ pub fn run_sdk_ninja_action(ctx: ActionCtx) -> i32:
     build.push(sdk_abs(root, build_dir))
     build.push("--target")
     build.push("install")
-    build = sdk_append_jobs(move build, jobs)
+    build = sdk_append_jobs(build, jobs)
     rc = sdk_run_capture(ctx, "ninja-build", build, 900000)
     if rc != 0: return rc
     let installed = sdk_tool(output_prefix, "ninja")
@@ -1162,7 +1162,7 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
         build.push("Release")
     build.push("--target")
     build.push("install")
-    build = sdk_append_jobs(move build, jobs)
+    build = sdk_append_jobs(build, jobs)
     rc = sdk_run_capture(ctx, "cmake-build", build, 3600000)
     if rc != 0: return rc
     if not fs.exists(sdk_tool(output_prefix, "cmake")):
@@ -1405,7 +1405,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         build.push("Release")
     build.push("--target")
     build.push("install")
-    build = sdk_append_jobs(move build, jobs)
+    build = sdk_append_jobs(build, jobs)
     rc = sdk_run_capture(ctx, "llvm-build", build, 21600000)
     if rc != 0: return rc
     let libclang = sdk_join(output_prefix, "lib/libclang.a")
@@ -3037,7 +3037,7 @@ pub fn sdk_linux_runtimes(ctx: &ActionCtx, root: &str, bootstrap_prefix: &str, o
     build.push(runtimes_build)
     build.push("--target")
     build.push("install")
-    build = sdk_append_jobs(move build, jobs)
+    build = sdk_append_jobs(build, jobs)
     rc = sdk_run_capture(ctx, "runtimes-build", build, 7200000)
     if rc != 0: return rc
     let builtins = sdk_join(output_prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/lib/" ++ sdk_linux_triple(a) ++ "/libclang_rt.builtins.a")
@@ -3425,7 +3425,7 @@ fn sdk_mingw_parse_makefile(ctx: &ActionCtx, path: &str, reldir: &str, arch_name
         if trimmed.starts_with("include "):
             let inc = sdk_trim(trimmed.slice(8, trimmed.len()))
             let inc_dir = sdk_dirname(inc)
-            out = sdk_mingw_parse_makefile(ctx, sdk_join(sdk_dirname(path), inc), inc_dir, arch_name, move out)
+            out = sdk_mingw_parse_makefile(ctx, sdk_join(sdk_dirname(path), inc), inc_dir, arch_name, out)
             continue
         // An assignment: an identifier, then `=` or `+=`.
         var k = 0
@@ -3444,7 +3444,7 @@ fn sdk_mingw_parse_makefile(ctx: &ActionCtx, path: &str, reldir: &str, arch_name
         else:
             continue
         let value = sdk_trim(rest).replace("%reldir%", reldir)
-        out = sdk_make_var_set(move out, name, value, append)
+        out = sdk_make_var_set(out, name, value, append)
     out
 
 // Configure substitutions this build reads, with the values configure
@@ -3476,7 +3476,7 @@ fn sdk_list_fail() -> SdkList:
 // `$(name)` references expanded recursively; `@NAME@` substituted.
 fn sdk_make_expand(ctx: &ActionCtx, vars: &List[SdkMakeVar], text: &str, top_srcdir: &str, depth: i32) -> SdkText:
     if depth > 32:
-        let _ = sdk_fail(ctx, "Makefile.am variable expansion too deep: " ++ text)
+        sdk_fail(ctx, "Makefile.am variable expansion too deep: " ++ text)
         return sdk_text_fail()
     var out = ""
     var i = 0
@@ -3496,7 +3496,7 @@ fn sdk_make_expand(ctx: &ActionCtx, vars: &List[SdkMakeVar], text: &str, top_src
                     return sdk_text_fail()
                 out = out ++ inner.text
             else:
-                let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am references $(" ++ name ++ "), which it does not define")
+                sdk_fail(ctx, "mingw-w64-crt/Makefile.am references $(" ++ name ++ "), which it does not define")
                 return sdk_text_fail()
             i = j + 1
             continue
@@ -3509,7 +3509,7 @@ fn sdk_make_expand(ctx: &ActionCtx, vars: &List[SdkMakeVar], text: &str, top_src
                 // default configure (sdk_mingw_subst_known).
                 let name = text.slice((i + 1) as i64, j as i64)
                 if not sdk_mingw_subst_known(name):
-                    let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am needs configure substitution @" ++ name ++ "@, which this build does not define (sdk_mingw_subst_known)")
+                    sdk_fail(ctx, "mingw-w64-crt/Makefile.am needs configure substitution @" ++ name ++ "@, which this build does not define (sdk_mingw_subst_known)")
                     return sdk_text_fail()
                 i = j + 1
                 continue
@@ -3560,7 +3560,7 @@ fn sdk_words(text: &str) -> List[str]:
 // A library's compiled members: its `_SOURCES` minus headers and .def inputs.
 fn sdk_mingw_compiled_sources(ctx: &ActionCtx, vars: &List[SdkMakeVar], var_name: &str, top_srcdir: &str) -> SdkList:
     if not sdk_make_var_has(vars, var_name):
-        let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am defines no " ++ var_name)
+        sdk_fail(ctx, "mingw-w64-crt/Makefile.am defines no " ++ var_name)
         return sdk_list_fail()
     let expanded = sdk_make_expand(ctx, vars, sdk_make_var_get(vars, var_name), top_srcdir, 0)
     if not expanded.ok:
@@ -3572,7 +3572,7 @@ fn sdk_mingw_compiled_sources(ctx: &ActionCtx, vars: &List[SdkMakeVar], var_name
         if w.ends_with(".c") or w.ends_with(".S"):
             out.push(sdk_owned_text(w))
         else if not (w.ends_with(".h") or w.ends_with(".def") or w.ends_with(".def.in")):
-            let _ = sdk_fail(ctx, var_name ++ " lists " ++ w ++ ", which this build does not know how to compile")
+            sdk_fail(ctx, var_name ++ " lists " ++ w ++ ", which this build does not know how to compile")
             return sdk_list_fail()
     SdkList { ok: true, items: out }
 
@@ -3683,11 +3683,11 @@ fn sdk_llvm_tool(ctx: &ActionCtx, tools_prefix: &str, tool_dir: &str, name: &str
         let sibling = sdk_tool(tools_prefix, family[i])
         if fs.exists(sibling):
             if fs.copy_file(sibling, staged) != 0:
-                let _ = sdk_fail(ctx, "could not stage " ++ name ++ " from " ++ sibling)
+                sdk_fail(ctx, "could not stage " ++ name ++ " from " ++ sibling)
                 return ""
             let _chmod = fs.chmod(staged, 0o755)
             return sdk_abs(root, staged)
-    let _ = sdk_fail(ctx, "the SDK at " ++ tools_prefix ++ " has no " ++ name ++ " (nor any binary of its multicall family)")
+    sdk_fail(ctx, "the SDK at " ++ tools_prefix ++ " has no " ++ name ++ " (nor any binary of its multicall family)")
     ""
 
 // The compile flags every mingw-w64 source gets here beyond Makefile.am's:
@@ -3718,7 +3718,7 @@ fn sdk_object_name(source: &str) -> str:
 fn sdk_compile_all(ctx: &ActionCtx, clang: &str, crt_dir: &str, sources: &List[str], flags: &List[str], obj_dir: &str, width: i32) -> SdkList:
     let root = ctx.project_info().project_root()
     if ctx.fs().mkdir_all(obj_dir) != 0:
-        let _ = sdk_fail(ctx, "could not create " ++ obj_dir)
+        sdk_fail(ctx, "could not create " ++ obj_dir)
         return sdk_list_fail()
     var jobs: List[ParJob] = List.new()
     var objects: List[str] = List.new()
@@ -3739,7 +3739,7 @@ fn sdk_compile_all(ctx: &ActionCtx, clang: &str, crt_dir: &str, sources: &List[s
     for i in 0..rcs.len():
         if rcs[i] != 0:
             failed = true
-            let _ = sdk_fail(ctx, f"compiling {sources[i]} failed with exit code {rcs[i]}: " ++ sdk_read_or_empty(ctx, objects[i] ++ ".stderr"))
+            sdk_fail(ctx, f"compiling {sources[i]} failed with exit code {rcs[i]}: " ++ sdk_read_or_empty(ctx, objects[i] ++ ".stderr"))
     if failed:
         return sdk_list_fail()
     SdkList { ok: true, items: objects }
@@ -3817,7 +3817,7 @@ fn sdk_mingw_def(ctx: &ActionCtx, clang: &str, crt_dir: &str, arch_name: &str, n
         out = out ++ sdk_strip_stdcall_suffix(lines[i]) ++ "\n"
     let def = sdk_join(work_dir, name ++ ".def")
     if fs.write_text(def, out) != 0:
-        let _ = sdk_fail(ctx, "could not write " ++ def)
+        sdk_fail(ctx, "could not write " ++ def)
         return ""
     def
 
@@ -3975,7 +3975,7 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
     let width: i32 = 16
     let base = sdk_mingw_toolchain_flags(root, tools_prefix, include_dir, arch_name)
     var empty: List[SdkMakeVar] = List.new()
-    let vars = sdk_mingw_parse_makefile(ctx, sdk_join(crt_dir, "Makefile.am"), ".", arch_name, move empty)
+    let vars = sdk_mingw_parse_makefile(ctx, sdk_join(crt_dir, "Makefile.am"), ".", arch_name, empty)
     let p = sdk_mingw_makefile_prefix(arch_name)
     let crt_abs = sdk_abs(root, crt_dir)
     let cpp_arch = if arch_name == "x86_64": "$(CPPFLAGS64)" else: "$(CPPFLAGSARM64)"

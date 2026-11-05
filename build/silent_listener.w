@@ -29,5 +29,5 @@ fn main -> i32:
         print("could not write the port")
         return 1
     sleep_secs(12)
-    let _ = socket_close(fd)
+    socket_close(fd)
     0

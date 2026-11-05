@@ -300,7 +300,7 @@ impl Sema:
             var diag = Diagnostic.err(f"{what} `{self.pool_resolve(name)}` is declared twice in this module", self.diagnostic_node_span(decl))
             diag.add_label(self.diagnostic_node_span(first), "first declared here")
             diag.add_label(self.diagnostic_node_span(decl), "declared again here")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
         self.report_function_named_like_global()
 
     // #2066: a free function and a module `const`/`var` of one name are two
@@ -348,7 +348,7 @@ impl Sema:
             var diag = Diagnostic.err(f"`{self.pool_resolve(name)}` is declared as a function and as a global in this module", self.diagnostic_node_span(decl))
             diag.add_label(self.diagnostic_node_span(global_decl), "the global")
             diag.add_label(self.diagnostic_node_span(decl), "the function")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
 
     mut fn compute_method_origins():
         self.compute_colliding_type_names()
@@ -1763,7 +1763,7 @@ impl Sema:
                             return
                 else:
                     // Already visited (gray revisit or black). Pop and mark black.
-                    let _ = stack.pop()
+                    stack.pop()
                     color.insert(cur, 2)
 
     mut fn emit_type_cycle_error(cycle_start: i32, cycle_end: i32, closing_edge_node: i32, parent_sym: &HashMap[i32, i32], parent_edge: &HashMap[i32, i32]):
@@ -1816,7 +1816,7 @@ impl Sema:
                 diag.add_label(Span { file: self.local_file_id, start: e_start, end: e_end }, "type `" ++ from_name ++ "` depends on `" ++ to_name ++ "` here")
 
         diag.add_help("break the cycle by using a pointer (`*" ++ self.pool_resolve_symbol(fwd_syms[0]) ++ "`) or reference (`&" ++ self.pool_resolve_symbol(fwd_syms[0]) ++ "`) for one field")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     fn fn_param_uses_value_ref_abi(param_start: i32, param_idx: i32, method_owner_sym: i32, self_type_id: i32) -> bool:
         // D12 receivers occupy parameter 0 only. Matching later params by
@@ -2100,7 +2100,7 @@ impl Sema:
         // D117 (§9.5): a `move fn` twin's symbol texts (`Owner.name$move`,
         // `name$move`) enter Sema's pool here; the parser's pool alone held
         // them, and the method symbol rebuild below looks them up.
-        let parsed_text: str = self.pool_resolve(parsed_fn_name)
+        let parsed_text = self.pool_resolve(parsed_fn_name)
         if parsed_text.ends_with("$move"):
             self.pool_intern(parsed_text)
             let twin_dot = parsed_text.rfind(".")
@@ -2141,7 +2141,7 @@ impl Sema:
         // shadowed and its function left declared without a body.
         // D117 (§9.5): `Owner.name$move` is the owned twin of `Owner.name`;
         // a call's receiver syntax selects it (check_method_call_parts_body).
-        let twin_text: str = self.pool_resolve(fn_name)
+        let twin_text = self.pool_resolve(fn_name)
         if twin_text.ends_with("$move"):
             let dot = twin_text.rfind(".")
             let short = twin_text[dot + 1..twin_text.len() - 5]
@@ -2161,7 +2161,7 @@ impl Sema:
                         self.prepare_fn_clause(dispatch_fn_name, existing_node, existing_di)
                         fn_name = self.prepare_fn_clause(dispatch_fn_name, node, current_di)
                     else:
-                        let fn_name_str: str = self.pool_resolve(fn_name)
+                        let fn_name_str = self.pool_resolve(fn_name)
                         self.emit_error(f"function '{fn_name_str}' is already defined", node)
                         return
         if self.ast.is_no_alloc_fn_node(node as NodeId):
@@ -2208,7 +2208,7 @@ impl Sema:
                         self.emit_error_with_help("Drop.drop receiver must be 'move self: Self' — a destructor always consumes (§2.4)", node, "write `move fn drop()`")
 
         // Bind Self to method owner type for dot-name methods
-        let self_sym: i32 = self.syms.self_type
+        let self_sym = self.syms.self_type
         var self_type_id: i32 = 0
         let fn_name_str = self.pool_resolve(method_base_sym)
         if method_owner_sym != 0:
@@ -2255,7 +2255,7 @@ impl Sema:
                 if bi_tp_count > 0:
                     self.register_generic_fn_node(fn_name, node)
                     self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-                    let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                    self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
                     self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                     for pi in 0..param_count:
                         self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi), self.ast.state.impl_type_params[(bi_tp_meta + 1)], bi_tp_count, bi_impl)
@@ -2266,7 +2266,7 @@ impl Sema:
             else if self.impl_target_has_bare_type_params(bi_impl):
                 self.register_generic_fn_node(fn_name, node)
                 self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-                let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
                 self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                 for pi2 in 0..param_count:
                     self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi2), 0, 0, bi_impl)
@@ -2295,7 +2295,7 @@ impl Sema:
                     if concrete_inst_impl_method == 0 and self.type_tid_decl_tp_count(self_type_id) > 0:
                         self.register_generic_fn_node(fn_name, node)
                         self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-                        let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                        self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
                         self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                         self.named_types.remove(self_sym)
                         return
@@ -2309,7 +2309,7 @@ impl Sema:
         if tp_count > 0:
             self.register_generic_fn_node(fn_name, node)
             self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-            let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+            self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
             self.register_generic_method_fn(node, fn_name, parsed_fn_name)
             for pi in 0..param_count:
                 let p_type_node = self.ast.fn_param_type(param_start, pi)
@@ -2480,7 +2480,7 @@ impl Sema:
                 for edi in 0..self.ast.decl_count():
                     if self.ast.get_decl(edi) == existing_node:
                         if self.is_local_or_prelude_decl(edi):
-                            let fn_name_str: str = self.pool_resolve(name)
+                            let fn_name_str = self.pool_resolve(name)
                             self.emit_error(f"'{fn_name_str}' is already defined as a function; extern fn would shadow it", node)
                             return
                         break
@@ -3184,7 +3184,7 @@ impl Sema:
                     if has_mode == 0 and p0_type != 0 and self.ast.kind(p0_type as NodeId) == NodeKind.NK_TYPE_NAMED:
                         let p0_ty_sym = self.ast.get_data0(p0_type as NodeId)
                         if self.pool_resolve(p0_ty_sym) == "Self":
-                            let mt_name_str: str = self.pool_resolve(mt_name)
+                            let mt_name_str = self.pool_resolve(mt_name)
                             self.emit_error(f"trait method '{mt_name_str}' requires an explicit receiver mode: use 'self: &Self', 'mut self: Self', or 'move self: Self'", node)
             for mpi in 0..mt_param_count:
                 self.refuse_dyn_by_value_params(self.ast.fn_param_type(mt_param_start, mpi), true)
@@ -3303,7 +3303,7 @@ impl Sema:
         let decl_index = self.find_decl_index(node)
         if decl_index >= 0 and decl_index < self.decl_is_c_import.len() and self.decl_is_c_import[decl_index] != 0:
             return
-        let threshold: i64 = self.copy_warn_threshold
+        let threshold = self.copy_warn_threshold
         if threshold <= 0 or type_tid <= 0:
             return
         if self.ast.kind(node) == NodeKind.NK_IMPL_DECL and self.ast.find_impl_type_params(node) >= 0:
@@ -3314,7 +3314,7 @@ impl Sema:
             return
         let size = self.type_layout_size_of(type_tid)
         if size > threshold:
-            let name: str = self.pool_resolve(type_name)
+            let name = self.pool_resolve(type_name)
             self.emit_warning(f"large Copy type '{name}' is {size} bytes; implicit copies may be expensive (copy_warn_threshold={threshold})", node)
 
     mut fn collect_impl_decl(node: i32, is_local_impl: bool):
@@ -3994,7 +3994,7 @@ impl Sema:
         false
 
     mut fn validate_copy_derives():
-        let copy_sym: i32 = self.syms.copy_trait
+        let copy_sym = self.syms.copy_trait
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -4063,9 +4063,9 @@ impl Sema:
         false
 
     mut fn validate_generic_type_decls():
-        let saved_file_id: i32 = self.local_file_id
+        let saved_file_id = self.local_file_id
         let saved_module_path = move self.current_module_path
-        let saved_module_has_ci: i32 = self.current_module_has_ci
+        let saved_module_has_ci = self.current_module_has_ci
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -4194,14 +4194,14 @@ impl Sema:
                     // default survives only as cascade suppression when the
                     // arguments already errored.
                     if self.diags.count_by_severity(DiagSeverity.Error) == 0:
-                        let mb_name: str = self.pool_resolve(tp_name)
+                        let mb_name = self.pool_resolve(tp_name)
                         self.emit_error(f"cannot infer type parameter '{mb_name}' for this call; the argument's shape does not match the parameter type that mentions '{mb_name}'", call_node)
                         return
                     self.put_generic_subst(tp_name, self.ty_i32, call_node)
                 else:
                     // #598 (ruled: no turbofish): teach the restructure instead of
                     // a bare "unknown type" cascade.
-                    let ug_name: str = self.pool_resolve(tp_name)
+                    let ug_name = self.pool_resolve(tp_name)
                     self.emit_error(f"cannot infer type parameter '{ug_name}' for this call; annotate the result binding or pass an argument that mentions '{ug_name}'", call_node)
                     return
             pos = pos + 2 + bound_count

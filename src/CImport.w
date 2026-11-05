@@ -7338,7 +7338,7 @@ impl CiStmtPool:
         let start = self.extra_len()
         var i: i64 = 0
         while i < ids.len():
-            let _ = self.add_extra(ids[i])
+            self.add_extra(ids[i])
             i = i + 1
         self.block(start, ids.len() as i32)
 
@@ -7387,7 +7387,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_ids.len():
-                let _ = self.add_extra(rewritten_ids[ri])
+                self.add_extra(rewritten_ids[ri])
                 ri = ri + 1
             return self.block(new_start, count)
         if kind == CiStmtKind.CIS_IF:
@@ -7423,7 +7423,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_records.len():
-                let _ = self.add_extra(rewritten_records[ri])
+                self.add_extra(rewritten_records[ri])
                 ri = ri + 1
             return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
         if kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE or kind == CiStmtKind.CIS_FOR:
@@ -7452,7 +7452,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_ids.len():
-                let _ = self.add_extra(rewritten_ids[ri])
+                self.add_extra(rewritten_ids[ri])
                 ri = ri + 1
             return self.block(new_start, count)
         if kind == CiStmtKind.CIS_IF:
@@ -7488,7 +7488,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_records.len():
-                let _ = self.add_extra(rewritten_records[ri])
+                self.add_extra(rewritten_records[ri])
                 ri = ri + 1
             return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
         if kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE or kind == CiStmtKind.CIS_FOR:
@@ -7599,7 +7599,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_records.len():
-                let _ = self.add_extra(rewritten_records[ri])
+                self.add_extra(rewritten_records[ri])
                 ri = ri + 1
             return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
         stmt_id
@@ -8095,7 +8095,7 @@ impl CiStmtPool:
             if stdarg == "va_end":
                 return self.empty_stmt_ir()
             if stdarg == "va_start":
-                let _ = ci_va_bail(session, cursor, "va_start is translated as a statement of a block: `var ap = va_start()`; this one is nested in another statement")
+                ci_va_bail(session, cursor, "va_start is translated as a statement of a block: `var ap = va_start()`; this one is nested in another statement")
                 return 0
             if stdarg == "va_copy":
                 ci_va_bail(session, cursor, "va_copy is translated as a statement of a block: `var dst = src`; this one is nested in another statement")
@@ -8194,8 +8194,8 @@ impl CiStmtPool:
                 continue
             // The element already names a temporary (an array compound
             // literal): read it; otherwise compute it into one.
-            var read: CiExprId = lowered.value_expr
-            var element_setup: CiStmtId = lowered.setup_stmt
+            var read = lowered.value_expr
+            var element_setup = lowered.setup_stmt
             if exprs.kind(lowered.value_expr) != CiExprKind.CIE_IDENT:
                 let temp = ci_expr_temp_name(session, value, "init")
                 let temp_ty = types.type_from_libclang(session, ci_value_cursor_type(session, value))
@@ -8719,20 +8719,20 @@ impl CiExprPool:
             let value_idx = self.add_string(i64_to_string(value))
             let value_lit = self.int_lit(value_idx, 0)
             let value_cast = self.cast(elem_ty, value_lit)
-            let _ = self.add_extra(value_cast as i32)
+            self.add_extra(value_cast as i32)
             item_count = item_count + 1
         let array_size = types.get_d1(array_ty)
         if array_size == CI_SIZE_INCOMPLETE or item_count < array_size:
             let zero_idx = self.add_string("0")
             let zero_lit = self.int_lit(zero_idx, 0)
             let zero_cast = self.cast(elem_ty, zero_lit)
-            let _ = self.add_extra(zero_cast as i32)
+            self.add_extra(zero_cast as i32)
             item_count = item_count + 1
         while array_size != CI_SIZE_INCOMPLETE and item_count < array_size:
             let pad_idx = self.add_string("0")
             let pad_lit = self.int_lit(pad_idx, 0)
             let pad_cast = self.cast(elem_ty, pad_lit)
-            let _ = self.add_extra(pad_cast as i32)
+            self.add_extra(pad_cast as i32)
             item_count = item_count + 1
         self.init_list(items_start, item_count, array_ty)
 
@@ -9746,8 +9746,8 @@ impl CiExprPool:
                     let fields_start = self.extra_len() as i32
                     var fj: i64 = 0
                     while fj < field_names.len():
-                        let _ = self.add_extra(field_names[fj])
-                        let _ = self.add_extra(field_values[fj])
+                        self.add_extra(field_names[fj])
+                        self.add_extra(field_values[fj])
                         fj = fj + 1
                     item_id = self.designated_init(fields_start, elem_field_count, elem_ty_id)
                     ai = ai + elem_field_count
@@ -9762,7 +9762,7 @@ impl CiExprPool:
             let items_start = self.extra_len() as i32
             var ii: i64 = 0
             while ii < item_ids.len():
-                let _ = self.add_extra(item_ids[ii])
+                self.add_extra(item_ids[ii])
                 ii = ii + 1
             return self.init_list(items_start, item_ids.len() as i32, init_ty_id)
         let aggregate_field_count = ci_init_list_record_field_count(session, ty_str, init_ty)
@@ -9792,7 +9792,7 @@ impl CiExprPool:
         let items_start = self.extra_len() as i32
         var ij: i64 = 0
         while ij < item_ids.len():
-            let _ = self.add_extra(item_ids[ij])
+            self.add_extra(item_ids[ij])
             ij = ij + 1
         self.init_list(items_start, item_ids.len() as i32, init_ty_id)
 
@@ -11007,7 +11007,7 @@ impl CiExprPool:
     fn va_arg_expr(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         let list_cursor = ci_va_arg_list_operand(session, cursor)
         if list_cursor < 0:
-            let _ = ci_va_bail(session, cursor, "va_arg names no list")
+            ci_va_bail(session, cursor, "va_arg names no list")
             return 0
         let list = self.lower_expr_ir(session, list_cursor, types, scope)
         if list == 0:
@@ -11017,7 +11017,7 @@ impl CiExprPool:
             return 0
         let arg_text = ci_print_type(types, arg_ty)
         if ci_str_contains(arg_text, "fn("):
-            let _ = ci_va_bail(session, cursor, "va_arg of an unnamed function-pointer type; name the type with a typedef")
+            ci_va_bail(session, cursor, "va_arg of an unnamed function-pointer type; name the type with a typedef")
             return 0
         let method = self.add(CiExprKind.CIE_FIELD, list as i32, self.add_string("arg[" ++ arg_text ++ "]"), 2, 0)
         var call = self.add(CiExprKind.CIE_CALL, method as i32, self.extra_len() as i32, 0, arg_ty)
@@ -11775,7 +11775,7 @@ impl CiExprPool:
         let args_start = self.extra_len() as i32
         var i: i64 = 0
         while i < arg_ids.len():
-            let _ = self.add_extra(arg_ids[i])
+            self.add_extra(arg_ids[i])
             i = i + 1
         var call = self.add(CiExprKind.CIE_CALL, callee_id as i32, args_start, arg_ids.len() as i32, result_ty)
         if ci_migrate_call_requires_unsafe_wrapper(name):
@@ -12533,7 +12533,7 @@ impl CiExprPool:
             let wa_idx = self.add_string("with_alloc")
             let wa_callee = self.ident(wa_idx, 0)
             let args_start = self.extra_len() as i32
-            let _ = self.add_extra(arg_as_i64 as i32)
+            self.add_extra(arg_as_i64 as i32)
             var call_id = self.add(CiExprKind.CIE_CALL, wa_callee as i32, args_start, 1, 0)
             if ci_migrate_call_requires_unsafe_wrapper("with_alloc"):
                 call_id = self.unsafe_expr(call_id)
@@ -12549,7 +12549,7 @@ impl CiExprPool:
             let wf_idx = self.add_string("with_free")
             let wf_callee = self.ident(wf_idx, 0)
             let args_start = self.extra_len() as i32
-            let _ = self.add_extra(arg_cast as i32)
+            self.add_extra(arg_cast as i32)
             var call_id = self.add(CiExprKind.CIE_CALL, wf_callee as i32, args_start, 1, 0)
             if ci_migrate_call_requires_unsafe_wrapper("with_free"):
                 call_id = self.unsafe_expr(call_id)
@@ -12566,8 +12566,8 @@ impl CiExprPool:
             let wz_idx = self.add_string("with_alloc_zeroed")
             let wz_callee = self.ident(wz_idx, 0)
             let args_start = self.extra_len() as i32
-            let _ = self.add_extra(count_as_i64 as i32)
-            let _ = self.add_extra(size_as_i64 as i32)
+            self.add_extra(count_as_i64 as i32)
+            self.add_extra(size_as_i64 as i32)
             var call_id = self.add(CiExprKind.CIE_CALL, wz_callee as i32, args_start, 2, 0)
             if ci_migrate_call_requires_unsafe_wrapper("with_alloc_zeroed"):
                 call_id = self.unsafe_expr(call_id)
@@ -13383,7 +13383,7 @@ impl CiStmtPool:
             // lower_effect_expr_ir); as a value they have none to give.
             let stdarg_operation = ci_stdarg_call_name(session, cursor)
             if stdarg_operation.len() > 0:
-                let _ = ci_va_bail(session, cursor, stdarg_operation ++ " is used as a value; it is translated only as a statement")
+                ci_va_bail(session, cursor, stdarg_operation ++ " is used as a value; it is translated only as a statement")
                 return ci_value_ir_invalid()
             var callee = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             // `(1 ? f : g)(args)` (M*LIB's M_IF selects a function by a
@@ -13531,7 +13531,7 @@ impl CiStmtPool:
             let args_start = exprs.extra_len()
             var j: i64 = 0
             while j < arg_ids.len():
-                let _ = exprs.add_extra(arg_ids[j])
+                exprs.add_extra(arg_ids[j])
                 j = j + 1
             // D102: a call through a nullable function pointer (a record
             // field, a pointee C hands over) unwraps it first, so a NULL
@@ -13922,7 +13922,7 @@ impl CiStmtPool:
                     if g_ci_bail_location.len() == 0:
                         g_ci_bail_location = with_ci_cursor_location(session, parts.init_cursor)
                         g_ci_bail_kind = CXK_DECL_STMT
-                    let _ = ci_scope_restore(inner_scope, scope_mark)
+                    ci_scope_restore(inner_scope, scope_mark)
                     return 0
                 inner_scope = decl_ir.updated_scope
                 init_id = decl_ir.stmt_id
@@ -13932,7 +13932,7 @@ impl CiStmtPool:
                     if g_ci_bail_location.len() == 0:
                         g_ci_bail_location = with_ci_cursor_location(session, parts.init_cursor)
                         g_ci_bail_kind = with_ci_cursor_kind(session, parts.init_cursor)
-                    let _ = ci_scope_restore(inner_scope, scope_mark)
+                    ci_scope_restore(inner_scope, scope_mark)
                     return 0
 
         var cond_setup_id: CiStmtId = 0
@@ -13943,7 +13943,7 @@ impl CiStmtPool:
                 if g_ci_bail_location.len() == 0:
                     g_ci_bail_location = with_ci_cursor_location(session, parts.cond_cursor)
                     g_ci_bail_kind = with_ci_cursor_kind(session, parts.cond_cursor)
-                let _ = ci_scope_restore(inner_scope, scope_mark)
+                ci_scope_restore(inner_scope, scope_mark)
                 return 0
             ci_trace_port("STRUCTURAL[b11.1.for_stmt_cond]")
             cond_setup_id = prepared_cond.setup_stmt
@@ -13956,7 +13956,7 @@ impl CiStmtPool:
             if g_ci_bail_location.len() == 0:
                 g_ci_bail_location = with_ci_cursor_location(session, parts.body_cursor)
                 g_ci_bail_kind = with_ci_cursor_kind(session, parts.body_cursor)
-            let _ = ci_scope_restore(inner_scope, scope_mark)
+            ci_scope_restore(inner_scope, scope_mark)
             return 0
 
         var inc_stmt_id: CiStmtId = 0
@@ -13966,7 +13966,7 @@ impl CiStmtPool:
                 if g_ci_bail_location.len() == 0:
                     g_ci_bail_location = with_ci_cursor_location(session, parts.inc_cursor)
                     g_ci_bail_kind = with_ci_cursor_kind(session, parts.inc_cursor)
-                let _ = ci_scope_restore(inner_scope, scope_mark)
+                ci_scope_restore(inner_scope, scope_mark)
                 return 0
             body_id = self.for_continue_runs_inc_ir( body_id, inc_stmt_id)
 
@@ -13974,8 +13974,8 @@ impl CiStmtPool:
         var while_body_id: CiStmtId = body_id
         if inc_stmt_id != 0:
             let bstart = self.extra_len()
-            let _ = self.add_extra(body_id as i32)
-            let _ = self.add_extra(inc_stmt_id as i32)
+            self.add_extra(body_id as i32)
+            self.add_extra(inc_stmt_id as i32)
             while_body_id = self.block(bstart, 2)
 
         var while_id: CiStmtId = 0
@@ -13990,12 +13990,12 @@ impl CiStmtPool:
         // Final: wrap init + while in a block if init is non-empty.
         if init_id != 0:
             let wstart = self.extra_len()
-            let _ = self.add_extra(init_id as i32)
-            let _ = self.add_extra(while_id as i32)
+            self.add_extra(init_id as i32)
+            self.add_extra(while_id as i32)
             let result = self.block(wstart, 2)
-            let _ = ci_scope_restore(inner_scope, scope_mark)
+            ci_scope_restore(inner_scope, scope_mark)
             return result
-        let _ = ci_scope_restore(inner_scope, scope_mark)
+        ci_scope_restore(inner_scope, scope_mark)
         while_id
 
     // Structural lowering for expression cursors when the value is
@@ -14034,7 +14034,7 @@ impl CiStmtPool:
         let new_start = self.extra_len()
         var i: i32 = 0
         while i < new_count:
-            let _ = self.add_extra(self.get_extra(extra_start + i))
+            self.add_extra(self.get_extra(extra_start + i))
             i = i + 1
         self.block(new_start, new_count)
 
@@ -14264,7 +14264,7 @@ impl CiStmtPool:
         let arms_start = self.extra_len()
         var ri: i64 = 0
         while ri < arm_records.len():
-            let _ = self.add_extra(arm_records[ri])
+            self.add_extra(arm_records[ri])
             ri = ri + 1
         let match_id = self.add(CiStmtKind.CIS_MATCH, subject_id as i32, arms_start, arm_count, 0)
         let switch_id = self.wrap_switch_match_breaks_ir(session, body_cursor, exprs, types, match_id, -1)
@@ -14501,17 +14501,17 @@ impl CiStmtPool:
                 ci = ci + 1
 
             if bailed:
-                let _ = ci_scope_restore(block_scope, block_mark)
+                ci_scope_restore(block_scope, block_mark)
                 return 0
 
             let extra_start = self.extra_len()
             let count = child_ids.len() as i32
             var cj: i64 = 0
             while cj < child_ids.len():
-                let _ = self.add_extra(child_ids[cj])
+                self.add_extra(child_ids[cj])
                 cj = cj + 1
             let block_id = self.block(extra_start, count)
-            let _ = ci_scope_restore(block_scope, block_mark)
+            ci_scope_restore(block_scope, block_mark)
             return block_id
 
         // Expression-as-statement: same structural lowering as
@@ -14585,9 +14585,9 @@ fn ci_trans_stmt_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: Ci
         if g_ci_fn_var_names.len() > saved_fn_var_names_len:
             g_ci_fn_var_names = with_str_clone_ref(g_ci_fn_var_names.slice(0, saved_fn_var_names_len))
         while g_ci_temp_cursors.len() > saved_temp_cursor_len:
-            let _ = g_ci_temp_cursors.pop()
+            g_ci_temp_cursors.pop()
         while g_ci_temp_ids.len() > saved_temp_id_len:
-            let _ = g_ci_temp_ids.pop()
+            g_ci_temp_ids.pop()
         g_ci_temp_next = saved_temp_next
         stmts.deinit()
         exprs.deinit()
@@ -15023,7 +15023,7 @@ fn ci_scope_restore(scope: CiScope, mark: CiScopeMark) -> CiScope:
 
 fn ci_scope_add(scope: CiScope, name: &str) -> CiScope:
     if name.len() > 0:
-        let _ = ci_scope_note_name(scope, name)
+        ci_scope_note_name(scope, name)
         unsafe:
             (*scope.ptr).names.insert(with_str_clone_ref(name), "")
     scope
@@ -15032,15 +15032,15 @@ fn ci_scope_add_mangled(scope: CiScope, original: &str, mangled: &str) -> CiScop
     if original.len() == 0:
         return scope
     if original == mangled:
-        let _ = ci_scope_note_name(scope, original)
+        ci_scope_note_name(scope, original)
         unsafe:
             (*scope.ptr).names.insert(with_str_clone_ref(original), "")
     else:
-        let _ = ci_scope_note_name(scope, original)
+        ci_scope_note_name(scope, original)
         unsafe:
             (*scope.ptr).names.insert(with_str_clone_ref(original), with_str_clone_ref(mangled))
         if mangled.len() > 0:
-            let _ = ci_scope_note_name(scope, mangled)
+            ci_scope_note_name(scope, mangled)
             unsafe:
                 (*scope.ptr).names.insert(with_str_clone_ref(mangled), "")
     scope
@@ -15048,7 +15048,7 @@ fn ci_scope_add_mangled(scope: CiScope, original: &str, mangled: &str) -> CiScop
 fn ci_scope_add_type(scope: CiScope, name: &str, ty: &str) -> CiScope:
     if name.len() == 0 or ty.len() == 0:
         return scope
-    let _ = ci_scope_note_type(scope, name)
+    ci_scope_note_type(scope, name)
     unsafe:
         (*scope.ptr).types.insert(with_str_clone_ref(name), with_str_clone_ref(ty))
     scope
@@ -15203,11 +15203,11 @@ impl CiStmtPool:
         let failed = CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
         let list = ci_va_list_operand(session, call)
         if list < 0 or with_ci_cursor_kind(session, list) != CXK_DECL_REF:
-            let _ = ci_va_bail(session, call, "va_start's list is not a local va_list variable")
+            ci_va_bail(session, call, "va_start's list is not a local va_list variable")
             return failed
         let key = "|" ++ with_ci_cursor_referenced_location(session, list) ++ "|"
         if not ci_str_contains(g_ci_va_deferred_decls, key):
-            let _ = ci_va_bail(session, call, "va_start's list is not a va_list declared in an enclosing block of this function")
+            ci_va_bail(session, call, "va_start's list is not a va_list declared in an enclosing block of this function")
             return failed
         let list_ty = types.type_from_libclang(session, with_ci_cursor_type(session, list))
         if list_ty == 0:
@@ -15342,7 +15342,7 @@ impl CiStmtPool:
                 if synth.len() > 0:
                     let rendered = ci_translate_anon_record_cursor(session, child, synth)
                     if rendered.ends_with("= opaque\n"):
-                        let _ = ci_va_bail(session, child, "local record '" ++ synth ++ "' has no With layout (§16.9)")
+                        ci_va_bail(session, child, "local record '" ++ synth ++ "' has no With layout (§16.9)")
                         return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
                     g_ci_body_hoisted_decls = g_ci_body_hoisted_decls ++ rendered
                     hoisted_record = true
@@ -15529,7 +15529,7 @@ impl CiStmtPool:
             let extra_start = self.extra_len()
             var cj: i64 = 0
             while cj < child_stmt_ids.len():
-                let _ = self.add_extra(child_stmt_ids[cj])
+                self.add_extra(child_stmt_ids[cj])
                 cj = cj + 1
             stmt_id = self.block(extra_start, count)
         else if deferred_va_list or hoisted_record:
@@ -16628,7 +16628,7 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
     if target_len >= 0:
         if bytes.len() > target_len:
             if bytes.len() == target_len + 1 and bytes[(bytes.len() - 1)] == 0:
-                let _ = bytes.pop()
+                bytes.pop()
             else:
                 return ""
         while bytes.len() < target_len:
@@ -17334,7 +17334,6 @@ fn ci_preprocessed_text_for_cursor(session: i64, cursor: i32, raw_src: &str) -> 
     // #348: the raw source of the construct is already in hand — expand its
     // macro references directly from the session instead of slicing a cc -E
     // dump by cursor location. (cursor retained for signature stability.)
-    let _ = cursor
     if g_migrate_raw_source.len() == 0 or raw_src.len() == 0:
         return ""
     ci_expand_macros_in_text(session, raw_src)
@@ -17829,7 +17828,6 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
 fn ci_preprocess_initializer_text(session: i64, var_cursor: i32, raw_decl_src: &str) -> str:
     // #348: expand the raw declaration text directly from the macro session
     // instead of slicing a cc -E dump by cursor location.
-    let _ = var_cursor
     if g_migrate_raw_source.len() == 0 or g_migrate_current_input_path.len() == 0 or raw_decl_src.len() == 0:
         return ""
     let expanded_decl = ci_expand_macros_in_text(session, raw_decl_src)
@@ -19351,7 +19349,7 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: List[CiHoistedVarDe
     let nc = with_ci_num_children(session, cursor)
     var ci = 0
     while ci < nc:
-        decls = ci_collect_var_decls(session, with_ci_child(session, cursor, ci), move decls, types)
+        decls = ci_collect_var_decls(session, with_ci_child(session, cursor, ci), decls, types)
         ci = ci + 1
     decls
 
@@ -19571,14 +19569,14 @@ impl CiGotoCfgContext:
 
     mut fn pop_break_target():
         if self.state.break_targets.len() > 0:
-            let _ = self.state.break_targets.pop()
+            self.state.break_targets.pop()
 
     mut fn push_continue_target(target: i32) -> Unit:
         self.state.continue_targets.push(target)
 
     mut fn pop_continue_target():
         if self.state.continue_targets.len() > 0:
-            let _ = self.state.continue_targets.pop()
+            self.state.continue_targets.pop()
 
 fn ci_goto_cfg_top_target(stack: &List[i32]) -> i32:
     if stack.len() == 0:
@@ -19676,7 +19674,7 @@ impl CiGotoCfgContext:
         values.push(ret_value as i32)
         self.return_current(values)
 
-    mut fn lower_compound(session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+    mut fn lower_compound(session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> Unit:
         let nc = with_ci_num_children(session, cursor)
         var block_scope = scope
         let block_mark = ci_scope_mark(block_scope)
@@ -19702,7 +19700,7 @@ impl CiGotoCfgContext:
                 if ck == CXK_LABEL_STMT:
                     block_scope = ci_goto_scope_after_label_stmt(session, child, block_scope)
             i = i + 1
-        let _ = ci_scope_restore(block_scope, block_mark)
+        ci_scope_restore(block_scope, block_mark)
 
     mut fn lower_if(session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
         let nc = with_ci_num_children(session, cursor)
@@ -19824,7 +19822,7 @@ impl CiGotoCfgContext:
                 let init_id = stmts.lower_stmt_expr_ir(session, parts.init_cursor, exprs, types, loop_scope)
                 if init_id == 0:
                     self.fail("unsupported for initializer in goto CFG", with_ci_cursor_location(session, parts.init_cursor))
-                    let _ = ci_scope_restore(loop_scope, scope_mark)
+                    ci_scope_restore(loop_scope, scope_mark)
                     return
                 self.append_stmt(stmts, init_id)
 
@@ -19839,7 +19837,7 @@ impl CiGotoCfgContext:
             let prepared_cond = stmts.prepare_stmt_condition_ir(session, parts.cond_cursor, exprs, types, loop_scope)
             if not ci_value_ir_valid(prepared_cond):
                 self.fail("unsupported for condition in goto CFG", with_ci_cursor_location(session, parts.cond_cursor))
-                let _ = ci_scope_restore(loop_scope, scope_mark)
+                ci_scope_restore(loop_scope, scope_mark)
                 return
             self.append_stmt(stmts, prepared_cond.setup_stmt)
             self.cond_current(prepared_cond.value_expr, body_block, after_block, with_ci_cursor_location(session, cursor))
@@ -19860,14 +19858,14 @@ impl CiGotoCfgContext:
             let inc_id = stmts.lower_stmt_expr_ir(session, parts.inc_cursor, exprs, types, loop_scope)
             if inc_id == 0:
                 self.fail("unsupported for increment in goto CFG", with_ci_cursor_location(session, parts.inc_cursor))
-                let _ = ci_scope_restore(loop_scope, scope_mark)
+                ci_scope_restore(loop_scope, scope_mark)
                 return
             self.append_stmt(stmts, inc_id)
         self.branch_current(cond_block, with_ci_cursor_location(session, cursor))
         self.set_current(after_block)
         if not self.block_has_pred(after_block):
             self.unreachable_current()
-        let _ = ci_scope_restore(loop_scope, scope_mark)
+        ci_scope_restore(loop_scope, scope_mark)
 
 fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
     let ptr = with_alloc(sizeof[CiGotoSwitchCaseState]()) as *mut CiGotoSwitchCaseState
@@ -19887,7 +19885,7 @@ impl CiGotoSwitchCase:
 
 impl CiGotoCfgContext:
     mut fn lower_case_children(session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-        let saved_cases: CiGotoSwitchCase = self.state.switch_cases
+        let saved_cases = self.state.switch_cases
         self.state.switch_cases = cases
         let case_mark = ci_scope_mark(scope)
         var case_scope = scope
@@ -19914,7 +19912,7 @@ impl CiGotoCfgContext:
             if ck == CXK_LABEL_STMT:
                 case_scope = ci_goto_scope_after_label_stmt(session, child, case_scope)
             i = i + 1
-        let _ = ci_scope_restore(scope, case_mark)
+        ci_scope_restore(scope, case_mark)
         self.state.switch_cases = saved_cases
 
     mut fn lower_case_node(session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
@@ -19943,7 +19941,7 @@ impl CiGotoCfgContext:
         self.fail("expected switch case/default in goto CFG", with_ci_cursor_location(session, cursor))
 
     mut fn lower_switch_body(session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-        let saved_cases: CiGotoSwitchCase = self.state.switch_cases
+        let saved_cases = self.state.switch_cases
         self.state.switch_cases = cases
         let nc = with_ci_num_children(session, body_cursor)
         let switch_mark = ci_scope_mark(scope)
@@ -19980,7 +19978,7 @@ impl CiGotoCfgContext:
             if ck == CXK_LABEL_STMT:
                 switch_scope = ci_goto_scope_after_label_stmt(session, child, switch_scope)
             i = i + 1
-        let _ = ci_scope_restore(scope, switch_mark)
+        ci_scope_restore(scope, switch_mark)
         self.state.switch_cases = saved_cases
 
     mut fn emit_switch_dispatch(exprs: CiExprPool, subject_id: CiExprId, dispatch_block: i32, after_block: i32, cases: CiGotoSwitchCase, loc: &str):
@@ -20176,7 +20174,7 @@ impl CiStackEmitContext:
 
     mut fn pop_frame():
         if self.frames.len() > 0:
-            let _ = self.frames.pop()
+            self.frames.pop()
         return
 
     mut fn resolve_frame(depth: i32) -> CiStackEmitFrame:
@@ -20194,7 +20192,7 @@ impl CiStmtPool:
         let start = self.extra_len()
         var i: i64 = 0
         while i < ids.len():
-            let _ = self.add_extra(ids[i])
+            self.add_extra(ids[i])
             i = i + 1
         self.block(start, ids.len() as i32)
 
@@ -20257,7 +20255,7 @@ impl CiStackEmitContext:
             let start = stmts.extra_len()
             var i: i64 = 0
             while i < ids.len():
-                let _ = stmts.add_extra(ids[i])
+                stmts.add_extra(ids[i])
                 i = i + 1
             return stmts.block_labeled(start, ids.len() as i32, label_sym)
         if node.kind == StackifyNodeKind.Loop:
@@ -20516,7 +20514,7 @@ impl CiStmtPool:
             let start = self.extra_len()
             var bi: i64 = 0
             while bi < block_ids.len():
-                let _ = self.add_extra(block_ids[bi])
+                self.add_extra(block_ids[bi])
                 bi = bi + 1
             ids.push(self.block_labeled(start, block_ids.len() as i32, labels[block]) as i32)
             block = block + 1
@@ -20539,7 +20537,7 @@ impl CiGotoCfgContext:
 impl CiStmtPool:
     fn lower_goto_body_stackify(session: i64, body_cursor: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
         var hoisted_decls: List[CiHoistedVarDecl] = List.new()
-        hoisted_decls = ci_collect_var_decls(session, body_cursor, move hoisted_decls, types)
+        hoisted_decls = ci_collect_var_decls(session, body_cursor, hoisted_decls, types)
 
         var hoisted_stmt_ids: List[i32] = List.new()
         var hvi: i32 = 0
@@ -20834,7 +20832,7 @@ fn ci_generic_selection_selected(session: i64, cursor: i32) -> i32:
     if trace: eprint("generic: wanted=" ++ wanted ++ " spelled=" ++ wanted_spelled)
     var default_at = -1
     for k in 1..segments.len():
-        let segment: str = segments[k]
+        let segment = segments[k]
         let colon = segment.find(":")
         if colon < 0: return -1
         let type_text = ci_trim(segment[..colon])
@@ -20853,7 +20851,7 @@ fn ci_generic_selection_selected(session: i64, cursor: i32) -> i32:
         // child's type names it.
         if ci_generic_key_is_bare_name(key) and not ci_generic_key_is_builtin(key):
             for j in 1..segments.len():
-                let other: str = segments[j]
+                let other = segments[j]
                 let other_colon = other.find(":")
                 if other_colon < 0: continue
                 let other_expr = ci_trim(other[other_colon + 1..])
@@ -21636,7 +21634,7 @@ impl CiExprPool:
             let args_start = self.extra_len() as i32
             var j: i64 = 0
             while j < arg_ids.len():
-                let _ = self.add_extra(arg_ids[j])
+                self.add_extra(arg_ids[j])
                 j = j + 1
             return self.add(CiExprKind.CIE_CALL, renamed_callee as i32, args_start, arg_count, 0)
         // malloc(N) → (with_alloc(N as i64) as *mut c_void)
@@ -21657,7 +21655,7 @@ impl CiExprPool:
             let wa_callee = self.ident(wa_idx, 0)
             // Push arg.
             let args_start = self.extra_len() as i32
-            let _ = self.add_extra(arg_as_i64 as i32)
+            self.add_extra(arg_as_i64 as i32)
             var call_id = self.add(CiExprKind.CIE_CALL, wa_callee as i32, args_start, 1, 0)
             if ci_migrate_call_requires_unsafe_wrapper("with_alloc"):
                 call_id = self.unsafe_expr(call_id)
@@ -21682,7 +21680,7 @@ impl CiExprPool:
             let wf_idx = self.add_string("with_free")
             let wf_callee = self.ident(wf_idx, 0)
             let args_start = self.extra_len() as i32
-            let _ = self.add_extra(arg_cast as i32)
+            self.add_extra(arg_cast as i32)
             var call_id = self.add(CiExprKind.CIE_CALL, wf_callee as i32, args_start, 1, 0)
             if ci_migrate_call_requires_unsafe_wrapper("with_free"):
                 call_id = self.unsafe_expr(call_id)

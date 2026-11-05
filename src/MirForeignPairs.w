@@ -163,7 +163,7 @@ type PairsBody {
 fn pairs_body_new(body: &MirBody) -> PairsBody:
     let keys = mir_drop_state_keys_new(body)
     let width = keys.len() as i32
-    PairsBody { keys: move keys, key_resource: pairs_list_i32(width, -1), key_alias: pairs_list_i32(width, -1), key_is_ref: pairs_list_i32(width, 0), ref_origin: pairs_list_i32(width, -2), origin_key: pairs_list_i32(width, 0), origin_bb: pairs_list_i32(width, -1), guard_alias: pairs_list_i32(width, -1), guard_ok: pairs_list_i64(width, -1), cond_guard: pairs_list_i32(width, -1), cond_is_eq: pairs_list_i32(width, 1), steps: List.new(), sites: List.new(), starts: List.new(), counts: List.new(), edges: List.new() }
+    PairsBody { keys: keys, key_resource: pairs_list_i32(width, -1), key_alias: pairs_list_i32(width, -1), key_is_ref: pairs_list_i32(width, 0), ref_origin: pairs_list_i32(width, -2), origin_key: pairs_list_i32(width, 0), origin_bb: pairs_list_i32(width, -1), guard_alias: pairs_list_i32(width, -1), guard_ok: pairs_list_i64(width, -1), cond_guard: pairs_list_i32(width, -1), cond_is_eq: pairs_list_i32(width, 1), steps: List.new(), sites: List.new(), starts: List.new(), counts: List.new(), edges: List.new() }
 
 impl PairsBody:
     fn width(): self.key_resource.len()

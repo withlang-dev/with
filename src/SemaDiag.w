@@ -183,7 +183,7 @@ impl Sema:
                 diag.add_help("regex splitting is a Regex method: `" ++ re_text ++ ".split(text)`")
             else if call_name == "str.contains":
                 diag.add_help("regex matching is `text =~ " ++ re_text ++ "` or `" ++ re_text ++ ".is_match(text)` (§18.5b)")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     fn unknown_type_message(sym: i32) -> str:
         let name = self.pool_resolve(sym)
@@ -205,7 +205,7 @@ impl Sema:
     // gap (§16.2 structured manifest: "location|category|reason") instead of
     // reading as a misspelled local name. True when the error was emitted.
     mut fn emit_ci_omitted_symbol_error(sym: i32, node: i32) -> bool:
-        let target_name: str = self.pool_resolve(sym)
+        let target_name = self.pool_resolve(sym)
         if not self.ci_omitted_symbols.contains(target_name):
             return false
         let record: str = with_str_clone_ref(self.ci_omitted_symbols.get(target_name).unwrap())
@@ -298,7 +298,7 @@ impl Sema:
             return
         var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn emit_error_code(msg: &str, node: i32, code: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
@@ -306,7 +306,7 @@ impl Sema:
         var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_code(code)
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn emit_error_with_help(msg: &str, node: i32, help: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
@@ -315,7 +315,7 @@ impl Sema:
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         if help.len() > 0:
             diag.add_help(help)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     // An error that also points at a second place: where the fact it rests
     // on came from.
@@ -330,13 +330,13 @@ impl Sema:
     mut fn emit_warning(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn emit_warning_code(msg: &str, node: i32, code: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_code(code)
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
 // ── Typed dump rendering ────────────────────────────────────────
 

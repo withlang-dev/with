@@ -513,7 +513,7 @@ fn allocate_stack_region(size: i64) -> *mut u8:
     let region = rt_libc_mmap(0 as *mut u8, total as u64, PROT_READ_WRITE, rt_fiber_mmap_flags(), -1, 0)
     if region as i64 == MAP_FAILED:
         return 0 as *mut u8
-    let _ = rt_libc_mprotect(region, page_sz as u64, PROT_NONE)
+    rt_libc_mprotect(region, page_sz as u64, PROT_NONE)
     (region as i64 + page_sz) as *mut u8
 
 fn acquire_fiber() -> i64:
@@ -553,7 +553,7 @@ fn free_fiber_stack(f: i64):
         return
     let page_sz = guard_page_size()
     let region = (stack as i64 - page_sz) as *mut u8
-    let _ = rt_libc_munmap(region, (page_sz + fiber_stack_size(f)) as u64)
+    rt_libc_munmap(region, (page_sz + fiber_stack_size(f)) as u64)
     fiber_set_stack(f, 0 as *mut u8)
 
 fn recycle_fiber(f: i64):
@@ -592,10 +592,10 @@ fn fiber_write_i32(fd: i32, n: i32):
     var buf: [16]u8 = [0 as u8; 16]
     var i = 0
     if value < 0:
-        let _ = rt_libc_write(fd, "-" as *const u8, 1)
+        rt_libc_write(fd, "-" as *const u8, 1)
         value = 0 - value
     if value == 0:
-        let _ = rt_libc_write(fd, "0" as *const u8, 1)
+        rt_libc_write(fd, "0" as *const u8, 1)
         return
     while value > 0 and i < 15:
         buf[i] = (48 + (value % 10)) as u8
@@ -603,7 +603,7 @@ fn fiber_write_i32(fd: i32, n: i32):
         i = i + 1
     var j = i - 1
     while j >= 0:
-        let _ = rt_libc_write(fd, (&raw const buf as i64 + j as i64) as *const u8, 1)
+        rt_libc_write(fd, (&raw const buf as i64 + j as i64) as *const u8, 1)
         j = j - 1
 
 fn fiber_guard_hit(f: i64, fault_addr: i64) -> bool:
@@ -614,23 +614,22 @@ fn fiber_guard_hit(f: i64, fault_addr: i64) -> bool:
         return false
     fault_addr >= stack as i64 - guard_page_size() and fault_addr < stack as i64
 
-pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8):
-    let _ = ucontext
+pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8) -> Unit:
     let fault_addr = rt_fiber_fault_addr(info)
     let worker = current_worker_index()
     let coro = worker_current_coros[worker]
     if fiber_guard_hit(coro, fault_addr):
-        let _ = rt_libc_write(2, "fatal: fiber stack overflow (pulled generator)\n" as *const u8, 47)
+        rt_libc_write(2, "fatal: fiber stack overflow (pulled generator)\n" as *const u8, 47)
         rt_libc_exit(134)
     let current = worker_current_fibers[worker]
     if fiber_guard_hit(current, fault_addr):
-        let _ = rt_libc_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
+        rt_libc_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
         fiber_write_i32(2, fiber_id(current))
-        let _ = rt_libc_write(2, ")\n" as *const u8, 2)
+        rt_libc_write(2, ")\n" as *const u8, 2)
         rt_libc_exit(134)
 
     rt_fiber_reset_signal_handler(sig)
-    let _ = rt_libc_raise(sig)
+    rt_libc_raise(sig)
 
 fn fiber_install_signal_handlers():
     rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_stack_overflow_handler as i64)
@@ -732,7 +731,7 @@ fn scheduler_start_workers():
     while i < active_worker_count:
         let handle = rt_thread_spawn(scheduler_worker_entry as *mut u8, (i as i64) as *mut u8)
         if handle < 0:
-            let _ = rt_libc_write(2, "fatal: could not start fiber scheduler worker\n" as *const u8, 46)
+            rt_libc_write(2, "fatal: could not start fiber scheduler worker\n" as *const u8, 46)
             rt_libc_abort()
         worker_handles[i] = handle
         i = i + 1
@@ -913,7 +912,7 @@ pub fn with_fiber_sleep_until(wake_at: i64) -> i32:
         scheduler_unlock()
         if earliest > now:
             let idle = earliest - now
-            let _ = rt_nanosleep(if idle < FIBER_SLEEP_SLICE_NS: idle else: FIBER_SLEEP_SLICE_NS)
+            rt_nanosleep(if idle < FIBER_SLEEP_SLICE_NS: idle else: FIBER_SLEEP_SLICE_NS)
         with_fiber_yield()
         scheduler_lock()
         fiber_set_wake_at(current, 0)
@@ -1153,7 +1152,7 @@ pub fn with_runtime_core_shutdown():
     while wi < active_worker_count:
         let handle = worker_handles[wi]
         if handle > 0:
-            let _ = rt_thread_join(handle)
+            rt_thread_join(handle)
         wi = wi + 1
 
     scheduler_lock()
@@ -1186,7 +1185,7 @@ pub fn with_runtime_core_has_fibers() -> i32:
 
 pub fn with_runtime_core_run_one_step():
     if run_one_fiber_for_worker(current_worker_index()) == 0:
-        let _ = rt_nanosleep(1000)
+        rt_nanosleep(1000)
 
 pub fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32:
     scheduler_lock()

@@ -675,7 +675,7 @@ fn emit_c_header_next_to(comp: &Compilation, artifact_path: &str) -> Unit:
     let header = sema.cheader_generate(c_header_guard_for(h_path))
     if header.len() == 0:
         return
-    let _ = with_fs_write_file(h_path, header)
+    with_fs_write_file(h_path, header)
 
 fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
     let name = cli_one_liner_mode_name(mode)
@@ -736,7 +736,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
             let start = source.len() as i32
             source.push_str(rewritten)
             source.push_str("\n")
-            syn = cli_synthetic_add_mapping(move syn, start, rewritten, "<cli -e #" ++ f"{i + 1}" ++ ">")
+            syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -e #" ++ f"{i + 1}" ++ ">")
         syn.source = source.to_str()
         return syn
     // The per-line loop takes a brace body (§29.13, the same AST as the
@@ -760,7 +760,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
             let start = source.len() as i32
             source.push_str(uses)
             source.push_str("\n")
-            syn = cli_synthetic_add_mapping(move syn, start, uses, f"<cli {flag} #{i + 1}>")
+            syn = cli_synthetic_add_mapping(syn, start, uses, f"<cli {flag} #{i + 1}>")
         rewritten_parts.push(rewritten)
         use_lens.push(use_len)
     source.push_str("var nr: i64 = 0\n")
@@ -771,7 +771,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
         let start = source.len() as i32
         source.push_str(cli_blank_prefix(rewritten_parts[i], use_lens[i]))
         source.push_str("\n")
-        syn = cli_synthetic_add_mapping(move syn, start, rewritten_parts[i], f"<cli {flag} #{i + 1}>")
+        syn = cli_synthetic_add_mapping(syn, start, rewritten_parts[i], f"<cli {flag} #{i + 1}>")
     if not lines_mode: source.push_str("print(line)\n")
     source.push_str("}\n")
     syn.source = source.to_str()
@@ -794,8 +794,6 @@ fn cli_one_liner_out_dir -> str:
     with_user_cache_dir() ++ "/with/one-liners"
 
 fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
-    let _ = argc
-    let _ = debug_info
     if not one.ok:
         with_eprint(one.error_msg)
         return 1
@@ -1778,7 +1776,7 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
     var comp = Compilation.init()
     var runner_options = build_command_options_clone(options)
     runner_options.opt_level = 1
-    comp.configure_options(move runner_options)
+    comp.configure_options(runner_options)
     comp.set_tool_mode_entry_path(entry_path)
     let no_settings: List[str] = List.new()
     // #1797/#1906: the runner links exactly as stage1 does — against a
@@ -2587,7 +2585,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     comp.configure_options(build_command_options_clone(options))
     comp.set_tool_mode_entry_path(entry_path)
     let compile_cfg = project_config_clone(cfg)
-    let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), move compile_cfg)
+    let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), compile_cfg)
     var sema = move comp.zcu.last_sema
     if pool.decl_count() == 0 or comp.has_errors():
         graph.error_msg = "build.w evaluation wrapper compilation failed"
@@ -2606,7 +2604,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
         graph.ok = false
         graph.error_msg = move eval_result.error_msg
         return BuildGraphLoadResult { graph, sema }
-    var materialized = materialize_build_graph_from_comptime(move sema, eval_result.value, move eval_result.extras)
+    var materialized = materialize_build_graph_from_comptime(sema, eval_result.value, move eval_result.extras)
     build_cache_record_build_effects(root, eval_result.effect_records)
     // Keyed on the environment this evaluation just read (#1925), not the
     // previous one's.
@@ -2691,7 +2689,6 @@ fn build_graph_run_cli_capture(root: &str, target: &BuildGraphTarget, compiler_p
     let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
     let out_text = with_fs_read_file(stdout_path)
     let err_text = with_fs_read_file(stderr_path)
-    let _ = label
     if rc == 0:
         let _remove_stdout = with_fs_remove_file(stdout_path)
         let _remove_stderr = with_fs_remove_file(stderr_path)
@@ -3469,7 +3466,7 @@ fn run_graph_target_command(target_name: &str) -> i32:
     var graph_options = build_graph_command_options_default()
     graph_options.selected_target = with_str_clone_ref(target_name)
     graph_options.selected_targets.push(with_str_clone_ref(target_name))
-    run_build_command(move build_options, graph_options)
+    run_build_command(build_options, graph_options)
 
 // Returns the INDEX, not a copy: returning the element bit-copied its
 // inputs/outputs/args vectors out of the caller's graph, and the copy's drop
@@ -3514,13 +3511,13 @@ fn repo_lock_acquire(target_name: &str) -> bool:
         return true
     let lock_dir = repo_lock_path()
     let parent = lock_dir.slice(0, lock_dir.len() - "/repo-serial.lock".len())
-    let _ = with_fs_mkdir_p(parent)
+    with_fs_mkdir_p(parent)
     let rc = with_fs_mkdir(lock_dir)
     if rc == 0:
         let owner_file = repo_lock_owner_path()
         let pid = with_getpid()
-        let _ = with_fs_write_file(owner_file, f"target={target_name} pid={pid}")
-        let _ = with_setenv_str("WITH_REPO_LOCKED", "1")
+        with_fs_write_file(owner_file, f"target={target_name} pid={pid}")
+        with_setenv_str("WITH_REPO_LOCKED", "1")
         return true
     if with_fs_file_exists(repo_lock_owner_path()) != 0:
         let owner = with_fs_read_file(repo_lock_owner_path())
@@ -3528,12 +3525,12 @@ fn repo_lock_acquire(target_name: &str) -> bool:
         if owner_pid > 0 and owner_pid == with_getpid():
             return true
         if owner_pid > 0 and with_process_alive(owner_pid) == 0:
-            let _ = with_fs_remove_tree(lock_dir)
+            with_fs_remove_tree(lock_dir)
             let rc2 = with_fs_mkdir(lock_dir)
             if rc2 == 0:
                 let pid = with_getpid()
-                let _ = with_fs_write_file(repo_lock_owner_path(), f"target={target_name} pid={pid}")
-                let _ = with_setenv_str("WITH_REPO_LOCKED", "1")
+                with_fs_write_file(repo_lock_owner_path(), f"target={target_name} pid={pid}")
+                with_setenv_str("WITH_REPO_LOCKED", "1")
                 return true
         with_eprint("error: another build is already running: " ++ owner ++ "\n")
     else:
@@ -3546,7 +3543,7 @@ fn repo_lock_release():
         let owner = with_fs_read_file(repo_lock_owner_path())
         let owner_pid = repo_lock_parse_pid(owner)
         if owner_pid == with_getpid():
-            let _ = with_fs_remove_tree(lock_dir)
+            with_fs_remove_tree(lock_dir)
 
 fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg: &ProjectConfig) -> BuildCommandOptions:
     var out = options
@@ -3781,7 +3778,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
         if cfg.manifest_error.len() > 0:
             with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
             return 1
-        actual_options = build_command_apply_project_target_default(move actual_options, cfg)
+        actual_options = build_command_apply_project_target_default(actual_options, cfg)
         if build_command_validate_target(actual_options, cfg) != 0:
             return 1
         if project_config_file_exists(build_path):
@@ -3860,7 +3857,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
         if cfg.manifest_error.len() > 0:
             with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
             return 1
-        actual_options = build_command_apply_project_target_default(move actual_options, cfg)
+        actual_options = build_command_apply_project_target_default(actual_options, cfg)
         if build_command_validate_target(actual_options, cfg) != 0:
             return 1
         // #747 instance E: `var actual_source = actual_options.source_path`
@@ -3992,7 +3989,7 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
     let run_dir = (if scratch.len() > 0: scratch else: link_stage_artifact_root()) ++ f"/with-run.{with_getpid()}.{with_clock_nanos()}"
     let bin_path = comp.build_binary_to_path(source_file, run_dir ++ "/" ++ link_stage_basename(link_stage_output_path_for_source(source_file)))
     if bin_path == "":
-        let _ = build_graph_rt_remove_tree(run_dir)
+        build_graph_rt_remove_tree(run_dir)
         with_eprint("error: run failed")
         return 1
     comp.print_warnings()
@@ -4003,7 +4000,7 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
         build_graph_rt_exec_binary(bin_path)
     else:
         build_graph_rt_exec_argv(bin_path ++ "\0" ++ prog_args)
-    let _ = build_graph_rt_remove_tree(run_dir)
+    build_graph_rt_remove_tree(run_dir)
     run_rc
 
 // A wasm program runs through its emitted JS host under node (WITH_NODE
@@ -4039,7 +4036,7 @@ fn dump_ast(source_file: &str, no_std: bool, alloc_mode: bool, include_header: b
     let tokens = lexer.tokenize()
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
-    var parser = Parser.init(move tokens, text, 0, intern, move diags)
+    var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
     diags = move parser.diags
 
@@ -4312,7 +4309,7 @@ fn discover_test_functions(text: &str) -> TestDiscovery:
     let tokens = lexer.tokenize()
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
-    var parser = Parser.init(move tokens, text, 0, intern, move diags)
+    var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
     diags = move parser.diags
 
@@ -4342,7 +4339,7 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
     let tokens = lexer.tokenize()
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
-    var parser = Parser.init(move tokens, text, 0, intern, move diags)
+    var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
     diags = move parser.diags
 
@@ -4628,7 +4625,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 result.known_issue = line.slice(known_issue_prefix.len(), line.len())
             else if line.starts_with("//! expect-debug-alloc: ") or line.starts_with("//! debug-alloc-filter: "):
                 // tools/debug_drop.w's directives (the debug-alloc lane).
-                let _ = 0
+                {}
             else if line.starts_with("//!"):
                 if unknown_line.len() == 0:
                     unknown_line = line
@@ -4847,7 +4844,6 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
         emit_test_stage_error(test_check_failure_message(result.rc), target, "check", "")
         emit_test_child_stderr(result.stderr)
         return 1
-    let _ = quiet
     -1
 
 fn test_extra_arg_present(args: &str, wanted: &str) -> bool:
@@ -5151,7 +5147,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
         if eq >= 0:
             let name = pair.slice(0, eq)
             saved.push(with_getenv_str(name) ++ "")
-            let _ = with_setenv_str(name, pair.slice(eq + 1, pair.len()))
+            with_setenv_str(name, pair.slice(eq + 1, pair.len()))
         else:
             saved.push("")
     let env_rc = run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
@@ -5159,7 +5155,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
         let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
         if eq >= 0:
-            let _ = with_setenv_str(pair.slice(0, eq), saved[ei])
+            with_setenv_str(pair.slice(0, eq), saved[ei])
     env_rc
 
 // #2011: `with test --validate-all` first checks a test that is meant to
@@ -5330,7 +5326,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         build_options.release = cli_release_flag()
         var graph_options = build_graph_command_options_default()
         graph_options.selected_target = "test"
-        return run_build_command(move build_options, graph_options)
+        return run_build_command(build_options, graph_options)
     // Two or more files run as a build.w test lane runs them: on the build
     // graph's pool, a worker per core, every failure reported and passes
     // cached machine-wide. Before, the files ran one after another and the
@@ -5789,7 +5785,6 @@ fn doc_markdown_entry(kind: &str, path: &str, name: &str, detail: &str, source_t
         out = out ++ "```with\n" ++ line ++ "\n```\n\n"
     if detail.len() > 0:
         out = out ++ detail ++ "\n\n"
-    let _ = kind
     out
 
 fn doc_project_root(info: &str) -> str:
@@ -5988,7 +5983,6 @@ fn print_repl_help:
     with_write("Each input line is compiled and run as normal With code. Persistent declarations are rejected until session state is implemented.\n")
 
 fn run_repl_command(argc: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    let _ = argc
     with_write("With REPL\n")
     print_repl_help()
     while true:
@@ -6500,7 +6494,7 @@ fn cli_configure_build_memory_limit() -> i32:
         limit = parsed
         limit_text = raw
     else:
-        let _ = with_setenv_str("WITH_MEMORY_LIMIT_BYTES", limit_text)
+        with_setenv_str("WITH_MEMORY_LIMIT_BYTES", limit_text)
     with_set_memory_limit_bytes(limit)
     0
 
@@ -7017,7 +7011,7 @@ fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinst
     if resolved_version.len() == 0:
         return 1
     let loaded_lock = lock_load(root)
-    let updated_lock = lock_upsert_installed_c_dep_tree(move loaded_lock, root, pkg_name, resolved_version)
+    let updated_lock = lock_upsert_installed_c_dep_tree(loaded_lock, root, pkg_name, resolved_version)
     if updated_lock.entries.len() == 0:
         return 1
     if lock_write(root, updated_lock) != 0:
@@ -7063,7 +7057,7 @@ fn run_remove_command(argc: i32) -> i32:
             return 1
     if with_fs_file_exists(lock_file_path(root)) != 0:
         let existing_lock = lock_load(root)
-        let next_lock = lock_remove(move existing_lock, "c." ++ pkg_name)
+        let next_lock = lock_remove(existing_lock, "c." ++ pkg_name)
         if lock_write(root, next_lock) != 0:
             return 1
     with_eprint("removed c." ++ pkg_name)
@@ -7089,7 +7083,7 @@ fn run_update_command(argc: i32) -> i32:
         let resolved_version = conan_install(dep.name, dep.constraint, root, true)
         if resolved_version.len() == 0:
             return 1
-        next_lock = lock_upsert_installed_c_dep_tree(move next_lock, root, dep.name, resolved_version)
+        next_lock = lock_upsert_installed_c_dep_tree(next_lock, root, dep.name, resolved_version)
         if next_lock.entries.len() == 0:
             return 1
         toml = cli_update_manifest_dep(toml, dep.name, resolved_version)

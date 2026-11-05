@@ -127,10 +127,10 @@ fn pkg_rel_path(root: &str, path: &str) -> str:
     ""
 
 fn pkg_add_parent_dirs(dirs: List[str], top_dir: &str, rel_path: &str) -> List[str]:
-    var out = pkg_add_unique(move dirs, top_dir)
+    var out = pkg_add_unique(dirs, top_dir)
     for i in 0..rel_path.len():
         if rel_path[i] == 47:
-            out = pkg_add_unique(move out, top_dir ++ "/" ++ rel_path.slice(0, i as i64))
+            out = pkg_add_unique(out, top_dir ++ "/" ++ rel_path.slice(0, i as i64))
     out
 
 fn pkg_host_exe_suffix() -> str:
@@ -472,7 +472,7 @@ fn pkg_write_archive(ctx: &ActionCtx, compiler_path: &str, stage_root: &str, top
         let rel = pkg_rel_path(stage_root, files[i])
         if rel.len() == 0:
             return pkg_fail(ctx, "package file is outside stage root: " ++ files[i])
-        dirs = pkg_add_parent_dirs(move dirs, top_dir, rel)
+        dirs = pkg_add_parent_dirs(dirs, top_dir, rel)
     dirs = pkg_sort_strings(dirs)
     let entries: List[ArchiveEntry] = List.new()
     for i in 0..dirs.len():

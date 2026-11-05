@@ -72,6 +72,6 @@ pub fn run_benchmarks_check_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("benchmarks-check: found no workloads under benchmarks/workloads/*/*.w")
     if failures > 0:
         ctx.diagnostics().error(f"benchmarks-check: {failures} of {total} benchmark program(s) failed to check; a benchmark tracks the current language like any program")
-    let _ = fs.write_text(bm_join(out_dir, ".stamp"), f"ok: {total} programs\n")
+    fs.write_text(bm_join(out_dir, ".stamp"), f"ok: {total} programs\n")
     print(f"benchmarks-check: {total} programs check")
     0

@@ -1160,7 +1160,7 @@ fn comp_spec_public_attributes(spec: &str) -> List[str]:
                     end = ci as i32
                     break
             if end > 1:
-                attrs = comp_collect_attr_names(move attrs, line.slice(1, end as i64))
+                attrs = comp_collect_attr_names(attrs, line.slice(1, end as i64))
     attrs
 
 fn comp_spec_internal_attributes(spec: &str) -> List[str]:
@@ -1171,7 +1171,7 @@ fn comp_spec_internal_attributes(spec: &str) -> List[str]:
         if line.starts_with("**Implementation-internal"):
             var j = i
             while j < lines.len() and comp_trim(lines[j]).len() > 0:
-                attrs = comp_collect_attr_names(move attrs, lines[j])
+                attrs = comp_collect_attr_names(attrs, lines[j])
                 j = j + 1
     attrs
 
@@ -1257,7 +1257,7 @@ fn comp_spec_cli_commands(spec: &str) -> List[str]:
 fn comp_spec_cli_flags():
     var flags: List[str] = List.new()
     let defaults = "--release --target --emit-c --emit-all --emit-obj --overflow --no-std --strict-effects --debug-alloc --trace-alloc --dump-drop-state -O0 -O1 -O2 -O3 --open -e -n -p --fail-fast --abi-sha --self-id"
-    comp_add_words(move flags, defaults)
+    comp_add_words(flags, defaults)
 
 fn comp_impl_commands(fs: &ToolFs) -> List[str]:
     let raw = comp_collect_quoted_after(fs.read_text("src/main.w"), "cli_command(argc) == \"")
@@ -1976,7 +1976,7 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     for path in chapters: spec = spec ++ fs.read_text(path) ++ "\n"
     var errors: List[str] = List.new()
 
-    errors = comp_inventory_add_errors(move errors, "keywords", comp_spec_keywords(spec), comp_impl_keywords(fs), "", "")
+    errors = comp_inventory_add_errors(errors, "keywords", comp_spec_keywords(spec), comp_impl_keywords(fs), "", "")
 
     var allowed_attrs = comp_spec_public_attributes(spec)
     let internal_attrs = comp_spec_internal_attributes(spec)
@@ -1984,10 +1984,10 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
         let item = internal_attrs[ai]
         if item.len() > 0 and not comp_list_contains(allowed_attrs, item):
             allowed_attrs.push(compiler_owned_text(item))
-    errors = comp_inventory_add_errors(move errors, "attributes", allowed_attrs, comp_impl_attributes(fs), "attribute", "")
+    errors = comp_inventory_add_errors(errors, "attributes", allowed_attrs, comp_impl_attributes(fs), "attribute", "")
 
-    errors = comp_inventory_add_errors(move errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "command", "command")
-    errors = comp_inventory_add_errors(move errors, "cli flags", comp_spec_cli_flags(), comp_impl_flags(fs), "flag", "flag")
+    errors = comp_inventory_add_errors(errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "command", "command")
+    errors = comp_inventory_add_errors(errors, "cli flags", comp_spec_cli_flags(), comp_impl_flags(fs), "flag", "flag")
     // The spec does not catalogue lib/std (Eric, 2026-09-20): a library is
     // documented by its source, and adding one is not a language change.
     for e in comp_conformance_errors(fs): errors.push(e)
@@ -2105,10 +2105,10 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
 
     var sizes: List[i32] = List.new()
     if format == "pe":
-        sizes = comp_stack_collect_after_marker(result.stdout, "ALLOC_SMALL size=", move sizes)
-        sizes = comp_stack_collect_after_marker(result.stdout, "ALLOC_LARGE size=", move sizes)
+        sizes = comp_stack_collect_after_marker(result.stdout, "ALLOC_SMALL size=", sizes)
+        sizes = comp_stack_collect_after_marker(result.stdout, "ALLOC_LARGE size=", sizes)
     else:
-        sizes = comp_stack_collect_after_marker(result.stdout, "DW_CFA_def_cfa_offset:", move sizes)
+        sizes = comp_stack_collect_after_marker(result.stdout, "DW_CFA_def_cfa_offset:", sizes)
 
     let report = comp_stack_summarize(binary_path, format, sizes)
     let max_frame: i32 = report.max_frame
@@ -2534,7 +2534,7 @@ pub fn compiler_w_files(fs: &ToolFs, dir: &str) -> List[str]:
     for i in 0..listing.len():
         if listing[i].ends_with(".w"):
             out.push(compiler_owned_text(listing[i]))
-    comp_sort_strings(move out)
+    comp_sort_strings(out)
 
 // sha256 over "<path>:<sha256(file)>\n" for every .w file under dir (the
 // build cache's build_cache_hash_directory_w_files shape): a .wo bundle's

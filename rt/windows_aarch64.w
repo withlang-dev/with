@@ -128,7 +128,6 @@ fn win_getrlimit(resource: i32, lim: *mut u8) -> i32:
     0
 
 fn win_setrlimit(resource: i32, lim: *const u8) -> i32:
-    let _ = lim
     if resource != 3: -1 else: 0
 
 var rt_argc: i32 = 0
@@ -342,7 +341,7 @@ fn win_utf16_to_utf8_buf(src: *const u16, dst: *mut u8, cap: i64) -> i32:
 fn win_utf16_to_str(src: *const u16) -> str:
     let n = win_utf16_utf8_len(src)
     let buf = with_alloc(n + 1)
-    let _ = win_utf16_to_utf8_buf(src, buf, n + 1)
+    win_utf16_to_utf8_buf(src, buf, n + 1)
     let text = with_str_from_bytes(buf as *const u8, n)
     with_free(buf)
     text
@@ -365,7 +364,7 @@ fn win_alloc_fd(handle: i64) -> i32:
         if rt_handles[i] == 0:
             rt_handles[i] = handle
             return i
-    let _ = CloseHandle(handle)
+    CloseHandle(handle)
     -24
 
 // ── Arguments ──────────────────────────────────────────────────────
@@ -407,7 +406,7 @@ fn win_utf8_argv(argc_out: *mut i32) -> *const *const u8:
     for i in 0..argc:
         let arg = win_wide_arg(wargv, i)
         let n = win_utf16_utf8_len(arg)
-        let _ = win_utf16_to_utf8_buf(arg, text as *mut u8, n + 1)
+        win_utf16_to_utf8_buf(arg, text as *mut u8, n + 1)
         unsafe *((block as i64 + i * 8) as *mut i64) = text
         text = text + n + 1
     // argv[argc] stays NULL: rt_mmap's pages come zero-filled.
@@ -417,12 +416,10 @@ fn win_utf8_argv(argc_out: *mut i32) -> *const *const u8:
 // main's narrow arguments are replaced by the UTF-8 ones; failing to read
 // them is fatal, as in the CRT's own startup (see windows_x86_64.w).
 pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
-    let _ = argc_val
-    let _ = argv_val
     var argc: i32 = 0
     let argv = win_utf8_argv(&raw mut argc)
     if argv as i64 == 0:
-        let _ = rt_write(2, "fatal: could not read the command line\n" as *const u8, 39)
+        rt_write(2, "fatal: could not read the command line\n" as *const u8, 39)
         ExitProcess(1)
     rt_argc = argc
     rt_argv_raw = argv as i64
@@ -460,7 +457,6 @@ pub fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
     got as i64
 
 pub fn rt_open(path: *const c_char, flags: i32, mode: i32) -> i32:
-    let _ = mode
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0:
@@ -497,9 +493,6 @@ pub fn rt_close(fd: i32) -> i32:
 // FD_CLOEXEC) have no HANDLE equivalent here, so the call is unsupported
 // and reports -1 (std.libc's fcntl seam; zlib's gz layer ignores it).
 pub fn rt_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
-    let _ = fd
-    let _ = cmd
-    let _ = arg
     -1
 
 pub fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
@@ -588,7 +581,6 @@ pub fn rt_mmap(size: i64) -> *mut u8:
     VirtualAlloc(0 as *mut u8, size as u64, MEM_COMMIT_RESERVE, PAGE_READWRITE)
 
 pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
-    let _ = size
     let _free = VirtualFree(ptr, 0, MEM_RELEASE)
 
 pub fn rt_exit(code: i32) -> Never:
@@ -596,9 +588,9 @@ pub fn rt_exit(code: i32) -> Never:
 
 pub fn rt_clock_ns() -> i64:
     if qpc_freq == 0:
-        let _ = QueryPerformanceFrequency(&raw mut qpc_freq)
+        QueryPerformanceFrequency(&raw mut qpc_freq)
     var now: i64 = 0
-    let _ = QueryPerformanceCounter(&raw mut now)
+    QueryPerformanceCounter(&raw mut now)
     if qpc_freq <= 0:
         return 0
     let seconds = now / qpc_freq
@@ -636,7 +628,7 @@ pub fn rt_kill(pid: i32, sig: i32) -> i32:
     if h == 0:
         return win_neg_error()
     if sig != 0:
-        let _ = TerminateProcess(h, (128 + sig) as u32)
+        TerminateProcess(h, (128 + sig) as u32)
     let _close = CloseHandle(h)
     0
 
@@ -652,7 +644,7 @@ pub fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64:
 
 pub fn rt_thread_join(handle: i64) -> i32:
     let r = WaitForSingleObject(handle, INFINITE)
-    let _ = CloseHandle(handle)
+    CloseHandle(handle)
     if r != WAIT_OBJECT_0:
         return win_neg_error()
     0
@@ -717,23 +709,19 @@ pub fn rt_fiber_mmap_flags() -> i32:
     0
 
 pub fn rt_fiber_fault_addr(info: *const u8) -> i64:
-    let _ = info
     0
 
-pub fn rt_fiber_reset_signal_handler(sig: i32) -> Unit:
-    let _ = sig
+pub fn rt_fiber_reset_signal_handler(sig: i32) {}
 
 // Arm the fiber stack's guard page. PAGE_GUARD raises STATUS_GUARD_PAGE_VIOLATION
 // on first touch AND auto-commits the page, so the vectored handler has real stack
 // to run its diagnostic on — the Windows analogue of POSIX sigaltstack.
 pub fn rt_fiber_protect_guard(region: *mut u8, len: i64) -> Unit:
     var old: u32 = 0
-    let _ = VirtualProtect(region, len as u64, PAGE_READWRITE | PAGE_GUARD, &raw mut old)
+    VirtualProtect(region, len as u64, PAGE_READWRITE | PAGE_GUARD, &raw mut old)
 
 pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
-    let _ = alt_stack
-    let _ = alt_stack_size
-    let _ = AddVectoredExceptionHandler(1 as u32, handler as *mut u8)
+    AddVectoredExceptionHandler(1 as u32, handler as *mut u8)
 
 // ── Directory walks ────────────────────────────────────────────────
 // Paths below the caller's stay UTF-16, as in windows_x86_64.w: a name
@@ -792,7 +780,6 @@ fn win_rmdir_w(wpath: *const u16) -> i32:
     if RemoveDirectoryW(wpath) == 0: win_neg_error() else: 0
 
 pub fn rt_mkdir(path: *const c_char, mode: i32) -> i32:
-    let _ = mode
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0: rc else: win_mkdir_w(&wpath as *const [4096]u16 as *const u16)
@@ -895,19 +882,19 @@ fn win_copy_file(src: *const u16, dst: *const u16) -> i32:
         return in_fd
     let out_fd = win_open_w(dst, 1 | 0x200 | 0x400)
     if out_fd < 0:
-        let _ = rt_close(in_fd)
+        rt_close(in_fd)
         return out_fd
     let buf = with_alloc(65536)
     if buf as i64 == 0:
-        let _ = rt_close(in_fd)
-        let _ = rt_close(out_fd)
+        rt_close(in_fd)
+        rt_close(out_fd)
         return -WIN_ENOMEM
     while true:
         let n = rt_read(in_fd, buf, 65536)
         if n < 0:
             with_free(buf)
-            let _ = rt_close(in_fd)
-            let _ = rt_close(out_fd)
+            rt_close(in_fd)
+            rt_close(out_fd)
             return n as i32
         if n == 0:
             break
@@ -916,8 +903,8 @@ fn win_copy_file(src: *const u16, dst: *const u16) -> i32:
             let w = rt_write(out_fd, (buf as i64 + off) as *const u8, n - off)
             if w <= 0:
                 with_free(buf)
-                let _ = rt_close(in_fd)
-                let _ = rt_close(out_fd)
+                rt_close(in_fd)
+                rt_close(out_fd)
                 return if w < 0: w as i32 else: -WIN_EWRITE
             off = off + w
     with_free(buf)
@@ -1104,7 +1091,7 @@ fn win_list_push(acc: *mut i64, text: &str):
         cap = new_cap
         unsafe *(acc as *mut *mut u8) = buf
         unsafe *((acc as i64 + 16) as *mut i64) = cap
-    let _ = with_memcpy((buf as i64 + len) as *mut u8, win_str_data(text), n)
+    with_memcpy((buf as i64 + len) as *mut u8, win_str_data(text), n)
     unsafe *((buf as i64 + len + n) as *mut u8) = 10 as u8
     unsafe *((acc as i64 + 8) as *mut i64) = len + n + 1
 
@@ -1192,7 +1179,6 @@ pub fn rt_list_dir(path: *const c_char) -> str:
     win_list_finish(&acc as *mut [3]i64 as *mut i64)
 
 pub fn rt_access(path: *const c_char, mode: i32) -> i32:
-    let _ = mode
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0:
@@ -1361,7 +1347,7 @@ pub fn rt_getenv(name: *const c_char) -> *const c_char:
     let len = win_utf16_utf8_len(value as *const u16)
     let buf = rt_mmap(len + 1)
     if buf as i64 != 0:
-        let _ = win_utf16_to_utf8_buf(value as *const u16, buf, len + 1)
+        win_utf16_to_utf8_buf(value as *const u16, buf, len + 1)
     if big as i64 != 0:
         rt_munmap(big, big_bytes)
     buf as *const c_char
@@ -1391,7 +1377,7 @@ fn win_mkstemp(template_path: *mut c_char) -> i32:
     if GetTempFileNameW(&dir as *const [1024]u16 as *const u16, &prefix as *const [5]u16 as *const u16, 0, &raw mut name as *mut [1024]u16 as *mut u16) == 0:
         return -1
     if win_utf16_to_utf8_buf(name_ptr, template_path as *mut u8, 1024) < 0:
-        let _ = DeleteFileW(name_ptr)
+        DeleteFileW(name_ptr)
         return -1
     win_open_w(name_ptr, 2)
 
@@ -1485,7 +1471,7 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     if wr != WAIT_OBJECT_0:
         return win_neg_error()
     var code: u32 = 1 as u32
-    let _ = GetExitCodeProcess(h, &raw mut code)
+    GetExitCodeProcess(h, &raw mut code)
     win_last_child_maxrss = win_process_peak_rss(h)
     let child_cpu = win_process_cpu_ns(h)
     if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
@@ -1615,7 +1601,7 @@ fn win_open_redirect(path: &str, write_mode: bool, handle: *mut i64) -> i32:
 
 fn win_close_redirect(opened: bool, handle: i64):
     if opened and handle != 0 and handle != INVALID_HANDLE_VALUE:
-        let _ = CloseHandle(handle)
+        CloseHandle(handle)
 
 fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: &str, cwd: &str, wait: bool, timeout_ms: i32) -> i32:
     let data = win_str_data(args)
@@ -1626,7 +1612,7 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
     // Windows' own limit on a command line; past it the spawn fails, and
     // says why (#1916) instead of returning -1 alone.
     if cmd_rc == -1:
-        let _ = rt_write(2, c"error: a command line longer than Windows allows (32767 UTF-16 units)\n".ptr as *const u8, 70)
+        rt_write(2, c"error: a command line longer than Windows allows (32767 UTF-16 units)\n".ptr as *const u8, 70)
     if cmd_rc != 0:
         with_free(cmd)
         return cmd_rc
@@ -1719,14 +1705,11 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
 pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     win_setenv(name, value)
 
-pub fn rt_compat_install_interrupt_handlers() -> Unit:
-    let _ = 0
+pub fn rt_compat_install_interrupt_handlers() {}
 
-pub fn rt_compat_raise_stack_limit() -> Unit:
-    let _ = 0
+pub fn rt_compat_raise_stack_limit() {}
 
 pub fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
-    let _ = limit
     0
 
 pub fn rt_compat_interrupt_requested() -> i32:
@@ -1786,7 +1769,7 @@ pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
     if wr != WAIT_OBJECT_0:
         return win_neg_error()
     var code: u32 = 1 as u32
-    let _ = GetExitCodeProcess(h, &raw mut code)
+    GetExitCodeProcess(h, &raw mut code)
     win_last_child_maxrss = win_process_peak_rss(h)
     let child_cpu = win_process_cpu_ns(h)
     if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
@@ -1958,9 +1941,9 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32, timeo
         if fd < 0:
             return -1
         if timeout_ms > 0:
-            let _ = rt_net_apply_timeout(fd, timeout_ms)
+            rt_net_apply_timeout(fd, timeout_ms)
         if connect(fd, &sa as *const [16]u8 as *const u8, 16) != 0:
-            let _ = closesocket(fd)
+            closesocket(fd)
             return -1
         return fd as i32
     // Non-numeric host: resolve through getaddrinfo.
@@ -1989,12 +1972,12 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32, timeo
         let fd = socket((unsafe *p).ai_family, (unsafe *p).ai_socktype, (unsafe *p).ai_protocol)
         if fd >= 0:
             if timeout_ms > 0:
-                let _ = rt_net_apply_timeout(fd, timeout_ms)
+                rt_net_apply_timeout(fd, timeout_ms)
             let rc = connect(fd, (unsafe *p).ai_addr as *const u8, (unsafe *p).ai_addrlen as i32)
             if rc == 0:
                 freeaddrinfo(res)
                 return fd as i32
-            let _ = closesocket(fd)
+            closesocket(fd)
         p = (unsafe *p).ai_next
     freeaddrinfo(res)
     -1
@@ -2027,10 +2010,10 @@ pub fn with_net_tcp_listen(port: i32, backlog: i32) -> i32:
     if fd < 0:
         return -1
     if rt_net_bind_inaddr_any(fd, port) != 0:
-        let _ = closesocket(fd)
+        closesocket(fd)
         return -1
     if listen(fd, backlog) != 0:
-        let _ = closesocket(fd)
+        closesocket(fd)
         return -1
     fd as i32
 
@@ -2049,7 +2032,7 @@ pub fn with_net_udp_bind(port: i32) -> i32:
     if fd < 0:
         return -1
     if rt_net_bind_inaddr_any(fd, port) != 0:
-        let _ = closesocket(fd)
+        closesocket(fd)
         return -1
     fd as i32
 

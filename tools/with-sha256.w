@@ -21,9 +21,9 @@ fn sha256_text(text: str) -> str:
     sha256_hex(&digest[0] as *const u8)
 
 // stderr without the prelude's with_eprint (see bootstrap note).
-fn ewrite(msg: str):
+fn ewrite(msg: str) -> Unit:
     let p = unsafe *(&msg as *const *mut u8)
-    let _ = unsafe { with_libc_write(2, p, msg.len() as u64) }
+    unsafe { with_libc_write(2, p, msg.len() as u64) }
 
 fn main:
     let argv = args()

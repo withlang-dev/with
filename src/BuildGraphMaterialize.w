@@ -168,7 +168,7 @@ impl BuildGraphMaterializer:
             if action_name != "build_noop_action":
                 out.error_msg = "non-action target '" ++ name_value.text ++ "' has an action function"
                 return out
-        out.targets.push(move target)
+        out.targets.push(target)
         out
 
     // #686: the module files an action's code can reach — its defining file
@@ -266,7 +266,7 @@ impl BuildGraphMaterializer:
         if generated_sources.kind != ComptimeValueKind.CV_LIST and generated_sources.kind != ComptimeValueKind.CV_ARRAY:
             return self.error("Build.generated_sources is not a vector")
         for i in 0..generated_sources.extra_count:
-            graph = self.materialize_generated_source(self.extras[(generated_sources.extra_start + i)], move graph)
+            graph = self.materialize_generated_source(self.extras[(generated_sources.extra_start + i)], graph)
             if graph.error_msg.len() > 0:
                 return graph
 
@@ -274,14 +274,14 @@ impl BuildGraphMaterializer:
         if targets.kind != ComptimeValueKind.CV_LIST and targets.kind != ComptimeValueKind.CV_ARRAY:
             return self.error("Build.targets is not a vector")
         for i in 0..targets.extra_count:
-            graph = self.materialize_target(self.extras[(targets.extra_start + i)], move graph)
+            graph = self.materialize_target(self.extras[(targets.extra_start + i)], graph)
             if graph.error_msg.len() > 0:
                 return graph
             if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
                 with_eprint(f"[graph] after-target-{i} dt=" ++ graph.default_target)
-        graph = build_graph_resolve_rss_budgets(move graph)
+        graph = build_graph_resolve_rss_budgets(graph)
         if graph.error_msg.len() > 0: return graph
-        graph = build_graph_complete_edges(move graph)
+        graph = build_graph_complete_edges(graph)
         graph.ok = true
         if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
             with_eprint("[graph] after-ok dt=" ++ graph.default_target)
@@ -294,6 +294,6 @@ impl BuildGraphMaterializer:
 // materializer stores the Sema (refs cannot be struct fields), so the
 // caller gets it back instead of reusing a moved value (§3.8).
 fn materialize_build_graph_from_comptime(sema: Sema, value: &ComptimeValue, extras: List[ComptimeValue]) -> BuildGraphMaterializeResult:
-    var mat = build_graph_materializer(move sema, move extras)
+    var mat = build_graph_materializer(sema, extras)
     let graph = mat.materialize_build(value)
     BuildGraphMaterializeResult { graph, sema: move mat.sema }

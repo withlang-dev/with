@@ -536,7 +536,7 @@ pub fn corpus_bundle_root_text(corpus: &Corpus, module_paths: &List[str]) -> str
     text = text ++ "// one `use` per corpus module"
     if harness.len() > 0: text = text ++ "; the harness (" ++ harness ++ ") is excluded"
     text = text ++ ".\n"
-    for name in corpus_sorted(move names): text = text ++ "use " ++ corpus.package ++ "." ++ name ++ "\n"
+    for name in corpus_sorted(names): text = text ++ "use " ++ corpus.package ++ "." ++ name ++ "\n"
     text
 
 /// Writes the root into `dir` (idempotent: an identical root is left alone).

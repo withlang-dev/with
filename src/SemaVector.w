@@ -303,7 +303,7 @@ impl Sema:
                 if arg_count != 1:
                     self.emit_error(f"{type_text}.splat takes one value", node)
                     return 0
-                let _ = self.check_expr_with_owned_demand(self.ast.get_extra(extra_start), self.vector_element_type(base_ty) as TypeId)
+                self.check_expr_with_owned_demand(self.ast.get_extra(extra_start), self.vector_element_type(base_ty) as TypeId)
                 return self.record_vector_op(node, VectorOp.SPLAT, base_ty)
             if not self.is_vector_type(base_ty):
                 if method == "from_bits":
@@ -339,7 +339,7 @@ impl Sema:
         if self.is_vector_or_mask_type(ty): return ty
         let pointee = self.shared_copy_pointee(ty)
         if pointee != 0 and self.is_vector_or_mask_type(pointee):
-            let _ = self.record_contextual_copy_adjustment(node, pointee, ty)
+            self.record_contextual_copy_adjustment(node, pointee, ty)
             return pointee
         ty
 
@@ -348,12 +348,12 @@ impl Sema:
         let n = self.vector_lane_count(vec_ty)
         if arg_count != n:
             for ai in 0..arg_count:
-                let _ = self.check_expr_value_context(self.ast.get_extra(extra_start + ai))
+                self.check_expr_value_context(self.ast.get_extra(extra_start + ai))
             self.emit_error(f"{type_text} takes exactly {n} lane values, not {arg_count} (§4.3d); `{type_text}.splat(s)` puts one value in every lane", node)
             return 0
         let lane = self.vector_element_type(vec_ty)
         for ai in 0..arg_count:
-            let _ = self.check_expr_with_owned_demand(self.ast.get_extra(extra_start + ai), lane as TypeId)
+            self.check_expr_with_owned_demand(self.ast.get_extra(extra_start + ai), lane as TypeId)
         self.record_vector_op(node, VectorOp.CONSTRUCT, vec_ty)
 
     // `m.select(a, b)` (D80): `a`'s lane where `m` is true, `b`'s where it
@@ -591,7 +591,7 @@ impl Sema:
                 self.emit_error(f"`{self.type_name(other_ty0)}` does not combine with the mask `{type_text}`: a mask's other operand is a mask of its shape or a `bool` (§4.3d)", node)
                 return 0
             if pointee == self.ty_bool as i32:
-                let _ = self.record_contextual_copy_adjustment(other_node, pointee, other_ty0)
+                self.record_contextual_copy_adjustment(other_node, pointee, other_ty0)
             self.vector_splats.insert(other_node, mask_ty)
         self.typed_expr_types.insert(node, mask_ty)
         mask_ty
@@ -614,7 +614,7 @@ impl Sema:
         let pointee = self.shared_copy_pointee(scalar_ty0)
         let scalar_ty = if pointee != 0 and self.is_numeric_type(pointee): pointee else: scalar_ty0
         if pointee != 0 and scalar_ty == pointee:
-            let _ = self.record_contextual_copy_adjustment(node, pointee, scalar_ty0)
+            self.record_contextual_copy_adjustment(node, pointee, scalar_ty0)
         if not self.is_numeric_type(scalar_ty):
             self.emit_error(f"`{self.type_name(scalar_ty0)}` is not a lane of `{self.type_name(vec_ty)}`; a scalar operand broadcasts only as a number (§4.3d)", node)
             return false

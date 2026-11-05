@@ -58,7 +58,7 @@ let argv = args()
 if argv.len() < 2: fail("usage: with run tools/pub_lint.w <root.w> [--apply]")
 let root = argv[1].to_owned()
 let apply = argv.len() > 2 and argv[2] == "--apply"
-let _ = mkdir_p("out/tmp")
+mkdir_p("out/tmp")
 
 // Single-pass extraction over `with analyze <root> facts`: declarations and
 // types of the root's package, plus references/calls/method-resolutions from

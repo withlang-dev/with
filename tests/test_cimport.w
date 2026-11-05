@@ -77,7 +77,7 @@ fn test_stdlib_functions():
 
 // ── stdio.h ─────────────────────────────────────────────────
 fn test_stdio_functions():
-    let _ = puts("  c_import: puts works" as *const i8)
+    puts("  c_import: puts works" as *const i8)
     assert_true(BUFSIZ > 0, "BUFSIZ > 0")
     assert_eq_i32(EOF, -1, "EOF")
     assert_eq_i32(SEEK_SET, 0, "SEEK_SET")

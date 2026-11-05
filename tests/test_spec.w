@@ -159,8 +159,7 @@ fn test_const:
 
 // ── §9.1 Functions (various forms) ─────────────────────────────
 
-fn no_args_no_return:
-    let _ = 1  // just a body
+fn no_args_no_return {}// just a body
 
 fn no_args_with_return -> i32:
     42

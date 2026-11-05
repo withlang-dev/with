@@ -85,7 +85,7 @@ fn process(path: &str) -> i32:
         pos = te
         count = count + 1
     out = out ++ text.slice(pos as i64, text.len())
-    let _ = write_file(path, out)
+    write_file(path, out)
     print(f"{path}: renamed {count} tokens across {names.len()} externs")
     0
 

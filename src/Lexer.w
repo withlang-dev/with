@@ -541,7 +541,7 @@ impl Lexer:
                         self.pos = self.pos + 1
 
         // Check for type suffix: 100i64, 3.14f32, 0xFFu32.
-        let suffix_pos: i32 = self.pos
+        let suffix_pos = self.pos
         let suffix_len = numeric_suffix_len(src, suffix_pos, slen)
         if suffix_len > 0:
             let suffix_head = src[suffix_pos]
@@ -685,7 +685,7 @@ impl Lexer:
                         continue
                     if f_expr_in_string:
                         if fch == CharCode.Backslash:
-                            let bs_start: i32 = self.pos
+                            let bs_start = self.pos
                             while self.pos < slen and src[(self.pos)] == CharCode.Backslash:
                                 self.pos = self.pos + 1
                             if self.pos < slen and src[(self.pos)] == CharCode.Dquote:
@@ -706,7 +706,7 @@ impl Lexer:
                         self.pos = self.pos + 1
                         continue
                     if fch == CharCode.Backslash:
-                        let bs_start: i32 = self.pos
+                        let bs_start = self.pos
                         while self.pos < slen and src[(self.pos)] == CharCode.Backslash:
                             self.pos = self.pos + 1
                         if self.pos < slen and src[(self.pos)] == CharCode.Dquote:

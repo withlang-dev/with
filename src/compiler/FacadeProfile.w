@@ -56,7 +56,7 @@ fn facade_profile_find(pool: &AstPool, intern: &InternPool, dotted: &str) -> i32
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_C_CONVENTION: continue
-        let have: str = intern.resolve(pool.get_data0(decl))
+        let have = intern.resolve(pool.get_data0(decl))
         if have == dotted: return decl as i32
     0
 
@@ -132,7 +132,7 @@ fn facade_profile_shadowing_clause(pool: &AstPool, intern: &InternPool, resource
         if kind == FACADE_CLAUSE_DROP and have == FACADE_CLAUSE_DROP: return clause
         if (kind == FACADE_CLAUSE_FROM or kind == FACADE_CLAUSE_INIT) and (have == FACADE_CLAUSE_FROM or have == FACADE_CLAUSE_INIT): return clause
         if kind == FACADE_CLAUSE_DESTROYS and (have == FACADE_CLAUSE_DROP or have == FACADE_CLAUSE_DESTROYS):
-            let named: str = intern.resolve(pool.get_extra(pool.get_data1(clause as NodeId)))
+            let named = intern.resolve(pool.get_extra(pool.get_data1(clause as NodeId)))
             if named == fn_name: return clause
     0
 
@@ -141,7 +141,7 @@ fn facade_profile_shadowing_clause(pool: &AstPool, intern: &InternPool, resource
 fn facade_profile_explicit_fn_item(pool: &AstPool, intern: &InternPool, fn_name: &str) -> i32:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for i in 0..items.len():
-        let have: str = intern.resolve(pool.get_data0(items[i] as NodeId))
+        let have = intern.resolve(pool.get_data0(items[i] as NodeId))
         if have == fn_name: return items[i]
     0
 

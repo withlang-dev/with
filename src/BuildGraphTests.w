@@ -280,11 +280,11 @@ fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compil
                 if first_failure == 0:
                     first_failure = verdict
             live[li] = live[live.len() - 1]
-            let _ = live.pop()
+            live.pop()
             finished = finished + 1
             reaped = true
         if not reaped and live.len() > 0:
-            let _ = build_graph_rt_usleep(2000)
+            build_graph_rt_usleep(2000)
 
     // Persist the passing set even when the target is red (compaction:
     // the file is rewritten with exactly the keys proven this run plus

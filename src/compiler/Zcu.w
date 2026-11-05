@@ -535,7 +535,7 @@ impl Zcu:
             runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_count()} sema.pool={sema.pool.symbol_count()} sema.ast.decls={sema.ast.decl_count()}")
         self.pool = sema.pool.clone()
         var tracked_paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, sema.tracked_input_paths)
+        self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, sema.tracked_input_paths)
         // Callers move sema.diags into Zcu.diagnostics before syncing. The moved
         // field is an all-zero reset sentinel, not a reusable List: pushing a
         // later comptime/action diagnostic would allocate zero bytes and leave

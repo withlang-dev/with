@@ -1416,7 +1416,6 @@ impl CCodegen:
         false
 
     fn payload_enum_variant_field(variant_index: i32) -> str:
-        let _ = self
         f"payload{variant_index}"
 
     // The member path from an enum value to payload field `field_idx` of
@@ -1729,7 +1728,6 @@ impl CCodegen:
         if self.sema.get_type_kind(resolved) == TypeKind.TY_FN: true else: false
 
     fn fat_thunk_name(fn_sym: i32, canon_tid: i32) -> str:
-        let _ = self
         f"__with_fn_thunk_{fn_sym}_{canon_tid}"
 
     // Materialize a named function as a fat fn value: register the static
@@ -1829,7 +1827,6 @@ impl CCodegen:
         od
 
     fn storage_copy_assignment(dst_place: &str, rval: &str) -> str:
-        let _ = self
         "    " ++ cc_lbrace() ++ " __typeof__(" ++ rval ++ ") __tmp = " ++ rval ++ "; memcpy(&(" ++ dst_place ++ "), &__tmp, sizeof(" ++ dst_place ++ ") < sizeof(__tmp) ? sizeof(" ++ dst_place ++ ") : sizeof(__tmp)); " ++ cc_rbrace()
 
     fn named_struct_tid(type_name: &str) -> i32:
@@ -2936,7 +2933,6 @@ impl CCodegen:
         out
 
     fn place_has_downcast(body: &MirBody, place_id: i32) -> bool:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return false
         let start = body.place_proj_starts[place_id]
@@ -3066,7 +3062,7 @@ impl CCodegen:
                     continue
                 let dst_tid = self.place_tid(body, body.stmt_d0[stmt_id])
                 let opt_tid = self.option_tid_for_payload(dst_tid)
-                out = self.record_local_tid(move out, src_local, opt_tid)
+                out = self.record_local_tid(out, src_local, opt_tid)
         out
 
     mut fn body_copied_payload_enum_tids(body: &MirBody, downcast_option_tids: &List[i32]) -> List[i32]:
@@ -3102,13 +3098,13 @@ impl CCodegen:
                     src_tid = cc_list_tid_at(downcast_option_tids, src_local)
                 if self.type_is_payload_enum(src_tid) == false:
                     continue
-                out = self.record_local_tid(move out, dst_local, src_tid)
+                out = self.record_local_tid(out, dst_local, src_tid)
         out
 
     mut fn body_ref_target_tids(body: &MirBody) -> List[i32]:
         var out = cc_zero_i32_list(body.local_count())
         for li in 0..body.local_count():
-            out = self.record_local_tid(move out, li, self.local_ref_target_tid(body, li))
+            out = self.record_local_tid(out, li, self.local_ref_target_tid(body, li))
         out
 
     mut fn place_local_tid(body: &MirBody, place_id: i32) -> i32:
@@ -3116,7 +3112,6 @@ impl CCodegen:
         self.local_declared_tid(body, local_id)
 
     fn place_is_direct_local(body: &MirBody, place_id: i32, local_id: i32) -> bool:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return false
         if body.place_locals[place_id] != local_id:
@@ -3126,7 +3121,6 @@ impl CCodegen:
         true
 
     fn place_uses_local(body: &MirBody, place_id: i32, local_id: i32) -> bool:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return false
         if body.place_locals[place_id] == local_id:
@@ -3613,7 +3607,7 @@ impl CCodegen:
                 expr = self.ast.get_data0(expr)
             if expr != 0 and self.ast.kind(expr) == NodeKind.NK_C_STRING_LIT:
                 let text = self.c_string_literal_node_payload_from_source(expr, self.decl_source_text(decl))
-                texts = cc_push_unique_str(move texts, move text)
+                texts = cc_push_unique_str(texts, text)
         for bi in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return texts
@@ -3623,7 +3617,7 @@ impl CCodegen:
                     continue
                 let sym = body.const_d0[ci]
                 let text = if sym != 0: cc_string_literal_payload(cc_intern_resolve(self.intern, sym)) else: ""
-                texts = cc_push_unique_str(move texts, move text)
+                texts = cc_push_unique_str(texts, text)
         texts
 
     mut fn emit_cstr_literal_defs() -> str:
@@ -4569,7 +4563,6 @@ impl CCodegen:
         body.operand_d0[first_arg]
 
     fn place_same(body: &MirBody, a: i32, b: i32) -> bool:
-        let _ = self
         if a < 0 or b < 0:
             return false
         if a >= body.place_locals.len() or b >= body.place_locals.len():
@@ -5651,23 +5644,12 @@ impl CCodegen:
         result
 
     fn infer_builtin_call_name(body: &MirBody, args_id: i32, dest_place: i32) -> str:
-        let _ = self
-        let _ = body
-        let _ = args_id
-        let _ = dest_place
         ""
 
     fn infer_print_call_name(body: &MirBody, args_id: i32, dest_place: i32) -> str:
-        let _ = self
-        let _ = body
-        let _ = args_id
-        let _ = dest_place
         ""
 
     fn extern_call_name(sym: i32, body: &MirBody, args_id: i32, dest_place: i32) -> str:
-        let _ = body
-        let _ = args_id
-        let _ = dest_place
         self.extern_sym_c_name(sym)
 
     mut fn sig_index_for_sym(fn_sym: i32) -> i32:
@@ -6354,7 +6336,6 @@ impl CCodegen:
         fallback
 
     mut fn resolve_call_callee_text(body: &MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> str:
-        let _ = bb
         self.callee_is_str_builtin_ref = 0
         if body.call_requires_contract(args_id):
             return self.fn_c_name(body.call_mono_sym(args_id))
@@ -6420,7 +6401,6 @@ impl CCodegen:
 
     mut fn call_return_tid(body: &MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
         let fallback = self.place_local_tid(body, dest_place)
-        let _ = bb
         if body.call_requires_contract(args_id):
             let sig_idx = body.call_sig_index(args_id)
             if sig_idx >= 0:
@@ -8742,7 +8722,6 @@ impl CCodegen:
             kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
         if kind == CcBuiltin.NONE:
             return ""
-        let _ = bb
         let argc = self.call_arg_count(body, args_id)
         let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
         let has_ret = (self.is_void_tid(ret_tid) == false) as i32
@@ -8884,7 +8863,6 @@ impl CCodegen:
         self.field_cache_record(base_resolved, field_sym, tid)
 
     fn place_is_single_field(body: &MirBody, place_id: i32) -> bool:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return false
         if body.place_proj_counts[place_id] != 1:
@@ -9135,7 +9113,6 @@ impl CCodegen:
         raw_field_tid
 
     fn is_unit_rvalue(body: &MirBody, rval_id: i32) -> bool:
-        let _ = self
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return false
         if body.rval_kinds[rval_id] != RvalueKind.RK_USE:
@@ -9154,7 +9131,6 @@ impl CCodegen:
         false
 
     fn rvalue_direct_local_id(body: &MirBody, rval_id: i32) -> i32:
-        let _ = self
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return -1
         if body.rval_kinds[rval_id] != RvalueKind.RK_USE:
@@ -9474,7 +9450,6 @@ impl CCodegen:
             let callee = self.resolve_call_callee_text(body, bb, d0, d1, d2)
             let ret_tid = self.call_return_tid(body, bb, d0, d1, d2)
             if callee == "/*unresolved_call*/" or callee == "/*ambiguous_call*/" or callee == "/*ambiguous_method*/":
-                let _ = ret_tid
                 return "    abort();"
             self.call_lends = List.new()
             var args = if self.callee_is_str_builtin_ref != 0: self.builtin_method_ref_args_text(body, d1) else: self.call_args_text(body, d1, d0)
@@ -9544,7 +9519,7 @@ impl CCodegen:
         // A nullable-pointer Option has no record of its own (#2036): its
         // payload's types are what it needs.
         if self.option_is_nullable_pointer(resolved as i32):
-            return self.collect_struct_types_from_tid(move acc, self.sema.get_generic_inst_arg(resolved as i32, 0))
+            return self.collect_struct_types_from_tid(acc, self.sema.get_generic_inst_arg(resolved as i32, 0))
         if tk == TypeKind.TY_STRUCT or self.type_is_payload_enum(resolved as i32):
             let cname = self.struct_c_name(resolved as i32)
             if not acc.seen_names.contains(resolved as i32) and not acc.seen_c_names.contains(cname):
@@ -9558,7 +9533,7 @@ impl CCodegen:
                     let payload_count = self.sema.type_reflection_variant_payload_count(resolved as i32, vi)
                     for pi in 0..payload_count:
                         let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(resolved as i32, vi, pi)
-                        payload_acc = self.collect_struct_types_from_tid(move payload_acc, payload_tid)
+                        payload_acc = self.collect_struct_types_from_tid(payload_acc, payload_tid)
                 return payload_acc
             return acc
         if tk == TypeKind.TY_TUPLE:
@@ -9571,7 +9546,7 @@ impl CCodegen:
             let start = self.sema.get_type_d0(resolved)
             let count = self.sema.get_type_d1(resolved)
             for ti in 0..count:
-                tuple_acc = self.collect_struct_types_from_tid(move tuple_acc, self.sema.type_extra[(start + ti)])
+                tuple_acc = self.collect_struct_types_from_tid(tuple_acc, self.sema.type_extra[(start + ti)])
             return tuple_acc
         if tk == TypeKind.TY_GENERIC_INST:
             let base_name = self.generic_inst_base_name(resolved as i32)
@@ -9582,7 +9557,7 @@ impl CCodegen:
                 var generic_acc = acc
                 let field_tids = self.synthetic_generic_struct_field_tids(resolved as i32)
                 for fi in 0..field_tids.len():
-                    generic_acc = self.collect_struct_types_from_tid(move generic_acc, field_tids[fi])
+                    generic_acc = self.collect_struct_types_from_tid(generic_acc, field_tids[fi])
                 return generic_acc
             if base_name == "List" or base_name == "HashMap" or base_name == "HashSet":
                 // The container itself is the runtime's with_vec/with_map,
@@ -9604,7 +9579,7 @@ impl CCodegen:
                 acc.out.push(resolved as i32)
                 var inst_acc = acc
                 for fi in 0..self.sema.type_reflection_field_count(resolved as i32):
-                    inst_acc = self.collect_struct_types_from_tid(move inst_acc, self.sema.type_reflection_field_type_frozen(resolved as i32, fi))
+                    inst_acc = self.collect_struct_types_from_tid(inst_acc, self.sema.type_reflection_field_type_frozen(resolved as i32, fi))
                 return inst_acc
         if tk == TypeKind.TY_SLICE:
             let cname = self.struct_c_name(resolved as i32)
@@ -9612,13 +9587,13 @@ impl CCodegen:
                 acc.seen_names.insert(resolved as i32, 1)
                 acc.seen_c_names.insert(cname, 1)
                 acc.out.push(resolved as i32)
-            return self.collect_struct_types_from_tid(move acc, self.sema.get_type_d0(resolved))
+            return self.collect_struct_types_from_tid(acc, self.sema.get_type_d0(resolved))
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_ARRAY:
             let inner_tid = self.sema.get_type_d0(resolved)
-            return self.collect_struct_types_from_tid(move acc, inner_tid)
+            return self.collect_struct_types_from_tid(acc, inner_tid)
         let box_pointee = self.std_box_pointee_tid(resolved as i32)
         if box_pointee != 0:
-            return self.collect_struct_types_from_tid(move acc, box_pointee)
+            return self.collect_struct_types_from_tid(acc, box_pointee)
         acc
 
     fn synthetic_generic_struct_field_tids(tid: i32) -> List[i32]:
@@ -9649,38 +9624,38 @@ impl CCodegen:
                 cur.seen_names.insert(resolved as i32, 1)
                 cur.out.push(resolved as i32)
             let ret_tid = self.sema.get_type_d2(resolved)
-            cur = self.collect_fn_types_from_tid(move cur, ret_tid)
+            cur = self.collect_fn_types_from_tid(cur, ret_tid)
             let start = self.sema.get_type_d0(resolved)
             let count = self.sema.get_type_d1(resolved)
             for pi in 0..count:
-                cur = self.collect_fn_types_from_tid(move cur, self.sema.type_extra[(start + pi)])
+                cur = self.collect_fn_types_from_tid(cur, self.sema.type_extra[(start + pi)])
             return cur
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
-            return self.collect_fn_types_from_tid(move cur, self.sema.get_type_d0(resolved))
+            return self.collect_fn_types_from_tid(cur, self.sema.get_type_d0(resolved))
         if tk == TypeKind.TY_GENERIC_INST:
             let arg_count = self.sema.get_generic_inst_arg_count(resolved as i32)
             for ai in 0..arg_count:
-                cur = self.collect_fn_types_from_tid(move cur, self.sema.get_generic_inst_arg(resolved as i32, ai))
+                cur = self.collect_fn_types_from_tid(cur, self.sema.get_generic_inst_arg(resolved as i32, ai))
             return cur
         if tk == TypeKind.TY_STRUCT:
             let start = self.sema.get_type_d1(resolved)
             let count = self.sema.get_type_d2(resolved)
             for fi in 0..count:
                 let raw_field_tid: i32 = self.sema.type_extra[(start + fi * 3 + 1)]
-                cur = self.collect_fn_types_from_tid(move cur, raw_field_tid)
+                cur = self.collect_fn_types_from_tid(cur, raw_field_tid)
             return cur
         if tk == TypeKind.TY_TUPLE:
             let start = self.sema.get_type_d0(resolved)
             let count = self.sema.get_type_d1(resolved)
             for ti in 0..count:
-                cur = self.collect_fn_types_from_tid(move cur, self.sema.type_extra[(start + ti)])
+                cur = self.collect_fn_types_from_tid(cur, self.sema.type_extra[(start + ti)])
             return cur
         if self.type_is_payload_enum(resolved as i32):
             let variant_count = self.sema.type_reflection_variant_count(resolved as i32)
             for vi in 0..variant_count:
                 let payload_count = self.sema.type_reflection_variant_payload_count(resolved as i32, vi)
                 for pi in 0..payload_count:
-                    cur = self.collect_fn_types_from_tid(move cur, self.sema.type_reflection_variant_payload_type_frozen(resolved as i32, vi, pi))
+                    cur = self.collect_fn_types_from_tid(cur, self.sema.type_reflection_variant_payload_type_frozen(resolved as i32, vi, pi))
             return cur
         cur
 
@@ -9691,19 +9666,19 @@ impl CCodegen:
                 return move acc.out
             let body = self.mir_body_at(bi as i64)
             for li in 0..body.local_type_ids.len():
-                acc = self.collect_fn_types_from_tid(move acc, body.local_type_ids[li])
+                acc = self.collect_fn_types_from_tid(acc, body.local_type_ids[li])
             let sig_idx = self.body_sig_index(body.fn_sym)
             if sig_idx >= 0:
-                acc = self.collect_fn_types_from_tid(move acc, self.c_sig_return_type(sig_idx))
+                acc = self.collect_fn_types_from_tid(acc, self.c_sig_return_type(sig_idx))
                 let param_count = self.sema.sig_get_param_count(sig_idx)
                 for pi in 0..param_count:
-                    acc = self.collect_fn_types_from_tid(move acc, self.sema.sig_param_type(sig_idx, pi))
+                    acc = self.collect_fn_types_from_tid(acc, self.sema.sig_param_type(sig_idx, pi))
         return move acc.out
 
     mut fn collect_used_struct_types() -> List[i32]:
         var acc = CollectStructTypes.new()
         if self.collect_cstr_literal_texts().len() > 0:
-            acc = self.collect_struct_types_from_tid(move acc, self.sema.ty_cstr as i32)
+            acc = self.collect_struct_types_from_tid(acc, self.sema.ty_cstr as i32)
 
         for bi in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
@@ -9731,7 +9706,7 @@ impl CCodegen:
                         let ga_tid = self.sema.type_level_arg_in_body(ga_owner, ga_type_node)
                         self.sema.current_module_path = saved_module
                         if ga_tid != 0:
-                            acc = self.collect_struct_types_from_tid(move acc, ga_tid)
+                            acc = self.collect_struct_types_from_tid(acc, ga_tid)
                     continue
                 if call_intr != MirIntrinsic.MAP_GET:
                     continue
@@ -9740,24 +9715,24 @@ impl CCodegen:
                 let value_tid = self.hashmap_value_tid(recv_tid)
                 if value_tid != 0 and self.is_void_tid(value_tid) == false:
                     let opt_tid = self.option_ref_tid_for_payload(value_tid)
-                    acc = self.collect_struct_types_from_tid(move acc, opt_tid)
+                    acc = self.collect_struct_types_from_tid(acc, opt_tid)
                 let dst_tid = self.place_local_tid(body, body.term_data2(bb))
                 if dst_tid != 0 and self.is_void_tid(dst_tid) == false and self.is_scalar_like_tid(dst_tid) == false:
                     let dst_opt_tid = self.option_ref_tid_for_payload(dst_tid)
-                    acc = self.collect_struct_types_from_tid(move acc, dst_opt_tid)
+                    acc = self.collect_struct_types_from_tid(acc, dst_opt_tid)
             for li in 0..body.local_type_ids.len():
                 if self.check_interrupted() != 0:
                     return move acc.out
                 let tid = self.local_struct_collection_tid(body, li as i32)
-                acc = self.collect_struct_types_from_tid(move acc, tid)
+                acc = self.collect_struct_types_from_tid(acc, tid)
             let sig_idx = self.body_sig_index(body.fn_sym)
             if sig_idx >= 0:
                 let ret_tid = self.c_sig_return_type(sig_idx)
-                acc = self.collect_struct_types_from_tid(move acc, ret_tid)
+                acc = self.collect_struct_types_from_tid(acc, ret_tid)
                 let param_count = self.sema.sig_get_param_count(sig_idx)
                 for pi in 0..param_count:
                     let p_tid = self.sema.sig_param_type(sig_idx, pi)
-                    acc = self.collect_struct_types_from_tid(move acc, p_tid)
+                    acc = self.collect_struct_types_from_tid(acc, p_tid)
         // A struct a function type names only through a pointer (an engine's
         // `fn(*mut m_string_s) -> i32` callback field, the pointee opaque)
         // needs its forward typedef before the fn typedefs: collected as a
@@ -9767,10 +9742,10 @@ impl CCodegen:
             let ftid = self.sema.resolve_alias(fn_tids[fi] as TypeId)
             let fkind = self.sema.get_type_kind(ftid)
             if fkind != TypeKind.TY_FN and fkind != TypeKind.TY_EXTERN_FN: continue
-            acc = self.collect_struct_types_from_tid(move acc, self.sema.get_type_d2(ftid))
+            acc = self.collect_struct_types_from_tid(acc, self.sema.get_type_d2(ftid))
             let pstart = self.sema.get_type_d0(ftid)
             for pi in 0..self.sema.get_type_d1(ftid):
-                acc = self.collect_struct_types_from_tid(move acc, self.sema.type_extra[(pstart + pi)])
+                acc = self.collect_struct_types_from_tid(acc, self.sema.type_extra[(pstart + pi)])
 
         var i = 0
         while i < acc.out.len():
@@ -9785,7 +9760,7 @@ impl CCodegen:
                 for fi in 0..field_tids.len():
                     if self.check_interrupted() != 0:
                         return move acc.out
-                    acc = self.collect_struct_types_from_tid(move acc, field_tids[fi])
+                    acc = self.collect_struct_types_from_tid(acc, field_tids[fi])
                 continue
             if self.type_is_payload_enum(resolved):
                 let variant_count = self.sema.type_reflection_variant_count(resolved)
@@ -9794,7 +9769,7 @@ impl CCodegen:
                     for pi in 0..payload_count:
                         if self.check_interrupted() != 0:
                             return move acc.out
-                        acc = self.collect_struct_types_from_tid(move acc, self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi))
+                        acc = self.collect_struct_types_from_tid(acc, self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi))
                 continue
             if tk == TypeKind.TY_TUPLE:
                 let start = self.sema.get_type_d0(resolved as TypeId)
@@ -9802,7 +9777,7 @@ impl CCodegen:
                 for ti in 0..count:
                     if self.check_interrupted() != 0:
                         return move acc.out
-                    acc = self.collect_struct_types_from_tid(move acc, self.sema.type_extra[(start + ti)])
+                    acc = self.collect_struct_types_from_tid(acc, self.sema.type_extra[(start + ti)])
                 continue
             if tk != TypeKind.TY_STRUCT:
                 continue
@@ -9812,7 +9787,7 @@ impl CCodegen:
                 if self.check_interrupted() != 0:
                     return move acc.out
                 let raw_field_tid: i32 = self.sema.type_extra[(start + fi * 3 + 1)]
-                acc = self.collect_struct_types_from_tid(move acc, raw_field_tid)
+                acc = self.collect_struct_types_from_tid(acc, raw_field_tid)
 
         return move acc.out
 
@@ -10587,11 +10562,11 @@ impl CCodegen:
                 let recv_tid = self.operand_tid_no_infer(body, recv_operand)
                 let value_tid = self.hashmap_value_tid(recv_tid)
                 if value_tid != 0 and self.is_void_tid(value_tid) == false:
-                    let _ = self.option_ref_tid_for_payload(value_tid)
+                    self.option_ref_tid_for_payload(value_tid)
                 let dest_place = body.term_data2(bb)
                 let dst_tid = self.place_local_tid(body, dest_place)
                 if dst_tid != 0 and self.is_void_tid(dst_tid) == false and self.is_scalar_like_tid(dst_tid) == false:
-                    let _ = self.option_ref_tid_for_payload(dst_tid)
+                    self.option_ref_tid_for_payload(dst_tid)
 
     mut fn local_receives_ref(body: &MirBody, local_id: i32) -> bool:
         self.local_ref_target_tid(body, local_id) != 0
@@ -10728,7 +10703,6 @@ impl CCodegen:
         false
 
     fn operand_is_int_const(body: &MirBody, operand_id: i32, value: i64) -> bool:
-        let _ = self
         if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return false
         if body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
@@ -10841,9 +10815,9 @@ impl CCodegen:
                 let recv_local = self.place_local_id(body, recv_place)
                 if self.place_is_direct_local(body, recv_place, recv_local):
                     if cc_builtin_uses_list_receiver(kind):
-                        flags = cc_mark_local_repr(move flags, recv_local, 2)
+                        flags = cc_mark_local_repr(flags, recv_local, 2)
                     else if cc_builtin_uses_option_receiver(kind):
-                        flags = cc_mark_local_repr(move flags, recv_local, 1)
+                        flags = cc_mark_local_repr(flags, recv_local, 1)
 
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -10862,12 +10836,12 @@ impl CCodegen:
                 let lhs = body.rval_d1[rval_id]
                 let rhs = body.rval_d2[rval_id]
                 if op == BinaryOp.OP_SUB and self.operand_is_int_const(body, rhs, 1):
-                    flags = cc_mark_local_repr(move flags, self.operand_direct_local_id(body, lhs), 1)
+                    flags = cc_mark_local_repr(flags, self.operand_direct_local_id(body, lhs), 1)
                 else if op == BinaryOp.OP_NEQ or op == BinaryOp.OP_EQ:
                     if self.operand_is_int_const(body, rhs, 0):
-                        flags = cc_mark_local_repr(move flags, self.operand_direct_local_id(body, lhs), 1)
+                        flags = cc_mark_local_repr(flags, self.operand_direct_local_id(body, lhs), 1)
                     if self.operand_is_int_const(body, lhs, 0):
-                        flags = cc_mark_local_repr(move flags, self.operand_direct_local_id(body, rhs), 1)
+                        flags = cc_mark_local_repr(flags, self.operand_direct_local_id(body, rhs), 1)
         flags
 
     mut fn local_used_as_encoded_option(body: &MirBody, local_id: i32) -> bool:
@@ -10930,15 +10904,12 @@ impl CCodegen:
         if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
 
     fn closure_fn_name(idx: i32) -> str:
-        let _ = self
         f"__with_closure_{idx}"
 
     fn closure_env_struct(idx: i32) -> str:
-        let _ = self
         f"struct __with_env_{idx}"
 
     fn closure_cell_struct(idx: i32) -> str:
-        let _ = self
         f"struct __with_cell_{idx}"
 
     fn closure_body_at(idx: i32) -> &MirBody:
@@ -12110,7 +12081,7 @@ impl CCodegen:
         if done.is_some():
             return done.unwrap()
         let tid = self.place_sema_tid(body, place_id)
-        var out: str = text
+        var out = text
         if hold == MIR_HOLD_TAKE:
             out = f"__with_take{self.hold_counter}"
             self.hold_counter = self.hold_counter + 1

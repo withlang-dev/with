@@ -167,7 +167,7 @@ fn py_lex(src: &str) -> List[PyTok]:
                 out.push(py_tok(PT_INDENT, "", line))
             else:
                 while col < indents[indents.len() - 1]:
-                    let _ = indents.pop()
+                    indents.pop()
                     out.push(py_tok(PT_DEDENT, "", line))
             continue
         let c = src[i]
@@ -201,7 +201,7 @@ fn py_lex(src: &str) -> List[PyTok]:
                 let raw = word.contains("r") or word.contains("R")
                 let is_f = word.contains("f") or word.contains("F")
                 let (body, next, lines) = py_lex_string_body(src, i)
-                if is_f: out = py_lex_fstring(py_unescape(body, raw), line, move out)
+                if is_f: out = py_lex_fstring(py_unescape(body, raw), line, out)
                 else: out.push(py_tok(PT_STR, py_unescape(body, raw), line))
                 line = line + lines
                 i = next
@@ -239,7 +239,7 @@ fn py_lex(src: &str) -> List[PyTok]:
         i = i + 1
     if out.len() > 0 and out[out.len() - 1].kind != PT_NEWLINE: out.push(py_tok(PT_NEWLINE, "", line))
     while indents.len() > 1:
-        let _ = indents.pop()
+        indents.pop()
         out.push(py_tok(PT_DEDENT, "", line))
     out.push(py_tok(PT_EOF, "", line))
     out
@@ -475,7 +475,7 @@ impl PyParser:
         while not self.is_op(")") and self.kind() != PT_EOF and self.err.len() == 0:
             if self.is_op("*") or self.is_op("**"):
                 self.advance()
-                let _ = self.expression()
+                self.expression()
                 args.push(self.leaf(N_UNSUPPORTED, "argument unpacking"))
             else if self.kind() == PT_NAME and self.toks[self.at + 1].kind == PT_OP and self.toks[self.at + 1].text == "=":
                 let name = self.text()
@@ -715,7 +715,7 @@ impl PyParser:
             let pline = self.line()
             self.advance()
             if self.accept_op(":"):
-                let _ = self.expression()
+                self.expression()
             if self.accept_op("="):
                 let default = self.expression()
                 params.push(self.mk(N_KW, default, -1, -1, pname, List.new(), pline))
@@ -723,10 +723,10 @@ impl PyParser:
             if not self.accept_op(","): break
         self.expect_op(")")
         if self.accept_op("->"):
-            let _ = self.expression()
+            self.expression()
         self.expect_op(":")
         let header_ok = self.err.len() == 0
-        let body_at: i32 = self.at
+        let body_at = self.at
         let body = self.block()
         var unreadable: i32 = 0
         if self.err.len() > 0 and header_ok:
@@ -783,7 +783,7 @@ impl PyParser:
             let body = self.block()
             if self.accept_word("else"):
                 self.expect_op(":")
-                let _ = self.block()
+                self.block()
             return self.mk(N_FOR, targets, iter, -1, "", body, line)
         if self.is_word("try"):
             // The body runs; handlers describe failures that do not happen here.
@@ -838,7 +838,7 @@ impl PyParser:
                 node = self.mk(N_AUG, target, value, -1, op, List.new(), line)
             else if self.accept_op(":"):
                 // An annotation, with or without a value.
-                let _ = self.expression()
+                self.expression()
                 if self.accept_op("="):
                     let value = self.expression_list()
                     node = self.mk(N_ASSIGN, target, value, -1, "", List.new(), line)
@@ -973,7 +973,7 @@ impl PyInterp:
     mut fn new_str_list(items: &List[str]) -> PyVal:
         var out: List[PyVal] = List.new()
         for s in items: out.push(pv_str(s))
-        self.new_list(move out)
+        self.new_list(out)
 
     mut fn new_dict() -> PyVal:
         self.dkeys.push(PyList { items: List.new() })
@@ -1140,7 +1140,7 @@ impl PyInterp:
             if name == "libdirs": items.push(pv_str("lib"))
             if name == "includedirs": items.push(pv_str("include"))
             if name == "bindirs": items.push(pv_str("bin"))
-            let list = self.new_list(move items)
+            let list = self.new_list(items)
             self.obj_set(obj, name, pv_copy(list))
             return list
         if name == "set_property" or name == "get_property": return self.bound(pv(V_OBJ, obj as i64, ""), name)
@@ -1269,7 +1269,7 @@ impl PyInterp:
             if name == "copy":
                 var items: List[PyVal] = List.new()
                 for i in 0..self.lists[id].items.len(): items.push(pv_copy(self.lists[id].items[i]))
-                return self.new_list(move items)
+                return self.new_list(items)
             return pv_unknown()
         if receiver.k == V_STR or receiver.k == V_OPT:
             let s = receiver.s
@@ -1282,7 +1282,7 @@ impl PyInterp:
             if name == "split" and arg0.k == V_STR:
                 var items: List[PyVal] = List.new()
                 for part in s.split(arg0.s): items.push(pv_str(part))
-                return self.new_list(move items)
+                return self.new_list(items)
             if name == "format":
                 // `{}` takes the next argument, `{N}` the Nth.
                 var out = ""
@@ -1338,8 +1338,8 @@ impl PyInterp:
                         var pair: List[PyVal] = List.new()
                         pair.push(pv_copy(self.dkeys[id].items[i]))
                         pair.push(pv_copy(self.dvals[id].items[i]))
-                        items.push(self.new_list(move pair))
-                return self.new_list(move items)
+                        items.push(self.new_list(pair))
+                return self.new_list(items)
             return pv_unknown()
         if receiver.k != V_OBJ: return pv_unknown()
         let obj = receiver.n as i32
@@ -1489,7 +1489,7 @@ impl PyInterp:
         self.frame_vals.push(PyList { items: vals })
         self.depth = self.depth + 1
         self.ret = pv_none()
-        let _ = self.exec_block(node)
+        self.exec_block(node)
         self.depth = self.depth - 1
         let _n = self.frame_names.pop()
         let _v = self.frame_vals.pop()
@@ -1508,7 +1508,7 @@ impl PyInterp:
             if self.nodes[arg].kind == N_KW: args.push(self.eval(self.nodes[arg].a))
             else: args.push(self.eval(arg))
         if callee.k == V_SINK: return pv_sink()
-        if callee.k == V_FUNC: return self.call_def(callee.n as i32, move args, line)
+        if callee.k == V_FUNC: return self.call_def(callee.n as i32, args, line)
         if callee.k == V_NAMED: return self.call_named(callee.s, args, line)
         if callee.k == V_BOUND:
             let receiver = pv_copy(self.recv[callee.n as i32])
@@ -1542,7 +1542,7 @@ impl PyInterp:
         if kind == N_LIST:
             var items: List[PyVal] = List.new()
             for i in 0..self.nodes[node].kids.len(): items.push(self.eval(self.nodes[node].kids[i]))
-            return self.new_list(move items)
+            return self.new_list(items)
         if kind == N_DICT:
             let dict = self.new_dict()
             var i = 0
@@ -1637,7 +1637,7 @@ impl PyInterp:
                     var items: List[PyVal] = List.new()
                     for i in 0..self.lists[left.n as i32].items.len(): items.push(pv_copy(self.lists[left.n as i32].items[i]))
                     for i in 0..self.lists[right.n as i32].items.len(): items.push(pv_copy(self.lists[right.n as i32].items[i]))
-                    return self.new_list(move items)
+                    return self.new_list(items)
                 if left.k == V_INT and right.k == V_INT: return pv(V_INT, left.n + right.n, "")
                 if (left.k == V_STR or left.k == V_OPT) and (right.k == V_STR or right.k == V_OPT): return pv_str(left.s ++ right.s)
             if op == "-" and left.k == V_INT and right.k == V_INT: return pv(V_INT, left.n - right.n, "")
@@ -1656,7 +1656,7 @@ impl PyInterp:
                     if t < 0: return pv_unknown()
                     if t == 0: continue
                 items.push(self.eval(self.nodes[node].a))
-            return self.new_list(move items)
+            return self.new_list(items)
         pv_unknown()
 
     // ── Statements ──
@@ -1726,7 +1726,7 @@ impl PyInterp:
         if kind == N_EXPR:
             if self.nodes[self.nodes[node].a].kind == N_UNSUPPORTED: self.note(line, "a '" ++ self.nodes[self.nodes[node].a].s ++ "' statement is not evaluated")
             else:
-                let _ = self.eval(self.nodes[node].a)
+                self.eval(self.nodes[node].a)
             return PY_NORMAL
         if kind == N_ASSIGN:
             let value = self.eval(self.nodes[node].b)
@@ -1737,7 +1737,7 @@ impl PyInterp:
             let value = self.eval(self.nodes[node].b)
             if current.k == V_LIST and self.nodes[node].s == "+":
                 // `list += other` grows the list in place.
-                let _ = self.call_method(current, "extend", py_one(value), line)
+                self.call_method(current, "extend", py_one(value), line)
                 return PY_NORMAL
             var result = pv_unknown()
             if self.nodes[node].s == "+":
@@ -1817,7 +1817,7 @@ impl PyInterp:
     mut fn run_method(name: &str) -> bool:
         for i in 0..self.method_names.len():
             if self.method_names[i] != name: continue
-            let _ = self.call_def(self.method_nodes[i], List.new(), self.nodes[self.method_nodes[i]].line)
+            self.call_def(self.method_nodes[i], List.new(), self.nodes[self.method_nodes[i]].line)
             return true
         false
 
@@ -1855,14 +1855,14 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
         if tree.nodes[t].kind == N_ASSIGN: top_assigns.push(t)
     ip.nodes = move tree.nodes
     for t in top_assigns:
-        let _ = ip.exec(t)
+        ip.exec(t)
     // The class body is statements too (`default_options = {…}` then
     // `default_options["fPIC"] = True`): run in order, and what they bind
     // is what `self.<name>` finds.
     ip.frame_names.push(PyNames { items: List.new() })
     ip.frame_vals.push(PyList { items: List.new() })
     for k in class_body:
-        let _ = ip.exec(k)
+        ip.exec(k)
     let class_frame: i32 = (ip.frame_names.len() - 1) as i32
     for i in 0..ip.frame_names[class_frame].items.len():
         let name = ip.frame_names[class_frame].items[i]
@@ -1885,7 +1885,7 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     let compiler_version = ip.setting(env.compiler_version)
     ip.obj_set(compiler.n as i32, "version", compiler_version)
     ip.obj_set(settings, "compiler", compiler)
-    let self_obj: i32 = ip.self_obj
+    let self_obj = ip.self_obj
     ip.obj_set(self_obj, "settings", pv(V_OBJ, settings as i64, ""))
     ip.obj_set(self_obj, "settings_build", pv(V_OBJ, settings as i64, ""))
     ip.obj_set(self_obj, "settings_target", pv_none())
@@ -1921,7 +1921,7 @@ fn recipe_built_options(recipe: &str, env: &RecipeEnv) -> List[str]:
     var out: List[str] = List.new()
     let (ip, problem) = recipe_interp(recipe, env)
     if problem.len() > 0: return out
-    let self_obj: i32 = ip.self_obj
+    let self_obj = ip.self_obj
     let at = ip.obj_find(self_obj, "options")
     if at < 0: return out
     let options = ip.objs[self_obj].vals[at].n as i32
@@ -1936,7 +1936,7 @@ fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
     ip.notes = List.new()
     if not ip.run_method("package_info"): return recipe_failed("the recipe defines no package_info")
     if ip.problem.len() > 0: return recipe_failed(ip.problem)
-    let self_obj: i32 = ip.self_obj
+    let self_obj = ip.self_obj
     let cpp_info = ip.objs[self_obj].vals[ip.obj_find(self_obj, "cpp_info")].n as i32
     let root = ip.component(cpp_info, "")
     var components: List[RecipeComponent] = List.new()

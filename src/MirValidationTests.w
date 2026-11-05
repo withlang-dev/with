@@ -1527,11 +1527,11 @@ fn body_params_verdict(shape: i32) -> str:
     for word in [2, counter_ty, 0, int_ty, 0]:
         mir_mod.sema_sig_param_data.push(word)
     var body = MirBody.init_for_fn(7)
-    let _ = body.new_temp(counter_ty)
+    body.new_temp(counter_ty)
     if shape == 1:
-        let _ = body.new_temp(ref_ty)
+        body.new_temp(ref_ty)
     if shape != 2:
-        let _ = body.new_temp(int_ty)
+        body.new_temp(int_ty)
     body.n_params = if shape == 2: 1 else: 2
     let entry = body.new_block()
     body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)

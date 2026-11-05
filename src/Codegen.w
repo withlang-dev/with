@@ -633,7 +633,7 @@ extend Codegen:
 
 fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: InternPool, sema: Sema) -> Codegen:
     var cg = Codegen.init_with_opt(module_name, opt_level)
-    let overflow_mode: i32 = sema.overflow_mode
+    let overflow_mode = sema.overflow_mode
     cg.intern = intern
     cg.sema = sema
     cg.overflow_mode = overflow_mode
@@ -706,7 +706,7 @@ impl Codegen:
 
     mut fn analysis_add(fact: AnalysisFact):
         if self.analysis_enabled != 0:
-            self.analysis_report.add(move fact)
+            self.analysis_report.add(fact)
 
     mut fn analysis_fail(message: &str):
         if self.analysis_enabled != 0:
@@ -797,7 +797,7 @@ impl Codegen:
                 fact.name = with_str_clone_ref(self.sema.pool_resolve(sema_sym))
                 fact.detail = f"share-place declaration emitted={function != 0} ref-table={ref_table} llvm-pointer={llvm_pointer}"
                 let selected = self.analysis_fact_selected(fact)
-                self.analysis_add(move fact)
+                self.analysis_add(fact)
                 if selected and function != 0 and (not ref_table or not llvm_pointer):
                     self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: share-place contract ref-table={ref_table} llvm-pointer={llvm_pointer}")
 
@@ -838,7 +838,7 @@ impl Codegen:
             fact.name = with_str_clone_ref(self.sema.pool_resolve(sema_sym))
             fact.detail = f"return-shape sema-ret={sema_ret} llvm-void={llvm_is_void} sret={has_sret}"
             let selected = self.analysis_fact_selected(fact)
-            self.analysis_add(move fact)
+            self.analysis_add(fact)
             if selected and sema_returns_value and llvm_is_void and not has_sret:
                 self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si}: Sema return type {sema_ret} emitted as LLVM void without sret")
 
@@ -1026,7 +1026,7 @@ impl Codegen:
         let has_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress or via_call_builder
         fact.detail = analysis_marshal_strategy_name(strategy) ++ f" raw={raw} marshaled={marshaled} sig={sig} fn-abi={descriptor} sema-share={share} ref-table={ref_table} needs-copy={needs_copy}"
         let selected = self.analysis_fact_selected(fact)
-        self.analysis_add(move fact)
+        self.analysis_add(fact)
         let abi_ty = if has_descriptor and via_call_builder: self.fn_abi_arg(descriptor, param_index).source_ty else if has_descriptor: self.fn_abi_arg(descriptor, param_index).llvm_ty else: 0
         if selected and has_descriptor and (marshaled == 0 or wl_type_of(marshaled) != abi_ty):
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: marshaled LLVM type disagrees with FnAbi")
@@ -1046,7 +1046,7 @@ impl Codegen:
         let share = sig >= 0 and param_index < self.sema.sig_get_param_count(sig) and self.sema.sig_param_uses_value_ref_abi(sig, param_index) != 0
         let ref_table = self.is_ref_param(fn_sym, param_index)
         let incoming_ptr = incoming != 0 and wl_get_type_kind(wl_type_of(incoming)) == wl_pointer_type_kind()
-        let name: str = self.sema.pool_resolve(fn_sym)
+        let name = self.sema.pool_resolve(fn_sym)
         var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.Parameter)
         fact.id = param_index
         fact.parent = sig
@@ -1061,7 +1061,7 @@ impl Codegen:
         let strategy_not_alias = strategy != AnalysisMarshalStrategy.CalleePlaceAlias
         fact.detail = analysis_marshal_strategy_name(strategy) ++ f" incoming={incoming} storage={storage} sig={sig} sema-share={share} ref-table={ref_table} llvm-pointer={incoming_ptr}"
         let selected = self.analysis_fact_selected(fact)
-        self.analysis_add(move fact)
+        self.analysis_add(fact)
         if selected and share and not ref_table:
             self.analysis_fail(f"callee {name} sig={sig} param={param_index}: Sema share-place contract is absent from Codegen ref table")
         if selected and share and strategy_not_alias:
@@ -2143,12 +2143,10 @@ impl Codegen:
         raw.len() > 0 and raw != "0"
 
     fn debug_pool_flow_enabled() -> bool:
-        let _ = self
         let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
         raw.len() > 0 and raw != "0"
 
     fn debug_type_layout_enabled() -> bool:
-        let _ = self
         let raw = with_getenv_str("WITH_DEBUG_TYPE_LAYOUT")
         raw.len() > 0 and raw != "0"
 
@@ -2215,7 +2213,7 @@ impl Codegen:
         self.loop_depth = st.depth
 
     mut fn push_loop_context(break_bb: i64, continue_bb: i64, result_alloca: i64, label_sym: i32):
-        let idx: i32 = self.loop_depth
+        let idx = self.loop_depth
         var labels: List[i32] = move self.loop_labels
         with_codegen_loop_set_break(idx, break_bb)
         with_codegen_loop_set_continue(idx, continue_bb)
@@ -2226,7 +2224,7 @@ impl Codegen:
 
     mut fn pop_loop_context():
         var labels: List[i32] = move self.loop_labels
-        let _ = labels.pop()
+        labels.pop()
         self.loop_labels = labels
         self.loop_depth = self.loop_depth - 1
 
@@ -2452,7 +2450,7 @@ impl Codegen:
             if ptr != 0:
                 out = ptr
 
-        let had_error_before: i32 = self.had_error
+        let had_error_before = self.had_error
         let coerced = self.enforce_coerced_type(out, param_ty, "wrong argument type")
         if self.had_error != had_error_before:
             self.debug_call_coerce_failure(call_context, call_node, arg_index, arg_node, out, param_ty)
@@ -3401,7 +3399,7 @@ impl Codegen:
     // clang expands va_arg — the LLVM va_arg instruction is not lowered for
     // every target this compiler emits (AAPCS64 Linux, Windows' 8-byte slots).
 
-    fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64):
+    fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64) -> Unit:
         let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         let ft = wl_function_type(wl_void_type(self.context), list_data_i64(params), 1, 0)
@@ -3410,7 +3408,7 @@ impl Codegen:
             func = wl_add_function(self.llmod, intrinsic_name, ft)
         let args: List[i64] = List.new()
         args.push(list_ptr)
-        let _ = wl_build_call(self.builder, ft, func, list_data_i64(args), 1)
+        wl_build_call(self.builder, ft, func, list_data_i64(args), 1)
 
     // The next argument of the list at `list_ptr` as `ty` — an integer at
     // least as wide as C's int, a double or a pointer (Sema refused every
@@ -3667,7 +3665,7 @@ impl Codegen:
         self.type_bodies_pending = self.type_bodies_pending - 1
         let saved_file = with_str_clone_ref(self.current_decl_source_file)
         let saved_module = with_str_clone_ref(self.sema.current_module_path)
-        let saved_len: i32 = self.type_bindings_len
+        let saved_len = self.type_bindings_len
         let saved_syms = move self.type_binding_syms
         let saved_types = move self.type_binding_types
         let saved_sema = move self.type_binding_sema
@@ -5727,7 +5725,7 @@ impl Codegen:
         let ctx_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, self.pool.get_data0(fn_node), decl_index)
         if ctx_sym == 0:
             return
-        let saved_decl_fn_sym: i32 = self.current_function_name_sym
+        let saved_decl_fn_sym = self.current_function_name_sym
         self.current_function_name_sym = ctx_sym
         self.declare_function_at_inner(fn_node, decl_index)
         self.current_function_name_sym = saved_decl_fn_sym
@@ -5787,7 +5785,7 @@ impl Codegen:
         let param_types: List[i64] = List.new()
 
         // Set method owner before resolving return type so Self can resolve
-        let saved_owner: i32 = self.current_method_owner_sym
+        let saved_owner = self.current_method_owner_sym
         if method_owner_sym != 0:
             self.current_method_owner_sym = method_owner_sym
 
@@ -5831,9 +5829,9 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(uses_c_abi, is_variadic != 0), is_variadic)
         let abi = self.fn_abis[abi_index]
         let has_sret = abi.ret.pass == PM_INDIRECT
-        let sret_ty: i64 = abi.ret.source_ty
+        let sret_ty = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_attr_types(abi_index)
-        let fn_type: i64 = abi.llvm_ty
+        let fn_type = abi.llvm_ty
 
         // Use "main" for @[entry] functions
         var effective_name = if sema_name_str.len() > 0: sema_name_str else: self.function_symbol_name(name_sym)
@@ -6109,7 +6107,7 @@ impl Codegen:
         wl_set_linkage(function, wl_internal_linkage())
         let thunk_byval = self.fn_abi_byval_attr_types(thunk_index)
         self.apply_c_abi_byval_attrs(function, thunk_byval, target.arg_count, 1)
-        let saved_fn: i64 = self.current_function
+        let saved_fn = self.current_function
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = function
         wl_position_at_end(self.builder, wl_append_bb(self.context, function, "entry"))
@@ -6253,8 +6251,8 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(false, self.sema.sig_is_variadic(sig_idx) != 0), self.sema.sig_is_variadic(sig_idx))
         let abi = self.fn_abis[abi_index]
         let has_sret = (abi.ret.pass == PM_INDIRECT) as i32
-        let sret_ty: i64 = abi.ret.source_ty
-        let fn_type: i64 = abi.llvm_ty
+        let sret_ty = abi.ret.source_ty
+        let fn_type = abi.llvm_ty
         // #839: reuse only a same-typed entry. A mismatched occupant (e.g. a
         // link_name extern claiming this bare name) keeps the C symbol; the
         // With fn takes an LLVM-uniquified name — resolution is value-keyed.
@@ -6800,7 +6798,7 @@ impl Codegen:
     mut fn ensure_llvm_memcpy_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memcpy.p0.p0.i64", wl_ptr_type(self.context))
     mut fn ensure_llvm_memset_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memset.p0.i64", wl_i8_type(self.context))
 
-    mut fn emit_llvm_memcpy(dst: i64, src: i64, byte_count: i64):
+    mut fn emit_llvm_memcpy(dst: i64, src: i64, byte_count: i64) -> Unit:
         let fn_val = self.ensure_llvm_memcpy_declared()
         let fn_ty = wl_global_get_value_type(fn_val)
         let args: List[i64] = List.new()
@@ -6808,7 +6806,7 @@ impl Codegen:
         args.push(src)
         args.push(wl_const_int(wl_i64_type(self.context), byte_count, 0))
         args.push(wl_const_int(wl_i1_type(self.context), 0, 0))
-        let _ = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), 4)
+        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), 4)
 
     mut fn c_abi_pack_direct_value(value: i64, abi_ty: i64) -> i64:
         if value == 0 or abi_ty == 0:
@@ -6957,9 +6955,9 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, if uses_internal_abi: FN_ABI_WITH else: FN_ABI_C, is_variadic)
         let abi = self.fn_abis[abi_index]
         let has_sret = abi.ret.pass == PM_INDIRECT
-        let sret_ty: i64 = abi.ret.source_ty
+        let sret_ty = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_attr_types(abi_index)
-        let fn_type: i64 = abi.llvm_ty
+        let fn_type = abi.llvm_ty
 
         // @[link_name("symbol")] overrides the C symbol this extern links against
         // (stored as a "link_name:" callconv prefix). Otherwise canonicalize the
@@ -7571,7 +7569,7 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, sources, places, if is_async: FN_ABI_ASYNC else: FN_ABI_WITH, 0)
         let abi = self.fn_abis[abi_index]
         let has_sret = abi.ret.pass == PM_INDIRECT
-        let fn_type: i64 = abi.llvm_ty
+        let fn_type = abi.llvm_ty
         let name = self.intern.resolve(mono_sym)
         let function = wl_add_function(self.llmod, name, fn_type)
         // A module object keeps every specialization it instantiates — a
@@ -8243,8 +8241,8 @@ impl Codegen:
             let exit_args: List[i64] = List.new()
             exit_args.push(exit_val)
             wl_build_call(self.builder, wl_global_get_value_type(exit_fn), exit_fn, list_data_i64(exit_args), 1)
-            let _ = wl_build_ret_void(self.builder)
+            wl_build_ret_void(self.builder)
             self.debug_clear_location()
             return
-        let _ = wl_build_ret(self.builder, exit_val)
+        wl_build_ret(self.builder, exit_val)
         self.debug_clear_location()

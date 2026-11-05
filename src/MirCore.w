@@ -491,8 +491,8 @@ impl MirModule:
 
     mut fn add_body(body: MirBody):
         let body_idx = self.bodies.len() as i32
-        let fn_sym: i32 = body.fn_sym
-        self.bodies.push(move body)
+        let fn_sym = body.fn_sym
+        self.bodies.push(body)
         self.body_fn_syms.push(fn_sym)
         if fn_sym != 0:
             self.body_index_by_fn_sym.insert(fn_sym, body_idx)
@@ -1602,7 +1602,7 @@ fn mir_drop_state_local_key(local_id: i32) -> str:
     // lock must bracket both. The returned str stays valid across grows — the List
     // buffer holds handles, not the string bytes.
     while mir_local_key_cache_lock.swap(1, .Acquire) != 0:
-        let _ = 0
+        {}
     while mir_local_key_cache.len() <= local_id:
         let n = mir_local_key_cache.len()
         mir_local_key_cache.push(f"_{n}")
