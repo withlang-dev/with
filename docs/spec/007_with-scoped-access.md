@@ -127,7 +127,7 @@ let damage = with calculate_armor_reduction(attacker, defender) as reduction:
     base_damage * (1.0 - reduction) + bonus_damage
 
 let label = with user.display_name.unwrap_or(user.username) as name:
-    "{name} ({user.role})"
+    f"{name} ({user.role})"
 
 let normalized = with vec.len() as len:
     if len > 1e-6: vec.scale(1.0 / len) else: Vec2.zero()

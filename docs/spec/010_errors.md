@@ -37,7 +37,7 @@ propagates `None`.
 fn load_config(path: &str) -> Result[Config, AppError]:
     let text = read_file(path)?           // propagates IoError
     let config = parse_toml(text)?        // propagates ParseError
-    Ok(config)
+    config
 ```
 
 The `?` operator is controlled by the `Try` syntax trait (§11.7).
@@ -267,11 +267,11 @@ a `source` field. This chains naturally with `?`:
 
 ```
 fn load_config(path: &str) -> Result[Config, AppError]:
-    let text = fs.read_to_string(path)
+    let text = read_file(path)
         .context("failed to read config file")?
     let config = toml.parse(text)
         .context("failed to parse config")?
-    Ok(config)
+    config
 
 // Error output:
 //   failed to read config file
@@ -283,7 +283,7 @@ useful when building the message is expensive:
 
 ```
 let user = db.find_user(id)
-    .with_context(() => "failed to find user {id}")?
+    .with_context(() => f"failed to find user {id}")?
 ```
 
 `ContextError[E]` implements `Error` when `E: Error`, and the
@@ -338,14 +338,14 @@ It is `map` + `sequence` fused into one pass:
 
 ```
 // Apply a fallible function to each element, collect successes
-// or fail on first error
+// or fail on first absent/error value
 let names = ["1", "2", "three"]
-let parsed = names.traverse(s => s.parse_int())
-// Err(ParseError) — "three" fails
+let parsed: Option[List[i32]] = names.traverse(s => s.parse())
+// None — "three" fails
 
 let names = ["1", "2", "3"]
-let parsed = names.traverse(s => s.parse_int())
-// Ok([1, 2, 3])
+let parsed: Option[List[i32]] = names.traverse(s => s.parse())
+// Some([1, 2, 3])
 ```
 
 `traverse` is the workhorse of "apply a fallible operation to every

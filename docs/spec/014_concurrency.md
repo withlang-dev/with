@@ -37,7 +37,7 @@ suspends the current fiber until a task completes.
 
 ```
 async fn fetch_user(id: UserId) -> Result[User, ApiError]:
-    let resp = http.get("/users/{id}").await
+    let resp = http.get(f"/users/{id}").await
     let body = resp.read_body().await
     json.decode(body)?
 ```
@@ -290,7 +290,7 @@ async scope s =>
     s.track(async:
         for i in 0..5:
             sleep(50.millis()).await
-            tx.send(f"msg-{i}").await
+            tx.send(f"msg-{i}")
     )
     s.track(async:
         for msg in rx:
@@ -446,12 +446,12 @@ tasks. When `cancel()` is called or a non-ephemeral `Task` is dropped:
    the **task handle**, not the error channel:
 
    ```
-   cancel(task)
+   task.cancel()
    if task.was_cancelled():
        log("task was cancelled before producing a result")
    else:
        let value = task.await
-       use(value)
+       inspect(value)
    ```
 
    `was_cancelled(&Task[T]) -> bool` reports whether the task was
@@ -486,7 +486,7 @@ not inside raw OS thread code.
 ```
 var data = [1, 2, 3]
 let task = process(data)
-cancel(task)                // runtime ensures fiber stops before
+task.cancel()               // runtime ensures fiber stops before
                             // proceeding (may yield)
 // data is safe — fiber is guaranteed stopped
 ```
@@ -518,7 +518,7 @@ async fn fetch_profile(id: UserId) -> Result[Profile, ApiError]:
     // both running concurrently
     let user = user_task.await?
     let posts = posts_task.await?
-    Ok(Profile { user, posts })
+    Profile { user, posts }
 ```
 
 ### 14.9 Structured Concurrency
@@ -546,7 +546,7 @@ async scope s { fetch().await }
 desugars to:
 
 ```
-runtime::structured_scope(s => { body })
+runtime.structured_scope(s => { body })
 ```
 
 The scope object `s` provides:
@@ -915,7 +915,7 @@ pointer types. `T` must be an integer type (`i32`, `i64`, `u32`,
 ```
 use std.collections
 
-var counter: Atomic[i32] = Atomic { val: 0 }
+var counter = Atomic.new(0)
 
 counter.store(42, .Release)
 let val = counter.load(.Acquire)

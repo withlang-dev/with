@@ -120,13 +120,13 @@ let k = 42
 let s = move () => k + 1   // move: s holds its own copy of k
 let m = s()             // k unchanged, m is 43
 
-let owned = List.from([1, 2, 3])
-let h = move () => owned.len()
+let owned = open_conn()
+let h = move () => owned.fd
 // owned is invalid after closure creation; h owns it
 
-let ys = List.from([1])
-let c = () => take(ys)     // consuming view of ys
-c()                     // moves ys; a second c() is an error
+let conn = open_conn()
+let c = () => take(conn)   // consuming view of conn
+c()                     // moves conn; a second c() is an error
 ```
 
 ---

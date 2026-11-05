@@ -118,16 +118,17 @@ fn caller(xs: &List[i32]):
         Some(v) => print(v) // OK: local use
         None    => ()
 
-// OK: wraps ephemeral return in another ephemeral return
-fn get_name(user: &User) -> StrView: user.name.as_view()
+// OK: returns an ephemeral view into user
+fn get_name(user: &User) -> StrView: &user.name
 
 // OK: chains ephemeral through caller
-fn get_name_upper(user: &User) -> StrView:
-    get_name(user).to_upper_view()
+fn non_empty_name(user: &User) -> Option[StrView]:
+    let s: StrView = get_name(user)
+    if s.is_empty(): None else: Some(s)
 
 // OK: consumes ephemeral, returns owned (chain ends here)
-fn get_name_owned(user: &User) -> String:
-    get_name(user).to_string()
+fn get_name_owned(user: &User) -> str:
+    get_name(user)
 ```
 
 When a function returns an ephemeral value and accepts multiple
@@ -273,7 +274,7 @@ This also works for method calls: `alice.greet()` works when
 
 ```
 extend User:
-    fn update(mut self: Self):
+    mut fn update():
         self.name = "Bob"
 
 var alice = User { name: "Alice" }
