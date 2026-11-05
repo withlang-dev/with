@@ -2972,40 +2972,50 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
 // honors the attribute — the attribute as written is the only spelling
 // all targets share (D147 point 1). A trailing attribute on a typedef of
 // an anonymous record is outside the record's extent and not seen here.
+unsafe fn cursor_has_packed_attr(cursor: CXCursor) -> i32:
+    if clang_Cursor_hasAttrs(cursor) == 0: return 0
+    let extent = clang_getCursorExtent(cursor)
+    let tu = clang_Cursor_getTranslationUnit(cursor)
+    var tokens: *mut CXToken = 0 as *mut CXToken
+    var token_count: u32 = 0
+    clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
+    var found: i32 = 0
+    var depth: i32 = 0
+    var armed = false
+    var ti: u32 = 0
+    while ti < token_count:
+        let tok = *((tokens as i64 + ti as i64 * 24) as *const CXToken)  // sizeof(CXToken)=24
+        let sp = clang_getTokenSpelling(tu, tok)
+        let cstr = clang_getCString(sp)
+        if depth == 0:
+            if armed and c_strcmp(cstr, "(\0" as *const u8) == 0:
+                depth = 1
+                armed = false
+            else: armed = c_strcmp(cstr, "__attribute__\0" as *const u8) == 0
+        else:
+            if c_strcmp(cstr, "(\0" as *const u8) == 0: depth = depth + 1
+            else if c_strcmp(cstr, ")\0" as *const u8) == 0: depth = depth - 1
+            else if c_strcmp(cstr, "packed\0" as *const u8) == 0 or c_strcmp(cstr, "__packed__\0" as *const u8) == 0: found = 1
+        clang_disposeString(sp)
+        if found != 0: break
+        ti = ti + 1
+    if tokens as i64 != 0:
+        clang_disposeTokens(tu, tokens, token_count)
+    found
+
 fn with_cimport_decl_has_packed_attr(session: i64, idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-        if clang_Cursor_hasAttrs(cursor) == 0: return 0
-        let extent = clang_getCursorExtent(cursor)
-        let tu = clang_Cursor_getTranslationUnit(cursor)
-        var tokens: *mut CXToken = 0 as *mut CXToken
-        var token_count: u32 = 0
-        clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
-        var found: i32 = 0
-        var depth: i32 = 0
-        var armed = false
-        var ti: u32 = 0
-        while ti < token_count:
-            let tok = *((tokens as i64 + ti as i64 * 24) as *const CXToken)  // sizeof(CXToken)=24
-            let sp = clang_getTokenSpelling(tu, tok)
-            let cstr = clang_getCString(sp)
-            if depth == 0:
-                if armed and c_strcmp(cstr, "(\0" as *const u8) == 0:
-                    depth = 1
-                    armed = false
-                else: armed = c_strcmp(cstr, "__attribute__\0" as *const u8) == 0
-            else:
-                if c_strcmp(cstr, "(\0" as *const u8) == 0: depth = depth + 1
-                else if c_strcmp(cstr, ")\0" as *const u8) == 0: depth = depth - 1
-                else if c_strcmp(cstr, "packed\0" as *const u8) == 0 or c_strcmp(cstr, "__packed__\0" as *const u8) == 0: found = 1
-            clang_disposeString(sp)
-            if found != 0: break
-            ti = ti + 1
-        if tokens as i64 != 0:
-            clang_disposeTokens(tu, tokens, token_count)
-        found
+        cursor_has_packed_attr(cursor)
+
+fn with_ci_cursor_has_packed_attr(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        cursor_has_packed_attr(cursor)
 
 // ── Translated type functions ───────────────────────────────
 
@@ -4643,6 +4653,14 @@ fn with_ci_cursor_is_bitfield(session: i64, cursor_idx: i32) -> i32:
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         clang_Cursor_isBitField(cursor)
 
+fn with_ci_cursor_bit_width(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        if clang_Cursor_isBitField(cursor) == 0: return 0
+        clang_getFieldDeclBitWidth(cursor)
+
 fn with_ci_field_offset_bits(session: i64, cursor_idx: i32) -> i64:
     unsafe:
         let s = session as *mut CImportSession
@@ -5501,6 +5519,18 @@ unsafe fn count_anon_member_ordinal(cursor: CXCursor, parent: CXCursor, data: *m
                 (*c).found = 1
                 return CXChildVisit_Break
             (*c).ordinal = (*c).ordinal + 1
+    else if kind == CXCursor_FieldDecl:
+        // A named field of tagless record type (`struct { ... } inner;`) also
+        // advances `anon_idx` in CImport's record renderers and field-name
+        // helpers, so count it here to keep `anon_N` ordinals identical.
+        let canonical = clang_getCanonicalType(clang_getCursorType(cursor))
+        if canonical.kind == CXType_Record:
+            let fdecl = clang_getTypeDeclaration(canonical)
+            if clang_Cursor_isAnonymous(fdecl) != 0 and clang_Cursor_isAnonymousRecordDecl(fdecl) == 0:
+                if clang_equalCursors(fdecl, (*c).target) != 0:
+                    (*c).found = 1
+                    return CXChildVisit_Break
+                (*c).ordinal = (*c).ordinal + 1
     CXChildVisit_Continue
 
 // #749: the member's access path in the migrated With, including the

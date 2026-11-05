@@ -1176,10 +1176,28 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
     rc = bs_assert_contains(ctx, repl_run.stdout, "repl-ok", "repl_smoke")
     if rc != 0: return rc
 
-    let repl_bad = bs_run_cli_capture_input(ctx, compiler_path, "repl-persistent-decl", repl_args, "let x = 1\n", BS_HANG_GUARD_MS)
-    if repl_bad.rc == 0:
-        return bs_fail(ctx, "repl persistent declaration unexpectedly succeeded")
-    bs_assert_contains(ctx, repl_bad.stderr, "persistent declarations are not implemented", "repl_persistent_decl")
+    // #3012 (§18.5): imports, types, functions, and bindings persist across
+    // REPL lines, and earlier prints do not replay on later turns.
+    let repl_persist = bs_run_cli_capture_input(ctx, compiler_path, "repl-persistent-decl", repl_args,
+        "use std.string.parse\n" ++
+        "type Boxed { v: i32 }\n" ++
+        "fn add_box(b: Boxed, d: i32): b.v + d\n" ++
+        "var n: i32 = parse(\"10\").unwrap()\n" ++
+        "print(f\"first={n}\")\n" ++
+        "n = add_box(Boxed { v: n }, 32)\n" ++
+        "print(f\"second={n}\")\n" ++
+        ":quit\n",
+        BS_HANG_GUARD_MS)
+    if repl_persist.rc != 0:
+        return bs_fail(ctx, "repl persistent session failed with exit code " ++ f"{repl_persist.rc}" ++ ": " ++ repl_persist.stderr)
+    rc = bs_assert_contains(ctx, repl_persist.stdout, "first=10", "repl_persistent_first")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, repl_persist.stdout, "second=42", "repl_persistent_second")
+    if rc != 0: return rc
+    let first_idx = repl_persist.stdout.find("first=10")
+    if first_idx >= 0 and repl_persist.stdout.slice(first_idx + 8, repl_persist.stdout.len()).contains("first=10"):
+        return bs_fail(ctx, "repl persistent session replayed prior turn stdout: " ++ repl_persist.stdout)
+    0
 
 fn bs_test_args(source_path: &str) -> List[str]:
     let args: List[str] = List.new()
@@ -5201,6 +5219,21 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     rc = bs_write_fixture(ctx, agree_src, "typedef struct { char x; char a:2; int b:30; } agree;\nint main(void) { agree m = {1, 1, 3}; return m.x + m.a + m.b - 5; }\n", "mixed sizes both ABIs place alike")
     if rc != 0: return rc
     rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "bitfields-agree", &agree_src, &agree_w)
+    if rc != 0: return rc
+    // #3014 (D147): bitfields in named and unnamed member records keep their
+    // layout, accessors, designated initializers, and ABI-agreement refusals.
+    let member_bits_src = bs_join(case_dir, "bitfields_member.c")
+    let member_bits_w = bs_join(case_dir, "bitfields_member.w")
+    rc = bs_write_fixture(ctx, member_bits_src, "#include <stdint.h>\ntypedef struct { struct { uint16_t a:5, b:11; } inner; struct { int16_t s:6; uint16_t u:10; }; } nested_bits;\ntypedef union { struct { uint32_t lo:8, hi:24; }; uint32_t raw; } word_view;\nint main(void) {\n    nested_bits x = { .inner = { .a = 21, .b = 1000 }, .s = -7, .u = 500 };\n    int ok = sizeof(nested_bits) == 4 && x.inner.a == 21 && x.inner.b == 1000 && x.s == -7 && x.u == 500;\n    x.inner.a = 35;\n    x.s--;\n    x.u += 12;\n    ok = ok && x.inner.a == 3 && x.s == -8 && x.u == 512;\n    word_view w = { .raw = 0x01020304u };\n    w.lo = 0x55u;\n    ok = ok && w.lo == 0x55u && w.hi == 0x010203u;\n    return ok ? 0 : 1;\n}\n", "member records with bitfields")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "bitfields-member", &member_bits_src, &member_bits_w)
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, member_bits_w, "= opaque", "no member bitfield record is demoted")
+    if rc != 0: return rc
+    let member_bad_src = bs_join(case_dir, "bitfields_member_msvc.c")
+    rc = bs_write_fixture(ctx, member_bad_src, "typedef struct { struct { int a:3; char b:2; } inner; } bad_outer;\nint main(void) { bad_outer x = {{1, 1}}; return x.inner.a - 1; }\n", "member record whose bitfield unit differs between Itanium and MSVC")
+    if rc != 0: return rc
+    rc = bs_migrate_expect_refusal(ctx, compiler_path, case_dir, "bitfields-member-msvc", &member_bad_src, "untranslatable record 'bad_outer_inner': bad_outer_inner: bitfield 'b' shares a storage unit with a member of another declared size")
     if rc != 0: return rc
     // D143: a `pub fn` that calls itself declares its return type, so a
     // recursive void function keeps `-> Unit` (STC's quicksort,

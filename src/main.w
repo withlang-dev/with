@@ -5936,18 +5936,97 @@ fn run_doc_command(argc: i32, source: &str, output: &str, no_std: bool, alloc_mo
         with_eprint("warning: --open generated documentation but browser opening is not implemented in this compiler build")
     0
 
-fn repl_source_for_line(line: &str) -> str:
+let REPL_TURN_SENTINEL: str = "__WITH_REPL_TURN_8f4a2b__"
+
+fn repl_default_imports() -> str:
     "use std.io\n" ++
     "use std.str\n" ++
     "use std.regex\n" ++
     "use std.math\n" ++
     "use std.collections\n" ++
-    "use std.builtins\n\n" ++
-    line ++ "\n"
+    "use std.builtins\n"
 
-fn repl_line_requires_session_state(line: &str) -> bool:
-    let text = line.trim()
-    text.starts_with("let ") or text.starts_with("var ") or text.starts_with("fn ") or text.starts_with("pub ") or text.starts_with("type ") or text.starts_with("trait ") or text.starts_with("impl ") or text.starts_with("extern ") or text.starts_with("use ")
+fn repl_line_is_import(text: &str) -> bool:
+    text.starts_with("use ") or text.starts_with("pub use ")
+
+fn repl_line_is_decl(text: &str) -> bool:
+    var s = text
+    if s.starts_with("pub "):
+        s = s.slice(4, s.len()).trim()
+    s.starts_with("fn ") or s.starts_with("async fn ") or s.starts_with("unsafe fn ") or s.starts_with("comptime fn ") or s.starts_with("type ") or s.starts_with("enum ") or s.starts_with("trait ") or s.starts_with("impl ") or s.starts_with("impl[") or s.starts_with("extend ") or s.starts_with("extend[") or s.starts_with("extern ") or s.starts_with("const ") or s.starts_with("@[")
+
+fn repl_line_is_transient_print(text: &str) -> bool:
+    text.starts_with("print(") or text.starts_with("eprint(") or text.starts_with("builtins.print(") or text.starts_with("builtins.eprint(")
+
+fn repl_unclosed_delims(text: &str) -> i32:
+    var depth: i32 = 0
+    var in_str = false
+    var in_char = false
+    var i: isize = 0
+    while i < text.len():
+        let b = text.byte_at(i)
+        if in_str:
+            if b == 92:
+                i += 2
+                continue
+            if b == 34:
+                in_str = false
+        else if in_char:
+            if b == 92:
+                i += 2
+                continue
+            if b == 39:
+                in_char = false
+        else:
+            if b == 47 and i + 1 < text.len() and text.byte_at(i + 1) == 47:
+                while i < text.len() and text.byte_at(i) != 10:
+                    i += 1
+                continue
+            if b == 34:
+                in_str = true
+            else if b == 39:
+                in_char = true
+            else if b == 123 or b == 40 or b == 91:
+                depth += 1
+            else if b == 125 or b == 41 or b == 93:
+                if depth > 0:
+                    depth -= 1
+        i += 1
+    depth
+
+fn repl_strip_line_comment(line: &str) -> str:
+    var in_str = false
+    var i: isize = 0
+    while i < line.len():
+        let b = line.byte_at(i)
+        if in_str:
+            if b == 92:
+                i += 2
+                continue
+            if b == 34:
+                in_str = false
+        else:
+            if b == 34:
+                in_str = true
+            else if b == 47 and i + 1 < line.len() and line.byte_at(i + 1) == 47:
+                return line.slice(0, i).trim()
+        i += 1
+    line.trim()
+
+fn repl_build_unit(imports: &List[str], decls: &List[str], stmts: &List[str], current: &str, with_sentinel: bool) -> str:
+    var out = repl_default_imports()
+    for imp in imports:
+        out = out ++ imp ++ "\n"
+    out = out ++ "\n"
+    for d in decls:
+        out = out ++ d ++ "\n\n"
+    for s in stmts:
+        out = out ++ s ++ "\n"
+    if with_sentinel:
+        out = out ++ "builtins.print(\"" ++ REPL_TURN_SENTINEL ++ "\")\n"
+    if current.len() > 0:
+        out = out ++ current ++ "\n"
+    out
 
 fn repl_bin_path -> str:
     // Same host exe suffix as cli_one_liner_bin_path (#1081): an
@@ -5956,11 +6035,18 @@ fn repl_bin_path -> str:
     let suffix = if with_sysinfo_os() == "Windows": ".exe" else: ""
     f"out/tmp/with-repl-{with_getpid()}-{with_clock_nanos()}" ++ suffix
 
-fn run_repl_line(line: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    if no_std:
-        with_eprint("error: repl requires the standard library")
+fn check_repl_unit(source: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    comp.set_debug_info(false)
+    comp.set_statements_entry(true)
+    let paths: List[str] = ["<repl>"]
+    let texts: List[str] = [source ++ ""]
+    if not comp.check_source_texts(paths, texts):
         return 1
-    let source = repl_source_for_line(line)
+    comp.print_warnings()
+    0
+
+fn run_repl_unit(source: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     let bin_path = repl_bin_path()
     var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     comp.set_debug_info(false)
@@ -5969,9 +6055,31 @@ fn run_repl_line(line: &str, no_std: bool, alloc_mode: bool, runtime_available: 
     if built == "":
         return 1
     comp.print_warnings()
-    let rc = build_graph_rt_exec_binary(built)
+    let out_path = built ++ ".stdout"
+    let err_path = built ++ ".stderr"
+    let rc = build_graph_rt_exec_argv_capture(build_graph_argv_append("", built), out_path, err_path, 60000)
+    let out_text = build_graph_rt_read_file(out_path)
+    let err_text = build_graph_rt_read_file(err_path)
+    build_graph_rt_remove_file(out_path)
+    build_graph_rt_remove_file(err_path)
     cleanup_binary_artifacts(built)
-    let _obj = build_graph_rt_remove_file(built ++ ".o")
+    build_graph_rt_remove_file(built ++ ".o")
+    if err_text.len() > 0:
+        with_ewrite(err_text)
+    let lf_marker = REPL_TURN_SENTINEL ++ "\n"
+    let crlf_marker = REPL_TURN_SENTINEL ++ "\r\n"
+    let crlf_pos = out_text.find(crlf_marker)
+    let lf_pos = out_text.find(lf_marker)
+    if crlf_pos >= 0:
+        let tail = out_text.slice(crlf_pos + crlf_marker.len(), out_text.len())
+        if tail.len() > 0:
+            with_write(tail)
+    else if lf_pos >= 0:
+        let tail = out_text.slice(lf_pos + lf_marker.len(), out_text.len())
+        if tail.len() > 0:
+            with_write(tail)
+    else if out_text.len() > 0:
+        with_write(out_text)
     rc
 
 fn print_repl_help:
@@ -5980,17 +6088,29 @@ fn print_repl_help:
     with_write("  :quit     Exit the REPL\n")
     with_write("  :exit     Exit the REPL\n")
     with_write("\n")
-    with_write("Each input line is compiled and run as normal With code. Persistent declarations are rejected until session state is implemented.\n")
+    with_write("Declarations, imports, and bindings persist across inputs in the session.\n")
 
 fn run_repl_command(argc: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    if no_std:
+        with_eprint("error: repl requires the standard library")
+        return 1
     with_write("With REPL\n")
     print_repl_help()
+    var session_imports: List[str] = List.new()
+    var session_decls: List[str] = List.new()
+    var session_stmts: List[str] = List.new()
+    var pending_line = ""
     while true:
-        with_write("with> ")
-        let line = with_read_line_stdin()
-        if line.len() == 0:
-            with_write("\n")
-            return 0
+        var line = ""
+        if pending_line.len() > 0:
+            line = pending_line
+            pending_line = ""
+        else:
+            with_write("with> ")
+            line = with_read_line_stdin()
+            if line.len() == 0:
+                with_write("\n")
+                return 0
         let trimmed = line.trim()
         if trimmed.len() == 0:
             continue
@@ -6002,12 +6122,52 @@ fn run_repl_command(argc: i32, no_std: bool, alloc_mode: bool, runtime_available
         if trimmed.starts_with(":"):
             with_eprint("error: unknown repl command '" ++ trimmed ++ "'")
             return 1
-        if repl_line_requires_session_state(trimmed):
-            with_eprint("error: repl persistent declarations are not implemented yet (#3012); use expression or statement snippets")
-            return 1
-        let rc = run_repl_line(trimmed, no_std, alloc_mode, runtime_available, prelude_mode)
+
+        var entry = line.trim_end()
+        while repl_unclosed_delims(entry) > 0:
+            with_write("...   ")
+            let next = with_read_line_stdin()
+            if next.len() == 0:
+                break
+            entry = entry ++ "\n" ++ next.trim_end()
+        if repl_unclosed_delims(entry) == 0 and repl_strip_line_comment(entry).ends_with(":"):
+            while true:
+                let next = with_read_line_stdin()
+                if next.len() == 0:
+                    break
+                let next_raw = next.trim_end()
+                if next_raw.trim().len() == 0:
+                    break
+                let first_ch = next_raw.byte_at(0)
+                if first_ch != 32 and first_ch != 9:
+                    pending_line = next
+                    break
+                entry = entry ++ "\n" ++ next_raw
+
+        let head = entry.trim()
+        if repl_line_is_import(head):
+            session_imports.push(head)
+            let check_src = repl_build_unit(session_imports, session_decls, session_stmts, "", true)
+            let rc = check_repl_unit(check_src, no_std, alloc_mode, runtime_available, prelude_mode)
+            if rc != 0:
+                session_imports.pop()
+                return rc
+            continue
+        if repl_line_is_decl(head):
+            session_decls.push(entry)
+            let check_src = repl_build_unit(session_imports, session_decls, session_stmts, "", true)
+            let rc = check_repl_unit(check_src, no_std, alloc_mode, runtime_available, prelude_mode)
+            if rc != 0:
+                session_decls.pop()
+                return rc
+            continue
+
+        let run_src = repl_build_unit(session_imports, session_decls, session_stmts, entry, true)
+        let rc = run_repl_unit(run_src, no_std, alloc_mode, runtime_available, prelude_mode)
         if rc != 0:
             return rc
+        if not repl_line_is_transient_print(head):
+            session_stmts.push(entry)
     0
 
 fn run_fmt_command(argc: i32) -> i32:
