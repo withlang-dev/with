@@ -65,15 +65,15 @@ same fiber.
 // UNDEFINED BEHAVIOR:
 async fn bad:
     let x = 42
-    let p: *const i32 = &raw x
+    let p = &raw const x
     some_io().await          // stack may be relocated
     unsafe { *p }            // UB: p may be dangling
 
 // OK: pointer used before await
 async fn ok:
     let x = 42
-    let p: *const i32 = &raw x
-    unsafe { use(p) }        // fine: no intervening await
+    let p = &raw const x
+    unsafe { inspect(p) }    // fine: no intervening await
     some_io().await
 ```
 

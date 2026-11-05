@@ -11,9 +11,9 @@ Assignment moves by default. After a move, the source binding is
 invalid.
 
 ```
-let a = List.new()
+let a = open_conn()
 let b = a            // a is moved; b is the new owner
-// a.push(1)         // COMPILE ERROR: use of moved value `a`
+// a.send(msg)       // COMPILE ERROR: use of moved value `a`
 ```
 
 **A field never moves out implicitly — anywhere, in any context.** The
@@ -39,20 +39,20 @@ diverge.
 
 ```
 fn demo(cond: bool):
-    let v = List.new()
+    let v = open_conn()
     if cond:
         consume(v)        // moves v on the cond == true path
-    v.push(1)             // COMPILE ERROR: v may have been moved
+    v.send(1)             // COMPILE ERROR: v may have been moved
 ```
 
 ```
 fn demo(cond: bool):
-    var v = List.new()
+    var v = open_conn()
     if cond:
         consume(v)        // moved on this path
     else:
-        v = List.new()     // reinitialized on this path
-    v.push(1)             // COMPILE ERROR: not reinitialized on the
+        v = open_conn()   // reinitialized on this path
+    v.send(1)             // COMPILE ERROR: not reinitialized on the
                           // cond == true path
 ```
 
@@ -95,8 +95,8 @@ let b = a            // copy; both a and b are valid
 type Point { x: f64, y: f64 }         // OK: f64 is Copy
 impl Copy for Point                       // OK
 
-type Handle { id: u32, gen: u32 }      // OK: u32 is Copy
-impl Copy for Handle                      // OK
+type EntityId { id: u32, generation: u32 } // OK: u32 is Copy
+impl Copy for EntityId                    // OK
 
 type Buffer { data: List[u8] }          // List is NOT Copy (has Drop)
 impl Copy for Buffer                      // ERROR: field `data` is not Copy
@@ -247,9 +247,9 @@ freely. Elsewhere, vacate a field with the explicit `move w1.fd`
 through a mutable path, clone it, or consume the whole value:
 
 ```
-type FileWrapper { fd: File, name: String }
+type FileWrapper { fd: File, name: str }
 impl Drop for FileWrapper:
-    fn drop(move self: Self): close_file(self.fd)
+    move fn drop(): close_file(self.fd)
 
 var w1 = FileWrapper { fd: open_file(), name: "A" }
 let w2 = FileWrapper { fd: move w1.fd, name: "B" }   // explicit vacate
@@ -265,7 +265,7 @@ executes a statement when the enclosing scope exits:
 ```
 fn process(path: str) -> Result[Unit, IoError]:
     let f = fs.open(path)?
-    defer f.close()
+    defer: f.close()
     // ... use f ...
     // f.close() runs here, regardless of early returns
     // implicit Ok(()) — no trailing expression needed
@@ -281,17 +281,17 @@ return value or jump to unexpected locations:
 
 ```
 // ERROR: return inside defer
-defer if file.has_error(): return Err(IoError)
-//                         ^^^^^^ ERROR E0901: non-local control
-//                         flow is forbidden inside defer
+defer: if file.has_error(): return Err(.Failed)
+//                          ^^^^^^ ERROR E0901: non-local control
+//                          flow is forbidden inside defer
 
 // ERROR: ? inside defer
-defer conn.close()?
-//                ^ ERROR E0901: ? may return early from defer
+defer: conn.close()?
+//                 ^ ERROR E0901: ? may return early from defer
 
 // OK: handle errors locally inside defer
-defer conn.close().unwrap_or(())
-defer if let Err(e) = f.sync(): log.warn("sync failed: {e}")
+defer: conn.close().unwrap_or(())
+defer: if let Err(e) = f.sync(): log.warn(f"sync failed: {e}")
 ```
 
 **`errdefer`:** Like `defer` but only executes when the function returns an
@@ -300,7 +300,7 @@ error (via `?` propagation). On normal return paths, `errdefer` is skipped:
 ```
 fn connect(url: str) -> Result[Connection, Error]:
     let conn = open_socket(url)?
-    errdefer conn.close()       // only runs if a later ? fails
+    errdefer: conn.close()          // only runs if a later ? fails
     let auth = authenticate(conn)?  // if this fails, conn.close() runs
     Connection { conn, auth }       // success: errdefer does NOT run
 ```

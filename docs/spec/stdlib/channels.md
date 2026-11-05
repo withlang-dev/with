@@ -3,8 +3,8 @@
 ```
 let (tx, rx) = chan[Message](buffer: 10)
 
-tx.send(msg).await                // suspends fiber if full
-let msg = rx.recv().await         // Option[Message]: suspends fiber if
+tx.send(msg)                      // suspends fiber if full
+let msg = rx.recv()               // Option[Message]: suspends fiber if
                                   // empty; None once closed AND drained
 
 // The blessed worker loop — receives until the sender hangs up,
@@ -42,14 +42,14 @@ fibers.
 async scope s =>
     let (tx, rx) = chan[&str](10)
     s.track(async:
-        let local = "hello".to_owned()
-        tx.send(local.as_view()).await  // ERROR: &str is not Send
+        let local = f"hello-{n}"
+        tx.send(&local)                 // ERROR: &str is not Send
     )
     s.track(async:
-        let msg = rx.recv().await       // would be use-after-free
+        let msg = rx.recv()             // would be use-after-free
     )
 
 // OK: send owned values over channels
-let (tx, rx) = chan[String](10)
-tx.send("hello").await                  // str literal, String is Send
+let (tx, rx) = chan[str](10)
+tx.send("hello")                        // str is Send
 ```

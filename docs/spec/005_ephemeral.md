@@ -61,14 +61,14 @@ compute ephemeral `&str`/`&[u8]` on demand from an owned buffer.
 
 ```
 type Request {
-    buf:     Bytes,
+    buf:     List[u8],
     path:    BufSlice,
     headers: List[Header],
 }
 
 extend Request:
-    fn path_str(self: &Request) -> StrView:
-        self.buf.view(self.path.offset, self.path.len)
+    fn path_bytes() -> &[u8]:
+        &self.buf[self.path.offset as isize .. (self.path.offset + self.path.len) as isize]
 ```
 
 ---

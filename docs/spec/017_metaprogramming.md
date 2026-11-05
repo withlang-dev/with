@@ -306,7 +306,7 @@ comptime fn derive_serialize[T: type] -> impl Serialize for T:
 
 // Usage: just annotate the type
 @[derive(Serialize)]
-type User { name: String, age: i32, email: String }
+type User { name: str, age: i32, email: str }
 
 // The compiler generates (conceptually):
 // impl Serialize for User:
@@ -373,7 +373,7 @@ fn serialize_value[T](val: &T, out: Writer) -> Writer:
     else if T.implements(Serialize):         // cascade: already comptime
         val.serialize(out)
     else:
-        comptime_error("Type {T.name()} is not serializable")
+        comptime_error(f"Type {T.name()} is not serializable")
 ```
 
 `comptime_error` produces a compile error with a custom message.

@@ -42,16 +42,16 @@ At every program point, the following must hold:
    `unsafe`, or relied on across an `unsafe fn` boundary (§16.11).
 
    ```
-   fn longest(a: &String, b: &String) -> &str:
+   fn longest(a: &str, b: &str) -> &str:
        if a.len() > b.len():
-           a.as_str()
+           a
        else:
-           b.as_str()
+           b
 
-   let s1 = String.from("hello")
-   let view: &str
+   let s1 = f"hello{n}"
+   var view: &str = s1
    {
-       let s2 = String.from("world")
+       let s2 = f"world{n}"
        view = longest(s1, s2)
    }
    print(view) // ERROR: view may originate from s2
@@ -63,12 +63,17 @@ At every program point, the following must hold:
    prevents use-after-free in cases like:
 
    ```
-   var v: List[&i32] = List.new()
-   var x = 5
-   v.push(&x)
-   // End of scope: x drops first, then v drops.
-   // v.drop() accesses &x, but x is already freed!
-   // Rejected: v's implicit drop uses &x after x is destroyed.
+   type Holder = ephemeral { items: List[&str] }
+   impl Drop for Holder:
+       move fn drop():
+           for s in self.items: print(*s)
+
+   var h = Holder { items: List.new() }
+   let x = f"local-{n}"
+   h.items.push(&x)
+   // End of scope: x drops first, then h drops.
+   // h.drop() accesses &x, but x is already freed!
+   // Rejected: h's implicit drop uses &x after x is destroyed.
    ```
 
    The compiler inserts implicit drop points at scope exit in
@@ -101,14 +106,14 @@ At every program point, the following must hold:
    // moved in one branch, reinitialized in the other → still a
    // use-after-move (the first branch does not reinitialize):
    if cond: consume(v) else: v = T.new()
-   use(v)               // ERROR unless reinitialized on every path
+   inspect(v)           // ERROR unless reinitialized on every path
 
    // an arm that consumes the value and then diverges does NOT mark
    // the value moved on the fallthrough path:
    match m:
        .A => return consume(owner)   // moves owner, but exits
        _  => ()
-   use(owner)                        // OK: the only arm that moved
+   inspect(owner)                    // OK: the only arm that moved
                                      // owner left the function
    ```
 
