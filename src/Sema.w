@@ -716,6 +716,8 @@ type Sema {
     script_slot_syms: List[i32],
     script_capture_records: List[i32],
     script_nonescaping_helpers: HashMap[i32, i32],
+    script_fn_value_uses: List[i32],
+    script_async_blocks: List[i32],
     // The scope indices of the captures injected for the helper being checked:
     // a helper's parameter or local shadows one (D173).
     script_capture_indices: HashMap[i32, i32],
@@ -3504,6 +3506,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         script_slot_syms: List.new(),
         script_capture_records: List.new(),
         script_nonescaping_helpers: sema_new_map_i32_i32(),
+        script_fn_value_uses: List.new(),
+        script_async_blocks: List.new(),
         script_capture_indices: sema_new_map_i32_i32(),
         type_kinds: List.new(),
         type_d0: List.new(),
@@ -11159,6 +11163,7 @@ impl Sema:
         // D63: closure arguments are judged against their callee's complete
         // escape effects and call-once flags, whatever the declaration order.
         self.finalize_closure_arg_checks()
+        self.check_script_nonescaping_helpers()
         self.check_generator_pulls()
         self.finalize_receiver_requirements()
         self.enforce_receiver_modes()
