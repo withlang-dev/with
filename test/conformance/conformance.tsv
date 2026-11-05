@@ -35,7 +35,7 @@ D189	tuple .await has no arity limit (§14.11)	implemented	test/behavior/behav_d
 D190	`?` in fn main: and in a script: an Err ends the program (stderr, exit 1)	implemented	test/behavior/behav_d190_question_in_main_err.w	#2935
 §14.19	@[ffi_stack]	open		#583
 §8.3	List.new_in(allocator)	open		#570
-§18.5	REPL persistent declarations	open		#3012
+§18.5	REPL persistent declarations	implemented	test/behavior/behav_3012_repl_persistent_decls.w	#3012
 §17	comptime enum payload shorthand; comptime f-string format specs	implemented	test/behavior/behav_2950_comptime_payload_variant.w	#2950
-D147	bitfields in member records under c_import	open		#3014
+D147	bitfields in member records under c_import	implemented	test/behavior/behav_d147_member_record_bitfields.w	#3014
 D191	a line beginning with |> (or <|, ??) continues the expression whose line is indented no more than its own; at a match's column it pipes the whole match (§9.6)	implemented	test/behavior/behav_d191_pipe_line_indent.w	

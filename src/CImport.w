@@ -1478,6 +1478,9 @@ fn ci_record_decl_directly_demoted_cursor(session: i64, decl_cursor: i32) -> boo
             // here: this predicate runs over every declaration the headers
             // bring in (sys/wait.h's `union wait`), emitted or not.
             if with_ci_cursor_is_bitfield(session, child) != 0:
+                if ci_translate_in_migrate_mode():
+                    i = i + 1
+                    continue
                 return true
             let anon_decl = ci_field_cursor_anon_record_decl(session, child)
             if anon_decl >= 0:
@@ -1546,12 +1549,14 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
     if with_cimport_is_name_emitted(synth_name) != 0:
         return ""
     with_cimport_mark_name_emitted(synth_name)
+    let safe_synth = ci_escape_reserved(synth_name)
     if ci_record_decl_directly_demoted_cursor(session, decl_cursor):
-        // D147: a migration never demotes a bitfield record silently; a
-        // member record with one is refused until it, too, keeps its layout.
-        if ci_translate_in_migrate_mode() and ci_record_cursor_has_bitfield(session, decl_cursor):
-            g_ci_refused_records = g_ci_refused_records ++ "migrate: untranslatable record '" ++ synth_name ++ "': a bitfield in a member record is not supported yet (D147, #3014)\n"
-        return "type " ++ ci_escape_reserved(synth_name) ++ " = opaque\n"
+        return "type " ++ safe_synth ++ " = opaque\n"
+
+    let bit_plan = if ci_translate_in_migrate_mode() and ci_record_cursor_has_bitfield(session, decl_cursor): ci_bitfield_plan_cursor(session, decl_cursor, synth_name) else: CiBitPlan { units: List.new(), members: List.new(), refusal: "" }
+    if bit_plan.refusal.len() > 0:
+        g_ci_refused_records = g_ci_refused_records ++ "migrate: untranslatable record '" ++ synth_name ++ "': " ++ bit_plan.refusal ++ "\n"
+        return "type " ++ safe_synth ++ " = opaque\n"
 
     let is_union = with_ci_cursor_kind(session, decl_cursor) == CK_UNION
     var nested_decls = ""
@@ -1559,11 +1564,23 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
     var anon_idx = 0
     let nc = with_ci_num_children(session, decl_cursor)
     var field_count = 0
+    var field_ordinal: i32 = 0
     var i = 0
     while i < nc:
         let child = with_ci_child(session, decl_cursor, i)
-        if with_ci_cursor_kind(session, child) == CK_FIELD:
-            let raw_name = with_ci_cursor_spelling(session, child)
+        let is_c11_anon = with_ci_cursor_is_anon_record_member(session, child) != 0
+        if with_ci_cursor_kind(session, child) == CK_FIELD or is_c11_anon:
+            let cur_fi = field_ordinal
+            field_ordinal = field_ordinal + 1
+            if bit_plan.units.len() > 0 and not is_c11_anon and with_ci_cursor_is_bitfield(session, child) != 0:
+                let started = ci_bit_unit_started_by(bit_plan, cur_fi)
+                if started >= 0:
+                    if field_count > 0: fields = fields ++ ", "
+                    fields = fields ++ "pub __bits_" ++ i64_to_string(started) ++ ": " ++ ci_bit_unit_type(bit_plan.units[started].bits) ++ " = 0"
+                    field_count = field_count + 1
+                i = i + 1
+                continue
+            let raw_name = if is_c11_anon: "" else: with_ci_cursor_spelling(session, child)
             var actual_name = if raw_name.len() > 0: raw_name else: f"anon_{anon_idx}"
             let field_cxtype = with_ci_cursor_type(session, child)
             var field_ty = with_ci_type_translated(session, field_cxtype)
@@ -1577,7 +1594,7 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
                 actual_name = if raw_name.len() > 0: raw_name else: f"anon_{anon_idx}"
                 anon_idx = anon_idx + 1
             else if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "c_void" or ci_field_holds_demoted_anon_array(session, child):
-                return "type " ++ ci_escape_reserved(synth_name) ++ " = opaque\n"
+                return "type " ++ safe_synth ++ " = opaque\n"
             else:
                 nested_decls = nested_decls ++ ci_translate_indirect_anon_record(session, child)
 
@@ -1585,24 +1602,27 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
                 fields = fields ++ ", "
             let default_val = ci_default_for_type(field_ty)
             let field_ty_render = ci_unsafe_fn_ptr_type(field_ty)
+            let field_vis = if bit_plan.units.len() > 0: "pub " else: ""
             if default_val.len() > 0:
-                fields = fields ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty_render ++ " = " ++ default_val
+                fields = fields ++ field_vis ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty_render ++ " = " ++ default_val
             else:
-                fields = fields ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty_render
+                fields = fields ++ field_vis ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty_render
             field_count = field_count + 1
         i = i + 1
 
     if field_count == 0:
         if is_union:
-            return nested_decls ++ "@[repr(C)]\ntype " ++ ci_escape_reserved(synth_name) ++ " = union { __pad0: u8 = 0 }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
-        return nested_decls ++ "@[repr(C)]\ntype " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
+            return nested_decls ++ "@[repr(C)]\ntype " ++ safe_synth ++ " = union { __pad0: u8 = 0 }\nimpl Copy for " ++ safe_synth ++ "\n"
+        return nested_decls ++ "@[repr(C)]\ntype " ++ safe_synth ++ " { __pad0: u8 = 0 }\nimpl Copy for " ++ safe_synth ++ "\n"
 
+    let type_kw = if bit_plan.units.len() > 0: "pub type " else: "type "
+    let bit_accessors = if bit_plan.units.len() > 0: ci_render_bitfield_accessors_sized(safe_synth, with_ci_type_sizeof(session, with_ci_cursor_type(session, decl_cursor)), bit_plan) else: ""
     if is_union:
-        return nested_decls ++ "@[repr(C)]\ntype " ++ ci_escape_reserved(synth_name) ++ " = union { " ++ fields ++ " }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
+        return nested_decls ++ "@[repr(C)]\n" ++ type_kw ++ safe_synth ++ " = union { " ++ fields ++ " }\nimpl Copy for " ++ safe_synth ++ "\n" ++ bit_accessors
     // A C record has C's layout (§16.1), a member or body-local one as a
     // top-level one does (ci_translate_struct): `@[repr(C)]`, which is also
     // what offers `T.zeroed()` (§16.2b.3) to its `{0}` and declarations.
-    nested_decls ++ "@[repr(C)]\ntype " ++ ci_escape_reserved(synth_name) ++ " { " ++ fields ++ " }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
+    nested_decls ++ "@[repr(C)]\n" ++ type_kw ++ safe_synth ++ " { " ++ fields ++ " }\nimpl Copy for " ++ safe_synth ++ "\n" ++ bit_accessors
 
 // ── Opaque demotion pre-scan ─────────────────────────────────
 // Two-pass analysis: first collect directly demoted types (bitfield, forward
@@ -2709,18 +2729,20 @@ fn ci_align_up_bits(value: i64, align: i64) -> i64:
 // member's declared size) is the migrating model's on both sides, as the
 // plan's own units already assume. Returns the field index of the first
 // member the two ABIs place differently, or -1.
-fn ci_bitfield_abi_divergence(session: i64, idx: i32, decl_cursor: i32) -> i32:
-    if with_cimport_decl_kind(session, idx) == CK_UNION:
+fn ci_record_field_cursors(session: i64, decl_cursor: i32) -> List[i32]:
+    var out: List[i32] = List.new()
+    if decl_cursor < 0:
+        return out
+    let nc = with_ci_num_children(session, decl_cursor)
+    for i in 0..nc:
+        let child = with_ci_child(session, decl_cursor, i)
+        if with_ci_cursor_kind(session, child) == CK_FIELD or with_ci_cursor_is_anon_record_member(session, child) != 0:
+            out.push(child)
+    out
+
+fn ci_bitfield_abi_divergence_cursor(session: i64, decl_cursor: i32, field_cursors: &List[i32]) -> i32:
+    if with_ci_cursor_kind(session, decl_cursor) == CK_UNION:
         return -1
-    let field_count = with_cimport_struct_field_count(session, idx)
-    // Per-run state; a run opens at a bitfield whose predecessor is not
-    // one. it_*: Itanium (a storage unit sized by the largest declared
-    // type placed in it, starting at that size's boundary at or before
-    // the unit's first member; a member that does not fit before the
-    // boundary starts a unit at its own type's next boundary). ms_*:
-    // MSVC (a new unit at the member type's next boundary whenever the
-    // declared size changes or the unit is full). A zero-width member
-    // closes the unit and aligns the next member to its declared type.
     var run_open = false
     var it_next: i64 = 0
     var it_chunk: i64 = 0
@@ -2729,18 +2751,18 @@ fn ci_bitfield_abi_divergence(session: i64, idx: i32, decl_cursor: i32) -> i32:
     var ms_unit: i64 = 0
     var ms_unit_start: i64 = 0
     var ms_used: i64 = 0
-    for fi in 0..field_count:
-        if with_cimport_struct_field_is_bitfield(session, idx, fi) == 0:
+    for fi in 0..field_cursors.len():
+        let field_cursor = field_cursors[fi]
+        if with_ci_cursor_is_bitfield(session, field_cursor) == 0:
             run_open = false
             continue
-        let size = with_cimport_struct_field_size(session, idx, fi)
+        let size = with_ci_type_sizeof(session, with_ci_cursor_type(session, field_cursor))
         if size <= 0 or size > 8:
             return -1  // The plan itself refuses this member.
         let type_bits = size * 8
-        let width = with_cimport_struct_field_bit_width(session, idx, fi) as i64
+        let width = with_ci_cursor_bit_width(session, field_cursor) as i64
         if not run_open:
-            let field_cursor = ci_decl_field_cursor(session, decl_cursor, fi)
-            let anchor = if field_cursor >= 0: with_ci_cursor_field_bit_offset(session, field_cursor) else: -1
+            let anchor = with_ci_cursor_field_bit_offset(session, field_cursor)
             if anchor < 0:
                 return -1  // The plan itself refuses a memberless offset.
             run_open = true
@@ -2779,31 +2801,30 @@ fn ci_bitfield_abi_divergence(session: i64, idx: i32, decl_cursor: i32) -> i32:
         ms_used = ms_used + width
         ms_next = ms_offset + width
         if it_offset != ms_offset:
-            return fi
+            return fi as i32
     -1
 
-// The storage-unit plan of record `idx`, or a plan whose `refusal` says why
-// there is none.
-fn ci_bitfield_plan(session: i64, idx: i32) -> CiBitPlan:
+// The storage-unit plan of `decl_cursor` (named `name`), or a plan whose
+// `refusal` says why there is none.
+fn ci_bitfield_plan_cursor(session: i64, decl_cursor: i32, name: &str) -> CiBitPlan:
     var plan = CiBitPlan { units: List.new(), members: List.new(), refusal: "" }
-    let name = with_cimport_decl_name(session, idx)
-    let decl_cursor = with_cimport_decl_cursor(session, idx)
-    let field_count = with_cimport_struct_field_count(session, idx)
-    for fi in 0..field_count:
-        if with_cimport_struct_field_is_bitfield(session, idx, fi) == 0: continue
-        let field_cursor = ci_decl_field_cursor(session, decl_cursor, fi)
-        let width = with_cimport_struct_field_bit_width(session, idx, fi)
-        let fname = with_cimport_struct_field_name(session, idx, fi)
-        let size = with_cimport_struct_field_size(session, idx, fi)
+    let field_cursors = ci_record_field_cursors(session, decl_cursor)
+    for fi in 0..field_cursors.len():
+        let field_cursor = field_cursors[fi]
+        if with_ci_cursor_is_bitfield(session, field_cursor) == 0: continue
+        let ftype = with_ci_cursor_type(session, field_cursor)
+        let width = with_ci_cursor_bit_width(session, field_cursor)
+        let fname = with_ci_cursor_spelling(session, field_cursor)
+        let size = with_ci_type_sizeof(session, ftype)
         if size <= 0 or size > 8:
             plan.refusal = name ++ ": bitfield '" ++ fname ++ "' has a declared type of " ++ i64_to_string(size) ++ " bytes, not an integer unit"
             return plan
-        if field_cursor >= 0 and with_ci_type_is_volatile(session, with_ci_cursor_type(session, field_cursor)) != 0:
+        if with_ci_type_is_volatile(session, ftype) != 0:
             plan.refusal = name ++ ": bitfield '" ++ fname ++ "' is volatile; a read-modify-write cannot be faithful to it (D147)"
             return plan
         // Unnamed and zero-width members are padding and alignment only.
         if width == 0 or fname.len() == 0: continue
-        let bit_offset = if field_cursor >= 0: with_ci_cursor_field_bit_offset(session, field_cursor) else: -1
+        let bit_offset = with_ci_cursor_field_bit_offset(session, field_cursor)
         if bit_offset < 0:
             plan.refusal = name ++ ": clang gave no offset for bitfield '" ++ fname ++ "'"
             return plan
@@ -2826,23 +2847,28 @@ fn ci_bitfield_plan(session: i64, idx: i32) -> CiBitPlan:
                 return plan
         if unit_slot < 0:
             unit_slot = plan.units.len()
-            plan.units.push(CiBitUnit { index: unit_slot, byte_offset: byte_offset, bits: unit_bits, first_field: fi })
-        let ty = ci_normalize_translated_type_name(with_cimport_struct_field_type_translated(session, idx, fi))
-        plan.members.push(CiBitMember { field: fi, name: fname, unit: unit_slot, shift: shift, width: width, signed: ci_bit_member_is_signed(session, field_cursor), ty: ty })
+            plan.units.push(CiBitUnit { index: unit_slot, byte_offset: byte_offset, bits: unit_bits, first_field: fi as i32 })
+        let ty = ci_normalize_translated_type_name(with_ci_type_translated(session, ftype))
+        plan.members.push(CiBitMember { field: fi as i32, name: fname, unit: unit_slot, shift: shift, width: width, signed: ci_bit_member_is_signed(session, field_cursor), ty: ty })
     // The overlap refusal above sees only the migrating host's ABI; the
     // simulation refuses the same records on an MSVC-layout host.
-    let divergent = ci_bitfield_abi_divergence(session, idx, decl_cursor)
+    let divergent = ci_bitfield_abi_divergence_cursor(session, decl_cursor, field_cursors)
     if divergent >= 0:
-        let dname = with_cimport_struct_field_name(session, idx, divergent)
+        let dname = with_ci_cursor_spelling(session, field_cursors[divergent])
         plan.refusal = name ++ ": bitfield '" ++ dname ++ "' shares a storage unit with a member of another declared size; Itanium packs across and MSVC starts a new unit, so the layout differs between the two (D147 point 1)"
     // A packed record's bitfield units are placed by rules clang's
     // targets do not share (windows-gnu aligns the unit to its declared
     // type where Itanium and MSVC pack it), so no one-target layout can
     // prove D147's agreement for it. Checked after the loop: a unit the
     // host layout already condemns keeps its more specific refusal.
-    if plan.refusal.len() == 0 and with_cimport_decl_has_packed_attr(session, idx) != 0:
+    if plan.refusal.len() == 0 and with_ci_cursor_has_packed_attr(session, decl_cursor):
         plan.refusal = name ++ ": a packed record's bitfield units are laid out differently by clang's targets, so one layout cannot serve every target (D147 point 1)"
     plan
+
+// The storage-unit plan of record `idx`, or a plan whose `refusal` says why
+// there is none.
+fn ci_bitfield_plan(session: i64, idx: i32) -> CiBitPlan:
+    ci_bitfield_plan_cursor(session, with_cimport_decl_cursor(session, idx), with_cimport_decl_name(session, idx))
 
 // The unit a bitfield field starts, or -1 (a later member of a unit renders
 // nothing: the unit's field stands for all of them).
@@ -2863,7 +2889,7 @@ fn ci_bit_mask_text(width: i32) -> str:
 
 // The accessors of every named member and the layout assertion, rendered
 // after the record and its `impl Copy`.
-fn ci_render_bitfield_accessors(session: i64, idx: i32, safe_name: &str, plan: &CiBitPlan) -> str:
+fn ci_render_bitfield_accessors_sized(safe_name: &str, size: i64, plan: &CiBitPlan) -> str:
     if plan.members.len() == 0: return ""
     var out = "impl " ++ safe_name ++ ":\n"
     for mi in 0..plan.members.len():
@@ -2890,13 +2916,15 @@ fn ci_render_bitfield_accessors(session: i64, idx: i32, safe_name: &str, plan: &
     // the targets of its data model: a pointer-sized member before a unit
     // moves it on wasm32 legitimately, and the bitfield units themselves
     // sit where C puts a whole integer member on every target.
-    let size = with_cimport_struct_size(session, idx)
     var checks = "sizeof[" ++ safe_name ++ "]() != " ++ i64_to_string(size)
     for ui in 0..plan.units.len():
         checks = checks ++ " or offsetof[" ++ safe_name ++ "](__bits_" ++ i64_to_string(ui as i64) ++ ") != " ++ i64_to_string(plan.units[ui].byte_offset)
     out = out ++ "comptime fn __ci_layout_" ++ safe_name ++ "() -> Unit:\n    if sizeof[*const u8]() == " ++ i64_to_string(ci_c_model_pointer_bytes()) ++ " and (" ++ checks ++ "): comptime_error(\"" ++ safe_name ++ ": the bitfield layout this migration recorded (D147) differs on this target\")\n"
     out = out ++ "const __ci_layout_" ++ safe_name ++ "_check: Unit = __ci_layout_" ++ safe_name ++ "()\n"
     out
+
+fn ci_render_bitfield_accessors(session: i64, idx: i32, safe_name: &str, plan: &CiBitPlan) -> str:
+    ci_render_bitfield_accessors_sized(safe_name, with_cimport_struct_size(session, idx), plan)
 
 fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &str, demoted_types: &str, count: i32) -> str:
     let name = with_cimport_decl_name(session, idx)
@@ -9393,7 +9421,7 @@ impl CiExprPool:
                 let lowered = self.lower_anon_member_arm_init(session, decl_idx, decl_cursor, slot, arm_idx, value_cursor, ty_str, types, scope)
                 if lowered == 0:
                     return 0
-                slot_exprs[slot] = lowered as i32
+                slot_exprs[slot] = self.merge_designated_init_slot(slot_exprs[slot], lowered) as i32
             else:
                 var raw_id = self.lower_expr_ir(session, value_cursor, types, scope)
                 if raw_id == 0:
@@ -9475,9 +9503,31 @@ impl CiExprPool:
         let coerced = self.coerce_init_expr_to_type(types, raw_id, arm_ty)
         let union_ty = types.named_type_from_text(ci_anon_member_synth_type_name(session, decl_idx, slot))
         let fields_start = self.extra_len() as i32
-        self.add_extra(self.add_string(arm_name))
+        let arm_pair = self.add_string(arm_name)
+        let setter_pair = ci_translate_in_migrate_mode() and with_ci_cursor_is_bitfield(session, arm_cursor) != 0
+        self.add_extra(if setter_pair: ci_init_pair_setter_encode(arm_pair) else: arm_pair)
         self.add_extra(coerced as i32)
         self.designated_init(fields_start, 1, union_ty)
+
+    fn merge_designated_init_slot(existing_raw: i32, added: CiExprId) -> CiExprId:
+        if existing_raw == 0:
+            return added
+        let existing = existing_raw as CiExprId
+        if self.kind(existing) != CiExprKind.CIE_DESIGNATED_INIT or self.kind(added) != CiExprKind.CIE_DESIGNATED_INIT:
+            return added
+        let es = self.get_d0(existing)
+        let ec = self.get_d1(existing)
+        let as_start = self.get_d0(added)
+        let ac = self.get_d1(added)
+        var pairs: List[i32] = List.new()
+        for i in 0..ec * 2:
+            pairs.push(self.get_extra(es + i))
+        for i in 0..ac * 2:
+            pairs.push(self.get_extra(as_start + i))
+        let merged_start = self.extra_len() as i32
+        for p in pairs:
+            self.add_extra(p)
+        self.designated_init(merged_start, ec + ac, self.get_type(added))
 
     // A record initializer lowered against the record's declaration cursor,
     // for a record the declaration index does not name: one declared in a
@@ -9560,6 +9610,8 @@ impl CiExprPool:
                 lowered = self.lower_record_init_by_cursor(session, value_cursor, with_ci_num_children(session, value_cursor), member_decl, member_name, types.named_type_from_text(member_name), types, scope)
             else if member_decl >= 0 and arm_idx >= 0 and not record_is_union:
                 lowered = self.lower_member_arm_init_by_cursor(session, member_decl, member_name, arm_idx, value_cursor, types, scope)
+                if lowered != 0:
+                    lowered = self.merge_designated_init_slot(slot_exprs[slot], lowered)
             else:
                 var raw_id = self.lower_expr_ir(session, value_cursor, types, scope)
                 if raw_id == 0:
@@ -9583,7 +9635,9 @@ impl CiExprPool:
                     slot_ty = with_ci_type_translated(session, with_ci_cursor_type(session, slot_cursor))
                 v = self.zeroed_record_slot_fill(session, slot_cursor, slot_ty, types) as i32
             if v != 0:
-                pair_names.push(self.add_string(self.member_slot_emitted_name(session, decl_cursor, si)))
+                let pair_name = self.add_string(self.member_slot_emitted_name(session, decl_cursor, si))
+                let setter_pair = ci_translate_in_migrate_mode() and with_ci_cursor_is_bitfield(session, ci_decl_field_cursor(session, decl_cursor, si)) != 0
+                pair_names.push(if setter_pair: ci_init_pair_setter_encode(pair_name) else: pair_name)
                 pair_values.push(v)
         if record_is_union and pair_values.len() > 1:
             if g_ci_bail_message.len() == 0:
@@ -9636,7 +9690,9 @@ impl CiExprPool:
             return 0
         let coerced = self.coerce_init_expr_to_type(types, raw_id, arm_ty)
         let fields_start = self.extra_len() as i32
-        self.add_extra(self.add_string(arm_name))
+        let arm_pair = self.add_string(arm_name)
+        let setter_pair = ci_translate_in_migrate_mode() and with_ci_cursor_is_bitfield(session, arm_cursor) != 0
+        self.add_extra(if setter_pair: ci_init_pair_setter_encode(arm_pair) else: arm_pair)
         self.add_extra(coerced as i32)
         self.designated_init(fields_start, 1, types.named_type_from_text(member_name))
 
@@ -12736,7 +12792,14 @@ impl CiExprPool:
     // migrated record carries; the callee's d2 == 3 marks it so the
     // assignment printer renders the setter (`base.set_member(value)`).
     fn bitfield_getter_call(base: CiExprId, member: &str, field_ty: CiTypeId) -> CiExprId:
-        let callee = self.add(CiExprKind.CIE_FIELD, base as i32, self.add_string(member), 3, 0)
+        var recv = base
+        var leaf = ci_escape_reserved(member)
+        let parts = member.split(".")
+        if parts.len() > 1:
+            for pi in 0..parts.len() - 1:
+                recv = self.add(CiExprKind.CIE_FIELD, recv as i32, self.add_string(ci_escape_reserved(parts[pi])), 0, 0)
+            leaf = ci_escape_reserved(parts[parts.len() - 1])
+        let callee = self.add(CiExprKind.CIE_FIELD, recv as i32, self.add_string(leaf), 3, 0)
         self.add(CiExprKind.CIE_CALL, callee as i32, self.extra_len() as i32, 0, field_ty)
 
 impl CiStmtPool:
