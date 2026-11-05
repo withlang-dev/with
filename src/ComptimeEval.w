@@ -6761,6 +6761,8 @@ impl ComptimeEvaluator:
             return comptime_control_value(comptime_value_float(target_type, real, ""))
         if value_signal.value.kind == ComptimeValueKind.CV_STR and target == self.sema.ty_str:
             return value_signal
+        if value_signal.value.kind == ComptimeValueKind.CV_STR and target_kind == TypeKind.TY_SLICE and self.sema.resolve_alias(self.sema.get_type_d0(target) as TypeId) == self.sema.ty_u8:
+            return comptime_control_value(comptime_value_bytes(target_type, value_signal.value.text))
         self.fail(node, "comptime cast is not supported for this value")
 
     mut fn eval_disc_variant_sym(sym: i32, node: i32) -> ComptimeControl:
@@ -6772,9 +6774,8 @@ impl ComptimeEvaluator:
         let enum_tid: i32 = self.sema.variant_type_ids.get(sym).unwrap()
         let enum_resolved = self.sema.resolve_alias(enum_tid as TypeId)
         if not self.sema.disc_repr_types.contains(enum_resolved as i32) or self.sema.disc_has_payload.contains(enum_resolved as i32):
-            if cv_trace:
-                with_eprint(f"[comptime] disc_variant miss: enum ty={enum_resolved as i32} repr={self.sema.disc_repr_types.contains(enum_resolved as i32)} payload={self.sema.disc_has_payload.contains(enum_resolved as i32)}")
-            return self.unsupported(node)
+            let extra_len = self.extra_values.len()
+            return comptime_control_value(comptime_value_enum(self.node_type_or(node, enum_tid), sym, extra_len as i32, 0))
         let disc = self.sema.enum_variant_discriminant_for_type(enum_resolved as i32, sym)
         // The value is the enum's, not its representation's: typed as the
         // integer it lost its variant when a constant was folded back into
@@ -7690,22 +7691,63 @@ impl ComptimeEvaluator:
                 return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         comptime_control_error()
 
+    mut fn eval_struct_iter_to_extras(iter_val0: &ComptimeValue, node: i32, fail_msg: &str) -> ComptimeControl:
+        let next_sym = self.pool.intern("next")
+        let resolved_recv = self.sema.auto_deref_method_type(iter_val0.type_id as TypeId, next_sym, 0, 0)
+        let owner = self.sema.method_owner_symbol_for_type(resolved_recv as i32)
+        let fn_sym = if owner != 0: self.sema.lookup_method_fn(owner, next_sym) else: 0
+        let next_sig = if owner != 0: self.sema.lookup_method_sig(owner, next_sym) else: -1
+        if fn_sym == 0 or next_sig < 0 or self.sema.is_option_type(self.sema.sig_return_type(next_sig)) == 0:
+            return self.fail(node, fail_msg)
+        var iter_val = comptime_value_clone(iter_val0)
+        var elems: List[ComptimeValue] = List.new()
+        var count: i32 = 0
+        let empty_i32: List[i32] = List.new()
+        while true:
+            let call_args: List[ComptimeValue] = List.new()
+            call_args.push(comptime_value_clone(iter_val))
+            var step = self.eval_fn_symbol_call_values_with_type_args(fn_sym, call_args, node, empty_i32, empty_i32)
+            if step.kind != ComptimeControlKind.CTL_VALUE:
+                return step
+            if self.last_call_has_mut_receiver != 0:
+                iter_val = comptime_value_clone(self.last_call_mut_receiver)
+            if step.value.kind == ComptimeValueKind.CV_ENUM and step.value.data0 == self.sema.syms.none as i64:
+                break
+            if step.value.kind == ComptimeValueKind.CV_ENUM and step.value.data0 == self.sema.syms.some as i64 and step.value.extra_count >= 1:
+                elems.push(self.extra_value_at(step.value.extra_start as i64))
+            else:
+                // Implicit `Some(...)` wrapping in a `-> Option[T]` body
+                // (`ByteIter.next()` returns `b` directly).
+                elems.push(comptime_value_clone(step.value))
+            count += 1
+        let start_len = self.extra_values.len()
+        let start = start_len as i32
+        for elem in elems.into_iter():
+            self.push_extra_value(elem)
+        comptime_control_value(comptime_value_list(0, start, count))
+
     mut fn eval_for(node: i32) -> ComptimeControl:
-        let iterable_signal = self.eval_expr(self.ast.get_data1(node))
+        var iterable_signal = self.eval_expr(self.ast.get_data1(node))
         if iterable_signal.kind != ComptimeControlKind.CTL_VALUE:
             return iterable_signal
+        if iterable_signal.value.kind == ComptimeValueKind.CV_STRUCT:
+            iterable_signal = self.eval_struct_iter_to_extras(iterable_signal.value, node, "comptime for requires an array, tuple, vec, map, range, or iterator")
+            if iterable_signal.kind != ComptimeControlKind.CTL_VALUE:
+                return iterable_signal
         let binding = self.ast.get_data0(node)
         let body = self.ast.get_data2(node)
-        var count: i32 = 0
+        var count: isize = 0
         // #2220: a map iterates its entries as (key, value) tuples, D44's
         // `for (k, v) in map`; the entries sit in extra_values as pairs.
         let is_map = iterable_signal.value.kind == ComptimeValueKind.CV_MAP
         if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE or iterable_signal.value.kind == ComptimeValueKind.CV_LIST or is_map:
             count = iterable_signal.value.extra_count
+        else if iterable_signal.value.kind == ComptimeValueKind.CV_BYTES:
+            count = iterable_signal.value.text.len()
         else if iterable_signal.value.kind == ComptimeValueKind.CV_RANGE:
             let start_value = iterable_signal.value.data0
             let end_value = iterable_signal.value.data1
-            count = if iterable_signal.value.extra_start != 0: (end_value - start_value + 1) as i32 else: (end_value - start_value) as i32
+            count = if iterable_signal.value.extra_start != 0: (end_value - start_value + 1) as isize else: (end_value - start_value) as isize
             if count < 0:
                 count = 0
         else:
@@ -7718,12 +7760,13 @@ impl ComptimeEvaluator:
         let loop_label = if for_meta >= 0: self.ast.for_meta_label(for_meta) else: 0
         self.loop_labels.push(loop_label)
         for i in 0..count:
+            let idx = i as i32
             self.push_scope()
             if iterable_signal.value.kind == ComptimeValueKind.CV_RANGE:
                 let step_value = iterable_signal.value.data0 + i as i64
                 self.bind_value(binding, comptime_value_int(self.sema.ty_i64 as i32, step_value), 0)
             else:
-                let elem = if is_map: comptime_value_tuple(0, iterable_signal.value.extra_start + i * 2, 2) else: self.extra_value_at((iterable_signal.value.extra_start + i) as i64)
+                let elem = if iterable_signal.value.kind == ComptimeValueKind.CV_BYTES: comptime_value_int(self.sema.ty_u8 as i32, (iterable_signal.value.text[i] as i64) & 255) else if is_map: comptime_value_tuple(0, iterable_signal.value.extra_start + idx * 2, 2) else: self.extra_value_at((iterable_signal.value.extra_start + idx) as i64)
                 if binds_pattern:
                     if self.match_pattern(binding, elem, node) == false:
                         self.pop_scope()
@@ -7781,19 +7824,27 @@ impl ComptimeEvaluator:
         if iterable_signal.kind != ComptimeControlKind.CTL_VALUE:
             state.signal = iterable_signal
             return state
+        if iterable_signal.value.kind == ComptimeValueKind.CV_STRUCT:
+            iterable_signal = self.eval_struct_iter_to_extras(iterable_signal.value, node, "a comptime comprehension iterates an array, tuple, vec, range, or iterator")
+            if iterable_signal.kind != ComptimeControlKind.CTL_VALUE:
+                state.signal = iterable_signal
+                return state
         let source = move iterable_signal.value
-        var count = 0
+        var count: isize = 0
         if source.kind == ComptimeValueKind.CV_ARRAY or source.kind == ComptimeValueKind.CV_TUPLE or source.kind == ComptimeValueKind.CV_LIST:
             count = source.extra_count
+        else if source.kind == ComptimeValueKind.CV_BYTES:
+            count = source.text.len()
         else if source.kind == ComptimeValueKind.CV_RANGE:
-            count = if source.extra_start != 0: (source.data1 - source.data0 + 1) as i32 else: (source.data1 - source.data0) as i32
+            count = if source.extra_start != 0: (source.data1 - source.data0 + 1) as isize else: (source.data1 - source.data0) as isize
             if count < 0: count = 0
         else:
             state.signal = self.fail(node, "a comptime comprehension iterates an array, tuple, vec, or range")
             return state
         for i in 0..count:
+            let idx = i as i32
             self.push_scope()
-            let item = if source.kind == ComptimeValueKind.CV_RANGE: comptime_value_int(self.sema.ty_i64 as i32, source.data0 + i as i64) else: self.extra_value_at((source.extra_start + i) as i64)
+            let item = if source.kind == ComptimeValueKind.CV_RANGE: comptime_value_int(self.sema.ty_i64 as i32, source.data0 + i as i64) else if source.kind == ComptimeValueKind.CV_BYTES: comptime_value_int(self.sema.ty_u8 as i32, (source.text[i] as i64) & 255) else: self.extra_value_at((source.extra_start + idx) as i64)
             var keep = self.match_pattern(pattern, item, node) > 0
             if keep and filter != 0:
                 var filter_signal = self.eval_expr(filter)

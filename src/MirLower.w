@@ -8806,14 +8806,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
 
         self.switch_to(body_bb)
-        let item_local = self.new_temp(elem_ty)
-        let item_place = self.place_for_local(item_local)
-        let downcast_place = self.body.new_downcast_place(next_place, some_idx)
-        let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
-        // Drop-class elements MOVE out of the Option temp (the `?` idiom) —
-        // a copy leaves the stale Some to double-drop the payload at cleanup.
-        let next_payload = self.body.new_operand(self.carrier_read_kind(elem_ty, self.local_type(self.place_base_local(payload_place))), payload_place)
-        self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
+        let item_place = self.extract_stepped_option_payload(next_place, some_idx, elem_ty, self.ast.get_start(iter_expr))
 
         // #614b + D33: the binding itself lives in a per-iteration scope. A
         // Drop-class element yielded by value (consuming iteration) must drop
@@ -9163,10 +9156,34 @@ impl MirBuilder:
             return self.ast.for_meta_label(for_meta)
         0
 
-    mut fn bind_for_element(for_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32):
+    // Extract the `Some` payload from an unscheduled step `Option[elem_ty]`
+    // temp (`next()` or `CHAN_RECV`) into a fresh plain local place. Plain
+    // bits copy; any payload with drop glue (Drop or RC str) moves out so the
+    // step temp never retains an orphaned hold.
+    mut fn extract_stepped_option_payload(opt_place: i32, some_idx: i32, elem_ty: i32, span: i32) -> i32:
+        let item_local = self.new_temp(elem_ty)
+        let item_place = self.place_for_local(item_local)
+        let downcast_place = self.body.new_downcast_place(opt_place, some_idx)
+        let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
+        let frame = self.push_stmt_temp_frame()
+        let op_kind = if self.type_needs_value_drop(elem_ty): OperandKind.OK_MOVE else: OperandKind.OK_COPY
+        let payload_op = self.body.new_operand(op_kind, payload_place)
+        self.assign_operand_to_place(item_place, payload_op, span)
+        self.finish_stmt_temp_frame(frame)
+        item_place
+
+    mut fn lower_owned_for_pattern(pat_or_sym: i32, item_place: i32, elem_ty: i32, owns_item: bool, span: i32):
+        let pat_frame = self.push_stmt_temp_frame()
+        self.lower_pattern(pat_or_sym, item_place)
+        self.finish_stmt_temp_frame(pat_frame)
+        let item_local = mir_place_plain_local(self.body, item_place)
+        if owns_item and item_local >= 0 and self.carrier_copies(elem_ty) and not self.local_value_moved(item_local):
+            self.emit_drop_stmt(item_place, "for-carrier", span)
+
+    mut fn bind_for_element(for_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32, owns_item: bool):
         // Bind loop variable: supports both simple identifiers and pattern destructuring
         if self.ast.for_binding_is_pattern(for_node):
-            self.lower_pattern(pat_or_sym, item_place)
+            self.lower_owned_for_pattern(pat_or_sym, item_place, elem_ty, owns_item, self.ast.get_start(for_node))
             return
         if pat_or_sym != 0:
             let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
@@ -9175,8 +9192,13 @@ impl MirBuilder:
             if not self.copy_is_bits(elem_ty):
                 self.schedule_drop(bind_local, DropKind.DK_VALUE)
             let bind_place = self.place_for_local(bind_local)
-            let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
+            let bind_frame = self.push_stmt_temp_frame()
+            let read_kind = if owns_item and self.type_needs_value_drop(elem_ty): OperandKind.OK_MOVE else: OperandKind.OK_COPY
+            let item_op = self.body.new_operand(read_kind, item_place)
             self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
+            self.finish_stmt_temp_frame(bind_frame)
+        else if owns_item and self.type_needs_value_drop(elem_ty):
+            self.emit_drop_stmt(item_place, "for-discard", self.ast.get_start(for_node))
 
     // §13.5 / #1490: a refutable `for PATTERN in …` skips the elements it does
     // not match. When the loop OWNS the element (consuming iteration moved it
@@ -9192,9 +9214,9 @@ impl MirBuilder:
                 self.emit_drop_stmt(item_place, "for-skip", self.ast.get_start(for_node))
             self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
             self.switch_to(matched_bb)
-            self.lower_pattern(pat_or_sym, item_place)
+            self.lower_owned_for_pattern(pat_or_sym, item_place, elem_ty, owns_item, self.ast.get_start(for_node))
             return
-        self.bind_for_element(for_node, pat_or_sym, item_place, elem_ty, body_expr)
+        self.bind_for_element(for_node, pat_or_sym, item_place, elem_ty, body_expr, owns_item)
 
     // §13.6: a comprehension clause's `for PATTERN in EXPR` is §13.5's
     // iteration, whose refutable pattern skips the elements it does not
@@ -9217,7 +9239,7 @@ impl MirBuilder:
                 self.emit_drop_stmt(item_place, "comprehension-skip", self.ast.get_start(span_node))
             self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
             self.switch_to(matched_bb)
-            self.lower_pattern(pat_or_sym, item_place)
+            self.lower_owned_for_pattern(pat_or_sym, item_place, elem_ty, owns_item, self.ast.get_start(span_node))
             return
         if pat_or_sym != 0:
             let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
@@ -9226,8 +9248,13 @@ impl MirBuilder:
             if not self.copy_is_bits(elem_ty):
                 self.schedule_drop(bind_local, DropKind.DK_VALUE)
             let bind_place = self.place_for_local(bind_local)
-            let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
+            let bind_frame = self.push_stmt_temp_frame()
+            let read_kind = if owns_item and self.type_needs_value_drop(elem_ty): OperandKind.OK_MOVE else: OperandKind.OK_COPY
+            let item_op = self.body.new_operand(read_kind, item_place)
             self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(span_node))
+            self.finish_stmt_temp_frame(bind_frame)
+        else if owns_item and self.type_needs_value_drop(elem_ty):
+            self.emit_drop_stmt(item_place, "comprehension-discard", self.ast.get_start(span_node))
 
     // D33/#912: a value a comprehension stores in its output (a List or set
     // element, a map key or value) MOVES there, and the move is REGISTERED
@@ -9675,14 +9702,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
 
         self.switch_to(body_bb)
-        let item_local = self.new_temp(elem_ty)
-        let item_place = self.place_for_local(item_local)
-        let downcast_place = self.body.new_downcast_place(next_place, some_idx)
-        let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
-        // Drop-class elements MOVE out of the Option temp (the `?` idiom) —
-        // a copy leaves the stale Some to double-drop the payload at cleanup.
-        let next_payload = self.body.new_operand(self.carrier_read_kind(elem_ty, self.local_type(self.place_base_local(payload_place))), payload_place)
-        self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
+        let item_place = self.extract_stepped_option_payload(next_place, some_idx, elem_ty, self.ast.get_start(iter_expr))
         // #614b + D33: the binding lives in a per-iteration scope so an
         // owned Drop element drops once on the back-edge — including
         // filter-skipped iterations — never again at function exit. All
@@ -10503,9 +10523,12 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
         self.switch_to(bind_bb)
         let some_index = self.enum_variant_index_for_type(opt_ty, self.sema.syms.some)
-        let downcast_place = self.body.new_downcast_place(opt_place, some_index)
-        let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
-        self.bind_for_element_or_skip(for_node, pat_or_sym, payload_place, elem_ty, body_expr, header_bb, true)
+        let item_place = self.extract_stepped_option_payload(opt_place, some_index, elem_ty, self.ast.get_start(iter_expr))
+        // #614b + D33: per-iteration scope so a received value with drop glue
+        // drops once per iteration on the back-edge/continue/break edge, never
+        // on the zero-iteration `None` exit path.
+        self.push_scope()
+        self.bind_for_element_or_skip(for_node, pat_or_sym, item_place, elem_ty, body_expr, header_bb, true)
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
@@ -10514,7 +10537,7 @@ impl MirBuilder:
         self.lower_expr_discard(body_expr)
         self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
-        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        self.pop_scope_with_goto(header_bb)
         self.pop_control_target()
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()

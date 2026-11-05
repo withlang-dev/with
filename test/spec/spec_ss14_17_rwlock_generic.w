@@ -22,7 +22,7 @@ impl Drop for DropPayload:
             RWLOCK_DROP_TRACE = RWLOCK_DROP_TRACE ++ self.id
 
 async fn write_to_42(lock: &RwLock[i64]) -> i32:
-    lock.write(42 as i64)
+    lock.set(42 as i64)
     0
 
 fn drive_until_done(task: &Task[i32]):
@@ -47,7 +47,7 @@ fn test_generic_payload:
     let total = with lock.enter() as stats:
         stats.reads + stats.writes
     assert(total == 33)
-    lock.write(Stats { reads: 5, writes: 6 })
+    lock.set(Stats { reads: 5, writes: 6 })
     let after_write = with lock.enter() as stats:
         stats.reads + stats.writes
     assert(after_write == 11)
@@ -69,7 +69,7 @@ fn replace_drop_payload:
         data.id
     assert(before == "old")
     unsafe { assert(RWLOCK_DROP_TRACE == "") }
-    lock.write(DropPayload { id: "new" })
+    lock.set(DropPayload { id: "new" })
 
 fn test_drop_payload_replacement_and_lock_drop:
     unsafe { RWLOCK_DROP_TRACE = "" }

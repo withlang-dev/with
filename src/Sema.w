@@ -1144,6 +1144,7 @@ type Sema {
     // symbol. Recorded by resolve_generic_type and carried through
     // substitution; read by generic_inst_template_tid.
     generic_inst_templates: HashMap[i32, i32],
+    generic_alias_inst_targets: HashMap[i32, i32],
     type_sym_tier_mask: HashMap[i32, i32],
     // Generic inst impls: impl Trait for Type[Args]
     // Key: pair(type_id, trait_sym) → 1
@@ -3035,7 +3036,7 @@ impl Sema:
             return true
         if name == "Mutex" or name == "RwLock" or name == "Atomic" or name == "AtomicI64" or name == "Order":
             return true
-        if name == "MutexGuard" or name == "MutexGuardMut" or name == "RwReadGuard" or name == "RwWriteGuard":
+        if name == "MutexGuard" or name == "MutexGuardMut" or name == "RwReadGuard" or name == "RwWriteGuard" or name == "RwLockReadGuard" or name == "RwLockWriteGuard":
             return true
         false
 
@@ -3687,6 +3688,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         operator_operand_nodes: HashSet.new(),
         type_tid_is_std: HashMap.new(),
         generic_inst_templates: HashMap.new(),
+        generic_alias_inst_targets: HashMap.new(),
         type_sym_tier_mask: HashMap.new(),
         impl_starts: List.new(),
         impl_counts: List.new(),
@@ -5535,6 +5537,29 @@ impl Sema:
             if path.len() > 0 and path != self.current_module_path and is_pub == 0 and self.module_is_visible_from_current(path) != 0:
                 return with_str_clone_ref(path)
             i = self.decl_visibility_prev[i]
+        i = if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            let path = self.displaced_fn_paths[i]
+            let is_pub = self.displaced_fn_pub[i]
+            if path.len() > 0 and path != self.current_module_path and is_pub == 0 and self.module_is_visible_from_current(path) != 0:
+                return with_str_clone_ref(path)
+            i = self.displaced_fn_prev[i]
+        // #2958 (§18.3): a non-`pub` std declaration in an unimported std
+        // module (when no std module exports a `pub` symbol of that name)
+        // names its package privacy rather than "undefined variable".
+        if self.std_gated_import_note(sym).len() == 0 and not sema_tier_path_is_std_implementation(self.current_module_path):
+            i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+            while i >= 0:
+                let path = self.decl_visibility_paths[i]
+                if path.len() > 0 and self.decl_visibility_pub[i] == 0 and sema_tier_path_is_std_implementation(path):
+                    return with_str_clone_ref(path)
+                i = self.decl_visibility_prev[i]
+            i = if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
+            while i >= 0:
+                let path = self.displaced_fn_paths[i]
+                if path.len() > 0 and self.displaced_fn_pub[i] == 0 and sema_tier_path_is_std_implementation(path):
+                    return with_str_clone_ref(path)
+                i = self.displaced_fn_prev[i]
         ""
 
     // D29 scaffolding (#750): when a name failed resolution only because the
@@ -7301,6 +7326,31 @@ impl Sema:
         // do not cascade into inference errors.
         self.validate_memo_arguments(gi_base_sym, gi_args, node)
         let inst = self.ensure_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
+        if gi_base_tid != 0 and self.get_type_kind(gi_base_tid as TypeId) == TypeKind.TY_ALIAS:
+            if let Some(cached) = self.generic_alias_inst_targets.get(inst):
+                return cached
+            let alias_decl = self.type_decl_nodes_by_tid.get(gi_base_tid) ?? (self.type_decl_nodes.get(gi_base_sym) ?? 0)
+            if alias_decl != 0:
+                let tp_count = self.type_decl_tp_count(alias_decl)
+                if tp_count > 0:
+                    if gi_arg_count != tp_count:
+                        self.emit_error(f"generic type alias '{self.pool_resolve_symbol(gi_base_sym)}' expects {tp_count} type argument(s), found {gi_arg_count}", node)
+                        return 0
+                    let saved_syms = sema_clone_i32_list(self.generic_subst_param_syms)
+                    let saved_tys = sema_clone_i32_list(self.generic_subst_type_ids)
+                    var pos = self.type_decl_tp_start(alias_decl)
+                    for ti in 0..tp_count:
+                        let tp_sym = self.ast.get_extra(pos)
+                        pos = pos + 2 + self.ast.get_extra(pos + 1)
+                        self.generic_subst_param_syms.push(tp_sym)
+                        self.generic_subst_type_ids.push(gi_args[ti])
+                    let aliased_node = self.ast.get_extra(self.ast.get_data1(alias_decl))
+                    let expanded = self.resolve_type_expr(aliased_node) as i32
+                    self.generic_subst_param_syms = saved_syms
+                    self.generic_subst_type_ids = saved_tys
+                    if expanded != 0:
+                        self.generic_alias_inst_targets.insert(inst, expanded)
+                        return expanded
         if inst != 0 and gi_base_tid != 0 and not self.generic_inst_templates.contains(inst):
             self.generic_inst_templates.insert(inst, gi_base_tid)
         inst

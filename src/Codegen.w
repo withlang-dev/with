@@ -495,6 +495,7 @@ type Codegen {
     async_block_counter: i32,
     async_block_captures: List[i32],
     async_block_rbuf: i64,
+    async_block_fn: i64,
 
     // Scope locals for drop
     scope_local_syms: List[i32],
@@ -1285,6 +1286,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         async_block_counter: 0,
         async_block_captures: List.new(),
         async_block_rbuf: 0,
+        async_block_fn: 0,
         scope_local_syms: List.new(),
         scope_local_allocas: List.new(),
         scope_local_types: List.new(),
