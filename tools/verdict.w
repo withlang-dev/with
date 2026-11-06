@@ -66,6 +66,21 @@ for pi in 0..paths.len():
     for line in text.split("\n"):
         if line.starts_with("rc="): rc = line.slice(3, line.len()).trim().to_owned()
         if line.starts_with("BATTERY_DONE"): done = true
+        // A `with uat` log (out/battery/uat.log) has no rc line: its
+        // summary (`uat: 13 scenarios: 10 pass, 2 skip, 1 FAIL`) closes it,
+        // and each `uat: <name> ... FAIL step N` line names a red (#2521).
+        if line.starts_with("uat: ") and line.contains(" scenarios: "):
+            done = true
+            // `uat: 13 scenarios: 10 pass, 2 skip, 1 FAIL`; a green run has
+            // no FAIL segment (`12 pass, 1 skip; 1 human check recorded`).
+            var failed_scenarios = false
+            for seg in line.split(": ")[2].split(";")[0].split(", "):
+                let s = seg.trim()
+                if s.ends_with(" FAIL") and not s.starts_with("0 "): failed_scenarios = true
+            if rc.len() == 0: rc = if failed_scenarios: "1" else: "0"
+        if line.starts_with("uat: ") and line.contains(" FAIL "):
+            let scenario = line.split(" ")[1].to_owned()
+            if not reds.contains(scenario): reds.push(scenario)
         let t = failed_target(line)
         if t.len() > 0 and not reds.contains(t): reds.push(t)
     if progress:

@@ -787,11 +787,15 @@ impl Sema:
         let evald = unsafe { comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, node) }
         if comptime_value_is_valid(evald.value) == false:
             return node
-        // A variant with a payload stays the call it was written as: folded
-        // to the shorthand, `AppError.Db(DbError.NotFound("users", "42"))`
-        // no longer matched `.Db(.NotFound(..))` at run time (#3016). The
-        // fold serves a `comptime` block's result (ct_rewrite_comptime).
-        if evald.value.kind == ComptimeValueKind.CV_ENUM and evald.value.extra_count > 0:
+        // A variant constructor call is already its value: folding it to the
+        // shorthand only rewrites the spelling, and loses what the spelling
+        // carries — the enum's name where no binding gives one (`let a =
+        // G.V(3)`, behav_1506), and the order: the transform runs before a
+        // later-declared enum's body is typed, so the written tree is the
+        // one Sema types in order (behav_1430). The fold serves a `comptime`
+        // block's result (ct_rewrite_comptime); the evaluator bug that once
+        // made such a fold mismatch (#3016) is fixed where it was.
+        if evald.value.kind == ComptimeValueKind.CV_ENUM:
             return node
         let folded = self.ct_build_value_tree(pool, intern, evald.value, node, evald.extras)
         if folded != 0:

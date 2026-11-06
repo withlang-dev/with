@@ -159,8 +159,9 @@ F-strings may not be nested.
 **Semantics:**
 
 - Each `{expr}` is type-checked at compile time.
-- Non-`str` expressions are converted to `str` via built-in
-  formatting functions (no trait dispatch).
+- Non-`str` expressions are converted to `str` by the built-in
+  formatting functions, or, for a type with an `impl Display`, by that
+  impl's `to_str` — `{p}` is what `print(p)` prints (D193).
 - `++` concatenates sequences (§15.4.9); it does not format. Use
   f-strings to format values into strings.
 - F-strings always produce owned `str` (they allocate).
@@ -340,11 +341,16 @@ errors:
 | **bool** | error | error | error | error | ✓ |
 | **struct** | error | error | error | error | ✓ |
 
-Using `{some_struct}` without `:?` is a compile-time error:
+Using `{some_struct}` without `:?` is a compile-time error unless the
+type has an `impl Display`, which then formats it (D193):
 
 ```
 f"{player}"      // error: struct type Player has no default
-                 //   display; use :? for debug
+                 //   display: give it an `impl Display`, or use :? for debug
+impl Display for Player:
+    fn to_str() -> str: f"{self.name} (level {self.level})"
+f"{player}"      // "Ada (level 3)", as print(player) prints
+f"{player:>20}"  // the display text, padded
 ```
 
 #### 15.4.9 Concatenation (`++`, `++=`)

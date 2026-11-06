@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D193 — `{x}` in an f-string displays a type through its `impl Display` (delegated, D98)](2026-11-06-D193-an-f-string-displays-a-type-through-its-display-impl.md)
+- [D192 — A range binds above `|>` and `??`, below the operators that compute its bounds (delegated, D98)](2026-11-06-D192-a-range-binds-above-the-pipe-and-the-default.md)
 - [D191 — The indentation of a `|>` line decides what its left-hand side includes](2026-11-02-D191-the-indentation-of-a-pipe-line-decides-its-left-hand-side.md)
 - [D190 — `?` in main: an `Err` that reaches main ends the program (delegated, D98)](2026-11-02-D190-question-mark-in-main-ends-the-program.md)
 - [D189 — Tuple `.await` has no arity limit (delegated, D98)](2026-11-02-D189-tuple-await-has-no-arity-limit.md)

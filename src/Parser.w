@@ -4132,6 +4132,10 @@ impl Parser:
             let op_code = info % 1000
             if prec < min_prec:
                 break
+            // `xs[i..]`: a `..` with nothing after it is the open slice's,
+            // parsed by parse_index_or_slice, never a range operator.
+            if (op_code == 502 or op_code == 503) and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_R_BRACKET:
+                break
             self.advance()
 
             // not in: consume second token
@@ -4276,32 +4280,35 @@ impl Parser:
         // takes a default and no range); `|` < `^` < `&`
         // as in C.
         if t == TokenKind.TK_QUESTION_QUESTION: return 6 * 1000 + BinaryOp.OP_DEFAULT
-        if t == TokenKind.TK_DOT_DOT: return 5 * 1000 + 502
-        if t == TokenKind.TK_DOT_DOT_EQ: return 5 * 1000 + 503
         if t == TokenKind.TK_PIPE_GT: return 7 * 1000 + 500
         if t == TokenKind.TK_LT_PIPE: return 7 * 1000 + 501
-        if t == TokenKind.TK_PIPE: return 8 * 1000 + BinaryOp.OP_BIT_OR
-        if t == TokenKind.TK_CARET: return 9 * 1000 + BinaryOp.OP_BIT_XOR
-        if t == TokenKind.TK_AMPERSAND: return 10 * 1000 + BinaryOp.OP_BIT_AND
-        if t == TokenKind.TK_LT_LT: return 11 * 1000 + BinaryOp.OP_SHL
-        if t == TokenKind.TK_GT_GT: return 11 * 1000 + BinaryOp.OP_SHR
-        if t == TokenKind.TK_PLUS: return 12 * 1000 + BinaryOp.OP_ADD
-        if t == TokenKind.TK_PLUS_PLUS: return 12 * 1000 + BinaryOp.OP_CONCAT
-        if t == TokenKind.TK_MINUS: return 12 * 1000 + BinaryOp.OP_SUB
-        if t == TokenKind.TK_PLUS_WRAP: return 12 * 1000 + BinaryOp.OP_ADD_WRAP
-        if t == TokenKind.TK_MINUS_WRAP: return 12 * 1000 + BinaryOp.OP_SUB_WRAP
-        if t == TokenKind.TK_PLUS_SAT: return 12 * 1000 + BinaryOp.OP_ADD_SAT
-        if t == TokenKind.TK_MINUS_SAT: return 12 * 1000 + BinaryOp.OP_SUB_SAT
-        if t == TokenKind.TK_STAR: return 13 * 1000 + BinaryOp.OP_MUL
-        if t == TokenKind.TK_SLASH: return 13 * 1000 + BinaryOp.OP_DIV
-        if t == TokenKind.TK_PERCENT: return 13 * 1000 + BinaryOp.OP_MOD
-        if t == TokenKind.TK_STAR_WRAP: return 13 * 1000 + BinaryOp.OP_MUL_WRAP
-        if t == TokenKind.TK_STAR_SAT: return 13 * 1000 + BinaryOp.OP_MUL_SAT
+        // §9.9 (#3001): a range is a value like a sum — above `|>` and `??`,
+        // so `0..n |> map(f)` is `(0..n) |> map(f)` and `a..b ?? c` is
+        // `(a..b) ?? c`; below the bitwise operators, which compute its bounds.
+        if t == TokenKind.TK_DOT_DOT: return 8 * 1000 + 502
+        if t == TokenKind.TK_DOT_DOT_EQ: return 8 * 1000 + 503
+        if t == TokenKind.TK_PIPE: return 9 * 1000 + BinaryOp.OP_BIT_OR
+        if t == TokenKind.TK_CARET: return 10 * 1000 + BinaryOp.OP_BIT_XOR
+        if t == TokenKind.TK_AMPERSAND: return 11 * 1000 + BinaryOp.OP_BIT_AND
+        if t == TokenKind.TK_LT_LT: return 12 * 1000 + BinaryOp.OP_SHL
+        if t == TokenKind.TK_GT_GT: return 12 * 1000 + BinaryOp.OP_SHR
+        if t == TokenKind.TK_PLUS: return 13 * 1000 + BinaryOp.OP_ADD
+        if t == TokenKind.TK_PLUS_PLUS: return 13 * 1000 + BinaryOp.OP_CONCAT
+        if t == TokenKind.TK_MINUS: return 13 * 1000 + BinaryOp.OP_SUB
+        if t == TokenKind.TK_PLUS_WRAP: return 13 * 1000 + BinaryOp.OP_ADD_WRAP
+        if t == TokenKind.TK_MINUS_WRAP: return 13 * 1000 + BinaryOp.OP_SUB_WRAP
+        if t == TokenKind.TK_PLUS_SAT: return 13 * 1000 + BinaryOp.OP_ADD_SAT
+        if t == TokenKind.TK_MINUS_SAT: return 13 * 1000 + BinaryOp.OP_SUB_SAT
+        if t == TokenKind.TK_STAR: return 14 * 1000 + BinaryOp.OP_MUL
+        if t == TokenKind.TK_SLASH: return 14 * 1000 + BinaryOp.OP_DIV
+        if t == TokenKind.TK_PERCENT: return 14 * 1000 + BinaryOp.OP_MOD
+        if t == TokenKind.TK_STAR_WRAP: return 14 * 1000 + BinaryOp.OP_MUL_WRAP
+        if t == TokenKind.TK_STAR_SAT: return 14 * 1000 + BinaryOp.OP_MUL_SAT
         // @ operator for matmul — distinguish from @[annotation] by checking next token
         if t == TokenKind.TK_AT:
             if self.pos + 1 < self.tokens.len():
                 if self.tokens.get_tag(self.pos + 1) != TokenKind.TK_L_BRACKET:
-                    return 13 * 1000 + BinaryOp.OP_MATMUL
+                    return 14 * 1000 + BinaryOp.OP_MATMUL
         0
 
     // ── Primary expression ──────────────────────────────────────────
@@ -6590,7 +6597,12 @@ impl Parser:
         let index = self.parse_index_expr()
         self.skip_newlines()
 
-        // Slice: a[start..end]
+        // Slice: a[start..end]. The range operator binds above `|>` and `??`
+        // (§9.9, #3001), so the index expression already holds `start..end`
+        // as a range; in a subscript it is the slice.
+        if self.pool.kind(index) == NodeKind.NK_RANGE and self.pool.get_data2(index) == 0 and self.peek() == TokenKind.TK_R_BRACKET:
+            self.advance()
+            return self.pool.add_node(NodeKind.NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, self.pool.get_data0(index), self.pool.get_data1(index))
         if self.peek() == TokenKind.TK_DOT_DOT:
             self.advance()
             self.skip_newlines()
@@ -7153,7 +7165,7 @@ impl Parser:
             // Prefix unsafe authorizes one unary/postfix raw-memory access chain.
             // Binary operators bind outside the unsafe marker, so
             // `unsafe *p + 1` parses as `(unsafe *p) + 1`.
-            body = self.parse_precedence(14)
+            body = self.parse_precedence(15)
         self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, unsafe_kind, UNSAFE_ORIGIN_EXPR)
 
     // Operand index for an asm {name} placeholder: position of `name_sym` in the
