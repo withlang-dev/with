@@ -108,9 +108,12 @@ error: cannot mutate `counts` while `count` is a live view into it
  --> counts.clear()
 note: `count` views a value stored in `counts`
 note: `count` is used after this mutation
-help: take an independent Copy value:
-      let count: i32 = counts.get("api").unwrap()
+note: take an independent Copy value with `let count: i32 = ...`
 ```
+
+(`count` is a live view here only because it was written `let count: &i32 =
+counts.get("api").unwrap()`; an unannotated binding of plain bits already
+takes the `i32`, D144, §3.8.)
 
 For a non-`Copy` join, the diagnostic must explain both branch contracts:
 
