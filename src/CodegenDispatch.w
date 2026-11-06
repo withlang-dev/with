@@ -19250,6 +19250,12 @@ impl Codegen:
                     let val = wl_build_load(self.builder, cap_ty, src_opt.unwrap() as i64)
                     let fld = self.tuple_elem_ptr(cap_struct_type, env_ptr, ci)
                     wl_build_store(self.builder, val, fld)
+                    // §14.6 (#3044): a capture the block consumes is the
+                    // block's value from here on — the outer slot is reset so
+                    // its own (guarded: MirLower marked it moved) drop frees
+                    // nothing, as `move ||` resets its captures (D63).
+                    if self.sema.closure_capture_consumes(node, ci) and self.sema.type_needs_drop_frozen(ab_body.local_type_ids[ci + 1]) != 0:
+                        self.emit_memset_zero(src_opt.unwrap() as i64, self.abi_size_of(cap_ty))
 
         // 9. Heap-allocate result buffer
         let result_size = self.abi_size_of(ret_ty)

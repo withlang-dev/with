@@ -3045,7 +3045,10 @@ impl Sema:
         // every declaration's module (update_module_context), and a caller
         // mid-check — the evaluator's check_fn_body_before_eval — resolves
         // names in its own module afterwards.
-        let saved_module_path: str = self.current_module_path
+        // Cloned, not copied: under the pinned seed a plain copy of the
+        // field is a view of it, and the restore below is a no-op
+        // (resolve_trait_default_method_type; seed-bound).
+        let saved_module_path: str = with_str_clone_ref(self.current_module_path)
         let saved_module_has_ci = self.current_module_has_ci
         var decl_nodes: HashMap[i32, i32] = sema_new_map_i32_i32()
         for di in 0..count: decl_nodes.insert(self.ast.get_decl(di), di)
@@ -8334,16 +8337,22 @@ impl Sema:
         if fn_node == 0:
             return self.get_sig(method_fn)
         let owner_decl: i32 = self.owner_decl_node_for_type(owner_sym, owner_type)
-        if owner_decl == 0:
+        // §11.6 (#3048): a bare-target blanket impl's method has no owner
+        // declaration — a primitive receiver has none — and no owner type
+        // parameters; its `T` is the receiver.
+        let bb_tp = self.bare_blanket_impl_param_sym(method_fn)
+        if owner_decl == 0 and bb_tp == 0:
             return -1
-        let owner_tp_start = self.type_decl_tp_start(owner_decl)
-        let owner_tp_count = self.type_decl_tp_count(owner_decl)
+        let owner_tp_start = if owner_decl != 0: self.type_decl_tp_start(owner_decl) else: 0
+        let owner_tp_count = if owner_decl != 0: self.type_decl_tp_count(owner_decl) else: 0
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             return -1
         let saved_syms = sema_clone_i32_list(self.generic_subst_param_syms)
         let saved_types = sema_clone_i32_list(self.generic_subst_type_ids)
         self.clear_generic_substitution()
+        if bb_tp != 0 and owner_type != 0:
+            self.put_generic_subst(bb_tp, owner_type, 0)
         if owner_tp_count > 0 and self.setup_generic_inst_substitution(owner_type, owner_sym) == 0:
             self.generic_subst_param_syms = saved_syms
             self.generic_subst_type_ids = saved_types
@@ -12659,7 +12668,16 @@ impl Sema:
             self.collect_function_labels(self.ast.get_data0(node))
             self.validate_function_gotos()
             self.push_label_boundary()
+            // §14.6 (#3044): an `async:` block captures as a closure does. The
+            // body is checked in the enclosing scope, so a binding it consumes
+            // ends MOVED there; the captures and which of them the block
+            // consumed are recorded as the block's capture summary — MirLower
+            // and codegen read it, as they read a closure's (D65).
+            let ab_outer_count = self.bind_names.len()
+            let ab_states_before: List[i32] = List.new()
+            for ci in 0..ab_outer_count: ab_states_before.push(self.bind_states[ci])
             let ab_body_ty = self.check_expr(self.ast.get_data0(node))
+            self.record_async_block_captures(node, self.ast.get_data0(node), ab_outer_count, ab_states_before)
             self.pop_label_frame()
             self.emit_unused_label_warnings()
             self.restore_label_registry(ab_saved_label_registry)
@@ -13295,7 +13313,11 @@ impl Sema:
                 self.int_local_decisions.insert(binding, (tid as i64) * 4294967296 + self.current_fn_decl_node as i64)
         // A global read by another's initializer is checked first, so it is
         // typed whatever the declaration order; its own initializer is refused.
-        if tid >= 0 and not is_local and self.top_level_let_current >= 0 and not self.const_global_syms.contains(sym):
+        // A `const` too: it has no order (§9.1c), but an untyped one's slot is
+        // typed by its initializer, and a body typed inside this pass (a
+        // callee of an initializer, by name) read the slot before the pass
+        // reached it — `<error>` with no diagnostic, and MIR refused the body.
+        if tid >= 0 and not is_local and self.top_level_let_current >= 0:
             if not self.check_top_level_let_before_use(sym, node): return 0
             tid = self.scope_lookup(sym)
         if tid >= 0:
@@ -20506,6 +20528,31 @@ impl Sema:
             self.record_gen_loop_captures(node, body, 0, -1, outer_binding_count)
         self.ty_void as i32
 
+    // §14.6 (#3044): the enclosing bindings an `async:` body names are its
+    // captures, taken by value into the task's environment; one the body
+    // consumed (LIVE before the check, MOVED after) is the block's to drop.
+    mut fn record_async_block_captures(node: i32, body: i32, outer_count: isize, states_before: &List[i32]):
+        let syms: List[i32] = List.new()
+        let effs: List[i32] = List.new()
+        for ci in 0..outer_count:
+            let sym: i32 = self.bind_names[ci]
+            if self.binding_index_is_global(ci as i32, sym):
+                continue
+            if self.expr_uses_symbol(body, sym) == 0:
+                continue
+            var seen = false
+            for si in 0..syms.len():
+                if syms[si] == sym:
+                    seen = true
+            if seen:
+                continue
+            syms.push(sym)
+            var eff = 0
+            if states_before[ci] == VarState.LIVE as i32 and self.bind_states[ci] == VarState.MOVED as i32:
+                eff = EFF_CONSUME
+            effs.push(eff)
+        self.set_closure_capture_summary(node, syms, effs)
+
     // D69 (§13.4): the body of `for x in g` over a Gen[T] runs as a closure,
     // so it captures by place every enclosing binding it uses — exactly the
     // places the loop body reads, writes or moves as an ordinary `for` body.
@@ -22211,7 +22258,6 @@ impl Sema:
         // signature, #1180; Sema now records it). Everything else is an error
         // — returning 0 silently let `captures[1]` on a struct with no index
         // method reach MIR and render as "" inside an f-string.
-        self.check_runtime_index_operand(index)
         // A generic instance's IndexPlace may be a bounded blanket impl: settle
         // it against the instance's arguments here, once, so the read-only
         // classification sees it (#2560).
@@ -22220,18 +22266,32 @@ impl Sema:
             let ig_trait = self.pool_lookup_symbol("IndexGet")
             if (ip_trait > 0 and self.type_implements_trait(container_tid as i32, ip_trait)) or (ig_trait > 0 and self.type_implements_trait(container_tid as i32, ig_trait)):
                 self.index_place_insts.insert(self.resolve_alias(container_tid) as i32)
-        if self.type_is_index_place(container_tid as i32):
-            // The subscript is the impl's `get` (and, as an assignment target,
-            // its `set`), specialized for this receiver type and recorded for
-            // MIR (#2560: a generic impl's `get` returns its `T`; the
-            // specialization names the concrete type).
+        // §11.7 (#3046): a user `IndexPlace[I, V]` or `IndexGet[I, V]` is the
+        // subscript's `get` (and, as an assignment target, `IndexPlace`'s
+        // `set`), specialized for this receiver type and recorded for MIR
+        // (#2560: a generic impl's `get` returns its `T`; the specialization
+        // names the concrete type). The index operand is whatever `I` the
+        // impl declares — a tuple, a str — checked against that parameter,
+        // never forced to an integer.
+        if self.type_is_user_indexable(container_tid as i32):
             let ip_value_ty = self.record_index_place_contracts(node, container_tid as i32)
-            if ip_value_ty != 0:
-                self.typed_expr_types.insert(node, ip_value_ty)
-                return ip_value_ty
-            return 0
+            if ip_value_ty == 0:
+                self.check_runtime_index_operand(index)
+                return 0
+            let ip_get_sig: i32 = self.index_place_get_sigs.get(node).unwrap()
+            // The index follows the receiver in the sig's parameter list.
+            let ip_index_pos = (self.sig_receiver_mode(ip_get_sig) != ReceiverMode.None) as isize
+            let ip_index_ty = if self.sig_get_param_count(ip_get_sig) > ip_index_pos: self.sig_param_type(ip_get_sig, ip_index_pos) else: 0
+            let ip_index_actual = if ip_index_ty > 0: self.check_expr_with_expected(index, ip_index_ty as TypeId) else: self.check_expr_value_context(index)
+            if ip_index_ty > 0 and ip_index_actual != 0 and self.types_compatible(ip_index_ty as TypeId, ip_index_actual) == 0 and self.arithmetic_result_type(ip_index_ty as TypeId, ip_index_actual) == 0 and self.has_contextual_copy_adjustment(index) == 0:
+                self.emit_error(f"index expression must be `{self.type_name(ip_index_ty)}`, the impl's index type; this one is `{self.type_name(ip_index_actual as i32)}`", index)
+            self.typed_expr_types.insert(node, ip_value_ty)
+            if self.get_type_kind(self.resolve_alias(ip_value_ty as TypeId)) == TypeKind.TY_REF:
+                self.record_view_producer_origins(node, expr)
+            return ip_value_ty
+        self.check_runtime_index_operand(index)
         let indexed_name: str = self.type_name(container_tid as i32)
-        self.emit_error(f"type '{indexed_name}' cannot be indexed: it is not a positional collection and implements no IndexPlace", node)
+        self.emit_error(f"type '{indexed_name}' cannot be indexed: it is not a positional collection and implements neither IndexPlace nor IndexGet", node)
         0
 
     mut fn is_runtime_multi_index_node(node: i32) -> bool:
@@ -22301,7 +22361,14 @@ impl Sema:
             let mi_sig = self.lookup_method_sig(base_name, mi_sym)
             if mi_sig >= 0:
                 if self.validate_multi_index_method_sig(base_name, mi_sig, mi_sym, 0, node):
-                    return self.sig_return_type(mi_sig)
+                    // The read's type is the method's return, recorded on the
+                    // node: MirLower types the MULTI_INDEX call's result by it
+                    // (an unrecorded `let x = m[i, j]` was a void temp
+                    // assigned to an i32, refused by the typed validator).
+                    let mi_ret = self.sig_return_type(mi_sig)
+                    if mi_ret != 0:
+                        self.typed_expr_types.insert(node, mi_ret)
+                    return mi_ret
                 return 0
         self.emit_error("type does not support multi-dimensional indexing (missing multi_index method required by MultiIndex)", node)
         0
@@ -31651,6 +31718,68 @@ impl Sema:
                     return true
         false
 
+    // §11.6 (#3048): the type parameter a bare-target blanket impl
+    // (`impl[T: Bound] Trait for T`) binds to its receiver, when `method_fn`
+    // is a method of such an impl; 0 for any other method. Its body and
+    // signature name `T` for the receiver's type, so every specialization
+    // of the method substitutes `T` with the concrete owner.
+    fn bare_blanket_impl_param_sym(method_fn: i32) -> i32:
+        if method_fn == 0 or not self.method_impl_nodes.contains(method_fn):
+            return 0
+        self.impl_bare_target_type_param(self.method_impl_nodes.get(method_fn).unwrap())
+
+    // The type parameter an impl's target IS (`impl[T: Bound] Trait for T`):
+    // a bare name — the parser records no target type node for one, so the
+    // impl's own name slot carries it — that is one of the impl's type
+    // parameters; 0 for any other target.
+    fn impl_bare_target_type_param(impl_node: i32) -> i32:
+        if impl_node == 0:
+            return 0
+        let target_node = self.ast.find_impl_target_type_node(impl_node as NodeId)
+        var sym: i32 = 0
+        if target_node == 0:
+            sym = self.ast.get_data0(impl_node)
+        else:
+            let kind = self.ast.kind(target_node)
+            if kind != NodeKind.NK_TYPE_NAMED and kind != NodeKind.NK_IDENT:
+                return 0
+            sym = self.ast.get_data0(target_node)
+        if sym == 0:
+            return 0
+        let tp_meta = self.ast.find_impl_type_params(impl_node)
+        if tp_meta < 0:
+            return 0
+        let tp_start: i32 = self.ast.state.impl_type_params[(tp_meta + 1)]
+        let tp_count: i32 = self.ast.state.impl_type_params[(tp_meta + 2)]
+        if self.type_param_in_impl_list(tp_start, tp_count, sym): sym else: 0
+
+    // §11.6 (#3048): the method `method_sym` a bare-target blanket impl
+    // provides for a receiver of type `recv_ty`: the impl whose trait
+    // declares it and whose bounds the receiver satisfies; 0 when none does.
+    mut fn bare_blanket_method_for_type(recv_ty: i32, method_sym: i32) -> i32:
+        if recv_ty == 0 or method_sym == 0:
+            return 0
+        var resolved = self.resolve_alias(recv_ty as TypeId) as i32
+        while self.get_type_kind(resolved as TypeId) == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved as TypeId) as TypeId) as i32
+        for bi in 0..self.blanket_trait_syms.len():
+            if self.blanket_target_base_syms[bi] != 0:
+                continue
+            let impl_node: i32 = self.blanket_impl_nodes[bi]
+            let tp_sym = self.impl_bare_target_type_param(impl_node)
+            if tp_sym == 0:
+                continue
+            let method_fn = self.lookup_generic_method_fn(tp_sym, method_sym)
+            if method_fn == 0:
+                continue
+            var names: List[i32] = List.new()
+            names.push(tp_sym)
+            var types: List[i32] = List.new()
+            types.push(resolved)
+            if self.blanket_impl_type_bounds_satisfied(impl_node, names, types):
+                return method_fn
+        0
+
     fn impl_target_has_bare_type_params(impl_node: i32) -> bool:
         if impl_node == 0:
             return false
@@ -32211,11 +32340,23 @@ impl Sema:
             if self.blanket_trait_syms[bi] != trait_sym:
                 continue
             let target_base = self.blanket_target_base_syms[bi]
-            if target_base != base_sym:
-                continue
             let impl_node: i32 = self.blanket_impl_nodes[bi]
+            // §11.6 (#3048): `impl[T: Bound] Trait for T` covers this
+            // instance when the instance satisfies the bound.
+            if target_base == 0:
+                let bare_tp = self.impl_bare_target_type_param(impl_node)
+                if bare_tp != 0:
+                    var bare_names: List[i32] = List.new()
+                    bare_names.push(bare_tp)
+                    var bare_types: List[i32] = List.new()
+                    bare_types.push(resolved as i32)
+                    if self.blanket_impl_type_bounds_satisfied(impl_node, bare_names, bare_types):
+                        return 1
+                continue
             let target_node = self.ast.find_impl_target_type_node(impl_node)
             if target_node == 0:
+                continue
+            if target_base != base_sym:
                 continue
             if self.ast.kind(target_node) != NodeKind.NK_TYPE_GENERIC:
                 continue
@@ -32948,6 +33089,11 @@ impl Sema:
             pos = pos + 2 + bound_count
         tp_syms.push(self.syms.self_type)
         tp_types.push(concrete_owner)
+        // §11.6 (#3048): a bare-target blanket impl's `T` is the receiver.
+        let bb_tp = self.bare_blanket_impl_param_sym(method_fn_sym)
+        if bb_tp != 0:
+            tp_syms.push(bb_tp)
+            tp_types.push(concrete_owner)
 
         let mono_sym = self.pool_intern(key)
         let existing = self.get_sig(mono_sym)
@@ -33463,6 +33609,11 @@ impl Sema:
             self.generic_subst_param_syms = saved_generic_method_subst_syms
             self.generic_subst_type_ids = saved_generic_method_subst_tys
             return 0
+        // §11.6 (#3048): a bare-target blanket impl's `T` is the receiver;
+        // the parameter types below and the body's specialization name it.
+        let bb_tp = self.bare_blanket_impl_param_sym(method_fn_sym)
+        if bb_tp != 0:
+            self.put_generic_subst(bb_tp, concrete_owner, node)
 
         let param_offset = (not (is_static != 0)) as i32
         // arg_count < 0: a compiler-synthesized call whose receiver alone
@@ -37425,7 +37576,11 @@ impl Sema:
         let call_param_offset = (not (is_static_receiver != 0)) as i32
         let call_effect_recv = if is_static_receiver != 0: 0 else: expr
         if type_name_sym != 0:
-            let generic_method_fn = self.lookup_generic_method_fn(type_name_sym, field)
+            var generic_method_fn = self.lookup_generic_method_fn(type_name_sym, field)
+            // §11.6 (#3048): a method of `impl[T: Bound] Trait for T` is the
+            // receiver's when the receiver satisfies the bound.
+            if generic_method_fn == 0 and is_static_receiver == 0:
+                generic_method_fn = self.bare_blanket_method_for_type(recv_type as i32, field)
             if generic_method_fn != 0:
                 if self.fn_symbol_is_unsafe(generic_method_fn):
                     if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == false:
@@ -40632,6 +40787,32 @@ fn unpack_place_mut(packed: i64) -> i32:
     (packed % 4294967296) as i32
 
 impl Sema:
+    // §11.7 (#3046): a type a subscript reads through — one with an
+    // `IndexPlace` impl (read and write) or an `IndexGet` impl (read only).
+    // classify_place keeps asking type_is_index_place: only `IndexPlace`
+    // makes `expr[index]` a writable place.
+    fn type_is_user_indexable(tid: i32) -> bool:
+        if self.type_is_index_place(tid):
+            return true
+        if tid == 0:
+            return false
+        var resolved = self.resolve_alias(tid as TypeId)
+        var tk = self.get_type_kind(resolved)
+        while tk == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+            tk = self.get_type_kind(resolved)
+        let ig_sym = self.pool_lookup_symbol("IndexGet")
+        if ig_sym <= 0:
+            return false
+        if tk == TypeKind.TY_GENERIC_INST:
+            if self.index_place_insts.contains(resolved as i32):
+                return true
+            return self.select_trait_impl(self.get_type_d0(resolved), ig_sym) != 0
+        if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
+            let owner_sym = self.get_type_d0(resolved)
+            return owner_sym != 0 and self.select_trait_impl(owner_sym, ig_sym) != 0
+        false
+
     fn type_is_index_place(tid: i32) -> bool:
         if tid == 0:
             return false

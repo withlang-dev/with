@@ -5,6 +5,11 @@
 // backed by the freelist allocator in rt_core.
 
 use rt.rt_core
+use std.builtins
+
+/// §16.11 (#3049): `mem.slice(p, len)` — the prelude's `slice`, a `[]T` view
+/// over `len` elements at a raw pointer; the caller vouches for them.
+pub unsafe fn slice[T](ptr: *const T, len: isize) -> []T: std.builtins.slice(ptr, len)
 
 /// Allocate `size` bytes on the heap. Returns pointer (0 on failure).
 pub fn alloc(size: i32) -> *i8:

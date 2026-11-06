@@ -153,3 +153,13 @@ impl ToString for bool:
 // Generic free function — call as int_to_string(x) for any numeric type.
 pub fn int_to_string(n: i64) -> str:
     with_i64_to_str(n)
+
+// §16.11 (#3049): `slice(p, len)` — a `[]T` view over `len` elements at a
+// raw pointer, the unsafe inverse of a slice's `.as_ptr()`. A `[]T` is the
+// (pointer, length) pair TypeLayout gives it on every target, so the view is
+// that pair read as the slice. The caller vouches for `len` elements at `p`.
+type RawSliceLayout[T] { ptr: *const T, len: i64 }
+
+pub unsafe fn slice[T](ptr: *const T, len: isize) -> []T:
+    let raw = RawSliceLayout { ptr, len: len as i64 }
+    *((&raw const raw) as *const []T)
