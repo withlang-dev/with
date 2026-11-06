@@ -421,8 +421,8 @@ expression that established the owned join and every relevant arm that was
 materialized. Clean builds do not emit coercion notes.
 
 ```
-let count = counts.get("api").unwrap()          // &i32
-let snapshot: i32 = counts.get("api").unwrap() // independent i32
+let count: &i32 = counts.get("api").unwrap()   // the view, kept by its annotation
+let snapshot = counts.get("api").unwrap()      // independent i32 (D144: plain bits)
 let port = counts.get("port") ?? 8080           // i32: owned arm anchors join
 
 let selected = match source:

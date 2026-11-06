@@ -96,8 +96,9 @@ nothing, so `let _ = x` moves a non-`Copy` `x` and drops it there (#2074).
 the value does not fit is an error at that use (#2101). §9.9: `??` has its
 own level between the comparisons and `|>`, right-associative (#2142).
 §11.8: a tuple, a fixed array, `Option` and `Result` implement `Clone`, `Eq`,
-`Ord`, `Hash` and `Debug` when every element type does; a clone that panics
-partway drops what it cloned (#2161).
+`Ord` and `Debug` when every element type does (`Hash` was in this list for a
+day: v7.25, D96, retired it — it is never written or derived); a clone that
+panics partway drops what it cloned (#2161).
 **Changelog v7.23:** a collection literal's binding, 2026-10-05 (D93).
 §4.3c rule 1: an annotation may name the collection without its arguments
 (`let w: List = [1, 2, 3]`); a binding with no annotation takes its type

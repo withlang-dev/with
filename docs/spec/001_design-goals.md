@@ -180,9 +180,9 @@ With prioritizes joy. The common case should be effortless:
   is expected. If it implements the trait, just pass it. (§3.9)
 - **Comprehensions** — `[x * x for x in 0..10]` builds a list.
   Obviously it allocates. That's fine. (§13.6)
-- **Short-circuit `for` comprehensions** — `for user in get_user(id);
-  profile in get_profile(user): yield profile.name` chains `Option`
-  and `Result` without pyramid-shaped `match` nests. (§13.6a)
+- **Short-circuit comprehensions** — `[profile.name for user in
+  get_user(id); profile in get_profile(user)]` chains `Option` and
+  `Result` without pyramid-shaped `match` nests. (§13.6a)
 - **Pattern `for` loops** — `for (key, value) in map:` and
   `for Some(item) in optional_items:` destructure directly in the
   loop header. (§13.5)

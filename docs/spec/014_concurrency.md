@@ -639,10 +639,14 @@ branch of the first to complete. Remaining expressions are cancelled.
 
 ```
 select await
-    msg = rx_fast.recv() => print(f"fast: {msg}")
-    msg = rx_slow.recv() => print(f"slow: {msg}")
+    msg = rx_fast.recv() => print(f"fast: {msg.unwrap()}")
+    msg = rx_slow.recv() => print(f"slow: {msg.unwrap()}")
     _ = timeout(1.secs()) => print("timeout")
 ```
+
+(`recv()` yields `Option[T]`: `None` once the channel is closed and drained,
+so a receive arm binds the `Option`; a loop ends on it with `let Some(m) =
+msg else break`, as below.)
 
 Each branch has the form `pattern = async_expr => body`. The runtime
 starts all expressions concurrently, the first to resolve fires its
@@ -659,7 +663,8 @@ number of branches without `First`/`Second`/`Third` boilerplate.
 loop:
     select await
         msg = inbox.recv() =>
-            process(msg)?
+            let Some(m) = msg else break
+            process(m)?
         _ = shutdown.recv() =>
             break
         _ = timeout(idle_timeout) =>
@@ -680,7 +685,7 @@ signal or heartbeat timer.
 ```
 loop:
     select await
-        data = fast_stream.recv() => handle(data)
+        data = fast_stream.recv() => handle(data.unwrap())
         _ = shutdown.recv() => break    // will eventually fire
 ```
 
@@ -690,8 +695,8 @@ branch that is ready (top-to-bottom priority):
 
 ```
 select await biased
-    urgent = priority_rx.recv() => handle_urgent(urgent)
-    normal = normal_rx.recv() => handle_normal(normal)
+    urgent = priority_rx.recv() => handle_urgent(urgent.unwrap())
+    normal = normal_rx.recv() => handle_normal(normal.unwrap())
     _ = timeout(1.secs()) => send_heartbeat().await
 ```
 
