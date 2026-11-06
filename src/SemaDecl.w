@@ -2977,7 +2977,25 @@ impl Sema:
         if impl_type_tid != 0:
             self.named_types.insert(self.syms.self_type, impl_type_tid)
         self.install_trait_default_type_args(trait_sym, impl_node, saved_subst_syms, saved_subst_tys)
+        // The trait's type node resolves in the trait's own module (#3047):
+        // its operand types (`IndexSpec` in `MultiIndex`'s signature) are
+        // that module's to name, whatever the impl's module imports — an
+        // impl that leaves the types to the trait (D140) never spells them.
+        // Saved by clone, not by copy: the pinned seed binds `let s: str =
+        // self.field` as a view of the field (the tree's compiler copies,
+        // D111), so a plain save followed the switch and the restore put the
+        // trait's module back (seed-bound; a plain copy once a post-D111
+        // seed is pinned).
+        let saved_module_path: str = with_str_clone_ref(self.current_module_path)
+        let saved_file_id = self.local_file_id
+        let saved_module_has_ci = self.current_module_has_ci
+        let trait_module: str = self.node_module_path_view(type_node)
+        if trait_module.len() > 0 and trait_module != self.current_module_path:
+            self.update_source_context_path(trait_module)
         let resolved = self.resolve_type_expr(type_node) as i32
+        self.current_module_path = saved_module_path
+        self.local_file_id = saved_file_id
+        self.current_module_has_ci = saved_module_has_ci
         if impl_type_tid != 0:
             if saved_self != 0:
                 self.named_types.insert(self.syms.self_type, saved_self)

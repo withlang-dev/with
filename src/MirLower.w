@@ -2404,7 +2404,9 @@ impl MirBuilder:
             let base_sym = self.sema.get_generic_inst_base(resolved)
             if base_sym == self.sema.syms.list or base_sym == self.sema.syms.hashmap:
                 return false
-        if self.sema.type_is_index_place(base_ty):
+        // §11.7 (#3046): `IndexGet` reads through the same recorded `get`;
+        // a store reaches here only for a type Sema classified as a place.
+        if self.sema.type_is_user_indexable(base_ty):
             return true
         false
 
@@ -16821,7 +16823,10 @@ impl MirBuilder:
     mut fn prepare_anonymous_body_of(node: i32, body_node: i32, ty: i32, is_async: bool) -> i32:
         let body_sym = self.pool.intern(f"$anonymous${self.body.fn_sym}${node}")
         let captures: List[i32] = List.new()
-        if is_async:
+        // §14.6 (#3044): an `async:` block's captures are Sema's summary, in
+        // its order (codegen indexes the consumed-capture fact by it). A body
+        // spawned without one (a select arm, §14.10) names what it uses.
+        if is_async and not self.sema.has_closure_capture_summary(node):
             for i in 0..self.bind_syms.len():
                 let sym = self.bind_syms[i]
                 let sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(sym))
@@ -16842,14 +16847,20 @@ impl MirBuilder:
         // pointer (reset-on-move inside the body). This frame's scope-exit
         // drop of the local must therefore keep its null guard — Stage 4
         // elides the guard for a local never recorded as moved.
-        if not is_async:
+        // An `async:` block takes a consumed capture the same way (§14.6):
+        // codegen resets the outer slot, so its drop keeps the guard.
+        let has_summary = self.sema.has_closure_capture_summary(node)
+        if not is_async or has_summary:
             for ci in 0..captures.len() as i32:
                 let consumed_local = self.lookup_local(captures[ci])
                 if consumed_local < 0 or self.sema.type_needs_drop_frozen(self.local_type(consumed_local)) == 0:
                     continue
                 // D63: `move ||` takes the value at creation — codegen resets
                 // the outer slot — so its drop keeps the guard too.
-                if not self.sema.closure_capture_by_place(node, ci) or self.sema.closure_capture_consumes(node, ci):
+                if is_async:
+                    if self.sema.closure_capture_consumes(node, ci):
+                        self.body.mark_local_ever_moved(consumed_local)
+                else if not self.sema.closure_capture_by_place(node, ci) or self.sema.closure_capture_consumes(node, ci):
                     self.body.mark_local_ever_moved(consumed_local)
         let capture_sources: List[ClosureCaptureSource] = List.new()
         if not is_async:
@@ -16873,6 +16884,10 @@ impl MirBuilder:
                 child.bind_local(sym, capture_local)
                 child.body.anonymous_capture_sources.push(local)
                 child.body.anonymous_capture_kinds.push(MIR_CAPTURE_LOCAL)
+                // A consumed capture is the block's value: it drops what the
+                // body did not move on, once, in the block (§14.6, #3044).
+                if has_summary and self.sema.closure_capture_consumes(node, ci as i32) and not self.copy_is_bits(capture_ty):
+                    child.schedule_drop(capture_local, DropKind.DK_VALUE)
             else:
                 child.bind_capture(sym, capture_sources[ci])
         for i in 0..param_count:

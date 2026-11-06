@@ -12,6 +12,9 @@ use std.engines.mlib.facade_shapes
 use std.collections.mlib_slot.MlibSlot
 use std.collections.mlib_slot.MlibSlotPrefix
 use std.collections.mlib_slot.mlib_slot_prefix
+// §11.7 (#3047): IndexSpec is declared beside MultiIndex in std.traits;
+// `use std.collections.IndexSpec` keeps resolving.
+pub use std.traits.IndexSpec
 
 /// A growable array. Create with `List.new()`, add with `.push()`,
 /// read with `.get()`. Supports iteration via `.iter()`.
@@ -1068,18 +1071,6 @@ impl[A, B, T] Iter[T] for ChainIter[A, B, T]:
 
 impl[I, T] Iter[T] for StepByIter[I, T]:
     mut fn next() -> Option[T]: self.next()
-
-/// Index specification for multi-dimensional indexing.
-/// Used by the MultiIndex trait. kind: 0=scalar, 1=slice, 2=ellipsis, 3=newaxis.
-pub type IndexSpec {
-    pub kind: i32,
-    pub start: i64,
-    pub stop: i64,
-    pub step: i64,
-    pub has_start: bool,
-    pub has_stop: bool,
-    pub has_step: bool,
-}
 
 // §13.3 (#1746): `it.collect[List]()` on any Iter[T] implementor, the one
 // adapter that builds a collection, so it lives with List rather than in

@@ -8942,7 +8942,10 @@ impl Sema:
         // caller's to get back, as ensure_body_typed keeps them.
         if state == 0 and self.top_level_let_current >= 0:
             let saved_file_id = self.local_file_id
-            let saved_module_path: str = self.current_module_path
+            // Cloned, not copied: under the pinned seed a plain copy of the
+            // field is a view of it, and the restore below is a no-op
+            // (resolve_trait_default_method_type; seed-bound).
+            let saved_module_path: str = with_str_clone_ref(self.current_module_path)
             let saved_module_has_ci = self.current_module_has_ci
             let caller_env = self.enter_callee_lexical_env()
             self.check_top_level_let_value(di)

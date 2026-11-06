@@ -9868,6 +9868,11 @@ impl Sema:
     // 1 when calling the closure moves capture `idx` out of its place (§12.4:
     // the body consumes or returns it) — MirLower keeps that local's drop
     // guard, since the body blanks the place through the capture (#1481).
+    // Whether a capture summary was recorded for this callable node (a
+    // closure's, a Gen loop body's, an `async:` block's); a count of zero
+    // alone cannot tell "no captures" from "never recorded".
+    fn has_closure_capture_summary(node: i32) -> bool: self.closure_capture_summary_starts.contains(node)
+
     fn closure_capture_consumes(closure_node: i32, idx: i32) -> bool:
         if (self.closure_capture_summary_eff(closure_node, idx) & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: true else: false
 
