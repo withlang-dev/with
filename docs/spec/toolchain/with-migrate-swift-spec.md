@@ -253,7 +253,7 @@ struct Point {
 }
 
 // With
-type Point = {
+type Point {
     x: f64,
     y: f64,
 }
@@ -263,7 +263,7 @@ impl Point:
         sqrt(pow(self.x - other.x, 2) + pow(self.y - other.y, 2))
 ```
 
-Struct → `type Name = { fields }`. Methods extracted to `impl`
+Struct → `type Name { fields }`. Methods extracted to `impl`
 block. Implicit `self` → explicit `self: &Self`.
 
 #### Memberwise initializer
@@ -470,7 +470,7 @@ struct Circle {
 }
 
 // With
-type Circle = {
+type Circle {
     radius: f64,
 }
 
@@ -512,7 +512,7 @@ func largest<T: Comparable>(in array: [T]) -> T { ... }
 
 // With
 fn swap[T](a: T, b: T) -> (T, T): ...
-type Stack[T] = { ... }
+type Stack[T] { ... }
 fn largest[T: Ord](array: &List[T]) -> T: ...
 ```
 
@@ -682,11 +682,11 @@ class Dog: Animal {
 // Options:
 //   1. Convert to struct + trait:
 //        trait Animal: fn speak(self: &Self)
-//        type Dog = { name: str }
+//        type Dog { name: str }
 //        impl Animal for Dog: fn speak(self: &Self): print("woof")
 //   2. If identity semantics needed: use Handle[T] + SlotMap
 //   3. If shared mutation needed: use with lock.write() as mut data: ...
-type Dog = {
+type Dog {
     name: str,
 }
 // TODO: restructure class hierarchy as traits
@@ -718,11 +718,11 @@ class Car: Vehicle {
 trait Describable:
     fn describe(self: &Self) -> str
 
-type Vehicle = { speed: f64 }
+type Vehicle { speed: f64 }
 impl Describable for Vehicle:
     fn describe(self: &Self) -> str: f"speed: {self.speed}"
 
-type Car = { speed: f64, doors: i32 }
+type Car { speed: f64, doors: i32 }
 impl Describable for Car:
     fn describe(self: &Self) -> str: f"speed: {self.speed}, doors: {self.doors}"
 ```
@@ -795,7 +795,7 @@ actor BankAccount {
 // With uses fiber-safe types and explicit synchronization.
 
 // @migrate: actor — use Mutex or channel-based pattern:
-type BankAccount = {
+type BankAccount {
     balance: f64,
 }
 // Wrap in Mutex for thread-safe access:

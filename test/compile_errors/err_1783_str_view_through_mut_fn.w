@@ -1,7 +1,7 @@
 //! expect-check-fail: view `ns` may originate from `s`, which no longer lives here
 
 // #1783: a `&str` view of a local stored through a `mut fn`.
-type Names = ephemeral { v: List[&str] }
+type Names ephemeral { v: List[&str] }
 impl Names:
     mut fn keep(s: &str): self.v.push(s)
 fn main:

@@ -11,12 +11,12 @@ impl Drop for Db:
     move fn drop():
         if self.live: print("close")
 
-type S = ephemeral { parent: &Db, n: i32, live: bool }
+type S ephemeral { parent: &Db, n: i32, live: bool }
 impl Drop for S:
     move fn drop():
         if self.live: print("finalize")
 
-type V = ephemeral { origin: &S, n: i32 }
+type V ephemeral { origin: &S, n: i32 }
 
 impl S:
     fn view() -> Option[V]: Some(V { origin: self, n: self.n })

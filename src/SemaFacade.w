@@ -3583,7 +3583,7 @@ impl Sema:
                         shown = "&" ++ shown
                         holds_parent = true
                 fields = fields ++ (if fi > 0: ", " else: "") ++ fname ++ ": " ++ shown
-            fix = f"type {cname} = ephemeral {{ {fields} }}"
+            fix = f"type {cname} ephemeral {{ {fields} }}"
         let what = if cname.len() > 0: f"'{cname}' stores" else: "this stores"
         let layout = if holds_parent: f"; a type holding a {parents} and a '{rname}' that depends on it is a self-referential layout" else: ""
         var diag = Diagnostic.err(f"{what} a '{rname}', which depends on its {parents} and cannot be stored in a non-ephemeral type{layout} (§16.2b.6)", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })

@@ -332,7 +332,7 @@ const Point = struct {
 };
 
 // With
-type Point = {
+type Point {
     x: f64,
     y: f64,
 }
@@ -523,14 +523,14 @@ const Packed = packed struct {
 
 // With
 @[extern]
-type Header = {
+type Header {
     magic: u32,
     version: u16,
     flags: u16,
 }
 
 // @migrate: packed struct with bit-width fields — needs manual bitfield handling
-type Packed = {
+type Packed {
     a: u8,   // @migrate: was u3
     b: u8,   // @migrate: was u5
 }
@@ -611,7 +611,7 @@ fn Matrix(comptime T: type, comptime rows: usize, comptime cols: usize) type {
 // With
 // @migrate: comptime type function — no direct equivalent.
 // With options:
-//   1. Use generic type: type Matrix[T] = { data: List[T], rows: i32, cols: i32 }
+//   1. Use generic type: type Matrix[T] { data: List[T], rows: i32, cols: i32 }
 //   2. Use comptime if for a fixed set of instantiations
 // Original Zig code preserved as comment below.
 ```

@@ -28,7 +28,7 @@ c facade dbf:
     fn st_step
         lend
 
-type StatementCache = ephemeral {
+type StatementCache ephemeral {
     db: &Database,
     ids: List[i32],
     stmts: List[Statement],
@@ -50,7 +50,7 @@ impl StatementCache:
 
     fn prepared(): self.stmts.len()
 
-type App = ephemeral { db: &Database, stmt: Statement }
+type App ephemeral { db: &Database, stmt: Statement }
 
 fn witness(l: Log) -> str:
     var out = ""

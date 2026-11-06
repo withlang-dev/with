@@ -18,7 +18,7 @@ impl Drop for Tok:
 
 type Bag[T] { items: List[T] }
 
-type BagIter[T] = ephemeral { items: &List[T], i: i32 }
+type BagIter[T] ephemeral { items: &List[T], i: i32 }
 
 impl[T] BagIter[T]:
     mut fn next() -> Option[&T]:

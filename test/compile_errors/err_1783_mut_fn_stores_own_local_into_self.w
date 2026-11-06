@@ -3,7 +3,7 @@
 // #1783 (§21.1): the receiver is the caller's place (D21) and outlives the
 // call; a view of the method's own local stored into it would dangle the
 // moment the method returns.
-type Holder = ephemeral { v: List[&i32] }
+type Holder ephemeral { v: List[&i32] }
 impl Holder:
     mut fn bad():
         let n = 5

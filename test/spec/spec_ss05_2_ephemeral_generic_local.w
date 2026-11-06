@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-type LocalToken = ephemeral {
+type LocalToken ephemeral {
     text: StrView,
 }
 

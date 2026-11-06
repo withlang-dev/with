@@ -1,6 +1,6 @@
 // Spec test: Section 5 — Ephemeral Types.
 
-type ExplicitView = ephemeral {
+type ExplicitView ephemeral {
     view: StrView,
 }
 

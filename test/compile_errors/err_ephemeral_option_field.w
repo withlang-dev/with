@@ -1,6 +1,6 @@
 //! expect-check-fail: ephemeral values cannot be stored in non-ephemeral structs
 
-type OptionToken = ephemeral {
+type OptionToken ephemeral {
     text: StrView,
 }
 

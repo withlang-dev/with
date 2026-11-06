@@ -5,7 +5,7 @@
 // into the caller's `H`, as `Mutex.set` is. A view of the local `x` there
 // would dangle once `keep` returns.
 use std.sync
-type H = ephemeral { slot: Mutex[Option[&i32]] }
+type H ephemeral { slot: Mutex[Option[&i32]] }
 fn keep(h: &H):
     let x = 5
     with h.slot.enter_mut() as mut v:

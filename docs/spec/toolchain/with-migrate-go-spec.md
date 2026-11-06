@@ -128,14 +128,14 @@ type Point struct {
 }
 
 // With
-type Point = {
+type Point {
     x: f64,
     y: f64,
 }
 // @migrate: exported fields X,Y lowercased to x,y — With uses lowercase fields
 ```
 
-Go struct → With `type Name = { fields }`. Go uses PascalCase
+Go struct → With `type Name { fields }`. Go uses PascalCase
 for exported fields; With uses lowercase. Lowercase all field
 names automatically.
 
@@ -476,7 +476,7 @@ Third-party imports → flag.
 func PublicFunc() {}      →  pub fn public_func:   // @migrate: renamed to snake_case
 func privateFunc() {}     →  fn private_func:
 
-type PublicStruct struct { →  pub type PublicStruct = {
+type PublicStruct struct { →  pub type PublicStruct {
     ExportedField int         pub exported_field: i32,
     unexported    int         unexported: i32,
 }
@@ -639,7 +639,7 @@ var ErrNotFound = errors.New("not found")
 fmt.Errorf("failed to open %s: %w", path, err)
 
 // With
-type NotFoundError = {
+type NotFoundError {
     name: str,
 }
 
@@ -690,14 +690,14 @@ type Dog struct {
 }
 
 // With
-type Animal = {
+type Animal {
     name: str,
 }
 
 impl Animal:
     fn speak(self: &Self) -> str: "..."
 
-type Dog = {
+type Dog {
     animal: Animal,    // @migrate: embedding → explicit field
     breed: str,
 }
@@ -778,7 +778,7 @@ func process(data interface{}) {
 // With
 // @migrate: interface{}/any — With has no universal base type.
 // Options:
-//   1. Use a discriminant enum: type Data = | Str(str) | Int(i32) | Other
+//   1. Use a discriminant enum: `enum Data:` with variants Str(str), Int(i32), Other
 //   2. Use a trait: fn process(data: &dyn Processable)
 //   3. Use generics: fn process[T](data: T)
 // Choose based on the actual set of types used.

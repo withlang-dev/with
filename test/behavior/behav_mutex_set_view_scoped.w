@@ -36,7 +36,7 @@ c facade engines:
     fn ctx_total
         of Tally
 
-type Pair = ephemeral { value: &i32, slot: Mutex[Option[&i32]] }
+type Pair ephemeral { value: &i32, slot: Mutex[Option[&i32]] }
 
 fn remember_own(p: &Pair):
     p.slot.set(Some(p.value))

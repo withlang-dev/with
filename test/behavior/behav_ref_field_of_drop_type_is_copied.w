@@ -8,10 +8,10 @@ type Db { n: i32, live: bool }
 impl Drop for Db:
     move fn drop():
         if self.live: print(f"close db {self.n}")
-type Stmt = ephemeral { parent: &Db, n: i32 }
+type Stmt ephemeral { parent: &Db, n: i32 }
 impl Stmt:
     fn step(): self.parent.n * 100 + self.n
-type Cache = ephemeral { db: &Db, stmts: List[Stmt] }
+type Cache ephemeral { db: &Db, stmts: List[Stmt] }
 impl Cache:
     mut fn step(id: i32) -> i32:
         self.stmts.push(Stmt { parent: self.db, n: id })

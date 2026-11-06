@@ -21,7 +21,7 @@ c facade engines:
         callback param step argv param 2 paired with argc param 1 as &[Arg]
         user_data from ctx_user_data as &U
 
-type Keep = ephemeral { r: &i32 }
+type Keep ephemeral { r: &i32 }
 
 fn step(t: Tally, args: &[Arg], k: &Keep):
     print(f"{*k.r}")

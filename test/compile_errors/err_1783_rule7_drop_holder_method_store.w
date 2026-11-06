@@ -3,7 +3,7 @@
 // #1783 (§21.1 rule 7): `h` has a destructor that reads its views and is
 // declared before `n`, so it drops after `n`; the view `keep` stored into it
 // is read by that drop.
-type Holder = ephemeral { v: List[&i32] }
+type Holder ephemeral { v: List[&i32] }
 impl Drop for Holder:
     move fn drop(): print(f"drop {self.v.len32()}")
 impl Holder:

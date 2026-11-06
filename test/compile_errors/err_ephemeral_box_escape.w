@@ -4,7 +4,7 @@
 // value into Box.new — the heap copy would outlive the borrowed storage.
 
 use std.box.Box
-type StrView = ephemeral { s: &str }
+type StrView ephemeral { s: &str }
 
 fn main:
     let owned = "hello"

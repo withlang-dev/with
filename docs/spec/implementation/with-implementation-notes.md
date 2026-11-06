@@ -433,7 +433,7 @@ for non-local control flow.
 The desugared closure returns a tagged result:
 
 ```
-enum WithFlow[R, Ret, Err] =
+enum WithFlow[R, Ret, Err]:
     | Complete(R)        // normal completion
     | Return(Ret)        // non-local return from enclosing function
     | Break              // break from enclosing loop
@@ -489,7 +489,7 @@ gen fn countdown(from: i32) -> i32:
 Compiles to a struct + `next()` method:
 
 ```
-type CountdownState = {
+type CountdownState {
     state: u8        // which yield point we're at
     i: i32           // captured local
 }
@@ -962,7 +962,7 @@ base expression's type implements `Drop`, record update syntax is a
 compile error:
 
 ```
-type FileWrapper = { fd: File, name: String }
+type FileWrapper { fd: File, name: String }
 impl Drop for FileWrapper
     fn drop(self: Self): close_file(self.fd)
 
@@ -1127,7 +1127,7 @@ Error messages are a primary UX concern. Every compile error should:
 error[E0301]: ephemeral value cannot be stored in struct
   --> src/main.w:15:5
    |
-15 |     type Bad = { view: StrView }
+15 |     type Bad { view: StrView }
    |                  ^^^^^^^^^^^^^ StrView is ephemeral
    |
    = help: use owned `String` or `BufSlice` instead
@@ -1439,7 +1439,7 @@ the dependency cost. Zig proved this approach works at scale.
 | `T*` | `*mut T` |
 | `const T*` | `*const T` |
 | `T[N]` | `[T; N]` (fixed-size array) |
-| `struct S` | `type S = { ... } with repr(C)` |
+| `struct S` | `type S { ... } with repr(C)` |
 | `union U` | `type U = union { ... } with repr(C)` |
 | `enum E` | Integer constants (C enums are ints) |
 | `typedef T name` | `type name = T` |
@@ -1568,7 +1568,7 @@ comptime if cfg.target_os == "linux" or cfg.target_os == "darwin":
 comptime else if cfg.target_os == "windows":
     use std.os.windows as platform
 
-pub type File = { handle: platform.FileHandle }
+pub type File { handle: platform.FileHandle }
 
 pub fn open(path: &str, mode: OpenMode) -> Result[File, IoError]:
     let raw = platform.open(path.as_cstr(), mode.to_flags())?
@@ -1584,7 +1584,7 @@ module std.os.posix
 use c_import("fcntl.h", link: "c")
 use c_import("unistd.h", link: "c")
 
-pub(crate) type FileHandle = { fd: i32 }
+pub(crate) type FileHandle { fd: i32 }
 
 pub(crate) fn open(path: &CStr, flags: i32) -> Result[FileHandle, IoError]:
     let fd = unsafe { c.open(path.as_ptr(), flags) }
@@ -2091,7 +2091,7 @@ properly cleaned up before starting new ones.
 ### 24.1 Architecture
 
 ```
-type Channel[T] = {
+type Channel[T] {
     buffer:    RingBuffer[T],   // bounded buffer
     senders:   WaitQueue,       // fibers blocked on send
     receivers: WaitQueue,       // fibers blocked on recv
@@ -2247,7 +2247,7 @@ capabilities not in bounds).
 
 ```
 @[derive(Serialize)]
-type User = { name: String, age: i32 }
+type User { name: String, age: i32 }
 
 // Equivalent to:
 comptime derive_serialize[User]()
@@ -2712,14 +2712,14 @@ For a type with `@[derive(Builder)]`:
 
 ```
 @[derive(Builder)]
-type Config = { host: str, port: i32 = 8080 }
+type Config { host: str, port: i32 = 8080 }
 ```
 
 The comptime function generates:
 
 1. A builder struct with `Option` wrappers for each field:
    ```
-   type ConfigBuilder = { host: Option[str], port: Option[i32] }
+   type ConfigBuilder { host: Option[str], port: Option[i32] }
    ```
 
 2. Chaining setter methods (by-value self):

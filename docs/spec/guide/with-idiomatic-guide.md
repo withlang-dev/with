@@ -1228,7 +1228,7 @@ wrapper with `unsafe` inside:
 ```
 // ✗ a hand-rolled wrapper: unsafe in application code, and the compiler
 //   knows nothing about the handle's lifetime
-type Database = { handle: *mut sqlite3 }
+type Database { handle: *mut sqlite3 }
 impl Drop for Database:
     move fn drop(): unsafe { sqlite3_close(self.handle) }
 

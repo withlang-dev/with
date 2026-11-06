@@ -47,7 +47,7 @@ let out =
     "// Embedded project templates for `with init`.\n" ++
     "// Generated from docs/spec/guide/with_for_ai.md by tools/gen_init_templates.w;\n" ++
     "// rerun that tool whenever the guide changes.\n\n" ++
-    "pub fn init_ai_guide_template -> str:\n" ++ body ++ "\n"
+    "fn init_ai_guide_template -> str:\n" ++ body ++ "\n"
 if write_file("src/InitTemplates.w", out) != 0:
     eprint("error: could not write src/InitTemplates.w")
     exit_code(1)
