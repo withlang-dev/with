@@ -5,7 +5,7 @@ enum TokenKind:
     Number
     String
 
-type Token = ephemeral {
+type Token ephemeral {
     text: StrView,
     kind: TokenKind,
     line: usize,

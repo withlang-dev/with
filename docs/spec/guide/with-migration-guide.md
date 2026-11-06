@@ -65,7 +65,7 @@ enum Shape {
 
 ```with
 // With
-type User = {
+type User {
     name: str,
     email: str,
     age: u32,
@@ -326,7 +326,7 @@ impl Counter {
 
 ```with
 // With
-type Counter = { count: u32 }
+type Counter { count: u32 }
 
 extend Counter
     fn new -> Counter: Counter { count: 0 }
@@ -378,7 +378,7 @@ let custom = Config { retries: 5, ..Config::default() };
 
 ```with
 // With — default field values (§4.3): declare defaults inline
-type Config = {
+type Config {
     timeout: u32 = 30,
     retries: u32 = 3,
     verbose: bool = false,
@@ -650,7 +650,7 @@ let updated = { user with name: "new_name", active: false }
 | `::` (path separator) | `.` |
 | `'a` (lifetimes) | (deleted — ephemeral system) |
 | `where T: Trait` | `[T: Trait]` in signature or `where T: Trait` |
-| `impl Default for Foo` + `..Default::default()` | Default field values: `type Foo = { x: i32 = 0 }`, `Foo {}` |
+| `impl Default for Foo` + `..Default::default()` | Default field values: `type Foo { x: i32 = 0 }`, `Foo {}` |
 | `thiserror` `#[from]` | `error AppError from IoError, DbError` |
 | `.unwrap_or(())` | `.unwrap_or()` (unit elision) |
 
@@ -684,7 +684,7 @@ const Shape = union(enum) {
 
 ```with
 // With
-type User = {
+type User {
     name: str,
     email: str,
     age: u32,
@@ -1061,7 +1061,7 @@ type Shape interface {
 
 ```with
 // With
-type User = {
+type User {
     name: str,
     email: str,
     age: i32,
@@ -1094,7 +1094,7 @@ config := Config{Port: 8080}  // other fields are zero
 
 ```with
 // With — default field values declare what "default" means
-type Config = {
+type Config {
     host: str = "localhost",
     port: i32 = 8080,
     retries: i32 = 3,
@@ -1235,7 +1235,7 @@ func printAnything(s Stringer) {
 trait Stringer
     fn to_string(self: &Self) -> str
 
-type User = { name: str }
+type User { name: str }
 
 impl Stringer for User {
     fn to_string(self: &User) -> str: self.name
@@ -1520,10 +1520,10 @@ let clone = shared.clone()   // both point to same data
 | `append(s, x)` | `s.push(x)` |
 | `for i, v := range x` | `for (i, v) in x.enumerate():` |
 | `fmt.Println(x)` | `println("{x}")` |
-| `struct{ }` | `type Foo = { }` |
+| `struct{ }` | `type Foo { }` |
 | `*T` (pointer) | `&T` (reference) or owned `T` |
 | `new(T)` | `Box.new(T { ... })` |
-| Zero-initialized fields | Default field values: `type Foo = { x: i32 = 0 }` |
+| Zero-initialized fields | Default field values: `type Foo { x: i32 = 0 }` |
 | `(value, error)` returns | `Result[T, E]` |
 | `errors.New("msg")` | `error AppError from ...` + `?` propagation |
 
@@ -1592,7 +1592,7 @@ auto buf = std::make_unique<Buffer>();
 
 ```with
 // With
-type Buffer = {
+type Buffer {
     data: List[u8],
 }
 
@@ -1660,7 +1660,7 @@ public:
 
 ```with
 // With
-type Entity = { id: i32 }
+type Entity { id: i32 }
 
 extend Entity
     fn new(id: i32) -> Entity: Entity { id }
@@ -1786,7 +1786,7 @@ class ViewModel {
 
 ```with
 // With
-type User = {
+type User {
     name: str,
     email: str,
     age: i32,
@@ -1798,7 +1798,7 @@ type Shape =
 
 // class → owned type (no ARC)
 // Default field values (§4.3) match Swift's property defaults:
-type ViewModel = {
+type ViewModel {
     items: List[Item] = List.new(),
 }
 let vm = ViewModel {}    // items defaults to empty List
@@ -2124,7 +2124,7 @@ let ref2 = service  // ARC: refcount = 3
 
 ```with
 // With — ownership, no refcount
-type Service = {
+type Service {
     db: Database,
     cache: Cache,
 }

@@ -3041,8 +3041,18 @@ impl Sema:
     // Nodes are appended children first, so a declaration's subtree is the ids
     // between the nearest declaration node below it and its own.
     mut fn prepare_body_order(count: i32):
+        // A preparation leaves the module context as it found it: it walks
+        // every declaration's module (update_module_context), and a caller
+        // mid-check — the evaluator's check_fn_body_before_eval — resolves
+        // names in its own module afterwards.
+        let saved_module_path: str = self.current_module_path
+        let saved_module_has_ci = self.current_module_has_ci
         var decl_nodes: HashMap[i32, i32] = sema_new_map_i32_i32()
         for di in 0..count: decl_nodes.insert(self.ast.get_decl(di), di)
+        // Declarations appended since the last preparation (a comptime
+        // transform's, a lazily loaded module's) get slots; a body already
+        // checked keeps its state, so re-preparing never checks it twice.
+        let prior_state = move self.body_order_state
         self.body_order_state = List.new()
         self.body_order_lower = List.new()
         self.body_typed_next = List.new()
@@ -3053,7 +3063,7 @@ impl Sema:
             // disjoint, so all of them together are one pass over the pool.
             var below = decl - 1
             while below > 0 and not decl_nodes.contains(below): below = below - 1
-            self.body_order_state.push(0)
+            self.body_order_state.push(if di < prior_state.len(): prior_state[di] else: 0)
             self.body_order_lower.push(below)
             self.body_typed_next.push(-1)
         self.body_decl_by_fn = sema_new_map_i32_i32()
@@ -3079,6 +3089,8 @@ impl Sema:
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.fn_view_origin_count(decl) > 0 and not self.decl_is_lazy_skipped(di):
                 self.update_module_context(di)
                 self.resolve_declared_view_origins(decl, self.ast.fn_decl_body_is_interface(decl))
+        self.current_module_path = saved_module_path
+        self.current_module_has_ci = saved_module_has_ci
 
     // The name a call spells a declaration by: a method's parsed name is
     // `Owner.m`, called as `self.m()` or `Owner.m()`; a function's is
@@ -3107,15 +3119,7 @@ impl Sema:
         let meta = self.ast.find_fn_meta(decl)
         if meta < 0 or self.ast.fn_meta_ret(meta) != 0 or self.ast.fn_meta_tp_count(meta) != 0 or self.fn_decl_is_entry_point(decl) != 0:
             return
-        let saved_file_id = self.local_file_id
-        let saved_module_path = move self.current_module_path
-        let saved_module_has_ci = self.current_module_has_ci
-        let caller_env = self.enter_callee_lexical_env()
-        self.check_decl_body_in_order(di)
-        self.leave_callee_lexical_env(caller_env)
-        self.local_file_id = saved_file_id
-        self.current_module_path = saved_module_path
-        self.current_module_has_ci = saved_module_has_ci
+        self.check_decl_body_from_use(di)
 
     mut fn check_decl_body_in_order(di: i32):
         if self.body_order_state[di] != 0: return
@@ -6244,6 +6248,39 @@ impl Sema:
     // context, so `var v = List.new()` takes its element type from its uses
     // (D93) exactly as at runtime. Once per declaration; check_bodies skips
     // it afterwards.
+    // The evaluator reaching a body before its turn in the check order (fold
+    // order, #767): Sema checks it now, so the facts it owns about that body
+    // (§4.9a's `value_to_option_nodes`, the checked types) exist when the
+    // body runs. A body already checked, or being checked, is left to that
+    // pass.
+    mut fn check_fn_body_before_eval(fn_node: i32):
+        if not self.bodies_checkable: return
+        let di = self.find_decl_index(fn_node)
+        if di < 0: return
+        // A declaration appended after the order was prepared (a lazily
+        // loaded module's) has no slot yet: the order is prepared again,
+        // keeping every state recorded so far.
+        if di >= self.body_order_state.len():
+            self.prepare_body_order(self.ast.decl_count())
+            if di >= self.body_order_state.len(): return
+        if self.body_order_state[di] != 0: return
+        self.check_decl_body_from_use(di)
+
+    // A body checked out of turn, from inside another body's check: its
+    // callees first (an unannotated helper's return type), in the callee's
+    // own lexical environment, with the caller's file, module and locals
+    // restored after.
+    mut fn check_decl_body_from_use(di: i32):
+        let saved_file_id = self.local_file_id
+        let saved_module_path = move self.current_module_path
+        let saved_module_has_ci = self.current_module_has_ci
+        let caller_env = self.enter_callee_lexical_env()
+        self.check_decl_body_in_order(di)
+        self.leave_callee_lexical_env(caller_env)
+        self.local_file_id = saved_file_id
+        self.current_module_path = saved_module_path
+        self.current_module_has_ci = saved_module_has_ci
+
     mut fn check_fn_body_on_demand(fn_node: i32):
         let di = self.find_decl_index(fn_node)
         if di < 0 or self.bodies_checked_on_demand.contains(di): return

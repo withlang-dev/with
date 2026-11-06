@@ -2698,6 +2698,10 @@ type Sema {
     ci_omitted_symbols: HashMap[str, str], // C name → omission reason
     ci_modules: HashMap[i32, i32],   // module-path-sym → 1 for modules that have c_import
     scoping_active: i32,             // 1 when multi-module c_import scoping is active
+    // True once declarations are collected: a body may be checked out of
+    // turn (check_fn_body_before_eval). Before that, the evaluator runs on
+    // declarations alone and checks none.
+    bodies_checkable: bool,
     current_module_has_ci: i32,      // 1 if current module has c_import declarations
     // Reachable-comptime-error traversal accumulators (formerly free-fn
     // &mut HashMap params). Reset on each entry to check_reachable_comptime_errors.
@@ -4453,6 +4457,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         ci_omitted_symbols: HashMap.new(),
         ci_modules: sema_new_map_i32_i32(),
         scoping_active: 0,
+        bodies_checkable: false,
         current_module_has_ci: 0,
         reachable_seen: sema_new_map_i32_i32(),
         reachable_visiting: sema_new_map_i32_i32(),
@@ -11234,6 +11239,7 @@ impl Sema:
             sema_profile_report("method_origins", t)
             t = with_clock_nanos()
         self.collect_declarations()
+        self.bodies_checkable = true
         if profile:
             sema_profile_report("collect_declarations", t)
             t = with_clock_nanos()

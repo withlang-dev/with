@@ -60,7 +60,7 @@ Variables, struct fields, and function parameters can specify custom
 alignment using the `align` attribute:
 
 ```
-type CacheLine = {
+type CacheLine {
     @[align(64)]
     data: [64]u8,
 }

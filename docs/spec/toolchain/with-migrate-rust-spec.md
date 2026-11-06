@@ -225,7 +225,7 @@ struct Point {
 }
 
 // With
-type Point = {
+type Point {
     x: f64,
     y: f64,
 }
@@ -243,7 +243,7 @@ type Shape =
     | Rect { w: f64, h: f64 }
 ```
 
-Struct → `type Name = { fields }`. Enum → `type Name = | Variant | ...`.
+Struct → `type Name { fields }`. Enum → `enum Name:` with one variant per line.
 
 ---
 
@@ -460,12 +460,12 @@ struct Parser<'a> {
 }
 
 // With
-type Parser = {
+type Parser {
     // @migrate: STORED REFERENCE — With does not allow references in structs.
     // Options:
-    //   1. Make this an ephemeral type: type Parser = ephemeral { source: StrView, pos: usize }
-    //   2. Own the data: type Parser = { source: str, pos: usize }
-    //   3. Use offset-based: type Parser = { source_len: usize, pos: usize }
+    //   1. Make this an ephemeral type: type Parser ephemeral { source: StrView, pos: usize }
+    //   2. Own the data: type Parser { source: str, pos: usize }
+    //   3. Use offset-based: type Parser { source_len: usize, pos: usize }
     source: str,    // changed from &'a str — verify ownership
     pos: usize,
 }

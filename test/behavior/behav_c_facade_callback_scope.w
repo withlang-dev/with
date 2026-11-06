@@ -22,7 +22,7 @@ c facade dbc:
 type Ctx { base: i32 }
 fn on(c: &Ctx, n: c_int) -> c_int: c.base + n
 
-type View = ephemeral { db: &Database, base: i32 }
+type View ephemeral { db: &Database, base: i32 }
 fn reenter(v: &View, n: c_int) -> c_int: v.db.total() + v.base + n
 
 fn main:

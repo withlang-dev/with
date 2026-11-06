@@ -25,7 +25,7 @@ c facade engines:
     fn ctx_add
         of Tally
 
-type Keeper = ephemeral { slot: Mutex[Option[Tally]] }
+type Keeper ephemeral { slot: Mutex[Option[Tally]] }
 
 fn step(t: Tally, n: c_int, keep: &Keeper):
     keep.slot.set(Some(t))

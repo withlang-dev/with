@@ -2003,8 +2003,7 @@ impl Parser:
             return self.finish_type_decl(node)
 
         if self.peek() == TokenKind.TK_L_BRACE:
-            if is_ephemeral == 0:
-                self.emit_legacy_struct_decl_error()
+            self.emit_legacy_struct_decl_error()
             let extra_start = self.parse_struct_body()
             self.pool.add_extra(is_pub)
             self.pool.add_extra(tp_start)

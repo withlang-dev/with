@@ -66,7 +66,7 @@
 // constructor, and the product is an ephemeral struct holding a view of each
 // parent it depends on (facade_render_deps below):
 //
-//     type Statement = ephemeral { parent: &Database, repr: *mut st, live: bool }
+//     type Statement ephemeral { parent: &Database, repr: *mut st, live: bool }
 //     fn Statement.db_prepare(d: &Database, sql: str) -> (c_int, Option[Statement]):
 //         var slot: *mut st = null
 //         let status = unsafe { db_prepare(d.repr, sql, &raw mut slot) }
@@ -336,7 +336,7 @@ fn facade_render_text_view(pool: &AstPool, intern: &InternPool, resource: i32) -
 // constructor — with the lends hosted on it (stated `of` it, or on a
 // representation it alone wraps, as for a resource):
 //
-//     type Context = ephemeral { repr: *mut sqlite3_context }
+//     type Context ephemeral { repr: *mut sqlite3_context }
 //     impl Context:
 //         fn result_int(v: c_int): unsafe { sqlite3_result_int(self.repr, v) }
 //
@@ -353,7 +353,7 @@ fn facade_render_handle(pool: &AstPool, intern: &InternPool, ci: &List[i32], ite
     // (verify_facade_handle); nothing is rendered for it.
     if not facade_render_unalias(pool, intern, repr_text).starts_with("*"):
         return ""
-    var out = "type " ++ name ++ " = ephemeral { repr: " ++ repr_text ++ " }\n"
+    var out = "type " ++ name ++ " ephemeral { repr: " ++ repr_text ++ " }\n"
     // A vector of it a callback is passed (D76): the slice the generated
     // wrapper makes of C's `T **` and count (facade_render_wrapper).
     if facade_render_handle_sliced(pool, intern, name):
@@ -576,7 +576,7 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
 // non-destroying, non-consuming ones) over the same `repr` field, and none
 // of R's destroyers or Drop:
 //
-//     type BorrowedDatabase = ephemeral { origin: &Statement, repr: *mut sqlite3 }
+//     type BorrowedDatabase ephemeral { origin: &Statement, repr: *mut sqlite3 }
 //     impl BorrowedDatabase:
 //         fn sqlite3_errmsg() -> *const i8:
 //             unsafe { sqlite3_errmsg(self.repr) }
@@ -1263,7 +1263,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // outliving, or being stored past, what it depends on, drops it before
     // its parents, and refuses a parent's move or destruction while it lives.
     // No reference count or generation check is added (ruling §29).
-    var out = if deps.slot_res.len() > 0: "type " ++ name ++ " = ephemeral { " ++ facade_render_dep_fields(pool, intern, deps) ++ "repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n" else: "type " ++ name ++ " { repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n"
+    var out = if deps.slot_res.len() > 0: "type " ++ name ++ " ephemeral { " ++ facade_render_dep_fields(pool, intern, deps) ++ "repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n" else: "type " ++ name ++ " { repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n"
     if drop_fn != 0:
         let drop_call = facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned))
         // `abandon <fn>` (§16.2b.9): the `callbacks none` abandonment path

@@ -9,7 +9,7 @@ type Counter { n: i32 }
 impl Counter:
     mut fn bump(): self.n += 1
 
-type Holder = ephemeral { counter: &Counter }
+type Holder ephemeral { counter: &Counter }
 
 impl Holder:
     mut fn go(): self.counter.bump()

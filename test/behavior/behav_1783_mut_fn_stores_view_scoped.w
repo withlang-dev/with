@@ -9,13 +9,13 @@
 // never read after the local dies and has no destructor; a holder declared
 // after its origin; and a `Drop` holder declared after the local it views
 // (rule 7: it drops first).
-type Holder = ephemeral { v: List[&i32], r: Option[&i32] }
+type Holder ephemeral { v: List[&i32], r: Option[&i32] }
 impl Holder:
     mut fn keep(x: &i32):
         self.v.push(x)
         self.r = Some(x)
 
-type Counted = ephemeral { v: List[&i32] }
+type Counted ephemeral { v: List[&i32] }
 impl Drop for Counted:
     move fn drop(): print(f"drop {self.v.len32()}")
 impl Counted:

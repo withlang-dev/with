@@ -6,7 +6,7 @@
 // `Box.new(view)` would, and was accepted.
 use std.box
 
-type Keep = ephemeral { r: &i32 }
+type Keep ephemeral { r: &i32 }
 
 fn main:
     let local = 5

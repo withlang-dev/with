@@ -249,7 +249,7 @@ Each block has:
   to next block)
 
 ```
-type BasicBlock = {
+type BasicBlock {
     id: i32,
     label: str,          // "" if unlabeled
     stmts: List[Cursor],  // statement cursors in this block
@@ -682,7 +682,7 @@ c_import("<string.h>")
 
 // ── Types ──────────────────────────────────────────────
 
-type FooContext = {
+type FooContext {
     buffer: *mut u8,
     length: i32,
     flags: u32,

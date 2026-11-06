@@ -120,7 +120,7 @@ enum ControlTargetKind: i32:
     CT_LOOP = 1
     CT_BLOCK = 2
 
-type MirBuilder = ephemeral {
+type MirBuilder ephemeral {
     body: MirBody,
     anonymous_bodies: List[MirBody],
     cur_bb: BlockId,
@@ -9172,6 +9172,12 @@ impl MirBuilder:
         self.finish_stmt_temp_frame(frame)
         item_place
 
+    // The operand that hands a stepped payload (a plain, unscheduled temp
+    // from extract_stepped_option_payload) to its one consumer.
+    mut fn stepped_item_operand(item_place: i32, elem_ty: i32) -> i32:
+        let kind = if self.type_needs_value_drop(elem_ty): OperandKind.OK_MOVE else: OperandKind.OK_COPY
+        self.body.new_operand(kind, item_place)
+
     mut fn lower_owned_for_pattern(pat_or_sym: i32, item_place: i32, elem_ty: i32, owns_item: bool, span: i32):
         let pat_frame = self.push_stmt_temp_frame()
         self.lower_pattern(pat_or_sym, item_place)
@@ -15535,7 +15541,9 @@ impl MirBuilder:
         var mapper_op: i32 = 0
         var wrapper_ty = recv_elem_ty
         if lowering == MethodLowering.ListTraverse:
-            mapper_op = self.lower_method_arg_with_expected(recv_type, self.sema.syms.traverse, self.ast.get_extra(arg_start), 0)
+            // The closure is called once per element: a copy of the callee,
+            // never a move the loop's second iteration would repeat.
+            mapper_op = self.mapper_callee_operand(self.lower_method_arg_with_expected(recv_type, self.sema.syms.traverse, self.ast.get_extra(arg_start), 0))
             if wrapper_base == self.sema.syms.option:
                 wrapper_ty = self.sema.find_option_type_for(output_elem_ty)
             else:
@@ -15595,10 +15603,19 @@ impl MirBuilder:
         self.emit_list_get_into(recv_place, counter_place, recv_elem_place, span)
         var wrapper_place = recv_elem_place
         if lowering == MethodLowering.ListTraverse:
+            // The step's Option/Result lives in an UNSCHEDULED temp inside the
+            // iteration's own stmt frame: its payload moves out below
+            // (extract_stepped_option_payload), so nothing is left to drop at
+            // the loop's exit — a scheduled temp written once per iteration is
+            // Maybe-initialized on the zero-iteration path.
             let call_args: List[i32] = List.new()
             call_args.push(self.operand_for_place(recv_elem_place, recv_elem_ty))
+            let wrapper_frame = self.push_stmt_temp_frame()
             let wrapper_op = self.lower_call_with_operand_args(mapper_op, call_args, wrapper_ty, node)
-            wrapper_place = self.materialize_operand(wrapper_op, wrapper_ty, span)
+            let wrapper_local = self.new_temp(wrapper_ty)
+            wrapper_place = self.place_for_local(wrapper_local)
+            self.assign_operand_to_place(wrapper_place, wrapper_op, span)
+            self.finish_stmt_temp_frame(wrapper_frame)
         let item_disc = self.lower_enum_discriminant(wrapper_place)
         let item_vals: List[i64] = List.new()
         item_vals.push(self.enum_variant_discriminant_for_type(wrapper_ty, success_variant))
@@ -15609,22 +15626,22 @@ impl MirBuilder:
 
         self.switch_to(item_success_bb)
         let success_idx = self.enum_variant_index_for_type(wrapper_ty, success_variant)
-        let success_downcast = self.body.new_downcast_place(wrapper_place, success_idx)
-        let success_payload_place = self.body.new_field_place(success_downcast, 0, output_elem_ty)
-        let success_payload_op = self.operand_for_place(success_payload_place, output_elem_ty)
-        self.emit_list_push(out_list_place, success_payload_op, span)
+        let success_item = self.extract_stepped_option_payload(wrapper_place, success_idx, output_elem_ty, span)
+        self.emit_list_push(out_list_place, self.stepped_item_operand(success_item, output_elem_ty), span)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
         self.switch_to(item_fail_bb)
+        // The short-circuit abandons the elements pushed so far: the output
+        // list is released here, since only the success path moves it out.
+        self.emit_drop_stmt(out_list_place, "traverse-fail", span)
         if wrapper_base == self.sema.syms.option:
             let fail_fields: List[i32] = List.new()
             self.assign_enum_variant_to_place(result_place, result_ty, failure_variant, fail_fields, span)
         else:
             let failure_idx = self.enum_variant_index_for_type(wrapper_ty, failure_variant)
-            let failure_downcast = self.body.new_downcast_place(wrapper_place, failure_idx)
-            let failure_payload_place = self.body.new_field_place(failure_downcast, 0, failure_payload_ty)
+            let failure_item = self.extract_stepped_option_payload(wrapper_place, failure_idx, failure_payload_ty, span)
             let fail_fields2: List[i32] = List.new()
-            fail_fields2.push(self.operand_for_place(failure_payload_place, failure_payload_ty))
+            fail_fields2.push(self.stepped_item_operand(failure_item, failure_payload_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, failure_variant, fail_fields2, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 

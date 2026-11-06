@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-type Rule7SafeHolder = ephemeral { view: &i32 }
+type Rule7SafeHolder ephemeral { view: &i32 }
 impl Drop for Rule7SafeHolder:
     fn drop(move self: Self):
         let _ = self.view

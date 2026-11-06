@@ -18,7 +18,7 @@ c facade dbc:
         lend
 
 type Ctx { base: i32 }
-type View = ephemeral { ctx: &Ctx }
+type View ephemeral { ctx: &Ctx }
 fn on(v: &View, n: c_int) -> c_int: v.ctx.base + n
 
 fn main:

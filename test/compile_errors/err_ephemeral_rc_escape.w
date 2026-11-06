@@ -5,7 +5,7 @@
 
 use std.rc
 
-type StrView = ephemeral { s: &str }
+type StrView ephemeral { s: &str }
 
 fn main:
     let owned = "hello"

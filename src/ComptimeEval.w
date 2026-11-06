@@ -3455,7 +3455,7 @@ impl ComptimeEvaluator:
         // §10.5's non-closure combinators. The closure-taking ones (map,
         // and_then, filter) wait on comptime closure evaluation (#665.3).
         let method = self.pool.resolve(field)
-        let is_some = recv_value.data0 as i32 == self.sema.syms.some
+        let is_some = self.same_variant(recv_value.data0, self.sema.syms.some as i64)
 
         if method == "is_some":
             if arg_count != 0:
@@ -7231,7 +7231,7 @@ impl ComptimeEvaluator:
                 return opt_signal
             if opt_signal.value.kind != ComptimeValueKind.CV_ENUM or not self.is_option_enum_value(opt_signal.value):
                 return self.fail(node, "`??` needs an Option on its left in comptime")
-            if opt_signal.value.data0 as i32 == self.sema.syms.some:
+            if self.same_variant(opt_signal.value.data0, self.sema.syms.some as i64):
                 return comptime_control_value(self.extra_value_at(opt_signal.value.extra_start as i64))
             return self.eval_expr(self.ast.get_data2(node))
 
@@ -7447,6 +7447,13 @@ impl ComptimeEvaluator:
             return self.eval_expr(else_node)
         comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
 
+    // One variant has two spellings in the evaluator: the bare name
+    // (`syms.some`, what the builtin producers write) and Sema's resolved
+    // `Owner.Name` (what a user-written `Some(x)` and a pattern carry). The
+    // subject's type already settles the enum; its variants compare by name.
+    fn same_variant(a: i64, b: i64) -> bool:
+        a == b or self.sema.unqualified_enum_variant_sym(a as i32) == self.sema.unqualified_enum_variant_sym(b as i32)
+
     mut fn match_pattern(pat: i32, value: ComptimeValue, node: i32) -> bool:
         if pat == 0:
             return true
@@ -7538,7 +7545,7 @@ impl ComptimeEvaluator:
             if self.sema.comp_resolved.contains(pat):
                 variant_sym = self.sema.comp_resolved.get(pat).unwrap()
             if value.kind == ComptimeValueKind.CV_ENUM:
-                if value.data0 as i32 != variant_sym:
+                if not self.same_variant(value.data0, variant_sym as i64):
                     return false
                 let bind_count = self.ast.get_data2(pat)
                 if bind_count != value.extra_count:
@@ -7563,7 +7570,7 @@ impl ComptimeEvaluator:
                 if comptime_value_is_intlike(value) and comptime_value_is_intlike(qp.value):
                     return comptime_value_intlike(value) == comptime_value_intlike(qp.value)
                 if value.kind == ComptimeValueKind.CV_ENUM and qp.value.kind == ComptimeValueKind.CV_ENUM:
-                    return value.data0 == qp.value.data0 and value.extra_count == 0 and qp.value.extra_count == 0
+                    return self.same_variant(value.data0, qp.value.data0) and value.extra_count == 0 and qp.value.extra_count == 0
             return false
         if self.require_success != 0:
             self.fail(pat, "pattern is not comptime-evaluable yet")
@@ -7602,7 +7609,18 @@ impl ComptimeEvaluator:
             self.pop_scope()
         let subj_kind = subject_signal.value.kind as i32
         let subj_d0 = subject_signal.value.data0
-        self.fail(node, f"no comptime match arm matched (subject kind={subj_kind} data0={subj_d0})")
+        // The report names what was compared: an enum subject's variant and
+        // payload count, and each variant arm's resolved symbol and binders.
+        var detail = f"subject kind={subj_kind} data0={subj_d0}"
+        if subject_signal.value.kind == ComptimeValueKind.CV_ENUM:
+            detail = f"subject variant `{self.pool.resolve(subj_d0 as i32)}` with {subject_signal.value.extra_count} payload value(s), type {self.sema.type_name(subject_signal.value.type_id as TypeId)}"
+        for i in 0..arm_count:
+            let pat = self.ast.get_data0(self.ast.get_extra(extra_start + i))
+            let pk = self.ast.kind(pat)
+            if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
+                let arm_sym = self.sema.comp_resolved.get(pat) ?? self.ast.get_data0(pat)
+                detail = detail ++ f"; arm {i} variant `{self.pool.resolve(arm_sym)}` with {self.ast.get_data2(pat)} binder(s)"
+        self.fail(node, "no comptime match arm matched (" ++ detail ++ ")")
 
     fn signal_matches_loop(signal: &ComptimeControl, loop_label: i32) -> bool:
         if signal.kind != ComptimeControlKind.CTL_BREAK and signal.kind != ComptimeControlKind.CTL_CONTINUE:
@@ -7711,14 +7729,11 @@ impl ComptimeEvaluator:
                 return step
             if self.last_call_has_mut_receiver != 0:
                 iter_val = comptime_value_clone(self.last_call_mut_receiver)
-            if step.value.kind == ComptimeValueKind.CV_ENUM and step.value.data0 == self.sema.syms.none as i64:
+            if step.value.kind == ComptimeValueKind.CV_ENUM and self.same_variant(step.value.data0, self.sema.syms.none as i64):
                 break
-            if step.value.kind == ComptimeValueKind.CV_ENUM and step.value.data0 == self.sema.syms.some as i64 and step.value.extra_count >= 1:
-                elems.push(self.extra_value_at(step.value.extra_start as i64))
-            else:
-                // Implicit `Some(...)` wrapping in a `-> Option[T]` body
-                // (`ByteIter.next()` returns `b` directly).
-                elems.push(comptime_value_clone(step.value))
+            if step.value.kind != ComptimeValueKind.CV_ENUM or not self.same_variant(step.value.data0, self.sema.syms.some as i64) or step.value.extra_count < 1:
+                return self.fail(node, "comptime iterator `next` did not yield an Option")
+            elems.push(self.extra_value_at(step.value.extra_start as i64))
             count += 1
         let start_len = self.extra_values.len()
         let start = start_len as i32
@@ -8492,6 +8507,11 @@ impl ComptimeEvaluator:
         let explicit_tp_count = tp_syms.len()
         if explicit_tp_count != tp_count:
             return self.fail(node, f"generic comptime function expects {tp_count} type argument(s), found {explicit_tp_count}")
+        // A plain body is Sema-checked before it runs (its facts, not a
+        // re-derivation, shape the values: §4.9a's `Some` wrapping). A generic
+        // body is checked per specialization by its own path.
+        if tp_count == 0:
+            self.sema.check_fn_body_before_eval(fn_node)
         let param_start = self.ast.fn_meta_param_start(meta)
         let param_count = self.ast.fn_meta_param_count(meta)
         let arg_count = arg_values.len()
@@ -8785,7 +8805,20 @@ impl ComptimeEvaluator:
         let msg_sym = self.ast.get_data0(node)
         self.fail(node, with_str_clone_ref(self.pool.resolve(msg_sym)))
 
+    // §4.9a (D103): Sema decided this value is `Some(value)` at its demand
+    // (`value_to_option_nodes`); the Option is built here around the
+    // evaluated value, as MirLower builds it around the lowered one.
     mut fn eval_expr(node: i32) -> ComptimeControl:
+        let signal = self.eval_expr_node(node)
+        if node > 0 and signal.kind == ComptimeControlKind.CTL_VALUE and self.sema.value_to_option_nodes.contains(node):
+            let opt_ty = self.sema.value_to_option_nodes.get(node).unwrap()
+            let start_len = self.extra_values.len()
+            let start = start_len as i32
+            self.extra_values.push(comptime_value_clone(signal.value))
+            return comptime_control_value(comptime_value_enum(opt_ty, self.sema.syms.some, start, 1))
+        signal
+
+    mut fn eval_expr_node(node: i32) -> ComptimeControl:
         if node == 0:
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         if self.step(node) == 0:

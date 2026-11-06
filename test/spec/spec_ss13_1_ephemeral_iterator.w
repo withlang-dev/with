@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 // §13.1.1.4: a user ephemeral Iter[T] type is returned by value and driven,
 // and propagates through an ephemeral parameter.
-type MIter = ephemeral { limit: i64, pos: i64 }
+type MIter ephemeral { limit: i64, pos: i64 }
 impl Iter[i64] for MIter:
     fn next(mut self: Self) -> Option[i64]:
         if self.pos >= self.limit:

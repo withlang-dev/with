@@ -402,7 +402,7 @@ type Lexer {
 Right for scoped parsing:
 
 ```with
-type Lexer = ephemeral {
+type Lexer ephemeral {
     source: &str,
     pos: usize,
 }
@@ -495,7 +495,7 @@ let name = box_user.name
 `ephemeral` marks a type as second-class.
 
 ```with
-type Token = ephemeral {
+type Token ephemeral {
     text: &str,
     kind: TokenKind,
     span: Span,
@@ -1233,7 +1233,7 @@ let snapshot = with state.read() as s:
 ### Ephemeral parser
 
 ```with
-type Parser = ephemeral {
+type Parser ephemeral {
     source: &str,
     pos: usize,
 }
@@ -1256,7 +1256,7 @@ type Lexer { source: &str }   // ERROR
 Use:
 
 ```with
-type Lexer = ephemeral { source: &str, pos: usize }
+type Lexer ephemeral { source: &str, pos: usize }
 ```
 
 or store offsets/handles.
@@ -1285,7 +1285,7 @@ fn matches(text: &str) -> dyn Iter[&str]  // wrong
 Use a concrete ephemeral iterator:
 
 ```with
-type MatchIter = ephemeral { text: &str, pos: usize }
+type MatchIter ephemeral { text: &str, pos: usize }
 ```
 
 ### Do not ignore tasks
@@ -1413,7 +1413,7 @@ type User {
 }
 
 // ephemeral struct
-type Parser = ephemeral {
+type Parser ephemeral {
     source: &str,
     pos: usize,
 }

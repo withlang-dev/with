@@ -24,7 +24,7 @@ type AsyncLowerResult {
     diags: DiagnosticList,
 }
 
-type AsyncLower = ephemeral {
+type AsyncLower ephemeral {
     mir_mod: &MirModule,
     ast: AstPool,
     pool: InternPool,

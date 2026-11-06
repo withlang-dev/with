@@ -12,7 +12,7 @@ impl Drop for Db:
     move fn drop():
         if self.live: print(f"close db {self.n}")
 
-type Stmt = ephemeral { parent: &Db, n: i32 }
+type Stmt ephemeral { parent: &Db, n: i32 }
 impl Drop for Stmt:
     move fn drop():
         print(f"finalize {self.n} of {self.parent.n}")

@@ -6,7 +6,7 @@
 // once `keep` returns; the store is refused.
 use std.sync
 
-type H = ephemeral { slot: Mutex[Option[&i32]] }
+type H ephemeral { slot: Mutex[Option[&i32]] }
 
 fn keep(h: &H):
     let x = 5

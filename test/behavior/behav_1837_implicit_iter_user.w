@@ -8,7 +8,7 @@
 // through an owned binding and through a `&Deck` view.
 type Deck { cards: List[i32] }
 
-type DeckIter = ephemeral { cards: &List[i32], i: i32 }
+type DeckIter ephemeral { cards: &List[i32], i: i32 }
 
 impl DeckIter:
     mut fn next() -> Option[i32]:
