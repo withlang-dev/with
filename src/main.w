@@ -36,6 +36,7 @@ use compiler.FrameworkStubs
 use compiler.WindowsImportLibs
 use compiler.DlltoolDriver
 use compiler.EmbeddedSysroot
+use std.process.exit_code
 use compiler.DsymutilDriver
 use compiler.GreenEvidence
 use compiler.DriverOptions
@@ -1255,7 +1256,9 @@ fn main -> Unit:
         with_eprint("error: REPL not yet available")
         print_usage()
         return
-    exit(run_cli(argc))
+    // The runtime's exit, not libc's: the debug allocator's peak report
+    // prints on the way out (#2407).
+    exit_code(run_cli(argc))
 
 // ── Command implementations ──────────────────────────────────────
 

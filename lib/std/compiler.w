@@ -1,7 +1,8 @@
 // std.compiler — compiler-hook introspection and tool capabilities.
 
 use rt.rt_core
-extern fn exit(code: i32) -> Unit
+// The process ends here (the debug allocator's peak report prints first, #2407).
+pub fn exit(code: i32) -> Never: with_exit(code)
 
 pub enum CompilerHookPhase: i32:
     after_typecheck = 0

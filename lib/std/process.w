@@ -7,14 +7,13 @@ use std.collections
 use rt.rt_core
 use rt.compat_runtime
 
-extern fn rt_exit(code: i32) -> Never
 // The vec RETAINS the pushed header — ownership transfers, unlike every
 // read-only str extern (§16.3d declared effect; the bit-copy default would
 // leave two owners).
 
 /// Exit the process with the given status code.
 pub fn exit_code(code: i32) -> Never:
-    rt_exit(code)
+    with_exit(code)
 
 /// Get the current process ID.
 pub fn pid -> i32:
