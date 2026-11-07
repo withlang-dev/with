@@ -382,11 +382,15 @@ that can't be expressed as trait bounds.
 
 **The target.** `Target.os` and `Target.arch` are compile-time constants
 of `std.os`'s enums `OsKind` and `ArchKind`: the operating system and the
-architecture the program is being compiled for, never the host's. Each
-enum has one variant per supported target and no other. A `comptime if`
-or a `comptime match` on them selects code and values per target:
+architecture the program is being compiled for, never the host's
+(`std.sysinfo` describes the host at run time). Each enum has one
+variant per supported target and no other. `Target` is imported like
+any other standard-library name (§18.2). A `comptime if` or a
+`comptime match` on them selects code and values per target:
 
 ```
+use std.os.Target
+
 pub const EAGAIN: i32 = comptime match Target.os:
     .Macos => 35
     .Linux => 11
