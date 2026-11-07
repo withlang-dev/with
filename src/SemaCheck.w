@@ -13372,6 +13372,7 @@ impl Sema:
             self.typed_expr_types.insert(node, ns_tid)
             return ns_tid
         let sym = self.resolve_displaced_fn_ident(ident_sym, node)
+        if self.ceremony_active_index_loops.len() > 0: self.ceremony_note_index_use(node, 0, false)
         if sym == self.syms.file_magic:
             self.magic_ident_kinds.insert(node, SemaMagicIdentKind.FILE)
             self.typed_expr_types.insert(node, self.ty_str as i32)
@@ -20204,6 +20205,8 @@ impl Sema:
         if self.ast.kind(target) == NodeKind.NK_IDENT:
             let rebound = self.binding_decl_node(self.ast.get_data0(target))
             if rebound != 0: self.ceremony_rebound_lets.insert(rebound, 1)
+        if self.ast.kind(target) == NodeKind.NK_INDEX and self.ast.kind(self.ast.get_data1(target)) == NodeKind.NK_IDENT and self.ceremony_active_index_loops.len() > 0:
+            self.ceremony_note_index_use(self.ast.get_data1(target), target, true)
         let value = self.ast.get_data1(node)
 
         if self.is_runtime_multi_index_node(target):
@@ -20544,6 +20547,39 @@ impl Sema:
         else:
             self.resolved_call_mono_syms.remove(key_node)
 
+    // #3061: the list a `0..xs.len()` range counts over, when `xs` is a plain
+    // name and the range exclusive (its ident node), else 0.
+    fn ceremony_index_loop_base(iterable: i32) -> i32:
+        if iterable == 0 or self.ast.kind(iterable) != NodeKind.NK_RANGE or self.ast.get_data2(iterable) != 0: return 0
+        let start = self.ast.get_data0(iterable)
+        if start == 0 or self.ast.kind(start) != NodeKind.NK_INT_LIT or self.int_literal_i64_value(start).value != 0: return 0
+        let end = self.ast.get_data1(iterable)
+        if end == 0 or self.ast.kind(end) != NodeKind.NK_CALL or self.ast.get_data2(end) != 0: return 0
+        let callee = self.ast.get_data0(end)
+        if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS or self.pool_resolve(self.ast.get_data1(callee)) != "len": return 0
+        let base = self.ast.get_data0(callee)
+        if self.ast.kind(base) != NodeKind.NK_IDENT: return 0
+        base
+
+    // A use of an active index loop's counter: every use counts; one that is
+    // the index of the loop's own list (`xs[i]`, not written through) counts
+    // as conforming. The loop rewrites when the two counts agree.
+    mut fn ceremony_note_index_use(ident_node: i32, index_node: i32, written: bool):
+        let sym = self.ast.get_data0(ident_node)
+        if not self.ceremony_active_index_loops.contains(sym): return
+        let loop_node = self.ceremony_active_index_loops.get(sym).unwrap()
+        if index_node == 0:
+            self.ceremony_loop_uses.insert(loop_node, (self.ceremony_loop_uses.get(loop_node) ?? 0) + 1)
+            return
+        if written:
+            self.ceremony_loop_written.insert(loop_node, 1)
+            return
+        let base = self.ast.get_data0(index_node)
+        let loop_base = self.ceremony_index_loop_bases.get(loop_node) ?? 0
+        if self.ast.kind(base) == NodeKind.NK_IDENT and loop_base != 0 and self.ast.get_data0(base) == self.ast.get_data0(loop_base):
+            self.ceremony_loop_index_uses.insert(loop_node, (self.ceremony_loop_index_uses.get(loop_node) ?? 0) + 1)
+            self.ceremony_loop_index_nodes.insert(index_node, loop_node)
+
     mut fn check_for(node: i32) -> i32:
         let binding = self.ast.get_data0(node)
         let iterable = self.ast.get_data1(node)
@@ -20675,9 +20711,17 @@ impl Sema:
         let saved_drop_cf_for = self.drop_control_flow_depth
         if self.current_drop_type_sym != 0:
             self.drop_control_flow_depth = self.drop_control_flow_depth + 1
+        // #3061: `for i in 0..xs.len():` over a plain list name — the uses of `i`
+        // in the body decide whether the loop iterates the list instead.
+        let index_loop_base = self.ceremony_index_loop_base(iterable)
+        if index_loop_base != 0 and binding != 0 and not self.ast.for_binding_is_pattern(node):
+            self.ceremony_active_index_loops.insert(binding, node)
+            self.ceremony_index_loop_bases.insert(node, index_loop_base)
+            self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
         self.push_live_loop(body, for_live_depth)
         let for_body_type = self.check_expr_statement_context(body)
         if range_literal and binding != 0 and not self.ast.for_binding_is_pattern(node): self.int_local_for_decls.remove(binding)
+        if binding != 0: self.ceremony_active_index_loops.remove(binding)
         self.unregister_iter_literal_bindings(binding, self.ast.for_binding_is_pattern(node))
         self.pop_live_loop()
         self.drop_control_flow_depth = saved_drop_cf_for
@@ -22296,6 +22340,7 @@ impl Sema:
         let expr = self.ast.get_data0(node)
         let index = self.ast.get_data1(node)
         let index2 = self.ast.get_data2(node)
+        if index2 == 0 and self.ast.kind(index) == NodeKind.NK_IDENT and self.ceremony_active_index_loops.len() > 0: self.ceremony_note_index_use(index, node, false)
         let arr_type = self.check_expr(expr)
 
         if arr_type == 0:

@@ -1236,6 +1236,16 @@ type Sema {
     ceremony_rebound_lets: HashMap[i32, i32],
     ceremony_widening_casts: HashMap[i32, i32],   // a widening `as` under a demand of its target (node → its source expression)
     ceremony_list_news: HashMap[i32, i32],        // a `List.new()` / `HashMap.new()` whose binding's type is written (node → 1)
+    // #3061 index loops: the active `for i in 0..xs.len()` loops by their
+    // counter (sym → for node), each loop's list ident, every use of the
+    // counter, the uses that index the list, the index nodes, and the loops
+    // whose list is written through the counter.
+    ceremony_active_index_loops: HashMap[i32, i32],
+    ceremony_index_loop_bases: HashMap[i32, i32],
+    ceremony_loop_uses: HashMap[i32, i32],
+    ceremony_loop_index_uses: HashMap[i32, i32],
+    ceremony_loop_index_nodes: HashMap[i32, i32],  // index node → its loop
+    ceremony_loop_written: HashMap[i32, i32],
     suspending_fns: HashMap[i32, i32],          // @[suspends] declarations (#3052): calling one may suspend the current fiber
     builtin_suspending_methods: HashMap[i64, i32], // … and the compiler-declared ones (Sender.send, Receiver.recv, Task.join_cleanup), keyed sema_pair_key(owner, method)
     result_option_fns: HashMap[i32, i32],
@@ -3494,6 +3504,12 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let ceremony_rebound_lets = sema_new_map_i32_i32()
     let ceremony_widening_casts = sema_new_map_i32_i32()
     let ceremony_list_news = sema_new_map_i32_i32()
+    let ceremony_active_index_loops = sema_new_map_i32_i32()
+    let ceremony_index_loop_bases = sema_new_map_i32_i32()
+    let ceremony_loop_uses = sema_new_map_i32_i32()
+    let ceremony_loop_index_uses = sema_new_map_i32_i32()
+    let ceremony_loop_index_nodes = sema_new_map_i32_i32()
+    let ceremony_loop_written = sema_new_map_i32_i32()
     let suspending_fns = sema_new_map_i32_i32()
     let builtin_suspending_methods: HashMap[i64, i32] = HashMap.new()
     let result_option_fns = sema_new_map_i32_i32()
@@ -3801,6 +3817,12 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         ceremony_rebound_lets,
         ceremony_widening_casts,
         ceremony_list_news,
+        ceremony_active_index_loops,
+        ceremony_index_loop_bases,
+        ceremony_loop_uses,
+        ceremony_loop_index_uses,
+        ceremony_loop_index_nodes,
+        ceremony_loop_written,
         suspending_fns,
         builtin_suspending_methods,
         result_option_fns,
