@@ -30061,6 +30061,7 @@ impl Sema:
         // auto-references a plain `x` (§3.8).
         if not is_default and expected_ty != 0 and self.ast.kind(arg_node) == NodeKind.NK_UNARY and self.ast.get_data0(arg_node) == UnaryOp.UOP_REF and self.get_type_kind(self.resolve_alias(expected_ty as TypeId)) == TypeKind.TY_REF:
             self.ceremony_sites.insert(arg_node, 2)
+            self.ceremony_let_paths.insert(arg_node, with_str_clone_ref(self.current_module_path))
         if not is_default:
             let arg_ty = if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
                 else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
@@ -30357,6 +30358,7 @@ impl Sema:
             return
         if self.types_compatible(self.get_generic_inst_arg(expected_option, 0) as TypeId, arg_ty as TypeId):
             self.ceremony_sites.insert(node, 3)
+            self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
 
     mut fn value_to_option_at_demand(node: i32, expected: TypeId, actual: TypeId) -> TypeId:
         if node == 0 or expected == 0 or actual == 0 or self.ast.kind(node) == NodeKind.NK_NULL_LIT:
@@ -36828,6 +36830,7 @@ impl Sema:
             let recv = self.recorded_expr_type_or_zero(expr)
             if recv != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId))) == TypeKind.TY_STR:
                 self.ceremony_sites.insert(node, 1)
+                self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
         result
 
     mut fn check_method_call_parts_body(expr0: i32, field0: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty0: i32) -> i32:

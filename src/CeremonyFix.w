@@ -93,6 +93,23 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
         if not cf_rewritable(path, excludes, std_too): continue
         if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
         let text = texts.get(path).unwrap()
+        // The census's typed patterns (SemaDiag.w): `.clone()` on a str
+        // (D111: a str is a value), an explicit `&x` at a `&T` parameter
+        // (§3.8 auto-references), `Some(x)` where an Option is demanded
+        // (D103: the demand converts). Each is its inner expression.
+        if sema.ceremony_sites.contains(node):
+            let pattern = sema.ceremony_sites.get(node).unwrap()
+            if pattern == 1:
+                let recv = pool.get_data0(pool.get_data0(node))
+                edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_end(recv), end: pool.get_end(node), replacement: "", what: "`.clone()` on a str: a str is a value (D111)" })
+            else if pattern == 2:
+                let inner = pool.get_data1(node)
+                edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_start(node), end: pool.get_start(inner), replacement: "", what: "`&x` at a `&T` parameter auto-references (§3.8)" })
+            else if pattern == 3:
+                let arg = pool.get_extra(pool.get_data1(node))
+                edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_start(node), end: pool.get_start(arg), replacement: "", what: "`Some(x)` where an Option is demanded: the demand converts (D103)" })
+                edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_end(arg), end: pool.get_end(node), replacement: "", what: "the closing paren" })
+            continue
         // `for i in 0..xs.len():` whose every use of `i` is `xs[i]` read: the
         // loop iterates the list, and each `xs[i]` is the element.
         if sema.ceremony_index_loop_bases.contains(node):
