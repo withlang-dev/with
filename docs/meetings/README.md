@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D195 — A fiber-aware runtime operation is one whose declaration says it may suspend (`@[suspends]`; delegated, D98)](2026-11-07-D195-a-may-suspend-operation-is-declared-not-listed.md)
 - [D194 — A retained pointer case of a variadic contract borrows caller-managed storage, held under the retained-borrow window; a pointer with a separately set length is one `&[u8]` operation](2026-11-07-D194-a-retained-pointer-case-borrows-caller-managed-storage.md)
 - [D193 — `{x}` in an f-string displays a type through its `impl Display` (delegated, D98)](2026-11-06-D193-an-f-string-displays-a-type-through-its-display-impl.md)
 - [D192 — A range binds above `|>` and `??`, below the operators that compute its bounds (delegated, D98)](2026-11-06-D192-a-range-binds-above-the-pipe-and-the-default.md)

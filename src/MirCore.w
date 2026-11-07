@@ -87,6 +87,11 @@ enum ConstKind: i32:
     CK_INT_EXACT = 9
     CK_REGEX_LIT = 10
     CK_C_STR = 11
+    // #2636: the all-zero value of a type (`T.zeroed()`, §16.2b.3): a
+    // value, not the reset-on-move blank CK_ZERO_SIZED is, so the
+    // drop-state tracker and the use-after-kill validator read it as an
+    // initialization. Codegen materializes both the same way.
+    CK_ZEROED = 12
 
 
 fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic) -> bool:
@@ -3579,7 +3584,7 @@ fn validate_mir_body(body: &MirBody) -> str:
 
     for ci in 0..const_count:
         let ck = body.const_kinds[ci]
-        if ck == ConstKind.CK_INT or ck == ConstKind.CK_BOOL or ck == ConstKind.CK_STR or ck == ConstKind.CK_C_STR or ck == ConstKind.CK_UNIT or ck == ConstKind.CK_FLOAT or ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_FN or ck == ConstKind.CK_CLOSURE or ck == ConstKind.CK_ASYNC_BLOCK or ck == ConstKind.CK_INT_EXACT or ck == ConstKind.CK_REGEX_LIT:
+        if ck == ConstKind.CK_INT or ck == ConstKind.CK_BOOL or ck == ConstKind.CK_STR or ck == ConstKind.CK_C_STR or ck == ConstKind.CK_UNIT or ck == ConstKind.CK_FLOAT or ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_ZEROED or ck == ConstKind.CK_FN or ck == ConstKind.CK_CLOSURE or ck == ConstKind.CK_ASYNC_BLOCK or ck == ConstKind.CK_INT_EXACT or ck == ConstKind.CK_REGEX_LIT:
             continue
         return f"const{ci}: unknown const kind {ck}"
 

@@ -55,6 +55,7 @@ type Parser {
     pending_inline: i32,
     pending_noinline: i32,
     pending_must_use: i32,
+    pending_suspends: i32,
     pending_no_await_guard: i32,
     pending_no_alloc: i32,
     pending_panic_handler: i32,
@@ -178,6 +179,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_inline: 0,
         pending_noinline: 0,
         pending_must_use: 0,
+        pending_suspends: 0,
         pending_no_await_guard: 0,
         pending_no_alloc: 0,
         pending_panic_handler: 0,
@@ -709,6 +711,7 @@ impl Parser:
         self.pending_inline = 0
         self.pending_noinline = 0
         self.pending_must_use = 0
+        self.pending_suspends = 0
         self.pending_no_await_guard = 0
         self.pending_no_alloc = 0
         self.pending_panic_handler = 0
@@ -749,6 +752,8 @@ impl Parser:
                 let attr_s = self.current_start()
                 let attr_e = self.current_end()
                 let attr_text = self.source.slice(attr_s as i64, attr_e as i64)
+                if attr_text == "suspends":
+                    self.pending_suspends = 1
                 if attr_text == "must_use":
                     self.pending_must_use = 1
                 if attr_text == "no_await_guard":
@@ -795,6 +800,9 @@ impl Parser:
                 self.advance()
             else if self.is_ident_named("noinline"):
                 self.pending_noinline = 1
+                self.advance()
+            else if self.is_ident_named("suspends"):
+                // Already handled by standalone check above
                 self.advance()
             else if self.is_ident_named("must_use"):
                 // Already handled by standalone check above
@@ -1779,6 +1787,8 @@ impl Parser:
             flags = flags + FnFlags.COMPTIME
         if self.pending_tailrec != 0:
             flags = flags + FnFlags.TAILREC
+        if self.pending_suspends != 0:
+            flags = flags + FnFlags.SUSPENDS
         if self.pending_must_use != 0:
             flags = flags + FnFlags.MUST_USE
         if self.pending_inline != 0:

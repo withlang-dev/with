@@ -13830,7 +13830,7 @@ impl MirBuilder:
         // §11.8 (D95): the tuple clone Sema synthesized.
         if self.sema.tuple_clone_nodes.contains(node): return self.lower_tuple_clone(self_expr, node)
         // §16.2b.3: Sema decided this `T.zeroed()` is the all-zero C record.
-        if self.sema.zeroed_call_nodes.contains(node): return self.body.gen_zero_operand(self.expr_type(node))
+        if self.sema.zeroed_call_nodes.contains(node): return self.body.gen_zeroed_value_operand(self.expr_type(node))
         // D65 phase 5 (#2043): the method Sema resolved the call to when it
         // is not the one the spelling names (method_call_fields).
         let method_sym: i32 = self.sema.method_call_fields.get(node) ?? method_sym0
@@ -19836,6 +19836,12 @@ impl MirBody:
     // The reset-on-move blank of a value of `tid` (§2.5.1).
     mut fn gen_zero_operand(tid: i32) -> i32:
         let c = self.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, tid)
+        self.new_operand(OperandKind.OK_CONSTANT, c)
+
+    // The all-zero value of `tid` (`T.zeroed()`, #2636): a value the body
+    // goes on to read, never the blank.
+    mut fn gen_zeroed_value_operand(tid: i32) -> i32:
+        let c = self.new_const(ConstKind.CK_ZEROED, 0, 0, 0, tid)
         self.new_operand(OperandKind.OK_CONSTANT, c)
 
 // D69 (§13.4): calling a gen fn evaluates its arguments into the generator

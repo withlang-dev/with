@@ -3303,11 +3303,69 @@ impl Sema:
         // linked as an object never did.
         if sema_path_is_runtime_implementation(self.current_module_path):
             return
-        if self.global_race_concurrency_node != 0:
-            return
-        self.global_race_concurrency_node = node
-        self.global_race_concurrency_file = self.local_file_id
-        self.global_race_concurrency_reason = with_str_clone_ref(reason)
+        // #2977: kept with the function it was found in; whether it counts
+        // is decided once every body is checked (resolve_global_race_concurrency):
+        // a library body the program never reaches is not the program's.
+        self.global_race_evidence.push(RaceEvidence { node, file: self.local_file_id, reason: with_str_clone_ref(reason), fn_sym: self.current_fn_symbol })
+
+    // The call graph the race proof walks (#2977): every call Sema resolved
+    // (comp_resolved) and every function taken as a value, from the function
+    // being checked (0: top level).
+    mut fn note_call_resolution(node: i32, fn_sym: i32):
+        self.comp_resolved.insert(node, fn_sym)
+        self.note_call_edge(fn_sym)
+
+    mut fn note_call_edge(fn_sym: i32):
+        if fn_sym == 0: return
+        // Indexed by caller as it is recorded: `first` is the caller's
+        // newest edge, `next` the one before it.
+        let caller = self.current_fn_symbol
+        self.race_call_edge_next.push(self.race_call_edge_first.get(caller) ?? -1)
+        self.race_call_edge_first.insert(caller, self.race_call_edge_to.len())
+        self.race_call_edge_to.push(fn_sym)
+
+    // A function the program runs without a call Sema saw: top level, `main`,
+    // an entry, test, before/after, bench or panic handler, a `@[c_export]`
+    // C reaches, and a trait impl method, which dispatch reaches without a
+    // resolved call. Everything else runs only through an edge.
+    fn race_root_fn(fn_sym: i32) -> bool:
+        if fn_sym == 0 or fn_sym == self.pool_lookup_symbol("main"): return true
+        let node = self.fn_symbol_decl_node(fn_sym)
+        if node != 0:
+            let meta = self.ast.find_fn_meta(node)
+            if meta >= 0:
+                let flags = self.ast.fn_meta_flags(meta)
+                let entry_like = (flags / FnFlags.ENTRY) % 2 == 1 or (flags / FnFlags.TEST) % 2 == 1 or (flags / FnFlags.BEFORE) % 2 == 1 or (flags / FnFlags.AFTER) % 2 == 1 or (flags / FnFlags.BENCH) % 2 == 1 or (flags / FnFlags.PANIC_HANDLER) % 2 == 1
+                if entry_like: return true
+            if self.fn_decl_has_c_export(node): return true
+        self.method_impl_nodes.contains(fn_sym) and self.ast.get_data2(self.method_impl_nodes.get(fn_sym).unwrap()) != 0
+
+    // Whether the program may run concurrently: some evidence site lies in a
+    // function the program reaches — a root, or a function a reachable one
+    // calls or takes as a value. The first counted site labels the
+    // diagnostics (emit_global_data_race_error).
+    mut fn resolve_global_race_concurrency() -> bool:
+        if self.global_race_evidence.len() == 0: return false
+        var reachable: HashMap[i32, i32] = HashMap.new()
+        let work = [e.fn_sym for e in self.global_race_evidence if self.race_root_fn(e.fn_sym)]
+        for (caller, _) in self.race_call_edge_first:
+            if self.race_root_fn(caller): work.push(caller)
+        while work.len() > 0:
+            let f = work.pop().unwrap()
+            if reachable.contains(f): continue
+            reachable.insert(f, 1)
+            var ei = self.race_call_edge_first.get(f) ?? -1
+            while ei >= 0:
+                let callee = self.race_call_edge_to[ei]
+                if not reachable.contains(callee): work.push(callee)
+                ei = self.race_call_edge_next[ei]
+        for e in self.global_race_evidence:
+            if reachable.contains(e.fn_sym):
+                self.global_race_concurrency_node = e.node
+                self.global_race_concurrency_file = e.file
+                self.global_race_concurrency_reason = with_str_clone_ref(e.reason)
+                return true
+        false
 
     fn global_symbol_is_synchronized(sym: i32) -> bool:
         let tid = self.scope_lookup(sym)
@@ -5117,7 +5175,7 @@ impl Sema:
         self.diags.emit(diag)
 
     mut fn validate_global_data_race_accesses():
-        let proof_failed = self.global_race_concurrency_node != 0
+        let proof_failed = self.resolve_global_race_concurrency()
         for i in 0..self.global_race_access_syms.len() as i32:
             if self.global_data_race_access_needs_proof(i) == false:
                 continue
@@ -12555,11 +12613,11 @@ impl Sema:
                 else if self.enum_has_variant(exp_resolved as i32, self.syms.err) != 0:
                     self.emit_error("Result for-comprehension guards are not allowed because guard failure has no implicit Err value", node)
                     return 0 as TypeId
-                self.comp_resolved.insert(node, name)
+                self.note_call_resolution(node, name)
             let expected_variant_ty = self.expected_variant_constructor_type(name)
             if expected_variant_ty != 0:
                 let resolved_variant_sym = self.qualified_enum_variant_sym(expected_variant_ty, name)
-                self.comp_resolved.insert(node, resolved_variant_sym)
+                self.note_call_resolution(node, resolved_variant_sym)
                 self.typed_expr_types.insert(node, expected_variant_ty)
                 self.check_variant_shorthand_args(node, expected_variant_ty, name)
                 return expected_variant_ty as TypeId
@@ -13444,6 +13502,7 @@ impl Sema:
             // whose calls pass no variable arguments and need no `unsafe`;
             // With has no variadic function-pointer type to give it.
             self.record_name_use(node, "fn-value", self.fn_symbol_source_path(sym), sym)
+            self.note_call_edge(sym)
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
                 return 0
@@ -13525,7 +13584,7 @@ impl Sema:
                 variant_expected_tid = self.imported_variant_owners.get(sym).unwrap()
             if variant_expected_tid != 0:
                 let resolved_variant_sym = self.qualified_enum_variant_sym(variant_expected_tid, sym)
-                self.comp_resolved.insert(node, resolved_variant_sym)
+                self.note_call_resolution(node, resolved_variant_sym)
             let variant_tid = if variant_expected_tid != 0: variant_expected_tid else: self.variant_type_ids.get(sym).unwrap()
             self.typed_expr_types.insert(node, variant_tid)
             return variant_tid
@@ -19233,7 +19292,7 @@ impl Sema:
         // gen_pull takes the generator value by value: the pull consumes it.
         self.note_place_effect(recv, EFF_CONSUME)
         self.mark_moved_if_consumed(recv)
-        self.comp_resolved.insert(node, fn_sym)
+        self.note_call_resolution(node, fn_sym)
         self.receiver_arg_call_nodes.insert(node, 1)
         self.typed_expr_types.insert(node, ret)
         self.gen_pull_nodes.push(node)
@@ -23690,7 +23749,7 @@ impl Sema:
         if carrier == 2:
             args.push(self.comprehension_root_err_types.get(root) ?? 0)
         let wrapped = if carrier == 1: self.ensure_generic_inst_type(self.syms.option, args, 1) else: self.ensure_generic_inst_type(self.syms.result, args, 2)
-        self.comp_resolved.insert(node, if carrier == 1: self.syms.some else: self.syms.ok)
+        self.note_call_resolution(node, if carrier == 1: self.syms.some else: self.syms.ok)
         self.typed_expr_types.insert(node, wrapped)
         wrapped
 
@@ -25575,7 +25634,7 @@ impl Sema:
                     let try_sym2 = if is_payload: self.syms.ok else: self.syms.err
                     if self.enum_has_variant(resolved_st as i32, try_sym2) != 0:
                         v_name = try_sym2
-                self.comp_resolved.insert(node, v_name)
+                self.note_call_resolution(node, v_name)
             if kind == NodeKind.NK_PAT_VARIANT and bind_count == 0 and subject_enum_ty == 0 and self.ast.pattern_qualifier(node) == 0:
                 let value_sym = self.pattern_variant_value_sym(node, v_name)
                 if self.try_mark_value_pattern(node, subject_shape_type, value_sym):
@@ -25584,7 +25643,7 @@ impl Sema:
             if pattern_enum_ty == 0:
                 return
             let resolved_variant_sym = self.qualified_enum_variant_sym(pattern_enum_ty, v_name)
-            self.comp_resolved.insert(node, resolved_variant_sym)
+            self.note_call_resolution(node, resolved_variant_sym)
             let v_extra = self.ast.get_data1(node)
             if subject_enum_ty == 0:
                 if bind_count != 0:
@@ -27013,7 +27072,7 @@ impl Sema:
         for ai in 0..arg_nodes.len():
             if arg_nodes[ai] > 0 and not self.implicit_iter_args.contains(arg_nodes[ai]):
                 self.mark_moved_if_consumed(arg_nodes[ai])
-        self.comp_resolved.insert(node, fn_sym)
+        self.note_call_resolution(node, fn_sym)
         self.receiver_arg_call_nodes.insert(node, 1)
         self.typed_expr_types.insert(node, ret)
         ret
@@ -27087,7 +27146,7 @@ impl Sema:
                 let target: str = with_str_clone_ref(self.pool_resolve(target_sym))
                 self.emit_error(f"`{stage}[{target}]` over a {self.type_name(lhs_ty)} is not available: this `{stage}` builds a {self.type_name(ret)}", callee)
                 return 0
-        self.comp_resolved.insert(node, fn_sym)
+        self.note_call_resolution(node, fn_sym)
         self.typed_expr_types.insert(node, ret)
         ret
 
@@ -28785,7 +28844,7 @@ impl Sema:
                     self.emit_argument_type_mismatch(pkg_name ++ "." ++ method_name, fn_sym, ai, ai, expected_ty, actual_ty, arg_node)
                 else:
                     self.note_call_arg_coercion(expected_ty, actual_ty, arg_node, node)
-        self.comp_resolved.insert(node, fn_sym)
+        self.note_call_resolution(node, fn_sym)
         self.qualified_extension_call_nodes.insert(node, 1)
         self.ensure_body_typed(fn_sym, sig_idx)
         self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, arg_count, false)
@@ -28865,7 +28924,7 @@ impl Sema:
                     self.emit_argument_type_mismatch(call_name, fn_sym, ai, ai, expected_ty, actual_ty, arg_node)
                 else:
                     self.note_call_arg_coercion(expected_ty, actual_ty, arg_node, node)
-        self.comp_resolved.insert(node, fn_sym)
+        self.note_call_resolution(node, fn_sym)
         self.qualified_extension_call_nodes.insert(node, 1)
         self.ensure_body_typed(fn_sym, sig_idx)
         self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, arg_count, false)
@@ -29117,7 +29176,7 @@ impl Sema:
                         fn_sym = self.syms.some
                 else:
                     fn_sym = self.syms.some
-                self.comp_resolved.insert(node, fn_sym)
+                self.note_call_resolution(node, fn_sym)
             // D29 precedence: a lexical binding wins before any module-level
             // interpretation — consult the scope BEFORE the global visibility
             // gate, or a local callable named like another module's private
@@ -29544,14 +29603,14 @@ impl Sema:
                 let drop_arg_nd = if has_resolved: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(resolved_extra_start)
                 if drop_arg_nd > 0:
                     self.mark_moved_if_consumed(drop_arg_nd)
-            self.comp_resolved.insert(node, fn_sym)
+            self.note_call_resolution(node, fn_sym)
             self.note_call_callee(node, CallCalleeKind.StdDrop)
             self.typed_expr_types.insert(node, self.ty_void as i32)
             return self.ty_void as i32
 
         // Known function
         if sig_idx >= 0:
-            self.comp_resolved.insert(node, fn_sym)
+            self.note_call_resolution(node, fn_sym)
             // std's `fence` is the atomic fence intrinsic: its declaration,
             // not its name, says so (a user's own `fence` is a function).
             self.note_call_callee(node, if self.fn_symbol_is_std_fence(fn_sym): CallCalleeKind.AtomicFence else: CallCalleeKind.Function)
@@ -29750,7 +29809,7 @@ impl Sema:
             self.emit_no_await_guard_may_suspend_call(node, fn_sym)
             self.note_allocating_callee(node, fn_sym)
             let ret = self.check_generic_call(fn_sym, fn_node, arg_types, checked_arg_nodes, resolved_arg_count, node)
-            self.comp_resolved.insert(node, fn_sym)
+            self.note_call_resolution(node, fn_sym)
             self.typed_expr_types.insert(node, ret)
             return ret
 
@@ -29786,7 +29845,7 @@ impl Sema:
                             let variant_name2: str = with_str_clone_ref(self.pool_resolve(fn_sym))
                             self.emit_argument_type_mismatch(variant_name2, fn_sym, ai, ai, expected_ty, arg_ty, if payload_arg_node > 0: payload_arg_node else: node)
             let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)
-            self.comp_resolved.insert(node, resolved_variant_sym)
+            self.note_call_resolution(node, resolved_variant_sym)
             self.note_call_callee(node, CallCalleeKind.Variant)
             self.typed_expr_types.insert(node, final_variant_ty as i32)
             if self.type_is_ephemeral_value(final_variant_ty as i32) or self.nodes_hold_ephemeral_value(checked_arg_nodes):
@@ -34887,7 +34946,7 @@ impl Sema:
         for ai in 0..arg_nodes.len():
             if arg_nodes[ai] > 0:
                 self.mark_moved_if_consumed(arg_nodes[ai])
-        self.comp_resolved.insert(node, fn_sym)
+        self.note_call_resolution(node, fn_sym)
         self.iter_ctor_call_nodes.insert(node, 1)
         self.typed_expr_types.insert(node, ret)
         ret
@@ -35840,25 +35899,18 @@ impl Sema:
         let owner_sym = self.method_owner_symbol_for_type(resolved)
         if owner_sym == 0:
             return false
-        let owner_name = self.pool_resolve(owner_sym)
-        let method_name = self.pool_resolve(field)
-        if owner_name == "Sender" and method_name == "send":
+        // #3052: the fact is the method's declaration's — `@[suspends]` on a
+        // std method (lib/std/sync.w), or the compiler's own declaration of
+        // a builtin method (Sema.w, beside the names it interns).
+        if self.builtin_suspending_methods.contains(sema_pair_key(owner_sym, field)):
             return true
-        if owner_name == "Receiver" and method_name == "recv":
-            return true
-        if owner_name == "Mutex" and (method_name == "lock" or method_name == "enter" or method_name == "enter_mut" or method_name == "set"):
-            return true
-        if owner_name == "RwLock" and (method_name == "read" or method_name == "write" or method_name == "enter" or method_name == "enter_mut" or method_name == "set"):
-            return true
-        if owner_name == "Once" and method_name == "call_once":
-            return true
-        if owner_name == "Condvar" and method_name == "wait":
-            return true
-        if owner_name == "Barrier" and method_name == "wait":
-            return true
-        if (owner_name == "Task" or owner_name == "ScopedTask") and method_name == "join_cleanup":
-            return true
-        false
+        // A top-level method (`pub fn Mutex.lock[T](self: &Self)`) is
+        // declared under its dotted symbol; an impl-block method under the
+        // method table.
+        let dotted = self.pool_lookup_symbol(self.pool_resolve(owner_sym) ++ "." ++ self.pool_resolve(field))
+        if dotted != 0 and self.suspending_fns.contains(dotted): return true
+        let method_fn = self.lookup_method_fn(owner_sym, field)
+        method_fn != 0 and self.suspending_fns.contains(method_fn)
 
     fn guard_source_root_sym(source: i32) -> i32:
         if source == 0:
@@ -36250,7 +36302,7 @@ impl Sema:
                     let note_arg = if has_resolved_args: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
                     self.note_call_arg_coercion(expected_ty, actual_ty, note_arg, node)
 
-        self.comp_resolved.insert(node, found_fn)
+        self.note_call_resolution(node, found_fn)
         if self.fn_decl_nodes.contains(found_fn) or self.generic_fn_node_for_symbol(found_fn) != 0:
             self.emit_no_await_guard_may_suspend_call(node, found_fn)
             self.note_allocating_callee(node, found_fn)
@@ -37646,7 +37698,7 @@ impl Sema:
                     self.note_allocation_site(node, AllocConstructKind.TO_OWNED, false, 0)
                 else:
                     self.note_allocating_callee(node, generic_method_fn)
-                self.comp_resolved.insert(node, generic_method_fn)
+                self.note_call_resolution(node, generic_method_fn)
                 if self.task_fns.contains(generic_method_fn):
                     self.record_global_concurrency_evidence(node, "async function call")
                 let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, expr, arg_types, extra_start, mc_resolved_arg_count, node)
@@ -37702,7 +37754,7 @@ impl Sema:
                     if self.fn_symbol_is_unsafe(method_fn_sym):
                         if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == false:
                             return 0
-                    self.comp_resolved.insert(node, method_fn_sym)
+                    self.note_call_resolution(node, method_fn_sym)
                     if self.task_fns.contains(method_fn_sym):
                         self.record_global_concurrency_evidence(node, "async function call")
                     self.emit_no_await_guard_may_suspend_call(node, method_fn_sym)
@@ -38320,7 +38372,7 @@ impl Sema:
                 if self.check_comptime_method_restriction(method_fn_sym, node):
                     return 0
                 if method_fn_sym != 0:
-                    self.comp_resolved.insert(node, method_fn_sym)
+                    self.note_call_resolution(node, method_fn_sym)
                 // #600 (§5.1): static method calls (Box.new / Rc.new / Arc.new)
                 // never reached the ephemeral arg gates — route each ephemeral
                 // arg through the same escape check as free-fn calls.

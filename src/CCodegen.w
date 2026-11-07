@@ -3794,7 +3794,7 @@ impl CCodegen:
                 if lit.len() > 0:
                     return lit
             return "0.0"
-        if ck == ConstKind.CK_ZERO_SIZED:
+        if ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_ZEROED:
             let zs_tid = body.const_types[const_id]
             if zs_tid != 0:
                 return self.zero_value_text(zs_tid)
@@ -9127,7 +9127,7 @@ impl CCodegen:
         if const_id < 0 or const_id >= body.const_kinds.len():
             return false
         let ck = body.const_kinds[const_id]
-        if ck == ConstKind.CK_UNIT or ck == ConstKind.CK_ZERO_SIZED:
+        if ck == ConstKind.CK_UNIT or ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_ZEROED:
             return true
         false
 

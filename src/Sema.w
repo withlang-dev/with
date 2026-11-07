@@ -655,6 +655,16 @@ type FacadeCallbackMethod {
     wrapped_params: List[i32],  // D76: the callbacks a generated wrapper serves (rendered indices), each `extern "C" fn(…, &U)` with `U` the userdata's
 }
 
+// #2977: one concurrency evidence site and the function it was found in
+// (0: top level); resolve_global_race_concurrency decides whether the
+// program reaches it.
+type RaceEvidence {
+    node: i32,
+    file: i32,
+    reason: str,
+    fn_sym: i32,
+}
+
 // D66 retained variadic pairs (#1652, §16.2b.9): what one operation of a
 // resource that has a callback pair does to that pair, keyed by the concrete
 // signature MIR records on the call (SemaFacade.w facade_index_pair_ops,
@@ -1215,6 +1225,8 @@ type Sema {
     must_use_types: HashMap[i32, i32],
     no_await_guard_types: HashMap[i32, i32],
     must_use_fns: HashMap[i32, i32],
+    suspending_fns: HashMap[i32, i32],          // @[suspends] declarations (#3052): calling one may suspend the current fiber
+    builtin_suspending_methods: HashMap[i64, i32], // … and the compiler-declared ones (Sender.send, Receiver.recv, Task.join_cleanup), keyed sema_pair_key(owner, method)
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
     no_alloc_fns: HashMap[i32, i32],
@@ -1320,6 +1332,14 @@ type Sema {
     global_race_concurrency_node: i32,
     global_race_concurrency_file: i32,
     global_race_concurrency_reason: str,
+    // #2977: every concurrency evidence site with the function it was found
+    // in (0: top level), and the call graph Sema resolved (from, to), so
+    // the proof counts only evidence the program can reach: a library body
+    // nothing calls does not make the program concurrent.
+    global_race_evidence: List[RaceEvidence],
+    race_call_edge_first: HashMap[i32, isize],     // a caller's first edge into race_call_edge_to; race_call_edge_next chains the rest
+    race_call_edge_to: List[i32],
+    race_call_edge_next: List[isize],
     // #1819 (§9.1c: globals are places; §21.1 rule 1): a call whose callee
     // writes a global — itself, or through its own calls — writes it at the
     // call site. Bodies are keyed by sema_global_effect_body: a signature
@@ -3456,6 +3476,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let must_use_types = sema_new_map_i32_i32()
     let no_await_guard_types = sema_new_map_i32_i32()
     let must_use_fns = sema_new_map_i32_i32()
+    let suspending_fns = sema_new_map_i32_i32()
+    let builtin_suspending_methods: HashMap[i64, i32] = HashMap.new()
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
     let no_alloc_fns = sema_new_map_i32_i32()
@@ -3754,6 +3776,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         must_use_types,
         no_await_guard_types,
         must_use_fns,
+        suspending_fns,
+        builtin_suspending_methods,
         result_option_fns,
         task_fns,
         no_alloc_fns,
@@ -3809,6 +3833,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         global_race_concurrency_node: 0,
         global_race_concurrency_file: 0,
         global_race_concurrency_reason: "",
+        global_race_evidence: [],
+        race_call_edge_first: HashMap.new(),
+        race_call_edge_to: [],
+        race_call_edge_next: [],
         global_write_records: List.new(),
         global_read_records: List.new(),
         global_init_order: List.new(),
@@ -6064,6 +6092,12 @@ impl Sema:
         self.syms.close = self.pool_intern("close")
         self.syms.cancel = self.pool_intern("cancel")
         self.syms.join_cleanup = self.pool_intern("join_cleanup")
+        // The compiler declares these methods itself (SemaCheck.w types them by
+        // owner and name), so their may-suspend fact is declared here too (#3052).
+        self.builtin_suspending_methods.insert(sema_pair_key(self.pool_intern("Sender"), self.syms.send), 1)
+        self.builtin_suspending_methods.insert(sema_pair_key(self.pool_intern("Receiver"), self.syms.recv), 1)
+        self.builtin_suspending_methods.insert(sema_pair_key(self.syms.task, self.syms.join_cleanup), 1)
+        self.builtin_suspending_methods.insert(sema_pair_key(self.syms.scoped_task, self.syms.join_cleanup), 1)
         self.syms.is_done = self.pool_intern("is_done")
         self.syms.was_cancelled = self.pool_intern("was_cancelled")
         self.syms.todo = self.pool_intern("todo")

@@ -1863,7 +1863,7 @@ impl Codegen:
                     return wl_const_real_of_string(float_ty, float_literal_value_text(float_text))
             return wl_const_real(float_ty, 0.0)
 
-        if ck == ConstKind.CK_ZERO_SIZED:
+        if ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_ZEROED:
             if materialize_ty != 0:
                 return self.build_default_value(materialize_ty)
             return wl_const_int(wl_i32_type(self.context), 0, 0)
@@ -7543,7 +7543,7 @@ impl Codegen:
         let cid = body.operand_d0[op]
         if cid < 0 or cid >= body.const_kinds.len():
             return false
-        body.const_kinds[cid] == ConstKind.CK_ZERO_SIZED
+        body.const_kinds[cid] == ConstKind.CK_ZERO_SIZED or body.const_kinds[cid] == ConstKind.CK_ZEROED
 
     mut fn mir_emit_stmt(body: &MirBody, stmt_id: i32) -> bool:
         if stmt_id < 0 or stmt_id >= body.stmt_kinds.len():
