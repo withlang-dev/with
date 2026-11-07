@@ -353,9 +353,12 @@ export WITH=$RELEASE_SEED
 WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build
 ```
 
-The remaining Darwin gates stay under the pinned seed (`seed-driver` refuses
-`:test` and `:last-green` under any other driver); only the release UAT runs
-under the rebuilt compiler, since it exercises that binary as the orchestrator:
+Every remaining Darwin gate, the release UAT included, runs under the pinned
+seed: `seed-driver` refuses any other driver, and `:release-uat` depends on
+`release-checks`, which depends on it (D131, #2888). The UAT still exercises
+the rebuilt binary — its input is the packaged asset
+(`release_platform_asset_bin()`), whoever drives the graph. Only the publish
+runs under the rebuilt compiler.
 
 ```sh
 WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :fixpoint
@@ -363,9 +366,7 @@ WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :test
 WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :test-green
 WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :last-green
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with version
-
-export WITH=$PWD/out/release/bin/with
-WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :release-uat
+WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :release-uat
 ```
 
 The Darwin release package target must copy `out/release/bin/with`, verify the

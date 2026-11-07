@@ -36,6 +36,18 @@ New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 try {
     Write-Output "downloading $url"
     Invoke-WebRequest -Uri $url -OutFile $tmpBin
+
+    # Every release publishes <asset>.sha256 beside the binary (#3003). Its
+    # first field is the digest (the second is the path CI hashed), compared
+    # before anything is installed or run; a mismatch removes the download.
+    Invoke-WebRequest -Uri "$url.sha256" -OutFile "$tmpBin.sha256"
+    $expected = ((Get-Content "$tmpBin.sha256" -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $tmpBin).Hash.ToLowerInvariant()
+    if (-not $expected -or $expected -ne $actual) {
+        Remove-Item -Force $tmpBin
+        throw "checksum mismatch for ${asset}: published $expected, downloaded $actual"
+    }
+
     Move-Item -Path $tmpBin -Destination $target -Force
 
     Write-Output "installed $target"
