@@ -603,7 +603,7 @@ type ForeignContract {
 }
 
 // D66 §16.2b.5: what a variadic case's argument is.
-pub enum FacadeVariadicKind:
+enum FacadeVariadicKind:
     Scalar      // a scalar C type: passed as that type
     Str         // `str`: a copied input string (§16.3c), passed as a call-scoped C string
     Callback    // a callback the resource keeps, with its paired userdata setter (§16.2b.9)
@@ -632,7 +632,7 @@ type ForeignVariadicSlot {
     until_syms: List[i32],
 }
 
-pub enum FacadeRetainedForm:
+enum FacadeRetainedForm:
     Callback
     Text
     Sized
