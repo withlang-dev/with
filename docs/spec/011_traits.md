@@ -472,7 +472,16 @@ numeric with two changes: every NaN equals every NaN, and `-0.0` equals
 
 A key is hashed by the compiler, structurally and consistently with `==`,
 with a hash seeded once per process from the runtime's randomness
-capability. No program writes a hash. A type whose equality is about one
+capability. No program writes a hash. The seed is the default for every
+key type; a map or set whose keys are integer IDs the program itself
+minted — a counter's output, which nothing outside the process chooses —
+may name the unseeded hasher where it is declared, as a type argument:
+`HashMap[K, V, Minted]`, `HashSet[T, Minted]` (D196). `Minted` is a
+multiply-mix, never the identity; it is refused over a key that is not an
+integer, and the choice never follows the key's type, since a key the
+program received (parsed, read from a socket) is the case the seed exists
+for. Iteration order is insertion order whatever the hasher, so the choice
+changes no output. A type whose equality is about one
 part of its value states that part once, as its key projection:
 
 ```

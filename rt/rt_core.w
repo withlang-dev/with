@@ -4077,7 +4077,7 @@ let HM_OFF_ECAP: i64 = 24
 let HM_OFF_LEN: i64 = 32
 let HM_OFF_KSZ: i64 = 40
 let HM_OFF_VSZ: i64 = 48
-let HM_OFF_ISSTR: i64 = 56
+let HM_OFF_KIND: i64 = 56   // the key kind: HM_KEY_BYTES, HM_KEY_STR, HM_KEY_FNS, HM_KEY_MINTED
 let HM_OFF_HASHFN: i64 = 64
 let HM_OFF_EQFN: i64 = 72
 let HM_OFF_INDEX: i64 = 80
@@ -4085,6 +4085,15 @@ let HM_OFF_ICAP: i64 = 88
 let HM_OFF_NENT: i64 = 96
 let HM_OFF_HOLDERS: i64 = 104
 let HM_SIZE: i64 = 112
+
+// How a map hashes and compares a key (§11.7, D96; with_hashmap_new_keyed's
+// key_kind): by its bytes; as a `str`; by the functions generated for its
+// type; or as an ID the program minted (D196): a multiply-mix, unseeded,
+// because nothing outside the process chose the key.
+let HM_KEY_BYTES: i64 = 0
+let HM_KEY_STR: i64 = 1
+let HM_KEY_FNS: i64 = 2
+let HM_KEY_MINTED: i64 = 3
 
 pub type MapKeyHashFn = *const fn(*const u8) -> u64
 pub type MapKeyEqFn = *const fn(*const u8, *const u8) -> i32
@@ -4101,8 +4110,9 @@ fn hm_nent(m: i64) -> i64: hm_field(m, HM_OFF_NENT)
 fn hm_len(m: i64) -> i64: hm_field(m, HM_OFF_LEN)
 fn hm_key_size(m: i64) -> i64: hm_field(m, HM_OFF_KSZ)
 fn hm_val_size(m: i64) -> i64: hm_field(m, HM_OFF_VSZ)
-fn hm_is_str_key(m: i64) -> i32: unsafe *((m + HM_OFF_ISSTR) as *const i32)
-fn hm_set_is_str_key(m: i64, v: i32): unsafe *((m + HM_OFF_ISSTR) as *mut i32) = v
+fn hm_key_kind(m: i64) -> i64: (unsafe *((m + HM_OFF_KIND) as *const i32)) as i64
+fn hm_is_str_key(m: i64) -> bool: hm_key_kind(m) == HM_KEY_STR
+fn hm_set_key_kind(m: i64, kind: i64): unsafe *((m + HM_OFF_KIND) as *mut i32) = kind as i32
 fn hm_hash_fn(m: i64) -> MapKeyHashFn: unsafe *((m + HM_OFF_HASHFN) as *const MapKeyHashFn)
 fn hm_eq_fn(m: i64) -> MapKeyEqFn: unsafe *((m + HM_OFF_EQFN) as *const MapKeyEqFn)
 fn hm_set_key_fns(m: i64, hash_fn: MapKeyHashFn, eq_fn: MapKeyEqFn):
@@ -4116,13 +4126,23 @@ fn hm_entry_live(m: i64, e: i64) -> bool: (unsafe hm_live(m)[e]) != 0
 fn hm_slot(m: i64, i: i64) -> i64: (unsafe hm_index(m)[i]) as i64
 fn hm_set_slot(m: i64, i: i64, e: i64): unsafe *((hm_index(m) as i64 + i * 4) as *mut i32) = e as i32
 
+// D196: a minted ID hashed without a seed. The product of a 64-bit odd
+// constant spreads the key over the high bits; folding them down gives the
+// low bits the table indexes by their share (an identity hash would cluster
+// sequential IDs, and a bare product leaves the low bits as they were).
+fn hm_hash_minted(key: *const u8, size: i64) -> u64:
+    let k: u64 = if size == 8: unsafe *(key as *const u64) else: if size == 4: (unsafe *(key as *const u32)) as u64 else: if size == 2: (unsafe *(key as *const u16)) as u64 else: (unsafe *key) as u64
+    let h = k *% 0x9E3779B97F4A7C15
+    h ^ (h >> 32)
+
 fn hm_hash_key(m: i64, key: *const u8) -> u64:
     let hash_fn = hm_hash_fn(m)
     if hash_fn as i64 != 0: return hash_fn(key)
+    if hm_key_kind(m) == HM_KEY_MINTED: return hm_hash_minted(key, hm_key_size(m))
     var state: [7]u64 = [0 as u64; 7]
     let s = (&raw mut state) as *mut [7]u64 as *mut u8
     with_hasher_init(s)
-    if hm_is_str_key(m) != 0:
+    if hm_is_str_key(m):
         // key points to a str value {ptr, len}: its length, then its bytes.
         with_hasher_write(s, (key as i64 + 8) as *const u8, 8)
         with_hasher_write(s, unsafe *(key as *const *const u8), unsafe *((key as i64 + 8) as *const i64))
@@ -4133,7 +4153,7 @@ fn hm_hash_key(m: i64, key: *const u8) -> u64:
 fn hm_keys_eq(m: i64, a: *const u8, b: *const u8) -> i32:
     let eq_fn = hm_eq_fn(m)
     if eq_fn as i64 != 0: return eq_fn(a, b)
-    if hm_is_str_key(m) != 0:
+    if hm_is_str_key(m):
         let a_ptr = unsafe *(a as *const *const u8)
         let a_len = unsafe *((a as i64 + 8) as *const i64)
         let b_ptr = unsafe *(b as *const *const u8)
@@ -4210,8 +4230,8 @@ fn hm_grow_entries(m: i64):
 pub fn with_hashmap_new_keyed(key_size: i64, val_size: i64, key_kind: i64, hash_fn: MapKeyHashFn, eq_fn: MapKeyEqFn) -> *mut u8:
     let m = with_hashmap_new(key_size, val_size)
     let mi = m as i64
-    hm_set_is_str_key(mi, if key_kind == 1: 1 else: 0)
-    hm_set_key_fns(mi, if key_kind == 2: hash_fn else: 0 as MapKeyHashFn, if key_kind == 2: eq_fn else: 0 as MapKeyEqFn)
+    hm_set_key_kind(mi, if key_kind == HM_KEY_FNS: HM_KEY_BYTES else: key_kind)
+    hm_set_key_fns(mi, if key_kind == HM_KEY_FNS: hash_fn else: 0 as MapKeyHashFn, if key_kind == HM_KEY_FNS: eq_fn else: 0 as MapKeyEqFn)
     m
 
 // The map of a compiler that names no key kind: a 16-byte key is taken to
@@ -4224,7 +4244,7 @@ pub fn with_hashmap_new(key_size: i64, val_size: i64) -> *mut u8:
     hm_set_key_fns(mi, 0 as MapKeyHashFn, 0 as MapKeyEqFn)
     hm_set_field(mi, HM_OFF_KSZ, key_size)
     hm_set_field(mi, HM_OFF_VSZ, val_size)
-    hm_set_is_str_key(mi, if key_size == 16: 1 else: 0)
+    hm_set_key_kind(mi, if key_size == 16: HM_KEY_STR else: HM_KEY_BYTES)
     hm_set_field(mi, HM_OFF_ECAP, 8)
     hm_set_field(mi, HM_OFF_KEYS, rt_alloc(8 * key_size) as i64)
     hm_set_field(mi, HM_OFF_VALS, rt_alloc(8 * val_size) as i64)
@@ -4244,7 +4264,7 @@ pub fn with_hashmap_new_at(base: *mut u8, offset: i64, key_size: i64, val_size: 
 pub fn with_hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: i64):
     let m = map as i64
     if is_str_key != 0:
-        hm_set_is_str_key(m, 1)
+        hm_set_key_kind(m, HM_KEY_STR)
     let slot = hm_find_slot(m, key)
     if slot >= 0:
         // The key is present: its value is replaced where it stands.

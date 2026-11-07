@@ -2427,6 +2427,24 @@ impl Sema:
 
         0 as TypeId
 
+    // `Name[A, B, C]` in expression position parses as a multi-index (two
+    // arguments are an NK_INDEX). When every spec is a scalar and the base
+    // names a type, the specs are type arguments (`HashMap[i32, V,
+    // Minted].new()`, D196): their expressions, else an empty list.
+    fn multi_index_type_arg_nodes(node: i32) -> List[i32]:
+        let out = []
+        if self.ast.kind(node) != NodeKind.NK_MULTI_INDEX: return out
+        let start = self.ast.get_data1(node)
+        for si in 0..self.ast.get_data2(node):
+            let spec = self.ast.get_extra(start + si)
+            if self.ast.get_data2(spec) / INDEX_KIND_SHIFT != INDEX_SCALAR or self.ast.get_data0(spec) == 0: return []
+            out.push(self.ast.get_data0(spec))
+        out
+
+    fn multi_index_names_type(node: i32) -> bool:
+        if self.ast.kind(node) != NodeKind.NK_MULTI_INDEX: return false
+        let base = self.ast.get_data0(node)
+        self.ast.kind(base) == NodeKind.NK_IDENT and self.has_named_type_visible(self.ast.get_data0(base)) and self.multi_index_type_arg_nodes(node).len() > 0
     mut fn resolve_type_level_arg_expr(node: i32) -> i32:
         if node == 0:
             return 0
@@ -2522,6 +2540,17 @@ impl Sema:
                     return 0
                 tuple_elems.push(elem)
             return self.ensure_tuple_type(tuple_elems, tuple_count) as i32
+        if kind == NodeKind.NK_MULTI_INDEX and self.multi_index_names_type(node):
+            let base_sym = self.ast.get_data0(self.ast.get_data0(node))
+            let base_tid = self.lookup_named_type_visible(base_sym)
+            let args = []
+            for arg_node in self.multi_index_type_arg_nodes(node):
+                let arg_ty = self.resolve_type_level_arg_expr(arg_node)
+                if arg_ty == 0: return 0
+                args.push(arg_ty)
+            if not self.validate_generic_arity(base_sym, base_tid, args, node): return 0
+            // `as i32`: the pinned seed predates D183's range-checked narrowing.
+            return self.ensure_generic_inst_type(base_sym, args, args.len() as i32) as i32
         if kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
             if self.ast.kind(base) != NodeKind.NK_IDENT:
@@ -2803,6 +2832,14 @@ impl Sema:
             return 0
         if kind == NodeKind.NK_TYPE_GENERIC:
             return self.resolve_generic_type_frozen(node)
+        if kind == NodeKind.NK_MULTI_INDEX and self.multi_index_names_type(node):
+            let base_sym = self.ast.get_data0(self.ast.get_data0(node))
+            let args = []
+            for arg_node in self.multi_index_type_arg_nodes(node):
+                let arg_ty = self.resolve_type_level_arg_expr_frozen(arg_node)
+                if arg_ty == 0: return 0
+                args.push(arg_ty)
+            return self.find_generic_inst_type(base_sym, args, args.len() as i32) as i32
         if kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
             if self.ast.kind(base) != NodeKind.NK_IDENT:
@@ -5293,7 +5330,7 @@ impl Sema:
             name = with_str_clone_ref(self.pool_resolve(fn_name))
         let dot = sema_str_find_char(name, 46)
         if dot >= 0:
-            return name.slice((dot + 1) as i64, name.len() as i64)
+            return name.slice(dot + 1, name.len())
         name
 
     mut fn trait_impl_method_contract(node: i32, fn_name: i32) -> SemaTraitImplMethodContract:
@@ -21709,7 +21746,7 @@ impl Sema:
                 let static_named = self.static_receiver_named_type(expr, static_type_sym)
                 if static_named != 0:
                     obj_type = static_named as TypeId
-        else if static_type_sym != 0 and self.static_receiver_type_is_known(expr) and static_expr_kind == NodeKind.NK_INDEX:
+        else if static_type_sym != 0 and self.static_receiver_type_is_known(expr) and (static_expr_kind == NodeKind.NK_INDEX or static_expr_kind == NodeKind.NK_MULTI_INDEX):
             let static_indexed = self.resolve_type_level_arg_expr(expr)
             if static_indexed != 0:
                 obj_type = static_indexed as TypeId
@@ -22202,6 +22239,7 @@ impl Sema:
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(expr)
             return self.has_named_type_visible(sym)
+        if kind == NodeKind.NK_MULTI_INDEX: return self.multi_index_names_type(expr)
         if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             return self.index_expr_is_type_level(self.ast.get_data0(expr))
         false
@@ -22408,7 +22446,7 @@ impl Sema:
 
     mut fn is_runtime_multi_index_node(node: i32) -> bool:
         let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_MULTI_INDEX:
+        if kind == NodeKind.NK_MULTI_INDEX and not self.multi_index_names_type(node):
             return true
         if kind == NodeKind.NK_INDEX:
             if self.ast.get_data2(node) != 0 and self.index_expr_is_type_level(self.ast.get_data0(node)) == 0:
@@ -22575,6 +22613,12 @@ impl Sema:
         true
 
     mut fn check_multi_index(node: i32) -> i32:
+        // `HashMap[i32, V, Minted]` in expression position (D196): a type,
+        // as check_index makes `HashMap[K, V]` one.
+        if self.multi_index_names_type(node):
+            let tid = self.resolve_type_level_arg_expr(node)
+            if tid != 0: self.typed_expr_types.insert(node, tid)
+            return tid
         let base_ty = self.check_multi_index_operands(node)
         self.check_multi_index_method(node, base_ty)
 
@@ -22953,7 +22997,7 @@ impl Sema:
             if base != self.syms.hashmap and base != self.syms.btreemap:
                 self.emit_error("map literal requires HashMap or BTreeMap expected type", node)
                 return 0
-            if self.get_generic_inst_arg_count(expected as i32) != 2:
+            if self.get_generic_inst_arg_count(expected as i32) < 2:
                 self.emit_error("map literal target requires key and value types", node)
                 return 0
             target_ty = expected as i32
@@ -25356,7 +25400,7 @@ impl Sema:
             if text[i] == 46:
                 dot = i as i32
         if dot >= 0 and dot + 1 < text.len():
-            return self.pool_lookup_symbol(text.slice((dot + 1) as i64, text.len() as i64))
+            return self.pool_lookup_symbol(text.slice(dot + 1, text.len()))
         variant_name
 
     // A read-only place: a `&T`'s pointee, a `*const T`. A downcast binding
@@ -36217,7 +36261,7 @@ impl Sema:
                 if fn_name == method_name:
                     return decl
             else:
-                let bare = fn_name.slice((dot + 1) as i64, fn_name.len() as i64)
+                let bare = fn_name.slice(dot + 1, fn_name.len())
                 if bare == method_name:
                     return decl
         0
@@ -36363,7 +36407,9 @@ impl Sema:
         if td_tp_count == 0:
             return 0
         let gi_arg_count = self.get_generic_inst_arg_count(gi_tid)
-        if gi_arg_count != td_tp_count:
+        // D196: a map or set's trailing `Minted` hasher argument binds no
+        // parameter of `impl[K, V] HashMap[K, V]`; the declared ones bind.
+        if gi_arg_count != td_tp_count and not (gi_arg_count == td_tp_count + 1 and (type_sym == self.syms.hashmap or type_sym == self.syms.hashset)):
             return 0
         self.clear_generic_substitution()
         var tp_pos = td_tp_start
@@ -36833,7 +36879,7 @@ impl Sema:
             let sym = self.ast.get_data0(node)
             if self.named_types.contains(sym):
                 return self.named_types.get(sym).unwrap()
-        if kind == NodeKind.NK_INDEX and self.receiver_names_type(node):
+        if (kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX) and self.receiver_names_type(node):
             let indexed_ty = self.resolve_type_level_arg_expr(node)
             if indexed_ty != 0:
                 return indexed_ty
@@ -36854,7 +36900,7 @@ impl Sema:
             return self.scope_lookup(sym) < 0 and self.named_types.contains(sym)
         if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
             return true
-        if kind == NodeKind.NK_INDEX:
+        if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX:
             return self.receiver_names_type(self.ast.get_data0(expr))
         false
 
@@ -38789,7 +38835,7 @@ impl Sema:
         if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC:
             return self.ast.get_data0(expr)
         // Handle List[i32].method() — NodeKind.NK_INDEX(NodeKind.NK_IDENT("List"), ...)
-        if kind == NodeKind.NK_INDEX:
+        if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX:
             let base = self.ast.get_data0(expr)
             if self.ast.kind(base) == NodeKind.NK_IDENT:
                 return self.ast.get_data0(base)

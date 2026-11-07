@@ -75,6 +75,14 @@ pub type HashMap[K, V]  {
     ptr: *const i8,
 }
 
+/// The hasher of a map or set whose keys are IDs this program minted (D196,
+/// §11.7): `HashMap[i32, V, Minted]`, `HashSet[i32, Minted]`. Symbol, node
+/// and row IDs come from a counter inside the process, so nothing outside it
+/// chooses them and the per-process seed buys nothing; they hash with an
+/// unseeded multiply-mix. A key the program received — parsed, read from a
+/// socket — stays with the default seeded hasher, whatever its type.
+pub type Minted {}
+
 /// An unordered set of unique values. Create with `HashSet.new()`.
 pub type HashSet[T]  {
     ptr: *const i8,

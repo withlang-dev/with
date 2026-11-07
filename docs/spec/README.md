@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.40
+# The With Programming Language — Specification v7.41
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.41:** D196 (Eric, 2026-11-08, #2372). §11.7: the per-process seed is the default hasher for every key type; a map or set keyed by integer IDs the program minted may name the unseeded `Minted` hasher as a type argument (`HashMap[K, V, Minted]`, `HashSet[T, Minted]`), a multiply-mix, refused over a non-integer key, never chosen by key type. A declared generic type now refuses a wrong argument count (`HashMap[i32, i32, i32]` was accepted and miscompiled).
+
 **Changelog v7.40:** D195 (delegated, 2026-11-07, #3052). §14.3: a fiber-aware runtime operation is one whose declaration says it may suspend (`@[suspends]` on a std method, or the compiler's own declaration of a builtin); the compiler keeps no list of names. Implemented in the same change, with #2977 (concurrency evidence counts only where the program reaches it) and #2636 (`T.zeroed()` is a value, not the reset-on-move blank).
 
 **Changelog v7.39:** D194 (Eric, 2026-11-07, #3010). §16.2b.5: a retained pointer case of a variadic contract (`case CONST: &CString retains by param N [length param CONST as T] [until <op>, …]`) is a borrow of caller-managed storage held under §16.2b.9's retained-borrow window; a pointer read to a separately set length is one presented operation over `&[u8]`; `str` in the slot is refused with its fix. §16.2b.9: several retentions per resource, each with its own release.

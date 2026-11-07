@@ -3110,10 +3110,24 @@ impl Codegen:
         2
 
     // A new map whose keys have With type `key_sema`.
-    mut fn mir_emit_hashmap_new(key_sema: i32, key_ty: i64, key_size: i64, val_size: i64) -> i64:
+    // D196: the map type's hasher argument names `Minted` (Sema validated it:
+    // HashMap's third argument, HashSet's second).
+    fn map_type_is_minted(map_sema: i32) -> bool:
+        if map_sema <= 0: return false
+        let resolved = self.sema.resolve_alias(map_sema as TypeId) as i32
+        if self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST: return false
+        let base = self.sema.get_generic_inst_base(resolved)
+        let count = self.sema.get_type_d2(resolved as TypeId)
+        let declared = if base == self.sema.syms.hashmap: 2 else: if base == self.sema.syms.hashset: 1 else: -1
+        if declared < 0 or count != declared + 1: return false
+        let hasher = self.sema.resolve_alias(self.sema.get_generic_inst_arg(resolved, declared) as TypeId)
+        let name = self.sema.get_type_name(hasher)
+        name != 0 and self.sema.pool_resolve(name) == "Minted"
+
+    mut fn mir_emit_hashmap_new(key_sema: i32, key_ty: i64, key_size: i64, val_size: i64, minted: bool) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let kind = self.mir_map_key_kind(key_sema)
+        let kind = if minted: 3 else: self.mir_map_key_kind(key_sema)
         var hash_fn = wl_const_null(ptr_ty)
         var eq_fn = wl_const_null(ptr_ty)
         if kind == 2 and key_ty != 0:
@@ -10689,6 +10703,7 @@ impl Codegen:
             var hm_base_sym = 0
             var hm_key_sema: i32 = 0
             var hm_key_llvm: i64 = 0
+            var hm_minted = false
             let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
             if dest_sema > 0:
                 let resolved = self.mir_resolve_alias_at(dest_sema)
@@ -10696,7 +10711,8 @@ impl Codegen:
                 if tk == TypeKind.TY_GENERIC_INST:
                     hm_base_sym = self.sema_sym_to_codegen_sym(self.mir_type_d0_at(resolved))
                     let gi_arg_count = self.mir_type_d2_at(resolved)
-                    if hm_base_sym == self.sym_hashmap and gi_arg_count == 2:
+                    hm_minted = self.map_type_is_minted(dest_sema)
+                    if hm_base_sym == self.sym_hashmap and gi_arg_count >= 2:
                         let args_start = self.mir_type_d1_at(resolved)
                         let key_sema = self.mir_type_extra_at(args_start)
                         let val_sema = self.mir_type_extra_at(args_start + 1)
@@ -10708,7 +10724,7 @@ impl Codegen:
                             hm_key_size = self.abi_size_of(key_llvm)
                             hm_val_size = self.abi_size_of(val_llvm)
                             hm_ty = self.get_or_create_hashmap_type(dest_sema, key_llvm, val_llvm)
-                    else if hm_base_sym == self.sym_hashset and gi_arg_count > 0:
+                    else if hm_base_sym == self.sym_hashset and gi_arg_count >= 1:
                         let args_start = self.mir_type_d1_at(resolved)
                         let elem_sema = self.mir_type_extra_at(args_start)
                         let elem_llvm = self.sema_type_to_llvm(elem_sema)
@@ -10718,7 +10734,7 @@ impl Codegen:
                             hm_key_size = self.abi_size_of(elem_llvm)
                             hm_val_size = 1
                             hm_ty = self.get_or_create_hashset_type(dest_sema, elem_llvm)
-            let handle = self.mir_emit_hashmap_new(hm_key_sema, hm_key_llvm, hm_key_size, hm_val_size)
+            let handle = self.mir_emit_hashmap_new(hm_key_sema, hm_key_llvm, hm_key_size, hm_val_size, hm_minted)
             // Wrap handle in HashMap struct { ptr }.
             if hm_ty == 0:
                 if hm_base_sym == self.sym_hashset:
@@ -12738,7 +12754,7 @@ impl Codegen:
             let map_ty = if map_ty0 != 0: map_ty0 else: if base_sym == self.sym_hashset: self.get_or_create_hashset_type(0, key_ty) else: self.get_or_create_hashmap_type(0, key_ty, val_ty)
             let key_size = self.abi_size_of(key_ty)
             let val_size = self.abi_size_of(val_ty)
-            let handle = self.mir_emit_hashmap_new(first_tid, key_ty, key_size, val_size)
+            let handle = self.mir_emit_hashmap_new(first_tid, key_ty, key_size, val_size, self.map_type_is_minted(self.mir_intrinsic_dest_sema_type(body, dest_place)))
             let map_value = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
             let insert_params: List[i64] = List.new()
             insert_params.push(ptr_ty)

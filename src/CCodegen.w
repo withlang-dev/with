@@ -7306,7 +7306,7 @@ impl CCodegen:
                     return ""
                 let key_ty = self.c_type(key_tid, 0)
                 let val_ty = self.c_type(if is_set: self.sema.ty_i64 as i32 else: val_tid, 0)
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(intptr_t)with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_args_text(key_tid) ++ ");\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(intptr_t)with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_args_text(key_tid, dst_tid) ++ ");\n"
             else:
                 out = out ++ "    (void)0;\n"
             out = out ++ f"    goto bb{next_bb};"
@@ -8663,7 +8663,7 @@ impl CCodegen:
         let key_ty = self.c_type(key_tid, 0)
         let val_ty = self.c_type(val_tid, 0)
         let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
-        out = out ++ " void* __with_h = with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_args_text(key_tid) ++ ");"
+        out = out ++ " void* __with_h = with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_args_text(key_tid, resolved) ++ ");"
         let entry_count = if is_set: argc else: argc / 2
         for i in 0..entry_count:
             let key_idx = if is_set: i else: i * 2
@@ -10374,7 +10374,9 @@ impl CCodegen:
     // as with_hashmap_new_keyed's last three arguments: 0, by its bytes (an
     // integer, a bool, a raw pointer); 1, as a `str`; 2, by the functions
     // generated for its type (key_hash_fn_name, key_eq_fn_name).
-    mut fn map_key_args_text(key_tid: i32) -> str:
+    // D196: a map whose type names `Minted` hashes its IDs unseeded (kind 3).
+    mut fn map_key_args_text(key_tid: i32, map_tid: i32) -> str:
+        if self.map_tid_is_minted(map_tid): return "3, 0, 0"
         let resolved = self.sema.resolve_alias(key_tid as TypeId) as i32
         let tk = self.sema.get_type_kind(resolved as TypeId)
         if not self.sema.concrete_key_sigs.contains(resolved):
@@ -10383,6 +10385,18 @@ impl CCodegen:
         let hash_fn = self.key_hash_fn_name(resolved)
         let eq_fn = self.key_eq_fn_name(resolved)
         "2, " ++ hash_fn ++ ", " ++ eq_fn
+
+    fn map_tid_is_minted(map_tid: i32) -> bool:
+        if map_tid <= 0: return false
+        let resolved = self.sema.resolve_alias(map_tid as TypeId) as i32
+        if self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST: return false
+        let base = self.sema.get_generic_inst_base(resolved)
+        let count = self.sema.get_type_d2(resolved as TypeId)
+        let declared = if base == self.sema.syms.hashmap: 2 else: if base == self.sema.syms.hashset: 1 else: -1
+        if declared < 0 or count != declared + 1: return false
+        let hasher = self.sema.resolve_alias(self.sema.get_generic_inst_arg(resolved, declared) as TypeId)
+        let name = self.sema.get_type_name(hasher)
+        name != 0 and self.sema.pool_resolve(name) == "Minted"
 
     fn prelude_block_declares(name: &str) -> bool:
         cc_str_starts_with(name, "with_str_") or cc_str_starts_with(name, "with_fmt_") or
