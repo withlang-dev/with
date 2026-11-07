@@ -528,6 +528,9 @@ fn mir_const_text(body: &MirBody, const_id: i32, pool: &InternPool, sema: &Sema)
         let ty_name = if ty != 0: f"ty{ty}" else: "<zst>"
         return "const zst(" ++ ty_name ++ ")"
 
+    if k == ConstKind.CK_ZEROED:
+        return f"const zeroed(ty{ty})"
+
     if k == ConstKind.CK_FN:
         if d0 != 0 and body.const_d1[const_id] == 1:
             return f"const callable fn sym{d0}"

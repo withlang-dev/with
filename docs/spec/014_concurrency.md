@@ -154,6 +154,12 @@ suspension:
    rejects direct `.await`, collection/select await, same-fiber
    `may_suspend` calls, structured-concurrency joins, implicit cleanup
    awaits, and direct fiber-aware runtime operations in that region.
+   A fiber-aware runtime operation is one whose declaration says it may
+   suspend: `@[suspends]` on a standard-library method (`Mutex.lock`,
+   `RwLock.write`, `Once.call_once`, `Condvar.wait`, `Barrier.wait`), or
+   the compiler's own declaration of a builtin method (`Sender.send`,
+   `Receiver.recv`, `Task.join_cleanup`). The compiler keeps no list of
+   names (D195).
 
 Programmers do not declare or annotate `may_suspend`. The compiler
 computes it internally; it may appear in diagnostics when a safety

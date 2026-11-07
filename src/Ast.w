@@ -463,10 +463,11 @@ enum FnFlags: i32:
     BEFORE = 8192
     AFTER = 16384
     BENCH = 32768
+    SUSPENDS = 65536  // @[suspends]: calling it may suspend the current fiber (#3052; a std lock, wait or receive)
 
 // Metadata packing unit used to encode required-parameter count into
 // fn_meta flags without affecting existing FnFlags.* parity checks.
-pub const FN_META_REQUIRED_UNIT: i32 = 65536
+pub const FN_META_REQUIRED_UNIT: i32 = 131072
 pub const FN_PARAM_STRIDE: i32 = 3
 pub const TRAIT_METHOD_STRIDE: i32 = 8
 pub const TRAIT_METHOD_NAME: i32 = 0

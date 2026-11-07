@@ -143,14 +143,17 @@ pub fn mutex_new(value: i64) -> Mutex[i64]:
     Mutex.new(value)
 
 /// Acquire the mutex (`with m.lock() as data:` or `with m.lock() as mut data:`).
+@[suspends]
 pub fn Mutex.lock[T](self: &Self) -> MutexGuardMut[T]: self.enter_mut()
 
 /// Acquire the mutex for reading.
+@[suspends]
 pub fn Mutex.enter[T](self: &Self) -> MutexGuard[T]:
     unsafe { sync_mutex_lock_state(self.ptr as *mut MutexState) }
     MutexGuard { ptr: self.ptr }
 
 /// Acquire the mutex for writing.
+@[suspends]
 pub fn Mutex.enter_mut[T](self: &Self) -> MutexGuardMut[T]:
     unsafe { sync_mutex_lock_state(self.ptr as *mut MutexState) }
     MutexGuardMut { ptr: self.ptr }
@@ -212,6 +215,7 @@ pub fn mutex_get(m: &Mutex[i64]) -> i64:
     guard.exit()
 
 /// Set the value inside a Mutex.
+@[suspends]
 pub fn Mutex.set[T](self: &Self, value: T) -> Unit:
     let state = self.ptr as *mut MutexState
     let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
@@ -246,12 +250,15 @@ pub fn rwlock_new(value: i64) -> RwLock[i64]:
     RwLock.new(value)
 
 /// Acquire for reading (`with rw.read() as data:`).
+@[suspends]
 pub fn RwLock.read[T](self: &Self) -> RwReadGuard[T]: self.enter()
 
 /// Acquire for writing (`with rw.write() as mut data:` or `with rw.write() as data:`).
+@[suspends]
 pub fn RwLock.write[T](self: &Self) -> RwWriteGuard[T]: self.enter_mut()
 
 /// Acquire for reading.
+@[suspends]
 pub fn RwLock.enter[T](self: &Self) -> RwReadGuard[T]:
     let state = self.ptr as *mut RwLockState
     let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
@@ -265,6 +272,7 @@ pub fn RwLock.enter[T](self: &Self) -> RwReadGuard[T]:
     RwReadGuard { ptr: self.ptr }
 
 /// Acquire for writing.
+@[suspends]
 pub fn RwLock.enter_mut[T](self: &Self) -> RwWriteGuard[T]:
     let state = self.ptr as *mut RwLockState
     let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
@@ -328,6 +336,7 @@ pub fn rwlock_read(rw: &RwLock[i64]) -> i64:
     guard.exit()
 
 /// Set a new value inside a RwLock.
+@[suspends]
 pub fn RwLock.set[T](self: &Self, value: T):
     let state = self.ptr as *mut RwLockState
     let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
@@ -356,6 +365,7 @@ pub fn Once.new() -> Once:
     (unsafe *state).state = 0
     Once { ptr: state as *mut u8 }
 
+@[suspends]
 pub fn Once.call_once(self: &Self, init: fn() -> Unit) -> Unit:
     let state = self.ptr as *mut OnceState
     let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
@@ -388,6 +398,7 @@ pub fn Condvar.new() -> Condvar:
     (unsafe *state).signals = 0
     Condvar { ptr: state as *mut u8 }
 
+@[suspends]
 pub fn Condvar.wait[T](self: &Self, lock: &Mutex[T]) -> Unit:
     let state = self.ptr as *mut CondvarState
     let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
@@ -431,6 +442,7 @@ pub fn Barrier.new(parties: i32) -> Barrier:
     (unsafe *state).locked = 0
     Barrier { ptr: state as *mut u8 }
 
+@[suspends]
 pub fn Barrier.wait(self: &Self) -> bool:
     let state = self.ptr as *mut BarrierState
     unsafe { sync_barrier_lock(state) }

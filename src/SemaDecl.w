@@ -2090,6 +2090,8 @@ impl Sema:
     mut fn record_fn_behavior_metadata(fn_name: i32, node: i32, flags: i32):
         if (flags / FnFlags.MUST_USE) % 2 == 1:
             self.must_use_fns.insert(fn_name, 1)
+        if (flags / FnFlags.SUSPENDS) % 2 == 1:
+            self.suspending_fns.insert(fn_name, 1)
         if (flags / FnFlags.ASYNC) % 2 == 1:
             self.task_fns.insert(fn_name, 1)
         if self.ast.state.fn_stack_sizes.contains(node):
