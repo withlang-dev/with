@@ -4392,8 +4392,12 @@ impl MirBuilder:
             let ty = if inferred_ty != 0: inferred_ty else: self.sema.ty_f64
             return self.const_operand(ConstKind.CK_FLOAT, float_str_idx, ty)
 
-        // Check for enum variant without payload (None, etc.)
-        if self.sema.variant_lookup.contains(sym):
+        // Check for enum variant without payload (None, etc.). Sema says
+        // which reads are a module variable's (global_value_ident_nodes,
+        // check_ident): a global named like an imported enum's variant is
+        // the global (§18.2, #3068), as the place path below reads it.
+        let reads_global = node_id != 0 and self.sema.global_value_ident_nodes.contains(node_id)
+        if self.sema.variant_lookup.contains(sym) and not reads_global:
             let vl_sym = if node_id != 0 and self.sema.comp_resolved.contains(node_id): self.sema.comp_resolved.get(node_id).unwrap() else: sym
             let vl_decl_ty: i32 = if self.sema.variant_type_ids.contains(vl_sym): self.sema.variant_type_ids.get(vl_sym).unwrap() else: self.sema.variant_type_ids.get(sym).unwrap()
             // #671: same guard as the constructor-call path — an ambient

@@ -1331,7 +1331,7 @@ fn comp_known_missing_attribute(item: &str) -> str:
     ""
 
 fn comp_internal_command(item: &str) -> bool:
-    item == "analyze" or item == "ast" or item == "bench" or item == "clean" or item == "fixpoint-diff" or item == "get" or item == "install-user" or item == "ir" or item == "lsp" or item == "migrate-receivers" or item == "reduce" or item == "remove" or item == "tokens"
+    item == "analyze" or item == "ast" or item == "bench" or item == "clean" or item == "fixpoint-diff" or item == "get" or item == "install-user" or item == "ir" or item == "lsp" or item == "migrate-receivers" or item == "fix-ceremony" or item == "reduce" or item == "remove" or item == "tokens"
 
 fn comp_internal_flag(item: &str) -> bool:
     // --link-object / --link-bundle / --emit-bundle-manifest are .wo bundle
