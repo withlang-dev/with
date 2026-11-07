@@ -378,19 +378,16 @@ impl Display for f64:  fn to_str(): f"{*self}"
 impl Display for bool: fn to_str(): f"{*self}"
 impl Display for str:  fn to_str(): self ++ ""
 
-/// Index specification for multi-dimensional indexing (§11.7). An operand of
-/// `MultiIndex` / `MultiIndexMut`, so it lives beside them and reaches an
-/// implementor under either prelude with no import (#3047); std.collections
-/// re-exports it. kind: 0=scalar, 1=slice, 2=ellipsis, 3=newaxis.
-pub type IndexSpec {
-    pub kind: i32,
-    pub start: i64,
-    pub stop: i64,
-    pub step: i64,
-    pub has_start: bool,
-    pub has_stop: bool,
-    pub has_step: bool,
-}
+/// One component of a multi-dimensional index (§11.7): `a[i, 2:5, ..., newaxis]`
+/// lowers to a sequence of these, the operand of `MultiIndex` /
+/// `MultiIndexMut`, so it lives beside them and reaches an implementor under
+/// either prelude with no import (#3047); std.collections re-exports it. A
+/// slice bound that was not written is `None`.
+pub enum IndexSpec:
+    Scalar(i64)
+    Slice(Option[i64], Option[i64], Option[i64])
+    Ellipsis
+    NewAxis
 
 /// Multi-dimensional indexing. Implement to enable `a[i, j]` and slice syntax.
 pub trait MultiIndex[O]:

@@ -1776,6 +1776,12 @@ type Sema {
     // after the specialization fixpoint. Entries are keyed by resolved
     // type and kept in registration order (the synthesized bodies' order).
     debug_fmt_index: HashMap[i32, i32],
+    // §11.7: a multi-index node's spec sequence — the `[IndexSpec; n]` the
+    // specs are built into and the `&[IndexSpec]` the method takes, both
+    // from the method's own signature (Sema owns the types; MirLower
+    // builds the values, codegen passes them).
+    multi_index_specs_array_types: HashMap[i32, i32],
+    multi_index_specs_slice_types: HashMap[i32, i32],
     // `{x}` over a type with an `impl Display` (§15.4, D193): the impl's
     // `to_str` by resolved type — fn symbol, signature, mono name.
     display_fmt_fns: HashMap[i32, i32],
@@ -4020,6 +4026,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         clone_contract_sigs: sema_new_map_i32_i32(),
         clone_contract_mono_syms: sema_new_map_i32_i32(),
         debug_fmt_index: sema_new_map_i32_i32(),
+        multi_index_specs_array_types: sema_new_map_i32_i32(),
+        multi_index_specs_slice_types: sema_new_map_i32_i32(),
         display_fmt_fns: sema_new_map_i32_i32(),
         display_fmt_sigs: sema_new_map_i32_i32(),
         display_fmt_monos: sema_new_map_i32_i32(),

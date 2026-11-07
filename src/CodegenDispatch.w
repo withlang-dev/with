@@ -9300,73 +9300,6 @@ impl Codegen:
             return wl_get_undef(dest_ty)
         wl_get_undef(wl_i32_type(self.context))
 
-    mut fn mir_build_multi_index_specs_ref(body: &MirBody, args_id: i32, mi_node: i32, is_set: i32) -> i64:
-        let mi_kind = self.pool.kind(mi_node)
-        let specs_start = if mi_kind == NodeKind.NK_MULTI_INDEX: self.pool.get_data1(mi_node) else: 0
-        let specs_count = if mi_kind == NodeKind.NK_INDEX: 2 else: self.pool.get_data2(mi_node)
-        let ctx = self.context
-        let spec_fields: List[i64] = List.new()
-        spec_fields.push(wl_i32_type(ctx))
-        spec_fields.push(wl_i64_type(ctx))
-        spec_fields.push(wl_i64_type(ctx))
-        spec_fields.push(wl_i64_type(ctx))
-        spec_fields.push(wl_i1_type(ctx))
-        spec_fields.push(wl_i1_type(ctx))
-        spec_fields.push(wl_i1_type(ctx))
-        let spec_ty = wl_struct_type(ctx, list_data_i64(spec_fields), 7, 0)
-        let arr_ty = wl_array_type(spec_ty, specs_count as i64)
-        let arr_ptr = self.create_entry_alloca(arr_ty)
-        let zero_i32 = wl_const_int(wl_i32_type(ctx), 0, 0)
-        let i64_ty = wl_i64_type(ctx)
-
-        for si in 0..specs_count:
-            var d0 = 0
-            var d1 = 0
-            var kind = INDEX_SCALAR
-            var step_node = 0
-            if mi_kind == NodeKind.NK_INDEX:
-                d0 = if si == 0: self.pool.get_data1(mi_node) else: self.pool.get_data2(mi_node)
-            else:
-                let spec_node = self.pool.get_extra(specs_start + si)
-                d0 = self.pool.get_data0(spec_node)
-                d1 = self.pool.get_data1(spec_node)
-                let d2 = self.pool.get_data2(spec_node)
-                kind = d2 / INDEX_KIND_SHIFT
-                step_node = d2 - kind * INDEX_KIND_SHIFT
-            let elem_indices: List[i64] = List.new()
-            elem_indices.push(zero_i32)
-            elem_indices.push(wl_const_int(wl_i32_type(ctx), si as i64, 0))
-            let elem_ptr = wl_build_gep(self.builder, arr_ty, arr_ptr, list_data_i64(elem_indices), 2)
-            wl_build_store(self.builder, wl_const_int(wl_i32_type(ctx), kind as i64, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 0))
-            let arg_base = 1 + si * 3
-            let start_arg = self.mir_intrinsic_arg(body, args_id, arg_base)
-            let stop_arg = self.mir_intrinsic_arg(body, args_id, arg_base + 1)
-            let step_arg = self.mir_intrinsic_arg(body, args_id, arg_base + 2)
-            let start_val = self.coerce_value_to_type(start_arg, i64_ty)
-            let stop_val = self.coerce_value_to_type(stop_arg, i64_ty)
-            let step_val = self.coerce_value_to_type(step_arg, i64_ty)
-            wl_build_store(self.builder, start_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 1))
-            wl_build_store(self.builder, stop_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 2))
-            wl_build_store(self.builder, step_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 3))
-            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), (d0 != 0) as i32, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 4))
-            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), (d1 != 0) as i32, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 5))
-            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), (step_node != 0) as i32, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 6))
-
-        let data_indices: List[i64] = List.new()
-        data_indices.push(zero_i32)
-        data_indices.push(zero_i32)
-        let data_ptr = if specs_count > 0: wl_build_gep(self.builder, arr_ty, arr_ptr, list_data_i64(data_indices), 2) else: wl_const_null(wl_ptr_type(ctx))
-        let slice_fields: List[i64] = List.new()
-        slice_fields.push(wl_ptr_type(ctx))
-        slice_fields.push(i64_ty)
-        let slice_ty = wl_struct_type(ctx, list_data_i64(slice_fields), 2, 0)
-        var slice_val = wl_get_undef(slice_ty)
-        slice_val = wl_build_insert_value(self.builder, slice_val, data_ptr, 0)
-        slice_val = wl_build_insert_value(self.builder, slice_val, wl_const_int(i64_ty, specs_count as i64, 0), 1)
-        let slice_ptr = self.create_entry_alloca(slice_ty)
-        wl_build_store(self.builder, slice_val, slice_ptr)
-        slice_ptr
-
     mut fn mir_emit_multi_index_method_call(body: &MirBody, args_id: i32, dest_place: i32, is_set: i32) -> i64:
         let mi_node = body.call_ast_node(args_id)
         if mi_node == 0:
@@ -9418,11 +9351,17 @@ impl Codegen:
             call_args.push(self.marshal_ref_addr(body, base_op, base_val))
         else:
             call_args.push(base_val)
-        call_args.push(self.mir_build_multi_index_specs_ref(body, args_id, mi_node, is_set))
-        let specs_count = if self.pool.kind(mi_node) == NodeKind.NK_INDEX: 2 else: self.pool.get_data2(mi_node)
-        call_args.push(wl_const_int(wl_i32_type(self.context), specs_count as i64, 0))
+        // §11.7 (#3047): the specs are MIR's — an `&[IndexSpec]` view of the
+        // `IndexSpec` values MirLower built (lower_multi_index_specs_slice),
+        // then the count, then (a set) the value. Nothing here lays a
+        // record out by hand.
+        let specs_op = body.call_arg_operands[(arg_start + 1)]
+        let specs_val = self.mir_eval_operand(body, specs_op, 0)
+        // #D6: the view parameter marshals through the one canonical policy.
+        call_args.push(if self.is_ref_param(fn_sym, 1): self.marshal_ref_addr(body, specs_op, specs_val) else: specs_val)
+        call_args.push(self.mir_eval_operand(body, body.call_arg_operands[(arg_start + 2)], 0))
         if is_set != 0:
-            let rhs_arg = body.call_arg_operands[(arg_start + 1 + specs_count * 3)]
+            let rhs_arg = body.call_arg_operands[(arg_start + 3)]
             call_args.push(self.mir_eval_operand(body, rhs_arg, 0))
 
         let fn_val = fn_val_opt.unwrap() as i64
