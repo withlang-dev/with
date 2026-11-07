@@ -14,6 +14,15 @@
 //                    with a hand-counted length (a literal is a str: pass it)
 //   bool-as-if-1-0   `if c: 1 else: 0` / `if c: 0 else: 1` — a bool spelled
 //                    as a number by hand (`c as i32` is the spelling, D177)
+//   list-new         `List.new()` (an empty list is `[]`, typed by its use, D93)
+//   list-annotation  `: List[T] = []` / `: List[T] = List.new()` — the
+//                    annotation restates what the use decides
+//   index-loop       `for i in 0..xs.len():` — a loop over a list iterates
+//                    the list (`for x in xs`)
+//   numbered-kind-const  `const KIND_A: i32 = 1` / `const KIND_B: i32 = 2` …
+//                    consecutive numbered constants: a closed set of kinds
+//                    is an enum (counted per member of a run)
+// (Eric, 2026-11-07: these four; the Sema-driven rewriter is #3061.)
 // Typed patterns come from one compilation of src/main.w, which covers the
 // compiler and lib/std (`with check --ceremony-census`):
 //   str-clone              `.clone()` on a str
@@ -69,7 +78,7 @@ fn under_any(path: &str, dirs: &List[str]) -> bool:
     false
 
 fn corpus_dirs(listing: &List[str]) -> List[str]:
-    var generated: List[str] = List.new()
+    let generated = []
     for path in listing:
         if path.ends_with("/corpus.stamp"): generated.push(path.slice(0, path.len() - "corpus.stamp".len()))
     generated
@@ -84,7 +93,7 @@ fn git_listing(args: &List[str], out_name: &str) -> List[str]:
 fn tracked_files() -> List[str]:
     let listing = git_listing(&["git", "ls-files"], "ls")
     let generated = corpus_dirs(&listing)
-    var files: List[str] = List.new()
+    let files = []
     for path in listing:
         if counted(path) and not under_any(path, generated): files.push(path)
     files
@@ -92,13 +101,13 @@ fn tracked_files() -> List[str]:
 // The counted files a change touches: modified against `rev`, plus new
 // untracked ones. Used by --diff, the iterate-tier shape.
 fn changed_counted_files(rev: &str) -> List[str]:
-    var argv: List[str] = List.new()
+    let argv = []
     argv.push("git")
     argv.push("ls-files")
     let listing = git_listing(&argv, "ls")
     let generated = corpus_dirs(&listing)
-    var files: List[str] = List.new()
-    var diff_argv: List[str] = List.new()
+    let files = []
+    let diff_argv = []
     diff_argv.push("git")
     diff_argv.push("diff")
     diff_argv.push("--name-only")
@@ -107,7 +116,7 @@ fn changed_counted_files(rev: &str) -> List[str]:
     diff_argv.push("--")
     for path in git_listing(&diff_argv, "diff"):
         if counted(path) and not under_any(path, generated) and not files.contains(path): files.push(path)
-    var new_argv: List[str] = List.new()
+    let new_argv = []
     new_argv.push("git")
     new_argv.push("ls-files")
     new_argv.push("--others")
@@ -118,7 +127,7 @@ fn changed_counted_files(rev: &str) -> List[str]:
 
 // The text of `path` at `rev`, "" when it did not exist there.
 fn text_at_rev(rev: &str, path: &str) -> str:
-    var argv: List[str] = List.new()
+    let argv = []
     argv.push("git")
     argv.push("show")
     argv.push(f"{rev}:{path}")
@@ -142,6 +151,8 @@ impl Census:
         let tokens = lexer.tokenize()
         let n = tokens.len()
         let word = (i) => if i >= 0 and i < n: source.slice(tokens.get_start(i), tokens.get_end(i)) else: ""
+        var prev_const_value: i64 = -2
+        var prev_const_counted = false
         for i in 0..n:
             let tag = tokens.get_tag(i)
             if tag == TokenKind.TK_DOT and i + 3 < n and tokens.get_tag(i + 2) == TokenKind.TK_L_PAREN and tokens.get_tag(i + 3) == TokenKind.TK_R_PAREN:
@@ -161,9 +172,52 @@ impl Census:
                 let a = word(i + 1)
                 let b = word(i + 4)
                 if (a == "1" and b == "0") or (a == "0" and b == "1"): self.bump(f"bool-as-if-1-0\t{area}")
+            else if tag == TokenKind.TK_IDENT and word(i) == "List" and i + 4 < n and tokens.get_tag(i + 1) == TokenKind.TK_DOT and word(i + 2) == "new" and tokens.get_tag(i + 3) == TokenKind.TK_L_PAREN and tokens.get_tag(i + 4) == TokenKind.TK_R_PAREN:
+                self.bump(f"list-new\t{area}")
+            else if tag == TokenKind.TK_COLON and i + 2 < n and word(i + 1) == "List" and tokens.get_tag(i + 2) == TokenKind.TK_L_BRACKET:
+                // `: List[T] = []` / `= List.new()`: the literal is typed by
+                // its use (D93); the annotation restates it.
+                var depth = 0
+                var j = i + 2
+                while j < n:
+                    let t = tokens.get_tag(j)
+                    if t == TokenKind.TK_L_BRACKET: depth = depth + 1
+                    if t == TokenKind.TK_R_BRACKET:
+                        depth = depth - 1
+                        if depth == 0: break
+                    if t == TokenKind.TK_NEWLINE: break
+                    j = j + 1
+                if j + 3 < n and tokens.get_tag(j) == TokenKind.TK_R_BRACKET and tokens.get_tag(j + 1) == TokenKind.TK_EQ:
+                    let empty_literal = tokens.get_tag(j + 2) == TokenKind.TK_L_BRACKET and tokens.get_tag(j + 3) == TokenKind.TK_R_BRACKET
+                    let list_new = word(j + 2) == "List" and tokens.get_tag(j + 3) == TokenKind.TK_DOT and word(j + 4) == "new"
+                    if empty_literal or list_new: self.bump(f"list-annotation\t{area}")
+            else if tag == TokenKind.TK_KW_FOR and i + 4 < n and tokens.get_tag(i + 1) == TokenKind.TK_IDENT and tokens.get_tag(i + 2) == TokenKind.TK_KW_IN and word(i + 3) == "0" and tokens.get_tag(i + 4) == TokenKind.TK_DOT_DOT:
+                // `for i in 0..xs.len():` (with or without `as T`): a loop over
+                // a list iterates the list.
+                var j = i + 5
+                while j < n and tokens.get_tag(j) != TokenKind.TK_COLON and tokens.get_tag(j) != TokenKind.TK_NEWLINE: j = j + 1
+                var k = j - 1
+                if k >= 2 and tokens.get_tag(k - 1) == TokenKind.TK_KW_AS: k = k - 2
+                if k >= 3 and tokens.get_tag(k) == TokenKind.TK_R_PAREN and tokens.get_tag(k - 1) == TokenKind.TK_L_PAREN and word(k - 2) == "len" and tokens.get_tag(k - 3) == TokenKind.TK_DOT:
+                    self.bump(f"index-loop\t{area}")
+            else if tag == TokenKind.TK_KW_CONST and i + 5 < n and tokens.get_tag(i + 1) == TokenKind.TK_IDENT and tokens.get_tag(i + 2) == TokenKind.TK_COLON and tokens.get_tag(i + 4) == TokenKind.TK_EQ and tokens.get_tag(i + 5) == TokenKind.TK_INT_LIT:
+                // `const KIND_A: i32 = 1` followed by `const KIND_B: i32 = 2`:
+                // a numbered closed set of kinds is an enum. Each member of a
+                // run of consecutive values counts, the first included.
+                // A short decimal literal only: a hex mask or a wide constant is
+                // not a kind number (and string_to_int panics past i64).
+                let digits = word(i + 5)
+                let value = if digits.len() <= 6 and not digits.contains("x") and not digits.contains("_"): string_to_int(digits) else: -2
+                if value == prev_const_value + 1:
+                    if not prev_const_counted: self.bump(f"numbered-kind-const\t{area}")
+                    self.bump(f"numbered-kind-const\t{area}")
+                    prev_const_counted = true
+                else:
+                    prev_const_counted = false
+                prev_const_value = value
 
 fn typed_sites(compiler: &str) -> str:
-    var argv: List[str] = List.new()
+    let argv = []
     argv.push(compiler.clone())
     argv.push("check")
     argv.push("src/main.w")

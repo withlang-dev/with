@@ -17,7 +17,7 @@
 //   a long, a copied string, a curl_off_t ........... case CURLOPT_NOSIGNAL / CURLOPT_URL / …
 //   the write callback and its userdata ............. case CURLOPT_WRITEFUNCTION: callback … userdata param CURLOPT_WRITEDATA retains by param 0
 //   abandoning a half-configured pair ............... abandon curl_easy_reset (callbacks none)
-//   the retained-pointer case (POSTFIELDS) .......... left out (#1652); raw under unsafe
+//   the retained-pointer case (POSTFIELDS) .......... case CURLOPT_POSTFIELDS: &str retains by param 0 length param CURLOPT_POSTFIELDSIZE_LARGE as curl_off_t (D194)
 //   the version record as a borrowed record view .... returns borrow curl_version_info_data from domain version_info
 //   its mutator ..................................... curl_global_init (nothing states `preserves` on it)
 //   static text ..................................... curl_version, curl_easy_strerror: returns static CStr
@@ -85,9 +85,28 @@ c facade curl:
     // storage associated to the pointer argument may be discarded or
     // reused after curl_easy_setopt returns. The only exception to this
     // rule is really CURLOPT_POSTFIELDS" — so a `char *` option is a
-    // copied `str`, and CURLOPT_POSTFIELDS, whose data "is NOT copied",
-    // is not listed (a retained pointer case, #1652): it is the raw
-    // curl_easy_setopt under unsafe until retention of a string is modeled.
+    // copied `str`.
+    //
+    // CURLOPT_POSTFIELDS(3) is the retained pointer case (D194, §16.2b.5):
+    // "The data pointed to is NOT copied by the library: as a consequence,
+    // it must be preserved by the calling application until the associated
+    // transfer finishes." The handle holds a borrow of the caller's `str`
+    // — `retains by param 0` — and is ephemeral while it does, through
+    // `perform`, until curl_easy_reset or cleanup (§16.2b.9 "Retained
+    // borrows"); a program binds the body before the handle, as it binds a
+    // callback's sink. The pointer is read to a length: "libcurl does a
+    // strlen() to measure the data size" unless CURLOPT_POSTFIELDSIZE_LARGE
+    // is set, and with it set it reads that many bytes whatever the
+    // content, so the two options are one presented operation over the
+    // `str`'s bytes (`length param CURLOPT_POSTFIELDSIZE_LARGE as
+    // curl_off_t`): the size is set first, the pointer only when that took,
+    // a body with a NUL in it posts whole, and neither option can be set
+    // apart from the other on the safe surface (D51 §9). The Rust `curl`
+    // crate exposes only `post_fields_copy` (CURLOPT_COPYPOSTFIELDS) because
+    // it cannot express the borrow; With expresses it and copies nothing.
+    // CURLOPT_COPYPOSTFIELDS is not listed: it reads a stale
+    // CURLOPT_POSTFIELDSIZE_LARGE too, so listing it as a copied `str`
+    // beside the sized case would be the overread D194 forbids.
     //
     // "Returns CURLE_OK (zero) on success or a non-zero error number" —
     // `ok CURLE_OK` is the status contract of the listed cases (§16.2b.5):
@@ -156,6 +175,7 @@ c facade curl:
             case CURLOPT_MAXREDIRS: c_long
             case CURLOPT_USERAGENT: str
             case CURLOPT_MAXFILESIZE_LARGE: curl_off_t
+            case CURLOPT_POSTFIELDS: &str retains by param 0 length param CURLOPT_POSTFIELDSIZE_LARGE as curl_off_t until curl_easy_reset
     // curl_easy_perform(3): "Perform the transfer as described in the
     // options." "Returns CURLE_OK (0) on success and a non-zero value on
     // error." A status with nothing produced: `ok CURLE_OK` projects a

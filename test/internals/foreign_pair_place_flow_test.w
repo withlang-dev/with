@@ -2,7 +2,7 @@
 use ForeignPairState
 
 fn step(action: i32, place: i32, source: i32, op: i32, guard: i32, can_fail: bool) -> ForeignPairStep:
-    ForeignPairStep { action, place, source, contract: ForeignPairBlock { action: op, ty: 17, origin: 3, guard, can_fail, preserves_on_failure: true, invokes: op == FOREIGN_PAIR_DESTROY } }
+    ForeignPairStep { action, place, source, contract: ForeignPairBlock { action: op, ty: 17, origin: 3, guard, can_fail, preserves_on_failure: true, invokes: op == FOREIGN_PAIR_DESTROY, slot: -1, releases: 0 } }
 
 fn main:
     let starts: List[i32] = List.new()

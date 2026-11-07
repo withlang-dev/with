@@ -2,7 +2,7 @@
 use ForeignPairState
 
 fn operation(action: i32, ty: i32, origin: i32) -> ForeignPairBlock:
-    ForeignPairBlock { action, ty, origin, guard: -1, can_fail: false, preserves_on_failure: false, invokes: false }
+    ForeignPairBlock { action, ty, origin, guard: -1, can_fail: false, preserves_on_failure: false, invokes: false, slot: -1, releases: 0 }
 
 fn main:
     var places = foreign_pair_places(4)

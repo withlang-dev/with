@@ -34,3 +34,21 @@ move-arg	src	847	852	D184 (#2951): script_capture_indices joins the SemaLexicalE
 clone-call	lib	38	44	#2943 (§13.3): a generic adapter that retains an element and yields it clones once per element it keeps (dedup, unique, intersperse, Iter.repeat), and group_by_views clones its key so the origin analysis reads an owned key (f takes the element's view)
 move-arg	src	848	850	#2950: two comptime values leave their ComptimeControl signal into the payload list and the spec formatter; a field never moves out implicitly (D32), so the move is spelled as every neighbor in ComptimeEval spells it
 len-cast	src	843	844	#2950: the payload list's extra_start is an i32 field taken from len(); the pinned seed predates D183's checked narrowing (`let start: i32 = xs.len()` is refused by it), so the cast stays until a post-D183 seed is pinned, as every neighbor in ComptimeEval spells it
+some-at-option-demand	src	6	9	#3062: a bare variant shorthand is refused under an Option demand in an assignment and in if-expression branches, so SemaFacade.w's case-kind classification writes Some(.Kind) three times; they come out when #3062 lands
+list-new	src	0	4328	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+list-new	lib	0	201	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+list-new	build	0	802	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+list-new	tools	0	216	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+list-new	examples	0	15	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth; examples track the current spec and are updated under the 2026-09-22 ruling in the #3061 sweep
+list-annotation	src	0	2902	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+list-annotation	lib	0	104	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+list-annotation	build	0	735	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+list-annotation	tools	0	197	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+list-annotation	examples	0	2	new census pattern (Eric 2026-11-07, D93): the tree's count at the pattern's birth; examples are updated in the #3061 sweep
+index-loop	src	0	2133	new census pattern (Eric 2026-11-07): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+index-loop	lib	0	72	new census pattern (Eric 2026-11-07): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+index-loop	build	0	443	new census pattern (Eric 2026-11-07): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+index-loop	tools	0	144	new census pattern (Eric 2026-11-07): the tree's count at the pattern's birth, recorded as the bar at the next reseed; the #3061 rewriter burns it down
+index-loop	examples	0	7	new census pattern (Eric 2026-11-07): the tree's count at the pattern's birth; examples are updated in the #3061 sweep
+numbered-kind-const	src	0	205	new census pattern (Eric 2026-11-07): a numbered closed set of kinds is an enum; the tree's count at the pattern's birth, converted set by set (#3061 reports them)
+numbered-kind-const	lib	0	12	new census pattern (Eric 2026-11-07): a numbered closed set of kinds is an enum; the tree's count at the pattern's birth, converted set by set (#3061 reports them)

@@ -1,4 +1,4 @@
-//! expect-check-fail: 'Handle' holds a retained callback borrow and cannot be returned or stored; it is ephemeral until reset or destroyed
+//! expect-check-fail: 'Handle' holds a retained borrow and cannot be returned or stored; it is ephemeral until the retention is released, or the resource reset or destroyed
 
 // D66 (spec §16.2b.9 "Retained borrows"): a resource holding a retained
 // borrow is ephemeral for that window — returning it would carry the

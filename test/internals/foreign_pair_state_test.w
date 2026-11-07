@@ -3,7 +3,7 @@
 use ForeignPairState
 
 fn block(action: i32, guard: i32, invokes: bool) -> ForeignPairBlock:
-    ForeignPairBlock { action, ty: 17, origin: 41, guard, can_fail: true, preserves_on_failure: false, invokes }
+    ForeignPairBlock { action, ty: 17, origin: 41, guard, can_fail: true, preserves_on_failure: false, invokes, slot: -1, releases: 0 }
 
 fn failure_cleanup_flow:
     var blocks: List[ForeignPairBlock] = List.new()

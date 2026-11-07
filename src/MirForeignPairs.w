@@ -86,7 +86,21 @@ fn pairs_place_escapes(body: &MirBody, place_id: i32) -> bool:
     body.place_locals[place_id] == 0 or body.place_proj_counts[place_id] != 0
 
 fn pairs_block(action: i32, ty: i32, origin: i32, guard: i32, can_fail: bool, invokes: bool) -> ForeignPairBlock:
-    ForeignPairBlock { action, ty, origin, guard, can_fail, preserves_on_failure: false, invokes }
+    ForeignPairBlock { action, ty, origin, guard, can_fail, preserves_on_failure: false, invokes, slot: -1, releases: 0 }
+
+// D194: a retained pointer setter holds `origin` under `slot`; any pair
+// operation may release the slots its contract lists (`until`).
+fn pairs_retain_block(slot: i32, origin: i32, guard: i32, releases: i64, invokes: bool):
+    ForeignPairBlock { action: FOREIGN_PAIR_RETAIN, ty: 0, origin, guard, can_fail: false, preserves_on_failure: false, invokes, slot, releases }
+
+// A release by an operation with a status (`ok`) is decided on the branch
+// that reads it (ForeignPairState.w foreign_pair_on_edge): `guard` is the
+// status key, or -1 when the operation cannot fail.
+fn pairs_releasing(block: ForeignPairBlock, releases: i64, guard: i32):
+    let out = block
+    out.releases = releases
+    if releases != 0: out.guard = guard
+    out
 
 fn pairs_keep() -> ForeignPairBlock: pairs_block(FOREIGN_PAIR_KEEP, 0, -1, -1, false, false)
 
@@ -106,15 +120,9 @@ fn pairs_switch_otherwise_value(body: &MirBody, table: i32) -> i64:
         if body.switch_table_vals[(start + i)] == 0: has_zero = true
     (has_zero) as i32
 
-fn pairs_list_i32(count: i32, value: i32) -> List[i32]:
-    let out: List[i32] = List.new()
-    for _ in 0..count: out.push(value)
-    out
+fn pairs_list_i32(count: i32, value: i32): [value for _ in 0..count]
 
-fn pairs_list_i64(count: i32, value: i64) -> List[i64]:
-    let out: List[i64] = List.new()
-    for _ in 0..count: out.push(value)
-    out
+fn pairs_list_i64(count: i32, value: i64): [value for _ in 0..count]
 
 // Whether the body can touch a pair at all: some place is a pair resource
 // or a reference to one. Everything else is skipped without building keys.
@@ -281,9 +289,10 @@ impl PairsBody:
             let action = sema.facade_pair_ops[opi].action
             let ok = sema.facade_pair_ops[opi].guard_ok
             let dest = self.key_of(body.term_data2(bb))
-            if (action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA) and ok >= 0 and dest >= 0:
+            let reads_status = action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA or action == FOREIGN_PAIR_RETAIN or sema.facade_pair_ops[opi].releases != 0
+            if reads_status and ok >= 0 and dest >= 0:
                 self.guard_ok[dest] = ok
-            if action == FOREIGN_PAIR_USERDATA:
+            if action == FOREIGN_PAIR_USERDATA or action == FOREIGN_PAIR_RETAIN:
                 let origin = self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param)
                 if origin >= 0:
                     self.origin_key[origin] = 1
@@ -443,12 +452,20 @@ impl PairsBody:
             if recv < 0:
                 return
             let dest = self.key_of(body.term_data2(bb))
-            if action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA:
-                let guard = if ok >= 0: dest else: -1
+            let releases = sema.facade_pair_ops[opi].releases
+            let guard = if ok >= 0: dest else: -1
+            if action == FOREIGN_PAIR_RETAIN:
+                // D194: the setter's storage argument is held under its slot
+                // whatever the status (a failed setter may have stored it);
+                // the slot's previous storage is released on the success
+                // edge only.
+                let origin = self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param)
+                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_retain_block(sema.facade_pair_ops[opi].slot, origin, guard, releases, invokes)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
+            else if action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA:
                 let origin = if action == FOREIGN_PAIR_USERDATA: self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param) else: -1
-                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_block(action, u_tid, origin, guard, true, invokes)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
+                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_releasing(pairs_block(action, u_tid, origin, guard, true, invokes), releases, guard)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
             else:
-                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_block(action, 0, -1, -1, false, invokes)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
+                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_releasing(pairs_block(action, 0, -1, -1, false, invokes), releases, guard)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
             return
         // Not a pair operation: a resource handed to it may be invoked and
         // changed in any way (checked as callback-capable, then unknown
@@ -569,14 +586,21 @@ fn pairs_describe(ast: &AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, si
         if subject >= 0 and call_id < body.call_arg_starts.len() and subject < body.call_arg_counts[call_id]:
             named = pb.key_of(pairs_operand_place(body, body.call_arg_operands[body.call_arg_starts[call_id] + subject]))
     let resource = pb.resource_name(sema, named)
+    // What the resource holds the origin as: a retained pointer case's
+    // storage (D194), named by its setter, or its callback userdata.
+    var held_as = "callback userdata"
+    if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
+        let call_id = body.term_data1(pb.origin_bb[site.key])
+        let opi = if call_id >= 0 and call_id < body.call_sig_indices.len(): sema.facade_pair_op_for_sig(body.call_sig_indices[call_id]) else: -1
+        if opi >= 0 and sema.facade_pair_ops[opi].action == FOREIGN_PAIR_RETAIN: held_as = "the storage " ++ sema.facade_pair_op_display(opi) ++ " set"
     if site.kind == PAIRS_SITE_INVOKE:
         return PairsFinding { fn_sym: body.fn_sym, start, end, message: pairs_op_name(sema, site.op) ++ " may invoke the callback pair of " ++ resource ++ ", and on this path the pair is not proven compatible (§16.2b.9)", note: "a callback set without its userdata, a setter whose failure was not handled, or a helper call that may have changed the pair leaves it unproven", help: "set both the callback and its userdata, branch on the setter's status against its 'ok' constant, or run the resource's abandonment path first" }
     if site.kind == PAIRS_SITE_HELPER:
         return PairsFinding { fn_sym: body.fn_sym, start, end, message: "passing " ++ resource ++ " to a call the facade does not describe while its callback pair is not proven compatible; the callee may invoke it (§16.2b.9)", note: "", help: "complete the pair or run the abandonment path before the call" }
     if site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED:
         let what = if site.kind == PAIRS_SITE_EXPIRE: "dies" else: "moves"
-        return PairsFinding { fn_sym: body.fn_sym, start, end, message: pb.key_name(sema, body, site.key) ++ " " ++ what ++ " while " ++ resource ++ " still holds it as callback userdata (§16.2b.9)", note: "", help: "keep it alive until the resource is reset or destroyed, or reset the resource first" }
-    PairsFinding { fn_sym: body.fn_sym, start, end, message: resource ++ " holds a retained callback borrow and cannot be returned or stored; it is ephemeral until reset or destroyed (§16.2b.9)", note: "", help: "run the abandonment path first, or keep the resource in this frame" }
+        return PairsFinding { fn_sym: body.fn_sym, start, end, message: pb.key_name(sema, body, site.key) ++ " " ++ what ++ " while " ++ resource ++ " still holds it as " ++ held_as ++ " (§16.2b.9)", note: "", help: "keep it alive until the retention is released or the resource is reset or destroyed, or reset the resource first" }
+    PairsFinding { fn_sym: body.fn_sym, start, end, message: resource ++ " holds a retained borrow and cannot be returned or stored; it is ephemeral until the retention is released, or the resource reset or destroyed (§16.2b.9)", note: "", help: "release the retention or run the abandonment path first, or keep the resource in this frame" }
 
 // WITH_DUMP_PAIR_FLOW=1: every fact the flow ran on, for one body — the
 // pair operations Sema registered, each call's recorded signature and the

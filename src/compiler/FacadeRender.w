@@ -2650,10 +2650,54 @@ fn facade_render_variadic_cases(pool: &AstPool, intern: &InternPool, decl: i32, 
             let ud_args = repr_arg ++ ", " ++ args ++ value ++ " as *const U as *mut c_void"
             out = out ++ mhead ++ facade_render_variadic_case_name(base, ud_sel) ++ "[U](" ++ params ++ value ++ ": &U)" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, ud_args) ++ "\n"
             continue
-        // A retained pointer case (`… retains by param N`, curl's
-        // CURLOPT_POSTFIELDS) is not modeled yet: Sema reports it; nothing
-        // is rendered as an ordinary copied value meanwhile.
+        // A retained pointer case (D194, §16.2b.5: `&CString retains by
+        // param N`, curl's CURLOPT_POSTFIELDS): the resource keeps the
+        // caller's storage, so the method takes the borrow and passes its
+        // pointer; `mut fn` because it changes the resource's foreign
+        // state, and MIR holds the borrow under the setter's slot
+        // (MirForeignPairs.w). A sized case (`&[u8]` / `&str` with `length
+        // param CONST as T`) sets the length option first and the pointer
+        // only when that took (the operation's `ok`, Sema requires it):
+        //
+        //     mut fn setopt__CURLOPT_POSTFIELDS(option: CURLoption, value: &str) -> CURLcode:
+        //         let value_bytes = value.as_bytes()
+        //         let value_count: curl_off_t = value_bytes.len() as curl_off_t
+        //         let value_rc = unsafe { curl_easy_setopt(self.repr, CURLOPT_POSTFIELDSIZE_LARGE, value_count) }
+        //         if value_rc != CURLE_OK: return value_rc
+        //         let value_ptr: *const c_void = if value_bytes.len() == 0: null else: &raw const value_bytes[0] as *const c_void
+        //         unsafe { curl_easy_setopt(self.repr, option, value_ptr) }
         if pool.get_extra(ops + 4) != 0:
+            if repr_arg.len() == 0:
+                continue
+            let mhead = head.replace("fn ", "mut fn ")
+            let referent = if ty.starts_with("&"): ty.slice(1, ty.len()) else: ty
+            let length_ref = pool.get_extra(ops + 5)
+            params = params ++ value ++ ": " ++ ty
+            if length_ref == 0:
+                args = args ++ (if referent == "CStr": value ++ ".ptr()" else: value ++ ".as_cstr().ptr()")
+                out = out ++ mhead ++ facade_render_variadic_case_name(base, sel) ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, repr_arg ++ ", " ++ args) ++ "\n"
+                continue
+            let ok = facade_render_fn_ok(pool, intern, decl)
+            if ok == 0 or pool.get_data0(length_ref as NodeId) != FACADE_PARAM_REF_NAME:
+                continue
+            let length_sel = intern.resolve(pool.get_data1(length_ref as NodeId))
+            let length_ty = render_type_expr(pool, intern, pool.get_extra(ops + 6) as NodeId)
+            let bytes = facade_render_fresh(value ++ "_bytes", taken)
+            let count = facade_render_fresh(value ++ "_count", taken)
+            let rc = facade_render_fresh(value ++ "_rc", taken)
+            let ptr = facade_render_fresh(value ++ "_ptr", taken)
+            // The length call: the selector argument replaced by the length
+            // option's constant, every other C argument as the bridge
+            // renders it.
+            let length_args = facade_render_replace_selector(pool, intern, clause, args, skip, length_sel)
+            pro = pro ++ "let " ++ bytes ++ " = " ++ (if referent == "str": value ++ ".as_bytes()" else: value) ++ "\n"
+            pro = pro ++ "let " ++ count ++ ": " ++ length_ty ++ " = " ++ bytes ++ ".len() as " ++ length_ty ++ "\n"
+            pro = pro ++ "if " ++ count ++ " < 0 or " ++ count ++ " as u64 != " ++ bytes ++ ".len() as u64: panic(\"" ++ base ++ "(" ++ sel ++ "): the byte count does not fit " ++ length_sel ++ "'s C type (§16.2b.8)\")\n"
+            pro = pro ++ "let " ++ rc ++ " = " ++ facade_render_call(pool, intern, decl, repr_arg ++ ", " ++ length_args ++ count) ++ "\n"
+            pro = pro ++ "if " ++ rc ++ " != " ++ intern.resolve(ok) ++ ": return " ++ rc ++ "\n"
+            pro = pro ++ "let " ++ ptr ++ ": *const c_void = if " ++ bytes ++ ".len() == 0: null else: &raw const " ++ bytes ++ "[0] as *const c_void\n"
+            args = args ++ ptr
+            out = out ++ mhead ++ facade_render_variadic_case_name(base, sel) ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, repr_arg ++ ", " ++ args) ++ "\n"
             continue
         if ty == "str":
             let cs = value ++ "_c"
@@ -2665,6 +2709,30 @@ fn facade_render_variadic_cases(pool: &AstPool, intern: &InternPool, decl: i32, 
             args = args ++ value
         let call_args = if repr_arg.len() > 0: repr_arg ++ ", " ++ args else: args
         out = out ++ head ++ facade_render_variadic_case_name(base, sel) ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, call_args) ++ "\n"
+    out
+
+// D194: the bridge's argument list with the selector argument (the
+// variadic clause's `selected by param P`) replaced by `constant`, for the
+// length call of a sized retained case. `args` lists the C parameters
+// before the variadic position as the bridge renders them, `skip` of them
+// (the receiver) left out.
+fn facade_render_replace_selector(pool: &AstPool, intern: &InternPool, clause: i32, args: &str, skip: i32, constant: &str) -> str:
+    let sel_ref = pool.get_extra(pool.get_data1(clause as NodeId) + 1)
+    let parts = args.split(", ")
+    if pool.get_data0(sel_ref as NodeId) == FACADE_PARAM_REF_INDEX:
+        let digits = intern.resolve(pool.get_data1(sel_ref as NodeId))
+        var idx = 0
+        for ch in digits.bytes(): idx = idx * 10 + (ch - '0')
+        let at = idx - skip
+        if at >= 0 and at < parts.len(): parts[at] = constant
+    else:
+        let name = intern.resolve(pool.get_data1(sel_ref as NodeId))
+        for i in 0..parts.len():
+            if parts[i] == name: parts[i] = constant
+    var out = ""
+    for part in parts:
+        if part.len() == 0: continue
+        out = out ++ part ++ ", "
     out
 
 // The view type a `returns borrow T from …` record view presents (D66,
@@ -2726,7 +2794,7 @@ fn facade_render_param_ref(pool: &AstPool, intern: &InternPool, decl: i32, ref_n
     let rk = pool.get_data0(ref_node as NodeId)
     if rk == FACADE_PARAM_REF_INDEX:
         let digits = intern.resolve(pool.get_data1(ref_node as NodeId))
-        var idx: i32 = 0
+        var idx = 0
         for i in 0..digits.len():
             idx = idx * 10 + (digits[i] - '0') as i32
         return if idx < count: idx else: -1
@@ -2908,7 +2976,7 @@ fn facade_render_index_ref(pool: &AstPool, intern: &InternPool, ref_node: i32) -
     if ref_node == 0 or pool.get_data0(ref_node as NodeId) != FACADE_PARAM_REF_INDEX:
         return -1
     let digits = intern.resolve(pool.get_data1(ref_node as NodeId))
-    var idx: i32 = 0
+    var idx = 0
     for i in 0..digits.len():
         idx = idx * 10 + (digits[i] - '0') as i32
     idx

@@ -1798,26 +1798,26 @@ impl Sema:
                 if tid == 0:
                     return c
                 let rt = self.resolve_alias(tid as TypeId)
-                var ckind: i32 = 0
+                var ckind: Option[FacadeVariadicKind] = None
                 let callback_ref = self.ast.get_extra(cops + 2)
                 let retainer_ref = self.ast.get_extra(cops + 4)
                 if callback_ref != 0 or retainer_ref != 0:
                     let slot = self.facade_resolve_variadic_slot(fn_sym, sig, case_node, tid, k)
                     if slot.resource < 0: return c
                     c.variadic_slots.push(slot)
-                    ckind = if callback_ref != 0: FACADE_VARIADIC_CALLBACK else: FACADE_VARIADIC_RETAINED
-                else if rt == self.ty_str: ckind = FACADE_VARIADIC_STR
-                else if self.get_type_kind(self.numeric_operand_type(rt as i32)) == TypeKind.TY_INT: ckind = FACADE_VARIADIC_SCALAR
-                if ckind == 0:
+                    ckind = Some(if callback_ref != 0: .Callback else: .Retained)
+                else if rt == self.ty_str: ckind = Some(.Str)
+                else if self.get_type_kind(self.numeric_operand_type(rt as i32)) == TypeKind.TY_INT: ckind = Some(.Scalar)
+                let Some(case_kind) = ckind else:
                     let tn = self.source_spelling(self.ast.get_extra(cops + 1))
-                    let hint = if self.get_type_kind(rt) == TypeKind.TY_PTR: "; a pointer the callee keeps needs its retention stated, and a callback its userdata pairing — neither is modeled yet (#1652)" else: ""
+                    let hint = if self.get_type_kind(rt) == TypeKind.TY_PTR: "; a pointer the callee keeps states its retention ('&CString retains by param N', D194), and a callback its userdata pairing ('callback param N as T userdata param CONST retains by param N')" else: ""
                     self.emit_error(f"fn '{fname}': 'case {sn}: {tn}' — a case states an integer C type ('c_long', 'curl_off_t', an enum) or 'str' (a copied input string, §16.3c){hint} (§16.2b.5)", case_node)
                     return c
                 c.variadic_case_syms.push(sel)
                 c.variadic_case_values.push(value)
                 c.variadic_case_tids.push(tid)
-                c.variadic_case_kinds.push(ckind)
-                if ckind == FACADE_VARIADIC_CALLBACK:
+                c.variadic_case_kinds.push(case_kind)
+                if case_kind == .Callback:
                     // A callback case installs the callback for later
                     // calls, so it states its retention — never inferred
                     // (§16.2b.9) — and its paired userdata setter is
@@ -1838,16 +1838,21 @@ impl Sema:
                     c.variadic_case_syms.push(ud_sel)
                     c.variadic_case_values.push(ud_value)
                     c.variadic_case_tids.push(tid)
-                    c.variadic_case_kinds.push(FACADE_VARIADIC_USERDATA)
+                    c.variadic_case_kinds.push(.Userdata)
             c.variadic_node = clause
             c.variadic_selector = p
-            // A retained pointer case (`<type> retains by param N`, curl's
-            // CURLOPT_POSTFIELDS) is not modeled yet: the caller's storage
-            // would have to outlive the resource as a C string (§16.3c).
-            for si in 0..c.variadic_slots.len():
-                if c.variadic_slots[si].callback_type == 0:
-                    self.emit_error("a retained pointer case of a variadic contract ('case CONST: <type> retains by param N') is not modeled yet (#3010); leave the case out and set that option through the raw function under unsafe (§16.2b.5)", c.variadic_slots[si].clause)
-                    return c
+            // D194 (§16.2b.5): a retained pointer case's length option is
+            // set only through the case's own operation; listing it as a
+            // case of its own would let safe code set a pointer and a
+            // length apart (D51 §9).
+            for slot in c.variadic_slots:
+                if slot.length_selector == 0: continue
+                for j in 0..c.variadic_case_syms.len():
+                    if c.variadic_case_syms[j] == slot.length_selector or c.variadic_case_values[j] == slot.length_value:
+                        let ln = self.pool_resolve(slot.length_selector)
+                        let cn = self.pool_resolve(c.variadic_case_syms[slot.case_index])
+                        self.emit_error(f"fn '{fname}': 'case {cn}' sets its length through {ln}, so {ln} is not listed as a case of its own: the pointer and its length are one operation (§16.2b.5, §16.2b.8)", slot.clause)
+                        return c
             return c
         if kind == FACADE_CLAUSE_OK:
             // `ok` on an fn item (§16.2b.4; ruling Amendment 3): the status
@@ -2124,7 +2129,7 @@ impl Sema:
     // Resolve the trusted declaration once, before any presented call is
     // checked. A case name cannot supply a callback ABI or retaining owner.
     mut fn facade_resolve_variadic_slot(fn_sym: i32, sig: i32, node: i32, tid: i32, case_index: i32) -> ForeignVariadicSlot:
-        var result = ForeignVariadicSlot { case_index, clause: node, resource: -1, retainer_param: -1, callback_type: 0, callback_userdata: -1, userdata_selector: 0, userdata_value: 0 }
+        var result = ForeignVariadicSlot { case_index, clause: node, resource: -1, retainer_param: -1, callback_type: 0, callback_userdata: -1, userdata_selector: 0, userdata_value: 0, retained_form: .Callback, length_selector: 0, length_value: 0, length_tid: 0, until_syms: [] }
         let ops = self.ast.get_data1(node)
         let callback_ref = self.ast.get_extra(ops + 2)
         let retainer_ref = self.ast.get_extra(ops + 4)
@@ -2167,10 +2172,54 @@ impl Sema:
                 self.emit_error("a variadic callback and its userdata need distinct selector values (§16.2b.5)", node)
                 return result
         else:
+            // D194 (§16.2b.5): the retained value is a borrow of
+            // caller-managed storage (§16.3c). C reads it either as a
+            // NUL-terminated string (`&CString`, `&CStr`) or as bytes to a
+            // length the case sets through a second option (`&[u8]`,
+            // `&str` with `length param CONST as T`). A `str` by value is
+            // a call-scoped C string: refused, with its fix.
             let resolved = self.resolve_alias(tid)
-            if resolved != self.ty_str and self.get_type_kind(resolved) != TypeKind.TY_PTR:
-                self.emit_error("a retained variadic case describes pointer storage, not a scalar value (§16.2b.5)", node)
+            let length_ref = self.ast.get_extra(ops + 5)
+            if resolved == self.ty_str:
+                self.emit_error_with_help("a retained pointer case keeps the caller's storage past the call, and a 'str' is copied to a C string that dies at the return (§16.2b.5, §16.3c)", node, "state '&CString' (an owned C string the caller binds to a local that outlives the retention: 'let body = s.to_cstring()?'), '&CStr', or '&[u8]' / '&str' with 'length param CONST as T' when C reads the bytes to a length")
                 return result
+            let is_ref = self.get_type_kind(resolved) == TypeKind.TY_REF
+            let referent = if is_ref: self.resolve_alias(self.get_type_d0(resolved) as TypeId) else: resolved
+            let referent_name = if self.get_type_name(referent) != 0: self.pool_resolve(self.get_type_name(referent)) else: ""
+            let text_form = is_ref and (referent == self.ty_cstr or referent_name == "CString")
+            let sized_form = (self.get_type_kind(referent) == TypeKind.TY_SLICE and self.resolve_alias(self.get_type_d0(referent) as TypeId) == self.ty_u8) or (is_ref and referent == self.ty_str)
+            if not text_form and not sized_form:
+                self.emit_error_with_help("a retained pointer case's type is caller-managed storage (§16.2b.5, §16.3c)", node, "'&CString' or '&CStr' for a NUL-terminated string; '&[u8]' or '&str' with 'length param CONST as T' for bytes read to a length")
+                return result
+            if sized_form and length_ref == 0:
+                self.emit_error_with_help("a retained byte case states the option its length is set through, so the pointer and its length are one operation (§16.2b.5, §16.2b.8)", node, "add 'length param CONST as T' after 'retains by param N', or state '&CString' when C reads the pointer as a NUL-terminated string")
+                return result
+            if text_form and length_ref != 0:
+                self.emit_error("a NUL-terminated retained case has no length option; state '&[u8]' or '&str' for bytes read to a length (§16.2b.5)", node)
+                return result
+            result.retained_form = if text_form: .Text else: .Sized
+            if length_ref != 0:
+                if self.ast.get_data0(length_ref) != FACADE_PARAM_REF_NAME:
+                    self.emit_error("a retained case's length option names an imported selector constant, not a parameter index (§16.2b.5)", node)
+                    return result
+                let length_sym = self.ast.get_data1(length_ref)
+                let length_decl = self.facade_const_decl(length_sym)
+                if length_decl == 0:
+                    self.emit_error("a retained case's length option names no imported integer constant (§16.2b.5)", node)
+                    return result
+                let length_tid = self.resolve_type_expr(self.ast.get_extra(ops + 6)) as i32
+                if length_tid == 0: return result
+                if self.get_type_kind(self.numeric_operand_type(self.resolve_alias(length_tid as TypeId) as i32)) != TypeKind.TY_INT:
+                    self.emit_error("a retained case's length option takes an integer C type ('c_long', 'curl_off_t') (§16.2b.5)", node)
+                    return result
+                result.length_selector = length_sym
+                result.length_value = self.facade_const_int_value(self.ast.get_data1(length_decl))
+                result.length_tid = length_tid
+                let selector_decl = self.facade_const_decl(self.ast.get_extra(ops))
+                if result.length_value == self.facade_const_int_value(self.ast.get_data1(selector_decl)):
+                    self.emit_error("a retained case and its length option need distinct selector values (§16.2b.5)", node)
+                    return result
+            for ui in 7..self.ast.get_data2(node): result.until_syms.push(self.ast.get_extra(ops + ui))
         let resources = self.facade_param_receives(fn_sym, owner)
         if resources.len() != 1:
             self.emit_error("a retained variadic case needs one modeled resource for its retaining parameter (§16.2b.5)", node)
@@ -2305,6 +2354,15 @@ impl Sema:
                 continue
             if self.facade_fn_is_resource_op(fn_sym):
                 self.emit_error(f"fn '{fname}': a variadic contract describes a lend or a free operation, and '{fname}' is a resource's own operation (its producer, initializer, drop or destroyer) (§16.2b.5)", node)
+                continue
+            // D194: a sized retained case is two C calls presented as one
+            // operation; the pointer is set only after the length took, so
+            // the operation states its success status.
+            var sized_without_ok = false
+            for slot in self.foreign_contracts[ci].variadic_slots:
+                if slot.retained_form == .Sized and self.foreign_contracts[ci].ok_const == 0: sized_without_ok = true
+            if sized_without_ok:
+                self.emit_error(f"fn '{fname}': a retained byte case sets its length option and then its pointer as one operation, so '{fname}' states 'ok CONST': the pointer is set only when the length took (§16.2b.5)", node)
                 continue
             if self.diags.has_errors():
                 continue
@@ -5106,7 +5164,7 @@ impl Sema:
                 for k in 0..self.foreign_contracts[ci].variadic_case_syms.len() as i32:
                     let mtext = host ++ "." ++ self.facade_variadic_case_name(mname, ci, k)
                     let kind = self.foreign_contracts[ci].variadic_case_kinds[k]
-                    if kind == FACADE_VARIADIC_CALLBACK or kind == FACADE_VARIADIC_USERDATA:
+                    if kind == .Callback or kind == .Userdata:
                         // Generic in `U`: registered per specialization
                         // (facade_note_pair_op_sig) under its generic node.
                         let msym = self.pool_lookup_symbol(mtext)
@@ -5116,7 +5174,12 @@ impl Sema:
                             self.facade_pair_setter_case.insert(mnode, k)
                     else if self.sig_text_index.contains(mtext):
                         let case_sig: i32 = self.sig_text_index.get(mtext).unwrap()
-                        self.facade_add_pair_op(case_sig, ci, ri, if invokes != 0: FOREIGN_PAIR_INVOKE else: FOREIGN_PAIR_KEEP, -1, 0, -1, invokes)
+                        if kind == .Retained:
+                            // D194: a retained pointer setter, concrete in
+                            // its storage type, holds under its case.
+                            self.facade_add_pair_op(case_sig, ci, ri, FOREIGN_PAIR_RETAIN, k, 0, self.facade_contract_ok_value(ci), invokes)
+                        else:
+                            self.facade_add_pair_op(case_sig, ci, ri, if invokes != 0: FOREIGN_PAIR_INVOKE else: FOREIGN_PAIR_KEEP, -1, 0, -1, invokes)
                 continue
             let mtext = host ++ "." ++ mname
             if not self.sig_text_index.contains(mtext):
@@ -5128,6 +5191,7 @@ impl Sema:
             if self.facade_same_fn(self.facade_resources[ri].abandon, fn_sym): action = FOREIGN_PAIR_RESET
             else if self.foreign_contracts[ci].destroys != 0: action = FOREIGN_PAIR_DESTROY
             self.facade_add_pair_op(sig, ci, ri, action, -1, 0, -1, invokes)
+        self.facade_index_retention_releases()
 
     mut fn facade_add_pair_op(sig: i32, ci: i32, ri: i32, action: i32, slot: i32, userdata_tid: i32, guard_ok: i64, invokes: i32):
         if sig < 0 or self.facade_pair_op_by_sig.contains(sig):
@@ -5136,8 +5200,56 @@ impl Sema:
         // Every pair operation is a method of its resource: the receiver is
         // the resource it acts on. A userdata setter retains the referent
         // of its last parameter, the `&U` (facade_note_pair_op_sig).
-        let retained_param = if action == FOREIGN_PAIR_USERDATA: self.sig_get_param_count(sig) - 1 else: -1
-        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes, subject_param: 0, retained_param })
+        // … as does a retained pointer setter (D194): the storage its last
+        // parameter borrows.
+        let retained_param = if action == FOREIGN_PAIR_USERDATA or action == FOREIGN_PAIR_RETAIN: self.sig_get_param_count(sig) - 1 else: -1
+        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes, subject_param: 0, retained_param, releases: 0 })
+
+    // The success status a contract's `ok CONST` states, or -1.
+    fn facade_contract_ok_value(ci: i32):
+        let ok_sym = self.foreign_contracts[ci].ok_const
+        if ok_sym == 0: return -1
+        let decl = self.facade_const_decl(ok_sym)
+        if decl == 0: -1 else: self.facade_const_int_value(self.ast.get_data1(decl))
+
+    // D194 (§16.2b.5): each name a retained case lists after `until` is a
+    // case of the same variadic operation, or a modeled operation of the
+    // retaining resource; the pair op of that case or operation releases
+    // the retained slot. The resource's abandonment path and destroyer
+    // release every slot already (FOREIGN_PAIR_RESET / _DESTROY), so
+    // naming either is accepted and adds nothing.
+    mut fn facade_index_retention_releases():
+        for ci in 0..self.foreign_contracts.len():
+            let hosts = self.facade_method_host(self.foreign_contracts[ci].fn_sym)
+            if hosts.len() != 1 or self.foreign_contracts[ci].variadic_node == 0:
+                continue
+            let ri = hosts[0]
+            let host = self.pool_resolve(self.facade_resources[ri].name)
+            let fname = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+            let mname = self.facade_presented(ri, fname)
+            for slot in self.foreign_contracts[ci].variadic_slots:
+                // A retention is keyed by its case (the RETAIN op's slot).
+                let bit = foreign_slot_bit(slot.case_index)
+                for sym in slot.until_syms:
+                    let name = self.pool_resolve(sym)
+                    var sig = -1
+                    if self.foreign_contracts[ci].variadic_case_syms.contains(sym):
+                        let mtext = host ++ "." ++ facade_render_variadic_case_name(mname, name)
+                        if self.sig_text_index.contains(mtext): sig = self.sig_text_index.get(mtext).unwrap()
+                    if sig < 0:
+                        if self.facade_same_fn(self.facade_resources[ri].drop, sym) or self.facade_same_fn(self.facade_resources[ri].abandon, sym):
+                            continue
+                        if self.facade_contract_for(sym) >= 0:
+                            let op_hosts = self.facade_method_host(sym)
+                            if op_hosts.len() == 1 and op_hosts[0] == ri:
+                                let mtext = host ++ "." ++ self.facade_presented(ri, name)
+                                if self.sig_text_index.contains(mtext): sig = self.sig_text_index.get(mtext).unwrap()
+                    if sig < 0:
+                        self.update_decl_source_context(self.foreign_contracts[ci].decl)
+                        self.emit_error(f"fn '{fname}': 'until {name}' names neither a case of this variadic operation nor a modeled operation of '{host}'; a retention is released by a listed case, an operation the facade describes, the abandonment path or destruction (§16.2b.5)", slot.clause)
+                        continue
+                    let opi = self.facade_pair_op_for_sig(sig)
+                    if opi >= 0: self.facade_pair_ops[opi].releases = self.facade_pair_ops[opi].releases | bit
 
     // The presented operation a pair op is, for a diagnostic: 'Host.method'.
     fn facade_pair_op_display(op: i32) -> str:
@@ -5162,13 +5274,13 @@ impl Sema:
             return
         let ci: i32 = self.facade_pair_setter_contract.get(node).unwrap()
         let k: i32 = self.facade_pair_setter_case.get(node).unwrap()
-        let kind: i32 = self.foreign_contracts[ci].variadic_case_kinds[k]
+        let kind = self.foreign_contracts[ci].variadic_case_kinds[k]
         let case_sym: i32 = self.foreign_contracts[ci].variadic_case_syms[k]
         var slot: i32 = -1
         for si in 0..self.foreign_contracts[ci].variadic_slots.len() as i32:
             let s = &self.foreign_contracts[ci].variadic_slots[si]
-            if kind == FACADE_VARIADIC_CALLBACK and s.case_index == k: slot = si
-            if kind == FACADE_VARIADIC_USERDATA and s.userdata_selector == case_sym: slot = si
+            if kind == .Callback and s.case_index == k: slot = si
+            if kind == .Userdata and s.userdata_selector == case_sym: slot = si
         if slot < 0:
             return
         let count = self.sig_get_param_count(sig)
@@ -5176,7 +5288,7 @@ impl Sema:
             return
         let last = self.resolve_alias(self.sig_param_type(sig, count - 1) as TypeId)
         var u_tid: i32 = 0
-        if kind == FACADE_VARIADIC_USERDATA:
+        if kind == .Userdata:
             if self.get_type_kind(last) == TypeKind.TY_REF: u_tid = self.resolve_alias(self.get_type_d0(last) as TypeId) as i32
         else:
             let callable = self.callable_type_resolved(last as i32)
@@ -5197,7 +5309,7 @@ impl Sema:
             let decl = self.facade_const_decl(ok_sym)
             if decl != 0: guard_ok = self.facade_const_int_value(self.ast.get_data1(decl))
         let invokes = (not (self.foreign_contracts[ci].callbacks_none != 0)) as i32
-        let action = if kind == FACADE_VARIADIC_CALLBACK: FOREIGN_PAIR_CALLBACK else: FOREIGN_PAIR_USERDATA
+        let action = if kind == .Callback: FOREIGN_PAIR_CALLBACK else: FOREIGN_PAIR_USERDATA
         self.facade_add_pair_op(sig, ci, self.foreign_contracts[ci].variadic_slots[slot].resource, action, slot, u_tid, guard_ok, invokes)
 
     // A callback-only pair setter binds its `U` from the callback
@@ -5213,7 +5325,7 @@ impl Sema:
             return
         let ci: i32 = self.facade_pair_setter_contract.get(fn_node).unwrap()
         let k: i32 = self.facade_pair_setter_case.get(fn_node).unwrap()
-        if self.foreign_contracts[ci].variadic_case_kinds[k] != FACADE_VARIADIC_CALLBACK:
+        if self.foreign_contracts[ci].variadic_case_kinds[k] != .Callback:
             return
         var slot = -1
         for si in 0..self.foreign_contracts[ci].variadic_slots.len():
@@ -5248,7 +5360,7 @@ impl Sema:
             return -1
         let ci: i32 = self.facade_pair_setter_contract.get(node).unwrap()
         let k: i32 = self.facade_pair_setter_case.get(node).unwrap()
-        if self.foreign_contracts[ci].variadic_case_kinds[k] != FACADE_VARIADIC_CALLBACK:
+        if self.foreign_contracts[ci].variadic_case_kinds[k] != .Callback:
             return -1
         arg_count - 1
 
@@ -5267,7 +5379,7 @@ impl Sema:
             return -1
         let ci: i32 = self.facade_pair_setter_contract.get(node).unwrap()
         let k: i32 = self.facade_pair_setter_case.get(node).unwrap()
-        if self.foreign_contracts[ci].variadic_case_kinds[k] != FACADE_VARIADIC_USERDATA:
+        if self.foreign_contracts[ci].variadic_case_kinds[k] != .Userdata:
             return -1
         arg_count - 1
 
