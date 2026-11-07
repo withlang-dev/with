@@ -2549,7 +2549,8 @@ impl Sema:
                 if arg_ty == 0: return 0
                 args.push(arg_ty)
             if not self.validate_generic_arity(base_sym, base_tid, args, node): return 0
-            return self.ensure_generic_inst_type(base_sym, args, args.len()) as i32
+            // `as i32`: the pinned seed predates D183's range-checked narrowing.
+            return self.ensure_generic_inst_type(base_sym, args, args.len() as i32) as i32
         if kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
             if self.ast.kind(base) != NodeKind.NK_IDENT:
@@ -2838,7 +2839,7 @@ impl Sema:
                 let arg_ty = self.resolve_type_level_arg_expr_frozen(arg_node)
                 if arg_ty == 0: return 0
                 args.push(arg_ty)
-            return self.find_generic_inst_type(base_sym, args, args.len()) as i32
+            return self.find_generic_inst_type(base_sym, args, args.len() as i32) as i32
         if kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
             if self.ast.kind(base) != NodeKind.NK_IDENT:

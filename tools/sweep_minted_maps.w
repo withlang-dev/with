@@ -66,15 +66,11 @@ fn sweep(text: str) -> (str, isize):
     if not out.contains("use std.collections.Minted"):
         let lines = out.split("\n")
         var last_use = -1
-        for li in 0..lines.len():
-            if lines[li].starts_with("use "): last_use = li
+        for (li, line) in lines.enumerate():
+            if line.starts_with("use "): last_use = li
         if last_use >= 0:
-            var rebuilt = ""
-            for li in 0..lines.len():
-                rebuilt = rebuilt ++ lines[li]
-                if li == last_use: rebuilt = rebuilt ++ "\nuse std.collections.Minted"
-                if li + 1 < lines.len(): rebuilt = rebuilt ++ "\n"
-            out = rebuilt
+            let kept = [if li == last_use: line ++ "\nuse std.collections.Minted" else: line for (li, line) in lines.enumerate()]
+            out = kept.join("\n")
     (out, inserts.len())
 
 fn main:
