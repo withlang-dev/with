@@ -7092,7 +7092,7 @@ impl MirBuilder:
         let resolved = self.sema.resolve_alias(target_ty)
         var key_ty: i32 = 0
         var val_ty: i32 = 0
-        if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
+        if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) >= 2:
             key_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
             val_ty = self.sema.get_generic_inst_arg(resolved as i32, 1)
         let target_base = self.literal_target_base_sym(target_ty)
@@ -9360,7 +9360,7 @@ impl MirBuilder:
             let resolved = self.sema.resolve_alias(target_ty)
             var key_ty: i32 = 0
             var val_ty = out_elem_ty
-            if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
+            if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) >= 2:
                 key_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
                 val_ty = self.sema.get_generic_inst_arg(resolved as i32, 1)
             let saved_expected2 = self.expected_type

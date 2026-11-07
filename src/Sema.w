@@ -7187,6 +7187,32 @@ impl Sema:
     // hashes and compares as the compiler generates, so no `key()`
     // projection anywhere in `K` runs inside the cache; its value is copied
     // out, so it holds no view, raw pointer, `str`, slice or function value.
+    // A declared generic type takes as many arguments as it declares
+    // parameters (`HashMap[i32, i32, i32]` was accepted and the map
+    // miscompiled: `get` found nothing). The one extension is the hasher
+    // slot (D196, §11.7): `HashMap[K, V, Minted]` and `HashSet[T, Minted]`
+    // name std's `Minted`, and only over an integer key — a minted ID is
+    // an integer the program generated, never one it received.
+    mut fn validate_generic_arity(base_sym: i32, base_tid: i32, args: &List[i32], node: i32) -> bool:
+        let decl = self.type_decl_nodes_by_tid.get(base_tid) ?? (self.type_decl_nodes.get(base_sym) ?? 0)
+        if decl == 0 or self.ast.kind(decl) != NodeKind.NK_TYPE_DECL: return true
+        let tp_count = self.type_decl_tp_count(decl)
+        if tp_count <= 0 or args.len() == tp_count: return true
+        let name = self.pool_resolve_symbol(base_sym)
+        let hashed = (base_sym == self.syms.hashmap or base_sym == self.syms.hashset) and sema_path_is_std_implementation(self.type_decl_source_path(base_sym))
+        if hashed and args.len() == tp_count + 1:
+            let hasher = self.resolve_alias(args[tp_count] as TypeId)
+            let hasher_name = if self.get_type_name(hasher) != 0: self.pool_resolve_symbol(self.get_type_name(hasher)) else: ""
+            if hasher_name != "Minted" or not sema_path_is_std_implementation(self.type_decl_source_path(self.get_type_name(hasher))):
+                self.emit_error(f"`{name}`'s third argument names its hasher: `Minted`, for keys that are IDs this program minted (§11.7, D196); `{self.type_name(args[tp_count])}` is not a hasher", node)
+                return false
+            if self.get_type_kind(self.resolve_alias(args[0] as TypeId)) != TypeKind.TY_INT:
+                self.emit_error(f"`Minted` hashes an integer ID the program minted; `{self.type_name(args[0])}` keys stay seeded (§11.7, D196)", node)
+                return false
+            return true
+        self.emit_error(f"`{name}` expects {tp_count} type argument(s), found {args.len()}", node)
+        false
+
     mut fn validate_memo_arguments(base_sym: i32, args: &List[i32], node: i32):
         if self.pool_resolve_symbol(base_sym) != "Memo" or not sema_path_is_std_memo_module(self.type_decl_source_path(base_sym)) or args.len() != 2:
             return
@@ -7413,6 +7439,8 @@ impl Sema:
                 return 0
             gi_args.push(gi_arg_tid as i32)
         if self.validate_atomic_payload_type(gi_base_sym, gi_args, gi_arg_count, node) == false:
+            return 0
+        if self.validate_generic_arity(gi_base_sym, gi_base_tid, gi_args, node) == false:
             return 0
         // A refused argument is reported and the instance kept, so its uses
         // do not cascade into inference errors.
