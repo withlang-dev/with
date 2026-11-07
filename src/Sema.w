@@ -1225,6 +1225,15 @@ type Sema {
     must_use_types: HashMap[i32, i32],
     no_await_guard_types: HashMap[i32, i32],
     must_use_fns: HashMap[i32, i32],
+    // #3061: the facts `with fix-ceremony` rewrites by, recorded where Sema
+    // decides them: a local let with an annotation and an initializer (node →
+    // the annotation's type), its initializer, the file it is in, and the lets
+    // whose binding is assigned again or passed to a `mut` parameter.
+    ceremony_let_annotations: HashMap[i32, i32],
+    ceremony_let_values: HashMap[i32, i32],
+    ceremony_let_type_nodes: HashMap[i32, i32],
+    ceremony_let_paths: HashMap[i32, str],
+    ceremony_rebound_lets: HashMap[i32, i32],
     suspending_fns: HashMap[i32, i32],          // @[suspends] declarations (#3052): calling one may suspend the current fiber
     builtin_suspending_methods: HashMap[i64, i32], // … and the compiler-declared ones (Sender.send, Receiver.recv, Task.join_cleanup), keyed sema_pair_key(owner, method)
     result_option_fns: HashMap[i32, i32],
@@ -3476,6 +3485,11 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let must_use_types = sema_new_map_i32_i32()
     let no_await_guard_types = sema_new_map_i32_i32()
     let must_use_fns = sema_new_map_i32_i32()
+    let ceremony_let_annotations = sema_new_map_i32_i32()
+    let ceremony_let_values = sema_new_map_i32_i32()
+    let ceremony_let_type_nodes = sema_new_map_i32_i32()
+    let ceremony_let_paths: HashMap[i32, str] = HashMap.new()
+    let ceremony_rebound_lets = sema_new_map_i32_i32()
     let suspending_fns = sema_new_map_i32_i32()
     let builtin_suspending_methods: HashMap[i64, i32] = HashMap.new()
     let result_option_fns = sema_new_map_i32_i32()
@@ -3776,6 +3790,11 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         must_use_types,
         no_await_guard_types,
         must_use_fns,
+        ceremony_let_annotations,
+        ceremony_let_values,
+        ceremony_let_type_nodes,
+        ceremony_let_paths,
+        ceremony_rebound_lets,
         suspending_fns,
         builtin_suspending_methods,
         result_option_fns,

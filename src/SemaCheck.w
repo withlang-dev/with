@@ -1799,6 +1799,9 @@ impl Sema:
         if unpack_place_kind(packed) == PlaceKind.PK_NotPlace:
             self.emit_error("a `mut` parameter needs a mutable place: the argument is a temporary (§3.8a)", arg_node)
             return true
+        // #3061: the place a `mut` parameter writes keeps its `var` (§3.8a).
+        let written = self.binding_decl_node(self.place_root_sym(arg_node))
+        if written != 0: self.ceremony_rebound_lets.insert(written, 1)
         if unpack_place_mut(packed) == PlaceMut.PM_ReadOnly or self.place_base_is_read_only_ref(arg_node) != 0:
             self.emit_error(f"a `mut` parameter needs a mutable place: `{self.call_node_text(arg_node)}` is reached through a read-only view (§3.8a)", arg_node)
             return true
@@ -13960,6 +13963,9 @@ impl Sema:
             else:
                 pos = pos + 1
             i = i + 1
+        // The expression's type, as every other expression records it (D65;
+        // `with fix-ceremony` reads it for `let s: str = f"…"`, #3061).
+        self.typed_expr_types.insert(node, self.ty_str as i32)
         self.ty_str as i32
 
     mut fn validate_fstring_spec(spec_node: i32, expr_ty: i32, expr_node: i32):
@@ -17662,6 +17668,9 @@ impl Sema:
         let value = self.ast.get_data1(node)
         let flags = self.ast.get_data2(node)
         let is_mut = flags % 2
+        // #3061: every local let, by the file it is in (`with fix-ceremony`
+        // turns a `var` never rebound into a `let`).
+        self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
         if value != 0:
             var labeled_value = value
             if self.ast.kind(value) == NodeKind.NK_LABEL:
@@ -17687,6 +17696,12 @@ impl Sema:
                 if (value_kind == NodeKind.NK_ARRAY_LIT and sequence) or (value_kind == NodeKind.NK_MAP_LIT and keyed): self.collection_literal_hints.insert(value, bare_generic)
             else:
                 ann_type = self.resolve_type_expr(ann_type_node)
+                // #3061: `with fix-ceremony` asks whether the annotation
+                // restates the initializer's type.
+                if value != 0 and ann_type != 0:
+                    self.ceremony_let_annotations.insert(node, ann_type as i32)
+                    self.ceremony_let_values.insert(node, value)
+                    self.ceremony_let_type_nodes.insert(node, ann_type_node)
 
         // D93: no annotation, an element-form literal, and uses that
         // demanded a collection: the binding has that type.
@@ -20129,6 +20144,10 @@ impl Sema:
 
     mut fn check_assign(node: i32) -> i32:
         let target = self.ast.get_data0(node)
+        // #3061: a binding assigned again (`x = …`, `x += …`) needs its `var`.
+        if self.ast.kind(target) == NodeKind.NK_IDENT:
+            let rebound = self.binding_decl_node(self.ast.get_data0(target))
+            if rebound != 0: self.ceremony_rebound_lets.insert(rebound, 1)
         let value = self.ast.get_data1(node)
 
         if self.is_runtime_multi_index_node(target):
