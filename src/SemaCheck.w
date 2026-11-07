@@ -854,6 +854,10 @@ impl Sema:
         let r = self.resolve_alias(tid as TypeId)
         self.get_type_kind(r) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(r as i32) == self.syms.option
 
+    // A `None` written bare (`None`, `.None`), before its Option is known.
+    fn node_is_bare_none(node: i32) -> bool:
+        (self.ast.kind(node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(node) == NodeKind.NK_IDENT) and self.ast.get_data0(node) == self.syms.none
+
     // D141: where a return type is inferred, a `T` beside `None` joins to
     // `Option[T]`. An `Option[T]` beside `None` does not join — `Option[
     // Option[T]]` would be a second meaning — and the type is written: -1.
@@ -13972,11 +13976,28 @@ impl Sema:
             return
         if kind == TypeKind.TY_ERR or kind == TypeKind.TY_VOID or self.debug_fmt_is_inline(kind):
             return
+        // §15.4 (D193, #3005): a type with an `impl Display` the program
+        // wrote displays through it — `{p}` is what `print(p)` prints. The
+        // impl's `to_str` is bound here, by type, and MIR calls it with a
+        // borrow of the value. An `error` type's generated impl is the
+        // enum display form itself and keeps that path.
+        if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_GENERIC_INST) and self.type_implements_trait(resolved, self.syms.display_trait):
+            let owner = self.method_owner_symbol_for_type(resolved)
+            if owner != 0 and not self.ast.is_generated_debug_type(owner):
+                if self.display_fmt_fns.contains(resolved):
+                    return
+                let method_fn = self.debug_fmt_method_fn(resolved, "to_str")
+                let sig = self.debug_fmt_method_sig(resolved, method_fn, "to_str", node)
+                if sig >= 0:
+                    self.display_fmt_fns.insert(resolved, method_fn)
+                    self.display_fmt_sigs.insert(resolved, sig)
+                    self.display_fmt_monos.insert(resolved, self.sig_names[sig])
+                return
         if self.debug_fmt_enum_base(resolved) != 0:
             self.register_display_payload_formatters(resolved, node, 0)
             return
         if kind == TypeKind.TY_STRUCT:
-            self.emit_error("struct type has no default display; use :? for debug", node)
+            self.emit_error("struct type has no default display: give it an `impl Display` (`fn to_str() -> str`), or use :? for debug", node)
             return
         self.emit_error("type '" ++ self.type_name(resolved) ++ "' has no default display; use :? for debug", node)
 
@@ -14083,12 +14104,15 @@ impl Sema:
     mut fn debug_fmt_method_sig(resolved: i32, method_fn: i32, method: &str, node: i32) -> i32:
         let owner = self.method_owner_symbol_for_type(resolved)
         let sig = if method_fn != 0: self.concrete_owner_method_sig(owner, resolved, method_fn) else: -1
+        // `to_str` is the Display impl a plain `{x}` calls (D193); every
+        // other method here is `:?`'s.
+        let form = if method == "to_str": "{}" else: ":?"
         if sig < 0:
-            self.emit_error("cannot format '" ++ self.type_name(resolved) ++ "' with :?: its " ++ method ++ " method could not be resolved for this type", node)
+            self.emit_error("cannot format '" ++ self.type_name(resolved) ++ "' with " ++ form ++ ": its " ++ method ++ " method could not be resolved for this type", node)
         else if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)) != TypeKind.TY_REF:
             // The formatter observes: a receiver that consumes cannot be
-            // called on a value `:?` only reads.
-            self.emit_error("cannot format '" ++ self.type_name(resolved) ++ "' with :?: its " ++ method ++ " must observe its receiver (`fn " ++ method ++ "()` or `self: &Self`)", node)
+            // called on a value the interpolation only reads.
+            self.emit_error("cannot format '" ++ self.type_name(resolved) ++ "' with " ++ form ++ ": its " ++ method ++ " must observe its receiver (`fn " ++ method ++ "()` or `self: &Self`)", node)
             return -1
         sig
 
@@ -15815,7 +15839,16 @@ impl Sema:
         // expectation: value context leaves a multi-param enum's other type
         // arguments unbound (Result's Err side), failing compatibility.
         if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
-            if self.ast.kind(lhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.comparison_operand_is_variant_call(lhs_node):
+            // A bare `None` is a variant shorthand without the dot: beside
+            // `Some(1)` it is that Option (D97: `None < Some(1)`); left
+            // bare, MIR refused the generic with no arguments (#2946).
+            if self.node_is_bare_none(lhs_node) and self.node_is_bare_none(rhs_node):
+                self.emit_error("`None` beside `None` names no Option: write one side's type (`let x: Option[i32] = None`)", node)
+                return 0
+            if self.node_is_bare_none(rhs_node):
+                lhs = self.check_expr_value_context(lhs_node)
+                rhs = self.check_expr_with_expected(rhs_node, self.comparison_value_peer(lhs))
+            else if self.ast.kind(lhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.node_is_bare_none(lhs_node) or self.comparison_operand_is_variant_call(lhs_node):
                 rhs = self.check_expr_value_context(rhs_node)
                 lhs = self.check_expr_with_expected(lhs_node, self.comparison_value_peer(rhs))
             else if self.ast.kind(lhs_node) == NodeKind.NK_NULL_LIT:
@@ -15856,7 +15889,7 @@ impl Sema:
                     lhs = self.check_expr_with_expected(lhs_node, rhs_peer as TypeId)
                 else:
                     lhs = self.check_expr_value_context(lhs_node)
-                if self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or (rhs == 0 and self.comparison_operand_is_variant_call(rhs_node)):
+                if self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or (rhs == 0 and (self.node_is_bare_none(rhs_node) or self.comparison_operand_is_variant_call(rhs_node))):
                     rhs = self.check_expr_with_expected(rhs_node, self.comparison_value_peer(lhs))
                 else if rhs == 0 and rhs_is_num_lit and not lhs_is_num_lit:
                     let lhs_peer = self.literal_peer_type(lhs as i32)
@@ -28937,7 +28970,13 @@ impl Sema:
             let qualified_trait_ret = self.check_qualified_trait_call(recv_expr, recv_field, extra_start, arg_count, node)
             if qualified_trait_ret >= 0:
                 return qualified_trait_ret
+            // The demand on the call is its result's, never the receiver's:
+            // `[1, 2, 3].traverse(...)` under a `Result[List[T], E]`
+            // annotation typed the literal by it (#3051, §4.3 / D93).
+            let saved_recv_demand = self.has_expected_type
+            self.has_expected_type = 0
             let checked_recv = self.check_expr(recv_expr) as i32
+            self.has_expected_type = saved_recv_demand
             let recv_ty = self.adjust_static_receiver_type(recv_expr, checked_recv)
             let vector_method = self.check_vector_method(node, recv_expr, recv_ty, recv_field, arg_count)
             if vector_method >= 0:
@@ -28989,7 +29028,10 @@ impl Sema:
             if self.ast.kind(generic_method_base) == NodeKind.NK_FIELD_ACCESS:
                 let recv_expr2 = self.ast.get_data0(generic_method_base)
                 let recv_field2 = self.ast.get_data1(generic_method_base)
+                let saved_recv_demand2 = self.has_expected_type
+                self.has_expected_type = 0
                 let checked_recv2 = self.check_expr(recv_expr2) as i32
+                self.has_expected_type = saved_recv_demand2
                 let recv_ty2 = self.adjust_static_receiver_type(recv_expr2, checked_recv2)
                 if recv_field2 == self.syms.va_arg_method and self.type_is_c_va_list(recv_ty2):
                     let va_arg_ret = self.check_va_arg_call(node, callee, recv_expr2, arg_count)

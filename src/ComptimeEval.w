@@ -3958,12 +3958,19 @@ impl ComptimeEvaluator:
             enum_type = self.sema.variant_type_ids.get(resolved_variant).unwrap()
         if enum_type == 0:
             return self.fail(node, "enum variant constructor type is unknown in comptime")
-        let payload_start = self.extra_values.len() as i32
+        // Every payload is evaluated before any is pushed: a nested payload
+        // variant pushes its own extras while it is evaluated, and a start
+        // taken first pointed at them — `AppError.Db(DbError.NotFound(a, b))`
+        // folded to `.Db(a)` and matched nothing at run time (#3016).
+        let values: List[ComptimeValue] = List.new()
         for i in 0..arg_count:
             var arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return arg_signal
-            self.extra_values.push(move arg_signal.value)
+            values.push(move arg_signal.value)
+        let payload_start = self.extra_values.len() as i32
+        for v in values.into_iter():
+            self.extra_values.push(v)
         comptime_control_value(comptime_value_enum(enum_type, resolved_variant, payload_start, arg_count))
 
     mut fn capability_expect_arg_count(arg_count: i32, expected: i32, method: &str, node: i32) -> bool:

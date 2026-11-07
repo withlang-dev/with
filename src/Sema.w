@@ -1776,6 +1776,11 @@ type Sema {
     // after the specialization fixpoint. Entries are keyed by resolved
     // type and kept in registration order (the synthesized bodies' order).
     debug_fmt_index: HashMap[i32, i32],
+    // `{x}` over a type with an `impl Display` (§15.4, D193): the impl's
+    // `to_str` by resolved type — fn symbol, signature, mono name.
+    display_fmt_fns: HashMap[i32, i32],
+    display_fmt_sigs: HashMap[i32, i32],
+    display_fmt_monos: HashMap[i32, i32],
     debug_fmt_tids: List[i32],
     debug_fmt_kinds: List[i32],
     debug_fmt_fns: List[i32],
@@ -4015,6 +4020,9 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         clone_contract_sigs: sema_new_map_i32_i32(),
         clone_contract_mono_syms: sema_new_map_i32_i32(),
         debug_fmt_index: sema_new_map_i32_i32(),
+        display_fmt_fns: sema_new_map_i32_i32(),
+        display_fmt_sigs: sema_new_map_i32_i32(),
+        display_fmt_monos: sema_new_map_i32_i32(),
         debug_fmt_tids: List.new(),
         debug_fmt_kinds: List.new(),
         debug_fmt_fns: List.new(),

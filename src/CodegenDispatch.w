@@ -5000,7 +5000,10 @@ impl Codegen:
                 return self.mir_bug_undef(f"discriminant rvalue {rval_id}: place {d0} out of range", wl_i32_type(self.context))
             var place_ty = self.mir_place_projected_type(body, d0)
             if place_ty == 0:
-                let local_ty: i64 = (self.mir_local_types.get(body.place_locals[d0]) ?? 0) as i64
+                // An unprojected place is its local: Sema's type of it when
+                // no alloca named it yet — a module global read in main
+                // (`a.is_none()` over `let a: Option[i32] = None`, #2976).
+                let local_ty = self.mir_local_llvm_type(body, body.place_locals[d0])
                 if local_ty == 0:
                     return self.mir_bug_undef(f"discriminant rvalue {rval_id}: place {d0} has no type", wl_i32_type(self.context))
                 place_ty = local_ty

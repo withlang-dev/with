@@ -1056,6 +1056,16 @@ pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
         return ret_write_output_stamp(ctx)
     if not manifest.contains(expected):
         return ret_fail(ctx, compiler_path ++ " is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
+    // #3017: the binary is the one last-green recorded, but last-green was
+    // recorded for the sources it names. After a `:sources-green` battery
+    // (which builds nothing) the manifest and the binary are a previous
+    // tree's, while HEAD's green is another tree's: the install would put
+    // yesterday's compiler under today's green. The sources must match.
+    let recorded_identity = ret_json_field(manifest, "source_identity")
+    let seed_input = if fs.exists("out/.build-state/seed-input.json"): fs.read_text("out/.build-state/seed-input.json") else: ""
+    let head_identity = ret_source_identity(ctx, ret_json_field(seed_input, "sha256"))
+    if recorded_identity.len() > 0 and head_identity.len() > 0 and recorded_identity != head_identity:
+        return ret_fail(ctx, compiler_path ++ " was built from other sources than HEAD (last-green records source identity " ++ recorded_identity ++ ", HEAD's is " ++ head_identity ++ "); run `src/main build`, then `:install-user`")
     let output = ctx.output()
     if output.len() > 0:
         let dir = ret_dirname(output)

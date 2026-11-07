@@ -1284,21 +1284,26 @@ see §4.2.7.
 | 4 | `<`, `>`, `<=`, `>=` | Chained |
 | 5 | `??` (default) | Right |
 | 6 | `\|>` (pipeline) | Left |
-| 7 | `\|` | Left |
-| 8 | `^` | Left |
-| 9 | `&` | Left |
-| 10 | `<<`, `>>` | Left |
-| 11 | `+`, `-`, `++` | Left |
-| 12 | `*`, `/`, `%`, `@` | Left |
-| 13 | Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`) | — |
-| 14 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
+| 7 | `..`, `..=` (range) | Non-associative |
+| 8 | `\|` | Left |
+| 9 | `^` | Left |
+| 10 | `&` | Left |
+| 11 | `<<`, `>>` | Left |
+| 12 | `+`, `-`, `++` | Left |
+| 13 | `*`, `/`, `%`, `@` | Left |
+| 14 | Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`) | — |
+| 15 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
 
 `??` binds below every operator that computes a value and above the
 comparisons, so a default applies to a whole pipeline or sum, and the
 result compares: `xs.iter() |> max() ?? 0.0` is
 `(xs.iter() |> max()) ?? 0.0`, and `x ?? 0 > 3` is `(x ?? 0) > 3`. It is
 right-associative: `a ?? b ?? c` is `a ?? (b ?? c)`. A pipeline stage is
-every operator above `|>`: `xs |> sum() * 2` is `xs |> (sum() * 2)`.
+every operator above `|>`: `xs |> sum() * 2` is `xs |> (sum() * 2)`. A
+range is a value like a sum: it binds above `|>` and `??` and below the
+operators that compute its bounds, so `0..n |> map(f)` is `(0..n) |>
+map(f)`, `a..b ?? c` is `(a..b) ?? c`, and `0..n + 1` is `0..(n + 1)`
+(D192). In a subscript, `xs[a..b]` is the slice.
 
 This means:
 

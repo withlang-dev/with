@@ -169,14 +169,15 @@ ERRDEFER_STMT := 'errdefer' BODY
 | 4 | `<`, `>`, `<=`, `>=` | Chained |
 | 5 | `??` (default) | Right |
 | 6 | `\|>` (pipeline) | Left |
-| 7 | `\|` | Left |
-| 8 | `^` | Left |
-| 9 | `&` | Left |
-| 10 | `<<`, `>>` | Left |
-| 11 | `+`, `-`, `++` | Left |
-| 12 | `*`, `/`, `%`, `@` | Left |
-| 13 | Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`) | — |
-| 14 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
+| 7 | `..`, `..=` (range) | Non-associative |
+| 8 | `\|` | Left |
+| 9 | `^` | Left |
+| 10 | `&` | Left |
+| 11 | `<<`, `>>` | Left |
+| 12 | `+`, `-`, `++` | Left |
+| 13 | `*`, `/`, `%`, `@` | Left |
+| 14 | Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`) | — |
+| 15 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
 
 **Comprehensions** (§13.6):
 

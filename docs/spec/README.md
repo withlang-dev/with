@@ -11,6 +11,7 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.38:** two delegated rulings of 2026-11-06. §9.9: `..` and `..=` are a precedence level of their own, above `|>` and `??` and below `|`, so `0..n |> map(f)` pipes the range (D192, #3001). §15.4: `{x}` in an f-string displays a type with an `impl Display` through its `to_str`, as `print(x)` does; `:?` stays the Debug form, and a type with neither is still refused (D193, #3005). Both implemented in the same change.
 **Changelog v7.37:** §9.6: a line that begins with `|>` (or `<|`, `??`) continues the expression whose line is indented no more than its own; at a `match`'s column it pipes the whole match (D191, Eric 2026-11-02). Implemented in the same change.
 **Changelog v7.36:** §10.2: in `main` (`fn main:` or a script's implicit main) `?` on a `Result` needs no `Result` return; an `Err` it meets is written to stderr in its `Debug` form after `error: ` and the process exits with status 1 (D190, delegated). Implemented in the same change (#2935).
 **Changelog v7.35:** seven rulings of 2026-11-02 (D183–D189). §4.2.6: an

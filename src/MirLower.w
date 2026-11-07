@@ -3500,6 +3500,21 @@ impl MirBuilder:
         self.register_stmt_temp(result_local, self.sema.ty_str)
         self.body.new_operand(OperandKind.OK_COPY, result_place)
 
+    // The display text of a plain `{x}`: a type with an `impl Display`
+    // (§15.4, D193) is formatted by its `to_str`, called with a borrow of
+    // the value (Sema bound it, display_fmt_*); every other value by the
+    // built-in formatter.
+    mut fn lower_display_text_op(expr_op: i32, resolved_ty: i32, node: i32) -> i32:
+        let resolved = self.sema.resolve_alias(resolved_ty as TypeId) as i32
+        if self.sema.display_fmt_fns.contains(resolved):
+            let fn_sym: i32 = self.sema.display_fmt_fns.get(resolved).unwrap()
+            let sig: i32 = self.sema.display_fmt_sigs.get(resolved).unwrap()
+            let mono: i32 = self.sema.display_fmt_monos.get(resolved).unwrap()
+            let value_place = self.debug_operand_place(expr_op, resolved_ty, node)
+            let text_place = self.lower_debug_borrowing_call(fn_sym, sig, mono, value_place, resolved)
+            return self.body.new_operand(OperandKind.OK_COPY, text_place)
+        self.lower_fmt_to_str(expr_op, node)
+
     mut fn lower_fmt_debug_str(operand: i32, node: i32) -> i32:
         // Emit MirIntrinsic.FMT_DEBUG_STR call to wrap a str value in quotes.
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_debug_str"), self.sema.ty_str)
@@ -4025,7 +4040,7 @@ impl MirBuilder:
                         // an enum's bytes were read as a str header).
                         let spec_kind = if resolved_ty != 0: self.sema.get_type_kind(resolved_ty as TypeId) else: TypeKind.TY_ERR
                         if resolved_ty != 0 and resolved_ty != self.sema.ty_str and spec_kind != TypeKind.TY_INT and spec_kind != TypeKind.TY_FLOAT:
-                            let display_op = self.lower_fmt_to_str(expr_op, node)
+                            let display_op = self.lower_display_text_op(expr_op, resolved_ty, node)
                             self.lower_fstring_buf_write_fmt(buf_op, display_op, spec_flags, spec_width, spec_precision, self.sema.ty_str as i32, node)
                         else:
                             self.lower_fstring_buf_write_fmt(buf_op, expr_op, spec_flags, spec_width, spec_precision, resolved_ty, node)
@@ -4038,8 +4053,9 @@ impl MirBuilder:
                         else:
                             self.lower_fstring_buf_write_str(buf_op, expr_op, node)
                     else:
-                        // Non-str: format to str then write
-                        let formatted = self.lower_fmt_to_str(expr_op, node)
+                        // Non-str: format to str (a Display impl's, or the
+                        // built-in formatter's) then write
+                        let formatted = self.lower_display_text_op(expr_op, resolved_ty, node)
                         self.lower_fstring_buf_write_str(buf_op, formatted, node)
                 pos = pos + 3
             else:
@@ -7416,8 +7432,12 @@ impl MirBuilder:
             if gv_local >= 0:
                 return self.place_for_local(gv_local)
             let magic_kind = self.magic_ident_kind(node)
-            if magic_kind != 0:
-                let op = self.lower_magic_ident(magic_kind, node)
+            // A bare variant name (`None`) is a value, as `.None` is: a
+            // borrowing use (the derived `eq` of `none == None`, #2946)
+            // reads it from a statement temp.
+            let names_variant = self.sema.variant_lookup.contains(if self.sema.comp_resolved.contains(node): self.sema.comp_resolved.get(node).unwrap() else: sym)
+            if magic_kind != 0 or names_variant:
+                let op = if magic_kind != 0: self.lower_magic_ident(magic_kind, node) else: self.lower_expr(node)
                 let ty = self.expr_type(node)
                 let tmp = self.new_temp(ty)
                 let p = self.place_for_local(tmp)
