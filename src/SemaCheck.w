@@ -12503,6 +12503,15 @@ impl Sema:
             // Store resolved cast type so MIR lowering can read it without
             // calling resolve_type_expr (which would add_type on a shallow-copied Sema).
             self.typed_expr_types.insert(node, cast_tid as i32)
+            // #3061: `x as T` where `x`'s integer type widens into `T` and the
+            // context demands exactly `T` — the compiler widens there without
+            // the cast (§4.2.6), so `with fix-ceremony` removes it.
+            if src_tid != 0 and cast_tid != 0 and self.has_expected_type != 0 and self.resolve_alias(self.expected_expr_type) == self.resolve_alias(cast_tid):
+                let sr = self.resolve_alias(src_tid)
+                let cr = self.resolve_alias(cast_tid)
+                if sr != cr and self.get_type_kind(sr) == TypeKind.TY_INT and self.get_type_kind(cr) == TypeKind.TY_INT and not self.int_narrowing_requires_cast(cast_tid, src_tid):
+                    self.ceremony_widening_casts.insert(node, src_node)
+                    self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
             if src_tid != 0 and cast_tid != 0:
                 let src_resolved = self.resolve_alias(src_tid)
                 let cast_resolved = self.resolve_alias(cast_tid)
@@ -17739,6 +17748,16 @@ impl Sema:
                     self.ceremony_let_annotations.insert(node, ann_type as i32)
                     self.ceremony_let_values.insert(node, value)
                     self.ceremony_let_type_nodes.insert(node, ann_type_node)
+                    // `let xs: List[T] = List.new()`: the written type makes
+                    // the empty literal's demand (D93), so the constructor is
+                    // ceremony `with fix-ceremony` turns into `[]` / `[:]`.
+                    if self.ast.kind(value) == NodeKind.NK_CALL and self.ast.get_data2(value) == 0:
+                        let callee = self.ast.get_data0(value)
+                        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.pool_resolve(self.ast.get_data1(callee)) == "new":
+                            let owner = self.ast.get_data0(callee)
+                            if self.ast.kind(owner) == NodeKind.NK_IDENT:
+                                let owner_sym = self.canonical_symbol_by_text(self.ast.get_data0(owner))
+                                if owner_sym == self.syms.list or owner_sym == self.syms.hashmap or owner_sym == self.syms.hashset: self.ceremony_list_news.insert(node, 1)
 
         // D93: no annotation, an element-form literal, and uses that
         // demanded a collection: the binding has that type.

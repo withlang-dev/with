@@ -86,6 +86,21 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
         if not cf_rewritable(path, excludes, std_too): continue
         if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
         let text = texts.get(path).unwrap()
+        // A widening `as` under a demand of its target: the cast goes, the
+        // source stays (`x as i64` where an i64 is demanded → `x`).
+        if sema.ceremony_widening_casts.contains(node):
+            let src = sema.ceremony_widening_casts.get(node).unwrap()
+            edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_end(src), end: pool.get_end(node), replacement: "", what: "`as " ++ sema.type_name(sema.typed_expr_types.get(node) ?? 0) ++ "` widens where the context already does (§4.2.6)" })
+            continue
+        // `List.new()` / `HashMap.new()` / `HashSet.new()` as a let's
+        // initializer with its type written: the empty literal (D93).
+        if sema.ceremony_list_news.contains(node):
+            let value = sema.ceremony_let_values.get(node).unwrap()
+            let callee = pool.get_data0(value)
+            let owner = pool.get_data0(callee)
+            let name = sema.pool_resolve(pool.get_data0(owner))
+            let literal = if name == "HashMap": "[:]" else: "[]"
+            edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_start(value), end: pool.get_end(value), replacement: literal, what: "`" ++ name ++ ".new()` under a written type is `" ++ literal ++ "` (D93)" })
         let flags = pool.get_data2(node)
         // The annotation: the type node's span, and the colon before it.
         if sema.ceremony_let_annotations.contains(node):
