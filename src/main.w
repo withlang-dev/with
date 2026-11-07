@@ -2941,7 +2941,14 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             build_graph_jobserver_release(js_dir, held_slot)
             held_slot = -1
             if not pool.has_live():
-                with_eprint("error: build.w targets wait on one another: none of the remaining targets is ready (a dependency cycle)")
+                // #3024: in a survey the remaining targets usually wait on
+                // one that failed; that failure is the news, 400 lines up.
+                // A cycle is the verdict only when nothing failed.
+                if survey_failed.len() > 0:
+                    let waiting = [graph.targets[ri].name for ri in remaining]
+                    with_eprint(f"error: build.w: {survey_failed.len()} target(s) failed: {survey_failed.join(", ")}; {waiting.len()} target(s) that wait on them cannot start: {waiting.join(", ")}")
+                else:
+                    with_eprint("error: build.w targets wait on one another: none of the remaining targets is ready (a dependency cycle)")
                 return 1
             // Nothing is ready until a lane finishes: retire the first to.
             let first_done = pool.wait_any_done()

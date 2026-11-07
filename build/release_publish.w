@@ -85,6 +85,25 @@ fn rp_trim_lines(text: &str) -> List[str]:
         if l.len() > 0: out.push(l ++ "")
     out
 
+/// #2973: "verified" when out/.build-state/fixpoint-evidence.json names the
+/// compiler the packaged assets derive from (out/release/bin/with, as it is
+/// now), else "unverified": a leg that never ran `:fixpoint`, or rebuilt the
+/// compiler after it, has no claim to make.
+fn rp_fixpoint_verdict(fs: &ToolFs) -> str:
+    let evidence_path = "out/.build-state/fixpoint-evidence.json"
+    if not fs.exists(evidence_path): return "unverified"
+    let evidence = fs.read_text(evidence_path)
+    let key = "\"compiler_sha256\": \""
+    let at = evidence.index_of(key)
+    if at < 0: return "unverified"
+    let rest = evidence.slice(at + key.len(), evidence.len())
+    let close = rest.index_of("\"")
+    if close != 64: return "unverified"
+    let proved = rest.slice(0, 64)
+    let compiler = if fs.exists("out/release/bin/with.exe"): "out/release/bin/with.exe" else: "out/release/bin/with"
+    if not fs.exists(compiler): return "unverified"
+    if fs.sha256_file(compiler) == proved: "verified" else: "unverified"
+
 /// The digest recorded in `<asset>.sha256` (first field), or "".
 fn rp_sidecar_digest(fs: &ToolFs, asset: &str) -> str:
     let text = fs.read_text(asset ++ ".sha256").trim().to_owned()
@@ -256,6 +275,16 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
             if p == name: already = true
         if not already: extras_to_upload.push(extra ++ "")
 
+    // #2973: `fixpoint=` is a fact, not a claim. `with build :fixpoint` wrote
+    // out/.build-state/fixpoint-evidence.json naming the compiler it proved
+    // (build/retention.w run_fixpoint_evidence_action); the packaged assets
+    // derive in-graph from out/release/bin/with, so the claim holds exactly
+    // when that binary is the one the evidence names. A release never
+    // publishes an unverified compiler; a nightly or test channel says so.
+    let fixpoint = rp_fixpoint_verdict(fs)
+    if channel == "release" and fixpoint != "verified":
+        return rp_fail(&ctx, "refusing to publish to the release channel: this tree's compiler has no fixpoint evidence (run `with build :fixpoint` on it, then package and publish again)")
+
     // Provenance sidecars, then one upload of everything.
     let no_rest: List[str] = List.new()
     var upload = rp_release_args("upload", tag, repo, &no_rest)
@@ -274,7 +303,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
             "version=" ++ tag ++ "\n" ++
             "channel=" ++ channel ++ "\n" ++
             "builder=" ++ (if builder.len() > 0: builder.clone() else: "unknown") ++ "\n" ++
-            "fixpoint=verified\n" ++
+            "fixpoint=" ++ fixpoint ++ "\n" ++
             "built_at=" ++ built_at ++ "\n"
         if fs.write_text(provenance, text) != 0: return rp_fail(&ctx, "could not write " ++ provenance)
         upload.push(asset ++ "")
