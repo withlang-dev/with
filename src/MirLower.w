@@ -5821,30 +5821,89 @@ impl MirBuilder:
             return false
         true
 
+    // §11.7 (#3047): the spec sequence of a multi-index node as the
+    // `&[IndexSpec]` its method takes — each component an `IndexSpec` value
+    // (`Scalar(i64)`, `Slice(Option[i64], Option[i64], Option[i64])`,
+    // `Ellipsis`, `NewAxis`), the values an array temp, the argument a view
+    // of it. Sema recorded both types off the method's signature.
+    mut fn lower_multi_index_specs_slice(node: i32) -> i32:
+        let arr_ty: i32 = self.sema.multi_index_specs_array_types.get(node).unwrap()
+        let slice_ty: i32 = self.sema.multi_index_specs_slice_types.get(node).unwrap()
+        let spec_ty = self.sema.get_type_d0(arr_ty as TypeId)
+        let span = self.ast.get_start(node)
+        let scalar_sym = self.sema.pool_lookup_symbol("Scalar")
+        let slice_sym = self.sema.pool_lookup_symbol("Slice")
+        let ellipsis_sym = self.sema.pool_lookup_symbol("Ellipsis")
+        let newaxis_sym = self.sema.pool_lookup_symbol("NewAxis")
+        let bound_tys = self.sema.enum_variant_payload_types_frozen(spec_ty, slice_sym)
+        let kind = self.ast.kind(node)
+        let count = if kind == NodeKind.NK_INDEX: 2 else: self.ast.get_data2(node)
+        let elems: List[i32] = List.new()
+        for si in 0..count:
+            var d0 = 0
+            var d1 = 0
+            var spec_kind = INDEX_SCALAR
+            var step_node = 0
+            if kind == NodeKind.NK_INDEX:
+                d0 = if si == 0: self.ast.get_data1(node) else: self.ast.get_data2(node)
+            else:
+                let spec = self.ast.get_extra(self.ast.get_data1(node) + si)
+                d0 = self.ast.get_data0(spec)
+                d1 = self.ast.get_data1(spec)
+                let d2 = self.ast.get_data2(spec)
+                spec_kind = d2 / INDEX_KIND_SHIFT
+                step_node = d2 - spec_kind * INDEX_KIND_SHIFT
+            let spec_tmp = self.new_temp(spec_ty)
+            let spec_place = self.place_for_local(spec_tmp)
+            let fields: List[i32] = List.new()
+            if spec_kind == INDEX_SCALAR:
+                fields.push(self.lower_index_bound(d0, node))
+                self.assign_enum_variant_to_place(spec_place, spec_ty, scalar_sym, fields, span)
+            else if spec_kind == INDEX_SLICE:
+                fields.push(self.lower_optional_index_bound(d0, bound_tys[0], node))
+                fields.push(self.lower_optional_index_bound(d1, bound_tys[1], node))
+                fields.push(self.lower_optional_index_bound(step_node, bound_tys[2], node))
+                self.assign_enum_variant_to_place(spec_place, spec_ty, slice_sym, fields, span)
+            else:
+                self.assign_enum_variant_to_place(spec_place, spec_ty, if spec_kind == INDEX_ELLIPSIS: ellipsis_sym else: newaxis_sym, fields, span)
+            elems.push(self.body.new_operand(OperandKind.OK_MOVE, spec_place))
+        let names: List[i32] = List.new()
+        for _ in 0..elems.len(): names.push(0)
+        let arr_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, self.body.new_agg_fields(elems, names), 0)
+        let arr_tmp = self.new_temp(arr_ty)
+        let arr_place = self.place_for_local(arr_tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, arr_place, arr_rv, span)
+        for ei in 0..elems.len(): self.consume_moved_operand(elems[ei])
+        let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, arr_place, self.int_const_operand(0, self.sema.ty_i64), self.int_const_operand(count, self.sema.ty_i64))
+        let slice_tmp = self.new_temp(slice_ty)
+        let slice_place = self.place_for_local(slice_tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, slice_place, slice_rv, span)
+        self.body.new_operand(OperandKind.OK_COPY, slice_place)
+
+    // An index bound as the `i64` a spec carries; a bound written in a
+    // narrower integer widens (as the old codegen coerced it).
+    mut fn lower_index_bound(expr: i32, node: i32) -> i32:
+        if self.expr_type(expr) == self.sema.ty_i64 as i32: return self.lower_expr(expr)
+        self.lower_move_cast(expr, self.sema.ty_i64 as i32, node)
+
+    // A slice bound: `Some(bound)` when written, `None` when left out.
+    mut fn lower_optional_index_bound(expr: i32, opt_ty: i32, node: i32) -> i32:
+        let tmp = self.new_temp(opt_ty)
+        let place = self.place_for_local(tmp)
+        let fields: List[i32] = List.new()
+        if expr != 0:
+            fields.push(self.lower_index_bound(expr, node))
+            self.assign_enum_variant_to_place(place, opt_ty, self.sema.syms.some, fields, self.ast.get_start(node))
+        else:
+            self.assign_enum_variant_to_place(place, opt_ty, self.sema.syms.none, fields, self.ast.get_start(node))
+        self.body.new_operand(OperandKind.OK_MOVE, place)
+
     mut fn lower_multi_index_read(node: i32) -> i32:
         let base_op = self.lower_expr(self.ast.get_data0(node))
         let mi_args: List[i32] = List.new()
         mi_args.push(base_op)
-        let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_INDEX:
-            mi_args.push(self.lower_expr(self.ast.get_data1(node)))
-            mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
-            mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
-            mi_args.push(self.lower_expr(self.ast.get_data2(node)))
-            mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
-            mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
-        else:
-            let specs_start = self.ast.get_data1(node)
-            let specs_count = self.ast.get_data2(node)
-            for si in 0..specs_count:
-                let spec = self.ast.get_extra(specs_start + si)
-                let d0 = self.ast.get_data0(spec)
-                let d1 = self.ast.get_data1(spec)
-                let d2 = self.ast.get_data2(spec)
-                let step_node = d2 - (d2 / INDEX_KIND_SHIFT) * INDEX_KIND_SHIFT
-                mi_args.push(if d0 != 0: self.lower_expr(d0) else: self.int_const_operand(0, self.sema.ty_i64))
-                mi_args.push(if d1 != 0: self.lower_expr(d1) else: self.int_const_operand(0, self.sema.ty_i64))
-                mi_args.push(if step_node != 0: self.lower_expr(step_node) else: self.int_const_operand(0, self.sema.ty_i64))
+        mi_args.push(self.lower_multi_index_specs_slice(node))
+        mi_args.push(self.int_const_operand(if self.ast.kind(node) == NodeKind.NK_INDEX: 2 else: self.ast.get_data2(node), self.sema.ty_i32))
         let mi_args_id = self.body.new_call_args(mi_args)
         self.body.set_call_intrinsic(mi_args_id, MirIntrinsic.MULTI_INDEX)
         self.body.set_call_ast_node(mi_args_id, node)
@@ -5861,26 +5920,8 @@ impl MirBuilder:
         let mi_base_op = self.lower_expr(self.ast.get_data0(place_expr))
         let mi_args: List[i32] = List.new()
         mi_args.push(mi_base_op)
-        let kind = self.ast.kind(place_expr)
-        if kind == NodeKind.NK_INDEX:
-            mi_args.push(self.lower_expr(self.ast.get_data1(place_expr)))
-            mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
-            mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
-            mi_args.push(self.lower_expr(self.ast.get_data2(place_expr)))
-            mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
-            mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
-        else:
-            let specs_start = self.ast.get_data1(place_expr)
-            let specs_count = self.ast.get_data2(place_expr)
-            for si in 0..specs_count:
-                let spec = self.ast.get_extra(specs_start + si)
-                let d0 = self.ast.get_data0(spec)
-                let d1 = self.ast.get_data1(spec)
-                let d2 = self.ast.get_data2(spec)
-                let step_node = d2 - (d2 / INDEX_KIND_SHIFT) * INDEX_KIND_SHIFT
-                mi_args.push(if d0 != 0: self.lower_expr(d0) else: self.int_const_operand(0, self.sema.ty_i64))
-                mi_args.push(if d1 != 0: self.lower_expr(d1) else: self.int_const_operand(0, self.sema.ty_i64))
-                mi_args.push(if step_node != 0: self.lower_expr(step_node) else: self.int_const_operand(0, self.sema.ty_i64))
+        mi_args.push(self.lower_multi_index_specs_slice(place_expr))
+        mi_args.push(self.int_const_operand(if self.ast.kind(place_expr) == NodeKind.NK_INDEX: 2 else: self.ast.get_data2(place_expr), self.sema.ty_i32))
         let mi_rhs_op = self.lower_expr(rhs_expr)
         mi_args.push(mi_rhs_op)
         let mi_args_id = self.body.new_call_args(mi_args)

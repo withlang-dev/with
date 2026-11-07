@@ -33,67 +33,57 @@ impl Matrix:
             return
         self.a11 = value
 
+// §11.7: a spec is `Scalar(i)`, `Slice(start?, stop?, step?)`, `Ellipsis` or
+// `NewAxis`; a scalar's index is read by matching it.
+fn scalar_of(spec: &IndexSpec) -> i64:
+    match spec:
+        .Scalar(i) => i
+        _ => panic("not a scalar spec")
+
 impl MultiIndex[i32] for Matrix:
     fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> i32:
         assert(count == 2)
-        let row = specs[0]
-        let col = specs[1]
-        assert(row.kind == 0)
-        assert(col.kind == 0)
-        assert(row.has_start)
-        assert(col.has_start)
-        self.at(row.start, col.start)
+        self.at(scalar_of(specs[0]), scalar_of(specs[1]))
 
 impl MultiIndexMut[i32] for Matrix:
     fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, value: i32) -> Unit:
         assert(count == 2)
-        let row = specs[0]
-        let col = specs[1]
-        assert(row.kind == 0)
-        assert(col.kind == 0)
-        self.set_at(row.start, col.start, value)
+        self.set_at(scalar_of(specs[0]), scalar_of(specs[1]), value)
         self.writes = self.writes + 1
+
+// The four forms a probe receives for `p[2:5, :, newaxis, ...]`.
+fn check_probe_specs(specs: &[IndexSpec]):
+    match specs[0]:
+        .Slice(start, stop, step) =>
+            assert(start.unwrap() == 2)
+            assert(stop.unwrap() == 5)
+            assert(step.is_none())
+        _ => panic("first spec is a slice")
+    match specs[1]:
+        .Slice(start, stop, step) =>
+            assert(start.is_none())
+            assert(stop.is_none())
+            assert(step.is_none())
+        _ => panic("second spec is the full slice")
+    match specs[2]:
+        .NewAxis => ()
+        _ => panic("third spec is newaxis")
+    match specs[3]:
+        .Ellipsis => ()
+        _ => panic("fourth spec is the ellipsis")
 
 type SpecProbe { marker: i32 }
 
 impl MultiIndex[i32] for SpecProbe:
     fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> i32:
         assert(count == 4)
-        let range = specs[0]
-        let full = specs[1]
-        let axis = specs[2]
-        let dots = specs[3]
-        assert(range.kind == 1)
-        assert(range.has_start)
-        assert(range.has_stop)
-        assert(not range.has_step)
-        assert(range.start == 2)
-        assert(range.stop == 5)
-        assert(full.kind == 1)
-        assert(not full.has_start)
-        assert(not full.has_stop)
-        assert(axis.kind == 3)
-        assert(dots.kind == 2)
+        check_probe_specs(specs)
         self.marker
 
 impl MultiIndexMut[i32] for SpecProbe:
     fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, value: i32) -> Unit:
         assert(count == 4)
-        let range = specs[0]
-        let full = specs[1]
-        let axis = specs[2]
-        let dots = specs[3]
-        assert(range.kind == 1)
-        assert(range.has_start)
-        assert(range.has_stop)
-        assert(not range.has_step)
-        assert(range.start == 2)
-        assert(range.stop == 5)
-        assert(full.kind == 1)
-        assert(not full.has_start)
-        assert(not full.has_stop)
-        assert(axis.kind == 3)
-        assert(dots.kind == 2)
+        check_probe_specs(specs)
         self.marker = value + count
 
 type Offset { value: i32 }

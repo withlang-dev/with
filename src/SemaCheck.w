@@ -20085,6 +20085,7 @@ impl Sema:
                     let mis_sig = self.lookup_method_sig(base_name, mis_sym)
                     if mis_sig >= 0:
                         if self.validate_multi_index_method_sig(base_name, mis_sig, mis_sym, 1, target):
+                            self.record_multi_index_spec_types(target, mis_sig)
                             expected_value_type = self.sig_param_type(mis_sig, 3)
                     else:
                         self.emit_error("type does not support multi-dimensional indexed assignment (missing multi_index_set method required by MultiIndexMut)", target)
@@ -22394,6 +22395,7 @@ impl Sema:
             let mi_sig = self.lookup_method_sig(base_name, mi_sym)
             if mi_sig >= 0:
                 if self.validate_multi_index_method_sig(base_name, mi_sig, mi_sym, 0, node):
+                    self.record_multi_index_spec_types(node, mi_sig)
                     // The read's type is the method's return, recorded on the
                     // node: MirLower types the MULTI_INDEX call's result by it
                     // (an unrecorded `let x = m[i, j]` was a void temp
@@ -22422,12 +22424,24 @@ impl Sema:
             return false
         let elem_tid = self.get_type_d0(slice_resolved)
         let elem_resolved = self.resolve_alias(elem_tid as TypeId)
-        if self.get_type_kind(elem_resolved) != TypeKind.TY_STRUCT:
+        if self.get_type_kind(elem_resolved) != TypeKind.TY_ENUM:
             return false
         let elem_name = self.get_type_d0(elem_resolved)
         if self.pool_resolve(elem_name) == "IndexSpec":
             return true
         false
+
+    // §11.7: the spec sequence a multi-index node passes — `[IndexSpec; n]`
+    // built from the node's components and the `&[IndexSpec]` the method
+    // takes, both read off the validated signature (its second parameter)
+    // and recorded for MirLower by node.
+    mut fn record_multi_index_spec_types(node: i32, sig_idx: i32):
+        let ref_resolved = self.resolve_alias(self.sig_param_type(sig_idx, 1) as TypeId)
+        let slice_tid = self.resolve_alias(self.get_type_d0(ref_resolved) as TypeId) as i32
+        let elem_tid = self.get_type_d0(slice_tid as TypeId)
+        let count = if self.ast.kind(node) == NodeKind.NK_MULTI_INDEX: self.ast.get_data2(node) else: 2
+        self.multi_index_specs_array_types.insert(node, self.ensure_exact_type(TypeKind.TY_ARRAY, elem_tid, count, 0) as i32)
+        self.multi_index_specs_slice_types.insert(node, slice_tid)
 
     mut fn validate_multi_index_method_sig(owner_sym: i32, sig_idx: i32, method_sym: i32, is_set: i32, node: i32) -> bool:
         let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))

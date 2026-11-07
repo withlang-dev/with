@@ -14,8 +14,12 @@ type Matrix { a00: i32, a01: i32, a10: i32, a11: i32 }
 impl MultiIndex[i32] for Matrix:
     fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> i32:
         assert(count == 2)
-        let row = specs[0].start
-        let col = specs[1].start
+        let row = match specs[0]:
+            .Scalar(i) => i
+            _ => -1
+        let col = match specs[1]:
+            .Scalar(i) => i
+            _ => -1
         if row == 0 and col == 0: return self.a00
         if row == 0 and col == 1: return self.a01
         if row == 1 and col == 0: return self.a10
@@ -24,7 +28,13 @@ impl MultiIndex[i32] for Matrix:
 impl MultiIndexMut[i32] for Matrix:
     mut fn multi_index_set(specs: &[IndexSpec], count: i32, value: i32):
         assert(count == 2)
-        if specs[0].start == 0 and specs[1].start == 1:
+        let row = match specs[0]:
+            .Scalar(i) => i
+            _ => -1
+        let col = match specs[1]:
+            .Scalar(i) => i
+            _ => -1
+        if row == 0 and col == 1:
             self.a01 = value
         else:
             self.a11 = value
