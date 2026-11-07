@@ -589,7 +589,7 @@ type ForeignContract {
     variadic_case_syms: List[i32],      // … each case's imported constant …
     variadic_case_values: List[i64],    // … that constant's value (parallel) …
     variadic_case_tids: List[i32],      // … the presented type of the variadic argument (parallel) …
-    variadic_case_kinds: List[i32],     // … and its kind: FACADE_VARIADIC_SCALAR or FACADE_VARIADIC_STR (parallel)
+    variadic_case_kinds: List[FacadeVariadicKind], // … and what its argument is (parallel)
     variadic_slots: List[ForeignVariadicSlot], // resolved retained cases; no downstream AST interpretation
     returns_borrow_record: i32,        // D66 §16.2b.6: `returns borrow T from …` for an imported record T (the type's symbol), or 0
     argv_cb: List[i32],                 // D76 §16.2b.9: each `callback param N argv param A paired with argc param C as &[H]`: the callback parameter N …
@@ -603,11 +603,12 @@ type ForeignContract {
 }
 
 // D66 §16.2b.5: what a variadic case's argument is.
-pub const FACADE_VARIADIC_SCALAR: i32 = 1   // a scalar C type: passed as that type
-pub const FACADE_VARIADIC_STR: i32 = 2      // `str`: a copied input string (§16.3c), passed as a call-scoped C string
-pub const FACADE_VARIADIC_CALLBACK: i32 = 3
-pub const FACADE_VARIADIC_RETAINED: i32 = 4
-pub const FACADE_VARIADIC_USERDATA: i32 = 5 // the userdata setter a callback case implies (§16.2b.5): `&U`, the borrow the resource holds
+pub enum FacadeVariadicKind:
+    Scalar      // a scalar C type: passed as that type
+    Str         // `str`: a copied input string (§16.3c), passed as a call-scoped C string
+    Callback    // a callback the resource keeps, with its paired userdata setter (§16.2b.9)
+    Retained    // D194: caller-managed storage the resource keeps (`&CString`, a sized `&str`)
+    Userdata    // the userdata setter a callback case implies (§16.2b.5): `&U`, the borrow the resource holds
 
 type ForeignVariadicSlot {
     case_index: i32,
@@ -618,7 +619,23 @@ type ForeignVariadicSlot {
     callback_userdata: i32,   // argument within that callable, or -1
     userdata_selector: i32,   // imported selector symbol, or 0
     userdata_value: i64,
+    // D194 (§16.2b.5), a retained pointer case: what C reads the pointer as
+    // (`.Text`: a NUL-terminated string, `&CString`, `&CStr`; `.Sized`:
+    // bytes to a length set through a second option, `&[u8]`, `&str`), the
+    // length option's selector, value and C type (0 / 0 / 0 for text), and
+    // the selectors and operations whose call releases the retention
+    // (`until A, B`).
+    retained_form: FacadeRetainedForm,
+    length_selector: i32,
+    length_value: i64,
+    length_tid: i32,
+    until_syms: List[i32],
 }
+
+pub enum FacadeRetainedForm:
+    Callback
+    Text
+    Sized
 
 // A callback method a facade rendered on a resource (stage 9, ruling
 // §44-§51; FacadeRender.w facade_render_callback_methods), keyed by the
@@ -647,12 +664,13 @@ type FacadePairOp {
     contract: i32,      // foreign_contracts index
     resource: i32,      // facade_resources index
     action: i32,        // FOREIGN_PAIR_CALLBACK / _USERDATA / _RESET / _DESTROY / _INVOKE (ForeignPairState.w)
-    slot: i32,          // the contract's variadic slot a setter serves, or -1
+    slot: i32,          // the contract's variadic slot a callback or userdata setter serves, the case index a retained pointer setter holds under (D194), or -1
     userdata_tid: i32,  // the concrete `U` a setter installs (the specialization's), or 0
     guard_ok: i64,      // the setter's success status (`ok CONST` on the operation), or -1: uninterpreted
     invokes: i32,       // 1 unless the operation is `callbacks none`
     subject_param: i32, // the parameter that receives the resource the operation acts on
-    retained_param: i32, // the parameter whose referent a userdata setter retains (its `&U`), or -1
+    retained_param: i32, // the parameter whose referent a userdata setter or a retained pointer setter retains (its `&U` / its storage), or -1
+    releases: i64,      // D194: the retained slots (bit per variadic slot index) this operation releases (`until`), besides reset and destruction
 }
 
 // Context shared by free and receiver callback calls. Userdata is checked

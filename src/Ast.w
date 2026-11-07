@@ -283,7 +283,7 @@ pub const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable pa
 pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, capacity(0|1), elements(0|1)] (D64 §16.2b.8)
 pub const FACADE_CLAUSE_FIXED: i32 = 25            // [param_ref, literal(node)]  (`param N fixed <literal>`, D64 §16.2b.11)
 pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref, case(node)...]  (`variadic param N selected by param P:`, D66 §16.2b.5)
-pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0]
+pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0, length_ref|0, length_type(node)|0, until_sym...] (D194: the last three; d2 is the count, so the `until` names are extras 7..d2)
 pub const FACADE_CLAUSE_CALLBACKS_NONE: i32 = 28  // [] trusted no-invocation guarantee (§16.2b.9)
 pub const FACADE_CLAUSE_ABANDON: i32 = 29          // [fn_sym] resource-only: the `callbacks none` operation run before the destroyer on a drop path not proven callback-free (§16.2b.9)
 

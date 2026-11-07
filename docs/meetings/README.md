@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D194 — A retained pointer case of a variadic contract borrows caller-managed storage, held under the retained-borrow window; a pointer with a separately set length is one `&[u8]` operation](2026-11-07-D194-a-retained-pointer-case-borrows-caller-managed-storage.md)
 - [D193 — `{x}` in an f-string displays a type through its `impl Display` (delegated, D98)](2026-11-06-D193-an-f-string-displays-a-type-through-its-display-impl.md)
 - [D192 — A range binds above `|>` and `??`, below the operators that compute its bounds (delegated, D98)](2026-11-06-D192-a-range-binds-above-the-pipe-and-the-default.md)
 - [D191 — The indentation of a `|>` line decides what its left-hand side includes](2026-11-02-D191-the-indentation-of-a-pipe-line-decides-its-left-hand-side.md)

@@ -5454,13 +5454,42 @@ impl Parser:
                     self.advance()
                     retainer_ref = self.parse_facade_param_ref()
                     if retainer_ref == 0: return 0
+                // A retained pointer case (D194, §16.2b.5): `length param
+                // CONST as T` names the option the pointer's byte count is
+                // set through, as one presented operation; `until A, B`
+                // lists the cases and operations that release the
+                // retention besides destruction and the abandonment path.
+                var length_ref: i32 = 0
+                var length_ty: i32 = 0
+                let until_syms = []
+                if retainer_ref != 0 and self.current_ident_is("length"):
+                    self.advance()
+                    length_ref = self.parse_facade_param_ref()
+                    if length_ref == 0: return 0
+                    if self.peek() != TokenKind.TK_KW_AS:
+                        self.emit_error("a sized retained case names the C type of its length option: '… length param CONST as T' (§16.2b.5)")
+                        return 0
+                    self.advance()
+                    length_ty = self.parse_type_expr() as i32
+                    if length_ty == 0: return 0
+                if retainer_ref != 0 and self.current_ident_is("until"):
+                    self.advance()
+                    while true:
+                        let name = self.expect_ident()
+                        if name == 0: return 0
+                        until_syms.push(name)
+                        if self.peek() != TokenKind.TK_COMMA: break
+                        self.advance()
                 let case_extra = self.pool.extra_len()
                 self.pool.add_extra(sel)
                 self.pool.add_extra(ty as i32)
                 self.pool.add_extra(callback_ref)
                 self.pool.add_extra(userdata_ref)
                 self.pool.add_extra(retainer_ref)
-                cases.push(self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, cstart, self.prev_end(), FACADE_CLAUSE_VARIADIC_CASE, case_extra, 5) as i32)
+                self.pool.add_extra(length_ref)
+                self.pool.add_extra(length_ty)
+                for sym in until_syms: self.pool.add_extra(sym)
+                cases.push(self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, cstart, self.prev_end(), FACADE_CLAUSE_VARIADIC_CASE, case_extra, self.pool.extra_len() - case_extra) as i32)
                 self.skip_newlines()
             if cases.len() == 0:
                 self.emit_error("a discriminated variadic contract lists at least one 'case <CONST>: <type>' beneath it (§16.2b.5)")

@@ -9644,7 +9644,11 @@ impl MirBuilder:
             let iter_op = self.lower_expr(iter_expr)
             list_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
         // A &List[T] receiver reads through one deref (lower_for_iter_ref).
-        if self.sema.get_type_kind(self.sema.resolve_alias(iter_ty)) == TypeKind.TY_REF:
+        // The place's own type decides (#2578, as lower_sequence_place):
+        // an element of a `List[List[T]]` (`refs[i]`, `self.refs[i]`) is
+        // typed by Sema as the element view, but the place lowered for it
+        // is the element itself, and a deref of it is invalid MIR.
+        if self.place_holds_reference(list_place):
             list_place = self.new_deref_place(list_place)
         let elem_is_view = self.sema.get_type_kind(self.sema.resolve_alias(elem_ty)) == TypeKind.TY_REF
 
