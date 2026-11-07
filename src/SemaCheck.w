@@ -5330,7 +5330,7 @@ impl Sema:
             name = with_str_clone_ref(self.pool_resolve(fn_name))
         let dot = sema_str_find_char(name, 46)
         if dot >= 0:
-            return name.slice((dot + 1) as i64, name.len() as i64)
+            return name.slice(dot + 1, name.len())
         name
 
     mut fn trait_impl_method_contract(node: i32, fn_name: i32) -> SemaTraitImplMethodContract:
@@ -25400,7 +25400,7 @@ impl Sema:
             if text[i] == 46:
                 dot = i as i32
         if dot >= 0 and dot + 1 < text.len():
-            return self.pool_lookup_symbol(text.slice((dot + 1) as i64, text.len() as i64))
+            return self.pool_lookup_symbol(text.slice(dot + 1, text.len()))
         variant_name
 
     // A read-only place: a `&T`'s pointee, a `*const T`. A downcast binding
@@ -36261,7 +36261,7 @@ impl Sema:
                 if fn_name == method_name:
                     return decl
             else:
-                let bare = fn_name.slice((dot + 1) as i64, fn_name.len() as i64)
+                let bare = fn_name.slice(dot + 1, fn_name.len())
                 if bare == method_name:
                     return decl
         0

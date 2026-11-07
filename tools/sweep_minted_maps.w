@@ -44,7 +44,7 @@ fn sweep(text: str) -> (str, isize):
             if t == TokenKind.TK_COMMA and depth == 1: commas = commas + 1
             j = j + 1
         if close < 0: continue
-        let want = if name == "HashMap": 1 else: 0
+        let want = (name == "HashMap") as i32
         if commas != want: continue
         inserts.push(toks.get_start(close))
     if inserts.len() == 0: return (text ++ "", 0)
