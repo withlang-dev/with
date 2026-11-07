@@ -234,3 +234,27 @@ disable-and-remeasure both proved inadequate. It only localizes to a manually ch
 - A user-frame filter for clean leak attribution.
 - No-C ASan-shadow emission for sanitizer-ecosystem interop (the hard-way path above).
 - Never-reuse-address UAF mode.
+
+## Peak report (#2407)
+
+Beside the leak report, the exit report states the run's memory high point
+and its shape, from the ledger's own size and origin records:
+
+```
+debug-alloc: peak live bytes=160 blocks=6 at allocation=8
+debug-alloc: peak by origin: HashMap=96 str=64
+debug-alloc: peak by size (bytes>=: blocks): 16:4 32:1 64:1
+debug-alloc: largest requests (bytes origin): 64 str 32 HashMap 16 List
+```
+
+`peak live bytes` is the most payload bytes live at once, `blocks` how many,
+`at allocation` the ordinal of the request that reached it. `by origin` splits
+the peak by the owner the runtime tagged the block with: `with_alloc` (a
+program's explicit allocation), `List`, `HashMap`, `SlotMap`, `str` (a
+NUL-terminated buffer), `fmt` (a formatter's buffer), `channel`, `fiber`, and
+`unknown` for an untagged runtime site. `by size` is a log2 histogram of the
+blocks live at the peak; `largest requests` the eight biggest distinct
+request sizes of the run with their owners. The site of a block is still the
+address trap's (`WITH_DEBUG_ALLOC_TRAP_FREE` under lldb): the report says
+what kind of memory peaked and how big its pieces are, and the trap says who
+made one.

@@ -1086,6 +1086,12 @@ let DBG_ORIGIN_WITH_ALLOC: i64 = 1
 let DBG_ORIGIN_LIST: i64 = 2
 let DBG_ORIGIN_CHANNEL: i64 = 3
 let DBG_ORIGIN_FIBER: i64 = 4
+// #2407: the runtime's own owners, so the peak report names the table a
+// block belongs to; a str's bytes and a formatter's buffer are the rest.
+let DBG_ORIGIN_MAP: i64 = 5
+let DBG_ORIGIN_SLOTMAP: i64 = 6
+let DBG_ORIGIN_STR: i64 = 7
+let DBG_ORIGIN_FMT: i64 = 8
 
 var dbg_state: i32 = 0              // 0=unread, 1=off, 2=on (cached, read once)
 var dbg_scribble_state: i32 = 0    // 0=unread, 1=off, 2=on (cached, read once)
@@ -1398,6 +1404,112 @@ fn dbg_ledger_init():
         return
     dbg_base = p as i64             // MAP_ANON is zero-filled; no memset needed
 
+// Peak live memory with its shape (#2407): bytes and blocks live now and at
+// the peak, split by origin kind and by size class (log2 buckets), and the
+// largest requests of the run. Updated under the allocator lock from the
+// record and free paths; printed by the exit report. The site of any block
+// is the address trap's job (WITH_DEBUG_ALLOC_TRAP_FREE under lldb).
+let DBG_ORIGIN_KINDS: i64 = 9
+let DBG_SIZE_BUCKETS: i64 = 48
+let DBG_TOP_COUNT: i64 = 8
+var dbg_live_bytes: i64 = 0
+var dbg_live_blocks: i64 = 0
+var dbg_live_by_origin: [9]i64 = [0 as i64; 9]
+var dbg_live_hist: [48]i64 = [0 as i64; 48]
+var dbg_peak_bytes: i64 = 0
+var dbg_peak_blocks: i64 = 0
+var dbg_peak_at: i64 = 0
+var dbg_peak_by_origin: [9]i64 = [0 as i64; 9]
+var dbg_peak_hist: [48]i64 = [0 as i64; 48]
+var dbg_top_sizes: [8]i64 = [0 as i64; 8]
+var dbg_top_origins: [8]i64 = [0 as i64; 8]
+
+fn dbg_size_bucket(size: i64) -> i64:
+    var b: i64 = 0
+    var s = size
+    while s > 1 and b < DBG_SIZE_BUCKETS - 1:
+        s = s >> 1
+        b = b + 1
+    b
+
+fn dbg_origin_slot(origin: i64) -> i64: if origin >= 0 and origin < DBG_ORIGIN_KINDS: origin else: 0
+
+fn dbg_account_alloc(size: i64, origin: i64):
+    dbg_live_bytes = dbg_live_bytes + size
+    dbg_live_blocks = dbg_live_blocks + 1
+    let o = dbg_origin_slot(origin)
+    dbg_live_by_origin[o] = dbg_live_by_origin[o] + size
+    let b = dbg_size_bucket(size)
+    dbg_live_hist[b] = dbg_live_hist[b] + 1
+    if dbg_live_bytes > dbg_peak_bytes:
+        dbg_peak_bytes = dbg_live_bytes
+        dbg_peak_blocks = dbg_live_blocks
+        dbg_peak_at = dbg_alloc_total
+        dbg_peak_by_origin = dbg_live_by_origin
+        dbg_peak_hist = dbg_live_hist
+    // The largest requests, kept sorted descending; a size already there is
+    // one class, not eight copies of it.
+    var i: i64 = 0
+    while i < DBG_TOP_COUNT:
+        if dbg_top_sizes[i] == size: return
+        if size > dbg_top_sizes[i]:
+            var j = DBG_TOP_COUNT - 1
+            while j > i:
+                dbg_top_sizes[j] = dbg_top_sizes[j - 1]
+                dbg_top_origins[j] = dbg_top_origins[j - 1]
+                j = j - 1
+            dbg_top_sizes[i] = size
+            dbg_top_origins[i] = origin
+            return
+        i = i + 1
+
+fn dbg_account_free(size: i64, origin: i64):
+    dbg_live_bytes = dbg_live_bytes - size
+    dbg_live_blocks = dbg_live_blocks - 1
+    let o = dbg_origin_slot(origin)
+    dbg_live_by_origin[o] = dbg_live_by_origin[o] - size
+    let b = dbg_size_bucket(size)
+    dbg_live_hist[b] = dbg_live_hist[b] - 1
+
+fn dbg_report_peak():
+    dbg_puts("debug-alloc: peak live bytes=")
+    dbg_put_i64(dbg_peak_bytes)
+    dbg_puts(" blocks=")
+    dbg_put_i64(dbg_peak_blocks)
+    dbg_puts(" at allocation=")
+    dbg_put_i64(dbg_peak_at)
+    dbg_puts("\n")
+    dbg_puts("debug-alloc: peak by origin:")
+    var o: i64 = 0
+    while o < DBG_ORIGIN_KINDS:
+        if dbg_peak_by_origin[o] != 0:
+            dbg_puts(" ")
+            dbg_put_origin(o)
+            dbg_puts("=")
+            dbg_put_i64(dbg_peak_by_origin[o])
+        o = o + 1
+    dbg_puts("\n")
+    dbg_puts("debug-alloc: peak by size (bytes>=: blocks):")
+    var b: i64 = 0
+    while b < DBG_SIZE_BUCKETS:
+        if dbg_peak_hist[b] != 0:
+            dbg_puts(" ")
+            dbg_put_i64((1 as i64) << (b as u32))
+            dbg_puts(":")
+            dbg_put_i64(dbg_peak_hist[b])
+        b = b + 1
+    dbg_puts("\n")
+    dbg_puts("debug-alloc: largest requests (bytes origin):")
+    var t: i64 = 0
+    while t < DBG_TOP_COUNT:
+        if dbg_top_sizes[t] != 0:
+            dbg_puts(" ")
+            dbg_put_i64(dbg_top_sizes[t])
+            dbg_puts(" ")
+            dbg_put_origin(dbg_top_origins[t])
+        t = t + 1
+    dbg_puts("\n")
+
 fn dbg_entry_addr(slot: i64) -> i64:
     dbg_base + slot * DBG_ENTRY_WORDS * 8
 
@@ -1414,6 +1526,10 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
         let e = dbg_entry_addr(slot)
         let a = unsafe *(e as *const i64)
         if a == 0 or a == addr:
+            // A reused address whose entry was never marked freed (an untracked
+            // free, or the ledger truncated): its bytes leave the live count here.
+            if a == addr and (unsafe *((e + 16) as *const i64)) == 0: dbg_account_free(unsafe *((e + 8) as *const i64), unsafe *((e + 24) as *const i64))
+            dbg_account_alloc(size, origin)
             unsafe *(e as *mut i64) = addr
             unsafe *((e + 8) as *mut i64) = size
             unsafe *((e + 16) as *mut i64) = 0      // freed flag clear (reuse-safe)
@@ -1445,6 +1561,7 @@ fn dbg_mark_free(addr: i64, drop_origin_ptr: i64, drop_origin_len: i64) -> i32:
             let freed = unsafe *((e + 16) as *const i64)
             if freed != 0:
                 return 1
+            dbg_account_free(unsafe *((e + 8) as *const i64), unsafe *((e + 24) as *const i64))
             unsafe *((e + 16) as *mut i64) = 1
             unsafe *((e + 32) as *mut i64) = drop_origin_ptr
             unsafe *((e + 40) as *mut i64) = drop_origin_len
@@ -1572,6 +1689,14 @@ fn dbg_put_origin(origin: i64):
         dbg_puts("List")
     else if origin == DBG_ORIGIN_CHANNEL:
         dbg_puts("channel")
+    else if origin == DBG_ORIGIN_MAP:
+        dbg_puts("HashMap")
+    else if origin == DBG_ORIGIN_SLOTMAP:
+        dbg_puts("SlotMap")
+    else if origin == DBG_ORIGIN_STR:
+        dbg_puts("str")
+    else if origin == DBG_ORIGIN_FMT:
+        dbg_puts("fmt")
     else if origin == DBG_ORIGIN_FIBER:
         dbg_puts("fiber")
     else:
@@ -1604,6 +1729,13 @@ fn dbg_scribble(ptr: i64, size: i64):
     while i < size:
         unsafe *((ptr + i) as *mut u8) = 0xDE as u8
         i = i + 1
+
+// An explicit exit (std.process.exit_code, the compiler's own exit) skips
+// the runtime shutdown and its leak walk: what is still allocated then is
+// not a leak, the program chose to stop. The peak report still holds (#2407).
+pub fn with_exit(code: i32) -> Never:
+    if dbg_on() != 0: dbg_report_peak()
+    rt_exit(code)
 
 // Called from with_runtime_shutdown on normal program exit.
 pub fn with_debug_alloc_report_leaks() -> Unit:
@@ -1644,6 +1776,7 @@ pub fn with_debug_alloc_report_leaks() -> Unit:
                 dbg_puts("\n")
                 leaks = leaks + 1
         slot = slot + 1
+    dbg_report_peak()
     dbg_puts("debug-alloc: leak count=")
     dbg_put_i64(leaks)
     dbg_puts(" allocations=")
@@ -1973,7 +2106,7 @@ fn str_to_cstr(s: &str) -> *const c_char:
         let empty = ""
         with_panic_ref("str to C string conversion: interior NUL byte", empty, 0)
     let slen = str_length(s)
-    let buf = rt_alloc(slen + 1)
+    let buf = rt_alloc_with_origin(slen + 1, DBG_ORIGIN_STR)
     rt_memcpy(buf, str_data(s), slen)
     unsafe *((buf as i64 + slen) as *mut u8) = 0
     buf as *const c_char
@@ -2118,7 +2251,7 @@ pub fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32:
 
 // Allocate a new str from a buffer
 fn alloc_str(buf: *const u8, len: i64) -> str:
-    let out = rt_alloc(len + 1)
+    let out = rt_alloc_with_origin(len + 1, DBG_ORIGIN_STR)
     rt_memcpy(out, buf, len)
     unsafe *((out as i64 + len) as *mut u8) = 0
     make_str(out as *const u8, len)
@@ -2380,7 +2513,7 @@ pub fn with_fmt_str_debug_ref(s: &str) -> str:
     var out_len: i64 = 2
     for i in 0..slen:
         out_len = out_len + rt_debug_escape_width(unsafe *((sp as i64 + i) as *const u8))
-    let out = rt_alloc(out_len + 1)
+    let out = rt_alloc_with_origin(out_len + 1, DBG_ORIGIN_STR)
     var w: i64 = 0
     unsafe *(out as *mut u8) = '"'
     w = 1
@@ -2447,7 +2580,7 @@ fn fb_grow(b: *mut u8, needed: i64):
     var new_cap = cur_cap * 2
     if new_cap < cur_len + needed:
         new_cap = cur_len + needed
-    let new_ptr = rt_alloc(new_cap)
+    let new_ptr = rt_alloc_with_origin(new_cap, DBG_ORIGIN_FMT)
     let old_ptr = fb_ptr(b)
     if old_ptr as i64 != 0 and cur_len > 0:
         rt_memcpy(new_ptr, old_ptr as *const u8, cur_len)
@@ -2464,8 +2597,8 @@ fn fb_append(b: *mut u8, data: *const u8, len: i64):
     fb_set_len(b, cur + len)
 
 pub fn with_fmt_buf_new() -> *mut u8:
-    let b = rt_alloc(FMT_BUF_SIZE)
-    fb_set_ptr(b, rt_alloc(64))
+    let b = rt_alloc_with_origin(FMT_BUF_SIZE, DBG_ORIGIN_FMT)
+    fb_set_ptr(b, rt_alloc_with_origin(64, DBG_ORIGIN_FMT))
     fb_set_len(b, 0)
     fb_set_cap(b, 64)
     b
@@ -2528,7 +2661,7 @@ fn pad_str(content: *const u8, clen: i64, width: i64, fill_char: i32, align_mode
     if clen >= width:
         return alloc_str(content, clen)
     let pad = width - clen
-    let out = rt_alloc(width + 1)
+    let out = rt_alloc_with_origin(width + 1, DBG_ORIGIN_STR)
     let fc: u8 = if fill_char != 0: fill_char as u8 else: 32  // ' '
     if align_mode == 1:
         // left align
@@ -2643,7 +2776,7 @@ fn fmt_int_spec_parts(lo: u64, hi: u64, negative: bool, signed: bool, flags: i64
             // Zero-pad: insert zeros after sign/prefix
             let prefix_len = len - dlen
             let pad_count = width as i64 - len
-            let out = rt_alloc(width as i64 + 1)
+            let out = rt_alloc_with_origin(width as i64 + 1, DBG_ORIGIN_STR)
             rt_memcpy(out, &buf as *const u8, prefix_len)
             rt_memset((out as i64 + prefix_len) as *mut u8, 48, pad_count)
             rt_memcpy((out as i64 + prefix_len + pad_count) as *mut u8, (&raw const buf as i64 + prefix_len) as *const u8, dlen)
@@ -2702,7 +2835,7 @@ fn rt_fmt_f64_spec_buf(val: f64, flags: i64, width: i32, precision: i32, mode: i
         if zero_pad != 0 and align_mode == 0:
             // Zero-pad after sign
             let pad_count = width as i64 - len
-            let out = rt_alloc(width as i64 + 1)
+            let out = rt_alloc_with_origin(width as i64 + 1, DBG_ORIGIN_STR)
             var sign_len: i64 = 0
             if len > 0 and (unsafe { buf[0] } == 45 or unsafe { buf[0] } == 43):
                 sign_len = 1
@@ -2745,7 +2878,7 @@ pub fn with_str_concat_ref(a: &str, b: &str) -> str:
     let total = al + bl
     var result = ""
     if total != 0:
-        let out = rt_alloc(total + 1)
+        let out = rt_alloc_with_origin(total + 1, DBG_ORIGIN_STR)
         let ap = str_data(a)
         let bp = str_data(b)
         if ap as i64 != 0 and al > 0:
@@ -2771,7 +2904,7 @@ fn str_concat_part_data(parts: *const str, index: i64): unsafe *((parts as i64 +
 fn str_concat_part_len(parts: *const str, index: i64): unsafe *((parts as i64 + index * 16 + 8) as *const i64)
 
 fn str_concat_n_copy(parts: *const str, count: i64, total: i64) -> str:
-    let out = rt_alloc(total + 1)
+    let out = rt_alloc_with_origin(total + 1, DBG_ORIGIN_STR)
     var offset: i64 = 0
     for i in 0..count:
         let part_len = str_concat_part_len(parts, i)
@@ -2885,7 +3018,7 @@ pub fn with_str_clone_ref(s: &str) -> str:
     // double-deref dodge retired with the 2026-08-17 reseed — the flip
     // compiler's RK_CAST preserves the reference value.)
     let data = unsafe *(s as *const str as *const *const u8)
-    let out = rt_alloc(slen + 1)
+    let out = rt_alloc_with_origin(slen + 1, DBG_ORIGIN_STR)
     rt_memcpy(out, data, slen)
     unsafe *((out as i64 + slen) as *mut u8) = 0
     make_str(out as *const u8, slen)
@@ -3000,7 +3133,7 @@ pub fn with_str_index_of_ref(hay: &str, needle: &str) -> i64:
 fn str_to_upper_ref(s: &str) -> str:
     let slen = str_length(s)
     if slen == 0: return ""  // #747: never return s (alias)
-    let out = rt_alloc(slen + 1)
+    let out = rt_alloc_with_origin(slen + 1, DBG_ORIGIN_STR)
     let sp = str_data(s)
     var i: i64 = 0
     while i < slen:
@@ -3019,7 +3152,7 @@ pub fn with_str_to_upper_ref(s: &str) -> str:
 fn str_to_lower_ref(s: &str) -> str:
     let slen = str_length(s)
     if slen == 0: return ""  // #747: never return s (alias)
-    let out = rt_alloc(slen + 1)
+    let out = rt_alloc_with_origin(slen + 1, DBG_ORIGIN_STR)
     let sp = str_data(s)
     var i: i64 = 0
     while i < slen:
@@ -3040,7 +3173,7 @@ fn str_repeat_ref(s: &str, count: i64) -> str:
     if count <= 0 or slen == 0:
         return ""
     let total = slen * count
-    let out = rt_alloc(total + 1)
+    let out = rt_alloc_with_origin(total + 1, DBG_ORIGIN_STR)
     let sp = str_data(s)
     var i: i64 = 0
     while i < count:
@@ -3073,7 +3206,7 @@ fn str_replace_ref(s: &str, old: &str, new_s: &str) -> str:
             i = i + 1
     if count == 0: return alloc_str(sp, sl)
     let new_len = sl + count * (nl - ol)
-    let out = rt_alloc(new_len + 1)
+    let out = rt_alloc_with_origin(new_len + 1, DBG_ORIGIN_STR)
     var j: i64 = 0
     i = 0
     while i < sl:
@@ -3826,9 +3959,9 @@ fn sm_grow(m: i64):
     let old_values = sm_values(m)
     let old_next = sm_next(m)
     let old_gens = sm_gens(m)
-    let new_values = rt_alloc(new_cap * es)
-    let new_next = rt_alloc(new_cap * 4)
-    let new_gens = rt_alloc(new_cap * 4)
+    let new_values = rt_alloc_with_origin(new_cap * es, DBG_ORIGIN_SLOTMAP)
+    let new_next = rt_alloc_with_origin(new_cap * 4, DBG_ORIGIN_SLOTMAP)
+    let new_gens = rt_alloc_with_origin(new_cap * 4, DBG_ORIGIN_SLOTMAP)
     if old_cap > 0:
         rt_memcpy(new_values, old_values, old_cap * es)
         rt_memcpy(new_next, old_next, old_cap * 4)
@@ -3859,7 +3992,7 @@ fn sm_valid(m: i64, index: u32, generation: u32) -> i32:
     1
 
 pub fn with_slotmap_new(elem_size: i64) -> *mut u8:
-    let map = rt_alloc(SM_SIZE)
+    let map = rt_alloc_with_origin(SM_SIZE, DBG_ORIGIN_SLOTMAP)
     let m = map as i64
     sm_set_values(m, 0 as *mut u8)
     sm_set_next(m, 0 as *mut u8)
@@ -4188,7 +4321,7 @@ fn hm_place(m: i64, e: i64):
 fn hm_rebuild_index(m: i64, icap: i64):
     let old = hm_index(m)
     if old as i64 != 0: rt_free_sized(old as *mut u8, hm_icap(m) * 4)
-    let index = rt_alloc(icap * 4)
+    let index = rt_alloc_with_origin(icap * 4, DBG_ORIGIN_MAP)
     rt_memset(index, 0xff, icap * 4)
     hm_set_field(m, HM_OFF_INDEX, index as i64)
     hm_set_field(m, HM_OFF_ICAP, icap)
@@ -4202,9 +4335,9 @@ fn hm_grow_entries(m: i64):
     let vsz = hm_val_size(m)
     let old_cap = hm_ecap(m)
     let new_cap = if hm_len(m) * 2 <= old_cap: old_cap else: old_cap * 2
-    let keys = rt_alloc(new_cap * ksz)
-    let vals = rt_alloc(new_cap * vsz)
-    let live = rt_alloc(new_cap)
+    let keys = rt_alloc_with_origin(new_cap * ksz, DBG_ORIGIN_MAP)
+    let vals = rt_alloc_with_origin(new_cap * vsz, DBG_ORIGIN_MAP)
+    let live = rt_alloc_with_origin(new_cap, DBG_ORIGIN_MAP)
     rt_memset(live, 0, new_cap)
     var n: i64 = 0
     for e in 0..hm_nent(m):
@@ -4238,7 +4371,7 @@ pub fn with_hashmap_new_keyed(key_size: i64, val_size: i64, key_kind: i64, hash_
 // be a `str`. Kept for code an earlier compiler generated; this compiler
 // calls with_hashmap_new_keyed.
 pub fn with_hashmap_new(key_size: i64, val_size: i64) -> *mut u8:
-    let m = rt_alloc(HM_SIZE)
+    let m = rt_alloc_with_origin(HM_SIZE, DBG_ORIGIN_MAP)
     let mi = m as i64
     rt_memset(m, 0, HM_SIZE)
     hm_set_key_fns(mi, 0 as MapKeyHashFn, 0 as MapKeyEqFn)
@@ -4246,9 +4379,9 @@ pub fn with_hashmap_new(key_size: i64, val_size: i64) -> *mut u8:
     hm_set_field(mi, HM_OFF_VSZ, val_size)
     hm_set_key_kind(mi, if key_size == 16: HM_KEY_STR else: HM_KEY_BYTES)
     hm_set_field(mi, HM_OFF_ECAP, 8)
-    hm_set_field(mi, HM_OFF_KEYS, rt_alloc(8 * key_size) as i64)
-    hm_set_field(mi, HM_OFF_VALS, rt_alloc(8 * val_size) as i64)
-    let live = rt_alloc(8)
+    hm_set_field(mi, HM_OFF_KEYS, rt_alloc_with_origin(8 * key_size, DBG_ORIGIN_MAP) as i64)
+    hm_set_field(mi, HM_OFF_VALS, rt_alloc_with_origin(8 * val_size, DBG_ORIGIN_MAP) as i64)
+    let live = rt_alloc_with_origin(8, DBG_ORIGIN_MAP)
     rt_memset(live, 0, 8)
     hm_set_field(mi, HM_OFF_LIVE, live as i64)
     hm_rebuild_index(mi, 16)
@@ -4429,16 +4562,16 @@ pub fn with_hashmap_make_unique(slot: *mut *mut u8) -> i64:
     let vsz = hm_val_size(m)
     let icap = hm_icap(m)
     cow_trace_copy("map", ecap * (ksz + vsz + 1) + icap * 4)
-    let fresh = rt_alloc(HM_SIZE)
+    let fresh = rt_alloc_with_origin(HM_SIZE, DBG_ORIGIN_MAP)
     rt_memcpy(fresh, map as *const u8, HM_SIZE)
     let f = fresh as i64
-    let keys = rt_alloc(ecap * ksz)
+    let keys = rt_alloc_with_origin(ecap * ksz, DBG_ORIGIN_MAP)
     rt_memcpy(keys, hm_keys(m) as *const u8, ecap * ksz)
-    let vals = rt_alloc(ecap * vsz)
+    let vals = rt_alloc_with_origin(ecap * vsz, DBG_ORIGIN_MAP)
     rt_memcpy(vals, hm_vals(m) as *const u8, ecap * vsz)
-    let live = rt_alloc(ecap)
+    let live = rt_alloc_with_origin(ecap, DBG_ORIGIN_MAP)
     rt_memcpy(live, hm_live(m) as *const u8, ecap)
-    let index = rt_alloc(icap * 4)
+    let index = rt_alloc_with_origin(icap * 4, DBG_ORIGIN_MAP)
     rt_memcpy(index, hm_index(m) as *const u8, icap * 4)
     hm_set_field(f, HM_OFF_KEYS, keys as i64)
     hm_set_field(f, HM_OFF_VALS, vals as i64)
@@ -4491,7 +4624,7 @@ pub fn with_sb_new() -> (*mut u8, i64, i64):
 pub fn with_sb_build(sb: *mut u8) -> str:
     let sb_buf = unsafe *(sb as *const *mut u8)
     let sb_len = unsafe *((sb as i64 + SB_OFF_LEN) as *const i64)
-    let out = rt_alloc(sb_len + 1)
+    let out = rt_alloc_with_origin(sb_len + 1, DBG_ORIGIN_STR)
     rt_memcpy(out, sb_buf as *const u8, sb_len)
     unsafe *((out as i64 + sb_len) as *mut u8) = 0
     make_str(out as *const u8, sb_len)
@@ -4537,7 +4670,7 @@ fn fs_read_file_status_c(cpath: *const c_char, status: *mut i32) -> str:
         rt_close(fd)
         return ""
     rt_seek(fd, 0, 0)  // SEEK_SET
-    let buf = rt_alloc(size + 1)
+    let buf = rt_alloc_with_origin(size + 1, DBG_ORIGIN_STR)
     var total: i64 = 0
     while total < size:
         let r = rt_read(fd, (buf as i64 + total) as *mut u8, size - total)
@@ -4803,7 +4936,7 @@ pub fn with_read_line_stdin() -> str:
 pub fn with_read_bytes_stdin(count: i32) -> str:
     if count <= 0:
         return ""
-    let buf = rt_alloc(count as i64 + 1)
+    let buf = rt_alloc_with_origin(count as i64 + 1, DBG_ORIGIN_STR)
     var total: i64 = 0
     while total < count as i64:
         let r = rt_read(0, (buf as i64 + total) as *mut u8, count as i64 - total)
@@ -4856,7 +4989,7 @@ pub fn with_str_join(parts: *mut u8, sep: &str) -> str:
         if i > 0:
             total = total + sep_l
         i = i + 1
-    let out = rt_alloc(total + 1)
+    let out = rt_alloc_with_origin(total + 1, DBG_ORIGIN_STR)
     var pos: i64 = 0
     i = 0
     while i < plen:
