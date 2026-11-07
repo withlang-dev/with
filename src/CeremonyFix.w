@@ -79,6 +79,13 @@ fn cf_rewritable(path: &str, excludes: &List[str], std_too: bool) -> bool:
     if not std_too and (path.starts_with("lib/std/") or path.contains("/lib/std/")): return false
     path.len() > 0 and not path.starts_with("<") and not cf_excluded(path, excludes) and with_fs_read_file(path).len() > 0
 
+// The element's name for a list's: the singular when the name is a plural
+// (`parts` → `part`, `xs` → `x`), else the name with `_item`. The re-check
+// after `--apply` catches a name already bound.
+fn cf_element_name(list_name: &str) -> str:
+    if list_name.len() > 1 and list_name.ends_with("s") and not list_name.ends_with("ss"): list_name.slice(0, list_name.len() - 1) ++ ""
+    else: list_name ++ "_item"
+
 fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[CeremonyEdit]:
     let edits = []
     let texts: HashMap[str, str] = HashMap.new()
@@ -86,6 +93,23 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
         if not cf_rewritable(path, excludes, std_too): continue
         if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
         let text = texts.get(path).unwrap()
+        // `for i in 0..xs.len():` whose every use of `i` is `xs[i]` read: the
+        // loop iterates the list, and each `xs[i]` is the element.
+        if sema.ceremony_index_loop_bases.contains(node):
+            let uses = sema.ceremony_loop_uses.get(node) ?? 0
+            let index_uses = sema.ceremony_loop_index_uses.get(node) ?? 0
+            if uses > 0 and uses == index_uses and not sema.ceremony_loop_written.contains(node):
+                let base = sema.ceremony_index_loop_bases.get(node).unwrap()
+                let list_name = sema.pool_resolve(pool.get_data0(base))
+                let elem = cf_element_name(list_name)
+                let iterable = pool.get_data1(node)
+                // `i in 0..xs.len()`: from the counter's name to the range's end.
+                var counter_start = pool.get_start(node) + 3
+                while counter_start < text.len() and text[counter_start] == ' ': counter_start = counter_start + 1
+                edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: counter_start, end: pool.get_end(iterable), replacement: elem ++ " in " ++ list_name, what: "`for i in 0..xs.len()` indexes only `xs`: it iterates the list" })
+                for (index_node, owner) in sema.ceremony_loop_index_nodes:
+                    if owner == node: edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_start(index_node), end: pool.get_end(index_node), replacement: with_str_clone_ref(elem), what: "the element" })
+            continue
         // A widening `as` under a demand of its target: the cast goes, the
         // source stays (`x as i64` where an i64 is demanded → `x`).
         if sema.ceremony_widening_casts.contains(node):
