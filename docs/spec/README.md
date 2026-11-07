@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.37
+# The With Programming Language — Specification v7.38
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
