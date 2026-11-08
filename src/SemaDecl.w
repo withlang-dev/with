@@ -2225,7 +2225,7 @@ impl Sema:
         if method_owner_sym != 0:
             self_type_id = self.lookup_named_type_visible(method_owner_sym)
             if self_type_id != 0:
-                self.named_types.insert(self_sym, self_type_id)
+                self.self_type_tid = self_type_id
 
         // #584: an impl method for a CONCRETE generic instantiation
         // (impl Trait for Box[i32]) binds Self to the INSTANTIATION, not the
@@ -2242,7 +2242,7 @@ impl Sema:
                         let sb_inst_tid = self.resolve_type_expr(sb_target)
                         if sb_inst_tid != 0 and self.get_type_kind(self.resolve_alias(sb_inst_tid)) == TypeKind.TY_GENERIC_INST:
                             self_type_id = sb_inst_tid as i32
-                            self.named_types.insert(self_sym, self_type_id)
+                            self.self_type_tid = self_type_id
 
         // Set up associated type bindings if inside a trait impl
         self.assoc_type_bindings.clear()
@@ -2272,7 +2272,7 @@ impl Sema:
                         self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi), self.ast.state.impl_type_params[(bi_tp_meta + 1)], bi_tp_count, bi_impl)
                     self.validate_type_expr_with_impl_type_params(ret_node, self.ast.state.impl_type_params[(bi_tp_meta + 1)], bi_tp_count, bi_impl)
                     if self_type_id != 0:
-                        self.named_types.remove(self_sym)
+                        self.self_type_tid = 0
                     return
             else if self.impl_target_has_bare_type_params(bi_impl):
                 self.register_generic_fn_node(fn_name, node)
@@ -2283,7 +2283,7 @@ impl Sema:
                     self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi2), 0, 0, bi_impl)
                 self.validate_type_expr_with_impl_type_params(ret_node, 0, 0, bi_impl)
                 if self_type_id != 0:
-                    self.named_types.remove(self_sym)
+                    self.self_type_tid = 0
                 return
 
         // Methods on generic structs: treat as generic (type params come from struct)
@@ -2308,7 +2308,7 @@ impl Sema:
                         self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
                         self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
                         self.register_generic_method_fn(node, fn_name, parsed_fn_name)
-                        self.named_types.remove(self_sym)
+                        self.self_type_tid = 0
                         return
                     break
 
@@ -2331,7 +2331,7 @@ impl Sema:
             // Validate where clause references
             self.validate_where_clause(node, self.ast.fn_meta_tp_start(meta), tp_count)
             if self_type_id != 0:
-                self.named_types.remove(self_sym)
+                self.self_type_tid = 0
             return
 
         if not interface_yields:
@@ -2444,7 +2444,7 @@ impl Sema:
 
         // Unbind Self
         if self_type_id != 0:
-            self.named_types.remove(self_sym)
+            self.self_type_tid = 0
 
     // A type expression that is, or points or refers to, `c_longdouble`.
     fn type_expr_names_c_longdouble(type_node: i32) -> bool:
@@ -2980,13 +2980,13 @@ impl Sema:
     mut fn resolve_trait_default_method_type(type_node: i32, impl_type_sym: i32, impl_type_tid: i32, trait_sym: i32, impl_node: i32) -> i32:
         if type_node == 0:
             return self.ty_void as i32
-        let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
+        let saved_self = self.self_type_tid
         let saved_subst_syms = move self.generic_subst_param_syms
         let saved_subst_tys = move self.generic_subst_type_ids
         self.generic_subst_param_syms = List.new()
         self.generic_subst_type_ids = List.new()
         if impl_type_tid != 0:
-            self.named_types.insert(self.syms.self_type, impl_type_tid)
+            self.self_type_tid = impl_type_tid
         self.install_trait_default_type_args(trait_sym, impl_node, saved_subst_syms, saved_subst_tys)
         // The trait's type node resolves in the trait's own module (#3047):
         // its operand types (`IndexSpec` in `MultiIndex`'s signature) are
@@ -3009,9 +3009,9 @@ impl Sema:
         self.current_module_has_ci = saved_module_has_ci
         if impl_type_tid != 0:
             if saved_self != 0:
-                self.named_types.insert(self.syms.self_type, saved_self)
+                self.self_type_tid = saved_self
             else:
-                self.named_types.remove(self.syms.self_type)
+                self.self_type_tid = 0
         self.generic_subst_param_syms = saved_subst_syms
         self.generic_subst_type_ids = saved_subst_tys
         resolved

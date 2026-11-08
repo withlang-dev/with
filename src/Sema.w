@@ -764,6 +764,11 @@ type Sema {
 
     // Named type lookup: sym → TypeId
     named_types: HashMap[i32, i32, Minted],
+    // #3100: the `Self` binding of the impl or body being checked (0 when
+    // none). It was inserted into and removed from named_types around every
+    // impl and body, which made that table the compiler's busiest and
+    // tombstone-heaviest map; flat_named_type reads this slot first.
+    self_type_tid: i32,
     // Type declaration AST nodes: sym → node (for cycle diagnostics)
     type_decl_nodes: HashMap[i32, i32, Minted],
     // #650: memoized trait_sym -> decl node (find_trait_decl_node was a
@@ -2819,7 +2824,7 @@ impl Sema:
             return
         let name = self.pool_resolve_symbol(sym)
         let prim = self.primitive_type_by_sym(sym)
-        let named = (self.named_types.contains(sym)) as i32
+        let named = ((self.flat_named_type(sym) != 0)) as i32
         with_eprint(f"[unknown-type] {context} sym={sym} name={name} prim={prim} named={named} collecting={self.collecting_types} node_kind={self.ast.kind(node)}")
 
     fn pool_resolve_symbol(sym: i32) -> &str:
@@ -3621,6 +3626,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         exact_type_cache_heads,
         exact_type_cache_next: List.new(),
         named_types,
+        self_type_tid: 0,
         type_decl_nodes,
         trait_decl_node_cache,
         type_decl_tids,
@@ -4846,7 +4852,7 @@ impl Sema:
 
     // Whether the flat entry for `sym` is a generic template declaration.
     fn named_type_entry_is_generic(sym: i32) -> bool:
-        if not self.named_types.contains(sym):
+        if not (self.flat_named_type(sym) != 0):
             return false
         let prev_tid = self.named_types.get(sym).unwrap()
         if not self.type_decl_nodes_by_tid.contains(prev_tid):
@@ -5855,6 +5861,12 @@ impl Sema:
             i = self.named_type_candidate_next[i]
         ""
 
+    // The flat named-type table with `Self` read from its own slot (#3100):
+    // the one way to ask what a bare type name is bound to right here.
+    fn flat_named_type(sym: i32) -> i32:
+        if sym == self.syms.self_type and self.self_type_tid != 0: return self.self_type_tid
+        if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
+
     fn lookup_named_type_visible(sym: i32) -> i32:
         self.lookup_named_type_filtered(sym, 1)
 
@@ -5993,7 +6005,7 @@ impl Sema:
         if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0): named_tid else: 0
 
     fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
-        let named_tid = if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
+        let named_tid = if (self.flat_named_type(sym) != 0): self.flat_named_type(sym) else: 0
         var global_tid: i32 = 0
         var saw_recorded: i32 = 0
         var saw_named_tid: i32 = 0
@@ -9683,7 +9695,7 @@ impl Sema:
             return false
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
-            if self.named_types.contains(base_sym) and self.get_type_kind(self.resolve_alias(self.named_types.get(base_sym).unwrap())) == TypeKind.TY_STRUCT:
+            if (self.flat_named_type(base_sym) != 0) and self.get_type_kind(self.resolve_alias(self.flat_named_type(base_sym))) == TypeKind.TY_STRUCT:
                 return self.struct_zero_is_sentinel(base_sym)
             return false
         if tk == TypeKind.TY_STRUCT:

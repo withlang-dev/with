@@ -2430,7 +2430,7 @@ impl Sema:
             let inner = self.resolve_type_expr(self.ast.get_data0(node))
             if inner == 0:
                 return 0 as TypeId
-            if not self.named_types.contains(self.syms.option):
+            if not (self.flat_named_type(self.syms.option) != 0):
                 return 0 as TypeId
             let opt_args: List[i32] = []
             opt_args.push(inner as i32)
@@ -2666,8 +2666,8 @@ impl Sema:
             // twin recovers TYPE IDENTITY from the raw registry rather than
             // re-policing it (behav_iter_pipeline_local: FilterIter resolved
             // at check time, "not visible" from the frozen context).
-            if self.named_types.contains(gi_base_sym):
-                gi_base_tid = self.named_types.get(gi_base_sym).unwrap()
+            if (self.flat_named_type(gi_base_sym) != 0):
+                gi_base_tid = self.flat_named_type(gi_base_sym)
         if gi_base_tid == 0:
             sema_phase_bug("BUG: frozen generic type base not visible")
         let gi_arg_count = self.ast.get_data2(node)
@@ -5425,10 +5425,10 @@ impl Sema:
             if owner_sym != 0 and self.type_decl_type_param_count(owner_sym) != 0:
                 continue
             self.update_decl_source_context(di)
-            let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
+            let saved_self = self.self_type_tid
             let self_tid = if owner_sym != 0: self.lookup_named_type_visible(owner_sym) else: 0
             if self_tid != 0:
-                self.named_types.insert(self.syms.self_type, self_tid)
+                self.self_type_tid = self_tid
             self.assoc_type_bindings.clear()
             let impl_nd: i32 = self.method_impl_nodes.get(fn_name).unwrap()
             let impl_ex = self.ast.get_data1(impl_nd)
@@ -5443,9 +5443,9 @@ impl Sema:
                 self.body_typed_sigs.insert(sig_idx, 1)
             self.assoc_type_bindings.clear()
             if saved_self != 0:
-                self.named_types.insert(self.syms.self_type, saved_self)
+                self.self_type_tid = saved_self
             else if self_tid != 0:
-                self.named_types.remove(self.syms.self_type)
+                self.self_type_tid = 0
 
     mut fn check_trait_impl_method_signature_contract(node: i32, sig_idx: i32, contract: &SemaTraitImplMethodContract, has_ret_annotation: bool):
         if contract.ok == 0 or sig_idx < 0:
@@ -5781,7 +5781,7 @@ impl Sema:
         // unbinds it, so a `Self { .. }` literal in the body was untyped and
         // MirLower resolved it by NAME through the flat map, which names the
         // newest declaration of that name in any module (#1457).
-        let saved_body_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
+        let saved_body_self = self.self_type_tid
         // A generic owner's methods are checked per instantiation with `Self`
         // in the substitution (check_fn_body_concrete), so only a
         // non-generic owner binds here.
@@ -5790,7 +5790,7 @@ impl Sema:
         if body_self_tid != 0 and self.type_decl_nodes.contains(body_owner_sym) and self.type_decl_tp_count(self.type_decl_nodes.get(body_owner_sym).unwrap()) != 0:
             body_self_tid = 0
         if body_self_tid != 0:
-            self.named_types.insert(self.syms.self_type, body_self_tid)
+            self.self_type_tid = body_self_tid
 
         // Set up associated type bindings if inside a trait impl
         self.assoc_type_bindings.clear()
@@ -6361,9 +6361,9 @@ impl Sema:
         self.unsafe_scope_nodes = saved_unsafe_scope_nodes
         if body_self_tid != 0:
             if saved_body_self != 0:
-                self.named_types.insert(self.syms.self_type, saved_body_self)
+                self.self_type_tid = saved_body_self
             else:
-                self.named_types.remove(self.syms.self_type)
+                self.self_type_tid = 0
         self.borrow_kinds = saved_borrow_kinds
         self.borrow_places = saved_borrow_places
         self.borrow_fields = saved_borrow_fields
@@ -6570,7 +6570,7 @@ impl Sema:
         let saved_has_expected = self.has_expected_type
         let saved_value_root = self.current_value_expr_root
         let saved_stmt_root = self.current_statement_expr_root
-        let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
+        let saved_self = self.self_type_tid
         let saved_assoc = move self.assoc_type_bindings
         let saved_subst_syms = move self.generic_subst_param_syms
         let saved_subst_tys = move self.generic_subst_type_ids
@@ -6578,7 +6578,7 @@ impl Sema:
 
         let impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
         if impl_type_tid != 0:
-            self.named_types.insert(self.syms.self_type, impl_type_tid)
+            self.self_type_tid = impl_type_tid
         self.assoc_type_bindings = fresh_assoc
         self.generic_subst_param_syms = List.new()
         self.generic_subst_type_ids = List.new()
@@ -6624,9 +6624,9 @@ impl Sema:
 
         self.pop_scope()
         if saved_self != 0:
-            self.named_types.insert(self.syms.self_type, saved_self)
+            self.self_type_tid = saved_self
         else:
-            self.named_types.remove(self.syms.self_type)
+            self.self_type_tid = 0
         self.assoc_type_bindings = saved_assoc
         self.generic_subst_param_syms = saved_subst_syms
         self.generic_subst_type_ids = saved_subst_tys
@@ -23385,9 +23385,8 @@ impl Sema:
         // struct name — the type args are re-inferred from the field values
         // exactly as a hand-written `Box { … }` literal's are.
         if tid == 0 and self.pool_resolve(name) == "Self":
-            let self_bound = self.named_types.get(self.syms.self_type)
-            if self_bound.is_some():
-                tid = self_bound.unwrap()
+            if self.self_type_tid != 0:
+                tid = self.self_type_tid
             else:
                 // Never silent: an untyped literal was lowered by name (#1457).
                 self.emit_error("`Self` is not bound here: a `Self { .. }` literal needs an enclosing method of a type", node)
@@ -23405,9 +23404,9 @@ impl Sema:
                     named_instance = lit_res
                 name = self.get_type_d0(lit_res)
                 tid = self.lookup_named_type_visible(name)
-                if tid == 0 and named_instance != 0 and self.named_types.contains(name):
+                if tid == 0 and named_instance != 0 and (self.flat_named_type(name) != 0):
                     // The alias is visible here; its base need not be.
-                    tid = self.named_types.get(name).unwrap()
+                    tid = self.flat_named_type(name)
         if tid == 0:
             if self.private_symbol_path_from_current(name).len() > 0:
                 self.emit_private_symbol_error(name, node)
@@ -28536,7 +28535,7 @@ impl Sema:
         let kind = self.get_type_kind(resolved)
         if kind == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
-            if not self.named_types.contains(base_sym):
+            if not (self.flat_named_type(base_sym) != 0):
                 return false
         true
 
@@ -29024,7 +29023,7 @@ impl Sema:
         // facade module no longer re-exports under §18.2's non-transitive
         // imports (#1708). Name the invisible type rather than demand a
         // receiver for a method no module declares.
-        if not self.module_declares_extension_method(method_sym, module_path, pkg_name) and self.named_types.contains(pkg_sym):
+        if not self.module_declares_extension_method(method_sym, module_path, pkg_name) and (self.flat_named_type(pkg_sym) != 0):
             self.emit_private_symbol_error(pkg_sym, recv_expr)
             return 0
         let method_name = with_str_clone_ref(self.pool_resolve(method_sym))
@@ -37049,8 +37048,8 @@ impl Sema:
             return self.resolve_type_expr(node) as i32
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(node)
-            if self.named_types.contains(sym):
-                return self.named_types.get(sym).unwrap()
+            if (self.flat_named_type(sym) != 0):
+                return self.flat_named_type(sym)
         if (kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX) and self.receiver_names_type(node):
             let indexed_ty = self.resolve_type_level_arg_expr(node)
             if indexed_ty != 0:
@@ -37058,8 +37057,8 @@ impl Sema:
             let base = self.ast.get_data0(node)
             if self.ast.kind(base) == NodeKind.NK_IDENT:
                 let sym = self.ast.get_data0(base)
-                if self.named_types.contains(sym):
-                    return self.named_types.get(sym).unwrap()
+                if (self.flat_named_type(sym) != 0):
+                    return self.flat_named_type(sym)
         0
 
     // A receiver that names a type, not a value (a local of that name wins).
@@ -37069,7 +37068,7 @@ impl Sema:
         let kind = self.ast.kind(expr)
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(expr)
-            return self.scope_lookup(sym) < 0 and self.named_types.contains(sym)
+            return self.scope_lookup(sym) < 0 and (self.flat_named_type(sym) != 0)
         if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
             return true
         if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX:
@@ -37160,7 +37159,7 @@ impl Sema:
         let kind = self.ast.kind(expr)
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(expr)
-            if self.scope_lookup(sym) < 0 and self.named_types.contains(sym): return sym
+            if self.scope_lookup(sym) < 0 and (self.flat_named_type(sym) != 0): return sym
             return 0
         if kind == NodeKind.NK_INDEX:
             return self.static_receiver_sema_base(self.ast.get_data0(expr))
@@ -37222,7 +37221,7 @@ impl Sema:
             return 0
         if self.type_identity_tids.contains(key):
             return self.type_identity_tids.get(key).unwrap()
-        self.named_types.get(key) ?? 0
+        self.flat_named_type(key)
     // The comprehension markers the parser desugars `yield`/empty to.
     fn sym_is_payload_marker(sym: i32): sym != 0 and sym == self.pool_lookup_symbol("_Payload")
     fn sym_is_empty_marker(sym: i32): sym != 0 and sym == self.pool_lookup_symbol("_Empty")
@@ -37644,9 +37643,9 @@ impl Sema:
             else:
                 if self.get_type_d1(worker_fn_ty) != 0 or self.get_type_d2(worker_fn_ty) != self.ty_i32:
                     self.emit_error("spawn() requires a fn() -> i32 worker", node)
-            if self.named_types.contains(self.syms.scoped_join_handle):
+            if (self.flat_named_type(self.syms.scoped_join_handle) != 0):
                 self.call_builtins.insert(node, CallBuiltin.ScopeSpawn as i32)
-                return self.named_types.get(self.syms.scoped_join_handle).unwrap()
+                return self.flat_named_type(self.syms.scoped_join_handle)
             self.emit_error("ScopedJoinHandle is missing from the prelude", node)
             return 0
 
@@ -41826,7 +41825,7 @@ impl Sema:
         let sym = self.ast.get_data0(b)
         if self.scope_has(sym):
             return false
-        if self.named_types.contains(sym): true else: false
+        if (self.flat_named_type(sym) != 0): true else: false
 
     // D32 (§2.2): the one legal vacate is the explicit `move place.field`
     // through a mutable path — a `var` base or the receiver of a `mut fn`
