@@ -5062,9 +5062,9 @@ fn test_lines_in_order(expected: &List[str], actual: &List[str]) -> bool:
 fn test_stdout_mismatch(expected: &List[str], actual: &List[str], stdout: &str) -> str:
     for expected_item in expected:
         if not stdout.contains(expected_item): return "missing expected output: " ++ expected_item
-    for i in 0..expected.len():
-        if expected[i].len() > 0 and test_line_count(actual, expected[i]) == 0:
-            return "expected line `" ++ expected[i] ++ "` is printed only inside `" ++ test_line_containing(actual, expected[i]) ++ "`"
+    for expected_item in expected:
+        if expected_item.len() > 0 and test_line_count(actual, expected_item) == 0:
+            return "expected line `" ++ expected_item ++ "` is printed only inside `" ++ test_line_containing(actual, expected_item) ++ "`"
     for i in 0..expected.len():
         let listed = test_line_count(expected, expected[i])
         let printed = test_line_count(actual, expected[i])

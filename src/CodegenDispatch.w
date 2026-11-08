@@ -2133,7 +2133,7 @@ impl Codegen:
                     loaded = wl_build_lshr(self.builder, loaded, bp_shift)
                 // Mask to field width
                 if bp_bit_width < bp_total_bits:
-                    let bp_mask = wl_const_int(ptr_ty, ((1 as i64) << (bp_bit_width as u32)) - 1, 0)
+                    let bp_mask = wl_const_int(ptr_ty, ((1 as i64) << bp_bit_width) - 1, 0)
                     loaded = wl_build_and(self.builder, loaded, bp_mask)
                 // Truncate to field type
                 let bp_field_ty = wl_int_type_n(self.context, bp_bit_width)
@@ -5200,7 +5200,7 @@ impl Codegen:
                         // Mask to field width, shift to position (MSB-first layout)
                         let bp_shift_amt = bp_total_bits - bp_bit_offset - bp_bit_width
                         if bp_bit_width < bp_total_bits:
-                            let bp_mask = wl_const_int(struct_ty, ((1 as i64) << (bp_bit_width as u32)) - 1, 0)
+                            let bp_mask = wl_const_int(struct_ty, ((1 as i64) << bp_bit_width) - 1, 0)
                             field_val = wl_build_and(self.builder, field_val, bp_mask)
                         if bp_shift_amt > 0:
                             let bp_shift = wl_const_int(struct_ty, bp_shift_amt, 0)
@@ -7763,8 +7763,8 @@ impl Codegen:
                 // Load current backing value
                 let bp_sold = wl_build_load(self.builder, bp_sbacking_ty, dst_ptr)
                 // Clear field bits
-                let bp_sfield_mask = ((1 as i64) << (bp_sbit_width as u32)) - 1
-                let bp_sclear_mask_val = (bp_sfield_mask << (bp_sshift_amt as u32)) ^ (-1 as i64)
+                let bp_sfield_mask = ((1 as i64) << bp_sbit_width) - 1
+                let bp_sclear_mask_val = (bp_sfield_mask << bp_sshift_amt) ^ (-1 as i64)
                 let bp_sclear_mask = wl_const_int(bp_sbacking_ty, bp_sclear_mask_val, 0)
                 let bp_scleared = wl_build_and(self.builder, bp_sold, bp_sclear_mask)
                 // Extend new value to backing width and shift into position
@@ -16978,8 +16978,8 @@ impl Codegen:
                     arg_llvm = self.type_fallback()
                 let tp_sym = tp_syms[ai]
                 var already_bound = false
-                for bi in 0..bind_syms.len():
-                    if bind_syms[bi] == tp_sym:
+                for bind_sym in bind_syms:
+                    if bind_sym == tp_sym:
                         already_bound = true
                         break
                 if not already_bound:
@@ -17043,8 +17043,8 @@ impl Codegen:
                         let inner_sema = self.sema.get_generic_inst_arg(arg_sema_tid, gi)
                         var canonical_inner_sym: i32 = 0
                         let inner_text = self.intern.resolve(inner_sym)
-                        for ti in 0..tp_syms.len():
-                            let candidate = tp_syms[ti]
+                        for tp_sym in tp_syms:
+                            let candidate = tp_sym
                             if candidate == inner_sym:
                                 canonical_inner_sym = candidate
                                 break

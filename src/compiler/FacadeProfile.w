@@ -276,8 +276,8 @@ fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], faca
         let rule = p.get_extra(rule_start + ri)
         if p.get_extra(p.get_data1(rule as NodeId) + 2) == 0: continue
         var noted = false
-        for m in 0..matched_rules.len():
-            if matched_rules[m] == rule: noted = true
+        for matched_rule in matched_rules:
+            if matched_rule == rule: noted = true
         if noted: continue
         let none: List[i32] = []
         records.push(facade_profile_record(p, at, rule, FACADE_PROFILE_NONE, 0, none))

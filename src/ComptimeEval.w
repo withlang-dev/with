@@ -5849,8 +5849,8 @@ impl ComptimeEvaluator:
                 if list_type == 0:
                     return self.fail(node, "ToolFs.list_files result type is unknown")
                 let start = self.extra_values.len() as i32
-                for i in 0..raw_files.len():
-                    self.extra_values.push(comptime_value_str(self.capability_project_relative_path(record, raw_files[i])))
+                for raw_file in raw_files:
+                    self.extra_values.push(comptime_value_str(self.capability_project_relative_path(record, raw_file)))
                 return comptime_control_value(comptime_value_list(list_type, start, raw_files.len() as i32))
             if method == "mkdir_all":
                 if not self.capability_require_mkdir_allowed(record, path, method, node):

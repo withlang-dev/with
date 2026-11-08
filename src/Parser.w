@@ -4819,7 +4819,7 @@ impl Parser:
                 self.advance()
                 if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
         let extra_start = self.pool.extra_len()
-        for i in 0..ops.len(): self.pool.add_extra(ops[i])
+        for op in ops: self.pool.add_extra(op)
         let template = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, tstart, self.prev_end(), kind, extra_start, ops.len() as i32)
         self.convention_rule_node(start, name, pat, template as i32, is_fn)
 
@@ -4856,7 +4856,7 @@ impl Parser:
             // unresolved profile is the ordinary unresolved-import error,
             // naming the package.
             let use_extra = self.pool.extra_len()
-            for i in 0..path.len(): self.pool.add_extra(path[i])
+            for path_item in path: self.pool.add_extra(path_item)
             let use_decl = self.pool.add_node(NodeKind.NK_USE_DECL, start, self.prev_end(), use_extra, path.len() as i32, 0)
             self.pending_post_decls.push(use_decl as i32)
             return self.pool.add_node(NodeKind.NK_FACADE_CONVENTION, start, self.prev_end(), extra_start, path.len() as i32, 0) as i32
@@ -4885,7 +4885,7 @@ impl Parser:
             if not ok: return 0
             let extra_start = self.pool.extra_len()
             self.pool.add_extra(repr as i32)
-            for i in 0..clauses.len(): self.pool.add_extra(clauses[i])
+            for clause in clauses: self.pool.add_extra(clause)
             return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.facade_item_end(head_end, clauses), name, extra_start, clauses.len() as i32) as i32
         if self.current_ident_is("handle"):
             // `handle Name wraps *mut T` (§16.2b.9, ruling Amendment 1): a
@@ -9825,8 +9825,8 @@ impl Parser:
 
         let count = (params.len() / (FN_PARAM_STRIDE as i64)) as i32
         let param_start = self.pool.extra_len()
-        for pi in 0..params.len():
-            self.pool.add_extra(params[pi])
+        for param in params:
+            self.pool.add_extra(param)
         // Store default value nodes for params that have them
         for di in 0..default_nodes.len():
             let def = default_nodes[di]

@@ -216,6 +216,11 @@ type MirBuilder ephemeral {
     bind_syms: List[i32],
     bind_local_ids: List[i32],
     bind_scope_starts: List[i32],
+    // A global's proxy local, for the whole body: a global first touched
+    // inside a block keeps one proxy (D52, #3086), never a scope-dropped one
+    // per block.
+    global_proxy_syms: List[i32],
+    global_proxy_locals: List[i32],
     // Non-owning lexical aliases (sym -> place), scoped.
     alias_syms: List[i32],
     alias_places: List[i32],
@@ -377,6 +382,8 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         with_cleanup_sigs: List.new(),
         with_cleanup_mono_syms: List.new(),
         bind_syms: List.new(),
+        global_proxy_syms: [],
+        global_proxy_locals: [],
         bind_local_ids: List.new(),
         bind_scope_starts: List.new(),
         alias_syms: List.new(),
@@ -2044,6 +2051,11 @@ impl MirBuilder:
             if self.symbols_match(self.bind_syms[i], sym):
                 return self.bind_local_ids[i]
             i = i - 1
+        var p = self.global_proxy_syms.len() - 1
+        while p >= 0:
+            if self.symbols_match(self.global_proxy_syms[p], sym):
+                return self.global_proxy_locals[p]
+            p = p - 1
         -1
 
     fn lookup_alias_place(sym: i32) -> i32:
@@ -4220,7 +4232,7 @@ impl MirBuilder:
                     ev_ty = self.sema.ty_i32
                 let local_id = self.body.new_local(ev_ty, ev_is_mut, sym, 1)
                 self.body.mark_global_local(local_id)
-                self.bind_local(sym, local_id)
+                self.bind_global_proxy(sym, local_id)
                 return local_id
             if dk != NodeKind.NK_LET_DECL:
                 continue
@@ -4254,7 +4266,7 @@ impl MirBuilder:
                 gty = self.sema.ty_i32 as i32
             let local_id = self.body.new_local(gty, is_mut, sym, 1)
             self.body.mark_global_local(local_id)
-            self.bind_local(sym, local_id)
+            self.bind_global_proxy(sym, local_id)
             return local_id
         // D184 (§29.15): a helper's capture of a script binding: the storage
         // main's let bound.
@@ -4263,9 +4275,17 @@ impl MirBuilder:
             let slot_mut: i32 = self.sema.script_slot_muts.get(sym) ?? 0
             let slot_local = self.body.new_local(slot_ty, slot_mut, sym, 1)
             self.body.mark_global_local(slot_local)
-            self.bind_local(sym, slot_local)
+            self.bind_global_proxy(sym, slot_local)
             return slot_local
         -1
+
+    // The proxy is bound in the current scope and remembered for the body:
+    // lookup_local finds it after the block that first touched the global
+    // ends, so no second proxy is made and no block drops it (D52, #3086).
+    mut fn bind_global_proxy(sym: i32, local_id: i32):
+        self.bind_local(sym, local_id)
+        self.global_proxy_syms.push(sym)
+        self.global_proxy_locals.push(local_id)
 
     // D88 (§4.2.1): a use of a constant with no numeric type of its own is
     // its initializer, lowered at the type Sema gave this use.
@@ -4928,8 +4948,8 @@ impl MirBuilder:
             if self.ast.kind(part) != NodeKind.NK_STRING_LIT:
                 return -1
         var marked_count = 0
-        for i in 0..parts.len():
-            if mir_str_payload_is_raw_marked(self.pool.resolve(self.ast.get_data0(parts[i]))):
+        for part in parts:
+            if mir_str_payload_is_raw_marked(self.pool.resolve(self.ast.get_data0(part))):
                 marked_count = marked_count + 1
         if marked_count != 0 and marked_count != parts.len():
             return -1
@@ -12154,8 +12174,8 @@ impl MirBuilder:
                     let field_place = self.body.new_named_field_place(struct_subject_place, field_name, bi, field_ty)
                     let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                     let inner = self.lower_pattern(inner_pat, child_place)
-                    for i in 0..inner.len():
-                        out.push(inner[i])
+                    for inner_item in inner:
+                        out.push(inner_item)
                 return out
 
         if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
@@ -14445,7 +14465,10 @@ impl MirBuilder:
             return op
         let local = self.lookup_local(self.ast.get_data0(expr))
         let place: i32 = self.body.operand_d0[op]
-        if local < 0 or mir_place_plain_local(self.body, place) != local or self.copy_is_bits(self.local_type(local)):
+        // D52 (§9.1c): a global is never moved out; its return copies (a str
+        // retains) as its block-tail read does. `return g` moved the proxy and
+        // reset-on-move blanked the global (#3086).
+        if local < 0 or mir_place_plain_local(self.body, place) != local or self.copy_is_bits(self.local_type(local)) or self.body.local_is_global[local] != 0:
             return op
         self.body.new_operand(OperandKind.OK_MOVE, place)
 
@@ -17172,7 +17195,7 @@ impl MirBuilder:
             self.lower_debug_counter_test(value_place, lo_place, BinaryOp.OP_LT, fail_bb, next_bb)
             self.switch_to(next_bb)
         if need_hi:
-            let hi: i64 = if width >= 64: 9223372036854775807 else if signed: ((1 as i64) << ((width - 1) as u32)) - 1 else: ((1 as i64) << (width as u32)) - 1
+            let hi: i64 = if width >= 64: 9223372036854775807 else if signed: ((1 as i64) << ((width - 1) as u32)) - 1 else: ((1 as i64) << width) - 1
             let hi_place = self.materialize_operand(self.int_const_operand(hi, src_ty), src_ty, span)
             let next_bb = self.new_block()
             self.lower_debug_counter_test(value_place, hi_place, BinaryOp.OP_GT, fail_bb, next_bb)
@@ -20759,8 +20782,8 @@ impl MirModule:
                 continue
 
             var recursive_violation_found = 0
-            for si in 0..scc_syms.len():
-                let member_sym = scc_syms[si]
+            for scc_sym in scc_syms:
+                let member_sym = scc_sym
                 let member_decl = tailrec_find_decl(ast_pool, member_sym)
                 if member_decl != 0:
                     let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(member_decl), scc_syms, 1, 0, tailrec_no_drop_state())

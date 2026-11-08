@@ -1021,8 +1021,8 @@ fn cimport_deps_sorted_unique_paths(files: &str) -> List[str]:
             if not exists:
                 var inserted = false
                 let next = frontend_new_list_str()
-                for i in 0..out.len():
-                    let existing = out[i]
+                for out_item in out:
+                    let existing = out_item
                     if not inserted and cimport_deps_str_compare(path, existing) < 0:
                         next.push(with_str_clone_ref(path))
                         inserted = true
@@ -2367,7 +2367,7 @@ impl Zcu:
             if already:
                 continue
             let file_id = mod.file_id
-            let path: str = mod.path
+            let path = mod.path
             let text = frontend_normalize_source_text(module_source_read(path).text)
             if text.len() > 0:
                 self.add_source_text_mapping(file_id, path, text)
@@ -2982,12 +2982,12 @@ impl Zcu:
                 user_fn_names.push(merged_pool.get_data0(ud))
 
         let higher_type_names: List[i32] = []
-        for ri in 0..root_ordered.len():
-            let rd = root_ordered[ri]
+        for root_ordered_item in root_ordered:
+            let rd = root_ordered_item
             if merged_pool.kind(rd) == NodeKind.NK_TYPE_DECL:
                 higher_type_names.push(merged_pool.get_data0(rd))
-        for ui in 0..user_import_ordered.len():
-            let ud = user_import_ordered[ui]
+        for user_import_ordered_item in user_import_ordered:
+            let ud = user_import_ordered_item
             if merged_pool.kind(ud) == NodeKind.NK_TYPE_DECL:
                 higher_type_names.push(merged_pool.get_data0(ud))
 

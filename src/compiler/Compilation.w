@@ -1121,7 +1121,7 @@ impl Compilation:
         self.zcu.pool
 
     mut fn emit_ir(pool: &AstPool) -> bool:
-        let source_path = self.zcu.current_source_path.clone()
+        let source_path = self.zcu.current_source_path
         let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
         if prepared_pool.decl_count() == 0:
             return false

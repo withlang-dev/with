@@ -105,7 +105,7 @@ fn sema_param_origin_bit(pi: i32) -> i32:
         return 0
     if pi >= 31:
         return -1
-    ((1 as i64) << (pi as u32)) as i32
+    ((1 as i64) << pi) as i32
 
 fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> bool:
     if mask == 0 or pi < 0:
@@ -4596,7 +4596,7 @@ impl Sema:
         if name_sym == 0 or idx < 0 or idx >= 31:
             return
         let existing = if self.retained_extern_params.contains(name_sym): self.retained_extern_params.get(name_sym).unwrap() else: 0
-        self.retained_extern_params.insert(name_sym, existing | (1 << (idx as u32)))
+        self.retained_extern_params.insert(name_sym, existing | (1 << idx))
 
     fn param_is_retained(name_sym: i32, idx: i32) -> bool:
         if name_sym == 0 or idx < 0 or idx >= 31:
@@ -4604,7 +4604,7 @@ impl Sema:
         if not self.retained_extern_params.contains(name_sym):
             return false
         let mask = self.retained_extern_params.get(name_sym).unwrap()
-        if (mask & (1 << (idx as u32))) != 0: true else: false
+        if (mask & (1 << idx)) != 0: true else: false
 
     // #602: parse a `retains:` entry of the form "fnname(idx)" and register it.
     mut fn register_retains_entry(entry_sym: i32):

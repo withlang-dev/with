@@ -2885,7 +2885,7 @@ fn ci_bit_signed_type(bits: i32) -> str:
 
 fn ci_bit_mask_text(width: i32) -> str:
     if width >= 64: return "18446744073709551615"
-    i64_to_string(((1 as i64) << (width as u32)) - 1)
+    i64_to_string(((1 as i64) << width) - 1)
 
 // The accessors of every named member and the layout assertion, rendered
 // after the record and its `impl Copy`.
@@ -3344,7 +3344,7 @@ fn ci_enum_const_value(value: i64, int_type: &str) -> i64:
     if value >= 0 or not ci_int_type_is_unsigned(int_type): return value
     let bits = ci_estimate_type_size(int_type) * 8
     if bits <= 0 or bits >= 64: return value
-    value + ((1 as i64) << (bits as u32))
+    value + ((1 as i64) << bits)
 
 fn ci_value_fits_int(value: i64) -> bool: value >= -2147483648 and value <= 2147483647
 
@@ -18544,13 +18544,13 @@ fn ci_collect_va_started_decls(session: i64, cursor: i32) -> bool:
     true
 
 fn ci_get_bail_location() -> str:
-    g_ci_bail_location.clone()
+    g_ci_bail_location
 
 fn ci_get_bail_kind() -> i32:
     g_ci_bail_kind
 
 fn ci_get_bail_message() -> str:
-    g_ci_bail_message.clone()
+    g_ci_bail_message
 
 fn ci_clear_bail_location():
     g_ci_bail_location = ""
@@ -18858,16 +18858,16 @@ fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
     if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
         let lhs = with_ci_child(session, cursor, 0)
         let rhs = with_ci_child(session, cursor, 1)
-        for pi in 0..params.len():
-            if ci_cursor_names(session, rhs, params[pi]):
+        for param in params:
+            if ci_cursor_names(session, rhs, param):
                 let l = ci_peel_transparent(session, lhs)
                 if with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:
-                    out = out ++ "field:" ++ params[pi] ++ "\n"
+                    out = out ++ "field:" ++ param ++ "\n"
                 else if with_ci_cursor_kind(session, l) == CXK_DECL_REF:
                     var is_param = false
                     for pj in 0..params.len():
                         if ci_cursor_names(session, l, params[pj]): is_param = true
-                    if not is_param: out = out ++ "global:" ++ params[pi] ++ "\n"
+                    if not is_param: out = out ++ "global:" ++ param ++ "\n"
     var i = 0
     while i < nc:
         out = out ++ ci_body_call_evidence(session, with_ci_child(session, cursor, i), params)

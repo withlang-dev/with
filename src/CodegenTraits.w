@@ -2160,13 +2160,13 @@ impl Codegen:
             if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
                 if rv < 0 or rv > 63: return const_int_fail()
                 if op == BinaryOp.OP_SHL:
-                    return const_int_ok(lv << (rv as u32))
+                    return const_int_ok(lv << rv)
                 // An unsigned result shifts logically: SIZE_MAX >> 1 is
                 // 0x7fff…, not the arithmetic shift of the i64 bit pattern.
                 let result_ty = self.sema_type_of_node(node)
                 if self.codegen_const_int_is_unsigned(result_ty):
-                    return const_int_ok(((lv as u64) >> (rv as u32)) as i64)
-                return const_int_ok(lv >> (rv as u32))
+                    return const_int_ok(((lv as u64) >> rv) as i64)
+                return const_int_ok(lv >> rv)
             if op == BinaryOp.OP_BIT_AND: return const_int_ok(lv & rv)
             if op == BinaryOp.OP_BIT_OR: return const_int_ok(lv | rv)
             if op == BinaryOp.OP_BIT_XOR: return const_int_ok(lv ^ rv)

@@ -28,7 +28,7 @@ impl BzBits:
             self.at = self.at + 1
             self.count = self.count + 8
         self.count = self.count - n
-        (self.buffer >> (self.count as u32)) & ((1 << (n as u32)) - 1)
+        (self.buffer >> self.count) & ((1 << n) - 1)
 
     mut fn bit() -> i32: self.bits(1) as i32
 

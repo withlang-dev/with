@@ -591,7 +591,7 @@ fn suspend_prov_origins_from_call(bits: SuspendBits, sema: &Sema, body: &MirBody
             if origin_mask == 0:
                 continue
             for origin_pi in 0..param_count:
-                if (origin_mask & (((1 as i64) << (origin_pi as u32)) as i32)) == 0:
+                if (origin_mask & (((1 as i64) << origin_pi) as i32)) == 0:
                     continue
                 if origin_pi < 0 or origin_pi >= arg_count:
                     continue
@@ -1412,8 +1412,8 @@ fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
             var any_view_live = false
             if view_locals.len() > 0:
                 let operands = last_use_site_operands(out, bb, si)
-                for oi in 0..operands.len():
-                    let op = operands[oi]
+                for operand in operands:
+                    let op = operand
                     if op >= 0 and op < out.operand_kinds.len() and (out.operand_kinds[op] == OperandKind.OK_COPY or out.operand_kinds[op] == OperandKind.OK_MOVE):
                         let root = suspend_place_root_local(out, out.operand_d0[op])
                         if root > 0 and root < local_count and in_views[root] != 0:

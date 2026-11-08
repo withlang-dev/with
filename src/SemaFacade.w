@@ -1805,8 +1805,8 @@ impl Sema:
                     let slot = self.facade_resolve_variadic_slot(fn_sym, sig, case_node, tid, k)
                     if slot.resource < 0: return c
                     c.variadic_slots.push(slot)
-                    ckind = Some(if callback_ref != 0: .Callback else: .Retained)
-                else if rt == self.ty_str: ckind = Some(.Str)
+                    ckind = if callback_ref != 0: .Callback else: .Retained
+                else if rt == self.ty_str: ckind = .Str
                 else if self.get_type_kind(self.numeric_operand_type(rt as i32)) == TypeKind.TY_INT: ckind = .Scalar
                 let Some(case_kind) = ckind else:
                     let tn = self.source_spelling(self.ast.get_extra(cops + 1))
@@ -2966,8 +2966,8 @@ impl Sema:
             for renamed_item in renamed:
                 let ca = renamed_item
                 let na = facade_render_present(self.ast, self.pool, self.decl_is_c_import, rnode, ca)
-                for b in 0..ops.len():
-                    let cb = ops[b]
+                for op in ops:
+                    let cb = op
                     if cb == ca:
                         continue
                     let nb = facade_render_present(self.ast, self.pool, self.decl_is_c_import, rnode, cb)
@@ -3395,7 +3395,7 @@ impl Sema:
             for si in 0..sigs.len():
                 let sig = sigs[si]
                 for parent in parents:
-                    let c_pi: i32 = parent
+                    let c_pi = parent
                     var pi = c_pi
                     if owner == FACADE_DEP_INIT:
                         pi = shift + c_pi - 1
@@ -4478,8 +4478,8 @@ impl Sema:
                 named = declared_item
         if named < 0:
             var have = ""
-            for k in 0..declared.len():
-                let dn = self.pool_resolve(self.facade_resources[declared[k]].name)
+            for declared_item in declared:
+                let dn = self.pool_resolve(self.facade_resources[declared_item].name)
                 if not have.contains("'" ++ dn ++ "'"):
                     have = if have.len() == 0: f"'{dn}'" else: have ++ f", '{dn}'"
             self.emit_error(f"fn '{fname}': {written} names {shown}, which receives '{an}'; '{an}' declares no parent of type '{pn}' (its 'borrows' parents: {have}), and naming a parent the resource does not declare is an error (§16.2b.6)", node)
@@ -4964,8 +4964,8 @@ impl Sema:
         for k in 0..self.foreign_contracts[ci].argv_cb.len():
             let cb = self.foreign_contracts[ci].argv_cb[k]
             var served = false
-            for wi in 0..wrapped.len():
-                if wrapped[wi] == cb: served = true
+            for wrapped_item in wrapped:
+                if wrapped_item == cb: served = true
             if not served:
                 let shown = self.facade_param_display(fn_sym, sig, cb)
                 self.emit_error(f"fn '{fname}': the callback {shown} does not receive the handle '{hname}' that {aname} reads the user data from, so no wrapper can reach the program's callback to hand it its arguments (§16.2b.9)", self.foreign_contracts[ci].argv_nodes[k])

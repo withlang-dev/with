@@ -2493,10 +2493,10 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     // Runtime-need detection must see undefined symbols from every unit, not
     // just the primary object. A failed probe stays the pure sentinel so the
     // conservative "<probe-failed>" equality checks keep firing.
-    for uu in 0..extra_objects.len():
+    for extra_object in extra_objects:
         if undef == "<probe-failed>":
             break
-        let unit_undef = link_stage_undefined_symbols_for_object(extra_objects[uu])
+        let unit_undef = link_stage_undefined_symbols_for_object(extra_object)
         if unit_undef == "<probe-failed>":
             undef = "<probe-failed>"
         else:
