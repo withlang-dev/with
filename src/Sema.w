@@ -938,6 +938,11 @@ type Sema {
     // to the owned element type; codegen copies each element (D65).
     collect_copy_elements: HashMap[i32, i32, Minted],
     literal_decisions: List[i32],
+    // #3099: a literal binding's type decided within its own body's settle
+    // loop (let node → type id), consulted before literal_decisions. A
+    // body-local `let xs = []` whose first push names the element type is
+    // decided by re-checking that body, not by a second Sema over the module.
+    literal_body_decisions: HashMap[i32, i32, Minted],
     // literal_decisions by `let`: the offset of each binding's entry, built
     // at the first lookup (one walk, not one per binding).
     literal_decision_at: HashMap[i32, i32, Minted],
@@ -3687,6 +3692,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         collect_copy_elements: HashMap.new(),
         literal_watermark: 0,
         literal_decisions: List.new(),
+        literal_body_decisions: [:],
         literal_decision_at: sema_new_map_i32_i32(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),

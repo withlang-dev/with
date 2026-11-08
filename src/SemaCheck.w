@@ -5621,11 +5621,51 @@ impl Sema:
             self.bind_is_view_bound.pop()
             self.bind_provenance.pop()
 
+    // #3099: the literal demands recorded since `start` (D93: `let xs = []`
+    // and the first use that names its type) become this body's decisions,
+    // so the body is checked again at the decided types and no second Sema
+    // runs over the module for them. Returns whether anything was decided.
+    // A binding two uses demand different types of is left to the module
+    // round, which reports the disagreement at the second use (§4.3c).
+    mut fn settle_literal_demands_in_body(start: isize) -> bool:
+        var decided_any = false
+        var i = start
+        while i + 2 < self.literal_demands.len():
+            let let_node: i32 = self.literal_demands[i]
+            let want: i32 = self.literal_demands[i + 1]
+            let use_node: i32 = self.literal_demands[i + 2]
+            i = i + 3
+            if want == 0: continue
+            let bound: i32 = self.typed_binding_types.get(let_node) ?? 0
+            if bound != 0 and self.resolve_alias(want as TypeId) == self.resolve_alias(bound as TypeId): continue
+            let weak = use_node < 0
+            let prior = self.literal_body_decisions.get(let_node)
+            if prior.is_some():
+                if self.resolve_alias(prior.unwrap() as TypeId) == self.resolve_alias(want as TypeId): continue
+                // Two typed demands that disagree: the module round's error.
+                if not weak: return false
+                continue
+            // Another typed demand of the same binding in this pass that
+            // disagrees (before or after, met or not) goes to the module round.
+            var j = start
+            var contradicted = false
+            while j + 2 < self.literal_demands.len():
+                if self.literal_demands[j] == let_node and self.literal_demands[j + 2] >= 0 and self.literal_demands[j + 1] != 0 and self.resolve_alias(self.literal_demands[j + 1] as TypeId) != self.resolve_alias(want as TypeId): contradicted = true
+                j = j + 3
+            if contradicted: return false
+            self.literal_body_decisions.insert(let_node, want)
+            decided_any = true
+        if decided_any:
+            while self.literal_demands.len() > start: self.literal_demands.pop()
+        decided_any
+
     mut fn check_fn_body_with_sig_at_settled(node: i32, sig_idx: i32, decl_index: i32, demands_start: isize, diags_start: isize):
         // A decision can make a new demand (`sum: i32` then `sum = sum + i`
         // demands of `i`), so the body is checked until no undecided local is
         // demanded; each pass decides at least one, so it ends.
         var passes = 0
+        // #3099: the literal demands this body records are settled here too.
+        let literal_start = self.literal_demands.len()
         // The `it` moves are this body's: a generic instance checked inside
         // it (`map`'s std body) settles its own and leaves these alone.
         let outer_it_moves = move self.it_closure_moves
@@ -5648,6 +5688,16 @@ impl Sema:
                 self.it_closure_moves.clear()
                 self.emit_error("BUG: the implicit `it` closures of this body did not settle in 64 checks (§9.3.1)", node)
                 break
+            // #3099: a literal binding this body's uses typed (`let xs = []`,
+            // `xs.push(x)`) is decided now and the body checked again, instead
+            // of the module in a second Sema. The pass's errors go with its
+            // diagnostics: the call on the untyped binding is one of them.
+            if self.literal_demands.len() > literal_start and passes < 64 and self.settle_literal_demands_in_body(literal_start):
+                while self.int_local_demands.len() > demands_start: self.int_local_demands.pop()
+                while self.diags.items.len() > diags_start: self.diags.items.pop()
+                passes += 1
+                self.int_local_rechecking += 1
+                continue
             if self.int_local_demands.len() == demands_start: break
             // A pass with an error of its own rejects the program whatever the
             // locals' types; its diagnostics stand and it is not checked again
@@ -17679,6 +17729,25 @@ impl Sema:
     // then each of the two types as a length and its encoding (the second
     // has length 0 when there is none). A binding whose demanded type cannot
     // be carried is left out, and stays the List it is without its uses.
+    // #3099: the bindings whose literal type their uses decided, one line
+    // each, for the profile: they are what a second Sema pass is for.
+    fn literal_demand_report() -> List[str]:
+        var out = []
+        var seen = sema_new_map_i32_i32()
+        var i = 0
+        while i + 2 < self.literal_demands.len():
+            let let_node: i32 = self.literal_demands[i]
+            let want: i32 = self.literal_demands[i + 1]
+            let use_node: i32 = self.literal_demands[i + 2]
+            i = i + 3
+            if seen.contains(let_node): continue
+            seen.insert(let_node, 1)
+            let name = self.pool_resolve(self.ast.get_data0(let_node))
+            let use_line = self.node_line(if use_node < 0: -use_node else: use_node)
+            let weak = if use_node < 0: " (weak)" else: ""
+            out.push(f"{self.node_module_path_view(let_node)}:{self.node_line(let_node)} `{name}` wants {self.type_name(want)} from a use at line {use_line}{weak}")
+        out
+
     fn literal_decisions_from_demands() -> List[i32]:
         // (let, type, second type or 0, use, second use), in this check's ids.
         let found: List[i32] = []
@@ -17726,6 +17795,9 @@ impl Sema:
     // The type the uses of the binding declared at `let_node` decided, or 0.
     // Two demanded types are an error at the second use (§4.3c).
     mut fn literal_decision(let_node: i32) -> i32:
+        // #3099: decided within this body's own settle loop.
+        let in_body = self.literal_body_decisions.get(let_node)
+        if in_body.is_some(): return in_body.unwrap()
         if self.literal_decision_at.len() == 0:
             var walk: i32 = 0
             while walk + 4 < self.literal_decisions.len():
@@ -17833,7 +17905,7 @@ impl Sema:
         let use_typed = ann_extra < 0 and value != 0 and (self.ast.kind(value) == NodeKind.NK_ARRAY_LIT or self.ast.kind(value) == NodeKind.NK_ARRAY_COMPREHENSION)
         if use_typed and self.literal_watermark == 0:
             self.literal_watermark = self.type_kinds.len() as i32
-        if use_typed and self.literal_decisions.len() > 0:
+        if use_typed and (self.literal_decisions.len() > 0 or self.literal_body_decisions.len() > 0):
             let decided = self.literal_decision(node)
             if decided != 0: ann_type = decided as TypeId
         // D126: a local its integer literal typed, at the type its uses agree on.
