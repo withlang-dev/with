@@ -5939,6 +5939,14 @@ impl Sema:
         self.has_expected_type = 0
         self.expected_expr_type = 0 as TypeId
         self.current_value_expr_root = 0
+        // Nor the caller's statement position (#3077): a generic `next`
+        // demanded by a `for` statement had its tail `match` checked as a
+        // statement, so its `None` arm, undemanded, resolved to whichever
+        // enum last declared a `None` variant and the body was refused.
+        let saved_match_stmt_pos = self.match_in_stmt_pos
+        let saved_stmt_pos_depth = self.stmt_pos_depth
+        self.match_in_stmt_pos = 0
+        self.stmt_pos_depth = 0
         let saved_loop_depth = self.loop_depth
         self.loop_depth = 0
         let saved_label_registry = self.save_label_registry()
@@ -6022,6 +6030,8 @@ impl Sema:
         self.emit_unused_label_warnings()
         self.restore_label_registry(saved_label_registry)
         self.loop_depth = saved_loop_depth
+        self.match_in_stmt_pos = saved_match_stmt_pos
+        self.stmt_pos_depth = saved_stmt_pos_depth
         self.current_value_expr_root = saved_body_value_root
         self.expected_expr_type = saved_expected_et
         self.has_expected_type = saved_has_et
@@ -10948,7 +10958,7 @@ impl Sema:
             let actual = self.recorded_expr_type_or_zero(value)
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
                 if self.return_value_type_compatible(expected, actual) == false and self.record_contextual_copy_adjustment(value, expected, actual) == 0 and not self.note_int_local_arg_demand(value, expected, actual):
-                    self.emit_error(msg, node)
+                    self.emit_error(msg ++ ": the function returns `" ++ self.type_name(expected) ++ "`, this value is `" ++ self.type_name(actual) ++ "`", node)
                     return 0
             return 1
         if kind == NodeKind.NK_BLOCK:
@@ -10999,7 +11009,7 @@ impl Sema:
                     // D93: a return demands its collection of a literal's binding.
                     self.note_literal_demand(node, expected, node)
                     if self.note_int_local_arg_demand(node, self.tail_ok_payload(expected, actual), actual): return 0
-                    self.emit_error(msg, node)
+                    self.emit_error(msg ++ ": the function returns `" ++ self.type_name(expected) ++ "`, this value is `" ++ self.type_name(actual) ++ "`", node)
                     return 0
         1
 
