@@ -7,9 +7,9 @@ use CeremonyFix
 use compiler.Compilation
 use std.fs
 
-let SAMPLE = "fn main:\n    let parts = [\"a\", \"b\"]\n    let ws = [1, 2, 3]\n    var total = 0\n    for i in 0..parts.len():\n        print(parts[i])\n    for i in 0..ws.len():\n        total = total + ws[i] * i\n    for i in 0..ws.len():\n        ws[i] = ws[i] + 1\n    for i in 0..parts.len():\n        print(f\"{parts[i]} {ws[i]}\")\n    print(f\"{total}\")\n"
+let SAMPLE = "fn later(names: &List[str]):\n    for i in 0..names.len():\n        print(names[i])\n    let name = \"z\"\n    print(name)\nfn main:\n    later([\"q\"])\n    let text = \"ab\"\n    for i in 0..text.len():\n        print(text[i])\n    let modules = [1]\n    for i in 0..modules.len():\n        print(modules[i])\n    let parts = [\"a\", \"b\"]\n    let ws = [1, 2, 3]\n    var total = 0\n    for i in 0..parts.len():\n        print(parts[i])\n    for i in 0..ws.len():\n        total = total + ws[i] * i\n    for i in 0..ws.len():\n        ws[i] = ws[i] + 1\n    for i in 0..parts.len():\n        print(f\"{parts[i]} {ws[i]}\")\n    print(f\"{total}\")\n"
 
-let EXPECTED = "fn main:\n    let parts = [\"a\", \"b\"]\n    let ws = [1, 2, 3]\n    var total = 0\n    for part in parts:\n        print(part)\n    for i in 0..ws.len():\n        total = total + ws[i] * i\n    for i in 0..ws.len():\n        ws[i] = ws[i] + 1\n    for i in 0..parts.len():\n        print(f\"{parts[i]} {ws[i]}\")\n    print(f\"{total}\")\n"
+let EXPECTED = "fn later(names: &List[str]):\n    for i in 0..names.len():\n        print(names[i])\n    let name = \"z\"\n    print(name)\nfn main:\n    later([\"q\"])\n    let text = \"ab\"\n    for i in 0..text.len():\n        print(text[i])\n    let modules = [1]\n    for each_module in modules:\n        print(each_module)\n    let parts = [\"a\", \"b\"]\n    let ws = [1, 2, 3]\n    var total = 0\n    for part in parts:\n        print(part)\n    for i in 0..ws.len():\n        total = total + ws[i] * i\n    for i in 0..ws.len():\n        ws[i] = ws[i] + 1\n    for i in 0..parts.len():\n        print(f\"{parts[i]} {ws[i]}\")\n    print(f\"{total}\")\n"
 
 fn main:
     let path = "out/ceremony_fix_loops_sample.w"
@@ -19,7 +19,7 @@ fn main:
     assert(pool.decl_count() > 0 and not comp.zcu.diagnostics.has_errors())
     let edits = cf_collect(comp.zcu.last_sema, pool, [], false)
     let mine = [e for e in edits if e.path == path]
-    assert_eq(mine.len(), 2)
+    assert_eq(mine.len(), 4)
     let rewritten = cf_rewrite(SAMPLE, mine)
     assert_eq(rewritten, EXPECTED)
     assert(write_file(path, rewritten) == 0)

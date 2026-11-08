@@ -1,6 +1,7 @@
 // SemaCheck — type expression resolution, expression type checking, generic/trait resolution.
 
 use Sema
+use Token
 use Ast
 use Resolve
 use BorrowCfg
@@ -5684,6 +5685,7 @@ impl Sema:
         let saved_no_alloc_depth = self.current_no_alloc_depth
         let saved_fn_may_alloc = self.current_fn_may_alloc
         let saved_current_fn_symbol = self.current_fn_symbol
+        let saved_ceremony_elems = move self.ceremony_fn_elem_syms
         // A generic or callee-first body is checked inside its caller, but
         // its operations do not belong to the caller's lexical unsafe block.
         // The callee's own unsafe declaration/block establishes its context.
@@ -5695,6 +5697,7 @@ impl Sema:
         self.unsafe_scope_nodes = List.new()
         self.current_fn_may_alloc = 0
         self.current_fn_symbol = fn_name
+        self.ceremony_fn_elem_syms = sema_new_map_i32_i32()   // #3061: this body's chosen element names; a nested body check saves and restores them
         if self.no_alloc_fns.contains(fn_name):
             self.current_no_alloc_depth = self.current_no_alloc_depth + 1
 
@@ -6307,6 +6310,7 @@ impl Sema:
         self.current_no_alloc_depth = saved_no_alloc_depth
         self.current_fn_may_alloc = saved_fn_may_alloc
         self.current_fn_symbol = saved_current_fn_symbol
+        self.ceremony_fn_elem_syms = saved_ceremony_elems
         while self.implicit_binding_syms.len() > saved_implicit_binding_len:
             self.implicit_binding_types.pop()
             self.implicit_binding_syms.pop()
@@ -6567,6 +6571,8 @@ impl Sema:
         self.current_return_type = ret_tid as TypeId
         let fn_sym = self.lookup_method_fn(owner_key, method_sym)
         self.current_fn_symbol = fn_sym
+        let saved_ceremony_elems_tm = move self.ceremony_fn_elem_syms
+        self.ceremony_fn_elem_syms = sema_new_map_i32_i32()
         // #1827: the default body is the impl's method: its writes and calls
         // are that signature's (a dyn call and a direct one run it).
         let saved_effect_body = self.current_effect_body
@@ -6587,6 +6593,7 @@ impl Sema:
         self.generic_subst_type_ids = saved_subst_tys
         self.current_return_type = saved_ret
         self.current_fn_symbol = saved_fn_symbol
+        self.ceremony_fn_elem_syms = saved_ceremony_elems_tm
         self.expected_expr_type = saved_expected
         self.has_expected_type = saved_has_expected
         self.current_value_expr_root = saved_value_root
@@ -12511,7 +12518,7 @@ impl Sema:
                 let cr = self.resolve_alias(cast_tid)
                 if sr != cr and self.get_type_kind(sr) == TypeKind.TY_INT and self.get_type_kind(cr) == TypeKind.TY_INT and not self.int_narrowing_requires_cast(cast_tid, src_tid):
                     self.ceremony_widening_casts.insert(node, src_node)
-                    self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
+                    self.ceremony_let_paths.insert(node, self.ceremony_node_path(node))
             if src_tid != 0 and cast_tid != 0:
                 let src_resolved = self.resolve_alias(src_tid)
                 let cast_resolved = self.resolve_alias(cast_tid)
@@ -12887,6 +12894,9 @@ impl Sema:
                 // receiver). Inside the owner's own drop the consumed `self`
                 // is owned (§2.4) and the gate does not apply. POD fields
                 // "move" as plain copies and stay ungated.
+                // #3061: the vacate is a write of the base binding: it keeps its `var`.
+                let vacated_root = self.binding_decl_node(self.place_root_sym(inner))
+                if vacated_root != 0: self.ceremony_rebound_lets.insert(vacated_root, 1)
                 if fty != 0 and self.type_needs_drop(fty as i32) != 0 and self.d32_field_move_path_is_mutable(inner) == 0:
                     let d32_owner = self.drop_owner_for_field_access(inner)
                     let d32_in_own_drop = self.current_drop_type_sym != 0 and self.current_drop_type_sym == d32_owner
@@ -14115,8 +14125,8 @@ impl Sema:
 
     mut fn register_display_payload_formatters(enum_ty: i32, node: i32, depth: i32):
         let components = self.debug_fmt_components(enum_ty)
-        for ci in 0..components.len():
-            var payload = self.resolve_alias(components[ci] as TypeId) as i32
+        for component in components:
+            var payload = self.resolve_alias(component as TypeId) as i32
             while self.get_type_kind(payload as TypeId) == TypeKind.TY_REF:
                 payload = self.resolve_alias(self.get_type_d0(payload as TypeId)) as i32
             let kind = self.get_type_kind(payload as TypeId)
@@ -14387,8 +14397,8 @@ impl Sema:
                 let payload_count: i32 = self.type_extra[(pos + 1)]
                 if base != 0:
                     let payloads = self.resolve_generic_enum_payload(resolved, base, variant_sym, payload_count)
-                    for pi in 0..payloads.len():
-                        out.push(payloads[pi])
+                    for payload in payloads:
+                        out.push(payload)
                 else:
                     for pi in 0..payload_count:
                         out.push(self.type_extra[(pos + 2 + pi)])
@@ -14906,7 +14916,7 @@ impl Sema:
                         continue_ty = self.get_generic_inst_arg(branch_ret as i32, 1)
             if continue_ty == 0 or break_ty == 0:
                 continue
-            let cf_args: List[i32] = List.new()
+            let cf_args: List[i32] = []
             cf_args.push(break_ty)
             cf_args.push(continue_ty)
             let branch_result_ty = self.ensure_generic_inst_type(control_flow_sym, cf_args, 2) as i32
@@ -14921,7 +14931,7 @@ impl Sema:
                     if self.get_type_kind(branch_ret2) == TypeKind.TY_GENERIC_INST and self.get_type_d0(branch_ret2) == control_flow_sym:
                         let break_ty2 = self.get_generic_inst_arg(branch_ret2 as i32, 0)
                         let continue_ty2 = self.get_generic_inst_arg(branch_ret2 as i32, 1)
-                        let cf_args2: List[i32] = List.new()
+                        let cf_args2: List[i32] = []
                         cf_args2.push(break_ty2)
                         cf_args2.push(continue_ty2)
                         let branch_result_ty2 = self.ensure_generic_inst_type(control_flow_sym, cf_args2, 2) as i32
@@ -17728,7 +17738,7 @@ impl Sema:
         let is_mut = flags % 2
         // #3061: every local let, by the file it is in (`with fix-ceremony`
         // turns a `var` never rebound into a `let`).
-        self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
+        self.ceremony_let_paths.insert(node, self.ceremony_node_path(node))
         if value != 0:
             var labeled_value = value
             if self.ast.kind(value) == NodeKind.NK_LABEL:
@@ -17756,7 +17766,13 @@ impl Sema:
                 ann_type = self.resolve_type_expr(ann_type_node)
                 // #3061: `with fix-ceremony` asks whether the annotation
                 // restates the initializer's type.
-                if value != 0 and ann_type != 0:
+                // A `&T` annotation on a `T` that takes its value on binding (a
+                // `str`, an integer) is not a restatement: without it the binding
+                // copies the value (the contextual copy below); with it the
+                // binding stays a view. It stays.
+                let ann_r = self.resolve_alias(ann_type)
+                let ann_keeps_view = self.get_type_kind(ann_r) == TypeKind.TY_REF and self.get_type_d1(ann_r) == 0 and self.type_takes_value_on_binding(self.get_type_d0(ann_r)) and not self.type_carries_view(self.get_type_d0(ann_r))
+                if value != 0 and ann_type != 0 and not ann_keeps_view:
                     self.ceremony_let_annotations.insert(node, ann_type as i32)
                     self.ceremony_let_values.insert(node, value)
                     self.ceremony_let_type_nodes.insert(node, ann_type_node)
@@ -19746,16 +19762,16 @@ impl Sema:
         // tie in its place: refused, never a silent miss.
         if self.ret_global_origin_heads.len() > 0 or self.declared_from_starts.len() > 0:
             let globals = self.sig_ret_global_origins(sig_idx)
-            for gi in 0..globals.len():
-                if self.is_ret_origin_placeholder(globals[gi]):
-                    concrete_deps = self.push_unique_i32(concrete_deps, globals[gi])
+            for each_global in globals:
+                if self.is_ret_origin_placeholder(each_global):
+                    concrete_deps = self.push_unique_i32(concrete_deps, each_global)
                     continue
-                if not self.names_global_place(globals[gi]):
-                    let gname: str = with_str_clone_ref(self.pool_resolve(globals[gi]))
-                    let callee_name: str = with_str_clone_ref(self.pool_resolve(self.sig_names[sig_idx]))
+                if not self.names_global_place(each_global):
+                    let gname = with_str_clone_ref(self.pool_resolve(each_global))
+                    let callee_name = with_str_clone_ref(self.pool_resolve(self.sig_names[sig_idx]))
                     self.emit_error_with_help(f"the view `{callee_name}` returns views the global `{gname}`, which a local binding shadows here: the call's result cannot be tied to the global (§21.1 rule 6)", call_node, f"rename the local `{gname}`")
                     continue
-                concrete_deps = self.push_unique_i32(concrete_deps, globals[gi])
+                concrete_deps = self.push_unique_i32(concrete_deps, each_global)
         // A set read before the callee's body is done is completed later:
         // the result also views the callee's placeholder.
         if self.current_fn_sig_idx >= 0 and self.sig_from_clause_node(sig_idx) == 0 and self.ret_view_read_early(sig_idx):
@@ -20559,7 +20575,8 @@ impl Sema:
             self.resolved_call_mono_syms.remove(key_node)
 
     // #3061: the list a `0..xs.len()` range counts over, when `xs` is a plain
-    // name and the range exclusive (its ident node), else 0.
+    // name of a List, array or slice type and the range exclusive (its ident
+    // node), else 0. A `str` has no element loop.
     fn ceremony_index_loop_base(iterable: i32) -> i32:
         if iterable == 0 or self.ast.kind(iterable) != NodeKind.NK_RANGE or self.ast.get_data2(iterable) != 0: return 0
         let start = self.ast.get_data0(iterable)
@@ -20570,8 +20587,11 @@ impl Sema:
         if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS or self.pool_resolve(self.ast.get_data1(callee)) != "len": return 0
         let base = self.ast.get_data0(callee)
         if self.ast.kind(base) != NodeKind.NK_IDENT: return 0
-        base
-
+        let base_ty = self.resolve_alias((self.typed_expr_types.get(base) ?? 0) as TypeId)
+        let through = if self.get_type_kind(base_ty) == TypeKind.TY_REF: self.resolve_alias(self.get_type_d0(base_ty) as TypeId) else: base_ty
+        let tk = self.get_type_kind(through)
+        let is_list = tk == TypeKind.TY_GENERIC_INST and self.std_generic_of(through as i32) == StdGeneric.List
+        if is_list or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE: base else: 0
     // A use of an active index loop's counter: every use counts; one that is
     // the index of the loop's own list (`xs[i]`, not written through) counts
     // as conforming. The loop rewrites when the two counts agree.
@@ -20723,16 +20743,29 @@ impl Sema:
         if self.current_drop_type_sym != 0:
             self.drop_control_flow_depth = self.drop_control_flow_depth + 1
         // #3061: `for i in 0..xs.len():` over a plain list name — the uses of `i`
-        // in the body decide whether the loop iterates the list instead.
+        // in the body decide whether the loop iterates the list instead. The
+        // element's name is chosen here, where the scope is known: the list's
+        // singular, `each_` in front when that is a keyword or `it`, and only
+        // when nothing visible already has the name.
         let index_loop_base = self.ceremony_index_loop_base(iterable)
         if index_loop_base != 0 and binding != 0 and not self.ast.for_binding_is_pattern(node):
-            self.ceremony_active_index_loops.insert(binding, node)
-            self.ceremony_index_loop_bases.insert(node, index_loop_base)
-            self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
+            let elem_sym = self.pool_intern(ceremony_element_name(self.pool_resolve(self.ast.get_data0(index_loop_base))))
+            let elem_free = self.scope_lookup(elem_sym) < 0 and not self.ceremony_fn_elem_syms.contains(elem_sym) and self.get_sig(elem_sym) < 0 and not self.has_named_type_visible(elem_sym) and self.global_value_decl_kind(elem_sym) == 0 and not self.variant_lookup.contains(elem_sym)
+            if elem_free:
+                self.ceremony_active_index_loops.insert(binding, node)
+                self.ceremony_active_elem_syms.insert(elem_sym, node)
+                self.ceremony_index_loop_bases.insert(node, index_loop_base)
+                self.ceremony_loop_elem_syms.insert(node, elem_sym)
+                self.ceremony_fn_elem_syms.insert(elem_sym, node)
+                self.ceremony_active_base_syms.insert(self.ast.get_data0(index_loop_base), node)
+                self.ceremony_let_paths.insert(node, self.ceremony_node_path(node))
         self.push_live_loop(body, for_live_depth)
         let for_body_type = self.check_expr_statement_context(body)
         if range_literal and binding != 0 and not self.ast.for_binding_is_pattern(node): self.int_local_for_decls.remove(binding)
-        if binding != 0: self.ceremony_active_index_loops.remove(binding)
+        if binding != 0 and self.ceremony_active_index_loops.contains(binding):
+            self.ceremony_active_index_loops.remove(binding)
+            self.ceremony_active_elem_syms.remove(self.ceremony_loop_elem_syms.get(node).unwrap())
+            self.ceremony_active_base_syms.remove(self.ast.get_data0(self.ceremony_index_loop_bases.get(node).unwrap()))
         self.unregister_iter_literal_bindings(binding, self.ast.for_binding_is_pattern(node))
         self.pop_live_loop()
         self.drop_control_flow_depth = saved_drop_cf_for
@@ -21904,8 +21937,8 @@ impl Sema:
         self.autoderef_step_counts.insert(expr, step_fns.len() as i32)
 
 fn sema_autoderef_seen_type(types: &List[i32], ty: i32) -> bool:
-    for i in 0..types.len():
-        if types[i] == ty:
+    for each_type in types:
+        if each_type == ty:
             return true
     false
 
@@ -23503,8 +23536,8 @@ impl Sema:
                             if cf_name == 0:
                                 continue
                             var cf_dup = false
-                            for sfi in 0..seen_lit_fields.len():
-                                if seen_lit_fields[sfi] == cf_name:
+                            for seen_lit_field in seen_lit_fields:
+                                if seen_lit_field == cf_name:
                                     cf_dup = true
                                     break
                             if cf_dup:
@@ -24844,7 +24877,7 @@ impl Sema:
         if target_err_ty == 0:
             self.emit_error("tuple await? requires the enclosing function to return Result", question_node)
             return 0
-        let payloads: List[i32] = List.new()
+        let payloads: List[i32] = []
         for ei in 0..elem_count:
             let elem_ty: i32 = self.type_extra[(elem_start + ei)]
             let payload_ty = self.try_unwrapped_type(elem_ty)
@@ -25442,6 +25475,17 @@ impl Sema:
                 if self.get_type_kind(base_tid as TypeId) == TypeKind.TY_ENUM:
                     if self.enum_has_variant(base_tid, variant_name) != 0:
                         return expected as i32
+            // D103 / #3062: under an `Option[E]` demand a shorthand that is not
+            // Option's own (`Some`, `None`) names E's variant; the demand wraps it
+            // (value_to_option_at_demand). E's variants need not be in this
+            // module's lookup: the demand carries the enum.
+            if gi_base == self.syms.option and variant_name != self.syms.some and variant_name != self.syms.none:
+                let payload = self.resolve_alias(self.get_generic_inst_arg(expected as i32, 0) as TypeId)
+                let payload_kind = self.get_type_kind(payload)
+                if payload_kind == TypeKind.TY_ENUM and self.enum_has_variant(payload as i32, variant_name) != 0: return payload as i32
+                if payload_kind == TypeKind.TY_GENERIC_INST:
+                    let payload_base = self.lookup_named_type_visible(self.get_type_d0(payload))
+                    if payload_base != 0 and self.get_type_kind(payload_base as TypeId) == TypeKind.TY_ENUM and self.enum_has_variant(payload_base, variant_name) != 0: return payload as i32
         0
 
     // The expected type's instance of `enum_tid` for `Enum.Variant`: only an
@@ -25828,7 +25872,7 @@ impl Sema:
                 return
             // Recursively check each payload pattern (extra stores pattern nodes).
             // For TypeKind.TY_GENERIC_INST, re-resolve payload types from AST with substitution.
-            var gi_payload_types: List[i32] = List.new()
+            var gi_payload_types: List[i32] = []
             if resolved_kind == TypeKind.TY_GENERIC_INST and payload_count > 0:
                 let gi_base = self.get_generic_inst_base(resolved)
                 gi_payload_types = self.resolve_generic_enum_payload(resolved, gi_base, v_name, payload_count)
@@ -30046,6 +30090,17 @@ impl Sema:
             self.emit_error("value is not callable", callee)
         0
 
+    // §3.8 auto-references a place: a temporary (`&List.new()`, `&f()`) keeps its `&`.
+    // The file a node is in: the module context can be another module's while a
+    // callee's body is checked from a caller's (`update_fn_source_context`).
+    fn ceremony_node_path(node: i32) -> str:
+        let own = self.node_module_path_view(node)
+        if own.len() > 0: own else: with_str_clone_ref(self.current_module_path)
+
+    fn ceremony_ref_operand_is_place(node: i32) -> bool:
+        let k = self.ast.kind(node)
+        k == NodeKind.NK_IDENT or k == NodeKind.NK_FIELD_ACCESS or k == NodeKind.NK_INDEX
+
     mut fn store_resolved_call_args(call_node: i32, args: &List[i32]):
         let start = self.call_resolved_args_data.len() as i32
         let count = args.len() as i32
@@ -30070,9 +30125,9 @@ impl Sema:
         let is_default = self.resolved_call_arg_is_default(call_node, arg_index)
         // Ceremony census: an explicit `&x` at a `&T` parameter, which
         // auto-references a plain `x` (§3.8).
-        if not is_default and expected_ty != 0 and self.ast.kind(arg_node) == NodeKind.NK_UNARY and self.ast.get_data0(arg_node) == UnaryOp.UOP_REF and self.get_type_kind(self.resolve_alias(expected_ty as TypeId)) == TypeKind.TY_REF:
+        if not is_default and expected_ty != 0 and self.ast.kind(arg_node) == NodeKind.NK_UNARY and self.ast.get_data0(arg_node) == UnaryOp.UOP_REF and self.get_type_kind(self.resolve_alias(expected_ty as TypeId)) == TypeKind.TY_REF and self.ceremony_ref_operand_is_place(self.ast.get_data1(arg_node)):
             self.ceremony_sites.insert(arg_node, 2)
-            self.ceremony_let_paths.insert(arg_node, with_str_clone_ref(self.current_module_path))
+            self.ceremony_let_paths.insert(arg_node, self.ceremony_node_path(arg_node))
         if not is_default:
             let arg_ty = if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
                 else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
@@ -30369,7 +30424,7 @@ impl Sema:
             return
         if self.types_compatible(self.get_generic_inst_arg(expected_option, 0) as TypeId, arg_ty as TypeId):
             self.ceremony_sites.insert(node, 3)
-            self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
+            self.ceremony_let_paths.insert(node, self.ceremony_node_path(node))
 
     mut fn value_to_option_at_demand(node: i32, expected: TypeId, actual: TypeId) -> TypeId:
         if node == 0 or expected == 0 or actual == 0 or self.ast.kind(node) == NodeKind.NK_NULL_LIT:
@@ -36841,7 +36896,7 @@ impl Sema:
             let recv = self.recorded_expr_type_or_zero(expr)
             if recv != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId))) == TypeKind.TY_STR:
                 self.ceremony_sites.insert(node, 1)
-                self.ceremony_let_paths.insert(node, with_str_clone_ref(self.current_module_path))
+                self.ceremony_let_paths.insert(node, self.ceremony_node_path(node))
         result
 
     mut fn check_method_call_parts_body(expr0: i32, field0: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty0: i32) -> i32:
@@ -37755,7 +37810,7 @@ impl Sema:
                     mc_static_variant_ty = inferred_variant_ty
             let payload_tys = if mc_static_variant_ty != mc_static_variant_result_ty: self.enum_variant_payload_types(mc_static_variant_ty, field) else: mc_static_variant_payload_tys
             let expected = payload_tys.len()
-            let static_payload_nodes: List[i32] = List.new()
+            let static_payload_nodes: List[i32] = []
             if mc_resolved_arg_count != expected:
                 let owner_name = self.type_name(obj_type)
                 let variant_name = self.pool_resolve(field)
@@ -40121,6 +40176,11 @@ impl Sema:
             self.diags.emit(kept.pop().unwrap())
 
     mut fn check_mutation_against_views(place_node: i32, err_node: i32):
+        // #3061: a write to an index loop's list inside its body (`xs.push`,
+        // `xs[j] = …`) keeps the loop indexed: an element loop could not mutate it.
+        if self.ceremony_active_base_syms.len() > 0:
+            let written_root = self.place_root_sym(place_node)
+            if self.ceremony_active_base_syms.contains(written_root): self.ceremony_loop_written.insert(self.ceremony_active_base_syms.get(written_root).unwrap(), 1)
         let place = self.borrow_root_place(place_node)
         if place == 0:
             return
@@ -43046,3 +43106,12 @@ impl Sema:
             if bound == 0 or self.resolve_alias(want as TypeId) != self.resolve_alias(bound as TypeId):
                 return true
         false
+
+// #3061 (with fix-ceremony): the element's name for a list's — the singular
+// when the name is a plural (`parts` → `part`, `xs` → `x`), else the name
+// with `_item`; `each_` in front when that is a keyword or the reserved `it`.
+// Sema chooses it where the scope is known; the rewriter reads it.
+pub fn ceremony_element_name(list_name: &str) -> str:
+    let singular = if list_name.len() > 1 and list_name.ends_with("s") and not list_name.ends_with("ss"): list_name.slice(0, list_name.len() - 1) ++ "" else: list_name ++ "_item"
+    if singular == "it" or tag_from_keyword(singular) != -1: "each_" ++ singular else: singular
+

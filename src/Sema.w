@@ -1246,6 +1246,10 @@ type Sema {
     ceremony_loop_index_uses: HashMap[i32, i32],
     ceremony_loop_index_nodes: HashMap[i32, i32],  // index node → its loop
     ceremony_loop_written: HashMap[i32, i32],
+    ceremony_loop_elem_syms: HashMap[i32, i32],     // loop → the element name Sema chose
+    ceremony_active_elem_syms: HashMap[i32, i32],   // that name → the loop, while its body is checked
+    ceremony_fn_elem_syms: HashMap[i32, i32],       // every element name chosen in the function being checked → its loop
+    ceremony_active_base_syms: HashMap[i32, i32],   // an active index loop's list (sym) → the loop; a mutation of it keeps the loop
     suspending_fns: HashMap[i32, i32],          // @[suspends] declarations (#3052): calling one may suspend the current fiber
     builtin_suspending_methods: HashMap[i64, i32], // … and the compiler-declared ones (Sender.send, Receiver.recv, Task.join_cleanup), keyed sema_pair_key(owner, method)
     result_option_fns: HashMap[i32, i32],
@@ -3500,7 +3504,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let ceremony_let_annotations = sema_new_map_i32_i32()
     let ceremony_let_values = sema_new_map_i32_i32()
     let ceremony_let_type_nodes = sema_new_map_i32_i32()
-    let ceremony_let_paths: HashMap[i32, str] = HashMap.new()
+    let ceremony_let_paths: HashMap[i32, str] = [:]
     let ceremony_rebound_lets = sema_new_map_i32_i32()
     let ceremony_widening_casts = sema_new_map_i32_i32()
     let ceremony_list_news = sema_new_map_i32_i32()
@@ -3510,6 +3514,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let ceremony_loop_index_uses = sema_new_map_i32_i32()
     let ceremony_loop_index_nodes = sema_new_map_i32_i32()
     let ceremony_loop_written = sema_new_map_i32_i32()
+    let ceremony_loop_elem_syms = sema_new_map_i32_i32()
+    let ceremony_active_elem_syms = sema_new_map_i32_i32()
+    let ceremony_fn_elem_syms = sema_new_map_i32_i32()
+    let ceremony_active_base_syms = sema_new_map_i32_i32()
     let suspending_fns = sema_new_map_i32_i32()
     let builtin_suspending_methods: HashMap[i64, i32] = HashMap.new()
     let result_option_fns = sema_new_map_i32_i32()
@@ -3585,8 +3593,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let generic_inst_cache: Memo[i64, i32] = Memo.new()
     let generic_enum_payload_cache_starts = sema_new_map_i64_i32()
     let generic_enum_payload_cache_counts = sema_new_map_i64_i32()
-    let generic_enum_payload_cache_values: List[i32] = List.new()
-    var s = Sema {
+    let generic_enum_payload_cache_values: List[i32] = []
+    let s = Sema {
         pool: pool.clone(),
         diags: diags,
         ast: ast.clone(),
@@ -3823,6 +3831,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         ceremony_loop_index_uses,
         ceremony_loop_index_nodes,
         ceremony_loop_written,
+        ceremony_loop_elem_syms,
+        ceremony_active_elem_syms,
+        ceremony_fn_elem_syms,
+        ceremony_active_base_syms,
         suspending_fns,
         builtin_suspending_methods,
         result_option_fns,
@@ -5947,7 +5959,7 @@ impl Sema:
         var i = self.trait_candidate_head(trait_sym)
         if i < 0:
             if self.trait_lookup.contains(trait_sym): return self.trait_lookup.get(trait_sym).unwrap() else: return -1
-        let impl_path: str = self.node_module_path_view(impl_node)
+        let impl_path = self.node_module_path_view(impl_node)
         var j = i
         while j >= 0:
             if self.trait_candidate_paths[j] == impl_path:
@@ -8235,6 +8247,10 @@ impl Sema:
         self.bind_is_scoped_task.push(false)
         self.bind_is_view_bound.push(0)
         self.bind_provenance.push(binding_provenance_empty())
+        // #3061: a binding that takes a name an index loop chose for its
+        // element — in the loop's body or later in the function (no-shadowing
+        // holds across sibling scopes) — keeps that loop as it is.
+        if self.ceremony_fn_elem_syms.contains(sym): self.ceremony_loop_written.insert(self.ceremony_fn_elem_syms.get(sym).unwrap(), 1)
         self.scope_name_map.insert(sym, idx)
         idx
 
