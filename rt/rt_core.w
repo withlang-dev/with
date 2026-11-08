@@ -969,6 +969,8 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
         let lmid = (llo + lhi) / 2
         let lstart = rt_range_start(rt_large_range_base, lmid)
         if lstart == header:
+            // A cached block (#3103) is recorded but freed: its size word is 0.
+            if unsafe *(header as *const i64) <= 0: return 0
             return if payload < rt_range_end(rt_large_range_base, rt_large_range_cap, lmid): 1 else: 0
         if lstart < header:
             llo = lmid + 1
@@ -1012,6 +1014,67 @@ var alloc_no_reuse_state: i32 = 0   // DIAGNOSTIC (#617): 0=unread,1=off,2=on
 // re-handed block (any reuse-dependent corruption vanishes = signal) and a double-free
 // hits the invalid-free check deterministically. Non-allocating rt_getenv + cached.
 // (Large allocs already rt_munmap on free, so they fault on UAF today.)
+// ── Large-block cache (#3103) ───────────────────────────────────────
+//
+// A large allocation (payload over RT_LARGE_THRESHOLD) is its own mapping.
+// Mapping and unmapping one per List buffer, and recording and forgetting
+// its range in the sorted table (a shift each), was a fifth of
+// `check src/main.w`. A large block up to RT_LARGE_CACHE_MAX is mapped at
+// the power of two that holds it and, when freed, kept on a per-class list
+// (at most RT_LARGE_CACHE_PER_CLASS blocks a class, RT_LARGE_CACHE_BYTES in
+// all) for the next allocation of its class; a cached block stays mapped
+// and recorded, with its size word 0 (so it is not an owned payload) and
+// the next block in its second header word. WITH_ALLOC_NO_REUSE bypasses
+// the cache, as it does the small freelists.
+let RT_LARGE_CACHE_MIN_SHIFT: u32 = 13           // 8 KiB mappings
+let RT_LARGE_CACHE_MAX_SHIFT: u32 = 21           // 2 MiB
+let RT_LARGE_CACHE_MAX: i64 = 1 << 21
+let RT_LARGE_CACHE_PER_CLASS: i64 = 32
+let RT_LARGE_CACHE_BYTES: i64 = 96 * 1024 * 1024
+var rt_large_cache_heads: [9]i64 = [0 as i64; 9]
+var rt_large_cache_counts: [9]i64 = [0 as i64; 9]
+var rt_large_cache_bytes: i64 = 0
+
+// The mapping that holds `total` bytes: the power of two from 8 KiB up to
+// RT_LARGE_CACHE_MAX, or `total` itself above that (never cached).
+fn large_map_size(total: i64) -> i64:
+    if total > RT_LARGE_CACHE_MAX: return total
+    var m: i64 = 1 << RT_LARGE_CACHE_MIN_SHIFT
+    while m < total: m = m * 2
+    m
+
+fn large_cache_class(map_size: i64) -> i64:
+    var shift: u32 = RT_LARGE_CACHE_MIN_SHIFT
+    var m: i64 = 1 << RT_LARGE_CACHE_MIN_SHIFT
+    while m < map_size:
+        m = m * 2
+        shift = shift + 1
+    (shift - RT_LARGE_CACHE_MIN_SHIFT) as i64
+
+// A cached block of the class that holds `total`, or 0.
+fn large_cache_take(total: i64) -> i64:
+    if total > RT_LARGE_CACHE_MAX or alloc_no_reuse_on() != 0: return 0
+    let cls = large_cache_class(large_map_size(total))
+    let block = rt_large_cache_heads[cls]
+    if block == 0: return 0
+    rt_large_cache_heads[cls] = unsafe *((block + 8) as *const i64)
+    rt_large_cache_counts[cls] = rt_large_cache_counts[cls] - 1
+    rt_large_cache_bytes = rt_large_cache_bytes - large_map_size(total)
+    unsafe *((block + 8) as *mut i64) = 0
+    block
+
+// Whether the freed block was kept for reuse (else the caller unmaps it).
+fn large_cache_keep(block: i64, map_size: i64) -> bool:
+    if map_size > RT_LARGE_CACHE_MAX or alloc_no_reuse_on() != 0: return false
+    let cls = large_cache_class(map_size)
+    if rt_large_cache_counts[cls] >= RT_LARGE_CACHE_PER_CLASS or rt_large_cache_bytes + map_size > RT_LARGE_CACHE_BYTES: return false
+    unsafe *(block as *mut i64) = 0
+    unsafe *((block + 8) as *mut i64) = rt_large_cache_heads[cls]
+    rt_large_cache_heads[cls] = block
+    rt_large_cache_counts[cls] = rt_large_cache_counts[cls] + 1
+    rt_large_cache_bytes = rt_large_cache_bytes + map_size
+    true
+
 fn alloc_no_reuse_on() -> i32:
     if alloc_no_reuse_state == 0:
         let v = rt_getenv(c"WITH_ALLOC_NO_REUSE".ptr)
@@ -1839,16 +1902,23 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         return payload
 
     if size > RT_LARGE_THRESHOLD:
-        // Large allocation: direct rt_mmap with 16-byte header storing size
+        // Large allocation: its own mapping, a 16-byte header holding the
+        // payload size. A cached block of its class is reused (#3103): it is
+        // still mapped and recorded, and its payload is zeroed here.
         let total = size + RT_ALLOC_HEADER_SIZE
-        rt_alloc_reserve_mmap_bytes(total)
-        let p = rt_mmap(total)
+        let cached = large_cache_take(total)
+        if cached != 0:
+            unsafe *(cached as *mut i64) = size
+            rt_zero_aligned(cached + RT_ALLOC_HEADER_SIZE, size)
+            return (cached + RT_ALLOC_HEADER_SIZE) as *mut u8
+        let map_size = large_map_size(total)
+        rt_alloc_reserve_mmap_bytes(map_size)
+        let p = rt_mmap(map_size)
         if p as i64 == 0:
-            rt_alloc_release_mmap_bytes(total)
-            rt_alloc_report_out_of_memory(total)
-        // Store allocation size in header
+            rt_alloc_release_mmap_bytes(map_size)
+            rt_alloc_report_out_of_memory(map_size)
         unsafe *(p as *mut i64) = size
-        rt_record_large_range(p as i64, total)
+        rt_record_large_range(p as i64, map_size)
         return (p as i64 + RT_ALLOC_HEADER_SIZE) as *mut u8
 
     // Small allocation: check freelist keyed by payload size class.
@@ -2001,10 +2071,11 @@ fn rt_free_unlocked_with_drop_origin(ptr_arg: *mut u8, drop_origin_ptr: i64, dro
         rt_libc_free(block as *mut u8)
         return
     if size > RT_LARGE_THRESHOLD:
-        let total = size + RT_ALLOC_HEADER_SIZE
+        let map_size = large_map_size(size + RT_ALLOC_HEADER_SIZE)
+        if large_cache_keep(block, map_size): return
         rt_forget_large_range(block)
-        rt_munmap(block as *mut u8, total)
-        rt_alloc_release_mmap_bytes(total)
+        rt_munmap(block as *mut u8, map_size)
+        rt_alloc_release_mmap_bytes(map_size)
         return
     let idx = size_class_index(size)
     free_small_block(block, idx)
@@ -2106,6 +2177,16 @@ fn rt_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
         let old_idx = size_class_index(stored_old_size)
         let new_idx = size_class_index(new_aligned)
         if old_idx == new_idx:
+            return ptr
+    // A large block that grows within its mapping (#3103) grows in place:
+    // the mapping already holds the new size, so the header takes it and
+    // the new bytes are zeroed as a fresh allocation's would be.
+    if stored_old_size > RT_LARGE_THRESHOLD and new_aligned > RT_LARGE_THRESHOLD and alloc_system_on() == 0 and dbg_on() == 0:
+        let old_map = large_map_size(stored_old_size + RT_ALLOC_HEADER_SIZE)
+        if old_map <= RT_LARGE_CACHE_MAX and large_map_size(new_aligned + RT_ALLOC_HEADER_SIZE) == old_map:
+            if new_aligned > stored_old_size:
+                rt_zero_aligned(ptr as i64 + stored_old_size, new_aligned - stored_old_size)
+            unsafe *(alloc_header_ptr(ptr as *const u8) as *mut i64) = new_aligned
             return ptr
 
     let new_ptr = rt_alloc(new_size)
