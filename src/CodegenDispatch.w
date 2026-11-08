@@ -16,6 +16,7 @@ use CodegenVector
 use TypeLayout
 use std.string.StringBuilder
 use rt.rt_core
+use std.collections.Minted
 
 
 // ── gen_function_dispatch: MIR-first, AST fallback for unsupported patterns ──
@@ -15955,17 +15956,17 @@ impl Codegen:
             self.current_ret_type = fn_direct_ret_ty
         self.current_method_owner_sym = 0
 
-        let fresh_local_allocas: HashMap[i32, i64] = [:]
-        let fresh_local_types: HashMap[i32, i64] = [:]
-        let fresh_local_muts: HashMap[i32, i32] = [:]
-        let fresh_local_pointee_structs: HashMap[i32, i32] = [:]
-        let fresh_local_sema_types: HashMap[i32, i32] = [:]
-        let fresh_task_locals: HashMap[i32, i32] = [:]
+        let fresh_local_allocas: HashMap[i32, i64, Minted] = [:]
+        let fresh_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_local_muts: HashMap[i32, i32, Minted] = [:]
+        let fresh_local_pointee_structs: HashMap[i32, i32, Minted] = [:]
+        let fresh_local_sema_types: HashMap[i32, i32, Minted] = [:]
+        let fresh_task_locals: HashMap[i32, i32, Minted] = [:]
         let fresh_defer_stack: List[i32] = []
         let fresh_errdefer_stack: List[i32] = []
-        let fresh_trait_locals: HashMap[i32, i32] = [:]
-        let fresh_trait_local_concrete_types: HashMap[i32, i32] = [:]
-        let fresh_enum_local_types: HashMap[i32, i32] = [:]
+        let fresh_trait_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_trait_local_concrete_types: HashMap[i32, i32, Minted] = [:]
+        let fresh_enum_local_types: HashMap[i32, i32, Minted] = [:]
         self.local_allocas = fresh_local_allocas
         self.local_types = fresh_local_types
         self.local_muts = fresh_local_muts
@@ -15994,12 +15995,12 @@ impl Codegen:
         self.tailrec_body_bb = 0
         self.tailrec_fn_sym = 0
 
-        let fresh_mir_locals: HashMap[i32, i64] = [:]
-        let fresh_mir_values: HashMap[i32, i64] = [:]
-        let fresh_mir_memory_locals: HashMap[i32, i32] = [:]
-        let fresh_mir_local_types: HashMap[i32, i64] = [:]
-        let fresh_mir_indirect_value_local_types: HashMap[i32, i64] = [:]
-        let fresh_mir_ref_capture_local_types: HashMap[i32, i64] = [:]
+        let fresh_mir_locals: HashMap[i32, i64, Minted] = [:]
+        let fresh_mir_values: HashMap[i32, i64, Minted] = [:]
+        let fresh_mir_memory_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_mir_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_mir_indirect_value_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_mir_ref_capture_local_types: HashMap[i32, i64, Minted] = [:]
         let fresh_mir_bbs: List[i64] = []
         let fresh_mir_default_unreachable_bbs: List[i64] = []
         self.mir_local_ptrs = fresh_mir_locals
@@ -16398,17 +16399,17 @@ impl Codegen:
             self.current_ret_type = fn_direct_ret_ty
         self.current_method_owner_sym = saved_owner
 
-        let fresh_local_allocas: HashMap[i32, i64] = [:]
-        let fresh_local_types: HashMap[i32, i64] = [:]
-        let fresh_local_muts: HashMap[i32, i32] = [:]
-        let fresh_local_pointee_structs: HashMap[i32, i32] = [:]
-        let fresh_local_sema_types: HashMap[i32, i32] = [:]
-        let fresh_task_locals: HashMap[i32, i32] = [:]
+        let fresh_local_allocas: HashMap[i32, i64, Minted] = [:]
+        let fresh_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_local_muts: HashMap[i32, i32, Minted] = [:]
+        let fresh_local_pointee_structs: HashMap[i32, i32, Minted] = [:]
+        let fresh_local_sema_types: HashMap[i32, i32, Minted] = [:]
+        let fresh_task_locals: HashMap[i32, i32, Minted] = [:]
         let fresh_defer_stack: List[i32] = []
         let fresh_errdefer_stack: List[i32] = []
-        let fresh_trait_locals: HashMap[i32, i32] = [:]
-        let fresh_trait_local_concrete_types: HashMap[i32, i32] = [:]
-        let fresh_enum_local_types: HashMap[i32, i32] = [:]
+        let fresh_trait_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_trait_local_concrete_types: HashMap[i32, i32, Minted] = [:]
+        let fresh_enum_local_types: HashMap[i32, i32, Minted] = [:]
         let fresh_scope_syms: List[i32] = []
         let fresh_scope_allocas: List[i64] = []
         let fresh_scope_types: List[i64] = []
@@ -16446,12 +16447,12 @@ impl Codegen:
         let saved_mir_ref_capture_local_types = move self.mir_ref_capture_local_types
         let saved_mir_bbs = move self.mir_bb_values
         let saved_mir_default_unreachable_bbs = move self.mir_default_unreachable_bbs
-        let fresh_mir_locals: HashMap[i32, i64] = [:]
-        let fresh_mir_values: HashMap[i32, i64] = [:]
-        let fresh_mir_memory_locals: HashMap[i32, i32] = [:]
-        let fresh_mir_local_types: HashMap[i32, i64] = [:]
-        let fresh_mir_indirect_value_local_types: HashMap[i32, i64] = [:]
-        let fresh_mir_ref_capture_local_types: HashMap[i32, i64] = [:]
+        let fresh_mir_locals: HashMap[i32, i64, Minted] = [:]
+        let fresh_mir_values: HashMap[i32, i64, Minted] = [:]
+        let fresh_mir_memory_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_mir_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_mir_indirect_value_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_mir_ref_capture_local_types: HashMap[i32, i64, Minted] = [:]
         let fresh_mir_bbs: List[i64] = []
         let fresh_mir_default_unreachable_bbs: List[i64] = []
         self.mir_local_ptrs = fresh_mir_locals
@@ -17552,9 +17553,9 @@ impl Codegen:
         let saved_types = move self.local_types
         let saved_muts = move self.local_muts
         let saved_loops = self.capture_loop_state()
-        let fresh_closure_locals: HashMap[i32, i64] = [:]
-        let fresh_closure_types: HashMap[i32, i64] = [:]
-        let fresh_closure_muts: HashMap[i32, i32] = [:]
+        let fresh_closure_locals: HashMap[i32, i64, Minted] = [:]
+        let fresh_closure_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_closure_muts: HashMap[i32, i32, Minted] = [:]
         self.local_allocas = fresh_closure_locals
         self.local_types = fresh_closure_types
         self.local_muts = fresh_closure_muts
@@ -17667,12 +17668,12 @@ impl Codegen:
         let saved_mir_ref_capture_local_types = move self.mir_ref_capture_local_types
         let saved_mir_bbs = move self.mir_bb_values
         let saved_mir_unreachable = move self.mir_default_unreachable_bbs
-        let fresh_cl_mir_locals: HashMap[i32, i64] = [:]
-        let fresh_cl_mir_values: HashMap[i32, i64] = [:]
-        let fresh_cl_mir_memory_locals: HashMap[i32, i32] = [:]
-        let fresh_cl_mir_local_types: HashMap[i32, i64] = [:]
-        let fresh_cl_mir_indirect_value_local_types: HashMap[i32, i64] = [:]
-        let fresh_cl_mir_ref_capture_local_types: HashMap[i32, i64] = [:]
+        let fresh_cl_mir_locals: HashMap[i32, i64, Minted] = [:]
+        let fresh_cl_mir_values: HashMap[i32, i64, Minted] = [:]
+        let fresh_cl_mir_memory_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_cl_mir_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_cl_mir_indirect_value_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_cl_mir_ref_capture_local_types: HashMap[i32, i64, Minted] = [:]
         let fresh_cl_mir_bbs: List[i64] = []
         let fresh_cl_mir_unreachable: List[i64] = []
         self.mir_local_ptrs = fresh_cl_mir_locals

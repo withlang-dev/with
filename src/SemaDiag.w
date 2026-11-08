@@ -11,6 +11,7 @@ use SemaTypes
 use SemaVector
 use compiler.FacadeRender
 use rt.rt_core
+use std.collections.Minted
 
 
 // Split a structured omission record "location|category|reason" into fields.
@@ -254,7 +255,7 @@ impl Sema:
     // `with check --ceremony-census`: one line per recorded ceremony site,
     // `pattern<TAB>path<TAB>line<TAB>start<TAB>end`, in the order Sema met them.
     fn ceremony_census_text() -> str:
-        let paths: HashMap[i32, str] = [:]
+        let paths: HashMap[i32, str, Minted] = [:]
         for di in 0..self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]
             if not paths.contains(file_id) and di < self.decl_source_paths.len():
@@ -523,7 +524,7 @@ impl Sema:
     // The adjustments in the program's own sources, without the embedded
     // stdlib's: what a fixture pins, unmoved by an edit to std.
     fn contextual_copy_adjustments_outside_std() -> isize:
-        let paths: HashMap[i32, str] = [:]
+        let paths: HashMap[i32, str, Minted] = [:]
         for di in 0..self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]
             if not paths.contains(file_id) and di < self.decl_source_paths.len():

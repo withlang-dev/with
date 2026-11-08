@@ -26,6 +26,7 @@ use std.libc.strerror
 use std.libc.strtod
 use rt.platform
 use rt.compat_runtime
+use std.collections.Minted
 
 
 // #1668: the value of a float literal's text, rounded once the way the
@@ -223,7 +224,7 @@ type ComptimeEvaluator {
     // #679: decl_node -> decl index, precomputed once — every interpreted
     // call resolved its module context via an O(decls) linear scan (3-4
     // per call), the dominant cost of action-heavy comptime evaluation.
-    decl_index_by_node: HashMap[i32, i32],
+    decl_index_by_node: HashMap[i32, i32, Minted],
     workspace_records: List[ComptimeWorkspaceRecord],
     current_workspace_id: i32,
     next_capability_generation: i32,
@@ -267,7 +268,7 @@ type ComptimeEvaluator {
     // Top-level comptime folding precedes Sema, so D21 carrier roots cannot
     // rely only on Sema.pipeline_carrier_kinds. Record the root established by
     // each evaluated carrier stage for the next stage in the same chain.
-    pipeline_receiver_carrier_roots: HashMap[i32, i32],
+    pipeline_receiver_carrier_roots: HashMap[i32, i32, Minted],
     // A comptime call owns a private parameter scope. Preserve the final
     // `mut self` value across that scope's pop so the method-call boundary can
     // write it back to the caller's place, exactly like runtime share-place.
@@ -310,8 +311,8 @@ fn comptime_control_break(value: ComptimeValue, label: i32) -> ComptimeControl:
 fn comptime_control_continue(label: i32) -> ComptimeControl:
     ComptimeControl { kind: ComptimeControlKind.CTL_CONTINUE, value: comptime_value_void(0), label }
 
-fn comptime_decl_index_map(ast: &AstPool) -> HashMap[i32, i32]:
-    let map: HashMap[i32, i32] = [:]
+fn comptime_decl_index_map(ast: &AstPool) -> HashMap[i32, i32, Minted]:
+    let map: HashMap[i32, i32, Minted] = [:]
     for di in 0..ast.decl_count():
         map.insert(ast.get_decl(di), di)
     map

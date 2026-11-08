@@ -89,6 +89,7 @@ use CImport
 use TargetSpec
 use Token
 use std.collections.HashMap
+use std.collections.Minted
 
 // A pinned resource's cell is a `Box` (D54): Resolve makes the facade block
 // that declares one this module's import of std.box (the D29 gate), since
@@ -1147,7 +1148,7 @@ fn facade_render_lend_hosted(pool: &AstPool, intern: &InternPool, li: &FacadeLen
 // discipline as facade_render_alias_index): every presentation question
 // asks for them, per operation of every resource.
 var g_facade_items_pool: i64 = 0
-var g_facade_items: HashMap[i32, List[i32]] = HashMap.new()
+var g_facade_items: HashMap[i32, List[i32], Minted] = [:]
 
 fn facade_render_all_items(pool: &AstPool, kind: NodeKind) -> List[i32]:
     if g_facade_items_pool != pool.shape():

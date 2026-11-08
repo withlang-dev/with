@@ -29,6 +29,7 @@ use std.collections.HashMap
 use SemaTypes
 use render
 use rt.rt_core
+use std.collections.Minted
 
 
 pub const BX_TYPE: i32 = 0
@@ -91,16 +92,16 @@ type BundleEmitter {
     modules: List[str],
     module_sources: List[str],
     // corpus type declarations: name symbol → decl index
-    type_decl_index: HashMap[i32, i32],
+    type_decl_index: HashMap[i32, i32, Minted],
     // impl blocks in the corpus: target type symbol and decl index, parallel
     impl_type_syms: List[i32],
     impl_decl_indices: List[i32],
     // the type closure worklist: name symbols a printed declaration named
     named_type_syms: List[i32],
-    named_type_seen: HashMap[i32, i32],
+    named_type_seen: HashMap[i32, i32, Minted],
     // every type declaration in the compilation: name symbol → canonical
     // module path, so a named non-corpus type finds the `use` it needs
-    type_decl_paths: HashMap[i32, str],
+    type_decl_paths: HashMap[i32, str, Minted],
     // the module whose declaration is being printed, and per module the
     // type symbols its declarations named ("<module>\t<sym>" deduped)
     current_module: str,

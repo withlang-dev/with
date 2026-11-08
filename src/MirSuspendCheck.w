@@ -7,6 +7,7 @@ use std.collections.HashMap
 use MirCore
 use SemaTypes
 use rt.rt_core
+use std.collections.Minted
 
 fn suspend_bit_index(local_count: i32, bb: i32, local: i32) -> i32:
     bb * local_count + local
@@ -296,15 +297,15 @@ fn suspend_term_directly_yields(body: &MirBody, bb: i32) -> bool:
     let call_id = body.term_data1(bb)
     suspend_is_scheduler_yield_intrinsic(body.call_intrinsic(call_id))
 
-fn suspend_build_body_index(mir_mod: &MirModule) -> HashMap[i32, i32]:
-    let body_by_fn: HashMap[i32, i32] = [:]
+fn suspend_build_body_index(mir_mod: &MirModule) -> HashMap[i32, i32, Minted]:
+    let body_by_fn: HashMap[i32, i32, Minted] = [:]
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.fn_sym != 0:
             body_by_fn.insert(body.fn_sym, bi as i32)
     body_by_fn
 
-fn suspend_body_index_for_sym(body_by_fn: &HashMap[i32, i32], fn_sym: i32) -> i32:
+fn suspend_body_index_for_sym(body_by_fn: &HashMap[i32, i32, Minted], fn_sym: i32) -> i32:
     if fn_sym == 0:
         return -1
     if not body_by_fn.contains(fn_sym):
@@ -319,7 +320,7 @@ fn suspend_body_has_direct_yield(body: &MirBody) -> bool:
 
 // The closure body a call argument hands over, when the argument is the
 // local a closure constant was assigned to; -1 otherwise.
-fn suspend_closure_arg_body(body: &MirBody, body_by_fn: &HashMap[i32, i32], operand_id: i32) -> i32:
+fn suspend_closure_arg_body(body: &MirBody, body_by_fn: &HashMap[i32, i32, Minted], operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return -1
     let ok = body.operand_kinds[operand_id]
@@ -349,7 +350,7 @@ fn suspend_closure_arg_body(body: &MirBody, body_by_fn: &HashMap[i32, i32], oper
 // §12.3 / D69: a closure handed straight to a call — a `for` body over a
 // Gen[T] among them — runs inside that call, so the call suspends when the
 // closure's body may.
-fn suspend_call_passes_suspending_closure(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, bb: i32) -> bool:
+fn suspend_call_passes_suspending_closure(body: &MirBody, body_by_fn: &HashMap[i32, i32, Minted], body_may_suspend: SuspendBits, bb: i32) -> bool:
     let call_id = body.term_data1(bb)
     if call_id < 0 or call_id >= body.call_arg_starts.len():
         return false
@@ -360,7 +361,7 @@ fn suspend_call_passes_suspending_closure(body: &MirBody, body_by_fn: &HashMap[i
             return true
     false
 
-fn suspend_body_calls_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits) -> bool:
+fn suspend_body_calls_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32, Minted], body_may_suspend: SuspendBits) -> bool:
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL:
             continue
@@ -374,7 +375,7 @@ fn suspend_body_calls_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32]
             return true
     false
 
-fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i32]) -> SuspendBits:
+fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i32, Minted]) -> SuspendBits:
     let body_count = mir_mod.bodies.len() as i32
     let body_may_suspend = suspend_bits_fill(body_count, 0)
     for bi in 0..body_count:
@@ -394,7 +395,7 @@ fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i3
                 changed = 1
     body_may_suspend
 
-fn suspend_term_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, bb: i32) -> i32:
+fn suspend_term_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32, Minted], body_may_suspend: SuspendBits, bb: i32) -> i32:
     if body.term_kind(bb) != TermKind.TK_CALL:
         return 0
     if suspend_term_directly_yields(body, bb):
@@ -430,7 +431,7 @@ fn suspend_body_has_guard_local(sema: &Sema, body: &MirBody) -> bool:
             return true
     false
 
-fn suspend_body_has_may_suspend_term(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits) -> bool:
+fn suspend_body_has_may_suspend_term(body: &MirBody, body_by_fn: &HashMap[i32, i32, Minted], body_may_suspend: SuspendBits) -> bool:
     for bb in 0..body.block_count():
         if suspend_term_may_suspend(body, body_by_fn, body_may_suspend, bb) != 0:
             return true
@@ -766,7 +767,7 @@ fn suspend_reported_no_suspend_site(reported_starts: &List[i32], reported_ends: 
             return true
     false
 
-fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, site: SuspendSiteSpan, bb: i32) -> DiagnosticList:
+fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, body_by_fn: &HashMap[i32, i32, Minted], body_may_suspend: SuspendBits, site: SuspendSiteSpan, bb: i32) -> DiagnosticList:
     let out = diags
     let diag = Diagnostic.err("E0702: suspension is not allowed inside no_suspend block", Span { file: sema.local_file_id, start: site.start, end: site.end })
     let call_id = body.term_data1(bb)
@@ -829,7 +830,7 @@ fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: &Sema, body: &M
     out.emit(diag)
     out
 
-fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
+fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32, Minted], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let local_count = body.local_count()
     let bb_count = body.block_count()
@@ -897,7 +898,7 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
                 break
     out
 
-fn suspend_check_no_suspend_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
+fn suspend_check_no_suspend_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32, Minted], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let reported_starts: List[i32] = []
     let reported_ends: List[i32] = []

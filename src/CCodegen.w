@@ -21,6 +21,7 @@ use MirLower
 use SemaTypes
 use rt.rt_core
 use rt.compat_runtime
+use std.collections.Minted
 
 
 type COut {
@@ -305,14 +306,14 @@ type CCodegen {
     line_file_id: i32,
     line_file_path: str,
     last_line_directive: i32,
-    body_fn_map: HashMap[i32, i32],
+    body_fn_map: HashMap[i32, i32, Minted],
     body_fn_name_map: HashMap[str, i32],
-    canonical_body_cache: HashMap[i32, i32],
+    canonical_body_cache: HashMap[i32, i32, Minted],
     // Receiver ABI decisions happen at every call, declaration, and place
     // reference. Keep parameter-shape lookups cached; the uncached path
     // resolves through Sema signatures at every generated call site.
-    fn_pointer_param_cache: HashMap[i64, i32],
-    sig_idx_cache: HashMap[i32, i32],
+    fn_pointer_param_cache: HashMap[i64, i32, Minted],
+    sig_idx_cache: HashMap[i32, i32, Minted],
     infer_local_depth: i32,
     active_local_body_fns: List[i32],
     active_local_ids: List[i32],
@@ -327,13 +328,13 @@ type CCodegen {
     field_cache_tids: List[i32],
     field_cache_ready: i32,
     in_field_cache_build: i32,
-    local_infer_cache: HashMap[i64, i32],
-    local_usage_hint_cache: HashMap[i64, i32],
-    local_call_ret_cache: HashMap[i64, i32],
-    local_copied_payload_cache: HashMap[i64, i32],
-    local_downcast_option_cache: HashMap[i64, i32],
-    local_effective_cache: HashMap[i64, i32],
-    local_ref_target_cache: HashMap[i64, i32],
+    local_infer_cache: HashMap[i64, i32, Minted],
+    local_usage_hint_cache: HashMap[i64, i32, Minted],
+    local_call_ret_cache: HashMap[i64, i32, Minted],
+    local_copied_payload_cache: HashMap[i64, i32, Minted],
+    local_downcast_option_cache: HashMap[i64, i32, Minted],
+    local_effective_cache: HashMap[i64, i32, Minted],
+    local_ref_target_cache: HashMap[i64, i32, Minted],
     // Write every function and global, reached or not (--emit-all).
     emit_all: bool,
     // Each local's direct assignments, in block and statement order: CSR
@@ -342,9 +343,9 @@ type CCodegen {
     assign_index_len: isize,
     assign_starts: List[i32],
     assign_stmts: List[i32],
-    local_value_use_cache: HashMap[i64, i32],
-    place_kind_cache: HashMap[i64, i32],
-    callee_hint_cache: HashMap[i32, i32],
+    local_value_use_cache: HashMap[i64, i32, Minted],
+    place_kind_cache: HashMap[i64, i32, Minted],
+    callee_hint_cache: HashMap[i32, i32, Minted],
     // With fn values are fat pairs {fn_ptr(ctx, ...), ctx} matching native
     // codegen's closure convention. Materializing a named function into a fn
     // value registers a static C thunk here; definitions are emitted between
@@ -352,7 +353,7 @@ type CCodegen {
     // stays deterministic.
     fat_thunk_syms: List[i32],
     fat_thunk_tids: List[i32],
-    fat_thunk_keys: HashMap[i64, i32],
+    fat_thunk_keys: HashMap[i64, i32, Minted],
     // Set by resolve_call_named_callee when the callee resolved to an
     // observing `_ref` str-builtin runtime fn (unqualified_builtin_method_name):
     // emit_term then passes each str-ish operand as the `&str` view the
@@ -382,21 +383,21 @@ type CCodegen {
     closure_nodes: List[i32],
     closure_in_loop: List[i32],
     closure_env_kinds: List[i32],
-    closure_index_by_sym: HashMap[i32, i32],
+    closure_index_by_sym: HashMap[i32, i32, Minted],
     // #983: the per-type drop and copy glue (ensure_glue), prototypes and
     // definitions in creation order, and the bodies of the types' Drop impls.
     glue_done: HashMap[str, i32],
     glue_protos: List[str],
     glue_defs: List[str],
-    drop_body_by_owner: HashMap[i32, i32],
+    drop_body_by_owner: HashMap[i32, i32, Minted],
     drop_receivers_ready: bool,
     // D111: the holds of the statement being emitted (held_operand_text).
     hold_active: bool,
     hold_pre: str,
-    hold_texts: HashMap[i32, str],
+    hold_texts: HashMap[i32, str, Minted],
     hold_counter: i32,
     // @[link_name("sym")] of each extern fn, by its symbol (extern_link_name).
-    extern_link_names: HashMap[i32, str],
+    extern_link_names: HashMap[i32, str, Minted],
 }
 
 // #1766: how a closure holds its environment (CodegenDispatch D63 tags).
@@ -9495,7 +9496,7 @@ impl CCodegen:
 // separate `&mut` accumulators.
 type CollectStructTypes {
     out: List[i32],
-    seen_names: HashMap[i32, i32],
+    seen_names: HashMap[i32, i32, Minted],
     seen_c_names: HashMap[str, i32],
 }
 
@@ -9504,8 +9505,8 @@ fn CollectStructTypes.new -> CollectStructTypes:
 
 type CollectFnTypes {
     out: List[i32],
-    seen_names: HashMap[i32, i32],
-    seen_types: HashMap[i32, i32],
+    seen_names: HashMap[i32, i32, Minted],
+    seen_types: HashMap[i32, i32, Minted],
 }
 
 fn CollectFnTypes.new -> CollectFnTypes:
@@ -9851,7 +9852,7 @@ impl CCodegen:
             return self.emit_fn_type_defs()
 
         let ordered: List[i32] = []
-        let emitted_names: HashMap[i32, i32] = [:]
+        let emitted_names: HashMap[i32, i32, Minted] = [:]
         while ordered.len() < struct_tids.len():
             if self.check_interrupted() != 0:
                 return ""
@@ -10150,7 +10151,7 @@ impl CCodegen:
     // entry wrapper stores its result. A global reached only from another
     // global's initializer is found by the next round.
     mut fn prepare_global_init_bodies():
-        let prepared: HashMap[i32, i32] = [:]
+        let prepared: HashMap[i32, i32, Minted] = [:]
         var grew = true
         while grew:
             grew = false
@@ -10256,8 +10257,8 @@ impl CCodegen:
                     out = out ++ "    " ++ self.fn_c_name(self.global_init_fn_syms[i]) ++ "();\n"
         out
 
-    mut fn collect_referenced_global_syms() -> HashMap[i32, i32]:
-        let used = HashMap[i32, i32].new()
+    mut fn collect_referenced_global_syms() -> HashMap[i32, i32, Minted]:
+        let used: HashMap[i32, i32, Minted] = [:]
         for bi in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return used
@@ -10268,8 +10269,8 @@ impl CCodegen:
                     used.insert(sym, 1)
         used
 
-    mut fn collect_referenced_fn_syms() -> HashMap[i32, i32]:
-        let used = HashMap[i32, i32].new()
+    mut fn collect_referenced_fn_syms() -> HashMap[i32, i32, Minted]:
+        let used: HashMap[i32, i32, Minted] = [:]
         for bi in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return used
@@ -10411,7 +10412,7 @@ impl CCodegen:
         name == "with_write" or name == "with_ewrite" or name == "with_panic" or name == "with_bool_to_str" or
         name == "with_i64_to_str" or name == "with_runtime_configure_fibers" or name == "with_str"
 
-    fn should_emit_extern_fn_decl(fn_sym: i32, referenced: &HashMap[i32, i32]) -> bool:
+    fn should_emit_extern_fn_decl(fn_sym: i32, referenced: &HashMap[i32, i32, Minted]) -> bool:
         if not referenced.contains(fn_sym):
             return false
         let linked = self.extern_link_name(fn_sym)
@@ -11608,7 +11609,7 @@ impl CCodegen:
         // any other runs at startup whatever reads it. pcre2's Unicode tables
         // are such initializers, 6 MB of C (3.6 MB in one function).
         let main_sym = self.find_main_sym()
-        let init_of_global: HashMap[i32, i32] = [:]
+        let init_of_global: HashMap[i32, i32, Minted] = [:]
         let body_count = self.mir_mod.bodies.len()
         let reach = CReach.new(body_count + global_defs.len())
         for gi in 0..global_defs.len():

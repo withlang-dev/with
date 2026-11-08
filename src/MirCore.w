@@ -9,6 +9,7 @@ use SemaTypes
 use std.collections.HashMap
 use std.string.StringBuilder
 use rt.rt_core
+use std.collections.Minted
 
 // D111: MirBody.operand_holds values.
 pub const MIR_HOLD_RETAIN: i32 = 1
@@ -244,13 +245,13 @@ type MirBody {
     // applies it where it evaluates the operand): MIR_HOLD_RETAIN, a hold on
     // every str it carries; MIR_HOLD_TAKE, the value itself at the source's last
     // use (the source is blanked: no retain, no release).
-    operand_holds: HashMap[i32, i32],
+    operand_holds: HashMap[i32, i32, Minted],
     // §4.3c (D119): the List literal calls whose value is never pushed,
     // grown, moved out, stored or retained (MirLower decides; codegen places
     // the elements on the stack and the header owns no heap buffer).
-    stack_literal_calls: HashMap[i32, i32],
+    stack_literal_calls: HashMap[i32, i32, Minted],
     // D127: locals backed by an immutable static (mark_static_const_local).
-    static_const_locals: HashMap[i32, i32],
+    static_const_locals: HashMap[i32, i32, Minted],
     // MathBuiltins row id for MATH_FN calls (parallel; -1 otherwise)
     call_math_fn_ids: List[i32],
     // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
@@ -327,11 +328,11 @@ type MirBody {
 type MirModule {
     bodies: List[MirBody],
     body_fn_syms: List[i32],
-    body_index_by_fn_sym: HashMap[i32, i32],
+    body_index_by_fn_sym: HashMap[i32, i32, Minted],
     // A global initializer lowered with the module (one that creates a
     // closure or an async block, whose bodies must join the module): its
     // value node to its body's symbol. Both backends run that body.
-    global_init_body_syms: HashMap[i32, i32],
+    global_init_body_syms: HashMap[i32, i32, Minted],
     // Snapshot of sema type tables at lowering time.
     // MirLower takes sema by value; its List reallocs can free
     // the shared buffer that the caller's sema copy points to.
@@ -341,12 +342,12 @@ type MirModule {
     sema_type_d1: List[i32],
     sema_type_d2: List[i32],
     sema_type_extra: List[i32],
-    sema_bitpacked_types: HashMap[i32, i32],
-    sema_disc_repr_types: HashMap[i32, i32],
-    sema_distinct_type_names: HashMap[i32, i32],
+    sema_bitpacked_types: HashMap[i32, i32, Minted],
+    sema_disc_repr_types: HashMap[i32, i32, Minted],
+    sema_distinct_type_names: HashMap[i32, i32, Minted],
     // The type ids Sema reads as void-like pointees (is_c_void_like_type):
     // a raw pointer to anything converts to a pointer to one.
-    sema_c_void_like_types: HashMap[i32, i32],
+    sema_c_void_like_types: HashMap[i32, i32, Minted],
     // std Box's name sym when the std-box module verdict holds (else 0) —
     // lets the typed validator mirror sema's Box[Concrete] -> Box[dyn Trait]
     // coercion arm exactly instead of approximating it.
@@ -362,21 +363,21 @@ type MirModule {
     // element, a variant payload) that has drop glue. The ownership
     // validator asks it whether a vacated sub-place is one the whole
     // value's drop would free again; MirCore has no Sema to ask.
-    sema_moved_drop_types: HashMap[i32, i32],
+    sema_moved_drop_types: HashMap[i32, i32, Minted],
     // #1559: the drop-glue types of every place a body drops (a Drop
     // statement or a drop terminator): a place need not be moved for a
     // drop of it on a path where it holds no value to free garbage.
-    sema_dropped_types: HashMap[i32, i32],
+    sema_dropped_types: HashMap[i32, i32, Minted],
     // #2702: the drop-glue types of every local whose storage a body ends:
     // a whole local still Init at its StorageDead is a value nobody freed.
-    sema_storage_dead_drop_types: HashMap[i32, i32],
+    sema_storage_dead_drop_types: HashMap[i32, i32, Minted],
     // #1814 (§2.3): the element types of every `array_fill` that are not
     // Copy. A fill evaluates its operand once and copies it N times, so a
     // non-Copy element is N owners of one value: invalid MIR.
-    sema_non_copy_fill_types: HashMap[i32, i32],
+    sema_non_copy_fill_types: HashMap[i32, i32, Minted],
     // #2108: the local types that are a generic struct or enum declaration
     // with no type arguments (`Option`, not `Option[i32]`).
-    sema_uninstantiated_generic_types: HashMap[i32, i32],
+    sema_uninstantiated_generic_types: HashMap[i32, i32, Minted],
     // D65 (#1647, #1639): every symbol Sema accepts as a direct call target,
     // keyed by this module's pool: MirCallableClass.Signature for a declared
     // signature, Generic for a generic template, Intrinsic for a builtin
@@ -384,18 +385,18 @@ type MirModule {
     // validator refuses a `const fn` callee outside it that has no body in
     // the module and no intrinsic mark, so a callee re-derived from an AST
     // spelling (#1635's `r(21)`) can never reach codegen silently.
-    sema_callable_syms: HashMap[i32, i32],
+    sema_callable_syms: HashMap[i32, i32, Minted],
     // #1735, #1742: each function's Sema signature, by this module's symbol
     // (the canonical signature of its name, get_sig): the offset of
     // [param count, then (type, consumes) per parameter] in
     // sema_sig_param_data. `consumes` is 1 for a parameter that takes
     // ownership of its argument — a plain `T` that is no in-place receiver
     // (value_ref_abi), not a `&T` or a raw pointer.
-    sema_sig_param_starts: HashMap[i32, i32],
+    sema_sig_param_starts: HashMap[i32, i32, Minted],
     sema_sig_param_data: List[i32],
     // #1742: every function whose signature returns Never (with_panic): a
     // call to it has no continuation for the caller's drops to run on.
-    sema_never_returning_syms: HashMap[i32, i32],
+    sema_never_returning_syms: HashMap[i32, i32, Minted],
 }
 
 enum MirCallableClass: i32:
@@ -1183,10 +1184,10 @@ type MirDropStateKeys {
     // always have one id.
     chunk: i32,
     chunk_data: List[i32],
-    chunk_heads: HashMap[i64, i32],
+    chunk_heads: HashMap[i64, i32, Minted],
     chunk_next: List[i32],
     // join_chunks memo: (a << 32 | b) → the stored join of chunks a and b.
-    chunk_joins: HashMap[i64, i32],
+    chunk_joins: HashMap[i64, i32, Minted],
 }
 
 impl MirDropStateKeys:
@@ -3326,7 +3327,7 @@ fn validate_mir_module(mir_mod: &MirModule) -> str:
     if body_count != mir_mod.body_fn_syms.len():
         return "bodies/body_fn_syms length mismatch"
 
-    let seen_fn_syms: HashMap[i32, i32] = [:]
+    let seen_fn_syms: HashMap[i32, i32, Minted] = [:]
     for bi in 0..body_count:
         let body = &mir_mod.bodies[bi]
         let fn_sym = mir_mod.body_fn_syms[bi]

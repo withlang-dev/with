@@ -15,6 +15,7 @@ use render
 use SemaTypes
 use std.collections.HashMap
 use rt.rt_core
+use std.collections.Minted
 
 
 // ── Collect trait info ────────────────────────────────────────────
@@ -630,14 +631,14 @@ impl Codegen:
         self.current_function_name_sym = fn_sym
         self.current_ret_type = final_ret_ty
         self.current_method_owner_sym = impl_type_sym
-        let fresh_local_allocas: HashMap[i32, i64] = [:]
-        let fresh_local_types: HashMap[i32, i64] = [:]
-        let fresh_local_muts: HashMap[i32, i32] = [:]
-        let fresh_local_pointees: HashMap[i32, i32] = [:]
-        let fresh_task_locals: HashMap[i32, i32] = [:]
-        let fresh_trait_locals: HashMap[i32, i32] = [:]
-        let fresh_trait_concrete: HashMap[i32, i32] = [:]
-        let fresh_enum_local_types: HashMap[i32, i32] = [:]
+        let fresh_local_allocas: HashMap[i32, i64, Minted] = [:]
+        let fresh_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_local_muts: HashMap[i32, i32, Minted] = [:]
+        let fresh_local_pointees: HashMap[i32, i32, Minted] = [:]
+        let fresh_task_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_trait_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_trait_concrete: HashMap[i32, i32, Minted] = [:]
+        let fresh_enum_local_types: HashMap[i32, i32, Minted] = [:]
         let fresh_scope_syms: List[i32] = []
         let fresh_scope_allocas: List[i64] = []
         let fresh_scope_types: List[i64] = []
@@ -704,8 +705,8 @@ impl Codegen:
         let saved_mir_ref_capture_locals = move self.mir_ref_capture_local_types
         self.mir_indirect_value_local_types = HashMap.new()
         self.mir_ref_capture_local_types = HashMap.new()
-        let dtm_fresh_mir_locals: HashMap[i32, i64] = [:]
-        let dtm_fresh_mir_types: HashMap[i32, i64] = [:]
+        let dtm_fresh_mir_locals: HashMap[i32, i64, Minted] = [:]
+        let dtm_fresh_mir_types: HashMap[i32, i64, Minted] = [:]
         let dtm_fresh_mir_bbs: List[i64] = []
         let dtm_fresh_mir_unr: List[i64] = []
         self.mir_local_ptrs = dtm_fresh_mir_locals
@@ -1532,14 +1533,14 @@ impl Codegen:
         // sret param (there is none) and `ret void` against a value return.
         let saved_fn_name_sym = self.current_function_name_sym
 
-        let fresh_local_allocas: HashMap[i32, i64] = [:]
-        let fresh_local_types: HashMap[i32, i64] = [:]
-        let fresh_local_muts: HashMap[i32, i32] = [:]
-        let fresh_local_pointees: HashMap[i32, i32] = [:]
-        let fresh_task_locals: HashMap[i32, i32] = [:]
-        let fresh_trait_locals: HashMap[i32, i32] = [:]
-        let fresh_trait_concrete: HashMap[i32, i32] = [:]
-        let fresh_enum_local_types: HashMap[i32, i32] = [:]
+        let fresh_local_allocas: HashMap[i32, i64, Minted] = [:]
+        let fresh_local_types: HashMap[i32, i64, Minted] = [:]
+        let fresh_local_muts: HashMap[i32, i32, Minted] = [:]
+        let fresh_local_pointees: HashMap[i32, i32, Minted] = [:]
+        let fresh_task_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_trait_locals: HashMap[i32, i32, Minted] = [:]
+        let fresh_trait_concrete: HashMap[i32, i32, Minted] = [:]
+        let fresh_enum_local_types: HashMap[i32, i32, Minted] = [:]
         let fresh_scope_syms: List[i32] = []
         let fresh_scope_allocas: List[i64] = []
         let fresh_scope_types: List[i64] = []

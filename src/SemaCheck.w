@@ -26,6 +26,7 @@ use FnAbi
 use TargetSpec
 
 use Overflow
+use std.collections.Minted
 
 
 // mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
@@ -88,7 +89,7 @@ impl Sema:
 // checked in the middle of it (a concrete generic instance, or a body
 // checked on demand for its inferred return type).
 type SemaLexicalEnv {
-    script_capture_indices: HashMap[i32, i32],
+    script_capture_indices: HashMap[i32, i32, Minted],
     bind_names: List[i32],
     bind_types: List[i32],
     bind_muts: List[i32],
@@ -103,10 +104,10 @@ type SemaLexicalEnv {
     moved_field_path_syms: List[i32],
     bind_provenance: List[BindingProvenance],
     scope_starts: List[i32],
-    scope_name_map: HashMap[i32, i32],
-    pending_generic_binding_base: HashMap[i32, i32],
-    pending_generic_binding_call: HashMap[i32, i32],
-    pending_generic_binding_decl: HashMap[i32, i32],
+    scope_name_map: HashMap[i32, i32, Minted],
+    pending_generic_binding_base: HashMap[i32, i32, Minted],
+    pending_generic_binding_call: HashMap[i32, i32, Minted],
+    pending_generic_binding_decl: HashMap[i32, i32, Minted],
     pending_soft_use_syms: List[i32],
     pending_soft_use_nodes: List[i32],
     pending_soft_debug_nodes: List[i32],
@@ -746,7 +747,7 @@ impl Sema:
     // - #1849: each argument from `variadic_from` on that a `...` receives,
     //   where the promotion changes its type (0 elsewhere); codegen converts
     //   the argument (sign- or zero-extending by its own type).
-    mut fn record_c_promoted_args(call_node: i32, fn_sym: i32, arg_nodes: &List[i32], arg_types: &List[i32], passed_types: &HashMap[i32, i32], variadic_from: i32):
+    mut fn record_c_promoted_args(call_node: i32, fn_sym: i32, arg_nodes: &List[i32], arg_types: &List[i32], passed_types: &HashMap[i32, i32, Minted], variadic_from: i32):
         let unprototyped = variadic_from < 0
         let start = self.c_promoted_arg_data.len() as i32
         self.c_promoted_arg_data.push(arg_types.len() as i32)
@@ -1345,7 +1346,7 @@ impl Sema:
             self.contextual_join_arm_roles.push(arm_role)
 
         let origin_start = self.contextual_join_origin_deps.len() as i32
-        let seen_origins: HashMap[i32, i32] = [:]
+        let seen_origins: HashMap[i32, i32, Minted] = [:]
         for gathered_origin in gathered_origins:
             let origin = gathered_origin
             if not seen_origins.contains(origin):
@@ -3387,7 +3388,7 @@ impl Sema:
     // diagnostics (emit_global_data_race_error).
     mut fn resolve_global_race_concurrency() -> bool:
         if self.global_race_evidence.len() == 0: return false
-        let reachable: HashMap[i32, i32] = [:]
+        let reachable: HashMap[i32, i32, Minted] = [:]
         let work = [e.fn_sym for e in self.global_race_evidence if self.race_root_fn(e.fn_sym)]
         for (caller, _) in self.race_call_edge_first:
             if self.race_root_fn(caller): work.push(caller)
@@ -4097,7 +4098,7 @@ impl Sema:
     // spawned, stored, returned, or used as a function value. Runs after
     // finalize_closure_arg_checks so every body's captures, the call graph,
     // and each closure's escaping state are settled.
-    fn script_body_captured_ephemeral_sym(start_body: i32, direct: &HashMap[i32, i32], index: &SemaGlobalCallIndex) -> i32:
+    fn script_body_captured_ephemeral_sym(start_body: i32, direct: &HashMap[i32, i32, Minted], index: &SemaGlobalCallIndex) -> i32:
         if direct.contains(start_body):
             return direct.get(start_body).unwrap()
         let seen = sema_new_map_i32_i32()
@@ -4240,7 +4241,7 @@ impl Sema:
     // order, never less.
     mut fn order_global_initializers():
         let inits: List[i32] = []
-        let sym_head: HashMap[i32, isize] = [:]
+        let sym_head: HashMap[i32, isize, Minted] = [:]
         let sym_next: List[isize] = []
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
@@ -4252,7 +4253,7 @@ impl Sema:
             inits.push(di)
         if inits.len() == 0: return
         let index = self.global_call_index()
-        let read_head: HashMap[i32, isize] = [:]
+        let read_head: HashMap[i32, isize, Minted] = [:]
         let read_next: List[isize] = []
         for ri in 0..self.global_read_records.len() / GLOBAL_READ_STRIDE:
             let body: i32 = self.global_read_records[ri * GLOBAL_READ_STRIDE]
@@ -5067,7 +5068,7 @@ impl Sema:
     // The binding through which callable parameter `param_body` runs a body
     // that writes (is in `via`): a closure a call binds to it, directly or
     // through a parameter of the caller that it forwards. -1 when none does.
-    fn param_binding_writer(param_body: i32, via: &HashMap[i32, i32], bound_head: &HashMap[i32, i32], bound_next: &List[i32]) -> i32:
+    fn param_binding_writer(param_body: i32, via: &HashMap[i32, i32, Minted], bound_head: &HashMap[i32, i32, Minted], bound_next: &List[i32]) -> i32:
         let seen = sema_new_map_i32_i32()
         let work: List[i32] = []
         seen.insert(param_body, 1)
@@ -5089,7 +5090,7 @@ impl Sema:
 
     // One kept check against `via` (check_calls_against_live_global_views):
     // reported when a body the call runs writes the global.
-    mut fn report_global_view_call_check(ci: i32, via: &HashMap[i32, i32], bound_head: &HashMap[i32, i32], bound_next: &List[i32]) -> bool:
+    mut fn report_global_view_call_check(ci: i32, via: &HashMap[i32, i32, Minted], bound_head: &HashMap[i32, i32, Minted], bound_next: &List[i32]) -> bool:
         let base = ci * GLOBAL_VIEW_CHECK_STRIDE
         let call: i32 = self.global_view_call_checks[base]
         let sym: i32 = self.global_view_call_checks[base + 1]
@@ -11584,7 +11585,7 @@ const BORROW_LIVE: i32 = 2
 // #1827: Sema.global_calls chained by caller (global_call_index), the
 // bundle build's index for fn_global_effects.
 type SemaGlobalCallIndex {
-    head: HashMap[i32, i32],
+    head: HashMap[i32, i32, Minted],
     next: List[i32],
 }
 
@@ -11847,7 +11848,7 @@ impl Sema:
             return 0
         var node = expr_node
         var mask: i32 = 0
-        let seen: HashMap[i32, i32] = [:]
+        let seen: HashMap[i32, i32, Minted] = [:]
         while node > 0 and not seen.contains(node):
             seen.insert(node, 1)
             let kind = self.ast.kind(node)
@@ -11880,7 +11881,7 @@ impl Sema:
     // every callee are complete. An unsafe block does not discharge a raw
     // parameter's requirement for the caller of this function.
     mut fn enforce_raw_pointer_contracts():
-        let seen: HashMap[i32, i32] = [:]
+        let seen: HashMap[i32, i32, Minted] = [:]
         for si in 0..self.sig_names.len() as i32:
             let node = self.receiver_decl_node_for_sig(si)
             if node <= 0 or seen.contains(node) or self.fn_decl_is_unsafe(node):
@@ -29496,8 +29497,8 @@ impl Sema:
                                 has_implicit = 1
                                 break
                         if has_implicit != 0:
-                            let resolved_map: HashMap[i32, i32] = [:]
-                            let resolved_defaults: HashMap[i32, i32] = [:]
+                            let resolved_map: HashMap[i32, i32, Minted] = [:]
+                            let resolved_defaults: HashMap[i32, i32, Minted] = [:]
                             // Positional args
                             for ai in 0..arg_count:
                                 resolved_map.insert(ai + param_offset, self.ast.get_extra(extra_start + ai))
@@ -36729,8 +36730,8 @@ impl Sema:
             for pi in arg_count + param_offset..param_count:
                 if self.ast.get_fn_param_default(ps, pi) == 0:
                     return arg_count
-        let resolved_map: HashMap[i32, i32] = [:]
-        let resolved_defaults: HashMap[i32, i32] = [:]
+        let resolved_map: HashMap[i32, i32, Minted] = [:]
+        let resolved_defaults: HashMap[i32, i32, Minted] = [:]
         var first_named_idx = arg_count
         for ai in 0..arg_count:
             if self.ast.get_call_named_arg(call_node, ai) != 0:
@@ -36816,8 +36817,8 @@ impl Sema:
         if meta < 0:
             return arg_count
         let param_start = self.ast.fn_meta_param_start(meta)
-        let resolved_map: HashMap[i32, i32] = [:]
-        let resolved_defaults: HashMap[i32, i32] = [:]
+        let resolved_map: HashMap[i32, i32, Minted] = [:]
+        let resolved_defaults: HashMap[i32, i32, Minted] = [:]
         for ai in 0..arg_count:
             resolved_map.insert(ai + param_offset, self.ast.get_extra(extra_start + ai))
         var filled = 0

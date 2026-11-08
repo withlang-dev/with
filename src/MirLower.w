@@ -15,6 +15,7 @@ use SemaTypes
 use MirVector
 use MirSuspendCheck
 use rt.rt_core
+use std.collections.Minted
 
 // ── Builder state ────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ type MirBuilder ephemeral {
     stmt_frame_cur_bbs: List[i32],
     // The drops an unwind emitted for a not-yet-moved local (statement
     // ids): drops on another path, never the awaited move.
-    unwind_drop_stmt_ids: HashSet[i32],
+    unwind_drop_stmt_ids: HashSet[i32, Minted],
     // #719: per-statement-frame snapshots of the pending-reset stacks.
     stmt_reset_starts: List[i32],
     stmt_reset_field_starts: List[i32],

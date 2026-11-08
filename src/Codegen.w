@@ -28,6 +28,7 @@ use std.collections.HashMap
 use std.memo
 use rt.rt_core
 use std.libc.exit
+use std.collections.Minted
 
 
 // Atomic operations
@@ -123,7 +124,7 @@ type Codegen {
     current_ret_type: i64,
     mir_emit_mutual_tail_call: i32,
     // Async trampolines: fn_sym → LLVM trampoline function value
-    async_trampolines: HashMap[i32, i64],
+    async_trampolines: HashMap[i32, i64, Minted],
     current_function: i64,
     current_function_name_sym: i32,
     current_function_node: i32,
@@ -212,28 +213,28 @@ type Codegen {
     sym_new: i32,
 
     // Local variables: sym → alloca/type/flags
-    local_allocas: HashMap[i32, i64],
-    local_types: HashMap[i32, i64],
-    local_muts: HashMap[i32, i32],
-    local_pointee_structs: HashMap[i32, i32],
+    local_allocas: HashMap[i32, i64, Minted],
+    local_types: HashMap[i32, i64, Minted],
+    local_muts: HashMap[i32, i32, Minted],
+    local_pointee_structs: HashMap[i32, i32, Minted],
 
     // Sema type annotations: sym → sema TypeId (for generic type dispatch)
-    local_sema_types: HashMap[i32, i32],
+    local_sema_types: HashMap[i32, i32, Minted],
 
     // Declared functions: sym → value/type
-    fn_values: HashMap[i32, i64],
-    fn_fn_types: HashMap[i32, i64],
-    generated_mir_body_syms: HashMap[i32, i32],
+    fn_values: HashMap[i32, i64, Minted],
+    fn_fn_types: HashMap[i32, i64, Minted],
+    generated_mir_body_syms: HashMap[i32, i32, Minted],
     fn_abis: List[FnAbi],
     fn_abi_args: List[ArgAbi],
     fn_abi_cache: HashMap[str, i32],
-    fn_abi_symbols: HashMap[i32, i32],
-    fn_abi_callables: HashMap[i64, i32],
-    fn_abi_values: HashMap[i64, i32],
-    analysis_call_abis: HashMap[i64, i32],
+    fn_abi_symbols: HashMap[i32, i32, Minted],
+    fn_abi_callables: HashMap[i64, i32, Minted],
+    fn_abi_values: HashMap[i64, i32, Minted],
+    analysis_call_abis: HashMap[i64, i32, Minted],
 
     // Struct types: sym → index into struct_type_* arrays
-    struct_type_map: HashMap[i32, i32],
+    struct_type_map: HashMap[i32, i32, Minted],
     // D29 scaffolding (#750): shadowed type names carry per-tier codegen
     // symbols so both layouts coexist in LLVM — the std-tier decl registers
     // under `name$std`, the user decl keeps the plain name. Populated during
@@ -245,8 +246,8 @@ type Codegen {
     // `name$<tid>`, keyed here by its resolved TypeId. `nominal_split_names`
     // holds the plain names that have more than one declaration, so a by-name
     // type lookup knows to ask Sema which declaration a type node means.
-    nominal_alias_by_tid: HashMap[i32, i32],
-    nominal_split_names: HashMap[i32, i32],
+    nominal_alias_by_tid: HashMap[i32, i32, Minted],
+    nominal_split_names: HashMap[i32, i32, Minted],
     struct_llvm_types: List[i64],
     struct_index_syms: List[i32],
     struct_field_starts: List[i32],
@@ -259,33 +260,33 @@ type Codegen {
 
     // Bitpacked struct tracking: which struct indices are bitpacked,
     // and per-field bit offsets/widths for shift/mask codegen
-    bitpacked_structs: HashMap[i32, i32],  // struct_idx → bp_info_start (index into bitpacked_field_* Vecs)
-    bitpacked_total_bits: HashMap[i32, i32],  // struct_idx → total_bits
+    bitpacked_structs: HashMap[i32, i32, Minted],  // struct_idx → bp_info_start (index into bitpacked_field_* Vecs)
+    bitpacked_total_bits: HashMap[i32, i32, Minted],  // struct_idx → total_bits
     // §16.4: an LLVM struct type whose C/With alignment exceeds its LLVM ABI
     // alignment (a repr(packed(N)) body is an LLVM packed struct, alignment
     // 1) → that alignment, which a struct embedding it is laid out by.
-    struct_declared_align: HashMap[i64, i64],
+    struct_declared_align: HashMap[i64, i64, Minted],
     // #1964: a tuple whose body carries padding members → the start, in
     // tuple_elem_indices, of its elements' LLVM positions (tuple_elem_index
     // reads them); padded bodies by (literal body, positions), so two tuples
     // with one padded literal never share a position table.
-    tuple_elem_index_starts: HashMap[i64, i32],
+    tuple_elem_index_starts: HashMap[i64, i32, Minted],
     tuple_elem_indices: List[i32],
     tuple_padded_types: HashMap[str, i64],
-    bitpacked_backing_types: HashMap[i32, i64],  // struct_idx → LLVM iN type (64-bit pointer)
-    bitpacked_by_llvm_type: HashMap[i64, i32],  // LLVM iN type → struct_idx (reverse lookup)
+    bitpacked_backing_types: HashMap[i32, i64, Minted],  // struct_idx → LLVM iN type (64-bit pointer)
+    bitpacked_by_llvm_type: HashMap[i64, i32, Minted],  // LLVM iN type → struct_idx (reverse lookup)
     // D72 (§2.5.1): LLVM struct type → the index of its hidden liveness byte
     // (Sema decided the struct carries one: struct_needs_liveness_byte).
-    liveness_byte_indices: HashMap[i64, i32],
+    liveness_byte_indices: HashMap[i64, i32, Minted],
     bitpacked_field_bit_offsets: List[i32],  // indexed by bp_info_start + field_idx
     bitpacked_field_bit_widths: List[i32],   // indexed by bp_info_start + field_idx
     // Per-place bitpacked projection: when a place resolves to a bitpacked field,
     // stores (bit_offset << 16 | bit_width) keyed by place_id.
     // mir_eval_operand checks this after loading to apply shift+mask extraction.
-    bitpacked_place_proj: HashMap[i32, i32],
+    bitpacked_place_proj: HashMap[i32, i32, Minted],
 
     // Enum types: sym → index into enum_* arrays
-    enum_type_map: HashMap[i32, i32],
+    enum_type_map: HashMap[i32, i32, Minted],
     enum_llvm_types: List[i64],
     enum_variant_starts: List[i32],
     enum_variant_counts: List[i32],
@@ -293,14 +294,14 @@ type Codegen {
     enum_variant_payloads: List[i64],
 
     // Enum by LLVM type (for match lookups)
-    enum_by_llvm: HashMap[i64, i32],
-    generic_enum_inst_types: HashMap[i32, i64],
-    generic_enum_inst_syms: HashMap[i32, i32],
+    enum_by_llvm: HashMap[i64, i32, Minted],
+    generic_enum_inst_types: HashMap[i32, i64, Minted],
+    generic_enum_inst_syms: HashMap[i32, i32, Minted],
     // #1647: a user generic struct instance's LLVM struct, by Sema TypeId.
-    generic_struct_inst_types: HashMap[i32, i64],
+    generic_struct_inst_types: HashMap[i32, i64, Minted],
 
     // Discriminant enums: sym → index into disc_enum_* arrays
-    disc_enum_type_map: HashMap[i32, i32],
+    disc_enum_type_map: HashMap[i32, i32, Minted],
     disc_enum_name_syms: List[i32],
     disc_enum_repr_types: List[i64],
     disc_enum_repr_unsigned: List[i32],
@@ -316,39 +317,39 @@ type Codegen {
     // declaration that defines it; how many are still pending (0 once Pass 0b
     // is done, which makes the reference hook free). type_layout_complete
     // memoizes the LLVM types proven to hold no opaque placeholder by value.
-    type_body_decl: HashMap[i32, i32],
+    type_body_decl: HashMap[i32, i32, Minted],
     type_body_sym: List[i32],
     type_body_state: List[i32],
     type_bodies_pending: i32,
-    type_layout_complete: HashMap[i64, i32],
+    type_layout_complete: HashMap[i64, i32, Minted],
 
     // Generic functions/structs: sym → node
-    generic_fns: HashMap[i32, i32],
-    generic_structs: HashMap[i32, i32],
+    generic_fns: HashMap[i32, i32, Minted],
+    generic_structs: HashMap[i32, i32, Minted],
     // First NK_TYPE_DECL per declared name, in decl order (generic_type_decl_node);
     // built once per module over type_decl_name_index_count decls.
     type_decl_name_index: HashMap[str, i32],
     type_decl_name_index_count: i32,
-    generic_struct_methods: HashMap[i32, i32],
-    mono_struct_base: HashMap[i32, i32],
-    mono_struct_tp_starts: HashMap[i32, i32],
-    mono_struct_tp_counts: HashMap[i32, i32],
+    generic_struct_methods: HashMap[i32, i32, Minted],
+    mono_struct_base: HashMap[i32, i32, Minted],
+    mono_struct_tp_starts: HashMap[i32, i32, Minted],
+    mono_struct_tp_counts: HashMap[i32, i32, Minted],
     mono_struct_tp_flat_syms: List[i32],
     mono_struct_tp_flat_types: List[i64],
     mono_struct_tp_flat_sema_types: List[i32],
 
     // Monomorphization cache: mangled_hash → value/type
-    mono_values: HashMap[i64, i64],
-    mono_types: HashMap[i64, i64],
+    mono_values: HashMap[i64, i64, Minted],
+    mono_types: HashMap[i64, i64, Minted],
 
     // Type aliases: sym → LLVM type
-    type_aliases: HashMap[i32, i64],
+    type_aliases: HashMap[i32, i64, Minted],
 
     // Module constants: sym → LLVM global
-    module_constants: HashMap[i32, i64],
+    module_constants: HashMap[i32, i64, Minted],
     // §4.3c (D119): a List global laid out as static data: sym → the LLVM
     // global holding its elements (`&raw const t[0]` in an initializer folds to it)
-    module_list_elems: HashMap[i32, i64],
+    module_list_elems: HashMap[i32, i64, Minted],
     // Module constants that require runtime reconstruction before user main.
     module_runtime_init_syms: List[i32],
     module_runtime_init_nodes: List[i32],
@@ -365,7 +366,7 @@ type Codegen {
     // extern declare path can distinguish "a With body occupies my C
     // symbol" (move it aside) from c_import's deliberate same-symbol
     // different-prototype reuse (keep, marshal via recorded transforms).
-    with_fn_link_names: HashMap[i32, i32],
+    with_fn_link_names: HashMap[i32, i32, Minted],
     const_int_syms: List[i32],
     const_int_vals: List[i64],
     decl_source_paths: List[str],
@@ -391,7 +392,7 @@ type Codegen {
     // #2219: why each of those did not fold — keyed by the global's name
     // symbol, the sub-expression `try_eval_const_llvm` stopped at — so a
     // body that reads the global is refused naming it (mir_bind_global_locals).
-    unlowered_global_reasons: HashMap[i32, str],
+    unlowered_global_reasons: HashMap[i32, str, Minted],
     // The innermost sub-expression the last `try_eval_const_llvm` could not
     // fold (0 when it folded); reset by gen_module_constant per global.
     const_fold_unfolded_node: i32,
@@ -416,30 +417,30 @@ type Codegen {
     errdefer_stack: List[i32],
 
     // Reference pointee types
-    ref_pointee_types: HashMap[i32, i64],
+    ref_pointee_types: HashMap[i32, i64, Minted],
 
     // Expected type context
     expected_type: i64,
     expected_type_node: i32,
 
     // Option type cache: sema_tid/payload_ty → LLVM type
-    option_cache_map: HashMap[i64, i64],
+    option_cache_map: HashMap[i64, i64, Minted],
 
     // Result type cache: "sema_tid" or "ok_ty:err_ty" → LLVM type
     result_cache_map: HashMap[str, i64],
 
     // Slice element types: sym → elem LLVM type
-    slice_elem_types: HashMap[i32, i64],
+    slice_elem_types: HashMap[i32, i64, Minted],
 
     // Enum-typed locals: sym → enum sym
-    enum_local_types: HashMap[i32, i32],
+    enum_local_types: HashMap[i32, i32, Minted],
 
     // Drop functions: type_sym → fn value/type
-    drop_fn_values: HashMap[i32, i64],
-    drop_fn_types: HashMap[i32, i64],
+    drop_fn_values: HashMap[i32, i64, Minted],
+    drop_fn_types: HashMap[i32, i64, Minted],
 
     // Trait info: sym → index into trait_* arrays
-    trait_map: HashMap[i32, i32],
+    trait_map: HashMap[i32, i32, Minted],
     trait_idx_syms: List[i32],
     trait_vtable_types: List[i64],
     trait_method_starts: List[i32],
@@ -453,44 +454,44 @@ type Codegen {
     trait_method_default_bodies: List[i32],
 
     // Trait decl nodes: sym → trait_decl_node
-    trait_decl_nodes: HashMap[i32, i32],
+    trait_decl_nodes: HashMap[i32, i32, Minted],
 
     // Trait type params: trait name_sym → flat start/count in trait_tp_flat_syms
-    trait_tp_starts: HashMap[i32, i32],
-    trait_tp_counts: HashMap[i32, i32],
+    trait_tp_starts: HashMap[i32, i32, Minted],
+    trait_tp_counts: HashMap[i32, i32, Minted],
     trait_tp_flat_syms: List[i32],
 
     // VTable globals: hash(type,trait) → global
-    vtable_globals: HashMap[i32, i64],
+    vtable_globals: HashMap[i32, i64, Minted],
     // #1847: the vtables' drop slots (dyn_drop_slot) and the concrete Sema
     // type each drops, their bodies emitted by define_dyn_drop_thunks.
     dyn_drop_thunks: List[i64],
     dyn_drop_thunk_types: List[i32],
 
     // Trait-typed locals
-    trait_locals: HashMap[i32, i32],
-    trait_local_concrete_types: HashMap[i32, i32],
+    trait_locals: HashMap[i32, i32, Minted],
+    trait_local_concrete_types: HashMap[i32, i32, Minted],
     dyn_fat_ptr_type: i64,
 
     // Fn dyn params: fn_sym → start/count in flat array
-    fn_dyn_param_starts: HashMap[i32, i32],
+    fn_dyn_param_starts: HashMap[i32, i32, Minted],
     fn_dyn_param_data: List[i32],
 
     // Fn ref params: fn_sym → start/count in flat array
 
     // Result return tracking
-    fn_result_err_symbols: HashMap[i32, i32],
-    fn_returns_result: HashMap[i32, i32],
-    fn_result_unit_returns: HashMap[i32, i32],
+    fn_result_err_symbols: HashMap[i32, i32, Minted],
+    fn_returns_result: HashMap[i32, i32, Minted],
+    fn_result_unit_returns: HashMap[i32, i32, Minted],
     current_result_err_symbol: i32,
     current_fn_returns_result: bool,
     current_fn_saw_explicit_return: bool,
 
     // Async
-    async_fn_symbols: HashMap[i32, i32],
-    async_fn_ret_types: HashMap[i32, i64],
-    async_fn_args_struct_types: HashMap[i32, i64],
-    task_locals: HashMap[i32, i32],
+    async_fn_symbols: HashMap[i32, i32, Minted],
+    async_fn_ret_types: HashMap[i32, i64, Minted],
+    async_fn_args_struct_types: HashMap[i32, i64, Minted],
+    task_locals: HashMap[i32, i32, Minted],
     uses_async: bool,
     async_block_counter: i32,
     async_block_captures: List[i32],
@@ -515,7 +516,7 @@ type Codegen {
     // Generator state
     gen_state_ptr: i64,
     gen_state_type: i64,
-    gen_field_indices: HashMap[i32, i32],
+    gen_field_indices: HashMap[i32, i32, Minted],
     gen_done_bb: i64,
     gen_option_type: i64,
     gen_payload_type: i64,
@@ -524,16 +525,16 @@ type Codegen {
 
     // List type cache
     // List type cache
-    list_cache_map: HashMap[i64, i64],
-    list_is_list: HashMap[i64, i32],
+    list_cache_map: HashMap[i64, i64, Minted],
+    list_is_list: HashMap[i64, i32, Minted],
     // HashMap type cache
-    hm_cache_map: HashMap[i64, i64],
-    hm_is_hm: HashMap[i64, i32],
+    hm_cache_map: HashMap[i64, i64, Minted],
+    hm_is_hm: HashMap[i64, i32, Minted],
 
     // HashSet type cache (elem LLVM type → HashSet LLVM struct type)
-    hs_cache_map: HashMap[i64, i64],
+    hs_cache_map: HashMap[i64, i64, Minted],
     // SlotMap type cache (elem LLVM type → SlotMap LLVM struct type)
-    slotmap_cache_map: HashMap[i64, i64],
+    slotmap_cache_map: HashMap[i64, i64, Minted],
 
     // Active type bindings (for monomorphization)
     type_binding_syms: List[i32],
@@ -542,8 +543,8 @@ type Codegen {
     type_bindings_len: i32,
 
     // Fn param defaults: fn_sym → start/count in flat array
-    fn_default_starts: HashMap[i32, i32],
-    fn_default_counts: HashMap[i32, i32],
+    fn_default_starts: HashMap[i32, i32, Minted],
+    fn_default_counts: HashMap[i32, i32, Minted],
 
     // Source info
     source_file: str,
@@ -562,11 +563,11 @@ type Codegen {
     // from (AstPool.file), so both the DIFile and the line of every location
     // come from that file, never the root's.
     di_file: i64,
-    di_files: HashMap[i32, i64],
+    di_files: HashMap[i32, i64, Minted],
     di_fn_file: i64,
     di_fn_file_id: i32,
-    di_fn_subprograms: HashMap[i32, i64],
-    di_type_cache: HashMap[i32, i64],
+    di_fn_subprograms: HashMap[i32, i64, Minted],
+    di_type_cache: HashMap[i32, i64, Minted],
     di_current_scope: i64,
 
     // Wave 10 MIR backend input (optional).
@@ -578,17 +579,17 @@ type Codegen {
     // main) are pinned to unit 0 (main's body is force-assigned there).
     unit_total: i32,
     unit_index: i32,
-    unit_assign: HashMap[i32, i32],
-    unit_rename_index: HashMap[i32, i32],
+    unit_assign: HashMap[i32, i32, Minted],
+    unit_rename_index: HashMap[i32, i32, Minted],
     // A `@[c_export("name")]` C symbol's With function: the unit plan is
     // keyed by the function, the module holds the C name.
     c_export_owner_syms: HashMap[str, i32],
-    mir_local_ptrs: HashMap[i32, i64],
-    mir_local_values: HashMap[i32, i64],
-    mir_memory_locals: HashMap[i32, i32],
-    mir_local_types: HashMap[i32, i64],
-    mir_indirect_value_local_types: HashMap[i32, i64],
-    mir_ref_capture_local_types: HashMap[i32, i64],
+    mir_local_ptrs: HashMap[i32, i64, Minted],
+    mir_local_values: HashMap[i32, i64, Minted],
+    mir_memory_locals: HashMap[i32, i32, Minted],
+    mir_local_types: HashMap[i32, i64, Minted],
+    mir_indirect_value_local_types: HashMap[i32, i64, Minted],
+    mir_ref_capture_local_types: HashMap[i32, i64, Minted],
     mir_bb_values: List[i64],
     mir_default_unreachable_bbs: List[i64],
 }
@@ -4390,7 +4391,7 @@ impl Codegen:
     // overwrote the first's one LLVM struct and the first module's values
     // were read through the second's layout.
     mut fn collect_nominal_aliases():
-        let first_tids: HashMap[i32, i32] = [:]
+        let first_tids: HashMap[i32, i32, Minted] = [:]
         for i in 0..self.pool.decl_count():
             if self.sema.decl_is_lazy_skipped(i):
                 continue

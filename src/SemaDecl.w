@@ -14,6 +14,7 @@ use TargetSpec
 use SemaTypes
 use SemaVector
 use rt.rt_core
+use std.collections.Minted
 
 
 // ── Discriminant values (§4.4a) ──────────────────────────────────
@@ -74,7 +75,7 @@ impl Sema:
         self.colliding_type_names = sema_new_map_i32_i32()
         self.type_identity_syms = sema_new_map_i64_i32()
         self.impl_identity_traits = sema_new_map_i64_i32()
-        let first_paths: HashMap[i32, i32] = [:]
+        let first_paths: HashMap[i32, i32, Minted] = [:]
         let dc = self.ast.decl_count()
         for di in 0..dc:
             let decl = self.ast.get_decl(di)
@@ -110,7 +111,7 @@ impl Sema:
         // after: without the entry the lookup fell to visibility, found a
         // different key once the type was registered, and registered the
         // method's signature without a name.
-        let package_identity: HashMap[i64, i32] = [:]
+        let package_identity: HashMap[i64, i32, Minted] = [:]
         for di in 0..dc:
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL: continue
@@ -139,7 +140,7 @@ impl Sema:
         self.colliding_trait_names = sema_new_map_i32_i32()
         self.trait_identity_syms = sema_new_map_i64_i32()
         self.trait_identity_first = sema_new_map_i32_i32()
-        let first_paths: HashMap[i32, i32] = [:]
+        let first_paths: HashMap[i32, i32, Minted] = [:]
         let dc = self.ast.decl_count()
         for di in 0..dc:
             let decl = self.ast.get_decl(di)
@@ -273,8 +274,8 @@ impl Sema:
     // exactly that, #2043). Reads only the decl table, before any type is
     // registered; every declaration counts, demanded or not.
     mut fn report_duplicate_type_declarations():
-        let first_types: HashMap[i64, i32] = [:]
-        let first_traits: HashMap[i64, i32] = [:]
+        let first_types: HashMap[i64, i32, Minted] = [:]
+        let first_traits: HashMap[i64, i32, Minted] = [:]
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
@@ -309,7 +310,7 @@ impl Sema:
     // A method is not a free function: a declaration inside an `impl`,
     // `extend` or `trait` block, or one spelled `T.m`, is skipped.
     mut fn report_function_named_like_global():
-        let globals: HashMap[i64, i32] = [:]
+        let globals: HashMap[i64, i32, Minted] = [:]
         let block_files: List[i32] = []
         let block_starts: List[i32] = []
         let block_ends: List[i32] = []
@@ -1766,7 +1767,7 @@ impl Sema:
                     stack.pop()
                     color.insert(cur, 2)
 
-    mut fn emit_type_cycle_error(cycle_start: i32, cycle_end: i32, closing_edge_node: i32, parent_sym: &HashMap[i32, i32], parent_edge: &HashMap[i32, i32]):
+    mut fn emit_type_cycle_error(cycle_start: i32, cycle_end: i32, closing_edge_node: i32, parent_sym: &HashMap[i32, i32, Minted], parent_edge: &HashMap[i32, i32, Minted]):
         // Reconstruct cycle path: cycle_start → ... → cycle_end → cycle_start
         let path_syms: List[i32] = []
         let path_edges: List[i32] = []

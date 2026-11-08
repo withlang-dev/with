@@ -27,6 +27,7 @@ use std.memo
 use compiler.Runtime
 use rt.rt_core
 use std.libc.abort
+use std.collections.Minted
 
 
 // WITH_PROFILE=1: one `[profile] sema.<phase>` line per check_module step,
@@ -313,18 +314,18 @@ type SemaBuiltinSymbols {
 }
 
 type SemaMethodLookup {
-    sig_lookup: HashMap[i64, i32],
-    fn_lookup: HashMap[i64, i32],
+    sig_lookup: HashMap[i64, i32, Minted],
+    fn_lookup: HashMap[i64, i32, Minted],
     // #2520: trait-qualified rows, keyed sema_trait_method_key(owner,
     // trait_idx, method); the bare tables above keep one winner per
     // (owner, method) and amb_* records when that winner is contested
     // by a second trait (inherent wins silently, trait-vs-trait is the
     // §11.4 ambiguity error at a bare call).
-    trait_sig_lookup: HashMap[i64, i32],
-    trait_fn_lookup: HashMap[i64, i32],
-    generic_fn_lookup: HashMap[i64, i32],
-    amb_heads: HashMap[i64, i32],
-    amb_next_fn: HashMap[i32, i32],
+    trait_sig_lookup: HashMap[i64, i32, Minted],
+    trait_fn_lookup: HashMap[i64, i32, Minted],
+    generic_fn_lookup: HashMap[i64, i32, Minted],
+    amb_heads: HashMap[i64, i32, Minted],
+    amb_next_fn: HashMap[i32, i32, Minted],
 }
 
 // #2520: (owner, trait_idx + 2, method) in one key; trait_idx -1 encodes
@@ -734,21 +735,21 @@ type Sema {
     ast: AstPool,
     // Reverse index for the AST declaration table. The first declaration for
     // a node wins, matching find_decl_index's original forward scan.
-    decl_index_by_node: HashMap[i32, i32],
+    decl_index_by_node: HashMap[i32, i32, Minted],
     // D184 (§29.15): a script's bindings a helper captures — their settled
     // type and mutability (storage a helper can reach), every capture read
     // as [body, sym, node, file] (the statement-order check), and the
     // helpers an ephemeral capture made non-escaping.
-    script_slot_types: HashMap[i32, i32],
-    script_slot_muts: HashMap[i32, i32],
+    script_slot_types: HashMap[i32, i32, Minted],
+    script_slot_muts: HashMap[i32, i32, Minted],
     script_slot_syms: List[i32],
     script_capture_records: List[i32],
-    script_nonescaping_helpers: HashMap[i32, i32],
+    script_nonescaping_helpers: HashMap[i32, i32, Minted],
     script_fn_value_uses: List[i32],
     script_async_blocks: List[i32],
     // The scope indices of the captures injected for the helper being checked:
     // a helper's parameter or local shadows one (D173).
-    script_capture_indices: HashMap[i32, i32],
+    script_capture_indices: HashMap[i32, i32, Minted],
 
     // Type table (SoA parallel arrays)
     type_kinds: List[i32],
@@ -758,26 +759,26 @@ type Sema {
     type_extra: List[i32],
     // Exact structural type lookup. Hash buckets point into a collision chain
     // indexed by TypeId; component checks keep hash collisions harmless.
-    exact_type_cache_heads: HashMap[i64, i32],
+    exact_type_cache_heads: HashMap[i64, i32, Minted],
     exact_type_cache_next: List[i32],
 
     // Named type lookup: sym → TypeId
-    named_types: HashMap[i32, i32],
+    named_types: HashMap[i32, i32, Minted],
     // Type declaration AST nodes: sym → node (for cycle diagnostics)
-    type_decl_nodes: HashMap[i32, i32],
+    type_decl_nodes: HashMap[i32, i32, Minted],
     // #650: memoized trait_sym -> decl node (find_trait_decl_node was a
     // linear scan over every decl per call; hot in whole-compiler sema).
-    trait_decl_node_cache: HashMap[i32, i32],
+    trait_decl_node_cache: HashMap[i32, i32, Minted],
     // Exact type binding for each declaration node.
-    type_decl_tids: HashMap[i32, i32],
+    type_decl_tids: HashMap[i32, i32, Minted],
     // Impl targets resolved in the declaration's lexical module, before any
     // body can ask which concrete destructor a dynamic value may run.
-    impl_decl_target_types: HashMap[i32, i32],
+    impl_decl_target_types: HashMap[i32, i32, Minted],
     // Temporary accumulators for cycle detection (accessed through self)
     cycle_dep_syms: List[i32],
     cycle_dep_nodes: List[i32],
     // Fallback pretty names keyed by symbol id.
-    pretty_symbol_names: HashMap[i32, str],
+    pretty_symbol_names: HashMap[i32, str, Minted],
 
     // Function signatures (parallel arrays)
     sig_names: List[i32],
@@ -789,9 +790,9 @@ type Sema {
     sig_param_counts: List[i32],
     sig_variadic: List[i32],
     sig_params: List[i32],
-    sig_lookup: HashMap[i32, i32],
+    sig_lookup: HashMap[i32, i32, Minted],
     // An extern keeps its own signature when a curated wrapper takes its name.
-    extern_decl_sigs: HashMap[i32, i32],
+    extern_decl_sigs: HashMap[i32, i32, Minted],
     // mutability.md Phase 4 — per-parameter effect bitsets.
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
     // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4,
@@ -815,10 +816,10 @@ type Sema {
     sig_param_invoke_many: List[i32],
     // Per body: how many times each callable binding is invoked (symbol →
     // count; an invocation inside a loop counts twice).
-    fn_param_invocations: HashMap[i32, i32],
+    fn_param_invocations: HashMap[i32, i32, Minted],
     // Per body: the call that made a callable binding's count exceed one
     // (the site a `once` parameter's error names, §12.4).
-    fn_param_many_nodes: HashMap[i32, i32],
+    fn_param_many_nodes: HashMap[i32, i32, Minted],
     sig_param_eff_starts: List[i32],
     // Parallel signature metadata for value parameters lowered through pointer ABI.
     // This is distinct from semantic reference types: `self: &Self` is already a
@@ -880,22 +881,22 @@ type Sema {
     binding_use_seq: i32,
     binding_use_epoch: i32,
     binding_epoch_counter: i32,
-    binding_last_use: HashMap[i32, i64],
+    binding_last_use: HashMap[i32, i64, Minted],
     // #1242: ident nodes that resolved to a module global (not a local or
     // parameter), keyed by node — the move checks consult it after scopes pop.
-    global_value_ident_nodes: HashMap[i32, i32],
+    global_value_ident_nodes: HashMap[i32, i32, Minted],
     // `const` globals: comptime values, exempt from the move-out check.
-    const_global_syms: HashMap[i32, i32],
+    const_global_syms: HashMap[i32, i32, Minted],
     // D88 (§4.2.1): a `const` declared without a type, by name: its
     // declaration, and the others of that name in other modules. Whether one
     // is an untyped numeric constant is its initializer's to say
     // (untyped_const_init).
-    untyped_const_decls: HashMap[i32, i32],
+    untyped_const_decls: HashMap[i32, i32, Minted],
     untyped_const_alt_decls: List[i32],
     // An identifier that names an untyped numeric constant -> the
     // initializer it stands for at that use. Its type there is the node's in
     // typed_expr_types; MIR lowers the initializer at that type.
-    untyped_const_uses: HashMap[i32, i32],
+    untyped_const_uses: HashMap[i32, i32, Minted],
     // D89 (§4.3): a field whose numeric type its uses decide. The frontend
     // checks such a program twice: once to hear what the uses demand
     // (collect_field_demands; each such field is a distinct alias of its
@@ -924,22 +925,22 @@ type Sema {
     // function signature * 2^32 + name: a return is judged after the body's
     // scopes have closed, and a generic callee's body is checked in the
     // middle of its caller's.
-    fn_literal_lets: HashMap[i64, i32],
+    fn_literal_lets: HashMap[i64, i32, Minted],
     // D114: per (function, name), the one unannotated `let` whose integer
     // literal chose its type, or -1 once the name is bound twice; names it
     // in a narrowing error after the binding's scope has closed (a tail).
-    fn_int_literal_lets: HashMap[i64, i32],
+    fn_int_literal_lets: HashMap[i64, i32, Minted],
     // §4.9 (D65): the signatures whose body tail Sema accepted by wrapping
     // it in `Ok`; MIR wraps exactly these, never re-deciding.
-    implicit_ok_tail_sigs: HashMap[i32, i32],
+    implicit_ok_tail_sigs: HashMap[i32, i32, Minted],
     // D111 / D22 §6.2: the collect calls whose destination owns the values
     // the iterator views (`List[str]` from `&str` items), keyed by call node
     // to the owned element type; codegen copies each element (D65).
-    collect_copy_elements: HashMap[i32, i32],
+    collect_copy_elements: HashMap[i32, i32, Minted],
     literal_decisions: List[i32],
     // literal_decisions by `let`: the offset of each binding's entry, built
     // at the first lookup (one walk, not one per binding).
-    literal_decision_at: HashMap[i32, i32],
+    literal_decision_at: HashMap[i32, i32, Minted],
     // The number of types when the first such binding was reached: the two
     // checks are the same check up to there, so a type below this mark has
     // one id in both, and a type above it is rebuilt from its structure.
@@ -948,12 +949,12 @@ type Sema {
     // FIELD-shaped transfer args, so `eat(move self.r)` followed by `self.tag`
     // reads verdicts on the `.r` path, not the whole receiver. Key packs
     // root_sym * 2^32 + field_sym; value packs epoch * 2^32 + seq.
-    field_last_use: HashMap[i64, i64],
+    field_last_use: HashMap[i64, i64, Minted],
     // explain:effect provenance — first setter of each ownership-forcing bit.
     // Key packs (sig, param, bit-index); value packs (kind, a, b): kind 1 =
     // direct (a = AST node), kind 2 = effect-flow edge (a = callee sig,
     // b = callee param).
-    effect_prov: HashMap[i64, i64],
+    effect_prov: HashMap[i64, i64, Minted],
     // Origin node for the next note_param_effect call (set/cleared by the
     // node-bearing noters; 0 = unknown source construct).
     effect_note_origin_node: i32,
@@ -963,7 +964,7 @@ type Sema {
     move_site_node: i32,
 
     // Extern fn names
-    extern_fn_names: HashMap[i32, i32],
+    extern_fn_names: HashMap[i32, i32, Minted],
     // "<module path>\n<name>" for every `extern fn` declaration site (#1695):
     // a module that declares an extern itself is classified by ITS
     // declaration, not by whichever other module (std.fs) declared the
@@ -972,49 +973,49 @@ type Sema {
     // an interface's declaration): the module's view (get_sig).
     extern_decl_sites: HashMap[str, i32],
     // a signature index -> the module that declared the extern (get_sig).
-    extern_sig_modules: HashMap[i32, str],
+    extern_sig_modules: HashMap[i32, str, Minted],
     // every extern fn's text (imports keep their own symbol pools).
     extern_fn_texts: HashMap[str, i32],
     // text -> newest extern signature of that text; signature -> the previous one.
     extern_chain_head: HashMap[str, i32],
-    extern_chain_prev: HashMap[i32, i32],
+    extern_chain_prev: HashMap[i32, i32, Minted],
     extern_var_texts: HashMap[str, i32],  // every collected extern var by name text (has_extern_var_decl)
     // #602: c_import/extern params that RETAIN a passed C-string pointer past
     // the call (§16.3c). Keyed by fn name sym → bitmask of retained param
     // indices. Such a param is modeled as a C-string input (cstr_in) but
     // rejects a call-scoped `str` temporary — the caller must own the storage.
-    retained_extern_params: HashMap[i32, i32],
+    retained_extern_params: HashMap[i32, i32, Minted],
     // Function AST node indices by name
-    fn_decl_nodes: HashMap[i32, i32],
+    fn_decl_nodes: HashMap[i32, i32, Minted],
     // Function declaration node -> semantic symbol. Most declarations use
     // their parsed symbol; cross-module extension methods get a unique symbol
     // so packages can define the same Type.method without colliding.
-    fn_decl_effective_syms: HashMap[i32, i32],
+    fn_decl_effective_syms: HashMap[i32, i32, Minted],
     // Function declaration source path by name
-    fn_decl_source_paths: HashMap[i32, str],
+    fn_decl_source_paths: HashMap[i32, str, Minted],
     // Multiple function clauses (§9.7): public dispatch symbol -> clause group index.
-    fn_clause_group_lookup: HashMap[i32, i32],
+    fn_clause_group_lookup: HashMap[i32, i32, Minted],
     fn_clause_group_names: List[i32],
     fn_clause_group_starts: List[i32],
     fn_clause_group_counts: List[i32],
     fn_clause_group_decls: List[i32],
     // Hidden clause body symbol -> public dispatch symbol.
-    fn_clause_body_dispatch: HashMap[i32, i32],
+    fn_clause_body_dispatch: HashMap[i32, i32, Minted],
     // Memoized §14.22 by-value Task parameter disposition:
     // key(fn_sym,param_i) -> 1 when the parameter is proven consumed in scope.
     task_param_consumed_memo: Memo[i64, i32],
-    task_param_consumed_visiting: HashMap[i64, i32],
-    detached_task_stmt_nodes: HashMap[i32, i32],
+    task_param_consumed_visiting: HashMap[i64, i32, Minted],
+    detached_task_stmt_nodes: HashMap[i32, i32, Minted],
     // Generic function node indices by name. The map preserves the first
     // declaration for single-template metadata lookups; the candidate tables
     // retain every same-name generic declaration for structural overload
     // selection at call sites.
-    generic_fn_nodes: HashMap[i32, i32],
-    generic_fn_candidate_counts: HashMap[i32, i32],
+    generic_fn_nodes: HashMap[i32, i32, Minted],
+    generic_fn_candidate_counts: HashMap[i32, i32, Minted],
     generic_fn_candidate_syms: List[i32],
     generic_fn_candidate_nodes: List[i32],
     // Call expression/pipeline node -> selected generic declaration node.
-    resolved_generic_call_nodes: HashMap[i32, i32],
+    resolved_generic_call_nodes: HashMap[i32, i32, Minted],
 
     // Methods: hash(type_sym, method_sym) → sig index
     extension_method_owner_syms: List[i32],
@@ -1022,36 +1023,36 @@ type Sema {
     extension_method_fn_syms: List[i32],
     extension_method_sig_idxs: List[i32],
     extension_method_paths: List[str],
-    qualified_extension_call_nodes: HashMap[i32, i32],
+    qualified_extension_call_nodes: HashMap[i32, i32, Minted],
     // Variant lookup: variant_sym → variant_index
-    variant_lookup: HashMap[i32, i32],
+    variant_lookup: HashMap[i32, i32, Minted],
     // Variant type IDs: variant_sym → enum_tid
-    variant_type_ids: HashMap[i32, i32],
+    variant_type_ids: HashMap[i32, i32, Minted],
     // Explicit constructor imports: variant_sym -> enum_tid.
-    imported_variant_owners: HashMap[i32, i32],
+    imported_variant_owners: HashMap[i32, i32, Minted],
     // Discriminant enum data
-    disc_repr_types: HashMap[i32, i32],
+    disc_repr_types: HashMap[i32, i32, Minted],
     // Per declaration (#1451): enum TypeId -> start of its variants' values in
     // disc_value_list, in variant order.
-    disc_value_starts: HashMap[i32, i32],
+    disc_value_starts: HashMap[i32, i32, Minted],
     disc_value_list: List[i64],
-    disc_has_payload: HashMap[i32, i32],
-    bitpacked_types: HashMap[i32, i32],  // type_id → 1 if bitpacked
-    packed_types: HashMap[i32, i32],     // type_id → 1 if repr(packed)/@[packed]
-    packed_caps: HashMap[i32, i32],      // type_id → N of @[repr(packed(N))] (§16.4)
-    repr_c_types: HashMap[i32, i32],     // type_id → 1 if @[repr(C)] (or repr(packed))
+    disc_has_payload: HashMap[i32, i32, Minted],
+    bitpacked_types: HashMap[i32, i32, Minted],  // type_id → 1 if bitpacked
+    packed_types: HashMap[i32, i32, Minted],     // type_id → 1 if repr(packed)/@[packed]
+    packed_caps: HashMap[i32, i32, Minted],      // type_id → N of @[repr(packed(N))] (§16.4)
+    repr_c_types: HashMap[i32, i32, Minted],     // type_id → 1 if @[repr(C)] (or repr(packed))
     // §16.11: TY_FN/TY_EXTERN_FN type_id → 1 when the callable is unsafe to
     // call (carries a raw-pointer-validity precondition). Part of type identity.
-    unsafe_fn_type_set: HashMap[i32, i32],
+    unsafe_fn_type_set: HashMap[i32, i32, Minted],
     // #1832: C variadic function-pointer types, `extern "C" fn(A, ...) -> R`.
     // Variadic-ness is part of the type's identity, and a variadic type is
     // always unsafe to call (§16.3c: a variadic call is raw).
-    variadic_fn_type_set: HashMap[i32, i32],
+    variadic_fn_type_set: HashMap[i32, i32, Minted],
     // §16.4 union last-written tracking. Maps a local union variable's name
     // sym → the last-written field sym (0 = tracked-but-unknown after control
     // flow). Absent = untracked (never literal-initialized/assigned) and never
     // flagged, which keeps raw/uninitialized union access build-safe.
-    union_last_written: HashMap[i32, i32],
+    union_last_written: HashMap[i32, i32, Minted],
     union_tracked_syms: List[i32],   // insertion-ordered tracked union var syms
     union_in_assign_target: i32,
 
@@ -1060,8 +1061,8 @@ type Sema {
     // pair(resolved inst tid, trait sym) into flat (method, sig, mono) rows.
     // Codegen's vtable builder consumes these (blanket impls have no
     // pre-monomorphized Type__Arg.method functions).
-    dyn_impl_starts: HashMap[i64, i32],
-    dyn_impl_counts: HashMap[i64, i32],
+    dyn_impl_starts: HashMap[i64, i32, Minted],
+    dyn_impl_counts: HashMap[i64, i32, Minted],
     dyn_impl_flat_method_names: List[i32],
     dyn_impl_flat_sigs: List[i32],
     dyn_impl_flat_mono_syms: List[i32],
@@ -1076,19 +1077,19 @@ type Sema {
     trait_method_ret_nodes: List[i32],
     trait_method_default_bodies: List[i32],
     trait_name_syms: List[i32],
-    trait_lookup: HashMap[i32, i32],
+    trait_lookup: HashMap[i32, i32, Minted],
     // #2520: trait identity is (module, name). Candidates chain by trait
     // index behind trait_candidate_heads (sym -> trait index), resolved
     // with the same visibility rules as named types; trait_decl_paths is
     // the declaring module and trait_decl_nodes the declaration per trait
     // index.
-    trait_candidate_heads: HashMap[i32, i32],
+    trait_candidate_heads: HashMap[i32, i32, Minted],
     trait_candidate_paths: List[str],
     trait_candidate_pubs: List[i32],
     trait_candidate_nexts: List[i32],
     trait_decl_paths: List[str],
     trait_decl_nodes: List[i32],
-    trait_idx_by_decl_node: HashMap[i32, i32],
+    trait_idx_by_decl_node: HashMap[i32, i32, Minted],
     // Trait type params: flat vec of type param name syms per trait
     trait_tp_starts: List[i32],
     trait_tp_counts: List[i32],
@@ -1107,56 +1108,56 @@ type Sema {
     impl_starts: List[i32],
     impl_counts: List[i32],
     impl_type_syms: List[i32],
-    impl_lookup: HashMap[i32, i32],
+    impl_lookup: HashMap[i32, i32, Minted],
     // D29 scaffolding (#750): tier provenance for the shadow case (a user type
     // decl reusing a prelude-closure type name). impl_extra_is_std runs in
     // lockstep with impl_extra; type_tid_is_std / type_decl_nodes_by_tid are
     // recorded at type-decl registration; type_sym_tier_mask bits: 1=std, 2=user.
     // All queries stay on the flat path unless the mask reads 3 (shadowed).
     impl_extra_is_std: List[bool],
-    type_decl_nodes_by_tid: HashMap[i32, i32],
+    type_decl_nodes_by_tid: HashMap[i32, i32, Minted],
     // D100 (§18.3): the `pub` fields, keyed by (type declaration node, field
     // name); a field not here is private to its package (sema_field_key).
-    pub_field_keys: HashSet[i64],
+    pub_field_keys: HashSet[i64, Minted],
     // §16.2b.3: the `T.zeroed()` calls on zero-valid C records; MIR
     // lowers each to the all-zero value of its type.
-    zeroed_call_nodes: HashSet[i32],
+    zeroed_call_nodes: HashSet[i32, Minted],
     // D104 (§17.1): the static comptime-callability verdict per function
     // symbol, for `comptime fn` bodies (checked at the declaration): 1
     // callable, 0 not; and for a refusal, the chain of calls to the first
     // forbidden operation (`helper -> print (I/O)`). Plain functions called
     // at compile time are judged by the evaluator instead.
     comptime_callable_memo: Memo[i32, i32],
-    comptime_callable_chain: HashMap[i32, str],
-    comptime_callable_visiting: HashSet[i32],
+    comptime_callable_chain: HashMap[i32, str, Minted],
+    comptime_callable_visiting: HashSet[i32, Minted],
     // §4.9a (D103): expressions a demanded Option[T] converts to Some(expression);
     // MIR builds the Some around the lowered value. Keyed by expression node,
     // the Option type.
-    value_to_option_nodes: HashMap[i32, i32],
+    value_to_option_nodes: HashMap[i32, i32, Minted],
     // D142 (§13.5): pipeline nodes whose left side is a sequence, iterated
     // by the `for` rule; the value is the iterator type MIR's inserted
     // `.iter()` call builds (for_iter_* keyed by the pipeline node).
-    pipeline_implicit_iter: HashMap[i32, i32],
+    pipeline_implicit_iter: HashMap[i32, i32, Minted],
     // D186 (§13.3): the argument of a `zip`, `chain` or `zip_with` stage
     // that is an iterable but no Iter, with the iterator type its `.iter()`
     // yields; the for_iter_* records keyed by the argument node say which
     // `.iter()` MIR calls there.
-    implicit_iter_args: HashMap[i32, i32],
+    implicit_iter_args: HashMap[i32, i32, Minted],
     // §13.3 (#2943): the call nodes of `Iter.empty()` and the other
     // standalone constructors, resolved to std's `iter_ctor_*`: a static
     // call, so MIR passes no receiver.
-    iter_ctor_call_nodes: HashMap[i32, i32],
+    iter_ctor_call_nodes: HashMap[i32, i32, Minted],
     // §14.10 (#2956): a select await arm whose expression is not a Task
     // (`rx.recv()`) runs as its own fiber, as an async block whose body is
     // the expression; keyed by the arm's expression node, the Task type the
     // select races.
-    select_arm_spawn_types: HashMap[i32, i32],
+    select_arm_spawn_types: HashMap[i32, i32, Minted],
     // D143: the unannotated function whose body is in its first pass, with
     // its own calls open (`Never`); the self-call nodes; the type the other
     // paths gave it, for the second pass's message.
     // (type, trait) pairs a derive validation is checking: assumed to hold
     // while it runs, so a recursive payload (`List[Self]`) closes.
-    derives_assumed: HashMap[i64, i32],
+    derives_assumed: HashMap[i64, i32, Minted],
     recursion_open_sym: i32,
     recursion_inferred_type: i32,
     // The node of a path that disagreed in the first pass (reported after
@@ -1164,19 +1165,19 @@ type Sema {
     recursion_pass1_mismatch: i32,
     // The operand an operator is checking against its other operand's type:
     // not a demand site (§4.9a), so no conversion fires on it.
-    operator_operand_nodes: HashSet[i32],
-    type_tid_is_std: HashMap[i32, i32],
+    operator_operand_nodes: HashSet[i32, Minted],
+    type_tid_is_std: HashMap[i32, i32, Minted],
     // #751 / #1745: the template declaration (its TY_STRUCT/TY_ENUM tid) a
     // generic instance was made from — identity, not the short name, since
     // a user `type PullCore` beside std.task's `PullCore[G]` shares the
     // symbol. Recorded by resolve_generic_type and carried through
     // substitution; read by generic_inst_template_tid.
-    generic_inst_templates: HashMap[i32, i32],
-    generic_alias_inst_targets: HashMap[i32, i32],
-    type_sym_tier_mask: HashMap[i32, i32],
+    generic_inst_templates: HashMap[i32, i32, Minted],
+    generic_alias_inst_targets: HashMap[i32, i32, Minted],
+    type_sym_tier_mask: HashMap[i32, i32, Minted],
     // Generic inst impls: impl Trait for Type[Args]
     // Key: pair(type_id, trait_sym) → 1
-    impl_generic_inst: HashMap[i64, i32],
+    impl_generic_inst: HashMap[i64, i32, Minted],
     // Blanket impls: impl[T: Bound] Trait for T
     blanket_trait_syms: List[i32],
     blanket_bound_syms: List[i32],
@@ -1198,10 +1199,10 @@ type Sema {
     blanket_guard: Memo[i64, bool],
 
     // Local trait/type names
-    local_trait_names: HashMap[i32, i32],
-    lang_trait_syms: HashMap[i32, i32],
-    local_type_names: HashMap[i32, i32],
-    distinct_type_names: HashMap[i32, i32],
+    local_trait_names: HashMap[i32, i32, Minted],
+    lang_trait_syms: HashMap[i32, i32, Minted],
+    local_type_names: HashMap[i32, i32, Minted],
+    distinct_type_names: HashMap[i32, i32, Minted],
     // The type parameters in scope for the declaration under comptime
     // transform (an impl's and a method's own): unbound there, never a
     // module type of the same name (a program's `type T` beside a std
@@ -1209,54 +1210,54 @@ type Sema {
     ct_type_param_syms: List[i32],
     // D120 (§4.3): the structs declared `resource type`, by name symbol:
     // never Copy, whatever their fields.
-    resource_type_names: HashMap[i32, i32],
+    resource_type_names: HashMap[i32, i32, Minted],
     // §4.5 (D75, #1802): the ownership mode of a cast whose target relabels
     // its source (CastMode, keyed by the NK_CAST node). Absent: an ordinary
     // value conversion. MirLower materializes the mode; it never re-derives it.
-    cast_modes: HashMap[i32, i32],
-    ephemeral_types: HashMap[i32, i32],
-    sealed_traits: HashMap[i32, i32],
+    cast_modes: HashMap[i32, i32, Minted],
+    ephemeral_types: HashMap[i32, i32, Minted],
+    sealed_traits: HashMap[i32, i32, Minted],
     // Sealed trait implementors: flat vec of type syms, with start/count per trait
     sealed_impl_types: List[i32],
-    sealed_impl_starts: HashMap[i32, i32],
-    sealed_impl_counts: HashMap[i32, i32],
+    sealed_impl_starts: HashMap[i32, i32, Minted],
+    sealed_impl_counts: HashMap[i32, i32, Minted],
 
     // Must-use / result-option / task fn tracking
-    must_use_types: HashMap[i32, i32],
-    no_await_guard_types: HashMap[i32, i32],
-    must_use_fns: HashMap[i32, i32],
+    must_use_types: HashMap[i32, i32, Minted],
+    no_await_guard_types: HashMap[i32, i32, Minted],
+    must_use_fns: HashMap[i32, i32, Minted],
     // #3061: the facts `with fix-ceremony` rewrites by, recorded where Sema
     // decides them: a local let with an annotation and an initializer (node →
     // the annotation's type), its initializer, the file it is in, and the lets
     // whose binding is assigned again or passed to a `mut` parameter.
-    ceremony_let_annotations: HashMap[i32, i32],
-    ceremony_let_values: HashMap[i32, i32],
-    ceremony_let_type_nodes: HashMap[i32, i32],
-    ceremony_let_paths: HashMap[i32, str],
-    ceremony_rebound_lets: HashMap[i32, i32],
-    ceremony_widening_casts: HashMap[i32, i32],   // a widening `as` under a demand of its target (node → its source expression)
-    ceremony_list_news: HashMap[i32, i32],        // a `List.new()` / `HashMap.new()` whose binding's type is written (node → 1)
+    ceremony_let_annotations: HashMap[i32, i32, Minted],
+    ceremony_let_values: HashMap[i32, i32, Minted],
+    ceremony_let_type_nodes: HashMap[i32, i32, Minted],
+    ceremony_let_paths: HashMap[i32, str, Minted],
+    ceremony_rebound_lets: HashMap[i32, i32, Minted],
+    ceremony_widening_casts: HashMap[i32, i32, Minted],   // a widening `as` under a demand of its target (node → its source expression)
+    ceremony_list_news: HashMap[i32, i32, Minted],        // a `List.new()` / `HashMap.new()` whose binding's type is written (node → 1)
     // #3061 index loops: the active `for i in 0..xs.len()` loops by their
     // counter (sym → for node), each loop's list ident, every use of the
     // counter, the uses that index the list, the index nodes, and the loops
     // whose list is written through the counter.
-    ceremony_active_index_loops: HashMap[i32, i32],
-    ceremony_index_loop_bases: HashMap[i32, i32],
-    ceremony_loop_uses: HashMap[i32, i32],
-    ceremony_loop_index_uses: HashMap[i32, i32],
-    ceremony_loop_index_nodes: HashMap[i32, i32],  // index node → its loop
-    ceremony_loop_written: HashMap[i32, i32],
-    ceremony_loop_elem_syms: HashMap[i32, i32],     // loop → the element name Sema chose
-    ceremony_active_elem_syms: HashMap[i32, i32],   // that name → the loop, while its body is checked
-    ceremony_fn_elem_syms: HashMap[i32, i32],       // every element name chosen in the function being checked → its loop
-    ceremony_active_base_syms: HashMap[i32, i32],   // an active index loop's list (sym) → the loop; a mutation of it keeps the loop
-    suspending_fns: HashMap[i32, i32],          // @[suspends] declarations (#3052): calling one may suspend the current fiber
-    builtin_suspending_methods: HashMap[i64, i32], // … and the compiler-declared ones (Sender.send, Receiver.recv, Task.join_cleanup), keyed sema_pair_key(owner, method)
-    result_option_fns: HashMap[i32, i32],
-    task_fns: HashMap[i32, i32],
-    no_alloc_fns: HashMap[i32, i32],
-    fn_may_alloc: HashMap[i32, i32],
-    fn_stack_sizes: HashMap[i32, i32],
+    ceremony_active_index_loops: HashMap[i32, i32, Minted],
+    ceremony_index_loop_bases: HashMap[i32, i32, Minted],
+    ceremony_loop_uses: HashMap[i32, i32, Minted],
+    ceremony_loop_index_uses: HashMap[i32, i32, Minted],
+    ceremony_loop_index_nodes: HashMap[i32, i32, Minted],  // index node → its loop
+    ceremony_loop_written: HashMap[i32, i32, Minted],
+    ceremony_loop_elem_syms: HashMap[i32, i32, Minted],     // loop → the element name Sema chose
+    ceremony_active_elem_syms: HashMap[i32, i32, Minted],   // that name → the loop, while its body is checked
+    ceremony_fn_elem_syms: HashMap[i32, i32, Minted],       // every element name chosen in the function being checked → its loop
+    ceremony_active_base_syms: HashMap[i32, i32, Minted],   // an active index loop's list (sym) → the loop; a mutation of it keeps the loop
+    suspending_fns: HashMap[i32, i32, Minted],          // @[suspends] declarations (#3052): calling one may suspend the current fiber
+    builtin_suspending_methods: HashMap[i64, i32, Minted], // … and the compiler-declared ones (Sender.send, Receiver.recv, Task.join_cleanup), keyed sema_pair_key(owner, method)
+    result_option_fns: HashMap[i32, i32, Minted],
+    task_fns: HashMap[i32, i32, Minted],
+    no_alloc_fns: HashMap[i32, i32, Minted],
+    fn_may_alloc: HashMap[i32, i32, Minted],
+    fn_stack_sizes: HashMap[i32, i32, Minted],
     // D69 (§13.4) generator metadata. A `gen fn f(params) -> T` is three
     // functions: `f` builds the generator value — a compiler-generated struct
     // holding the arguments, which implements Gen[T]; its `each(body)` method
@@ -1264,59 +1265,59 @@ type Sema {
     // which every `yield e` calls `body(e)`. Keys: the gen fn's symbol, except
     // generator_state_yield_types (state type id) and generator_mir_only_fns
     // (run/each symbol → gen fn symbol; MIR-only functions codegen declares).
-    generator_fn_yield_types: HashMap[i32, i32],
-    generator_fn_state_types: HashMap[i32, i32],
-    generator_fn_state_syms: HashMap[i32, i32],
-    generator_fn_run_syms: HashMap[i32, i32],
-    generator_fn_each_syms: HashMap[i32, i32],
+    generator_fn_yield_types: HashMap[i32, i32, Minted],
+    generator_fn_state_types: HashMap[i32, i32, Minted],
+    generator_fn_state_syms: HashMap[i32, i32, Minted],
+    generator_fn_run_syms: HashMap[i32, i32, Minted],
+    generator_fn_each_syms: HashMap[i32, i32, Minted],
     // Gen fns whose generator value holds a view of the borrowed receiver
     // (field 0 is &Self): the constructor stores its place, `each` passes
     // that place to the producer.
-    generator_fn_receiver_views: HashMap[i32, i32],
-    generator_mir_only_fns: HashMap[i32, i32],
-    generator_state_yield_types: HashMap[i32, i32],
+    generator_fn_receiver_views: HashMap[i32, i32, Minted],
+    generator_mir_only_fns: HashMap[i32, i32, Minted],
+    generator_state_yield_types: HashMap[i32, i32, Minted],
     // §13.6a: an NK_FOR whose iterable is an Option or Result is the
     // one-clause comprehension the parser recorded beside it: the NK_FOR
     // node -> that match node, which Sema checked and MIR lowers instead.
-    for_carrier_matches: HashMap[i32, i32],
+    for_carrier_matches: HashMap[i32, i32, Minted],
     // D69 (§13.4): `for x in g` over a Gen[T] runs its body as the `body`
     // closure of `g.each(body)`. Keyed by the NK_FOR node: the element type
     // T, the closure's type fn(T) -> bool, and the `each` callee (its
     // signature and specialization symbol for a generic impl). The body's
     // captures live in the closure capture summary under the same node.
-    gen_for_elem_types: HashMap[i32, i32],
-    gen_for_body_types: HashMap[i32, i32],
-    gen_for_each_syms: HashMap[i32, i32],
-    gen_for_each_sigs: HashMap[i32, i32],
-    gen_for_each_monos: HashMap[i32, i32],
+    gen_for_elem_types: HashMap[i32, i32, Minted],
+    gen_for_body_types: HashMap[i32, i32, Minted],
+    gen_for_each_syms: HashMap[i32, i32, Minted],
+    gen_for_each_sigs: HashMap[i32, i32, Minted],
+    gen_for_each_monos: HashMap[i32, i32, Minted],
     // D65 (§13.5): the element type Sema bound each loop's pattern to — keyed
     // by the NK_FOR node, and a comprehension clause's by its iterable node.
     // MIR reads it; it re-derived one from the iterable's type.
-    for_elem_types: HashMap[i32, i32],
+    for_elem_types: HashMap[i32, i32, Minted],
     // §13.5 (#1837): the `.iter()` the compiler inserts for a loop over a
     // collection that is no Iter[T] — the callee, its signature, its
     // specialization symbol (a generic impl) and the iterator type it
     // returns, keyed like for_elem_types. MIR lowers exactly this call and
     // steps its result with `next()`.
-    for_iter_fn_syms: HashMap[i32, i32],
-    for_iter_sigs: HashMap[i32, i32],
-    for_iter_monos: HashMap[i32, i32],
-    for_iter_types: HashMap[i32, i32],
+    for_iter_fn_syms: HashMap[i32, i32, Minted],
+    for_iter_sigs: HashMap[i32, i32, Minted],
+    for_iter_monos: HashMap[i32, i32, Minted],
+    for_iter_types: HashMap[i32, i32, Minted],
     // The concrete `next()` of a non-generic iterator that `.iter()`
     // returns (a generic one is demanded into iter_next_sigs/monos).
-    for_iter_next_fns: HashMap[i32, i32],
-    mutable_global_syms: HashMap[i32, i32],
+    for_iter_next_fns: HashMap[i32, i32, Minted],
+    mutable_global_syms: HashMap[i32, i32, Minted],
     // mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
     // diagnostic on rebind attempts. `global var X = ...` does NOT register
     // here — it's rebindable.
-    stable_global_syms: HashMap[i32, i32],
-    global_value_decl_kinds: HashMap[i32, i32],
+    stable_global_syms: HashMap[i32, i32, Minted],
+    global_value_decl_kinds: HashMap[i32, i32, Minted],
     // D39: a bundle interface's storage and constants live beside the flat
     // global scope, not in it — symbol → binding index and declaring module,
     // consulted by scope_lookup only from a module that imports theirs.
-    interface_global_index: HashMap[i32, i32],
-    interface_global_paths: HashMap[i32, str],
+    interface_global_index: HashMap[i32, i32, Minted],
+    interface_global_paths: HashMap[i32, str, Minted],
     // The same name exported by a second bundle (pcre2's and zlib's
     // UINT_MAX, both from limits.h): every further declaring module gets
     // its own binding, and scope_lookup picks the one the current module
@@ -1329,20 +1330,20 @@ type Sema {
     // 1 when the source can name it; the symbols the source names.
     decl_is_iface: List[i32],
     decl_iface_demanded: List[i32],
-    iface_mentioned: HashMap[i32, i32],
+    iface_mentioned: HashMap[i32, i32, Minted],
     interface_eager: i32,            // 1: a bundle build or a .wi root — collect every interface declaration
     // every flat-scope global's declaring module and binding index (symbol
     // → path, symbol → index), and the globals a local binding is standing
     // in for while its scope lasts — a function's local may take the name
     // of a global its module cannot see (§18.1); the global's slot returns
     // when the scope ends
-    global_value_decl_paths: HashMap[i32, str],
-    global_value_decl_bindings: HashMap[i32, i32],
+    global_value_decl_paths: HashMap[i32, str, Minted],
+    global_value_decl_bindings: HashMap[i32, i32, Minted],
     // Each global initializer by its name (sym → decl index) and its check's
     // state by declaration (1 running, 2 done): a use of an untyped global
     // checks its initializer first, whatever the declaration order.
-    top_level_let_pending: HashMap[i32, i32],
-    top_level_let_state: HashMap[i32, i32],
+    top_level_let_pending: HashMap[i32, i32, Minted],
+    top_level_let_state: HashMap[i32, i32, Minted],
     top_level_let_current: i32,
     shadowed_global_syms: List[i32],
     shadowed_global_indices: List[i32],
@@ -1352,8 +1353,8 @@ type Sema {
     global_race_access_paths: List[str],
     global_race_access_kinds: List[i32],
     global_race_access_unsafe: List[i32],
-    global_race_mutated_syms: HashMap[i32, i32],
-    global_race_mutation_nodes: HashMap[i32, i32],
+    global_race_mutated_syms: HashMap[i32, i32, Minted],
+    global_race_mutation_nodes: HashMap[i32, i32, Minted],
     global_race_concurrency_node: i32,
     global_race_concurrency_file: i32,
     global_race_concurrency_reason: str,
@@ -1362,7 +1363,7 @@ type Sema {
     // the proof counts only evidence the program can reach: a library body
     // nothing calls does not make the program concurrent.
     global_race_evidence: List[RaceEvidence],
-    race_call_edge_first: HashMap[i32, isize],     // a caller's first edge into race_call_edge_to; race_call_edge_next chains the rest
+    race_call_edge_first: HashMap[i32, isize, Minted],     // a caller's first edge into race_call_edge_to; race_call_edge_next chains the rest
     race_call_edge_to: List[i32],
     race_call_edge_next: List[isize],
     // #1819 (§9.1c: globals are places; §21.1 rule 1): a call whose callee
@@ -1385,7 +1386,7 @@ type Sema {
     // decl indices, each after every global its initializer may read.
     global_read_records: List[i32],
     global_init_order: List[i32],
-    global_init_rank: HashMap[i32, isize],
+    global_init_rank: HashMap[i32, isize, Minted],
     global_calls: List[i32],
     global_call_targets: List[i32],
     global_call_bindings: List[i32],
@@ -1396,7 +1397,7 @@ type Sema {
     current_effect_body: i32,
     // A function named as a value (`apply(change)`), keyed by the ident
     // node, to the signature Sema resolved it to (check_ident).
-    fn_value_ident_sigs: HashMap[i32, i32],
+    fn_value_ident_sigs: HashMap[i32, i32, Minted],
     // #1827: how many of global_dispatchers expand_global_dispatchers has
     // given their call records; the rest are expanded on the next call.
     global_dispatchers_expanded: i32,
@@ -1407,7 +1408,7 @@ type Sema {
     // §21.1 rule 1: each declaration's resolved `writes` clause, keyed by
     // its node, as an index into declared_write_syms_flat holding the count
     // then the global symbols (resolve_declared_global_writes).
-    declared_write_starts: HashMap[i32, i32],
+    declared_write_starts: HashMap[i32, i32, Minted],
     declared_write_syms_flat: List[i32],
     // #1903 (§21.1 rule 6): the globals a function's returned view views —
     // directly, or through a callee's returned view — keyed by signature, as
@@ -1415,13 +1416,13 @@ type Sema {
     // (note_returned_global_origins). A call's result views them
     // (record_call_view_origins_args), so §21.1 rule 1 judges a write of
     // one while the result is live.
-    ret_global_origin_heads: HashMap[i32, i32],
+    ret_global_origin_heads: HashMap[i32, i32, Minted],
     ret_global_origin_entries: List[i32],
     // Each declaration's resolved `from` clause, keyed by its node, as an
     // index into declared_from_flat holding the count then the entries: a
     // parameter as -1 - its index, a global as its symbol
     // (resolve_declared_view_origins).
-    declared_from_starts: HashMap[i32, i32],
+    declared_from_starts: HashMap[i32, i32, Minted],
     declared_from_flat: List[i32],
     // Recursion (#1903): a call that reads a callee's returned-view globals
     // before the callee's body is done (it calls back, directly or through
@@ -1434,8 +1435,8 @@ type Sema {
     // the diagnostic a view of the global itself gets, built at the write
     // (judge_placeholder_writes); so is each `from` clause, as
     // [declaration, sig, file].
-    ret_origin_placeholder_sigs: HashMap[i32, i32],
-    ret_origin_placeholder_syms: HashMap[i32, i32],
+    ret_origin_placeholder_sigs: HashMap[i32, i32, Minted],
+    ret_origin_placeholder_syms: HashMap[i32, i32, Minted],
     ret_global_origin_sigs: List[i32],
     ret_view_placeholder_writes: List[i32],
     ret_view_placeholder_diags: List[Diagnostic],
@@ -1457,9 +1458,9 @@ type Sema {
     // The entries of one (sig, pi) chain from footprint_entry_heads through
     // footprint_entry_next (-1 ends it): a lookup touches that key's entries,
     // never every signature's (the compiler has tens of thousands).
-    footprint_entry_heads: HashMap[i64, isize],
+    footprint_entry_heads: HashMap[i64, isize, Minted],
     footprint_entry_next: List[isize],
-    footprint_whole: HashMap[i64, i32],
+    footprint_whole: HashMap[i64, i32, Minted],
     footprint_edges: List[i32],
     footprint_call_callee_sig: i32,
     footprint_call_callee_pi: i32,
@@ -1469,7 +1470,7 @@ type Sema {
     // counts as the argument's path only when no edge exists (a call through
     // a trait object or a callable). Resolved when the fixpoint starts.
     footprint_propagated_pending: List[i32],
-    footprint_edge_nodes: HashMap[i32, i32],
+    footprint_edge_nodes: HashMap[i32, i32, Minted],
     footprint_pending_diags: List[Diagnostic],
     footprint_pending_data: List[i32],
     // WITH_PROFILE=1 accumulators: nanoseconds in the per-call conflict
@@ -1482,15 +1483,15 @@ type Sema {
     // produces something else (predicate_other_results). A function whose
     // every result is a 0/1 literal and whose declared return is an integer
     // is counted as `i32-predicate`: a yes/no stored in a number.
-    predicate_zero_results: HashMap[i32, i32],
-    predicate_one_results: HashMap[i32, i32],
-    predicate_other_results: HashMap[i32, i32],
+    predicate_zero_results: HashMap[i32, i32, Minted],
+    predicate_one_results: HashMap[i32, i32, Minted],
+    predicate_other_results: HashMap[i32, i32, Minted],
     declared_from_checks: List[i32],
     // #1827: bodies a call runs that the running program chooses — every
     // impl of a dyn method, every callable of a callable type, every drop a
     // type's drop runs — as [kind, a, b]; chained by `a` for lookup.
     global_dispatchers: List[i32],
-    global_dispatcher_heads: HashMap[i32, i32],
+    global_dispatcher_heads: HashMap[i32, i32, Minted],
     global_dispatcher_next: List[i32],
     // #1827: every callable value in this compilation — a closure (-2 - its
     // node) or a function named as a value (its signature) — with its
@@ -1501,31 +1502,31 @@ type Sema {
     // callee, which drops it), keyed by the argument node; the first
     // binding of the body being checked (a return drops every binding from
     // here); and, per type, whether its drop runs a user Drop impl (1/0).
-    global_consumed_args: HashMap[i32, i32],
+    global_consumed_args: HashMap[i32, i32, Minted],
     current_fn_bind_start: i32,
-    global_user_drop_types: HashMap[i32, i32],
+    global_user_drop_types: HashMap[i32, i32, Minted],
     // #1847: a dyn method call whose method consumes its receiver (`move
     // self`), keyed by the call node.
-    dyn_consuming_calls: HashMap[i32, i32],
+    dyn_consuming_calls: HashMap[i32, i32, Minted],
     // #1860: a typed binding pattern's view type (`c: &Circle`), keyed by
     // the pattern node, and its active binding symbols (for the assign help).
     // The symbol marker expires when that binding leaves scope.
-    dyn_downcast_binding_types: HashMap[i32, i32],
-    dyn_downcast_binding_syms: HashMap[i32, i32],
+    dyn_downcast_binding_types: HashMap[i32, i32, Minted],
+    dyn_downcast_binding_syms: HashMap[i32, i32, Minted],
     // The matches Sema proved exhaustive (a value position, a must-use
     // subject), keyed by the match node: their last arm's failure edge is
     // no path (MirLower.lower_match).
-    exhaustive_matches: HashMap[i32, i32],
+    exhaustive_matches: HashMap[i32, i32, Minted],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
 
     // Method origin tracking
-    method_impl_nodes: HashMap[i32, i32],
-    method_decl_impl_nodes: HashMap[i32, i32],
-    method_decl_origins: HashMap[i32, i32],
-    method_has_inherent: HashMap[i32, i32],
-    method_symbol_flags: HashMap[i32, i32],
+    method_impl_nodes: HashMap[i32, i32, Minted],
+    method_decl_impl_nodes: HashMap[i32, i32, Minted],
+    method_decl_origins: HashMap[i32, i32, Minted],
+    method_has_inherent: HashMap[i32, i32, Minted],
+    method_symbol_flags: HashMap[i32, i32, Minted],
     method_lookup: SemaMethodLookup,
     drop_method_cache: Memo[i32, i32],
     // D72 (§2.5.1, #1431): struct name sym -> 1 when the struct carries the
@@ -1538,7 +1539,7 @@ type Sema {
     liveness_byte_decl_cache: Memo[i32, i32],
     // is_copy cycle guard — HashSet (heap handle) so is_copy can be `&Self` and
     // mutate it through a copied handle (D7 interior-mutability recipe).
-    copy_visit_stack: HashSet[i32],
+    copy_visit_stack: HashSet[i32, Minted],
     // D120 stage 3: the struct field walk of is_copy, memoized per resolved
     // type once it is exact (no unresolved field, no cycle met); without it
     // every query walked every field of every struct (type_needs_drop stops
@@ -1547,7 +1548,7 @@ type Sema {
     copy_walk_incomplete: i32,
     copy_cycle_hits: i32,
     // type_needs_drop cycle guard — HashSet (heap handle) for `&Self` interior mut.
-    needs_drop_visit: HashSet[i32],
+    needs_drop_visit: HashSet[i32, Minted],
     current_drop_type_sym: i32,
     pattern_subject_node: i32,         // subject expr of the pattern being checked (#1272 fix-its); 0 when none
     pattern_bind_mut: i32,             // 1 while checking a `var PATTERN` head: its bindings are mutable (#1354)
@@ -1569,15 +1570,15 @@ type Sema {
     // (the hole arrives blanked by design); only IMPLICIT moves (bare
     // assignment-RHS reads) make later whole-value uses an error. A
     // suppression set, so branch-merge imprecision only ever suppresses.
-    explicitly_partial_syms: HashMap[i32, i32],
+    explicitly_partial_syms: HashMap[i32, i32, Minted],
     // D32 (§2.2): one field-move diagnostic per node — the demand-site
     // error (D22 §13.6) and the implicit-move error claim the node here,
     // whichever fires first.
-    field_move_diag_nodes: HashMap[i32, i32],
+    field_move_diag_nodes: HashMap[i32, i32, Minted],
     // §10.3 (D74, #1710): the optional chains that read their base in place
     // (a Copy field, a borrowing method, a view). A chain absent here takes
     // its payload out of a temporary. Sema decides; MirLower reads.
-    optional_chain_observing_nodes: HashMap[i32, i32],
+    optional_chain_observing_nodes: HashMap[i32, i32, Minted],
     marking_explicit_move: i32,
     moved_field_path_starts: List[i32],
     moved_field_path_counts: List[i32],
@@ -1587,19 +1588,19 @@ type Sema {
     bind_is_scoped_task: List[bool],
     bind_is_view_bound: List[i32],
     bind_provenance: List[BindingProvenance],
-    binding_decl_nodes: HashMap[i32, i32],
-    binding_value_nodes: HashMap[i32, i32],
+    binding_decl_nodes: HashMap[i32, i32, Minted],
+    binding_value_nodes: HashMap[i32, i32, Minted],
     // §29.6 (D95): a binding a `let _ = x` dropped, and that `let`, for the
     // help on a later use.
-    discard_lets: HashMap[i32, i32],
+    discard_lets: HashMap[i32, i32, Minted],
     scope_starts: List[i32],
-    scope_name_map: HashMap[i32, i32],
+    scope_name_map: HashMap[i32, i32, Minted],
     // A binding whose scope has ended: its name to its declaring node, so an
     // undefined name that was bound in a block before its use says so.
-    ended_bindings: HashMap[i32, i32],
-    pending_generic_binding_base: HashMap[i32, i32],
-    pending_generic_binding_call: HashMap[i32, i32],
-    pending_generic_binding_decl: HashMap[i32, i32],
+    ended_bindings: HashMap[i32, i32, Minted],
+    pending_generic_binding_base: HashMap[i32, i32, Minted],
+    pending_generic_binding_call: HashMap[i32, i32, Minted],
+    pending_generic_binding_decl: HashMap[i32, i32, Minted],
     // #1856 (§4.2.1): uses of a pending soft-literal enum binding made
     // before it settles; settlement retypes them.
     pending_soft_use_syms: List[i32],
@@ -1626,7 +1627,7 @@ type Sema {
     // #1733: every loop or labeled block a checked `break` exits, by node.
     // Whether a `while true` or `loop` falls through is this fact: a syntax
     // walk looking for the `break` missed one in a let-else's else branch.
-    break_target_nodes: HashMap[i32, i32],
+    break_target_nodes: HashMap[i32, i32, Minted],
     loop_break_flat: List[i32],
     // Parallel to loop_break_flat and sharing its per-frame offset (label_break_off):
     // the loop-entry move-state snapshot, one region per active loop. It lets the
@@ -1696,18 +1697,18 @@ type Sema {
 
     // Resolved call args for named/default-arg calls. Keep starts and counts
     // explicit: AST node IDs and the flattened data index both exceed 16 bits.
-    call_resolved_arg_starts: HashMap[i32, i32],
-    call_resolved_arg_counts: HashMap[i32, i32],
+    call_resolved_arg_starts: HashMap[i32, i32, Minted],
+    call_resolved_arg_counts: HashMap[i32, i32, Minted],
     call_resolved_args_data: List[i32],
-    call_resolved_default_arg_keys: HashMap[i64, i32],
+    call_resolved_default_arg_keys: HashMap[i64, i32, Minted],
     // Concrete call contract chosen by Sema. Generic calls cannot recover this
     // from their template symbol: the concrete signature owns the final
     // share-place ABI and the monomorphized MIR identity.
-    resolved_call_sigs: HashMap[i32, i32],
-    resolved_call_mono_syms: HashMap[i32, i32],
+    resolved_call_sigs: HashMap[i32, i32, Minted],
+    resolved_call_mono_syms: HashMap[i32, i32, Minted],
     // A free math builtin call (`cos(x)`), keyed by the call node, to its
     // MathBuiltins row id. Sema decides once; MirLower reads, never re-derives.
-    math_builtin_calls: HashMap[i32, i32],
+    math_builtin_calls: HashMap[i32, i32, Minted],
     // §4.3d (D78): the SIMD vector facts Sema decides and MirLower
     // materializes (SemaVector.w). vector_ops: a construction, splat,
     // `select`, reduction, `.bits()`/`from_bits` or swizzle node → its
@@ -1716,15 +1717,15 @@ type Sema {
     // scalar operand or literal broadcast to every lane → the vector type.
     // vector_conversions: a vector value an owned demand widens lane-wise
     // (§4.2.6) → the demanded vector type.
-    vector_ops: HashMap[i32, i32],
-    vector_swizzles: HashMap[i32, str],
-    vector_splats: HashMap[i32, i32],
-    vector_conversions: HashMap[i32, i32],
+    vector_ops: HashMap[i32, i32, Minted],
+    vector_swizzles: HashMap[i32, str, Minted],
+    vector_splats: HashMap[i32, i32, Minted],
+    vector_conversions: HashMap[i32, i32, Minted],
     // D75 (§16.2b.5): a `va_start()` call node (→ 1) and an `ap.arg[T]()`
     // call node (→ T), decided here; MirLower lowers them to VA_START and
     // VA_ARG and ends each started list with its binding scope.
-    va_start_calls: HashMap[i32, i32],
-    va_arg_calls: HashMap[i32, i32],
+    va_start_calls: HashMap[i32, i32, Minted],
+    va_arg_calls: HashMap[i32, i32, Minted],
     // The initializer a `let`/`var` binding is checking, so `va_start()`
     // knows it names a variable (the only place a list starts).
     va_start_binding_value: i32,
@@ -1732,27 +1733,27 @@ type Sema {
     // node (loops) or the clause's iterable expression node (comprehensions).
     // A dedicated channel — keying resolved_call_sigs by an expression node
     // would clobber that expression's own call contract.
-    iter_next_sigs: HashMap[i32, i32],
-    iter_next_mono_syms: HashMap[i32, i32],
-    magic_ident_kinds: HashMap[i32, i32],
+    iter_next_sigs: HashMap[i32, i32, Minted],
+    iter_next_mono_syms: HashMap[i32, i32, Minted],
+    magic_ident_kinds: HashMap[i32, i32, Minted],
     // Implicit parameter bindings stack: pairs of (type_id, binding_sym)
     implicit_binding_types: List[i32],
     implicit_binding_syms: List[i32],
-    with_form_kinds: HashMap[i32, i32],
-    with_payload_types: HashMap[i32, i32],
-    with_enter_methods: HashMap[i32, i32],
-    with_exit_methods: HashMap[i32, i32],
-    with_enter_sigs: HashMap[i32, i32],
-    with_enter_mono_syms: HashMap[i32, i32],
-    with_exit_sigs: HashMap[i32, i32],
-    with_exit_mono_syms: HashMap[i32, i32],
+    with_form_kinds: HashMap[i32, i32, Minted],
+    with_payload_types: HashMap[i32, i32, Minted],
+    with_enter_methods: HashMap[i32, i32, Minted],
+    with_exit_methods: HashMap[i32, i32, Minted],
+    with_enter_sigs: HashMap[i32, i32, Minted],
+    with_enter_mono_syms: HashMap[i32, i32, Minted],
+    with_exit_sigs: HashMap[i32, i32, Minted],
+    with_exit_mono_syms: HashMap[i32, i32, Minted],
     no_await_guard_origin_roots: List[i32],
     no_await_guard_scope_depth: i32,
     no_suspend_scope_depth: i32,
 
     // For-comprehension resolved variants: node → resolved variant sym.
     // Maps _Payload/_Empty marker nodes to Some/None or Ok/Err.
-    comp_resolved: HashMap[i32, i32],
+    comp_resolved: HashMap[i32, i32, Minted],
     // #2211: resolved name uses (node, kind, declaring module path, name) for
     // the analyzer's `reference` facts: a global read, a function taken as a
     // value, a type name — calls and methods have their own facts.
@@ -1762,75 +1763,75 @@ type Sema {
     name_use_names: List[str],
     name_use_from: List[str],
     // Surviving generic comptime-if wrapper node → selected branch node.
-    comptime_selected_branches: HashMap[i32, i32],
+    comptime_selected_branches: HashMap[i32, i32, Minted],
     // Pipeline method calls: NK_PIPELINE node → method-name symbol. D21 keeps
     // the ordinary call result separate from the value carried to the next
     // stage: carrier kind 1 threads the receiver place, 0 threads the result.
-    pipeline_method_calls: HashMap[i32, i32],
-    pipeline_call_return_types: HashMap[i32, i32],
-    pipeline_carrier_kinds: HashMap[i32, i32],
+    pipeline_method_calls: HashMap[i32, i32, Minted],
+    pipeline_call_return_types: HashMap[i32, i32, Minted],
+    pipeline_carrier_kinds: HashMap[i32, i32, Minted],
     // Operator method calls: NK_BINARY node -> resolved function symbol, plus
     // node -> 1 when the right operand is the receiver.
-    operator_method_calls: HashMap[i32, i32],
+    operator_method_calls: HashMap[i32, i32, Minted],
     // D117: method names that have an owned twin (`name` → `name$move`).
-    method_twin_names: HashMap[i32, i32],
+    method_twin_names: HashMap[i32, i32, Minted],
     // D116 (§15.4.9): each `++` over two sequences, node → the element
     // type of the List[T] it builds. MirLower lowers it as LIST_CONCAT, or
     // LIST_EXTEND when it is the value assigned back to its left operand.
-    concat_sequence_nodes: HashMap[i32, i32],
-    operator_method_reversed: HashMap[i32, i32],
+    concat_sequence_nodes: HashMap[i32, i32, Minted],
+    operator_method_reversed: HashMap[i32, i32, Minted],
     // §11.7: node -> the comparison operator derived from the family's
     // primitive (`Ord.cmp` for the ordered four, `Eq.eq` for `!=`); the call
     // in operator_method_calls yields i32 / bool and MirLower applies the
     // derivation (`cmp(...) < 0`, `not eq(...)`).
-    operator_method_derived: HashMap[i32, i32],
+    operator_method_derived: HashMap[i32, i32, Minted],
     // User Try resolution sidecars for NK_UNARY(UOP_TRY): node -> type/fn data.
-    try_continue_tys: HashMap[i32, i32],
-    try_break_tys: HashMap[i32, i32],
-    try_branch_result_tys: HashMap[i32, i32],
-    try_branch_fns: HashMap[i32, i32],
-    try_from_break_fns: HashMap[i32, i32],
+    try_continue_tys: HashMap[i32, i32, Minted],
+    try_break_tys: HashMap[i32, i32, Minted],
+    try_branch_result_tys: HashMap[i32, i32, Minted],
+    try_branch_fns: HashMap[i32, i32, Minted],
+    try_from_break_fns: HashMap[i32, i32, Minted],
     // §10.2 (D190): the `?` nodes in main whose Err ends the program.
-    main_question_nodes: HashMap[i32, i32],
+    main_question_nodes: HashMap[i32, i32, Minted],
     // §4.2.6 (D183): an expression Sema admitted at a narrower or other-signed
     // integer demand, keyed to the demanded type; MIR converts it with a range check.
-    checked_narrowings: HashMap[i32, i32],
+    checked_narrowings: HashMap[i32, i32, Minted],
     // §11.8 (D95): a tuple's synthesized clone, keyed by the call node to the tuple type.
-    tuple_clone_nodes: HashMap[i32, i32],
-    try_branch_sigs: HashMap[i32, i32],
-    try_branch_mono_syms: HashMap[i32, i32],
-    try_from_break_sigs: HashMap[i32, i32],
-    try_from_break_mono_syms: HashMap[i32, i32],
+    tuple_clone_nodes: HashMap[i32, i32, Minted],
+    try_branch_sigs: HashMap[i32, i32, Minted],
+    try_branch_mono_syms: HashMap[i32, i32, Minted],
+    try_from_break_sigs: HashMap[i32, i32, Minted],
+    try_from_break_mono_syms: HashMap[i32, i32, Minted],
     // Synthetic BTree literal/comprehension insertion contracts. These cannot
     // use resolved_call_*: the anchor expression may itself be a generic call.
-    btree_insert_sigs: HashMap[i32, i32],
-    btree_insert_mono_syms: HashMap[i32, i32],
+    btree_insert_sigs: HashMap[i32, i32, Minted],
+    btree_insert_mono_syms: HashMap[i32, i32, Minted],
     // The `new()` a BTree literal or comprehension starts from, specialized
     // for the concrete type (record_btree_new_contract), keyed by the node.
-    btree_new_sigs: HashMap[i32, i32],
-    btree_new_mono_syms: HashMap[i32, i32],
+    btree_new_sigs: HashMap[i32, i32, Minted],
+    btree_new_mono_syms: HashMap[i32, i32, Minted],
     // A user IndexPlace subscript (`b[i]`, `b[i] = v`): the impl's `get` and
     // `set` specialized for the receiver type (record_index_place_contracts),
     // keyed by the NK_INDEX node. MIR lowers these; it never re-derives the
     // callee from the type's name (#2560, D65).
-    index_place_get_fns: HashMap[i32, i32],
-    index_place_get_sigs: HashMap[i32, i32],
-    index_place_get_mono_syms: HashMap[i32, i32],
-    index_place_set_fns: HashMap[i32, i32],
-    index_place_set_sigs: HashMap[i32, i32],
-    index_place_set_mono_syms: HashMap[i32, i32],
+    index_place_get_fns: HashMap[i32, i32, Minted],
+    index_place_get_sigs: HashMap[i32, i32, Minted],
+    index_place_get_mono_syms: HashMap[i32, i32, Minted],
+    index_place_set_fns: HashMap[i32, i32, Minted],
+    index_place_set_sigs: HashMap[i32, i32, Minted],
+    index_place_set_mono_syms: HashMap[i32, i32, Minted],
     // The generic instances whose IndexPlace impl is a bounded blanket impl
     // (`impl[T: Copy] IndexPlace[isize, T] for Box3[T]`), established by the
     // subscript's check so the read-only classification (type_is_index_place,
     // classify_place, MIR) sees them (#2560).
-    index_place_insts: HashSet[i32],
+    index_place_insts: HashSet[i32, Minted],
     // Compiler-synthesized Clone calls (currently Option[&T].cloned()).
     // The source node names the builtin eliminator, not the payload's clone
     // method, so resolved_call_* cannot carry both contracts. Sema resolves
     // and specializes the payload method once; MIR consumes this sidecar.
-    clone_contract_fns: HashMap[i32, i32],
-    clone_contract_sigs: HashMap[i32, i32],
-    clone_contract_mono_syms: HashMap[i32, i32],
+    clone_contract_fns: HashMap[i32, i32, Minted],
+    clone_contract_sigs: HashMap[i32, i32, Minted],
+    clone_contract_mono_syms: HashMap[i32, i32, Minted],
     // D61 (§15.4.7): the `:?` formatter registry. Every type an f-string
     // formats with `:?` that is not formatted inline (numbers, bool, str,
     // Unit, raw pointers, views of those) has one entry, and so does every
@@ -1838,18 +1839,18 @@ type Sema {
     // collection's formatter method, or a formatter MirLower synthesizes
     // after the specialization fixpoint. Entries are keyed by resolved
     // type and kept in registration order (the synthesized bodies' order).
-    debug_fmt_index: HashMap[i32, i32],
+    debug_fmt_index: HashMap[i32, i32, Minted],
     // §11.7: a multi-index node's spec sequence — the `[IndexSpec; n]` the
     // specs are built into and the `&[IndexSpec]` the method takes, both
     // from the method's own signature (Sema owns the types; MirLower
     // builds the values, codegen passes them).
-    multi_index_specs_array_types: HashMap[i32, i32],
-    multi_index_specs_slice_types: HashMap[i32, i32],
+    multi_index_specs_array_types: HashMap[i32, i32, Minted],
+    multi_index_specs_slice_types: HashMap[i32, i32, Minted],
     // `{x}` over a type with an `impl Display` (§15.4, D193): the impl's
     // `to_str` by resolved type — fn symbol, signature, mono name.
-    display_fmt_fns: HashMap[i32, i32],
-    display_fmt_sigs: HashMap[i32, i32],
-    display_fmt_monos: HashMap[i32, i32],
+    display_fmt_fns: HashMap[i32, i32, Minted],
+    display_fmt_sigs: HashMap[i32, i32, Minted],
+    display_fmt_monos: HashMap[i32, i32, Minted],
     debug_fmt_tids: List[i32],
     debug_fmt_kinds: List[i32],
     debug_fmt_fns: List[i32],
@@ -1862,37 +1863,37 @@ type Sema {
     debug_fmt_aux_monos: List[i32],
     // Synthesized formatter symbol -> its entry (codegen declares these
     // MIR-only functions the way it declares generator producers).
-    debug_fmt_synth_syms: HashMap[i32, i32],
+    debug_fmt_synth_syms: HashMap[i32, i32, Minted],
     // debug_fmt_has_form's in-progress types (a recursion guard).
-    debug_fmt_probe_visiting: HashMap[i32, i32],
+    debug_fmt_probe_visiting: HashMap[i32, i32, Minted],
     // Auto-deref adjustment sidecar: expression node -> contiguous step range.
     // Step fn 0 means builtin &/* deref; non-zero is a user Deref.deref fn.
-    autoderef_step_starts: HashMap[i32, i32],
-    autoderef_step_counts: HashMap[i32, i32],
+    autoderef_step_starts: HashMap[i32, i32, Minted],
+    autoderef_step_counts: HashMap[i32, i32, Minted],
     // #604 stage 1: call-arg nodes coerced collection→slice (1=imm, 3=mut);
     // consumed by MirLower.lower_call_arg to borrow the place instead of
     // moving the collection.
-    slice_coerce_args: HashMap[i32, i32],
+    slice_coerce_args: HashMap[i32, i32, Minted],
     // #1739: a sequence or map literal with no expected instance whose
     // declared destination names a collection with undecided type
     // arguments (a generic struct field `items: List[T]`): literal node ->
     // the collection base the literal builds (§4.3c rule 1 and 2).
-    collection_literal_hints: HashMap[i32, i32],
+    collection_literal_hints: HashMap[i32, i32, Minted],
     // §4.3a (#1478): `[value; N]` with a non-literal count keeps the count
     // expression as the literal's d2; its evaluated value, by literal node.
     // MirLower and the comptime evaluator read the count here.
-    array_fill_counts: HashMap[i32, i32],
+    array_fill_counts: HashMap[i32, i32, Minted],
     // #1754: the if/match argument now being checked at a `&T` parameter;
     // its arms meet `T` and its join has no owned anchor.
     borrow_pointee_join_node: i32,
     // D22 Stage 2 contextual-Copy decisions. The node map indexes the single
     // structured record consumed by later stages; expression type inference
     // never reads this sidecar and therefore remains exact.
-    contextual_copy_adjustment_indices: HashMap[i64, i32],
+    contextual_copy_adjustment_indices: HashMap[i64, i32, Minted],
     contextual_copy_adjustments: List[ContextualCopyAdjustment],
     // D22 Stage 3 contextual-join decisions. Roles distinguish ordinary AST
     // expressions from synthetic carrier payloads and lazy fallback results.
-    contextual_join_decision_indices: HashMap[i64, i32],
+    contextual_join_decision_indices: HashMap[i64, i32, Minted],
     contextual_join_decisions: List[ContextualJoinDecision],
     contextual_join_arm_nodes: List[i32],
     contextual_join_arm_origin_nodes: List[i32],
@@ -1906,60 +1907,60 @@ type Sema {
     autoderef_step_fns: List[i32],
     autoderef_step_tys: List[i32],
     // Match value-pattern sidecar: pattern node → symbol compared by value.
-    pattern_value_syms: HashMap[i32, i32],
+    pattern_value_syms: HashMap[i32, i32, Minted],
     // #1302: match / let-else nodes whose pattern CONSUMES the subject (an arm
     // binds a non-Copy value by value, or a Drop type is taken apart). Every
     // other by-value place subject is observed in place by MirLower.
-    consuming_pattern_subjects: HashMap[i32, i32],
+    consuming_pattern_subjects: HashMap[i32, i32, Minted],
     // D144: pattern identifier nodes bound in place as a view of the
     // payload's place (an observed subject, a payload that is not plain
     // bits); MIR aliases them. And the bindings (by symbol) observing a
     // place whose root is mutable: a mutating call through one writes it.
-    pattern_place_bindings: HashMap[i32, i32],
+    pattern_place_bindings: HashMap[i32, i32, Minted],
     // §4.7: a `start`/`end` field access on a range, keyed by the access
     // node, with the bound's field index (0 or 1) for MIR (D65).
-    range_bound_fields: HashMap[i32, i32],
-    binding_observes_mutable_place: HashMap[i32, i32],
+    range_bound_fields: HashMap[i32, i32, Minted],
+    binding_observes_mutable_place: HashMap[i32, i32, Minted],
     // §4.2.6: where a narrowed integer is going (" (argument 2 of `get_tag`)"),
     // appended to the narrowing diagnostic; "" when not known.
     narrowing_target_note: str,
     // D115 (§9.7): slice pattern nodes that take an owned subject apart by
     // value; every other slice pattern observes its subject. The rest
     // binding's type, keyed by the same node.
-    owned_slice_patterns: HashMap[i32, i32],
-    slice_rest_types: HashMap[i32, i32],
+    owned_slice_patterns: HashMap[i32, i32, Minted],
+    slice_rest_types: HashMap[i32, i32, Minted],
     // The owned-List slice pattern of the pattern being checked that removes
     // elements from its List, 0 when none (a match guard cannot follow one).
     pattern_list_removal: i32,
     // Regex literal metadata sidecars, keyed by NK_REGEX_LIT/NK_PAT_REGEX node.
-    regex_capture_counts: HashMap[i32, i32],
-    regex_capture_name_starts: HashMap[i32, i32],
-    regex_capture_name_counts: HashMap[i32, i32],
+    regex_capture_counts: HashMap[i32, i32, Minted],
+    regex_capture_name_starts: HashMap[i32, i32, Minted],
+    regex_capture_name_counts: HashMap[i32, i32, Minted],
     regex_capture_name_syms: List[i32],
 
     // Typed dump sidecar maps (keyed by span start byte offset)
-    typed_expr_types: HashMap[i32, i32],
-    typed_binding_types: HashMap[i32, i32],
+    typed_expr_types: HashMap[i32, i32, Minted],
+    typed_binding_types: HashMap[i32, i32, Minted],
     // D65 (#1647): the callable type an indirect call invokes — a call node
     // whose callee is a callable binding, a callable field or any other
     // callable-typed expression, keyed by the call node. Sema resolves the
     // callee here (check_call) and nowhere else; MirLower materializes the
     // call and `audit:resolution` verifies the MIR callee and argument count
     // against this fact. Absent for a call Sema resolved to a function symbol.
-    call_callable_types: HashMap[i32, i32],
+    call_callable_types: HashMap[i32, i32, Minted],
     // D65 phase 5: each call's CallCalleeKind (a call whose callee is a
     // name, or a type-level builtin), and the `T.new` a type-constructor
     // call `T(..)` resolved to.
-    call_callee_kinds: HashMap[i32, i32],
-    type_ctor_call_syms: HashMap[i32, i32],
+    call_callee_kinds: HashMap[i32, i32, Minted],
+    type_ctor_call_syms: HashMap[i32, i32, Minted],
     // The contents an `embed_file(path)` call embeds, read when Sema
     // evaluated the path (check_intrinsic_call); codegen emits it.
-    embed_file_contents: HashMap[i32, str],
+    embed_file_contents: HashMap[i32, str, Minted],
     // #2043: each method function's owner key (the symbol its method table
     // row is keyed by), its specializations included.
-    method_owner_keys: HashMap[i32, i32],
+    method_owner_keys: HashMap[i32, i32, Minted],
     // #2043: each builtin call's CallBuiltin, by call node.
-    call_builtins: HashMap[i32, i32],
+    call_builtins: HashMap[i32, i32, Minted],
     // D110: the builtin methods' declared signatures (BuiltinSigs.w), loaded
     // once: (owner sym, method sym) -> row, each row's parameter modes, the
     // receiver type names that share an owner (the iterator adapters), and
@@ -1970,28 +1971,28 @@ type Sema {
     // builtin_required_param_count); -1 for the synthetic float-math row,
     // whose arity MathBuiltins declares per name (#2358).
     builtin_sig_required: List[i32],
-    builtin_sig_owner_alias: HashMap[i32, i32],
-    builtin_call_sigs: HashMap[i32, i32],
+    builtin_sig_owner_alias: HashMap[i32, i32, Minted],
+    builtin_call_sigs: HashMap[i32, i32, Minted],
     // D109: each `offsetof[T](field)` call's field index in T's declaration,
     // by call node (Law 3: Sema names the field; codegen reads the layout).
-    offsetof_field_indices: HashMap[i32, i32],
+    offsetof_field_indices: HashMap[i32, i32, Minted],
     // ... and the record it measures, by call node, as checked outside any
     // specialization (a specialization's own type comes from
     // specialization_type_args). Codegen reads it in every body, a module's
     // runtime initializer included, where no name resolves (#2131).
-    offsetof_owner_types: HashMap[i32, i32],
+    offsetof_owner_types: HashMap[i32, i32, Minted],
     // #2043: each builtin method call's MirIntrinsic, keyed (instance, node).
-    method_intrinsics: HashMap[i64, i32],
+    method_intrinsics: HashMap[i64, i32, Minted],
     // ... and its MethodLowering kind (present for every checked method call).
-    method_lowerings: HashMap[i64, i32],
+    method_lowerings: HashMap[i64, i32, Minted],
     // #2043: each method function's own name in its owner's table (`push`
     // for `Vec__i32.push`), recorded with its owner key.
-    method_name_syms: HashMap[i32, i32],
+    method_name_syms: HashMap[i32, i32, Minted],
     // #2043: an extern variable's declared type, keyed by its declaration.
-    extern_var_type_ids: HashMap[i32, i32],
+    extern_var_type_ids: HashMap[i32, i32, Minted],
     // #2043: an impl's trait type argument (`impl Trait[i32] for T`) as the
     // default methods it instantiates bind it, keyed by the argument node.
-    impl_trait_arg_type_ids: HashMap[i32, i32],
+    impl_trait_arg_type_ids: HashMap[i32, i32, Minted],
 
     // C11 6.5.2.2p6-7: the type each argument of a call to a C function is
     // passed as after the default argument promotions, keyed by the call
@@ -1999,25 +2000,25 @@ type Sema {
     // unprototyped callee (#1831) — codegen builds the call's FnAbi from
     // exactly these types; for a variadic callee, the `...` arguments the
     // promotion changes, 0 elsewhere (#1849).
-    c_promoted_arg_starts: HashMap[i32, i32],
+    c_promoted_arg_starts: HashMap[i32, i32, Minted],
     c_promoted_arg_data: List[i32],
     // Signatures declared without a prototype (`int f();`, whose c_import
     // NK_EXTERN_FN carries flag bit 1): C calls them with the promoted arguments
     // and the fixed-argument convention, never the variadic one (#1831).
-    unprototyped_sigs: HashMap[i32, i32],
+    unprototyped_sigs: HashMap[i32, i32, Minted],
 
     // D65 (§12): an identifier naming a function, used as a value and typed
     // its With callable `fn(...)` (not an `extern "C" fn`): node -> 1.
     // MirLower marks its constant, and codegen builds the callable adapter.
-    fn_callable_values: HashMap[i32, i32],
+    fn_callable_values: HashMap[i32, i32, Minted],
 
     // D51 stage 2: facade facts (SemaFacade.w).
-    facade_resource_index: HashMap[i32, i32],   // resource sym -> facade_resources index
+    facade_resource_index: HashMap[i32, i32, Minted],   // resource sym -> facade_resources index
     facade_resources: List[FacadeResource],
-    foreign_contract_index: HashMap[i32, i32],  // fn sym -> foreign_contracts index
+    foreign_contract_index: HashMap[i32, i32, Minted],  // fn sym -> foreign_contracts index
     foreign_contracts: List[ForeignContract],
-    facade_domains: HashMap[i32, i32],          // domain sym -> kind sym
-    facade_program_domains: HashMap[i32, i32],  // the domains a program facade declares (D30)
+    facade_domains: HashMap[i32, i32, Minted],          // domain sym -> kind sym
+    facade_program_domains: HashMap[i32, i32, Minted],  // the domains a program facade declares (D30)
     // Stage 7 (ruling §33-§38, spec §16.2b.7): the declared foreign-state
     // domains with their origin symbols, and per signature — a rendered
     // facade operation, or the raw C function itself — what a call
@@ -2027,12 +2028,12 @@ type Sema {
     // records the call and the parameter or domain it came through, for
     // the diagnostic at its next use.
     facade_domain_list: List[FacadeDomain],
-    facade_domain_index: HashMap[i32, i32],     // domain sym -> facade_domain_list index
-    facade_domain_origin_index: HashMap[i32, i32], // origin sym -> facade_domain_list index
+    facade_domain_index: HashMap[i32, i32, Minted],     // domain sym -> facade_domain_list index
+    facade_domain_origin_index: HashMap[i32, i32, Minted], // origin sym -> facade_domain_list index
     facade_call_effects: List[FacadeCallEffect],
-    facade_call_effect_index: HashMap[i32, i32],   // sig -> facade_call_effects index
-    facade_touch_nodes: HashMap[i32, i32],         // call node -> facade_call_effects index
-    facade_touch_hit_params: HashMap[i32, i32],    // poisoned view sym -> the parameter the origin came through (-1: a domain)
+    facade_call_effect_index: HashMap[i32, i32, Minted],   // sig -> facade_call_effects index
+    facade_touch_nodes: HashMap[i32, i32, Minted],         // call node -> facade_call_effects index
+    facade_touch_hit_params: HashMap[i32, i32, Minted],    // poisoned view sym -> the parameter the origin came through (-1: a domain)
     // D134: facade facts for methods of the generic `BorrowedR[Origin]`
     // impl, keyed by the method's effective name ("BorrowedR.m"); a generic
     // method has no signature until it is instantiated, and each
@@ -2052,32 +2053,32 @@ type Sema {
     // presented at the call: the C name stays the surface and the call's
     // result is `Option[CStr]` in every module that imported it
     // (SemaFacade.w verify_facade_text_return; SemaCheck.w check_call).
-    facade_presented_syms: HashMap[i32, i32],      // fn sym -> 1
+    facade_presented_syms: HashMap[i32, i32, Minted],      // fn sym -> 1
     facade_bridge_of: HashMap[str, str],           // D64: C name -> the rendered free operation presented under it (`__with_facade_<name>`)
-    facade_presented_calls: HashMap[i32, i32],     // call node -> 1
+    facade_presented_calls: HashMap[i32, i32, Minted],     // call node -> 1
     // D65 phase 5 (#2043): a call whose value is a conversion of what its
     // callee returns, and the conversion function Sema chose for it (a
     // presented text view is `cstr_option_from_ptr` of C's pointer,
     // §16.2b.8). MirLower lowers the callee's call and then an ordinary
     // call of the conversion on its result; it knows nothing of why.
-    call_value_conversions: HashMap[i32, i32],     // call node -> conversion fn sym
+    call_value_conversions: HashMap[i32, i32, Minted],     // call node -> conversion fn sym
     // D65 phase 5 (#2043): a method call Sema resolved to another method
     // than the one its spelling names (a variadic contract's case, D66
     // §16.2b.5): the name of the method it calls. MirLower reads it in
     // place of the spelling.
-    method_call_fields: HashMap[i32, i32],         // call node -> method name sym
+    method_call_fields: HashMap[i32, i32, Minted],         // call node -> method name sym
     // D86 (§18.2): a call of `assert`/`require`/`check` (std.builtins or
     // std.testing) is a compiler-known form, not a function call: its
     // message is evaluated only when its condition is false (SemaCheck.w
     // check_call; MirLower.w lower_call; ComptimeEval.w eval_call).
-    precondition_form_calls: HashMap[i32, i32],    // call node -> form fn sym
+    precondition_form_calls: HashMap[i32, i32, Minted],    // call node -> form fn sym
     // D66 (spec §16.2b.5): a discriminated variadic contract is presented
     // as one method or function per case, chosen at the call by the
     // selector's compile-time value (SemaFacade.w facade_variadic_retarget;
     // SemaCheck.w check_method_call / check_call record the choice as the
     // call's resolution: comp_resolved, method_call_fields).
     facade_variadic_ops: HashMap[str, i32],        // "Host.method" (hosted) or the presented free name -> foreign_contracts index
-    facade_variadic_method_names: HashMap[i32, i32], // a hosted presented method's symbol -> 1 (the cheap pre-check)
+    facade_variadic_method_names: HashMap[i32, i32, Minted], // a hosted presented method's symbol -> 1 (the cheap pre-check)
     // §30 (spec §16.2b.6): ephemeral-storage errors whose ephemerality a
     // facade resource supplies, held until the facade facts exist
     // (SemaFacade.w report_facade_layout_errors).
@@ -2092,54 +2093,54 @@ type Sema {
     // index_facade_callback_methods; SemaCheck.w consults them at generic
     // call sites).
     facade_callback_methods: List[FacadeCallbackMethod],
-    facade_callback_method_index: HashMap[i32, i32],   // the method's generic fn node -> facade_callback_methods index
-    facade_c_invoked_userdata: HashMap[i32, i32],      // §12.4/§16.2b.9: a callback method's concrete signature -> its userdata parameter (signature index), which C invokes through the callback any number of times
+    facade_callback_method_index: HashMap[i32, i32, Minted],   // the method's generic fn node -> facade_callback_methods index
+    facade_c_invoked_userdata: HashMap[i32, i32, Minted],      // §12.4/§16.2b.9: a callback method's concrete signature -> its userdata parameter (signature index), which C invokes through the callback any number of times
     facade_pair_ops: List[FacadePairOp],                // D66 #1652: per concrete signature (facade_pair_op_by_sig)
-    facade_pair_op_by_sig: HashMap[i32, i32],
-    facade_pair_setter_contract: HashMap[i32, i32],    // a pair setter's generic fn node -> foreign_contracts index …
-    facade_pair_setter_case: HashMap[i32, i32],        // … and the case it renders (parallel)
-    facade_pair_resources: HashMap[i32, i32],          // resource type symbol -> facade_resources index, for resources with a callback pair
-    facade_pair_retainers: HashMap[i32, i32],          // a local handed to a pair's userdata setter -> the resource local retaining it (§16.2b.9: alive while the resource is used)
+    facade_pair_op_by_sig: HashMap[i32, i32, Minted],
+    facade_pair_setter_contract: HashMap[i32, i32, Minted],    // a pair setter's generic fn node -> foreign_contracts index …
+    facade_pair_setter_case: HashMap[i32, i32, Minted],        // … and the case it renders (parallel)
+    facade_pair_resources: HashMap[i32, i32, Minted],          // resource type symbol -> facade_resources index, for resources with a callback pair
+    facade_pair_retainers: HashMap[i32, i32, Minted],          // a local handed to a pair's userdata setter -> the resource local retaining it (§16.2b.9: alive while the resource is used)
     // D22 §13.6: field-access exprs whose base is a shared view and whose
     // field type is non-Copy — an owned demand on one is an error.
-    view_projection_exprs: HashMap[i32, i32],
+    view_projection_exprs: HashMap[i32, i32, Minted],
     // §3.8 join rule 3 (#1408): a non-Copy field place that is an arm of a
     // join with no owned anchor joins as a view of its place — field node ->
     // the `&F` it is typed as there. MirLower lowers it as `ref(shared, place)`.
-    join_field_view_arms: HashMap[i32, i32],
+    join_field_view_arms: HashMap[i32, i32, Minted],
     // D22 §8: join arm tails that are bindings observing a place
     // (note_arm_tail), joined as views.
-    join_view_binding_arms: HashMap[i32, i32],
+    join_view_binding_arms: HashMap[i32, i32, Minted],
     // §2.4: value nodes of drop-body self-field lets — MirLower binds these
     // by MOVE (never the alias path); the field glue skips them via
     // drop_consumed_field.
-    drop_consumed_binding_values: HashMap[i32, i32],
+    drop_consumed_binding_values: HashMap[i32, i32, Minted],
     // #1244: initializer nodes of `let s: &T = place` — the annotation demands
     // a reference and the value is an owned T, so the binding BORROWS (§3.8
     // auto-referencing, the same rule as a call argument); MirLower emits the
     // shared ref instead of moving the bytes.
-    auto_ref_binding_values: HashMap[i32, i32],
+    auto_ref_binding_values: HashMap[i32, i32, Minted],
     // #1627: enum payload argument nodes auto-referenced against a `&T`
     // payload (`Some(ctx)` for `Option[&Ctx]`): each is a view of its place,
     // exactly as `&ctx` is (collect_expr_view_deps).
-    auto_ref_payload_args: HashMap[i32, i32],
+    auto_ref_payload_args: HashMap[i32, i32, Minted],
     // CLAUDE.md ceremony census: node -> pattern (1 `.clone()` on a str, 2 an
     // explicit `&` at a `&T` parameter, 3 `Some(x)` where Option is demanded).
-    ceremony_sites: HashMap[i32, i32],
+    ceremony_sites: HashMap[i32, i32, Minted],
     // #1627/#1618: the `Some(...)` a nullable facade callback's userdata
     // argument is, while facade_prepare_callback_call checks it: the
     // parameter is `Option[&U]`, so its payload is borrowed, not moved.
     facade_userdata_ctor: i32,
-    typed_binding_names: HashMap[i32, i32],
-    typed_binding_muts: HashMap[i32, i32],
-    ephemeral_task_binding_nodes: HashMap[i32, i32],
+    typed_binding_names: HashMap[i32, i32, Minted],
+    typed_binding_muts: HashMap[i32, i32, Minted],
+    ephemeral_task_binding_nodes: HashMap[i32, i32, Minted],
     // Whole-var assignment target being re-checked: a moved binding is a
     // legal assignment target (the store revives it, spec §2.4), so the
     // ident check must not flag it. Set around check_assign's LHS check.
     assign_target_revive_sym: i32,
     // Cycle-detection state for the may_suspend / ephemeral-task walkers
     // (reset at each outer query; same pattern as reachable_visiting).
-    suspend_visiting: HashMap[i32, i32],
+    suspend_visiting: HashMap[i32, i32, Minted],
     // §13.4 `g.pull()`: expr_may_suspend records the first suspension site it
     // finds at fn_symbol_may_suspend depth suspend_site_record_depth (-1: none).
     suspend_site_depth: i32,
@@ -2150,7 +2151,7 @@ type Sema {
     // checking is done, keyed by declaration node so a generic template and
     // its specializations share one answer. While suspend_facts_settling is
     // set, fn_symbol_may_suspend reads this table instead of walking.
-    suspend_fact_nodes: HashMap[i32, i32],
+    suspend_fact_nodes: HashMap[i32, i32, Minted],
     suspend_facts_settling: i32,
     // #1985 (§14.3 INVARIANT 5): the callable summary — whether invoking a
     // callable value may suspend the calling fiber. While checking, an
@@ -2161,39 +2162,39 @@ type Sema {
     // passed it, and answers for it), or a value Sema cannot see through (a
     // closure's parameter, a capture of one, a global). A fn declaration's
     // name needs no record.
-    callable_ident_decls: HashMap[i32, i32],
-    callable_param_idents: HashMap[i32, i32],
-    callable_opaque_idents: HashMap[i32, i32],
-    callable_let_decls: HashMap[i32, i32],
-    callable_value_heads: HashMap[i32, i32],
+    callable_ident_decls: HashMap[i32, i32, Minted],
+    callable_param_idents: HashMap[i32, i32, Minted],
+    callable_opaque_idents: HashMap[i32, i32, Minted],
+    callable_let_decls: HashMap[i32, i32, Minted],
+    callable_value_heads: HashMap[i32, i32, Minted],
     callable_value_nodes: List[i32],
     callable_value_next: List[i32],
-    callable_value_visiting: HashMap[i32, i32],
+    callable_value_visiting: HashMap[i32, i32, Minted],
     // Settled with suspend_fact_nodes: the (trait, method) pairs whose `dyn`
     // call may suspend (an implementation or the default body may), and the
     // call nodes that reach a may-suspend callable — through the callee
     // value, a `dyn` method, or a callable argument handed over.
-    dyn_suspend_methods: HashMap[i64, i32],
-    suspend_call_sites: HashMap[i32, i32],
+    dyn_suspend_methods: HashMap[i64, i32, Minted],
+    suspend_call_sites: HashMap[i32, i32, Minted],
     // §13.4 `g.pull()`: the generator value's type → its gen fn; a gen fn → its
     // first `yield` that hands out a view of its own locals (and that local);
     // each checked `g.pull()` node and its gen fn, judged once bodies are done.
-    generator_state_fns: HashMap[i32, i32],
-    generator_local_view_yields: HashMap[i32, i32],
-    generator_local_view_origins: HashMap[i32, i32],
+    generator_state_fns: HashMap[i32, i32, Minted],
+    generator_local_view_yields: HashMap[i32, i32, Minted],
+    generator_local_view_origins: HashMap[i32, i32, Minted],
     gen_pull_nodes: List[i32],
     // The `g.pull()` calls of a generator value that is ephemeral (§13.4,
     // #1732): the pulled iterator views what the generator's view arguments
     // view, so the call carries those origins and is an ephemeral value.
-    gen_pull_view_nodes: HashMap[i32, i32],
+    gen_pull_view_nodes: HashMap[i32, i32, Minted],
     // A method-call node Sema resolved to a free function that takes the
     // receiver as its first argument, by that parameter's declared mode
     // (§13.4 `g.pull()` is `gen_pull(g)`); MIR lowers the receiver as an
     // ordinary argument, never as a method receiver.
-    receiver_arg_call_nodes: HashMap[i32, i32],
+    receiver_arg_call_nodes: HashMap[i32, i32, Minted],
     gen_pull_fns: List[i32],
-    eph_task_visiting: HashMap[i32, i32],
-    typed_dump_seen_nodes: HashMap[i32, i32],
+    eph_task_visiting: HashMap[i32, i32, Minted],
+    typed_dump_seen_nodes: HashMap[i32, i32, Minted],
     typed_dump_visit_budget: i32,
     // Generic substitution map + specialization cache
     generic_subst_param_syms: List[i32],
@@ -2207,12 +2208,12 @@ type Sema {
     // own, and a backend resolving a name in its body frozen (a C emitter's
     // `sizeof[PullCore]` in gen_pull's instance) needs the module that
     // declared the code, not the module that instantiated it.
-    specialization_source_paths: HashMap[i32, str],
+    specialization_source_paths: HashMap[i32, str, Minted],
     // Concrete generic bodies are checked during Sema, then rechecked/lowered
     // into MIR before freeze. Codegen consumes those bodies; it must never
     // reopen Sema. Parallel descriptor arrays are indexed by
     // concrete_specialization_by_sym[mono_sym].
-    concrete_specialization_by_sym: HashMap[i32, i32],
+    concrete_specialization_by_sym: HashMap[i32, i32, Minted],
     concrete_specialization_nodes: List[i32],
     concrete_specialization_syms: List[i32],
     concrete_specialization_sigs: List[i32],
@@ -2229,19 +2230,19 @@ type Sema {
     // through directly. Its `v.iter()` is lowered by the loop, which binds
     // each element as a view; it is never the by-value library iterator.
     loop_iterable_node: i32,
-    concrete_drop_sigs: HashMap[i32, i32],
-    concrete_drop_mono_syms: HashMap[i32, i32],
+    concrete_drop_sigs: HashMap[i32, i32, Minted],
+    concrete_drop_mono_syms: HashMap[i32, i32, Minted],
     // #2137: structural equality has no AST call node either. A type whose
     // `==` is its own `eq` method, compared as a part of another value
     // (a field, an element, a payload), maps to that method's contract —
     // the method itself, or its specialization for a generic instance.
-    concrete_eq_sigs: HashMap[i32, i32],
-    concrete_eq_mono_syms: HashMap[i32, i32],
+    concrete_eq_sigs: HashMap[i32, i32, Minted],
+    concrete_eq_mono_syms: HashMap[i32, i32, Minted],
     // The same for `Ord.cmp` (`<` on a value holding the type) and for a
     // key projection, `Key.key` (§11.7, D96).
-    concrete_cmp_sigs: HashMap[i32, i32],
-    concrete_cmp_mono_syms: HashMap[i32, i32],
-    concrete_key_sigs: HashMap[i32, i32],
+    concrete_cmp_sigs: HashMap[i32, i32, Minted],
+    concrete_cmp_mono_syms: HashMap[i32, i32, Minted],
+    concrete_key_sigs: HashMap[i32, i32, Minted],
     // explain:origin (analyze): each view binding's origins as Sema set them,
     // in order, per function (the binding table itself is popped with its
     // scope), and the first node that put a parameter in a returned view's
@@ -2261,7 +2262,7 @@ type Sema {
     param_view_fact_storage: List[i32],
     param_view_fact_nodes: List[i32],
     param_view_fact_files: List[i32],
-    concrete_key_mono_syms: HashMap[i32, i32],
+    concrete_key_mono_syms: HashMap[i32, i32, Minted],
     generic_inst_cache: Memo[i64, i32],
     // D7: eager tables filled in preregister_mir_types (before freeze) so the frozen
     // consumers read answers via &Self twins instead of re-deriving them through the
@@ -2280,12 +2281,12 @@ type Sema {
     // A method argument's expected type at (resolved receiver, method,
     // argument index), settled while checking; MIR reads it frozen.
     method_expected_arg_memo: Memo[(i32, i32, i32), i32],
-    generic_enum_payload_cache_starts: HashMap[i64, i32],
-    generic_enum_payload_cache_counts: HashMap[i64, i32],
+    generic_enum_payload_cache_starts: HashMap[i64, i32, Minted],
+    generic_enum_payload_cache_counts: HashMap[i64, i32, Minted],
     generic_enum_payload_cache_values: List[i32],
 
     // Associated type bindings from current impl (for Self.Name resolution)
-    assoc_type_bindings: HashMap[i32, i32],
+    assoc_type_bindings: HashMap[i32, i32, Minted],
 
     // Frozen flags: set to 1 after check_module + preregister completes.
     // When frozen, add_type and new semantic symbol interning will error.
@@ -2302,15 +2303,15 @@ type Sema {
     // Signatures whose body writes a read (`fn`) receiver: the write the
     // &T clamp drops from the effects callers see, kept so the receiver
     // requirement names the `mut fn` the method is (D172).
-    receiver_write_demand_sigs: HashMap[i32, i32],
+    receiver_write_demand_sigs: HashMap[i32, i32, Minted],
     // D177 (§4.2a): an integer expression in a boolean-test context — a
     // condition, the operand of `not`, an operand of `and`/`or` — keyed by
     // its node, with its integer type. Nonzero tests true; MIR materializes
     // the compare. The expression's own type is unchanged.
-    truth_test_exprs: HashMap[i32, i32],
+    truth_test_exprs: HashMap[i32, i32, Minted],
     current_fn_param_direct_effs: List[i32], // body-local effects, excluding propagated calls
     current_fn_raw_derefs: i32,              // the body dereferenced a raw pointer
-    sig_raw_deref_bodies: HashMap[i32, i32], // sig -> 1: its body reads through a raw pointer (§21.1 rule 6)
+    sig_raw_deref_bodies: HashMap[i32, i32, Minted], // sig -> 1: its body reads through a raw pointer (§21.1 rule 6)
     current_fn_param_origins: List[i32],// accumulated escape_view origin masks per param
     current_fn_param_storage_origins: List[i32], // the subset of those whose own storage the returned view may point into
     current_fn_param_view_nodes: List[i32], // representative return/view node for escape_view diagnostics
@@ -2325,15 +2326,15 @@ type Sema {
 
     // Closure capture summaries: closure node -> [capture_sym, effect_bits, type]*.
     // The type is recorded while the capture's scope is still available.
-    closure_capture_summary_starts: HashMap[i32, i32],
-    closure_capture_summary_counts: HashMap[i32, i32],
+    closure_capture_summary_starts: HashMap[i32, i32, Minted],
+    closure_capture_summary_counts: HashMap[i32, i32, Minted],
     closure_capture_summary_data: List[i32],
     // Binding -> originating closure node when initialized directly from a closure literal.
-    binding_closure_nodes: HashMap[i32, i32],
+    binding_closure_nodes: HashMap[i32, i32, Minted],
     // D63: `f.clone()` call nodes on a callable value (MirLower lowers them
     // to the CLOSURE_CLONE intrinsic; a bare or view callable copies its
     // pair, an owned environment is cloned by its cell's clone fn).
-    callable_clone_nodes: HashMap[i32, i32],
+    callable_clone_nodes: HashMap[i32, i32, Minted],
     // D63 call-site checks recorded while bodies are checked and run after
     // the effect fixpoint, when every callee's escape effects and call-once
     // flags are complete regardless of declaration order. Six ints per
@@ -2350,20 +2351,20 @@ type Sema {
     // view, by let node: 1 = a reference value (`&T`), 2 = a view of a
     // place (a recorded view projection or a field view, D22/D27). MIR
     // materializes 2 as an alias of the place, never as an owning local.
-    view_bound_let_nodes: HashMap[i32, i32],
+    view_bound_let_nodes: HashMap[i32, i32, Minted],
     // Expression-level view metadata for call expressions and view-producing nodes.
-    expr_view_param_origins: HashMap[i32, i32],
+    expr_view_param_origins: HashMap[i32, i32, Minted],
     // The subset of a node's expr_view_param_origins whose parameters' own
     // storage the value may point into, recorded only where a recorder
     // proved it narrower (compute_expr_storage_origin_mask); absent means
     // the whole mask.
-    expr_view_storage_origins: HashMap[i32, i32],
+    expr_view_storage_origins: HashMap[i32, i32, Minted],
     // #962: a view produced from a statement temporary (`split(..).get(1)`,
     // `split(..)[1]`): node → the temporary's type. Fine inside the statement,
     // a use-after-free once bound or returned.
-    expr_view_into_temporary: HashMap[i32, i32],
-    expr_view_dep_starts: HashMap[i32, i32],
-    expr_view_dep_counts: HashMap[i32, i32],
+    expr_view_into_temporary: HashMap[i32, i32, Minted],
+    expr_view_dep_starts: HashMap[i32, i32, Minted],
+    expr_view_dep_counts: HashMap[i32, i32, Minted],
     expr_view_dep_data: List[i32],
     alloc_site_nodes: List[i32],
     alloc_site_kinds: List[i32],
@@ -2384,20 +2385,20 @@ type Sema {
     // fact instead of re-resolving the node under the instance's
     // substitution, which needs the mutable substitution stack.
     current_specialization_sym: i32,
-    specialization_type_args: HashMap[i64, i32],
+    specialization_type_args: HashMap[i64, i32, Minted],
     // #1647 (D65): each runtime index expression's element place type and
     // the type of the base it indexes, as checked in the body that holds it,
     // keyed pair(specialization symbol or 0, index node). typed_expr_types
     // holds one type per node — a template's nodes carry whichever instance
     // was checked last — so MIR and the audit read the instance's answer
     // here (index_element_in_body).
-    index_element_types: HashMap[i64, i32],
-    index_base_types: HashMap[i64, i32],
+    index_element_types: HashMap[i64, i32, Minted],
+    index_base_types: HashMap[i64, i32, Minted],
     // ... and each source field access's position in the struct
     // declaration Sema resolved its owner to (field_decl_index_in_body).
-    field_access_decl_indexes: HashMap[i64, i32],
-    field_access_types: HashMap[i64, i32],
-    field_access_owners: HashMap[i64, i32],
+    field_access_decl_indexes: HashMap[i64, i32, Minted],
+    field_access_types: HashMap[i64, i32, Minted],
+    field_access_owners: HashMap[i64, i32, Minted],
 
     // Current state
     source_text: str,
@@ -2436,27 +2437,27 @@ type Sema {
     body_tail_is_statement: bool,
     // The assignment tails Sema discarded (body tails only); MirLower lowers
     // exactly these in discard mode.
-    discarded_tails: HashMap[i32, i32],
+    discarded_tails: HashMap[i32, i32, Minted],
     // §9.1 / D60: the assignments whose value is the body's returned value —
     // the body tail under a declared non-`Unit` return, or an arm of a tail
     // `if`/`match` that the return takes. MirLower lowers each as its store
     // followed by a read of its place (tail_reads_place): 1 for the tail
     // (D60: a whole local moves), 2 for any other value position (D73: the
     // read is a view of the place, assign_reads_view).
-    tail_read_assigns: HashMap[i32, i32],
+    tail_read_assigns: HashMap[i32, i32, Minted],
     // Signatures whose parameter summaries a `c facade` declares
     // (facade_declare_view_of_param: constructors' dependency facts, text,
     // record and Borrowed<R> views): the body check merges its own findings
     // into them and never replaces them (D65: the facade fact is the owner;
     // the rendered body reads a raw pointer and can derive no foreign origin).
-    facade_declared_effect_sigs: HashMap[i32, i32],
+    facade_declared_effect_sigs: HashMap[i32, i32, Minted],
     // D85: (sig, param) -> the through bits a parent borrow declares
     // (facade_declare_view_through_param): the result views what the
     // parameter views, never its storage.
-    facade_declared_through: HashMap[i64, i32],
+    facade_declared_through: HashMap[i64, i32, Minted],
     // D73: assignment node -> the whole non-Copy local it assigns, when its
     // view (assign_reads_view) is rooted at that local (a view origin).
-    assign_view_targets: HashMap[i32, i32],
+    assign_view_targets: HashMap[i32, i32, Minted],
     // D55 (§18.2): the `if`/`match` node that is the argument of a generic
     // parameter bounded by Display (`print(match ..)`). Its arms join under
     // the ordinary rule; when nothing joins, the fix-it is the f-string.
@@ -2468,21 +2469,21 @@ type Sema {
     // #1196: signatures whose return type has been taken from their body. Until
     // then an unannotated signature reads as Unit, which a caller cannot tell
     // from a function that returns nothing.
-    body_typed_sigs: HashMap[i32, i32],
+    body_typed_sigs: HashMap[i32, i32, Minted],
     // Each top-level function declaration index by its semantic symbol
     // (prepare_body_order), for checking a body on demand.
-    body_decl_by_fn: HashMap[i32, i32],
+    body_decl_by_fn: HashMap[i32, i32, Minted],
     // Calls checked against such a placeholder: (node, sig, callee symbol, file)
     // in fours. Whether the placeholder was wrong is known once every body is typed.
     untyped_callee_calls: List[i32],
     // #2220: bodies the comptime evaluator had Sema type on demand (a const
     // initializer's call reaches them before check_bodies), by declaration
     // index; check_bodies does not check them a second time.
-    bodies_checked_on_demand: HashMap[i32, i32],
+    bodies_checked_on_demand: HashMap[i32, i32, Minted],
     // #2220 step 2: the `xs.iter()` / `xs.iter_ref()` calls that are a
     // `for` loop's iterable over a List (iterable node -> receiver node):
     // MirLower lowers those as the implicit form's counter loop.
-    for_list_iter_recvs: HashMap[i32, i32],
+    for_list_iter_recvs: HashMap[i32, i32, Minted],
     // The collection `collect[C]()` names while its Iter[T]-implementor
     // call is checked (List, HashSet or BTreeSet; 0 outside one).
     user_collect_target: i32,
@@ -2494,17 +2495,17 @@ type Sema {
     // fns whose name is used as a value (callers Sema cannot see, so their
     // callable parameters stay "may"); current_fn_decl_node: the fn whose
     // body is being checked (-1 outside one).
-    callable_param_keys: HashMap[i32, i64],
-    callable_param_fn_nodes: HashMap[i32, i32],
-    callable_param_may_suspend: HashMap[i64, i32],
-    fn_escapes_as_value: HashMap[i32, i32],
+    callable_param_keys: HashMap[i32, i64, Minted],
+    callable_param_fn_nodes: HashMap[i32, i32, Minted],
+    callable_param_may_suspend: HashMap[i64, i32, Minted],
+    fn_escapes_as_value: HashMap[i32, i32, Minted],
     current_fn_decl_node: i32,
     callee_ident_node: i32,
     suspend_params_unattributed: i32,
     // #2511: a callable struct field's may_suspend is what the program stores
     // in it: (owner type symbol, field symbol) -> 1 when some struct literal
     // or assignment stores a callable that may suspend.
-    callable_field_may_suspend: HashMap[i64, i32],
+    callable_field_may_suspend: HashMap[i64, i32, Minted],
     // The statement a block is checking: its value is discarded, so a callee
     // that is not typed yet costs a call in that position nothing.
     discarded_stmt_node: i32,
@@ -2521,14 +2522,14 @@ type Sema {
     // binding in that body was refused for, whose bare uses then say nothing
     // more.
     receiver_field_owner: i32,
-    receiver_field_shadowed: HashMap[i32, i32],
+    receiver_field_shadowed: HashMap[i32, i32, Minted],
     // §18.1: module_self_name's last answer, for the module path it read.
     self_name_cache_path: str,
     self_name_cache: str,
     // §18.2: callee nodes `builtins.name` bound to a compiler intrinsic —
     // the intrinsic, whatever else the bare name names here.
-    builtins_intrinsic_nodes: HashMap[i32, i32],
-    body_typed_decls: HashMap[i32, i32],
+    builtins_intrinsic_nodes: HashMap[i32, i32, Minted],
+    body_typed_decls: HashMap[i32, i32, Minted],
     body_typed_next: List[i32],
     // §13.6a: one for-comprehension's desugar (AstPool.build_comprehension_match)
     // is a chain from its outermost clause match (the root): the inner clause
@@ -2536,10 +2537,10 @@ type Sema {
     // its carrier family (1 Option, 2 Result) and, for Result, the Err type
     // every clause shares. A failure arm's `___fail_i` value re-wraps the
     // clause's failure in the comprehension's carrier: that node -> family.
-    comprehension_chain_roots: HashMap[i32, i32],
-    comprehension_root_carriers: HashMap[i32, i32],
-    comprehension_root_err_types: HashMap[i32, i32],
-    comprehension_failure_rewraps: HashMap[i32, i32],
+    comprehension_chain_roots: HashMap[i32, i32, Minted],
+    comprehension_root_carriers: HashMap[i32, i32, Minted],
+    comprehension_root_err_types: HashMap[i32, i32, Minted],
+    comprehension_failure_rewraps: HashMap[i32, i32, Minted],
     // §13.6a: check_for typed this match subject (the NK_FOR's iterable)
     // before choosing the comprehension reading; check_match_expr takes the
     // type instead of checking the node a second time.
@@ -2572,7 +2573,7 @@ type Sema {
     // (check_fn_body_with_sig_at). int_local_rechecks counts the bodies
     // checked twice: zero over a program that compiles without the rule.
     int_local_demands: List[i32],
-    int_local_decisions: HashMap[i32, i64],
+    int_local_decisions: HashMap[i32, i64, Minted],
     int_local_rechecking: i32,
     pub int_local_rechecks: i32,
     // §9.3.1 (#2326): an implicit `it` closure belongs to the nearest
@@ -2581,31 +2582,31 @@ type Sema {
     // met no function demand asks for that argument (closure, argument
     // pairs), the pass loop moves it there and checks the body again, and
     // the argument suppresses errors until then. Only inside that loop.
-    it_arg_demands: HashMap[i32, i32],
+    it_arg_demands: HashMap[i32, i32, Minted],
     it_closure_moves: List[i32],
-    it_moves_suppressing: HashMap[i32, i32],
+    it_moves_suppressing: HashMap[i32, i32, Minted],
     it_moves_allowed: i32,
     it_closure_depth: i32,
     pub int_local_recheck_names: List[str],
     // D128: the `for` whose literal range binds each loop variable in scope
     // (`for i in 1..9`), a literal-typed local like a `let` (no shadowing,
     // so the name is the key).
-    int_local_for_decls: HashMap[i32, i32],
+    int_local_for_decls: HashMap[i32, i32, Minted],
     // A closure parameter nothing types, while its body is checked: name ->
     // its key, -(closure node * 64 + index + 1), never an AST node.
-    int_local_closure_params: HashMap[i32, i32],
+    int_local_closure_params: HashMap[i32, i32, Minted],
     // Every such parameter key, for a demand on the closure value itself.
-    int_local_closure_keys: HashMap[i32, i32],
+    int_local_closure_keys: HashMap[i32, i32, Minted],
     // D128 (#2343): a loop or comprehension binding that walks a literal's
     // binding (`for x in xs`, `[a + b for (a, b) in src]` over `let src =
     // [(1, 2)]`): the name → that `let`, and the name → its position in the
     // clause's tuple pattern (-1: the element itself). A demand on the name
     // is a demand on the literal's element at that position.
-    iter_literal_lets: HashMap[i32, i32],
-    iter_literal_positions: HashMap[i32, i32],
+    iter_literal_lets: HashMap[i32, i32, Minted],
+    iter_literal_positions: HashMap[i32, i32, Minted],
     // D128: per (function, name), the last unannotated `let` of a tuple
     // literal or a pending generic constructor (demand_let_of).
-    fn_demand_lets: HashMap[i64, i32],
+    fn_demand_lets: HashMap[i64, i32, Minted],
     // Per label frame, the numeric type the enclosing demand wants of a
     // `loop`'s value, so an untyped `break 42` takes it (§4.2.1 rule 4).
     label_break_expected: List[i32],
@@ -2635,8 +2636,8 @@ type Sema {
     // D69 (#1734): the places a generator call's view arguments name (the
     // referent of `&x`, a view argument, a borrowed receiver), keyed by the
     // call node: gen_call_view_place_nodes[start..start+count].
-    gen_call_view_place_starts: HashMap[i32, i32],
-    gen_call_view_place_counts: HashMap[i32, i32],
+    gen_call_view_place_starts: HashMap[i32, i32, Minted],
+    gen_call_view_place_counts: HashMap[i32, i32, Minted],
     gen_call_view_place_nodes: List[i32],
     stmt_pos_depth: i32,
     current_statement_expr_root: i32,
@@ -2688,7 +2689,7 @@ type Sema {
     // for with.toml; Sema reads no files).
     package_keys: HashMap[str, str],
     decl_source_file_ids: List[i32],  // one file id per decl index (from Frontend)
-    module_path_by_file: HashMap[i32, str], // #1362: file id -> declaring module path (lazy)
+    module_path_by_file: HashMap[i32, str, Minted], // #1362: file id -> declaring module path (lazy)
     decl_is_c_import: List[i32],      // 0 unless the decl came from a c_import; then 1 + the byte offset of that `use c_import` in its module (#1221: import order)
     source_text_file_ids: List[i32],  // imported/extra source text file ids
     source_text_names: List[str],     // source display names aligned with source_text_file_ids
@@ -2699,7 +2700,7 @@ type Sema {
     // D30 step 2: the signatures whose `@[effect]` pins are a declared
     // contract (a runtime ABI definition's), applied at declaration as an
     // extern's and kept through the body's inference.
-    runtime_contract_sigs: HashMap[i32, i32],
+    runtime_contract_sigs: HashMap[i32, i32, Minted],
     module_paths: List[str],          // resolved module graph paths
     module_import_starts: List[i32],  // per-module start into module_import_targets
     module_import_counts: List[i32],  // per-module import edge count
@@ -2724,7 +2725,7 @@ type Sema {
     named_type_candidate_paths: List[str],      // defining module path or "" for global
     named_type_candidate_pub: List[i32],        // parallel public flag
     named_type_candidate_ci: List[i32],         // parallel: 1 when a c_import expansion declared it
-    named_type_candidate_heads: HashMap[i32, i32], // symbol -> newest candidate index
+    named_type_candidate_heads: HashMap[i32, i32, Minted], // symbol -> newest candidate index
     named_type_candidate_next: List[i32],       // previous candidate for the same symbol
     // #1457: type names declared in more than one source file. A method of
     // such a type carries its declaration: its symbol and its method-table
@@ -2733,22 +2734,22 @@ type Sema {
     // is its own (§18.1). Computed once from the decl table
     // (compute_method_origins) so the declaring side and the lookup side
     // read one answer.
-    colliding_type_names: HashMap[i32, i32],   // name symbol -> 1
+    colliding_type_names: HashMap[i32, i32, Minted],   // name symbol -> 1
     // #2520: the trait mirror of the type-identity tables above — a trait
     // name declared in more than one file keys its impl methods by
     // `Trait$m$<path hash>`; trait_identity_first is sym -> first identity.
-    colliding_trait_names: HashMap[i32, i32],
-    trait_identity_syms: HashMap[i64, i32],
-    trait_identity_first: HashMap[i32, i32],
-    type_identity_syms: HashMap[i64, i32],     // pair(name symbol, path symbol) -> identity symbol
-    type_identity_tids: HashMap[i32, i32],     // identity symbol -> the declaration's TypeId
-    type_identity_names: HashMap[i32, i32],    // identity symbol -> the declared name symbol
-    impl_identity_traits: HashMap[i64, i32],   // pair(identity symbol, trait) -> 1: that declaration's direct impls
+    colliding_trait_names: HashMap[i32, i32, Minted],
+    trait_identity_syms: HashMap[i64, i32, Minted],
+    trait_identity_first: HashMap[i32, i32, Minted],
+    type_identity_syms: HashMap[i64, i32, Minted],     // pair(name symbol, path symbol) -> identity symbol
+    type_identity_tids: HashMap[i32, i32, Minted],     // identity symbol -> the declaration's TypeId
+    type_identity_names: HashMap[i32, i32, Minted],    // identity symbol -> the declared name symbol
+    impl_identity_traits: HashMap[i64, i32, Minted],   // pair(identity symbol, trait) -> 1: that declaration's direct impls
     decl_visibility_syms: List[i32],            // top-level symbol visibility candidates
     decl_visibility_paths: List[str],           // parallel declaring module path
     decl_visibility_pub: List[i32],             // parallel public flag
     decl_visibility_nodes: List[i32],           // parallel declaration node
-    decl_visibility_index: HashMap[i32, i32],  // symbol → its newest record; older records chain through decl_visibility_prev
+    decl_visibility_index: HashMap[i32, i32, Minted],  // symbol → its newest record; older records chain through decl_visibility_prev
     decl_visibility_prev: List[i32],
     // #2249: the visibility explainer (`with analyze … explain:visible:<name>`):
     // every rule a verdict passed through, when on.
@@ -2756,21 +2757,21 @@ type Sema {
     // condition that did not evaluate, so the report names the cause (an
     // unimported type) instead of "not comptime-evaluable".
     comptime_truthy_error: str,
-    decl_visibility_node_index: HashMap[i32, i32], // declaration node → its record
+    decl_visibility_node_index: HashMap[i32, i32, Minted], // declaration node → its record
     // #1350: fns the flat merge displaced to a module-qualified identity
     // (`name$in$<module>`), chained per short name like decl_visibility.
-    displaced_fn_index: HashMap[i32, i32],     // short symbol → its newest record
-    displaced_fn_record_of: HashMap[i32, i32], // displaced symbol → its record
+    displaced_fn_index: HashMap[i32, i32, Minted],     // short symbol → its newest record
+    displaced_fn_record_of: HashMap[i32, i32, Minted], // displaced symbol → its record
     displaced_fn_syms: List[i32],               // displaced (module-qualified) symbol
     displaced_fn_paths: List[str],              // parallel declaring module path
     displaced_fn_pub: List[i32],                // parallel public flag
     displaced_fn_prev: List[i32],               // older record for the same short name
-    displaced_global_syms: HashMap[i32, i32],  // #1703: displaced records that are module values, not fns
+    displaced_global_syms: HashMap[i32, i32, Minted],  // #1703: displaced records that are module values, not fns
     // c_import scoping: tracks which symbols are c_import-origin
-    ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
-    ci_raw_syms: HashMap[i32, i32],  // sym → 1 for c_import raw ABI calls
+    ci_syms: HashMap[i32, i32, Minted],      // sym → 1 for c_import-origin symbols
+    ci_raw_syms: HashMap[i32, i32, Minted],  // sym → 1 for c_import raw ABI calls
     ci_omitted_symbols: HashMap[str, str], // C name → omission reason
-    ci_modules: HashMap[i32, i32],   // module-path-sym → 1 for modules that have c_import
+    ci_modules: HashMap[i32, i32, Minted],   // module-path-sym → 1 for modules that have c_import
     scoping_active: i32,             // 1 when multi-module c_import scoping is active
     // True once declarations are collected: a body may be checked out of
     // turn (check_fn_body_before_eval). Before that, the evaluator runs on
@@ -2779,9 +2780,9 @@ type Sema {
     current_module_has_ci: i32,      // 1 if current module has c_import declarations
     // Reachable-comptime-error traversal accumulators (formerly free-fn
     // &mut HashMap params). Reset on each entry to check_reachable_comptime_errors.
-    reachable_seen: HashMap[i32, i32],
-    reachable_visiting: HashMap[i32, i32],
-    reachable_decl_indices: HashMap[i32, i32],
+    reachable_seen: HashMap[i32, i32, Minted],
+    reachable_visiting: HashMap[i32, i32, Minted],
+    reachable_decl_indices: HashMap[i32, i32, Minted],
 }
 
 fn sema_debug_stage1_enabled -> bool:
@@ -3140,16 +3141,16 @@ impl Sema:
         self.emit_error(name ++ " requires std", node)
         false
 
-fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
+fn sema_new_map_i32_i32 -> HashMap[i32, i32, Minted]:
     HashMap.new()
 
-fn sema_new_map_i32_str -> HashMap[i32, str]:
+fn sema_new_map_i32_str -> HashMap[i32, str, Minted]:
     HashMap.new()
 
 fn sema_new_map_str_i32 -> HashMap[str, i32]:
     HashMap.new()
 
-fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
+fn sema_new_map_i64_i32 -> HashMap[i64, i32, Minted]:
     HashMap.new()
 
 fn sema_new_list_str -> List[str]:
@@ -3476,7 +3477,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let retained_extern_params = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
     let fn_decl_effective_syms = sema_new_map_i32_i32()
-    let fn_decl_source_paths = HashMap[i32, str].new()
+    let fn_decl_source_paths: HashMap[i32, str, Minted] = [:]
     let fn_clause_group_lookup = sema_new_map_i32_i32()
     let fn_clause_body_dispatch = sema_new_map_i32_i32()
     let generic_fn_nodes = sema_new_map_i32_i32()
@@ -3504,7 +3505,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let ceremony_let_annotations = sema_new_map_i32_i32()
     let ceremony_let_values = sema_new_map_i32_i32()
     let ceremony_let_type_nodes = sema_new_map_i32_i32()
-    let ceremony_let_paths: HashMap[i32, str] = [:]
+    let ceremony_let_paths: HashMap[i32, str, Minted] = [:]
     let ceremony_rebound_lets = sema_new_map_i32_i32()
     let ceremony_widening_casts = sema_new_map_i32_i32()
     let ceremony_list_news = sema_new_map_i32_i32()
@@ -3519,7 +3520,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let ceremony_fn_elem_syms = sema_new_map_i32_i32()
     let ceremony_active_base_syms = sema_new_map_i32_i32()
     let suspending_fns = sema_new_map_i32_i32()
-    let builtin_suspending_methods: HashMap[i64, i32] = [:]
+    let builtin_suspending_methods: HashMap[i64, i32, Minted] = [:]
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
     let no_alloc_fns = sema_new_map_i32_i32()
@@ -3589,7 +3590,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let ephemeral_task_binding_nodes = sema_new_map_i32_i32()
     let typed_dump_seen_nodes = sema_new_map_i32_i32()
     let generic_specializations_in_check = sema_new_map_str_i32()
-    let specialization_source_paths: HashMap[i32, str] = [:]
+    let specialization_source_paths: HashMap[i32, str, Minted] = [:]
     let generic_inst_cache: Memo[i64, i32] = Memo.new()
     let generic_enum_payload_cache_starts = sema_new_map_i64_i32()
     let generic_enum_payload_cache_counts = sema_new_map_i64_i32()
@@ -3768,11 +3769,11 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         impl_extra: List.new(),
         impl_extra_is_std: List.new(),
         type_decl_nodes_by_tid: HashMap.new(),
-        pub_field_keys: HashSet[i64].new(),
-        zeroed_call_nodes: HashSet[i32].new(),
+        pub_field_keys: [],
+        zeroed_call_nodes: [],
         comptime_callable_memo: Memo.new(),
         comptime_callable_chain: HashMap.new(),
-        comptime_callable_visiting: HashSet[i32].new(),
+        comptime_callable_visiting: [],
         value_to_option_nodes: HashMap.new(),
         pipeline_implicit_iter: HashMap.new(),
         implicit_iter_args: HashMap.new(),
@@ -10805,7 +10806,7 @@ impl Sema:
     // source declaration names the exact mode the compiler derived; there is no
     // declaration-spelling exemption and no warning/fallback mode.
     mut fn enforce_receiver_modes():
-        let seen: HashMap[i32, i32] = [:]
+        let seen: HashMap[i32, i32, Minted] = [:]
         for si in 0..self.sig_receiver_modes.len() as i32:
             let declared = self.sig_receiver_mode(si)
             if declared == ReceiverMode.None or self.sig_get_param_count(si) <= 0:

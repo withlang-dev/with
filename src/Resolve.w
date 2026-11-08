@@ -18,6 +18,7 @@ use compiler.Runtime
 use std.collections.HashMap
 use std.string.StringBuilder
 use rt.rt_core
+use std.collections.Minted
 
 
 fn resolve_owned_text(text: &str) -> str:
@@ -166,8 +167,8 @@ type ResolveState {
     module_processed: List[i32],
 
     module_map: HashMap[str, i32],
-    link_lib_set: HashMap[i32, i32],
-    binding_map: HashMap[i64, i32],
+    link_lib_set: HashMap[i32, i32, Minted],
+    binding_map: HashMap[i64, i32, Minted],
     root_source_dir: str,
 
     next_file_id: i32,

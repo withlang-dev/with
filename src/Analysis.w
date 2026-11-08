@@ -15,6 +15,7 @@ use MirCore
 use SemaTypes
 use std.collections.HashMap
 use rt.rt_core
+use std.collections.Minted
 
 
 type CompilerAnalysisResult {
@@ -1640,7 +1641,7 @@ fn analysis_term_successors(body: &MirBody, bb: i32) -> List[i32]:
 // (producer discovery); otherwise only the known pool fields.
 type PoolViewOrigins { origin: List[i32], field: List[i32] }
 
-fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i32, i32], fields: &HashMap[i32, i32], any_field: bool) -> PoolViewOrigins:
+fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i32, i32, Minted], fields: &HashMap[i32, i32, Minted], any_field: bool) -> PoolViewOrigins:
     let origin: List[i32] = []
     let field: List[i32] = []
     for li in 0..body.local_count():
@@ -1683,7 +1684,7 @@ fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i3
 // The pool fields a body grows directly: it mutates a place ending in the
 // field in place (receiver of a `mut fn`/`move fn`, or a mutating container
 // intrinsic) or assigns the whole field.
-fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32, i32]) -> List[i32]:
+fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32, i32, Minted]) -> List[i32]:
     let grown: List[i32] = []
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL: continue
@@ -1717,9 +1718,9 @@ fn analysis_local_label(body: &MirBody, sema: &Sema, li: i32) -> str:
 fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str):
     let bodies = mir_mod.bodies.len()
     // 1. Producers and pool fields, to a fixpoint over wrapper chains.
-    let fields: HashMap[i32, i32] = [:]
+    let fields: HashMap[i32, i32, Minted] = [:]
     let field_list: List[i32] = []
-    let producers: HashMap[i32, i32] = [:]
+    let producers: HashMap[i32, i32, Minted] = [:]
     var changed = true
     while changed:
         changed = false
@@ -1741,7 +1742,7 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
     //    on (body, field); each entry remembers the direct grower it reaches,
     //    for the report). Growing one pool never invalidates a view into
     //    another.
-    let reaches: HashMap[i64, i32] = [:]
+    let reaches: HashMap[i64, i32, Minted] = [:]
     var direct = 0
     for bi in 0..bodies:
         let body = &mir_mod.bodies[bi]
@@ -1790,7 +1791,7 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
         let blocks = body.block_count()
         let state: List[i32] = []
         for i in 0..blocks * locals: state.push(0)
-        let seen: HashMap[i32, i32] = [:]
+        let seen: HashMap[i32, i32, Minted] = [:]
         let fn_name = with_str_clone_ref(sema.pool_resolve(body.fn_sym))
         let fn_path = analysis_sig_path(sema, body.fn_sym, source_path)
         let fn_source = analysis_source_for_path(sema, fn_path, source_text)
@@ -2501,7 +2502,7 @@ fn analysis_call_path(report: &AnalysisReport, from: &str, to: &str) -> str:
     if start == 0 or target == 0:
         return f"call-path: unresolved endpoint from={from} to={to}\n"
     let queue: List[i32] = []
-    let pred: HashMap[i32, i32] = [:]
+    let pred: HashMap[i32, i32, Minted] = [:]
     queue.push(start)
     pred.insert(start, 0)
     var qi = 0
@@ -2536,7 +2537,7 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
     if start == 0:
         return f"call-closure: unresolved root {root}\n"
     let queue: List[i32] = []
-    let pred: HashMap[i32, i32] = [:]
+    let pred: HashMap[i32, i32, Minted] = [:]
     queue.push(start)
     pred.insert(start, 0)
     var qi = 0

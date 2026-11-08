@@ -37,6 +37,7 @@ use compiler.LldDriver
 use InternPool
 use std.string.StringBuilder
 use std.memo
+use std.collections.Minted
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 var frontend_cimport_compiler_fingerprint_ready: i32 = 0
@@ -354,7 +355,7 @@ impl Sema:
             // modules import for themselves stays theirs — std.regex reaches
             // the pcre2 interface through its own `use std.engines.pcre2.*`, and pcre2's
             // three thousand names are not every program's namespace.
-            let seen_global: HashMap[i32, i32] = [:]
+            let seen_global: HashMap[i32, i32, Minted] = [:]
             while global_frontier.len() > 0:
                 let last = global_frontier.len() - 1
                 let mid: i32 = global_frontier[last]
@@ -2545,7 +2546,7 @@ impl Zcu:
     // (fn_abi_module_link_name). The earlier declaration keeps the short name,
     // so a source definition always does (D39: the interface yields).
     fn displace_colliding_interface_fns(pool: &AstPool, base: i32):
-        let taken: HashMap[i32, str] = [:]
+        let taken: HashMap[i32, str, Minted] = [:]
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di) as i32
             let kind = pool.kind(decl)
@@ -2593,7 +2594,7 @@ impl Zcu:
     // headers' externs of one symbol are that symbol declared twice, which
     // Sema accepts (collect_extern_var).
     fn displace_colliding_globals(pool: &AstPool):
-        let taken: HashMap[i32, str] = [:]
+        let taken: HashMap[i32, str, Minted] = [:]
         for pass in 0..3:
             for di in 0..pool.decl_count():
                 let decl = pool.get_decl(di) as i32
@@ -2684,7 +2685,7 @@ impl Zcu:
     // c_import is an owner of its own (#1753). A header's extern stays the
     // one global C symbol (D29).
     fn displace_colliding_c_import_fns(pool: &AstPool):
-        let taken: HashMap[i32, str] = [:]
+        let taken: HashMap[i32, str, Minted] = [:]
         for pass in 0..2:
             for di in 0..pool.decl_count():
                 let decl = pool.get_decl(di) as i32

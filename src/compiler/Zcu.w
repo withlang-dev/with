@@ -17,6 +17,7 @@ use compiler.EmbeddedStdlib
 use compiler.BundleInterfaces
 use FnAbi
 use rt.rt_core
+use std.collections.Minted
 
 fn zcu_owned_text(text: &str) -> str:
     if text.len() == 0:
@@ -110,7 +111,7 @@ type Zcu {
     refused_runtime_sources: List[str],
     // The symbols the source names — the on-demand interface merge's S —
     // and the interface sections whose declarations wait for it.
-    iface_mentioned: HashMap[i32, i32],
+    iface_mentioned: HashMap[i32, i32, Minted],
     pending_iface_paths: List[str],
     pending_iface_texts: List[str],
     import_path_memo: HashMap[str, str],   // "name|dir" → resolved module path (the sections' 937 use lines name ~35 modules)

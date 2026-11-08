@@ -38,6 +38,7 @@ use MirCore
 use SemaTypes
 use std.collections.HashMap
 use rt.rt_core
+use std.collections.Minted
 
 
 fn resolution_line(source: &str, offset: i32) -> i32:
@@ -240,8 +241,8 @@ fn resolution_span_key(file: i32, offset: i32) -> i64: ((file as i64) << 32) | (
 // have no body and are not judged); the nodes of a body's closures are
 // inside its span and their calls are in the module's call facts.
 fn resolution_audit_unlowered_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
-    let lowered_nodes: HashMap[i32, i32] = [:]
-    let elided_nodes: HashMap[i32, i32] = [:]
+    let lowered_nodes: HashMap[i32, i32, Minted] = [:]
+    let elided_nodes: HashMap[i32, i32, Minted] = [:]
     var elided = 0
     let span_keys: List[i64] = []
     let span_end_keys: List[i64] = []
