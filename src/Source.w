@@ -74,7 +74,7 @@ impl Source:
         slice
 
 fn source_compute_line_offsets(text: &str) -> List[i32]:
-    var offsets: List[i32] = List.new()
+    let offsets: List[i32] = []
     offsets.push(0)
     for i in 0..text.len():
         if text[i] == 10:

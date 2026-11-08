@@ -17,7 +17,7 @@ fn host_lib_multiarch(arch: &str): if arch == "aarch64": "aarch64-linux-gnu" els
 fn host_lib_elf_machine(arch: &str): if arch == "aarch64": 183 else: 62
 
 fn host_lib_push_dir(dirs: List[str], dir: &str) -> List[str]:
-    var out = dirs
+    let out = dirs
     if dir.len() == 0 or runtime_is_dir(dir) == 0: return out
     for d in out:
         if d == dir: return out
@@ -25,7 +25,7 @@ fn host_lib_push_dir(dirs: List[str], dir: &str) -> List[str]:
     out
 
 fn host_lib_sorted(xs: List[str]) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     for x in xs:
         var i = out.len()
         out.push(x)
@@ -39,7 +39,7 @@ fn host_lib_sorted(xs: List[str]) -> List[str]:
 // The `include` operand's files: a path, or a `*` pattern in the final
 // component (`/etc/ld.so.conf.d/*.conf`), in name order as ldconfig reads them.
 fn host_lib_conf_includes(root: &str, pattern: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     let path = if pattern.starts_with("/"): root ++ pattern else: root ++ "/etc/" ++ pattern
     let star = path.find("*")
     if star < 0:
@@ -88,7 +88,7 @@ fn host_library_trusted_dirs(root: &str, arch: &str): host_lib_push_trusted(List
 /// order, each existing once. `root` is "" for the running host, else a
 /// sysroot; LIBRARY_PATH is the running host's alone.
 fn host_library_dirs(root: &str, arch: &str) -> List[str]:
-    var dirs: List[str] = List.new()
+    var dirs: List[str] = []
     if root.len() == 0:
         for dir in runtime_getenv("LIBRARY_PATH").split(":"):
             if dir.starts_with("/"): dirs = host_lib_push_dir(dirs, dir)

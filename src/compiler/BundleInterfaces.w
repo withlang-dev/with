@@ -20,7 +20,7 @@ var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
 // sha256 hex of a text — the manifest's `interface-sha` (the .wi bytes) and
 // the fingerprint (the canonical declaration rows).
 fn bundle_text_sha256(text: &str) -> str:
-    var digest: [32]u8 = [0 as u8; 32]
+    let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(text, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
 
@@ -52,7 +52,7 @@ fn bundle_module_dotted_name(canonical_path: &str) -> str:
 
 // The `module <path>` section paths of an interface file, in file order.
 fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     var start: i64 = 0
     while start < wi_text.len():
         var end = start

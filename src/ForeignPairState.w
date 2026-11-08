@@ -181,7 +181,7 @@ fn foreign_slot_bit(slot: i32) -> i64: 1 << (slot as u32)
 // D194: the retentions an operation releases (`until`, a bit per slot),
 // and a setter's own slot replaced by its new storage.
 fn foreign_pair_release(state: &ForeignPairState, mask: i64, guard: i32) -> ForeignPairState:
-    var result = foreign_pair_on_edge(state, -1, true)
+    let result = foreign_pair_on_edge(state, -1, true)
     result.held = if guard < 0: [r for r in state.held if mask & foreign_slot_bit(r.slot) == 0] else: [if mask & foreign_slot_bit(r.slot) == 0: r else: ForeignRetention { slot: r.slot, origin: r.origin, pending_guard: guard } for r in state.held]
     result
 
@@ -275,7 +275,7 @@ fn foreign_pair_places_clone(source: &ForeignPairPlaces) -> ForeignPairPlaces:
 
 fn foreign_pair_places_join(a: &ForeignPairPlaces, b: &ForeignPairPlaces) -> ForeignPairPlaces:
     assert(a.values.len() == b.values.len())
-    var result = foreign_pair_places_clone(a)
+    let result = foreign_pair_places_clone(a)
     for key in 0..a.values.len():
         result.values[key] = foreign_pair_join(a.values[key], b.values[key])
         for target in b.references[key]:
@@ -355,7 +355,7 @@ type ForeignPairPlaceFlow {
 }
 
 fn foreign_pair_execute_step(places: &ForeignPairPlaces, step: &ForeignPairStep) -> (ForeignPairPlaces, bool):
-    var after = foreign_pair_places_clone(places)
+    let after = foreign_pair_places_clone(places)
     var valid = true
     if step.action == FOREIGN_STEP_APPLY:
         valid = after.apply_at(step.place, step.contract)
@@ -373,7 +373,7 @@ fn foreign_pair_execute_step(places: &ForeignPairPlaces, step: &ForeignPairStep)
     (after, valid)
 
 fn foreign_pair_places_edge(source: &ForeignPairPlaces, edge: &ForeignPairEdge) -> (ForeignPairPlaces, bool):
-    var result = foreign_pair_places_clone(source)
+    let result = foreign_pair_places_clone(source)
     var reachable = true
     for key in 0..result.values.len():
         result.values[key] = foreign_pair_on_edge(source.values[key], edge.guard, edge.succeeded)

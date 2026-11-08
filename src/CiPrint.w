@@ -48,7 +48,7 @@ fn ci_reindent_spaces(text: &str, spaces: i32) -> str:
     // CIS_BLOCK's child-separator convention — the legacy
     // `ci_indent_block(s, indent) ++ push("\n")` pattern produces
     // two trailing newlines after each child, and we need the same.
-    var parts: List[str] = List.new()
+    let parts: List[str] = []
     var start = 0
     let tlen = text.len()
     while start < tlen:
@@ -691,7 +691,7 @@ fn ci_print_sizeof_type_text(text: &str) -> str:
     with_str_clone_ref(text)
 
 fn i32_to_string(n: i32) -> str:
-    i64_to_string(n as i64)
+    i64_to_string(n)
 
 
 // ── CiExpr printing ──────────────────────────────────────────
@@ -1029,9 +1029,9 @@ fn ci_print_note_unknown(detail: &str):
 
 /// The printer's unrenderable-node records since the last take; taking clears.
 fn ci_print_take_unknowns() -> List[str]:
-    var taken: List[str] = List.new()
-    for i in 0..g_ci_print_unknowns.len():
-        taken.push(g_ci_print_unknowns[i])
+    let taken: List[str] = []
+    for g_ci_print_unknown in g_ci_print_unknowns:
+        taken.push(g_ci_print_unknown)
     g_ci_print_unknowns.clear()
     taken
 
@@ -1184,12 +1184,12 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
         let arm_count = stmts.get_d2(id)
         let brace = migrate_prefer_brace()
         var out = indent ++ "match " ++ ci_print_expr(exprs, types, subject, 0, 0) ++ (if brace: " {\n" else: ":\n")
-        var cursor: i32 = arms_start
+        var cursor = arms_start
         var ai: i32 = 0
         while ai < arm_count:
             let value_count = stmts.get_extra(cursor)
             cursor = cursor + 1
-            var arm_heads: List[str] = List.new()
+            let arm_heads: List[str] = []
             if value_count == 0:
                 arm_heads.push("_")
             else:
@@ -1359,7 +1359,7 @@ fn ci_expect_eq(label: &str, actual: &str, expected: &str) -> i32:
     1
 
 fn ci_roundtrip_types -> i32:
-    var types = CiTypePool.new()
+    let types = CiTypePool.new()
     let i32_ty = types.ty_int(32, 0)
     let u8_ty = types.ty_int(8, 1)
     let bool_ty = types.ty_bool()
@@ -1376,8 +1376,8 @@ fn ci_roundtrip_types -> i32:
     fails
 
 fn ci_roundtrip_exprs -> i32:
-    var types = CiTypePool.new()
-    var exprs = CiExprPool.new()
+    let types = CiTypePool.new()
+    let exprs = CiExprPool.new()
     let i32_ty = types.ty_int(32, 0)
     let u8_ty = types.ty_int(8, 1)
     let f32_ty = types.ty_float(32)
@@ -1431,10 +1431,10 @@ fn ci_roundtrip_exprs -> i32:
 fn ci_roundtrip_fn_decl -> i32:
     // Construct:  fn foo() -> i32:
     //                 return 42
-    var types = CiTypePool.new()
-    var exprs = CiExprPool.new()
-    var stmts = CiStmtPool.new()
-    var decls = CiDeclPool.new()
+    let types = CiTypePool.new()
+    let exprs = CiExprPool.new()
+    let stmts = CiStmtPool.new()
+    let decls = CiDeclPool.new()
     let i32_ty = types.ty_int(32, 0)
     let lit_idx = exprs.add_string("42")
     let lit = exprs.int_lit(lit_idx, i32_ty)

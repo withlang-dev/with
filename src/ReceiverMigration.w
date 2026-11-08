@@ -46,7 +46,7 @@ fn trim(s: &str):
 // Names from a type-param inner text ("K: Ord, V" -> "K, V"): each top-level
 // comma segment's identifier, stripped of its optional `: Bound`.
 fn tparam_names(inner: &str):
-    var parts: List[str] = List.new()
+    let parts: List[str] = []
     let m = inner.len()
     var seg_start = 0
     var depth = 0
@@ -73,7 +73,7 @@ fn tparam_names(inner: &str):
 
 // Prefix `pad` to every non-empty line of `text` (blank lines stay blank).
 fn reindent(text: &str, pad: &str):
-    var parts: List[str] = List.new()
+    let parts: List[str] = []
     let m = text.len()
     var line_start = 0
     var i = 0
@@ -149,11 +149,11 @@ impl RelocationFacts:
         let tlen = text.len()
         if tlen == 0:
             return 0
-        var lexer = Lexer.init(text, 0)
+        let lexer = Lexer.init(text, 0)
         let tokens = lexer.tokenize()
         let n = tokens.len()
 
-        var chunks: List[str] = List.new()
+        let chunks: List[str] = []
         var cursor = 0             // bytes emitted up to here
         var open_header = ""       // current open impl group header ("" = none)
         var count = 0
@@ -230,9 +230,9 @@ impl RelocationFacts:
             let tp_end = paren_pos
 
             // first param must be `[mut|move] self`
-            var fp = k + 1
+            let fp = k + 1
             var source_mode = AnalysisReceiverMode.Read as i32
-            var param_start = tokens.get_start(fp)
+            let param_start = tokens.get_start(fp)
             var self_tok = fp
             if fp < n and tokens.get_tag(fp) == TokenKind.TK_KW_MUT:
                 source_mode = AnalysisReceiverMode.Mut as i32
@@ -281,7 +281,7 @@ impl RelocationFacts:
                 else if t == TokenKind.TK_COMMA and depth == 0:
                     break
                 q = q + 1
-            var recv_type = slice(text, recv_start, tokens.get_start(q))
+            let recv_type = slice(text, recv_start, tokens.get_start(q))
             // strip a leading `&` (borrow) and spaces
             var rti = 0
             let rlen = recv_type.len()
@@ -380,7 +380,7 @@ impl RelocationFacts:
                 open_header = header
 
             // transformed method: pub? + mode + `fn ` + name + `(` + params-after-self + body
-            var mparts: List[str] = List.new()
+            let mparts: List[str] = []
             mparts.push(slice(text, decl_start, fn_pos))   // `pub ` or ``
             mparts.push(mode_kw)                           // `mut `/`move `/``
             mparts.push(slice(text, fn_pos, type_start))   // `fn `
@@ -417,13 +417,13 @@ impl RelocationFacts:
         count
 
 fn path_excluded(path: &str, excludes: &List[str]) -> bool:
-    for i in 0..excludes.len():
-        let excluded = excludes[i]
+    for exclude in excludes:
+        let excluded = exclude
         if path == excluded or path.starts_with(excluded ++ "/"): return true
     false
 
 fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]) -> List[str]:
-    let paths: List[str] = List.new()
+    let paths: List[str] = []
     for i in 0..facts.paths.len():
         let path = facts.paths[i]
         if path_excluded(path, excludes): continue
@@ -460,7 +460,7 @@ fn run_receiver_migration -> i32:
         exit_code(1)
     var apply = false
     var list_methods = false
-    let excludes: List[str] = List.new()
+    let excludes: List[str] = []
     var entry = ""
     var arg = 2
     while arg < argv.len():
@@ -485,14 +485,14 @@ fn run_receiver_migration -> i32:
     if entry.len() == 0:
         print("error: no semantic entry file supplied")
         exit_code(1)
-    var facts = compiler_relocation_facts(entry)
+    let facts = compiler_relocation_facts(entry)
     let paths = unique_relocation_paths(facts, excludes)
     let selected = count_selected(facts, excludes)
     // Always complete a no-write structural preflight over the whole semantic
     // selection before the first file can be changed.
     var preflight: isize = 0
-    for i in 0..paths.len():
-        let changed = facts.relocate_file(paths[i], false, list_methods)
+    for path in paths:
+        let changed = facts.relocate_file(path, false, list_methods)
         if changed < 0: exit_code(1)
         preflight = preflight + changed
     if not verify_all_matched(facts, excludes): exit_code(1)

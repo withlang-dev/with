@@ -33,7 +33,7 @@ fn with_dsymutil_cli_main() -> i32:
     if not with_dsymutil_available():
         runtime_eprint("error: this build of `with` has no dsymutil: the LLVM SDK it was linked against predates lib/libdsymutilMain.a (#1915)")
         return 127
-    let args: List[str] = List.new()
+    let args: List[str] = []
     args.push("dsymutil")
     for i in 2..with_arg_count(): args.push(with_arg_at(i))
     unsafe:

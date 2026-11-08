@@ -12,7 +12,7 @@ use rt.rt_core
 let XZ_MASK32: i64 = 4294967295
 
 fn xz_crc32_table() -> List[i64]:
-    let table: List[i64] = List.new()
+    let table: List[i64] = []
     for n in 0..256:
         var c = n as i64
         for _ in 0..8:
@@ -31,15 +31,15 @@ fn xz_crc32(data: &str, start: i64, end: i64) -> i64:
 // only through the u64 view.
 fn xz_crc64(data: &List[u8]) -> u64:
     let poly: u64 = 0xC96C5795D7870F42
-    let table: List[u64] = List.new()
+    let table: List[u64] = []
     for n in 0..256:
         var c = n as u64
         for _ in 0..8:
             c = if c % 2 == 1: poly ^ (c >> 1) else: c >> 1
         table.push(c)
     var crc: u64 = 0xFFFFFFFFFFFFFFFF
-    for i in 0..data.len():
-        crc = table[((crc ^ data[i] as u64) & 255) as i32] ^ (crc >> 8)
+    for data_item in data:
+        crc = table[((crc ^ data_item as u64) & 255) as i32] ^ (crc >> 8)
     crc ^ 0xFFFFFFFFFFFFFFFF
 
 fn xz_u32_le(data: &str, at: i64) -> i64:
@@ -180,7 +180,7 @@ impl XzLzma:
         let len_state: i32 = if len < 3: len else: 3
         let slot = self.bittree(P_POS_SLOT + len_state * 64, 6)
         if slot < 4:
-            return slot as i64
+            return slot
         let direct = (slot >> 1) - 1
         var dist = ((2 | (slot & 1)) as i64) << (direct as u32)
         if slot < 14:
@@ -339,7 +339,7 @@ fn xz_vli(data: &str, at: i64) -> List[i64]:
         value = value | ((b & 127) << ((7 * i) as u32))
         i = i + 1
         if b < 128: break
-    let out: List[i64] = List.new()
+    let out: List[i64] = []
     out.push(value)
     out.push(at + i)
     out
@@ -351,8 +351,8 @@ fn xz_bytes_to_str(v: &List[u8]) -> str:
 // The decompressed contents of the .xz file `data`; "" and the reason in
 // the second element on failure. Concatenated streams are read in turn.
 fn xz_decompress(data: &str) -> List[str]:
-    var dec = XzLzma { data: data.to_owned(), at: 0, end: 0, range: 0, code: 0, probs: List.new(), lc: 0, lp: 0, pb: 0, state: 0, rep0: 0, rep1: 0, rep2: 0, rep3: 0, out: List.new(), dict_start: 0, problem: "" }
-    let result: List[str] = List.new()
+    let dec = XzLzma { data: data.to_owned(), at: 0, end: 0, range: 0, code: 0, probs: List.new(), lc: 0, lp: 0, pb: 0, state: 0, rep0: 0, rep1: 0, rep2: 0, rep3: 0, out: List.new(), dict_start: 0, problem: "" }
+    let result: List[str] = []
     var at: i64 = 0
     var streams = 0
     while at < data.len():
@@ -412,7 +412,7 @@ fn xz_decompress(data: &str) -> List[str]:
             else if check == 4:
                 ok = xz_crc64(block_data) == xz_u64_le(data, at)
             else if check == 10:
-                var digest: [32]u8 = [0 as u8; 32]
+                let digest: [32]u8 = [0 as u8; 32]
                 sha256_hash_str(xz_bytes_to_str(block_data), &raw mut digest[0] as *mut u8)
                 for i in 0..32:
                     if digest[i] != data[at + i as i64]: ok = false

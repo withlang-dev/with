@@ -119,7 +119,7 @@ fn lock_json_extract_string(json: &str, key: &str) -> str:
     ""
 
 fn lock_json_extract_string_array(json: &str, key: &str) -> List[str]:
-    let result: List[str] = List.new()
+    let result: List[str] = []
     let needle = "\"" ++ key ++ "\""
     let json_len = json.len()
     var pos = 0
@@ -160,7 +160,7 @@ fn lock_json_extract_string_array(json: &str, key: &str) -> List[str]:
     result
 
 fn lock_split_nonempty_lines(text: &str) -> List[str]:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     let n = text.len()
     var start = 0
     var i = 0
@@ -268,7 +268,7 @@ fn lock_load(project_root: &str) -> LockFile:
     lock
 
 fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
-    let out_entries: List[LockEntry] = List.new()
+    let out_entries: List[LockEntry] = []
     var inserted = false
     for i in 0..lock.entries.len():
         let existing = lock.entries[i]
@@ -287,7 +287,7 @@ fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
     LockFile { entries: out_entries }
 
 fn lock_remove(lock: &LockFile, name: &str) -> LockFile:
-    let out_entries: List[LockEntry] = List.new()
+    let out_entries: List[LockEntry] = []
     for i in 0..lock.entries.len():
         let entry = lock.entries[i]
         if entry.name != name:
@@ -327,7 +327,7 @@ fn lock_write(project_root: &str, lock: &LockFile) -> i32:
     runtime_write_file(lock_file_path(project_root), text)
 
 fn lock_sha256_text(data: &str) -> str:
-    var digest: [32]u8 = [0 as u8; 32]
+    let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
 
@@ -400,8 +400,8 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
     out.lock = lock_upsert(move out.lock, entry)
     let meta = runtime_read_file(lock_c_dep_dir(project_root, name, version) ++ "/metadata.json")
     let requirements = lock_json_extract_string_array(meta, "requires")
-    for i in 0..requirements.len():
-        let req = requirements[i]
+    for requirement in requirements:
+        let req = requirement
         let req_name = lock_ref_name(req)
         let req_version = lock_ref_version(req)
         if req_name.len() == 0 or req_version.len() == 0:

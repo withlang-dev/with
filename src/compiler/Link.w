@@ -156,7 +156,7 @@ fn link_stage_darwin_version_string(encoded: i64) -> str:
 // `-l` names resolve to — so no input is newer than the program.
 fn link_stage_darwin_platform_version(obj_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> str:
     var best: i64 = 11 * 65536
-    let inputs: List[str] = List.new()
+    let inputs: List[str] = []
     inputs.push(obj_path.to_owned())
     for extra in extras: inputs.push(extra)
     let dirs = link_stage_explicit_search_dirs(extras, link_args, "")
@@ -205,7 +205,7 @@ fn link_stage_framework_name(lib: &str) -> str:
 // and yields no args. (Returns a List because With has no safe mutable-ref
 // param to push through.)
 fn link_stage_lib_args(lib: &str, is_darwin: i32) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     let fw = link_stage_framework_name(lib)
     if fw.len() > 0:
         if is_darwin == 0:
@@ -229,7 +229,7 @@ fn link_stage_archive_group_marker(is_elf: i32, via_driver: i32, open: i32) -> s
     if via_driver != 0: "-Wl," ++ flag else: flag
 
 fn link_stage_collect_cleanup_files(extras: &List[str]) -> List[str]:
-    let cleanup: List[str] = List.new()
+    let cleanup: List[str] = []
     for i in 0..extras.len():
         let extra = extras[i]
         if link_stage_is_temp_archive_path(extra):
@@ -237,8 +237,8 @@ fn link_stage_collect_cleanup_files(extras: &List[str]) -> List[str]:
     cleanup
 
 fn link_stage_cleanup_files(files: &List[str]):
-    for i in 0..files.len():
-        let _remove = runtime_remove_file(files[i])
+    for file in files:
+        let _remove = runtime_remove_file(file)
 
 fn link_stage_basename(path: &str) -> str:
     var last_slash = -1
@@ -288,10 +288,10 @@ type LinkStageSavedEnv {
 }
 
 fn link_stage_apply_env(env: &List[LinkStageEnvVar]) -> LinkStageSavedEnv:
-    let names: List[str] = List.new()
-    let values: List[str] = List.new()
-    for i in 0..env.len():
-        let item = env[i]
+    let names: List[str] = []
+    let values: List[str] = []
+    for env_item in env:
+        let item = env_item
         names.push(with_str_clone_ref(item.name))
         values.push(runtime_getenv(item.name) ++ "")
         runtime_setenv(item.name, item.value)
@@ -333,10 +333,10 @@ impl LinkStageCommand:
         rc
 
 fn link_stage_make_link_command(linker: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
-    let args: List[str] = List.new()
-    let env: List[LinkStageEnvVar] = List.new()
-    let inputs: List[str] = List.new()
-    let outputs: List[str] = List.new()
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
     args.push(with_str_clone_ref(obj_path))
     inputs.push(with_str_clone_ref(obj_path))
     for i in 0..extras.len():
@@ -358,13 +358,13 @@ fn link_stage_make_link_command(linker: &str, obj_path: &str, bin_path: &str, ex
     let cc_is_darwin = (runtime_sysinfo_os() == "Macos") as i32
     let cc_is_elf = runtime_sysinfo_os() == "Linux" and link_libs.len() > 0
     if cc_is_elf: args.push(link_stage_archive_group_marker(1, 1, 1))
-    for i in 0..link_libs.len():
-        let cc_la = link_stage_lib_args(link_libs[i], cc_is_darwin)
-        for j in 0..cc_la.len():
-            args.push(with_str_clone_ref(cc_la[j]))
+    for link_lib in link_libs:
+        let cc_la = link_stage_lib_args(link_lib, cc_is_darwin)
+        for cc_la_item in cc_la:
+            args.push(with_str_clone_ref(cc_la_item))
     if cc_is_elf: args.push(link_stage_archive_group_marker(1, 1, 0))
-    for i in 0..link_args.len():
-        args.push(with_str_clone_ref(link_args[i]))
+    for link_arg in link_args:
+        args.push(with_str_clone_ref(link_arg))
     if runtime_sysinfo_os() == "Linux":
         args.push("-lm")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
@@ -455,7 +455,7 @@ fn link_stage_linux_dir_carries(dir: &str, name: &str) -> bool:
 // The directories a link names itself, `-L<dir>` or `-L <dir>`, in order:
 // a package's own (`with get`), the sysroot's, the program's.
 fn link_stage_explicit_search_dirs(extras: &List[str], link_args: &List[str], sysroot_lib: &str) -> List[str]:
-    let dirs: List[str] = List.new()
+    let dirs: List[str] = []
     if sysroot_lib.len() > 0: dirs.push(sysroot_lib)
     for args in [extras, link_args]:
         for i in 0..args.len():
@@ -469,8 +469,8 @@ fn link_stage_explicit_search_dirs(extras: &List[str], link_args: &List[str], sy
 // or says it cannot; else its host file by path (HostLibs), with that file's
 // directory to search.
 fn link_stage_linux_resolve_libs(host_dirs: &List[str], link_libs: &List[str], explicit_dirs: &List[str]) -> LinkStageLinuxLibs:
-    var dirs: List[str] = List.new()
-    let inputs: List[str] = List.new()
+    let dirs: List[str] = []
+    let inputs: List[str] = []
     for name in link_libs:
         if link_stage_framework_name(name).len() > 0:
             with_eprint("error: link: \"" ++ name ++ "\" — Apple frameworks are only available on macOS targets\n")
@@ -497,10 +497,10 @@ fn link_stage_file_prefix_map_root() -> str:
     if eq <= 0: "" else: mapping.slice(0, eq)
 
 fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
-    let args: List[str] = List.new()
-    let env: List[LinkStageEnvVar] = List.new()
-    let inputs: List[str] = List.new()
-    let outputs: List[str] = List.new()
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
     let platform_version = link_stage_darwin_platform_version(obj_path, extras, link_libs, link_args)
     args.push("-arch")
     args.push("arm64")
@@ -526,10 +526,10 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
         let extra = extras[i]
         args.push(with_str_clone_ref(extra))
         inputs.push(with_str_clone_ref(extra))
-    for i in 0..link_libs.len():
-        let dw_la = link_stage_lib_args(link_libs[i], 1)
-        for j in 0..dw_la.len():
-            args.push(with_str_clone_ref(dw_la[j]))
+    for link_lib in link_libs:
+        let dw_la = link_stage_lib_args(link_lib, 1)
+        for dw_la_item in dw_la:
+            args.push(with_str_clone_ref(dw_la_item))
     for arg in link_stage_driver_args_for_ld(link_args):
         args.push(arg)
     args.push("-lSystem")
@@ -563,10 +563,10 @@ fn link_stage_linux_own_dynamic_linker() -> str:
     if link_stage_linux_arch() == "aarch64": "/lib/ld-linux-aarch64.so.1" else: "/lib64/ld-linux-x86-64.so.2"
 
 fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str], compiler_link: bool) -> LinkStageCommand:
-    let args: List[str] = List.new()
-    let env: List[LinkStageEnvVar] = List.new()
-    let inputs: List[str] = List.new()
-    let outputs: List[str] = List.new()
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
     let lib = sysroot ++ "/usr/lib"
     args.push("-m")
     args.push(link_stage_linux_emulation())
@@ -591,9 +591,9 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
         inputs.push(lib ++ "/" ++ crt)
     args.push(with_str_clone_ref(obj_path))
     inputs.push(with_str_clone_ref(obj_path))
-    for i in 0..extras.len():
-        args.push(with_str_clone_ref(extras[i]))
-        inputs.push(with_str_clone_ref(extras[i]))
+    for extra in extras:
+        args.push(with_str_clone_ref(extra))
+        inputs.push(with_str_clone_ref(extra))
     args.push("-L" ++ lib)
     // A library a program names that the sysroot does not carry (GL, zlib,
     // curl) is the host's (HostLibs), linked by path; its directory is
@@ -607,8 +607,8 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
         args.push(input)
         if not input.starts_with("-l"): inputs.push(input)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
-    for i in 0..link_args.len():
-        args.push(with_str_clone_ref(link_args[i]))
+    for link_arg in link_args:
+        args.push(with_str_clone_ref(link_arg))
     // libm, libpthread and libdl (separate libraries until glibc 2.34, and
     // the sysroot targets 2.28), libc (glibc's script: libc.so.6,
     // libc_nonshared, the dynamic linker), and compiler-rt where a gcc link
@@ -635,8 +635,8 @@ fn link_stage_linux_native_link_plan(obj_path: &str, bin_path: &str, extras: &Li
         with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
         return link_stage_plan_fail()
     let ld_link_args = link_stage_linux_driver_args_for_ld(link_args)
-    var command = link_stage_make_linux_own_sysroot_command(self_exe, sysroot, obj_path, bin_path, extras, link_libs, ld_link_args, false)
-    let args: List[str] = List.new()
+    let command = link_stage_make_linux_own_sysroot_command(self_exe, sysroot, obj_path, bin_path, extras, link_libs, ld_link_args, false)
+    let args: List[str] = []
     args.push("__ld")
     for i in 0..command.args.len():
         args.push(with_str_clone_ref(command.args[i]))
@@ -647,9 +647,9 @@ fn link_stage_linux_native_link_plan(obj_path: &str, bin_path: &str, extras: &Li
 // `-Wl,` unwrapped as on macOS, and `-pthread` (a driver flag) its library.
 fn link_stage_linux_driver_args_for_ld(link_args: &List[str]) -> List[str]:
     let unwrapped = link_stage_driver_args_for_ld(link_args)
-    let out: List[str] = List.new()
-    for i in 0..unwrapped.len():
-        if unwrapped[i] == "-pthread": out.push("-lpthread") else: out.push(with_str_clone_ref(unwrapped[i]))
+    let out: List[str] = []
+    for unwrapped_item in unwrapped:
+        if unwrapped_item == "-pthread": out.push("-lpthread") else: out.push(with_str_clone_ref(unwrapped_item))
     out
 
 fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
@@ -662,10 +662,10 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
                 with_eprint("error: link: no linux sysroot for " ++ target_spec_name() ++ " at " ++ link_stage_runtime_variant_dir() ++ "/sysroot (build the cross runtime, which puts it there), and WITH_LINUX_SYSROOT names none")
             return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
         return link_stage_make_linux_own_sysroot_command(llvm_ld, own, obj_path, bin_path, extras, link_libs, link_args, true)
-    let args: List[str] = List.new()
-    let env: List[LinkStageEnvVar] = List.new()
-    let inputs: List[str] = List.new()
-    let outputs: List[str] = List.new()
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
     let sysroot = link_stage_linux_sysroot()
     let dynamic_linker = link_stage_linux_dynamic_linker(sysroot)
     let crt1 = link_stage_linux_crt_object(sysroot, "crt1.o")
@@ -760,8 +760,8 @@ fn link_stage_windows_lib_is_crt_implicit(name: &str): name == "m" or name == "c
 // link, with such an SDK, is the only one that still reads Visual Studio or a
 // Windows Kit (WITH_WINDOWS_*_LIBDIR).
 fn link_stage_windows_is_compiler_link(extras: &List[str]) -> bool:
-    for i in 0..extras.len():
-        if link_stage_is_llvm_bridge_rsp(extras[i]):
+    for extra in extras:
+        if link_stage_is_llvm_bridge_rsp(extra):
             return true
     false
 
@@ -914,7 +914,7 @@ fn link_stage_windows_builtins(sdk_dir: &str, arch: &str) -> str:
 // The in-box DLLs every program links, and uuid's GUIDs (their libraries ship
 // in the SDK's libc; build/sdk.w sdk_windows_import_libs names the DLLs).
 fn link_stage_windows_system_libs() -> List[str]:
-    let names: List[str] = List.new()
+    let names: List[str] = []
     names.push("kernel32.lib")
     names.push("ntdll.lib")
     names.push("advapi32.lib")
@@ -939,10 +939,10 @@ fn link_stage_windows_system_libs() -> List[str]:
 // archive (libbz2.a), so `bz2` names it (#1915). A name found nowhere stays
 // `<name>.lib`, and lld says it could not open it.
 fn link_stage_windows_find_lib(name: &str, libc_dir: &str, extras: &List[str]) -> str:
-    var dirs: List[str] = List.new()
-    for i in 0..extras.len():
-        if extras[i].starts_with("-L"):
-            dirs.push(extras[i].slice(2, extras[i].len()))
+    let dirs: List[str] = []
+    for extra in extras:
+        if extra.starts_with("-L"):
+            dirs.push(extra.slice(2, extra.len()))
     dirs.push(with_str_clone_ref(libc_dir))
     for d in dirs:
         for candidate in ["lib" ++ name ++ ".a", name ++ ".lib", "lib" ++ name ++ ".lib", name ++ ".a"]:
@@ -952,10 +952,10 @@ fn link_stage_windows_find_lib(name: &str, libc_dir: &str, extras: &List[str]) -
     name ++ ".lib"
 
 fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
-    let args: List[str] = List.new()
-    let env: List[LinkStageEnvVar] = List.new()
-    let inputs: List[str] = List.new()
-    let outputs: List[str] = List.new()
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
     let compiler_link = link_stage_windows_is_compiler_link(extras)
     let link_sdk_dir = link_stage_windows_effective_sdk_dir(sdk_dir, extras, compiler_link)
     let arch = link_stage_windows_arch()
@@ -1021,8 +1021,8 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
         else:
             args.push(with_str_clone_ref(extra))
             inputs.push(with_str_clone_ref(extra))
-    for i in 0..link_libs.len():
-        let lib = link_libs[i]
+    for link_lib in link_libs:
+        let lib = link_lib
         if lib.ends_with(".lib"):
             args.push(with_str_clone_ref(lib))
         else if not link_stage_windows_lib_is_crt_implicit(lib):
@@ -1035,8 +1035,8 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
         // genuinely missing library fails loudly rather than silently
         // vanishing: an application's own libraries (opengl32, gdi32, ...)
         // come from `with get` or its own link settings, never the SDK.
-    for i in 0..link_args.len():
-        args.push(with_str_clone_ref(link_args[i]))
+    for link_arg in link_args:
+        args.push(with_str_clone_ref(link_arg))
     if sdk_libc:
         // The C runtime: mingw-w64's UCRT startup and support code, compiler-rt's
         // builtins under it, and the UCRT itself (ucrtbase and the
@@ -1050,8 +1050,8 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
         args.push("mingwex.lib")
         args.push("ucrt.lib")
         let system = link_stage_windows_system_libs()
-        for i in 0..system.len():
-            args.push(with_str_clone_ref(system[i]))
+        for system_item in system:
+            args.push(with_str_clone_ref(system_item))
     else:
         // Visual Studio's C runtime: static for the compiler (its LLVM
         // archives are MultiThreaded), the DLL runtime otherwise.
@@ -1095,7 +1095,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
 // The link runs from the root with root-relative paths, and /pdbsourcepath
 // names the root as the map's <to>: the -oso_prefix of a Mach-O link.
 fn link_stage_windows_root_relative_args(args: &List[str], root: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     for arg in args: out.push(link_stage_root_relative_arg(arg, root))
     let mapping = runtime_getenv("WITH_FILE_PREFIX_MAP")
     out.push("/pdbsourcepath:" ++ mapping.slice(mapping.find("=") + 1, mapping.len()))
@@ -1130,10 +1130,10 @@ fn link_stage_wasm_stack_size() -> str:
     "8388608"
 
 fn link_stage_make_wasm_llvm_link_command(wasm_ld: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
-    let args: List[str] = List.new()
-    let env: List[LinkStageEnvVar] = List.new()
-    let inputs: List[str] = List.new()
-    let outputs: List[str] = List.new()
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
     if target_spec_active_kind() == 8:
         args.push("-mwasm64")
     // rt/wasm.w's with_wasm_startup/with_wasm_exit bracket codegen's
@@ -1159,14 +1159,14 @@ fn link_stage_make_wasm_llvm_link_command(wasm_ld: &str, obj_path: &str, bin_pat
         else:
             args.push(with_str_clone_ref(extra))
             inputs.push(with_str_clone_ref(extra))
-    for i in 0..link_libs.len():
+    for link_lib in link_libs:
         // There is no libc or libm on this target; a request for one is a
         // no-op, anything else must resolve as a wasm archive or fail loudly.
-        let lib = link_libs[i]
+        let lib = link_lib
         if lib != "m" and lib != "c":
             args.push("-l" ++ lib)
-    for i in 0..link_args.len():
-        args.push(with_str_clone_ref(link_args[i]))
+    for link_arg in link_args:
+        args.push(with_str_clone_ref(link_arg))
     if wasm_host_emit(bin_path):
         return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
     outputs.push(wasm_host_js_path(bin_path))
@@ -1239,7 +1239,7 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
 fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
     if ptr as i64 == 0 or len <= 0:
         return ""
-    var out: str = ""
+    let out = ""
     unsafe:
         let sp = &raw mut out as *mut u8
         *(sp as *mut u64) = ptr as u64
@@ -1288,12 +1288,12 @@ fn link_stage_extract_runtime_obj(name: &str, path: &str) -> bool:
     false
 
 fn link_stage_link(obj_path: &str, bin_path: &str) -> bool:
-    let extras: List[str] = List.new()
-    let link_libs: List[str] = List.new()
+    let extras: List[str] = []
+    let link_libs: List[str] = []
     link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
 
 fn link_stage_link_with_extras(obj_path: &str, bin_path: &str, extras: List[str]) -> bool:
-    let link_libs: List[str] = List.new()
+    let link_libs: List[str] = []
     link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
 
 fn link_stage_link_with_extras_and_libs(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]) -> bool:
@@ -1303,7 +1303,7 @@ fn link_stage_link_with_extras_and_libs_result(obj_path: &str, bin_path: &str, e
     link_stage_result_for_plan(link_stage_link_with_extras_and_libs_plan(obj_path, bin_path, extras, link_libs))
 
 fn link_stage_link_with_extras_and_libs_plan(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]) -> LinkStagePlan:
-    let link_args: List[str] = List.new()
+    let link_args: List[str] = []
     link_stage_link_with_extras_libs_args_plan(obj_path, bin_path, extras, link_libs, link_args)
 
 fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStagePlan:
@@ -1352,10 +1352,10 @@ fn link_stage_wasm_native_link_plan(obj_path: &str, bin_path: &str, extras: &Lis
     if self_exe.len() == 0:
         with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
         return link_stage_plan_fail()
-    var command = link_stage_make_wasm_llvm_link_command("wasm-ld", obj_path, bin_path, extras, link_libs, link_args)
+    let command = link_stage_make_wasm_llvm_link_command("wasm-ld", obj_path, bin_path, extras, link_libs, link_args)
     if command.linker.len() == 0:
         return link_stage_plan_fail()
-    let args: List[str] = List.new()
+    let args: List[str] = []
     args.push("__ld")
     args.push("-flavor")
     args.push("wasm")
@@ -1374,10 +1374,10 @@ fn link_stage_windows_native_link_plan(toolchain: &str, obj_path: &str, bin_path
     if self_exe.len() == 0:
         with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
         return link_stage_plan_fail()
-    var command = link_stage_make_windows_llvm_link_command("lld-link", toolchain, obj_path, bin_path, extras, link_libs, link_args)
+    let command = link_stage_make_windows_llvm_link_command("lld-link", toolchain, obj_path, bin_path, extras, link_libs, link_args)
     if command.linker.len() == 0:
         return link_stage_plan_fail()
-    let args: List[str] = List.new()
+    let args: List[str] = []
     args.push("__ld")
     args.push("-flavor")
     args.push("link")
@@ -1408,8 +1408,8 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &L
         let named_by = if runtime_getenv("WITH_SDKROOT").len() > 0: "WITH_SDKROOT" else if runtime_getenv("SDKROOT").len() > 0: "SDKROOT" else: "the [c_import] sdk_path"
         with_eprint("error: link: " ++ named_by ++ " names the macOS SDK `" ++ sysroot ++ "`, which does not exist; point it at an installed SDK (`xcrun --sdk macosx --show-sdk-path`) or unset it to use this compiler's own sysroot")
         return link_stage_plan_fail()
-    var command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, link_args)
-    let args: List[str] = List.new()
+    let command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, link_args)
+    let args: List[str] = []
     args.push("__ld")
     args.push("-syslibroot")
     args.push(sysroot)
@@ -1424,7 +1424,7 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &L
 // driver's wrapper is unwrapped here; every other argument passes as written
 // and lld names one it does not know.
 fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     var i = 0
     while i < link_args.len():
         let arg = link_args[i]
@@ -1443,7 +1443,7 @@ fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
 // tokens. The command runs directly, so no shell ever expands these values.
 // Windows loads beside the executable itself; wasm has no dynamic loader.
 fn link_stage_rpath_driver_args(paths: &List[str], target_os: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     if target_os != "Linux" and target_os != "Macos": return out
     for path in paths:
         out.push("-Xlinker")
@@ -1475,7 +1475,7 @@ fn link_stage_link_with_llvm_result(obj_path: &str, bin_path: &str, extras: List
     link_stage_result_for_plan(link_stage_link_with_llvm_plan(obj_path, bin_path, extras, link_libs, llvm_ld))
 
 fn link_stage_link_with_llvm_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], llvm_ld: &str) -> LinkStagePlan:
-    let link_args: List[str] = List.new()
+    let link_args: List[str] = []
     link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, link_args, llvm_ld)
 
 fn link_stage_link_with_llvm_args_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str], llvm_ld: &str) -> LinkStagePlan:
@@ -1537,7 +1537,7 @@ fn link_stage_macho_undefined_symbols(path: &str) -> str:
             let strsize = link_stage_read_u32_le(data, offset + 20) as i32
             if symoff + nsyms * 16 > size or stroff + strsize > size:
                 return "<probe-failed>"
-            var out = StringBuilder.new()
+            let out = StringBuilder.new()
             for s in 0..nsyms:
                 // nlist_64: n_strx u32, n_type u8, n_sect u8, n_desc u16, n_value u64.
                 let entry = symoff + s * 16
@@ -1577,7 +1577,7 @@ fn link_stage_coff_undefined_symbols(path: &str) -> str:
     if symtab <= 0 or count < 0 or symtab + count * entry_size + 4 > data.len():
         return "<probe-failed>"
     let strtab = symtab + count * entry_size
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     var i: i64 = 0
     while i < count:
         let at = symtab + i * entry_size
@@ -1588,7 +1588,7 @@ fn link_stage_coff_undefined_symbols(path: &str) -> str:
         if class == 2 and section == 0 and value == 0:
             var name = ""
             if link_stage_read_u32_le(data, at as i32) == 0:
-                var start = strtab + link_stage_read_u32_le(data, (at + 4) as i32)
+                let start = strtab + link_stage_read_u32_le(data, (at + 4) as i32)
                 var end = start
                 while end < data.len() and data[end] != 0:
                     end = end + 1
@@ -1630,7 +1630,7 @@ fn link_stage_wasm_undefined_symbols(path: &str) -> str:
         return "<not-wasm>"
     let size = data.len()
     var offset: i64 = 8
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     while offset < size:
         let id = data[offset] as i32
         let (section_len, after_len) = link_stage_read_uleb(data, offset + 1)
@@ -1740,13 +1740,13 @@ fn link_stage_elf_undefined_symbols(path: &str) -> str:
             let strsize = link_stage_read_u64_le_small(data, strsh + 0x20) as i32
             if stroff < 0 or strsize < 0 or stroff + strsize > size:
                 return "<probe-failed>"
-            var out = StringBuilder.new()
+            let out = StringBuilder.new()
             // Elf64_Sym: st_name u32, st_info u8, st_other u8, st_shndx u16,
             // st_value u64, st_size u64. Entry 0 is the null symbol.
             var at = symoff + 24
             while at + 24 <= symoff + symsize:
                 let bind = (data[at + 4] as i32) >> 4
-                let shndx = link_stage_read_u16_le(data, (at + 6) as i64)
+                let shndx = link_stage_read_u16_le(data, (at + 6))
                 // STB_GLOBAL or STB_WEAK, SHN_UNDEF.
                 if (bind == 1 or bind == 2) and shndx == 0:
                     let name = link_stage_read_u32_le(data, at) as i32
@@ -1919,8 +1919,8 @@ fn LINK_BUNDLE_FAILED -> str: "<bundle-failed>"
 var link_stage_explicit_bundle_prefixes: List[str] = List.new()
 
 fn link_stage_add_explicit_bundle_prefixes(prefixes: &List[str]):
-    for i in 0..prefixes.len():
-        let prefix = prefixes[i]
+    for prefixe in prefixes:
+        let prefix = prefixe
         if not link_stage_explicit_bundle_prefixes.contains(prefix):
             link_stage_explicit_bundle_prefixes.push(with_str_clone_ref(prefix))
 
@@ -1928,8 +1928,8 @@ fn link_stage_bundle_provided_explicitly(manifest: &str) -> bool:
     let prefixes = bundle_manifest_prefixes(manifest)
     if prefixes.len() == 0:
         return false
-    for i in 0..prefixes.len():
-        if not link_stage_explicit_bundle_prefixes.contains(prefixes[i]):
+    for prefixe in prefixes:
+        if not link_stage_explicit_bundle_prefixes.contains(prefixe):
             return false
     true
 
@@ -1945,7 +1945,7 @@ fn link_stage_bundle_provided_explicitly(manifest: &str) -> bool:
 // cannot vouch for it): the build's named root, then the same candidates
 // link_stage_resolve_runtime_root probes. "" when none.
 fn link_stage_runtime_root_bundle_dir() -> str:
-    let candidates: List[str] = List.new()
+    let candidates: List[str] = []
     let explicit = runtime_getenv("WITH_RUNTIME_ROOT") ++ ""
     if explicit.len() > 0:
         candidates.push(explicit)
@@ -1954,10 +1954,10 @@ fn link_stage_runtime_root_bundle_dir() -> str:
     let compiler_dir = link_stage_compiler_dir()
     candidates.push(compiler_dir ++ "/runtime")
     candidates.push(compiler_dir ++ "/../lib")
-    for i in 0..candidates.len():
+    for candidate in candidates:
         // A cross target's bundle sits in the root's cross/<target>/
         // (link_stage_runtime_variant_dir's shape).
-        let dir = if target_spec_is_native(): with_str_clone_ref(candidates[i]) else: candidates[i] ++ "/cross/" ++ target_spec_name()
+        let dir = if target_spec_is_native(): with_str_clone_ref(candidate) else: candidate ++ "/cross/" ++ target_spec_name()
         let manifest = runtime_read_file(dir ++ "/rt.manifest")
         if manifest.len() == 0:
             continue
@@ -2004,8 +2004,8 @@ fn link_stage_bundle_import_drift(name: &str, manifest: &str) -> str:
             return ""
         let why = if imports.len() == 0: "records no import contracts" else: "cannot be checked against this compiler's runtime, whose manifest records no contracts"
         return "error: bundle '" ++ name ++ "' " ++ why ++ ", and it was built by compiler generation " ++ (if generation.len() > 0: generation else: "(unrecorded)") ++ ", not this one (" ++ compiler_generation() ++ "); rebuild the bundle"
-    for ii in 0..imports.len():
-        let row = imports[ii]
+    for import in imports:
+        let row = import
         if bundle_row_field(row, 1) != "rt":
             continue
         let symbol = bundle_row_field(row, 0)
@@ -2026,7 +2026,7 @@ fn link_stage_runtime_root_bundle_object() -> str:
     dir ++ "/rt.o"
 
 fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     let count = embedded_bundle_count()
     if count == 0:
         return out
@@ -2056,7 +2056,7 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
                 continue
             if not link_stage_embedded_runtime_is_this_generation():
                 with_eprint(link_stage_runtime_generation_refusal())
-                let failed: List[str] = List.new()
+                let failed: List[str] = []
                 failed.push(LINK_BUNDLE_FAILED())
                 return failed
         else if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
@@ -2064,7 +2064,7 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
         let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
         if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
             with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
-            let failed: List[str] = List.new()
+            let failed: List[str] = []
             failed.push(LINK_BUNDLE_FAILED())
             return failed
         // A bundle is compiled for one platform; a cross link of a program
@@ -2073,7 +2073,7 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
         let bundle_target = link_stage_bundle_manifest_field(manifest, "target")
         if bundle_target != target_spec_resolved_name():
             with_eprint("error: embedded bundle '" ++ name ++ "' was built for target " ++ bundle_target ++ " but this link targets " ++ target_spec_resolved_name() ++ " (this compiler embeds no " ++ name ++ " bundle for that target)")
-            let failed: List[str] = List.new()
+            let failed: List[str] = []
             failed.push(LINK_BUNDLE_FAILED())
             return failed
         // D138: every runtime symbol the bundle imports is provided under
@@ -2081,7 +2081,7 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
         let drift = link_stage_bundle_import_drift(name, manifest)
         if drift.len() > 0:
             with_eprint(drift)
-            let failed: List[str] = List.new()
+            let failed: List[str] = []
             failed.push(LINK_BUNDLE_FAILED())
             return failed
         // D39 pairing: the embedded interface is the one the object was
@@ -2090,7 +2090,7 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
         let embedded_wi_sha = bundle_text_sha256(embedded_bundle_interface_text(bi))
         if manifest_wi_sha.len() == 0 or embedded_wi_sha != manifest_wi_sha:
             with_eprint("error: embedded bundle '" ++ name ++ "': its interface (sha256 " ++ embedded_wi_sha ++ ") is not the one its manifest was built with (" ++ manifest_wi_sha ++ "); this compiler's embedded bundles are corrupt")
-            let failed: List[str] = List.new()
+            let failed: List[str] = []
             failed.push(LINK_BUNDLE_FAILED())
             return failed
         // The extracted object is named by the bundle it is (its interface
@@ -2103,7 +2103,7 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
         let data = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
         if runtime_mkdir_p(tmp_dir) != 0 or link_stage_extract_blob(data, obj_path):
             with_eprint("error: could not extract embedded bundle '" ++ name ++ "' to " ++ obj_path)
-            let failed: List[str] = List.new()
+            let failed: List[str] = []
             failed.push(LINK_BUNDLE_FAILED())
             return failed
         out.push(obj_path)
@@ -2134,7 +2134,7 @@ fn link_stage_resolve_runtime_root() -> str:
             return ""
         return explicit
     let compiler_dir = link_stage_compiler_dir()
-    let candidates: List[str] = List.new()
+    let candidates: List[str] = []
     candidates.push(link_stage_artifact_root() ++ "/lib")
     // Seed-built bootstrap runtime: the seed's generation, so only a seed
     // (the build's driver) takes it.
@@ -2144,8 +2144,8 @@ fn link_stage_resolve_runtime_root() -> str:
     // <compiler_dir>/../lib/ (direct FHS-style path): out/bootstrap/lib is
     // the runtime stage1 compiles for the programs it links (`:dev`).
     candidates.push(compiler_dir ++ "/../lib")
-    for i in 0..candidates.len():
-        let dir = candidates[i]
+    for candidate in candidates:
+        let dir = candidate
         let probe = dir ++ "/cimport_stubs.o"
         if runtime_read_file(probe).len() == 0:
             continue
@@ -2368,7 +2368,7 @@ fn link_stage_make_archive(obj_path: &str) -> str:
     ar_path
 
 fn link_stage_make_archive_to_path(obj_path: &str, ar_path: &str) -> str:
-    let members: List[str] = List.new()
+    let members: List[str] = []
     members.push(with_str_clone_ref(obj_path))
     let rc = create_static_archive(ar_path, members)
     if rc == 0:
@@ -2470,25 +2470,25 @@ fn link_stage_output_path_for_source(source_path: &str) -> str:
     base
 
 fn link_stage_link_object_to_binary(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], needs_async_runtime: bool) -> bool:
-    let link_args: List[str] = List.new()
+    let link_args: List[str] = []
     link_stage_link_object_to_binary_result(obj_path, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime).ok
 
 fn link_stage_link_object_to_binary_result(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStageResult:
-    let no_extra_objects: List[str] = List.new()
+    let no_extra_objects: List[str] = []
     link_stage_result_for_plan(link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime))
 
 fn link_stage_link_object_to_binary_plan(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
-    let no_extra_objects: List[str] = List.new()
+    let no_extra_objects: List[str] = []
     link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime)
 
 fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_objects: &List[str], bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
-    let extras: List[str] = List.new()
+    let extras: List[str] = []
     // #650 codegen units: sibling .o files are full linker inputs like the
     // primary object (objects always load wholly, so position is irrelevant).
-    for ui in 0..extra_objects.len():
-        extras.push(with_str_clone_ref(extra_objects[ui]))
-    for i in 0..link_search_paths.len():
-        extras.push("-L" ++ link_search_paths[i])
+    for extra_object in extra_objects:
+        extras.push(with_str_clone_ref(extra_object))
+    for link_search_path in link_search_paths:
+        extras.push("-L" ++ link_search_path)
     var undef = link_stage_undefined_symbols_for_object(obj_path)
     // Runtime-need detection must see undefined symbols from every unit, not
     // just the primary object. A failed probe stays the pure sentinel so the
@@ -2522,14 +2522,14 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     if bundle_objects.len() == 1 and bundle_objects[0] == LINK_BUNDLE_FAILED():
         return link_stage_plan_fail()
     var rt_bundle_joined = false
-    for boi in 0..bundle_objects.len():
+    for bundle_object in bundle_objects:
         // The embedded slot's extraction, or the runtime root's own rt.o.
         // The extracted runtime bundle is `wo_rt_<interface sha>.o` (named by
         // the bundle it is); a runtime root's is `rt.o`.
-        let bundle_name = link_stage_basename(bundle_objects[boi])
+        let bundle_name = link_stage_basename(bundle_object)
         if (bundle_name.starts_with("wo_rt_") and bundle_name.ends_with(".o")) or bundle_name == "rt.o":
             rt_bundle_joined = true
-        extras.push(with_str_clone_ref(bundle_objects[boi]))
+        extras.push(with_str_clone_ref(bundle_object))
     if needs_fiber_runtime != 0 or (rt_bundle_joined and not target_spec_is_wasm()):
         // Runtime emitted in-unit: the asm-defined with_fiber_* symbols
         // still trip the predicate, but only fiber_asm.o may link — the

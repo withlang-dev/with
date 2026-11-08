@@ -25,12 +25,12 @@ fn build_graph_target_input_path(root: &str, target: &BuildGraphTarget, index: i
 // install): a read failure is the operation's error, never mistaken for an
 // empty file (#953). `what` names the operation for the diagnostic.
 fn build_graph_read_input(what: &str, path: &str) -> Option[str]:
-    var status: i32 = 0
+    let status: i32 = 0
     let text = build_graph_rt_read_file_status(path, &raw mut status as *mut i32)
     if status != 0:
         build_graph_rt_eprint("error: " ++ what ++ " could not read " ++ path ++ f" (os error {0 - status})")
         return None
-    Some(text)
+    text
 
 fn build_graph_compare_files(root: &str, target: &BuildGraphTarget, operation_name: &str) -> i32:
     let left_path = build_graph_target_input_path(root, target, 0)
@@ -236,7 +236,7 @@ fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> i32:
 // `text` with every relative `.incbin`/`.include` operand resolved against
 // the project root.
 fn build_graph_asm_resolve_operands(root: &str, text: &str) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     var start: i64 = 0
     while start < text.len():
         var end = start
@@ -260,7 +260,7 @@ fn build_graph_asm_resolve_operands(root: &str, text: &str) -> str:
 // bytes changed leaves the source identical, and without these the object
 // stayed fresh over the old bytes.
 fn build_graph_discovered_inputs(root: &str, target: &BuildGraphTarget) -> List[str]:
-    var paths: List[str] = List.new()
+    let paths: List[str] = []
     if target.kind != 13 or target.entry.len() == 0: return paths
     let text = build_graph_rt_read_file(build_graph_resolve_project_path(root, target.entry))
     var start: i64 = 0
@@ -332,7 +332,7 @@ fn build_graph_create_archive(root: &str, target: &BuildGraphTarget) -> i32:
     if build_graph_rt_mkdir_p(output_dir) != 0:
         build_graph_rt_eprint("error: could not create archive output directory for target '" ++ target.name ++ "': " ++ output_dir)
         return 1
-    let resolved_inputs: List[str] = List.new()
+    let resolved_inputs: List[str] = []
     for ii in 0..target.inputs.len():
         let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if build_graph_rt_file_exists(input_path) == 0:
@@ -500,7 +500,7 @@ fn build_graph_copy_manifest_files(root: &str, target: &BuildGraphTarget, operat
     // #967: every input is checked and read before the first write, so a
     // missing or unreadable one leaves the destination as it was; one at a
     // time, a failure left part of the tree new and part old.
-    let contents_of: List[str] = List.new()
+    let contents_of: List[str] = []
     for ii in 0..target.inputs.len():
         let rel = target.inputs[ii]
         if not build_graph_manifest_relative_path_valid(rel):
@@ -536,8 +536,8 @@ fn build_graph_promote_tree_if_verified(root: &str, target: &BuildGraphTarget) -
     // later run consumed.
     var stale_count = 0
     var fresh_count = 0
-    let stale_dest: List[str] = List.new()
-    let stale_contents: List[str] = List.new()
+    let stale_dest: List[str] = []
+    let stale_contents: List[str] = []
     for ii in 0..target.inputs.len():
         let rel = target.inputs[ii]
         if not build_graph_manifest_relative_path_valid(rel):

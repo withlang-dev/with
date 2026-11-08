@@ -133,7 +133,7 @@ fn with_cc_main() -> i32:
     if not with_cc_available():
         with_eprint("error: this build of `with` has no C compiler: the LLVM SDK it was linked against predates `with cc`")
         return 127
-    let args: List[str] = List.new()
+    let args: List[str] = []
     args.push("clang")
     let first = if with_arg_count() > 2: with_arg_at(2) else: ""
     // The driver passes -resource-dir down to its own -cc1 invocations.
@@ -226,7 +226,7 @@ fn cc_caller_names(prefix: &str) -> bool:
 type CcToolchain { problem: str, args: List[str] }
 
 fn cc_windows_toolchain() -> CcToolchain:
-    var args: List[str] = List.new()
+    let args: List[str] = []
     // The link-only choices below are not unused in a compile-only run.
     args.push("--start-no-unused-arguments")
     let libc = link_stage_windows_libc_root()

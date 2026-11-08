@@ -114,13 +114,13 @@ fn libc_facade_operand(line: &str) -> str:
 // capability and never asserts a contract the declarations do not carry.
 fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claimed: &List[str]) -> str:
     let lines = libc_facade_source().split("\n")
-    var kept_names: List[str] = List.new()
-    var kept_reprs: List[str] = List.new()
+    let kept_names: List[str] = []
+    let kept_reprs: List[str] = []
     // Domain lines are kept when a kept item names the domain (a
     // `from domain D` or `preserves domain D` clause) and the program's own
     // facades do not declare it.
-    var domain_lines: List[str] = List.new()
-    var domain_names: List[str] = List.new()
+    let domain_lines: List[str] = []
+    let domain_names: List[str] = []
     var body = ""
     var i = 1
     while i < lines.len():
@@ -128,7 +128,7 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
         i = i + 1
         if header.trim().len() == 0:
             continue
-        var clauses: List[str] = List.new()
+        let clauses: List[str] = []
         while i < lines.len() and lines[i].starts_with("        "):
             clauses.push(lines[i])
             i = i + 1

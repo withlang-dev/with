@@ -32,7 +32,7 @@ fn tracked_input_str_compare(a: &str, b: &str) -> i32:
 fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
     if path.len() == 0:
         return paths
-    var out: List[str] = List.new()
+    let out: List[str] = []
     var inserted = false
     for i in 0..paths.len():
         let existing = paths[i]
@@ -49,8 +49,8 @@ fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
 
 fn tracked_input_merge_unique(left: List[str], right: &List[str]) -> List[str]:
     var out = left
-    for i in 0..right.len():
-        out = tracked_input_insert_unique(out, right[i])
+    for right_item in right:
+        out = tracked_input_insert_unique(out, right_item)
     out
 
 fn tracked_dirname(path: &str) -> str:
@@ -107,7 +107,7 @@ fn tracked_normalize_path(path: &str) -> str:
         return with_str_clone_ref(path)
     let is_abs = runtime_path_is_absolute(path)
     let root_parts = runtime_path_root_part_count(path)
-    let parts: List[str] = List.new()
+    let parts: List[str] = []
     var start = 0
     for i in 0..(path.len() + 1):
         let at_end = i == path.len()

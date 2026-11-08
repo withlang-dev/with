@@ -38,7 +38,7 @@ fn wil_field(text: &str, key: &str) -> str:
 
 fn wil_sha256_file(path: &str) -> str:
     if runtime_file_exists(path) == 0: return ""
-    var digest: [32]u8 = [0 as u8; 32]
+    let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(runtime_read_file(path), &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
 
@@ -67,7 +67,7 @@ fn wil_crt_dir(libc_root: &str) -> str:
     let actual = wil_sha256_file(archive)
     if actual != sha:
         return "error: " ++ url ++ " has sha256 " ++ actual ++ "; the SDK was built from " ++ sha
-    let keep: List[str] = List.new()
+    let keep: List[str] = []
     keep.push("mingw-w64-crt/lib-common/")
     keep.push("mingw-w64-crt/lib64/")
     keep.push("mingw-w64-crt/libarm64/")
@@ -115,7 +115,7 @@ fn wil_def(self_exe: &str, crt: &str, arch: &str, name: &str, work: &str) -> str
         common = true
         if runtime_file_exists(input) == 0: return ""
     let pre = work ++ "/" ++ name ++ ".pre.def"
-    let argv: List[str] = List.new()
+    let argv: List[str] = []
     argv.push(self_exe.to_owned())
     argv.push("cc")
     argv.push("--target=" ++ arch ++ "-w64-windows-gnu")
@@ -154,7 +154,7 @@ fn windows_lib_in_dirs(name: &str, dirs: &List[str]) -> bool:
 type WindowsImportLibs { written: List[str], problem: str }
 
 fn windows_import_libs_write(dir: &str, names: &List[str]) -> WindowsImportLibs:
-    let written: List[str] = List.new()
+    let written: List[str] = []
     if runtime_sysinfo_os() != "Windows":
         return WindowsImportLibs { written, problem: "Windows import libraries are generated on Windows only" }
     let libc_root = link_stage_windows_libc_root()
@@ -177,7 +177,7 @@ fn windows_import_libs_write(dir: &str, names: &List[str]) -> WindowsImportLibs:
         if def.starts_with("error: "):
             let _rm = runtime_remove_tree(work)
             return WindowsImportLibs { written, problem: def.slice(7, def.len()) }
-        let argv: List[str] = List.new()
+        let argv: List[str] = []
         argv.push(self_exe)
         argv.push("__dlltool")
         argv.push("-m")
@@ -201,7 +201,7 @@ fn with_windows_import_libs_main(args: &List[str]) -> i32:
     if args.len() < 2:
         runtime_eprint("usage: with __windows-import-libs <dir> <dll-name>...")
         return 2
-    let names: List[str] = List.new()
+    let names: List[str] = []
     for i in 1..args.len(): names.push(args[i])
     if runtime_mkdir_p(args[0]) != 0:
         runtime_eprint("error: could not create " ++ args[0])

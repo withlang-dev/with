@@ -50,9 +50,9 @@ type MirLazyArmFrame {
 }
 
 fn mir_clone_i32_list(values: &List[i32]) -> List[i32]:
-    let out: List[i32] = List.new()
-    for i in 0..values.len():
-        out.push(values[i])
+    let out: List[i32] = []
+    for value in values:
+        out.push(value)
     out
 
 // D69 (§13.4): what a `for` body over a Gen[T], run as a closure, tells the
@@ -327,7 +327,7 @@ type MirBuilder ephemeral {
 }
 
 fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -> MirBuilder:
-    var body = MirBody.init(fn_sym, sema)
+    let body = MirBody.init(fn_sym, sema)
     let entry = body.new_block()
     MirBuilder {
         body,
@@ -576,7 +576,7 @@ impl MirBuilder:
         let guard_ty = self.local_type(guard_local)
         let guard_place = self.place_for_local(guard_local)
         let guard_expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0: self.sema.sig_param_type(sig_idx, 0) else: 0
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         // A `mut fn with_exit_mut` mutates the guard in place: its receiver is
         // the guard's place, as at any `mut fn` call, never a move of it
         // (the guard is dropped below, #978).
@@ -1307,7 +1307,7 @@ impl MirBuilder:
             if cap_sym != 0 and self.place_base_local(cap_place) == local_id and self.place_field_projection_count(cap_place) > 0 and self.type_id_is_str(cap_ty):
                 let cap_local = self.body.new_local(cap_ty, 0, cap_sym, 1)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, cap_local, 0, 0)
-                let cap_parts: List[i32] = List.new()
+                let cap_parts: List[i32] = []
                 cap_parts.push(self.body.new_operand(OperandKind.OK_COPY, cap_place))
                 cap_parts.push(self.lower_str_lit(self.pool.intern("")))
                 let cap_args = self.body.new_call_args(cap_parts)
@@ -1413,7 +1413,7 @@ impl MirBuilder:
         let tk = self.body.term_kind(bb)
         if tk == TermKind.TK_DROP_AND_GOTO: return self.place_is_local(self.body.term_data0(bb), local)
         if tk != TermKind.TK_CALL: return false
-        let args: i32 = self.body.term_data1(bb)
+        let args = self.body.term_data1(bb)
         if args < 0 or args >= self.body.call_arg_starts.len(): return false
         for ai in 0..self.body.call_arg_counts[args]:
             if self.operand_reads_local(self.body.call_arg_operands[self.body.call_arg_starts[args] + ai], local): return true
@@ -1502,7 +1502,7 @@ impl MirBuilder:
     // destination has no concrete MIR type, and validate-all refused every
     // scope program for it (#1411).
     mut fn emit_handle_call(handle_op: i32, intrinsic: MirIntrinsic, node: i32):
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(handle_op)
         let call_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(call_id, intrinsic)
@@ -1662,7 +1662,7 @@ impl MirBuilder:
     mut fn emit_defers_for_range(start: i32, end: i32):
         var i = end - 1
         while i >= start:
-            let ran: List[i32] = List.new()
+            let ran: List[i32] = []
             while self.defer_nodes.len() > i:
                 ran.push(self.defer_nodes.remove(self.defer_nodes.len() - 1))
             self.emit_deferred_body(ran[(ran.len() - 1)])
@@ -1682,8 +1682,8 @@ impl MirBuilder:
     // outer scope's defer (§14.7, #1986) runs only the drops still pending,
     // never one this exit already ran. Sibling paths keep every record.
     mut fn emit_cleanup_to_target(target: LoopInfo):
-        let ran_ids: List[i32] = List.new()
-        let ran_kinds: List[i32] = List.new()
+        let ran_ids: List[i32] = []
+        let ran_kinds: List[i32] = []
         var scope_idx = self.drop_scope_starts.len() - 1
         var lowest_drop_start = self.drop_local_ids.len() as i32
         var lowest_defer_start = self.defer_nodes.len() as i32
@@ -2166,7 +2166,7 @@ impl MirBuilder:
         let type_arg_node = self.ast.get_data1(node)
         if type_arg_node == 0:
             return 0
-        var arg_type = self.resolve_type_arg_node(type_arg_node)
+        let arg_type = self.resolve_type_arg_node(type_arg_node)
         if arg_type == 0:
             return 0
         // Check for second type argument (d2 of NodeKind.NK_INDEX) — HashMap[K, V]
@@ -2177,7 +2177,7 @@ impl MirBuilder:
         // The instance Sema.check_index created. #2000: by identity, not by
         // the memo's hash alone (a comptime evaluation empties the memo, and
         // a hash names no type on its own).
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(arg_type)
         if arg2_type > 0: args.push(arg2_type)
         self.sema.find_generic_inst_type(base_sym, args, args.len() as i32) as i32
@@ -2960,7 +2960,7 @@ impl MirBuilder:
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             return self.try_eval_const(self.ast.get_data0(node))
         if kind == NodeKind.NK_BOOL_LIT:
-            return self.ast.get_data0(node) as i64
+            return self.ast.get_data0(node)
         if kind == NodeKind.NK_UNARY:
             let op = self.ast.get_data0(node)
             let inner = self.try_eval_const(self.ast.get_data1(node))
@@ -3058,7 +3058,7 @@ impl MirBuilder:
             let is_mut = flags % 2
             if is_mut != 0:
                 continue
-            var value_node = self.ast.get_data1(decl)
+            let value_node = self.ast.get_data1(decl)
             if value_node == 0:
                 continue
             return self.try_eval_const(value_node)
@@ -3132,7 +3132,7 @@ impl MirBuilder:
                 else if node_kind == NodeKind.NK_FIELD_ACCESS:
                     let base = self.ast.get_data0(self.cur_node)
                     let field_sym = self.ast.get_data1(self.cur_node)
-                    let field_name: str = with_str_clone_ref(self.pool.resolve(field_sym))
+                    let field_name = with_str_clone_ref(self.pool.resolve(field_sym))
                     let sema_field_sym = self.sema.pool_lookup_symbol(field_name)
                     let base_ty = self.expr_type(base)
                     let field_ty = self.expr_type(self.cur_node)
@@ -3210,7 +3210,7 @@ impl MirBuilder:
 
     mut fn source_line_operand(node: i32) -> i32:
         let loc = self.sema.source_location_for_file_id(self.sema.local_file_id, self.ast.get_start(node))
-        self.int_const_operand((loc.line + 1) as i64, self.sema.ty_u32 as i32)
+        self.int_const_operand((loc.line + 1), self.sema.ty_u32 as i32)
 
     mut fn source_fn_operand(node: i32) -> i32:
         self.lower_synthesized_str_lit(with_str_clone_ref(self.pool.resolve(self.body.fn_sym)))
@@ -3225,7 +3225,7 @@ impl MirBuilder:
         self.unit_operand()
 
     fn magic_ident_kind(node: i32) -> i32:
-        var kind = self.sema.magic_ident_kind(node)
+        let kind = self.sema.magic_ident_kind(node)
         if kind != SemaMagicIdentKind.NONE:
             return kind
         if node == 0 or self.ast.kind(node) != NodeKind.NK_IDENT:
@@ -3286,7 +3286,7 @@ impl MirBuilder:
         let found = self.sema.find_generic_inst(opt_sym, cap_ty)
         if found != 0:
             return found
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(cap_ty)
         self.sema.find_generic_inst_type(opt_sym, args, 1) as i32
 
@@ -3312,7 +3312,7 @@ impl MirBuilder:
         let method_sym = self.sema.pool_lookup_symbol(method_name)
         let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, method_sym)
         let fn_op = self.lower_var(fn_sym, 0, 0)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.regex_ref_operand(regex_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, text_place))
         let args_id = self.body.new_call_args(args)
@@ -3330,7 +3330,7 @@ impl MirBuilder:
         let method_sym = self.sema.pool_lookup_symbol("captures_match_op")
         let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, method_sym)
         let fn_op = self.lower_var(fn_sym, 0, 0)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.regex_ref_operand(regex_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, text_place))
         let args_id = self.body.new_call_args(args)
@@ -3344,7 +3344,7 @@ impl MirBuilder:
 
     mut fn lower_option_is_some_place(opt_place: i32, opt_ty: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("is_some"), self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, opt_place))
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.OPT_IS_SOME)
@@ -3357,7 +3357,7 @@ impl MirBuilder:
 
     mut fn lower_option_unwrap_place(opt_place: i32, opt_ty: i32, result_ty: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("unwrap"), self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         let opt_op = self.body.new_operand(OperandKind.OK_MOVE, opt_place)
         self.consume_moved_operand(opt_op)
         args.push(opt_op)
@@ -3410,7 +3410,7 @@ impl MirBuilder:
         let captures_sym = self.sema.pool_lookup_symbol("Captures")
         let fn_sym = self.sema.lookup_method_fn(captures_sym, method_sym)
         let fn_op = self.lower_var(fn_sym, 0, 0)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.captures_ref_operand(captures_place))
         if name_sym != 0:
             args.push(self.lower_str_lit(name_sym))
@@ -3485,7 +3485,7 @@ impl MirBuilder:
     mut fn lower_fmt_to_str(operand: i32, node: i32) -> i32:
         // Emit MirIntrinsic.FMT_TO_STR call to format a non-str value to str.
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_to_str"), self.sema.ty_str)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(operand)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(self.sema.ty_str)
@@ -3518,7 +3518,7 @@ impl MirBuilder:
     mut fn lower_fmt_debug_str(operand: i32, node: i32) -> i32:
         // Emit MirIntrinsic.FMT_DEBUG_STR call to wrap a str value in quotes.
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_debug_str"), self.sema.ty_str)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(operand)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(self.sema.ty_str)
@@ -3538,7 +3538,7 @@ impl MirBuilder:
         // Codegen dispatches based on type: str→quoted, struct→fields, etc.
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_debug"), self.sema.ty_str)
         let type_const = self.const_operand(ConstKind.CK_INT, sema_ty, self.sema.ty_i32)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(operand)
         call_args.push(type_const)
         let args_id = self.body.new_call_args(call_args)
@@ -3624,7 +3624,7 @@ impl MirBuilder:
 
     // The same, with a second borrowed argument when `place2` >= 0.
     mut fn lower_debug_borrowing_call2(fn_sym: i32, sig: i32, mono: i32, place: i32, place_ty: i32, place2: i32, place2_ty: i32) -> i32:
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.operand_for_place_arg(place, place_ty, self.sema.sig_param_type(sig, 0), 0))
         if place2 >= 0:
             args.push(self.operand_for_place_arg(place2, place2_ty, self.sema.sig_param_type(sig, 1), 0))
@@ -3710,13 +3710,13 @@ impl MirBuilder:
         let disc = self.lower_enum_discriminant(place)
         let join_bb = self.new_block()
         let default_bb = self.new_block()
-        let vals: List[i64] = List.new()
-        let targets: List[i32] = List.new()
-        let arms: List[i32] = List.new()
+        let vals: List[i64] = []
+        let targets: List[i32] = []
+        let arms: List[i32] = []
         let variant_count = self.sema.get_type_d2(enum_base as TypeId)
         var pos = self.sema.get_type_d1(enum_base as TypeId)
-        let names: List[i32] = List.new()
-        let payload_counts: List[i32] = List.new()
+        let names: List[i32] = []
+        let payload_counts: List[i32] = []
         for vi in 0..variant_count:
             let variant_sym: i32 = self.sema.type_extra[pos]
             let payload_count: i32 = self.sema.type_extra[(pos + 1)]
@@ -3780,7 +3780,7 @@ impl MirBuilder:
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
         if list_like != 0:
-            let len_args: List[i32] = List.new()
+            let len_args: List[i32] = []
             len_args.push(self.body.new_operand(OperandKind.OK_COPY, place))
             let len_args_id = self.body.new_call_args(len_args)
             self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
@@ -3859,7 +3859,7 @@ impl MirBuilder:
 
         let cap_local = self.new_temp(self.sema.ty_i64)
         let cap_place = self.place_for_local(cap_local)
-        let cap_args: List[i32] = List.new()
+        let cap_args: List[i32] = []
         cap_args.push(self.body.new_operand(OperandKind.OK_COPY, set_place))
         let cap_args_id = self.body.new_call_args(cap_args)
         self.body.set_call_intrinsic(cap_args_id, MirIntrinsic.MAP_CAPACITY)
@@ -3885,9 +3885,9 @@ impl MirBuilder:
         let occupied_local = self.new_temp(self.sema.ty_i32)
         let occupied_place = self.place_for_local(occupied_local)
         self.emit_map_slot_call(MirIntrinsic.MAP_SLOT_OCCUPIED, set_place, slot_place, occupied_place)
-        let empty_vals: List[i64] = List.new()
+        let empty_vals: List[i64] = []
         empty_vals.push(0)
-        let empty_targets: List[i32] = List.new()
+        let empty_targets: List[i32] = []
         empty_targets.push(inc_bb as i32)
         let empty_table = self.body.new_switch_table(empty_vals, empty_targets)
         let occupied_read = self.body.new_operand(OperandKind.OK_COPY, occupied_place)
@@ -3928,9 +3928,9 @@ impl MirBuilder:
         let test_place = self.place_for_local(test_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, test_place, test_rv, 0)
         let test_op = self.body.new_operand(OperandKind.OK_COPY, test_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(yes_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, test_op, table, no_bb, 0)
@@ -3944,7 +3944,7 @@ impl MirBuilder:
         let width_const = self.const_operand(ConstKind.CK_INT, width, self.sema.ty_i32)
         let prec_const = self.const_operand(ConstKind.CK_INT, precision, self.sema.ty_i32)
         let type_const = self.const_operand(ConstKind.CK_INT, sema_ty, self.sema.ty_i32)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(operand)
         call_args.push(flags_const)
         call_args.push(width_const)
@@ -4085,7 +4085,7 @@ impl MirBuilder:
 
     mut fn lower_fstring_buf_new(node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_new"), self.sema.ty_i32)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         let args_id = self.body.new_call_args(call_args)
         // Result is a pointer (use i32 as placeholder sema type, codegen knows it's ptr)
         let result_local = self.new_temp(self.sema.ty_i32)
@@ -4098,7 +4098,7 @@ impl MirBuilder:
 
     mut fn lower_fstring_buf_write_str(buf_op: i32, str_op: i32, node: i32):
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_write_str"), self.sema.ty_void)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(buf_op)
         call_args.push(str_op)
         let args_id = self.body.new_call_args(call_args)
@@ -4111,7 +4111,7 @@ impl MirBuilder:
 
     mut fn lower_fstring_buf_write_str_ref(buf_op: i32, str_ref_op: i32, node: i32):
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_write_str_ref"), self.sema.ty_void)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(buf_op)
         call_args.push(str_ref_op)
         let args_id = self.body.new_call_args(call_args)
@@ -4124,7 +4124,7 @@ impl MirBuilder:
 
     mut fn lower_str_clone_ref(str_ref_op: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("str_clone_ref"), self.sema.ty_str)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(str_ref_op)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(self.sema.ty_str)
@@ -4145,7 +4145,7 @@ impl MirBuilder:
         let width_const = self.const_operand(ConstKind.CK_INT, width, self.sema.ty_i32)
         let prec_const = self.const_operand(ConstKind.CK_INT, precision, self.sema.ty_i32)
         let type_const = self.const_operand(ConstKind.CK_INT, sema_ty, self.sema.ty_i32)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(buf_op)
         call_args.push(val_op)
         call_args.push(flags_const)
@@ -4162,7 +4162,7 @@ impl MirBuilder:
 
     mut fn lower_fstring_buf_finish(buf_op: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_finish"), self.sema.ty_str)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         call_args.push(buf_op)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(self.sema.ty_str)
@@ -4418,8 +4418,8 @@ impl MirBuilder:
             let vl_is_disc_enum = self.sema.disc_repr_types.contains(vl_resolved as i32)
             if vl_is_disc_enum and not self.sema.disc_has_payload.contains(vl_resolved as i32):
                 return self.int_const_operand(self.enum_variant_discriminant_for_type(vl_decl_ty, vl_sym), vl_result_ty)
-            let vl_fields: List[i32] = List.new()
-            let vl_names: List[i32] = List.new()
+            let vl_fields: List[i32] = []
+            let vl_names: List[i32] = []
             let vl_fid = self.body.new_agg_fields(vl_fields, vl_names)
             let vl_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vl_fid, vl_variant_idx)
             let vl_tmp = self.new_temp(vl_result_ty)
@@ -4738,9 +4738,9 @@ impl MirBuilder:
     // #1491: the string flow facts as they stand (lower_if keeps them per
     // arm and joins them).
     fn save_string_flow_facts() -> MirStrFlowFacts:
-        var local_ids: List[i32] = List.new()
-        var local_flags: List[i32] = List.new()
-        var field_flags: List[i32] = List.new()
+        let local_ids: List[i32] = []
+        let local_flags: List[i32] = []
+        let field_flags: List[i32] = []
         for i in 0..self.string_alias_local_ids.len():
             local_ids.push(self.string_alias_local_ids[i])
             local_flags.push(self.string_alias_flags[i])
@@ -4762,7 +4762,7 @@ impl MirBuilder:
     // The facts where two paths meet: a place may alias if it may on either
     // path, and is owned only if it is owned on both.
     mut fn join_string_flow_facts(a: &MirStrFlowFacts, b: &MirStrFlowFacts):
-        var ids: List[i32] = List.new()
+        let ids: List[i32] = []
         for i in 0..a.local_ids.len():
             ids.push(a.local_ids[i])
         for i in 0..b.local_ids.len():
@@ -4770,9 +4770,9 @@ impl MirBuilder:
                 ids.push(b.local_ids[i])
         self.string_alias_local_ids = List.new()
         self.string_alias_flags = List.new()
-        for i in 0..ids.len():
-            self.string_alias_local_ids.push(ids[i])
-            self.string_alias_flags.push(str_flow_join(str_flow_local_flags(a, ids[i]), str_flow_local_flags(b, ids[i])))
+        for id in ids:
+            self.string_alias_local_ids.push(id)
+            self.string_alias_flags.push(str_flow_join(str_flow_local_flags(a, id), str_flow_local_flags(b, id)))
         for i in 0..self.string_field_alias_flags.len():
             self.string_field_alias_flags[i] = str_flow_join(str_flow_field_flags(a, i as i32), str_flow_field_flags(b, i as i32))
 
@@ -4899,14 +4899,14 @@ impl MirBuilder:
         self.sema.resolve_alias(ty) == self.sema.ty_str
 
     mut fn collect_left_string_concat_parts(node: i32) -> List[i32]:
-        let rev: List[i32] = List.new()
+        let rev: List[i32] = []
         var cur = node
         while self.is_string_concat_node(cur):
             rev.push(self.ast.get_data2(cur))
             cur = self.ast.get_data1(cur)
         rev.push(cur)
 
-        let out: List[i32] = List.new()
+        let out: List[i32] = []
         var i = rev.len() - 1
         while i >= 0:
             out.push(rev[i])
@@ -4924,8 +4924,8 @@ fn mir_str_payload_is_raw_marked(text: &str) -> bool:
 // chain is not foldable.
 impl MirBuilder:
     mut fn try_fold_literal_str_concat(node: i32, parts: &List[i32]) -> i32:
-        for i in 0..parts.len():
-            if self.ast.kind(parts[i]) != NodeKind.NK_STRING_LIT:
+        for part in parts:
+            if self.ast.kind(part) != NodeKind.NK_STRING_LIT:
                 return -1
         var marked_count = 0
         for i in 0..parts.len():
@@ -4947,9 +4947,9 @@ impl MirBuilder:
     mut fn lower_str_concat_chain(node: i32, parts: &List[i32]) -> i32:
         let saved_expected = self.expected_type
         self.expected_type = self.sema.ty_str as i32
-        let operands: List[i32] = List.new()
-        for i in 0..parts.len():
-            operands.push(self.lower_str_concat_part(parts[i]))
+        let operands: List[i32] = []
+        for part in parts:
+            operands.push(self.lower_str_concat_part(part))
         self.expected_type = saved_expected
 
         let args_id = self.body.new_call_args(operands)
@@ -5255,7 +5255,7 @@ impl MirBuilder:
 
         let saved_expected = self.expected_type
         self.expected_type = self.sema.ty_str as i32
-        let operands: List[i32] = List.new()
+        let operands: List[i32] = []
         operands.push(self.body.new_operand(OperandKind.OK_MOVE, dest_place))
         for i in 1..parts.len():
             operands.push(self.lower_str_concat_part(parts[i]))
@@ -5582,7 +5582,7 @@ impl MirBuilder:
 
     mut fn lower_str_contains_char(op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         let recv_op = self.lower_receiver_with_method_autoderef(rhs_expr)
         call_args.push(self.borrowed_receiver_operand(recv_op))
         call_args.push(self.lower_expr(lhs_expr))
@@ -5641,9 +5641,9 @@ impl MirBuilder:
         let end_bb = self.new_block()
         let lhs_read = self.body.new_operand(OperandKind.OK_COPY, result_place)
         // Use switch_int: value 1 (true) goes to one target, default goes to other
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         if op == 12:
             // or: if lhs is true (1), skip to end; default (false) → evaluate rhs
             targets.push(end_bb as i32)
@@ -5700,7 +5700,7 @@ impl MirBuilder:
     mut fn lower_method_bin_op(lhs_expr: i32, rhs_expr: i32, method_sym: i32, node: i32) -> i32:
         // Lower as: method_sym(lhs, rhs)
         let fn_op = self.lower_var(method_sym, 0, 0)
-        let arg_nodes: List[i32] = List.new()
+        let arg_nodes: List[i32] = []
         arg_nodes.push(lhs_expr)
         arg_nodes.push(rhs_expr)
         let ret_ty = self.expr_type(node)
@@ -5710,7 +5710,7 @@ impl MirBuilder:
     // selection is `b.cmp(&a) > 0`); `a != b` with no `ne` is `not a.eq(&b)`.
     mut fn lower_derived_comparison(op: i32, lhs_expr: i32, rhs_expr: i32, method_sym: i32, reversed: i32, node: i32) -> i32:
         let fn_op = self.lower_var(method_sym, 0, 0)
-        let arg_nodes: List[i32] = List.new()
+        let arg_nodes: List[i32] = []
         arg_nodes.push(if reversed != 0: rhs_expr else: lhs_expr)
         arg_nodes.push(if reversed != 0: lhs_expr else: rhs_expr)
         let bool_ty = self.sema.ty_bool as i32
@@ -5734,7 +5734,7 @@ impl MirBuilder:
 
     mut fn lower_method_un_op(expr: i32, method_sym: i32, node: i32) -> i32:
         let fn_op = self.lower_var(method_sym, 0, 0)
-        let arg_nodes: List[i32] = List.new()
+        let arg_nodes: List[i32] = []
         arg_nodes.push(expr)
         let ret_ty = self.expr_type(node)
         self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, ret_ty, node)
@@ -5752,7 +5752,7 @@ impl MirBuilder:
         let from_break_sig: i32 = self.sema.try_from_break_sigs.get(node).unwrap()
         let from_break_mono_sym: i32 = self.sema.try_from_break_mono_syms.get(node).unwrap()
 
-        let branch_args: List[i32] = List.new()
+        let branch_args: List[i32] = []
         branch_args.push(self.lower_expr(expr))
         let branch_op = self.lower_resolved_call_with_operand_args_contract(branch_fn, branch_args, branch_ty, node, branch_sig, branch_mono_sym)
         let branch_place = self.materialize_operand(branch_op, branch_ty, self.ast.get_start(expr))
@@ -5770,9 +5770,9 @@ impl MirBuilder:
             return self.unit_operand()
 
         let disc = self.lower_enum_discriminant(branch_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(branch_ty, continue_sym))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
@@ -5793,7 +5793,7 @@ impl MirBuilder:
         let break_downcast = self.body.new_downcast_place(branch_place, break_idx)
         let break_payload_place = self.body.new_field_place(break_downcast, 0, break_ty)
         let break_op = self.body.new_operand(self.carrier_read_kind(break_ty, self.local_type(self.place_base_local(break_payload_place))), break_payload_place)
-        let from_break_args: List[i32] = List.new()
+        let from_break_args: List[i32] = []
         from_break_args.push(break_op)
         let ret_op = self.lower_resolved_call_with_operand_args_contract(from_break_fn, from_break_args, ret_ty, node, from_break_sig, from_break_mono_sym)
         self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(expr))
@@ -5842,7 +5842,7 @@ impl MirBuilder:
         let bound_tys = self.sema.enum_variant_payload_types_frozen(spec_ty, slice_sym)
         let kind = self.ast.kind(node)
         let count = if kind == NodeKind.NK_INDEX: 2 else: self.ast.get_data2(node)
-        let elems: List[i32] = List.new()
+        let elems: List[i32] = []
         for si in 0..count:
             var d0 = 0
             var d1 = 0
@@ -5859,7 +5859,7 @@ impl MirBuilder:
                 step_node = d2 - spec_kind * INDEX_KIND_SHIFT
             let spec_tmp = self.new_temp(spec_ty)
             let spec_place = self.place_for_local(spec_tmp)
-            let fields: List[i32] = List.new()
+            let fields: List[i32] = []
             if spec_kind == INDEX_SCALAR:
                 fields.push(self.lower_index_bound(d0, node))
                 self.assign_enum_variant_to_place(spec_place, spec_ty, scalar_sym, fields, span)
@@ -5871,13 +5871,13 @@ impl MirBuilder:
             else:
                 self.assign_enum_variant_to_place(spec_place, spec_ty, if spec_kind == INDEX_ELLIPSIS: ellipsis_sym else: newaxis_sym, fields, span)
             elems.push(self.body.new_operand(OperandKind.OK_MOVE, spec_place))
-        let names: List[i32] = List.new()
+        let names: List[i32] = []
         for _ in 0..elems.len(): names.push(0)
         let arr_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, self.body.new_agg_fields(elems, names), 0)
         let arr_tmp = self.new_temp(arr_ty)
         let arr_place = self.place_for_local(arr_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, arr_place, arr_rv, span)
-        for ei in 0..elems.len(): self.consume_moved_operand(elems[ei])
+        for elem in elems: self.consume_moved_operand(elem)
         let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, arr_place, self.int_const_operand(0, self.sema.ty_i64), self.int_const_operand(count, self.sema.ty_i64))
         let slice_tmp = self.new_temp(slice_ty)
         let slice_place = self.place_for_local(slice_tmp)
@@ -5894,7 +5894,7 @@ impl MirBuilder:
     mut fn lower_optional_index_bound(expr: i32, opt_ty: i32, node: i32) -> i32:
         let tmp = self.new_temp(opt_ty)
         let place = self.place_for_local(tmp)
-        let fields: List[i32] = List.new()
+        let fields: List[i32] = []
         if expr != 0:
             fields.push(self.lower_index_bound(expr, node))
             self.assign_enum_variant_to_place(place, opt_ty, self.sema.syms.some, fields, self.ast.get_start(node))
@@ -5904,7 +5904,7 @@ impl MirBuilder:
 
     mut fn lower_multi_index_read(node: i32) -> i32:
         let base_op = self.lower_expr(self.ast.get_data0(node))
-        let mi_args: List[i32] = List.new()
+        let mi_args: List[i32] = []
         mi_args.push(base_op)
         mi_args.push(self.lower_multi_index_specs_slice(node))
         mi_args.push(self.int_const_operand(if self.ast.kind(node) == NodeKind.NK_INDEX: 2 else: self.ast.get_data2(node), self.sema.ty_i32))
@@ -5922,7 +5922,7 @@ impl MirBuilder:
 
     mut fn lower_multi_index_set(place_expr: i32, rhs_expr: i32):
         let mi_base_op = self.lower_expr(self.ast.get_data0(place_expr))
-        let mi_args: List[i32] = List.new()
+        let mi_args: List[i32] = []
         mi_args.push(mi_base_op)
         mi_args.push(self.lower_multi_index_specs_slice(place_expr))
         mi_args.push(self.int_const_operand(if self.ast.kind(place_expr) == NodeKind.NK_INDEX: 2 else: self.ast.get_data2(place_expr), self.sema.ty_i32))
@@ -6280,7 +6280,7 @@ impl MirBuilder:
         let recv_tmp = self.new_temp(recv_ref_ty)
         let recv_place = self.place_for_local(recv_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, recv_place, rv, self.ast.get_start(node))
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, recv_place))
         // Sema records the concrete deref specialization on the base expr
         // (ensure_user_deref_specialization), so the dispatch keeps the full
@@ -6569,7 +6569,7 @@ impl MirBuilder:
         let a = self.lower_concat_operand(self.ast.get_data1(node), elem)
         let b = self.lower_concat_operand(self.ast.get_data2(node), elem)
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("concat"), self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(a)
         args.push(b)
         let args_id = self.body.new_call_args(args)
@@ -6587,7 +6587,7 @@ impl MirBuilder:
         let more = self.lower_concat_operand(more_expr, elem)
         self.make_unique_before_mutation(target)
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("extend"), self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, target))
         args.push(more)
         let args_id = self.body.new_call_args(args)
@@ -6608,7 +6608,7 @@ impl MirBuilder:
             self.expected_type = elem_ty
         let elem_op = self.lower_expr(elem_node)
         self.expected_type = saved_expected
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         args.push(elem_op)
         let args_id = self.body.new_call_args(args)
@@ -6660,7 +6660,7 @@ impl MirBuilder:
         if fn_sym == 0 or not self.sema.btree_new_sigs.contains(node):
             self.mark_unsupported()
             return
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         let sig_idx: i32 = self.sema.btree_new_sigs.get(node).unwrap()
         let mono_sym: i32 = self.sema.btree_new_mono_syms.get(node).unwrap()
         let made = self.lower_resolved_call_with_operand_args_contract(fn_sym, args, target_ty, node, sig_idx, mono_sym)
@@ -6676,7 +6676,7 @@ impl MirBuilder:
         if fn_sym == 0:
             self.mark_unsupported()
             return
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, set_place))
         args.push(elem_op)
         let sig_idx: i32 = self.sema.btree_insert_sigs.get(node).unwrap()
@@ -6689,7 +6689,7 @@ impl MirBuilder:
         if fn_sym == 0:
             self.mark_unsupported()
             return
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         args.push(key_op)
         args.push(val_op)
@@ -6783,8 +6783,8 @@ impl MirBuilder:
                 self.assign_operand_to_place(result_place, zop, span)
             else:
                 let moves = self.type_needs_value_drop(elem_ty)
-                let fields: List[i32] = List.new()
-                let names: List[i32] = List.new()
+                let fields: List[i32] = []
+                let names: List[i32] = []
                 for j in 1..n:
                     let src = self.body.new_field_place(recv_place, j, elem_ty)
                     let op = self.body.new_operand(if moves: OperandKind.OK_MOVE else: OperandKind.OK_COPY, src)
@@ -6814,9 +6814,9 @@ impl MirBuilder:
             let rest_none_bb = self.new_block()
             let rest_join_bb = self.new_block()
             let empty_op = self.seq_len_is_zero_operand(len_place, span)
-            let rest_vals: List[i64] = List.new()
+            let rest_vals: List[i64] = []
             rest_vals.push(1)
-            let rest_targets: List[i32] = List.new()
+            let rest_targets: List[i32] = []
             rest_targets.push(rest_none_bb as i32)
             self.terminate(TermKind.TK_SWITCH_INT, empty_op, self.body.new_switch_table(rest_vals, rest_targets), rest_some_bb, 0)
             self.switch_to(rest_some_bb)
@@ -6834,8 +6834,8 @@ impl MirBuilder:
         // is the mode Sema declared.
         let payload_ty = self.sema.get_generic_inst_arg(result_ty, 0)
         let observing = payload_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(payload_ty as TypeId)) == TypeKind.TY_REF
-        let none_fields: List[i32] = List.new()
-        let none_names: List[i32] = List.new()
+        let none_fields: List[i32] = []
+        let none_names: List[i32] = []
         let none_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, self.body.new_agg_fields(none_fields, none_names), self.sema.enum_variant_index_for_type(result_ty, self.sema.syms.none))
         if base_kind == TypeKind.TY_ARRAY:
             let n = self.sema.get_type_d1(base_ty)
@@ -6873,9 +6873,9 @@ impl MirBuilder:
         let none_bb = self.new_block()
         let join_bb = self.new_block()
         let empty_op = self.seq_len_is_zero_operand(len_place, span)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(none_bb as i32)
         self.terminate(TermKind.TK_SWITCH_INT, empty_op, self.body.new_switch_table(vals, targets), some_bb, 0)
         self.switch_to(none_bb)
@@ -6916,13 +6916,13 @@ impl MirBuilder:
         let result_local = self.new_temp(result_ty)
         let result_place = self.place_for_local(result_local)
         // The entries, as the aggregate an owned `rest()` builds.
-        let fields: List[i32] = List.new()
-        let names: List[i32] = List.new()
+        let fields: List[i32] = []
+        let names: List[i32] = []
         if self.sema.get_type_kind(t) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(t) == self.sema.syms.list:
             let list_place = self.lower_expr_place(self_expr)
             let len_local = self.new_temp(self.sema.ty_i64)
             let len_place = self.place_for_local(len_local)
-            let len_args: List[i32] = List.new()
+            let len_args: List[i32] = []
             len_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
             let len_args_id = self.body.new_call_args(len_args)
             self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
@@ -6933,7 +6933,7 @@ impl MirBuilder:
             names.push(0)
             t = self.sema.resolve_alias(self.sema.get_generic_inst_arg(t, 0) as TypeId) as i32
         while self.sema.get_type_kind(t) == TypeKind.TY_ARRAY:
-            fields.push(self.int_const_operand(self.sema.get_type_d1(t) as i64, self.sema.ty_isize as i32))
+            fields.push(self.int_const_operand(self.sema.get_type_d1(t), self.sema.ty_isize as i32))
             names.push(0)
             t = self.sema.resolve_alias(self.sema.get_type_d0(t) as TypeId) as i32
         let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, self.body.new_agg_fields(fields, names), 0)
@@ -6964,9 +6964,9 @@ impl MirBuilder:
 
     // Assign `Some(payload_op)` into `result_place`; returns `finish`.
     mut fn seq_some_operand(result_place: i32, result_ty: i32, payload_op: i32, finish: i32, span: i32) -> i32:
-        let fields: List[i32] = List.new()
+        let fields: List[i32] = []
         fields.push(payload_op)
-        let names: List[i32] = List.new()
+        let names: List[i32] = []
         names.push(0)
         let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, self.body.new_agg_fields(fields, names), self.sema.enum_variant_index_for_type(result_ty, self.sema.syms.some))
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
@@ -7004,7 +7004,7 @@ impl MirBuilder:
         if self.is_btreeset_base_sym(target_base):
             return self.lower_btree_seq_literal(node, elem_ty)
         let saved_expected = self.expected_type
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         // §4.3a (#1478): a fill with a non-literal count holds its value
         // once; Sema evaluated the count, and the List gets that many copies,
         // each an evaluation of the value as the written form's are.
@@ -7058,13 +7058,13 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
         self.switch_to(header_bb)
-        let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, self.body.new_operand(OperandKind.OK_COPY, counter_place), self.int_const_operand(count as i64, self.sema.ty_i64))
+        let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, self.body.new_operand(OperandKind.OK_COPY, counter_place), self.int_const_operand(count, self.sema.ty_i64))
         let cmp_local = self.new_temp(self.sema.ty_bool)
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, cmp_place), table, exit_bb, 0)
@@ -7099,7 +7099,7 @@ impl MirBuilder:
         if self.is_btreemap_base_sym(target_base):
             return self.lower_btree_map_literal(node, key_ty, val_ty)
         let saved_expected = self.expected_type
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         for i in 0..pair_count:
             let key_node = self.ast.get_extra(pair_start + i * 2)
             let val_node = self.ast.get_extra(pair_start + i * 2 + 1)
@@ -7329,7 +7329,7 @@ impl MirBuilder:
                 let ip_is_compound = self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr
                 if ip_is_compound:
                     let ip_cur_ty = self.expr_type(place_expr)
-                    let ip_get_args: List[i32] = List.new()
+                    let ip_get_args: List[i32] = []
                     ip_get_args.push(self.index_place_borrowed_receiver(ip_recv_place, ip_recv_expr_ty, ip_get_sig, self.ast.get_start(place_expr)))
                     ip_get_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                     let ip_cur_val = self.lower_resolved_call_with_operand_args_contract(ip_get_fn, ip_get_args, ip_cur_ty, place_expr, ip_get_sig, ip_get_mono)
@@ -7338,7 +7338,7 @@ impl MirBuilder:
                     ip_val_op = self.lower_bin_op_operand(ip_ca_op, ip_cur_val, ip_inc_val, ip_cur_ty, self.ast.get_start(place_expr))
                 else:
                     ip_val_op = self.lower_expr(rhs_expr)
-                let ip_args: List[i32] = List.new()
+                let ip_args: List[i32] = []
                 ip_args.push(ip_recv_op)
                 ip_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                 ip_args.push(ip_val_op)
@@ -7348,7 +7348,7 @@ impl MirBuilder:
                 // The place of a user IndexPlace is its `get`: read it back
                 // with the receiver and index this store evaluated once.
                 let ip_rb_ty = self.assignment_place_value_type(place_expr)
-                let ip_rb_args: List[i32] = List.new()
+                let ip_rb_args: List[i32] = []
                 ip_rb_args.push(self.index_place_borrowed_receiver(ip_recv_place, ip_recv_expr_ty, ip_get_sig, self.ast.get_start(place_expr)))
                 ip_rb_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                 let ip_rb_val = self.lower_resolved_call_with_operand_args_contract(ip_get_fn, ip_rb_args, ip_rb_ty, place_expr, ip_get_sig, ip_get_mono)
@@ -8114,7 +8114,7 @@ impl MirBuilder:
         self.assign_operand_to_place(yielded_place, raw_op, self.ast.get_start(inner))
         let value_op = self.operand_for_place(yielded_place, elem_ty)
         self.consume_moved_operand(value_op)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(value_op)
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, node)
@@ -8127,9 +8127,9 @@ impl MirBuilder:
         self.switch_to(after_call)
         let resume_bb = self.new_block()
         let stop_bb = self.new_block()
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(0)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(stop_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         let more_op = self.body.new_operand(OperandKind.OK_COPY, more_place)
@@ -8322,9 +8322,9 @@ impl MirBuilder:
         let else_bb = self.new_block()
         let join_bb = self.new_block()
 
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(then_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, else_bb, 0)
@@ -8589,9 +8589,9 @@ impl MirBuilder:
         else:
             cond_op = self.lower_truth_test(cond_expr, self.lower_expr(cond_expr))
         self.finish_stmt_temp_frame(cond_frame)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, exit_bb, 0)
@@ -8652,9 +8652,9 @@ impl MirBuilder:
 
         self.switch_to(cond_bb)
         let cond_op = self.lower_truth_test(cond_expr, self.lower_expr(cond_expr))
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, exit_bb, 0)
@@ -8670,8 +8670,8 @@ impl MirBuilder:
     // error out. The binding's payload is then gone; it is not dropped again.
     mut fn lower_comprehension_failure(node: i32) -> i32:
         let result_ty = self.expr_type(node)
-        let fields: List[i32] = List.new()
-        let names: List[i32] = List.new()
+        let fields: List[i32] = []
+        let names: List[i32] = []
         var variant = self.sema.syms.none
         if (self.sema.comprehension_failure_rewraps.get(node) ?? 0) == 2:
             variant = self.sema.syms.err
@@ -8847,7 +8847,7 @@ impl MirBuilder:
         self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, header_bb, exit_bb, -1)
 
         self.switch_to(header_bb)
-        let next_args: List[i32] = List.new()
+        let next_args: List[i32] = []
         next_args.push(self.body.new_operand(OperandKind.OK_COPY, iter_place))
         let args_id = self.body.new_call_args(next_args)
         if recorded_sig_idx >= 0:
@@ -8865,9 +8865,9 @@ impl MirBuilder:
         self.switch_to(after_next_bb)
         let disc = self.lower_enum_discriminant(next_place)
         let some_idx = self.success_variant_index(next_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.success_variant_tag(next_place))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
@@ -8915,7 +8915,7 @@ impl MirBuilder:
             self.consume_moved_operand(recv_op)
         else:
             recv_op = self.lower_generic_receiver_arg(iterable, self.pool.intern("iter"), iter_sig)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(recv_op)
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, key_node)
@@ -8952,7 +8952,7 @@ impl MirBuilder:
         // The generator value moves into `each`.
         let gen_op = self.lower_expr(iter_expr)
         let flag_local = self.new_gen_loop_flag()
-        var child = self.begin_gen_loop_closure(for_node, flag_local)
+        let child = self.begin_gen_loop_closure(for_node, flag_local)
         let item_local = child.add_gen_loop_item(elem_ty, for_node)
 
         let more_bb = child.new_block()
@@ -8992,7 +8992,7 @@ impl MirBuilder:
             sema_phase_bug(f"BUG: a comprehension's collection is not a local place (node {comp_node})")
         let gen_op = self.lower_expr(iter_expr)
         let flag_local = self.new_gen_loop_flag()
-        var child = self.begin_gen_loop_closure(iter_expr, flag_local)
+        let child = self.begin_gen_loop_closure(iter_expr, flag_local)
         let child_out_local = child.add_protocol_capture(out_local, self.local_type(out_local), self.pool.intern(f"$gencomp_out${iter_expr}"))
         let item_local = child.add_gen_loop_item(elem_ty, iter_expr)
         let child_out_place = child.place_for_local(child_out_local)
@@ -9006,9 +9006,9 @@ impl MirBuilder:
         if clause_filter != 0:
             let pass_bb = child.new_block()
             let cond_op = child.lower_comprehension_filter(clause_filter)
-            let vals: List[i64] = List.new()
+            let vals: List[i64] = []
             vals.push(1)
-            let targets: List[i32] = List.new()
+            let targets: List[i32] = []
             targets.push(pass_bb as i32)
             let table = child.body.new_switch_table(vals, targets)
             child.terminate(TermKind.TK_SWITCH_INT, cond_op, table, join_bb, 0)
@@ -9059,8 +9059,8 @@ impl MirBuilder:
         // The body's captures, resolved in this frame. A body that moves out
         // of a by-place capture blanks the outer slot (#1481); that slot's
         // scope-exit drop keeps its null guard.
-        let capture_syms: List[i32] = List.new()
-        let capture_sources: List[ClosureCaptureSource] = List.new()
+        let capture_syms: List[i32] = []
+        let capture_sources: List[ClosureCaptureSource] = []
         for ci in 0..self.sema.closure_capture_summary_count(key_node):
             let sym = mir_symbol_for_pool(self.sema, self.pool, self.sema.closure_capture_summary_sym(key_node, ci))
             let source = self.closure_capture_source(sym, key_node, ci)
@@ -9069,7 +9069,7 @@ impl MirBuilder:
             capture_syms.push(sym)
             capture_sources.push(source)
         let body_local = self.gen_body_local
-        var child = MirBuilder.init(self.sema, self.ast, self.pool, self.pool.intern(f"$genloop${self.body.fn_sym}${key_node}"))
+        let child = MirBuilder.init(self.sema, self.ast, self.pool, self.pool.intern(f"$genloop${self.body.fn_sym}${key_node}"))
         child.contextual_fact_sig_idx = self.contextual_fact_sig_idx
         child.body.instance_sym = self.body.instance_sym
         child.body.anonymous_type = self.sema.gen_for_body_types.get(key_node).unwrap()
@@ -9124,7 +9124,7 @@ impl MirBuilder:
         let closure_op = self.body.new_operand(OperandKind.OK_MOVE, closure_place)
         self.consume_moved_operand(gen_op)
         self.consume_moved_operand(closure_op)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(gen_op)
         args.push(closure_op)
         let args_id = self.body.new_call_args(args)
@@ -9145,15 +9145,15 @@ impl MirBuilder:
 
         // Act on the flag: the closure's exits that leave this loop too.
         let exit_bb = self.new_block()
-        let vals: List[i64] = List.new()
-        let targets: List[i32] = List.new()
-        let codes: List[i32] = List.new()
+        let vals: List[i64] = []
+        let targets: List[i32] = []
+        let codes: List[i32] = []
         for code in GEN_LOOP_RETURN..GEN_LOOP_LABEL_BASE:
             if (used_codes / gen_loop_code_bit(code)) % 2 == 1:
                 codes.push(code)
         for ei in 0..exit_labels.len():
             codes.push((GEN_LOOP_LABEL_BASE + ei) as i32)
-        let arm_bbs: List[BlockId] = List.new()
+        let arm_bbs: List[BlockId] = []
         for ai in 0..codes.len():
             let arm_bb = self.new_block()
             arm_bbs.push(arm_bb)
@@ -9447,9 +9447,9 @@ impl MirBuilder:
             let pass_bb = self.new_block()
             let skip_bb = self.new_block()
             let cond_op = self.lower_comprehension_filter(filter)
-            let vals: List[i64] = List.new()
+            let vals: List[i64] = []
             vals.push(1)
-            let targets: List[i32] = List.new()
+            let targets: List[i32] = []
             targets.push(pass_bb as i32)
             let table = self.body.new_switch_table(vals, targets)
             self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, skip_bb, 0)
@@ -9509,9 +9509,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
@@ -9560,9 +9560,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(range_node))
         let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
@@ -9608,9 +9608,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -9680,9 +9680,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -9753,7 +9753,7 @@ impl MirBuilder:
 
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
         self.switch_to(header_bb)
-        let next_args: List[i32] = List.new()
+        let next_args: List[i32] = []
         next_args.push(self.body.new_operand(OperandKind.OK_COPY, iter_place))
         let args_id = self.body.new_call_args(next_args)
         if recorded_sig_idx >= 0:
@@ -9771,9 +9771,9 @@ impl MirBuilder:
         self.switch_to(after_next_bb)
         let disc = self.lower_enum_discriminant(next_place)
         let some_idx = self.success_variant_index(next_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.success_variant_tag(next_place))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
@@ -9795,9 +9795,9 @@ impl MirBuilder:
         if clause_filter != 0:
             let pass_bb = self.new_block()
             let cond_op = self.lower_comprehension_filter(clause_filter)
-            let fvals: List[i64] = List.new()
+            let fvals: List[i64] = []
             fvals.push(1)
-            let ftargets: List[i32] = List.new()
+            let ftargets: List[i32] = []
             ftargets.push(pass_bb as i32)
             let ftable = self.body.new_switch_table(fvals, ftargets)
             self.terminate(TermKind.TK_SWITCH_INT, cond_op, ftable, iter_join_bb, 0)
@@ -9886,7 +9886,7 @@ impl MirBuilder:
         self.lower_comprehension_generic_iter(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr, iter_ty)
 
     mut fn lower_array_comprehension(comp_node: i32) -> i32:
-        var out_ty = self.expr_type(comp_node)
+        let out_ty = self.expr_type(comp_node)
         if out_ty == 0 or out_ty == self.sema.ty_void:
             self.mark_unsupported()
             return self.unit_operand()
@@ -9983,9 +9983,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
@@ -10068,9 +10068,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(range_node))
         let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
@@ -10150,7 +10150,7 @@ impl MirBuilder:
     mut fn sequence_len_rvalue(slice_place: i32, iter_ty: i32) -> i32:
         let resolved = self.sema.resolve_alias(iter_ty)
         if self.sema.get_type_kind(resolved) == TypeKind.TY_ARRAY:
-            return self.body.new_rvalue(RvalueKind.RK_USE, self.int_const_operand(self.sema.get_type_d1(resolved) as i64, self.sema.ty_i64), 0, 0)
+            return self.body.new_rvalue(RvalueKind.RK_USE, self.int_const_operand(self.sema.get_type_d1(resolved), self.sema.ty_i64), 0, 0)
         self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0)
 
     // The element at `counter_local`, in a temp the pattern can read. A
@@ -10203,9 +10203,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -10262,7 +10262,7 @@ impl MirBuilder:
         // Get length via VEC_LEN intrinsic (returns i64)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_args: List[i32] = List.new()
+        let len_args: List[i32] = []
         len_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let len_args_id = self.body.new_call_args(len_args)
         self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
@@ -10295,9 +10295,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span_start)
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -10306,7 +10306,7 @@ impl MirBuilder:
         self.switch_to(body_bb)
         let elem_local = self.new_temp(elem_ty)
         let elem_place = self.place_for_local(elem_local)
-        let get_args: List[i32] = List.new()
+        let get_args: List[i32] = []
         get_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         get_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
         let get_args_id = self.body.new_call_args(get_args)
@@ -10344,7 +10344,7 @@ impl MirBuilder:
 
     // D44: one call of a map table-walk intrinsic on (map, slot).
     mut fn emit_map_slot_call(intrinsic: MirIntrinsic, map_place: i32, slot_place: i32, dest_place: i32):
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, slot_place))
         let args_id = self.body.new_call_args(args)
@@ -10384,7 +10384,7 @@ impl MirBuilder:
             map_place = self.materialize_operand(map_op, map_ty, self.ast.get_start(iter_expr))
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_args: List[i32] = List.new()
+        let len_args: List[i32] = []
         len_args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         let len_args_id = self.body.new_call_args(len_args)
         self.body.set_call_intrinsic(len_args_id, MirIntrinsic.MAP_CAPACITY)
@@ -10415,9 +10415,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -10430,17 +10430,17 @@ impl MirBuilder:
         let occupied_place = self.place_for_local(occupied_local)
         self.emit_map_slot_call(MirIntrinsic.MAP_SLOT_OCCUPIED, map_place, counter_place, occupied_place)
         let live_bb = self.new_block()
-        let occupied_vals: List[i64] = List.new()
+        let occupied_vals: List[i64] = []
         occupied_vals.push(0)
-        let occupied_targets: List[i32] = List.new()
+        let occupied_targets: List[i32] = []
         occupied_targets.push(inc_bb as i32)
         let occupied_table = self.body.new_switch_table(occupied_vals, occupied_targets)
         let occupied_read = self.body.new_operand(OperandKind.OK_COPY, occupied_place)
         self.terminate(TermKind.TK_SWITCH_INT, occupied_read, occupied_table, live_bb, 0)
 
         self.switch_to(live_bb)
-        let tuple_fields: List[i32] = List.new()
-        let tuple_names: List[i32] = List.new()
+        let tuple_fields: List[i32] = []
+        let tuple_names: List[i32] = []
         tuple_fields.push(self.lower_map_slot_binding(MirIntrinsic.MAP_KEY_AT, map_place, counter_place, self.tuple_elem_type(elem_ty, 0)))
         tuple_names.push(0)
         tuple_fields.push(self.lower_map_slot_binding(MirIntrinsic.MAP_VALUE_AT, map_place, counter_place, self.tuple_elem_type(elem_ty, 1)))
@@ -10482,7 +10482,7 @@ impl MirBuilder:
         let list_place = self.materialize_operand(list_op, list_ty, self.ast.get_start(list_expr))
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_args: List[i32] = List.new()
+        let len_args: List[i32] = []
         len_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let len_args_id = self.body.new_call_args(len_args)
         self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
@@ -10509,9 +10509,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(list_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -10519,7 +10519,7 @@ impl MirBuilder:
         self.make_unique_before_mutation(list_place)
         let slot_local = self.new_temp(slot_ty)
         let slot_place = self.place_for_local(slot_local)
-        let slot_args: List[i32] = List.new()
+        let slot_args: List[i32] = []
         slot_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         slot_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
         let slot_args_id = self.body.new_call_args(slot_args)
@@ -10581,7 +10581,7 @@ impl MirBuilder:
         self.switch_to(header_bb)
         let opt_local = self.new_temp(opt_ty)
         let opt_place = self.place_for_local(opt_local)
-        let recv_args: List[i32] = List.new()
+        let recv_args: List[i32] = []
         recv_args.push(self.body.new_operand(OperandKind.OK_COPY, rx_place))
         let recv_args_id = self.body.new_call_args(recv_args)
         self.body.set_call_intrinsic(recv_args_id, MirIntrinsic.CHAN_RECV)
@@ -10592,9 +10592,9 @@ impl MirBuilder:
         self.emit_wait_cancel_check()
         let disc = self.lower_enum_discriminant(opt_place)
         let some_disc = self.enum_variant_discriminant_for_type(opt_ty, self.sema.syms.some)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(some_disc)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(bind_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
@@ -10654,7 +10654,7 @@ impl MirBuilder:
         let ref_elem_ty = self.loop_element_type(for_node)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_args: List[i32] = List.new()
+        let len_args: List[i32] = []
         len_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let len_args_id = self.body.new_call_args(len_args)
         self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
@@ -10681,16 +10681,16 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span_start)
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
         self.switch_to(body_bb)
         let ref_local = self.new_temp(ref_elem_ty)
         let ref_place = self.place_for_local(ref_local)
-        let ref_args: List[i32] = List.new()
+        let ref_args: List[i32] = []
         ref_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         ref_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
         let ref_args_id = self.body.new_call_args(ref_args)
@@ -10898,7 +10898,7 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_COPY, place)
 
     mut fn lower_single_await(task_op: i32, result_ty: i32, task_ty: i32, node: i32, await_owns: bool) -> i32:
-        let no_siblings: List[i32] = List.new()
+        let no_siblings: List[i32] = []
         self.lower_group_await(task_op, result_ty, task_ty, node, await_owns, no_siblings, 0)
 
     // One task of a tuple await `(t1, t2, ...).await`: `sibling_ops` are the
@@ -10919,7 +10919,7 @@ impl MirBuilder:
         // 1. Emit FIBER_AWAIT intrinsic call. Arg 1 (await_owns) tells codegen whether
         // this value-await OWNS the result buffer and must free it (§14.7/G3): 1 for a
         // temporary/owned-local await, 0 for a borrowed param (the owner's drop frees).
-        let await_args: List[i32] = List.new()
+        let await_args: List[i32] = []
         await_args.push(observe_op)
         await_args.push(self.const_operand(ConstKind.CK_INT, await_owns as i32, self.sema.ty_i32))
         let await_args_id = self.body.new_call_args(await_args)
@@ -10933,7 +10933,7 @@ impl MirBuilder:
         self.switch_to(after_await)
 
         // 2. Check self-cancellation: IS_CANCELLED() → i32
-        let ic_args: List[i32] = List.new()
+        let ic_args: List[i32] = []
         let ic_args_id = self.body.new_call_args(ic_args)
         self.body.set_call_intrinsic(ic_args_id, MirIntrinsic.FIBER_IS_CANCELLED)
         let ic_result = self.new_temp(self.sema.ty_i32 as i32)
@@ -10948,9 +10948,9 @@ impl MirBuilder:
         let self_cancel_bb = self.new_block()
         let unwind_bb = self.new_block()
         let normal_bb = self.new_block()
-        let sw_vals1: List[i64] = List.new()
+        let sw_vals1: List[i64] = []
         sw_vals1.push(0)
-        let sw_tgts1: List[i32] = List.new()
+        let sw_tgts1: List[i32] = []
         sw_tgts1.push(check_child_bb)
         let sw1 = self.body.new_switch_table(sw_vals1, sw_tgts1)
         let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
@@ -10958,7 +10958,7 @@ impl MirBuilder:
 
         // 3. Self-cancel BB: cancel child, join it for cleanup, then unwind.
         self.switch_to(self_cancel_bb)
-        let cancel_args: List[i32] = List.new()
+        let cancel_args: List[i32] = []
         cancel_args.push(self.observing_operand(task_op))
         let cancel_call_id = self.body.new_call_args(cancel_args)
         self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.FIBER_CANCEL)
@@ -10977,7 +10977,7 @@ impl MirBuilder:
         let task_place = self.materialize_operand(task_op, task_ty, span)
         let fid_place = self.body.new_field_place(task_place, 0, self.sema.ty_i32 as i32)
         let fid_op = self.body.new_operand(OperandKind.OK_COPY, fid_place)
-        let wcr_args: List[i32] = List.new()
+        let wcr_args: List[i32] = []
         wcr_args.push(fid_op)
         let wcr_args_id = self.body.new_call_args(wcr_args)
         self.body.set_call_intrinsic(wcr_args_id, MirIntrinsic.FIBER_WAS_CANCELLED_RETURN)
@@ -10989,9 +10989,9 @@ impl MirBuilder:
         self.switch_to(check_child_cont)
 
         // Branch: 0 → normal, else: → unwind
-        let sw_vals2: List[i64] = List.new()
+        let sw_vals2: List[i64] = []
         sw_vals2.push(0)
-        let sw_tgts2: List[i32] = List.new()
+        let sw_tgts2: List[i32] = []
         sw_tgts2.push(normal_bb)
         let sw2 = self.body.new_switch_table(sw_vals2, sw_tgts2)
         let wcr_op = self.body.new_operand(OperandKind.OK_COPY, wcr_place)
@@ -11014,7 +11014,7 @@ impl MirBuilder:
 
     // `unwritten`: the local the unwinding call never wrote (-1: none).
     mut fn emit_cancelled_return_unwritten(unwritten: i32):
-        let scr_args: List[i32] = List.new()
+        let scr_args: List[i32] = []
         let scr_args_id = self.body.new_call_args(scr_args)
         self.body.set_call_intrinsic(scr_args_id, MirIntrinsic.FIBER_SET_CANCELLED_RETURN)
         let scr_result = self.new_temp(self.sema.ty_i32)
@@ -11052,7 +11052,7 @@ impl MirBuilder:
             for di in 0..self.drop_local_ids.len():
                 if self.drop_local_ids[di] == dest_local:
                     sema_phase_bug(f"BUG: a call that may unwind on cancellation writes _{dest_local}, already scheduled for drop (#916)")
-        let ic_args: List[i32] = List.new()
+        let ic_args: List[i32] = []
         let ic_args_id = self.body.new_call_args(ic_args)
         self.body.set_call_intrinsic(ic_args_id, MirIntrinsic.FIBER_WAIT_CANCELLED)
         let ic_result = self.new_temp(self.sema.ty_i32)
@@ -11062,9 +11062,9 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, ic_unit, ic_args_id, ic_place, check_bb)
         self.switch_to(check_bb)
         let unwind_bb = self.new_block()
-        let sw_vals: List[i64] = List.new()
+        let sw_vals: List[i64] = []
         sw_vals.push(0)
-        let sw_tgts: List[i32] = List.new()
+        let sw_tgts: List[i32] = []
         sw_tgts.push(continue_bb)
         let sw = self.body.new_switch_table(sw_vals, sw_tgts)
         let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
@@ -11079,7 +11079,7 @@ impl MirBuilder:
     // Join a Task purely for cleanup: await completion and free its result buffer,
     // but do not propagate child-cancel status into the current fiber.
     mut fn lower_cleanup_await(task_op: i32, node: i32):
-        let await_args: List[i32] = List.new()
+        let await_args: List[i32] = []
         await_args.push(task_op)
         let await_args_id = self.body.new_call_args(await_args)
         self.body.set_call_intrinsic(await_args_id, MirIntrinsic.FIBER_CLEANUP_AWAIT)
@@ -11142,9 +11142,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(pat_node))
         let cmp_op = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(arm_bb)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_op, table, fail_bb, 0)
@@ -11221,9 +11221,9 @@ impl MirBuilder:
         let captures_opt_place = self.lower_regex_captures_places(regex_place, scrutinee_place)
         self.remember_regex_pattern_captures(pat_node, captures_opt_place)
         let result_op = self.lower_option_is_some_place(captures_opt_place, self.regex_captures_option_type())
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(arm_bb)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, result_op, table, fail_bb, 0)
@@ -11321,9 +11321,9 @@ impl MirBuilder:
             if needs_payload_checks:
                 success_bb = self.new_block() as i32
             let disc = self.lower_enum_discriminant(variant_subject_place)
-            let vals: List[i64] = List.new()
+            let vals: List[i64] = []
             vals.push(variant_disc)
-            let targets: List[i32] = List.new()
+            let targets: List[i32] = []
             targets.push(success_bb)
             let table = self.body.new_switch_table(vals, targets)
             self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
@@ -11386,9 +11386,9 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, ge_place, ge_rv, self.ast.get_start(pat_node))
             let ge_op = self.body.new_operand(OperandKind.OK_COPY, ge_place)
             let range_hi_bb = self.new_block()
-            let ge_vals: List[i64] = List.new()
+            let ge_vals: List[i64] = []
             ge_vals.push(1)
-            let ge_targets: List[i32] = List.new()
+            let ge_targets: List[i32] = []
             ge_targets.push(range_hi_bb as i32)
             let ge_table = self.body.new_switch_table(ge_vals, ge_targets)
             self.terminate(TermKind.TK_SWITCH_INT, ge_op, ge_table, fail_bb, 0)
@@ -11400,9 +11400,9 @@ impl MirBuilder:
             let le_place = self.place_for_local(le_tmp)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, le_place, le_rv, self.ast.get_start(pat_node))
             let le_op = self.body.new_operand(OperandKind.OK_COPY, le_place)
-            let le_vals: List[i64] = List.new()
+            let le_vals: List[i64] = []
             le_vals.push(1)
-            let le_targets: List[i32] = List.new()
+            let le_targets: List[i32] = []
             le_targets.push(arm_bb)
             let le_table = self.body.new_switch_table(le_vals, le_targets)
             self.terminate(TermKind.TK_SWITCH_INT, le_op, le_table, fail_bb, 0)
@@ -11469,7 +11469,7 @@ impl MirBuilder:
             let tb_scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
             let tb_type_const = self.int_const_operand(tb_type_sym, self.sema.ty_i32)
             let tb_trait_const = self.int_const_operand(tb_trait_sym, self.sema.ty_i32)
-            let tb_args: List[i32] = List.new()
+            let tb_args: List[i32] = []
             tb_args.push(tb_scrutinee_op)
             tb_args.push(tb_type_const)
             tb_args.push(tb_trait_const)
@@ -11481,9 +11481,9 @@ impl MirBuilder:
             self.terminate(TermKind.TK_CALL, tb_fn_op, tb_args_id, tb_result_place, tb_switch_bb)
             self.switch_to(tb_switch_bb)
             let tb_cmp_op = self.body.new_operand(OperandKind.OK_COPY, tb_result_place)
-            let tb_vals: List[i64] = List.new()
+            let tb_vals: List[i64] = []
             tb_vals.push(1)
-            let tb_targets: List[i32] = List.new()
+            let tb_targets: List[i32] = []
             tb_targets.push(arm_bb)
             let tb_table = self.body.new_switch_table(tb_vals, tb_targets)
             self.terminate(TermKind.TK_SWITCH_INT, tb_cmp_op, tb_table, fail_bb, 0)
@@ -11520,16 +11520,16 @@ impl MirBuilder:
                 let sp_span = self.ast.get_start(pat_node)
                 let sp_base = self.slice_pattern_dyn_base(sp_shape_place, sp_arr_ty, sp_span)
                 let sp_len = self.slice_pattern_dyn_len(sp_base, sp_arr_ty, sp_span)
-                let sp_need = self.int_const_operand((sp_head + sp_tail_count) as i64, self.sema.ty_i64)
+                let sp_need = self.int_const_operand((sp_head + sp_tail_count), self.sema.ty_i64)
                 let sp_len_op = self.body.new_operand(OperandKind.OK_COPY, sp_len)
                 let sp_op = if sp_has_rest != 0: BinaryOp.OP_GTE else: BinaryOp.OP_EQ
                 let sp_cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, sp_op, sp_len_op, sp_need)
                 let sp_cmp_local = self.new_temp(self.sema.ty_bool)
                 let sp_cmp = self.place_for_local(sp_cmp_local)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, sp_cmp, sp_cmp_rv, sp_span)
-                let sp_vals: List[i64] = List.new()
+                let sp_vals: List[i64] = []
                 sp_vals.push(1)
-                let sp_targets: List[i32] = List.new()
+                let sp_targets: List[i32] = []
                 sp_targets.push(arm_bb)
                 let sp_table = self.body.new_switch_table(sp_vals, sp_targets)
                 let sp_cmp_op = self.body.new_operand(OperandKind.OK_COPY, sp_cmp)
@@ -11692,7 +11692,7 @@ impl MirBuilder:
             let len_rv = self.body.new_rvalue(RvalueKind.RK_LEN, base, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, span)
             return len_place
-        let len_args: List[i32] = List.new()
+        let len_args: List[i32] = []
         len_args.push(self.body.new_operand(OperandKind.OK_COPY, base))
         let len_args_id = self.body.new_call_args(len_args)
         self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
@@ -11707,7 +11707,7 @@ impl MirBuilder:
     // of the element (D27: element access observes), and `rest` as a `[]T`
     // view of the elements between the matched ends.
     mut fn lower_slice_pattern_views(pat_node: i32, scrutinee_place: i32) -> List[i32]:
-        let out: List[i32] = List.new()
+        let out: List[i32] = []
         let span = self.ast.get_start(pat_node)
         let sp_extra = self.ast.get_data0(pat_node)
         let head = self.ast.get_data1(pat_node)
@@ -11753,12 +11753,12 @@ impl MirBuilder:
                 let idx_local = self.new_temp(self.sema.ty_i64)
                 let idx_place = self.place_for_local(idx_local)
                 if i < head:
-                    let idx_op = self.int_const_operand(i as i64, self.sema.ty_i64)
+                    let idx_op = self.int_const_operand(i, self.sema.ty_i64)
                     let idx_rv = self.body.new_rvalue(RvalueKind.RK_USE, idx_op, 0, 0)
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, idx_place, idx_rv, span)
                 else:
                     let len_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
-                    let back_op = self.int_const_operand(from_end as i64, self.sema.ty_i64)
+                    let back_op = self.int_const_operand(from_end, self.sema.ty_i64)
                     let idx_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_SUB, len_op, back_op)
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, idx_place, idx_rv, span)
                 if seq_dyn == 1:
@@ -11766,7 +11766,7 @@ impl MirBuilder:
                     let view_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, elem_place, 0)
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, local_place, view_rv, span)
                 else:
-                    let ref_args: List[i32] = List.new()
+                    let ref_args: List[i32] = []
                     ref_args.push(self.body.new_operand(OperandKind.OK_COPY, base))
                     ref_args.push(self.body.new_operand(OperandKind.OK_COPY, idx_place))
                     let ref_args_id = self.body.new_call_args(ref_args)
@@ -11784,13 +11784,13 @@ impl MirBuilder:
             let rest_local = self.body.new_local(rest_ty, self.pattern_bind_mut, rest_sym, 1)
             self.bind_local(rest_sym, rest_local)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, rest_local, 0, span)
-            let start_op = self.int_const_operand(head as i64, self.sema.ty_i64)
-            var end_op = self.int_const_operand((arr_len - tail) as i64, self.sema.ty_i64)
+            let start_op = self.int_const_operand(head, self.sema.ty_i64)
+            var end_op = self.int_const_operand((arr_len - tail), self.sema.ty_i64)
             if seq_dyn != 0:
                 let end_local = self.new_temp(self.sema.ty_i64)
                 let end_place = self.place_for_local(end_local)
                 let len_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
-                let back_op = self.int_const_operand(tail as i64, self.sema.ty_i64)
+                let back_op = self.int_const_operand(tail, self.sema.ty_i64)
                 let end_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_SUB, len_op, back_op)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, end_place, end_rv, span)
                 end_op = self.body.new_operand(OperandKind.OK_COPY, end_place)
@@ -11832,7 +11832,7 @@ impl MirBuilder:
     // the subject: a named one into its binding, the ones between the ends
     // into the rest array (or, under a bare `..`, each discarded like `_`).
     mut fn lower_slice_pattern_take_array(pat_node: i32, scrutinee_place: i32) -> List[i32]:
-        var out: List[i32] = []
+        let out: List[i32] = []
         let span = self.ast.get_start(pat_node)
         let arr_ty = self.sema.resolve_alias(self.place_local_type(scrutinee_place) as TypeId) as i32
         if self.sema.get_type_kind(arr_ty) != TypeKind.TY_ARRAY or self.sema.get_type_d0(arr_ty) == 0:
@@ -11867,8 +11867,8 @@ impl MirBuilder:
                 self.assign_operand_to_place(rest_place, zop, span)
             else:
                 let moves = self.type_needs_value_drop(elem_ty)
-                let fields: List[i32] = List.new()
-                let names: List[i32] = List.new()
+                let fields: List[i32] = []
+                let names: List[i32] = []
                 for j in 0..mid:
                     let src = self.body.new_field_place(scrutinee_place, head + j, elem_ty)
                     let op = self.body.new_operand(if moves: OperandKind.OK_MOVE else: OperandKind.OK_COPY, src)
@@ -11898,7 +11898,7 @@ impl MirBuilder:
     // dropped with the subject. Sema refuses a match guard after any
     // removal (#2289): a removed element has no place to be put back.
     mut fn lower_slice_pattern_take_list(pat_node: i32, scrutinee_place: i32) -> List[i32]:
-        var out: List[i32] = []
+        let out: List[i32] = []
         let span = self.ast.get_start(pat_node)
         let list_ty = self.sema.resolve_alias(self.place_local_type(scrutinee_place) as TypeId) as i32
         let elem_ty = self.sema.get_generic_inst_arg(list_ty, 0)
@@ -11913,7 +11913,7 @@ impl MirBuilder:
                 let idx_local = self.new_temp(self.sema.ty_i64)
                 let idx_place = self.place_for_local(idx_local)
                 let len_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
-                let back_op = self.int_const_operand((tail - t) as i64, self.sema.ty_i64)
+                let back_op = self.int_const_operand((tail - t), self.sema.ty_i64)
                 let idx_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_SUB, len_op, back_op)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, idx_place, idx_rv, span)
                 let idx_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
@@ -12010,10 +12010,10 @@ impl MirBuilder:
     // the rest node; each moved element is logged against its slot in that
     // tuple so a failed guard can put it back.
     mut fn lower_tuple_rest_pattern(rest_pat: i32, scrutinee_place: i32, tuple_place: i32, elem_start: i32, first: i32, covered: i32) -> List[i32]:
-        let out: List[i32] = List.new()
+        let out: List[i32] = []
         let span = self.ast.get_start(rest_pat)
         let rest_name = self.ast.get_data0(rest_pat)
-        let child_places: List[i32] = List.new()
+        let child_places: List[i32] = []
         for ci in 0..covered:
             let elem_ty: i32 = self.sema.type_extra[(elem_start + first + ci)]
             let field_place = self.body.new_tuple_index_place(tuple_place, first + ci, elem_ty)
@@ -12041,8 +12041,8 @@ impl MirBuilder:
         if self.type_needs_value_drop(rest_ty):
             self.schedule_drop(local_id, DropKind.DK_VALUE)
         let local_place = self.place_for_local(local_id)
-        let fields: List[i32] = List.new()
-        let names: List[i32] = List.new()
+        let fields: List[i32] = []
+        let names: List[i32] = []
         for ci in 0..covered:
             let child = child_places[ci]
             let moves = self.type_needs_value_drop(self.place_local_type(child))
@@ -12065,7 +12065,7 @@ impl MirBuilder:
         out
 
     mut fn lower_pattern(pat_node: i32, scrutinee_place: i32) -> List[i32]:
-        let out: List[i32] = List.new()
+        let out: List[i32] = []
         if pat_node == 0:
             return out
 
@@ -12129,8 +12129,8 @@ impl MirBuilder:
             if inner_pat != 0 and self.ast.kind(inner_pat) == NodeKind.NK_PAT_WILDCARD:
                 return out
             let inner = self.lower_pattern(inner_pat, scrutinee_place)
-            for i in 0..inner.len():
-                out.push(inner[i])
+            for inner_item in inner:
+                out.push(inner_item)
             return out
 
         if pk == NodeKind.NK_PAT_VARIANT:
@@ -12235,8 +12235,8 @@ impl MirBuilder:
                 if ti == t_rest:
                     let covered = elem_count - (t_count - 1)
                     let rest_out = self.lower_tuple_rest_pattern(elem_pat, scrutinee_place, tuple_subject_place, elem_start, t_rest, covered)
-                    for i in 0..rest_out.len():
-                        out.push(rest_out[i])
+                    for rest_out_item in rest_out:
+                        out.push(rest_out_item)
                     continue
                 let si = self.ast.tuple_pattern_subject_index(pat_node, ti, elem_count)
                 let elem_ty: i32 = self.sema.type_extra[(elem_start + si)]
@@ -12330,7 +12330,7 @@ impl MirBuilder:
             let dc_fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
             let dc_scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
             let dc_type_const = self.int_const_operand(tb_type_sym, self.sema.ty_i32)
-            let dc_args: List[i32] = List.new()
+            let dc_args: List[i32] = []
             dc_args.push(dc_scrutinee_op)
             dc_args.push(dc_type_const)
             let dc_args_id = self.body.new_call_args(dc_args)
@@ -12496,9 +12496,9 @@ impl MirBuilder:
                 self.finish_stmt_temp_frame(guard_temp_frame)
                 let guard_pass_bb = self.new_block()
                 let guard_fail_bb = self.new_block()
-                let vals: List[i64] = List.new()
+                let vals: List[i64] = []
                 vals.push(1)
-                let targets: List[i32] = List.new()
+                let targets: List[i32] = []
                 targets.push(guard_pass_bb as i32)
                 let table = self.body.new_switch_table(vals, targets)
                 self.terminate(TermKind.TK_SWITCH_INT, guard_op, table, guard_fail_bb, 0)
@@ -12583,7 +12583,7 @@ impl MirBuilder:
         let arg_exprs_start = self.ast.get_data1(node)
         let arg_exprs_count = self.ast.get_data2(node)
         let ret_type_id = self.expr_type(node)
-        let math_args: List[i32] = List.new()
+        let math_args: List[i32] = []
         for i in 0..arg_exprs_count:
             let math_arg_node = self.ast.get_extra(arg_exprs_start + i)
             // An integer operand converts to the call's float type (Sema
@@ -12612,7 +12612,7 @@ impl MirBuilder:
     // of the binding Sema accepted it for (va_start_calls) — the list is
     // started where it lives, never in a temporary copied out.
     mut fn lower_va_start_into(place: i32, node: i32):
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         let call_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(call_id, MirIntrinsic.VA_START)
         self.body.set_call_ast_node(call_id, node)
@@ -12628,7 +12628,7 @@ impl MirBuilder:
         let arg_ty: i32 = self.sema.va_arg_calls.get(node).unwrap()
         let callee = self.ast.get_data0(node)
         let list_place = self.lower_expr_place(self.ast.get_data0(self.ast.get_data0(callee)))
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let call_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(call_id, MirIntrinsic.VA_ARG)
@@ -12668,7 +12668,7 @@ impl MirBuilder:
         if self.sema.precondition_form_calls.contains(node):
             return self.lower_precondition_form(fn_op, sig_idx, self.sema.precondition_form_calls.get(node).unwrap(), actual_ret_type_id, 0, arg_exprs_start, arg_exprs_count, node)
 
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         // Use sema-resolved arg order for named-arg and implicit-arg calls
         if self.sema.has_resolved_call_args(node):
             let resolved_count = self.sema.get_resolved_call_arg_count(node)
@@ -12747,8 +12747,8 @@ impl MirBuilder:
         // that leaves parameters to their defaults (#2024,
         // SemaCheck.w resolve_named_call_args); a call without one spells
         // every argument.
-        let arg_nodes: List[i32] = List.new()
-        let arg_defaults: List[bool] = List.new()
+        let arg_nodes: List[i32] = []
+        let arg_defaults: List[bool] = []
         if lead != 0:
             arg_nodes.push(lead)
             arg_defaults.push(false)
@@ -12767,9 +12767,9 @@ impl MirBuilder:
         let cond_op = self.lower_call_arg(arg_nodes[0], sig_idx, 0, 0, form_sym)
         let fail_bb = self.new_block()
         let pass_bb = self.new_block()
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(1)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, fail_bb, 0)
@@ -12784,7 +12784,7 @@ impl MirBuilder:
         let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
         self.switch_to(fail_bb)
         let fail_arm = self.begin_lazy_arm()
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         // The condition is false on this path.
         args.push(self.lower_bool_lit(0))
         for i in 1..arg_nodes.len() as i32:
@@ -12820,7 +12820,7 @@ impl MirBuilder:
         if conv_sig < 0:
             sema_phase_bug(f"BUG: Sema converts a call's value through a function with no signature: node={node}")
         let fn_op = self.lower_var(conv_sym, 0, 0)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, raw_place))
         let args_id = self.body.new_call_args(args)
         let result_ty = self.sema.sig_return_type(conv_sig)
@@ -12843,7 +12843,7 @@ impl MirBuilder:
             let sig_ret = self.sema.sig_return_type(sig_idx)
             if sig_ret != 0:
                 actual_ret_type_id = sig_ret
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         for i in 0..arg_exprs_count:
             let arg_node = self.ast.get_extra(arg_exprs_start + i)
             args.push(self.lower_call_arg(arg_node, sig_idx, 0, i, fn_sym))
@@ -12887,7 +12887,7 @@ impl MirBuilder:
             let sig_ret = self.sema.sig_return_type(sig_idx)
             if sig_ret != 0:
                 actual_ret_type_id = sig_ret
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         var arg_pos: i32 = 0
         if recv_op >= 0:
             args.push(recv_op)
@@ -13441,7 +13441,7 @@ impl MirBuilder:
         let decision = self.contextual_join_decision(join_node)
         let exact_type: i32 = self.sema.contextual_join_arm_types[arm_index]
         let arm_kind: i32 = self.sema.contextual_join_arm_kinds[arm_index]
-        var source_type: i32 = exact_type
+        var source_type = exact_type
         var op = self.body.new_operand(self.carrier_read_kind(exact_type, self.local_type(self.place_base_local(exact_place))), exact_place)
         if arm_kind == D22_JOIN_ARM_MATERIALIZED_REF:
             let resolved = self.sema.resolve_alias(exact_type as TypeId)
@@ -13744,8 +13744,8 @@ impl MirBuilder:
         let payload_tys = self.sema.enum_variant_payload_types_frozen(result_ty, variant_sym)
         let has_resolved = self.sema.has_resolved_call_args(node)
         let count = if has_resolved != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
-        let fields: List[i32] = List.new()
-        let names: List[i32] = List.new()
+        let fields: List[i32] = []
+        let names: List[i32] = []
         for i in 0..count:
             let arg_node = if has_resolved != 0: self.sema.get_resolved_call_arg(node, i) else: self.ast.get_extra(arg_start + i)
             let saved_expected = self.expected_type
@@ -13771,8 +13771,8 @@ impl MirBuilder:
         // consume_moved_operand arms. Without it the moved-out temp's drop
         // ran unguarded on intact bytes: every Drop-payload enum double-freed
         // at plain scope exit.
-        for cfi in 0..fields.len():
-            self.consume_moved_operand(fields[cfi])
+        for field in fields:
+            self.consume_moved_operand(field)
         // #693 (secondary): the constructed variant is OWNED by this temp — a
         // Drop-payload enum must MOVE into its destination; Copy stays for
         // Copy enums only, matching every other result-operand site.
@@ -13810,8 +13810,8 @@ impl MirBuilder:
         if recv_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(recv_ty as TypeId)) == TypeKind.TY_REF:
             place = self.new_deref_place(place)
         let elem_count = self.sema.get_type_d1(self.sema.resolve_alias(tuple_ty as TypeId))
-        let fields: List[i32] = List.new()
-        let names: List[i32] = List.new()
+        let fields: List[i32] = []
+        let names: List[i32] = []
         for ti in 0..elem_count:
             let elem_ty = self.tuple_elem_type(tuple_ty, ti)
 
@@ -13877,7 +13877,7 @@ impl MirBuilder:
             if clone_recv_place < 0:
                 sema_phase_bug(f"BUG: callable clone receiver is not a place: node={node}")
             let clone_fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
-            let clone_args: List[i32] = List.new()
+            let clone_args: List[i32] = []
             clone_args.push(self.body.new_operand(OperandKind.OK_COPY, clone_recv_place))
             let clone_args_id = self.body.new_call_args(clone_args)
             self.body.set_call_intrinsic(clone_args_id, MirIntrinsic.CLOSURE_CLONE)
@@ -13986,7 +13986,7 @@ impl MirBuilder:
                     dyn_recv_is_static = true
             if not dyn_recv_is_static:
                 let dyn_fn_op = self.const_operand(ConstKind.CK_FN, method_sym, 0)
-                let dyn_args: List[i32] = List.new()
+                let dyn_args: List[i32] = []
                 // #1847: only a `move self` method consumes the receiver
                 // (Sema: dyn_consuming_calls); any other call observes the
                 // fat pointer in place. Moving it made the caller skip the
@@ -14035,7 +14035,7 @@ impl MirBuilder:
         let returns_mut_ptr = call_ret_res > 0 and self.sema.get_type_kind(call_ret_res) == TypeKind.TY_PTR and self.sema.get_type_d1(call_ret_res) != 0
         if method_is_unresolved or self.sym_is_generic_fn(callee_sym):
                 let gc_fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, 0)
-                let gc_args: List[i32] = List.new()
+                let gc_args: List[i32] = []
                 let gc_sig_idx = if has_recorded_method_sig: recorded_method_sig else: self.call_sig_for_sym(callee_sym)
                 // Lower self + method args so the handler can eval them.
                 // Skip receiver for static calls (type name, not value expression).
@@ -14077,7 +14077,7 @@ impl MirBuilder:
                 let gc_has_resolved_args = self.sema.has_resolved_call_args(node)
                 let gc_arg_count = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
                 let gc_param_offset = (not (gc_is_static)) as i32
-                let gc_closure_ops: List[i32] = List.new()
+                let gc_closure_ops: List[i32] = []
                 for gc_mai in 0..gc_arg_count:
                     let gc_ma_node = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg(node, gc_mai) else: self.ast.get_extra(arg_start + gc_mai)
                     if self.ast.kind(gc_ma_node) != NodeKind.NK_CLOSURE:
@@ -14124,8 +14124,8 @@ impl MirBuilder:
                 // into the call (validate-ownership: a drop of a Moved place,
                 // #1539; a capturing closure's environment freed twice,
                 // test/debug_alloc/da_closure_literal_into_generic_method.w).
-                for gc_ci in 0..gc_closure_ops.len():
-                    self.consume_moved_operand(gc_closure_ops[gc_ci])
+                for gc_closure_op in gc_closure_ops:
+                    self.consume_moved_operand(gc_closure_op)
                 self.body.set_call_ast_node(gc_args_id, node)
                 self.record_call_contract(gc_args_id, node, gc_sig_idx)
                 var gc_ret_ty = self.method_call_result_type(node)
@@ -14139,7 +14139,7 @@ impl MirBuilder:
                 return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
 
         let fn_op = self.lower_var(callee_sym, 0, 0)
-        let arg_nodes: List[i32] = List.new()
+        let arg_nodes: List[i32] = []
         // For static method calls (receiver is a type name, not a value),
         // don't pass the receiver as an argument.
         var is_static_call = false
@@ -14288,7 +14288,7 @@ impl MirBuilder:
         // Build argument operands. For static calls (List.new, HashMap.new),
         // the receiver is a type ident — skip it. For instance methods, include it.
         let is_static = intrinsic == MirIntrinsic.LIST_NEW or intrinsic == MirIntrinsic.FIXED_STRING_NEW or intrinsic == MirIntrinsic.LIST_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         var recv_type_for_args: i32 = 0
         if not is_static:
             let recv_ty = self.expr_type(self_expr)
@@ -14515,8 +14515,8 @@ impl MirBuilder:
             let op_kind = self.carrier_read_kind(payload_ty, enum_ty)
             return self.body.new_operand(op_kind, field_place)
 
-        let tuple_fields: List[i32] = List.new()
-        let tuple_names: List[i32] = List.new()
+        let tuple_fields: List[i32] = []
+        let tuple_names: List[i32] = []
         let tuple_elem_start = if self.sema.get_type_kind(self.sema.resolve_alias(unwrapped_ty as TypeId)) == TypeKind.TY_TUPLE: self.sema.get_type_d0(self.sema.resolve_alias(unwrapped_ty as TypeId)) else: 0
         for pi in 0..payload_count:
             let payload_ty = payloads[pi]
@@ -14542,7 +14542,7 @@ impl MirBuilder:
         self.body.new_operand(if self.copy_is_bits(unwrapped_ty): OperandKind.OK_COPY else: OperandKind.OK_MOVE, tuple_place)
 
     mut fn assign_enum_variant_to_place(result_place: i32, result_ty: i32, variant_sym: i32, fields: &List[i32], span: i32):
-        let names: List[i32] = List.new()
+        let names: List[i32] = []
         for _ in 0..fields.len():
             names.push(0)
         let fid = self.body.new_agg_fields(fields, names)
@@ -14550,14 +14550,14 @@ impl MirBuilder:
         let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, variant_idx)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
         // #693: moved payload operands must be consumed (see the ctor twin).
-        for cfi in 0..fields.len():
-            self.consume_moved_operand(fields[cfi])
+        for field in fields:
+            self.consume_moved_operand(field)
 
     mut fn lower_context_error_operand(message_op: i32, source_op: i32, context_error_ty: i32, span: i32) -> i32:
-        let fields: List[i32] = List.new()
+        let fields: List[i32] = []
         fields.push(message_op)
         fields.push(source_op)
-        let names: List[i32] = List.new()
+        let names: List[i32] = []
         names.push(self.pool.intern("message"))
         names.push(self.pool.intern("source"))
         let fid = self.body.new_agg_fields(fields, names)
@@ -14625,9 +14625,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(recv_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(variant_disc)
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -14635,13 +14635,13 @@ impl MirBuilder:
         self.switch_to(none_bb)
         if accessor_kind == 2 and not self.copy_is_bits(enum_ty):
             self.emit_drop_stmt(recv_place, "enum-accessor", span)
-        let none_fields: List[i32] = List.new()
+        let none_fields: List[i32] = []
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb as i32, 0, 0, 0)
 
         self.switch_to(some_bb)
         let payload = self.enum_accessor_payload_operand(recv_place, enum_ty, variant_sym, variant_index, accessor_kind, result_ty, span)
-        let some_fields: List[i32] = List.new()
+        let some_fields: List[i32] = []
         some_fields.push(payload)
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb as i32, 0, 0, 0)
@@ -14672,7 +14672,7 @@ impl MirBuilder:
         let err_op = self.body.new_operand(self.carrier_read_kind(err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place)
         let msg = self.lower_fmt_debug(err_op, err_ty, span_node)
         let exit_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("with_main_error_exit"), self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(msg)
         let args_id = self.body.new_call_args(args)
         let tmp_place = self.place_for_local(self.new_temp(self.sema.ty_void))
@@ -14696,9 +14696,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.success_variant_tag(value_place))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
@@ -14736,21 +14736,21 @@ impl MirBuilder:
                             let conversion_variant = conversion_chain.variant_syms[ci]
                             let wrapped_err_local = self.new_temp(wrapped_ty)
                             let wrapped_err_place = self.place_for_local(wrapped_err_local)
-                            let wrapped_fields: List[i32] = List.new()
+                            let wrapped_fields: List[i32] = []
                             wrapped_fields.push(target_err_op)
                             self.assign_enum_variant_to_place(wrapped_err_place, wrapped_ty, conversion_variant, wrapped_fields, self.ast.get_start(span_node))
                             target_err_op = self.operand_for_place(wrapped_err_place, wrapped_ty)
                             if ci == 0:
                                 break
                             ci = ci - 1
-                        let err_fields: List[i32] = List.new()
+                        let err_fields: List[i32] = []
                         err_fields.push(target_err_op)
                         self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.err, err_fields, self.ast.get_start(span_node))
         else if source_option_ty != 0:
             if target_option_ty == 0:
                 self.mark_unsupported()
             else:
-                let none_fields: List[i32] = List.new()
+                let none_fields: List[i32] = []
                 self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.none, none_fields, self.ast.get_start(span_node))
         else:
             let fail_op = self.body.new_operand(OperandKind.OK_MOVE, value_place)
@@ -14810,16 +14810,16 @@ impl MirBuilder:
         let await_tuple_ty = self.expr_type(await_node)
         let result_tuple_ty = self.expr_type(question_node)
 
-        let task_ops: List[i32] = List.new()
-        let tq_owns: List[bool] = List.new()
+        let task_ops: List[i32] = []
+        let tq_owns: List[bool] = []
         for i in 0..count:
             let elem = self.ast.get_extra(extra + i)
             tq_owns.push(self.await_task_owns_result(elem))
             self.cancel_scheduled_value_drop_for_receiver_expr(elem)
             task_ops.push(self.lower_expr(elem))
 
-        let fields: List[i32] = List.new()
-        let names: List[i32] = List.new()
+        let fields: List[i32] = []
+        let names: List[i32] = []
         for i in 0..count:
             let elem_node = self.ast.get_extra(extra + i)
             let task_ty = self.expr_type(elem_node)
@@ -14848,7 +14848,7 @@ impl MirBuilder:
             if await_inner != 0 and self.ast.kind(await_inner) == NodeKind.NK_TUPLE:
                 return self.lower_tuple_await_question_mark(expr, node)
 
-        let cleanup_task_ops: List[i32] = List.new()
+        let cleanup_task_ops: List[i32] = []
         let value_op = self.lower_expr(expr)
         let value_ty = self.expr_type(expr)
         // #605/#606: `?` consumes its operand; cancel a named source's drop so its
@@ -14880,9 +14880,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.success_variant_tag(value_place))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -14993,7 +14993,7 @@ impl MirBuilder:
     mut fn emit_list_new_into(list_place: i32, span: i32):
         let new_sym = self.sema.syms.new
         let fn_op = self.const_operand(ConstKind.CK_FN, new_sym, self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_NEW)
         let next_bb = self.new_block()
@@ -15003,7 +15003,7 @@ impl MirBuilder:
     mut fn emit_list_len_into(list_place: i32, len_place: i32, span: i32):
         let len_sym = self.sema.syms.len
         let fn_op = self.const_operand(ConstKind.CK_FN, len_sym, self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_LEN)
@@ -15014,7 +15014,7 @@ impl MirBuilder:
     mut fn emit_list_get_into(list_place: i32, index_place: i32, elem_place: i32, span: i32):
         let get_sym = self.sema.syms.get
         let fn_op = self.const_operand(ConstKind.CK_FN, get_sym, self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, index_place))
         let args_id = self.body.new_call_args(args)
@@ -15026,7 +15026,7 @@ impl MirBuilder:
     // Element view: VEC_GET_REF yields &T for the element at index without
     // copying it — the read lower_for_iter_ref uses for Drop-class elements.
     mut fn emit_list_get_ref_into(list_place: i32, index_place: i32, elem_place: i32, span: i32):
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, index_place))
         let args_id = self.body.new_call_args(args)
@@ -15077,7 +15077,7 @@ impl MirBuilder:
     // mutates through an index projection of a CoW List, make every indexed
     // List base along `place`'s projection chain unique from outer to inner.
     mut fn make_unique_indexed_bases_of_place(place: i32):
-        var bases: List[i32] = List.new()
+        let bases: List[i32] = []
         var cur = place
         var steps = 0
         while cur >= 0 and steps < 32:
@@ -15104,7 +15104,7 @@ impl MirBuilder:
         self.make_unique_before_mutation(list_place)
         let push_sym = self.sema.syms.push
         let fn_op = self.const_operand(ConstKind.CK_FN, push_sym, self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         args.push(elem_op)
         let args_id = self.body.new_call_args(args)
@@ -15118,7 +15118,7 @@ impl MirBuilder:
     mut fn emit_map_new_into(map_place: i32, span: i32):
         let new_sym = self.sema.syms.new
         let fn_op = self.const_operand(ConstKind.CK_FN, new_sym, self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.MAP_NEW)
         let next_bb = self.new_block()
@@ -15128,7 +15128,7 @@ impl MirBuilder:
     mut fn emit_map_insert(map_place: i32, key_op: i32, val_op: i32, is_set: i32, span: i32):
         let insert_sym = self.sema.syms.insert
         let fn_op = self.const_operand(ConstKind.CK_FN, insert_sym, self.sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         args.push(key_op)
         if is_set == 0:
@@ -15168,9 +15168,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -15178,9 +15178,9 @@ impl MirBuilder:
         self.switch_to(none_bb)
         let none_option_local = self.new_temp(result_ok_ty)
         let none_option_place = self.place_for_local(none_option_local)
-        let none_fields: List[i32] = List.new()
+        let none_fields: List[i32] = []
         self.assign_enum_variant_to_place(none_option_place, result_ok_ty, self.sema.syms.none, none_fields, span)
-        let none_ok_fields: List[i32] = List.new()
+        let none_ok_fields: List[i32] = []
         none_ok_fields.push(self.operand_for_place(none_option_place, result_ok_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, none_ok_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15190,9 +15190,9 @@ impl MirBuilder:
         let some_downcast = self.body.new_downcast_place(value_place, some_idx)
         let inner_result_place = self.body.new_field_place(some_downcast, 0, inner_result_ty)
         let inner_disc = self.lower_enum_discriminant(inner_result_place)
-        let inner_vals: List[i64] = List.new()
+        let inner_vals: List[i64] = []
         inner_vals.push(self.enum_variant_discriminant_for_type(inner_result_ty, self.sema.syms.ok))
-        let inner_targets: List[i32] = List.new()
+        let inner_targets: List[i32] = []
         inner_targets.push(inner_ok_bb as i32)
         let inner_table = self.body.new_switch_table(inner_vals, inner_targets)
         self.terminate(TermKind.TK_SWITCH_INT, inner_disc, inner_table, inner_err_bb, 0)
@@ -15203,10 +15203,10 @@ impl MirBuilder:
         let ok_payload_place = self.body.new_field_place(ok_downcast, 0, inner_ok_ty)
         let some_option_local = self.new_temp(result_ok_ty)
         let some_option_place = self.place_for_local(some_option_local)
-        let some_fields: List[i32] = List.new()
+        let some_fields: List[i32] = []
         some_fields.push(self.body.new_operand(self.carrier_read_kind(inner_ok_ty, self.local_type(self.place_base_local(ok_payload_place))), ok_payload_place))
         self.assign_enum_variant_to_place(some_option_place, result_ok_ty, self.sema.syms.some, some_fields, span)
-        let ok_fields: List[i32] = List.new()
+        let ok_fields: List[i32] = []
         ok_fields.push(self.operand_for_place(some_option_place, result_ok_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, ok_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15215,7 +15215,7 @@ impl MirBuilder:
         let err_idx = self.enum_variant_index_for_type(inner_result_ty, self.sema.syms.err)
         let err_downcast = self.body.new_downcast_place(inner_result_place, err_idx)
         let err_payload_place = self.body.new_field_place(err_downcast, 0, inner_err_ty)
-        let err_fields: List[i32] = List.new()
+        let err_fields: List[i32] = []
         err_fields.push(self.body.new_operand(self.carrier_read_kind(inner_err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15251,9 +15251,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.ok))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(ok_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, err_bb, 0)
@@ -15264,10 +15264,10 @@ impl MirBuilder:
         let err_payload_place = self.body.new_field_place(err_downcast, 0, inner_err_ty)
         let err_result_local = self.new_temp(result_some_ty)
         let err_result_place = self.place_for_local(err_result_local)
-        let err_fields: List[i32] = List.new()
+        let err_fields: List[i32] = []
         err_fields.push(self.body.new_operand(self.carrier_read_kind(inner_err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place))
         self.assign_enum_variant_to_place(err_result_place, result_some_ty, self.sema.syms.err, err_fields, span)
-        let err_some_fields: List[i32] = List.new()
+        let err_some_fields: List[i32] = []
         err_some_fields.push(self.operand_for_place(err_result_place, result_some_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, err_some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15277,15 +15277,15 @@ impl MirBuilder:
         let ok_downcast = self.body.new_downcast_place(value_place, ok_idx)
         let inner_option_place = self.body.new_field_place(ok_downcast, 0, inner_option_ty)
         let inner_disc = self.lower_enum_discriminant(inner_option_place)
-        let inner_vals: List[i64] = List.new()
+        let inner_vals: List[i64] = []
         inner_vals.push(self.enum_variant_discriminant_for_type(inner_option_ty, self.sema.syms.some))
-        let inner_targets: List[i32] = List.new()
+        let inner_targets: List[i32] = []
         inner_targets.push(inner_some_bb as i32)
         let inner_table = self.body.new_switch_table(inner_vals, inner_targets)
         self.terminate(TermKind.TK_SWITCH_INT, inner_disc, inner_table, inner_none_bb, 0)
 
         self.switch_to(inner_none_bb)
-        let none_fields: List[i32] = List.new()
+        let none_fields: List[i32] = []
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -15295,10 +15295,10 @@ impl MirBuilder:
         let some_payload_place = self.body.new_field_place(some_downcast, 0, inner_some_ty)
         let ok_result_local = self.new_temp(result_some_ty)
         let ok_result_place = self.place_for_local(ok_result_local)
-        let ok_fields: List[i32] = List.new()
+        let ok_fields: List[i32] = []
         ok_fields.push(self.body.new_operand(self.carrier_read_kind(inner_some_ty, self.local_type(self.place_base_local(some_payload_place))), some_payload_place))
         self.assign_enum_variant_to_place(ok_result_place, result_some_ty, self.sema.syms.ok, ok_fields, span)
-        let some_fields: List[i32] = List.new()
+        let some_fields: List[i32] = []
         some_fields.push(self.operand_for_place(ok_result_place, result_some_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15308,7 +15308,7 @@ impl MirBuilder:
         self.operand_for_place(result_place, result_ty)
 
     mut fn tuple_operand_from_fields(fields: &List[i32], result_ty: i32, span: i32) -> i32:
-        let names: List[i32] = List.new()
+        let names: List[i32] = []
         for _ in 0..fields.len():
             names.push(0)
         let fid = self.body.new_agg_fields(fields, names)
@@ -15331,7 +15331,7 @@ impl MirBuilder:
         let sig_idx: i32 = clone_sig_opt.unwrap()
         let mono_sym: i32 = clone_mono_opt.unwrap()
         let expected = if self.sema.sig_get_param_count(sig_idx) > 0: self.sema.sig_param_type(sig_idx, 0) else: 0
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(self.operand_for_place_arg(payload_place, payload_ty, expected, self.ast.get_start(node)))
         self.lower_resolved_call_with_operand_args_contract(clone_fn, args, payload_ty, node, sig_idx, mono_sym)
 
@@ -15355,15 +15355,15 @@ impl MirBuilder:
         let none_bb = self.new_block()
         let join_bb = self.new_block()
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
 
         self.switch_to(none_bb)
-        let none_fields: List[i32] = List.new()
+        let none_fields: List[i32] = []
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -15407,15 +15407,15 @@ impl MirBuilder:
         let join_bb = self.new_block()
         let wanted_variant: i32 = if lowering == MethodLowering.ResOk: self.sema.syms.ok else: self.sema.syms.err
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(value_ty, wanted_variant))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(wanted_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, other_bb, 0)
 
         self.switch_to(other_bb)
-        let none_fields: List[i32] = List.new()
+        let none_fields: List[i32] = []
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -15423,7 +15423,7 @@ impl MirBuilder:
         let variant_idx = self.enum_variant_index_for_type(value_ty, wanted_variant)
         let downcast = self.body.new_downcast_place(value_place, variant_idx)
         let payload_place = self.body.new_field_place(downcast, 0, payload_ty)
-        let some_fields: List[i32] = List.new()
+        let some_fields: List[i32] = []
         let ok_err_payload_op = self.body.new_operand(self.carrier_read_kind(payload_ty, self.local_type(self.place_base_local(payload_place))), payload_place)
         some_fields.push(ok_err_payload_op)
         // Consuming the payload into the Option queues its reset-on-move
@@ -15464,24 +15464,24 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let left_disc = self.lower_enum_discriminant(left_place)
-        let left_vals: List[i64] = List.new()
+        let left_vals: List[i64] = []
         left_vals.push(self.enum_variant_discriminant_for_type(left_ty, self.sema.syms.some))
-        let left_targets: List[i32] = List.new()
+        let left_targets: List[i32] = []
         left_targets.push(left_some_bb as i32)
         let left_table = self.body.new_switch_table(left_vals, left_targets)
         self.terminate(TermKind.TK_SWITCH_INT, left_disc, left_table, none_bb, 0)
 
         self.switch_to(left_some_bb)
         let right_disc = self.lower_enum_discriminant(right_place)
-        let right_vals: List[i64] = List.new()
+        let right_vals: List[i64] = []
         right_vals.push(self.enum_variant_discriminant_for_type(right_ty, self.sema.syms.some))
-        let right_targets: List[i32] = List.new()
+        let right_targets: List[i32] = []
         right_targets.push(right_some_bb as i32)
         let right_table = self.body.new_switch_table(right_vals, right_targets)
         self.terminate(TermKind.TK_SWITCH_INT, right_disc, right_table, none_bb, 0)
 
         self.switch_to(none_bb)
-        let none_fields: List[i32] = List.new()
+        let none_fields: List[i32] = []
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -15492,11 +15492,11 @@ impl MirBuilder:
         let right_idx = self.enum_variant_index_for_type(right_ty, self.sema.syms.some)
         let right_downcast = self.body.new_downcast_place(right_place, right_idx)
         let right_payload_place = self.body.new_field_place(right_downcast, 0, right_elem_ty)
-        let tuple_fields: List[i32] = List.new()
+        let tuple_fields: List[i32] = []
         tuple_fields.push(self.operand_for_place(left_payload_place, left_elem_ty))
         tuple_fields.push(self.operand_for_place(right_payload_place, right_elem_ty))
         let tuple_op = self.tuple_operand_from_fields(tuple_fields, tuple_ty, span)
-        let some_fields: List[i32] = List.new()
+        let some_fields: List[i32] = []
         some_fields.push(tuple_op)
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15534,9 +15534,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -15544,13 +15544,13 @@ impl MirBuilder:
         self.switch_to(none_bb)
         let left_none_local = self.new_temp(left_option_ty)
         let left_none_place = self.place_for_local(left_none_local)
-        let left_none_fields: List[i32] = List.new()
+        let left_none_fields: List[i32] = []
         self.assign_enum_variant_to_place(left_none_place, left_option_ty, self.sema.syms.none, left_none_fields, span)
         let right_none_local = self.new_temp(right_option_ty)
         let right_none_place = self.place_for_local(right_none_local)
-        let right_none_fields: List[i32] = List.new()
+        let right_none_fields: List[i32] = []
         self.assign_enum_variant_to_place(right_none_place, right_option_ty, self.sema.syms.none, right_none_fields, span)
-        let none_tuple_fields: List[i32] = List.new()
+        let none_tuple_fields: List[i32] = []
         none_tuple_fields.push(self.operand_for_place(left_none_place, left_option_ty))
         none_tuple_fields.push(self.operand_for_place(right_none_place, right_option_ty))
         let none_tuple_op = self.tuple_operand_from_fields(none_tuple_fields, result_ty, span)
@@ -15565,15 +15565,15 @@ impl MirBuilder:
         let right_place = self.body.new_tuple_index_place(tuple_place, 1, right_elem_ty)
         let left_some_local = self.new_temp(left_option_ty)
         let left_some_place = self.place_for_local(left_some_local)
-        let left_some_fields: List[i32] = List.new()
+        let left_some_fields: List[i32] = []
         left_some_fields.push(self.operand_for_place(left_place, left_elem_ty))
         self.assign_enum_variant_to_place(left_some_place, left_option_ty, self.sema.syms.some, left_some_fields, span)
         let right_some_local = self.new_temp(right_option_ty)
         let right_some_place = self.place_for_local(right_some_local)
-        let right_some_fields: List[i32] = List.new()
+        let right_some_fields: List[i32] = []
         right_some_fields.push(self.operand_for_place(right_place, right_elem_ty))
         self.assign_enum_variant_to_place(right_some_place, right_option_ty, self.sema.syms.some, right_some_fields, span)
-        let some_tuple_fields: List[i32] = List.new()
+        let some_tuple_fields: List[i32] = []
         some_tuple_fields.push(self.operand_for_place(left_some_place, left_option_ty))
         some_tuple_fields.push(self.operand_for_place(right_some_place, right_option_ty))
         let some_tuple_op = self.tuple_operand_from_fields(some_tuple_fields, result_ty, span)
@@ -15661,9 +15661,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span)
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let header_vals: List[i64] = List.new()
+        let header_vals: List[i64] = []
         header_vals.push(1)
-        let header_targets: List[i32] = List.new()
+        let header_targets: List[i32] = []
         header_targets.push(body_bb as i32)
         let header_table = self.body.new_switch_table(header_vals, header_targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, header_table, done_bb, 0)
@@ -15679,7 +15679,7 @@ impl MirBuilder:
             // (extract_stepped_option_payload), so nothing is left to drop at
             // the loop's exit — a scheduled temp written once per iteration is
             // Maybe-initialized on the zero-iteration path.
-            let call_args: List[i32] = List.new()
+            let call_args: List[i32] = []
             call_args.push(self.operand_for_place(recv_elem_place, recv_elem_ty))
             let wrapper_frame = self.push_stmt_temp_frame()
             let wrapper_op = self.lower_call_with_operand_args(mapper_op, call_args, wrapper_ty, node)
@@ -15688,9 +15688,9 @@ impl MirBuilder:
             self.assign_operand_to_place(wrapper_place, wrapper_op, span)
             self.finish_stmt_temp_frame(wrapper_frame)
         let item_disc = self.lower_enum_discriminant(wrapper_place)
-        let item_vals: List[i64] = List.new()
+        let item_vals: List[i64] = []
         item_vals.push(self.enum_variant_discriminant_for_type(wrapper_ty, success_variant))
-        let item_targets: List[i32] = List.new()
+        let item_targets: List[i32] = []
         item_targets.push(item_success_bb as i32)
         let item_table = self.body.new_switch_table(item_vals, item_targets)
         self.terminate(TermKind.TK_SWITCH_INT, item_disc, item_table, item_fail_bb, 0)
@@ -15706,12 +15706,12 @@ impl MirBuilder:
         // list is released here, since only the success path moves it out.
         self.emit_drop_stmt(out_list_place, "traverse-fail", span)
         if wrapper_base == self.sema.syms.option:
-            let fail_fields: List[i32] = List.new()
+            let fail_fields: List[i32] = []
             self.assign_enum_variant_to_place(result_place, result_ty, failure_variant, fail_fields, span)
         else:
             let failure_idx = self.enum_variant_index_for_type(wrapper_ty, failure_variant)
             let failure_item = self.extract_stepped_option_payload(wrapper_place, failure_idx, failure_payload_ty, span)
-            let fail_fields2: List[i32] = List.new()
+            let fail_fields2: List[i32] = []
             fail_fields2.push(self.stepped_item_operand(failure_item, failure_payload_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, failure_variant, fail_fields2, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15724,7 +15724,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
         self.switch_to(done_bb)
-        let success_fields: List[i32] = List.new()
+        let success_fields: List[i32] = []
         success_fields.push(self.operand_for_place(out_list_place, output_list_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, success_variant, success_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15766,20 +15766,20 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
 
         self.switch_to(none_bb)
         if lowering == MethodLowering.OptOrElse:
-            let no_args: List[i32] = List.new()
+            let no_args: List[i32] = []
             let fallback_op = self.lower_call_with_operand_args(mapper_op, no_args, result_ty, node)
             self.assign_operand_to_place(result_place, fallback_op, span)
         else:
-            let none_fields: List[i32] = List.new()
+            let none_fields: List[i32] = []
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -15788,7 +15788,7 @@ impl MirBuilder:
         let downcast_place = self.body.new_downcast_place(value_place, some_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         if lowering == MethodLowering.OptFilter:
-            let filter_args: List[i32] = List.new()
+            let filter_args: List[i32] = []
             // §10.5 `(fn(&T) -> bool)`: the predicate observes the payload in
             // place, like `inspect`; Sema types its parameter `&T`. Passing
             // it by value moved the payload into the predicate, which freed
@@ -15798,15 +15798,15 @@ impl MirBuilder:
             let keep_op = self.lower_call_with_operand_args(mapper_op, filter_args, self.sema.ty_bool as i32, node)
             let keep_bb = self.new_block()
             let reject_bb = self.new_block()
-            let keep_vals: List[i64] = List.new()
+            let keep_vals: List[i64] = []
             keep_vals.push(1)
-            let keep_targets: List[i32] = List.new()
+            let keep_targets: List[i32] = []
             keep_targets.push(keep_bb as i32)
             let keep_table = self.body.new_switch_table(keep_vals, keep_targets)
             self.terminate(TermKind.TK_SWITCH_INT, keep_op, keep_table, reject_bb, 0)
 
             self.switch_to(keep_bb)
-            let kept_fields: List[i32] = List.new()
+            let kept_fields: List[i32] = []
             kept_fields.push(self.operand_for_place(payload_place, payload_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, kept_fields, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15816,7 +15816,7 @@ impl MirBuilder:
             self.switch_to(reject_bb)
             if mir_place_plain_local(self.body, value_place) >= 0:
                 self.emit_drop_stmt(value_place, "filter-reject", span)
-            let rejected_fields: List[i32] = List.new()
+            let rejected_fields: List[i32] = []
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, rejected_fields, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -15830,19 +15830,19 @@ impl MirBuilder:
             self.forget_string_flow_facts()
             return self.operand_for_place(result_place, result_ty)
         if lowering == MethodLowering.OptAndThen:
-            let call_args: List[i32] = List.new()
+            let call_args: List[i32] = []
             call_args.push(self.operand_for_place(payload_place, payload_ty))
             let mapped_op = self.lower_call_with_operand_args(mapper_op, call_args, result_ty, node)
             self.assign_operand_to_place(result_place, mapped_op, span)
         else:
             var payload_op: i32 = 0
             if lowering == MethodLowering.OptMap:
-                let call_args2: List[i32] = List.new()
+                let call_args2: List[i32] = []
                 call_args2.push(self.operand_for_place(payload_place, payload_ty))
                 let mapped_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.option, 0)
                 payload_op = self.lower_call_with_operand_args(mapper_op, call_args2, mapped_ty, node)
             else if lowering == MethodLowering.OptInspect:
-                let inspect_args: List[i32] = List.new()
+                let inspect_args: List[i32] = []
                 let ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, payload_ty, 0, 0) as i32
                 inspect_args.push(self.operand_for_place_arg(payload_place, payload_ty, ref_ty, span))
                 self.lower_call_with_operand_args(mapper_op, inspect_args, self.sema.ty_void as i32, node)
@@ -15856,7 +15856,7 @@ impl MirBuilder:
                     payload_op = self.clone_or_copy_place(pointee_place, owned_payload_ty, node)
             else:
                 payload_op = self.operand_for_place(payload_place, payload_ty)
-            let some_fields: List[i32] = List.new()
+            let some_fields: List[i32] = []
             some_fields.push(payload_op)
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15924,9 +15924,9 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.ok))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(ok_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, err_bb, 0)
@@ -15935,13 +15935,13 @@ impl MirBuilder:
         let ok_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.ok)
         let ok_downcast = self.body.new_downcast_place(value_place, ok_idx)
         let ok_payload_place = self.body.new_field_place(ok_downcast, 0, source_ok_ty)
-        let ok_fields: List[i32] = List.new()
+        let ok_fields: List[i32] = []
         if lowering == MethodLowering.ResMap:
-            let ok_call_args: List[i32] = List.new()
+            let ok_call_args: List[i32] = []
             ok_call_args.push(self.operand_for_place(ok_payload_place, source_ok_ty))
             ok_fields.push(self.lower_call_with_operand_args(mapper_op, ok_call_args, result_ok_ty, node))
         else if lowering == MethodLowering.ResAndThen:
-            let ok_call_args2: List[i32] = List.new()
+            let ok_call_args2: List[i32] = []
             ok_call_args2.push(self.operand_for_place(ok_payload_place, source_ok_ty))
             let chained_op = self.lower_call_with_operand_args(mapper_op, ok_call_args2, result_ty, node)
             self.assign_operand_to_place(result_place, chained_op, span)
@@ -15950,7 +15950,7 @@ impl MirBuilder:
             let err_idx2 = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
             let err_downcast2 = self.body.new_downcast_place(value_place, err_idx2)
             let err_payload_place2 = self.body.new_field_place(err_downcast2, 0, source_err_ty)
-            let err_fields2: List[i32] = List.new()
+            let err_fields2: List[i32] = []
             err_fields2.push(if decomposed: self.payload_take_operand(err_payload_place2, source_err_ty) else: self.operand_for_place(err_payload_place2, source_err_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields2, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -15958,7 +15958,7 @@ impl MirBuilder:
             self.forget_string_flow_facts()
             return self.operand_for_place(result_place, result_ty)
         else if lowering == MethodLowering.ResInspect:
-            let inspect_args: List[i32] = List.new()
+            let inspect_args: List[i32] = []
             let ok_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, source_ok_ty, 0, 0) as i32
             inspect_args.push(self.operand_for_place_arg(ok_payload_place, source_ok_ty, ok_ref_ty, span))
             self.lower_call_with_operand_args(mapper_op, inspect_args, self.sema.ty_void as i32, node)
@@ -15975,13 +15975,13 @@ impl MirBuilder:
         let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
         let err_downcast = self.body.new_downcast_place(value_place, err_idx)
         let err_payload_place = self.body.new_field_place(err_downcast, 0, source_err_ty)
-        let err_fields: List[i32] = List.new()
+        let err_fields: List[i32] = []
         if lowering == MethodLowering.ResMapErr:
-            let err_call_args: List[i32] = List.new()
+            let err_call_args: List[i32] = []
             err_call_args.push(self.operand_for_place(err_payload_place, source_err_ty))
             err_fields.push(self.lower_call_with_operand_args(mapper_op, err_call_args, result_err_ty, node))
         else if lowering == MethodLowering.ResOrElse:
-            let err_call_args2: List[i32] = List.new()
+            let err_call_args2: List[i32] = []
             err_call_args2.push(self.operand_for_place(err_payload_place, source_err_ty))
             let recovered_op = self.lower_call_with_operand_args(mapper_op, err_call_args2, result_ty, node)
             self.assign_operand_to_place(result_place, recovered_op, span)
@@ -15992,12 +15992,12 @@ impl MirBuilder:
         else if lowering == MethodLowering.ResContext or lowering == MethodLowering.ResWithContext:
             var message_op = context_message_op
             if lowering == MethodLowering.ResWithContext:
-                let no_context_args: List[i32] = List.new()
+                let no_context_args: List[i32] = []
                 message_op = self.lower_call_with_operand_args(context_fn_op, no_context_args, self.sema.ty_str as i32, node)
             let source_op = self.operand_for_place(err_payload_place, source_err_ty)
             err_fields.push(self.lower_context_error_operand(message_op, source_op, result_err_ty, span))
         else if lowering == MethodLowering.ResInspectErr:
-            let inspect_err_args: List[i32] = List.new()
+            let inspect_err_args: List[i32] = []
             let err_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, source_err_ty, 0, 0) as i32
             inspect_err_args.push(self.operand_for_place_arg(err_payload_place, source_err_ty, err_ref_ty, span))
             self.lower_call_with_operand_args(mapper_op, inspect_err_args, self.sema.ty_void as i32, node)
@@ -16050,9 +16050,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.success_variant_tag(value_place))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -16142,9 +16142,9 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.success_variant_tag(value_place))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(success_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, failure_bb, 0)
@@ -16163,7 +16163,7 @@ impl MirBuilder:
         self.switch_to(failure_bb)
         let uoe_scrut_local = self.retire_decomposed_carrier(value_place)
         let uoe_arm = self.begin_lazy_arm()
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         if self.is_result_type(value_ty):
             let err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
             if err_ty == 0:
@@ -16230,7 +16230,7 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, payload_local, 0, span)
 
         let guard_expected = if enter_sig >= 0 and self.sema.sig_get_param_count(enter_sig) > 0: self.sema.sig_param_type(enter_sig, 0) else: 0
-        let enter_args: List[i32] = List.new()
+        let enter_args: List[i32] = []
         let enter_guard_place = self.place_for_local(guard_local)
         enter_args.push(self.operand_for_place_arg(enter_guard_place, source_ty, guard_expected, span))
         let enter_args_id = self.body.new_call_args(enter_args)
@@ -16378,7 +16378,7 @@ impl MirBuilder:
                     struct_extra = self.sema.get_type_d1(base_resolved)
                     struct_fc = self.sema.get_type_d2(base_resolved)
 
-        let update_ops: List[i32] = List.new()
+        let update_ops: List[i32] = []
         for i in 0..field_updates_count:
             let f_name_sym = self.ast.get_extra(field_updates_start + i * 2)
             let f_val_node = self.ast.get_extra(field_updates_start + i * 2 + 1)
@@ -16400,8 +16400,8 @@ impl MirBuilder:
             self.assign_operand_to_place(whole_place, self.body.new_operand(OperandKind.OK_MOVE, base_place), self.ast.get_start(node))
             base_place = whole_place
 
-        let result_fields: List[i32] = List.new()
-        let result_names: List[i32] = List.new()
+        let result_fields: List[i32] = []
+        let result_names: List[i32] = []
         for fi in 0..struct_fc:
             let f_name_sym: i32 = self.sema.type_extra[(struct_extra + fi * 3)]
             let field_ty = self.struct_field_type(ty, f_name_sym)
@@ -16435,9 +16435,9 @@ impl MirBuilder:
 
     mut fn lower_implicit_ok(expr: i32, ok_type_id: i32) -> i32:
         let op = self.lower_expr(expr)
-        let fields: List[i32] = List.new()
+        let fields: List[i32] = []
         fields.push(op)
-        let no_names: List[i32] = List.new()
+        let no_names: List[i32] = []
         no_names.push(0)
         let fid = self.body.new_agg_fields(fields, no_names)
         let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, 0)
@@ -16459,7 +16459,7 @@ impl MirBuilder:
             if base == self.sema.syms.option:
                 let tmp = self.new_temp(type_id)
                 let place = self.place_for_local(tmp)
-                let fields: List[i32] = List.new()
+                let fields: List[i32] = []
                 self.assign_enum_variant_to_place(place, type_id, self.sema.syms.none, fields, span)
                 return self.body.new_operand(OperandKind.OK_COPY, place)
             if base == self.sema.syms.result and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
@@ -16467,7 +16467,7 @@ impl MirBuilder:
                 let ok_value = self.lower_implicit_default_value(ok_type, span)
                 let tmp = self.new_temp(type_id)
                 let place = self.place_for_local(tmp)
-                let fields: List[i32] = List.new()
+                let fields: List[i32] = []
                 fields.push(ok_value)
                 self.assign_enum_variant_to_place(place, type_id, self.sema.syms.ok, fields, span)
                 return self.body.new_operand(OperandKind.OK_COPY, place)
@@ -16542,13 +16542,13 @@ impl MirBuilder:
             self.assign_operand_to_place(result_place, field_op, span)
             return
 
-        let success_fields: List[i32] = List.new()
+        let success_fields: List[i32] = []
         success_fields.push(field_op)
         self.assign_enum_variant_to_place(result_place, result_ty, success_sym, success_fields, span)
 
     mut fn lower_intrinsic_call_with_receiver_operand(intrinsic: MirIntrinsic, recv_op: i32, recv_type: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
-        let call_args: List[i32] = List.new()
+        let call_args: List[i32] = []
         // D120: a writing intrinsic on a value List makes it unique first.
         if self.list_intrinsic_mutates(intrinsic) and self.body.operand_kinds[recv_op] != OperandKind.OK_CONSTANT:
             self.make_unique_before_mutation(self.body.operand_d0[recv_op])
@@ -16598,8 +16598,8 @@ impl MirBuilder:
         self.body.new_operand(if self.copy_is_bits(type_id): OperandKind.OK_COPY else: OperandKind.OK_MOVE, place)
 
     mut fn lower_call_with_operand_args(fn_op: i32, args: &List[i32], ret_type: i32, node: i32) -> i32:
-        for ai in 0..args.len():
-            self.consume_moved_operand(args[ai])
+        for arg in args:
+            self.consume_moved_operand(arg)
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, node)
         let result_local = self.new_temp(ret_type)
@@ -16698,7 +16698,7 @@ impl MirBuilder:
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         if sig_idx < 0 or self.sema.sig_param_uses_value_ref_abi(sig_idx, 0) == 0:
             self.consume_moved_operand(recv_op)
         args.push(recv_op)
@@ -16756,7 +16756,7 @@ impl MirBuilder:
             self.assign_operand_to_place(result_place, raw_op, self.ast.get_start(node))
             return
 
-        let success_fields: List[i32] = List.new()
+        let success_fields: List[i32] = []
         success_fields.push(raw_op)
         self.assign_enum_variant_to_place(result_place, result_ty, success_sym, success_fields, self.ast.get_start(node))
 
@@ -16821,7 +16821,7 @@ impl MirBuilder:
             fn_op = self.const_operand(ConstKind.CK_FN, resolved, if resolved_sig >= 0: self.sema.sig_return_type(resolved_sig) else: self.sema.ty_void as i32)
             callee_sym = resolved
         let conv_sym: i32 = if call_node != 0: self.sema.call_value_conversions.get(call_node) ?? 0 else: 0
-        let arg_nodes: List[i32] = List.new()
+        let arg_nodes: List[i32] = []
         arg_nodes.push(lhs_expr)
         // #2024: the stage call's argument list as Sema filled it (its
         // defaults included), after the piped value.
@@ -16891,7 +16891,7 @@ impl MirBuilder:
     // expression itself, keyed by that node.
     mut fn prepare_anonymous_body_of(node: i32, body_node: i32, ty: i32, is_async: bool) -> i32:
         let body_sym = self.pool.intern(f"$anonymous${self.body.fn_sym}${node}")
-        let captures: List[i32] = List.new()
+        let captures: List[i32] = []
         // §14.6 (#3044): an `async:` block's captures are Sema's summary, in
         // its order (codegen indexes the consumed-capture fact by it). A body
         // spawned without one (a select arm, §14.10) names what it uses.
@@ -16931,7 +16931,7 @@ impl MirBuilder:
                         self.body.mark_local_ever_moved(consumed_local)
                 else if not self.sema.closure_capture_by_place(node, ci) or self.sema.closure_capture_consumes(node, ci):
                     self.body.mark_local_ever_moved(consumed_local)
-        let capture_sources: List[ClosureCaptureSource] = List.new()
+        let capture_sources: List[ClosureCaptureSource] = []
         if not is_async:
             for ci in 0..captures.len():
                 capture_sources.push(self.closure_capture_source(captures[ci], node, ci as i32))
@@ -17091,9 +17091,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(base_place)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         vals.push(self.enum_variant_discriminant_for_type(base_ty, success_sym))
-        let targets: List[i32] = List.new()
+        let targets: List[i32] = []
         targets.push(success_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, failure_bb, 0)
@@ -17117,11 +17117,11 @@ impl MirBuilder:
             else:
                 let err_downcast = self.body.new_downcast_place(base_place, err_idx)
                 let err_payload_place = self.body.new_field_place(err_downcast, 0, result_err_ty)
-                let err_fields: List[i32] = List.new()
+                let err_fields: List[i32] = []
                 err_fields.push(self.operand_for_place(err_payload_place, result_err_ty))
                 self.assign_enum_variant_to_place(result_place, result_ty, failure_sym, err_fields, self.ast.get_start(node))
         else:
-            let none_fields: List[i32] = List.new()
+            let none_fields: List[i32] = []
             self.assign_enum_variant_to_place(result_place, result_ty, failure_sym, none_fields, self.ast.get_start(node))
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -17174,7 +17174,7 @@ impl MirBuilder:
         let pass_bb = self.cur_bb
         self.switch_to(fail_bb)
         let panic_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("with_panic"), self.sema.ty_void)
-        let panic_args: List[i32] = List.new()
+        let panic_args: List[i32] = []
         panic_args.push(self.lower_str_lit(self.pool.intern("integer does not fit `" ++ self.sema.type_name(target_ty) ++ "` (§4.2.6)")))
         panic_args.push(self.lower_str_lit(self.pool.intern("")))
         panic_args.push(self.int_const_operand(0, self.sema.ty_i32))
@@ -17218,7 +17218,7 @@ impl MirBuilder:
                 op = self.lower_value_cast(op, src_ty, payload, span)
             let tmp = self.new_temp(opt_ty)
             let place = self.place_for_local(tmp)
-            let fields: List[i32] = List.new()
+            let fields: List[i32] = []
             fields.push(op)
             self.assign_enum_variant_to_place(place, opt_ty, self.sema.syms.some, fields, self.ast.get_start(node))
             op = if self.sema.is_copy_frozen(opt_ty) != 0: self.body.new_operand(OperandKind.OK_COPY, place) else: self.body.new_operand(OperandKind.OK_MOVE, place)
@@ -17330,7 +17330,7 @@ impl MirBuilder:
             // Lower input expression values as MIR args
             let asm_packed_d2 = self.ast.get_data2(node)
             let asm_extra_start = asm_packed_d2 >> 8
-            let asm_args: List[i32] = List.new()
+            let asm_args: List[i32] = []
             if asm_extra_start > 0:
                 // Extras: [output_count, out_types.., input_count, in_exprs..]
                 let asm_output_count = self.ast.get_extra(asm_extra_start)
@@ -17442,8 +17442,8 @@ impl MirBuilder:
                             // discriminant enums lower to their repr integer.
                             let fa_is_disc_enum = self.sema.disc_repr_types.contains(fa_resolved as i32)
                             if not fa_is_disc_enum or self.sema.disc_has_payload.contains(fa_resolved as i32):
-                                let fa_fields: List[i32] = List.new()
-                                let fa_names: List[i32] = List.new()
+                                let fa_fields: List[i32] = []
+                                let fa_names: List[i32] = []
                                 let fa_fid = self.body.new_agg_fields(fa_fields, fa_names)
                                 let fa_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid, self.enum_variant_index_for_type(fa_base_ty, fa_qual_sym))
                                 let fa_tmp = self.new_temp(fa_base_ty)
@@ -17457,8 +17457,8 @@ impl MirBuilder:
                             if self.sema.enum_pattern_owner_sym(fa_var_tid) == self.sema.enum_pattern_owner_sym(fa_resolved):
                                 let fa_is_disc_enum2 = self.sema.disc_repr_types.contains(fa_resolved as i32)
                                 if not fa_is_disc_enum2 or self.sema.disc_has_payload.contains(fa_resolved as i32):
-                                    let fa_fields2: List[i32] = List.new()
-                                    let fa_names2: List[i32] = List.new()
+                                    let fa_fields2: List[i32] = []
+                                    let fa_names2: List[i32] = []
                                     let fa_fid2 = self.body.new_agg_fields(fa_fields2, fa_names2)
                                     let fa_rv2 = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid2, self.enum_variant_index_for_type(fa_base_ty, fa_field_sym))
                                     let fa_tmp2 = self.new_temp(fa_base_ty)
@@ -17483,7 +17483,7 @@ impl MirBuilder:
                 // historical move; recorded as #780 residue.
                 let fb_owned_demand = self.expected_type != 0 and self.type_id_is_str(self.sema.resolve_alias(self.expected_type as TypeId) as i32)
                 if fb_owned_demand and self.type_id_is_str(fa_val_ty) and self.field_read_base_is_shared_borrow(node):
-                    let fb_parts: List[i32] = List.new()
+                    let fb_parts: List[i32] = []
                     fb_parts.push(self.body.new_operand(OperandKind.OK_COPY, place))
                     fb_parts.push(self.lower_str_lit(self.pool.intern("")))
                     let fb_args = self.body.new_call_args(fb_parts)
@@ -17520,7 +17520,7 @@ impl MirBuilder:
                 let ip_rd_recv_op = self.index_place_borrowed_receiver(ip_rd_recv_place, ip_rd_recv_expr_ty, ip_rd_sig, self.ast.get_start(node))
                 let ip_rd_idx_op = self.lower_expr(self.ast.get_data1(node))
                 let ip_rd_ret_ty = self.expr_type(node)
-                let ip_rd_args: List[i32] = List.new()
+                let ip_rd_args: List[i32] = []
                 ip_rd_args.push(ip_rd_recv_op)
                 ip_rd_args.push(ip_rd_idx_op)
                 return self.lower_resolved_call_with_operand_args_contract(ip_rd_fn_sym, ip_rd_args, ip_rd_ret_ty, node, ip_rd_sig, ip_rd_mono)
@@ -17717,7 +17717,7 @@ impl MirBuilder:
                 generic_builtin_sym = self.ast.get_data0(gb_base)
             if generic_builtin_sym > 0:
                 let gc_fn_op = self.const_operand(ConstKind.CK_FN, generic_builtin_sym, 0)
-                let gc_args: List[i32] = List.new()
+                let gc_args: List[i32] = []
                 let gc_as = self.ast.get_data1(node)
                 // D109: `offsetof[T](field)` names a field of T's declaration;
                 // Sema recorded its index, and nothing is evaluated.
@@ -17794,8 +17794,8 @@ impl MirBuilder:
                     let vc_args_start = self.ast.get_data1(node)
                     let vc_has_resolved = self.sema.has_resolved_call_args(node)
                     let vc_args_count = if vc_has_resolved != 0: self.sema.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
-                    let vc_fields: List[i32] = List.new()
-                    let vc_names: List[i32] = List.new()
+                    let vc_fields: List[i32] = []
+                    let vc_names: List[i32] = []
                     for vci in 0..vc_args_count:
                         let vc_arg = if vc_has_resolved != 0: self.sema.get_resolved_call_arg(node, vci) else: self.ast.get_extra(vc_args_start + vci)
                         let saved_expected = self.expected_type
@@ -17869,7 +17869,7 @@ impl MirBuilder:
                     let gc_recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
                     if gc_recorded_sig.is_some():
                         gc_sig_idx = gc_recorded_sig.unwrap()
-                    let gc_args: List[i32] = List.new()
+                    let gc_args: List[i32] = []
                     let gc_as = self.ast.get_data1(node)
                     let gc_ac = self.ast.get_data2(node)
                     for gc_ai in 0..gc_ac:
@@ -17905,7 +17905,7 @@ impl MirBuilder:
                 let bu_fn_op = self.const_operand(ConstKind.CK_FN, self.ast.get_data0(callee), 0)
                 // The builtin's arguments are MIR operands like any call's;
                 // codegen reads them, never the AST (#2043).
-                let bu_args: List[i32] = List.new()
+                let bu_args: List[i32] = []
                 let bu_resolved = self.sema.has_resolved_call_args(node)
                 let bu_count = if bu_resolved: self.sema.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
                 for bu_ai in 0..bu_count:
@@ -17928,7 +17928,7 @@ impl MirBuilder:
             // std's `fence(order)`: the atomic fence intrinsic (Sema's
             // declaration identity, not the name).
             if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.AtomicFence:
-                let ifn_args: List[i32] = List.new()
+                let ifn_args: List[i32] = []
                 let ifn_as = self.ast.get_data1(node)
                 for ifn_ai in 0..self.ast.get_data2(node):
                     ifn_args.push(self.lower_expr(self.ast.get_extra(ifn_as + ifn_ai)))
@@ -17990,8 +17990,8 @@ impl MirBuilder:
             let sl_field_count = self.ast.get_data2(node)
             let sl_name_sym = self.ast.get_data0(node)
             let sl_struct_ty = self.expr_type(node)
-            let sl_fields: List[i32] = List.new()
-            let sl_names: List[i32] = List.new()
+            let sl_fields: List[i32] = []
+            let sl_names: List[i32] = []
             for i in 0..sl_field_count:
                 let f_name_sym = self.ast.get_extra(sl_fields_start + i * 2)
                 let f_val_node = self.ast.get_extra(sl_fields_start + i * 2 + 1)
@@ -18043,7 +18043,7 @@ impl MirBuilder:
                 if self.sema.type_needs_drop_frozen(f_ty) != 0:
                     self.consume_moved_operand(f_op)
             if self.sema.struct_literal_decl_node(sl_name_sym, sl_struct_ty) != 0:
-                let sl_td_node: i32 = self.sema.struct_literal_decl_node(sl_name_sym, sl_struct_ty)
+                let sl_td_node = self.sema.struct_literal_decl_node(sl_name_sym, sl_struct_ty)
                 let sl_td_extra = self.ast.get_data1(sl_td_node)
                 let sl_td_packed = self.ast.get_data2(sl_td_node)
                 if type_decl_sub_kind(sl_td_packed) == TypeDeclKind.Struct:
@@ -18099,8 +18099,8 @@ impl MirBuilder:
             let start_op = if range_start_node != 0: self.lower_expr(range_start_node) else: self.int_const_operand(0, range_elem)
             let end_op = self.lower_expr(range_end_node)
             let incl_op = self.int_const_operand(range_inclusive, self.sema.ty_bool)
-            let range_fields: List[i32] = List.new()
-            let range_names: List[i32] = List.new()
+            let range_fields: List[i32] = []
+            let range_names: List[i32] = []
             range_fields.push(start_op)
             range_fields.push(end_op)
             range_fields.push(incl_op)
@@ -18119,8 +18119,8 @@ impl MirBuilder:
             let elem_count = self.ast.get_data1(node)
             if elem_count == 0:
                 return self.unit_operand()
-            let tup_fields: List[i32] = List.new()
-            let tup_names: List[i32] = List.new()
+            let tup_fields: List[i32] = []
+            let tup_names: List[i32] = []
             let saved_expected = self.expected_type
             var expected_tuple = 0
             var expected_elem_start = 0
@@ -18206,8 +18206,8 @@ impl MirBuilder:
                 let fill_place = self.place_for_local(fill_tmp)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, fill_place, fill_rv, self.ast.get_start(node))
                 return self.body.new_operand(OperandKind.OK_COPY, fill_place)
-            let arr_fields: List[i32] = List.new()
-            let arr_names: List[i32] = List.new()
+            let arr_fields: List[i32] = []
+            let arr_names: List[i32] = []
             // #586: elements lower under the ARRAY'S ELEMENT type, not the ambient
             // expected type. Without the rebind, the array/let type leaked into
             // enum-variant element temps (Some(1) inside [?i32] typed as the ARRAY
@@ -18270,8 +18270,8 @@ impl MirBuilder:
                     if vs_arg_count == 0:
                         let vs_is_disc_enum = self.sema.disc_repr_types.contains(vs_resolved as i32)
                         if not vs_is_disc_enum or self.sema.disc_has_payload.contains(vs_resolved as i32):
-                            let vs_de_fields: List[i32] = List.new()
-                            let vs_de_names: List[i32] = List.new()
+                            let vs_de_fields: List[i32] = []
+                            let vs_de_names: List[i32] = []
                             let vs_de_fid = self.body.new_agg_fields(vs_de_fields, vs_de_names)
                             let vs_de_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vs_de_fid, vs_variant_idx)
                             let vs_de_tmp = self.new_temp(vs_result_ty)
@@ -18279,8 +18279,8 @@ impl MirBuilder:
                             self.body.push_stmt(self.cur_bb, StmtKind.Assign, vs_de_place, vs_de_rv, self.ast.get_start(node))
                             return self.body.new_operand(OperandKind.OK_COPY, vs_de_place)
                         return self.int_const_operand(self.enum_variant_discriminant_for_type(vs_result_ty, vs_name_sym), vs_result_ty)
-            let vs_fields: List[i32] = List.new()
-            let vs_names: List[i32] = List.new()
+            let vs_fields: List[i32] = []
+            let vs_names: List[i32] = []
             let vs_payload_tys = self.sema.enum_variant_payload_types_frozen(vs_result_ty, vs_name_sym)
             for vsi in 0..vs_arg_count:
                 let vs_arg = self.ast.get_extra(vs_args_start + vsi)
@@ -18398,16 +18398,16 @@ impl MirBuilder:
                 let ta_count = self.ast.get_data1(inner)
                 let ta_result_ty = self.expr_type(node)
                 // Lower all task expressions first (spawns all fibers)
-                var ta_task_ops: List[i32] = List.new()
-                var ta_owns: List[bool] = List.new()
+                let ta_task_ops: List[i32] = []
+                let ta_owns: List[bool] = []
                 for ta_i in 0..ta_count:
                     let ta_elem = self.ast.get_extra(ta_extra + ta_i)
                     ta_owns.push(self.await_task_owns_result(ta_elem))
                     self.cancel_scheduled_value_drop_for_receiver_expr(ta_elem)
                     ta_task_ops.push(self.lower_expr(ta_elem))
                 // Await each sequentially, collect results
-                var ta_awaited_ops: List[i32] = List.new()
-                var ta_awaited_names: List[i32] = List.new()
+                let ta_awaited_ops: List[i32] = []
+                let ta_awaited_names: List[i32] = []
                 for ta_i in 0..ta_count:
                     let ta_elem_ty = self.tuple_elem_type(ta_result_ty, ta_i)
                     let ta_elem_node = self.ast.get_extra(ta_extra + ta_i)
@@ -18440,7 +18440,7 @@ impl MirBuilder:
             // 1. Create scope handle via with_scope_create()
             let scope_sym = self.ast.get_data0(node)
             let span = self.ast.get_start(node)
-            let create_args: List[i32] = List.new()
+            let create_args: List[i32] = []
             let create_call_id = self.body.new_call_args(create_args)
             self.body.set_call_intrinsic(create_call_id, MirIntrinsic.SCOPE_CREATE)
             self.body.set_call_ast_node(create_call_id, node)
@@ -18476,7 +18476,7 @@ impl MirBuilder:
         if kind == NodeKind.NK_SCOPE:
             let scope_sym = self.ast.get_data0(node)
             let span = self.ast.get_start(node)
-            let create_args: List[i32] = List.new()
+            let create_args: List[i32] = []
             let create_call_id = self.body.new_call_args(create_args)
             self.body.set_call_intrinsic(create_call_id, MirIntrinsic.THREAD_SCOPE_CREATE)
             self.body.set_call_ast_node(create_call_id, node)
@@ -18521,8 +18521,8 @@ impl MirBuilder:
             // 1. Lower each arm's task expression → task operands. Capture ownership
             // BEFORE the cancel (§14.7/G3): the winner's value-await frees its result
             // buffer iff this scope owns the task (its drop, cancelled just below).
-            var task_ops: List[i32] = List.new()
-            var sel_owns: List[bool] = List.new()
+            let task_ops: List[i32] = []
+            let sel_owns: List[bool] = []
             for ai in 0..arm_count:
                 let task_node = self.ast.get_extra(extra_start + ai * 3 + 1)
                 // §14.10 (#2956): an arm expression that is not a Task runs
@@ -18543,7 +18543,7 @@ impl MirBuilder:
             // #2011: the select observes every task (copy); on each arm's
             // path every task is taken once — the winner by its await, each
             // loser by its cleanup await (its cancel observes).
-            let select_args: List[i32] = List.new()
+            let select_args: List[i32] = []
             for ai in 0..arm_count:
                 select_args.push(self.observing_operand(task_ops[ai]))
             let select_call_id = self.body.new_call_args(select_args)
@@ -18559,8 +18559,8 @@ impl MirBuilder:
             self.switch_to(switch_bb)
 
             // 3. Create basic blocks for each arm + join
-            var arm_bbs: List[i32] = List.new()
-            var switch_vals: List[i64] = List.new()
+            let arm_bbs: List[i32] = []
+            let switch_vals: List[i64] = []
             for ai in 0..arm_count:
                 let arm_bb = self.new_block()
                 arm_bbs.push(arm_bb)
@@ -18588,7 +18588,7 @@ impl MirBuilder:
                 let arm_body = self.ast.get_extra(extra_start + ai * 3 + 2)
 
                 // Await the winning task to get its result
-                let await_args: List[i32] = List.new()
+                let await_args: List[i32] = []
                 await_args.push(task_ops[ai])
                 await_args.push(self.const_operand(ConstKind.CK_INT, sel_owns[ai] as i32, self.sema.ty_i32))
                 let await_call_id = self.body.new_call_args(await_args)
@@ -18616,7 +18616,7 @@ impl MirBuilder:
                 // Cancel losing tasks
                 for li in 0..arm_count:
                     if li != ai:
-                        let cancel_args: List[i32] = List.new()
+                        let cancel_args: List[i32] = []
                         let loser_task = task_ops[li]
                         cancel_args.push(self.observing_operand(loser_task))
                         let cancel_call_id = self.body.new_call_args(cancel_args)
@@ -18714,7 +18714,7 @@ fn cow_arg_preserves_uniqueness(sema: &Sema, body: &MirBody, call_id: i32, intr:
     false
 
 fn cow_transfer_stmt(body: &MirBody, candidates: &List[i32], ref_root: &List[i32], stmt_id: i32, state_in: List[i32]) -> List[i32]:
-    var state = state_in
+    let state = state_in
     let kind = body.stmt_kind(stmt_id)
     let d0 = body.stmt_data0(stmt_id)
     let d1 = body.stmt_data1(stmt_id)
@@ -18761,7 +18761,7 @@ fn cow_transfer_stmt(body: &MirBody, candidates: &List[i32], ref_root: &List[i32
     state
 
 fn cow_transfer_term(sema: &Sema, body: &MirBody, candidates: &List[i32], ref_root: &List[i32], bb: i32, state_in: List[i32]) -> List[i32]:
-    var state = state_in
+    let state = state_in
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_DROP_AND_GOTO:
         let direct = suspend_direct_place_local(body, body.term_data0(bb))
@@ -18798,20 +18798,20 @@ fn cow_transfer_term(sema: &Sema, body: &MirBody, candidates: &List[i32], ref_ro
 
 fn cow_compute_reachable_and_preds(body: &MirBody) -> (List[i32], List[List[i32]]):
     let bb_count = body.block_count()
-    var reachable: List[i32] = List.new()
-    var preds: List[List[i32]] = List.new()
+    let reachable: List[i32] = []
+    let preds: List[List[i32]] = []
     for _ in 0..bb_count:
         reachable.push(0)
         preds.push(List.new())
     if bb_count == 0:
         return (reachable, preds)
-    var work: List[i32] = [0]
+    let work: List[i32] = [0]
     reachable[0] = 1
     while work.len() > 0:
         let bb = work.pop().unwrap()
         let succs = last_use_successors(body, bb)
-        for si in 0..succs.len():
-            let s = succs[si]
+        for succ in succs:
+            let s = succ
             if s >= 0 and s < bb_count:
                 preds[s].push(bb)
                 if reachable[s] == 0:
@@ -18826,14 +18826,14 @@ fn cow_compute_unique_dataflow(sema: &Sema, body: &MirBody, candidates: &List[i3
     let bb_count = body.block_count()
     let local_count = body.local_count()
     let cand_count = cand_locals.len()
-    var unique_in: List[i32] = List.with_capacity(bb_count * cand_count)
-    var unique_out: List[i32] = List.with_capacity(bb_count * cand_count)
+    let unique_in: List[i32] = List.with_capacity(bb_count * cand_count)
+    let unique_out: List[i32] = List.with_capacity(bb_count * cand_count)
     for bb in 0..bb_count:
         let active = (bb > 0 and reachable[bb] != 0) as i32
         for _ in 0..cand_count:
             unique_in.push(active)
             unique_out.push(active)
-    var state: List[i32] = List.new()
+    var state: List[i32] = []
     for _ in 0..local_count:
         state.push(0)
     var changed = true
@@ -18911,7 +18911,7 @@ fn cow_local_is_loop_invariant(sema: &Sema, body: &MirBody, in_loop: &List[i32],
 // yet unique entering a loop is hoisted once into the loop preheader.
 fn cow_natural_loop_for_header(body: &MirBody, reachable: &List[i32], preds: &List[List[i32]], h: i32) -> List[i32]:
     let bb_count = body.block_count()
-    var in_loop: List[i32] = List.new()
+    let in_loop: List[i32] = []
     for _ in 0..bb_count:
         in_loop.push(0)
     var any_back = false
@@ -18919,11 +18919,11 @@ fn cow_natural_loop_for_header(body: &MirBody, reachable: &List[i32], preds: &Li
         let u = preds[h][pi]
         if u < h or u >= bb_count or reachable[u] == 0:
             continue
-        var vis: List[i32] = List.new()
+        let vis: List[i32] = []
         for _ in 0..bb_count:
             vis.push(0)
         vis[h] = 1
-        var work: List[i32] = List.new()
+        let work: List[i32] = []
         if vis[u] == 0:
             vis[u] = 1
             work.push(u)
@@ -18945,10 +18945,10 @@ fn cow_natural_loop_for_header(body: &MirBody, reachable: &List[i32], preds: &Li
     in_loop
 
 fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
-    var out = body
+    let out = body
     let local_count = out.local_count()
-    var candidates: List[i32] = List.new()
-    var cand_locals: List[i32] = List.new()
+    let candidates: List[i32] = []
+    let cand_locals: List[i32] = []
     for l in 0..local_count:
         if l > out.n_params and out.local_is_global[l] == 0 and out.local_is_caller_place[l] == 0 and cow_collection_of_sema(sema, out.local_type_ids[l]) != StdGeneric.None:
             candidates.push(1)
@@ -18971,7 +18971,7 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
                         break
     if not has_make_unique:
         return out
-    var ref_root: List[i32] = List.new()
+    let ref_root: List[i32] = []
     for _ in 0..local_count:
         ref_root.push(-1)
     for bb in 0..out.block_count():
@@ -19043,9 +19043,9 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
             let mu_intr = out.call_intrinsic(mu_call_id)
             let mu_ops = suspend_call_operands(out, mu_call_id)
             let mu_place: i32 = out.operand_d0[mu_ops[0]]
-            let mu_fn_op: i32 = out.term_data0(mu_bb)
-            let mu_res_place: i32 = out.term_data2(mu_bb)
-            let cont_bb: i32 = out.new_block() as i32
+            let mu_fn_op = out.term_data0(mu_bb)
+            let mu_res_place = out.term_data2(mu_bb)
+            let cont_bb = out.new_block() as i32
             out.set_terminator(cont_bb, TermKind.TK_GOTO as i32, h, 0, 0, 0, 0)
             let new_arg_op = out.new_operand(OperandKind.OK_COPY, mu_place)
             let new_args: List[i32] = [new_arg_op]
@@ -19076,7 +19076,7 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
         let target = suspend_direct_place_local(out, out.operand_d0[ops[0]])
         if target <= out.n_params or target >= local_count or candidates[target] == 0:
             continue
-        var state: List[i32] = List.new()
+        var state: List[i32] = []
         for _ in 0..local_count:
             state.push(0)
         for ci in 0..cand_locals.len():
@@ -19086,7 +19086,7 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
         if state[target] != 0:
             if trace_cow:
                 with_eprint(f"[cow] elide local={target} bb={bb}")
-            let next_bb: i32 = out.term_data3(bb)
+            let next_bb = out.term_data3(bb)
             out.set_terminator(bb, TermKind.TK_GOTO as i32, next_bb, 0, 0, 0, 0)
     out
 
@@ -19200,7 +19200,7 @@ fn mir_body_cow_check_reason(sema: &Sema, body: &MirBody, bb: i32) -> str:
     if local >= 1 and local <= body.n_params:
         return "through a parameter"
     let local_count = body.local_count()
-    var ref_root: List[i32] = List.new()
+    let ref_root: List[i32] = []
     for _ in 0..local_count:
         ref_root.push(-1)
     for b in 0..body.block_count():
@@ -19239,17 +19239,17 @@ fn mir_body_cow_check_reason(sema: &Sema, body: &MirBody, bb: i32) -> str:
 // writes in place), and the header owns no buffer (capacity 0, so
 // its drop frees nothing and a growth would copy out rather than free).
 fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
-    var out = body
+    let out = body
     let local_count = out.local_count()
     // Per literal call: its first destination. Per local: the literal calls
     // it holds, where it moved them (-1 if it did not), and its verdict.
-    var call_ids: List[i32] = List.new()
-    var call_dest: List[i32] = List.new()
-    var call_block: List[i32] = List.new()
-    var holds: List[i32] = List.new()
-    var fwd: List[i32] = List.new()
-    var disqualified: List[i32] = List.new()
-    var written: List[i32] = List.new()
+    let call_ids: List[i32] = []
+    let call_dest: List[i32] = []
+    let call_block: List[i32] = []
+    let holds: List[i32] = []
+    let fwd: List[i32] = []
+    let disqualified: List[i32] = []
+    let written: List[i32] = []
     for _ in 0..local_count:
         holds.push(0)
         fwd.push(-1)
@@ -19272,12 +19272,12 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
         holds[dest] = holds[dest] + 1
     if call_ids.len() == 0:
         return out
-    var literal_dest_of_call: List[i32] = List.new()
+    let literal_dest_of_call: List[i32] = []
     for _ in 0..out.call_arg_starts.len(): literal_dest_of_call.push(-1)
     for ci in 0..call_ids.len(): literal_dest_of_call[call_ids[ci]] = call_dest[ci]
     // Whole moves from a holder into a local: the holder's literals go with
     // them. Repeated until no chain grows.
-    var link_op: List[i32] = List.new()
+    let link_op: List[i32] = []
     for _ in 0..out.operand_kinds.len(): link_op.push(0)
     var changed = true
     while changed:
@@ -19303,7 +19303,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
             changed = true
     // Per local: the holder it is a borrow of, or -1 (a method receiver is
     // passed as one).
-    var ref_root: List[i32] = List.new()
+    let ref_root: List[i32] = []
     for _ in 0..local_count: ref_root.push(-1)
     for stmt in 0..out.stmt_kinds.len() as i32:
         if out.stmt_kind(stmt) != StmtKind.Assign:
@@ -19314,7 +19314,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
             let root = suspend_place_root_local(out, out.rval_d1[rval])
             if root > 0 and root < local_count and holds[root] > 0: ref_root[to] = root
     // Copies handed to a reading call.
-    var reading_copy: List[i32] = List.new()
+    let reading_copy: List[i32] = []
     for _ in 0..out.operand_kinds.len(): reading_copy.push(0)
     for bb in 0..out.block_count():
         if out.term_kind(bb) != TermKind.TK_CALL:
@@ -19350,9 +19350,9 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
             if reads: reading_copy[op] = 1
     // The operands and rvalues the body uses: lowering can leave one it made
     // and did not place (a receiver it then borrowed instead).
-    var used_op: List[i32] = List.new()
+    let used_op: List[i32] = []
     for _ in 0..out.operand_kinds.len(): used_op.push(0)
-    var used_rval: List[i32] = List.new()
+    let used_rval: List[i32] = []
     for _ in 0..out.rval_kinds.len(): used_rval.push(0)
     for stmt in 0..out.stmt_kinds.len() as i32:
         if out.stmt_kind(stmt) != StmtKind.Assign:
@@ -19483,7 +19483,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         // Parameter locals must occupy locals 1..n contiguously (codegen binds
         // incoming arguments to them in order), so create them all first and
         // record their ids before destructuring any parameter patterns.
-        let param_locals: List[i32] = List.new()
+        let param_locals: List[i32] = []
         for i in 0..param_count:
             let p_name = builder.ast.fn_param_name(param_start, i)
             var p_ty: i32 = 0
@@ -19600,8 +19600,8 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     // construction with tag 0. D65: Sema decided the wrap
     // (implicit_ok_tail_sigs); MIR does not re-derive it from the types.
     if body_falls_through != 0 and not ret_is_void and sig_idx >= 0 and builder.sema.implicit_ok_tail_sigs.contains(sig_idx):
-        let ok_fields: List[i32] = List.new()
-        let ok_names: List[i32] = List.new()
+        let ok_fields: List[i32] = []
+        let ok_names: List[i32] = []
         ok_fields.push(result)
         ok_names.push(0)
         let ok_fid = builder.body.new_agg_fields(ok_fields, ok_names)
@@ -19659,7 +19659,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: &AstPool, pool: &InternPool
     let first_clause = if clause_count > 0: sema.fn_clause_group_clause(group, 0) else: 0
     let first_meta = if first_clause != 0: ast_pool.find_fn_meta(first_clause) else: -1
     let param_count = sema.sig_get_param_count(sig_idx)
-    let param_locals: List[i32] = List.new()
+    let param_locals: List[i32] = []
     for pi in 0..param_count:
         var p_name = pool.intern(f"__param_{pi}")
         if first_meta >= 0:
@@ -19720,7 +19720,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: &AstPool, pool: &InternPool
 
         builder.switch_to(arm_bb)
         let fn_op = builder.const_operand(ConstKind.CK_FN, clause_sym, sema.ty_void)
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         for pi2 in 0..param_count:
             let p_ty = sema.sig_param_type(sig_idx, pi2)
             let place = builder.place_for_local(param_locals[pi2])
@@ -19743,7 +19743,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: &AstPool, pool: &InternPool
     builder.switch_to(dispatch_bb)
     let panic_sym = sema.pool_lookup_symbol("with_panic")
     let panic_op = builder.const_operand(ConstKind.CK_FN, panic_sym, sema.ty_void)
-    let panic_args: List[i32] = List.new()
+    let panic_args: List[i32] = []
     panic_args.push(builder.lower_str_lit(pool.intern("no function clause matched")))
     panic_args.push(builder.lower_str_lit(pool.intern("")))
     panic_args.push(builder.int_const_operand(0, sema.ty_i32))
@@ -19857,8 +19857,8 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: &AstPool, pool: &InternPoo
     var builder = MirBuilder.init(sema, ast_pool, pool, body_sym)
     builder.body.local_type_ids[0] = state_tid
     let span = ast_pool.get_start(fn_node)
-    let fields: List[i32] = List.new()
-    let names: List[i32] = List.new()
+    let fields: List[i32] = []
+    let names: List[i32] = []
     let param_count = sema.sig_get_param_count(sig_idx)
     let meta = ast_pool.find_fn_meta(fn_node)
     // The parameters are locals 1..=param_count, before any temporary.
@@ -19897,7 +19897,7 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: &AstPool, pool: &InternPoo
 // The builder of a specialization's body: Sema's per-instance facts are
 // keyed by its symbol.
 fn specialization_builder(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mono_sym: i32) -> MirBuilder:
-    var builder = MirBuilder.init(sema, ast_pool, pool, mono_sym)
+    let builder = MirBuilder.init(sema, ast_pool, pool, mono_sym)
     builder.body.instance_sym = mono_sym
     builder
 
@@ -19905,9 +19905,9 @@ fn specialization_builder(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mo
 // (0 for a non-generic one).
 fn lower_generator_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32, instance_sym: i32) -> LoweredFunction:
     let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
-    var producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
+    let producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
     producer_builder.body.instance_sym = instance_sym
-    var lowered = lower_fn_with_sig(producer_builder, fn_node, sema.get_sig(run_sym))
+    let lowered = lower_fn_with_sig(producer_builder, fn_node, sema.get_sig(run_sym))
     lowered.anonymous_bodies.push(lower_generator_constructor(sema, ast_pool, pool, fn_node, fn_sym, body_sym, sig_idx))
     lowered.anonymous_bodies.push(lower_generator_each_body(sema, ast_pool, pool, fn_sym))
     lowered
@@ -19926,7 +19926,7 @@ fn lower_generator_each_body(sema: &Sema, ast_pool: &AstPool, pool: &InternPool,
     let body_local = builder.body.new_local(sema.sig_param_type(each_sig, 1), 0, pool.intern("__with_gen_body"), 1)
     builder.body.n_params = 2
     let self_place = builder.place_for_local(self_local)
-    let args: List[i32] = List.new()
+    let args: List[i32] = []
     let field_start = sema.get_type_d1(state_tid)
     for fi in 0..sema.get_type_d2(state_tid):
         let field_sym: i32 = sema.type_extra[(field_start + fi * 3)]
@@ -20044,9 +20044,9 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: &AstPool, pool: &InternPo
     let subst_count: i32 = sema.concrete_specialization_subst_counts[specialization]
     let param_start: i32 = sema.concrete_specialization_param_starts[specialization]
     let param_count: i32 = sema.concrete_specialization_param_counts[specialization]
-    let subst_syms: List[i32] = List.new()
-    let subst_types: List[i32] = List.new()
-    let concrete_params: List[i32] = List.new()
+    let subst_syms: List[i32] = []
+    let subst_types: List[i32] = []
+    let concrete_params: List[i32] = []
     for i in 0..subst_count:
         subst_syms.push(sema.concrete_specialization_subst_syms[(subst_start + i)])
         subst_types.push(sema.concrete_specialization_subst_types[(subst_start + i)])
@@ -20067,8 +20067,8 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: &AstPool, pool: &InternPo
 
     let saved_subst_syms = sema_clone_i32_list(sema.generic_subst_param_syms)
     let saved_subst_types = sema_clone_i32_list(sema.generic_subst_type_ids)
-    let saved_named: List[i32] = List.new()
-    let saved_named_had: List[i32] = List.new()
+    let saved_named: List[i32] = []
+    let saved_named_had: List[i32] = []
     sema.generic_subst_param_syms = List.new()
     sema.generic_subst_type_ids = List.new()
     for i in 0..subst_count:
@@ -20156,7 +20156,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
     sema.prepare_source_line_offsets()
     // #916: lowering a call reads whether its callee may suspend.
     sema.settle_may_suspend_facts()
-    var mir_mod = MirModule.init()
+    let mir_mod = MirModule.init()
 
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
@@ -20181,7 +20181,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
             mir_mod.add_lowered_function(lower_generator_functions(sema, ast_pool, pool, decl as i32, fn_sym, mir_fn_sym, sig_idx, 0))
             continue
         let sig_idx = sema.get_sig(fn_sym)
-        var builder = MirBuilder.init(sema, ast_pool, pool, mir_fn_sym)
+        let builder = MirBuilder.init(sema, ast_pool, pool, mir_fn_sym)
         // fn_sym is the declaration's authoritative Sema-pool identity.
         // mir_fn_sym belongs to the output pool; treating its numeric ID as a
         // Sema symbol can select an unrelated but valid signature in large
@@ -20258,7 +20258,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
     MirLowerResult { sema, mir_module: mir_mod }
 
 fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: &AstPool, pool: &InternPool) -> List[i32]:
-    let tailrec_syms: List[i32] = List.new()
+    let tailrec_syms: List[i32] = []
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
         if ast_pool.kind(decl) != NodeKind.NK_FN_DECL:
@@ -20352,8 +20352,8 @@ fn mir_is_tail_call_to(body: &MirBody, bb: i32, target_sym: i32) -> bool:
     mir_is_tail_return_path(body, next_bb, result_local, 0)
 
 fn mir_list_contains_i32(v: &List[i32], value: i32) -> bool:
-    for i in 0..v.len():
-        if v[i] == value:
+    for v_item in v:
+        if v_item == value:
             return true
     false
 
@@ -20420,8 +20420,8 @@ fn mir_tailrec_sig_compatible(sema: &Sema, ast_pool: &AstPool, fn_a: i32, fn_b: 
     true
 
 fn tailrec_scc_contains(scc: &List[i32], fn_sym: i32) -> bool:
-    for i in 0..scc.len():
-        if scc[i] == fn_sym:
+    for scc_item in scc:
+        if scc_item == fn_sym:
             return true
     false
 
@@ -20639,10 +20639,10 @@ impl MirModule:
         if start_idx == target_idx:
             return true
         let body_count = self.body_count()
-        var visited: List[i32] = List.new()
+        let visited: List[i32] = []
         for _ in 0..body_count:
             visited.push(0)
-        var stack: List[i32] = List.new()
+        let stack: List[i32] = []
         stack.push(start_idx)
         while stack.len() > 0:
             let idx = stack.remove(stack.len() - 1)
@@ -20668,7 +20668,7 @@ impl MirModule:
         false
 
     fn collect_tailrec_scc(start_idx: i32) -> List[i32]:
-        var members: List[i32] = List.new()
+        let members: List[i32] = []
         let body_count = self.body_count()
         for idx in 0..body_count:
             if self.body_reaches(start_idx, idx) and self.body_reaches(idx, start_idx):
@@ -20676,13 +20676,13 @@ impl MirModule:
         members
 
     mut fn mark_tailrec_scc_edges(scc: &List[i32]):
-        for si in 0..scc.len():
-            let src_idx = scc[si]
+        for scc_item in scc:
+            let src_idx = scc_item
             // View: a bare element read copies the MirBody's Drop-bearing
             // tables and aliases the module's own (#715 class).
             let body = &self.bodies[src_idx]
             let bb_count = body.block_count()
-            let tail_bbs: List[i32] = List.new()
+            let tail_bbs: List[i32] = []
             for bb in 0..bb_count:
                 if body.term_kind(bb) != TermKind.TK_CALL:
                     continue
@@ -20705,22 +20705,22 @@ impl MirModule:
                 self.bodies[src_idx].mutual_tail_bbs.push(tail_bb)
 
     fn tailrec_scc_syms(scc: &List[i32]) -> List[i32]:
-        var syms: List[i32] = List.new()
-        for si in 0..scc.len():
-            let body_idx = scc[si]
+        let syms: List[i32] = []
+        for scc_item in scc:
+            let body_idx = scc_item
             if body_idx < 0 or body_idx >= self.body_count():
                 continue
             syms.push(self.bodies[body_idx].fn_sym)
         syms
 
     mut fn verify_tailrec_contracts(sema: &Sema, ast_pool: &AstPool, tailrec_syms: &List[i32]) -> List[TailrecViolation]:
-        let violations: List[TailrecViolation] = List.new()
+        let violations: List[TailrecViolation] = []
         let body_count = self.body_count()
-        var processed: List[i32] = List.new()
+        let processed: List[i32] = []
         for _ in 0..body_count:
             processed.push(0)
-        for ti in 0..tailrec_syms.len():
-            let fn_sym = tailrec_syms[ti]
+        for tailrec_sym in tailrec_syms:
+            let fn_sym = tailrec_sym
             let body_idx = self.find_body(fn_sym)
             if body_idx < 0:
                 continue
@@ -20743,8 +20743,8 @@ impl MirModule:
                 continue
 
             var all_annotated = 1
-            for si in 0..scc_syms.len():
-                let member_sym = scc_syms[si]
+            for scc_sym in scc_syms:
+                let member_sym = scc_sym
                 if mir_fn_is_tailrec(ast_pool, member_sym) == false:
                     all_annotated = 0
                     break
@@ -20777,8 +20777,8 @@ impl MirModule:
                 continue
 
             var bad_edge = 0
-            for si in 0..scc.len():
-                let src_idx = scc[si]
+            for scc_item in scc:
+                let src_idx = scc_item
                 let src_body = &self.bodies[src_idx]
                 for ti2 in 0..scc_syms.len():
                     let dst_sym = scc_syms[ti2]

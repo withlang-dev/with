@@ -516,7 +516,7 @@ impl MirModule:
 // ── MirBody builders ─────────────────────────────────────────────
 
 fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
-    var body = MirBody {
+    let body = MirBody {
         fn_sym,
         lowering_failed: 0,
         anonymous_type: 0,
@@ -832,8 +832,8 @@ impl MirBody:
 
     mut fn new_call_args(operands: &List[i32]) -> i32:
         if with_getenv_str("WITH_TRACE_RESETS").len() > 0:
-            for __i in 0..operands.len():
-                let __op = operands[__i]
+            for operand in operands:
+                let __op = operand
                 with_eprint(f"[call-arg] op={__op} kind={self.operand_kinds[__op]} place={self.operand_d0[__op]}")
         let id = self.call_arg_starts.len() as i32
         let start = self.call_arg_operands.len() as i32
@@ -1200,8 +1200,8 @@ impl MirDropStateKeys:
             None => -1
 
     fn initial(body: &MirBody) -> MirDropStateMap:
-        var own: List[i32] = List.new()
-        var refs: List[i32] = List.new()
+        let own: List[i32] = []
+        let refs: List[i32] = []
         for c in 0..self.chunk_count():
             refs.push((-(c + 1)) as i32)
         for id in 0..self.chunk_count() * self.chunk:
@@ -1258,7 +1258,7 @@ impl MirDropStateKeys:
             None => -1
         if memo >= 0:
             return memo
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         let a_base = a * self.chunk
         let b_base = b * self.chunk
         for k in 0..self.chunk:
@@ -1268,11 +1268,11 @@ impl MirDropStateKeys:
         joined
 
 fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
-    var names: List[str] = List.new()
-    var base_local: List[i32] = List.new()
-    var index: HashMap[str, i32] = HashMap.new()
+    let names: List[str] = []
+    let base_local: List[i32] = []
+    let index: HashMap[str, i32] = [:]
     let local_count = body.local_count()
-    var owned_cleanup: List[i32] = List.new()
+    let owned_cleanup: List[i32] = []
     for li in 0..local_count:
         let name = mir_drop_state_local_key(li)
         index.insert(name ++ "", li)
@@ -1282,7 +1282,7 @@ fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
     for li in body.owned_cleanup_locals:
         if li >= 0 and li < local_count:
             owned_cleanup[li] = 1
-    var place_key: List[i32] = List.new()
+    let place_key: List[i32] = []
     for p in 0..body.place_locals.len():
         let base: i32 = body.place_locals[p]
         if body.place_proj_counts[p] == 0:
@@ -1298,21 +1298,21 @@ fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
             names.push(text)
             base_local.push(base)
         place_key.push(id)
-    var child_counts: List[i32] = List.new()
+    let child_counts: List[i32] = []
     for _ in 0..local_count:
         child_counts.push(0)
     for id in local_count..names.len() as i32:
         let base: i32 = base_local[id]
         child_counts[base] = child_counts[base] + 1
-    var child_starts: List[i32] = List.new()
-    var fill: List[i32] = List.new()
+    let child_starts: List[i32] = []
+    let fill: List[i32] = []
     var total: i32 = 0
     for li in 0..local_count:
         child_starts.push(total)
         fill.push(total)
         total = total + child_counts[li]
     child_starts.push(total)
-    var children: List[i32] = List.new()
+    let children: List[i32] = []
     for _ in 0..total:
         children.push(0)
     for id in local_count..names.len() as i32:
@@ -1683,7 +1683,7 @@ fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> List[i32]:
     if body.term_kind(bb) == TermKind.TK_SWITCH_INT:
         let chosen = mir_drop_state_constant_switch_target(body, bb)
         if chosen >= 0:
-            var out: List[i32] = List.new()
+            let out: List[i32] = []
             out.push(chosen)
             return out
     mir_term_successors(body, bb)
@@ -1691,7 +1691,7 @@ fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> List[i32]:
 // Every block a terminator names as a successor: which data slot holds a
 // block is the terminator kind's (a call's d2 is its destination place).
 fn mir_term_successors(body: &MirBody, bb: i32) -> List[i32]:
-    var out: List[i32] = List.new()
+    let out: List[i32] = []
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -1743,7 +1743,7 @@ impl MirDropStateBlocks:
 
     // The stored out-state of `bb`, sharing the stored chunks.
     fn load_block(bb: i32) -> MirDropStateMap:
-        var refs: List[i32] = List.new()
+        let refs: List[i32] = []
         let base = bb * self.width()
         for c in 0..self.width():
             refs.push(self.rows[base + c])
@@ -1836,45 +1836,45 @@ impl MirDropStateBlocks:
 
 fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
     let bb_count = body.block_count()
-    var keys = mir_drop_state_keys_new(body)
-    var absent: List[i32] = List.new()
+    let keys = mir_drop_state_keys_new(body)
+    let absent: List[i32] = []
     for _ in 0..keys.chunk:
         absent.push(MirDropState.Absent)
     let absent_id = keys.intern_chunk(absent, 0)
-    var rows: List[i32] = List.new()
+    let rows: List[i32] = []
     for _ in 0..bb_count * keys.chunk_count():
         rows.push(absent_id)
     let initial = keys.initial(body)
-    var entry: List[i32] = List.new()
+    let entry: List[i32] = []
     for c in 0..keys.chunk_count():
         entry.push(keys.intern_chunk(initial.own, (c * keys.chunk) as i32))
-    var computed: List[i32] = List.new()
-    var pred_counts: List[i32] = List.new()
+    let computed: List[i32] = []
+    let pred_counts: List[i32] = []
     for _ in 0..bb_count:
         computed.push(0)
         pred_counts.push(0)
     // Successor CSR straight from the terminators; predecessor CSR by counting
     // then filling (two passes, O(blocks + edges)).
-    var succ_starts: List[i32] = List.new()
-    var succs: List[i32] = List.new()
+    let succ_starts: List[i32] = []
+    let succs: List[i32] = []
     for bb in 0..bb_count:
         succ_starts.push(succs.len() as i32)
         let targets = mir_drop_state_block_successors(body, bb)
-        for i in 0..targets.len():
-            let s: i32 = targets[i]
+        for target in targets:
+            let s: i32 = target
             if s >= 0 and s < bb_count:
                 succs.push(s)
                 pred_counts[s] = pred_counts[s] + 1
     succ_starts.push(succs.len() as i32)
-    var pred_starts: List[i32] = List.new()
-    var fill: List[i32] = List.new()
+    let pred_starts: List[i32] = []
+    let fill: List[i32] = []
     var total: i32 = 0
     for bb in 0..bb_count:
         pred_starts.push(total)
         fill.push(total)
         total = total + pred_counts[bb]
     pred_starts.push(total)
-    var preds: List[i32] = List.new()
+    let preds: List[i32] = []
     for _ in 0..total:
         preds.push(0)
     for bb in 0..bb_count:
@@ -1900,13 +1900,13 @@ fn mir_drop_state_sweep_bound(local_count: i32, block_count: i32) -> i64:
 
 fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
     let bb_count = body.block_count()
-    var blocks = mir_drop_state_blocks_new(body)
+    let blocks = mir_drop_state_blocks_new(body)
     let sweep_bound = mir_drop_state_sweep_bound(body.local_count(), bb_count)
     // Worklist as a dirty flag per block: a block is recomputed only when one
     // of its predecessors changed (or on the first sweep), so a loop-free body
     // costs one pass plus the blocks that were numbered before their
     // predecessors — not a whole extra sweep of every block.
-    var dirty: List[i32] = List.new()
+    let dirty: List[i32] = []
     for _ in 0..bb_count:
         dirty.push(1)
     var sweeps: i64 = 0
@@ -1935,15 +1935,15 @@ fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
     blocks
 
 fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     let fn_name = if body.fn_sym != 0:
         f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
     else:
         "<anon>"
     out.push_str("fn " ++ fn_name ++ " " ++ lbrace() ++ "\n")
-    var blocks = mir_drop_state_compute_blocks(body)
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(bb)
+        let state = blocks.input(bb)
         out.push_str(f"  bb{bb} in: " ++ state.format(blocks.keys) ++ "\n")
         let stmt_start: i32 = body.bb_stmt_starts[bb]
         let stmt_count: i32 = body.bb_stmt_counts[bb]
@@ -2070,10 +2070,10 @@ fn mir_elaborate_dead_drops(body: MirBody) -> MirBody:
         pre = pre + 1
     if not has_drop:
         return body
-    var to_nop: List[i32] = List.new()
-    var blocks = mir_drop_state_compute_blocks(body)
+    let to_nop: List[i32] = []
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(bb)
+        let state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
@@ -2083,8 +2083,8 @@ fn mir_elaborate_dead_drops(body: MirBody) -> MirBody:
                     to_nop.push(stmt_id)
             state.transfer_stmt(blocks.keys, body, stmt_id)
         state.transfer_term(blocks.keys, body, bb)
-    for i in 0..to_nop.len():
-        body.stmt_kinds[to_nop[i]] = StmtKind.Nop
+    for to_nop_item in to_nop:
+        body.stmt_kinds[to_nop_item] = StmtKind.Nop
     body
 
 fn mir_projection_debug_name(mir_mod: &MirModule, current_ty: i32, proj_kind: i32, proj_data: i32) -> str:
@@ -2197,7 +2197,7 @@ fn mir_drop_state_moved_rank(state: i32) -> i32:
 
 // The first MIR place naming each drop-state key, -1 for none.
 fn mir_drop_state_key_places(keys: &MirDropStateKeys) -> List[i32]:
-    var out: List[i32] = List.new()
+    let out: List[i32] = []
     for _ in 0..keys.len():
         out.push(-1)
     for p in 0..keys.place_key.len():
@@ -2301,7 +2301,7 @@ fn mir_move_through_reference(mir_mod: &MirModule, body: &MirBody, operand_id: i
 
 // The operands a statement's rvalue reads, decoded as note_rvalue does.
 fn mir_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
-    var ops: List[i32] = List.new()
+    let ops: List[i32] = []
     if rval_id < 0 or rval_id >= body.rval_kinds.len():
         return ops
     let kind: i32 = body.rval_kinds[rval_id]
@@ -2326,7 +2326,7 @@ fn mir_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
 // The operands a terminator reads, decoded as transfer_term does.
 fn mir_term_operands(body: &MirBody, bb: i32) -> List[i32]:
     let tk = body.term_kind(bb)
-    var term_ops: List[i32] = List.new()
+    let term_ops: List[i32] = []
     if tk == TermKind.TK_SWITCH_INT:
         term_ops.push(body.term_data0(bb))
     else if tk == TermKind.TK_CALL:
@@ -2484,10 +2484,10 @@ fn mir_sig_param_consumes(mir_mod: &MirModule, sym: i32, pi: i32) -> bool:
 // Whether a whole drop of `local` is reachable from block `from` before
 // any statement writes it (a re-initialization or a reset blank).
 fn mir_drop_reachable_before_write(body: &MirBody, from: i32, local: i32) -> bool:
-    var seen: List[i32] = List.new()
+    let seen: List[i32] = []
     for _ in 0..body.block_count():
         seen.push(0)
-    var work: List[i32] = List.new()
+    let work: List[i32] = []
     work.push(from)
     while work.len() > 0:
         let bb: i32 = work.pop().unwrap()
@@ -2585,13 +2585,13 @@ fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str
             if body.stmt_kind(stmt_id) != StmtKind.Assign:
                 continue
             let ops = mir_rvalue_operands(body, body.stmt_data1(stmt_id))
-            for oi in 0..ops.len():
-                let err = mir_move_through_reference(mir_mod, body, ops[oi])
+            for op in ops:
+                let err = mir_move_through_reference(mir_mod, body, op)
                 if err.len() > 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={body.stmt_spans[stmt_id]}: " ++ err
         let term_ops = mir_term_operands(body, bb)
-        for oi in 0..term_ops.len():
-            let err = mir_move_through_reference(mir_mod, body, term_ops[oi])
+        for term_op in term_ops:
+            let err = mir_move_through_reference(mir_mod, body, term_op)
             if err.len() > 0:
                 return f"fn sym{body.fn_sym} bb{bb}: " ++ err
     ""
@@ -2657,9 +2657,9 @@ fn validate_read_after_drop(body: &MirBody) -> str:
     if local_count <= 0 or block_count <= 0:
         return ""
     // Only locals some whole drop targets can be read after a drop.
-    var slot: List[i32] = List.new()
-    var write_count: List[i32] = List.new()
-    var ref_target: List[i32] = List.new()
+    let slot: List[i32] = []
+    let write_count: List[i32] = []
+    let ref_target: List[i32] = []
     for _ in 0..local_count:
         slot.push(-1)
         write_count.push(0)
@@ -2721,14 +2721,14 @@ fn validate_read_after_drop(body: &MirBody) -> str:
                             ref_changed = true
     // Forward must-analysis: a block's input is the meet (AND) of its
     // reachable predecessors' outputs; the entry starts with nothing dropped.
-    var reached: List[i32] = List.new()
+    let reached: List[i32] = []
     for _ in 0..block_count:
         reached.push(0)
-    var work: List[i32] = List.new()
+    let work: List[i32] = []
     work.push(0)
     reached[0] = 1
-    var edge_from: List[i32] = List.new()
-    var edge_to: List[i32] = List.new()
+    let edge_from: List[i32] = []
+    let edge_to: List[i32] = []
     while work.len() > 0:
         let bb: i32 = work.pop().unwrap()
         for next in mir_drop_state_block_successors(body, bb):
@@ -2740,22 +2740,22 @@ fn validate_read_after_drop(body: &MirBody) -> str:
                 reached[next] = 1
                 work.push(next)
     // Predecessors of block b: pred_list[pred_start[b]..pred_start[b + 1]].
-    var pred_start: List[i32] = List.new()
+    let pred_start: List[i32] = []
     for _ in 0..block_count + 1:
         pred_start.push(0)
-    for e in 0..edge_to.len():
-        pred_start[edge_to[e] + 1] += 1
+    for edge_to_item in edge_to:
+        pred_start[edge_to_item + 1] += 1
     for b in 0..block_count:
         pred_start[b + 1] += pred_start[b]
-    var fill = pred_start.clone()
-    var pred_list: List[i32] = List.new()
+    let fill = pred_start.clone()
+    let pred_list: List[i32] = []
     for _ in 0..edge_to.len():
         pred_list.push(0)
     for e in 0..edge_to.len():
         pred_list[fill[edge_to[e]]] = edge_from[e]
         fill[edge_to[e]] += 1
     // out rows: block_count × width, all-dropped (the meet's top) until computed.
-    var out: List[i32] = List.new()
+    let out: List[i32] = []
     for _ in 0..block_count * width:
         out.push(1)
     var changed = true
@@ -2764,7 +2764,7 @@ fn validate_read_after_drop(body: &MirBody) -> str:
         for bb in 0..block_count:
             if reached[bb] == 0:
                 continue
-            var state = mir_dropped_input(out, pred_start, pred_list, bb, width)
+            let state = mir_dropped_input(out, pred_start, pred_list, bb, width)
             for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
                 state.transfer_stmt(body, slot, si)
             state.transfer_term(body, slot, bb)
@@ -2775,7 +2775,7 @@ fn validate_read_after_drop(body: &MirBody) -> str:
     for bb in 0..block_count:
         if reached[bb] == 0:
             continue
-        var state = mir_dropped_input(out, pred_start, pred_list, bb, width)
+        let state = mir_dropped_input(out, pred_start, pred_list, bb, width)
         for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
             if body.stmt_kind(si) == StmtKind.Assign:
                 for local in mir_rvalue_read_locals(body, body.stmt_data1(si)):
@@ -2806,7 +2806,7 @@ fn validate_read_after_drop(body: &MirBody) -> str:
 // A block's dropped set on entry: nothing at the entry block, else the AND
 // of its predecessors' outputs.
 fn mir_dropped_input(out: &List[i32], pred_start: &List[i32], pred_list: &List[i32], bb: i32, width: i32) -> MirDroppedSet:
-    var flags: List[i32] = List.new()
+    let flags: List[i32] = []
     for _ in 0..width:
         flags.push((not (bb == 0)) as i32)
     if bb != 0:
@@ -2824,26 +2824,26 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
     let read_after_drop = validate_read_after_drop(body)
     if read_after_drop.len() > 0:
         return read_after_drop
-    var blocks = mir_drop_state_compute_blocks(body)
+    let blocks = mir_drop_state_compute_blocks(body)
     let key_places = mir_drop_state_key_places(blocks.keys)
-    var dropped_local: List[i32] = List.new()
+    let dropped_local: List[i32] = []
     for _ in 0..body.local_type_ids.len():
         dropped_local.push(0)
     for li in body.owned_cleanup_locals:
         if li < 0 or li >= dropped_local.len():
             return f"fn sym{body.fn_sym}: owned cleanup local _{li} is out of range"
         dropped_local[li] = 1
-    var owned_local: List[i32] = List.new()
+    let owned_local: List[i32] = []
     for _ in 0..body.local_type_ids.len():
         owned_local.push(0)
     for li in body.owned_cleanup_locals:
         owned_local[li] = 1
     // #2702: each local's whole-place key, for the StorageDead leak rule.
-    var whole_key_place: List[i32] = List.new()
+    let whole_key_place: List[i32] = []
     for _ in 0..body.local_type_ids.len():
         whole_key_place.push(-1)
-    for k in 0..key_places.len():
-        let kp: i32 = key_places[k]
+    for key_place in key_places:
+        let kp: i32 = key_place
         if kp >= 0 and body.place_proj_counts[kp] == 0:
             whole_key_place[body.place_locals[kp]] = kp
     for bb in 0..body.block_count():
@@ -2860,7 +2860,7 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
             if place_id >= 0 and place_id < body.place_locals.len() and body.place_proj_counts[place_id] == 0:
                 dropped_local[body.place_locals[place_id]] = 1
     for bb in 0..body.block_count():
-        var state = blocks.input(bb)
+        let state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
@@ -3105,7 +3105,7 @@ fn mir_local_of_place(body: &MirBody, place: i32) -> i32:
 // kind — so operand 0 of the body (a move-self function's `self`) was
 // "read" after its reset blank, and every D32 rebind builder audited red.
 fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     if rv < 0 or rv >= body.rval_kinds.len():
         return out
     let k = body.rval_kinds[rv]
@@ -3113,7 +3113,7 @@ fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> List[i32]:
     let d1 = body.rval_d1[rv]
     let d2 = body.rval_d2[rv]
     // Collect candidate locals (-1 = none), then keep the real ones.
-    let cands: List[i32] = List.new()
+    let cands: List[i32] = []
     if k == RvalueKind.RK_USE or k == RvalueKind.RK_CAST or k == RvalueKind.RK_ARRAY_FILL:
         cands.push(mir_local_of_operand(body, d0))
     else if k == RvalueKind.RK_BIN_OP:
@@ -3143,8 +3143,8 @@ fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> List[i32]:
                 let opi = start + ai
                 if opi >= 0 and opi < body.call_arg_operands.len():
                     cands.push(mir_local_of_operand(body, body.call_arg_operands[opi]))
-    for ci in 0..cands.len():
-        let local = cands[ci]
+    for cand in cands:
+        let local = cand
         if local >= 0:
             out.push(local)
     out
@@ -3160,8 +3160,8 @@ fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
     let local_count = body.local_type_ids.len()
     if local_count <= 0 or local_count > 20000:
         return ""
-    let killed: List[i32] = List.new()
-    let killed_bb: List[i32] = List.new()
+    let killed: List[i32] = []
+    let killed_bb: List[i32] = []
     for _i in 0..local_count:
         killed.push(0)
         killed_bb.push(-1)
@@ -3209,7 +3209,7 @@ fn validate_use_after_kill(body: &MirBody, pool: &InternPool) -> str:
 // A validator verdict names bodies `fn sym<N>`; the reader needs the
 // function. Each `fn sym<N>` gains its name, as --dump-mir prints it.
 fn mir_name_fn_syms(text: &str, pool: &InternPool) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     var i = 0
     let n = text.len()
     while i < n:
@@ -3298,7 +3298,7 @@ fn validate_mir_module(mir_mod: &MirModule) -> str:
     if body_count != mir_mod.body_fn_syms.len():
         return "bodies/body_fn_syms length mismatch"
 
-    let seen_fn_syms: HashMap[i32, i32] = HashMap.new()
+    let seen_fn_syms: HashMap[i32, i32] = [:]
     for bi in 0..body_count:
         let body = &mir_mod.bodies[bi]
         let fn_sym = mir_mod.body_fn_syms[bi]

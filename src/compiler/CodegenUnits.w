@@ -93,9 +93,9 @@ type CodegenUnitAssign {
 }
 
 fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUnitAssign:
-    let fn_syms: List[i32] = List.new()
-    let units: List[i32] = List.new()
-    let bin_loads: List[i64] = List.new()
+    let fn_syms: List[i32] = []
+    let units: List[i32] = []
+    let bin_loads: List[i64] = []
     var total_cost: i64 = 0
     var pre = 0
     while pre < unit_count:
@@ -196,7 +196,7 @@ type CodegenUnitPipeline {
 }
 
 fn codegen_unit_pipeline(unit_count: i32, obj_path: &str, opt_level: i32, do_profile: bool, window: i32) -> CodegenUnitPipeline:
-    let jobs: List[CodegenUnitEmitJob] = List.new()
+    let jobs: List[CodegenUnitEmitJob] = []
     for k in 0..unit_count:
         jobs.push(CodegenUnitEmitJob { context: 0, llmod: 0, obj_path: with_str_clone_ref(obj_path), opt_level, unit_index: k, do_profile, rc: 0 })
     let w = if window < 1: 1 else: if window > unit_count: unit_count else: window
@@ -208,7 +208,7 @@ impl CodegenUnitPipeline:
         if self.handles.len() - self.next_join >= self.window:
             self.join_oldest()
         unsafe:
-            let job_ptr = with_vec_get_ptr_es(&raw mut self.jobs as *mut u8, k as i64, sizeof[CodegenUnitEmitJob]()) as *mut CodegenUnitEmitJob
+            let job_ptr = with_vec_get_ptr_es(&raw mut self.jobs as *mut u8, k, sizeof[CodegenUnitEmitJob]()) as *mut CodegenUnitEmitJob
             (*job_ptr).context = context
             (*job_ptr).llmod = llmod
             // A one-unit window is a small host: no unit emits while the
@@ -237,7 +237,7 @@ impl CodegenUnitPipeline:
         self.rc
 
 fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> List[str]:
-    let extras: List[str] = List.new()
+    let extras: List[str] = []
     var k: i32 = 1
     while k < unit_count:
         extras.push(codegen_unit_object_path(obj_path, k))

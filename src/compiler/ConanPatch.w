@@ -4,7 +4,7 @@
 // place they do — and anything else is an error naming the file and hunk.
 
 fn cp_lines(text: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     for raw in text.split("\n"): out.push(if raw.ends_with("\r"): raw.slice(0, raw.len() - 1).to_owned() else: raw.to_owned())
     out
 
@@ -62,7 +62,7 @@ fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &List[CpHun
         let want: i32 = hunks[hi].old_start - 1 + shift
         let at = if hunks[hi].old.len() == 0: (if want < 0: 0 else: want) else: cp_locate(file, want, hunks[hi].old)
         if at < 0: return ("", f"hunk {hi + 1} of the patch does not apply to " ++ path)
-        let rebuilt: List[str] = List.new()
+        let rebuilt: List[str] = []
         for i in 0..at: rebuilt.push(file[i])
         for line in hunks[hi].new: rebuilt.push(line.to_owned())
         for i in at + hunks[hi].old.len()..file.len(): rebuilt.push(file[i])
@@ -77,7 +77,7 @@ fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: fn(&
     let lines = cp_lines(patch)
     var path = ""
     var creates = false
-    var hunks: List[CpHunk] = List.new()
+    var hunks: List[CpHunk] = []
     var in_hunk = false
     var i = 0
     while i <= lines.len():

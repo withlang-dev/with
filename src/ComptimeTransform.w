@@ -13,7 +13,7 @@ use rt.rt_core
 
 
 fn ct_new_list_str -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     out
 
 impl Sema:
@@ -23,12 +23,12 @@ impl Sema:
         self.diags.emit(Diagnostic.err(msg, Span { file: self.local_file_id, start, end }))
 
     mut fn ct_emit_error_help(ast: &AstPool, node: i32, msg: &str, help: &str):
-        var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: ast.get_start(node), end: ast.get_end(node) })
+        let diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: ast.get_start(node), end: ast.get_end(node) })
         diag.add_help(help)
         self.diags.emit(diag)
 
 fn astpool_clone_deep(src: &AstPool) -> AstPool:
-    var out = AstPool.new()
+    let out = AstPool.new()
 
     for si in 0..src.state.strings.len():
         out.add_string(src.get_string(si as i32))
@@ -264,7 +264,7 @@ impl AstPool:
     // file, since a default body is the trait's code.
     mut fn clone_default_method_bodies():
         let st = self.state
-        let traits: List[i32] = List.new()
+        let traits: List[i32] = []
         for di in 0..self.decl_count():
             let decl = self.get_decl(di)
             if self.kind(decl) == NodeKind.NK_TRAIT_DECL: traits.push(decl as i32)
@@ -275,8 +275,8 @@ impl AstPool:
             if self.kind(impl_node) != NodeKind.NK_IMPL_DECL: continue
             let trait_sym = self.get_data2(impl_node)
             if trait_sym == 0: continue
-            for ti in 0..traits.len():
-                let trait_node: i32 = traits[ti]
+            for each_trait in traits:
+                let trait_node: i32 = each_trait
                 if self.get_data0(trait_node) != trait_sym: continue
                 for mi in 0..self.trait_method_count(trait_node as NodeId):
                     let body = self.trait_method_field(trait_node as NodeId, mi, TRAIT_METHOD_DEFAULT_BODY)
@@ -319,7 +319,7 @@ impl AstPool:
 // enclosing impl's (`impl_node`, 0 for none), then a fn's own. Each list is
 // `[name, bound count, bounds...]` per parameter.
 fn ct_type_params_in_scope(pool: &AstPool, impl_node: i32, decl: i32) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     if impl_node != 0:
         let tp_meta = pool.find_impl_type_params(impl_node as NodeId)
         if tp_meta >= 0:
@@ -330,7 +330,7 @@ fn ct_type_params_in_scope(pool: &AstPool, impl_node: i32, decl: i32) -> List[i3
     if pool.kind(decl) == NodeKind.NK_FN_DECL:
         let meta = pool.find_fn_meta(decl)
         if meta >= 0:
-            var pos: i32 = pool.fn_meta_tp_start(meta)
+            var pos = pool.fn_meta_tp_start(meta)
             for _ in 0..pool.fn_meta_tp_count(meta):
                 out.push(pool.get_extra(pos))
                 pos = pos + 2 + pool.get_extra(pos + 1)
@@ -338,7 +338,7 @@ fn ct_type_params_in_scope(pool: &AstPool, impl_node: i32, decl: i32) -> List[i3
 
 // Every impl declaration of the module, in declaration order.
 fn ct_impl_decl_nodes(pool: &AstPool) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) == NodeKind.NK_IMPL_DECL: out.push(decl as i32)
@@ -370,7 +370,7 @@ impl Sema:
             let base_sym = intern.intern(self.pool_resolve(self.get_type_d0(resolved)))
             let extra_start = self.get_type_d1(resolved)
             let arg_count = self.get_type_d2(resolved)
-            let arg_nodes: List[i32] = List.new()
+            let arg_nodes: List[i32] = []
             for ai in 0..arg_count:
                 let arg_tid = self.type_extra[(extra_start + ai)]
                 let arg_node = self.ct_build_type_expr(pool, intern, arg_tid, node)
@@ -378,8 +378,8 @@ impl Sema:
                     return 0
                 arg_nodes.push(arg_node)
             let new_extra = pool.extra_len()
-            for ai in 0..arg_nodes.len():
-                pool.add_extra(arg_nodes[ai])
+            for arg_node in arg_nodes:
+                pool.add_extra(arg_node)
             return pool.add_node(NodeKind.NK_TYPE_GENERIC, start, end, base_sym, new_extra, arg_count) as i32
 
         if tk == TypeKind.TY_ARRAY:
@@ -397,7 +397,7 @@ impl Sema:
         if tk == TypeKind.TY_TUPLE:
             let extra_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
-            let elem_nodes: List[i32] = List.new()
+            let elem_nodes: List[i32] = []
             for ei in 0..elem_count:
                 let elem_tid = self.type_extra[(extra_start + ei)]
                 let elem_node = self.ct_build_type_expr(pool, intern, elem_tid, node)
@@ -405,8 +405,8 @@ impl Sema:
                     return 0
                 elem_nodes.push(elem_node)
             let new_extra = pool.extra_len()
-            for ei in 0..elem_nodes.len():
-                pool.add_extra(elem_nodes[ei])
+            for elem_node in elem_nodes:
+                pool.add_extra(elem_node)
             return pool.add_node(NodeKind.NK_TYPE_TUPLE, start, end, new_extra, elem_count, 0) as i32
 
         if tk == TypeKind.TY_PTR:
@@ -424,7 +424,7 @@ impl Sema:
         if tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN:
             let param_start = self.get_type_d0(resolved)
             let param_count = self.get_type_d1(resolved)
-            let param_nodes: List[i32] = List.new()
+            let param_nodes: List[i32] = []
             for pi in 0..param_count:
                 let param_tid = self.type_extra[(param_start + pi)]
                 let param_node = self.ct_build_type_expr(pool, intern, param_tid, node)
@@ -432,8 +432,8 @@ impl Sema:
                     return 0
                 param_nodes.push(param_node)
             let new_extra = pool.extra_len()
-            for pi in 0..param_nodes.len():
-                pool.add_extra(param_nodes[pi])
+            for param_node in param_nodes:
+                pool.add_extra(param_node)
             let ret_node = self.ct_build_type_expr(pool, intern, self.get_type_d2(resolved), node)
             if ret_node == 0:
                 return 0
@@ -450,8 +450,8 @@ impl Sema:
 impl AstPool:
     mut fn ct_build_call(node: i32, callee: i32, args: &List[i32]) -> i32:
         let extra_start = self.extra_len()
-        for ai in 0..args.len():
-            self.add_extra(args[ai])
+        for arg in args:
+            self.add_extra(arg)
         self.add_node(NodeKind.NK_CALL, self.get_start(node), self.get_end(node), callee, extra_start, args.len() as i32) as i32
 
 impl Sema:
@@ -461,7 +461,7 @@ impl Sema:
             return 0
         let new_sym = intern.intern("new")
         let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), type_node, new_sym, 0)
-        let no_args: List[i32] = List.new()
+        let no_args: List[i32] = []
         pool.ct_build_call(node, callee as i32, no_args)
 
     fn ct_build_typed_binding(mut pool: AstPool, intern: &InternPool, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
@@ -478,7 +478,7 @@ impl Sema:
         let ctor = self.ct_build_collection_ctor(pool, intern, value.type_id, node)
         if ctor == 0:
             return 0
-        let stmts: List[i32] = List.new()
+        let stmts: List[i32] = []
         let tmp_binding = self.ct_build_typed_binding(pool, intern, tmp_sym, ctor, value.type_id, node, 1)
         if tmp_binding == 0:
             return 0
@@ -491,12 +491,12 @@ impl Sema:
                 return 0
             let recv_ident = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
             let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), recv_ident as i32, push_sym, 0)
-            let args: List[i32] = List.new()
+            let args: List[i32] = []
             args.push(elem_node)
             stmts.push(pool.ct_build_call(node, callee as i32, args))
         let stmt_extra = pool.extra_len()
-        for si in 0..stmts.len():
-            pool.add_extra(stmts[si])
+        for stmt in stmts:
+            pool.add_extra(stmt)
         let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
         pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
 
@@ -505,7 +505,7 @@ impl Sema:
         let ctor = self.ct_build_collection_ctor(pool, intern, value.type_id, node)
         if ctor == 0:
             return 0
-        let stmts: List[i32] = List.new()
+        let stmts: List[i32] = []
         let tmp_binding = self.ct_build_typed_binding(pool, intern, tmp_sym, ctor, value.type_id, node, 1)
         if tmp_binding == 0:
             return 0
@@ -519,13 +519,13 @@ impl Sema:
                 return 0
             let recv_ident = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
             let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), recv_ident as i32, insert_sym, 0)
-            let args: List[i32] = List.new()
+            let args: List[i32] = []
             args.push(key_node)
             args.push(item_node)
             stmts.push(pool.ct_build_call(node, callee as i32, args))
         let stmt_extra = pool.extra_len()
-        for si in 0..stmts.len():
-            pool.add_extra(stmts[si])
+        for stmt in stmts:
+            pool.add_extra(stmt)
         let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
         pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
 
@@ -588,18 +588,18 @@ impl Sema:
             let full = self.pool_resolve(value.data0 as i32)
             let dot = full.rfind(".")
             let bare = if dot >= 0: full[(dot + 1)..] else: full
-            let arg_nodes: List[i32] = List.new()
+            let arg_nodes: List[i32] = []
             for i in 0..value.extra_count:
                 let arg_node = self.ct_build_value_tree(pool, intern, extras[(value.extra_start + i)], node, extras)
                 if arg_node == 0:
                     return 0
                 arg_nodes.push(arg_node)
             let args_start = pool.extra_len()
-            for i in 0..arg_nodes.len():
-                pool.add_extra(arg_nodes[i])
+            for arg_node in arg_nodes:
+                pool.add_extra(arg_node)
             return pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, pool.get_start(node), pool.get_end(node), intern.intern(bare), args_start, value.extra_count) as i32
         if value.kind == ComptimeValueKind.CV_ARRAY or value.kind == ComptimeValueKind.CV_TUPLE:
-            let elem_nodes: List[i32] = List.new()
+            let elem_nodes: List[i32] = []
             for i in 0..value.extra_count:
                 let elem = extras[(value.extra_start + i)]
                 let elem_node = self.ct_build_value_tree(pool, intern, elem, node, extras)
@@ -607,8 +607,8 @@ impl Sema:
                     return 0
                 elem_nodes.push(elem_node)
             let extra_start = pool.extra_len()
-            for i in 0..elem_nodes.len():
-                pool.add_extra(elem_nodes[i])
+            for elem_node in elem_nodes:
+                pool.add_extra(elem_node)
             let out_kind = if value.kind == ComptimeValueKind.CV_ARRAY: NodeKind.NK_ARRAY_LIT else: NodeKind.NK_TUPLE
             return pool.add_node(out_kind, pool.get_start(node), pool.get_end(node), extra_start, value.extra_count, 0) as i32
         if value.kind == ComptimeValueKind.CV_RANGE:
@@ -636,8 +636,8 @@ impl Sema:
             let name_sym = intern.intern(self.pool_resolve(self.get_type_d0(resolved)))
             let te_start = self.get_type_d1(resolved)
             let field_count = self.get_type_d2(resolved)
-            let field_syms: List[i32] = List.new()
-            let field_nodes: List[i32] = List.new()
+            let field_syms: List[i32] = []
+            let field_nodes: List[i32] = []
             for fi in 0..field_count:
                 let field_sym = intern.intern(self.pool_resolve(self.type_extra[(te_start + fi * 3)]))
                 let field_value = extras[(value.extra_start + fi)]
@@ -874,13 +874,13 @@ impl AstPool:
         if kind == NodeKind.NK_CALL or kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT or kind == NodeKind.NK_PAT_TUPLE or kind == NodeKind.NK_PAT_OR:
             let extra_start = if kind == NodeKind.NK_CALL: self.get_data1(node) else: self.get_data0(node)
             let count = if kind == NodeKind.NK_CALL: self.get_data2(node) else: self.get_data1(node)
-            let cloned_items: List[i32] = List.new()
+            let cloned_items: List[i32] = []
             for i in 0..count:
                 let child = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
                 cloned_items.push(child)
             let new_extra = self.extra_len()
-            for i in 0..cloned_items.len():
-                self.add_extra(cloned_items[i])
+            for cloned_item in cloned_items:
+                self.add_extra(cloned_item)
             if kind == NodeKind.NK_CALL:
                 let callee = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
                 let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), callee, new_extra, count, self.literal_suffix(node))
@@ -896,13 +896,13 @@ impl AstPool:
         if kind == NodeKind.NK_BLOCK:
             let extra_start = self.get_data0(node)
             let stmt_count = self.get_data1(node)
-            let stmt_nodes: List[i32] = List.new()
+            let stmt_nodes: List[i32] = []
             for i in 0..stmt_count:
                 let stmt = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
                 stmt_nodes.push(stmt)
             let stmt_extra = self.extra_len()
-            for i in 0..stmt_nodes.len():
-                self.add_extra(stmt_nodes[i])
+            for stmt_node in stmt_nodes:
+                self.add_extra(stmt_node)
             let tail = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
             let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), stmt_extra, stmt_count, tail, self.literal_suffix(node))
             let block_meta = self.find_block_meta(node)
@@ -964,13 +964,13 @@ impl AstPool:
         if kind == NodeKind.NK_MATCH:
             let extra_start = self.get_data1(node)
             let arm_count = self.get_data2(node)
-            let arm_nodes: List[i32] = List.new()
+            let arm_nodes: List[i32] = []
             for i in 0..arm_count:
                 let arm = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
                 arm_nodes.push(arm)
             let new_extra = self.extra_len()
-            for i in 0..arm_nodes.len():
-                self.add_extra(arm_nodes[i])
+            for arm_node in arm_nodes:
+                self.add_extra(arm_node)
             let subject = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), subject, new_extra, arm_count, self.literal_suffix(node))
 
@@ -983,15 +983,15 @@ impl AstPool:
         if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_RECORD_UPDATE:
             let extra_start = self.get_data1(node)
             let field_count = self.get_data2(node)
-            let field_extras: List[i32] = List.new()
+            let field_extras: List[i32] = []
             for i in 0..field_count:
                 let base = extra_start + i * 2
                 field_extras.push(self.get_extra(base))
                 let value = self.ct_clone_tree_with_subst(self.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
                 field_extras.push(value)
             let new_extra = self.extra_len()
-            for i in 0..field_extras.len():
-                self.add_extra(field_extras[i])
+            for field_extra in field_extras:
+                self.add_extra(field_extra)
             let source = if kind == NodeKind.NK_RECORD_UPDATE: self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node) else: self.get_data0(node)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), source, new_extra, field_count, self.literal_suffix(node))
 
@@ -1007,19 +1007,19 @@ impl AstPool:
         if kind == NodeKind.NK_VARIANT_SHORTHAND:
             let arg_count = self.get_data2(node)
             let extra_start = self.get_data1(node)
-            let arg_nodes: List[i32] = List.new()
+            let arg_nodes: List[i32] = []
             for i in 0..arg_count:
                 let arg = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
                 arg_nodes.push(arg)
             let new_extra = self.extra_len()
-            for i in 0..arg_nodes.len():
-                self.add_extra(arg_nodes[i])
+            for arg_node in arg_nodes:
+                self.add_extra(arg_node)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), new_extra, arg_count, self.literal_suffix(node))
 
         if kind == NodeKind.NK_ENUM_VARIANT:
             let old_extra = self.get_data2(node)
             let arg_count = self.get_extra(old_extra)
-            let arg_nodes: List[i32] = List.new()
+            let arg_nodes: List[i32] = []
             for i in 0..arg_count:
                 let arg = self.ct_clone_tree_with_subst(self.get_extra(old_extra + 1 + i), subst_sym, subst_node, index_sym, index_node)
                 arg_nodes.push(arg)
@@ -1032,7 +1032,7 @@ impl AstPool:
         if kind == NodeKind.NK_OPTIONAL_CHAIN:
             let old_extra = self.get_data2(node)
             let has_args = self.get_extra(old_extra)
-            let arg_nodes: List[i32] = List.new()
+            let arg_nodes: List[i32] = []
             let arg_count = if has_args != 0: self.get_extra(old_extra + 1) else: 0
             if has_args != 0:
                 for i in 0..arg_count:
@@ -1116,7 +1116,7 @@ impl AstPool:
         if kind == NodeKind.NK_SELECT_AWAIT:
             let extra_start = self.get_data0(node)
             let arm_count = self.get_data1(node)
-            let arm_extras: List[i32] = List.new()
+            let arm_extras: List[i32] = []
             for i in 0..arm_count:
                 let base = extra_start + i * 3
                 arm_extras.push(self.get_extra(base))
@@ -1125,14 +1125,14 @@ impl AstPool:
                 arm_extras.push(task_expr)
                 arm_extras.push(body)
             let new_extra = self.extra_len()
-            for i in 0..arm_extras.len():
-                self.add_extra(arm_extras[i])
+            for arm_extra in arm_extras:
+                self.add_extra(arm_extra)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), new_extra, arm_count, 0, self.literal_suffix(node))
 
         if kind == NodeKind.NK_FSTRING:
             let seg_count = self.get_data0(node)
             let old_extra = self.get_data1(node)
-            let seg_extras: List[i32] = List.new()
+            let seg_extras: List[i32] = []
             var pos = old_extra
             for _ in 0..seg_count:
                 let seg_kind = self.get_extra(pos)
@@ -1147,8 +1147,8 @@ impl AstPool:
                     seg_extras.push(self.get_extra(pos + 1))
                     pos = pos + 2
             let new_extra = self.extra_len()
-            for i in 0..seg_extras.len():
-                self.add_extra(seg_extras[i])
+            for seg_extra in seg_extras:
+                self.add_extra(seg_extra)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), seg_count, new_extra, 0, self.literal_suffix(node))
 
         if kind == NodeKind.NK_CLOSURE:
@@ -1190,7 +1190,7 @@ impl Sema:
             return wrapper
 
         let template_body = self.ct_transform_expr(pool, intern, pool.get_data2(inner))
-        let stmt_nodes: List[i32] = List.new()
+        let stmt_nodes: List[i32] = []
         let binding = pool.get_data0(inner)
         let for_meta = pool.find_for_meta(inner)
         let index_binding = if for_meta >= 0: pool.for_meta_index_binding(for_meta) else: 0
@@ -1201,14 +1201,14 @@ impl Sema:
                 return wrapper
             var index_node: i32 = 0
             if index_binding != 0:
-                let index_value = comptime_value_int(self.ty_i64 as i32, i as i64)
-                let empty_values: List[ComptimeValue] = List.new()
+                let index_value = comptime_value_int(self.ty_i64 as i32, i)
+                let empty_values: List[ComptimeValue] = []
                 index_node = self.ct_build_value_tree(pool, intern, index_value, wrapper, empty_values)
             let cloned_body = pool.ct_clone_tree_with_subst(template_body, binding, item_node, index_binding, index_node)
             stmt_nodes.push(self.ct_transform_expr(pool, intern, cloned_body))
         let stmt_extra = pool.extra_len()
-        for i in 0..stmt_nodes.len():
-            pool.add_extra(stmt_nodes[i])
+        for stmt_node in stmt_nodes:
+            pool.add_extra(stmt_node)
         pool.add_node(NodeKind.NK_BLOCK, pool.get_start(wrapper), pool.get_end(wrapper), stmt_extra, iter_count, 0) as i32
 
     mut fn ct_rewrite_comptime(mut pool: AstPool, intern: &InternPool, node: i32) -> i32:
@@ -1681,8 +1681,8 @@ impl AstPool:
 
     mut fn ct_build_block(node: i32, stmts: &List[i32], tail: i32) -> i32:
         let stmt_extra = self.extra_len()
-        for si in 0..stmts.len():
-            self.add_extra(stmts[si])
+        for stmt in stmts:
+            self.add_extra(stmt)
         self.add_node(NodeKind.NK_BLOCK, self.get_start(node), self.get_end(node), stmt_extra, stmts.len() as i32, tail) as i32
 
     mut fn ct_add_fn_param(name: i32, type_node: i32, flags: i32):
@@ -1790,7 +1790,7 @@ impl Sema:
         pool.add_node(NodeKind.NK_TYPE_GENERIC, pool.get_start(node), pool.get_end(node), intern.intern("List"), arg_start, 1) as i32
 
     mut fn ct_generate_soa_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             return generated
 
@@ -1816,7 +1816,7 @@ impl Sema:
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
         let type_extra_start = out.get_data1(decl)
-        let soa_field_types: List[i32] = List.new()
+        let soa_field_types: List[i32] = []
         for fi in 0..field_count:
             let field_tid = self.type_extra[(te_start + fi * 3 + 1)]
             let field_type_node = out.get_extra(type_extra_start + 1 + fi * 3 + 1)
@@ -1855,10 +1855,10 @@ impl Sema:
         let source_type = ct_build_generic_self_type(out, decl, type_name_sym, tp_start, tp_count)
         let idx_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, i64_sym, 0, 0)
 
-        let new_field_values: List[i32] = List.new()
+        let new_field_values: List[i32] = []
         for fi in 0..field_count:
             let new_callee = out.ct_build_field_access(decl, soa_field_types[fi], new_sym)
-            let new_args: List[i32] = List.new()
+            let new_args: List[i32] = []
             let new_call = out.ct_build_call(decl, new_callee, new_args)
             new_field_values.push(new_call)
         let new_field_extra = out.extra_len()
@@ -1878,7 +1878,7 @@ impl Sema:
         // the pre-D7 mut-self-returning-self form fails receiver-mode
         // enforcement: "mut receiver is too weak").
         let soa_out_sym = intern.intern("__soa_out")
-        let push_stmts: List[i32] = List.new()
+        let push_stmts: List[i32] = []
         let push_self_ident = out.ct_build_ident(decl, self_sym)
         push_stmts.push(out.add_node(NodeKind.NK_LET_BINDING, start, end, soa_out_sym, push_self_ident as i32, 1) as i32)
         // D32 (§2.2): the row's fields are vacated explicitly — a bare
@@ -1895,7 +1895,7 @@ impl Sema:
             let value_ident = out.ct_build_ident(decl, soa_value_sym)
             let value_field = out.ct_build_field_access(decl, value_ident, field_sym)
             let moved_field = out.add_node(NodeKind.NK_MOVE_ARG, start, end, value_field as i32, 0, 0)
-            let push_args: List[i32] = List.new()
+            let push_args: List[i32] = []
             push_args.push(moved_field as i32)
             push_stmts.push(out.ct_build_call(decl, push_callee, push_args))
         let push_tail = out.ct_build_ident(decl, soa_out_sym)
@@ -1908,7 +1908,7 @@ impl Sema:
         out.add_fn_meta(push_fn, 2 * FN_META_REQUIRED_UNIT, soa_self_type as i32, push_param_start, 2, 0, 0)
         generated.push(push_fn as i32)
 
-        let get_field_values: List[i32] = List.new()
+        let get_field_values: List[i32] = []
         for fi in 0..field_count:
             let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
             let self_ident = out.ct_build_ident(decl, self_sym)
@@ -1930,7 +1930,7 @@ impl Sema:
             let field_tp_sym = ct_type_param_sym_for_type_node(out, out.get_extra(type_extra_start + 1 + fi * 3 + 1), tp_start, tp_count)
             if field_tp_sym != 0 or self.is_copy(elem_tid as TypeId) == 0:
                 let clone_callee = out.ct_build_field_access(decl, get_call, intern.intern("clone"))
-                let clone_args: List[i32] = List.new()
+                let clone_args: List[i32] = []
                 get_call = out.ct_build_call(decl, clone_callee, clone_args)
             get_field_values.push(get_call)
         let get_field_extra = out.extra_len()
@@ -1953,7 +1953,7 @@ impl Sema:
             let self_ident = out.ct_build_ident(decl, self_sym)
             let self_field = out.ct_build_field_access(decl, self_ident, first_field_sym)
             let len_callee = out.ct_build_field_access(decl, self_field, len_sym)
-            let len_args: List[i32] = List.new()
+            let len_args: List[i32] = []
             len_body = out.ct_build_call(decl, len_callee, len_args)
         let len_param_start = out.extra_len()
         out.ct_add_fn_param(self_sym, soa_self_ref_type as i32, FN_PARAM_FLAG_REF_SELF)
@@ -1991,7 +1991,7 @@ impl Sema:
             return 0
         let default_sym = intern.intern("default")
         let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), type_node, default_sym, 0)
-        let no_args: List[i32] = List.new()
+        let no_args: List[i32] = []
         pool.ct_build_call(node, callee as i32, no_args)
 
 fn ct_add_generated_impl_target(mut out: AstPool, decl: i32, impl_node: i32, type_name_sym: i32, tp_start: i32, tp_count: i32, trait_sym: i32):
@@ -2139,11 +2139,11 @@ impl Sema:
         move evald.value.text
 
     mut fn ct_parse_user_derive_source(out: &AstPool, intern: &InternPool, decl: i32, source: &str) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if source.len() == 0:
             return generated
         let before = out.decl_count()
-        var lexer = Lexer.init(source, self.local_file_id)
+        let lexer = Lexer.init(source, self.local_file_id)
         let tokens = lexer.tokenize()
         var parser = Parser.init_with_pool(tokens, source, self.local_file_id, intern, move self.diags, out.clone())
         let parsed = parser.parse_module()
@@ -2156,7 +2156,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_user_defined_derives(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         let meta = out.find_type_meta(decl as NodeId)
         if meta < 0:
             return generated
@@ -2172,8 +2172,8 @@ impl Sema:
                 continue
             let generated_source = self.ct_eval_user_derive_source(out, intern, decl, derive_sym)
             let generated_decls = self.ct_parse_user_derive_source(out, intern, decl, generated_source)
-            for gi in 0..generated_decls.len():
-                generated.push(generated_decls[gi])
+            for generated_decl in generated_decls:
+                generated.push(generated_decl)
         generated
 
 fn ct_type_param_list_contains(out: &AstPool, tp_start: i32, tp_count: i32, sym: i32) -> bool:
@@ -2311,7 +2311,7 @@ fn ct_build_variant_bind_pattern(mut out: AstPool, intern: &InternPool, decl: i3
     let end = out.get_end(decl)
     if payload_count == 0:
         return out.add_node(NodeKind.NK_PAT_VARIANT, start, end, variant_sym, 0, 0) as i32
-    let pats: List[i32] = List.new()
+    let pats: List[i32] = []
     for pi in 0..payload_count:
         pats.push(out.add_node(NodeKind.NK_PAT_IDENT, start, end, ct_payload_bind_sym(intern, pi), 0, 0) as i32)
     let pat_extra = out.extra_len()
@@ -2321,8 +2321,8 @@ fn ct_build_variant_bind_pattern(mut out: AstPool, intern: &InternPool, decl: i3
 
 fn ct_build_match(mut out: AstPool, decl: i32, subject: i32, arms: &List[i32]) -> i32:
     let arm_start = out.extra_len()
-    for ai in 0..arms.len():
-        out.add_extra(arms[ai])
+    for arm in arms:
+        out.add_extra(arm)
     out.add_node(NodeKind.NK_MATCH, out.get_start(decl), out.get_end(decl), subject, arm_start, arms.len() as i32) as i32
 
 fn ct_build_self_field(mut out: AstPool, decl: i32, self_sym: i32, field_sym: i32) -> i32:
@@ -2335,17 +2335,17 @@ fn ct_build_method_call(mut out: AstPool, decl: i32, receiver: i32, method_sym: 
 
 fn ct_build_generic_type(mut out: AstPool, decl: i32, type_sym: i32, args: &List[i32]) -> i32:
     let arg_start = out.extra_len()
-    for ai in 0..args.len():
-        out.add_extra(args[ai])
+    for arg in args:
+        out.add_extra(arg)
     out.add_node(NodeKind.NK_TYPE_GENERIC, out.get_start(decl), out.get_end(decl), type_sym, arg_start, args.len() as i32) as i32
 
 fn ct_build_option_type(mut out: AstPool, intern: &InternPool, decl: i32, payload_type: i32) -> i32:
-    let args: List[i32] = List.new()
+    let args: List[i32] = []
     args.push(payload_type)
     ct_build_generic_type(out, decl, intern.intern("Option"), args)
 
 fn ct_build_result_type(mut out: AstPool, intern: &InternPool, decl: i32, ok_type: i32, err_type: i32) -> i32:
-    let args: List[i32] = List.new()
+    let args: List[i32] = []
     args.push(ok_type)
     args.push(err_type)
     ct_build_generic_type(out, decl, intern.intern("Result"), args)
@@ -2356,8 +2356,8 @@ fn ct_build_variant_call(mut out: AstPool, intern: &InternPool, decl: i32, varia
 
 fn ct_build_variant_shorthand(mut out: AstPool, intern: &InternPool, decl: i32, variant_name: &str, args: &List[i32]) -> i32:
     let extra_start = out.extra_len()
-    for ai in 0..args.len():
-        out.add_extra(args[ai])
+    for arg in args:
+        out.add_extra(arg)
     out.add_node(NodeKind.NK_VARIANT_SHORTHAND, out.get_start(decl), out.get_end(decl), intern.intern(variant_name), extra_start, args.len() as i32) as i32
 
 fn ct_build_return(mut out: AstPool, decl: i32, value: i32) -> i32:
@@ -2367,7 +2367,7 @@ fn ct_build_let_binding(mut out: AstPool, decl: i32, name_sym: i32, value: i32) 
     out.add_node(NodeKind.NK_LET_BINDING, out.get_start(decl), out.get_end(decl), name_sym, value, 0) as i32
 
 fn ct_build_empty_block(mut out: AstPool, decl: i32) -> i32:
-    let stmts: List[i32] = List.new()
+    let stmts: List[i32] = []
     out.ct_build_block(decl, stmts, 0)
 
 fn ct_build_if_expr(mut out: AstPool, decl: i32, cond: i32, then_body: i32, else_body: i32) -> i32:
@@ -2375,7 +2375,7 @@ fn ct_build_if_expr(mut out: AstPool, decl: i32, cond: i32, then_body: i32, else
 
 impl Sema:
     mut fn ct_generate_copy_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         let copy_trait_sym = intern.intern("Copy")
         if self.type_decl_has_derive(decl, copy_trait_sym) == false:
             return generated
@@ -2388,7 +2388,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_default_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             return generated
 
@@ -2422,8 +2422,8 @@ impl Sema:
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
         let type_extra_start = out.get_data1(decl)
-        let field_syms: List[i32] = List.new()
-        let field_values: List[i32] = List.new()
+        let field_syms: List[i32] = []
+        let field_values: List[i32] = []
         for fi in 0..field_count:
             let field_sym = self.type_extra[(te_start + fi * 3)]
             let field_tid = self.type_extra[(te_start + fi * 3 + 1)]
@@ -2457,7 +2457,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_eq_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             return generated
 
@@ -2503,7 +2503,7 @@ impl Sema:
             let lhs_field = ct_build_self_field(out, decl, self_sym, field_sym)
             let other_ident = out.ct_build_ident(decl, other_sym)
             let rhs_field = out.ct_build_field_access(decl, other_ident, field_sym)
-            let args: List[i32] = List.new()
+            let args: List[i32] = []
             args.push(rhs_field)
             let eq_call = ct_build_method_call(out, decl, lhs_field, eq_method_sym, args)
             if first:
@@ -2530,7 +2530,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_ord_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             return generated
 
@@ -2569,16 +2569,16 @@ impl Sema:
 
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
-        let stmts: List[i32] = List.new()
+        let stmts: List[i32] = []
         for fi in 0..field_count:
             let field_sym = self.type_extra[(te_start + fi * 3)]
             let lhs_field = ct_build_self_field(out, decl, self_sym, field_sym)
             let other_ident = out.ct_build_ident(decl, other_sym)
             let rhs_field = out.ct_build_field_access(decl, other_ident, field_sym)
-            let args: List[i32] = List.new()
+            let args: List[i32] = []
             args.push(rhs_field)
             let cmp_call = ct_build_method_call(out, decl, lhs_field, cmp_method_sym, args)
-            let tmp_sym = intern.intern("__with_derive_cmp_" ++ with_i64_to_str(fi as i64))
+            let tmp_sym = intern.intern("__with_derive_cmp_" ++ with_i64_to_str(fi))
             stmts.push(ct_build_let_binding(out, decl, tmp_sym, cmp_call))
             let tmp_ident = out.ct_build_ident(decl, tmp_sym)
             let neq_zero = out.ct_build_binary(decl, BinaryOp.OP_NEQ, tmp_ident, out.ct_build_int_lit(decl, 0))
@@ -2623,7 +2623,7 @@ fn ct_build_fstring_self(mut out: AstPool, decl: i32, self_sym: i32, debug_mode:
 
 impl Sema:
     mut fn ct_generate_error_format_impl(mut out: AstPool, intern: &InternPool, decl: i32, trait_sym: i32, method_sym: i32, debug_mode: i32, receiver_flags: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         let type_name_sym = out.get_data0(decl)
         if self.lookup_method_sig(type_name_sym, method_sym) >= 0:
             return generated
@@ -2662,7 +2662,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_error_decl_impls(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         let packed_kind = out.get_data2(decl)
         if type_decl_is_error(packed_kind) == 0 or type_decl_sub_kind(packed_kind) != TypeDeclKind.Enum:
             return generated
@@ -2672,21 +2672,21 @@ impl Sema:
         // `:?` must not dispatch back through it.
         if debug_impl.len() > 0:
             out.mark_generated_debug_type(out.get_data0(decl))
-        for i in 0..debug_impl.len():
-            generated.push(debug_impl[i])
+        for debug_impl_item in debug_impl:
+            generated.push(debug_impl_item)
 
         let display_impl = self.ct_generate_error_format_impl(out, intern, decl, intern.intern("Display"), intern.intern("to_str"), 0, FN_PARAM_FLAG_MOVE_SELF)
-        for i in 0..display_impl.len():
-            generated.push(display_impl[i])
+        for display_impl_item in display_impl:
+            generated.push(display_impl_item)
 
         let error_impl = self.ct_generate_error_format_impl(out, intern, decl, intern.intern("Error"), intern.intern("display"), 0, FN_PARAM_FLAG_REF_SELF)
-        for i in 0..error_impl.len():
-            generated.push(error_impl[i])
+        for error_impl_item in error_impl:
+            generated.push(error_impl_item)
 
         generated
 
     mut fn ct_generate_debug_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         let is_enum = ct_type_decl_is_enum(out, decl)
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct and not is_enum:
             return generated
@@ -2743,7 +2743,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_display_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         let display_trait_sym = intern.intern("Display")
         let sub_kind = type_decl_sub_kind(out.get_data2(decl))
         if sub_kind != TypeDeclKind.Enum and sub_kind != TypeDeclKind.DiscEnum:
@@ -2781,7 +2781,7 @@ impl Sema:
 
         let te_start = self.get_type_d1(resolved)
         let variant_count = self.get_type_d2(resolved)
-        let arms: List[i32] = List.new()
+        let arms: List[i32] = []
         var pos = te_start
         for vi in 0..variant_count:
             let variant_sym = self.type_extra[pos]
@@ -2799,8 +2799,8 @@ impl Sema:
             arms.push(arm as i32)
             pos = pos + 2 + payload_count
         let arm_start = out.extra_len()
-        for ai in 0..arms.len():
-            out.add_extra(arms[ai])
+        for arm in arms:
+            out.add_extra(arm)
         let self_ident = out.ct_build_ident(decl, self_sym)
         let subject = out.add_node(NodeKind.NK_UNARY, start, end, UnaryOp.UOP_DEREF, self_ident, 0)
         let body = out.add_node(NodeKind.NK_MATCH, start, end, subject as i32, arm_start, variant_count)
@@ -2826,20 +2826,20 @@ impl Sema:
     mut fn ct_enum_clone_body(mut out: AstPool, intern: &InternPool, decl: i32, resolved: TypeId, self_sym: i32, clone_method_sym: i32) -> i32:
         let start = out.get_start(decl)
         let end = out.get_end(decl)
-        let arms: List[i32] = List.new()
+        let arms: List[i32] = []
         var pos = self.get_type_d1(resolved)
         for _ in 0..self.get_type_d2(resolved):
             let variant_sym: i32 = self.type_extra[pos]
             let payload_count: i32 = self.type_extra[(pos + 1)]
             let pat = ct_build_variant_bind_pattern(out, intern, decl, variant_sym, payload_count)
-            let args: List[i32] = List.new()
+            let args: List[i32] = []
             for pi in 0..payload_count:
                 let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
                 let payload = out.ct_build_ident(decl, ct_payload_bind_sym(intern, pi))
                 if self.is_copy(payload_tid as TypeId) != 0 and self.type_declares_clone(payload_tid) == 0:
                     args.push(payload)
                 else:
-                    let no_args: List[i32] = List.new()
+                    let no_args: List[i32] = []
                     args.push(ct_build_method_call(out, decl, payload, clone_method_sym, no_args))
             let body = ct_build_variant_shorthand(out, intern, decl, intern.resolve(variant_sym), args)
             arms.push(out.add_node(NodeKind.NK_MATCH_ARM, start, end, pat, body, 0) as i32)
@@ -2847,7 +2847,7 @@ impl Sema:
         ct_build_match(out, decl, out.ct_build_ident(decl, self_sym), arms)
 
     mut fn ct_generate_clone_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         let is_enum = ct_type_decl_is_enum(out, decl)
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct and not is_enum:
             return generated
@@ -2889,8 +2889,8 @@ impl Sema:
         else:
             let te_start = self.get_type_d1(resolved)
             let field_count = self.get_type_d2(resolved)
-            let field_syms: List[i32] = List.new()
-            let field_values: List[i32] = List.new()
+            let field_syms: List[i32] = []
+            let field_values: List[i32] = []
             for fi in 0..field_count:
                 let field_sym: i32 = self.type_extra[(te_start + fi * 3)]
                 let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
@@ -2903,7 +2903,7 @@ impl Sema:
                     if self.is_copy(field_tid as TypeId) != 0 and self.type_declares_clone(field_tid) == 0:
                         field_expr
                     else:
-                        let no_args: List[i32] = List.new()
+                        let no_args: List[i32] = []
                         ct_build_method_call(out, decl, field_expr, clone_method_sym, no_args)
                 field_syms.push(field_sym)
                 field_values.push(field_value)
@@ -2933,7 +2933,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_builder_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             return generated
 
@@ -2978,8 +2978,8 @@ impl Sema:
                 self.ct_emit_error(out, decl, "derive Builder cannot generate a setter for field 'build' because it conflicts with build()")
                 return generated
 
-        let builder_field_syms: List[i32] = List.new()
-        let builder_field_types: List[i32] = List.new()
+        let builder_field_syms: List[i32] = []
+        let builder_field_types: List[i32] = []
         for fi2 in 0..field_count:
             builder_field_syms.push(self.type_extra[(te_start + fi2 * 3)])
             let field_type_node = out.get_extra(type_extra_start + 1 + fi2 * 3 + 1)
@@ -3008,7 +3008,7 @@ impl Sema:
             let field_type_node = out.get_extra(type_extra_start + 1 + fi4 * 3 + 1)
             let param_type = out.ct_clone_tree_with_subst(field_type_node, 0, 0, 0, 0)
             let val_ident = out.ct_build_ident(decl, val_sym)
-            let some_args: List[i32] = List.new()
+            let some_args: List[i32] = []
             some_args.push(val_ident)
             let some_value = ct_build_variant_call(out, intern, decl, "Some", some_args)
             let update_extra = out.extra_len()
@@ -3032,11 +3032,11 @@ impl Sema:
         // explicitly through a `var` rebind (an owned move-self is a read
         // path), exactly as the SoA push does.
         let build_owner_sym = intern.intern("__builder")
-        let build_stmts: List[i32] = List.new()
+        let build_stmts: List[i32] = []
         let build_self_ident = out.ct_build_ident(decl, self_sym)
         build_stmts.push(out.add_node(NodeKind.NK_LET_BINDING, start, end, build_owner_sym, build_self_ident as i32, 1) as i32)
-        let field_syms: List[i32] = List.new()
-        let field_values: List[i32] = List.new()
+        let field_syms: List[i32] = []
+        let field_values: List[i32] = []
         for fi5 in 0..field_count:
             let field_sym = self.type_extra[(te_start + fi5 * 3)]
             let owner_field = ct_build_self_field(out, decl, build_owner_sym, field_sym)
@@ -3046,10 +3046,10 @@ impl Sema:
             if default_node != 0:
                 fallback = out.ct_clone_tree_with_subst(default_node, 0, 0, 0, 0)
             else:
-                let missing_args: List[i32] = List.new()
+                let missing_args: List[i32] = []
                 missing_args.push(out.ct_build_string_lit(intern, decl, intern.resolve(field_sym)))
                 let missing = ct_build_variant_shorthand(out, intern, decl, "MissingField", missing_args)
-                let err_args: List[i32] = List.new()
+                let err_args: List[i32] = []
                 err_args.push(missing)
                 let err_value = ct_build_variant_call(out, intern, decl, "Err", err_args)
                 fallback = ct_build_return(out, decl, err_value)
@@ -3070,14 +3070,14 @@ impl Sema:
         generated.push(build_fn as i32)
 
         let none_sym = intern.intern("None")
-        let ctor_fields: List[i32] = List.new()
+        let ctor_fields: List[i32] = []
         for fi7 in 0..field_count:
             let field_sym = self.type_extra[(te_start + fi7 * 3)]
             ctor_fields.push(field_sym)
             ctor_fields.push(out.ct_build_ident(decl, none_sym))
         let ctor_extra = out.extra_len()
-        for ci in 0..ctor_fields.len():
-            out.add_extra(ctor_fields[ci])
+        for ctor_field in ctor_fields:
+            out.add_extra(ctor_field)
         let ctor_body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, builder_sym, ctor_extra, field_count)
         let builder_ret_type = ct_build_generic_self_type(out, decl, builder_sym, tp_start, tp_count)
         let ctor_fn_sym = intern.intern(type_name ++ ".builder")
@@ -3109,7 +3109,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_serialize_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             return generated
 
@@ -3140,7 +3140,7 @@ impl Sema:
 
         let out_ident = out.ct_build_ident(decl, out_sym)
         let begin_callee = out.ct_build_field_access(decl, out_ident, begin_object_sym)
-        let no_args: List[i32] = List.new()
+        let no_args: List[i32] = []
         var writer_expr = out.ct_build_call(decl, begin_callee, no_args)
 
         let type_extra_start = out.get_data1(decl)
@@ -3148,14 +3148,14 @@ impl Sema:
         for fi in 0..field_count:
             let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
             let key_callee = out.ct_build_field_access(decl, writer_expr, key_sym)
-            let key_args: List[i32] = List.new()
+            let key_args: List[i32] = []
             key_args.push(out.ct_build_string_lit(intern, decl, intern.resolve(field_sym)))
             writer_expr = out.ct_build_call(decl, key_callee, key_args)
 
             let self_ident = out.ct_build_ident(decl, self_sym)
             let self_field = out.ct_build_field_access(decl, self_ident, field_sym)
             let serialize_callee = out.ct_build_field_access(decl, self_field, serialize_method_sym)
-            let serialize_args: List[i32] = List.new()
+            let serialize_args: List[i32] = []
             serialize_args.push(writer_expr)
             writer_expr = out.ct_build_call(decl, serialize_callee, serialize_args)
 
@@ -3184,7 +3184,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_deserialize_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             return generated
 
@@ -3220,8 +3220,8 @@ impl Sema:
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
         let type_extra_start = out.get_data1(decl)
-        let field_syms: List[i32] = List.new()
-        let field_values: List[i32] = List.new()
+        let field_syms: List[i32] = []
+        let field_values: List[i32] = []
         for fi in 0..field_count:
             let field_sym = self.type_extra[(te_start + fi * 3)]
             let field_tid = self.type_extra[(te_start + fi * 3 + 1)]
@@ -3232,11 +3232,11 @@ impl Sema:
                 return generated
             let input_ident = out.ct_build_ident(decl, input_sym)
             let field_callee = out.ct_build_field_access(decl, input_ident, field_method_sym)
-            let field_args: List[i32] = List.new()
+            let field_args: List[i32] = []
             field_args.push(out.ct_build_string_lit(intern, decl, intern.resolve(field_sym)))
             let field_view = out.ct_build_call(decl, field_callee, field_args)
             let deserialize_callee = out.ct_build_field_access(decl, field_type, deserialize_method_sym)
-            let deserialize_args: List[i32] = List.new()
+            let deserialize_args: List[i32] = []
             deserialize_args.push(field_view)
             let field_value = out.ct_build_call(decl, deserialize_callee, deserialize_args)
             field_syms.push(field_sym)
@@ -3268,7 +3268,7 @@ impl Sema:
         generated
 
     mut fn ct_generate_component_id_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
-        let generated: List[i32] = List.new()
+        let generated: List[i32] = []
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             return generated
 
@@ -3355,8 +3355,8 @@ impl Sema:
         let saved_module_import_selected = sema_clone_str_list(self.module_import_selected)
         let saved_module_import_offsets = sema_clone_i32_list(self.module_import_offsets)
         let saved_global_module_paths = ct_new_list_str()
-        for smi in 0..saved_module_paths.len():
-            let module_path = saved_module_paths[smi]
+        for saved_module_path in saved_module_paths:
+            let module_path = saved_module_path
             if self.global_visible_module_paths.contains(module_path):
                 saved_global_module_paths.push(sema_owned_text(module_path))
 
@@ -3374,10 +3374,10 @@ impl Sema:
         let deserialize_trait_sym = intern.intern("Deserialize")
         let component_id_trait_sym = intern.intern("ComponentId")
 
-        let ordered: List[i32] = List.new()
+        let ordered: List[i32] = []
         let ordered_paths = ct_new_list_str()
-        let ordered_file_ids: List[i32] = List.new()
-        let ordered_ci: List[i32] = List.new()
+        let ordered_file_ids: List[i32] = []
+        let ordered_ci: List[i32] = []
         let base_decl_count = out.decl_count()
         var generated_local_count: i32 = 0
         // A derive diagnostic is rendered against the declaring file, not
@@ -3406,8 +3406,8 @@ impl Sema:
                 continue
             if self.type_decl_has_derive(decl as i32, copy_trait_sym):
                 let generated_copy = self.ct_generate_copy_derive(out, intern, decl as i32)
-                for gi in 0..generated_copy.len():
-                    ordered.push(generated_copy[gi])
+                for generated_copy_item in generated_copy:
+                    ordered.push(generated_copy_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3415,8 +3415,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_copy.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, default_trait_sym, all_sym):
                 let generated_defaults = self.ct_generate_default_derive(out, intern, decl as i32)
-                for gi in 0..generated_defaults.len():
-                    ordered.push(generated_defaults[gi])
+                for generated_default in generated_defaults:
+                    ordered.push(generated_default)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3424,8 +3424,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_defaults.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, eq_trait_sym, all_sym):
                 let generated_eq = self.ct_generate_eq_derive(out, intern, decl as i32)
-                for gi in 0..generated_eq.len():
-                    ordered.push(generated_eq[gi])
+                for generated_eq_item in generated_eq:
+                    ordered.push(generated_eq_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3433,8 +3433,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_eq.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, ord_trait_sym, all_sym):
                 let generated_ord = self.ct_generate_ord_derive(out, intern, decl as i32)
-                for gi in 0..generated_ord.len():
-                    ordered.push(generated_ord[gi])
+                for generated_ord_item in generated_ord:
+                    ordered.push(generated_ord_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3442,8 +3442,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_ord.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, debug_trait_sym, all_sym):
                 let generated_debug = self.ct_generate_debug_derive(out, intern, decl as i32)
-                for gi in 0..generated_debug.len():
-                    ordered.push(generated_debug[gi])
+                for generated_debug_item in generated_debug:
+                    ordered.push(generated_debug_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3451,8 +3451,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_debug.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, display_trait_sym, all_sym):
                 let generated_display = self.ct_generate_display_derive(out, intern, decl as i32)
-                for gi in 0..generated_display.len():
-                    ordered.push(generated_display[gi])
+                for generated_display_item in generated_display:
+                    ordered.push(generated_display_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3460,8 +3460,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_display.len()) as i32
             if type_decl_is_error(out.get_data2(decl)) != 0:
                 let generated_error = self.ct_generate_error_decl_impls(out, intern, decl as i32)
-                for gi in 0..generated_error.len():
-                    ordered.push(generated_error[gi])
+                for generated_error_item in generated_error:
+                    ordered.push(generated_error_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3469,8 +3469,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_error.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, clone_trait_sym, all_sym):
                 let generated_clone = self.ct_generate_clone_derive(out, intern, decl as i32)
-                for gi in 0..generated_clone.len():
-                    ordered.push(generated_clone[gi])
+                for generated_clone_item in generated_clone:
+                    ordered.push(generated_clone_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3478,8 +3478,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_clone.len()) as i32
             if self.type_decl_has_derive(decl as i32, builder_trait_sym):
                 let generated_builder = self.ct_generate_builder_derive(out, intern, decl as i32)
-                for gi in 0..generated_builder.len():
-                    ordered.push(generated_builder[gi])
+                for generated_builder_item in generated_builder:
+                    ordered.push(generated_builder_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3487,8 +3487,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_builder.len()) as i32
             if self.type_decl_has_derive(decl as i32, soa_trait_sym):
                 let generated_soa = self.ct_generate_soa_derive(out, intern, decl as i32)
-                for gi in 0..generated_soa.len():
-                    ordered.push(generated_soa[gi])
+                for generated_soa_item in generated_soa:
+                    ordered.push(generated_soa_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3496,8 +3496,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_soa.len()) as i32
             if self.type_decl_has_derive(decl as i32, serialize_trait_sym):
                 let generated_serialize = self.ct_generate_serialize_derive(out, intern, decl as i32)
-                for gi in 0..generated_serialize.len():
-                    ordered.push(generated_serialize[gi])
+                for generated_serialize_item in generated_serialize:
+                    ordered.push(generated_serialize_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3505,8 +3505,8 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_serialize.len()) as i32
             if self.type_decl_has_derive(decl as i32, deserialize_trait_sym):
                 let generated_deserialize = self.ct_generate_deserialize_derive(out, intern, decl as i32)
-                for gi in 0..generated_deserialize.len():
-                    ordered.push(generated_deserialize[gi])
+                for generated_deserialize_item in generated_deserialize:
+                    ordered.push(generated_deserialize_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
@@ -3514,16 +3514,16 @@ impl Sema:
                     generated_local_count = (generated_local_count + generated_deserialize.len()) as i32
             if self.type_decl_has_derive(decl as i32, component_id_trait_sym):
                 let generated_component_id = self.ct_generate_component_id_derive(out, intern, decl as i32)
-                for gi in 0..generated_component_id.len():
-                    ordered.push(generated_component_id[gi])
+                for generated_component_id_item in generated_component_id:
+                    ordered.push(generated_component_id_item)
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_component_id.len()) as i32
             let generated_user_derives = self.ct_generate_user_defined_derives(out, intern, decl as i32)
-            for gi in 0..generated_user_derives.len():
-                ordered.push(generated_user_derives[gi])
+            for generated_user_derive in generated_user_derives:
+                ordered.push(generated_user_derive)
                 ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
@@ -3532,8 +3532,8 @@ impl Sema:
         self.local_file_id = saved_file_id
         while out.decl_count() > 0:
             out.state.decls.pop()
-        for oi in 0..ordered.len():
-            out.add_decl(ordered[oi])
+        for ordered_item in ordered:
+            out.add_decl(ordered_item)
 
         let local_limit = source_ast.local_decl_count()
         if local_limit >= 0:

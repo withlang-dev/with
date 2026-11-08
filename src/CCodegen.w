@@ -540,7 +540,7 @@ fn cc_hex_digit(v: i32) -> str:
     "F"
 
 fn cc_escape_c_string(text: &str) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    let out = StringBuilder.with_capacity(text.len())
     for i in 0..text.len():
         let b = text[i]
         if b == 92: // '\'
@@ -584,7 +584,7 @@ fn cc_hex_digit_value(ch: i32) -> i32:
     -1
 
 fn cc_decode_with_string_escapes(text: &str) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    let out = StringBuilder.with_capacity(text.len())
     var i = 0
     while i < text.len():
         let ch = text[i]
@@ -761,8 +761,8 @@ fn cc_cstr_literal_bytes_initializer(text: &str) -> str:
     out ++ "0" ++ cc_rbrace()
 
 fn cc_str_list_contains(values: &List[str], needle: &str) -> bool:
-    for i in 0..values.len():
-        if values[i] == needle:
+    for value in values:
+        if value == needle:
             return true
     false
 
@@ -1106,7 +1106,7 @@ impl CCodegen:
         self.source_text_for_path(self.decl_source_path(decl))
 
 fn cc_path_with_slashes(path: &str) -> str:
-    var out = StringBuilder.with_capacity(path.len())
+    let out = StringBuilder.with_capacity(path.len())
     for i in 0..path.len():
         let ch = path[i]
         if ch == 92:
@@ -1134,7 +1134,7 @@ fn cc_path_find(text: &str, needle: &str) -> isize:
 
 fn cc_line_directive_path(path: &str) -> str:
     let p = cc_path_with_slashes(path)
-    let anchors: List[str] = List.new()
+    let anchors: List[str] = []
     anchors.push("/out/gen/")
     anchors.push("/src/")
     anchors.push("/lib/")
@@ -1574,7 +1574,7 @@ impl CCodegen:
 
     mut fn payload_enum_variant_format_expr(enum_tid: i32, expr: &str, variant_index: i32, context: &str) -> str:
         let name_sym = self.sema.type_reflection_variant_name(enum_tid, variant_index)
-        let variant_name: str = with_str_clone_ref(self.sema.pool_resolve(name_sym))
+        let variant_name = with_str_clone_ref(self.sema.pool_resolve(name_sym))
         var out = "WITH_STR_LIT(\"" ++ cc_escape_c_string(variant_name) ++ "\")"
         let payload_count = self.sema.type_reflection_variant_payload_count(enum_tid, variant_index)
         if payload_count <= 0:
@@ -2650,7 +2650,7 @@ impl CCodegen:
     fn option_tid_for_payload(payload_tid: i32) -> i32:
         if payload_tid == 0 or self.is_void_tid(payload_tid):
             return 0
-        let args: List[i32] = List.new()
+        let args: List[i32] = []
         args.push(payload_tid)
         self.sema.find_generic_inst_type(self.sema.syms.option, args, 1) as i32
 
@@ -3005,7 +3005,7 @@ impl CCodegen:
         out
 
 fn cc_zero_i32_list(count: i32) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     for i in 0..count:
         out.push(0)
     out
@@ -3583,7 +3583,7 @@ impl CCodegen:
         "((" ++ self.c_type(tid, 0) ++ ")&" ++ cc_cstr_literal_view_name(text) ++ ")"
 
     mut fn collect_cstr_literal_texts() -> List[str]:
-        var texts: List[str] = List.new()
+        var texts: List[str] = []
         let used_globals = self.collect_referenced_global_syms()
         if self.had_error != 0:
             return texts
@@ -3628,7 +3628,7 @@ impl CCodegen:
         var out = ""
         // One definition per text: a literal reached twice (a global the
         // lowering referenced twice) is still one C constant.
-        var emitted: List[str] = List.new()
+        let emitted: List[str] = []
         for i in 0..texts.len():
             let text = texts[i]
             if emitted.contains(text): continue
@@ -4158,7 +4158,7 @@ impl CCodegen:
                             field_text = self.fat_fn_literal(field_fn_sym, self.sema.resolve_alias(field_tid) as i32)
                     fields_text = fields_text ++ "." ++ cc_payload_struct_field(pi) ++ " = " ++ field_text
                 return self.payload_enum_literal(dst_tid, variant_index, fields_text ++ cc_rbrace())
-            var unit_variant: i32 = variant_index
+            var unit_variant = variant_index
             if self.sema.type_reflection_variant_payload_count(dst_tid, unit_variant) != 0:
                 unit_variant = self.payload_enum_single_unit_variant(dst_tid)
             if unit_variant < 0:
@@ -4465,7 +4465,7 @@ impl CCodegen:
             if i > 0:
                 out = out ++ ", "
             out = out ++ self.str_value_text(body, body.call_arg_operands[(start + i)])
-        out ++ "}, " ++ with_i64_to_str(count as i64) ++ ")"
+        out ++ "}, " ++ with_i64_to_str(count) ++ ")"
 
     fn local_assigned_fn_sym_depth(body: &MirBody, local_id: i32, depth: i32) -> i32:
         if local_id < 0:
@@ -4586,7 +4586,7 @@ impl CCodegen:
     fn place_kind_cache_lookup(body_fn_sym: i32, place_id: i32) -> Option[CcPlaceKind]:
         let raw = self.place_kind_cache.get(cc_body_local_cache_key(body_fn_sym, place_id))
         if raw.is_some():
-            return Some(raw.unwrap() as CcPlaceKind)
+            return raw.unwrap() as CcPlaceKind
         None
 
     mut fn place_kind_cache_store(body_fn_sym: i32, place_id: i32, kind: CcPlaceKind):
@@ -4595,7 +4595,7 @@ impl CCodegen:
     fn callee_hint_cache_lookup(fn_sym: i32) -> Option[CcCalleeHint]:
         let raw = self.callee_hint_cache.get(fn_sym)
         if raw.is_some():
-            return Some(raw.unwrap() as CcCalleeHint)
+            return raw.unwrap() as CcCalleeHint
         None
 
     mut fn callee_hint_cache_store(fn_sym: i32, kind: CcCalleeHint):
@@ -5184,8 +5184,8 @@ type CReach {
 }
 
 fn CReach.new(n: isize) -> CReach:
-    var marked: List[bool] = List.new()
-    var done: List[bool] = List.new()
+    let marked: List[bool] = []
+    let done: List[bool] = []
     for _ in 0..n:
         marked.push(false)
         done.push(false)
@@ -5211,7 +5211,7 @@ impl CReach:
                 continue
             let start = i
             while i < n and cc_is_ident_char(text[i]): i += 1
-            if not is_digit(text[i - 1] as i32) or i - start < 4: continue
+            if not is_digit(text[i - 1]) or i - start < 4: continue
             let id = text.slice(start, i)
             if not id.contains("__"): continue
             let body: i32 = self.by_name.get(id) ?? -1
@@ -6154,7 +6154,7 @@ impl CCodegen:
             if dst_atomic != 0 and self.is_void_tid(dst_atomic) == false:
                 return dst_atomic
             let payload = self.atomic_recv_value_tid(body, args_id)
-            let args: List[i32] = List.new()
+            let args: List[i32] = []
             args.push(payload)
             args.push(payload)
             return self.sema.find_generic_inst_type(self.sema.syms.result, args, 2) as i32
@@ -7239,7 +7239,7 @@ impl CCodegen:
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let rf_es = self.list_recv_elem_sizeof_text(body, args_id)
             let elem_text = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = "    " ++ cc_lbrace() ++ " with_vec_restore_front_es((uint8_t*)" ++ recv_ptr ++ ", (const uint8_t*)&(" ++ elem_text ++ "), " ++ rf_es ++ "); " ++ cc_rbrace() ++ "\n"
+            let out = "    " ++ cc_lbrace() ++ " with_vec_restore_front_es((uint8_t*)" ++ recv_ptr ++ ", (const uint8_t*)&(" ++ elem_text ++ "), " ++ rf_es ++ "); " ++ cc_rbrace() ++ "\n"
             return out ++ f"    goto bb{next_bb};"
 
         if kind == CcBuiltin.LIST_TAKE_FRONT:
@@ -8883,7 +8883,7 @@ impl CCodegen:
             if self.check_interrupted() != 0:
                 self.in_field_cache_build = 0
                 return
-            let body = self.mir_body_at(bi as i64)
+            let body = self.mir_body_at(bi)
             for bb in 0..body.block_count():
                 if self.check_interrupted() != 0:
                     self.in_field_cache_build = 0
@@ -8946,7 +8946,7 @@ impl CCodegen:
         for bi in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return 0
-            let body = self.mir_body_at(bi as i64)
+            let body = self.mir_body_at(bi)
 
             for bb in 0..body.block_count():
                 if self.check_interrupted() != 0:
@@ -9557,8 +9557,8 @@ impl CCodegen:
                     acc.out.push(resolved as i32)
                 var generic_acc = acc
                 let field_tids = self.synthetic_generic_struct_field_tids(resolved as i32)
-                for fi in 0..field_tids.len():
-                    generic_acc = self.collect_struct_types_from_tid(generic_acc, field_tids[fi])
+                for field_tid in field_tids:
+                    generic_acc = self.collect_struct_types_from_tid(generic_acc, field_tid)
                 return generic_acc
             if base_name == "List" or base_name == "HashMap" or base_name == "HashSet":
                 // The container itself is the runtime's with_vec/with_map,
@@ -9598,7 +9598,7 @@ impl CCodegen:
         acc
 
     fn synthetic_generic_struct_field_tids(tid: i32) -> List[i32]:
-        let fields: List[i32] = List.new()
+        let fields: List[i32] = []
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
         if self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
             return fields
@@ -9665,7 +9665,7 @@ impl CCodegen:
         for bi in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return move acc.out
-            let body = self.mir_body_at(bi as i64)
+            let body = self.mir_body_at(bi)
             for li in 0..body.local_type_ids.len():
                 acc = self.collect_fn_types_from_tid(acc, body.local_type_ids[li])
             let sig_idx = self.body_sig_index(body.fn_sym)
@@ -9684,7 +9684,7 @@ impl CCodegen:
         for bi in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return move acc.out
-            let body = self.mir_body_at(bi as i64)
+            let body = self.mir_body_at(bi)
             for bb in 0..body.block_count():
                 if self.check_interrupted() != 0:
                     return move acc.out
@@ -9739,8 +9739,8 @@ impl CCodegen:
         // needs its forward typedef before the fn typedefs: collected as a
         // signature's parameters are.
         let fn_tids = self.collect_used_fn_types()
-        for fi in 0..fn_tids.len():
-            let ftid = self.sema.resolve_alias(fn_tids[fi] as TypeId)
+        for fn_tid in fn_tids:
+            let ftid = self.sema.resolve_alias(fn_tid as TypeId)
             let fkind = self.sema.get_type_kind(ftid)
             if fkind != TypeKind.TY_FN and fkind != TypeKind.TY_EXTERN_FN: continue
             acc = self.collect_struct_types_from_tid(acc, self.sema.get_type_d2(ftid))
@@ -9758,10 +9758,10 @@ impl CCodegen:
             let tk = self.sema.get_type_kind(resolved as TypeId)
             if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_needs_struct_def(resolved):
                 let field_tids = self.synthetic_generic_struct_field_tids(resolved)
-                for fi in 0..field_tids.len():
+                for field_tid in field_tids:
                     if self.check_interrupted() != 0:
                         return move acc.out
-                    acc = self.collect_struct_types_from_tid(acc, field_tids[fi])
+                    acc = self.collect_struct_types_from_tid(acc, field_tid)
                 continue
             if self.type_is_payload_enum(resolved):
                 let variant_count = self.sema.type_reflection_variant_count(resolved)
@@ -9796,11 +9796,11 @@ impl CCodegen:
         let fn_tids = self.collect_used_fn_types()
         var out = ""
         // Structurally equal fn types share one C name (#1766): one typedef.
-        var seen_names: HashMap[str, i32] = HashMap.new()
-        for i in 0..fn_tids.len():
+        let seen_names: HashMap[str, i32] = [:]
+        for fn_tid in fn_tids:
             if self.check_interrupted() != 0:
                 return ""
-            let tid = self.sema.resolve_alias(fn_tids[i] as TypeId)
+            let tid = self.sema.resolve_alias(fn_tid as TypeId)
             let tid_kind = self.sema.get_type_kind(tid)
             if tid_kind != TypeKind.TY_FN and tid_kind != TypeKind.TY_EXTERN_FN:
                 continue
@@ -9850,16 +9850,16 @@ impl CCodegen:
         if struct_tids.len() == 0:
             return self.emit_fn_type_defs()
 
-        let ordered: List[i32] = List.new()
-        let emitted_names: HashMap[i32, i32] = HashMap.new()
+        let ordered: List[i32] = []
+        let emitted_names: HashMap[i32, i32] = [:]
         while ordered.len() < struct_tids.len():
             if self.check_interrupted() != 0:
                 return ""
             var progressed = 0
-            for i in 0..struct_tids.len():
+            for struct_tid in struct_tids:
                 if self.check_interrupted() != 0:
                     return ""
-                let resolved = self.sema.resolve_alias(struct_tids[i] as TypeId) as i32
+                let resolved = self.sema.resolve_alias(struct_tid as TypeId) as i32
                 if emitted_names.contains(resolved):
                     continue
                 let resolved_kind = self.sema.get_type_kind(resolved as TypeId)
@@ -9937,10 +9937,10 @@ impl CCodegen:
                     emitted_names.insert(resolved, 1)
 
         var out = ""
-        for i in 0..ordered.len():
+        for ordered_item in ordered:
             if self.check_interrupted() != 0:
                 return ""
-            let tid = ordered[i]
+            let tid = ordered_item
             let resolved = self.sema.resolve_alias(tid)
             if self.sema.get_type_kind(resolved) == TypeKind.TY_SLICE:
                 let name = self.struct_c_name(tid)
@@ -9976,7 +9976,7 @@ impl CCodegen:
                 let start = self.sema.get_type_d0(resolved)
                 let count = self.sema.get_type_d1(resolved)
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
-                var elem_names: List[str] = List.new()
+                let elem_names: List[str] = []
                 for ti in 0..count:
                     if self.check_interrupted() != 0:
                         return ""
@@ -10048,7 +10048,7 @@ impl CCodegen:
                 continue
             if self.generic_inst_is_declared_struct(resolved as i32):
                 out = out ++ self.record_keyword(resolved as i32) ++ " " ++ name ++ " " ++ cc_lbrace() ++ "\n"
-                var field_names: List[str] = List.new()
+                let field_names: List[str] = []
                 for fi in 0..self.sema.type_reflection_field_count(resolved as i32):
                     let field_name = cc_member(cc_intern_resolve(self.intern, self.sema.type_reflection_field_name(resolved as i32, fi)))
                     out = out ++ "    " ++ self.c_decl(self.sema.type_reflection_field_type_frozen(resolved as i32, fi), field_name) ++ ";\n"
@@ -10070,7 +10070,7 @@ impl CCodegen:
                 out = out ++ "typedef " ++ self.c_decl(field_tid, name) ++ ";\n\n"
                 continue
             out = out ++ self.record_keyword(resolved as i32) ++ " " ++ name ++ " " ++ cc_lbrace() ++ "\n"
-            var field_names: List[str] = List.new()
+            let field_names: List[str] = []
             for fi in 0..count:
                 if self.check_interrupted() != 0:
                     return ""
@@ -10150,7 +10150,7 @@ impl CCodegen:
     // entry wrapper stores its result. A global reached only from another
     // global's initializer is found by the next round.
     mut fn prepare_global_init_bodies():
-        let prepared: HashMap[i32, i32] = HashMap.new()
+        let prepared: HashMap[i32, i32] = [:]
         var grew = true
         while grew:
             grew = false
@@ -10291,7 +10291,7 @@ impl CCodegen:
     // declaration, always written): emit_module writes the ones the emitted
     // C names.
     mut fn global_var_defs() -> List[CGlobalDef]:
-        var out: List[CGlobalDef] = List.new()
+        let out: List[CGlobalDef] = []
         let used_globals = self.collect_referenced_global_syms()
         if self.had_error != 0:
             return out
@@ -10567,7 +10567,7 @@ impl CCodegen:
         for i in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return
-            let body = self.mir_body_at(i as i64)
+            let body = self.mir_body_at(i)
             for bb in 0..body.block_count():
                 if body.term_kind(bb) != TermKind.TK_CALL:
                     continue
@@ -10591,15 +10591,15 @@ impl CCodegen:
     mut fn ensure_assign_index(body: &MirBody):
         if self.assign_index_sym == body.fn_sym and self.assign_index_len == body.stmt_kinds.len(): return
         let n = body.local_count()
-        var starts = cc_zero_i32_list(n + 1)
+        let starts = cc_zero_i32_list(n + 1)
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             for si in 0..body.bb_stmt_counts[bb]:
                 let local = cc_direct_assign_local(body, start + si)
                 if local >= 0: starts[local + 1] += 1
         for k in 0..n: starts[k + 1] += starts[k]
-        var fill = starts.clone()
-        var stmts = cc_zero_i32_list(starts[n])
+        let fill = starts.clone()
+        let stmts = cc_zero_i32_list(starts[n])
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             for si in 0..body.bb_stmt_counts[bb]:
@@ -10803,7 +10803,7 @@ impl CCodegen:
         false
 
 fn cc_mark_local_repr(flags_in: List[i32], local_id: i32, mark: i32) -> List[i32]:
-    var flags = flags_in
+    let flags = flags_in
     if local_id < 0 or local_id >= flags.len():
         return flags
     let existing = flags[local_id]
@@ -10815,7 +10815,7 @@ fn cc_mark_local_repr(flags_in: List[i32], local_id: i32, mark: i32) -> List[i32
 
 impl CCodegen:
     mut fn encoded_option_local_flags(body: &MirBody) -> List[i32]:
-        var flags: List[i32] = List.new()
+        var flags: List[i32] = []
         for _i in 0..body.local_count():
             flags.push(0)
 
@@ -10929,7 +10929,7 @@ impl CCodegen:
         f"struct __with_cell_{idx}"
 
     fn closure_body_at(idx: i32) -> &MirBody:
-        self.mir_body_at(self.mir_mod.find_body(self.closure_syms[idx]) as i64)
+        self.mir_body_at(self.mir_mod.find_body(self.closure_syms[idx]))
 
     // "path:line" of an AST node, for a diagnostic that names a construct.
     fn node_site_text(node: i32) -> str:
@@ -10946,7 +10946,7 @@ impl CCodegen:
     // each one's environment kind from the facts Sema recorded on its node.
     mut fn register_closures():
         for bi in 0..self.mir_mod.bodies.len():
-            let body = self.mir_body_at(bi as i64)
+            let body = self.mir_body_at(bi)
             for ci in 0..body.const_kinds.len():
                 if body.const_kinds[ci] != ConstKind.CK_CLOSURE:
                     continue
@@ -10959,7 +10959,7 @@ impl CCodegen:
                 if body_idx < 0:
                     self.fail(f"emit-c: the closure at {site} has no retained MIR body")
                     return
-                let closure_body = self.mir_body_at(body_idx as i64)
+                let closure_body = self.mir_body_at(body_idx)
                 let kind = self.sema.get_type_kind(self.sema.resolve_alias(closure_body.anonymous_type))
                 if kind == TypeKind.TY_EXTERN_FN:
                     self.fail(f"emit-c does not support a closure used as a C function pointer ({site})")
@@ -11225,8 +11225,8 @@ impl CCodegen:
         out.write(fn_sig ++ " " ++ cc_lbrace() ++ "\n")
         out.write(prologue)
         out.write(self.closure_env_locals_text(body))
-        let call_override_locals: List[i32] = List.new()
-        let call_override_tids: List[i32] = List.new()
+        let call_override_locals: List[i32] = []
+        let call_override_tids: List[i32] = []
         for bb in 0..body.block_count():
             if self.check_interrupted() != 0:
                 return ""
@@ -11269,8 +11269,8 @@ impl CCodegen:
             if ret_tid == 0 or self.is_void_tid(ret_tid):
                 continue
             var seen = 0
-            for oi in 0..call_override_locals.len():
-                if call_override_locals[oi] == local_id:
+            for call_override_local in call_override_locals:
+                if call_override_local == local_id:
                     seen = 1
                     break
             if seen != 0:
@@ -11414,7 +11414,7 @@ impl CCodegen:
         let worker_count = self.sema.runtime_fiber_worker_count
         if stack_size <= 0 and pool_size <= 0 and worker_count <= 0:
             return ""
-        "    if (with_runtime_configure_fibers(" ++ with_i64_to_str(stack_size) ++ "LL, " ++ with_i64_to_str(pool_size as i64) ++ ", " ++ with_i64_to_str(worker_count as i64) ++ ") != 0) {\n" ++
+        "    if (with_runtime_configure_fibers(" ++ with_i64_to_str(stack_size) ++ "LL, " ++ with_i64_to_str(pool_size) ++ ", " ++ with_i64_to_str(worker_count) ++ ") != 0) {\n" ++
         "        with_panic(WITH_STR_LIT(\"runtime fiber configuration cannot change after fibers exist\"), WITH_STR_LIT(\"\"), 0);\n" ++
         "    }\n"
 
@@ -11582,11 +11582,11 @@ impl CCodegen:
 
         // Forward declarations for all lowered functions; only the reached
         // ones are written (below).
-        var decls: List[str] = List.new()
+        let decls: List[str] = []
         for i in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return ""
-            let body = self.mir_body_at(i as i64)
+            let body = self.mir_body_at(i)
             decls.push(if self.body_sig_index(body.fn_sym) < 0: "" else: self.emit_fn_decl(body))
 
         // #1766: every closure's environment struct, owned-cell glue and
@@ -11608,29 +11608,29 @@ impl CCodegen:
         // any other runs at startup whatever reads it. pcre2's Unicode tables
         // are such initializers, 6 MB of C (3.6 MB in one function).
         let main_sym = self.find_main_sym()
-        var init_of_global: HashMap[i32, i32] = HashMap.new()
+        let init_of_global: HashMap[i32, i32] = [:]
         let body_count = self.mir_mod.bodies.len()
-        var reach = CReach.new(body_count + global_defs.len())
+        let reach = CReach.new(body_count + global_defs.len())
         for gi in 0..global_defs.len():
             if global_defs[gi].name.len() == 0 or self.emit_all: reach.mark((body_count + gi) as i32) else: reach.name(global_defs[gi].name, (body_count + gi) as i32)
         for i in 0..self.mir_mod.bodies.len():
-            let fn_sym = self.mir_body_at(i as i64).fn_sym
+            let fn_sym = self.mir_body_at(i).fn_sym
             let init_global = self.global_init_target(fn_sym)
             if init_global != 0:
-                let init_body = self.mir_body_at(i as i64)
+                let init_body = self.mir_body_at(i)
                 if not self.emit_all and self.init_body_is_pure(init_body): init_of_global.insert(init_global, i as i32) else: reach.mark(i as i32)
                 continue
             if decls[i].len() == 0: continue
             if self.emit_all or fn_sym == main_sym or not self.fn_c_name_is_internal(fn_sym): reach.mark(i as i32) else: reach.name(self.fn_c_name(fn_sym), i as i32)
         reach.scan(struct_defs)
         reach.scan(closure_decls)
-        var closure_texts: List[str] = List.new()
+        let closure_texts: List[str] = []
         for ci in 0..self.closure_syms.len():
             if self.check_interrupted() != 0:
                 return ""
             closure_texts.push(self.emit_closure_body(ci as i32))
             reach.scan(closure_texts[ci])
-        var body_texts: List[str] = List.new()
+        let body_texts: List[str] = []
         for _ in 0..self.mir_mod.bodies.len(): body_texts.push("")
         var thunk_defs = ""
         // #983: glue names the Drop impls it calls; bodies make more glue.
@@ -11642,7 +11642,7 @@ impl CCodegen:
                 if not reach.take(i as i32): continue
                 if self.check_interrupted() != 0:
                     return ""
-                let body = self.mir_body_at(i as i64)
+                let body = self.mir_body_at(i)
                 body_texts[i] = self.emit_fn_body(body)
                 reach.scan(body_texts[i])
                 grew = true
@@ -11662,9 +11662,9 @@ impl CCodegen:
             if reach.pending(): grew = true
         if self.had_error != 0:
             return ""
-        var skipped_inits: List[i32] = List.new()
+        let skipped_inits: List[i32] = []
         for i in 0..body_count:
-            let fn_sym = self.mir_body_at(i as i64).fn_sym
+            let fn_sym = self.mir_body_at(i).fn_sym
             if self.global_init_target(fn_sym) != 0 and not reach.emitted(i as i32): skipped_inits.push(fn_sym)
         let main_wrapper = self.emit_main_wrapper(skipped_inits)
         if self.had_error != 0:
@@ -11698,8 +11698,8 @@ impl CCodegen:
             if not reach.emitted(i as i32): continue
             out.write(body_texts[i])
             out.write("\n")
-        for ci in 0..closure_texts.len():
-            out.write(closure_texts[ci])
+        for closure_text in closure_texts:
+            out.write(closure_text)
             out.write("\n")
 
         // C entrypoint wrapper for With `main`.
@@ -11871,7 +11871,7 @@ impl CCodegen:
 
     // A struct's C members, as emit_struct_type_defs declares them.
     fn glue_field_syms(resolved: i32) -> List[i32]:
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STRUCT:
             let start = self.sema.get_type_d1(resolved as TypeId)
             for fi in 0..self.sema.get_type_d2(resolved as TypeId):
@@ -11883,13 +11883,13 @@ impl CCodegen:
         out
 
     fn glue_field_names(resolved: i32) -> List[str]:
-        var out: List[str] = List.new()
+        let out: List[str] = []
         for sym in self.glue_field_syms(resolved):
             out.push(cc_member(cc_intern_resolve(self.intern, sym)))
         out
 
     mut fn glue_field_tids(resolved: i32) -> List[i32]:
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STRUCT:
             let start = self.sema.get_type_d1(resolved as TypeId)
             for fi in 0..self.sema.get_type_d2(resolved as TypeId):

@@ -308,7 +308,7 @@ fn analysis_parse_i32(text: &str) -> i32:
     value * sign
 
 fn analysis_escape(text: &str) -> str:
-    let parts: List[str] = List.new()
+    let parts: List[str] = []
     var start: i32 = 0
     for i in 0..text.len():
         let c = text[i] as i32
@@ -402,7 +402,7 @@ impl AnalysisFact:
 
 impl AnalysisReport:
     fn render_facts(query: &str) -> str:
-        let lines: List[str] = List.new()
+        let lines: List[str] = []
         lines.push("analysis-facts\tv2\tstage\tkind\tid\tparent\tnode\tbody\tsymbol\towner\tindex\ttype\teffects\tflags\tsource-file\tstart\tend\tline\tcolumn\tpath\tname\tdetail\n")
         for i in 0..self.facts.len():
             let fact = self.facts[i]
@@ -420,7 +420,7 @@ impl AnalysisReport:
         count
 
     fn render_summary(query: &str) -> str:
-        let lines: List[str] = List.new()
+        let lines: List[str] = []
         lines.push("analysis-summary\tv1\n")
         let stages = [AnalysisStage.Ast, AnalysisStage.Sema, AnalysisStage.Mir, AnalysisStage.Abi, AnalysisStage.Codegen, AnalysisStage.Diagnostic, AnalysisStage.Source]
         let kinds = [
@@ -435,8 +435,8 @@ impl AnalysisReport:
             AnalysisFactKind.MethodResolution, AnalysisFactKind.ForeignContract,
             AnalysisFactKind.GlobalEffect, AnalysisFactKind.Operator,
         ]
-        let stage_counts: List[i32] = List.new()
-        let kind_counts: List[i32] = List.new()
+        let stage_counts: List[i32] = []
+        let kind_counts: List[i32] = []
         for i in 0..8: stage_counts.push(0)
         for i in 0..28: kind_counts.push(0)
         var total = 0
@@ -464,7 +464,7 @@ impl AnalysisReport:
         lines.join("")
 
     fn render_matrix(query: &str) -> str:
-        let lines: List[str] = List.new()
+        let lines: List[str] = []
         lines.push("analysis-matrix\tv2\tstage\tkind\tname\towner\tindex\ttype\teffects\tflags\tsource-file\tstart\tend\tdetail\n")
         for i in 0..self.facts.len():
             let fact = self.facts[i]
@@ -482,7 +482,7 @@ impl AnalysisReport:
         lines.join("")
 
     fn render_verdict(label: &str) -> str:
-        let lines: List[str] = List.new()
+        let lines: List[str] = []
         for i in 0..self.notes.len():
             lines.push("note: ")
             lines.push(with_str_clone_ref(self.notes[i]))

@@ -91,7 +91,7 @@ fn Lexer.init(source: &str, file_id: i32) -> Lexer:
 // Tokenize the entire source, returning a token list ending with EOF.
 impl Lexer:
     mut fn tokenize() -> TokenList:
-        var tokens = TokenList.new()
+        let tokens = TokenList.new()
         loop:
             let tag = self.next_token()
             tokens.append(tag, self.token_start, self.pos)

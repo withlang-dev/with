@@ -18,7 +18,7 @@ fn build_graph_materializer(sema: Sema, extras: List[ComptimeValue]) -> BuildGra
 
 impl BuildGraphMaterializer:
     fn error(message: str) -> BuildGraph:
-        var graph = empty_build_graph()
+        let graph = empty_build_graph()
         graph.error_msg = message
         graph
 
@@ -53,7 +53,7 @@ impl BuildGraphMaterializer:
         field
 
     fn string_list_field(value: &ComptimeValue, field_name: &str) -> List[str]:
-        let out: List[str] = List.new()
+        let out: List[str] = []
         let field = self.field_value(value, field_name)
         if field.kind != ComptimeValueKind.CV_LIST and field.kind != ComptimeValueKind.CV_ARRAY:
             return out
@@ -99,7 +99,7 @@ impl BuildGraphMaterializer:
         false
 
     fn materialize_target(value: &ComptimeValue, graph: BuildGraph) -> BuildGraph:
-        var out = graph
+        let out = graph
         if value.kind != ComptimeValueKind.CV_STRUCT:
             out.error_msg = "build target is not a struct value"
             return out
@@ -132,7 +132,7 @@ impl BuildGraphMaterializer:
         if not build_graph_target_valid(target_kind):
             out.error_msg = "build target '" ++ name_value.text ++ "' has invalid target platform"
             return out
-        var target = build_graph_materialized_target(kind, name_value.text, entry_value.text, target_kind, optimize_value.data0 as i32, output_value.text)
+        let target = build_graph_materialized_target(kind, name_value.text, entry_value.text, target_kind, optimize_value.data0 as i32, output_value.text)
         target.system_libs = self.string_list_field(value, "system_libs")
         target.library_paths = self.string_list_field(value, "library_paths")
         target.rpaths = self.string_list_field(value, "rpaths")
@@ -177,7 +177,7 @@ impl BuildGraphMaterializer:
     // over-invalidate, never under-invalidate. Empty result = caller falls
     // back to hashing all build-graph sources.
     fn action_source_closure(action_sym: i32) -> List[str]:
-        let empty: List[str] = List.new()
+        let empty: List[str] = []
         let found = self.sema.fn_decl_source_paths.get(action_sym)
         if not found.is_some():
             build_graph_rt_eprint("[graph] action closure MISS (no source path) for '" ++ self.sema.pool_resolve(action_sym) ++ "'")
@@ -191,8 +191,8 @@ impl BuildGraphMaterializer:
         if start_module < 0:
             build_graph_rt_eprint("[graph] action closure MISS (module not found) for '" ++ self.sema.pool_resolve(action_sym) ++ "' defined in '" ++ defining ++ "'")
             return empty
-        let visited: List[i32] = List.new()
-        let queue: List[i32] = List.new()
+        let visited: List[i32] = []
+        let queue: List[i32] = []
         visited.push(start_module)
         queue.push(start_module)
         var qi = 0
@@ -206,20 +206,20 @@ impl BuildGraphMaterializer:
                 if t < 0:
                     continue
                 var seen = false
-                for vi in 0..visited.len():
-                    if visited[vi] == t:
+                for visited_item in visited:
+                    if visited_item == t:
                         seen = true
                         break
                 if not seen:
                     visited.push(t)
                     queue.push(t)
-        let paths: List[str] = List.new()
+        let paths: List[str] = []
         for i in 0..visited.len():
             paths.push(with_str_clone_ref(self.sema.module_paths[visited[i]]))
         paths
 
     fn materialize_generated_source(value: &ComptimeValue, graph: BuildGraph) -> BuildGraph:
-        var out = graph
+        let out = graph
         if value.kind != ComptimeValueKind.CV_STRUCT:
             out.error_msg = "generated source is not a struct value"
             return out
@@ -230,7 +230,7 @@ impl BuildGraphMaterializer:
             return out
         // D32: take intended; clone until the D32 compiler is the seed
         // (old §2.4 Drop-owner gate on ComptimeValue).
-        out.generated_sources.push(BuildGraphGeneratedSource { path: path.text.clone(), contents: contents.text.clone() })
+        out.generated_sources.push(BuildGraphGeneratedSource { path: path.text, contents: contents.text })
         out
 
 type BuildGraphMaterializeResult {
@@ -252,7 +252,7 @@ impl BuildGraphMaterializer:
             with_eprint(f"[graph] build value start={value.extra_start} count={value.extra_count} extras_len={self.extras.len()}")
             for tf in 0..value.extra_count:
                 let tfv = self.extras[(value.extra_start + tf)]
-                with_eprint(f"[graph] field[{tf}] kind={tfv.kind as i32} text=" ++ (if tfv.kind == ComptimeValueKind.CV_STR: tfv.text.clone() else: ""))
+                with_eprint(f"[graph] field[{tf}] kind={tfv.kind as i32} text=" ++ (if tfv.kind == ComptimeValueKind.CV_STR: tfv.text else: ""))
         let default_target = self.expect_str_field(value, "default_target")
         if package_name.kind == ComptimeValueKind.CV_INVALID or package_version.kind == ComptimeValueKind.CV_INVALID or default_target.kind == ComptimeValueKind.CV_INVALID:
             return self.error("Build has a field with the wrong comptime value type")

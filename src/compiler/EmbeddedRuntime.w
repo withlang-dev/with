@@ -66,7 +66,7 @@ fn embedded_rt_real_path(rel_path: &str) -> str:
 // rt_bundle_modules, cross_rt_bundle_modules, wasm32_rt_bundle_modules).
 // "" entries never occur: an empty platform means no runtime for the target.
 fn embedded_rt_unit_files() -> List[str]:
-    let files: List[str] = List.new()
+    let files: List[str] = []
     let platform = embedded_rt_platform_file()
     if platform.len() == 0:
         return files

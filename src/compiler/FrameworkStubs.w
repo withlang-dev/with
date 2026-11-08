@@ -120,7 +120,7 @@ fn fs_open_cache() -> DscCache:
     if main_path.len() == 0:
         return fs_cache_error("no dyld shared cache on this machine (looked in /System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld and /System/Library/dyld)")
     let base = fs_basename(main_path)
-    let files: List[str] = List.new()
+    let files: List[str] = []
     files.push(main_path)
     for line in runtime_list_files(fs_dirname(main_path)).split("\n"):
         let name = fs_basename(line)
@@ -128,7 +128,7 @@ fn fs_open_cache() -> DscCache:
         // .atlas side files, and not the local-symbols file.
         if name.starts_with(base ++ ".") and not name.ends_with(".map") and not name.ends_with(".atlas") and not name.ends_with(".symbols"):
             files.push(fs_dirname(main_path) ++ "/" ++ name)
-    var cache = DscCache { fds: List.new(), mappings: List.new(), images: List.new(), problem: "" }
+    let cache = DscCache { fds: List.new(), mappings: List.new(), images: List.new(), problem: "" }
     for f in 0..files.len():
         let fd = fs_open(files[f])
         if fd < 0:
@@ -224,7 +224,7 @@ fn fs_read_library(cache: &DscCache, install_name: &str) -> DscLibrary:
         return fs_library_error(install_name, "no 64-bit Mach-O header for " ++ install_name)
     let ncmds = fs_u32(head, 16)
     let cmds = fs_read_vm(cache, address, 32 + fs_u32(head, 20))
-    var library = DscLibrary { install_name: install_name.to_owned(), current_version: "1", compatibility_version: "1", reexports: List.new(), symbols: List.new(), weak_symbols: List.new(), tls_symbols: List.new(), problem: "" }
+    let library = DscLibrary { install_name: install_name.to_owned(), current_version: "1", compatibility_version: "1", reexports: List.new(), symbols: List.new(), weak_symbols: List.new(), tls_symbols: List.new(), problem: "" }
     var linkedit_vm: i64 = -1
     var linkedit_file: i64 = 0
     var trie_off: i64 = -1
@@ -258,8 +258,8 @@ fn fs_read_library(cache: &DscCache, install_name: &str) -> DscLibrary:
         return fs_library_error(install_name, "could not read the exports trie of " ++ install_name)
     // Depth-first over the trie: each node is a terminal (its export flags)
     // and edges (a label and a child offset).
-    let prefixes: List[str] = List.new()
-    let nodes: List[i64] = List.new()
+    let prefixes: List[str] = []
+    let nodes: List[i64] = []
     prefixes.push("")
     nodes.push(0)
     var visited = 0
@@ -305,17 +305,17 @@ fn fs_str_less(a: &str, b: &str) -> bool:
 
 fn fs_sorted(items: &List[str]) -> List[str]:
     if items.len() <= 1:
-        let one: List[str] = List.new()
-        for i in 0..items.len(): one.push(items[i])
+        let one: List[str] = []
+        for item in items: one.push(item)
         return one
     let mid = items.len() / 2
-    let left: List[str] = List.new()
-    let right: List[str] = List.new()
+    let left: List[str] = []
+    let right: List[str] = []
     for i in 0..items.len():
         if i < mid: left.push(items[i]) else: right.push(items[i])
     let a = fs_sorted(left)
     let b = fs_sorted(right)
-    let out: List[str] = List.new()
+    let out: List[str] = []
     var i = 0
     var j = 0
     while i < a.len() or j < b.len():
@@ -329,7 +329,7 @@ fn fs_sorted(items: &List[str]) -> List[str]:
 
 fn fs_yaml_list(out: &str, key: &str, items: &List[str]) -> str:
     if items.len() == 0: return out.to_owned()
-    var text = StringBuilder.new()
+    let text = StringBuilder.new()
     text.push_str(out)
     text.push_str("    " ++ key ++ ":")
     var pad = 17 - key.len() - 1
@@ -369,10 +369,10 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
     let install_name = fs_framework_install_name(cache, name)
     if install_name.len() == 0:
         return "error: no framework " ++ name ++ " in this machine's dyld shared cache"
-    let queue: List[str] = List.new()
-    let seen: List[str] = List.new()
+    let queue: List[str] = []
+    let seen: List[str] = []
     queue.push(install_name)
-    var text = StringBuilder.new()
+    let text = StringBuilder.new()
     var next = 0
     while next < queue.len():
         let current = queue[next]
@@ -383,8 +383,8 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
         text.push_str(fs_tbd_document(library))
         for r in 0..library.reexports.len():
             var known = false
-            for s in 0..queue.len():
-                if queue[s] == library.reexports[r]: known = true
+            for queue_item in queue:
+                if queue_item == library.reexports[r]: known = true
             if not known: queue.push(library.reexports[r])
     text.push_str("...\n")
     text.to_str()
@@ -399,15 +399,15 @@ fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
     if cache.problem.len() > 0:
         fs_close_cache(cache)
         return cache.problem
-    for i in 0..names.len():
-        let tbd = fs_framework_tbd(cache, names[i])
+    for name in names:
+        let tbd = fs_framework_tbd(cache, name)
         if tbd.starts_with("error: "):
             fs_close_cache(cache)
             return tbd.slice(7, tbd.len())
-        let framework_dir = dir ++ "/" ++ names[i] ++ ".framework"
-        if runtime_mkdir_p(framework_dir) != 0 or runtime_write_file(framework_dir ++ "/" ++ names[i] ++ ".tbd", tbd) != 0:
+        let framework_dir = dir ++ "/" ++ name ++ ".framework"
+        if runtime_mkdir_p(framework_dir) != 0 or runtime_write_file(framework_dir ++ "/" ++ name ++ ".tbd", tbd) != 0:
             fs_close_cache(cache)
-            return "could not write " ++ framework_dir ++ "/" ++ names[i] ++ ".tbd"
+            return "could not write " ++ framework_dir ++ "/" ++ name ++ ".tbd"
     fs_close_cache(cache)
     ""
 
@@ -415,7 +415,7 @@ fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
 // pairs in a package's link arguments: a weakly linked framework needs its
 // stub at link time as any other does.
 fn framework_names_in_link_args(link_args: &List[str]) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     for i in 0..link_args.len():
         if (link_args[i] == "-framework" or link_args[i] == "-weak_framework") and i + 1 < link_args.len():
             out.push(link_args[i + 1])
@@ -427,7 +427,7 @@ fn with_framework_stubs_main(args: &List[str]) -> i32:
     if args.len() < 2:
         runtime_eprint("usage: with __framework-stubs <dir> <Framework>...")
         return 2
-    let names: List[str] = List.new()
+    let names: List[str] = []
     for i in 1..args.len(): names.push(args[i])
     let problem = framework_stubs_write(args[0], names)
     if problem.len() > 0:

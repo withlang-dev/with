@@ -40,7 +40,7 @@ impl Codegen:
 
     // A vector constant with `elem` in every one of `n` lanes.
     fn cg_splat_const(elem: i64, n: i32) -> i64:
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         for _ in 0..n:
             vals.push(elem)
         wl_const_vector(list_data_i64(vals), n)
@@ -50,7 +50,7 @@ impl Codegen:
     // any width — Overflow's i64 helpers stop at 64 bits, and a vector lane
     // may be 128 (or 256 inside the saturating multiply).
     fn cg_int_top_bit(ty: i64, bits: i32) -> i64:
-        wl_build_shl(self.builder, wl_const_int(ty, 1, 0), wl_const_int(ty, (bits - 1) as i64, 0))
+        wl_build_shl(self.builder, wl_const_int(ty, 1, 0), wl_const_int(ty, (bits - 1), 0))
 
     fn cg_int_signed_min(ty: i64, bits: i32) -> i64:
         wl_build_sub(self.builder, wl_const_int(ty, 0, 0), self.cg_int_top_bit(ty, bits))
@@ -60,7 +60,7 @@ impl Codegen:
 
     fn cg_int_unsigned_max(ty: i64, bits: i32) -> i64:
         if bits >= wl_get_int_type_width(ty): return wl_const_int(ty, -1, 1)
-        wl_build_sub(self.builder, wl_build_shl(self.builder, wl_const_int(ty, 1, 0), wl_const_int(ty, bits as i64, 0)), wl_const_int(ty, 1, 0))
+        wl_build_sub(self.builder, wl_build_shl(self.builder, wl_const_int(ty, 1, 0), wl_const_int(ty, bits, 0)), wl_const_int(ty, 1, 0))
 
     // `value` in every lane of `vec_ty`.
     fn cg_splat_value(value: i64, vec_ty: i64) -> i64:
@@ -68,7 +68,7 @@ impl Codegen:
         var out = wl_get_undef(vec_ty)
         let i32_ty = wl_i32_type(self.context)
         for i in 0..n:
-            out = wl_build_insert_element(self.builder, out, value, wl_const_int(i32_ty, i as i64, 0))
+            out = wl_build_insert_element(self.builder, out, value, wl_const_int(i32_ty, i, 0))
         out
 
     // Call the overloaded LLVM intrinsic `name` at `overloads`.
@@ -84,9 +84,9 @@ impl Codegen:
 
     // Whether any lane of a `<N x i1>` is set, as an i1.
     mut fn cg_any_lane(bits: i64) -> i64:
-        let overloads: List[i64] = List.new()
+        let overloads: List[i64] = []
         overloads.push(wl_type_of(bits))
-        let args: List[i64] = List.new()
+        let args: List[i64] = []
         args.push(bits)
         self.cg_vector_intrinsic("llvm.vector.reduce.or", overloads, args)
 
@@ -153,14 +153,14 @@ impl Codegen:
             // The scalar total-shift rule per lane: a count of the width or
             // more shifts every bit out (a signed right shift fills with the
             // sign).
-            let limit = self.cg_splat_const(wl_const_int(elem_ty, width as i64, 0), n)
+            let limit = self.cg_splat_const(wl_const_int(elem_ty, width, 0), n)
             let too_big = wl_build_icmp(self.builder, wl_int_uge(), r, limit)
-            let masked = wl_build_and(self.builder, r, self.cg_splat_const(wl_const_int(elem_ty, (width - 1) as i64, 0), n))
+            let masked = wl_build_and(self.builder, r, self.cg_splat_const(wl_const_int(elem_ty, (width - 1), 0), n))
             if op == BinaryOp.OP_SHL:
                 return wl_build_select(self.builder, too_big, wl_const_null(vec_ty), wl_build_shl(self.builder, l, masked))
             if unsigned:
                 return wl_build_select(self.builder, too_big, wl_const_null(vec_ty), wl_build_lshr(self.builder, l, masked))
-            let sign_fill = wl_build_ashr(self.builder, l, self.cg_splat_const(wl_const_int(elem_ty, (width - 1) as i64, 0), n))
+            let sign_fill = wl_build_ashr(self.builder, l, self.cg_splat_const(wl_const_int(elem_ty, (width - 1), 0), n))
             return wl_build_select(self.builder, too_big, sign_fill, wl_build_ashr(self.builder, l, masked))
         if op == BinaryOp.OP_ADD_WRAP: return wl_build_add(self.builder, l, r)
         if op == BinaryOp.OP_SUB_WRAP: return wl_build_sub(self.builder, l, r)
@@ -175,9 +175,9 @@ impl Codegen:
             if saturating or self.overflow_mode == OVERFLOW_MODE_SATURATE():
                 return self.cg_vector_saturating(base_op, l, r, unsigned)
             let name = self.mir_checked_overflow_intrinsic_name(base_op, unsigned)
-            let overloads: List[i64] = List.new()
+            let overloads: List[i64] = []
             overloads.push(vec_ty)
-            let args: List[i64] = List.new()
+            let args: List[i64] = []
             args.push(l)
             args.push(r)
             let pair = self.cg_vector_intrinsic(name, overloads, args)
@@ -209,9 +209,9 @@ impl Codegen:
         let vec_ty = wl_type_of(l)
         if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB:
             let name = if op == BinaryOp.OP_ADD: (if unsigned: "llvm.uadd.sat" else: "llvm.sadd.sat") else: (if unsigned: "llvm.usub.sat" else: "llvm.ssub.sat")
-            let overloads: List[i64] = List.new()
+            let overloads: List[i64] = []
             overloads.push(vec_ty)
-            let args: List[i64] = List.new()
+            let args: List[i64] = []
             args.push(l)
             args.push(r)
             return self.cg_vector_intrinsic(name, overloads, args)
@@ -307,7 +307,7 @@ impl Codegen:
         if op != VectorOp.CONSTRUCT as i32 and op != VectorOp.SPLAT as i32:
             return 0
         let extra_start = self.pool.get_data1(node)
-        let vals: List[i64] = List.new()
+        let vals: List[i64] = []
         for i in 0..n:
             let arg = self.pool.get_extra(extra_start + (if op == VectorOp.SPLAT as i32: 0 else: i))
             let c = self.try_eval_const_llvm(arg, lane)
@@ -327,7 +327,7 @@ impl Codegen:
                 lane = wl_build_sext(self.builder, lane, elem_ty)
             if wl_type_of(lane) != elem_ty:
                 return self.cg_vector_unsupported("a vector lane operand of another type")
-            out = wl_build_insert_element(self.builder, out, lane, wl_const_int(i32_ty, i as i64, 0))
+            out = wl_build_insert_element(self.builder, out, lane, wl_const_int(i32_ty, i, 0))
         out
 
     // Codegen met a vector shape MIR should not have produced: a compiler
@@ -344,14 +344,14 @@ impl Codegen:
         let i64_ty = wl_i64_type(self.context)
         let idx64 = if wl_get_int_type_width(wl_type_of(idx)) < 64: wl_build_sext(self.builder, idx, i64_ty) else: idx
         if wl_is_constant(idx64) == 0:
-            let bad = wl_build_icmp(self.builder, wl_int_uge(), idx64, wl_const_int(i64_ty, n as i64, 0))
+            let bad = wl_build_icmp(self.builder, wl_int_uge(), idx64, wl_const_int(i64_ty, n, 0))
             let panic_bb = wl_append_bb(self.context, self.current_function, "lane.bounds.panic")
             let ok_bb = wl_append_bb(self.context, self.current_function, "lane.bounds.ok")
             wl_build_cond_br(self.builder, bad, panic_bb, ok_bb)
             wl_position_at_end(self.builder, panic_bb)
             self.emit_runtime_panic("index out of bounds")
             wl_position_at_end(self.builder, ok_bb)
-        let indices: List[i64] = List.new()
+        let indices: List[i64] = []
         indices.push(idx64)
         wl_build_gep(self.builder, wl_get_element_type(vec_ty), vec_ptr, list_data_i64(indices), 1)
 
@@ -376,7 +376,7 @@ impl Codegen:
             let i64_ty = wl_i64_type(self.context)
             let idx64 = if wl_get_int_type_width(wl_type_of(idx)) < 64: wl_build_sext(self.builder, idx, i64_ty) else: idx
             if wl_is_constant(idx64) == 0:
-                let bad = wl_build_icmp(self.builder, wl_int_uge(), idx64, wl_const_int(i64_ty, wl_get_vector_size(a_ty) as i64, 0))
+                let bad = wl_build_icmp(self.builder, wl_int_uge(), idx64, wl_const_int(i64_ty, wl_get_vector_size(a_ty), 0))
                 let panic_bb = wl_append_bb(self.context, self.current_function, "lane.bounds.panic")
                 let ok_bb = wl_append_bb(self.context, self.current_function, "lane.bounds.ok")
                 wl_build_cond_br(self.builder, bad, panic_bb, ok_bb)
@@ -393,9 +393,9 @@ impl Codegen:
                 result = wl_build_insert_element(self.builder, a, lane_value, idx64)
         else if intrinsic == MirIntrinsic.SIMD_ALL or intrinsic == MirIntrinsic.SIMD_ANY:
             let bits = self.cg_mask_to_bits(a)
-            let overloads: List[i64] = List.new()
+            let overloads: List[i64] = []
             overloads.push(wl_type_of(bits))
-            let args: List[i64] = List.new()
+            let args: List[i64] = []
             args.push(bits)
             result = self.cg_vector_intrinsic(if intrinsic == MirIntrinsic.SIMD_ALL: "llvm.vector.reduce.and" else: "llvm.vector.reduce.or", overloads, args)
         else:
@@ -405,9 +405,9 @@ impl Codegen:
             let is_float = self.cg_lane_is_float(lane)
             let unsigned = self.cg_lane_is_unsigned(lane)
             let elem_ty = wl_get_element_type(a_ty)
-            let overloads: List[i64] = List.new()
+            let overloads: List[i64] = []
             overloads.push(a_ty)
-            let args: List[i64] = List.new()
+            let args: List[i64] = []
             var name = ""
             if intrinsic == MirIntrinsic.SIMD_REDUCE_ADD or intrinsic == MirIntrinsic.SIMD_REDUCE_MUL:
                 if is_float:

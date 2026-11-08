@@ -134,7 +134,7 @@ impl CfgGraph:
 // For now, builds a simple linear CFG from the expression.
 // Full implementation requires walking the AST expression tree.
 fn build_cfg(pool: &AstPool, expr_node: i32) -> CfgGraph:
-    var graph = CfgGraph.init()
+    let graph = CfgGraph.init()
 
     let start = pool.get_start(expr_node)
     let end = pool.get_end(expr_node)

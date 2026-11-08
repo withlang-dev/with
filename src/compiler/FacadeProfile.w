@@ -72,15 +72,15 @@ fn facade_profile_dotted(pool: &AstPool, intern: &InternPool, item: i32) -> str:
 // c_import may declare a name as both the extern and its wrapper; the
 // first is the one the facade's own clauses resolve, facade_render_find_fn).
 fn facade_profile_imported_fns(pool: &AstPool, intern: &InternPool, ci: &List[i32]) -> (List[str], List[i32]):
-    let names: List[str] = List.new()
-    let decls: List[i32] = List.new()
+    let names: List[str] = []
+    let decls: List[i32] = []
     for di in 0..pool.decl_count():
         if di >= ci.len() or ci[di] == 0: continue
         let decl = pool.get_decl(di)
         let kind = pool.kind(decl)
         if kind != NodeKind.NK_EXTERN_FN and kind != NodeKind.NK_FN_DECL: continue
         if pool.find_fn_meta(decl) < 0: continue
-        let name: str = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+        let name = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
         var seen = false
         for k in 0..names.len():
             if names[k] == name: seen = true
@@ -140,16 +140,16 @@ fn facade_profile_shadowing_clause(pool: &AstPool, intern: &InternPool, resource
 // profile, ruling §7.2), or 0.
 fn facade_profile_explicit_fn_item(pool: &AstPool, intern: &InternPool, fn_name: &str) -> i32:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
-    for i in 0..items.len():
-        let have = intern.resolve(pool.get_data0(items[i] as NodeId))
-        if have == fn_name: return items[i]
+    for item in items:
+        let have = intern.resolve(pool.get_data0(item as NodeId))
+        if have == fn_name: return item
     0
 
 fn facade_profile_record(mut pool: AstPool, at: i32, rule: i32, status: i32, subject: i32, candidates: &List[i32]) -> i32:
     let extra_start = pool.extra_len()
     pool.add_extra(subject)
     pool.add_extra(candidates.len() as i32)
-    for i in 0..candidates.len(): pool.add_extra(candidates[i])
+    for candidate in candidates: pool.add_extra(candidate)
     pool.add_node(NodeKind.NK_FACADE_PROFILE_MATCH, pool.get_start(at as NodeId), pool.get_end(at as NodeId), rule, status, extra_start) as i32
 
 // The clause a rule states on a subject: the template's operands with the
@@ -171,14 +171,14 @@ fn facade_profile_clause(mut pool: AstPool, at: i32, template: i32, fn_sym: i32,
 fn facade_profile_append_extras(mut pool: AstPool, node: i32, head_start: i32, head_count: i32, tail: &List[i32]) -> i32:
     let extra_start = pool.extra_len()
     for i in 0..head_count: pool.add_extra(pool.get_extra(head_start + i))
-    for i in 0..tail.len(): pool.add_extra(tail[i])
+    for tail_item in tail: pool.add_extra(tail_item)
     extra_start
 
 // Applies `profile` to `facade` for its `use convention` item `at`: states
 // every uniquely matched rule and records every outcome on the item.
 fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], facade: i32, at: i32, profile: i32) -> AstPool:
     var p = pool
-    let records: List[i32] = List.new()
+    let records: List[i32] = []
     let (names, decls) = facade_profile_imported_fns(p, intern, ci)
     let rule_start = p.get_data1(profile as NodeId)
     let rule_count = p.get_data2(profile as NodeId)
@@ -193,11 +193,11 @@ fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], faca
             let rule = p.get_extra(rule_start + ri)
             let rx = p.get_data1(rule as NodeId)
             if p.get_extra(rx + 2) != 0: continue
-            let pattern: str = with_str_clone_ref(intern.resolve(p.get_extra(rx)))
+            let pattern = with_str_clone_ref(intern.resolve(p.get_extra(rx)))
             let template = p.get_extra(rx + 1)
             let kind = p.get_data0(template as NodeId)
             let out_ref = if kind == FACADE_CLAUSE_FROM: p.get_extra(p.get_data1(template as NodeId) + 1) else: 0
-            let candidates: List[i32] = List.new()
+            let candidates: List[i32] = []
             for k in 0..names.len():
                 if not facade_profile_glob(pattern, names[k]): continue
                 if not facade_profile_shape_fits(p, intern, decls[k], kind, out_ref, repr): continue
@@ -208,16 +208,16 @@ fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], faca
             if candidates.len() > 1:
                 records.push(facade_profile_record(p, at, rule, FACADE_PROFILE_AMBIGUOUS, resource, candidates))
                 continue
-            let fn_name: str = with_str_clone_ref(intern.resolve(candidates[0]))
+            let fn_name = with_str_clone_ref(intern.resolve(candidates[0]))
             let shadow = facade_profile_shadowing_clause(p, intern, resource, kind, fn_name)
             if shadow != 0:
-                let by: List[i32] = List.new()
+                let by: List[i32] = []
                 by.push(candidates[0])
                 by.push(shadow)
                 records.push(facade_profile_record(p, at, rule, FACADE_PROFILE_SHADOWED, resource, by))
                 continue
             let clause = facade_profile_clause(p, at, template, candidates[0], rule)
-            let tail: List[i32] = List.new()
+            let tail: List[i32] = []
             tail.push(clause)
             let new_start = facade_profile_append_extras(p, resource, p.get_data1(resource as NodeId), 1 + p.get_data2(resource as NodeId), tail)
             p.set_data1(resource as NodeId, new_start)
@@ -226,33 +226,33 @@ fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], faca
     // Fn rules, per imported function whose first parameter receives a
     // resource of this facade and that no resource clause assigns: the
     // rules that match it are its candidates.
-    let reprs: List[str] = List.new()
+    let reprs: List[str] = []
     for ii in 0..item_count:
         let resource = p.get_extra(item_start + ii)
         if p.kind(resource as NodeId) != NodeKind.NK_FACADE_RESOURCE: continue
         reprs.push(facade_render_unalias(p, intern, render_type_expr(p, intern, p.get_extra(p.get_data1(resource as NodeId)) as NodeId)))
-    let new_items: List[i32] = List.new()
-    let matched_rules: List[i32] = List.new()
+    let new_items: List[i32] = []
+    let matched_rules: List[i32] = []
     for k in 0..names.len():
         let p0 = facade_profile_p0(p, intern, decls[k])
         var received = false
-        for r in 0..reprs.len():
-            if p0 == reprs[r] or p0 == "*mut " ++ reprs[r]: received = true
+        for repr in reprs:
+            if p0 == repr or p0 == "*mut " ++ repr: received = true
         if not received: continue
         if facade_render_is_resource_op(p, intern, names[k]): continue
-        let candidates: List[i32] = List.new()
+        let candidates: List[i32] = []
         var rule_of: i32 = 0
         for ri in 0..rule_count:
             let rule = p.get_extra(rule_start + ri)
             let rx = p.get_data1(rule as NodeId)
             if p.get_extra(rx + 2) == 0: continue
-            let pattern: str = with_str_clone_ref(intern.resolve(p.get_extra(rx)))
+            let pattern = with_str_clone_ref(intern.resolve(p.get_extra(rx)))
             if not facade_profile_glob(pattern, names[k]): continue
             candidates.push(p.get_data0(rule as NodeId))
             rule_of = rule
             var noted = false
-            for m in 0..matched_rules.len():
-                if matched_rules[m] == rule: noted = true
+            for matched_rule in matched_rules:
+                if matched_rule == rule: noted = true
             if not noted: matched_rules.push(rule)
         if candidates.len() == 0: continue
         let fn_sym = p.get_data0(decls[k] as NodeId)
@@ -261,7 +261,7 @@ fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], faca
             continue
         let explicit = facade_profile_explicit_fn_item(p, intern, names[k])
         if explicit != 0:
-            let by: List[i32] = List.new()
+            let by: List[i32] = []
             by.push(candidates[0])
             by.push(explicit)
             records.push(facade_profile_record(p, at, rule_of, FACADE_PROFILE_SHADOWED, fn_sym, by))
@@ -279,7 +279,7 @@ fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], faca
         for m in 0..matched_rules.len():
             if matched_rules[m] == rule: noted = true
         if noted: continue
-        let none: List[i32] = List.new()
+        let none: List[i32] = []
         records.push(facade_profile_record(p, at, rule, FACADE_PROFILE_NONE, 0, none))
     if new_items.len() > 0:
         let new_start = facade_profile_append_extras(p, facade, p.get_data1(facade as NodeId), p.get_data2(facade as NodeId), new_items)

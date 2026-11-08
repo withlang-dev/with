@@ -111,7 +111,7 @@ fn contract_clause(sema: &Sema, item: i32, kind: i32, nth: i32) -> i32:
 fn contract_from_clause(sema: &Sema, item: i32, pi: i32) -> i32: contract_clause(sema, item, FACADE_CLAUSE_FROM, pi)
 
 fn contract_fact(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, flags: i32, node: i32, symbol: i32, owner: i32, index: i32, name: &str, detail: &str) -> i32:
-    var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.ForeignContract)
+    let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.ForeignContract)
     fact.id = report.facts.len() as i32
     fact.parent = parent
     fact.flags = flags
@@ -144,7 +144,7 @@ fn contract_join(parts: &List[str], sep: &str) -> str:
     out
 
 fn contract_push_unique(xs0: List[str], x: &str) -> List[str]:
-    var xs = xs0
+    let xs = xs0
     for i in 0..xs.len():
         if xs[i] == x: return xs
     xs.push(with_str_clone_ref(x))
@@ -154,11 +154,11 @@ fn contract_push_unique(xs0: List[str], x: &str) -> List[str]:
 // no user program calls) are counted, not named, so a library's own
 // operations stay readable.
 fn contract_list(names: &List[str], empty: &str) -> str:
-    let shown: List[str] = List.new()
+    let shown: List[str] = []
     var seams = 0
-    for i in 0..names.len():
-        if names[i].starts_with("with_"): seams = seams + 1
-        else: shown.push(names[i])
+    for name in names:
+        if name.starts_with("with_"): seams = seams + 1
+        else: shown.push(name)
     var out = if shown.len() > 0: contract_join(shown, ", ") else: with_str_clone_ref(empty)
     if seams > 0: out = out ++ f" (and {seams} compiler runtime seams)"
     out
@@ -174,13 +174,13 @@ fn contract_resource_name(sema: &Sema, ri: i32) -> str: sema.safe_symbol_text(se
 // The resources a parameter receives, as `Database` / `Database|Statement`.
 fn contract_received(sema: &Sema, fn_sym: i32, pi: i32) -> str:
     let recv = sema.facade_param_receives(fn_sym, pi)
-    let names: List[str] = List.new()
-    for i in 0..recv.len(): names.push(contract_resource_name(sema, recv[i]))
+    let names: List[str] = []
+    for recv_item in recv: names.push(contract_resource_name(sema, recv_item))
     contract_join(names, "|")
 
 fn contract_thread_caps(caps: i32) -> str:
     if caps == 0: return "creator"
-    let parts: List[str] = List.new()
+    let parts: List[str] = []
     if (caps & 1) != 0: parts.push("creator")
     if (caps & 2) != 0: parts.push("send")
     if (caps & 4) != 0: parts.push("share")
@@ -264,8 +264,8 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
         if parents.len() == 0:
             contract_row(report, sema, site, subject, CONTRACT_RESOURCE, node, f, owner, -1, "dependency", f"none via {fname}; it receives no modeled resource", "default:no resource parameter (§16.2b.6)")
             continue
-        for k in 0..parents.len():
-            let pi = parents[k]
+        for parent in parents:
+            let pi = parent
             var clause: i32 = 0
             for bi in 0..r.borrows.len():
                 if r.borrows_owner[bi] == o and r.borrows[bi] == pi: clause = r.borrows_nodes[bi]
@@ -291,8 +291,8 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
             let recv = sema.facade_param_receives(c.fn_sym, c.returns_borrow_from)
             if recv.len() == 1 and recv[0] == ri:
                 contract_row(report, sema, site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"CStr from {fname}, dependent on {contract_param(sema, c.fn_sym, c.returns_borrow_from)}", contract_item_at(sema, site, "fn", c.node))
-    var invalidators: List[str] = List.new()
-    var preservers: List[str] = List.new()
+    var invalidators: List[str] = []
+    var preservers: List[str] = []
     for ei in 0..sema.facade_call_effects.len():
         let e = &sema.facade_call_effects[ei]
         let sig = sema.get_sig(e.fn_sym)
@@ -429,7 +429,7 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
     for k in 0..c.preserves_domains.len():
         let clause = contract_clause(sema, node, FACADE_CLAUSE_PRESERVES, (c.preserves_params.len() + k) as i32)
         contract_row(report, sema, site, subject, CONTRACT_FN, clause, c.fn_sym, owner, -1, "preserves", "domain " ++ sema.safe_symbol_text(c.preserves_domains[k]), contract_clause_at(sema, site, clause))
-    let touched: List[str] = List.new()
+    let touched: List[str] = []
     for pi in 0..count:
         if sema.facade_param_receives(c.fn_sym, pi).len() != 1: continue
         var kept = false
@@ -437,8 +437,8 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
             if c.preserves_params[k] == pi: kept = true
         if not kept: touched.push(f"{contract_received(sema, c.fn_sym, pi)} ({contract_param(sema, c.fn_sym, pi)})")
     let domains = sema.facade_domains_touched(sema.facade_fn_file(c.fn_sym), ci)
-    for k in 0..domains.len():
-        touched.push("domain " ++ sema.safe_symbol_text(sema.facade_domain_list[domains[k]].name))
+    for domain in domains:
+        touched.push("domain " ++ sema.safe_symbol_text(sema.facade_domain_list[domain].name))
     if touched.len() > 0:
         contract_row(report, sema, site, subject, CONTRACT_FN, node, c.fn_sym, owner, -1, "invalidates", contract_join(touched, ", "), "default:unknown effect is invalidate (§16.2b.7)")
     // Presentation (§16.2b.11).
@@ -542,14 +542,14 @@ fn contract_collect_domain(mut report: AnalysisReport, sema: &Sema, di: i32, sou
     let scope = if kind == "thread": "views inherit the thread restriction" else if kind == "static": "static data does not participate in invalidation" else if kind == "process": "process-wide state" else: "state of a resource"
     contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "scope", f"{kind}; {scope}", contract_item_at(sema, site, "domain", d.node))
     contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "library", f"{d.files.len()} imported translation unit(s) whose every operation touches it unless it preserves it", "default:the coarse library domain (§16.2b.7)")
-    let views: List[str] = List.new()
-    var preservers: List[str] = List.new()
+    let views: List[str] = []
+    var preservers: List[str] = []
     for ci in 0..sema.foreign_contracts.len():
         let c = &sema.foreign_contracts[ci]
         if c.returns_borrow_domain == d.name: views.push(sema.safe_symbol_text(c.fn_sym))
         for k in 0..c.preserves_domains.len():
             if c.preserves_domains[k] == d.name: preservers = contract_push_unique(preservers, sema.safe_symbol_text(c.fn_sym))
-    var invalidators: List[str] = List.new()
+    var invalidators: List[str] = []
     for ei in 0..sema.facade_call_effects.len():
         let e = &sema.facade_call_effects[ei]
         if e.sig != sema.get_sig(e.fn_sym): continue
@@ -573,7 +573,7 @@ fn contract_collect_conventions(mut report: AnalysisReport, sema: &Sema, source_
         let node = sema.facade_convention_nodes[k]
         let site = contract_convention_site(sema, node, source_path, source_text)
         let start = sema.ast.get_data0(node)
-        let parts: List[str] = List.new()
+        let parts: List[str] = []
         for i in 0..sema.ast.get_data1(node): parts.push(sema.safe_symbol_text(sema.ast.get_extra(start + i)))
         let path = contract_join(parts, ".")
         let at = contract_item_at(sema, site, "use convention", node)
@@ -583,24 +583,24 @@ fn contract_collect_conventions(mut report: AnalysisReport, sema: &Sema, source_
         let recs = sema.facade_profile_matches(node)
         if recs.len() == 0:
             contract_row(report, sema, site, subject, CONTRACT_CONVENTION, node, 0, 0, -1, "profile", "adopted; no rule was applied (the profile did not resolve, or has no rules)", "default:no profile fact exists")
-        for m in 0..recs.len():
-            let (rule, status, subject_node, cands) = sema.facade_profile_match(recs[m])
+        for rec in recs:
+            let (rule, status, subject_node, cands) = sema.facade_profile_match(rec)
             let rname = sema.facade_rule_name(rule)
             let template = sema.facade_rule_template_text(rule)
             let what = sema.facade_profile_subject_text(rule, subject_node)
             let prov = contract_rule_at(sema, rule)
             if status == FACADE_PROFILE_APPLIED:
                 let named = if sema.facade_rule_is_fn(rule): "" else: ": " ++ sema.facade_profile_names(cands)
-                contract_row(report, sema, site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) applied to {what}{named}", prov)
+                contract_row(report, sema, site, subject, CONTRACT_CONVENTION, rec, rule, 0, -1, "rule", f"{rname} ({template}) applied to {what}{named}", prov)
             else if status == FACADE_PROFILE_AMBIGUOUS:
                 let who = if sema.facade_rule_is_fn(rule): f"rules {sema.facade_profile_names(cands)} all match {what}" else: f"{rname} ({template}) matches {cands.len()} candidates for {what}: {sema.facade_profile_names(cands)}"
-                contract_row(report, sema, site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{who}; ambiguous, contributes nothing (§16.2b.12)", prov)
+                contract_row(report, sema, site, subject, CONTRACT_CONVENTION, rec, rule, 0, -1, "rule", f"{who}; ambiguous, contributes nothing (§16.2b.12)", prov)
             else if status == FACADE_PROFILE_SHADOWED:
                 let by = if sema.facade_rule_is_fn(rule): "an fn item" else: "clause `" ++ facade_clause_name(sema.ast.get_data0(cands[1])) ++ "`"
                 let matched = if sema.facade_rule_is_fn(rule): what else: f"{sema.safe_symbol_text(cands[0])} for {what}"
-                contract_row(report, sema, site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) matched {matched}; shadowed by {by} at {contract_where(site, sema, cands[1])}, the facade's explicit statement wins (§16.2b.2)", prov)
+                contract_row(report, sema, site, subject, CONTRACT_CONVENTION, rec, rule, 0, -1, "rule", f"{rname} ({template}) matched {matched}; shadowed by {by} at {contract_where(site, sema, cands[1])}, the facade's explicit statement wins (§16.2b.2)", prov)
             else:
-                contract_row(report, sema, site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) matched nothing" ++ (if subject_node != 0 and not sema.facade_rule_is_fn(rule): " for " ++ what else: ""), prov)
+                contract_row(report, sema, site, subject, CONTRACT_CONVENTION, rec, rule, 0, -1, "rule", f"{rname} ({template}) matched nothing" ++ (if subject_node != 0 and not sema.facade_rule_is_fn(rule): " for " ++ what else: ""), prov)
 
 fn analysis_collect_foreign_contracts(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for di in 0..sema.facade_domain_list.len():
@@ -621,7 +621,7 @@ fn analysis_collect_foreign_contracts(mut report: AnalysisReport, sema: &Sema, s
 // silences it.
 
 fn contract_destroy_words() -> List[str]:
-    let words: List[str] = List.new()
+    let words: List[str] = []
     for w in ["close", "free", "destroy", "release", "finalize", "delete", "unref", "dispose", "dealloc", "shutdown", "terminate", "term", "fini", "deinit", "teardown", "cleanup", "kill", "end", "finish", "exit"]:
         words.push(with_str_clone_ref(w))
     words
@@ -636,8 +636,8 @@ fn contract_name_resembles_destroyer(name: &str) -> str:
     while i <= n:
         if i == n or name[i] == '_':
             if seg.len() > 0:
-                for w in 0..words.len():
-                    if seg.starts_with(words[w]): return words[w]
+                for word in words:
+                    if seg.starts_with(word): return word
             seg = ""
         else:
             seg = seg ++ name.slice(i, i + 1)
@@ -779,8 +779,8 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
         let item = sema.facade_convention_nodes[k]
         let site = contract_convention_site(sema, item, source_path, source_text)
         let recs = sema.facade_profile_matches(item)
-        for m in 0..recs.len():
-            let (rule, status, subject_node, cands) = sema.facade_profile_match(recs[m])
+        for rec in recs:
+            let (rule, status, subject_node, cands) = sema.facade_profile_match(rec)
             let profile = sema.facade_rule_profile_name(rule)
             let rname = sema.facade_rule_name(rule)
             let template = sema.facade_rule_template_text(rule)
@@ -807,7 +807,7 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
 // text a `select:kind=foreign-contract` query returns.
 
 fn contract_view_render(report: &AnalysisReport) -> str:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     lines.push("foreign-contract view\tv1\n")
     var subjects = 0
     for i in 0..report.facts.len():

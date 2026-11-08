@@ -557,7 +557,7 @@ unsafe fn make_str(p: *const u8) -> str:
     if owned as i64 == 0: return ""
     with_memcpy(owned, p, len)
     *((owned as i64 + len) as *mut u8) = 0
-    var raw: [2]i64 = [owned as i64, len]
+    let raw: [2]i64 = [owned as i64, len]
     let sp = &raw as *const str
     *sp
 
@@ -585,7 +585,7 @@ unsafe fn make_path_str(p: *const u8) -> str:
         *((owned as i64 + i) as *mut u8) = if ch == '\\': '/' else: ch
         i = i + 1
     *((owned as i64 + len) as *mut u8) = 0
-    var raw: [2]i64 = [owned as i64, len]
+    let raw: [2]i64 = [owned as i64, len]
     let sp = &raw as *const str
     *sp
 
@@ -679,7 +679,7 @@ unsafe fn buf_append_path(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
     *((buf as i64 + *pos) as *mut u8) = 0
 
 unsafe fn buf_append_i64(buf: *mut u8, pos: *mut i64, cap: i64, val: i64):
-    var tmp: [32]u8 = [0 as u8; 32]
+    let tmp: [32]u8 = [0 as u8; 32]
     var v = val
     if v < 0:
         buf_append_str(buf, pos, cap, "-" as *const u8)
@@ -978,8 +978,8 @@ unsafe fn translate_parameter_type(s: *mut CImportSession, ty: CXType, depth: i3
         let elem = clang_getArrayElementType(canonical)
         let elem_str = translate_type_recursive(s, elem, depth + 1, 0)
         if elem_str as i64 == 0 or c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0: return elem_str
-        var buf: [2048]u8 = [0 as u8; 2048]
-        var pos: i64 = 0
+        let buf: [2048]u8 = [0 as u8; 2048]
+        let pos: i64 = 0
         buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, if clang_isConstQualifiedType(elem) != 0: "*const \0" as *const u8 else: "*mut \0" as *const u8)
         buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, elem_str as *const u8)
         return session_strdup(s, &buf as *const [2048]u8 as *const u8)
@@ -1014,8 +1014,8 @@ unsafe fn type_is_fn_pointer(ty: CXType) -> bool:
 /// a parameter keep the non-null type.
 unsafe fn option_wrapped(s: *mut CImportSession, ty: CXType, inner: *mut u8) -> *mut u8:
     if inner as i64 == 0 or not type_is_fn_pointer(ty) or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0: return inner
-    var buf: [2048]u8 = [0 as u8; 2048]
-    var pos: i64 = 0
+    let buf: [2048]u8 = [0 as u8; 2048]
+    let pos: i64 = 0
     buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "Option[\0" as *const u8)
     buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, inner as *const u8)
     buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "]\0" as *const u8)
@@ -1095,8 +1095,8 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         // an explicit cast (#1417). Its spelling was `*mut __unaligned
         // struct tagMETARECORD`, which the import failed to parse.
         if can_pointee.kind == CXType_Void or type_is_unaligned_qualified(pointee):
-            var buf: [64]u8 = [0 as u8; 64]
-            var pos: i64 = 0
+            let buf: [64]u8 = [0 as u8; 64]
+            let pos: i64 = 0
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " c_void\0" as *const u8)
@@ -1110,8 +1110,8 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         // (D156: an explicit `signed char *` is `*i8`, as its scalar is;
         // it takes the general pointer path below.)
         if can_pointee.kind == CXType_Char_S or can_pointee.kind == CXType_Char_U:
-            var buf: [64]u8 = [0 as u8; 64]
-            var pos: i64 = 0
+            let buf: [64]u8 = [0 as u8; 64]
+            let pos: i64 = 0
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " c_char\0" as *const u8)
@@ -1126,8 +1126,8 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         // (c_algorithms' `_RBTreeNode`). A c_import keeps the pointee's
         // identity (`*mut FILE`), which the toolchain libc facade names.
         if (*s).migration != 0 and can_pointee.kind == CXType_Record and record_is_reserved_system(can_pointee):
-            var buf: [64]u8 = [0 as u8; 64]
-            var pos: i64 = 0
+            let buf: [64]u8 = [0 as u8; 64]
+            let pos: i64 = 0
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " c_void\0" as *const u8)
@@ -1136,8 +1136,8 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         let inner = option_wrapped(s, pointee, translate_type_recursive_mode(s, pointee, depth + 1, 0, preserve_incomplete_arrays))
         if inner as i64 == 0 or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             return session_strdup(s, "*const i8\0" as *const u8)
-        var buf: [2048]u8 = [0 as u8; 2048]
-        var pos: i64 = 0
+        let buf: [2048]u8 = [0 as u8; 2048]
+        let pos: i64 = 0
         buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "*\0" as *const u8)
         buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, qual)
         buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, " \0" as *const u8)
@@ -1152,8 +1152,8 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             return session_strdup(s, "c_void\0" as *const u8)
         if c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             return elem_str
-        var buf: [2048]u8 = [0 as u8; 2048]
-        var pos: i64 = 0
+        let buf: [2048]u8 = [0 as u8; 2048]
+        let pos: i64 = 0
         // D119: `[T; N]`; an array element joins the dimensions in index
         // order, so C's `T a[2][3]` is `[T; 2, 3]`.
         let out = &raw mut buf as *mut [u8; 2048] as *mut u8
@@ -1178,8 +1178,8 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         let elem_str = option_wrapped(s, elem, translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays))
         if elem_str as i64 == 0 or c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             return session_strdup(s, "*const i8\0" as *const u8)
-        var buf: [2048]u8 = [0 as u8; 2048]
-        var pos: i64 = 0
+        let buf: [2048]u8 = [0 as u8; 2048]
+        let pos: i64 = 0
         if preserve_incomplete_arrays != 0 or is_last_struct_field != 0:
             buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "[0]\0" as *const u8)
             buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, elem_str as *const u8)
@@ -1246,7 +1246,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     // `return a & FLAG` a narrowing).
     if kind == CXType_Enum:
         let decl = clang_getTypeDeclaration(canonical)
-        var probe = EnumFitProbe { fits: 1 }
+        let probe = EnumFitProbe { fits: 1 }
         clang_visitChildren(decl, probe_enum_const_fits as *const u8, &raw mut probe as *mut EnumFitProbe as *mut u8)
         if probe.fits != 0:
             return session_strdup(s, "i32\0" as *const u8)
@@ -1304,7 +1304,7 @@ unsafe fn translate_vector_type(s: *mut CImportSession, canonical: CXType) -> *m
         return session_strdup(s, "__UNSUPPORTED:vector of a lane type With has no vector of (§4.3d: integer or float lanes of 8 to 64 bits)\0" as *const u8)
     let total = n * bytes * 8
     let text = if total == 128 or total == 256 or total == 512: f"{lane}x{n}" else: f"Vector[{lane}, {n}]"
-    var buf: [64]u8 = [0 as u8; 64]
+    let buf: [64]u8 = [0 as u8; 64]
     for i in 0..text.len():
         buf[i] = text[i]
     session_strdup(s, &buf as *const [64]u8 as *const u8)
@@ -1362,8 +1362,8 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
         ret_str = session_strdup(s, "Unit\0" as *const u8)
     let num_args = clang_getNumArgTypes(fn_type)
     let is_variadic = clang_isFunctionTypeVariadic(fn_type) != 0 and fn_type.kind != CXType_FunctionNoProto
-    var params: [4096]u8 = [0 as u8; 4096]
-    var pos: i64 = 0
+    let params: [4096]u8 = [0 as u8; 4096]
+    let pos: i64 = 0
     var i: i32 = 0
     while i < num_args:
         if i > 0:
@@ -1386,8 +1386,8 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
             buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, "...\0" as *const u8)
     if c_strncmp(ret_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
         return ret_str
-    var buf: [8192]u8 = [0 as u8; 8192]
-    var bpos: i64 = 0
+    let buf: [8192]u8 = [0 as u8; 8192]
+    let bpos: i64 = 0
     buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, "extern \"C\" fn(\0" as *const u8)
     buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, &params as *const [4096]u8 as *const u8)
     buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, ") -> \0" as *const u8)
@@ -1402,10 +1402,10 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
 // no function mangling or name heuristic decides the imported linkage.
 unsafe fn cimport_linkage_is_c(s: *mut CImportSession, cursor: CXCursor):
     if clang_getCursorKind(cursor) != CXCursor_LinkageSpec: return false
-    var file: *mut u8 = null
-    var start: u32 = 0
+    let file: *mut u8 = null
+    let start: u32 = 0
     clang_getSpellingLocation(clang_getRangeStart(clang_getCursorExtent(cursor)), &raw mut file, null, null, &raw mut start)
-    var size: u64 = 0
+    let size: u64 = 0
     if file as i64 == 0: return false
     let contents = clang_getFileContents((*s).tu, file, &raw mut size)
     if contents as i64 == 0: return false
@@ -1413,8 +1413,8 @@ unsafe fn cimport_linkage_is_c(s: *mut CImportSession, cursor: CXCursor):
     while start as u64 < size:
         let end = if start as u64 + width < size: start as u64 + width else: size
         let range = clang_getRange(clang_getLocationForOffset((*s).tu, file, start), clang_getLocationForOffset((*s).tu, file, end as u32))
-        var tokens: *mut CXToken = null
-        var count: u32 = 0
+        let tokens: *mut CXToken = null
+        let count: u32 = 0
         clang_tokenize((*s).tu, range, &raw mut tokens, &raw mut count)
         var seen_extern = false
         var language = ""
@@ -1458,7 +1458,7 @@ unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32
     // Filter transitive includes
     if (*s).header_file as i64 != 0:
         let loc = clang_getCursorLocation(cursor)
-        var file: *mut u8 = 0 as *mut u8
+        let file = 0 as *mut u8
         clang_getFileLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
         if file as i64 != 0 and clang_File_isEqual(file, (*s).header_file) == 0:
             return CXChildVisit_Continue
@@ -1710,7 +1710,7 @@ unsafe fn name_anon_record(s: *mut CImportSession, decl: CXCursor, base: *const 
     if slot < 0: return
     let name_slot = ((*s).anon_record_names as i64 + slot as i64 * 8) as *mut *mut u8
     if *name_slot as i64 != 0: return
-    var buf: [1024]u8 = [0 as u8; 1024]
+    let buf: [1024]u8 = [0 as u8; 1024]
     var pos: i64 = 0
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, base)
     let stem = pos
@@ -1755,8 +1755,8 @@ unsafe fn name_anon_records_in_type(s: *mut CImportSession, ty: CXType, base: *c
 
 unsafe fn name_anon_records_used_by(s: *mut CImportSession, ty: CXType, declarator: CXCursor, suffix: *const u8):
     let spelling = clang_getCursorSpelling(declarator)
-    var buf: [1024]u8 = [0 as u8; 1024]
-    var pos: i64 = 0
+    let buf: [1024]u8 = [0 as u8; 1024]
+    let pos: i64 = 0
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, clang_getCString(spelling))
     clang_disposeString(spelling)
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, suffix)
@@ -1785,8 +1785,8 @@ unsafe fn anon_record_behind_indirection(ty: CXType, through: bool, pointers: bo
     anon_record_behind_indirection(modified, through, pointers, found, depth + 1)
 
 unsafe fn anon_join(parent: *const u8, sep: *const u8, tail: *const u8, n: i64) -> *mut u8:
-    var buf: [1024]u8 = [0 as u8; 1024]
-    var pos: i64 = 0
+    let buf: [1024]u8 = [0 as u8; 1024]
+    let pos: i64 = 0
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, parent)
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, sep)
     if n >= 0:
@@ -1829,7 +1829,7 @@ unsafe fn collect_member_slot(cursor: CXCursor, parent: CXCursor, data: *mut u8)
 /// `Parent_anon_N` counting every directly held one).
 unsafe fn name_member_anon_records(s: *mut CImportSession, record: CXCursor, parent: *const u8, depth: i32):
     if depth > MAX_TYPE_DEPTH: return
-    var mc = MemberCollector { cursors: 0 as *mut CXCursor, count: 0, cap: 0 }
+    let mc = MemberCollector { cursors: 0 as *mut CXCursor, count: 0, cap: 0 }
     clang_visitChildren(record, collect_member_slot as *const u8, &raw mut mc as *mut MemberCollector as *mut u8)
     var anon_idx: i64 = 0
     var fi = 0
@@ -1845,7 +1845,7 @@ unsafe fn name_member_anon_records(s: *mut CImportSession, record: CXCursor, par
             if (tk == CXCursor_StructDecl or tk == CXCursor_UnionDecl) and clang_Cursor_isAnonymous(tdecl) != 0 and session_file_scope_anon_record_name(s, tdecl) as i64 == 0:
                 direct = tdecl
                 is_direct = true
-        var reached = member
+        let reached = member
         if is_direct:
             // A C11 anonymous member has no name (collect_field stores "").
             var nested = 0 as *mut u8
@@ -1905,7 +1905,7 @@ unsafe fn name_local_anon_record(cursor: CXCursor, parent: CXCursor, data: *mut 
     if kind != CXCursor_VarDecl: return CXChildVisit_Recurse
     let namer = data as *mut LocalAnonNamer
     let s = (*namer).s
-    var reached = cursor
+    let reached = cursor
     if not anon_record_behind_indirection(clang_getCursorType(cursor), true, true, &raw mut reached, 0): return CXChildVisit_Recurse
     if session_anon_record_name(s, reached) as i64 != 0: return CXChildVisit_Recurse
     if session_anon_record_slot(s, reached) < 0:
@@ -1968,14 +1968,14 @@ unsafe fn name_file_scope_anon_record_users(s: *mut CImportSession):
                 let arg = clang_Cursor_getArgument(cursor, ai as u32)
                 let arg_spelling = clang_getCursorSpelling(arg)
                 let arg_name = clang_getCString(arg_spelling)
-                var suffix: [256]u8 = [0 as u8; 256]
-                var spos: i64 = 0
+                let suffix: [256]u8 = [0 as u8; 256]
+                let spos: i64 = 0
                 buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, "_\0" as *const u8)
                 if arg_name as i64 != 0 and *arg_name != 0:
                     buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, arg_name)
                 else:
                     buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, "arg\0" as *const u8)
-                    buf_append_i64(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, ai as i64)
+                    buf_append_i64(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, ai)
                 clang_disposeString(arg_spelling)
                 buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, "_anon\0" as *const u8)
                 name_anon_records_used_by(s, clang_getCursorType(arg), cursor, &suffix as *const [256]u8 as *const u8)
@@ -1989,7 +1989,7 @@ unsafe fn name_local_anon_records(s: *mut CImportSession):
         let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
         if clang_getCursorKind(cursor) == CXCursor_FunctionDecl and clang_isCursorDefinition(cursor) != 0:
             let fn_spelling = clang_getCursorSpelling(cursor)
-            var namer = LocalAnonNamer { s: s, fn_name: clang_getCString(fn_spelling) }
+            let namer = LocalAnonNamer { s: s, fn_name: clang_getCString(fn_spelling) }
             clang_visitChildren(cursor, name_local_anon_record as *const u8, &raw mut namer as *mut LocalAnonNamer as *mut u8)
             clang_disposeString(fn_spelling)
         i = i + 1
@@ -2046,7 +2046,7 @@ unsafe fn ensure_fields_cached(s: *mut CImportSession, idx: isize):
     let cache = ((*s).caches as i64 + idx as i64 * sizeof[DeclCache]()) as *mut DeclCache
     if (*cache).fields_cached != 0: return
     (*cache).fields_cached = 1
-    var fc = FieldCollector { fields: 0 as *mut FieldInfo, count: 0, cap: 0 }
+    let fc = FieldCollector { fields: 0 as *mut FieldInfo, count: 0, cap: 0 }
     let decl = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_visitChildren(decl, collect_field as *const u8, &raw mut fc as *mut FieldCollector as *mut u8)
     (*cache).fields = fc.fields
@@ -2096,7 +2096,7 @@ unsafe fn ensure_enum_consts_cached(s: *mut CImportSession, idx: i32):
     let cache = ((*s).caches as i64 + idx as i64 * sizeof[DeclCache]()) as *mut DeclCache
     if (*cache).enum_consts_cached != 0: return
     (*cache).enum_consts_cached = 1
-    var ec = EnumConstCollector { consts: 0 as *mut EnumConstInfo, count: 0, cap: 0 }
+    let ec = EnumConstCollector { consts: 0 as *mut EnumConstInfo, count: 0, cap: 0 }
     let decl = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_visitChildren(decl, collect_enum_const as *const u8, &raw mut ec as *mut EnumConstCollector as *mut u8)
     (*cache).enum_consts = ec.consts
@@ -2112,7 +2112,7 @@ fn with_cimport_available() -> i32:
 fn with_cimport_is_name_emitted(name: &str) -> bool:
     unsafe:
         if name.len() <= 0: return false
-        var buf: [512]u8 = [0 as u8; 512]
+        let buf: [512]u8 = [0 as u8; 512]
         let len = if name.len() < 511: name.len() else: 511
         if len > 0:
             let sp = *(name as *const str as *const *const u8)
@@ -2123,7 +2123,7 @@ fn with_cimport_is_name_emitted(name: &str) -> bool:
 fn with_cimport_mark_name_emitted(name: &str) -> i32:
     unsafe:
         if name.len() <= 0: return 0
-        var buf: [512]u8 = [0 as u8; 512]
+        let buf: [512]u8 = [0 as u8; 512]
         let len = if name.len() < 511: name.len() else: 511
         if len > 0:
             let sp = *(name as *const str as *const *const u8)
@@ -2440,9 +2440,9 @@ unsafe fn cimport_record_parse_error(s: *mut CImportSession):
             // by its spelling alone, and the failing `#if` could not be
             // found among 250k lines of amalgamation.
             let loc = clang_getDiagnosticLocation(diag)
-            var presumed_bits: [2]i64 = [0 as i64; 2]
-            var presumed_line: u32 = 0
-            var presumed_col: u32 = 0
+            let presumed_bits: [2]i64 = [0 as i64; 2]
+            let presumed_line: u32 = 0
+            let presumed_col: u32 = 0
             clang_getPresumedLocation(loc, &raw mut presumed_bits as *mut [2]i64 as *mut CXString, &raw mut presumed_line, &raw mut presumed_col)
             let presumed_file = *(&raw mut presumed_bits as *mut [2]i64 as *mut CXString)
             let presumed_name = clang_getCString(presumed_file)
@@ -2499,7 +2499,7 @@ fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
             return s as i64
 
         // Create temp file
-        var template_path: [4096]u8 = [0 as u8; 4096]
+        let template_path: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
         with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
@@ -2703,7 +2703,7 @@ fn with_ci_record_requires_cxx_semantics(session: i64, cursor_idx: i32) -> bool:
         let s = session as *mut CImportSession
         if s as i64 == 0 or not (*s).cxx or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return false
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
-        var unsupported = false
+        let unsupported = false
         clang_visitChildren(cursor, collect_cxx_record_semantics as *const u8, &raw mut unsupported as *mut bool as *mut u8)
         unsupported
 
@@ -2725,7 +2725,7 @@ fn with_ci_field_indirect_anon_record(session: i64, field_cursor: i32, through_p
         if (*s).anon_record_count <= (*s).anon_file_scope_count: return -1
         let cursor = *(((*s).cursors as i64 + field_cursor as i64 * 32) as *const CXCursor)
         if clang_getCursorKind(cursor) != CXCursor_FieldDecl: return -1
-        var reached = cursor
+        let reached = cursor
         if not anon_record_behind_indirection(clang_getCursorType(cursor), false, through_pointers != 0, &raw mut reached, 0): return -1
         let slot = session_anon_record_slot(s, reached)
         if slot < (*s).anon_file_scope_count: return -1
@@ -2895,8 +2895,8 @@ fn with_cimport_fn_is_noreturn(session: i64, idx: i32) -> i32:
         if clang_Cursor_hasAttrs(cursor) == 0: return 0
         let extent = clang_getCursorExtent(cursor)
         let tu = clang_Cursor_getTranslationUnit(cursor)
-        var tokens: *mut CXToken = 0 as *mut CXToken
-        var token_count: u32 = 0
+        let tokens = 0 as *mut CXToken
+        let token_count: u32 = 0
         clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
         var found: i32 = 0
         var ti: u32 = 0
@@ -2927,8 +2927,8 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
         if clang_Cursor_hasAttrs(cursor) == 0: return ""
         let extent = clang_getCursorExtent(cursor)
         let tu = clang_Cursor_getTranslationUnit(cursor)
-        var tokens: *mut CXToken = 0 as *mut CXToken
-        var token_count: u32 = 0
+        let tokens = 0 as *mut CXToken
+        let token_count: u32 = 0
         clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
         var out = ""
         var depth: i32 = 0        // parentheses open inside an __attribute__
@@ -2976,8 +2976,8 @@ unsafe fn cursor_has_packed_attr(cursor: CXCursor) -> bool:
     if clang_Cursor_hasAttrs(cursor) == 0: return false
     let extent = clang_getCursorExtent(cursor)
     let tu = clang_Cursor_getTranslationUnit(cursor)
-    var tokens: *mut CXToken = 0 as *mut CXToken
-    var token_count: u32 = 0
+    let tokens = 0 as *mut CXToken
+    let token_count: u32 = 0
     clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
     var found = false
     var depth: i32 = 0
@@ -3019,7 +3019,7 @@ fn with_cimport_fn_param_type_translated(session: i64, idx: isize, param: isize)
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         let arg = clang_Cursor_getArgument(cursor, param as u32)
         let ty = clang_getCursorType(arg)
-        var result = translate_parameter_type(s, ty, 0)
+        let result = translate_parameter_type(s, ty, 0)
         // D102 (§16.6): a function-pointer parameter is non-null. D107: in a
         // migration, a corpus definition's parameter is `Option` by evidence
         // (a continuing NULL test, a corpus caller passing NULL, a nullable
@@ -3143,7 +3143,7 @@ fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64:
         if (*fi).name as i64 == 0 or *((*fi).name as *const u8) == 0:
             var anon_offset_bits = clang_Cursor_getOffsetOfField((*fi).cursor)
             if anon_offset_bits < 0 and (*s).cxx:
-                var offset = AnonymousRecordOffset { parent: ty, record: (*fi).clang_type, bits: -1 }
+                let offset = AnonymousRecordOffset { parent: ty, record: (*fi).clang_type, bits: -1 }
                 clang_visitChildren((*fi).cursor, collect_anonymous_record_offset as *const u8, &raw mut offset as *mut AnonymousRecordOffset as *mut u8)
                 anon_offset_bits = offset.bits
             if anon_offset_bits < 0: return -1
@@ -3387,9 +3387,9 @@ fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
             return 0
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         let loc = clang_getCursorLocation(cursor)
-        var presumed_bits: [2]i64 = [0 as i64; 2]
-        var presumed_line: u32 = 0
-        var presumed_col: u32 = 0
+        let presumed_bits: [2]i64 = [0 as i64; 2]
+        let presumed_line: u32 = 0
+        let presumed_col: u32 = 0
         clang_getPresumedLocation(loc, &raw mut presumed_bits as *mut [2]i64 as *mut CXString, &raw mut presumed_line, &raw mut presumed_col)
         let presumed_file = *(&raw mut presumed_bits as *mut [2]i64 as *mut CXString)
         let presumed_name = clang_getCString(presumed_file)
@@ -3417,7 +3417,7 @@ fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
             if presumed_matches != 0:
                 return 1
             return 0
-        var file: *mut u8 = 0 as *mut u8
+        let file = 0 as *mut u8
         clang_getFileLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
         if file as i64 == 0:
             with_free(c_path)
@@ -3475,12 +3475,12 @@ fn with_cimport_hex_float_to_decimal(hex_str: &str) -> str:
     unsafe:
         let cstr = str_to_cstr(hex_str)
         if cstr as i64 == 0: return ""
-        var endptr: *mut c_char = 0 as *mut c_char
+        let endptr = 0 as *mut c_char
         let val = strtod(cstr as *const c_char, &raw mut endptr)
         with_free(cstr)
         // Format as decimal — simple approach: use a fixed buffer
-        var buf: [64]u8 = [0 as u8; 64]
-        var pos: i64 = 0
+        let buf: [64]u8 = [0 as u8; 64]
+        let pos: i64 = 0
         // Convert to integer part + fraction
         let int_part = val as i64
         buf_append_i64(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, int_part)
@@ -3493,7 +3493,7 @@ fn with_cimport_realpath(path: &str) -> str:
     unsafe:
         let cpath = str_to_cstr(path)
         if cpath as i64 == 0: return ""
-        var buf: [1024]u8 = [0 as u8; 1024]
+        let buf: [1024]u8 = [0 as u8; 1024]
         let r = realpath(cpath as *const c_char, &raw mut buf as *mut [1024]u8 as *mut c_char)
         with_free(cpath)
         if r as i64 == 0: return ""
@@ -3538,9 +3538,9 @@ fn cimport_path_is_system(path: &str) -> bool:
 
 unsafe fn macro_location_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let loc = clang_getCursorLocation(cursor)
-    var file: *mut u8 = 0 as *mut u8
-    var line_val: u32 = 0
-    var col_val: u32 = 0
+    let file = 0 as *mut u8
+    let line_val: u32 = 0
+    let col_val: u32 = 0
     clang_getSpellingLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
     if file as i64 == 0:
         clang_getExpansionLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
@@ -3551,27 +3551,27 @@ unsafe fn macro_location_from_cursor(s: *mut CImportSession, cursor: CXCursor) -
     if fname_str as i64 == 0 or *fname_str == 0:
         clang_disposeString(fname)
         return ""
-    var buf: [1024]u8 = [0 as u8; 1024]
-    var pos: i64 = 0
+    let buf: [1024]u8 = [0 as u8; 1024]
+    let pos: i64 = 0
     buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val)
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val)
     clang_disposeString(fname)
     session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
 unsafe fn macro_source_line_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let loc = clang_getCursorLocation(cursor)
-    var file: *mut u8 = 0 as *mut u8
-    var offset: u32 = 0
+    let file = 0 as *mut u8
+    let offset: u32 = 0
     clang_getSpellingLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, &raw mut offset)
     if file as i64 == 0:
         clang_getExpansionLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, &raw mut offset)
     if file as i64 == 0: return ""
     // Clang owns the exact buffer it parsed. Reopening and scanning the
     // entire header for every definition made collection quadratic (#1163).
-    var size: u64 = 0
+    let size: u64 = 0
     let contents = clang_getFileContents((*s).tu, file, &raw mut size)
     if contents as i64 == 0 or offset as u64 >= size: return ""
     let len = size as i64
@@ -3617,7 +3617,7 @@ unsafe fn macro_source_line_from_cursor(s: *mut CImportSession, cursor: CXCursor
 
 unsafe fn macro_location_is_system_from_cursor(cursor: CXCursor) -> bool:
     let loc = clang_getCursorLocation(cursor)
-    var file: *mut u8 = 0 as *mut u8
+    let file = 0 as *mut u8
     clang_getSpellingLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
     if file as i64 == 0:
         clang_getExpansionLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
@@ -3709,7 +3709,7 @@ unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *c
     *((name as i64 + name_len) as *mut u8) = 0
 
     var value_start = name_end
-    var macro_params: *mut *mut u8 = 0 as *mut *mut u8
+    var macro_params = 0 as *mut *mut u8
     var macro_param_count: i32 = 0
     if is_fn_like != 0:
         let pstart = (name_end as i64 + 1) as *const u8
@@ -3800,7 +3800,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
         return 0
     with_memset(s as *mut u8, 0, size)
 
-    var template_path: [4096]u8 = [0 as u8; 4096]
+    let template_path: [4096]u8 = [0 as u8; 4096]
     let tmpl = "/tmp/with_cimport_macro_XXXXXX\0"
     let tp = *(&tmpl as *const *const u8)
     with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 31)
@@ -3820,7 +3820,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
         with_cimport_dispose(s as i64)
         return 0
 
-    var ctx = MacroCollectContext { session: s, macros: ms }
+    let ctx = MacroCollectContext { session: s, macros: ms }
     let root = clang_getTranslationUnitCursor((*s).tu)
     clang_visitChildren(root, collect_macro_def as *const u8, &raw mut ctx as *mut MacroCollectContext as *mut u8)
     with_cimport_dispose(s as i64)
@@ -3851,7 +3851,7 @@ fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str,
             return ""
         with_memset(s as *mut u8, 0, size)
 
-        var template_path: [4096]u8 = [0 as u8; 4096]
+        let template_path: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
         with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
@@ -3929,7 +3929,7 @@ fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx: boo
             return 0
         with_memset(s as *mut u8, 0, size)
 
-        var template_path: [4096]u8 = [0 as u8; 4096]
+        let template_path: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
         with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
@@ -3979,10 +3979,10 @@ fn with_cimport_macro_probe_errors(session: i64, first_line: i32) -> str:
         while i < count:
             let diag = clang_getDiagnostic((*s).tu, i)
             if clang_getDiagnosticSeverity(diag) >= CXDiagnostic_Error:
-                var file: *mut u8 = 0 as *mut u8
-                var line: u32 = 0
-                var col: u32 = 0
-                var offset: u32 = 0
+                let file = 0 as *mut u8
+                let line: u32 = 0
+                let col: u32 = 0
+                let offset: u32 = 0
                 clang_getExpansionLocation(clang_getDiagnosticLocation(diag), &raw mut file, &raw mut line, &raw mut col, &raw mut offset)
                 let in_probes = file as i64 != 0 and clang_File_isEqual(file, (*s).header_file) != 0 and line as i32 >= first_line
                 out = if in_probes: out ++ f"|{line as i32 - first_line}|" else: "*"
@@ -4167,7 +4167,7 @@ unsafe fn cursor_hash_of(cursor: CXCursor) -> i64:
 // pad0 is C struct padding (undefined bytes in a by-value CXType) — hash and
 // compare only kind + data so identical types always collide into one entry.
 unsafe fn type_hash_of(ty: CXType) -> i64:
-    ci_node_hash(ty.kind as u32 as i64, ty.data[0], ty.data[1], 0)
+    ci_node_hash(ty.kind as u32, ty.data[0], ty.data[1], 0)
 
 unsafe fn cursor_hash_insert(tbl: *mut i32, cap: i64, h: i64, idx: i32):
     var slot = h & (cap - 1)
@@ -4295,7 +4295,7 @@ unsafe fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
     if start_val != -1: return  // already cached
     // Collect children
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
-    var cc = ChildCollector { session: s, indices: 0 as *mut i32, count: 0, cap: 0 }
+    let cc = ChildCollector { session: s, indices: 0 as *mut i32, count: 0, cap: 0 }
     clang_visitChildren(cursor, collect_child_cursor as *const u8, &raw mut cc as *mut ChildCollector as *mut u8)
     // Store results
     let flat_start = (*s).child_indices_count
@@ -4895,16 +4895,16 @@ fn with_ci_type_is_bool(session: i64, cursor_idx: i32) -> bool:
 // declaration's key miss its own reference. It is `<c_import source>`.
 unsafe fn session_cursor_location(s: *mut CImportSession, cursor: CXCursor) -> str:
     let loc = clang_getCursorLocation(cursor)
-    var presumed_bits: [2]i64 = [0 as i64; 2]
-    var line_val: u32 = 0
-    var col_val: u32 = 0
+    let presumed_bits: [2]i64 = [0 as i64; 2]
+    let line_val: u32 = 0
+    let col_val: u32 = 0
     clang_getPresumedLocation(loc, &raw mut presumed_bits as *mut [2]i64 as *mut CXString, &raw mut line_val, &raw mut col_val)
     let presumed_file = *(&raw mut presumed_bits as *mut [2]i64 as *mut CXString)
     var fname_str = clang_getCString(presumed_file)
-    var fallback_bits: [2]i64 = [0 as i64; 2]
+    let fallback_bits: [2]i64 = [0 as i64; 2]
     var fallback_active = false
     if fname_str as i64 == 0 or *fname_str == 0:
-        var file: *mut u8 = 0 as *mut u8
+        let file = 0 as *mut u8
         clang_getFileLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
         if file as i64 == 0:
             clang_disposeString(presumed_file)
@@ -4914,15 +4914,15 @@ unsafe fn session_cursor_location(s: *mut CImportSession, cursor: CXCursor) -> s
         fallback_bits[0] = fname.data
         fallback_bits[1] = ((fname.private_flags as u64) | ((fname.pad0 as u64) << 32)) as i64
         fallback_active = true
-    var buf: [1024]u8 = [0 as u8; 1024]
-    var pos: i64 = 0
+    let buf: [1024]u8 = [0 as u8; 1024]
+    let pos: i64 = 0
     let is_inline_source = fname_str as i64 != 0 and (*s).tmp_path as i64 != 0 and c_strcmp(fname_str, (*s).tmp_path as *const u8) == 0
     let shown_name = if is_inline_source: "<c_import source>\0" as *const u8 else: if fname_str as i64 != 0: fname_str else: "?\0" as *const u8
     buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, shown_name)
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val)
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val)
     if fallback_active:
         let fallback_file = *(&raw mut fallback_bits as *mut [2]i64 as *mut CXString)
         clang_disposeString(fallback_file)
@@ -4965,11 +4965,11 @@ fn with_ci_cursor_spelling_designator(session: i64, cursor_idx: i32) -> str:
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         let range = clang_getCursorExtent(cursor)
-        var file: *mut u8 = 0 as *mut u8
-        var start_off: u32 = 0
+        let file = 0 as *mut u8
+        let start_off: u32 = 0
         source_location_spelling_offset(clang_getRangeStart(range), &raw mut file, &raw mut start_off)
         if file as i64 == 0: return ""
-        var buf_size: u64 = 0
+        let buf_size: u64 = 0
         let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
         if contents as i64 == 0 or start_off as u64 >= buf_size: return ""
         let base = contents as i64 + start_off as i64
@@ -5034,9 +5034,9 @@ fn with_ci_cursor_expansion_location(session: i64, cursor_idx: i32) -> str:
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         let loc = clang_getCursorLocation(cursor)
-        var file: *mut u8 = 0 as *mut u8
-        var line_val: u32 = 0
-        var col_val: u32 = 0
+        let file = 0 as *mut u8
+        let line_val: u32 = 0
+        let col_val: u32 = 0
         clang_getExpansionLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
         if file as i64 == 0:
             return ""
@@ -5045,13 +5045,13 @@ fn with_ci_cursor_expansion_location(session: i64, cursor_idx: i32) -> str:
         if fname_str as i64 == 0 or *fname_str == 0:
             clang_disposeString(fname)
             return ""
-        var buf: [1024]u8 = [0 as u8; 1024]
-        var pos: i64 = 0
+        let buf: [1024]u8 = [0 as u8; 1024]
+        let pos: i64 = 0
         buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
+        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val)
         clang_disposeString(fname)
         session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
@@ -5079,18 +5079,18 @@ fn with_ci_cursor_system_macro(session: i64, cursor_idx: i32) -> str:
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         let loc = clang_getRangeStart(clang_getCursorExtent(cursor))
-        var spelled_file: *mut u8 = null
-        var spelled: u32 = 0
+        let spelled_file: *mut u8 = null
+        let spelled: u32 = 0
         clang_getSpellingLocation(loc, &raw mut spelled_file, null, null, &raw mut spelled)
-        var used_file: *mut u8 = null
-        var used: u32 = 0
+        let used_file: *mut u8 = null
+        let used: u32 = 0
         clang_getExpansionLocation(loc, &raw mut used_file, null, null, &raw mut used)
         if spelled_file as i64 == 0 or (spelled_file as i64 == used_file as i64 and spelled == used): return ""
         let fname = clang_getFileName(spelled_file)
         let is_system = cimport_location_path_is_system(clang_getCString(fname))
         clang_disposeString(fname)
         if is_system == 0: return ""
-        var size: u64 = 0
+        let size: u64 = 0
         let contents = clang_getFileContents((*s).tu, spelled_file, &raw mut size)
         if contents as i64 == 0 or spelled as u64 >= size: return ""
         let len = size as i64
@@ -5120,7 +5120,7 @@ fn with_ci_cursor_system_macro(session: i64, cursor_idx: i32) -> str:
         let name_start = p
         while p < end and define_ident_byte(contents[p]): p += 1
         if p == name_start or (p < end and contents[p] == '(' as u8): return ""
-        var name_buf: [256]u8 = [0 as u8; 256]
+        let name_buf: [256]u8 = [0 as u8; 256]
         let name_len = p - name_start
         if name_len >= 255: return ""
         with_memcpy(&raw mut name_buf as *mut [256]u8 as *mut u8, (contents as i64 + name_start) as *const u8, name_len)
@@ -5158,10 +5158,10 @@ fn with_ci_cursor_spelling_location(session: i64, cursor_idx: i32) -> str:
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         let loc = clang_getCursorLocation(cursor)
-        var expansion_file: *mut u8 = 0 as *mut u8
-        var file: *mut u8 = 0 as *mut u8
-        var line_val: u32 = 0
-        var col_val: u32 = 0
+        let expansion_file = 0 as *mut u8
+        var file = 0 as *mut u8
+        let line_val: u32 = 0
+        let col_val: u32 = 0
         clang_getSpellingLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
         if file as i64 == 0:
             clang_getExpansionLocation(loc, &raw mut expansion_file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
@@ -5173,13 +5173,13 @@ fn with_ci_cursor_spelling_location(session: i64, cursor_idx: i32) -> str:
         if fname_str as i64 == 0 or *fname_str == 0:
             clang_disposeString(fname)
             return ""
-        var buf: [1024]u8 = [0 as u8; 1024]
-        var pos: i64 = 0
+        let buf: [1024]u8 = [0 as u8; 1024]
+        let pos: i64 = 0
         buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
+        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val)
         clang_disposeString(fname)
         session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
@@ -5194,8 +5194,8 @@ unsafe fn source_location_spelling_offset(loc: CXSourceLocation, file: *mut *mut
         clang_getFileLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
 
 unsafe fn source_range_expansion_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
-    var start_file: *mut u8 = 0 as *mut u8
-    var end_file: *mut u8 = 0 as *mut u8
+    let start_file = 0 as *mut u8
+    let end_file = 0 as *mut u8
     source_location_expansion_offset(clang_getRangeStart(range), &raw mut start_file, start_off)
     source_location_expansion_offset(clang_getRangeEnd(range), &raw mut end_file, end_off)
     if start_file as i64 == 0 or end_file as i64 == 0:
@@ -5206,8 +5206,8 @@ unsafe fn source_range_expansion_offsets(range: CXSourceRange, file: *mut *mut u
     1
 
 unsafe fn source_range_spelling_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
-    var start_file: *mut u8 = 0 as *mut u8
-    var end_file: *mut u8 = 0 as *mut u8
+    let start_file = 0 as *mut u8
+    let end_file = 0 as *mut u8
     source_location_spelling_offset(clang_getRangeStart(range), &raw mut start_file, start_off)
     source_location_spelling_offset(clang_getRangeEnd(range), &raw mut end_file, end_off)
     if start_file as i64 == 0 or end_file as i64 == 0:
@@ -5226,17 +5226,17 @@ unsafe fn source_range_spelling_offsets(range: CXSourceRange, file: *mut *mut u8
 // invocation (expansion start) falls strictly inside such a range; a range
 // wholly in the body or wholly in one argument does not straddle it.
 unsafe fn source_range_spelling_is_mixed(range: CXSourceRange, spelling_file: *mut u8, spelling_start: u32, spelling_end: u32) -> bool:
-    var expansion_file: *mut u8 = 0 as *mut u8
-    var expansion_start: u32 = 0
-    var expansion_end: u32 = 0
+    let expansion_file = 0 as *mut u8
+    let expansion_start: u32 = 0
+    let expansion_end: u32 = 0
     if source_range_expansion_offsets(range, &raw mut expansion_file, &raw mut expansion_start, &raw mut expansion_end) == 0:
         return false
     clang_File_isEqual(spelling_file, expansion_file) != 0 and spelling_start < expansion_start and spelling_end > expansion_start
 
 unsafe fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
-    var spelling_file: *mut u8 = 0 as *mut u8
-    var spelling_start: u32 = 0
-    var spelling_end: u32 = 0
+    let spelling_file = 0 as *mut u8
+    let spelling_start: u32 = 0
+    let spelling_end: u32 = 0
     let has_spelling = source_range_spelling_offsets(range, &raw mut spelling_file, &raw mut spelling_start, &raw mut spelling_end)
 
     if has_spelling != 0 and spelling_end > spelling_start:
@@ -5249,9 +5249,9 @@ unsafe fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *
             *end_off = spelling_end
             return 1
 
-    var expansion_file: *mut u8 = 0 as *mut u8
-    var expansion_start: u32 = 0
-    var expansion_end: u32 = 0
+    let expansion_file = 0 as *mut u8
+    let expansion_start: u32 = 0
+    let expansion_end: u32 = 0
     if source_range_expansion_offsets(range, &raw mut expansion_file, &raw mut expansion_start, &raw mut expansion_end) != 0:
         *file = expansion_file
         *start_off = expansion_start
@@ -5269,21 +5269,21 @@ fn with_ci_cursor_start_offset(session: i64, cursor_idx: i32) -> i32:
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         let range = clang_getCursorExtent(cursor)
         let start_loc = clang_getRangeStart(range)
-        var file: *mut u8 = 0 as *mut u8
-        var start_off: u32 = 0
+        let file = 0 as *mut u8
+        let start_off: u32 = 0
         source_location_expansion_offset(start_loc, &raw mut file, &raw mut start_off)
         if file as i64 == 0: return -1
         start_off as i32
 
 unsafe fn cursor_source_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let range = clang_getCursorExtent(cursor)
-    var file: *mut u8 = 0 as *mut u8
-    var start_off: u32 = 0
-    var end_off: u32 = 0
+    let file = 0 as *mut u8
+    let start_off: u32 = 0
+    let end_off: u32 = 0
     if source_range_preferred_text_offsets(range, &raw mut file, &raw mut start_off, &raw mut end_off) == 0:
         return ""
     if end_off <= start_off: return ""
-    var buf_size: u64 = 0
+    let buf_size: u64 = 0
     let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
     if contents as i64 == 0 or end_off as u64 > buf_size: return ""
     let len = (end_off - start_off) as i64
@@ -5296,13 +5296,13 @@ unsafe fn cursor_source_text_from_cursor(s: *mut CImportSession, cursor: CXCurso
 
 unsafe fn cursor_expansion_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let range = clang_getCursorExtent(cursor)
-    var file: *mut u8 = 0 as *mut u8
-    var start_off: u32 = 0
-    var end_off: u32 = 0
+    let file = 0 as *mut u8
+    let start_off: u32 = 0
+    let end_off: u32 = 0
     if source_range_expansion_offsets(range, &raw mut file, &raw mut start_off, &raw mut end_off) == 0:
         return ""
     if end_off <= start_off: return ""
-    var buf_size: u64 = 0
+    let buf_size: u64 = 0
     let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
     if contents as i64 == 0 or end_off as u64 > buf_size: return ""
     let len = (end_off - start_off) as i64
@@ -5315,16 +5315,16 @@ unsafe fn cursor_expansion_text_from_cursor(s: *mut CImportSession, cursor: CXCu
 
 unsafe fn cursor_spelling_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let range = clang_getCursorExtent(cursor)
-    var file: *mut u8 = 0 as *mut u8
-    var start_off: u32 = 0
-    var end_off: u32 = 0
+    let file = 0 as *mut u8
+    let start_off: u32 = 0
+    let end_off: u32 = 0
     if source_range_spelling_offsets(range, &raw mut file, &raw mut start_off, &raw mut end_off) == 0:
         return ""
     if end_off <= start_off: return ""
     // #1387: a body+argument spelling range spans unrelated text; the cursor
     // has no spelling text of its own.
     if source_range_spelling_is_mixed(range, file, start_off, end_off): return ""
-    var buf_size: u64 = 0
+    let buf_size: u64 = 0
     let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
     if contents as i64 == 0 or end_off as u64 > buf_size: return ""
     let len = (end_off - start_off) as i64
@@ -5342,11 +5342,11 @@ unsafe fn cursor_spelling_head_from_cursor(s: *mut CImportSession, cursor: CXCur
     // straddles files — operator keyword in the macro body, operand type in a
     // header. Used to recover `sizeof`/`alignof` under macro expansion.
     let range = clang_getCursorExtent(cursor)
-    var file: *mut u8 = 0 as *mut u8
-    var start_off: u32 = 0
+    let file = 0 as *mut u8
+    let start_off: u32 = 0
     source_location_spelling_offset(clang_getRangeStart(range), &raw mut file, &raw mut start_off)
     if file as i64 == 0: return ""
-    var buf_size: u64 = 0
+    let buf_size: u64 = 0
     let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
     if contents as i64 == 0 or start_off as u64 >= buf_size: return ""
     let base = contents as i64 + start_off as i64
@@ -5371,16 +5371,16 @@ unsafe fn cursor_token_text_from_cursor(s: *mut CImportSession, cursor: CXCursor
     if tu as i64 == 0:
         return ""
     let cursor_range = clang_getCursorExtent(cursor)
-    var file: *mut u8 = 0 as *mut u8
-    var start_off: u32 = 0
-    var end_off: u32 = 0
+    let file = 0 as *mut u8
+    let start_off: u32 = 0
+    let end_off: u32 = 0
     if source_range_preferred_text_offsets(cursor_range, &raw mut file, &raw mut start_off, &raw mut end_off) == 0:
         return ""
     let begin_loc = clang_getLocationForOffset(tu, file, start_off)
     let end_loc = clang_getLocationForOffset(tu, file, end_off)
     let range = clang_getRange(begin_loc, end_loc)
-    var tokens: *mut CXToken = 0 as *mut CXToken
-    var token_count: u32 = 0
+    let tokens = 0 as *mut CXToken
+    let token_count: u32 = 0
     clang_tokenize(tu, range, &raw mut tokens, &raw mut token_count)
     if tokens as i64 == 0 or token_count == 0:
         return ""
@@ -5481,16 +5481,16 @@ fn with_ci_member_is_arrow(session: i64, cursor_idx: i32) -> bool:
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return false
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         let range = clang_getCursorExtent(cursor)
-        var start_off: u32 = 0
-        var end_off: u32 = 0
-        var file: *mut u8 = 0 as *mut u8
+        let start_off: u32 = 0
+        let end_off: u32 = 0
+        let file = 0 as *mut u8
         if source_range_expansion_offsets(range, &raw mut file, &raw mut start_off, &raw mut end_off) == 0:
             return false
         if end_off <= start_off: return false
-        var buf_size: u64 = 0
+        let buf_size: u64 = 0
         let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
         if contents as i64 == 0: return false
-        var i: u32 = start_off
+        var i = start_off
         while i + 1 < end_off and i as u64 < buf_size - 1:
             if *((contents as i64 + i as i64) as *const u8) == 45 and *((contents as i64 + i as i64 + 1) as *const u8) == 62:
                 return true
@@ -5568,7 +5568,7 @@ fn with_ci_member_field_name(session: i64, cursor_idx: i32) -> str:
             if clang_Cursor_isAnonymousRecordDecl(member) == 0:
                 break
             let outer = clang_getCursorSemanticParent(member)
-            var counter = AnonOrdinalCounter { target: member, ordinal: 0, found: 0 }
+            let counter = AnonOrdinalCounter { target: member, ordinal: 0, found: 0 }
             clang_visitChildren(outer, count_anon_member_ordinal as *const u8, &raw mut counter as *mut AnonOrdinalCounter as *mut u8)
             if counter.found == 0:
                 break
@@ -5599,14 +5599,14 @@ fn with_ci_binary_op(session: i64, cursor_idx: i32) -> i32:
         let rhs_range = clang_getCursorExtent(rhs_cursor)
         let lhs_end = clang_getRangeEnd(lhs_range)
         let rhs_start = clang_getRangeStart(rhs_range)
-        var lhs_end_off: u32 = 0
-        var rhs_start_off: u32 = 0
-        var lhs_file: *mut u8 = 0 as *mut u8
-        var rhs_file: *mut u8 = 0 as *mut u8
+        let lhs_end_off: u32 = 0
+        let rhs_start_off: u32 = 0
+        let lhs_file = 0 as *mut u8
+        let rhs_file = 0 as *mut u8
         source_location_expansion_offset(lhs_end, &raw mut lhs_file, &raw mut lhs_end_off)
         source_location_expansion_offset(rhs_start, &raw mut rhs_file, &raw mut rhs_start_off)
         if lhs_file as i64 != 0 and rhs_file as i64 != 0 and clang_File_isEqual(lhs_file, rhs_file) != 0 and rhs_start_off > lhs_end_off:
-            var buf_size: u64 = 0
+            let buf_size: u64 = 0
             let contents = clang_getFileContents((*s).tu, lhs_file, &raw mut buf_size)
             if contents as i64 != 0 and rhs_start_off as u64 <= buf_size:
                 // Extract operator text between lhs end and rhs start, trimmed
@@ -5706,12 +5706,12 @@ fn with_ci_unary_op(session: i64, cursor_idx: i32) -> i32:
         let op_loc = clang_getRangeStart(range)
         let child_start = clang_getRangeStart(child_range)
         let child_end = clang_getRangeEnd(child_range)
-        var op_off: u32 = 0
-        var child_start_off: u32 = 0
-        var child_end_off: u32 = 0
-        var op_file: *mut u8 = 0 as *mut u8
-        var child_start_file: *mut u8 = 0 as *mut u8
-        var child_end_file: *mut u8 = 0 as *mut u8
+        let op_off: u32 = 0
+        let child_start_off: u32 = 0
+        let child_end_off: u32 = 0
+        let op_file = 0 as *mut u8
+        let child_start_file = 0 as *mut u8
+        let child_end_file = 0 as *mut u8
         source_location_expansion_offset(op_loc, &raw mut op_file, &raw mut op_off)
         source_location_expansion_offset(child_start, &raw mut child_start_file, &raw mut child_start_off)
         source_location_expansion_offset(child_end, &raw mut child_end_file, &raw mut child_end_off)
@@ -5721,7 +5721,7 @@ fn with_ci_unary_op(session: i64, cursor_idx: i32) -> i32:
             return -1
         if clang_File_isEqual(op_file, child_start_file) == 0 or clang_File_isEqual(op_file, child_end_file) == 0:
             return -1
-        var buf_size: u64 = 0
+        let buf_size: u64 = 0
         let contents = clang_getFileContents((*s).tu, op_file, &raw mut buf_size)
         if contents as i64 == 0: return -1
         // Prefix operator
@@ -5739,8 +5739,8 @@ fn with_ci_unary_op(session: i64, cursor_idx: i32) -> i32:
             if len == 2 and *op == 43 and *((op as i64 + 1) as *const u8) == 43: return 7 // ++ = CB_UO_PRE_INC
             if len == 2 and *op == 45 and *((op as i64 + 1) as *const u8) == 45: return 8 // -- = CB_UO_PRE_DEC
         // Postfix operator
-        var range_end_off: u32 = 0
-        var range_end_file: *mut u8 = 0 as *mut u8
+        let range_end_off: u32 = 0
+        let range_end_file = 0 as *mut u8
         source_location_expansion_offset(clang_getRangeEnd(range), &raw mut range_end_file, &raw mut range_end_off)
         if range_end_file as i64 == 0 or clang_File_isEqual(op_file, range_end_file) == 0:
             return -1

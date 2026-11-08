@@ -43,7 +43,7 @@ fn embedded_blob_view(start: i64, end: i64) -> str:
     let len = end - start
     if start == 0 or len <= 0:
         return ""
-    var out: str = ""
+    let out = ""
     unsafe:
         let sp = &raw mut out as *mut u8
         *(sp as *mut u64) = start as u64
@@ -65,7 +65,7 @@ fn embedded_bundle_present(index: i32) -> bool:
 // functions whose module carries one of these; the link stage selects the
 // bundle when an undefined symbol does.
 fn bundle_manifest_prefixes(manifest: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     var start: i64 = 0
     while start < manifest.len():
         var end = start
@@ -85,7 +85,7 @@ fn bundle_manifest_prefixes(manifest: &str) -> List[str]:
 // The canonical module paths a manifest lists — the `<path>` of its
 // `prefix <p> <path>` lines.
 fn bundle_manifest_paths(manifest: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     var start: i64 = 0
     while start < manifest.len():
         var end = start
@@ -104,15 +104,15 @@ fn bundle_manifest_paths(manifest: &str) -> List[str]:
 
 // Every prefix any embedded bundle for the active target provides.
 fn embedded_bundle_prefixes() -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     for bi in 0..embedded_bundle_count():
         if not embedded_bundle_present(bi):
             continue
         if not embedded_bundle_for_this_target(bi):
             continue
         let prefixes = bundle_manifest_prefixes(embedded_bundle_manifest_text(bi))
-        for pi in 0..prefixes.len():
-            out.push(with_str_clone_ref(prefixes[pi]))
+        for prefixe in prefixes:
+            out.push(with_str_clone_ref(prefixe))
     out
 
 // Blob address pairs; the link stage turns them into byte slices.
@@ -136,7 +136,7 @@ fn embedded_bundle_object_end(index: i32) -> i64:
 // BundleInterfaceEmit.bundle_symbol_contract). The rows of one key, each
 // without the key and its tab.
 fn bundle_manifest_rows(manifest: &str, key: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     let want = key ++ "\t"
     var start: i64 = 0
     while start < manifest.len():
@@ -165,15 +165,15 @@ fn bundle_row_field(row: &str, index: i32) -> str:
 
 // The contract a `provides` row set declares for `symbol` ("" when none).
 fn bundle_provided_contract(provides: &List[str], symbol: &str) -> str:
-    for i in 0..provides.len():
-        if bundle_row_field(provides[i], 0) == symbol:
-            return bundle_row_field(provides[i], 1)
+    for provide in provides:
+        if bundle_row_field(provide, 0) == symbol:
+            return bundle_row_field(provide, 1)
     ""
 
 // The runtime bundle's manifest: its modules are the embedded runtime's.
 fn bundle_manifest_is_runtime(manifest: &str) -> bool:
     let paths = bundle_manifest_paths(manifest)
-    for pi in 0..paths.len():
-        if paths[pi].starts_with("<embedded-rt>/"):
+    for path in paths:
+        if path.starts_with("<embedded-rt>/"):
             return true
     false

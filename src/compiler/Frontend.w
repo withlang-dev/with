@@ -103,11 +103,11 @@ fn interface_name_token(line: &str, start: i64) -> str:
     frontend_owned_text(line.slice(start, end))
 
 fn frontend_new_list_str -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     out
 
 fn frontend_normalize_source_text(text: &str) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    let out = StringBuilder.with_capacity(text.len())
     var i = 0
     while i < text.len():
         let ch = text[i]
@@ -165,7 +165,7 @@ impl Zcu:
         // consumed (and freed) the buffer; the NEXT call iterated recycled
         // memory (release-lane c_import SEGV: quoted-path text read as a
         // str header in tracked_input_str_compare).
-        var paths = move self.tracked_input_paths
+        let paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_insert_unique(paths, path)
 
 fn count_non_use_decls_frontend(pool: &AstPool) -> i32:
@@ -200,7 +200,7 @@ impl Zcu:
     // process}`) names a module per member. The member files, or none
     // when a member is missing (then the base's not-found error stands).
     mut fn group_member_files_frontend(pool: &AstPool, decl: i32, dir: &str) -> List[str]:
-        let out: List[str] = List.new()
+        let out: List[str] = []
         let ps = pool.get_data0(decl)
         let pc = pool.get_data1(decl)
         let sc = pool.get_data2(decl)
@@ -341,7 +341,7 @@ impl Sema:
             self.module_import_counts.push(visible_count)
             self.module_index_by_path.insert(frontend_owned_text(mod.path), mod.module_id)
         if resolved.modules.len() > 0:
-            let global_frontier: List[i32] = List.new()
+            let global_frontier: List[i32] = []
             let root = resolved.modules[0]
             for ii in 0..root.import_count:
                 let imp = resolved.imports[(root.import_start + ii)]
@@ -354,7 +354,7 @@ impl Sema:
             // modules import for themselves stays theirs — std.regex reaches
             // the pcre2 interface through its own `use std.engines.pcre2.*`, and pcre2's
             // three thousand names are not every program's namespace.
-            let seen_global: HashMap[i32, i32] = HashMap.new()
+            let seen_global: HashMap[i32, i32] = [:]
             while global_frontier.len() > 0:
                 let last = global_frontier.len() - 1
                 let mid: i32 = global_frontier[last]
@@ -376,10 +376,10 @@ impl Sema:
 impl Zcu:
     mut fn expand_c_imports_frontend(pool: AstPool) -> AstPool:
         var out = pool
-        let ordered: List[i32] = List.new()
+        let ordered: List[i32] = []
         let ordered_paths = frontend_new_list_str()
-        let ordered_file_ids: List[i32] = List.new()
-        let ordered_ci: List[i32] = List.new()
+        let ordered_file_ids: List[i32] = []
+        let ordered_ci: List[i32] = []
         let base_count = out.decl_count()
         var has_c_import = 0
         var c_import_count = 0
@@ -450,7 +450,7 @@ impl Zcu:
             ordered_ci.push(0)
 
             let header_sym = out.get_data0(decl)
-            let header_spec: str = with_str_clone_ref(self.pool.resolve(header_sym))
+            let header_spec = with_str_clone_ref(self.pool.resolve(header_sym))
             let decl_dir = self.decl_source_dir_frontend(i)
             let resolved_header_spec = project_config_resolve_c_import_header(self.project_config, decl_dir, header_spec)
             self.record_frontend_tracked_input(c_import_absolute_quoted_path(resolved_header_spec))
@@ -484,8 +484,8 @@ impl Zcu:
                     // The cached translation depends on every header in its manifest;
                     // track them so incremental builds re-translate on header changes.
                     let hit_dep_paths = c_import_deps_manifest_paths(c_import_fs_cache_deps_manifest(cache_key))
-                    for dpi in 0..hit_dep_paths.len():
-                        self.record_frontend_tracked_input(hit_dep_paths[dpi])
+                    for hit_dep_path in hit_dep_paths:
+                        self.record_frontend_tracked_input(hit_dep_path)
                 else:
                     if self.trace_c_import_cache:
                         runtime_eprint("c_import cache miss")
@@ -503,8 +503,8 @@ impl Zcu:
                     // would be a second method of each name. The cache key
                     // (c_import_cache_key_frontend) carries the same names.
                     let view_types = facade_render_record_view_names(out, self.pool, 0)
-                    for vi in 0..view_types.len():
-                        nm_types.push(frontend_owned_text(view_types[vi]))
+                    for view_type in view_types:
+                        nm_types.push(frontend_owned_text(view_type))
                     ci_set_no_methods(c_import_no_methods_all(nm_packed), nm_types)
                     let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines, self.c_import_is_cxx_frontend(out, decl))
                     ci_clear_no_methods()
@@ -514,8 +514,8 @@ impl Zcu:
                     if libclang_result.len() > 0:
                         synthetic = libclang_result
                         let gen_dep_paths = cimport_deps_sorted_unique_paths(c_import_included_files())
-                        for dpi in 0..gen_dep_paths.len():
-                            self.record_frontend_tracked_input(gen_dep_paths[dpi])
+                        for gen_dep_path in gen_dep_paths:
+                            self.record_frontend_tracked_input(gen_dep_path)
                     else:
                         let libclang_error = c_import_last_error()
                         if libclang_error.len() > 0:
@@ -561,7 +561,7 @@ impl Zcu:
             let ci_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(ci_file_id, "<c_import " ++ header_spec ++ ">", synthetic)
-            var lexer = Lexer.init(synthetic, ci_file_id)
+            let lexer = Lexer.init(synthetic, ci_file_id)
             let tokens = lexer.tokenize()
             var parser = Parser.init_with_pool(tokens, synthetic, ci_file_id, self.pool, move self.diagnostics, out)
             out = parser.parse_module()
@@ -628,13 +628,13 @@ impl Zcu:
         // of the same name. Kept, both registered and MIR lowered the
         // generated body, which Sema never checked (#2403: "call of
         // `xdoc_root` has callee kind 0").
-        var written_methods: List[i32] = List.new()
+        let written_methods: List[i32] = []
         for oi in 0..ordered.len():
             if ordered_ci[oi] == 0 and frontend_fn_decl_is_method(out, self.pool, ordered[oi]):
                 written_methods.push(out.get_data0(ordered[oi]))
         let kept_paths = frontend_new_list_str()
-        let kept_file_ids: List[i32] = List.new()
-        let kept_ci: List[i32] = List.new()
+        let kept_file_ids: List[i32] = []
+        let kept_ci: List[i32] = []
         while out.decl_count() > 0:
             out.state.decls.pop()
         for oi in 0..ordered.len():
@@ -658,7 +658,7 @@ impl Zcu:
     // renders beside that module's own facades. Names the program's own
     // facades state are left to them.
     mut fn inject_toolchain_facades_frontend(pool: AstPool) -> AstPool:
-        var out = self.project_owned_annotations_frontend(pool)
+        let out = self.project_owned_annotations_frontend(pool)
         var claimed = frontend_new_list_str()
         var owner: i32 = -1
         for i in 0..out.decl_count():
@@ -692,7 +692,7 @@ impl Zcu:
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(file_id, file_name, text)
         let before = out.decl_count()
-        var lexer = Lexer.init(text, file_id)
+        let lexer = Lexer.init(text, file_id)
         let tokens = lexer.tokenize()
         var parser = Parser.init_with_pool(tokens, text, file_id, self.pool, move self.diagnostics, out)
         out = parser.parse_module()
@@ -736,7 +736,7 @@ impl Zcu:
                     continue
                 let rname = facade_owns_resource_name(ctor)
                 text = text ++ f"    resource {rname} wraps {ret}\n        from {ctor}\n        drop {dtor}\n"
-                var w = Diagnostic.warn(f"c_import: owns: \"{entry}\" is a deprecated spelling of a facade resource; `{ctor}` produces a `{rname}` whose Drop calls `{dtor}` (§16.2b.3)", span)
+                let w = Diagnostic.warn(f"c_import: owns: \"{entry}\" is a deprecated spelling of a facade resource; `{ctor}` produces a `{rname}` whose Drop calls `{dtor}` (§16.2b.3)", span)
                 w.add_help(f"write it in a facade: `c facade NAME:` / `resource {rname} wraps {ret}` / `from {ctor}` / `drop {dtor}`")
                 self.diagnostics.emit(w)
             for bi in 0..borrows:
@@ -753,7 +753,7 @@ impl Zcu:
                     self.diagnostics.emit(Diagnostic.err(f"c_import: borrows: \"{entry}\" names '{fname}', which this c_import does not declare (§16.2b.13)", span))
                     continue
                 text = text ++ f"    fn {fname}\n        lend\n"
-                var w = Diagnostic.warn(f"c_import: borrows: \"{entry}\" is a deprecated spelling of a facade lend; `{fname}` lends the resource, as the method `{fname}` of it (§16.2b.5)", span)
+                let w = Diagnostic.warn(f"c_import: borrows: \"{entry}\" is a deprecated spelling of a facade lend; `{fname}` lends the resource, as the method `{fname}` of it (§16.2b.5)", span)
                 w.add_help(f"write it in a facade: `c facade NAME:` / `fn {fname}` / `lend`")
                 self.diagnostics.emit(w)
             if text.len() > 0:
@@ -806,7 +806,7 @@ impl Zcu:
                 if profile == 0:
                     if self.resolve_module_path_frontend(dotted, self.decl_source_dir_frontend(i)).len() > 0:
                         let span = Span { file: self.decl_source_file_id_frontend(i), start: out.get_start(item as NodeId), end: out.get_end(item as NodeId) }
-                        var d = Diagnostic.err(f"use convention {dotted}: module '{dotted}' declares no convention profile '{dotted}' (§16.2b.12)", span)
+                        let d = Diagnostic.err(f"use convention {dotted}: module '{dotted}' declares no convention profile '{dotted}' (§16.2b.12)", span)
                         d.add_help(f"a profile is the block `c convention {dotted}:` in the package it is named after; its rules are '<name>: drop *_unref', '<name>: from *_new', '<name>: fn *_get lend'")
                         self.diagnostics.emit(d)
                     continue
@@ -831,17 +831,17 @@ impl Zcu:
     // the whole facade in one module, so a written item that names a type
     // the project's resource renders (a borrow of it) resolves.
     fn merge_fetched_facades_frontend(pool: AstPool) -> AstPool:
-        var out = pool
+        let out = pool
         let count = out.decl_count()
         for i in 0..count:
             let decl = out.get_decl(i)
             if out.kind(decl) != NodeKind.NK_C_FACADE or not frontend_path_is_fetched_facade(self.decl_source_path_frontend(i)): continue
             let name = out.get_data0(decl)
-            var fn_syms: List[i32] = List.new()
-            var resource_syms: List[i32] = List.new()
-            var moved: List[i32] = List.new()
+            let fn_syms: List[i32] = []
+            let resource_syms: List[i32] = []
+            let moved: List[i32] = []
             var moved_count: i32 = 0
-            var project_blocks: List[i32] = List.new()
+            let project_blocks: List[i32] = []
             for j in 0..count:
                 let other = out.get_decl(j)
                 if j == i or out.kind(other) != NodeKind.NK_C_FACADE or out.get_data0(other) != name: continue
@@ -857,7 +857,7 @@ impl Zcu:
             if moved_count == 0: continue
             let start = out.get_data1(decl)
             let item_count = out.get_data2(decl)
-            var kept: List[i32] = List.new()
+            let kept: List[i32] = []
             var kept_count: i32 = 0
             for k in 0..item_count:
                 let item = out.get_extra(start + k)
@@ -882,7 +882,7 @@ impl Zcu:
             let decl = out.get_decl(i)
             if out.kind(decl) != NodeKind.NK_C_FACADE:
                 continue
-            let facade_name: str = with_str_clone_ref(self.pool.resolve(out.get_data0(decl)))
+            let facade_name = with_str_clone_ref(self.pool.resolve(out.get_data0(decl)))
             // Ruling Amendment 3: a function presented twice has a declaration
             // per later presentation, in the pool before the block is rendered.
             // Each is the import's declaration under another name, so it
@@ -933,8 +933,8 @@ impl Zcu:
             key = key ++ "|" ++ self.pool.resolve(nm_sym)
         // D122: the record views the facades borrow take no §16.2a sugar.
         let view_types = facade_render_record_view_names(pool, self.pool, 0)
-        for vi in 0..view_types.len():
-            key = key ++ "|view:" ++ view_types[vi]
+        for view_type in view_types:
+            key = key ++ "|view:" ++ view_type
         // §16.2 selective/strict imports must not share cached output with a
         // permissive whole import of the same header.
         let strict_flag = (self.c_import_is_strict_frontend(pool, decl)) as i32
@@ -1015,8 +1015,8 @@ fn cimport_deps_sorted_unique_paths(files: &str) -> List[str]:
         if line_end > pos:
             let path = files.slice(pos as i64, line_end as i64)
             var exists = false
-            for i in 0..out.len():
-                if out[i] == path:
+            for out_item in out:
+                if out_item == path:
                     exists = true
             if not exists:
                 var inserted = false
@@ -1085,7 +1085,7 @@ fn c_import_deps_manifest_entries_valid(manifest: &str) -> bool:
     saw_header
 
 fn c_import_deps_manifest_paths(manifest: &str) -> List[str]:
-    var out = frontend_new_list_str()
+    let out = frontend_new_list_str()
     var pos = 0
     let total = manifest.len()
     while pos < total:
@@ -1148,7 +1148,7 @@ fn c_import_fs_cache_store(cache_key: &str, value: &str, warnings: &str):
 // omission is a stub: the body was given up on, yet a declaration binds the
 // name and a call reaches nothing.
 fn c_import_declared_and_omitted(synthetic: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     let prefix = "// @with-cimport-omitted|"
     for line in synthetic.split("\n"):
         if not c_import_starts_with(line, prefix): continue
@@ -1680,7 +1680,7 @@ fn c_import_function_decl(stmt_raw: &str) -> str:
     "extern fn " ++ fn_name ++ "(" ++ params_out ++ ") -> " ++ ret_ty ++ "\n"
 
 fn c_import_param_type(param_raw: &str) -> str:
-    var param = c_import_trim_outer_parens(c_import_trim(param_raw))
+    let param = c_import_trim_outer_parens(c_import_trim(param_raw))
     if param.len() == 0:
         return ""
     if param == "void":
@@ -1758,7 +1758,7 @@ fn c_import_map_c_type(spec_raw: &str) -> str:
     out
 
 fn c_import_decode_escapes(raw: &str) -> str:
-    var out = StringBuilder.with_capacity(raw.len())
+    let out = StringBuilder.with_capacity(raw.len())
     var i = 0
     let len = raw.len()
     while i < len:
@@ -1911,8 +1911,8 @@ impl Zcu:
         // The target's module set, owned by EmbeddedRuntime (on wasm the
         // fiber stubs stand in for the fiber and channel runtimes).
         let files = embedded_rt_unit_files()
-        for i in 0..files.len():
-            let rel = files[i]
+        for file in files:
+            let rel = file
             let path = embedded_rt_resolve_path(rel)
             if path.len() == 0:
                 self.diagnostics.emit(Diagnostic.err("rt-in-unit: runtime source not embedded: " ++ rel, Span { file: 0, start: 0, end: 0 }))
@@ -1995,7 +1995,7 @@ impl Zcu:
 
     // The Sema that checks the final pool, configured from this frontend.
     mut fn new_module_sema(text: &str, pool: &AstPool) -> Sema:
-        var sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
+        let sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
         sema.source_text = with_str_clone_ref(text)
         sema.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
         sema.package_keys = self.package_key_map()
@@ -2037,7 +2037,7 @@ impl Zcu:
         // #682's later increments. Final decl ORDER is unchanged: the
         // three-tier import merge already emits prelude → user imports → root.
         let t_parse = runtime_clock_nanos()
-        var pool: AstPool = AstPool.new()
+        var pool = AstPool.new()
         self.prelude_prefix_decls = 0
         self.prelude_prefix_non_use = 0
         // D39: a `.wi` root (`with check x.wi`) parses in interface flavor.
@@ -2045,7 +2045,7 @@ impl Zcu:
         if self.prelude_mode != PRELUDE_NONE():
             let prelude_module = if self.prelude_mode == PRELUDE_CORE(): "std.prelude_core" else if self.prelude_mode == PRELUDE_ALLOC(): "std.prelude_alloc" else: "std.prelude"
             let synthetic = "use " ++ prelude_module ++ "\n"
-            var plexer = Lexer.init(synthetic, 0)
+            let plexer = Lexer.init(synthetic, 0)
             let ptokens = plexer.tokenize()
             var pparser = Parser.init(ptokens, synthetic, 0, self.pool, move self.diagnostics)
             pool = pparser.parse_module()
@@ -2059,7 +2059,7 @@ impl Zcu:
             self.prelude_prefix_decls = pool.decl_count()
             self.prelude_prefix_non_use = count_non_use_decls_frontend(pool)
             let before_user = pool.decl_count()
-            var ulexer = Lexer.init(normalized_text, file_id)
+            let ulexer = Lexer.init(normalized_text, file_id)
             let utokens = ulexer.tokenize()
             var uparser = Parser.init_with_pool(utokens, normalized_text, file_id, self.pool, move self.diagnostics, pool)
             if implicit_main_mode != 0:
@@ -2070,7 +2070,7 @@ impl Zcu:
             self.diagnostics = move uparser.diags
             self.append_decl_source_paths(pool.decl_count() - before_user, name, file_id)
         else:
-            var lexer = Lexer.init(normalized_text, file_id)
+            let lexer = Lexer.init(normalized_text, file_id)
             let tokens = lexer.tokenize()
             var parser = Parser.init(tokens, normalized_text, file_id, self.pool, move self.diagnostics)
             if implicit_main_mode != 0:
@@ -2081,13 +2081,13 @@ impl Zcu:
             self.diagnostics = move parser.diags
             self.seed_decl_source_paths(pool, name, file_id)
         for extra_i in 0..self.extra_source_names.len():
-            let extra_name: str = with_str_clone_ref(self.extra_source_names[extra_i])
+            let extra_name = with_str_clone_ref(self.extra_source_names[extra_i])
             let extra_text = frontend_normalize_source_text(self.extra_source_texts[extra_i])
             let extra_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(extra_file_id, extra_name, extra_text)
             let before = pool.decl_count()
-            var extra_lexer = Lexer.init(extra_text, extra_file_id)
+            let extra_lexer = Lexer.init(extra_text, extra_file_id)
             let extra_tokens = extra_lexer.tokenize()
             var extra_parser = Parser.init_with_pool(extra_tokens, extra_text, extra_file_id, self.pool, move self.diagnostics, pool)
             pool = extra_parser.parse_module()
@@ -2111,7 +2111,7 @@ impl Zcu:
             runtime_eprint("[frontend] compile_source:resolve")
         // Wave 4: sidecar resolved artifact.
         let t_resolve = runtime_clock_nanos()
-        var _sp_diag = move self.diagnostics
+        let _sp_diag = move self.diagnostics
         var artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, _sp_diag, false, self.prelude_prefix_decls, self.next_file_id, self.import_root_dir)
         if do_profile:
             let resolve_ns = runtime_clock_nanos() - t_resolve
@@ -2246,7 +2246,7 @@ impl Zcu:
             self.source_text_names = sema_clone_str_list(pre_sema.source_text_names)
             self.source_texts = sema_clone_str_list(pre_sema.source_texts)
             self.c_import_omitted_symbols = sema_clone_str_str_hashmap(pre_sema.ci_omitted_symbols)
-            var tracked_paths = move self.tracked_input_paths
+            let tracked_paths = move self.tracked_input_paths
             self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, pre_sema.tracked_input_paths)
             if self.diagnostics.has_errors() and self.analysis_partial_semantics == 0:
                 self.render_all_diagnostics_frontend()
@@ -2266,7 +2266,7 @@ impl Zcu:
         // on the final pool (the comptime transform may replace it).
         // A c_import's translation and a rendered `c facade` are the
         // compiler's own text: the rule is for modules people write.
-        let generated_files: List[i32] = List.new()
+        let generated_files: List[i32] = []
         for si in 0..self.source_text_names.len():
             let text_name = self.source_text_names[si]
             if text_name.starts_with("<c_import ") or text_name.starts_with("<facade ") or text_name.starts_with("<toolchain facade "):
@@ -2289,7 +2289,7 @@ impl Zcu:
         // program one that is checked twice: first to hear what the uses
         // demand, with nothing reported, then with every such field at the
         // type decided. A program without one is checked once, as before.
-        var field_decisions: List[i32] = List.new()
+        var field_decisions: List[i32] = []
         if frontend_has_inferred_numeric_fields(pool):
             let reported = self.diagnostics.count()
             var probe = self.new_module_sema(text, pool)
@@ -2316,7 +2316,7 @@ impl Zcu:
         // comes after an earlier one and wins (literal_decision reads the
         // last), and a binding no later round mentions keeps its decision.
         var literal_rounds = 0
-        var literal_decisions: List[i32] = List.new()
+        let literal_decisions: List[i32] = []
         while sema.literal_demands.len() > 0 and sema.literal_demands_change_types() and literal_rounds < 8:
             for code in sema.literal_decisions_from_demands(): literal_decisions.push(code)
             self.diagnostics = move sema.diags
@@ -2375,7 +2375,7 @@ impl Zcu:
     mut fn merge_resolved_modules_frontend(root_pool: AstPool, root_path: &str) -> AstPool:
         var merged_pool = root_pool
         // Noted after the loop: `mod` is a view into self.last_resolved.
-        var refused_runtime: List[str] = List.new()
+        let refused_runtime: List[str] = []
 
         for mi in 0..self.last_resolved.modules.len():
             let mod = self.last_resolved.modules[mi]
@@ -2383,7 +2383,7 @@ impl Zcu:
                 continue
 
             let file_id = mod.file_id
-            let path: str = mod.path
+            let path = mod.path
             if path.len() == 0 or path == root_path:
                 continue
 
@@ -2397,7 +2397,7 @@ impl Zcu:
                 self.diagnostics.emit(Diagnostic.err("failed to read imported module", span))
                 continue
 
-            var lexer = Lexer.init(text, file_id)
+            let lexer = Lexer.init(text, file_id)
             let tokens = lexer.tokenize()
             let before = merged_pool.decl_count()
             var parser = Parser.init_with_pool(tokens, text, file_id, self.pool, move self.diagnostics, merged_pool)
@@ -2408,8 +2408,8 @@ impl Zcu:
             self.add_source_text_mapping(file_id, path, text)
             self.append_decl_source_paths(merged_pool.decl_count() - before, path, file_id)
 
-        for ri in 0..refused_runtime.len():
-            self.note_refused_runtime_source(refused_runtime[ri])
+        for refused_runtime_item in refused_runtime:
+            self.note_refused_runtime_source(refused_runtime_item)
         self.strip_use_decls_frontend(merged_pool)
 
     // ── D39 on-demand interface sections ─────────────────────────────
@@ -2430,12 +2430,12 @@ impl Zcu:
         // main's `?` exit (§10.2, D190). Seeded here so its interface line
         // is merged and Sema resolves the callee it names (D65).
         self.iface_mentioned.insert(self.pool.intern("with_main_error_exit"), 1)
-        let line_section: List[i32] = List.new()
+        let line_section: List[i32] = []
         let line_texts = frontend_new_list_str()
         let line_names = frontend_new_list_str()
-        let line_kinds: List[i32] = List.new()
-        let line_done: List[i32] = List.new()
-        let line_counts: List[i32] = List.new()
+        let line_kinds: List[i32] = []
+        let line_done: List[i32] = []
+        let line_counts: List[i32] = []
         var decl_lines = 0
         for si in 0..paths.len():
             let lines = texts[si].split("\n")
@@ -2456,7 +2456,7 @@ impl Zcu:
                 if li < lines.len(): li = li + 1
                 while li < lines.len() and (lines[li].starts_with(" ") or lines[li].starts_with("\t") or lines[li].len() == 0 or lines[li].starts_with("//")):
                     li = li + 1
-                var declaration = StringBuilder.new()
+                let declaration = StringBuilder.new()
                 var count: i32 = 0
                 for bi in start..li:
                     declaration.push_str(lines[bi])
@@ -2500,20 +2500,20 @@ impl Zcu:
         // takes the last root_tail entries. The chunks go before them.
         let total = out.decl_count()
         if root_tail > 0 and total > base and base >= root_tail:
-            let order: List[i32] = List.new()
+            let order: List[i32] = []
             for di in 0..(base - root_tail):
                 order.push(di)
             for di in base..total:
                 order.push(di)
             for di in (base - root_tail)..base:
                 order.push(di)
-            let decls: List[i32] = List.new()
+            let decls: List[i32] = []
             for di in 0..total:
                 decls.push(out.get_decl(di) as i32)
-            let ordered: List[i32] = List.new()
+            let ordered: List[i32] = []
             let ordered_paths = frontend_new_list_str()
-            let ordered_file_ids: List[i32] = List.new()
-            let ordered_ci: List[i32] = List.new()
+            let ordered_file_ids: List[i32] = []
+            let ordered_ci: List[i32] = []
             for oi in 0..total:
                 let di = order[oi]
                 ordered.push(decls[di])
@@ -2545,7 +2545,7 @@ impl Zcu:
     // (fn_abi_module_link_name). The earlier declaration keeps the short name,
     // so a source definition always does (D39: the interface yields).
     fn displace_colliding_interface_fns(pool: &AstPool, base: i32):
-        let taken: HashMap[i32, str] = HashMap.new()
+        let taken: HashMap[i32, str] = [:]
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di) as i32
             let kind = pool.kind(decl)
@@ -2593,7 +2593,7 @@ impl Zcu:
     // headers' externs of one symbol are that symbol declared twice, which
     // Sema accepts (collect_extern_var).
     fn displace_colliding_globals(pool: &AstPool):
-        let taken: HashMap[i32, str] = HashMap.new()
+        let taken: HashMap[i32, str] = [:]
         for pass in 0..3:
             for di in 0..pool.decl_count():
                 let decl = pool.get_decl(di) as i32
@@ -2636,9 +2636,9 @@ impl Zcu:
     // precedence (resolve_displaced_fn_ident: the importer's to its wrapper,
     // std.engines.pcre2's to its own import).
     fn displace_c_import_wrappers(pool: &AstPool):
-        var extern_names: List[i32] = List.new()
-        var extern_paths: List[str] = List.new()
-        var extern_imports: List[bool] = List.new()
+        let extern_names: List[i32] = []
+        let extern_paths: List[str] = []
+        let extern_imports: List[bool] = []
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di) as i32
             if pool.kind(decl) == NodeKind.NK_EXTERN_FN:
@@ -2684,7 +2684,7 @@ impl Zcu:
     // c_import is an owner of its own (#1753). A header's extern stays the
     // one global C symbol (D29).
     fn displace_colliding_c_import_fns(pool: &AstPool):
-        let taken: HashMap[i32, str] = HashMap.new()
+        let taken: HashMap[i32, str] = [:]
         for pass in 0..2:
             for di in 0..pool.decl_count():
                 let decl = pool.get_decl(di) as i32
@@ -2708,7 +2708,7 @@ impl Zcu:
         var out = pool
         let chunk_file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
-        var lexer = Lexer.init(chunk, chunk_file_id)
+        let lexer = Lexer.init(chunk, chunk_file_id)
         let tokens = lexer.tokenize()
         let before_decls = out.decl_count()
         let before_nodes = out.node_count()
@@ -2779,7 +2779,7 @@ impl Zcu:
                     self.iface_mentioned.insert(pool.get_extra(path_start + i), 1)
 
     mut fn strip_use_decls_frontend(pool: AstPool) -> AstPool:
-        var out = pool
+        let out = pool
         var has_use = 0
         for i in 0..out.decl_count():
             let decl = out.get_decl(i)
@@ -2789,10 +2789,10 @@ impl Zcu:
         if has_use == 0:
             return out
 
-        let ordered: List[i32] = List.new()
+        let ordered: List[i32] = []
         let ordered_paths = frontend_new_list_str()
-        let ordered_file_ids: List[i32] = List.new()
-        let ordered_c_import: List[i32] = List.new()
+        let ordered_file_ids: List[i32] = []
+        let ordered_c_import: List[i32] = []
         for i in 0..out.decl_count():
             let decl = out.get_decl(i)
             if out.kind(decl) != NodeKind.NK_USE_DECL or out.get_data2(decl) > 0:
@@ -2804,8 +2804,8 @@ impl Zcu:
 
         while out.decl_count() > 0:
             out.state.decls.pop()
-        for oi in 0..ordered.len():
-            out.add_decl(ordered[oi])
+        for ordered_item in ordered:
+            out.add_decl(ordered_item)
         self.decl_source_paths = ordered_paths
         self.decl_source_file_ids = ordered_file_ids
         self.decl_is_c_import = ordered_c_import
@@ -2824,18 +2824,18 @@ impl Zcu:
             let root_src_path = self.decl_source_path_frontend(0)
             if root_src_path.len() > 0 and self.has_imported_path(root_src_path) == false:
                 self.add_imported_path(root_src_path)
-        var prelude_ordered: List[i32] = List.new()
+        var prelude_ordered: List[i32] = []
         var prelude_paths = frontend_new_list_str()
-        var prelude_file_ids: List[i32] = List.new()
-        var prelude_c_import: List[i32] = List.new()
-        var user_import_ordered: List[i32] = List.new()
+        var prelude_file_ids: List[i32] = []
+        var prelude_c_import: List[i32] = []
+        var user_import_ordered: List[i32] = []
         var user_import_paths = frontend_new_list_str()
-        var user_import_file_ids: List[i32] = List.new()
-        var user_import_c_import: List[i32] = List.new()
-        var root_ordered: List[i32] = List.new()
-        var root_paths = frontend_new_list_str()
-        var root_file_ids: List[i32] = List.new()
-        var root_c_import: List[i32] = List.new()
+        var user_import_file_ids: List[i32] = []
+        var user_import_c_import: List[i32] = []
+        let root_ordered: List[i32] = []
+        let root_paths = frontend_new_list_str()
+        let root_file_ids: List[i32] = []
+        let root_c_import: List[i32] = []
 
         // Phase 1: Expand prelude USE (position 0) and its transitive imports.
         let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NodeKind.NK_USE_DECL
@@ -2960,28 +2960,28 @@ impl Zcu:
         user_import_c_import = move user_reordered.ci_flags
 
         // Collect fn names from higher-priority tiers for deduplication.
-        var root_fn_names: List[i32] = List.new()
+        let root_fn_names: List[i32] = []
         // #2554: a `@[c_export]` definition defines the C symbol a root
         // `extern fn` of the same name declares; only a root DEFINITION of
         // the name may shadow it. Dropped, the definition vanished and the
         // link failed with the symbol undefined.
-        var root_defined_fn_names: List[i32] = List.new()
-        for ri in 0..root_ordered.len():
-            let rd = root_ordered[ri]
+        let root_defined_fn_names: List[i32] = []
+        for root_ordered_item in root_ordered:
+            let rd = root_ordered_item
             let rk = merged_pool.kind(rd)
             if rk == NodeKind.NK_FN_DECL or rk == NodeKind.NK_EXTERN_FN:
                 root_fn_names.push(merged_pool.get_data0(rd))
             if rk == NodeKind.NK_FN_DECL:
                 root_defined_fn_names.push(merged_pool.get_data0(rd))
 
-        var user_fn_names: List[i32] = List.new()
-        for ui in 0..user_import_ordered.len():
-            let ud = user_import_ordered[ui]
+        let user_fn_names: List[i32] = []
+        for user_import_ordered_item in user_import_ordered:
+            let ud = user_import_ordered_item
             let uk = merged_pool.kind(ud)
             if uk == NodeKind.NK_FN_DECL or uk == NodeKind.NK_EXTERN_FN:
                 user_fn_names.push(merged_pool.get_data0(ud))
 
-        var higher_type_names: List[i32] = List.new()
+        let higher_type_names: List[i32] = []
         for ri in 0..root_ordered.len():
             let rd = root_ordered[ri]
             if merged_pool.kind(rd) == NodeKind.NK_TYPE_DECL:
@@ -2996,21 +2996,21 @@ impl Zcu:
         while merged_pool.decl_count() > 0:
             merged_pool.state.decls.pop()
         let rebuilt_paths = frontend_new_list_str()
-        let rebuilt_file_ids: List[i32] = List.new()
-        let rebuilt_c_import: List[i32] = List.new()
+        let rebuilt_file_ids: List[i32] = []
+        let rebuilt_c_import: List[i32] = []
         // Combine user + root fn names for prelude cross-tier shadowing.
-        var higher_fn_names: List[i32] = List.new()
-        for hi in 0..root_fn_names.len():
-            higher_fn_names.push(root_fn_names[hi])
-        for hi in 0..user_fn_names.len():
-            higher_fn_names.push(user_fn_names[hi])
+        let higher_fn_names: List[i32] = []
+        for root_fn_name in root_fn_names:
+            higher_fn_names.push(root_fn_name)
+        for user_fn_name in user_fn_names:
+            higher_fn_names.push(user_fn_name)
         // D30 R2c: runtime DEFINITIONS (bodied fns from <embedded-rt>/) are
         // never decl-dropped by a bodiless extern in a higher tier — the
         // extern is the redundant one (its symbol resolves in-unit) and is
         // dropped from the higher tier instead. Higher-tier BODIED fns
         // still shadow normally. Empty for a --no-std unit.
-        var embedded_rt_fn_names: List[i32] = List.new()
-        var higher_bodied_fn_names: List[i32] = List.new()
+        let embedded_rt_fn_names: List[i32] = []
+        let higher_bodied_fn_names: List[i32] = []
         for oi in 0..prelude_ordered.len():
             let pd = prelude_ordered[oi]
             if merged_pool.kind(pd) == NodeKind.NK_FN_DECL and prelude_paths[oi].starts_with("<embedded-rt>/"):
@@ -3118,8 +3118,8 @@ fn frontend_path_is_std_rc_module(path: &str) -> bool:
     false
 
 fn frontend_name_shadowed_by_extern(tier: &List[i32], pool: &AstPool, name: i32) -> bool:
-    for i in 0..tier.len():
-        let d = tier[i]
+    for tier_item in tier:
+        let d = tier_item
         if pool.kind(d) == NodeKind.NK_EXTERN_FN and pool.get_data0(d) == name:
             return true
     false
@@ -3237,9 +3237,9 @@ fn frontend_fn_decl_is_c_export(pool: &AstPool, intern: &InternPool, decl: i32) 
 // diagnostics, and resolves each module's references
 // (Sema.record_displaced_fn, Sema.resolve_displaced_fn_ident).
 fn frontend_displace_fn_decl(pool: &AstPool, intern: &InternPool, decl: i32, path: &str):
-    let name: str = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+    let name = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
     let canonical = codegen_canonical_module_path(path)
-    var tag = StringBuilder.with_capacity(canonical.len())
+    let tag = StringBuilder.with_capacity(canonical.len())
     for i in 0..canonical.len():
         let c = canonical[i]
         if (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9'):
@@ -3283,8 +3283,8 @@ fn frontend_extern_var_matches_decl(pool: &AstPool, intern: &InternPool, decl: i
     other_type == decl_type
 
 fn frontend_extern_var_shadowed_by_tier(tier: &List[i32], pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
-    for i in 0..tier.len():
-        if frontend_extern_var_matches_decl(pool, intern, decl, tier[i]):
+    for tier_item in tier:
+        if frontend_extern_var_matches_decl(pool, intern, decl, tier_item):
             return true
     false
 
@@ -3306,8 +3306,8 @@ fn frontend_extern_var_shadowed_in_tier(tier: &List[i32], pool: &AstPool, intern
     false
 
 fn frontend_list_contains_i32(v: &List[i32], target: i32) -> bool:
-    for i in 0..v.len():
-        if v[i] == target:
+    for v_item in v:
+        if v_item == target:
             return true
     false
 
@@ -3362,7 +3362,7 @@ impl Zcu:
         accum.state.order.push(frontend_owned_text(path))
 
     fn reorder_import_tier_frontend(decls: &List[i32], paths: &List[str], file_ids: &List[i32], ci_flags: &List[i32]) -> ReorderedTier:
-        let wanted_paths: HashMap[str, i32] = HashMap.new()
+        let wanted_paths: HashMap[str, i32] = [:]
         let first_seen_paths = frontend_new_list_str()
         for i in 0..paths.len():
             let path = paths[i]
@@ -3374,16 +3374,16 @@ impl Zcu:
             first_seen_paths.push(frontend_owned_text(path))
 
         let accum = DepOrderAccum.new()
-        for i in 0..first_seen_paths.len():
-            self.collect_module_dependency_order_frontend(first_seen_paths[i], wanted_paths, accum)
+        for first_seen_path in first_seen_paths:
+            self.collect_module_dependency_order_frontend(first_seen_path, wanted_paths, accum)
 
         let module_order = accum.state.order
-        let out_decls: List[i32] = List.new()
+        let out_decls: List[i32] = []
         let out_paths = frontend_new_list_str()
-        let out_file_ids: List[i32] = List.new()
-        let out_c_import: List[i32] = List.new()
-        for oi in 0..module_order.len():
-            let module_path = module_order[oi]
+        let out_file_ids: List[i32] = []
+        let out_c_import: List[i32] = []
+        for module_order_item in module_order:
+            let module_path = module_order_item
             for di in 0..decls.len():
                 if paths[di] != module_path:
                     continue
@@ -3582,7 +3582,7 @@ impl Zcu:
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(file_id, path, text)
 
-        var lexer = Lexer.init(text, file_id)
+        let lexer = Lexer.init(text, file_id)
         let tokens = lexer.tokenize()
 
         var parser = Parser.init_with_pool(tokens, text, file_id, self.pool, move self.diagnostics, target_pool)

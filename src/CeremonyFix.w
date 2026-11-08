@@ -97,7 +97,7 @@ fn cf_rewritable(path: &str, excludes: &List[str], std_too: bool) -> bool:
 
 fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[CeremonyEdit]:
     let edits = []
-    let texts: HashMap[str, str] = HashMap.new()
+    let texts: HashMap[str, str] = [:]
     for (node, path) in sema.ceremony_let_paths:
         if not cf_rewritable(path, excludes, std_too): continue
         if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
@@ -219,7 +219,7 @@ fn run_ceremony_fix() -> i32:
     if entry.len() == 0:
         print("usage: with fix-ceremony [--report|--apply] [--exclude path ...] [--check-with compiler] <entry.w>")
         return 2
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     let pool = comp.compile_entry_file(entry)
     if pool.decl_count() == 0 or comp.zcu.diagnostics.has_errors():
         eprint(f"fix-ceremony: {entry} does not check; fix it first")
@@ -234,7 +234,7 @@ fn run_ceremony_fix() -> i32:
             if e.path == path: print(f"{path}:{cf_line_of(text, e.start)}: {e.what}")
     print(f"fix-ceremony: {edits.len()} rewrite(s) in {paths.len()} file(s)")
     if not apply or edits.len() == 0: return 0
-    let originals: HashMap[str, str] = HashMap.new()
+    let originals: HashMap[str, str] = [:]
     for path in paths:
         let text = with_fs_read_file(path)
         originals.insert(with_str_clone_ref(path), with_str_clone_ref(text))

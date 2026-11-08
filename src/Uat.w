@@ -76,7 +76,7 @@ fn uat_trim_trailing_line_endings(text: &str) -> str:
     text.slice(0, end)
 
 fn uat_split_list(text: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     for part in text.split(","):
         let t = part.trim()
         if t.len() > 0: out.push(t)
@@ -127,7 +127,7 @@ fn uat_parse_int(text: &str) -> (bool, i64):
     (true, if neg: 0 - value else: value)
 
 fn uat_sort_strings(items: List[str]) -> List[str]:
-    var sorted = items
+    let sorted = items
     for i in 1..sorted.len():
         var j = i
         while j > 0 and sorted[j - 1] > sorted[j]:
@@ -138,7 +138,7 @@ fn uat_sort_strings(items: List[str]) -> List[str]:
     sorted
 
 fn uat_error(sc: UatScenario, line: isize, message: &str) -> UatScenario:
-    var out = sc
+    let out = sc
     out.problem = f"{out.path}:{line}: {message}"
     out
 
@@ -151,8 +151,8 @@ fn uat_stem(path: &str) -> str:
     path.slice(start, end)
 
 fn uat_parse(path: &str, text: &str) -> UatScenario:
-    var sc = UatScenario { name: uat_stem(path), path: path, title: "", requires: List.new(), platforms: List.new(), steps: List.new(), problem: "" }
-    var lines: List[str] = List.new()
+    let sc = UatScenario { name: uat_stem(path), path: path, title: "", requires: List.new(), platforms: List.new(), steps: List.new(), problem: "" }
+    let lines: List[str] = []
     for raw in text.split("\n"):
         lines.push(uat_trim_trailing_line_endings(raw))
     var i: i32 = 0
@@ -261,7 +261,7 @@ fn uat_parse(path: &str, text: &str) -> UatScenario:
 // A command line into argv: whitespace-separated, single or double quotes
 // group, a backslash escapes the next character inside double quotes.
 fn uat_split_command(text: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     var cur = ""
     var have = false
     var quote = 0
@@ -293,8 +293,8 @@ fn uat_split_command(text: &str) -> List[str]:
 
 fn uat_argv_blob(items: &List[str]) -> str:
     var out = ""
-    for i in 0..items.len():
-        out = out ++ items[i] ++ "\0"
+    for item in items:
+        out = out ++ item ++ "\0"
     out
 
 // ── host probes (`requires:`) ─────────────────────────────────────────────
@@ -353,7 +353,7 @@ fn uat_probe_capture(argv: &List[str], scratch: &str) -> i32:
 // Whether the console session's screen is locked: `ioreg` (in the base
 // system) prints the session dictionary with `"CGSSessionScreenIsLocked"=Yes`.
 fn uat_darwin_screen_locked(scratch: &str) -> bool:
-    var argv: List[str] = List.new()
+    let argv: List[str] = []
     argv.push("/usr/sbin/ioreg")
     argv.push("-n")
     argv.push("Root")
@@ -383,7 +383,7 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
         return ""
     if req.starts_with("lib "):
         let name = req.slice(4, req.len()).trim().to_owned()
-        var argv: List[str] = List.new()
+        let argv: List[str] = []
         argv.push("pkg-config")
         argv.push("--exists")
         argv.push(name)
@@ -393,7 +393,7 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
         return "requires lib " ++ name ++ ": not found"
     if req.starts_with("tool "):
         let name = req.slice(5, req.len()).trim().to_owned()
-        var argv: List[str] = List.new()
+        let argv: List[str] = []
         argv.push(if uat_host_platform() == "windows": "where" else: "which")
         argv.push(name)
         if uat_probe_capture(argv, scratch) == 0: return ""
@@ -460,7 +460,7 @@ fn uat_toolchain(self_path: &str) -> str:
 // `--keep`): a run leaves the project as it found it. A file that was there
 // before the run is the project's and stays.
 fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
-    var created: List[str] = List.new()
+    let created: List[str] = []
     for si in 0..sc.steps.len():
         let verb = sc.steps[si].verb
         if verb == UAT_NEW_DIRECTORY: break
@@ -474,7 +474,7 @@ fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -
     outcome
 
 fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
-    var human: List[str] = List.new()
+    let human: List[str] = []
     let capture_dir = uat_join(root, "out/uat/" ++ sc.name)
     with_fs_mkdir_p(capture_dir)
     var cwd = root
@@ -494,7 +494,7 @@ fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> U
             if with_fs_mkdir_p(temp_dir) != 0: return uat_fail(steps, step, "could not create " ++ temp_dir, "", human)
             cwd = temp_dir
         else if verb == UAT_RUN or verb == UAT_RUN_FAILS:
-            var argv = uat_split_command(step.a)
+            let argv = uat_split_command(step.a)
             if argv.len() == 0: return uat_fail(steps, step, "empty command", "", human)
             if argv[0] == "with": argv[0] = uat_toolchain(self_path)
             // `./bin/with` names a file of the scenario directory. Windows resolves
@@ -589,7 +589,7 @@ fn uat_project_root() -> str:
     uat_abs(".")
 
 fn uat_list_scenarios(root: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     let listing = with_fs_list_files(uat_join(root, "uat"))
     for line in listing.split("\n"):
         let p = line.trim()
@@ -630,10 +630,10 @@ fn run_uat_command(argv: &List[str]) -> i32:
     var fail = 0
     var found = false
     var human_all = ""
-    for pi in 0..paths.len():
+    for path in paths:
         // Reported paths are the project's own (`uat/<name>.uat`).
-        let shown = if paths[pi].starts_with(root ++ "/"): paths[pi].slice(root.len() + 1, paths[pi].len()) else: paths[pi]
-        let sc = uat_parse(shown, uat_read_text(paths[pi]))
+        let shown = if path.starts_with(root ++ "/"): path.slice(root.len() + 1, path.len()) else: path
+        let sc = uat_parse(shown, uat_read_text(path))
         if wanted.len() > 0 and sc.name != wanted: continue
         found = true
         if sc.problem.len() > 0:

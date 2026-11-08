@@ -24,7 +24,7 @@ fn zcu_owned_text(text: &str) -> str:
     runtime_str_clone(text)
 
 fn zcu_new_list_str -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     out
 
 fn zcu_debug_init_enabled() -> bool:
@@ -139,11 +139,11 @@ type Zcu {
 
 fn Zcu.init -> Zcu:
     zcu_debug_init("Zcu.init:start")
-    let pool: InternPool = InternPool.init()
+    let pool = InternPool.init()
     zcu_debug_init("Zcu.init:pool")
-    let diagnostics: DiagnosticList = DiagnosticList.init()
+    let diagnostics = DiagnosticList.init()
     zcu_debug_init("Zcu.init:diagnostics")
-    let sema_seed: Sema = Sema.placeholder(pool, DiagnosticList.init(), AstPool.new())
+    let sema_seed = Sema.placeholder(pool, DiagnosticList.init(), AstPool.new())
     zcu_debug_init("Zcu.init:sema_seed")
     Zcu {
         pool: pool.clone(),
@@ -210,8 +210,8 @@ fn Zcu.init -> Zcu:
 
 impl Zcu:
     mut fn add_link_bundle_prefixes(prefixes: &List[str]):
-        for i in 0..prefixes.len():
-            let prefix = prefixes[i]
+        for prefixe in prefixes:
+            let prefix = prefixe
             if not self.link_bundle_prefixes.contains(prefix):
                 self.link_bundle_prefixes.push(with_str_clone_ref(prefix))
 
@@ -268,7 +268,7 @@ impl Zcu:
         self.imported_std_files.push(zcu_owned_text(key))
 
     fn import_conflict_messages() -> List[str]:
-        var out = zcu_new_list_str()
+        let out = zcu_new_list_str()
         for i in 0..self.import_conflicts.len():
             out.push(zcu_owned_text(self.import_conflicts[i]))
         out
@@ -286,7 +286,7 @@ impl Zcu:
     // rule; computed here, where with.toml can be probed (Sema reads no
     // files).
     fn package_key_map() -> HashMap[str, str]:
-        var out = HashMap[str, str].new()
+        let out = HashMap[str, str].new()
         for path in self.decl_source_paths:
             if not out.contains(path): out.insert(path, zcu_package_key(path))
         out
@@ -383,8 +383,8 @@ impl Zcu:
             return
         // #670: labels can point into other files (e.g. E0921's concurrency
         // evidence in the std prelude); resolve each one against its own file.
-        let label_paths: List[str] = List.new()
-        let label_texts: List[str] = List.new()
+        let label_paths: List[str] = []
+        let label_texts: List[str] = []
         for li in 0..diag.labels.len():
             let lab_file = diag.labels[li].span.file
             // File 0 is the root source, and is a cross-file label when the
@@ -534,7 +534,7 @@ impl Zcu:
         if zcu_debug_pool_flow_enabled():
             runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_count()} sema.pool={sema.pool.symbol_count()} sema.ast.decls={sema.ast.decl_count()}")
         self.pool = sema.pool.clone()
-        var tracked_paths = move self.tracked_input_paths
+        let tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, sema.tracked_input_paths)
         // Callers move sema.diags into Zcu.diagnostics before syncing. The moved
         // field is an all-zero reset sentinel, not a reusable List: pushing a
@@ -546,7 +546,7 @@ impl Zcu:
             runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.symbol_count()} last_sema.pool={self.last_sema.pool.symbol_count()} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
     mut fn set_resolve_snapshot(result: &ResolveResult, root_path: &str):
-        let modules: List[ResolvedModule] = List.new()
+        let modules: List[ResolvedModule] = []
         for i in 0..result.modules.len():
             let m = result.modules[i]
             modules.push(ResolvedModule {
@@ -558,7 +558,7 @@ impl Zcu:
                 decl_count: m.decl_count,
             })
 
-        let imports: List[ResolvedImport] = List.new()
+        let imports: List[ResolvedImport] = []
         for i in 0..result.imports.len():
             let imp = result.imports[i]
             imports.push(ResolvedImport {
@@ -574,23 +574,23 @@ impl Zcu:
                 span_end: imp.span_end,
             })
 
-        let defs: List[ResolvedDef] = List.new()
+        let defs: List[ResolvedDef] = []
         for i in 0..result.defs.len():
             defs.push(result.defs[i])
 
-        let scopes: List[ResolvedScope] = List.new()
+        let scopes: List[ResolvedScope] = []
         for i in 0..result.scopes.len():
             scopes.push(result.scopes[i])
 
-        let bindings: List[ResolvedBinding] = List.new()
+        let bindings: List[ResolvedBinding] = []
         for i in 0..result.bindings.len():
             bindings.push(result.bindings[i])
 
-        let uses: List[ResolvedUse] = List.new()
+        let uses: List[ResolvedUse] = []
         for i in 0..result.uses.len():
             uses.push(result.uses[i])
 
-        let link_libs: List[i32] = List.new()
+        let link_libs: List[i32] = []
         for i in 0..result.link_libs.len():
             link_libs.push(result.link_libs[i])
 
@@ -630,7 +630,7 @@ impl Zcu:
             let lib_sym = self.last_resolved.link_libs[li]
             if lib_sym <= 0:
                 continue
-            let lib_name: str = with_str_clone_ref(self.pool.resolve(lib_sym))
+            let lib_name = with_str_clone_ref(self.pool.resolve(lib_sym))
             if lib_name.len() > 0:
                 self.last_link_lib_names.push(lib_name)
 

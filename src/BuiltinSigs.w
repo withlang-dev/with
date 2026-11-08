@@ -22,7 +22,7 @@ type BuiltinSigRow { owner: str, method: str, params: str }
 fn sig(owner: str, method: str, params: str) -> BuiltinSigRow: BuiltinSigRow { owner, method, params }
 
 fn builtin_sig_table() -> List[BuiltinSigRow]:
-    var t: List[BuiltinSigRow] = List.new()
+    let t: List[BuiltinSigRow] = []
     t.push(sig("str", "byte_at", "index: i64"))
     t.push(sig("str", "slice", "start: i64, end: i64"))
     t.push(sig("str", "contains", "needle: &str"))

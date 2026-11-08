@@ -88,7 +88,7 @@ fn resolution_sema_answer(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, b
     let callee_operand = body.term_data0(bb)
     let call_id = body.term_data1(bb)
     let node = body.call_ast_node(call_id)
-    var answer = callee_resolution_unknown()
+    let answer = callee_resolution_unknown()
     let node_valid = node > 0 and node < sema.ast.node_count()
     if node_valid:
         let node_sig = sema.resolved_call_sigs.get(node)
@@ -153,7 +153,7 @@ fn resolution_sema_answer(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, b
     answer
 
 fn resolution_violation(mut report: AnalysisReport, sema: &Sema, site: &ResolutionSite, body: &MirBody, bb: i32, node: i32, fn_name: &str, message: &str):
-    var fact = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Invariant)
+    let fact = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Invariant)
     fact.id = bb
     fact.node = node
     fact.body_sym = body.fn_sym
@@ -193,7 +193,7 @@ fn resolution_audit_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &Mir
 // The indices 0..keys.len() ordered by key (heap sort). The stdlib has no
 // sort yet; this is the analyzer's own and stays here.
 fn resolution_sorted_by_key(keys: &List[i64]):
-    var order: List[i32] = List.new()
+    let order: List[i32] = []
     let n = keys.len()
     for i in 0..n: order.push(i as i32)
     // Empty and singleton inputs have no heap parent (n / 2 - 1 is -1).
@@ -240,12 +240,12 @@ fn resolution_span_key(file: i32, offset: i32) -> i64: ((file as i64) << 32) | (
 // have no body and are not judged); the nodes of a body's closures are
 // inside its span and their calls are in the module's call facts.
 fn resolution_audit_unlowered_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
-    let lowered_nodes: HashMap[i32, i32] = HashMap.new()
-    let elided_nodes: HashMap[i32, i32] = HashMap.new()
+    let lowered_nodes: HashMap[i32, i32] = [:]
+    let elided_nodes: HashMap[i32, i32] = [:]
     var elided = 0
-    let span_keys: List[i64] = List.new()
-    let span_end_keys: List[i64] = List.new()
-    let span_bodies: List[i32] = List.new()
+    let span_keys: List[i64] = []
+    let span_end_keys: List[i64] = []
+    let span_bodies: List[i32] = []
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         for ci in 0..body.call_ast_nodes.len():
@@ -268,10 +268,10 @@ fn resolution_audit_unlowered_calls(mut report: AnalysisReport, sema: &Sema, mir
     // prefix_max_end[i]: the greatest end key among order[0..=i], so the
     // backward walk from a binary-search hit stops as soon as no earlier
     // span can still contain the node.
-    let prefix_max_end: List[i64] = List.new()
+    let prefix_max_end: List[i64] = []
     var running: i64 = -1
-    for i in 0..order.len():
-        let e = span_end_keys[order[i]]
+    for order_item in order:
+        let e = span_end_keys[order_item]
         if e > running: running = e
         prefix_max_end.push(running)
     var checked = 0
