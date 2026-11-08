@@ -50,7 +50,7 @@ type PairsStepSite {
 }
 impl Copy for PairsStepSite
 
-fn pairs_place_key(keys: &MirDropStateKeys, place_id: i32) -> i32:
+fn pairs_place_key(keys: &MirDropStateKeys, place_id: isize) -> i32:
     if place_id < 0 or place_id >= keys.place_key.len():
         return -1
     keys.place_key[place_id]
@@ -122,7 +122,7 @@ fn pairs_switch_otherwise_value(body: &MirBody, table: i32) -> i64:
 
 fn pairs_list_i32(count: i32, value: i32): [value for _ in 0..count]
 
-fn pairs_list_i64(count: i32, value: i64): [value for _ in 0..count]
+fn pairs_list_i64(count: isize, value: i64): [value for _ in 0..count]
 
 // Whether the body can touch a pair at all: some place is a pair resource
 // or a reference to one. Everything else is skipped without building keys.
@@ -176,7 +176,7 @@ fn pairs_body_new(body: &MirBody) -> PairsBody:
 impl PairsBody:
     fn width(): self.key_resource.len()
 
-    fn key_of(place_id: i32) -> i32:
+    fn key_of(place_id: isize) -> i32:
         let raw = pairs_place_key(self.keys, place_id)
         if raw >= 0 and self.key_alias[raw] >= 0: self.key_alias[raw] else: raw
 
@@ -238,7 +238,7 @@ impl PairsBody:
             let base_ty = sema.resolve_alias(body.local_type_ids[base] as TypeId)
             if sema.get_type_kind(base_ty) == TypeKind.TY_REF and sema.facade_pair_resource_for_type(base_ty as i32) >= 0:
                 self.key_alias[raw] = base
-        for p in 0..body.place_sema_types.len() as i32:
+        for p in 0..body.place_sema_types.len():
             let key = self.key_of(p)
             if key < 0 or self.is_resource(key) or self.is_ref(key) or self.key_alias[pairs_place_key(self.keys, p)] >= 0:
                 continue

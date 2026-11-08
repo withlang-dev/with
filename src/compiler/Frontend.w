@@ -1066,7 +1066,7 @@ fn c_import_deps_manifest_entries_valid(manifest: &str) -> bool:
             else:
                 var sep1 = -1
                 var sep2 = -1
-                for i in 0..line.len() as i32:
+                for i in 0..line.len():
                     if line[i] == 124:
                         if sep1 < 0:
                             sep1 = i
@@ -1616,7 +1616,7 @@ fn c_import_function_decl(stmt_raw: &str) -> str:
 
     var open = -1
     var close = -1
-    for i in 0..stmt.len() as i32:
+    for i in 0..stmt.len():
         let ch = stmt[i]
         if ch == 40 and open < 0:
             open = i
@@ -3035,7 +3035,7 @@ impl Zcu:
         // table holds one entry per symbol: a shadowed FN decl of another
         // module is displaced to its module-qualified identity (#1350), a
         // same-module duplicate is dropped (frontend_fn_tier_verdict).
-        for oi in 0..prelude_ordered.len() as i32:
+        for oi in 0..prelude_ordered.len():
             let id = prelude_ordered[oi]
             let ik = merged_pool.kind(id)
             let prelude_path = prelude_paths[oi]
@@ -3075,7 +3075,7 @@ impl Zcu:
             rebuilt_paths.push(frontend_owned_text(prelude_path))
             rebuilt_file_ids.push(prelude_file_ids[oi])
             rebuilt_c_import.push(prelude_c_import[oi])
-        for oi in 0..user_import_ordered.len() as i32:
+        for oi in 0..user_import_ordered.len():
             let id = user_import_ordered[oi]
             let ik = merged_pool.kind(id)
             if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
@@ -3158,7 +3158,7 @@ const FRONTEND_FN_DISPLACE = 2
 // (one global C symbol in every tier), an interface decl (displaced by the
 // on-demand interface merge instead: displace_colliding_interface_fns,
 // #1362) and a c_export fn (one exported C name) keep the drop.
-fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool, intern: &InternPool, idx: i32, higher_names: &List[i32]) -> i32:
+fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool, intern: &InternPool, idx: isize, higher_names: &List[i32]) -> i32:
     let current = tier[idx]
     let current_kind = pool.kind(current)
     if frontend_fn_decl_is_method(pool, intern, current):
@@ -3289,7 +3289,7 @@ fn frontend_extern_var_shadowed_by_tier(tier: &List[i32], pool: &AstPool, intern
             return true
     false
 
-fn frontend_extern_var_shadowed_in_tier(tier: &List[i32], pool: &AstPool, intern: &InternPool, idx: i32) -> bool:
+fn frontend_extern_var_shadowed_in_tier(tier: &List[i32], pool: &AstPool, intern: &InternPool, idx: isize) -> bool:
     let decl = tier[idx]
     for j in 0..tier.len():
         if j == idx:

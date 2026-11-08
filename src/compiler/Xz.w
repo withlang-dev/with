@@ -154,7 +154,7 @@ impl XzLzma:
                 self.code = ((self.code << 8) | self.next_byte()) & XZ_MASK32
         result
 
-    mut fn bittree(base: i32, bits: i32) -> i32:
+    mut fn bittree(base: isize, bits: i32) -> i32:
         var m: i32 = 1
         for _ in 0..bits:
             m = (m << 1) + self.bit(base + m)
@@ -169,7 +169,7 @@ impl XzLzma:
             symbol = symbol | (b << i)
         symbol
 
-    mut fn length(base: i32, pos_state: i32) -> i32:
+    mut fn length(base: i32, pos_state: isize) -> i32:
         if self.bit(base + LEN_CHOICE) == 0:
             return self.bittree(base + LEN_LOW + pos_state * 8, 3)
         if self.bit(base + LEN_CHOICE2) == 0:
@@ -222,7 +222,7 @@ impl XzLzma:
         let goal = self.out.len() + unpacked
         let pb_mask: i32 = (1 << self.pb) - 1
         while self.out.len() < goal and self.problem.len() == 0:
-            let pos_state = self.out.len() as i32 & pb_mask
+            let pos_state = self.out.len() & pb_mask
             if self.bit(P_IS_MATCH + (self.state << 4) + pos_state) == 0:
                 self.literal()
                 continue

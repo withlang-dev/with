@@ -1867,7 +1867,7 @@ impl ComptimeEvaluator:
         for i in 0..tp_syms.len():
             subst_syms.push(tp_syms[i])
             subst_tys.push(tp_tys[i])
-        self.sema.substitute_type(ret_type, subst_syms, subst_tys, tp_syms.len() as i32)
+        self.sema.substitute_type(ret_type, subst_syms, subst_tys, tp_syms.len())
 
     mut fn apply_implicit_default_return(fn_node: i32, ret_type: i32, signal: ComptimeControl) -> ComptimeControl:
         if signal.kind == ComptimeControlKind.CTL_RETURN or signal.kind == ComptimeControlKind.CTL_VALUE:
@@ -2192,7 +2192,7 @@ impl ComptimeEvaluator:
         identity
 
 fn comptime_effect_contains_slash(text: &str) -> bool:
-    for i in 0..text.len():
+    for i in 0..text.len() as i32:
         if text[i] == 47:
             return true
     false
@@ -7505,7 +7505,7 @@ impl ComptimeEvaluator:
             self.bind_value(self.ast.get_data0(pat), comptime_value_share(value), 0)
             return self.match_pattern(self.ast.get_data1(pat), value, node)
         if kind == NodeKind.NK_PAT_OR:
-            let start = self.slot_syms.len()
+            let start = self.slot_syms.len() as i32
             let extra_start = self.ast.get_data0(pat)
             let count = self.ast.get_data1(pat)
             for i in 0..count:
@@ -7766,7 +7766,7 @@ impl ComptimeEvaluator:
         if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE or iterable_signal.value.kind == ComptimeValueKind.CV_LIST or is_map:
             count = iterable_signal.value.extra_count
         else if iterable_signal.value.kind == ComptimeValueKind.CV_BYTES:
-            count = iterable_signal.value.text.len()
+            count = iterable_signal.value.text.len() as i32
         else if iterable_signal.value.kind == ComptimeValueKind.CV_RANGE:
             let start_value = iterable_signal.value.data0
             let end_value = iterable_signal.value.data1

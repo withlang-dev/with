@@ -553,7 +553,7 @@ impl Lexer:
             return TokenKind.TK_FLOAT_LIT
         TokenKind.TK_INT_LIT
 
-fn numeric_suffix_len(src: &str, pos: i32, slen: i32) -> i32:
+fn numeric_suffix_len(src: &str, pos: i32, slen: isize) -> i32:
     if pos >= slen:
         return 0
     let ch = src[pos]
@@ -589,7 +589,7 @@ fn numeric_suffix_len(src: &str, pos: i32, slen: i32) -> i32:
         return 2
     0
 
-fn suffix_accept(src: &str, pos: i32, slen: i32, suffix: &str, suf_len: i32) -> bool:
+fn suffix_accept(src: &str, pos: i32, slen: isize, suffix: &str, suf_len: i32) -> bool:
     if pos + suf_len > slen:
         return false
     for i in 0..suf_len:

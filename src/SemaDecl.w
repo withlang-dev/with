@@ -1894,7 +1894,7 @@ impl Sema:
     // here and runs nothing; dropping the value unconsumed drops them. A
     // generator method's borrowed receiver is held as a view of the caller's
     // place (generator_borrows_receiver).
-    mut fn ensure_generator_state_type(fn_sym: i32, yield_ty: i32, param_start: i32, sig_param_start: i32, param_count: i32, borrow_receiver: bool) -> i32:
+    mut fn ensure_generator_state_type(fn_sym: i32, yield_ty: i32, param_start: i32, sig_param_start: isize, param_count: i32, borrow_receiver: bool) -> i32:
         if self.generator_fn_state_types.contains(fn_sym):
             return self.generator_fn_state_types.get(fn_sym).unwrap()
 
@@ -1933,7 +1933,7 @@ impl Sema:
     // view argument — and the gen fn and its producer take it by place
     // (value_ref_abi) whatever the owner type. A `move fn` receiver, or a
     // `self` spelled as a reference, is an ordinary argument.
-    fn generator_borrows_receiver(param_start: i32, param_count: i32, sig_param_start: i32) -> bool:
+    fn generator_borrows_receiver(param_start: i32, param_count: i32, sig_param_start: isize) -> bool:
         let mode = self.receiver_mode_from_param(param_start, param_count)
         if mode == ReceiverMode.None or mode == ReceiverMode.Move:
             return false
@@ -1944,7 +1944,7 @@ impl Sema:
     // specialization of a generic one (its specialization symbol): the
     // generator value's type, which the gen fn's signature returns, and its
     // producer and `each`. Returns the value's type.
-    mut fn register_generator(fn_sym: i32, yield_ty: i32, param_start: i32, sig_param_start: i32, param_count: i32) -> i32:
+    mut fn register_generator(fn_sym: i32, yield_ty: i32, param_start: i32, sig_param_start: isize, param_count: i32) -> i32:
         let borrow_receiver = self.generator_borrows_receiver(param_start, param_count, sig_param_start)
         let state_tid = self.ensure_generator_state_type(fn_sym, yield_ty, param_start, sig_param_start, param_count, borrow_receiver)
         let state_sym: i32 = self.generator_fn_state_syms.get(fn_sym).unwrap()
@@ -1983,7 +1983,7 @@ impl Sema:
     // `__with_generator_run_{f}(params, body)` is f's body, lowered with each
     // `yield e` calling `body(e)`; the generator value's `move fn each(body)`
     // hands its stored arguments and `body` to the producer.
-    mut fn register_generator_functions(fn_sym: i32, state_sym: i32, state_tid: i32, yield_ty: i32, sig_param_start: i32, param_count: i32, borrow_receiver: bool):
+    mut fn register_generator_functions(fn_sym: i32, state_sym: i32, state_tid: i32, yield_ty: i32, sig_param_start: isize, param_count: i32, borrow_receiver: bool):
         if self.generator_fn_run_syms.contains(fn_sym):
             return
         let body_ty = self.generator_body_fn_type(yield_ty)
@@ -3282,7 +3282,7 @@ impl Sema:
                 self.emit_error_code("overlapping implementations of '" ++ tn ++ "'", node, "E1201")
 
     // Check if a new blanket impl overlaps with any existing direct impl
-    mut fn check_blanket_overlap(trait_sym: i32, bound_start: i32, bound_count: i32, target_base: i32, node: i32):
+    mut fn check_blanket_overlap(trait_sym: i32, bound_start: isize, bound_count: i32, target_base: i32, node: i32):
         for ti in 0..self.impl_type_syms.len():
             let t_sym = self.impl_type_syms[ti]
             // If the blanket targets a specific type, only check that type.

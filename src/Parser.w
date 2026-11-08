@@ -5623,7 +5623,7 @@ impl Parser:
         // node indices. Then write all segment data contiguously to the extra
         // pool. This avoids interleaving sub-parser extra data with segment
         // records (sub-parsers may add to the extra pool during parse_expr).
-        let clen = content.len() as i32
+        let clen = content.len()
 
         // Phase 1: Scan content, parse expressions, collect segment info.
         // seg_kinds: 0=literal, 1=expr
@@ -5902,7 +5902,7 @@ impl Parser:
             i = i + 1
         InterpNormalized { text: out, src }
 
-    fn interp_clean_segment(content: &str, from: i32, to: i32) -> str:
+    fn interp_clean_segment(content: &str, from: i32, to: isize) -> str:
         // Replace {{ → { and }} → } in literal segments (Python-style brace escaping).
         var out = ""
         var i = from
@@ -9823,7 +9823,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_R_PAREN or self.peek() == TokenKind.TK_DOT_DOT_DOT:
                 break
 
-        let count = (params.len() / (FN_PARAM_STRIDE as i64)) as i32
+        let count = (params.len() as i32 / (FN_PARAM_STRIDE as i64)) as i32
         let param_start = self.pool.extra_len()
         for param in params:
             self.pool.add_extra(param)

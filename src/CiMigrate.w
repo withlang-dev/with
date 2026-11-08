@@ -1852,7 +1852,7 @@ impl CiProject:
         let n = self.symbols.len()
         for si in 0..n:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
-            let count = self.symbols[si].param_fn_ptr.len() as i32
+            let count = self.symbols[si].param_fn_ptr.len()
             self.symbols[si].grow_params(count)
             for pi in 0..count:
                 if self.symbols[si].param_fn_ptr[pi] == 0: continue

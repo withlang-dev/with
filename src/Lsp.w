@@ -423,7 +423,7 @@ type LspDocument {
     // Fast-tier cache (parse-only, invalidated on text change)
     fast_pool: AstPool,
     fast_intern: InternPool,
-    fast_text_len: i32,
+    fast_text_len: isize,
     fast_valid: bool,
     // Slow-tier cache (full compilation, invalidated on text change)
     cached_pool: AstPool,
@@ -435,7 +435,7 @@ type LspDocument {
     cached_type_at: HashMap[i32, str, Minted],
     // Maps type name → list of trait method names
     cached_trait_methods: HashMap[str, List[str]],
-    cached_text_len: i32,
+    cached_text_len: isize,
     cache_valid: bool,
 }
 
@@ -633,7 +633,7 @@ fn uri_to_path(uri: &str) -> str:
 
 // ── Line/column utilities ────────────────────────────────────
 
-fn lsp_offset_to_line(text: &str, offset: i32) -> i32:
+fn lsp_offset_to_line(text: &str, offset: isize) -> i32:
     var line: i32 = 0
     var i = 0
     while i < offset and i < text.len():
@@ -1999,7 +1999,7 @@ fn run_lsp() -> i32:
                 let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 let formatted = format_source(doc_text)
                 if formatted != doc_text:
-                    let el = lsp_offset_to_line(doc_text, doc_text.len() as i32)
+                    let el = lsp_offset_to_line(doc_text, doc_text.len())
                     let edit = jarr_start() ++ jobj_start() ++ jkv_raw("range", jrange(0, 0, el + 1, 0)) ++ "," ++ jkv_str("newText", formatted) ++ jobj_end() ++ jarr_end()
                     lsp_write_response(jrpc_result(id, edit))
                 else:

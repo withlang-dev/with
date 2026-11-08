@@ -883,7 +883,7 @@ impl Codegen:
     mut fn audit_mode_provenance():
         if self.analysis_enabled == 0:
             return
-        for site in 0..self.mode_site_decisions.len() as i32:
+        for site in 0..self.mode_site_decisions.len():
             let name = mode_site_name(site)
             if self.mode_site_disagree[site] > 0:
                 self.analysis_fail(f"mode-provenance: {name}: {mode_site_owner(site)} and {mode_site_derivation(site)} disagree in {self.mode_site_disagree[site]} of {self.mode_site_decisions[site]} decisions; first: {self.mode_site_first[site]}")
@@ -1963,7 +1963,7 @@ impl Codegen:
             return false
         true
 
-    fn get_fn_dyn_param_trait(fn_sym: i32, param_idx: i32) -> i32:
+    fn get_fn_dyn_param_trait(fn_sym: i32, param_idx: isize) -> i32:
         let base_opt = self.fn_dyn_param_starts.get(fn_sym)
         if param_idx < 0:
             return 0
@@ -2240,7 +2240,7 @@ impl Codegen:
     fn loop_result_alloca_at(idx: i32) -> i64:
         with_codegen_loop_get_result(idx)
 
-    fn debug_call_coerce_failure(coerce_context: &str, call_node: i32, arg_index: i32, arg_node: i32, actual_val: i64, expected_ty: i64):
+    fn debug_call_coerce_failure(coerce_context: &str, call_node: i32, arg_index: isize, arg_node: i32, actual_val: i64, expected_ty: i64):
         if not self.debug_call_coerce_enabled():
             return
         var msg = "[call-coerce] " ++ coerce_context
@@ -2441,7 +2441,7 @@ impl Codegen:
         wl_build_store(self.builder, arg_val, tmp)
         tmp
 
-    mut fn coerce_call_arg_to_param(arg_node: i32, arg_val: i64, param_ty: i64, call_context: &str, call_node: i32, arg_index: i32) -> i64:
+    mut fn coerce_call_arg_to_param(arg_node: i32, arg_val: i64, param_ty: i64, call_context: &str, call_node: i32, arg_index: isize) -> i64:
         if arg_val == 0 or param_ty == 0:
             return arg_val
 
@@ -2645,7 +2645,7 @@ impl Codegen:
                             return alias_known.unwrap()
         0
 
-    mut fn coerce_call_args_for_fn_value(fn_sym: i32, fn_val: i64, args_start: i32, arg_node_base_index: i32, args: &List[i64], arg_count: i32, call_context: &str, call_node: i32) -> List[i64]:
+    mut fn coerce_call_args_for_fn_value(fn_sym: i32, fn_val: i64, args_start: i32, arg_node_base_index: i32, args: &List[i64], arg_count: isize, call_context: &str, call_node: i32) -> List[i64]:
         let out: List[i64] = []
         let param_count = wl_count_params(fn_val)
         let sret_opt = self.fn_abi_has_sret(fn_sym)
@@ -5501,7 +5501,7 @@ pub const MODE_SITE_DECL_TYPE_NODE: i32 = 16
 pub const MODE_SITE_BODY_TYPE_NODE: i32 = 17
 pub const MODE_SITE_COUNT: i32 = 18
 
-fn mode_site_name(site: i32) -> str:
+fn mode_site_name(site: isize) -> str:
     if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
     if site == MODE_SITE_FIELD_PTR_THROUGH_ADDRESS: return "place-ptr field through an address"
     if site == MODE_SITE_INDEX_THROUGH_ADDRESS: return "place-ptr index through an address"
@@ -5522,7 +5522,7 @@ fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_BODY_TYPE_NODE: return "body type node LLVM type"
     "unknown"
 
-fn mode_site_owner(site: i32) -> str:
+fn mode_site_owner(site: isize) -> str:
     if site == MODE_SITE_MARSHAL_EXISTING_POINTER: return "the operand's Sema category"
     if site == MODE_SITE_PARAM_BY_ADDRESS or site == MODE_SITE_PARAM_PLACE_ALIAS or site == MODE_SITE_EVAL_INDIRECT_LOCAL or site == MODE_SITE_REF_VALUE_IS_ADDRESS: return "FnAbi's PassMode"
     if site == MODE_SITE_SIZEOF_TYPE_ARG: return "Sema's type argument"
@@ -5534,7 +5534,7 @@ fn mode_site_owner(site: i32) -> str:
     "Sema's place category"
 
 // What a site re-derived its fact from before it read the owner.
-fn mode_site_derivation(site: i32) -> str:
+fn mode_site_derivation(site: isize) -> str:
     if site == MODE_SITE_SIZEOF_TYPE_ARG or site == MODE_SITE_STRUCT_FIELD_TYPE or site == MODE_SITE_DECL_TYPE_NODE or site == MODE_SITE_BODY_TYPE_NODE: return "the AST type node"
     if site == MODE_SITE_FIELD_INDEX: return "the LLVM struct registry"
     if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "the closure's AST spelling"
@@ -5981,7 +5981,7 @@ impl Codegen:
 // the cached descriptor. Extend the classification there, never per-path.
 
 impl Codegen:
-    mut fn abi_param_source_type(sig_idx: i32, pi: i32) -> i64:
+    mut fn abi_param_source_type(sig_idx: isize, pi: i32) -> i64:
         var p_ty = self.sema_type_to_llvm(self.sema.sig_param_type(sig_idx, pi))
         if p_ty == 0:
             let name = self.sema.pool_resolve(self.sema.sig_names[sig_idx])

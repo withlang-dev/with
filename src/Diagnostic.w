@@ -197,7 +197,7 @@ impl DiagnosticList:
     // then message; equal keys keep their emission order. A phase whose
     // work order is not the program's (bodies checked callee first, or in
     // parallel) reports in the program's order.
-    mut fn sort_from(start: i32):
+    mut fn sort_from(start: isize):
         let rest: List[Diagnostic] = []
         while self.items.len() > start:
             rest.push(self.items.remove(start))

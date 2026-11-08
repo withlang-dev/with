@@ -42,7 +42,7 @@ fn analysis_line_slot(source: &str, offset: i32) -> isize:
         for i in 0..source.len():
             if source[i] == '\n': starts.push(i as i32 + 1)
         g_analysis_line_starts = starts
-    let at = if offset < 0: 0 else if offset < source.len(): offset else: source.len() as i32
+    let at = if offset < 0: 0 else if offset < source.len() as i32: offset else: source.len() as i32
     var lo: isize = 0
     var hi = g_analysis_line_starts.len()
     while lo < hi:
@@ -94,7 +94,7 @@ fn analysis_receiver_mode_name(mode: ReceiverMode) -> str:
     if mode == ReceiverMode.Missing: return "missing"
     "none"
 
-fn analysis_param_class(sema: &Sema, sig: i32, param: i32) -> str:
+fn analysis_param_class(sema: &Sema, sig: isize, param: i32) -> str:
     let ty = sema.sig_param_type(sig, param)
     if ty > 0 and sema.get_type_kind(sema.resolve_alias(ty as TypeId)) == TypeKind.TY_REF:
         return "borrowed"
@@ -489,7 +489,7 @@ fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_s
     let exact_source = sema.source_text_for_file_id(file)
     if exact_source.len() > 0:
         source = exact_source
-    for si in 0..sema.source_text_file_ids.len():
+    for si in 0..sema.source_text_file_ids.len() as i32:
         if sema.source_text_file_ids[si] == file:
             path = sema.source_text_names[si]
             break
@@ -550,7 +550,7 @@ fn analysis_collect_ast_node_tree(mut report: AnalysisReport, sema: &Sema, node:
 fn analysis_collect_requested_node(mut report: AnalysisReport, sema: &Sema, request: &str, source_path: &str, source_text: &str):
     if not request.starts_with("explain:node:"):
         return
-    let node = analysis_parse_node_id(analysis_slice(request, 13, request.len() as i32))
+    let node = analysis_parse_node_id(analysis_slice(request, 13, request.len()))
     if node < 0:
         report.fail("explain:node requires a non-negative AST node id")
         return
@@ -997,7 +997,7 @@ fn analysis_collect_mir(mut report: AnalysisReport, mir_mod: &MirModule, sema: &
             place.name = with_str_clone_ref(body_fact.name)
             place.detail = mir_place_text(body, pi)
             report.add(place)
-        for ci in 0..body.call_arg_starts.len():
+        for ci in 0..body.call_arg_starts.len() as i32:
             analysis_collect_mir_call(report, mir_mod, body, sema, pool, ci as i32, source_path, source_text)
 
 fn analysis_audit_call_contracts(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule):
@@ -1046,7 +1046,7 @@ fn analysis_audit_call_contracts(mut report: AnalysisReport, sema: &Sema, mir_mo
 fn analysis_audit_effects(mut report: AnalysisReport, sema: &Sema):
     if sema.sig_param_effects.len() != sema.sig_param_direct_effects.len():
         report.fail("effect tables are not parallel")
-    for si in 0..sema.sig_names.len() as i32:
+    for si in 0..sema.sig_names.len():
         let count = sema.sig_get_param_count(si)
         let mode = sema.sig_receiver_mode(si)
         if mode == ReceiverMode.None or count == 0:
@@ -2262,7 +2262,7 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
     let copies_view = counts[3]
     let copies_raw = counts[4]
     let retained = counts[5]
-    for si in 0..sema.sig_names.len() as i32:
+    for si in 0..sema.sig_names.len():
         for pi in 0..sema.sig_get_param_count(si):
             if (sema.sig_param_effect(si, pi) & EFF_ESCAPE_VIEW) == 0:
                 continue
@@ -2294,7 +2294,7 @@ fn analysis_effect_bit_name(bit_idx: i32) -> str:
     if bit_idx == 1: return "escape_value"
     "write"
 
-fn analysis_explain_effect_chain(sema: &Sema, sig: i32, pi: i32, bit_idx: i32, source_path: &str) -> str:
+fn analysis_explain_effect_chain(sema: &Sema, sig: isize, pi: i32, bit_idx: i32, source_path: &str) -> str:
     var out = ""
     var cur_sig = sig
     var cur_pi = pi
@@ -2329,14 +2329,14 @@ fn analysis_explain_effect(sema: &Sema, target: &str, source_path: &str) -> str:
     let colon = analysis_find_from(target, ":", 0)
     if colon >= 0:
         fn_name = analysis_slice(target, 0, colon)
-        let pi_text = analysis_slice(target, colon + 1, target.len() as i32)
+        let pi_text = analysis_slice(target, colon + 1, target.len())
         if pi_text == "self":
             want_pi = 0
         else:
             want_pi = analysis_parse_i32(pi_text)
     var out = f"explain:effect {fn_name}\n"
     var found = 0
-    for si in 0..sema.sig_names.len() as i32:
+    for si in 0..sema.sig_names.len():
         if sema.pool_resolve(sema.sig_names[si]) != fn_name:
             continue
         found = found + 1
@@ -2386,12 +2386,12 @@ fn analysis_explain_origin(sema: &Sema, target: &str, source_path: &str) -> str:
     let colon = analysis_find_from(target, ":", 0)
     if colon >= 0:
         fn_name = analysis_slice(target, 0, colon)
-        want = analysis_slice(target, colon + 1, target.len() as i32)
+        want = analysis_slice(target, colon + 1, target.len())
     var out = f"explain:origin {target}\n"
     var found = 0
     // A body Sema checks more than once records each fact again: print one.
     let seen: List[str] = []
-    for si in 0..sema.sig_names.len() as i32:
+    for si in 0..sema.sig_names.len():
         if not analysis_origin_fn_matches(sema, sema.sig_names[si], fn_name): continue
         let pc = sema.sig_get_param_count(si)
         for pi in 0..pc:
@@ -2443,12 +2443,12 @@ fn analysis_explain_request(request: &str) -> str:
     let first = analysis_find_from(request, ":", 0)
     if first < 0:
         return with_str_clone_ref(request)
-    let rest = analysis_slice(request, first + 1, request.len() as i32)
+    let rest = analysis_slice(request, first + 1, request.len())
     let second = analysis_find_from(rest, ":", 0)
     if second < 0:
         return rest
     let kind = analysis_slice(rest, 0, second)
-    let wanted = analysis_slice(rest, second + 1, rest.len() as i32)
+    let wanted = analysis_slice(rest, second + 1, rest.len())
     analysis_fact_explain_query(kind, wanted)
 
 fn analysis_lldb_recipe(report: &AnalysisReport, query: &str) -> str:
@@ -2637,10 +2637,10 @@ fn analysis_help() -> str:
 fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request == "help": return analysis_help()
     if request == "" or request == "facts" or request == "snapshot": return report.render_facts("")
-    if request.starts_with("select:"): return report.render_facts(analysis_slice(request, 7, request.len() as i32))
+    if request.starts_with("select:"): return report.render_facts(analysis_slice(request, 7, request.len()))
     if request == "summary": return report.render_summary("")
-    if request.starts_with("summary:"): return report.render_summary(analysis_slice(request, 8, request.len() as i32))
-    if request.starts_with("matrix:"): return report.render_matrix(analysis_slice(request, 7, request.len() as i32)) ++ report.render_verdict("compiler-analysis")
+    if request.starts_with("summary:"): return report.render_summary(analysis_slice(request, 8, request.len()))
+    if request.starts_with("matrix:"): return report.render_matrix(analysis_slice(request, 7, request.len())) ++ report.render_verdict("compiler-analysis")
     if request.starts_with("explain:"): return report.render_facts(analysis_explain_request(request)) ++ report.render_verdict("compiler-analysis")
     if request == "audit:calls": return report.render_verdict("call-contract-audit")
     if request == "audit:effects": return report.render_verdict("effect-audit")
@@ -2660,12 +2660,12 @@ fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request == "audit:trait-tables": return report.render_verdict("trait-table-audit")
     if request == "audit:all": return report.render_verdict("compiler-analysis-audit")
     if request.starts_with("path:call:"):
-        let endpoints = analysis_slice(request, 10, request.len() as i32)
+        let endpoints = analysis_slice(request, 10, request.len())
         let split = analysis_find_from(endpoints, ":", 0)
         if split < 0: return "error: path:call requires <from>:<to>\n"
-        return analysis_call_path(report, analysis_slice(endpoints, 0, split), analysis_slice(endpoints, split + 1, endpoints.len() as i32))
-    if request.starts_with("closure:call:"): return analysis_call_closure(report, analysis_slice(request, 13, request.len() as i32))
-    if request.starts_with("lldb:"): return analysis_lldb_recipe(report, analysis_slice(request, 5, request.len() as i32))
+        return analysis_call_path(report, analysis_slice(endpoints, 0, split), analysis_slice(endpoints, split + 1, endpoints.len()))
+    if request.starts_with("closure:call:"): return analysis_call_closure(report, analysis_slice(request, 13, request.len()))
+    if request.starts_with("lldb:"): return analysis_lldb_recipe(report, analysis_slice(request, 5, request.len()))
     "error: unknown analysis request '" ++ request ++ "'\n"
 
 fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str, request: &str, diagnostics: &DiagnosticList) -> CompilerAnalysisResult:
@@ -2688,23 +2688,23 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
     if request == "cow":
         return CompilerAnalysisResult { text: analysis_cow_sites(sema, mir_mod, source_path, source_text), status: 0, needs_codegen: false, codegen_query: "", report }
     if request.starts_with("explain:origin:"):
-        let eo_target = analysis_slice(request, 15, request.len() as i32)
+        let eo_target = analysis_slice(request, 15, request.len())
         return CompilerAnalysisResult { text: analysis_explain_origin(sema, eo_target, source_path), status: 0, needs_codegen: false, codegen_query: "", report }
     if request.starts_with("explain:effect:"):
-        let ee_target = analysis_slice(request, 15, request.len() as i32)
+        let ee_target = analysis_slice(request, 15, request.len())
         return CompilerAnalysisResult { text: analysis_explain_effect(sema, ee_target, source_path), status: 0, needs_codegen: false, codegen_query: "", report }
     if request.starts_with("matrix:"):
-        let query = analysis_slice(request, 7, request.len() as i32)
+        let query = analysis_slice(request, 7, request.len())
         if query.contains("name"):
             needs_codegen = true
             codegen_query = "matrix:" ++ query
     else if request.starts_with("select:") and (request.contains("stage=codegen") or request.contains("kind=operator") or request.contains("kind=codegen-argument")):
         // Codegen facts exist only once the backend runs with the query.
         needs_codegen = true
-        codegen_query = analysis_slice(request, 7, request.len() as i32)
+        codegen_query = analysis_slice(request, 7, request.len())
     else if request.starts_with("explain:call:"):
         needs_codegen = true
-        codegen_query = "name~" ++ analysis_slice(request, 13, request.len() as i32)
+        codegen_query = "name~" ++ analysis_slice(request, 13, request.len())
     else if request == "audit:calls":
         analysis_audit_call_contracts(report, sema, mir_mod)
     else if request == "audit:effects":
@@ -2753,7 +2753,7 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
         needs_codegen = true
         codegen_query = "audit"
     else if request.starts_with("lldb:"):
-        if analysis_lldb_recipe(report, analysis_slice(request, 5, request.len() as i32)).contains("No facts matched"):
+        if analysis_lldb_recipe(report, analysis_slice(request, 5, request.len())).contains("No facts matched"):
             status = 1
     else if request != "help" and request != "" and request != "facts" and request != "snapshot" and
             request != "summary" and not request.starts_with("summary:") and not request.starts_with("select:") and

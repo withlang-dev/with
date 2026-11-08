@@ -173,7 +173,7 @@ fn resolution_violation(mut report: AnalysisReport, sema: &Sema, site: &Resoluti
 // Rule 1–4: every MIR call terminator against Sema's answer for its node.
 fn resolution_audit_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
-    for bi in 0..mir_mod.bodies.len():
+    for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let fn_name = with_str_clone_ref(pool.resolve(body.fn_sym))

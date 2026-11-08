@@ -602,7 +602,7 @@ fn conan_ref_version(req: &str) -> str:
     if slash <= 0:
         return ""
     var end = req.len()
-    for i in (slash + 1)..req.len() as i32:
+    for i in (slash + 1)..req.len():
         let ch = req[i]
         if ch == 64 or ch == 35 or ch == 58:
             end = i
