@@ -8,8 +8,16 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261102-local-1-365c20085d2b
-with-darwin-aarch64=21a5bf930eea2cd819b3466131eef9558bdab25088060a79644865bdc061e325
+version=nightly-20261110-local-1-d02ac04992f8
+with-darwin-aarch64=bd69443a177718a75ccc4c73459f8a10ecd7057ba497d8c6f13f33ca76635371
+# The four gating platforms are cut from main d02ac0499 (2026-11-10), each to a
+# stage2 == stage3 fixpoint with :release-checks green: darwin on the laptop,
+# linux-x86_64 on eric-5090, windows-x86_64 on win10, linux-aarch64 in
+# tools/docker/linux-aarch64. The first seeds past D183, D197 and the #3080
+# tail-read retain: the src/ ceremony sweep they unlock removes the 242
+# rewrites the previous seed refused and the 807 `len() as i32` (#3073), and
+# the HashMap[K, V, Minted] sweep of the compiler's own maps (D196). The
+# seeds before them:
 # The four gating platforms are cut from main 365c20085 (2026-11-02), each to a
 # stage2 == stage3 fixpoint with :release-checks green: darwin on the laptop,
 # linux-x86_64 on eric-5090, windows-x86_64 on win10, linux-aarch64 in
@@ -110,10 +118,10 @@ with-darwin-aarch64=21a5bf930eea2cd819b3466131eef9558bdab25088060a79644865bdc061
 # The linux and windows legs of nightly-20261023-local-1 wait for their
 # hosts (eric-5090 and win10 were unreachable on 2026-10-23); these four stay
 # on local-3 until the legs are cut (issue below).
-with-linux-x86_64=42ed3ac8ad9d7b31262696f7967f01918fde682826500b9f3f8c6b486528a377
+with-linux-x86_64=98b09355660b939ca88bb9aa68384af9f02f7812eb7538bdfea7fbfe2f39a37c
 # linux-aarch64: the D155 builtins make c_char the target's u8 there; the lane
 # pool in the 7.7 GiB container needs WITH_BUILD_JOBS=3 (#2603).
-with-linux-aarch64=59d0726185cda67921435292a271a327f33f522299d456476efd441938e6b6ee
+with-linux-aarch64=73b9203f3dec3e7eeec9aaeab3e0958ef6cef675ee295318c4f4030f69b99da7
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
@@ -125,6 +133,6 @@ with-linux-aarch64=59d0726185cda67921435292a271a327f33f522299d456476efd441938e6b
 # against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies (before it: run 39288117180
 # from main 35afb3a7a).
-with-windows-x86_64.exe=edf08f64be7e4a6ad8b587f65823afb6f3d2b4b6659e9012a785e121c275efa7
+with-windows-x86_64.exe=c4d7029f0dd6b02d265fc1c47166f8fc22a27756a0bcaf9f7315c67b75cce502
 with-windows-aarch64.exe.version=seed-windows-aarch64
 with-windows-aarch64.exe=d748d4efb9ed01e113d90fd582fc05d153335cfb86f4bd3255e428063957621c
