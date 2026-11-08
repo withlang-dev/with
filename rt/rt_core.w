@@ -1735,10 +1735,12 @@ fn dbg_scribble(ptr: i64, size: i64):
 // not a leak, the program chose to stop. The peak report still holds (#2407).
 pub fn with_exit(code: i32) -> Never:
     if dbg_on() != 0: dbg_report_peak()
+    hm_trace_report()
     rt_exit(code)
 
 // Called from with_runtime_shutdown on normal program exit.
 pub fn with_debug_alloc_report_leaks() -> Unit:
+    hm_trace_report()
     if dbg_on() == 0:
         return
     // The report is unconditional: a program that never allocated has no
@@ -4301,14 +4303,205 @@ fn hm_find_slot(m: i64, key: *const u8) -> i64:
     if hm_len(m) == 0: return -1
     let mask = hm_icap(m) - 1
     var i = (hm_hash_key(m, key) & (mask as u64)) as i64
-    var probes: i64 = 0
-    while probes <= mask:
+    var slots: i64 = 0
+    var found: i64 = -1
+    while slots <= mask:
         let e = hm_slot(m, i)
-        if e == -1: return -1
-        if e >= 0 and hm_keys_eq(m, hm_key_at(m, e) as *const u8, key) != 0: return i
+        slots = slots + 1
+        if e == -1: break
+        if e >= 0 and hm_keys_eq(m, hm_key_at(m, e) as *const u8, key) != 0:
+            found = i
+            break
         i = (i + 1) & mask
-        probes = probes + 1
+    if hm_trace_state != 1: hm_trace_lookup(m, slots)
+    found
+
+// WITH_TRACE_HM_PROBES=1 (#3087, the D196 follow-up): every lookup counts the
+// index slots it read, and the program's end reports the histogram, the
+// totals by key kind, and the maps that read most. A map is known by its
+// address: one freed and another made at the same address merge, and the
+// report says how many maps the table could not hold.
+var hm_trace_state: i32 = 0            // 0=unread, 1=off, 2=on
+var hm_trace_lookups: i64 = 0
+var hm_trace_slots: i64 = 0
+var hm_trace_hist: [8]i64 = [0 as i64; 8]          // slots 1,2,3,4,5-8,9-16,17-64,65+
+var hm_trace_kind_lookups: [4]i64 = [0 as i64; 4]  // by hm_key_kind
+var hm_trace_kind_slots: [4]i64 = [0 as i64; 4]
+let HM_TRACE_MAPS: i64 = 4096
+var hm_trace_map_addr: [4096]i64 = [0 as i64; 4096]
+var hm_trace_map_lookups: [4096]i64 = [0 as i64; 4096]
+var hm_trace_map_slots: [4096]i64 = [0 as i64; 4096]
+var hm_trace_map_len: [4096]i64 = [0 as i64; 4096]      // at the last lookup
+var hm_trace_map_nent: [4096]i64 = [0 as i64; 4096]
+var hm_trace_map_icap: [4096]i64 = [0 as i64; 4096]
+var hm_trace_map_kind: [4096]i64 = [0 as i64; 4096]
+var hm_trace_map_ksz: [4096]i64 = [0 as i64; 4096]
+var hm_trace_maps_unheld: i64 = 0
+
+// Freed maps give their rows back and their counts go here, by key kind,
+// so the table holds the live maps and a program that makes a map per body
+// is still counted in full.
+var hm_trace_freed_maps: [4]i64 = [0 as i64; 4]
+var hm_trace_freed_lookups: [4]i64 = [0 as i64; 4]
+var hm_trace_freed_slots: [4]i64 = [0 as i64; 4]
+
+// The map's row: its address hashed into the table, linear probing, at most
+// 16 steps; -1 when it has none (and `create` did not find a free one).
+fn hm_trace_row(m: i64, create: bool) -> i64:
+    let spread: u64 = ((m as u64) >> 4) *% 0x9E3779B97F4A7C15
+    var row = ((spread >> 52) as i64) & (HM_TRACE_MAPS - 1)
+    var steps: i64 = 0
+    while steps < 16:
+        if hm_trace_map_addr[row] == m: return row
+        if hm_trace_map_addr[row] == 0:
+            if not create: return -1
+            hm_trace_map_addr[row] = m
+            return row
+        row = (row + 1) & (HM_TRACE_MAPS - 1)
+        steps = steps + 1
     -1
+
+fn hm_trace_free(m: i64):
+    if hm_trace_state != 2: return
+    let row = hm_trace_row(m, false)
+    if row < 0: return
+    let kind = hm_trace_map_kind[row]
+    if kind >= 0 and kind < 4:
+        hm_trace_freed_maps[kind] = hm_trace_freed_maps[kind] + 1
+        hm_trace_freed_lookups[kind] = hm_trace_freed_lookups[kind] + hm_trace_map_lookups[row]
+        hm_trace_freed_slots[kind] = hm_trace_freed_slots[kind] + hm_trace_map_slots[row]
+    hm_trace_map_addr[row] = 0
+    hm_trace_map_lookups[row] = 0
+    hm_trace_map_slots[row] = 0
+
+fn hm_trace_bucket(slots: i64) -> i64:
+    if slots <= 4: slots - 1 else: if slots <= 8: 4 else: if slots <= 16: 5 else: if slots <= 64: 6 else: 7
+
+fn hm_trace_lookup(m: i64, slots: i64):
+    if hm_trace_state == 0:
+        hm_trace_state = if rt_parse_limit_cstr(rt_getenv(c"WITH_TRACE_HM_PROBES".ptr)) > 0: 2 else: 1
+        if hm_trace_state == 1: return
+    hm_trace_lookups = hm_trace_lookups + 1
+    hm_trace_slots = hm_trace_slots + slots
+    hm_trace_hist[hm_trace_bucket(slots)] = hm_trace_hist[hm_trace_bucket(slots)] + 1
+    let kind = hm_key_kind(m)
+    if kind >= 0 and kind < 4:
+        hm_trace_kind_lookups[kind] = hm_trace_kind_lookups[kind] + 1
+        hm_trace_kind_slots[kind] = hm_trace_kind_slots[kind] + slots
+    let row = hm_trace_row(m, true)
+    if row < 0:
+        hm_trace_maps_unheld = hm_trace_maps_unheld + 1
+        return
+    hm_trace_map_lookups[row] = hm_trace_map_lookups[row] + 1
+    hm_trace_map_slots[row] = hm_trace_map_slots[row] + slots
+    hm_trace_map_len[row] = hm_len(m)
+    hm_trace_map_nent[row] = hm_nent(m)
+    hm_trace_map_icap[row] = hm_icap(m)
+    hm_trace_map_kind[row] = kind
+    hm_trace_map_ksz[row] = hm_key_size(m)
+
+fn hm_trace_put_kind(kind: i64):
+    if kind == HM_KEY_STR: dbg_puts("str")
+    else if kind == HM_KEY_MINTED: dbg_puts("minted")
+    else if kind == HM_KEY_BYTES: dbg_puts("bytes")
+    else: dbg_puts("fn")
+
+// Slots per lookup in hundredths, as "a.bc".
+fn hm_trace_put_ratio(slots: i64, lookups: i64):
+    if lookups == 0:
+        dbg_puts("0")
+        return
+    let hundredths = slots * 100 / lookups
+    dbg_put_i64(hundredths / 100)
+    dbg_puts(".")
+    if hundredths % 100 < 10: dbg_puts("0")
+    dbg_put_i64(hundredths % 100)
+
+fn hm_trace_report():
+    if hm_trace_state != 2: return
+    hm_trace_state = 1
+    dbg_puts("hm-probes: lookups=")
+    dbg_put_i64(hm_trace_lookups)
+    dbg_puts(" slots=")
+    dbg_put_i64(hm_trace_slots)
+    dbg_puts(" slots/lookup=")
+    hm_trace_put_ratio(hm_trace_slots, hm_trace_lookups)
+    dbg_puts("\n")
+    dbg_puts("hm-probes: slots read per lookup (slots: lookups): 1:")
+    dbg_put_i64(hm_trace_hist[0])
+    dbg_puts(" 2:")
+    dbg_put_i64(hm_trace_hist[1])
+    dbg_puts(" 3:")
+    dbg_put_i64(hm_trace_hist[2])
+    dbg_puts(" 4:")
+    dbg_put_i64(hm_trace_hist[3])
+    dbg_puts(" 5-8:")
+    dbg_put_i64(hm_trace_hist[4])
+    dbg_puts(" 9-16:")
+    dbg_put_i64(hm_trace_hist[5])
+    dbg_puts(" 17-64:")
+    dbg_put_i64(hm_trace_hist[6])
+    dbg_puts(" 65+:")
+    dbg_put_i64(hm_trace_hist[7])
+    dbg_puts("\n")
+    dbg_puts("hm-probes: by key kind (kind lookups slots/lookup):")
+    var k: i64 = 0
+    while k < 4:
+        if hm_trace_kind_lookups[k] != 0:
+            dbg_puts(" ")
+            hm_trace_put_kind(k)
+            dbg_puts(" ")
+            dbg_put_i64(hm_trace_kind_lookups[k])
+            dbg_puts(" ")
+            hm_trace_put_ratio(hm_trace_kind_slots[k], hm_trace_kind_lookups[k])
+        k = k + 1
+    dbg_puts("\n")
+    // The twenty maps that read most slots, by selection; a row is spent
+    // once printed.
+    dbg_puts("hm-probes: maps reading most slots (kind key-bytes lookups slots/lookup len/entries/index-cap):\n")
+    var shown: i64 = 0
+    while shown < 20:
+        var best: i64 = -1
+        var r: i64 = 0
+        while r < HM_TRACE_MAPS:
+            if hm_trace_map_addr[r] != 0 and (best < 0 or hm_trace_map_slots[r] > hm_trace_map_slots[best]): best = r
+            r = r + 1
+        if best < 0: break
+        dbg_puts("hm-probes:   ")
+        hm_trace_put_kind(hm_trace_map_kind[best])
+        dbg_puts(" ")
+        dbg_put_i64(hm_trace_map_ksz[best])
+        dbg_puts(" ")
+        dbg_put_i64(hm_trace_map_lookups[best])
+        dbg_puts(" ")
+        hm_trace_put_ratio(hm_trace_map_slots[best], hm_trace_map_lookups[best])
+        dbg_puts(" ")
+        dbg_put_i64(hm_trace_map_len[best])
+        dbg_puts("/")
+        dbg_put_i64(hm_trace_map_nent[best])
+        dbg_puts("/")
+        dbg_put_i64(hm_trace_map_icap[best])
+        dbg_puts("\n")
+        hm_trace_map_addr[best] = 0
+        shown = shown + 1
+    dbg_puts("hm-probes: maps freed before exit (kind maps lookups slots/lookup):")
+    var fk: i64 = 0
+    while fk < 4:
+        if hm_trace_freed_maps[fk] != 0:
+            dbg_puts(" ")
+            hm_trace_put_kind(fk)
+            dbg_puts(" ")
+            dbg_put_i64(hm_trace_freed_maps[fk])
+            dbg_puts(" ")
+            dbg_put_i64(hm_trace_freed_lookups[fk])
+            dbg_puts(" ")
+            hm_trace_put_ratio(hm_trace_freed_slots[fk], hm_trace_freed_lookups[fk])
+        fk = fk + 1
+    dbg_puts("\n")
+    if hm_trace_maps_unheld != 0:
+        dbg_puts("hm-probes: lookups on maps the table could not hold=")
+        dbg_put_i64(hm_trace_maps_unheld)
+        dbg_puts("\n")
 
 // Puts entry `e` in the first free (empty or removed) slot of its probe.
 fn hm_place(m: i64, e: i64):
@@ -4520,6 +4713,7 @@ pub fn with_hashmap_take_at(map: *mut u8, index: i64, key_out: *mut u8, val_out:
 pub fn with_hashmap_free(map: *mut u8):
     if map as i64 == 0: return
     let m = map as i64
+    hm_trace_free(m)
     let ecap = hm_ecap(m)
     rt_free_sized(hm_keys(m), ecap * hm_key_size(m))
     rt_free_sized(hm_vals(m), ecap * hm_val_size(m))
