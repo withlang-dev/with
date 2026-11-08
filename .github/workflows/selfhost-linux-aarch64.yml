@@ -36,8 +36,8 @@ jobs:
       # lane needs no runtime bundle, linker shim, host libxml2 or host gcc.
       WITH_SEED_REPO: withlang-dev/with
       WITH_SEED_ASSET: with-linux-aarch64
-      WITH_SEED_VERSION: nightly-20261102-local-1-365c20085d2b
-      WITH_SEED_SHA256: 59d0726185cda67921435292a271a327f33f522299d456476efd441938e6b6ee
+      WITH_SEED_VERSION: nightly-20261110-local-1-d02ac04992f8
+      WITH_SEED_SHA256: 73b9203f3dec3e7eeec9aaeab3e0958ef6cef675ee295318c4f4030f69b99da7
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: nightly-sdk-20260930-e997223d40ce
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
