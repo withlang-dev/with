@@ -2817,7 +2817,35 @@ fn mir_dropped_input(out: &List[i32], pred_start: &List[i32], pred_list: &List[i
                     flags[i] = 0
     MirDroppedSet { flags }
 
+// D52 (§9.1c): a global is never moved out. A `move` operand whose place is
+// rooted in a global proxy local is the defect #3086 found (`return g` of a
+// global str blanked it); the validator was silent, so it says so now.
+fn validate_global_moves(body: &MirBody) -> str:
+    for bb in 0..body.block_count():
+        let stmt_start = body.bb_stmt_starts[bb]
+        for si in 0..body.bb_stmt_counts[bb]:
+            let stmt_id = stmt_start + si
+            if body.stmt_kind(stmt_id) != StmtKind.Assign: continue
+            for op in mir_rvalue_operands(body, body.stmt_data1(stmt_id)):
+                let err = mir_move_of_global(body, op)
+                if err.len() > 0: return f"fn sym{body.fn_sym} stmt{stmt_id} span={body.stmt_spans[stmt_id]}: " ++ err
+        for term_op in mir_term_operands(body, bb):
+            let err = mir_move_of_global(body, term_op)
+            if err.len() > 0: return f"fn sym{body.fn_sym} bb{bb}: " ++ err
+    ""
+
+fn mir_move_of_global(body: &MirBody, operand_id: i32) -> str:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() or body.operand_kinds[operand_id] != OperandKind.OK_MOVE: return ""
+    let place = body.operand_d0[operand_id]
+    if place < 0 or place >= body.place_locals.len(): return ""
+    let local = body.place_locals[place]
+    if local < 0 or local >= body.local_is_global.len() or body.local_is_global[local] == 0: return ""
+    f"D52: a global is never moved out, but `move` reads global local _{local}"
+
 fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
+    let global_move = validate_global_moves(body)
+    if global_move.len() > 0:
+        return global_move
     let through_reference = validate_moves_through_references(mir_mod, body)
     if through_reference.len() > 0:
         return through_reference
