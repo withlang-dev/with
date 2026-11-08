@@ -4392,11 +4392,28 @@ fn hm_trace_row(m: i64, create: bool) -> i64:
         steps = steps + 1
     -1
 
+var hm_trace_free_report_at: i64 = 0
+
 fn hm_trace_free(m: i64):
     if hm_trace_state != 2: return
     let row = hm_trace_row(m, false)
     if row < 0: return
     let kind = hm_trace_map_kind[row]
+    if hm_trace_free_report_at != 0 and hm_trace_map_lookups[row] >= hm_trace_free_report_at:
+        dbg_puts("hm-probes: freed after ")
+        dbg_put_i64(hm_trace_map_lookups[row])
+        dbg_puts(" lookups (")
+        hm_trace_put_kind(kind)
+        dbg_puts(" key-bytes=")
+        dbg_put_i64(hm_trace_map_ksz[row])
+        dbg_puts(" len/entries/index-cap=")
+        dbg_put_i64(hm_trace_map_len[row])
+        dbg_puts("/")
+        dbg_put_i64(hm_trace_map_nent[row])
+        dbg_puts("/")
+        dbg_put_i64(hm_trace_map_icap[row])
+        dbg_puts("); freed from:\n")
+        rt_backtrace_print()
     if kind >= 0 and kind < 4:
         hm_trace_freed_maps[kind] = hm_trace_freed_maps[kind] + 1
         hm_trace_freed_lookups[kind] = hm_trace_freed_lookups[kind] + hm_trace_map_lookups[row]
@@ -4410,7 +4427,12 @@ fn hm_trace_bucket(slots: i64) -> i64:
 
 fn hm_trace_lookup(m: i64, slots: i64):
     if hm_trace_state == 0:
-        hm_trace_state = if rt_parse_limit_cstr(rt_getenv(c"WITH_TRACE_HM_PROBES".ptr)) > 0: 2 else: 1
+        let setting = rt_parse_limit_cstr(rt_getenv(c"WITH_TRACE_HM_PROBES".ptr))
+        hm_trace_state = if setting > 0: 2 else: 1
+        // #3093: a value of 2 or more is also a threshold: a map freed after
+        // at least that many lookups is reported with the backtrace of its
+        // free, which names the owner whose drop freed it.
+        hm_trace_free_report_at = if setting >= 2: setting else: 0
         if hm_trace_state == 1: return
     hm_trace_lookups = hm_trace_lookups + 1
     hm_trace_slots = hm_trace_slots + slots
