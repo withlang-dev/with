@@ -1180,7 +1180,8 @@ Environment switches (set on the compiler's run unless noted):
 | `WITH_TRACE_CMP=1` | codegen | each integer `==`/`!=` with its operand types and signedness |
 | `WITH_TRACE_VECDROP=1` | codegen | each List drop and whether its elements need dropping |
 | `WITH_TRACE_COW=1` | MIR | each mutation site of a collection place (D120): the place, its type, whether it is a value List/HashMap/HashSet (a make-unique call is emitted) or not |
-| `WITH_TRACE_HM_PROBES=1` | runtime (set on the program's run; for the compiler's own maps, on `check`) | at exit, `hm-probes:` lines: every HashMap/HashSet lookup's index slots read, as a total, a histogram, totals by key kind (`str`, `bytes`, `minted`, `fn`), and the twenty maps that read most with their key size, lookups, slots per lookup and `len/entries/index-cap` at their last lookup (#3087; a map is known by its address) |
+| `WITH_TRACE_HM_PROBES=1` | runtime (set on the program's run; for the compiler's own maps, on `check`) | at exit, `hm-probes:` lines: every HashMap/HashSet lookup's index slots read, as a total, a histogram, totals by key kind (`str`, `bytes`, `minted`, `fn`), the twenty live maps that read most with their key size, lookups, slots per lookup and `len/entries/index-cap` at their last lookup, and the maps freed before exit aggregated by kind (#3087; a map is known by its address) |
+| `WITH_TRACE_HM_PROBES=<N>`, N ≥ 2 | runtime | the same, and every map freed after at least N lookups is reported at its free with that free's backtrace, which names the owner whose drop freed it: the route to the creation sites of short-lived maps (#3093) |
 | `WITH_TRACE_CARGS=1` | C backend | each extern call's signature and argument count |
 | `WITH_ANALYZE_TRACE=pool-views` | analyze | `audit:pool-views`'s per-body walk |
 | `WITH_TRACE_GRAPH=1` | build | the build graph as it materializes |
