@@ -1026,30 +1026,60 @@ var alloc_no_reuse_state: i32 = 0   // DIAGNOSTIC (#617): 0=unread,1=off,2=on
 // and recorded, with its size word 0 (so it is not an owned payload) and
 // the next block in its second header word. WITH_ALLOC_NO_REUSE bypasses
 // the cache, as it does the small freelists.
-let RT_LARGE_CACHE_MIN_SHIFT: u32 = 13           // 8 KiB mappings
-let RT_LARGE_CACHE_MAX_SHIFT: u32 = 21           // 2 MiB
-let RT_LARGE_CACHE_MAX: i64 = 1 << 21
+// Mappings up to RT_LARGE_CACHE_FINE_MAX are a multiple of RT_LARGE_PAGE
+// (the host page; the kernel commits no less), one class per multiple;
+// above that a power of two, up to RT_LARGE_CACHE_MAX. A cache yields to
+// WITH_MEMORY_LIMIT_BYTES: a reservation that would cross the limit first
+// gives every cached block back.
+let RT_LARGE_PAGE: i64 = 16384
+let RT_LARGE_CACHE_FINE_MAX: i64 = 262144
+let RT_LARGE_CACHE_FINE_CLASSES: i64 = 16        // 16 KiB .. 256 KiB
+let RT_LARGE_CACHE_MAX: i64 = 1 << 21            // 2 MiB
+let RT_LARGE_CACHE_CLASSES: i64 = 19             // + 512 KiB, 1 MiB, 2 MiB
 let RT_LARGE_CACHE_PER_CLASS: i64 = 32
 let RT_LARGE_CACHE_BYTES: i64 = 96 * 1024 * 1024
-var rt_large_cache_heads: [9]i64 = [0 as i64; 9]
-var rt_large_cache_counts: [9]i64 = [0 as i64; 9]
+var rt_large_cache_heads: [19]i64 = [0 as i64; 19]
+var rt_large_cache_counts: [19]i64 = [0 as i64; 19]
 var rt_large_cache_bytes: i64 = 0
 
-// The mapping that holds `total` bytes: the power of two from 8 KiB up to
-// RT_LARGE_CACHE_MAX, or `total` itself above that (never cached).
+// The mapping that holds `total` bytes; `total` itself above the cache's
+// ceiling (never cached).
 fn large_map_size(total: i64) -> i64:
     if total > RT_LARGE_CACHE_MAX: return total
-    var m: i64 = 1 << RT_LARGE_CACHE_MIN_SHIFT
+    if total <= RT_LARGE_CACHE_FINE_MAX: return (total + RT_LARGE_PAGE - 1) / RT_LARGE_PAGE * RT_LARGE_PAGE
+    var m: i64 = RT_LARGE_CACHE_FINE_MAX * 2
     while m < total: m = m * 2
     m
 
 fn large_cache_class(map_size: i64) -> i64:
-    var shift: u32 = RT_LARGE_CACHE_MIN_SHIFT
-    var m: i64 = 1 << RT_LARGE_CACHE_MIN_SHIFT
+    if map_size <= RT_LARGE_CACHE_FINE_MAX: return map_size / RT_LARGE_PAGE - 1
+    var cls = RT_LARGE_CACHE_FINE_CLASSES
+    var m: i64 = RT_LARGE_CACHE_FINE_MAX * 2
     while m < map_size:
         m = m * 2
-        shift = shift + 1
-    (shift - RT_LARGE_CACHE_MIN_SHIFT) as i64
+        cls = cls + 1
+    cls
+
+fn large_cache_class_size(cls: i64) -> i64:
+    if cls < RT_LARGE_CACHE_FINE_CLASSES: return (cls + 1) * RT_LARGE_PAGE
+    RT_LARGE_CACHE_FINE_MAX * (2 << ((cls - RT_LARGE_CACHE_FINE_CLASSES) as u32))
+
+// Every cached block goes back to the system (under the allocator lock).
+fn large_cache_flush():
+    var cls: i64 = 0
+    while cls < RT_LARGE_CACHE_CLASSES:
+        let map_size = large_cache_class_size(cls)
+        var block = rt_large_cache_heads[cls]
+        while block != 0:
+            let next = unsafe *((block + 8) as *const i64)
+            rt_forget_large_range(block)
+            rt_munmap(block as *mut u8, map_size)
+            rt_alloc_committed_bytes = if map_size >= rt_alloc_committed_bytes: 0 else: rt_alloc_committed_bytes - map_size
+            block = next
+        rt_large_cache_heads[cls] = 0
+        rt_large_cache_counts[cls] = 0
+        cls = cls + 1
+    rt_large_cache_bytes = 0
 
 // A cached block of the class that holds `total`, or 0.
 fn large_cache_take(total: i64) -> i64:
@@ -1451,6 +1481,9 @@ fn rt_alloc_reserve_mmap_bytes(total: i64):
         return
     let limit = rt_alloc_effective_limit_unlocked()
     if limit > 0:
+        // The large-block cache yields before the limit is reported (#3103).
+        if (total > limit or rt_alloc_committed_bytes > limit - total) and rt_large_cache_bytes > 0:
+            large_cache_flush()
         if total > limit or rt_alloc_committed_bytes > limit - total:
             rt_alloc_report_limit_exceeded(total, limit)
     rt_alloc_committed_bytes = rt_alloc_committed_bytes + total
