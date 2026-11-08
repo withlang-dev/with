@@ -18,6 +18,7 @@ use compiler.EmbeddedStdlib
 use std.builtins.int_to_string
 use std.collections.HashMap
 use rt.rt_core
+use std.collections.Minted
 
 
 
@@ -431,7 +432,7 @@ type LspDocument {
     cached_decl_paths: List[str],
     // Sema data (built during ensure_analyzed while Compilation is alive)
     // Maps byte offset of expression → resolved type name
-    cached_type_at: HashMap[i32, str],
+    cached_type_at: HashMap[i32, str, Minted],
     // Maps type name → list of trait method names
     cached_trait_methods: HashMap[str, List[str]],
     cached_text_len: i32,

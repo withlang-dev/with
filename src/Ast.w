@@ -12,6 +12,7 @@ use InternPool
 use std.collections.HashMap
 use rt.rt_core
 use std.libc.abort
+use std.collections.Minted
 
 
 fn ast_pool_phase_bug(message: &str):
@@ -728,110 +729,110 @@ type AstPoolState {
     // type_bound_arg_nodes, count) triples.
     type_bound_args: List[i32],
     type_bound_arg_nodes: List[i32],
-    fn_meta_map: HashMap[i32, i32],
+    fn_meta_map: HashMap[i32, i32, Minted],
     // For `x in collection` / `x not in collection` binary nodes: the extra-array
     // index of the pre-reserved `collection.contains(x)` argument. Allocated at
     // parse time because the pool freezes before MIR lowering (#234, §9.9).
-    membership_arg_map: HashMap[i32, i32],
+    membership_arg_map: HashMap[i32, i32, Minted],
     // (parent for/comprehension node, binding value) pairs the parser built
     // as PATTERN bindings; absent = plain symbol binding. See
     // for_binding_is_pattern. The List mirrors the map in insertion order so
     // pool clones (ComptimeTransform) can copy it deterministically.
-    pattern_binding_keys: HashMap[i64, i32],
+    pattern_binding_keys: HashMap[i64, i32, Minted],
     pattern_binding_pairs: List[i64],
-    type_meta_map: HashMap[i32, i32],
-    pattern_qualifier_map: HashMap[i32, i32],
-    where_meta_map: HashMap[i32, i32],
-    impl_type_params_map: HashMap[i32, i32],
-    impl_target_type_nodes_map: HashMap[i32, i32],
-    impl_trait_type_args_map: HashMap[i32, i32],
-    type_bound_args_map: HashMap[i32, i32],
-    fn_param_pattern_meta_map: HashMap[i32, i32],
-    for_meta_map: HashMap[i32, i32],
-    for_carrier_alt_map: HashMap[i32, i32],
-    block_meta_map: HashMap[i32, i32],
-    fn_param_defaults: HashMap[i64, i32],
-    must_use_type_set: HashMap[i32, i32],
-    no_await_guard_type_set: HashMap[i32, i32],
-    no_alloc_fn_set: HashMap[i32, i32],
-    iter_of_self_fn_set: HashMap[i32, i32],
-    sealed_trait_set: HashMap[i32, i32],
-    extend_impl_set: HashMap[i32, i32],
-    comptime_decl_set: HashMap[i32, i32],
-    const_decl_set: HashMap[i32, i32],
+    type_meta_map: HashMap[i32, i32, Minted],
+    pattern_qualifier_map: HashMap[i32, i32, Minted],
+    where_meta_map: HashMap[i32, i32, Minted],
+    impl_type_params_map: HashMap[i32, i32, Minted],
+    impl_target_type_nodes_map: HashMap[i32, i32, Minted],
+    impl_trait_type_args_map: HashMap[i32, i32, Minted],
+    type_bound_args_map: HashMap[i32, i32, Minted],
+    fn_param_pattern_meta_map: HashMap[i32, i32, Minted],
+    for_meta_map: HashMap[i32, i32, Minted],
+    for_carrier_alt_map: HashMap[i32, i32, Minted],
+    block_meta_map: HashMap[i32, i32, Minted],
+    fn_param_defaults: HashMap[i64, i32, Minted],
+    must_use_type_set: HashMap[i32, i32, Minted],
+    no_await_guard_type_set: HashMap[i32, i32, Minted],
+    no_alloc_fn_set: HashMap[i32, i32, Minted],
+    iter_of_self_fn_set: HashMap[i32, i32, Minted],
+    sealed_trait_set: HashMap[i32, i32, Minted],
+    extend_impl_set: HashMap[i32, i32, Minted],
+    comptime_decl_set: HashMap[i32, i32, Minted],
+    const_decl_set: HashMap[i32, i32, Minted],
     // D88: an unannotated `const` -> the initializer it was written with,
     // kept when the comptime transform folds the declaration to its value.
-    untyped_const_inits: HashMap[i32, i32],
-    move_closure_set: HashMap[i32, i32],
-    mut_arg_set: HashMap[i32, i32],
-    non_escaping_closure_set: HashMap[i32, i32],
-    by_place_closure_set: HashMap[i32, i32],
-    closure_ret_type_map: HashMap[i32, i32],
-    compiler_hook_fn_set: HashMap[i32, i32],
-    compiler_hook_phase_map: HashMap[i32, i32],
-    global_allocator_decl_set: HashMap[i32, i32],
+    untyped_const_inits: HashMap[i32, i32, Minted],
+    move_closure_set: HashMap[i32, i32, Minted],
+    mut_arg_set: HashMap[i32, i32, Minted],
+    non_escaping_closure_set: HashMap[i32, i32, Minted],
+    by_place_closure_set: HashMap[i32, i32, Minted],
+    closure_ret_type_map: HashMap[i32, i32, Minted],
+    compiler_hook_fn_set: HashMap[i32, i32, Minted],
+    compiler_hook_phase_map: HashMap[i32, i32, Minted],
+    global_allocator_decl_set: HashMap[i32, i32, Minted],
     // D184 (§29.15): a script's top-level bindings (sym -> NK_LET_BINDING) and
     // the file's top-level fns, which capture them.
     script_binding_syms: List[i32],
     script_binding_nodes: List[i32],
-    script_binding_by_sym: HashMap[i32, i32],
+    script_binding_by_sym: HashMap[i32, i32, Minted],
     script_helper_decls: List[i32],
-    script_helper_set: HashMap[i32, i32],
-    call_named_args: HashMap[i32, i32],
+    script_helper_set: HashMap[i32, i32, Minted],
+    call_named_args: HashMap[i32, i32, Minted],
     // §9.3.1 (#2326): a call argument that is or holds an implicit `it`
     // closure → its extra slot, and → the enclosing call argument holding
     // it. Sema walks them to give the closure to the nearest argument whose
     // parameter takes a one-parameter function.
-    implicit_it_slots: HashMap[i32, i32],
-    implicit_it_parents: HashMap[i32, i32],
-    fn_stack_sizes: HashMap[i32, i32],
-    fn_weak_flags: HashMap[i32, i32],
-    extern_var_link_names: HashMap[i32, i32],  // NK_EXTERN_VAR node → @[link_name("sym")] symbol (#858)
-    fn_target_arch: HashMap[i32, i32],   // fn_node → @[target("arch")] arch name sym
-    unsafe_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
-    variadic_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_EXTERN_FN node → 1 if `extern "C" fn(A, ...)` (#1832)
-    fn_effect_pin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_effect_pin_*
-    fn_effect_pin_counts: HashMap[i32, i32],   // fn_node → entry count
+    implicit_it_slots: HashMap[i32, i32, Minted],
+    implicit_it_parents: HashMap[i32, i32, Minted],
+    fn_stack_sizes: HashMap[i32, i32, Minted],
+    fn_weak_flags: HashMap[i32, i32, Minted],
+    extern_var_link_names: HashMap[i32, i32, Minted],  // NK_EXTERN_VAR node → @[link_name("sym")] symbol (#858)
+    fn_target_arch: HashMap[i32, i32, Minted],   // fn_node → @[target("arch")] arch name sym
+    unsafe_fn_type_nodes: HashMap[i32, i32, Minted],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
+    variadic_fn_type_nodes: HashMap[i32, i32, Minted],  // NK_TYPE_EXTERN_FN node → 1 if `extern "C" fn(A, ...)` (#1832)
+    fn_effect_pin_starts: HashMap[i32, i32, Minted],   // fn_node → first entry in fn_effect_pin_*
+    fn_effect_pin_counts: HashMap[i32, i32, Minted],   // fn_node → entry count
     fn_effect_pin_params: List[i32],            // param_name_sym
     fn_effect_pin_bits: List[i32],              // effect bitmask
     // §21.1 rule 1 (D39): a function's declared global write set, its
     // checked contract — (module path sym, 0 when the clause names the
     // global in scope; name sym) pairs (Parser.attach_pending_global_writes).
-    fn_global_write_starts: HashMap[i32, i32],  // fn_node → first entry in fn_global_write_*
-    fn_global_write_counts: HashMap[i32, i32],  // fn_node → entry count
+    fn_global_write_starts: HashMap[i32, i32, Minted],  // fn_node → first entry in fn_global_write_*
+    fn_global_write_counts: HashMap[i32, i32, Minted],  // fn_node → entry count
     fn_global_write_paths: List[i32],            // module path sym
     fn_global_write_names: List[i32],            // global name sym
     // §21.1 rule 6 (#1903): a function's declared returned-view origins,
     // `-> &T from p, other.G` — (module path sym or 0; name sym) pairs, a
     // parameter (`self` included) or a global (Parser.parse_optional_from_clause).
-    fn_view_origin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_view_origin_*
-    fn_view_origin_counts: HashMap[i32, i32],   // fn_node → entry count
+    fn_view_origin_starts: HashMap[i32, i32, Minted],   // fn_node → first entry in fn_view_origin_*
+    fn_view_origin_counts: HashMap[i32, i32, Minted],   // fn_node → entry count
     fn_view_origin_paths: List[i32],             // module path sym
     fn_view_origin_names: List[i32],             // parameter or global name sym
     // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
-    copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
+    copy_arg_needs_clone: HashMap[i32, i32, Minted],   // node → 1
     // A trait's default method body as one impl's own nodes
     // (clone_default_method_bodies): the impl, the trait's body, the copy.
     default_body_clone_impls: List[i32],
     default_body_clone_origins: List[i32],
     default_body_clones: List[i32],
-    default_body_clone_index: HashMap[i64, i32],   // (impl, trait body) → index
+    default_body_clone_index: HashMap[i64, i32, Minted],   // (impl, trait body) → index
     // D61: type symbols whose Debug impl the compiler generated (a derive,
     // an `error` declaration). `:?` formats them with the generated form.
     generated_debug_type_syms: List[i32],
     // D70 (§18.2): `use m as n` / `use c_import(...) as n` — import decl → n.
-    use_alias_map: HashMap[i32, i32],
+    use_alias_map: HashMap[i32, i32, Minted],
     // D70: field-access nodes Sema resolved through an import namespace and
     // rewrote into the declaration's ident (Sema.rewrite_namespace_access),
     // mapped to the module's type when the member is a type (#1757), else 0.
-    namespace_bound_set: HashMap[i32, i32],
+    namespace_bound_set: HashMap[i32, i32, Minted],
     // §9.5 (#1930): resolve_receiver_field_names' record. An instance method
     // declared in its type's own module → the type's declaration; each
     // NK_FIELD_ACCESS it made of a bare field name → that declaration; and
     // (declaration, field name) keys of those types' fields.
-    receiver_field_methods: HashMap[i32, i32],
-    receiver_field_accesses: HashMap[i32, i32],
-    receiver_field_keys: HashMap[i64, i32],
+    receiver_field_methods: HashMap[i32, i32, Minted],
+    receiver_field_accesses: HashMap[i32, i32, Minted],
+    receiver_field_keys: HashMap[i64, i32, Minted],
     // §18.1: (file, last segment of its `module` header) pairs, in parse
     // order — a module's self-name when it has a header.
     module_header_files: List[i32],
@@ -1982,11 +1983,11 @@ impl AstPool:
         if st.frozen != 0:
             ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
         let self_sym = intern.intern("self")
-        let generated: HashMap[i32, i32] = [:]
+        let generated: HashMap[i32, i32, Minted] = [:]
         for generated_file in generated_files:
             generated.insert(generated_file, 1)
-        let struct_decls: HashMap[i64, i32] = [:]
-        let decl_nodes: HashMap[i32, i32] = [:]
+        let struct_decls: HashMap[i64, i32, Minted] = [:]
+        let decl_nodes: HashMap[i32, i32, Minted] = [:]
         for di in 0..self.decl_count():
             let decl = self.get_decl(di)
             decl_nodes.insert(decl as i32, 1)
@@ -2006,7 +2007,7 @@ impl AstPool:
     // The struct or union `fn_node` is an instance method of when the file
     // declaring the method declares the type, else 0. A derive the compiler
     // generates carries its type's span: it is not a method anyone wrote.
-    fn own_module_receiver_type(fn_node: NodeId, self_sym: i32, intern: &InternPool, struct_decls: &HashMap[i64, i32]) -> i32:
+    fn own_module_receiver_type(fn_node: NodeId, self_sym: i32, intern: &InternPool, struct_decls: &HashMap[i64, i32, Minted]) -> i32:
         if self.kind(fn_node) != NodeKind.NK_FN_DECL or self.get_data1(fn_node) == 0 or self.fn_decl_body_is_interface(fn_node):
             return 0
         let meta = self.find_fn_meta(fn_node)
@@ -2028,7 +2029,7 @@ impl AstPool:
             return 0
         decl
 
-    mut fn resolve_method_receiver_field_names(fn_node: NodeId, owner: i32, self_sym: i32, decl_nodes: &HashMap[i32, i32]):
+    mut fn resolve_method_receiver_field_names(fn_node: NodeId, owner: i32, self_sym: i32, decl_nodes: &HashMap[i32, i32, Minted]):
         let st = self.state
         st.receiver_field_methods.insert(fn_node as i32, owner)
         let fields_ex = self.get_data1(owner as NodeId)
@@ -2049,11 +2050,11 @@ impl AstPool:
         // A nested fn is its own scope, with no receiver.
         let nested_starts: List[i32] = []
         let nested_ends: List[i32] = []
-        let callees: HashMap[i32, i32] = [:]
+        let callees: HashMap[i32, i32, Minted] = [:]
         // Names a binding in the body takes. Sema refuses that binding
         // (§29.8); its uses stay the binding's, so the refusal is the one
         // diagnostic rather than the head of a cascade through `self.<name>`.
-        let bound: HashMap[i32, i32] = [:]
+        let bound: HashMap[i32, i32, Minted] = [:]
         for n in below + 1..fn_node as i32:
             let node = n as NodeId
             let kind = self.kind(node)
