@@ -36,3 +36,8 @@ demanding site is an instance, not a new rule.
 
 **Reopens if** a count's local is wanted as a signed value elsewhere in
 the same function often enough that the disagreement error is ceremony.
+
+**Retired 2026-11-09 by D197:** the signed-count type error is struck and a
+signed count converts with a range check, so this demand has nothing left to
+satisfy; a literal-typed count local is typed by its other uses (D128). The
+`u32` default for an untyped literal count (§4.2.1) stands.

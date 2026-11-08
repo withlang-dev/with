@@ -90,8 +90,8 @@ host's (D114).
 **Locals typed by their uses (D128).** A binding with no annotation whose
 initializer is an untyped integer literal expression has the type its
 demanding uses in its own function agree on: a parameter, a return, an `Ok`
-payload, a typed place, a shift count (`u32`, as an untyped count is; D160),
-reached by the name or through arithmetic on it.
+payload, a typed place, reached by the name or through arithmetic on it.
+A shift count is not a demand: it converts the local's type (§4.2.4, D197).
 Where no use demands a type narrower than `isize`, the binding is `isize`.
 Uses that demand two different types are an error at the second, naming
 both. The rule never changes the type of a binding in a program that
@@ -342,8 +342,10 @@ y >> 1          // 0x40000000 (logical: zero-filled)
 
 **Shift operations:** The shift operators `<<` (left shift) and `>>`
 (right shift) take a left operand of any integer type and a right
-operand of any unsigned integer type. A signed right operand is a type
-error; callers must cast explicitly.
+operand of any integer type. An unsigned count is taken as it is. A
+signed count converts to `u32` as §4.2.6 converts a value at a narrower
+demand: with a range check, so a negative count panics (D197). An
+untyped count is `u32` (§4.2.1, D160). No cast is written for a count.
 
 When the right operand is less than the bit width of the left operand,
 the shift has its usual arithmetic meaning.

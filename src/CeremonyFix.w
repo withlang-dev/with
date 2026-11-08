@@ -54,6 +54,15 @@ fn cf_demand_free(sema: &Sema, pool: &AstPool, node: i32) -> bool:
 
 // The byte just before `at` that is a colon, skipping blanks: where a
 // `let x: T` annotation begins.
+// The `(` at `open` groups an expression, as against opening a call's or an
+// index's argument list: nothing of a name, a `)` or a `]` precedes it.
+fn cf_paren_is_grouping(text: &str, open: i32) -> bool:
+    var i = open - 1
+    while i >= 0 and (text[i] == ' ' or text[i] == '\t'): i = i - 1
+    if i < 0: return true
+    let c = text[i]
+    not ((c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_' or c == ')' or c == ']')
+
 fn cf_colon_before(text: &str, at: i32) -> i32:
     var i = at - 1
     while i >= 0 and (text[i] == ' ' or text[i] == '\t'): i = i - 1
@@ -131,7 +140,14 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
         // source stays (`x as i64` where an i64 is demanded → `x`).
         if sema.ceremony_widening_casts.contains(node):
             let src = sema.ceremony_widening_casts.get(node).unwrap()
-            edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_end(src), end: pool.get_end(node), replacement: "", what: "`as " ++ sema.type_name(sema.typed_expr_types.get(node) ?? 0) ++ "` widens where the context already does (§4.2.6)" })
+            let cast_start = pool.get_start(node)
+            let cast_end = pool.get_end(node)
+            // `(x as u32)` written as a shift count or an operand: the parens held
+            // the cast, and go with it.
+            let wrapped = cast_start > 0 and cast_end < text.len() and text[cast_start - 1] == '(' and text[cast_end] == ')' and cf_paren_is_grouping(text, cast_start - 1)
+            let what = "`as " ++ sema.type_name(sema.typed_expr_types.get(node) ?? 0) ++ "` widens where the context already does (§4.2.6)"
+            if wrapped: edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: cast_start - 1, end: cast_start, replacement: "", what: with_str_clone_ref(what) })
+            edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_end(src), end: if wrapped: cast_end + 1 else: cast_end, replacement: "", what: what })
             continue
         // `List.new()` / `HashMap.new()` / `HashSet.new()` as a let's
         // initializer with its type written: the empty literal (D93).

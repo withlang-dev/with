@@ -16310,7 +16310,10 @@ impl Sema:
             self.emit_error("arithmetic operator requires numeric operands", node)
             return 0
 
-        // Shifts use the left operand width and require an unsigned count.
+        // Shifts use the left operand width. D197 (§4.2.4): the count is any
+        // integer; a signed count converts to `u32` with a range check (D183), so
+        // a negative count panics. An untyped literal count is `u32` (§4.2.1);
+        // a literal-typed local is typed by its other uses (D128) and converts.
         if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
             let lhs_numeric = self.numeric_operand_type(lhs as i32)
             let lhs_resolved = self.resolve_alias(lhs_numeric as TypeId)
@@ -16319,12 +16322,20 @@ impl Sema:
                 return 0
             let rhs_numeric = self.numeric_operand_type(rhs as i32)
             let rhs_resolved = self.resolve_alias(rhs_numeric as TypeId)
-            // D128: a signed count read from literal-typed locals demands
-            // §4.2.1's `u32` of them, as an untyped literal count is.
-            let count_unsigned = self.get_type_kind(rhs_resolved) == TypeKind.TY_INT and self.get_type_d1(rhs_resolved) == 0
-            if not count_unsigned and not (self.get_type_kind(rhs_resolved) == TypeKind.TY_INT and self.note_int_local_demand(rhs_node, self.ty_u32 as i32)):
-                self.emit_error("shift count must be unsigned integer", node)
+            if self.get_type_kind(rhs_resolved) != TypeKind.TY_INT:
+                self.emit_error("shift count must be an integer", node)
                 return 0
+            if self.get_type_d1(rhs_resolved) != 0:
+                self.checked_narrowings.insert(rhs_node, self.ty_u32)
+            // `x as u32` written for the old rule: the count converts without it.
+            var count_node = rhs_node
+            while count_node != 0 and self.ast.kind(count_node) == NodeKind.NK_GROUPED: count_node = self.ast.get_data0(count_node)
+            if self.ast.kind(count_node) == NodeKind.NK_CAST and self.get_type_d1(rhs_resolved) == 0:
+                let count_src = self.ast.get_data0(count_node)
+                let count_src_ty = self.resolve_alias((self.typed_expr_types.get(count_src) ?? 0) as TypeId)
+                if self.get_type_kind(count_src_ty) == TypeKind.TY_INT and self.get_type_d1(count_src_ty) != 0:
+                    self.ceremony_widening_casts.insert(count_node, count_src)
+                    self.ceremony_let_paths.insert(count_node, with_str_clone_ref(self.current_module_path))
             // #765: record the result type (= lhs type) like the bitwise arm
             // below. Without it MirLower's expr_type fell back and typed the
             // shift temp from the COUNT operand (u32): the i8 result was
