@@ -839,6 +839,34 @@ impl Sema:
     // collapse to their common resolved type; a concrete generic instance wins
     // over its erased base declaration.
     // A bare `None`'s type: an `Option` whose payload is not yet known.
+    // #3088: the enum an undemanded bare variant name belongs to, by scope:
+    // one declared in this module, else the prelude's Option/Result, else
+    // the one visible enum that declares it. The variant table alone names
+    // whichever enum registered last, so `None` in a std body took a user
+    // enum's `None`, and a user's `let x = None` took an unimported one.
+    fn bare_variant_owner(sym: i32) -> i32:
+        let registered = self.variant_type_ids.get(sym) ?? 0
+        let owners = self.variant_owner_tids.get(sym)
+        if owners.is_none() or owners.unwrap().len() <= 1: return registered
+        var local = 0
+        var prelude = 0
+        var visible = 0
+        var visible_count = 0
+        for tid in owners.unwrap():
+            let owner_sym = self.get_type_name(self.resolve_alias(tid as TypeId))
+            if owner_sym == self.syms.option or owner_sym == self.syms.result: prelude = tid
+            let decl = self.type_decl_nodes.get(owner_sym) ?? 0
+            if decl == 0: continue
+            let path = self.node_module_path_view(decl)
+            if path == self.current_module_path: local = tid
+            else if self.module_is_visible_from_current(path) != 0:
+                visible = tid
+                visible_count = visible_count + 1
+        if local != 0: return local
+        if prelude != 0: return prelude
+        if visible_count == 1: return visible
+        registered
+
     fn is_bare_none_type(tid: i32) -> bool:
         if tid == 0:
             return false
@@ -12698,7 +12726,7 @@ impl Sema:
                     self.emit_error("enum variant shorthand does not match expected enum type", node)
                     return 0 as TypeId
             if self.variant_lookup.contains(name):
-                let vs_tid: i32 = self.variant_type_ids.get(name).unwrap()
+                let vs_tid: i32 = self.bare_variant_owner(name)
                 // #694: a GENERIC enum's template tid must not escape as an
                 // expression type — nothing binds its parameters here, and
                 // codegen has no layout for the unparameterized template
@@ -13656,7 +13684,7 @@ impl Sema:
             if variant_expected_tid != 0:
                 let resolved_variant_sym = self.qualified_enum_variant_sym(variant_expected_tid, sym)
                 self.note_call_resolution(node, resolved_variant_sym)
-            let variant_tid = if variant_expected_tid != 0: variant_expected_tid else: self.variant_type_ids.get(sym).unwrap()
+            let variant_tid = if variant_expected_tid != 0: variant_expected_tid else: self.bare_variant_owner(sym)
             self.typed_expr_types.insert(node, variant_tid)
             return variant_tid
 
