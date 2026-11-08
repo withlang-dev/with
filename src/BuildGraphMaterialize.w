@@ -214,8 +214,8 @@ impl BuildGraphMaterializer:
                     visited.push(t)
                     queue.push(t)
         let paths: List[str] = []
-        for i in 0..visited.len():
-            paths.push(with_str_clone_ref(self.sema.module_paths[visited[i]]))
+        for visited_item in visited:
+            paths.push(with_str_clone_ref(self.sema.module_paths[visited_item]))
         paths
 
     fn materialize_generated_source(value: &ComptimeValue, graph: BuildGraph) -> BuildGraph:

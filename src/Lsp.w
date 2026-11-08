@@ -1375,8 +1375,8 @@ fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offs
         for i in 0..stmt_count:
             let stmt = pool.get_extra(extra_start + i)
             let inner = lsp_collect_bindings_rec(pool, intern, stmt, offset)
-            for ii in 0..inner.len():
-                result.push(with_str_clone_ref(inner[ii]))
+            for inner_item in inner:
+                result.push(with_str_clone_ref(inner_item))
         if tail != 0:
             let inner = lsp_collect_bindings_rec(pool, intern, tail, offset)
             for ii in 0..inner.len():

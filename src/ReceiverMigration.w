@@ -504,8 +504,8 @@ fn run_receiver_migration -> i32:
         return 0
     facts.reset_matches()
     var changed_total: isize = 0
-    for i in 0..paths.len():
-        let changed = facts.relocate_file(paths[i], true, false)
+    for path in paths:
+        let changed = facts.relocate_file(path, true, false)
         if changed < 0: exit_code(1)
         changed_total = changed_total + changed
     if not verify_all_matched(facts, excludes) or changed_total != selected:

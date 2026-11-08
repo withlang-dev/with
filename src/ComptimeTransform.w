@@ -276,7 +276,7 @@ impl AstPool:
             let trait_sym = self.get_data2(impl_node)
             if trait_sym == 0: continue
             for each_trait in traits:
-                let trait_node: i32 = each_trait
+                let trait_node = each_trait
                 if self.get_data0(trait_node) != trait_sym: continue
                 for mi in 0..self.trait_method_count(trait_node as NodeId):
                     let body = self.trait_method_field(trait_node as NodeId, mi, TRAIT_METHOD_DEFAULT_BODY)
@@ -1025,8 +1025,8 @@ impl AstPool:
                 arg_nodes.push(arg)
             let new_extra = self.extra_len()
             self.add_extra(arg_count)
-            for i in 0..arg_nodes.len():
-                self.add_extra(arg_nodes[i])
+            for arg_node in arg_nodes:
+                self.add_extra(arg_node)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), self.get_data1(node), new_extra, self.literal_suffix(node))
 
         if kind == NodeKind.NK_OPTIONAL_CHAIN:

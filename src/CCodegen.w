@@ -9927,10 +9927,10 @@ impl CCodegen:
                 emitted_names.insert(resolved, 1)
                 progressed = 1
             if progressed == 0:
-                for i in 0..struct_tids.len():
+                for struct_tid in struct_tids:
                     if self.check_interrupted() != 0:
                         return ""
-                    let resolved = self.sema.resolve_alias(struct_tids[i] as TypeId) as i32
+                    let resolved = self.sema.resolve_alias(struct_tid as TypeId) as i32
                     if emitted_names.contains(resolved):
                         continue
                     ordered.push(resolved)
@@ -9959,10 +9959,10 @@ impl CCodegen:
         out = out ++ "\n"
         out = out ++ self.emit_fn_type_defs()
 
-        for i in 0..ordered.len():
+        for ordered_item in ordered:
             if self.check_interrupted() != 0:
                 return ""
-            let tid = ordered[i]
+            let tid = ordered_item
             let resolved = self.sema.resolve_alias(tid)
             let name = self.struct_c_name(resolved)
             if self.sema.get_type_kind(resolved) == TypeKind.TY_SLICE:

@@ -3821,8 +3821,8 @@ impl Sema:
                 continue
             let text = with_str_clone_ref(self.pool_resolve(self.ast.fn_param_name(param_start, pi)))
             self.emit_error_with_help(f"`{fn_text}` returns a view derived from `{text}`, which its `from` clause does not name: the clause states every origin of the returned view (§21.1 rule 6)", node, f"write `{lead} {text}`")
-        for gi in 0..derived_globals.len():
-            let g = derived_globals[gi]
+        for derived_global in derived_globals:
+            let g = derived_global
             if entries.contains(g):
                 continue
             let text = with_str_clone_ref(self.pool_resolve(g))
@@ -4665,9 +4665,9 @@ impl Sema:
                 let param: i32 = self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE + 1]
                 let bound: i32 = self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE + 2]
                 let call: i32 = self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE + 3]
-                for bi in 0..bodies.len():
-                    if bodies[bi] >= 0 and bodies[bi] < GLOBAL_PARAM_BODY:
-                        self.push_global_call_binding(bodies[bi], param, bound, call)
+                for bodie in bodies:
+                    if bodie >= 0 and bodie < GLOBAL_PARAM_BODY:
+                        self.push_global_call_binding(bodie, param, bound, call)
             di = di + 1
 
     mut fn push_global_view_check(call: i32, sym: i32, view_sym: i32, view_node: i32, last_use: i32, flags: i32):
@@ -7354,8 +7354,8 @@ impl Sema:
         out = out ++ "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
         for ordered_item in ordered:
             out = out ++ self.cheader_struct_def(ordered_item)
-        for ei in 0..exported.len():
-            out = out ++ self.cheader_prototype(exported[ei])
+        for exported_item in exported:
+            out = out ++ self.cheader_prototype(exported_item)
         out = out ++ "\n#ifdef __cplusplus\n}\n#endif\n\n#endif\n"
         out
 
@@ -15462,7 +15462,7 @@ impl Sema:
             return false
         if amount.value >= 63:
             return true
-        ((value.value << (amount.value as u32)) >> (amount.value as u32)) != value.value
+        ((value.value << amount.value) >> amount.value) != value.value
 
     // Whether every literal in an untyped constant expression fits `ty`.
     fn constant_literals_fit(node: i32, ty: i32) -> bool:
@@ -15834,10 +15834,10 @@ impl Sema:
             if not amount_unsigned:
                 return failed
             if op == BinaryOp.OP_SHL:
-                return IntArithmeticResult { ok: 1, overflow: 0, value: if wide: 0 else: int_truncate_to_width(lhs.value << (rhs.value as u32), bits, signed == 0) }
+                return IntArithmeticResult { ok: 1, overflow: 0, value: if wide: 0 else: int_truncate_to_width(lhs.value << rhs.value, bits, signed == 0) }
             if wide:
                 return IntArithmeticResult { ok: 1, overflow: 0, value: if signed != 0 and lhs.value < 0: -1 else: 0 }
-            let shifted = if signed != 0: lhs.value >> (rhs.value as u32) else: ((int_truncate_to_width(lhs.value, bits, true) as u64) >> (rhs.value as u32)) as i64
+            let shifted = if signed != 0: lhs.value >> rhs.value else: ((int_truncate_to_width(lhs.value, bits, true) as u64) >> rhs.value) as i64
             return IntArithmeticResult { ok: 1, overflow: 0, value: int_truncate_to_width(shifted, bits, signed == 0) }
         if op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
             // Division by zero is not an overflow; it panics where it runs.
@@ -16552,11 +16552,11 @@ impl Sema:
         if lit.ok == 0 or lit.value < 0:
             return
         let signed = self.get_type_d1(resolved) != 0
-        let bound: i64 = if signed: (1 as i64) << ((width - 1) as u32) else: (1 as i64) << (width as u32)
+        let bound: i64 = if signed: (1 as i64) << ((width - 1) as u32) else: (1 as i64) << width
         let max = bound - 1
         if lit.value <= max:
             return
-        var wrapped = lit.value & (((1 as i64) << (width as u32)) - 1)
+        var wrapped = lit.value & (((1 as i64) << width) - 1)
         if signed and wrapped >= bound:
             wrapped = wrapped - bound * 2
         let diag = Diagnostic.warn(f"constant {lit.value} wraps in cast to {self.type_name(cast_tid)}: out of range (maximum {max}), yields {wrapped}", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
@@ -19751,8 +19751,8 @@ impl Sema:
                     storage_mask = storage_mask | self.arg_storage_origin_mask(origin_arg, has_receiver and bp == 0)
                     var arg_deps: List[i32] = []
                     arg_deps = self.collect_expr_view_deps(origin_arg, arg_deps)
-                    for di in 0..arg_deps.len():
-                        concrete_deps = self.push_unique_i32(concrete_deps, arg_deps[di])
+                    for arg_dep in arg_deps:
+                        concrete_deps = self.push_unique_i32(concrete_deps, arg_dep)
                     if arg_deps.len() == 0 or self.expr_type_is_value(origin_arg):
                         concrete_deps = self.push_unique_i32(concrete_deps, self.place_root_sym(origin_arg))
         // #1903 (§21.1 rule 6): the result views every global the callee's
@@ -24392,7 +24392,7 @@ impl Sema:
         let one: i64 = 1
         if self.get_type_d1(ty as TypeId) == 0:
             if bits >= 64: return 9223372036854775807
-            return (one << bits as u64) - 1
+            return (one << bits) - 1
         if bits >= 64: 9223372036854775807 else: (one << (bits - 1) as u64) - 1
 
     // The value interval an integer head covers, as [lo, hi]; hi < lo when
@@ -24647,8 +24647,8 @@ impl Sema:
             let seg_lo = starts[si]
             let seg_hi = if si + 1 < starts.len(): starts[si + 1] - 1 else: dom_hi
             var covered = false
-            for hi in 0..heads.len():
-                let h = heads[hi]
+            for head in heads:
+                let h = head
                 if h != 0 and self.exh_int_interval_lo(h) <= seg_lo and seg_hi <= self.exh_int_interval_hi(h):
                     covered = true
                     break
@@ -28662,7 +28662,7 @@ impl Sema:
                 if (cap_eff & EFF_ESCAPE_VIEW) != 0:
                     let cap_pi = self.param_index_for_sym(cap_sym)
                     if cap_pi >= 0:
-                        closure_view_mask = closure_view_mask | (((1 as i64) << (cap_pi as u32)) as i32)
+                        closure_view_mask = closure_view_mask | (((1 as i64) << cap_pi) as i32)
                     else:
                         closure_view_mask = closure_view_mask | self.binding_view_origin_mask(cap_sym)
                     let dep_count = self.binding_view_dep_count(cap_sym)
@@ -29389,7 +29389,7 @@ impl Sema:
             // that is not callable is an error at the call, never a fallback
             // to the module-scope function it shadows.
             if local_tid >= 0 and callable_value_tid == 0 and self.scope_binding_is_local(fn_sym):
-                let local_name: str = with_str_clone_ref(self.pool_resolve(fn_sym))
+                let local_name = with_str_clone_ref(self.pool_resolve(fn_sym))
                 let at = Span { file: self.local_file_id, start: self.ast.get_start(callee), end: self.ast.get_end(callee) }
                 let diag = Diagnostic.err(f"'{local_name}' is not callable", at)
                 diag.add_label(at, f"'{local_name}' resolves to a local binding of type {self.type_name(local_tid)}")
@@ -30024,7 +30024,7 @@ impl Sema:
                     // #1368: an aggregate payload's elements do not convert.
                     if self.value_aggregate_repr_differs(expected_ty, arg_ty) or (self.types_compatible(expected_ty, arg_ty) == false and payload_materializes_copy == 0):
                         if self.value_aggregate_repr_differs(expected_ty, arg_ty) or self.arithmetic_result_type(expected_ty, arg_ty) == 0:
-                            let variant_name2: str = with_str_clone_ref(self.pool_resolve(fn_sym))
+                            let variant_name2 = with_str_clone_ref(self.pool_resolve(fn_sym))
                             self.emit_argument_type_mismatch(variant_name2, fn_sym, ai, ai, expected_ty, arg_ty, if payload_arg_node > 0: payload_arg_node else: node)
             let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)
             self.note_call_resolution(node, resolved_variant_sym)
@@ -30047,7 +30047,7 @@ impl Sema:
             let dt_materializes_copy = self.record_contextual_copy_adjustment(dt_arg_node, dt_inner, dt_arg_ty)
             if self.types_compatible(dt_inner, dt_arg_ty) == false and dt_materializes_copy == 0:
                 if self.arithmetic_result_type(dt_inner, dt_arg_ty) == 0:
-                    let dt_name: str = with_str_clone_ref(self.pool_resolve(fn_sym))
+                    let dt_name = with_str_clone_ref(self.pool_resolve(fn_sym))
                     self.emit_argument_type_mismatch(dt_name, fn_sym, 0, 0, dt_inner, dt_arg_ty, dt_arg_node)
             self.typed_expr_types.insert(node, dt_tid)
             return dt_tid
@@ -30139,7 +30139,7 @@ impl Sema:
             return arg_ty
         let saved_file_id = self.local_file_id
         let saved_module_has_ci = self.current_module_has_ci
-        let saved_module_path = self.current_module_path.clone()
+        let saved_module_path = self.current_module_path
         let saved_scope_name_map = move self.scope_name_map
         self.scope_name_map = HashMap.new()
         let module_scope_len = if self.scope_starts.len() > 1: self.scope_starts[1] else: self.bind_names.len()
@@ -36026,8 +36026,8 @@ impl Sema:
                 let dpi = self.param_index_for_sym(self.binding_view_dep_at(root, di))
                 if dpi >= 0: storage_mask = storage_mask | sema_param_origin_bit(dpi)
             var escaping: i32 = 0
-            for vi in 0..value_deps.len():
-                let d = value_deps[vi]
+            for value_dep in value_deps:
+                let d = value_dep
                 let dpi = self.param_index_for_sym(d)
                 if dpi >= 0 and sema_param_origin_mask_contains(storage_mask, dpi):
                     continue

@@ -158,7 +158,7 @@ impl XzLzma:
         var m: i32 = 1
         for _ in 0..bits:
             m = (m << 1) + self.bit(base + m)
-        m - (1 << (bits as u32))
+        m - (1 << bits)
 
     mut fn bittree_reverse(base: i32, bits: i32) -> i32:
         var m = 1
@@ -166,7 +166,7 @@ impl XzLzma:
         for i in 0..bits:
             let b = self.bit(base + m)
             m = (m << 1) + b
-            symbol = symbol | (b << (i as u32))
+            symbol = symbol | (b << i)
         symbol
 
     mut fn length(base: i32, pos_state: i32) -> i32:
@@ -182,7 +182,7 @@ impl XzLzma:
         if slot < 4:
             return slot
         let direct = (slot >> 1) - 1
-        var dist = ((2 | (slot & 1)) as i64) << (direct as u32)
+        var dist = ((2 | (slot & 1)) as i64) << direct
         if slot < 14:
             dist = dist + self.bittree_reverse(P_SPEC_POS + dist as i32 - slot - 1, direct) as i64
         else:
@@ -193,7 +193,7 @@ impl XzLzma:
     mut fn literal():
         let pos = self.out.len()
         let prev = if pos > self.dict_start: self.out[pos - 1] as i32 else: 0
-        let base = P_LITERAL + 768 * ((((pos as i32) & ((1 << (self.lp as u32)) - 1)) << (self.lc as u32)) + (prev >> ((8 - self.lc) as u32)))
+        let base = P_LITERAL + 768 * ((((pos as i32) & ((1 << self.lp) - 1)) << self.lc) + (prev >> ((8 - self.lc) as u32)))
         var symbol = 1
         if self.state >= 7:
             var match_byte = self.out[pos - self.rep0 - 1] as i32
@@ -220,7 +220,7 @@ impl XzLzma:
     // One LZMA chunk: `unpacked` bytes out, reading the chunk's packed bytes.
     mut fn decode_chunk(unpacked: i64):
         let goal = self.out.len() + unpacked
-        let pb_mask: i32 = (1 << (self.pb as u32)) - 1
+        let pb_mask: i32 = (1 << self.pb) - 1
         while self.out.len() < goal and self.problem.len() == 0:
             let pos_state = self.out.len() as i32 & pb_mask
             if self.bit(P_IS_MATCH + (self.state << 4) + pos_state) == 0:

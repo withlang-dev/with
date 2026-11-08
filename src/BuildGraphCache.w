@@ -273,7 +273,7 @@ fn build_cache_current_compiler_fingerprint():
             build_cache_fingerprint_file(compiler_path)
         build_cache_compiler_fingerprint_ready = 1
     // Each key owns its text; returning the cached owner would empty the cache.
-    build_cache_compiler_fingerprint.clone()
+    build_cache_compiler_fingerprint
 
 fn build_cache_target_uses_current_compiler(target: &BuildGraphTarget) -> bool:
     if target.kind == 0: return true

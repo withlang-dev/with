@@ -1861,7 +1861,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
         succ_starts.push(succs.len() as i32)
         let targets = mir_drop_state_block_successors(body, bb)
         for target in targets:
-            let s: i32 = target
+            let s = target
             if s >= 0 and s < bb_count:
                 succs.push(s)
                 pred_counts[s] = pred_counts[s] + 1
@@ -2843,7 +2843,7 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
     for _ in 0..body.local_type_ids.len():
         whole_key_place.push(-1)
     for key_place in key_places:
-        let kp: i32 = key_place
+        let kp = key_place
         if kp >= 0 and body.place_proj_counts[kp] == 0:
             whole_key_place[body.place_locals[kp]] = kp
     for bb in 0..body.block_count():
@@ -2953,8 +2953,8 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
         // out or blanked (a partial move leaves a shell nothing needs to free),
         // it is a leak: no path dropped or moved it.
         if body.term_kind(bb) == TermKind.TK_RETURN and blocks.computed[bb] != 0:
-            for k in 0..key_places.len():
-                let place_id: i32 = key_places[k]
+            for key_place in key_places:
+                let place_id: i32 = key_place
                 if place_id < 0 or body.place_proj_counts[place_id] != 0:
                     continue
                 let local_id = body.place_locals[place_id]

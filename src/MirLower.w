@@ -4928,8 +4928,8 @@ impl MirBuilder:
             if self.ast.kind(part) != NodeKind.NK_STRING_LIT:
                 return -1
         var marked_count = 0
-        for i in 0..parts.len():
-            if mir_str_payload_is_raw_marked(self.pool.resolve(self.ast.get_data0(parts[i]))):
+        for part in parts:
+            if mir_str_payload_is_raw_marked(self.pool.resolve(self.ast.get_data0(part))):
                 marked_count = marked_count + 1
         if marked_count != 0 and marked_count != parts.len():
             return -1
@@ -12154,8 +12154,8 @@ impl MirBuilder:
                     let field_place = self.body.new_named_field_place(struct_subject_place, field_name, bi, field_ty)
                     let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                     let inner = self.lower_pattern(inner_pat, child_place)
-                    for i in 0..inner.len():
-                        out.push(inner[i])
+                    for inner_item in inner:
+                        out.push(inner_item)
                 return out
 
         if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
@@ -17172,7 +17172,7 @@ impl MirBuilder:
             self.lower_debug_counter_test(value_place, lo_place, BinaryOp.OP_LT, fail_bb, next_bb)
             self.switch_to(next_bb)
         if need_hi:
-            let hi: i64 = if width >= 64: 9223372036854775807 else if signed: ((1 as i64) << ((width - 1) as u32)) - 1 else: ((1 as i64) << (width as u32)) - 1
+            let hi: i64 = if width >= 64: 9223372036854775807 else if signed: ((1 as i64) << ((width - 1) as u32)) - 1 else: ((1 as i64) << width) - 1
             let hi_place = self.materialize_operand(self.int_const_operand(hi, src_ty), src_ty, span)
             let next_bb = self.new_block()
             self.lower_debug_counter_test(value_place, hi_place, BinaryOp.OP_GT, fail_bb, next_bb)
@@ -20759,8 +20759,8 @@ impl MirModule:
                 continue
 
             var recursive_violation_found = 0
-            for si in 0..scc_syms.len():
-                let member_sym = scc_syms[si]
+            for scc_sym in scc_syms:
+                let member_sym = scc_sym
                 let member_decl = tailrec_find_decl(ast_pool, member_sym)
                 if member_decl != 0:
                     let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(member_decl), scc_syms, 1, 0, tailrec_no_drop_state())

@@ -275,8 +275,8 @@ fn facade_render_hosted_fn_errors(pool: &AstPool, intern: &InternPool, ci: &List
         let fname = intern.resolve(pool.get_data0(li.decl as NodeId))
         out = out ++ facade_render_fn_error_type(pool, intern, li.decl, facade_render_present(pool, intern, ci, resource, fname), facade_render_message_call(pool, intern, ci, resource).len() > 0)
     // A callback operation hosted here (`db.exec(sql, callback, userdata)`).
-    for i in 0..items.len():
-        let cbi = facade_render_callback_item(pool, intern, ci, items[i])
+    for item in items:
+        let cbi = facade_render_callback_item(pool, intern, ci, item)
         if cbi.decl == 0 or not facade_render_callback_hosted(pool, intern, cbi, resource, repr) or facade_render_fn_oks(pool, intern, cbi.decl).len() == 0:
             continue
         let fname = intern.resolve(pool.get_data0(cbi.decl as NodeId))
@@ -825,8 +825,8 @@ fn facade_render_surface(pool: &AstPool, intern: &InternPool, ci: &List[i32], re
         var rename = ""
         if li.rename != 0: rename = intern.resolve(li.rename)
         s = facade_render_surface_add(s, cname, prefixes, rename, "a lend method")
-    for i in 0..items.len():
-        let cb = facade_render_callback_item(pool, intern, ci, items[i])
+    for item in items:
+        let cb = facade_render_callback_item(pool, intern, ci, item)
         if not facade_render_callback_hosted(pool, intern, cb, resource, repr):
             continue
         let cname = intern.resolve(pool.get_data0(cb.decl as NodeId))
@@ -1283,8 +1283,8 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             out = out ++ "        for facade_i in 0..self.retained_ptrs.len():\n            let facade_free = self.retained_frees[facade_i]\n            facade_free(self.retained_ptrs[facade_i])\n"
     if destroyers.len() > 0 or methods.len() > 0:
         out = out ++ "impl " ++ name ++ ":\n" ++ methods
-        for di in 0..destroyers.len():
-            let d = destroyers[di]
+        for destroyer in destroyers:
+            let d = destroyer
             let dname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(d as NodeId)))
             let (params, args) = facade_render_params(pool, intern, d, 1)
             let repr_arg = facade_render_repr_arg(pool, intern, d, repr_text, "self.repr", pinned)

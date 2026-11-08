@@ -392,7 +392,7 @@ fn ci_migrate_insert_collections_use(output: &str) -> str:
 fn ci_migrate_shared_module_prefix() -> str:
     if g_migrate_shared_defs_prefix.ends_with(".defs"):
         return g_migrate_shared_defs_prefix.slice(0, g_migrate_shared_defs_prefix.len() - 5)
-    g_migrate_shared_defs_prefix.clone()
+    g_migrate_shared_defs_prefix
 
 // Physical output paths and imports must use the same identifier spelling.
 // A C filename may contain punctuation that is not valid in a With module.
@@ -2514,8 +2514,8 @@ fn ci_migrate_apply_writes_clauses() -> i32:
                         writes[fi] = writes[fi] ++ g ++ "|"
                         changed = true
     // The markers, replaced.
-    for pi in 0..g_migrate_writes_paths.len():
-        let path = g_migrate_writes_paths[pi]
+    for g_migrate_writes_path in g_migrate_writes_paths:
+        let path = g_migrate_writes_path
         var text = with_fs_read_file(path)
         if ci_find_str(text, "@@with-writes:") < 0:
             continue

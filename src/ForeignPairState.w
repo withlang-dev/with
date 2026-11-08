@@ -176,7 +176,7 @@ fn foreign_pair_absent() -> ForeignPairState:
 
 // D194: the bit a retained slot occupies in a release mask (a shift count
 // is unsigned, so the index is cast once, here).
-fn foreign_slot_bit(slot: i32) -> i64: 1 << (slot as u32)
+fn foreign_slot_bit(slot: i32) -> i64: 1 << slot
 
 // D194: the retentions an operation releases (`until`, a bit per slot),
 // and a setter's own slot replaced by its new storage.
