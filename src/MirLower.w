@@ -8026,6 +8026,12 @@ impl MirBuilder:
             return result
         let read_tmp = self.new_temp(read_ty)
         let read_place = self.place_for_local(read_tmp)
+        // D111: the temp is a holder of what it read. A counted copy (a str, a
+        // CoW List) retains here, as it does into any owning destination
+        // (consume_moved_operand): the consumer takes from the temp after the
+        // scope's drops, and without the retain the tail `value.text` of an owned
+        // local returned a freed str (`_5 = copy _2.text; drop(_2); _0 = copy+take _5`).
+        self.retain_consumed_copy(result)
         let read_rv = self.body.new_rvalue(RvalueKind.RK_USE, result, 0, 0)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, read_place, read_rv, self.ast.get_start(tail_expr))
         self.body.new_operand(OperandKind.OK_COPY, read_place)
