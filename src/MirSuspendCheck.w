@@ -12,7 +12,7 @@ use std.collections.Minted
 fn suspend_bit_index(local_count: i32, bb: i32, local: i32) -> i32:
     bb * local_count + local
 
-fn suspend_list_fill(count: i32, value: i32) -> List[i32]:
+fn suspend_list_fill(count: isize, value: i32) -> List[i32]:
     let out: List[i32] = []
     for _ in 0..count:
         out.push(value)
@@ -36,7 +36,7 @@ impl SuspendBits:
         let st = self.state
         unsafe { st.w[idx] }
 
-    fn vset(idx: i32, value: i32):
+    fn vset(idx: isize, value: i32):
         let st = self.state
         unsafe { st.w[idx] = value }
 
@@ -48,7 +48,7 @@ impl SuspendBits:
         let st = self.state
         unsafe { st.w.push(value) }
 
-fn suspend_bits_fill(count: i32, value: i32) -> SuspendBits:
+fn suspend_bits_fill(count: isize, value: i32) -> SuspendBits:
     // List header is larger than a pointer; allocate generously like the
     // other handle states (InternPool uses 256 for a 7-field state).
     let ptr = with_alloc(64) as *mut SuspendBitsState
@@ -376,7 +376,7 @@ fn suspend_body_calls_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32,
     false
 
 fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i32, Minted]) -> SuspendBits:
-    let body_count = mir_mod.bodies.len() as i32
+    let body_count = mir_mod.bodies.len()
     let body_may_suspend = suspend_bits_fill(body_count, 0)
     for bi in 0..body_count:
         let body = &mir_mod.bodies[bi]
@@ -446,7 +446,7 @@ fn suspend_collect_guard_locals(sema: &Sema, body: &MirBody) -> List[i32]:
     out
 
 fn suspend_guard_index(guard_locals: &List[i32], guard_local: i32) -> i32:
-    for gi in 0..guard_locals.len():
+    for gi in 0..guard_locals.len() as i32:
         if guard_locals[gi] == guard_local:
             return gi as i32
     -1
@@ -454,7 +454,7 @@ fn suspend_guard_index(guard_locals: &List[i32], guard_local: i32) -> i32:
 fn suspend_guard_index_for_sym(body: &MirBody, guard_locals: &List[i32], sym: i32) -> i32:
     if sym == 0:
         return -1
-    for gi in 0..guard_locals.len():
+    for gi in 0..guard_locals.len() as i32:
         let local = guard_locals[gi]
         if local >= 0 and local < body.local_names.len():
             if body.local_names[local] == sym:

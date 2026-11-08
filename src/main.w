@@ -679,7 +679,7 @@ fn emit_c_header_next_to(comp: &Compilation, artifact_path: &str) -> Unit:
         return
     with_fs_write_file(h_path, header)
 
-fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
+fn cli_one_liner_source_name(mode: i32, count: isize) -> str:
     let name = cli_one_liner_mode_name(mode)
     if count == 1:
         return "<cli " ++ name ++ " #1>"
@@ -807,7 +807,7 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
         return 1
     let synthetic = cli_build_synthetic_source(one)
     let source = synthetic.source
-    let source_name = cli_one_liner_source_name(one.mode, one.code_parts.len() as i32)
+    let source_name = cli_one_liner_source_name(one.mode, one.code_parts.len())
     let bin_path = cli_one_liner_bin_path()
     let _out_dir = build_graph_rt_mkdir_p(cli_one_liner_out_dir())
     let saved_out_dir = build_graph_rt_getenv("WITH_OUT_DIR") ++ ""
@@ -2342,7 +2342,7 @@ impl PoolState:
     // Children still running: spawned and not yet reaped by a sweep.
     fn running_len() -> isize:
         var n = 0
-        for i in self.oldest..self.names.len() as i32:
+        for i in self.oldest..self.names.len():
             if self.done[i] == 0: n += 1
         n
 
@@ -2371,12 +2371,12 @@ impl PoolState:
             build_graph_rt_usleep(10000)
             self.sweep()
             let now = with_clock_nanos()
-            for i in self.oldest..self.names.len() as i32:
+            for i in self.oldest..self.names.len():
                 if self.done[i] != 0 or now - self.t0s[i] < self.timeouts[i] as i64 * 1000000: continue
                 self.finish(i, build_graph_rt_exec_wait(self.pids[i], 1))
 
     fn dep_inflight(dep_name: &str) -> bool:
-        for pi in self.oldest..self.names.len() as i32:
+        for pi in self.oldest..self.names.len():
             if self.retired[pi] == 0 and self.names[pi] == dep_name:
                 return true
         false
@@ -2400,7 +2400,7 @@ impl PoolState:
     // One nonblocking pass over the live entries: reap and timestamp any
     // child that has exited, in-order or not.
     mut fn sweep() -> Unit:
-        for i in self.oldest..self.names.len() as i32:
+        for i in self.oldest..self.names.len():
             if self.done[i] != 0:
                 continue
             let rc = build_graph_rt_exec_try_wait(self.pids[i])
@@ -3296,7 +3296,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             completed_targets.push(with_str_clone_ref(target.name))
             continue
         if target.kind == 1:
-            let ar_path = build_graph_library_output_path(root, target, options.output_path, graph.targets.len() as i32)
+            let ar_path = build_graph_library_output_path(root, target, options.output_path, graph.targets.len())
             if ar_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
@@ -3314,7 +3314,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             completed_targets.push(with_str_clone_ref(target.name))
             continue
         if target.kind == 3:
-            let obj_path = build_graph_object_output_path(root, target, options.output_path, graph.targets.len() as i32)
+            let obj_path = build_graph_object_output_path(root, target, options.output_path, graph.targets.len())
             if obj_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
@@ -3332,7 +3332,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             completed_targets.push(with_str_clone_ref(target.name))
             continue
         if target.kind == 4:
-            let ar_path = build_graph_library_output_path(root, target, options.output_path, graph.targets.len() as i32)
+            let ar_path = build_graph_library_output_path(root, target, options.output_path, graph.targets.len())
             if ar_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
@@ -3349,7 +3349,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             build_cache_record(root, target, comp.tracked_input_paths(), no_strings)
             completed_targets.push(with_str_clone_ref(target.name))
             continue
-        let bin_path = build_graph_output_path(root, target, options.output_path, graph.targets.len() as i32)
+        let bin_path = build_graph_output_path(root, target, options.output_path, graph.targets.len())
         if bin_path.len() == 0:
             with_eprint("error: -o cannot be used when build.w declares multiple targets")
             return 1
@@ -3974,7 +3974,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     if built_index < 0:
         with_eprint("error: target '" ++ selected_target_name ++ "' vanished from the filtered build graph")
         return 1
-    let bin_path = build_graph_output_path(root, selected_graph.targets[built_index], "", selected_graph.targets.len() as i32)
+    let bin_path = build_graph_output_path(root, selected_graph.targets[built_index], "", selected_graph.targets.len())
     if bin_path.len() == 0 or with_fs_file_exists(bin_path) == 0:
         with_eprint("error: run target '" ++ selected_target_name ++ "' did not produce executable output")
         return 1
@@ -4923,7 +4923,7 @@ fn split_nonempty_lines(text: &str) -> List[str]:
 fn test_target_is_directory(target: &str) -> bool:
     with_fs_is_dir(target) != 0
 
-fn test_count_label(count: i32) -> str:
+fn test_count_label(count: isize) -> str:
     if count == 1:
         return "test"
     "tests"
@@ -4935,7 +4935,7 @@ fn emit_test_stage_error(message: &str, target: &str, stage: &str, test_name: &s
     if test_name.len() > 0:
         with_eprint(" = test: " ++ test_name)
 
-fn print_test_summary(target: &str, passed: i32, failed: i32, quiet: bool):
+fn print_test_summary(target: &str, passed: isize, failed: isize, quiet: bool):
     if quiet:
         return
     if failed == 0:
@@ -5256,7 +5256,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
             let rc = run_test_binary_checked(bin_path, target, "", run_quiet, directives)
             finish_test_binary(bin_path, keep_binary or rc != 0, single_run_reruns(rc), run_quiet)
             if rc == 0:
-                print_test_summary(target, discovery.test_names.len() as i32, 0, run_quiet)
+                print_test_summary(target, discovery.test_names.len(), 0, run_quiet)
                 return 0
             print_test_summary(target, 0, 1, run_quiet)
             return 1
@@ -5278,7 +5278,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
                 failed_tests.push(test_name ++ "")
                 if verbose:
                     with_eprint("FAIL " ++ test_name)
-        let failed = failed_tests.len() as i32
+        let failed = failed_tests.len()
         finish_test_binary(bin_path, keep_binary or failed > 0, failed_tests, run_quiet)
         print_test_summary(target, passed, failed, run_quiet)
         if failed == 0:

@@ -6431,7 +6431,7 @@ impl Codegen:
         let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(params), params.len() as i32, 0)
         if f == 0:
             f = wl_add_function(self.llmod, name, fn_ty)
-        wl_build_call(self.builder, fn_ty, f, list_data_i64(args), args.len() as i32)
+        wl_build_call(self.builder, fn_ty, f, list_data_i64(args), args.len())
 
     // D116: append `n` elements at `data` to the List at `out_ptr`.
     // D111: an element `++` copies is one more holder of what it shares: a
@@ -17081,7 +17081,7 @@ impl Codegen:
             inst_args.push(arg_sema)
         let owner_text = with_str_clone_ref(self.intern.resolve(owner_sym))
         let sema_owner_sym = if owner_text.len() > 0: self.sema.pool_lookup_symbol(owner_text) else: 0
-        let inst_tid = self.sema.find_generic_inst_type(sema_owner_sym, inst_args, tp_syms.len() as i32) as i32
+        let inst_tid = self.sema.find_generic_inst_type(sema_owner_sym, inst_args, tp_syms.len()) as i32
         if inst_tid <= 0:
             return 0
         let mono_ty = self.get_or_create_generic_struct_type(inst_tid)

@@ -485,7 +485,7 @@ fn to_cstr(s: &str) -> *const u8:
         rt_write(2, "error: LLVM bridge exhausted thread-local cstr slots\n" as *const u8, 53)
         abort()
     let idx = cstr_slot_indices[slot]
-    let n = if s.len() < 4095: s.len() else: 4095
+    let n = if s.len() as i32 < 4095: s.len() else: 4095
     let src = unsafe *(s as *const str as *const *const u8)
     let dst = &raw mut cstr_bufs[slot][idx] as *mut u8
     with_memcpy(dst, src, n)

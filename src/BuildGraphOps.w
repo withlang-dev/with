@@ -311,7 +311,7 @@ fn build_graph_compile_ir_to_object(root: &str, target: &BuildGraphTarget) -> i3
         build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' failed")
     rc
 
-fn build_graph_archive_member_seen(inputs: &List[str], count: i32, basename: &str) -> bool:
+fn build_graph_archive_member_seen(inputs: &List[str], count: isize, basename: &str) -> bool:
     for i in 0..count:
         if build_graph_path_basename(inputs[i]) == basename:
             return true
@@ -339,7 +339,7 @@ fn build_graph_create_archive(root: &str, target: &BuildGraphTarget) -> i32:
             build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' missing input: " ++ input_path)
             return 1
         let member = build_graph_path_basename(input_path)
-        if build_graph_archive_member_seen(resolved_inputs, resolved_inputs.len() as i32, member):
+        if build_graph_archive_member_seen(resolved_inputs, resolved_inputs.len(), member):
             build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' has duplicate archive member name: " ++ member)
             return 1
         resolved_inputs.push(input_path)

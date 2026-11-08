@@ -53,7 +53,7 @@ fn py_unescape(body: &str, raw: bool) -> str:
     if raw or body.find("\\") < 0: return body.to_owned()
     let out = StringBuilder.with_capacity(body.len())
     var i = 0
-    let n = body.len()
+    let n = body.len() as i32
     var start = 0
     while i < n:
         if body[i] != '\\' or i + 1 >= n:
@@ -135,7 +135,7 @@ fn py_lex(src: &str) -> List[PyTok]:
     var out: List[PyTok] = []
     let indents: List[i32] = []
     indents.push(0)
-    let n = src.len()
+    let n = src.len() as i32
     var i: i32 = 0
     var line: i32 = 1
     var depth = 0

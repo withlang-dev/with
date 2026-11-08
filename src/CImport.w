@@ -6163,7 +6163,7 @@ fn ci_find_binary_op_ext(s: &str) -> i32:
     var best_len: i32 = 0
     var paren_depth = 0
     var idx: i32 = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while idx < slen:
         let c = s[idx]
         if c == 40:
@@ -6199,7 +6199,7 @@ fn ci_is_c_ident_prefix(s: &str) -> bool:
     let c0 = s[0]
     (c0 >= 65 and c0 <= 90) or (c0 >= 97 and c0 <= 122) or c0 == 95
 
-fn ci_op_prec_ext(s: &str, idx: i32, slen: i32) -> i32:
+fn ci_op_prec_ext(s: &str, idx: i32, slen: isize) -> i32:
     let c = s[idx]
     var nx = 0
     if idx + 1 < slen:
@@ -6234,7 +6234,7 @@ fn ci_op_prec_ext(s: &str, idx: i32, slen: i32) -> i32:
     if c == 37: return 9
     -1
 
-fn ci_op_length_ext(s: &str, idx: i32, slen: i32) -> i32:
+fn ci_op_length_ext(s: &str, idx: i32, slen: isize) -> i32:
     if idx + 1 < slen:
         let c = s[idx]
         let nx = s[idx as i64 + 1]
@@ -6787,7 +6787,7 @@ fn ci_find_binary_op(s: &str) -> i32:
     var best_len: i32 = 0
     var paren_depth = 0
     var idx: i32 = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while idx < slen:
         let c = s[idx]
         if c == 40:
@@ -6805,7 +6805,7 @@ fn ci_find_binary_op(s: &str) -> i32:
         return best_pos * 256 + best_len
     -1
 
-fn ci_op_prec(s: &str, idx: i32, slen: i32) -> i32:
+fn ci_op_prec(s: &str, idx: i32, slen: isize) -> i32:
     let c = s[idx]
     var nx = 0
     if idx + 1 < slen:
@@ -6822,7 +6822,7 @@ fn ci_op_prec(s: &str, idx: i32, slen: i32) -> i32:
     if c == 37: return 5
     -1
 
-fn ci_op_length(s: &str, idx: i32, slen: i32) -> i32:
+fn ci_op_length(s: &str, idx: i32, slen: isize) -> i32:
     if idx + 1 < slen:
         let c = s[idx]
         let nx = s[idx as i64 + 1]
@@ -16213,7 +16213,7 @@ fn ci_is_float_literal(s: &str) -> bool:
     if start as i64 + 1 < s.len() and first == 48:
         let second = s[(start + 1)]
         if second == 120 or second == 88:
-            for hi in (start + 2)..s.len() as i32:
+            for hi in (start + 2)..s.len():
                 let hc = s[hi]
                 if hc == 112 or hc == 80:
                     return true
@@ -16221,7 +16221,7 @@ fn ci_is_float_literal(s: &str) -> bool:
     // Decimal float: scan for decimal point or e/E exponent
     var has_dot = false
     var has_exp = false
-    for i in start..s.len() as i32:
+    for i in start..s.len():
         let c = s[i]
         if c == 46:
             has_dot = true

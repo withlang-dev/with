@@ -101,14 +101,14 @@ pub const DECLARED_ORIGIN_AMBIGUOUS: i32 = -1
 // parameter entry (-1 - index).
 pub const FROM_STATIC_ENTRY: i32 = -1048576
 
-fn sema_param_origin_bit(pi: i32) -> i32:
+fn sema_param_origin_bit(pi: isize) -> i32:
     if pi < 0:
         return 0
     if pi >= 31:
         return -1
     ((1 as i64) << pi) as i32
 
-fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> bool:
+fn sema_param_origin_mask_contains(mask: i32, pi: isize) -> bool:
     if mask == 0 or pi < 0:
         return false
     if mask < 0:
@@ -3222,10 +3222,10 @@ impl Sema:
         // text on every comptime eval leaked ~8.5 MB × N evals = GBs of dead copies.
         self
 
-fn sema_pair_key(a: i32, b: i32) -> i64:
+fn sema_pair_key(a: isize, b: isize) -> i64:
     (a as i64) * 4294967296 + (b as i64)
 
-fn sema_exact_type_hash(kind: i32, d0: i32, d1: i32, d2: i32) -> i64:
+fn sema_exact_type_hash(kind: i32, d0: i32, d1: isize, d2: i32) -> i64:
     var h: u64 = 14695981039346656037
     h = (h ^ kind as u64) *% 1099511628211
     h = (h ^ d0 as u64) *% 1099511628211
@@ -3239,7 +3239,7 @@ fn sema_pair_lo(key: i64): (key % 4294967296) as i32
 // Key = (sig, pi, bit_idx) with pi < 2^16, bit_idx < 2^8; value = (kind, a, b)
 // with a, b < 2^28. These fns are the only place the field widths appear;
 // encode and decode both live here so they cannot drift apart.
-fn effect_prov_key(sig: i32, pi: i32, bit_idx: i32) -> i64:
+fn effect_prov_key(sig: isize, pi: i32, bit_idx: i32) -> i64:
     (sig as i64) * 16777216 + (pi as i64) * 256 + bit_idx as i64
 
 fn effect_prov_val(kind: i64, a: i32, b: i32) -> i64:
@@ -6621,7 +6621,7 @@ impl Sema:
 
     // ── Type management ──────────────────────────────────────────────
 
-    fn exact_type_components_match(tid: i32, kind: i32, d0: i32, d1: i32, d2: i32) -> bool:
+    fn exact_type_components_match(tid: i32, kind: i32, d0: i32, d1: isize, d2: i32) -> bool:
         self.type_kinds[tid] == kind and
             self.type_d0[tid] == d0 and
             self.type_d1[tid] == d1 and
@@ -6675,13 +6675,13 @@ impl Sema:
     mut fn freeze_types():
         self.types_frozen = 1
 
-    fn type_extra_matches(extra_start: i32, values: &List[i32], count: i32) -> bool:
+    fn type_extra_matches(extra_start: i32, values: &List[i32], count: isize) -> bool:
         for i in 0..count:
             if self.type_extra[(extra_start + i)] != values[i]:
                 return false
         true
 
-    fn find_exact_type(kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
+    fn find_exact_type(kind: i32, d0: i32, d1: isize, d2: i32) -> TypeId:
         let key = sema_exact_type_hash(kind, d0, d1, d2)
         if not self.exact_type_cache_heads.contains(key):
             return 0 as TypeId
@@ -6700,7 +6700,7 @@ impl Sema:
             return 0 as TypeId
         self.add_type(kind, d0, d1, d2)
 
-    fn find_tuple_type(elems: &List[i32], elem_count: i32) -> TypeId:
+    fn find_tuple_type(elems: &List[i32], elem_count: isize) -> TypeId:
         let type_count = self.type_kinds.len()
         for ti in 0..type_count:
             if self.type_kinds[ti] != TypeKind.TY_TUPLE:
@@ -6729,7 +6729,7 @@ impl Sema:
     // §16.11: unsafe-ness is part of callable type identity, so two signatures
     // that differ only in unsafe-ness are distinct types; so is variadic-ness
     // (#1832). `flags`: CALLABLE_UNSAFE | CALLABLE_VARIADIC.
-    fn find_fn_type_of_kind_u(kind: i32, params: &List[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
+    fn find_fn_type_of_kind_u(kind: i32, params: &List[i32], param_count: isize, ret: TypeId, flags: i32) -> TypeId:
         let type_count = self.type_kinds.len()
         for ti in 0..type_count:
             if self.type_kinds[ti] != kind:
@@ -6811,7 +6811,7 @@ impl Sema:
             current = self.get_type_d0(resolved)
         0
 
-    fn fn_type_param_type(fn_tid: i32, param_i: i32) -> i32:
+    fn fn_type_param_type(fn_tid: i32, param_i: isize) -> i32:
         if fn_tid == 0 or param_i < 0:
             return 0
         let param_count = self.get_type_d1(fn_tid)
@@ -6951,14 +6951,14 @@ impl Sema:
             return self.types_identical(self.get_type_d2(ar as TypeId), self.get_type_d2(br as TypeId))
         false
 
-fn sema_generic_inst_hash(base_sym: i32, args: &List[i32], arg_count: i32) -> i64:
+fn sema_generic_inst_hash(base_sym: i32, args: &List[i32], arg_count: isize) -> i64:
     var h: i64 = base_sym
     for ai in 0..arg_count:
         h = (h *% 31) +% (args[ai] as i64)
     h
 
 impl Sema:
-    fn find_generic_inst_type(base_sym: i32, args: &List[i32], arg_count: i32) -> TypeId:
+    fn find_generic_inst_type(base_sym: i32, args: &List[i32], arg_count: isize) -> TypeId:
         let key = sema_generic_inst_hash(base_sym, args, arg_count)
         if let Some(cached) = self.generic_inst_cache.get(key):
             if cached >= 0 and cached < self.type_kinds.len():
@@ -7873,7 +7873,7 @@ impl Sema:
     // substitute_type: walk a TypeId, replacing type parameters with concrete types.
     // subst_syms/subst_tids/count define the mapping: subst_syms[i] → subst_tids[i].
     // Returns the substituted TypeId, or the original if no substitution applies.
-    mut fn substitute_type(tid: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: i32) -> i32:
+    mut fn substitute_type(tid: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: isize) -> i32:
         if tid <= 0 or count == 0:
             return tid
         let kind = self.get_type_kind(tid as TypeId)
@@ -7935,7 +7935,7 @@ impl Sema:
     // A type parameter's replacement under the substitution, or `tid` when
     // it names none: the struct/enum/alias case of substitute_type and
     // substitute_type_frozen alike.
-    fn subst_param_match(tid: i32, d0: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: i32) -> i32:
+    fn subst_param_match(tid: i32, d0: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: isize) -> i32:
         // A type its declaration made is never a type parameter, whatever
         // its name: a program's own `type U` mapped through iter_map[T, U, I]
         // was rewritten to the U the specialization binds, building
@@ -7964,7 +7964,7 @@ impl Sema:
     // lists are taken as values (O(1), D120): building a type can
     // specialize, and a specialization replaces them while it runs
     // (TypeLayout restores a saved frame), which a view would outlive.
-    mut fn substitute_current(tid: i32, count: i32) -> i32:
+    mut fn substitute_current(tid: i32, count: isize) -> i32:
         let subst_syms = self.generic_subst_param_syms.clone()
         let subst_tids = self.generic_subst_type_ids.clone()
         self.substitute_type(tid, subst_syms, subst_tids, count)
@@ -7972,7 +7972,7 @@ impl Sema:
     // substitute_type after the types are frozen (D7): every instance a
     // substitution reaches was registered before the freeze, so it is found,
     // never built; 0 when one is missing, as ensure_* answers when frozen.
-    fn substitute_type_frozen(tid: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: i32) -> i32:
+    fn substitute_type_frozen(tid: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: isize) -> i32:
         if tid <= 0 or count == 0:
             return tid
         let kind = self.get_type_kind(tid as TypeId)
@@ -8091,7 +8091,7 @@ impl Sema:
         if resolved == 0 or pi < 0 or pi >= self.get_type_d1(resolved): return 0
         self.type_uses_c_va_list_place(self.type_extra[self.get_type_d0(resolved) + pi])
 
-    fn sig_param_is_c_va_list_by_place(sig_idx: i32, pi: i32) -> i32:
+    fn sig_param_is_c_va_list_by_place(sig_idx: isize, pi: i32) -> i32:
         self.type_uses_c_va_list_place(self.sig_param_type(sig_idx, pi))
 
     fn is_c_void_like_type(tid: i32) -> bool:
@@ -8322,7 +8322,7 @@ impl Sema:
     // bundle interface's storage — is referenced in place by every body,
     // a closure's included: it is never a capture (#1313). A local that
     // shadows an unseen global holds the same symbol at another index.
-    fn binding_index_is_global(idx: i32, sym: i32) -> bool:
+    fn binding_index_is_global(idx: isize, sym: i32) -> bool:
         if self.global_value_decl_bindings.contains(sym):
             let bind: i32 = self.global_value_decl_bindings.get(sym).unwrap()
             if bind == idx: return true
@@ -8993,7 +8993,7 @@ impl Sema:
     // Allocate this loop's break-flag region in loop_break_flat (called by each loop
     // construct after push_label_frame). One VarState slot per outer binding, init
     // LIVE; freed in finalize_loop_move_state.
-    mut fn alloc_loop_break_region(frame_idx: i32):
+    mut fn alloc_loop_break_region(frame_idx: isize):
         if frame_idx < 0 or frame_idx >= self.label_break_off.len():
             return
         let count: i32 = self.label_loop_entry_binds[frame_idx]
@@ -9069,7 +9069,7 @@ impl Sema:
     // (the loop may exit via its condition with the entry or body-end state) and 0
     // for `loop` (exits only via break). The break accumulator carries moves that a
     // break propagated out of the loop.
-    mut fn finalize_loop_move_state(entry: &List[i32], frame_idx: i32, body_diverges: i32, has_condition_exit: i32, loop_node: i32):
+    mut fn finalize_loop_move_state(entry: &List[i32], frame_idx: isize, body_diverges: i32, has_condition_exit: i32, loop_node: i32):
         let entry_count = entry.len()
         // WITH_TRACE_MOVE: dump the loop back-edge move-check inputs per binding
         // (the sema-phase analog of --trace-ownership). Prints name, entry-state,
@@ -10003,7 +10003,7 @@ impl Sema:
         if closure_node == 0:
             return
         let start = self.closure_capture_summary_data.len() as i32
-        let count = if capture_syms.len() as i32 < capture_effs.len() as i32: capture_syms.len() as i32 else: capture_effs.len() as i32
+        let count = (if capture_syms.len() < capture_effs.len(): capture_syms.len() else: capture_effs.len()) as i32
         for i in 0..count:
             self.closure_capture_summary_data.push(capture_syms[i])
             self.closure_capture_summary_data.push(capture_effs[i])
@@ -10033,14 +10033,14 @@ impl Sema:
     // alone cannot tell "no captures" from "never recorded".
     fn has_closure_capture_summary(node: i32) -> bool: self.closure_capture_summary_starts.contains(node)
 
-    fn closure_capture_consumes(closure_node: i32, idx: i32) -> bool:
+    fn closure_capture_consumes(closure_node: i32, idx: isize) -> bool:
         if (self.closure_capture_summary_eff(closure_node, idx) & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: true else: false
 
     // D62/D65: Sema's capture mode for capture `idx` of a closure — by place
     // (a pointer to the creating frame's slot, Copy or not) unless the
     // closure is `move`, which takes the value. Every downstream stage reads
     // this; none re-reads the closure's spelling.
-    fn closure_capture_by_place(closure_node: i32, idx: i32) -> bool:
+    fn closure_capture_by_place(closure_node: i32, idx: isize) -> bool:
         (self.closure_capture_summary_eff(closure_node, idx) & EFF_CAPTURE_BY_PLACE) != 0
 
     // D63: the closure value owns its environment — some capture is held by
@@ -10050,7 +10050,7 @@ impl Sema:
             if not self.closure_capture_by_place(closure_node, ci): return true
         false
 
-    fn closure_capture_summary_eff(closure_node: i32, idx: i32) -> i32:
+    fn closure_capture_summary_eff(closure_node: i32, idx: isize) -> i32:
         if not self.closure_capture_summary_starts.contains(closure_node):
             return 0
         let count = self.closure_capture_summary_count(closure_node)
@@ -10122,12 +10122,12 @@ impl Sema:
         self.sig_receiver_required_effects.push(0)
         self.sig_lookup.insert(name, idx)
 
-    mut fn set_sig_receiver_mode(si: i32, mode: ReceiverMode):
+    mut fn set_sig_receiver_mode(si: isize, mode: ReceiverMode):
         if si < 0 or si >= self.sig_receiver_modes.len():
             return
         self.sig_receiver_modes[si] = mode as i32
 
-    fn sig_receiver_mode(si: i32) -> ReceiverMode:
+    fn sig_receiver_mode(si: isize) -> ReceiverMode:
         if si < 0 or si >= self.sig_receiver_modes.len():
             return ReceiverMode.None
         self.sig_receiver_modes[si] as ReceiverMode
@@ -10149,7 +10149,7 @@ impl Sema:
     // D172 (§3.8a): parameter `pi` of signature `si` is declared `mut` — a
     // `mut p: T` parameter, or a `mut self` receiver, the same mode. Read
     // from the declaration's parameter flags, the one source of the mode.
-    fn sig_param_is_mut(si: i32, pi: i32) -> bool:
+    fn sig_param_is_mut(si: i32, pi: isize) -> bool:
         if si < 0 or si >= self.sig_param_counts.len() or pi < 0 or pi >= self.sig_param_counts[si]:
             return false
         let decl = self.receiver_decl_node_for_sig(si)
@@ -10160,7 +10160,7 @@ impl Sema:
             return false
         fn_param_is_mut_self(self.ast.fn_param_flags(self.ast.fn_meta_param_start(meta), pi)) != 0
 
-    fn sig_param_uses_value_ref_abi(si: i32, pi: i32) -> i32:
+    fn sig_param_uses_value_ref_abi(si: isize, pi: isize) -> i32:
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return 0
         let start = self.sig_param_eff_starts[si]
@@ -10169,7 +10169,7 @@ impl Sema:
             return 0
         self.sig_value_ref_abi_params[(start + pi)]
 
-    mut fn set_sig_param_value_ref_abi(si: i32, pi: i32, value: i32):
+    mut fn set_sig_param_value_ref_abi(si: isize, pi: i32, value: i32):
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return
         let start: i32 = self.sig_param_eff_starts[si]
@@ -10178,7 +10178,7 @@ impl Sema:
             return
         self.sig_value_ref_abi_params[(start + pi)] = value
 
-    fn sig_param_effect(si: i32, pi: i32) -> i32:
+    fn sig_param_effect(si: isize, pi: isize) -> i32:
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return 0
         let start = self.sig_param_eff_starts[si]
@@ -10187,7 +10187,7 @@ impl Sema:
             return 0
         self.sig_param_effects[(start + pi)]
 
-    mut fn set_sig_param_effect(si: i32, pi: i32, eff: i32):
+    mut fn set_sig_param_effect(si: isize, pi: isize, eff: i32):
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return
         let start: i32 = self.sig_param_eff_starts[si]
@@ -10198,7 +10198,7 @@ impl Sema:
         // category, whether found in the body or added by the fixed point.
         self.sig_param_effects[(start + pi)] = if (eff & EFF_RAW_PTR_VALIDITY) != 0: eff & ~EFF_READ else: eff
 
-    mut fn set_sig_param_direct_effect(si: i32, pi: i32, eff: i32):
+    mut fn set_sig_param_direct_effect(si: isize, pi: isize, eff: i32):
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return
         let start: i32 = self.sig_param_eff_starts[si]
@@ -10217,7 +10217,7 @@ impl Sema:
                 return pi
         -1
 
-    mut fn apply_declared_effects_to_extern_sig(node: i32, sig_idx: i32, param_start: i32, param_count: i32):
+    mut fn apply_declared_effects_to_extern_sig(node: i32, sig_idx: isize, param_start: i32, param_count: i32):
         let pin_count = self.ast.fn_effect_pin_count(node as NodeId)
         for pin_i in 0..pin_count:
             let pin_param_sym = self.ast.fn_effect_pin_param(node as NodeId, pin_i)
@@ -10229,7 +10229,7 @@ impl Sema:
                 self.set_sig_param_effect(sig_idx, pin_pi, pin_bits)
                 self.set_sig_param_direct_effect(sig_idx, pin_pi, pin_bits)
 
-    fn sig_param_view_origin(si: i32, pi: i32) -> i32:
+    fn sig_param_view_origin(si: isize, pi: isize) -> i32:
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return 0
         let start = self.sig_param_eff_starts[si]
@@ -10247,7 +10247,7 @@ impl Sema:
             return 0
         self.sig_param_invoke_many[(start + pi)]
 
-    mut fn set_sig_param_invoke_many(si: i32, pi: i32, many: i32):
+    mut fn set_sig_param_invoke_many(si: i32, pi: isize, many: i32):
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return
         let start: i32 = self.sig_param_eff_starts[si]
@@ -10256,7 +10256,7 @@ impl Sema:
             return
         self.sig_param_invoke_many[(start + pi)] = many
 
-    mut fn set_sig_param_view_origin(si: i32, pi: i32, mask: i32):
+    mut fn set_sig_param_view_origin(si: i32, pi: isize, mask: i32):
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return
         let start: i32 = self.sig_param_eff_starts[si]
@@ -10265,7 +10265,7 @@ impl Sema:
             return
         self.sig_param_view_origins[(start + pi)] = mask
 
-    fn sig_param_view_through(si: i32, pi: i32) -> i32:
+    fn sig_param_view_through(si: isize, pi: i32) -> i32:
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return 0
         let start = self.sig_param_eff_starts[si]
@@ -10274,7 +10274,7 @@ impl Sema:
             return 0
         self.sig_param_view_through[(start + pi)]
 
-    mut fn set_sig_param_view_through(si: i32, pi: i32, mask: i32):
+    mut fn set_sig_param_view_through(si: i32, pi: isize, mask: i32):
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return
         let start: i32 = self.sig_param_eff_starts[si]
@@ -10742,7 +10742,7 @@ impl Sema:
                 continue
             self.sig_receiver_required_effects[si] = self.sig_param_effect(si, 0) & EFF_DECLARED_MASK
 
-    fn receiver_decl_node_for_sig(sig: i32) -> i32:
+    fn receiver_decl_node_for_sig(sig: isize) -> i32:
         if sig < 0 or sig >= self.sig_names.len():
             return 0
         let sym = self.sig_names[sig]
@@ -10771,7 +10771,7 @@ impl Sema:
         required
 
     fn receiver_decl_has_effect_signature(node: i32) -> bool:
-        for si in 0..self.sig_names.len() as i32:
+        for si in 0..self.sig_names.len():
             if self.receiver_decl_node_for_sig(si) == node and self.sig_get_param_count(si) > 0:
                 return true
         false
@@ -10807,7 +10807,7 @@ impl Sema:
     // declaration-spelling exemption and no warning/fallback mode.
     mut fn enforce_receiver_modes():
         let seen: HashMap[i32, i32, Minted] = [:]
-        for si in 0..self.sig_receiver_modes.len() as i32:
+        for si in 0..self.sig_receiver_modes.len():
             let declared = self.sig_receiver_mode(si)
             if declared == ReceiverMode.None or self.sig_get_param_count(si) <= 0:
                 continue
@@ -10851,7 +10851,7 @@ impl Sema:
                 errors = errors + 1
         errors
 
-    fn sig_param_direct_effect(sig: i32, pi: i32) -> i32:
+    fn sig_param_direct_effect(sig: isize, pi: i32) -> i32:
         if sig < 0 or sig >= self.sig_param_eff_starts.len():
             return 0
         let start = self.sig_param_eff_starts[sig]
@@ -10931,7 +10931,7 @@ impl Sema:
     // Backs `--dump-abi`. Run after check so effects + value_ref_abi are final.
     mut fn dump_abi() -> str:
         var out = f"abi module sigs={self.sig_names.len()}\n"
-        for si in 0..self.sig_names.len() as i32:
+        for si in 0..self.sig_names.len():
             let fn_sym = self.sig_names[si]
             let name = self.pool_resolve(fn_sym)
             let pc = self.sig_get_param_count(si)
@@ -10983,7 +10983,7 @@ impl Sema:
     // nested body (closure) stamps its own sites first; already-stamped entries
     // are never overwritten by the enclosing body's pass. Field-shaped args
     // consult the (root, field) path map; whole-binding args the root map.
-    mut fn stamp_move_site_liveness(start: i32):
+    mut fn stamp_move_site_liveness(start: isize):
         var i = start
         while i + 8 < self.consume_call_sites.len():
             if self.consume_call_sites[(i + 8)] == 0:
@@ -11225,14 +11225,14 @@ impl Sema:
                             return method_node
         0
 
-    fn sig_return_type(idx: i32) -> i32:
+    fn sig_return_type(idx: isize) -> i32:
         self.sig_ret_types[idx]
 
-    fn sig_param_type(idx: i32, param_i: isize) -> i32:
+    fn sig_param_type(idx: isize, param_i: isize) -> i32:
         let start = self.sig_param_starts[idx]
         self.sig_params[(start + param_i)]
 
-    fn sig_get_param_count(idx: i32) -> i32:
+    fn sig_get_param_count(idx: isize) -> i32:
         self.sig_param_counts[idx]
 
     fn sig_is_variadic(idx: i32) -> i32:
@@ -11364,7 +11364,7 @@ impl Sema:
         let types_before = self.type_kinds.len()
         let symbols_before = self.pool.state.symbol_texts.len()
         let sigs_before = self.sig_names.len()
-        let diags_start = self.diags.items.len() as i32
+        let diags_start = self.diags.items.len()
         self.check_bodies()
         if profile:
             sema_profile_report("bodies", t)
@@ -11428,7 +11428,7 @@ fn sema_module_stem_self_name(path: &str) -> str:
     var start = 0
     for i in 0..path.len():
         if path[i] == '/': start = (i + 1) as i32
-    var end = path.len() as i32
+    var end = path.len()
     if path.ends_with(".wi"): end = end - 3
     else if path.ends_with(".w"): end = end - 2
     if end <= start:

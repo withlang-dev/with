@@ -1390,7 +1390,7 @@ fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> List[
     let order: List[i32] = []
     for kind in 0..7:
         let names: List[str] = []
-        for ei in 0..model.exports.len():
+        for ei in 0..model.exports.len() as i32:
             let e = model.exports[ei]
             if e.kind == kind and e.mod_path == mod_path:
                 names.push(with_str_clone_ref(e.name))

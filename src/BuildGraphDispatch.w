@@ -54,7 +54,7 @@ fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &st
         shared = shared + seen.claim(resolve_join(root, generated.path), "generated source '" ++ generated.path ++ "'")
     for ti in 0..graph.targets.len():
         let target = &graph.targets[ti]
-        let path = build_graph_target_output_path(root, target, output_path, graph.targets.len() as i32)
+        let path = build_graph_target_output_path(root, target, output_path, graph.targets.len())
         let owner = "target '" ++ target.name ++ "'"
         shared = shared + seen.claim(path, owner)
         for oi in 0..target.extra_outputs.len():

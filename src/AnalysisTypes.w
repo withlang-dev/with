@@ -275,7 +275,7 @@ fn analysis_kind_name(kind: AnalysisFactKind) -> str:
     if kind == AnalysisFactKind.Operator: return "operator"
     "unknown"
 
-fn analysis_slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
+fn analysis_slice(text: &str, start: i32, end: isize): text.slice(start as i64, end as i64)
 
 fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
     let n = text.len()
@@ -323,7 +323,7 @@ fn analysis_escape(text: &str) -> str:
             parts.push(replacement)
             start = (i + 1) as i32
     if start < text.len():
-        parts.push(analysis_slice(text, start, text.len() as i32))
+        parts.push(analysis_slice(text, start, text.len()))
     parts.join("")
 
 fn analysis_fact_field(fact: &AnalysisFact, field: &str) -> str:
@@ -367,7 +367,7 @@ fn analysis_term_matches(fact: &AnalysisFact, term: &str) -> bool:
     if op <= 0:
         return fact.name.contains(term) or fact.detail.contains(term)
     let field = analysis_slice(term, 0, op)
-    let wanted = analysis_slice(term, op + op_len, term.len() as i32)
+    let wanted = analysis_slice(term, op + op_len, term.len())
     let actual = analysis_fact_field(fact, field)
     if mode == 1: return actual.contains(wanted)
     if mode == 2: return actual != wanted

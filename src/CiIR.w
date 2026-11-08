@@ -1127,7 +1127,7 @@ impl CiProjectSymbol:
         self.consumers = self.consumers ++ "|" ++ i64_to_string(module_id) ++ "|"
 
     // D107: size every per-parameter vector to at least `n` entries.
-    mut fn grow_params(n: i32):
+    mut fn grow_params(n: isize):
         while self.param_fn_ptr.len() < n: self.param_fn_ptr.push(0)
         while self.param_tested.len() < n: self.param_tested.push(0)
         while self.param_aborting.len() < n: self.param_aborting.push(0)

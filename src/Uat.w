@@ -271,7 +271,7 @@ fn uat_split_command(text: &str) -> List[str]:
         if quote != 0:
             if c == quote:
                 quote = 0
-            else if c == '\\' and quote == '"' and i + 1 < text.len() as i32:
+            else if c == '\\' and quote == '"' and i + 1 < text.len():
                 i = i + 1
                 cur = cur ++ text.slice(i, i + 1)
             else:

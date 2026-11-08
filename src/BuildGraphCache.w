@@ -423,7 +423,7 @@ fn build_cache_effect_env_state_line(effect_line: &str) -> str:
     var tab_count = 0
     var second_tab = -1
     var third_tab = -1
-    for i in 0..effect_line.len() as i32:
+    for i in 0..effect_line.len():
         if effect_line[i] == 9:
             tab_count = tab_count + 1
             if tab_count == 2:

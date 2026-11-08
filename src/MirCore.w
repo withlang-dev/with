@@ -632,7 +632,7 @@ impl MirBody:
 
 impl MirBody:
     mut fn new_block() -> BlockId:
-        let id = self.bb_stmt_starts.len()
+        let id = self.bb_stmt_starts.len() as i32
         self.bb_stmt_starts.push(self.stmt_kinds.len() as i32)
         self.bb_stmt_counts.push(0)
         self.bb_term_kinds.push(TermKind.TK_UNREACHABLE)
@@ -893,7 +893,7 @@ impl MirBody:
         if call_id >= 0 and call_id < self.call_ast_nodes.len():
             self.call_ast_nodes[call_id] = node
 
-    fn call_ast_node(call_id: i32) -> i32:
+    fn call_ast_node(call_id: isize) -> i32:
         if call_id < 0 or call_id >= self.call_ast_nodes.len():
             return 0
         self.call_ast_nodes[call_id]
@@ -909,7 +909,7 @@ impl MirBody:
             return
         self.call_contract_required[call_id] = 1
 
-    fn call_requires_contract(call_id: i32) -> bool:
+    fn call_requires_contract(call_id: isize) -> bool:
         if call_id < 0 or call_id >= self.call_contract_required.len():
             return false
         self.call_contract_required[call_id] != 0
@@ -969,12 +969,12 @@ impl MirBody:
             return -1
         self.call_pipeline_receiver_places[call_id]
 
-    fn call_sig_index(call_id: i32) -> i32:
+    fn call_sig_index(call_id: isize) -> i32:
         if call_id < 0 or call_id >= self.call_sig_indices.len():
             return -1
         self.call_sig_indices[call_id]
 
-    fn call_mono_sym(call_id: i32) -> i32:
+    fn call_mono_sym(call_id: isize) -> i32:
         if call_id < 0 or call_id >= self.call_mono_syms.len():
             return 0
         self.call_mono_syms[call_id]
@@ -1000,17 +1000,17 @@ impl MirBody:
             is_user_var: self.local_is_user_var[idx],
         }
 
-    fn stmt_kind(idx: i32) -> i32:
+    fn stmt_kind(idx: isize) -> i32:
         if idx < 0 or idx >= self.stmt_kinds.len():
             return StmtKind.Nop
         self.stmt_kinds[idx]
 
-    fn stmt_data0(idx: i32) -> i32:
+    fn stmt_data0(idx: isize) -> i32:
         if idx < 0 or idx >= self.stmt_d0.len():
             return 0
         self.stmt_d0[idx]
 
-    fn stmt_data1(idx: i32) -> i32:
+    fn stmt_data1(idx: isize) -> i32:
         if idx < 0 or idx >= self.stmt_d1.len():
             return 0
         self.stmt_d1[idx]
@@ -1056,7 +1056,7 @@ fn mir_clip_text(s: &str, max_len: i32) -> str:
         return s.slice(0, max_len)
     s.slice(0, max_len - 3) ++ "..."
 
-fn mir_place_text(body: &MirBody, place_id: i32) -> str:
+fn mir_place_text(body: &MirBody, place_id: isize) -> str:
     if place_id < 0 or place_id >= body.place_locals.len():
         return "_?"
 
@@ -2121,7 +2121,7 @@ fn mir_projection_next_type(mir_mod: &MirModule, current_ty: i32, proj_kind: i32
         return current_ty
     0
 
-fn mir_place_projection_debug_list(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> str:
+fn mir_place_projection_debug_list(mir_mod: &MirModule, body: &MirBody, place_id: isize) -> str:
     if place_id < 0 or place_id >= body.place_locals.len():
         return "[]"
     var out = "["
@@ -2140,7 +2140,7 @@ fn mir_place_projection_debug_list(mir_mod: &MirModule, body: &MirBody, place_id
 
 fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPool) -> str:
     var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
-    for place_id in 0..body.place_locals.len() as i32:
+    for place_id in 0..body.place_locals.len():
         let local_id = body.place_locals[place_id]
         let ty = body.place_sema_types[place_id]
         out = out ++ f"  place#{place_id} path=" ++ mir_place_text(body, place_id) ++ f" base=_{local_id} ty=ty{ty} projections=" ++ mir_place_projection_debug_list(mir_mod, body, place_id) ++ "\n"
@@ -3316,10 +3316,10 @@ fn mir_unop_name(op: i32) -> str:
 
 // ── MIR validation (Wave 10 backend contract) ───────────────────
 
-fn mir_index_in_range(idx: i32, len: i32) -> bool:
+fn mir_index_in_range(idx: i32, len: isize) -> bool:
     idx >= 0 and idx < len
 
-fn mir_span_in_range(start: i32, count: i32, len: i32) -> bool:
+fn mir_span_in_range(start: i32, count: i32, len: isize) -> bool:
     start >= 0 and count >= 0 and start + count <= len
 
 fn validate_mir_module(mir_mod: &MirModule) -> str:
@@ -3350,7 +3350,7 @@ fn validate_mir_module(mir_mod: &MirModule) -> str:
     ""
 
 fn validate_mir_body(body: &MirBody) -> str:
-    let local_count = body.local_type_ids.len() as i32
+    let local_count = body.local_type_ids.len()
     if local_count <= 0:
         return "missing return local"
     if local_count != body.local_mutables.len():
@@ -3366,7 +3366,7 @@ fn validate_mir_body(body: &MirBody) -> str:
     if body.n_params < 0 or body.n_params > local_count:
         return "invalid n_params"
 
-    let bb_count = body.bb_stmt_starts.len() as i32
+    let bb_count = body.bb_stmt_starts.len()
     if bb_count <= 0:
         return "missing basic blocks"
     if bb_count != body.bb_stmt_counts.len():
@@ -3385,49 +3385,49 @@ fn validate_mir_body(body: &MirBody) -> str:
     if bb_count != body.bb_no_suspend_nodes.len():
         return "bb_no_suspend_nodes length mismatch"
 
-    let stmt_count = body.stmt_kinds.len() as i32
+    let stmt_count = body.stmt_kinds.len()
     if stmt_count != body.stmt_d0.len() or
        stmt_count != body.stmt_d1.len() or
        stmt_count != body.stmt_spans.len():
         return "statement table length mismatch"
 
-    let place_count = body.place_locals.len() as i32
+    let place_count = body.place_locals.len()
     if place_count != body.place_proj_starts.len() or
        place_count != body.place_proj_counts.len():
         return "place table length mismatch"
 
-    let proj_count = body.proj_kinds.len() as i32
+    let proj_count = body.proj_kinds.len()
     if proj_count != body.proj_d0.len():
         return "projection table length mismatch"
 
-    let rval_count = body.rval_kinds.len() as i32
+    let rval_count = body.rval_kinds.len()
     if rval_count != body.rval_d0.len() or
        rval_count != body.rval_d1.len() or
        rval_count != body.rval_d2.len():
         return "rvalue table length mismatch"
 
-    let operand_count = body.operand_kinds.len() as i32
+    let operand_count = body.operand_kinds.len()
     if operand_count != body.operand_d0.len():
         return "operand table length mismatch"
 
-    let const_count = body.const_kinds.len() as i32
+    let const_count = body.const_kinds.len()
     if const_count != body.const_d0.len() or
        const_count != body.const_d1.len() or
        const_count != body.const_d2.len() or
        const_count != body.const_types.len():
         return "constant table length mismatch"
 
-    let switch_count = body.switch_table_starts.len() as i32
+    let switch_count = body.switch_table_starts.len()
     if switch_count != body.switch_table_counts.len():
         return "switch table length mismatch"
     if body.switch_table_vals.len() != body.switch_table_targets.len():
         return "switch value/target table length mismatch"
 
-    let agg_count = body.agg_field_starts.len() as i32
+    let agg_count = body.agg_field_starts.len()
     if agg_count != body.agg_field_counts.len():
         return "aggregate field table length mismatch"
 
-    let call_args_count = body.call_arg_starts.len() as i32
+    let call_args_count = body.call_arg_starts.len()
     if call_args_count != body.call_arg_counts.len():
         return "call args table length mismatch"
     if call_args_count != body.call_pipeline_receiver_places.len():
@@ -3620,7 +3620,7 @@ fn validate_mir_body(body: &MirBody) -> str:
     for ti in 0..switch_count:
         let start = body.switch_table_starts[ti]
         let count = body.switch_table_counts[ti]
-        let total = body.switch_table_vals.len() as i32
+        let total = body.switch_table_vals.len()
         if not mir_span_in_range(start, count, total):
             return f"switch table{ti}: span out of range"
         for i in 0..count:
@@ -3631,7 +3631,7 @@ fn validate_mir_body(body: &MirBody) -> str:
     for ai in 0..agg_count:
         let start = body.agg_field_starts[ai]
         let count = body.agg_field_counts[ai]
-        let total = body.agg_field_operands.len() as i32
+        let total = body.agg_field_operands.len()
         if not mir_span_in_range(start, count, total):
             return f"aggregate table{ai}: span out of range"
         for i in 0..count:
@@ -3642,7 +3642,7 @@ fn validate_mir_body(body: &MirBody) -> str:
     for ai in 0..call_args_count:
         let start = body.call_arg_starts[ai]
         let count = body.call_arg_counts[ai]
-        let total = body.call_arg_operands.len() as i32
+        let total = body.call_arg_operands.len()
         if not mir_span_in_range(start, count, total):
             return f"call args table{ai}: span out of range"
         for i in 0..count:
@@ -4030,7 +4030,7 @@ fn mir_validate_place_derived_type(mir_mod: &MirModule, body: &MirBody, place_id
     mir_validate_place_prefix_type(mir_mod, body, place_id, 0)
 
 // The same walk stopped `trailing` projections short of the place's end.
-fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id: i32, trailing: i32) -> i32:
+fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id: isize, trailing: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len():
         return 0
     let local_id = body.place_locals[place_id]
@@ -4566,7 +4566,7 @@ fn mir_validate_cast_supported(mir_mod: &MirModule, src_ty: i32, dst_ty: i32) ->
 // read a Task handle's fiber id out of a local MIR typed as the awaited i32,
 // declared as i32, and passed verification.
 fn mir_validate_scalar_field_projection(mir_mod: &MirModule, body: &MirBody) -> str:
-    for place in 0..body.place_locals.len() as i32:
+    for place in 0..body.place_locals.len():
         let proj_count = body.place_proj_counts[place]
         let proj_start = body.place_proj_starts[place]
         for pi in 0..proj_count:

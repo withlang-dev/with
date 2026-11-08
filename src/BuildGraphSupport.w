@@ -13,7 +13,7 @@ use rt.rt_core
 // target's own ceiling.
 const TEST_HANG_GUARD_MS: i32 = 1800000
 
-fn build_graph_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: i32) -> str:
+fn build_graph_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: isize) -> str:
     if output_path.len() > 0:
         if target_count != 1:
             return ""
@@ -22,7 +22,7 @@ fn build_graph_output_path(root: &str, target: &BuildGraphTarget, output_path: &
         return build_graph_resolve_project_path(root, target.output)
     runtime_program_path(resolve_join(resolve_join(root, "out/bin"), target.name))
 
-fn build_graph_library_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: i32) -> str:
+fn build_graph_library_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: isize) -> str:
     if output_path.len() > 0:
         if target_count != 1:
             return ""
@@ -31,7 +31,7 @@ fn build_graph_library_output_path(root: &str, target: &BuildGraphTarget, output
         return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/lib"), "lib" ++ target.name ++ ".a")
 
-fn build_graph_object_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: i32) -> str:
+fn build_graph_object_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: isize) -> str:
     if output_path.len() > 0:
         if target_count != 1:
             return ""
@@ -43,7 +43,7 @@ fn build_graph_object_output_path(root: &str, target: &BuildGraphTarget, output_
 /// The file a target produces: its declared output, or its kind's default
 /// (an executable's out/bin/<name>). The one answer the runner, `with run`,
 /// the output-ownership check and the cache all read.
-fn build_graph_target_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: i32) -> str:
+fn build_graph_target_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: isize) -> str:
     if target.kind == 0: return build_graph_output_path(root, target, output_path, target_count)
     if target.kind == 1 or target.kind == 4: return build_graph_library_output_path(root, target, output_path, target_count)
     if target.kind == 3: return build_graph_object_output_path(root, target, output_path, target_count)

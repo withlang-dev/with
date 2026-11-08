@@ -169,7 +169,7 @@ fn contract_param(sema: &Sema, fn_sym: i32, pi: i32) -> str:
     if sig < 0 or pi < 0 or pi >= sema.sig_get_param_count(sig): return f"param {pi}"
     sema.facade_param_display(fn_sym, sig, pi)
 
-fn contract_resource_name(sema: &Sema, ri: i32) -> str: sema.safe_symbol_text(sema.facade_resources[ri].name)
+fn contract_resource_name(sema: &Sema, ri: isize) -> str: sema.safe_symbol_text(sema.facade_resources[ri].name)
 
 // The resources a parameter receives, as `Database` / `Database|Statement`.
 fn contract_received(sema: &Sema, fn_sym: i32, pi: i32) -> str:
@@ -680,7 +680,7 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
         if sig < 0: continue
         // Destroying operation still presented as a borrow (§63).
         var destroyer_of = ""
-        for ri in 0..sema.facade_resources.len() as i32:
+        for ri in 0..sema.facade_resources.len():
             let r = &sema.facade_resources[ri]
             if sema.facade_same_fn(r.drop, c.fn_sym): destroyer_of = contract_resource_name(sema, ri)
             for di in 0..r.destroyers.len():

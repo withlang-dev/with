@@ -1017,7 +1017,7 @@ impl AstPool:
     mut fn add_node(kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
         if self.state.frozen != 0:
             ast_pool_phase_bug("BUG: AstPool.add_node called after freeze")
-        let idx = self.state.kinds.len()
+        let idx = self.state.kinds.len() as i32
         self.state.kinds.push(kind)
         self.state.starts.push(start)
         self.state.ends.push(end)

@@ -777,7 +777,7 @@ fn cc_sanitize_ident(raw: &str) -> str:
     if raw.len() == 0:
         return "sym"
     var out = ""
-    for i in 0..raw.len():
+    for i in 0..raw.len() as i32:
         if with_interrupt_requested() != 0:
             return "__with_interrupted"
         let b = raw[i]
@@ -4831,7 +4831,7 @@ impl CCodegen:
         let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
         var match_sym: i32 = 0
         var match_score = -1
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let sym: i32 = self.sema.sig_names[si]
             if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
@@ -4940,7 +4940,7 @@ impl CCodegen:
         let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
         var match_sym: i32 = 0
         var match_score = -1
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let sym: i32 = self.sema.sig_names[si]
             if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
@@ -4976,7 +4976,7 @@ impl CCodegen:
         let dest_tid = self.place_local_tid(body, dest_place)
         var out = ""
         var kept = 0
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let sym: i32 = self.sema.sig_names[si]
             if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
@@ -5519,7 +5519,7 @@ impl CCodegen:
 
         var match_sym: i32 = 0
         var match_score = -1
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let sym: i32 = self.sema.sig_names[si]
             if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
@@ -5594,7 +5594,7 @@ impl CCodegen:
         let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
         var match_sym: i32 = 0
         var match_score = -1
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let sym: i32 = self.sema.sig_names[si]
             if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
@@ -6286,7 +6286,7 @@ impl CCodegen:
     // through this, so the `Task[T]` a Sema signature declares (§14.4; #1464
     // made the inferred ones agree with the annotated ones) never names a C
     // type the backend does not define (`Task_Unit_ task_cancel_point()`).
-    fn c_sig_return_type(sig_idx: i32) -> i32:
+    fn c_sig_return_type(sig_idx: isize) -> i32:
         self.sema.unwrap_task_type(self.sema.sig_return_type(sig_idx) as TypeId) as i32
 
     mut fn call_return_tid_for_fn_sym(body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32, fallback: i32) -> i32:
@@ -10920,16 +10920,16 @@ impl CCodegen:
         let sig_idx = self.body_sig_index(body.fn_sym)
         if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
 
-    fn closure_fn_name(idx: i32) -> str:
+    fn closure_fn_name(idx: isize) -> str:
         f"__with_closure_{idx}"
 
-    fn closure_env_struct(idx: i32) -> str:
+    fn closure_env_struct(idx: isize) -> str:
         f"struct __with_env_{idx}"
 
-    fn closure_cell_struct(idx: i32) -> str:
+    fn closure_cell_struct(idx: isize) -> str:
         f"struct __with_cell_{idx}"
 
-    fn closure_body_at(idx: i32) -> &MirBody:
+    fn closure_body_at(idx: isize) -> &MirBody:
         self.mir_body_at(self.mir_mod.find_body(self.closure_syms[idx]))
 
     // "path:line" of an AST node, for a diagnostic that names a construct.
@@ -11012,7 +11012,7 @@ impl CCodegen:
 
     // The owned cell is clonable when every capture is Copy or a str
     // (CodegenDispatch.gen_closure_env_clone_fn); otherwise clone_fn is null.
-    fn closure_cell_clonable(idx: i32) -> bool:
+    fn closure_cell_clonable(idx: isize) -> bool:
         let body = self.closure_body_at(idx)
         for ci in 0..body.anonymous_capture_count:
             let tid = body.local_type_ids[ci + 1]
@@ -11020,7 +11020,7 @@ impl CCodegen:
                 return false
         true
 
-    mut fn closure_fn_sig(idx: i32) -> str:
+    mut fn closure_fn_sig(idx: isize) -> str:
         let body = self.closure_body_at(idx)
         let ret_tid = body.local_type_ids[0]
         // #1817: the array out-pointer after the context, as the fat
@@ -11036,7 +11036,7 @@ impl CCodegen:
     mut fn emit_closure_decls() -> str:
         var out = ""
         var any_inline = false
-        for idx in 0..self.closure_syms.len() as i32:
+        for idx in 0..self.closure_syms.len():
             if self.check_interrupted() != 0:
                 return ""
             let body = self.closure_body_at(idx)

@@ -748,7 +748,7 @@ impl MirBuilder:
     // Whether `local_id` currently has a scheduled value drop in this scope (an
     // owned local), without cancelling it. A share-place borrow (param) has none.
     fn local_has_scheduled_value_drop(local_id: i32) -> bool:
-        var i = self.drop_local_ids.len() - 1
+        var i = self.drop_local_ids.len() as i32 - 1
         while i >= 0:
             if self.drop_local_ids[i] == local_id and self.drop_kind_owns_value(self.drop_kinds[i]):
                 return true
@@ -843,7 +843,7 @@ impl MirBuilder:
         if base_local < 0:
             return
         let path_start: i32 = self.body.place_proj_starts[place]
-        for i in 0..self.moved_field_base_locals.len():
+        for i in 0..self.moved_field_base_locals.len() as i32:
             if self.moved_field_path_matches(i as i32, base_local, path_start, path_count):
                 return
         let stored_start = self.moved_field_path_syms.len() as i32
@@ -961,7 +961,7 @@ impl MirBuilder:
         // that destructor, just as for a moved variant payload above.
         if place >= 0 and place < self.body.place_locals.len():
             let base_local: i32 = self.body.place_locals[place]
-            for i in 0..self.pending_reset_field_places.len():
+            for i in 0..self.pending_reset_field_places.len() as i32:
                 let field_place: i32 = self.pending_reset_field_places[i]
                 if self.body.place_locals[field_place] == base_local:
                     let zero = self.body.gen_zero_operand(self.pending_reset_field_types[i])
@@ -1216,10 +1216,10 @@ impl MirBuilder:
     // Blank the payloads moved out in the current block (of `base_local`
     // only, when it is >= 0), in the order they were moved.
     mut fn emit_payload_resets(base_local: i32):
-        self.emit_payload_resets_before(base_local, self.pending_payload_reset_places.len() as i32)
+        self.emit_payload_resets_before(base_local, self.pending_payload_reset_places.len())
 
     // The same, for the entries queued before index `limit`.
-    mut fn emit_payload_resets_before(base_local: i32, limit: i32):
+    mut fn emit_payload_resets_before(base_local: i32, limit: isize):
         var i: i32 = 0
         var end = limit
         while i < end:
@@ -1236,14 +1236,14 @@ impl MirBuilder:
 
     // Drop the current block's entries of `base_local` queued at `from` or
     // later without blanking: the base was overwritten whole.
-    mut fn discard_payload_resets_from(base_local: i32, from: i32):
-        var i = self.pending_payload_reset_places.len() as i32 - 1
+    mut fn discard_payload_resets_from(base_local: i32, from: isize):
+        var i = self.pending_payload_reset_places.len() - 1
         while i >= from:
             if self.pending_payload_reset_blocks[i] == self.cur_bb as i32 and self.body.place_locals[self.pending_payload_reset_places[i]] == base_local:
                 self.remove_payload_reset(i)
             i = i - 1
 
-    mut fn remove_payload_reset(i: i32):
+    mut fn remove_payload_reset(i: isize):
         let _p = self.pending_payload_reset_places.remove(i)
         let _t = self.pending_payload_reset_types.remove(i)
         let _b = self.pending_payload_reset_blocks.remove(i)
@@ -1368,7 +1368,7 @@ impl MirBuilder:
     // local's later drops (drop-before-overwrite, scope-exit) free nothing.
     // `start` scopes the flush to a branch/statement so an outer-scope move's reset
     // is not emitted inside (and made conditional by) an inner branch.
-    mut fn flush_pending_resets_since(start: i32, field_start: i32, temp_start: i32):
+    mut fn flush_pending_resets_since(start: isize, field_start: isize, temp_start: isize):
         self.emit_pending_resets_since(start, field_start, temp_start)
         while self.pending_move_temp_locals.len() > temp_start:
             self.pending_move_temp_locals.pop()
@@ -1392,7 +1392,7 @@ impl MirBuilder:
     // The statements and terminators are matched by the local, whatever
     // operand reads it: a cast relabels through a `copy` of the consumed
     // local, and a consume may be recorded after its statement.
-    fn pending_move_emitted(ri: i32) -> bool:
+    fn pending_move_emitted(ri: isize) -> bool:
         if self.pending_reset_operands[ri] < 0: return true
         let local: i32 = self.pending_reset_locals[ri]
         for si in self.pending_reset_stmt_marks[ri]..self.body.stmt_count():
@@ -1427,7 +1427,7 @@ impl MirBuilder:
             if self.operand_reads_local(self.body.call_arg_operands[self.body.call_arg_starts[args] + ai], local): return true
         false
 
-    mut fn emit_pending_resets_since(start: i32, field_start: i32, temp_start: i32):
+    mut fn emit_pending_resets_since(start: isize, field_start: isize, temp_start: isize):
         // D16: drop the move-arg temporaries first (their values die at the end
         // of the statement / on the moving path), then blank the moved-from
         // sources. The drops are dominated by the temp's initialization — both
@@ -1667,7 +1667,7 @@ impl MirBuilder:
     // Each defer body runs with only the defers registered before it still
     // pending: a cancellation unwind inside it (§14.7, #916) runs those, never
     // the body itself or the ones this exit already ran.
-    mut fn emit_defers_for_range(start: i32, end: i32):
+    mut fn emit_defers_for_range(start: isize, end: isize):
         var i = end - 1
         while i >= start:
             let ran: List[i32] = []
@@ -1678,7 +1678,7 @@ impl MirBuilder:
                 self.defer_nodes.push(ran.remove(ran.len() - 1))
             i = i - 1
 
-    mut fn emit_drops_for_range(start: i32, end: i32):
+    mut fn emit_drops_for_range(start: i32, end: isize):
         var i = end - 1
         while i >= start:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
@@ -1693,16 +1693,16 @@ impl MirBuilder:
         let ran_ids: List[i32] = []
         let ran_kinds: List[i32] = []
         var scope_idx = self.drop_scope_starts.len() - 1
-        var lowest_drop_start = self.drop_local_ids.len() as i32
-        var lowest_defer_start = self.defer_nodes.len() as i32
+        var lowest_drop_start = self.drop_local_ids.len()
+        var lowest_defer_start = self.defer_nodes.len()
         while scope_idx >= target.break_scope_depth:
             let defer_start: i32 = self.defer_scope_starts[scope_idx]
-            let defer_end = if scope_idx + 1 < self.defer_scope_starts.len() as i32: self.defer_scope_starts[(scope_idx + 1)] else: self.defer_nodes.len() as i32
+            let defer_end = if scope_idx + 1 < self.defer_scope_starts.len(): self.defer_scope_starts[(scope_idx + 1)] else: self.defer_nodes.len()
             lowest_defer_start = defer_start
             self.emit_defers_for_range(defer_start, defer_end)
 
             let drop_start: i32 = self.drop_scope_starts[scope_idx]
-            let drop_end = if scope_idx + 1 < self.drop_scope_starts.len() as i32: self.drop_scope_starts[(scope_idx + 1)] else: self.drop_local_ids.len() as i32
+            let drop_end = if scope_idx + 1 < self.drop_scope_starts.len(): self.drop_scope_starts[(scope_idx + 1)] else: self.drop_local_ids.len()
             lowest_drop_start = drop_start
             self.emit_drops_for_range(drop_start, drop_end)
             while self.drop_local_ids.len() > drop_start:
@@ -1736,7 +1736,7 @@ impl MirBuilder:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
             i = i - 1
 
-    mut fn emit_defers_for_return(): self.emit_defers_for_range(0, self.defer_nodes.len() as i32)
+    mut fn emit_defers_for_return(): self.emit_defers_for_range(0, self.defer_nodes.len())
 
     mut fn emit_errdefers_for_return():
         var i = self.errdefer_nodes.len() - 1
@@ -2078,7 +2078,7 @@ impl MirBuilder:
     mut fn concrete_type(type_id: i32) -> i32:
         if type_id <= 0:
             return type_id
-        let subst_count = self.sema.generic_subst_param_syms.len() as i32
+        let subst_count = self.sema.generic_subst_param_syms.len()
         if subst_count == 0:
             return type_id
         self.sema.substitute_type_frozen(type_id, self.sema.generic_subst_param_syms, self.sema.generic_subst_type_ids, subst_count)
@@ -2193,7 +2193,7 @@ impl MirBuilder:
         let args: List[i32] = []
         args.push(arg_type)
         if arg2_type > 0: args.push(arg2_type)
-        self.sema.find_generic_inst_type(base_sym, args, args.len() as i32) as i32
+        self.sema.find_generic_inst_type(base_sym, args, args.len()) as i32
 
     mut fn resolve_type_arg_node(type_arg_node: i32) -> i32:
         self.sema.resolve_type_level_arg_expr_frozen(type_arg_node)
@@ -4489,7 +4489,7 @@ impl MirBuilder:
             if self.body.operand_kinds[operand_id] == OperandKind.OK_MOVE:
                 if self.places_are_identical(place, self.body.operand_d0[operand_id]):
                     return
-        let payload_resets_before = self.pending_payload_reset_places.len() as i32
+        let payload_resets_before = self.pending_payload_reset_places.len()
         self.consume_moved_operand(operand_id)
         self.update_string_alias_after_assignment(place, operand_id)
         // #1394: a payload moved out of the destination's base earlier in this
@@ -4570,7 +4570,7 @@ impl MirBuilder:
         self.type_id_is_str(self.sema.get_type_d0(resolved))
 
     fn string_alias_index(local_id: i32) -> i32:
-        for i in 0..self.string_alias_local_ids.len():
+        for i in 0..self.string_alias_local_ids.len() as i32:
             if self.string_alias_local_ids[i] == local_id:
                 return i as i32
         -1
@@ -4625,7 +4625,7 @@ impl MirBuilder:
             return -1
         self.body.place_locals[place]
 
-    fn string_field_alias_path_matches(idx: i32, place: i32) -> bool:
+    fn string_field_alias_path_matches(idx: isize, place: i32) -> bool:
         if idx < 0 or idx >= self.string_field_alias_base_locals.len():
             return false
         let field_count = self.place_field_projection_count(place)
@@ -5685,9 +5685,9 @@ impl MirBuilder:
         // temps, its pending source-resets, and its move state on the RHS
         // path, before merging.
         let rhs_move_state = self.save_move_state()
-        let pending_reset_start = self.pending_reset_locals.len() as i32
-        let pending_reset_field_start = self.pending_reset_field_places.len() as i32
-        let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
+        let pending_reset_start = self.pending_reset_locals.len()
+        let pending_reset_field_start = self.pending_reset_field_places.len()
+        let pending_move_temp_start = self.pending_move_temp_locals.len()
         self.field_move_in_branch = self.field_move_in_branch + 1
         let rhs_temp_frame = self.push_stmt_temp_frame()
         let rhs = self.lower_truth_test(rhs_expr, self.lower_expr(rhs_expr))
@@ -7196,7 +7196,7 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, slice_place, slice_rv, self.ast.get_start(node))
         self.body.new_operand(OperandKind.OK_COPY, slice_place)
 
-    mut fn finish_assignment_to_place(place_expr: i32, place: i32, dest_ty: i32, rhs: i32, rhs_reset_start: i32, rhs_field_reset_start: i32, rhs_move_temp_start: i32) -> i32:
+    mut fn finish_assignment_to_place(place_expr: i32, place: i32, dest_ty: i32, rhs: i32, rhs_reset_start: isize, rhs_field_reset_start: isize, rhs_move_temp_start: isize) -> i32:
         // A consuming call in the RHS may move the assignment target itself
         // (`x = normalize(move x)`). Its source reset must run after the call has
         // read x but before drop-before-overwrite and the result store. Leaving it
@@ -7401,9 +7401,9 @@ impl MirBuilder:
             self.make_unique_indexed_bases_of_place(place)
         let saved_expected = self.expected_type
         let dest_ty = self.assignment_place_value_type(place_expr)
-        let rhs_reset_start = self.pending_reset_locals.len() as i32
-        let rhs_field_reset_start = self.pending_reset_field_places.len() as i32
-        let rhs_move_temp_start = self.pending_move_temp_locals.len() as i32
+        let rhs_reset_start = self.pending_reset_locals.len()
+        let rhs_field_reset_start = self.pending_reset_field_places.len()
+        let rhs_move_temp_start = self.pending_move_temp_locals.len()
         if dest_ty != 0 and dest_ty != self.sema.ty_void:
             self.expected_type = dest_ty
         let rhs = self.lower_expr(rhs_expr)
@@ -7759,9 +7759,9 @@ impl MirBuilder:
     // `else: return consume(keep)` blanked `keep` for the matched path, which
     // then read "" and leaked the buffer).
     mut fn lower_let_else_branch(else_body: i32):
-        let reset_start = self.pending_reset_locals.len() as i32
-        let reset_field_start = self.pending_reset_field_places.len() as i32
-        let move_temp_start = self.pending_move_temp_locals.len() as i32
+        let reset_start = self.pending_reset_locals.len()
+        let reset_field_start = self.pending_reset_field_places.len()
+        let move_temp_start = self.pending_move_temp_locals.len()
         self.field_move_in_branch = self.field_move_in_branch + 1
         let frame = self.push_stmt_temp_frame()
         self.lower_expr(else_body)
@@ -7804,9 +7804,9 @@ impl MirBuilder:
                 self.terminate(TermKind.TK_GOTO, obs_cont_bb, 0, 0, 0)
                 self.switch_to(obs_cont_bb)
             return
-        let rhs_reset_start = self.pending_reset_locals.len() as i32
-        let rhs_reset_field_start = self.pending_reset_field_places.len() as i32
-        let rhs_move_temp_start = self.pending_move_temp_locals.len() as i32
+        let rhs_reset_start = self.pending_reset_locals.len()
+        let rhs_reset_field_start = self.pending_reset_field_places.len()
+        let rhs_move_temp_start = self.pending_move_temp_locals.len()
         // §30.4: an annotated pattern let lowers its subject against the
         // annotation, as a typed named let does (Sema recorded it as rhs_ty).
         let saved_expected = self.expected_type
@@ -8035,7 +8035,7 @@ impl MirBuilder:
             return result
         let drop_start: i32 = self.drop_scope_starts[(self.drop_scope_starts.len() - 1)]
         var dropped = false
-        for di in drop_start..self.drop_local_ids.len() as i32:
+        for di in drop_start..self.drop_local_ids.len():
             if self.drop_local_ids[di] == root:
                 dropped = true
         if not dropped:
@@ -8182,7 +8182,7 @@ impl MirBuilder:
         if block_label != 0:
             self.push_control_target(block_label, ControlTargetKind.CT_BLOCK, -1, labeled_after_bb, -1)
         self.push_scope()
-        let defer_start = self.defer_nodes.len() as i32
+        let defer_start = self.defer_nodes.len()
 
         for i in 0..stmt_count:
             let stmt = self.ast.get_extra(stmt_start + i)
@@ -8282,7 +8282,7 @@ impl MirBuilder:
                 self.finish_stmt_temp_frame(tail_frame)
 
         // Emit defers added in this block scope (LIFO order), before popping scope
-        let defer_end = self.defer_nodes.len() as i32
+        let defer_end = self.defer_nodes.len()
         if defer_end > defer_start:
             self.emit_defers_for_range(defer_start, defer_end)
             // Remove the block's defers from the stack
@@ -8341,9 +8341,9 @@ impl MirBuilder:
         // Reset-on-move (spec §2.5.1): only flush resets recorded WITHIN a branch,
         // so an outer-scope move's reset is not pulled inside (and made conditional
         // by) this if.
-        let pending_reset_start = self.pending_reset_locals.len() as i32
-        let pending_reset_field_start = self.pending_reset_field_places.len() as i32
-        let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
+        let pending_reset_start = self.pending_reset_locals.len()
+        let pending_reset_field_start = self.pending_reset_field_places.len()
+        let pending_move_temp_start = self.pending_move_temp_locals.len()
 
         let then_bb = self.new_block()
         let else_bb = self.new_block()
@@ -8558,9 +8558,9 @@ impl MirBuilder:
         self.push_control_target(self.ast.get_data1(node), ControlTargetKind.CT_LOOP, header_bb, break_bb, result_place)
 
         self.switch_to(body_bb)
-        let pending_reset_start = self.pending_reset_locals.len() as i32
-        let pending_reset_field_start = self.pending_reset_field_places.len() as i32
-        let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
+        let pending_reset_start = self.pending_reset_locals.len()
+        let pending_reset_field_start = self.pending_reset_field_places.len()
+        let pending_move_temp_start = self.pending_move_temp_locals.len()
         self.field_move_in_branch = self.field_move_in_branch + 1
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
@@ -8630,9 +8630,9 @@ impl MirBuilder:
         // iteration (and on break/continue) — not once, at function exit,
         // after every iteration overwrote them and on the no-match exit that
         // never wrote them.
-        let pending_reset_start = self.pending_reset_locals.len() as i32
-        let pending_reset_field_start = self.pending_reset_field_places.len() as i32
-        let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
+        let pending_reset_start = self.pending_reset_locals.len()
+        let pending_reset_field_start = self.pending_reset_field_places.len()
+        let pending_move_temp_start = self.pending_move_temp_locals.len()
         let capture_scoped = regex_capture_node != 0
         if capture_scoped:
             self.push_scope()
@@ -9044,9 +9044,9 @@ impl MirBuilder:
         // lower_comprehension_generic_iter): the join still drops a
         // filtered-out element.
         let pass_move_state = child.save_move_state()
-        let pass_reset_start = child.pending_reset_locals.len() as i32
-        let pass_reset_field_start = child.pending_reset_field_places.len() as i32
-        let pass_move_temp_start = child.pending_move_temp_locals.len() as i32
+        let pass_reset_start = child.pending_reset_locals.len()
+        let pass_reset_field_start = child.pending_reset_field_places.len()
+        let pass_move_temp_start = child.pending_move_temp_locals.len()
         let leaf_frame = child.push_stmt_temp_frame()
         child.lower_comprehension_next_or_push(comp_node, clause_index + 1, child_out_place, out_elem_ty)
         child.finish_stmt_temp_frame(leaf_frame)
@@ -9486,9 +9486,9 @@ impl MirBuilder:
             // that path only, and its resets are flushed inside the arm.
             self.switch_to(pass_bb)
             let pass_move_state = self.save_move_state()
-            let pass_reset_start = self.pending_reset_locals.len() as i32
-            let pass_reset_field_start = self.pending_reset_field_places.len() as i32
-            let pass_move_temp_start = self.pending_move_temp_locals.len() as i32
+            let pass_reset_start = self.pending_reset_locals.len()
+            let pass_reset_field_start = self.pending_reset_field_places.len()
+            let pass_move_temp_start = self.pending_move_temp_locals.len()
             self.lower_comprehension_iteration(comp_node, clause_index, out_place, out_elem_ty)
             self.flush_pending_resets_since(pass_reset_start, pass_reset_field_start, pass_move_temp_start)
             self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
@@ -9839,9 +9839,9 @@ impl MirBuilder:
             // element; its resets are flushed inside the arm, so the
             // binding the push took is blank at the join.
             let pass_move_state = self.save_move_state()
-            let pass_reset_start = self.pending_reset_locals.len() as i32
-            let pass_reset_field_start = self.pending_reset_field_places.len() as i32
-            let pass_move_temp_start = self.pending_move_temp_locals.len() as i32
+            let pass_reset_start = self.pending_reset_locals.len()
+            let pass_reset_field_start = self.pending_reset_field_places.len()
+            let pass_move_temp_start = self.pending_move_temp_locals.len()
             let pass_frame = self.push_stmt_temp_frame()
             self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
             self.finish_stmt_temp_frame(pass_frame)
@@ -11629,7 +11629,7 @@ impl MirBuilder:
     // goes back to the subject place it came from and its binding place is
     // blanked, so the binding's scheduled drop frees nothing. A binding place
     // is a whole local, or one element of a tuple rest binding (#1366).
-    mut fn restore_pattern_moves(start: i32):
+    mut fn restore_pattern_moves(start: isize):
         var i = self.pattern_move_log.len() - 2
         while i >= start:
             let bind_place: i32 = self.pattern_move_log[i]
@@ -11650,7 +11650,7 @@ impl MirBuilder:
     // was at `start` go back, newest first: a head through the prefix the
     // take left (`with_vec_restore_front_es`), a tail by `push`. The binding
     // is blanked so its scheduled drop frees nothing.
-    mut fn restore_pattern_takes(move_log_start: i32):
+    mut fn restore_pattern_takes(move_log_start: isize):
         // The take log is cut at the same arm boundary as the move log: both
         // are recorded per arm and truncated together (take_log_mark).
         let start = self.take_log_mark_for(move_log_start)
@@ -11677,7 +11677,7 @@ impl MirBuilder:
 
     // The take log's length when the move log had `move_log_start` entries:
     // each arm records its move-log mark; the take log is marked alongside.
-    fn take_log_mark_for(move_log_start: i32) -> i32:
+    fn take_log_mark_for(move_log_start: isize) -> i32:
         var k = self.take_log_marks.len() - 2
         while k >= 0:
             if self.take_log_marks[k] == move_log_start: return self.take_log_marks[k + 1]
@@ -12428,9 +12428,9 @@ impl MirBuilder:
         let scrutinee_ty = self.expr_type(scrutinee_expr)
         let observed_place = self.observed_pattern_subject_place(node, scrutinee_expr)
         // The marks the subject's resets and then each arm's are flushed from.
-        let pending_reset_start = self.pending_reset_locals.len() as i32
-        let pending_reset_field_start = self.pending_reset_field_places.len() as i32
-        let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
+        let pending_reset_start = self.pending_reset_locals.len()
+        let pending_reset_field_start = self.pending_reset_field_places.len()
+        let pending_move_temp_start = self.pending_move_temp_locals.len()
         var scrutinee_place = observed_place
         if observed_place < 0:
             let saved_scrutinee_expected = self.expected_type
@@ -12541,7 +12541,7 @@ impl MirBuilder:
                 self.restore_pattern_moves(move_log_start)
                 let gscope_idx = self.drop_scope_starts.len() - 1
                 let gdrop_start: i32 = self.drop_scope_starts[gscope_idx]
-                self.emit_drops_for_range(gdrop_start, self.drop_local_ids.len() as i32)
+                self.emit_drops_for_range(gdrop_start, self.drop_local_ids.len())
                 self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
                 self.switch_to(guard_pass_bb)
 
@@ -12806,9 +12806,9 @@ impl MirBuilder:
         // source-resets flush inside it (lower_if): left pending they would
         // blank, on the passing path, a value the message did not move.
         let str_entry = self.save_string_flow_facts()
-        let pending_reset_start = self.pending_reset_locals.len() as i32
-        let pending_reset_field_start = self.pending_reset_field_places.len() as i32
-        let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
+        let pending_reset_start = self.pending_reset_locals.len()
+        let pending_reset_field_start = self.pending_reset_field_places.len()
+        let pending_move_temp_start = self.pending_move_temp_locals.len()
         self.switch_to(fail_bb)
         let fail_arm = self.begin_lazy_arm()
         let args: List[i32] = []
@@ -13134,12 +13134,12 @@ impl MirBuilder:
         fill
 
     // A share-place (value_ref_abi) parameter borrows its argument.
-    fn call_param_borrows(sig_idx: i32, arg_i: i32, expected_ty: i32) -> bool:
+    fn call_param_borrows(sig_idx: i32, arg_i: isize, expected_ty: i32) -> bool:
         if sig_idx >= 0: arg_i >= 0 and self.sema.sig_param_uses_value_ref_abi(sig_idx, arg_i) != 0 else: self.sema.type_uses_c_va_list_place(expected_ty) != 0
 
     // A parameter that owns what it is passed: neither a `&T` nor a
     // share-place one. A copy into it takes its own hold (D111).
-    fn call_param_owns(sig_idx: i32, arg_i: i32, expected_ty: i32) -> bool:
+    fn call_param_owns(sig_idx: i32, arg_i: isize, expected_ty: i32) -> bool:
         if expected_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(expected_ty as TypeId)) == TypeKind.TY_REF:
             return false
         not self.call_param_borrows(sig_idx, arg_i, expected_ty)
@@ -14680,7 +14680,7 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.body.new_operand(if self.sema.is_copy_frozen(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, result_place)
 
-    mut fn emit_cleanup_awaits_from(task_ops: &List[i32], start_idx: i32, node: i32):
+    mut fn emit_cleanup_awaits_from(task_ops: &List[i32], start_idx: isize, node: i32):
         var ci = start_idx
         while ci < task_ops.len():
             let task_op = task_ops[ci]
@@ -14712,7 +14712,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
 
 
-    mut fn lower_question_mark_value(value_op: i32, value_ty: i32, result_ty_hint: i32, node: i32, span_node: i32, cleanup_task_ops: &List[i32], cleanup_start_idx: i32) -> i32:
+    mut fn lower_question_mark_value(value_op: i32, value_ty: i32, result_ty_hint: i32, node: i32, span_node: i32, cleanup_task_ops: &List[i32], cleanup_start_idx: isize) -> i32:
         let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(span_node))
 
         // #605/#606: `?` decomposes the Result/Option — its active payload is moved
@@ -14885,7 +14885,7 @@ impl MirBuilder:
         // payload (now propagated/extracted) is not double-freed.
         self.cancel_scheduled_value_drop_for_receiver_expr(expr)
         let question_ty = self.expr_type(node)
-        self.lower_question_mark_value(value_op, value_ty, question_ty, node, expr, cleanup_task_ops, cleanup_task_ops.len() as i32)
+        self.lower_question_mark_value(value_op, value_ty, question_ty, node, expr, cleanup_task_ops, cleanup_task_ops.len())
 
     // TODO(D22): consume one Sema-resolved Join[T,U] decision here. Do not
     // re-derive the result from payload Copy-ness; materialize only arms Sema
@@ -15125,7 +15125,7 @@ impl MirBuilder:
                         next = self.body.field_place_bases[k]
                         break
             cur = next
-        var bi = bases.len() as i32 - 1
+        var bi = bases.len() - 1
         while bi >= 0:
             self.make_unique_before_mutation(bases[bi])
             bi = bi - 1
@@ -16950,7 +16950,7 @@ impl MirBuilder:
         // codegen resets the outer slot, so its drop keeps the guard.
         let has_summary = self.sema.has_closure_capture_summary(node)
         if not is_async or has_summary:
-            for ci in 0..captures.len() as i32:
+            for ci in 0..captures.len():
                 let consumed_local = self.lookup_local(captures[ci])
                 if consumed_local < 0 or self.sema.type_needs_drop_frozen(self.local_type(consumed_local)) == 0:
                     continue
@@ -17654,9 +17654,9 @@ impl MirBuilder:
             // block and constant-folding the surrounding null check.
             let saved_expected = self.expected_type
             let target_ty = self.assignment_place_value_type(target)
-            let rhs_reset_start = self.pending_reset_locals.len() as i32
-            let rhs_field_reset_start = self.pending_reset_field_places.len() as i32
-            let rhs_move_temp_start = self.pending_move_temp_locals.len() as i32
+            let rhs_reset_start = self.pending_reset_locals.len()
+            let rhs_field_reset_start = self.pending_reset_field_places.len()
+            let rhs_move_temp_start = self.pending_move_temp_locals.len()
             if target_ty != 0 and target_ty != self.sema.ty_void as i32:
                 self.expected_type = target_ty
             let rhs_op = self.lower_expr(rhs_node)
@@ -19312,7 +19312,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
     var changed = true
     while changed:
         changed = false
-        for stmt in 0..out.stmt_kinds.len() as i32:
+        for stmt in 0..out.stmt_kinds.len():
             if out.stmt_kind(stmt) != StmtKind.Assign:
                 continue
             let to = suspend_direct_place_local(out, out.stmt_data0(stmt))
@@ -19335,7 +19335,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
     // passed as one).
     let ref_root: List[i32] = []
     for _ in 0..local_count: ref_root.push(-1)
-    for stmt in 0..out.stmt_kinds.len() as i32:
+    for stmt in 0..out.stmt_kinds.len():
         if out.stmt_kind(stmt) != StmtKind.Assign:
             continue
         let to = suspend_direct_place_local(out, out.stmt_data0(stmt))
@@ -19384,7 +19384,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
     for _ in 0..out.operand_kinds.len(): used_op.push(0)
     let used_rval: List[i32] = []
     for _ in 0..out.rval_kinds.len(): used_rval.push(0)
-    for stmt in 0..out.stmt_kinds.len() as i32:
+    for stmt in 0..out.stmt_kinds.len():
         if out.stmt_kind(stmt) != StmtKind.Assign:
             continue
         let rval = out.stmt_data1(stmt)
@@ -19435,7 +19435,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
             disqualified[stack_literal_final(fwd, local)] = 1
     // An element store marks its list written; a holder written whole by
     // anything but a move of a literal into it does not qualify.
-    for stmt in 0..out.stmt_kinds.len() as i32:
+    for stmt in 0..out.stmt_kinds.len():
         if out.stmt_kind(stmt) != StmtKind.Assign:
             continue
         let root = suspend_place_root_local(out, out.stmt_data0(stmt))
@@ -20014,7 +20014,7 @@ impl MirModule:
     fn validate_generic_call_contracts(sema: &Sema):
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
-            for ci in 0..body.const_kinds.len() as i32:
+            for ci in 0..body.const_kinds.len():
                 let kind = body.const_kinds[ci]
                 if kind != ConstKind.CK_CLOSURE and kind != ConstKind.CK_ASYNC_BLOCK: continue
                 let child_idx = self.find_body(body.const_d1[ci])
@@ -20023,7 +20023,7 @@ impl MirModule:
                 let child = &self.bodies[child_idx]
                 if child.anonymous_type != body.const_types[ci] or child.anonymous_capture_count < 0 or child.anonymous_capture_count > child.n_params or child.anonymous_capture_sources.len() != child.anonymous_capture_count:
                     sema_phase_bug(f"BUG: anonymous expression/body contract mismatch: body={body.fn_sym} node={body.const_d0[ci]}")
-            let call_count = body.call_arg_starts.len() as i32
+            let call_count = body.call_arg_starts.len()
             if body.call_sig_indices.len() != call_count or body.call_mono_syms.len() != call_count or body.call_contract_required.len() != call_count or body.call_pipeline_receiver_places.len() != call_count:
                 sema_phase_bug(f"BUG: MIR call-contract tables are not parallel in body {body.fn_sym}")
             for ci in 0..call_count:
