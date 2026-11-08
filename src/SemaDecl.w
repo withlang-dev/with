@@ -1354,6 +1354,10 @@ impl Sema:
                 let v_name: i32 = self.type_extra[vpos]
                 self.variant_lookup.insert(v_name, vi)
                 self.variant_type_ids.insert(v_name, tid as i32)
+                var owners = []
+                if self.variant_owner_tids.contains(v_name): owners = self.variant_owner_tids.remove(v_name).unwrap()
+                owners.push(tid as i32)
+                self.variant_owner_tids.insert(v_name, owners)
                 let v_name_str = self.pool_resolve(v_name)
                 let qual_name = plain_type_name_str ++ "." ++ v_name_str
                 let qual_sym = self.pool_intern(qual_name)
@@ -1469,6 +1473,10 @@ impl Sema:
                 let v_name: i32 = self.type_extra[vpos]
                 self.variant_lookup.insert(v_name, vi)
                 self.variant_type_ids.insert(v_name, tid as i32)
+                var owners = []
+                if self.variant_owner_tids.contains(v_name): owners = self.variant_owner_tids.remove(v_name).unwrap()
+                owners.push(tid as i32)
+                self.variant_owner_tids.insert(v_name, owners)
                 // Also register qualified name for EnumType.Variant lookup
                 let v_name_str = self.pool_resolve(v_name)
                 let qual_name = type_name_str ++ "." ++ v_name_str

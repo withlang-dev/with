@@ -1028,6 +1028,10 @@ type Sema {
     variant_lookup: HashMap[i32, i32, Minted],
     // Variant type IDs: variant_sym → enum_tid
     variant_type_ids: HashMap[i32, i32, Minted],
+    // #3088: every enum that declares a bare variant name, so an undemanded
+    // bare name resolves by scope (bare_variant_owner), not by which enum
+    // registered last.
+    variant_owner_tids: HashMap[i32, List[i32], Minted],
     // Explicit constructor imports: variant_sym -> enum_tid.
     imported_variant_owners: HashMap[i32, i32, Minted],
     // Discriminant enum data
@@ -3484,6 +3488,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let generic_fn_candidate_counts = sema_new_map_i32_i32()
     let variant_lookup = sema_new_map_i32_i32()
     let variant_type_ids = sema_new_map_i32_i32()
+    let variant_owner_tids: HashMap[i32, List[i32], Minted] = [:]
     let imported_variant_owners = sema_new_map_i32_i32()
     let disc_repr_types = sema_new_map_i32_i32()
     let disc_has_payload = sema_new_map_i32_i32()
@@ -3720,6 +3725,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         qualified_extension_call_nodes,
         variant_lookup,
         variant_type_ids,
+        variant_owner_tids,
         imported_variant_owners,
         disc_repr_types,
         disc_value_starts: sema_new_map_i32_i32(),
