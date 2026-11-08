@@ -161,9 +161,9 @@ fn driver_clone_str(s: &str) -> str:
     with_str_clone_ref(s)
 
 fn driver_clone_str_list(values: &List[str]) -> List[str]:
-    let out: List[str] = List.new()
-    for i in 0..values.len():
-        out.push(driver_clone_str(values[i]))
+    let out: List[str] = []
+    for value in values:
+        out.push(driver_clone_str(value))
     out
 
 fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOptions:
@@ -249,7 +249,7 @@ fn driver_has_flag(argc: i32, flag: &str) -> bool:
 
 // Every value following an occurrence of `flag` (`--flag a --flag b` → [a, b]).
 fn driver_flag_values(argc: i32, flag: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     var i = 1
     while i + 1 < argc:
         if with_arg_at(i) == flag:
@@ -404,7 +404,7 @@ fn driver_build_target_arg(argc: i32) -> str:
 // Taking only the first silently discarded the rest, so
 // `build :zlib-promote :pcre2-promote` promoted zlib and said nothing.
 fn driver_build_target_args(argc: i32) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -484,8 +484,8 @@ fn driver_parse_overflow_mode(argc: i32) -> DriverOverflowParseResult:
     DriverOverflowParseResult { true, mode, "" }
 
 fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
-    var build = build_command_options_default()
-    var graph = build_graph_command_options_default()
+    let build = build_command_options_default()
+    let graph = build_graph_command_options_default()
     build.source_path = driver_build_source_arg(argc)
     build.output_path = driver_output_arg(argc)
     build.opt_level = driver_build_opt_level(argc)

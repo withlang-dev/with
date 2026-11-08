@@ -180,7 +180,7 @@ impl CiProject:
     // outside the corpus that is not on the pure list. The callee half of
     // Amendment 2's proof; the locals that alias the parameter count too.
     fn ct_sinks_refusal(si: i32, pi: isize) -> str:
-        var sinks: List[str] = List.new()
+        let sinks: List[str] = []
         for sink in self.symbols[si].param_sinks[pi].split(";"):
             if sink.len() > 0: sinks.push(sink)
         for line in self.symbols[si].own_evidence.split("\n"):
@@ -237,7 +237,7 @@ impl CiProject:
     // The verdicts of one defined function, as the artifact prints them.
     fn ct_verdicts(si: i32) -> str:
         if self.symbols[si].unanalyzable != 0 or ct_has_line(self.symbols[si].contract_evidence, "unanalyzable"): return "unanalyzable"
-        var out: List[str] = List.new()
+        let out: List[str] = []
         let evidence = with_str_clone_ref(self.symbols[si].contract_evidence)
         let n = self.symbols[si].param_ty.len()
         for pi in 0..n:
@@ -414,7 +414,7 @@ impl CiProject:
     // would share a method name both keep their raw signatures, and the
     // artifact says which.
     mut fn resolve_method_shapes():
-        var taken: HashMap[str, str] = HashMap.new()
+        let taken: HashMap[str, str] = [:]
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             let shape = self.ct_method_shape(si as i32)
@@ -439,7 +439,7 @@ impl CiProject:
 
     // The artifact: one line per defined function, sorted by name.
     fn contracts_tsv() -> str:
-        var names: List[str] = List.new()
+        let names: List[str] = []
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             names.push(self.symbols[si].name)

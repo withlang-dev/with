@@ -11,7 +11,7 @@ use rt.rt_core
 
 
 fn render_module(pool: &AstPool, intern: &InternPool) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     for i in 0..pool.decl_count():
         let decl = pool.get_decl(i)
         out.push_str(render_decl(pool, intern, (decl) as NodeId, 0))
@@ -26,7 +26,7 @@ fn render_decl(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let name = intern.resolve(pool.get_data0(node))
         let flags = pool.get_data2(node)
         let body = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if has_flag(flags, FnFlags.PUB):
             out.push_str("pub ")
@@ -62,7 +62,7 @@ fn render_decl(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let packed_kind = pool.get_data2(node)
         let sub_kind = type_decl_sub_kind(packed_kind)
         let is_ephemeral = type_decl_is_ephemeral(packed_kind)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(with_str_clone_ref(prefix))
 
         if type_decl_is_specified(packed_kind) != 0:
@@ -161,7 +161,7 @@ fn render_decl(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
     if kind == NodeKind.NK_USE_DECL:
         let extra_start = pool.get_data0(node)
         let path_count = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "use ")
         for pi in 0..path_count:
             if pi > 0:
@@ -173,7 +173,7 @@ fn render_decl(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let name = intern.resolve(pool.get_data0(node))
         let value = pool.get_data1(node)
         let flags = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if (flags / 2) % 2 == 1:
             out.push_str("pub ")
@@ -191,7 +191,7 @@ fn render_decl(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
     if kind == NodeKind.NK_EXTERN_FN:
         let name = intern.resolve(pool.get_data0(node))
         let variadic = pool.get_data2(node) % 2
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "extern fn " ++ name ++ "(")
         let meta = pool.find_fn_meta(node)
         var param_count: i32 = 0
@@ -218,7 +218,7 @@ fn render_decl(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let packed_counts = pool.get_data2(node)
         let link_count = c_import_link_count(packed_counts)
         let allow_count = c_import_allow_count(packed_counts)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "use c_import(\"" ++ header ++ "\"")
         if link_count > 0:
             out.push_str(", link: ")
@@ -250,7 +250,7 @@ fn render_decl(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let name = intern.resolve(pool.get_data0(node))
         let vis = pool.get_data2(node)
         let extra_start = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if vis == Visibility.Public:
             out.push_str("pub ")
@@ -390,7 +390,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let callee = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ render_expr(pool, intern, (callee) as NodeId, 0) ++ "(")
         for i in 0..arg_count:
             if i > 0:
@@ -412,7 +412,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let expr = pool.get_data0(node)
         let member = intern.resolve(pool.get_data1(node))
         let extra_start = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ render_expr(pool, intern, (expr) as NodeId, 0) ++ "?." ++ member)
         if pool.optional_chain_is_call(extra_start) != 0:
             let arg_count = pool.optional_chain_arg_count(extra_start)
@@ -434,7 +434,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let expr = pool.get_data0(node)
         let start_expr = pool.get_data1(node)
         let end_expr = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ render_expr(pool, intern, (expr) as NodeId, 0) ++ "[")
         if start_expr != 0:
             out.push_str(render_expr(pool, intern, (start_expr) as NodeId, 0))
@@ -447,7 +447,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let extra_start = pool.get_data0(node)
         let stmt_count = pool.get_data1(node)
         let tail = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         let block_meta = pool.find_block_meta(node)
         let block_label = if block_meta >= 0: pool.block_meta_label(block_meta) else: 0
         var body_indent = indent
@@ -492,7 +492,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let cond = pool.get_data0(node)
         let then_body = pool.get_data1(node)
         let else_body = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "if " ++ render_expr(pool, intern, (cond) as NodeId, 0) ++ ": " ++ render_expr(pool, intern, (then_body) as NodeId, 0))
         if else_body != 0:
             out.push_str(" else: " ++ render_expr(pool, intern, (else_body) as NodeId, 0))
@@ -508,7 +508,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let name = intern.resolve(pool.get_data0(node))
         let value = pool.get_data1(node)
         let flags = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if flags % 2 == 1:
             out.push_str("var ")
@@ -525,7 +525,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let extra_start = pool.get_data0(node)
         let arm_count = pool.get_data1(node)
         let biased = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if biased != 0:
             out.push_str("select await biased:\n")
@@ -547,7 +547,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
     if kind == NodeKind.NK_LET_ELSE:
         let value = pool.get_data1(node)
         let else_body = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ (if pool.let_pattern_is_mut(node) != 0: "var " else: "let ") ++ render_pattern(pool, intern, pool.let_pattern(node)))
         let type_ann = pool.let_pattern_type_ann(node)
         if type_ann != 0:
@@ -561,7 +561,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let extra_start = pool.get_data0(node)
         let binding_count = pool.get_data1(node)
         let value = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "let ")
         if binding_count > 0:
             out.push_str("(")
@@ -583,7 +583,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
     if kind == NodeKind.NK_TUPLE:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         out.push_str("(")
         for i in 0..count:
@@ -597,7 +597,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let start_expr = pool.get_data0(node)
         let end_expr = pool.get_data1(node)
         let inclusive = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if start_expr != 0:
             out.push_str(render_expr(pool, intern, (start_expr) as NodeId, 0))
@@ -613,7 +613,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "." ++ name)
         if arg_count > 0:
             out.push_str("(")
@@ -654,7 +654,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
     if kind == NodeKind.NK_BREAK:
         let value = pool.get_data0(node)
         let label = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "break")
         if label != 0:
             out.push_str(" '" ++ intern.resolve(label))
@@ -664,7 +664,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
 
     if kind == NodeKind.NK_CONTINUE:
         let label = pool.get_data0(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "continue")
         if label != 0:
             out.push_str(" '" ++ intern.resolve(label))
@@ -673,7 +673,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
     if kind == NodeKind.NK_LOOP:
         let body = pool.get_data0(node)
         let label = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if label != 0:
             out.push_str("'" ++ intern.resolve(label) ++ " ")
@@ -685,7 +685,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let body = pool.get_data2(node)
         let for_meta = pool.find_for_meta(node)
         let label = if for_meta >= 0: pool.for_meta_label(for_meta) else: 0
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if label != 0:
             out.push_str("'" ++ intern.resolve(label) ++ " ")
@@ -702,7 +702,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let cond = pool.get_data0(node)
         let body = pool.get_data1(node)
         let label = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix)
         if label != 0:
             out.push_str("'" ++ intern.resolve(label) ++ " ")
@@ -712,7 +712,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let body = pool.get_data0(node)
         let cond = pool.get_data1(node)
         let label = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(with_str_clone_ref(prefix))
         if label != 0:
             out.push_str("'" ++ intern.resolve(label) ++ " ")
@@ -732,7 +732,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         // `[0 as u8; 16777216]` 150 MB (#1358).
         if count > 1 and array_lit_is_fill(pool, extra_start, count):
             return prefix ++ "[" ++ render_expr(pool, intern, (pool.get_extra(extra_start)) as NodeId, 0) ++ f"; {count}]"
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "[")
         for i in 0..count:
             if i > 0:
@@ -745,7 +745,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let count = pool.get_data1(node)
         if count == 0:
             return prefix ++ "[:]"
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "[")
         for i in 0..count:
             if i > 0:
@@ -762,7 +762,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let comp_start = pool.get_data1(node)
         let clause_count = pool.get_data2(node)
         let rendered_expr = render_expr(pool, intern, (expr) as NodeId, 0)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(f"{prefix}[{rendered_expr}")
         for ci in 0..clause_count:
             let base = comp_start + ci * 3
@@ -788,7 +788,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let value_expr = pool.get_extra(comp_start + 1)
         let rendered_key = render_expr(pool, intern, (key_expr) as NodeId, 0)
         let rendered_value = render_expr(pool, intern, (value_expr) as NodeId, 0)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(f"{prefix}[{rendered_key}: {rendered_value}")
         for ci in 0..clause_count:
             let base = comp_start + 2 + ci * 3
@@ -811,7 +811,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ name ++ " " ++ render_lbrace() ++ " ")
         for fi in 0..field_count:
             if fi > 0:
@@ -829,7 +829,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let subject = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let arm_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "match " ++ render_expr(pool, intern, (subject) as NodeId, 0) ++ ":\n")
         for ai in 0..arm_count:
             let arm = pool.get_extra(extra_start + ai)
@@ -860,7 +860,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let body = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let param_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "|")
         for pi in 0..param_count:
             if pi > 0:
@@ -881,7 +881,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let type_name = intern.resolve(pool.get_data0(node))
         let variant_name = intern.resolve(pool.get_data1(node))
         let extra_start = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ type_name ++ "." ++ variant_name)
         if extra_start != 0:
             let arg_count = pool.get_extra(extra_start)
@@ -900,7 +900,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let encoded = pool.get_data2(node)
         let name = intern.resolve(decode_with_binding_sym(encoded))
         let is_mut = decode_with_binding_is_mut(encoded)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ "with " ++ render_expr(pool, intern, (source) as NodeId, 0))
         if is_mut != 0:
             out.push_str(" as mut " ++ name ++ ":\n")
@@ -915,7 +915,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let wt_extra = pool.get_data2(node)
         let wt_count = pool.get_extra(wt_extra)
         let wt_mut = pool.get_extra(wt_extra + 1)
-        var wt_out = StringBuilder.new()
+        let wt_out = StringBuilder.new()
         wt_out.push_str(prefix ++ "with " ++ render_expr(pool, intern, (wt_source) as NodeId, 0))
         if wt_mut != 0:
             wt_out.push_str(" as mut (")
@@ -937,7 +937,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let wi_source = pool.get_data0(node)
         let wi_body = pool.get_data1(node)
         let wi_name = intern.resolve(pool.get_data2(node))
-        var wi_out = StringBuilder.new()
+        let wi_out = StringBuilder.new()
         wi_out.push_str(prefix ++ "with " ++ render_expr(pool, intern, (wi_source) as NodeId, 0))
         wi_out.push_str(" as " ++ wi_name ++ ":\n")
         wi_out.push_str(render_expr(pool, intern, (wi_body) as NodeId, indent + 2))
@@ -947,7 +947,7 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         let source = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(prefix ++ render_lbrace() ++ " " ++ render_expr(pool, intern, (source) as NodeId, 0) ++ " with ")
         for fi in 0..field_count:
             if fi > 0:
@@ -993,7 +993,7 @@ fn render_pattern(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let qualifier = pool.pattern_qualifier(node)
         let extra_start = pool.get_data1(node)
         let binding_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(if qualifier != 0: intern.resolve(qualifier) ++ "." ++ name else: with_str_clone_ref(name))
         if binding_count > 0:
             out.push_str("(")
@@ -1012,7 +1012,7 @@ fn render_pattern(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let binding_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str("." ++ name)
         if binding_count > 0:
             out.push_str("(")
@@ -1030,7 +1030,7 @@ fn render_pattern(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
     if kind == NodeKind.NK_PAT_TUPLE:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str("(")
         for i in 0..count:
             if i > 0:
@@ -1048,7 +1048,7 @@ fn render_pattern(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
     if kind == NodeKind.NK_PAT_OR:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         for i in 0..count:
             if i > 0:
                 out.push_str(" | ")
@@ -1065,7 +1065,7 @@ fn render_pattern(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let head_count = pool.get_data1(node)
         let rest_sym = pool.get_data2(node)
         let has_rest = pool.get_extra(extra_start)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str("[")
         for hi in 0..head_count:
             if hi > 0:
@@ -1084,7 +1084,7 @@ fn render_pattern(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
         let has_rest = pool.get_extra(extra_start + field_count * 2)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         if type_name != 0:
             out.push_str(intern.resolve(type_name) ++ " ")
         out.push_str(render_lbrace() ++ " ")
@@ -1126,7 +1126,7 @@ fn render_type_expr(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(name ++ "[")
         for i in 0..arg_count:
             if i > 0:
@@ -1152,7 +1152,7 @@ fn render_type_expr(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let extra_start = pool.get_data0(node)
         let param_count = pool.get_data1(node)
         let ret = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str("fn(")
         for pi in 0..param_count:
             if pi > 0:
@@ -1165,7 +1165,7 @@ fn render_type_expr(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let extra_start = pool.get_data0(node)
         let param_count = pool.get_data1(node)
         let ret = pool.get_data2(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str("extern \"C\" fn(")
         for pi in 0..param_count:
             if pi > 0:
@@ -1177,7 +1177,7 @@ fn render_type_expr(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
     if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str("(")
         for ti in 0..count:
             if ti > 0:
@@ -1213,7 +1213,7 @@ fn render_type_expr(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
     f"<type:{kind}>"
 
 fn render_type_params(pool: &AstPool, intern: &InternPool, tp_start: i32, tp_count: i32) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     out.push_str("[")
     var cursor = tp_start
     for i in 0..tp_count:
@@ -1233,7 +1233,7 @@ fn render_type_params(pool: &AstPool, intern: &InternPool, tp_start: i32, tp_cou
     out.to_str() ++ "]"
 
 fn render_params(pool: &AstPool, intern: &InternPool, param_start: i32, param_count: i32) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     for i in 0..param_count:
         if i > 0:
             out.push_str(", ")
@@ -1342,7 +1342,7 @@ fn unary_op_str(op: i32) -> str:
     "?uop?"
 
 fn make_indent(n: i32) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     for i in 0..n:
         out.push_str(" ")
     out.to_str()

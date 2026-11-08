@@ -37,7 +37,7 @@ var g_analysis_line_starts: List[i32] = [0]
 fn analysis_line_slot(source: &str, offset: i32) -> isize:
     if source != g_analysis_line_text:
         g_analysis_line_text = source
-        var starts: List[i32] = [0]
+        let starts: List[i32] = [0]
         for i in 0..source.len():
             if source[i] == '\n': starts.push(i as i32 + 1)
         g_analysis_line_starts = starts
@@ -54,7 +54,7 @@ fn analysis_line_for_offset(source: &str, offset: i32) -> i32: (analysis_line_sl
 fn analysis_column_for_offset(source: &str, offset: i32) -> i32: offset - g_analysis_line_starts[analysis_line_slot(source, offset)] + 1
 
 fn analysis_with_node_location(fact: AnalysisFact, sema: &Sema, node: i32, source_path: &str, source_text: &str) -> AnalysisFact:
-    var located = fact
+    let located = fact
     located.node = node
     located.path = with_str_clone_ref(source_path)
     if node <= 0 or node >= sema.ast.node_count():
@@ -278,7 +278,7 @@ fn analysis_collect_trait_declarations(mut report: AnalysisReport, sema: &Sema, 
             if mode == ReceiverMode.Read: effects = EFF_READ
             else if mode == ReceiverMode.Mut: effects = EFF_READ | EFF_WRITE
             else if mode == ReceiverMode.Move: effects = EFF_READ | EFF_CONSUME
-            var fact = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.Declaration)
+            let fact = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.Declaration)
             fact.id = pos
             fact.parent = trait_node
             fact.node = trait_node
@@ -311,7 +311,7 @@ fn analysis_collect_types(mut report: AnalysisReport, sema: &Sema):
         let d1 = sema.get_type_d1(tid as TypeId)
         let d2 = sema.get_type_d2(tid as TypeId)
         let type_name = sema.type_name(tid as i32)
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Type)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Type)
         fact.id = tid as i32
         fact.index = kind
         fact.symbol = if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS: d0 else: 0
@@ -335,7 +335,7 @@ fn analysis_collect_types(mut report: AnalysisReport, sema: &Sema):
         let field_start = d1
         let field_count = d2
         if field_start < 0 or field_count < 0 or field_start + field_count * 3 > sema.type_extra.len():
-            var invalid = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Invariant)
+            let invalid = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Invariant)
             invalid.id = tid as i32
             invalid.name = type_name ++ ".fields"
             invalid.detail = f"invalid struct field table start={field_start} count={field_count} extra={sema.type_extra.len()}"
@@ -346,7 +346,7 @@ fn analysis_collect_types(mut report: AnalysisReport, sema: &Sema):
             let field_sym = sema.type_extra[base]
             let field_ty = sema.type_extra[(base + 1)]
             let default_node = sema.type_extra[(base + 2)]
-            var field = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Field)
+            let field = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Field)
             field.id = base
             field.parent = tid as i32
             field.symbol = field_sym
@@ -380,7 +380,7 @@ fn analysis_collect_expressions(mut report: AnalysisReport, sema: &Sema):
         if not sema.typed_expr_types.contains(node):
             continue
         let tid = sema.typed_expr_types.get(node).unwrap()
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Expression)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Expression)
         fact.id = node
         fact.node = node
         fact.index = sema.ast.kind(node)
@@ -479,7 +479,7 @@ fn analysis_ast_child_role(sema: &Sema, node: i32, child_index: i32) -> str:
     f"child[{child_index}]"
 
 fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_source: &str) -> List[str]:
-    let result: List[str] = List.new()
+    let result: List[str] = []
     var path = fallback_path
     var source = with_str_clone_ref(fallback_source)
     // The parser owns a node's source identity. A diagnostic may itself
@@ -536,7 +536,7 @@ fn analysis_collect_ast_node_tree(mut report: AnalysisReport, sema: &Sema, node:
     for ci in 0..analysis_ast_child_count(sema, node):
         let child = analysis_ast_child(sema, node, ci)
         if child <= 0 or child >= sema.ast.node_count():
-            var invalid = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.Invariant)
+            let invalid = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.Invariant)
             invalid.id = node
             invalid.parent = node
             invalid.index = ci
@@ -559,7 +559,7 @@ fn analysis_collect_signatures(mut report: AnalysisReport, sema: &Sema, source_p
     for si in 0..sema.sig_names.len() as i32:
         let sym = sema.sig_names[si]
         let name = sema.pool_resolve(sym)
-        var sig = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Signature)
+        let sig = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Signature)
         sig.id = si
         sig.symbol = sym
         sig.type_id = sema.sig_ret_types[si]
@@ -573,7 +573,7 @@ fn analysis_collect_signatures(mut report: AnalysisReport, sema: &Sema, source_p
         report.add(sig.owned_copy())
 
         for pi in 0..sema.sig_get_param_count(si):
-            var param = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Parameter)
+            let param = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Parameter)
             param.id = sema.sig_param_eff_starts[si] + pi
             param.parent = si
             param.symbol = sym
@@ -598,12 +598,12 @@ fn analysis_collect_signatures(mut report: AnalysisReport, sema: &Sema, source_p
             param.detail = analysis_param_class(sema, si, pi) ++ f" direct={sema.sig_param_direct_effect(si, pi)} final={param.effects} value-ref={param.flags} declared-ref={declared_ref}"
             report.add(param.owned_copy())
 
-            var abi = param
+            let abi = param
             abi.stage = AnalysisStage.Abi
             report.add(abi)
         let receiver = sema.sig_receiver_mode(si)
         if receiver != ReceiverMode.None:
-            var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Receiver)
+            let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Receiver)
             fact.id = si
             fact.parent = si
             fact.symbol = sym
@@ -625,7 +625,7 @@ fn analysis_collect_effect_edges(mut report: AnalysisReport, sema: &Sema):
         let callee_sig = sema.effect_flow_edges[(at + 2)]
         let callee_pi = sema.effect_flow_edges[(at + 3)]
         let projection = if edge < sema.effect_flow_projections.len(): sema.effect_flow_projections[edge] else: -1
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.EffectEdge)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.EffectEdge)
         fact.id = edge
         fact.parent = caller_sig
         fact.symbol = if callee_sig >= 0 and callee_sig < sema.sig_names.len(): sema.sig_names[callee_sig] else: 0
@@ -643,7 +643,7 @@ fn analysis_collect_effect_edges(mut report: AnalysisReport, sema: &Sema):
 
 fn analysis_global_location(fact: AnalysisFact, sema: &Sema, node: i32, source_path: &str, source_text: &str) -> AnalysisFact:
     let subject = analysis_node_subject(sema, node, source_path, source_text)
-    var located = analysis_with_node_location(fact, sema, node, subject[0], subject[1])
+    let located = analysis_with_node_location(fact, sema, node, subject[0], subject[1])
     if node > 0 and node < sema.ast.node_count():
         located.source_file = sema.ast.file(node as NodeId) as i32
     located
@@ -653,7 +653,7 @@ fn analysis_global_location(fact: AnalysisFact, sema: &Sema, node: i32, source_p
 fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for wi in 0..sema.global_write_records.len() / 5:
         let at = wi * 5
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
         fact.id = wi as i32
         fact.owner = sema.global_write_records[at]
         fact.body_sym = if fact.owner >= 0 and fact.owner < sema.sig_names.len(): sema.sig_names[fact.owner] else: 0
@@ -664,7 +664,7 @@ fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, sour
         report.add(analysis_global_location(fact, sema, sema.global_write_records[(at + 2)], source_path, source_text))
     for ci in 0..sema.global_calls.len() / 8:
         let at = ci * 8
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
         fact.id = ci as i32
         fact.index = 1
         fact.owner = sema.global_calls[at]
@@ -682,7 +682,7 @@ fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, sour
         report.add(analysis_global_location(fact, sema, sema.global_calls[(at + 1)], source_path, source_text))
     for vi in 0..sema.global_view_call_checks.len() / 6:
         let at = vi * 6
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
         fact.id = vi as i32
         fact.index = 2
         fact.parent = sema.global_view_call_checks[at]
@@ -695,7 +695,7 @@ fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, sour
     for di in 0..sema.global_drop_impl_targets.len() / 3:
         let at = di * 3
         let decl = sema.global_drop_impl_targets[(at + 1)]
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
         fact.id = di as i32
         fact.index = 3
         fact.parent = sema.global_drop_impl_targets[at]
@@ -706,7 +706,7 @@ fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, sour
         report.add(analysis_global_location(fact, sema, decl, source_path, source_text))
     for tid in 1..sema.type_kinds.len() as i32:
         if not sema.global_user_drop_types.contains(tid): continue
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
         fact.id = tid
         fact.index = 4
         fact.type_id = tid
@@ -722,7 +722,7 @@ fn analysis_collect_specializations(mut report: AnalysisReport, sema: &Sema, sou
         let sig = sema.concrete_specialization_sigs[si]
         let subst_start = sema.concrete_specialization_subst_starts[si]
         let subst_count = sema.concrete_specialization_subst_counts[si]
-        let parts: List[str] = List.new()
+        let parts: List[str] = []
         for ti in 0..subst_count:
             if ti > 0: parts.push(", ")
             let param = sema.concrete_specialization_subst_syms[(subst_start + ti)]
@@ -730,7 +730,7 @@ fn analysis_collect_specializations(mut report: AnalysisReport, sema: &Sema, sou
             parts.push(with_str_clone_ref(sema.pool_resolve(param)))
             parts.push("=ty")
             parts.push(f"{ty}")
-        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Specialization)
+        let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Specialization)
         fact.id = si as i32
         fact.parent = sig
         fact.node = node
@@ -835,7 +835,7 @@ fn analysis_collect_method_resolutions(mut report: AnalysisReport, sema: &Sema, 
 fn analysis_collect_diagnostics(mut report: AnalysisReport, sema: &Sema, diagnostics: &DiagnosticList):
     for i in 0..diagnostics.items.len():
         let diag = &diagnostics.items[i]
-        var fact = AnalysisFact.new(AnalysisStage.Diagnostic, AnalysisFactKind.Diagnostic)
+        let fact = AnalysisFact.new(AnalysisStage.Diagnostic, AnalysisFactKind.Diagnostic)
         fact.id = i as i32
         fact.node = diag.origin_node
         fact.flags = diag.severity
@@ -866,7 +866,7 @@ fn analysis_collect_diagnostics(mut report: AnalysisReport, sema: &Sema, diagnos
         report.add(fact)
 
 fn analysis_collect_phase(mut report: AnalysisReport, sema: &Sema):
-    var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Phase)
+    let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Phase)
     fact.id = 0
     fact.flags = ((sema.symbols_frozen != 0) as i32) | (if sema.types_frozen != 0: 2 else: 0)
     fact.index = sema.type_kinds.len() as i32
@@ -966,7 +966,7 @@ fn analysis_collect_mir_call(mut report: AnalysisReport, mir_mod: &MirModule, bo
 fn analysis_collect_mir(mut report: AnalysisReport, mir_mod: &MirModule, sema: &Sema, pool: &InternPool, source_path: &str, source_text: &str):
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
-        var body_fact = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Body)
+        let body_fact = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Body)
         body_fact.id = bi
         body_fact.body_sym = body.fn_sym
         body_fact.symbol = body.fn_sym
@@ -975,7 +975,7 @@ fn analysis_collect_mir(mut report: AnalysisReport, mir_mod: &MirModule, sema: &
         body_fact.detail = f"locals={body.local_count()} blocks={body.block_count()} calls={body.call_arg_starts.len()} failed={body.lowering_failed}"
         report.add(body_fact.owned_copy())
         for li in 0..body.local_count():
-            var local = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Local)
+            let local = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Local)
             local.id = li
             local.parent = bi
             local.body_sym = body.fn_sym
@@ -987,7 +987,7 @@ fn analysis_collect_mir(mut report: AnalysisReport, mir_mod: &MirModule, sema: &
             local.detail = f"_{li} ty={local.type_id} mut={body.local_mutables[li]}"
             report.add(local)
         for pi in 0..body.place_locals.len() as i32:
-            var place = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Place)
+            let place = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Place)
             place.id = pi
             place.parent = body.place_locals[pi]
             place.body_sym = body.fn_sym
@@ -1190,7 +1190,7 @@ fn analysis_audit_storage(mut report: AnalysisReport, sema: &Sema):
                 report.fail(f"resolved call {node} arg {ai}: key={key} expected={expected}")
     if node_count > 65537 and sema.resolved_call_arg_key(1, 0) == sema.resolved_call_arg_key(65537, 0):
         report.fail("resolved-call argument keys collide across the former 16-bit node boundary")
-    var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Invariant)
+    let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Invariant)
     fact.id = node_count
     fact.index = resolved_calls
     fact.flags = (node_count > 65535) as i32
@@ -1226,7 +1226,7 @@ fn analysis_audit_storage(mut report: AnalysisReport, sema: &Sema):
             if source_start < previous_end:
                 report.fail(f"trait {trait_node} method {mi}: source spans overlap or are out of order")
             previous_end = source_end
-    var trait_fact = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.Invariant)
+    let trait_fact = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.Invariant)
     trait_fact.id = trait_count
     trait_fact.index = trait_methods
     trait_fact.name = "trait-method-storage"
@@ -1251,7 +1251,7 @@ fn analysis_audit_storage(mut report: AnalysisReport, sema: &Sema):
         let spelled_extend = prefix.starts_with("extend") or prefix.starts_with("pub extend")
         if marked_extend != spelled_extend:
             report.fail(f"impl declaration {impl_node}: parser kind metadata disagrees with source prefix '{prefix}'")
-    var impl_kind_fact = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.Invariant)
+    let impl_kind_fact = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.Invariant)
     impl_kind_fact.id = impl_count
     impl_kind_fact.index = extend_count
     impl_kind_fact.name = "impl-kind-storage"
@@ -1305,7 +1305,7 @@ fn analysis_audit_frozen_calls(mut report: AnalysisReport, sema: &Sema, mir_mod:
             let mode = sema.sig_receiver_mode(sig)
             if mode != ReceiverMode.Mut and mode != ReceiverMode.Move:
                 continue
-            var fact = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Invariant)
+            let fact = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Invariant)
             fact.id = ci
             fact.parent = sig
             fact.node = body.call_ast_node(ci)
@@ -1565,7 +1565,7 @@ fn analysis_call_callee_sym(body: &MirBody, sema: &Sema, bb: i32) -> i32:
     0
 
 fn analysis_operand_list_locals(body: &MirBody, start: i32, count: i32, operands: &List[i32]) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     for i in 0..count:
         let opi = start + i
         if opi >= 0 and opi < operands.len():
@@ -1574,7 +1574,7 @@ fn analysis_operand_list_locals(body: &MirBody, start: i32, count: i32, operands
 
 // Every local an rvalue reads (as a bare operand or as the base of a place).
 fn analysis_rvalue_read_locals(body: &MirBody, rv: i32) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     if rv < 0 or rv >= body.rval_kinds.len(): return out
     let k = body.rval_kinds[rv]
     let d0 = body.rval_d0[rv]
@@ -1605,7 +1605,7 @@ fn analysis_rvalue_read_locals(body: &MirBody, rv: i32) -> List[i32]:
 
 // Every local a terminator reads: the switch subject, the call arguments.
 fn analysis_term_read_locals(body: &MirBody, bb: i32) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_SWITCH_INT:
         out.push(analysis_operand_local(body, body.term_data0(bb)))
@@ -1616,7 +1616,7 @@ fn analysis_term_read_locals(body: &MirBody, bb: i32) -> List[i32]:
     out
 
 fn analysis_term_successors(body: &MirBody, bb: i32) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_GOTO:
         out.push(body.term_data0(bb))
@@ -1641,8 +1641,8 @@ fn analysis_term_successors(body: &MirBody, bb: i32) -> List[i32]:
 type PoolViewOrigins { origin: List[i32], field: List[i32] }
 
 fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i32, i32], fields: &HashMap[i32, i32], any_field: bool) -> PoolViewOrigins:
-    var origin: List[i32] = List.new()
-    var field: List[i32] = List.new()
+    let origin: List[i32] = []
+    let field: List[i32] = []
     for li in 0..body.local_count():
         origin.push(0)
         field.push(-1)
@@ -1684,7 +1684,7 @@ fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i3
 // field in place (receiver of a `mut fn`/`move fn`, or a mutating container
 // intrinsic) or assigns the whole field.
 fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32, i32]) -> List[i32]:
-    let grown: List[i32] = List.new()
+    let grown: List[i32] = []
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL: continue
         let args_id = body.term_data1(bb)
@@ -1717,9 +1717,9 @@ fn analysis_local_label(body: &MirBody, sema: &Sema, li: i32) -> str:
 fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str):
     let bodies = mir_mod.bodies.len()
     // 1. Producers and pool fields, to a fixpoint over wrapper chains.
-    let fields: HashMap[i32, i32] = HashMap.new()
-    var field_list: List[i32] = List.new()
-    let producers: HashMap[i32, i32] = HashMap.new()
+    let fields: HashMap[i32, i32] = [:]
+    let field_list: List[i32] = []
+    let producers: HashMap[i32, i32] = [:]
     var changed = true
     while changed:
         changed = false
@@ -1741,15 +1741,15 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
     //    on (body, field); each entry remembers the direct grower it reaches,
     //    for the report). Growing one pool never invalidates a view into
     //    another.
-    let reaches: HashMap[i64, i32] = HashMap.new()
+    let reaches: HashMap[i64, i32] = [:]
     var direct = 0
     for bi in 0..bodies:
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let grown = analysis_body_grown_fields(body, sema, fields)
-        for gi in 0..grown.len():
-            reaches.insert(sema_pair_key(body.fn_sym, grown[gi]), body.fn_sym)
-            report.note("pool-views: grower " ++ sema.pool_resolve(body.fn_sym) ++ f" (field token {grown[gi]})")
+        for grown_item in grown:
+            reaches.insert(sema_pair_key(body.fn_sym, grown_item), body.fn_sym)
+            report.note("pool-views: grower " ++ sema.pool_resolve(body.fn_sym) ++ f" (field token {grown_item})")
             direct = direct + 1
     changed = true
     while changed:
@@ -1761,10 +1761,10 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
                 if body.term_kind(bb) != TermKind.TK_CALL: continue
                 let callee = analysis_call_callee_sym(body, sema, bb)
                 if callee == 0: continue
-                for fi in 0..field_list.len():
-                    let key = sema_pair_key(callee, field_list[fi])
-                    if reaches.contains(key) and not reaches.contains(sema_pair_key(body.fn_sym, field_list[fi])):
-                        reaches.insert(sema_pair_key(body.fn_sym, field_list[fi]), reaches.get(key).unwrap())
+                for field_list_item in field_list:
+                    let key = sema_pair_key(callee, field_list_item)
+                    if reaches.contains(key) and not reaches.contains(sema_pair_key(body.fn_sym, field_list_item)):
+                        reaches.insert(sema_pair_key(body.fn_sym, field_list_item), reaches.get(key).unwrap())
                         changed = true
     // 3. Hits: forward dataflow per body. State per (block, local) is the
     //    callee that poisoned the view (0 = clean); a call that reaches a
@@ -1788,15 +1788,15 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
                 view_locals = view_locals + 1
         if not any: continue
         let blocks = body.block_count()
-        var state: List[i32] = List.new()
+        let state: List[i32] = []
         for i in 0..blocks * locals: state.push(0)
-        let seen: HashMap[i32, i32] = HashMap.new()
+        let seen: HashMap[i32, i32] = [:]
         let fn_name = with_str_clone_ref(sema.pool_resolve(body.fn_sym))
         let fn_path = analysis_sig_path(sema, body.fn_sym, source_path)
         let fn_source = analysis_source_for_path(sema, fn_path, source_text)
-        var worklist: List[i32] = List.new()
-        var queued: List[i32] = List.new()
-        var visited: List[i32] = List.new()
+        let worklist: List[i32] = []
+        let queued: List[i32] = []
+        let visited: List[i32] = []
         for bb in 0..blocks:
             queued.push(0)
             visited.push(0)
@@ -1808,7 +1808,7 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
             wi = wi + 1
             queued[bb] = 0
             visited[bb] = 1
-            var cur: List[i32] = List.new()
+            let cur: List[i32] = []
             for li in 0..locals: cur.push(state[bb * locals + li])
             if trace:
                 var in_text = ""
@@ -1819,7 +1819,7 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
             for k in 0..body.bb_stmt_counts[bb]:
                 let si = stmt_start + k
                 if body.stmt_kind(si) != StmtKind.Assign: continue
-                var reads = analysis_rvalue_read_locals(body, body.stmt_data1(si))
+                let reads = analysis_rvalue_read_locals(body, body.stmt_data1(si))
                 let dest = body.stmt_data0(si)
                 let dest_local = analysis_place_local(body, dest)
                 if dest_local >= 0 and body.place_proj_counts[dest] != 0: reads.push(dest_local)
@@ -1835,8 +1835,8 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
                         report.fail(analysis_pool_view_hit(sema, body, fn_name, fn_path, fn_source, li, origin[li], "read", body.stmt_spans[si], cur[li], reaches.get(sema_pair_key(cur[li], field[li])).unwrap()))
                 if dest_local >= 0 and body.place_proj_counts[dest] == 0: cur[dest_local] = 0
             let term_reads = analysis_term_read_locals(body, bb)
-            for ri in 0..term_reads.len():
-                let li = term_reads[ri]
+            for term_read in term_reads:
+                let li = term_read
                 if li >= 0 and origin[li] != 0 and cur[li] != 0 and not seen.contains(li):
                     seen.insert(li, 1)
                     hits = hits + 1
@@ -1850,8 +1850,8 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
                 let dest_local = analysis_place_local(body, dest)
                 if dest_local >= 0 and body.place_proj_counts[dest] == 0: cur[dest_local] = 0
             let succs = analysis_term_successors(body, bb)
-            for sx in 0..succs.len():
-                let nb = succs[sx]
+            for succ in succs:
+                let nb = succ
                 if nb < 0 or nb >= blocks: continue
                 var grew = false
                 for li in 0..locals:
@@ -2072,10 +2072,10 @@ fn analysis_seam_place_is_unowned_root(sema: &Sema, body: &MirBody, place_id: i3
     false
 
 fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path: &str) -> List[str]:
-    let rows: List[str] = List.new()
-    let candidate_locals: List[i32] = List.new()
-    let candidate_spans: List[i32] = List.new()
-    let candidate_types: List[i32] = List.new()
+    let rows: List[str] = []
+    let candidate_locals: List[i32] = []
+    let candidate_spans: List[i32] = []
+    let candidate_types: List[i32] = []
     // Pass 1: calls whose result is a Drop non-Copy value read from an unowned container.
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL:
@@ -2162,12 +2162,12 @@ fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path
 
 fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
     var out = "path\toffset\tfn\tclass\ttier\tcontext\tplace\ttype\n"
-    let report_lines: List[str] = List.new()
-    let counts: List[i32] = List.new()
+    let report_lines: List[str] = []
+    let counts: List[i32] = []
     for _ci in 0..7:
         counts.push(0)
     var escapes = 0
-    let seen: HashMap[str, i32] = HashMap.new()
+    let seen: HashMap[str, i32] = [:]
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0:
@@ -2175,8 +2175,8 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
         let fn_name = sema.pool_resolve(body.fn_sym)
         let fn_path = analysis_sig_path(sema, body.fn_sym, source_path)
         let ret_rows = analysis_seam_retention_rows(sema, body, fn_name, fn_path)
-        for ri in 0..ret_rows.len():
-            report_lines.push(with_str_clone_ref(ret_rows[ri]))
+        for ret_row in ret_rows:
+            report_lines.push(with_str_clone_ref(ret_row))
             counts[5] = counts[5] + 1
         // Statements: an operand inside an aggregate or a plain assign is
         // RETAINED by the destination; anything else is a transient read.
@@ -2188,8 +2188,8 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
             if rv < 0 or rv >= body.rval_kinds.len():
                 continue
             let rk = body.rval_kinds[rv]
-            let pending: List[i32] = List.new()
-            let contexts: List[str] = List.new()
+            let pending: List[i32] = []
+            let contexts: List[str] = []
             if rk == RvalueKind.RK_AGGREGATE:
                 let fid = body.rval_d1[rv]
                 if fid >= 0 and fid < body.agg_field_starts.len():
@@ -2253,8 +2253,8 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
                     if cr.actionable != 0:
                         counts[6] = counts[6] + 1
                     report_lines.push(move cr.row)
-    for li in 0..report_lines.len():
-        out = out ++ report_lines[li]
+    for report_line in report_lines:
+        out = out ++ report_line
     let moves_ref = counts[0]
     let moves_raw = counts[1]
     let copies_elem = counts[2]
@@ -2389,7 +2389,7 @@ fn analysis_explain_origin(sema: &Sema, target: &str, source_path: &str) -> str:
     var out = f"explain:origin {target}\n"
     var found = 0
     // A body Sema checks more than once records each fact again: print one.
-    var seen: List[str] = List.new()
+    let seen: List[str] = []
     for si in 0..sema.sig_names.len() as i32:
         if not analysis_origin_fn_matches(sema, sema.sig_names[si], fn_name): continue
         let pc = sema.sig_get_param_count(si)
@@ -2451,7 +2451,7 @@ fn analysis_explain_request(request: &str) -> str:
     analysis_fact_explain_query(kind, wanted)
 
 fn analysis_lldb_recipe(report: &AnalysisReport, query: &str) -> str:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     lines.push("# Generated from live compiler-analysis facts.\n")
     var hits = 0
     for i in 0..report.facts.len():
@@ -2500,8 +2500,8 @@ fn analysis_call_path(report: &AnalysisReport, from: &str, to: &str) -> str:
     let target = analysis_find_symbol(report, to)
     if start == 0 or target == 0:
         return f"call-path: unresolved endpoint from={from} to={to}\n"
-    let queue: List[i32] = List.new()
-    let pred: HashMap[i32, i32] = HashMap.new()
+    let queue: List[i32] = []
+    let pred: HashMap[i32, i32] = [:]
     queue.push(start)
     pred.insert(start, 0)
     var qi = 0
@@ -2516,12 +2516,12 @@ fn analysis_call_path(report: &AnalysisReport, from: &str, to: &str) -> str:
             queue.push(fact.symbol)
     if not pred.contains(target):
         return f"call-path: no path from {from} to {to}\n"
-    let reverse: List[i32] = List.new()
+    let reverse: List[i32] = []
     var at = target
     while at != 0:
         reverse.push(at)
         at = pred.get(at).unwrap()
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     lines.push(f"call-path: {from} -> {to}\n")
     var i = reverse.len() - 1
     while i >= 0:
@@ -2535,8 +2535,8 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
     let start = analysis_find_symbol(report, root)
     if start == 0:
         return f"call-closure: unresolved root {root}\n"
-    let queue: List[i32] = List.new()
-    let pred: HashMap[i32, i32] = HashMap.new()
+    let queue: List[i32] = []
+    let pred: HashMap[i32, i32] = [:]
     queue.push(start)
     pred.insert(start, 0)
     var qi = 0
@@ -2549,10 +2549,10 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
                 continue
             pred.insert(fact.symbol, caller)
             queue.push(fact.symbol)
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     lines.push(f"call-closure: root={root} reachable={queue.len()}\n")
-    for i in 0..queue.len():
-        let sym = queue[i]
+    for queue_item in queue:
+        let sym = queue_item
         let parent = pred.get(sym).unwrap()
         lines.push(analysis_symbol_name(report, sym))
         lines.push("\t")

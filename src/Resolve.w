@@ -26,7 +26,7 @@ fn resolve_owned_text(text: &str) -> str:
     runtime_str_clone(text)
 
 fn resolve_new_list_str -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     out
 
 enum ImportKind: i32:
@@ -181,7 +181,7 @@ type ResolveState {
 }
 
 fn resolve_normalize_source_text(text: &str) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    let out = StringBuilder.with_capacity(text.len())
     var i = 0
     while i < text.len():
         let ch = text[i]
@@ -245,7 +245,7 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
                 continue
 
             let file_id = state.module_file_ids[work]
-            var lexer = Lexer.init(text, file_id)
+            let lexer = Lexer.init(text, file_id)
             let tokens = lexer.tokenize()
             var parser = Parser.init(tokens, text, file_id, state.pool, move state.diags)
             parser.enable_module_mode(path)
@@ -275,9 +275,9 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
 fn resolve_interface_use_lines(text: &str) -> str:
     var out = ""
     let lines = text.split("\n")
-    for i in 0..lines.len():
-        if lines[i].starts_with("use "):
-            out = out ++ lines[i] ++ "\n"
+    for line in lines:
+        if line.starts_with("use "):
+            out = out ++ line ++ "\n"
     out
 
 fn ResolveState.init(pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveState:
@@ -346,7 +346,7 @@ impl ResolveState:
         id
 
     fn build_module_table() -> List[ResolvedModule]:
-        var out: List[ResolvedModule] = List.new()
+        let out: List[ResolvedModule] = []
         for mid in 0..self.module_paths.len():
             out.push(ResolvedModule {
                 module_id: mid as i32,
@@ -369,8 +369,8 @@ impl ResolveState:
         let module_scope = self.add_scope(module_id, -1, -1, ScopeKind.SK_MODULE)
         self.module_scope_ids[module_id] = module_scope
 
-        var pending_fn_nodes: List[i32] = List.new()
-        var pending_fn_defs: List[i32] = List.new()
+        let pending_fn_nodes: List[i32] = []
+        let pending_fn_defs: List[i32] = []
 
         var import_index: i32 = 0
 
@@ -394,7 +394,7 @@ impl ResolveState:
                 // process}`): `std` names no module and each member names one,
                 // so the group is one import per member, under the member's name.
                 if resolved_path.len() == 0 and ast_pool.get_data2(decl) > 0 and ast_pool.use_alias(decl as NodeId) == 0:
-                    let member_paths: List[str] = List.new()
+                    let member_paths: List[str] = []
                     var all_members = true
                     for si in 0..ast_pool.get_data2(decl):
                         let member = self.pool.resolve(resolve_extra_or_zero(ast_pool, path_start + path_count + si))
@@ -479,7 +479,7 @@ impl ResolveState:
 
             if kind == NodeKind.NK_C_IMPORT:
                 let header_sym = ast_pool.get_data0(decl)
-                let header: str = with_str_clone_ref(self.pool.resolve(header_sym))
+                let header = with_str_clone_ref(self.pool.resolve(header_sym))
                 self.result.imports.push(ResolvedImport {
                     module_id,
                     index_in_module: import_index,
@@ -1621,7 +1621,7 @@ fn resolve_canonical_module_key(path: &str) -> str:
         let cwd = runtime_cwd()
         if cwd.len() > 0:
             p = cwd ++ "/" ++ p
-    let parts: List[str] = List.new()
+    let parts: List[str] = []
     let is_abs = runtime_path_is_absolute(p)
     let root_parts = runtime_path_root_part_count(p)
     var start = 0

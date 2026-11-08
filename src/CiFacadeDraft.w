@@ -70,18 +70,18 @@ fn fd_argmap_at(argmap: &str, pos: i32) -> str:
     for entry in argmap.split(","):
         let eq = entry.find("=")
         if eq <= 0: continue
-        let p: i32 = parse(entry.slice(0, eq))
+        let p = parse(entry.slice(0, eq))
         if p == pos: return entry.slice(eq + 1, entry.len()).to_owned()
     ""
 
 fn fd_i32(text: &str) -> i32:
-    let v: i32 = parse(text)
+    let v = parse(text)
     v
 
 // D187 (§16.2b.6): the parameters a "borrow:<i>" / "borrow:<i>,<j>"
 // verdict names, in order.
 fn fd_borrow_members(verdict: &str) -> List[i32]:
-    var out: List[i32] = List.new()
+    let out: List[i32] = []
     for part in verdict.slice(7, verdict.len()).split(","):
         if part.len() > 0: out.push(fd_i32(part))
     out
@@ -90,7 +90,7 @@ fn fd_borrow_members(verdict: &str) -> List[i32]:
 // the two parameters the clause can state.
 fn fd_borrow_union(a: &str, b: &str) -> str:
     if not a.starts_with("borrow:") or not b.starts_with("borrow:"): return ""
-    var members = fd_borrow_members(a)
+    let members = fd_borrow_members(a)
     for m in fd_borrow_members(b):
         if not members.contains(m): members.push(m)
     if members.len() > 2: return ""
@@ -657,7 +657,7 @@ impl CiProject:
     // The pointer-to-record representations the corpus produces or
     // destroys, in first-seen order of the symbol table.
     fn fd_representations() -> List[str]:
-        var out: List[str] = List.new()
+        let out: List[str] = []
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
             if self.symbols[si].owns_return != 0:
@@ -670,7 +670,7 @@ impl CiProject:
         out
 
     fn fd_producers_of(record: &str) -> List[i32]:
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         for si in 0..self.symbols.len():
             if self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and self.fd_subject(si as i32) and self.symbols[si].header_declared != 0 and self.symbols[si].owns_return != 0 and fd_record_pointee(self.symbols[si].ret_ty) == record: out.push(si as i32)
         out
@@ -678,7 +678,7 @@ impl CiProject:
     // The functions destroying a parameter of `record`; `unary` keeps those
     // whose only parameter it is.
     fn fd_destroyers_of(record: &str, unary: bool) -> List[i32]:
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0: continue
             let count = self.symbols[si].param_destroys.len()
@@ -718,7 +718,7 @@ impl CiProject:
     // (`xmlFirstElementChild`) is one candidate, its origin whatever the
     // caller holds.
     fn fd_borrow_candidates_from(record: &str, origins: &List[str]) -> List[i32]:
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.symbols[si].borrow_from < 0: continue
             if fd_record_pointee(self.symbols[si].ret_ty) != record or self.fd_retains_any(si as i32): continue
@@ -731,7 +731,7 @@ impl CiProject:
     // The producers of `record` the draft can state as `from F`: owned
     // return, every parameter presentable over `modeled`.
     fn fd_presentable_producers_of(record: &str, modeled: &List[str]) -> List[i32]:
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         for si in self.fd_producers_of(record):
             if self.fd_presentable(si, -1, true, modeled): out.push(si)
         out
@@ -740,7 +740,7 @@ impl CiProject:
     // F's first parameter (§16.2b.13), the return a value, the rest
     // presentable.
     fn fd_presentable_destroyers_of(record: &str, unary: bool, modeled: &List[str]) -> List[i32]:
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         for si in self.fd_destroyers_of(record, unary):
             if self.symbols[si].param_destroys.len() > 0 and self.symbols[si].param_destroys[0] != 0 and fd_record_pointee(self.symbols[si].param_ty[0]) == record and self.fd_presentable(si, 0, false, modeled): out.push(si)
         out
@@ -756,7 +756,7 @@ impl CiProject:
     // representation the corpus destroys and never produces or lends is
     // not a resource here.
     fn fd_modeled_records() -> List[str]:
-        var out: List[str] = List.new()
+        let out: List[str] = []
         let all = self.fd_representations()
         var changed = true
         while changed:
@@ -798,7 +798,7 @@ impl CiProject:
         // several origins.
         // Each fn block carries the registry's presentation facts for its
         // function (D121 step 6); `blocks` keeps one block per function.
-        var blocks: List[i32] = List.new()
+        let blocks: List[i32] = []
         for record in modeled:
             let candidates = self.fd_borrow_candidates(record)
             for si in candidates:

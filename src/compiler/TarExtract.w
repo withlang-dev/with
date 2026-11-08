@@ -71,7 +71,7 @@ fn te_dirname(path: &str) -> str:
 // Unpacks the tar image `data` into `dest`, dropping the first `strip`
 // components of every name. "" on success, else why not.
 fn tar_extract_text(data: &str, dest: &str, strip: i32) -> str:
-    let all: List[str] = List.new()
+    let all: List[str] = []
     tar_extract_text_keep(data, dest, strip, all)
 
 // Whether the stripped name `rel` is under one of `keep`; every name is when
@@ -156,7 +156,7 @@ fn te_bytes(text: &str) -> List[u8]:
 
 // Unpacks the gzip-compressed tar `archive` into `dest`. "" or why not.
 fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
-    let all: List[str] = List.new()
+    let all: List[str] = []
     tar_gz_extract_keep(archive, dest, strip, all)
 
 // Unpacks the gzip-compressed tar image `packed` (bytes in memory, an

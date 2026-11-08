@@ -415,7 +415,7 @@ fn cli_analysis_request(argc: i32, source: &str) -> str:
     "facts"
 
 fn parse_cli_options(argc: i32) -> CliOptions:
-    var opts = cli_options_default()
+    let opts = cli_options_default()
     opts.command = cli_command(argc)
     opts.source_file = find_source_arg(argc)
     opts.output_path = find_output_arg(argc)
@@ -437,7 +437,7 @@ fn parse_cli_options(argc: i32) -> CliOptions:
     opts
 
 fn tokenize_text(text: &str) -> TokenList:
-    var lexer = Lexer.init(text, 0)
+    let lexer = Lexer.init(text, 0)
     return lexer.tokenize()
 
 fn cli_one_liner_default(argc: i32) -> CliOneLiner:
@@ -480,7 +480,7 @@ fn cli_one_liner_known_flag(arg: &str):
     arg == "-g0" or arg == "-h" or arg == "--help"
 
 fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
-    var result = cli_one_liner_default(argc)
+    let result = cli_one_liner_default(argc)
     var after_double_dash = false
     var i = 1
     while i < argc:
@@ -544,7 +544,7 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
     result
 
 fn cli_escape_with_string(value: &str) -> str:
-    var out = StringBuilder.with_capacity(value.len())
+    let out = StringBuilder.with_capacity(value.len())
     for i in 0..value.len():
         let ch = value[i]
         if ch == 92:
@@ -562,9 +562,9 @@ fn cli_escape_with_string(value: &str) -> str:
     out.to_str()
 
 fn cli_rewrite_semicolons(code: &str) -> str:
-    var lexer = Lexer.init(code, 0)
+    let lexer = Lexer.init(code, 0)
     let tokens = lexer.tokenize()
-    var out = StringBuilder.with_capacity(code.len())
+    let out = StringBuilder.with_capacity(code.len())
     var cursor = 0
     var depth = 0
     for i in 0..tokens.len():
@@ -595,7 +595,7 @@ fn cli_rewrite_semicolons(code: &str) -> str:
 // from the code's tokens, so a `use` inside a string or a name like `user`
 // is never one, and a braced import list may span lines.
 fn cli_leading_use_len(code: &str) -> isize:
-    var lexer = Lexer.init(code, 0)
+    let lexer = Lexer.init(code, 0)
     let tokens = lexer.tokenize()
     var end = 0
     var i: i32 = 0
@@ -630,7 +630,7 @@ fn cli_leading_use_len(code: &str) -> isize:
 // length, lines and columns.
 fn cli_blank_prefix(code: &str, n: isize) -> str:
     if n <= 0: return with_str_clone_ref(code)
-    var out = StringBuilder.with_capacity(code.len())
+    let out = StringBuilder.with_capacity(code.len())
     for i in 0..n:
         out.push_str(if code[i] == '\n': "\n" else: " ")
     out.push_str(code.slice(n as i64, code.len()))
@@ -655,7 +655,7 @@ fn c_header_guard_for(h_path: &str) -> str:
     while i < h_path.len():
         if h_path[i] == 47: start = i + 1
         i = i + 1
-    var g = StringBuilder.new()
+    let g = StringBuilder.new()
     g.push_str("WITH_CHDR_")
     var j = start
     while j < h_path.len():
@@ -686,10 +686,10 @@ fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
     "<cli " ++ name ++ ">"
 
 fn cli_build_args_binding(args: &List[str]) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     out.push_str("let args: List[str] = List.new()\n")
-    for i in 0..args.len():
-        let escaped = cli_escape_with_string(args[i])
+    for arg in args:
+        let escaped = cli_escape_with_string(arg)
         out.push_str("args.push(\"")
         out.push_str(escaped)
         out.push_str("\")\n")
@@ -713,7 +713,7 @@ fn cli_synthetic_add_mapping(syn: CliSyntheticSource, start: i32, text: &str, so
 
 fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     var syn = cli_synthetic_source_new()
-    var source = StringBuilder.new()
+    let source = StringBuilder.new()
     source.push_str("use std.io\n")
     source.push_str("use std.str\n")
     source.push_str("use std.regex\n")
@@ -752,8 +752,8 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     // A part's leading `use` declarations are the program's, not the loop
     // body's (#2015): they are hoisted above the loop, and blanked to spaces
     // in the body so every byte after them keeps its line and column.
-    var rewritten_parts: List[str] = List.new()
-    var use_lens: List[isize] = List.new()
+    let rewritten_parts: List[str] = []
+    let use_lens: List[isize] = []
     for i in 0..one.code_parts.len():
         let rewritten = cli_rewrite_semicolons(one.code_parts[i])
         let use_len = cli_leading_use_len(rewritten)
@@ -813,7 +813,7 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     let saved_out_dir = build_graph_rt_getenv("WITH_OUT_DIR") ++ ""
     if saved_out_dir.len() == 0:
         let _set_out_dir = build_graph_rt_setenv("WITH_OUT_DIR", cli_one_liner_out_dir())
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     comp.configure(one.opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(false)
@@ -896,13 +896,13 @@ fn run_cli(full_argc: i32) -> i32:
             with_eprint(f"error: unknown option `{unknown}` for `with {cli_cmd}`{hint}")
             return 2
     if cli_command(argc) == "__framework-stubs":
-        let stub_args: List[str] = List.new()
+        let stub_args: List[str] = []
         for i in 2..argc: stub_args.push(with_arg_at(i))
         return with_framework_stubs_main(stub_args)
     // `with __windows-import-libs <dir> <name>...`: the import libraries of
     // in-box DLLs `with get` writes for a package that links them (#1915).
     if cli_command(argc) == "__windows-import-libs":
-        let lib_args: List[str] = List.new()
+        let lib_args: List[str] = []
         for i in 2..argc: lib_args.push(with_arg_at(i))
         return with_windows_import_libs_main(lib_args)
     // `with __ar qc lib.a a.o b.o` / `with __ranlib lib.a`: what CMake asks of
@@ -914,7 +914,7 @@ fn run_cli(full_argc: i32) -> i32:
         if argc < 5:
             with_eprint("usage: with __ar <qc|rc|rcs> <archive> <object>...")
             return 2
-        let named: List[str] = List.new()
+        let named: List[str] = []
         for i in 4..argc: named.push(with_arg_at(i))
         // `@objects.rsp`: the members a build system wrote to a file because
         // the command line would be too long.
@@ -1011,7 +1011,7 @@ fn run_cli(full_argc: i32) -> i32:
         if source == "":
             with_eprint("error: 'emit-c-header' requires a source file argument")
             return 1
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         comp.configure(opt_level, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         comp.set_overflow_mode(driver_internal_overflow_mode())
@@ -1026,7 +1026,7 @@ fn run_cli(full_argc: i32) -> i32:
         if source == "":
             with_eprint("error: 'ir' requires a source file argument")
             return 1
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         comp.configure(opt_level, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         comp.set_overflow_mode(driver_internal_overflow_mode())
@@ -1055,7 +1055,7 @@ fn run_cli(full_argc: i32) -> i32:
         if source == "":
             with_eprint("error: 'analyze' requires a source file argument")
             return 1
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         comp.configure(opt_level, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         comp.set_overflow_mode(driver_internal_overflow_mode())
@@ -1121,7 +1121,7 @@ fn run_cli(full_argc: i32) -> i32:
             return validate_all_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_async_mir_flag:
             return dump_async_mir_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         // §18.5: `--target` selects the platform the check is for — its
@@ -1218,7 +1218,7 @@ fn run_cli(full_argc: i32) -> i32:
     if cli_command(argc) == "init":
         return run_init_command(argc)
     if cli_command(argc) == "uat":
-        var uat_argv: List[str] = List.new()
+        let uat_argv: List[str] = []
         for ai in 0..argc: uat_argv.push(with_arg_at(ai))
         return run_uat_command(uat_argv)
     if cli_command(argc) == "get":
@@ -1365,11 +1365,11 @@ fn finish_test_binary(bin_path: &str, keep: bool, rerun_tests: &List[str], quiet
         return
     let kept = test_binary_absolute_path(bin_path)
     with_eprint("test binary kept: " ++ kept)
-    for ti in 0..rerun_tests.len():
-        with_eprint("rerun: " ++ test_child_env_prefix(rerun_tests[ti], quiet) ++ kept)
+    for rerun_test in rerun_tests:
+        with_eprint("rerun: " ++ test_child_env_prefix(rerun_test, quiet) ++ kept)
 
 fn single_run_reruns(rc: i32) -> List[str]:
-    let reruns: List[str] = List.new()
+    let reruns: List[str] = []
     if rc != 0:
         reruns.push("")
     reruns
@@ -1413,7 +1413,7 @@ fn reduce_exit_want(argc: i32) -> i32:
     test_parse_i32(v)
 
 fn reduce_split_lines_keep_empty(text: &str) -> List[str]:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     var start = 0
     var i = 0
     while i <= text.len():
@@ -1564,7 +1564,7 @@ fn run_reduce_command(argc: i32) -> i32:
     if with_fs_write_file(candidate_path, original) != 0:
         with_eprint("error: reduce could not write candidate path")
         return 1
-    var pred = ReducePredicate {
+    let pred = ReducePredicate {
         dashdash: dashdash,
         contains: cli_value_or_prefix(argc, "--contains", "--contains="),
         exit_mode: reduce_exit_mode(argc),
@@ -1779,12 +1779,12 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
         return ""
     let entry_path = resolve_join(root, "__with_build_runner.w")
     let t0 = with_clock_nanos()
-    var comp = Compilation.init()
-    var runner_options = build_command_options_clone(options)
+    let comp = Compilation.init()
+    let runner_options = build_command_options_clone(options)
     runner_options.opt_level = 1
     comp.configure_options(runner_options)
     comp.set_tool_mode_entry_path(entry_path)
-    let no_settings: List[str] = List.new()
+    let no_settings: List[str] = []
     // #1797/#1906: the runner links exactly as stage1 does — against a
     // runtime root the build names (WITH_RUNTIME_ROOT), which Link.w refuses
     // when its .producer is another generation and never trades for another
@@ -1839,7 +1839,7 @@ fn build_runner_copy(from: &str, to: &str) -> bool:
 // root explicitly (WITH_RUNTIME_ROOT), so a directory of another
 // generation is never a candidate, whatever is on disk beside it.
 fn build_runner_link_root(root: &str) -> str:
-    let dirs: List[str] = List.new()
+    let dirs: List[str] = []
     dirs.push("out/bootstrap-lib")
     dirs.push("out/lib")
     for i in 0..dirs.len():
@@ -1881,12 +1881,12 @@ fn build_runner_fallback_list_path(root: &str) -> str:
     resolve_join(root, "out/.build-state/runner-fallback.list")
 
 fn build_runner_load_fallback(root: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     let text = with_fs_read_file(build_runner_fallback_list_path(root))
     let lines = text.split("\n")
-    for i in 0..lines.len():
-        if lines[i].len() > 0:
-            out.push(with_str_clone_ref(lines[i]))
+    for line in lines:
+        if line.len() > 0:
+            out.push(with_str_clone_ref(line))
     out
 
 fn build_runner_note_fallback(root: &str, name: &str):
@@ -1899,8 +1899,8 @@ fn build_runner_note_fallback(root: &str, name: &str):
 fn build_runner_target_eligible(target: &BuildGraphTarget, options: &BuildCommandOptions, runner_path: &str, fallback: &List[str]) -> bool:
     if runner_path.len() == 0 or target.kind != 23 or options.strict_effects:
         return false
-    for i in 0..fallback.len():
-        if fallback[i] == target.name:
+    for fallback_item in fallback:
+        if fallback_item == target.name:
             return false
     true
 
@@ -1913,12 +1913,12 @@ fn build_runner_effects_path(root: &str, target_name: &str) -> str:
 // per path the action read through ToolFs, each kept in its own file beside
 // the log (ToolFs.record_read).
 fn build_runner_read_effects(path: &str) -> List[str]:
-    var out: List[str] = List.new()
+    let out: List[str] = []
     let text = with_fs_read_file(path)
     let lines = text.split("\n")
-    for i in 0..lines.len():
-        if lines[i].len() > 0:
-            out.push(with_str_clone_ref(lines[i]))
+    for line in lines:
+        if line.len() > 0:
+            out.push(with_str_clone_ref(line))
     let reads = build_graph_rt_list_files(path ++ ".reads").split("\n")
     for i in 0..reads.len():
         if reads[i].len() > 0:
@@ -1966,7 +1966,7 @@ fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget,
 // the log names each one, so a half-written output never reaches a
 // dependent (pcre2's heap-8 test once ran a pcre2test from such a state).
 fn build_runner_discard_partial_outputs(root: &str, target: &BuildGraphTarget):
-    var paths: List[str] = List.new()
+    let paths: List[str] = []
     if target.output.len() > 0: paths.push(target.output)
     for oi in 0..target.extra_outputs.len(): paths.push(target.extra_outputs[oi])
     for pi in 0..paths.len():
@@ -1992,7 +1992,7 @@ fn build_runner_postprocess(root: &str, target: &BuildGraphTarget, raw_rc: i32, 
     let out_rc = build_runner_validate_outputs(root, target)
     if out_rc != 0:
         return out_rc
-    let no_inputs: List[str] = List.new()
+    let no_inputs: List[str] = []
     build_cache_record(root, target, no_inputs, build_runner_read_effects(effects_path))
     0
 
@@ -2136,8 +2136,8 @@ fn build_graph_lane_left(graph: &BuildGraph, pool: &PoolState, priority: &List[i
 // still running.
 fn build_graph_longest_remaining(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, priority: &List[i64]) -> i64:
     var longest: i64 = 0
-    for ri in 0..remaining.len():
-        if priority[remaining[ri]] > longest: longest = priority[remaining[ri]]
+    for remaining_item in remaining:
+        if priority[remaining_item] > longest: longest = priority[remaining_item]
     let now = with_clock_nanos()
     for pi in pool.oldest as isize..pool.names.len():
         if pool.retired[pi] != 0 or pool.done[pi] != 0: continue
@@ -2166,10 +2166,10 @@ fn build_graph_critical_lanes(graph: &BuildGraph, pool: &PoolState, priority: &L
 fn build_graph_priorities(root: &str, graph: &BuildGraph) -> List[i64]:
     var ledger = with_fs_read_file(resolve_join(root, "out/.build-state/battery-times.tsv"))
     if ledger.len() == 0: ledger = with_fs_read_file(green_store_dir() ++ "/battery-times.tsv")
-    var own: List[i64] = List.new()
+    let own: List[i64] = []
     for ti in 0..graph.targets.len(): own.push(build_graph_ledger_ms(ledger, graph.targets[ti].name))
-    var prio: List[i64] = List.new()
-    for ti in 0..own.len(): prio.push(own[ti])
+    let prio: List[i64] = []
+    for own_item in own: prio.push(own_item)
     var changed = true
     while changed:
         changed = false
@@ -2209,8 +2209,8 @@ fn build_graph_target_poolable(t: &BuildGraphTarget, top_level: bool) -> bool:
 
 // Every target `name` depends on, transitively, by name.
 fn build_graph_transitive_deps(graph: &BuildGraph, name: &str) -> List[str]:
-    var out: List[str] = List.new()
-    var frontier: List[str] = List.new()
+    let out: List[str] = []
+    let frontier: List[str] = []
     frontier.push(name.to_owned())
     while frontier.len() > 0:
         let cur = frontier.pop().unwrap()
@@ -2585,14 +2585,14 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
             cache_admitted = wi >= 0 and (&cached.targets[wi]).kind != 23
         if cache_admitted:
             return BuildGraphLoadResult { graph: cached, sema: Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new()) }
-    var graph = empty_build_graph()
+    let graph = empty_build_graph()
     let entry_path = resolve_join(root, "__with_build_eval.w")
     var comp = Compilation.init()
     comp.configure_options(build_command_options_clone(options))
     comp.set_tool_mode_entry_path(entry_path)
     let compile_cfg = project_config_clone(cfg)
     let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), compile_cfg)
-    var sema = move comp.zcu.last_sema
+    let sema = move comp.zcu.last_sema
     if pool.decl_count() == 0 or comp.has_errors():
         graph.error_msg = "build.w evaluation wrapper compilation failed"
         return BuildGraphLoadResult { graph, sema }
@@ -2716,7 +2716,7 @@ fn build_graph_trim_space_and_newlines(text: &str) -> str:
     text.slice(start as i64, end as i64)
 
 fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target: &BuildGraphTarget) -> BuildCommandOptions:
-    var options = build_command_options_clone(base)
+    let options = build_command_options_clone(base)
     if target.optimize_mode == 1 and options.opt_level < 2:
         options.opt_level = 2
     options.target_kind = target.target_kind
@@ -2800,14 +2800,14 @@ fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64
     1
 
 unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool, skipped_root_prepare: bool) -> i32:
-    let no_strings: List[str] = List.new()
+    let no_strings: List[str] = []
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
     // --survey: keep going past test/action target failures, report the
     // full matrix at the end. Evidence recorders (test-green/last-green)
     // are skipped once anything has failed.
-    var survey_failed: List[str] = List.new()
+    let survey_failed: List[str] = []
     let force_action_worker_target = build_action_force_env_enabled()
     let output_rc = build_graph_validate_outputs(root, graph, options.output_path)
     if output_rc != 0:
@@ -2818,27 +2818,27 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     let generated_rc = build_graph_write_generated_sources(root, graph)
     if generated_rc != 0:
         return generated_rc
-    let completed_targets: List[str] = List.new()
-    let skipped_targets: List[str] = List.new()
+    let completed_targets: List[str] = []
+    let skipped_targets: List[str] = []
     // Early cutoff: a target's output digest taken when it was dispatched, by
     // name. A dependency that re-ran and produced the same bytes has not
     // changed anything its dependents can see (Go's content ID).
-    var cutoff_names: List[str] = List.new()
-    var cutoff_digests: List[str] = List.new()
+    let cutoff_names: List[str] = []
+    let cutoff_digests: List[str] = []
     // Per-target wall time: only the top-level driver records/reports; worker
     // re-entries (forced action / test workers) stay silent.
     let times_top_level = not force_action_worker_target and not build_test_worker_env_enabled()
     let run_t0 = with_clock_nanos()
-    let timed_names: List[str] = List.new()
-    let timed_ns: List[i64] = List.new()
-    let timed_rss: List[i64] = List.new()
+    let timed_names: List[str] = []
+    let timed_ns: List[i64] = []
+    let timed_rss: List[i64] = []
     var timing_name = ""
     var timing_rss0: i64 = 0
     var timing_t0: i64 = 0
     // #680 stage B: allow_parallel action targets run as concurrent workers.
     // Declaration order stays the program order — the pool only overlaps runs
     // of consecutive marked targets; any other execution drains it first.
-    var pool = PoolState.new()
+    let pool = PoolState.new()
     var pool_failed_rc: i32 = 0
     let pool_width = build_pool_width()
     // The test-process budget every lane's runner shares (BuildGraphTests.w
@@ -2869,7 +2869,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // Action target so non-action invocations never pay its compile.
     var runner_checked = false
     var runner_path = ""
-    var runner_fallback: List[str] = List.new()
+    var runner_fallback: List[str] = []
     // #1075/#1074/#1797/#1906: the runner links against a runtime root of
     // this driver's generation (build_runner_link_root: the seed's
     // out/bootstrap-lib, or out/lib under a tree compiler), named to the
@@ -2893,7 +2893,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // every serial target drain the pool first, so a battery's eighty
     // targets ran one after another on an eighteen-core machine (the gate:
     // 713 s of target time in 719 s of wall).
-    var remaining: List[i32] = List.new()
+    let remaining: List[i32] = []
     for ri in 0..graph.targets.len(): remaining.push(ri as i32)
     // The targets upstream of the runner's prepare target run before it
     // whatever their kind; every other Action waits for it.
@@ -2905,7 +2905,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // reaches it.
         var finished = pool.next_done()
         while finished >= 0:
-            var done_lane = pool.retire_at(finished)
+            let done_lane = pool.retire_at(finished)
             let done_rc = build_pool_finalize_retire(root, graph, options, done_lane)
             timed_names.push(with_str_clone_ref(done_lane.name))
             timed_ns.push(done_lane.spent)
@@ -2920,7 +2920,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             finished = pool.next_done()
         if not survey and pool_failed_rc != 0:
             while pool.has_live():
-                var drain = pool.retire_oldest()
+                let drain = pool.retire_oldest()
                 let _drain_rc = build_pool_finalize_retire(root, graph, options, drain)
             return pool_failed_rc
         let runner_gate = if bootstrap_root_scheduled and not completed_targets.contains(bootstrap_root_target): bootstrap_root_target else: ""
@@ -2958,7 +2958,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 return 1
             // Nothing is ready until a lane finishes: retire the first to.
             let first_done = pool.wait_any_done()
-            var waited = pool.retire_at(first_done)
+            let waited = pool.retire_at(first_done)
             let waited_rc = build_pool_finalize_retire(root, graph, options, waited)
             timed_names.push(with_str_clone_ref(waited.name))
             timed_ns.push(waited.spent)
@@ -3276,10 +3276,10 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
                 build_test_clear_worker_env_for_children()
-                for fi in 0..test_files.len():
+                for test_file in test_files:
                     if survey_target_failed:
                         break
-                    let test_path = test_files[fi]
+                    let test_path = test_file
                     let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.runtime_available, target_options.prelude_mode, target_options.debug_info, false, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs, target_options.link_search_paths, target_options.link_rpaths)
                     if test_rc != 0:
                         with_eprint("error: build.w test target failed: " ++ target.name)
@@ -3300,7 +3300,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             if ar_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
-            var comp = Compilation.init()
+            let comp = Compilation.init()
             comp.configure_options(target_options)
             let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, target_options.include_paths, target_options.defines, target_options.link_libs)
@@ -3318,7 +3318,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             if obj_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
-            var comp = Compilation.init()
+            let comp = Compilation.init()
             comp.configure_options(target_options)
             let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_object_to_path_with_build_settings(source_path, obj_path, target_options.include_paths, target_options.defines, target_options.link_libs)
@@ -3336,7 +3336,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             if ar_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
-            var comp = Compilation.init()
+            let comp = Compilation.init()
             comp.configure_options(target_options)
             let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, target_options.include_paths, target_options.defines, target_options.link_libs)
@@ -3353,7 +3353,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if bin_path.len() == 0:
             with_eprint("error: -o cannot be used when build.w declares multiple targets")
             return 1
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         comp.configure_options(target_options)
         let saved_env = build_graph_apply_target_env(target)
         let built = comp.build_binary_to_path_with_build_settings(source_path, bin_path, target_options.include_paths, target_options.defines, target_options.link_libs)
@@ -3393,8 +3393,8 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if not build_graph_quiet_times: build_graph_times_report(root, timed_names, timed_ns, timed_rss, with_clock_nanos() - run_t0)
     if survey and survey_failed.len() > 0:
         with_eprint(f"survey: {survey_failed.len()} target(s) failed:")
-        for sfi in 0..survey_failed.len():
-            with_eprint("  failed: " ++ survey_failed[sfi])
+        for survey_failed_item in survey_failed:
+            with_eprint("  failed: " ++ survey_failed_item)
         return 1
     if survey:
         with_write("survey: all targets green\n")
@@ -3476,7 +3476,7 @@ fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
 
 fn run_graph_target_command(target_name: &str) -> i32:
     let build_options = build_command_options_default()
-    var graph_options = build_graph_command_options_default()
+    let graph_options = build_graph_command_options_default()
     graph_options.selected_target = with_str_clone_ref(target_name)
     graph_options.selected_targets.push(with_str_clone_ref(target_name))
     run_build_command(build_options, graph_options)
@@ -3559,7 +3559,7 @@ fn repo_lock_release():
             with_fs_remove_tree(lock_dir)
 
 fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg: &ProjectConfig) -> BuildCommandOptions:
-    var out = options
+    let out = options
     if not out.target_explicit and cfg.target_default.len() > 0:
         out.target_kind = driver_target_triple_kind(cfg.target_default)
     if cfg.strict_effects:
@@ -3710,7 +3710,7 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     if data.len() == 0:
         with_eprint("error: could not read " ++ compiler_path)
         return 1
-    var digest: [32]u8 = [0 as u8; 32]
+    let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     let sha = sha256_hex(&digest[0] as *const u8)
     var verified_by = "verified against last-green"
@@ -3814,7 +3814,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 let self_exe = with_self_exe()
                 if self_exe.len() > 0:
                     let _named = with_setenv_str("WITH", self_exe)
-            var load_result = load_build_graph_from_build_w(root, cfg, actual_options)
+            let load_result = load_build_graph_from_build_w(root, cfg, actual_options)
             let graph = load_result.graph
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
@@ -3825,7 +3825,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 return build_cache_print_effects(root, graph, "")
             // Every `:target` selector names a root (`build :a :b` builds
             // both closures in one graph); none falls back to the default.
-            var selected_names: List[str] = List.new()
+            let selected_names: List[str] = []
             for si in 0..graph_options.selected_targets.len():
                 selected_names.push(with_str_clone_ref(graph_options.selected_targets[si]))
             if selected_names.len() == 0 and graph.default_target.len() > 0:
@@ -3881,7 +3881,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
     if graph_options.no_deps:
         with_eprint("error: --no-deps is only supported for build.w action and test targets")
         return 1
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     comp.configure_options(actual_options)
     if actual_options.output_kind == BuildOutputKind.C:
         let c_path = comp.emit_c(actual_options.source_path, actual_options.output_path)
@@ -3930,7 +3930,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     if cfg.manifest_error.len() > 0:
         with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
         return 1
-    var options = build_command_options_default()
+    let options = build_command_options_default()
     options.opt_level = opt_level
     options.no_std = no_std
     options.alloc_mode = alloc_mode
@@ -3938,7 +3938,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     options.prelude_mode = prelude_mode
     options.debug_info = debug_info
     options.release = cli_release_flag()
-    var load_result = load_build_graph_from_build_w(root, cfg, options)
+    let load_result = load_build_graph_from_build_w(root, cfg, options)
     let graph = load_result.graph
     if not graph.ok:
         with_eprint("error: " ++ graph.error_msg)
@@ -3983,7 +3983,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
 fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, prog_args: &str) -> i32:
     if source_file == "":
         return run_run_project_command(selected_target_hint, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
@@ -4045,9 +4045,9 @@ fn dump_ast(source_file: &str, no_std: bool, alloc_mode: bool, include_header: b
         with_eprint("error: cannot read '{source_file}'")
         return 1
 
-    var lexer = Lexer.init(text, 0)
+    let lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
-    var intern = InternPool.init()
+    let intern = InternPool.init()
     var diags = DiagnosticList.init()
     var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
@@ -4097,7 +4097,7 @@ fn dump_tokens(source_file: &str, deterministic: bool) -> i32:
     if text.len() == 0:
         with_eprint("error: cannot read '{source_file}'")
         return 1
-    var lexer = Lexer.init(text, 0)
+    let lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
     if deterministic:
         with_write(f"tokens file={source_file} count={tokens.len()}\n")
@@ -4122,7 +4122,7 @@ fn dump_tokens(source_file: &str, deterministic: bool) -> i32:
     0
 
 fn dump_resolved_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let result = comp.resolve_file(source_file, true)
     let has_errors = comp.has_errors()
     if has_errors:
@@ -4136,7 +4136,7 @@ fn dump_resolved_artifact(source_file: &str, no_std: bool, alloc_mode: bool, run
 // `--link-bundle` prefixes apply to every command that compiles, so a dump
 // of a consumer sees the bundle's interface exactly as a build does.
 fn cli_check_compilation(no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> Compilation:
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_link_bundles(driver_link_bundle_args(with_arg_count()))
@@ -4147,7 +4147,7 @@ fn cli_check_compilation(no_std: bool, alloc_mode: bool, runtime_available: bool
     comp
 
 fn dump_typed_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let typed_ok = comp.emit_typed_file(source_file)
     if not typed_ok:
         with_eprint("error: typed dump failed during compilation or semantic analysis")
@@ -4155,7 +4155,7 @@ fn dump_typed_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtim
     0
 
 fn dump_project_info_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_project_info_file(source_file)
     if text.len() == 0:
         with_eprint("error: project info dump failed")
@@ -4164,7 +4164,7 @@ fn dump_project_info_artifact(source_file: &str, no_std: bool, alloc_mode: bool,
     0
 
 fn dump_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let mir_ok = comp.print_mir_file(source_file)
     if not mir_ok:
         with_eprint("error: mir dump failed during compilation or mir lowering")
@@ -4172,7 +4172,7 @@ fn dump_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_
     0
 
 fn dump_drop_state_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_drop_state_file(source_file)
     if text.len() == 0:
         with_eprint("error: drop-state dump failed during compilation or mir lowering")
@@ -4181,7 +4181,7 @@ fn dump_drop_state_artifact(source_file: &str, no_std: bool, alloc_mode: bool, r
     0
 
 fn trace_place_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.trace_place_file(source_file, spec)
     if text.len() == 0:
         with_eprint("error: trace-place failed during compilation or mir lowering")
@@ -4190,7 +4190,7 @@ fn trace_place_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode:
     0
 
 fn explain_mir_origin_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.explain_mir_origin_file(source_file, spec)
     if text.len() == 0:
         with_eprint("error: explain-mir-origin failed during compilation or mir lowering")
@@ -4199,7 +4199,7 @@ fn explain_mir_origin_artifact(source_file: &str, spec: &str, no_std: bool, allo
     0
 
 fn trace_ownership_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.trace_ownership_file(source_file, spec)
     if text.len() == 0:
         with_eprint("error: trace-ownership failed during compilation or mir lowering")
@@ -4208,7 +4208,7 @@ fn trace_ownership_artifact(source_file: &str, spec: &str, no_std: bool, alloc_m
     0
 
 fn dump_drop_plan_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_drop_plan_file(source_file)
     if text.len() == 0:
         with_eprint("error: drop-plan dump failed during compilation or mir lowering")
@@ -4219,12 +4219,12 @@ fn dump_drop_plan_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
 // CLAUDE.md ceremony census: the typed ceremony sites of one compilation,
 // one `pattern<TAB>path<TAB>line` per site (tools/ceremony_census.w totals them).
 fn ceremony_census_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     with_write(comp.ceremony_census_file(source_file))
     (comp.has_errors()) as i32
 
 fn dump_abi_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_abi_file(source_file)
     if text.len() == 0:
         with_eprint("error: abi dump failed during compilation")
@@ -4233,7 +4233,7 @@ fn dump_abi_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_
     0
 
 fn validate_ownership_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let result = comp.validate_ownership_file(source_file)
     if result != "ok":
         with_eprint("error: validate-ownership failed: " ++ result)
@@ -4242,7 +4242,7 @@ fn validate_ownership_artifact(source_file: &str, no_std: bool, alloc_mode: bool
     0
 
 fn dump_place_map_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_place_map_file(source_file)
     if text.len() == 0:
         with_eprint("error: place-map dump failed during compilation or mir lowering")
@@ -4255,7 +4255,7 @@ fn trace_cleanup_edge_artifact(source_file: &str, spec: &str, no_std: bool, allo
     if mir_cleanup_edge_spec_ok(spec) == false:
         with_eprint("error: invalid --trace-cleanup-edge spec '" ++ spec ++ "'; expected fn:bbFROM->bbTO")
         return 1
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.trace_cleanup_edge_file(source_file, spec)
     if text.len() == 0:
         with_eprint("error: trace-cleanup-edge failed during compilation or mir lowering")
@@ -4264,7 +4264,7 @@ fn trace_cleanup_edge_artifact(source_file: &str, spec: &str, no_std: bool, allo
     0
 
 fn validate_all_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let result = comp.validate_all_file(source_file)
     if result != "ok":
         with_eprint("error: validate-all failed: " ++ result)
@@ -4273,7 +4273,7 @@ fn validate_all_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runt
     0
 
 fn dump_async_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let async_mir_text = comp.dump_async_mir_file(source_file)
     if async_mir_text.len() == 0:
         with_eprint("error: async-mir dump failed during compilation or lowering")
@@ -4282,7 +4282,7 @@ fn dump_async_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
     0
 
 fn escape_dump_lexeme(text: &str) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    let out = StringBuilder.with_capacity(text.len())
     var run_start: i64 = 0
     for i in 0..text.len():
         let ch = text[i]
@@ -4318,15 +4318,15 @@ fn dump_tag_name(tag: i32, lexeme: &str) -> str:
     return tag_name(tag)
 
 fn discover_test_functions(text: &str) -> TestDiscovery:
-    var lexer = Lexer.init(text, 0)
+    let lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
-    var intern = InternPool.init()
+    let intern = InternPool.init()
     var diags = DiagnosticList.init()
     var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
     diags = move parser.diags
 
-    let test_names: List[str] = List.new()
+    let test_names: List[str] = []
     if diags.has_errors():
         return TestDiscovery { parse_ok: false, has_main: false, test_names }
 
@@ -4348,15 +4348,15 @@ fn discover_test_functions(text: &str) -> TestDiscovery:
     TestDiscovery { parse_ok: true, has_main, test_names }
 
 fn discover_bench_functions(text: &str) -> BenchDiscovery:
-    var lexer = Lexer.init(text, 0)
+    let lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
-    var intern = InternPool.init()
+    let intern = InternPool.init()
     var diags = DiagnosticList.init()
     var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
     diags = move parser.diags
 
-    let bench_names: List[str] = List.new()
+    let bench_names: List[str] = []
     if diags.has_errors():
         return BenchDiscovery { parse_ok: false, has_main: false, bench_names }
 
@@ -4377,7 +4377,7 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
     BenchDiscovery { parse_ok: true, has_main, bench_names }
 
 fn synthesize_bench_main_source(text: &str, bench_names: &List[str]) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    let out = StringBuilder.with_capacity(text.len())
     out.push_str(text)
     if text.len() > 0 and text[text.len() - 1] != 10:
         out.push_str("\n")
@@ -4400,7 +4400,7 @@ fn synthesize_bench_main_source(text: &str, bench_names: &List[str]) -> str:
     out.to_str()
 
 fn synthesize_test_main_source(text: &str, test_names: &List[str]) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    let out = StringBuilder.with_capacity(text.len())
     out.push_str(text)
     if text.len() > 0 and text[text.len() - 1] != 10:
         out.push_str("\n")
@@ -4517,7 +4517,7 @@ fn test_arch_matches(required: &str, host: &str) -> bool:
     required == host
 
 fn parse_test_directives_for_target(target: &str) -> TestDirectives:
-    var result = empty_test_directives()
+    let result = empty_test_directives()
     let text = with_fs_read_file(target)
     if text.len() == 0:
         return result
@@ -4902,7 +4902,7 @@ fn test_effective_prelude_mode(default_mode: i32, args: &str) -> i32:
     default_mode
 
 fn split_nonempty_lines(text: &str) -> List[str]:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     let text_len = text.len()
     var start = 0
     var i = 0
@@ -5009,8 +5009,8 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
     TestRunResult { rc, stdout: out_text, stderr: err_text }
 
 fn test_validate_output(stream_name: &str, actual: &str, expected_values: &List[str], target: &str, test_name: &str) -> bool:
-    for ei in 0..expected_values.len():
-        let expected = expected_values[ei]
+    for expected_value in expected_values:
+        let expected = expected_value
         if not actual.contains(expected):
             emit_test_stage_error(stream_name ++ " mismatch; missing expected output: " ++ expected, target, "run", test_name)
             return false
@@ -5019,7 +5019,7 @@ fn test_validate_output(stream_name: &str, actual: &str, expected_values: &List[
 // The lines of a captured stream: `\n` ends a line, a `\r` before it is the
 // platform's, and a last line without `\n` still counts.
 fn test_output_lines(text: &str) -> List[str]:
-    var lines: List[str] = List.new()
+    let lines: List[str] = []
     let n = text.len()
     var start = 0
     while start < n:
@@ -5033,13 +5033,13 @@ fn test_output_lines(text: &str) -> List[str]:
 
 fn test_line_count(lines: &List[str], wanted: &str) -> isize:
     var n = 0
-    for i in 0..lines.len():
-        if lines[i] == wanted: n = n + 1
+    for line in lines:
+        if line == wanted: n = n + 1
     n
 
 fn test_line_containing(lines: &List[str], fragment: &str) -> str:
-    for i in 0..lines.len():
-        if lines[i].contains(fragment): return lines[i]
+    for line in lines:
+        if line.contains(fragment): return line
     ""
 
 // The number of leading lines the two agree on.
@@ -5050,8 +5050,8 @@ fn test_lines_agree(expected: &List[str], actual: &List[str]) -> isize:
 
 fn test_lines_in_order(expected: &List[str], actual: &List[str]) -> bool:
     var k = 0
-    for i in 0..actual.len():
-        if k < expected.len() and actual[i] == expected[k]: k = k + 1
+    for actual_item in actual:
+        if k < expected.len() and actual_item == expected[k]: k = k + 1
     k == expected.len()
 
 // Why the printed lines are not the expected ones, from the class a
@@ -5060,8 +5060,8 @@ fn test_lines_in_order(expected: &List[str], actual: &List[str]) -> bool:
 // a line printed more or fewer times than listed (a double drop), the lines
 // out of order, and lines the expectations do not list.
 fn test_stdout_mismatch(expected: &List[str], actual: &List[str], stdout: &str) -> str:
-    for i in 0..expected.len():
-        if not stdout.contains(expected[i]): return "missing expected output: " ++ expected[i]
+    for expected_item in expected:
+        if not stdout.contains(expected_item): return "missing expected output: " ++ expected_item
     for i in 0..expected.len():
         if expected[i].len() > 0 and test_line_count(actual, expected[i]) == 0:
             return "expected line `" ++ expected[i] ++ "` is printed only inside `" ++ test_line_containing(actual, expected[i]) ++ "`"
@@ -5153,7 +5153,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
     let env_directives = parse_test_directives_for_target(target)
     if env_directives.env_pairs.len() == 0:
         return run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
-    let saved: List[str] = List.new()
+    let saved: List[str] = []
     for ei in 0..env_directives.env_pairs.len():
         let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
@@ -5184,7 +5184,7 @@ fn test_flag_configures_compilation(token: &str) -> bool:
 fn run_test_validate_all(target: &str, directives: &TestDirectives) -> i32:
     if directives.skip or directives.expect_check_fail.len() > 0 or directives.expect_build_fail.len() > 0:
         return 0
-    var vd = parse_test_directives_for_target(target)
+    let vd = parse_test_directives_for_target(target)
     // Only the fixture's flags that configure how it compiles (prelude tier,
     // std, runtime, overflow, optimization) apply; a dump or trace request
     // would print in place of the verdict, and its value would be read as a
@@ -5227,7 +5227,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     let effective_runtime_available = runtime_available and not test_extra_arg_present(directives.extra_args, "--no-runtime") and not test_extra_arg_present(directives.extra_args, "--freestanding")
     let effective_alloc_mode = alloc_mode or test_extra_arg_present(directives.extra_args, "--alloc")
     let effective_prelude_mode = test_effective_prelude_mode(prelude_mode, directives.extra_args)
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     comp.configure(effective_opt_level, effective_no_std, effective_alloc_mode, effective_runtime_available)
     comp.set_prelude_mode(effective_prelude_mode)
     let effective_overflow_mode = test_effective_overflow_mode(directives.extra_args)
@@ -5261,7 +5261,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
             print_test_summary(target, 0, 1, run_quiet)
             return 1
         var passed: i32 = 0
-        let failed_tests: List[str] = List.new()
+        let failed_tests: List[str] = []
         var run_quiet = quiet
         if verbose:
             run_quiet = false
@@ -5296,16 +5296,16 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     run_rc
 
 fn run_test_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str) -> i32:
-    let include_paths: List[str] = List.new()
-    let defines: List[str] = List.new()
-    let link_libs: List[str] = List.new()
+    let include_paths: List[str] = []
+    let defines: List[str] = []
+    let link_libs: List[str] = []
     run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, include_paths, include_paths)
 
 fn test_command_option_takes_value(arg: &str) -> bool:
     arg == "-f" or arg == "--filter" or cli_option_takes_value(arg)
 
 fn test_command_collect_targets(argc: i32) -> List[str]:
-    let targets: List[str] = List.new()
+    let targets: List[str] = []
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -5329,7 +5329,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
     let filter = cli_test_filter(argc)
     let targets = test_command_collect_targets(argc)
     if targets.len() == 0:
-        var build_options = build_command_options_default()
+        let build_options = build_command_options_default()
         build_options.opt_level = opt_level
         build_options.no_std = no_std
         build_options.alloc_mode = alloc_mode
@@ -5337,7 +5337,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         build_options.prelude_mode = prelude_mode
         build_options.debug_info = debug_info
         build_options.release = cli_release_flag()
-        var graph_options = build_graph_command_options_default()
+        let graph_options = build_graph_command_options_default()
         graph_options.selected_target = "test"
         return run_build_command(build_options, graph_options)
     // Two or more files run as a build.w test lane runs them: on the build
@@ -5345,7 +5345,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
     // cached machine-wide. Before, the files ran one after another and the
     // first failure ended the run, so a set of tests took their sum and
     // hid every failure after the first.
-    var files: List[str] = List.new()
+    let files: List[str] = []
     for ti in 0..targets.len():
         let target = targets[ti]
         if test_target_is_directory(target):
@@ -5353,11 +5353,11 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
             if dir_files.len() == 0:
                 with_eprint(f"error: no test sources found in '{target}'")
                 return 1
-            for fi in 0..dir_files.len(): files.push(with_str_clone_ref(dir_files[fi]))
+            for dir_file in dir_files: files.push(with_str_clone_ref(dir_file))
         else:
             files.push(with_str_clone_ref(target))
     if files.len() > 1:
-        var lane = empty_build_graph_target()
+        let lane = empty_build_graph_target()
         lane.name = "with-test"
         lane.args = test_command_pass_through_args(argc)
         return build_graph_run_test_files_pool(test_command_root(), lane, test_running_compiler_path(), files, true)
@@ -5366,7 +5366,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
 // The options each file's run takes: every argument that is not a test file
 // or directory, a value-taking option with its value.
 fn test_command_pass_through_args(argc: i32) -> List[str]:
-    var args: List[str] = List.new()
+    let args: List[str] = []
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -5398,7 +5398,7 @@ fn run_bench_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, 
         with_eprint("error: no benchmarks found in '" ++ target ++ "'")
         return 1
     let synthetic_source = synthesize_bench_main_source(text, discovery.bench_names)
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
@@ -5686,7 +5686,7 @@ fn run_migrate_command(argc: i32) -> i32:
     migrate_apply_std_use_fixits(output_path)
 
 fn cli_read_all_stdin() -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     while true:
         let chunk = with_read_bytes_stdin(4096)
         if chunk.len() == 0:
@@ -5764,7 +5764,7 @@ fn doc_extract_comment(text: &str, decl_start: i32) -> str:
     var pos = decl_start - 1
     while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
         pos = pos - 1
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     while pos >= 0:
         var line_start = pos
         while line_start > 0 and text[(line_start - 1)] != 10:
@@ -5828,7 +5828,7 @@ fn doc_path_seen(paths: &List[str], path: &str) -> bool:
     false
 
 fn doc_module_paths(info: &str, root: &str, source_path: &str) -> List[str]:
-    let paths: List[str] = List.new()
+    let paths: List[str] = []
     let lines = split_nonempty_lines(info)
     for i in 0..lines.len():
         let line = lines[i]
@@ -5900,7 +5900,7 @@ fn run_doc_command(argc: i32, source: &str, output: &str, no_std: bool, alloc_mo
     if source_text.len() == 0:
         with_eprint("error: with doc could not read source file: " ++ source_path)
         return 1
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let pool = comp.compile_file(source_path)
     if pool.decl_count() == 0:
         with_eprint("error: with doc failed during compilation")
@@ -5913,7 +5913,7 @@ fn run_doc_command(argc: i32, source: &str, output: &str, no_std: bool, alloc_mo
     var all_info = ""
     for mi in 0..module_paths.len():
         let module_path = module_paths[mi]
-        var module_comp = Compilation.init()
+        let module_comp = Compilation.init()
         module_comp.configure(0, no_std, alloc_mode, runtime_available)
         module_comp.set_prelude_mode(prelude_mode)
         let module_pool = module_comp.compile_file(module_path)
@@ -6049,7 +6049,7 @@ fn repl_bin_path -> str:
     f"out/tmp/with-repl-{with_getpid()}-{with_clock_nanos()}" ++ suffix
 
 fn check_repl_unit(source: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> bool:
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     comp.set_debug_info(false)
     comp.set_statements_entry(true)
     let paths: List[str] = ["<repl>"]
@@ -6061,7 +6061,7 @@ fn check_repl_unit(source: &str, no_std: bool, alloc_mode: bool, runtime_availab
 
 fn run_repl_unit(source: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     let bin_path = repl_bin_path()
-    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     comp.set_debug_info(false)
     comp.set_statements_entry(true)
     let built = comp.build_entry_binary_from_source_to_path("<repl>", source, bin_path)
@@ -6109,9 +6109,9 @@ fn run_repl_command(argc: i32, no_std: bool, alloc_mode: bool, runtime_available
         return 1
     with_write("With REPL\n")
     print_repl_help()
-    var session_imports: List[str] = List.new()
-    var session_decls: List[str] = List.new()
-    var session_stmts: List[str] = List.new()
+    let session_imports: List[str] = []
+    let session_decls: List[str] = []
+    let session_stmts: List[str] = []
     var pending_line = ""
     while true:
         var line = ""
@@ -6193,7 +6193,7 @@ fn run_fmt_command(argc: i32) -> i32:
     var fmt_style: i32 = 0
     if prefer_brace: fmt_style = 2
     if prefer_colon: fmt_style = 1
-    var files: List[str] = List.new()
+    let files: List[str] = []
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -6785,7 +6785,7 @@ fn cli_remove_manifest_dep(toml: &str, pkg_name: &str) -> CliManifestRemoveResul
     CliManifestRemoveResult { ok: removed, text: out }
 
 fn cli_manifest_c_deps(toml: &str) -> List[CliManifestDep]:
-    let deps: List[CliManifestDep] = List.new()
+    let deps: List[CliManifestDep] = []
     var in_deps = false
     var start = 0
     var i = 0

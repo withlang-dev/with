@@ -40,7 +40,7 @@ fn type_layout_int_bytes(bits: i32) -> i64:
     let bytes = bits / 8
     if bytes <= 0:
         return 1
-    bytes as i64
+    bytes
 
 // with-abi.md §2, the one enum layout rule (#1438): a tag, then the payload
 // area at the first offset aligned to the largest payload's alignment; the
@@ -147,7 +147,7 @@ impl Sema:
         let packed = self.ast.get_data2(decl)
         if type_decl_is_packed(packed) != 0:
             return 1
-        type_decl_pack_cap(packed) as i64
+        type_decl_pack_cap(packed)
 
     // A field's alignment under its struct's cap (§16.4).
     fn type_layout_capped(tid: i32, align: i64) -> i64:
@@ -175,7 +175,7 @@ impl Sema:
         if align_slot >= 0 and align_slot < self.type_extra.len():
             let explicit = self.type_extra[align_slot]
             if explicit > 0:
-                return self.type_layout_capped(resolved as i32, explicit as i64)
+                return self.type_layout_capped(resolved as i32, explicit)
         self.type_layout_capped(resolved as i32, natural)
 
     mut fn type_layout_struct_field_offset(tid: i32, field_index: i32) -> i64:

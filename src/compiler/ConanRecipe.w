@@ -20,7 +20,7 @@ fn cr_is_version_key(line: &str, version: &str) -> bool:
 // regular enough to read by line: a version block ends at the next line that
 // is itself a key with nothing after the colon, other than `url:`.
 fn cr_version_block(data: &str, section: &str, version: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     var in_section = false
     var in_version = false
     for raw in data.split("\n"):
@@ -36,7 +36,7 @@ fn cr_version_block(data: &str, section: &str, version: &str) -> List[str]:
     out
 
 fn conan_data_source(data: &str, version: &str) -> ConanSource:
-    let urls: List[str] = List.new()
+    let urls: List[str] = []
     var sha256 = ""
     var in_url_list = false
     for line in cr_version_block(data, "sources", version):
@@ -86,7 +86,7 @@ fn conan_data_patch_problem(data: &str, version: &str) -> str:
 
 // Paths of the version's patch files, relative to the recipe folder, in order.
 fn conan_data_patches(data: &str, version: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     for line in cr_version_block(data, "patches", version):
         let at = line.find("patch_file:")
         if at >= 0: out.push(cr_unquote(line.slice(at + 11, line.len())))

@@ -50,13 +50,13 @@ impl MirModule:
             if not self.sema_callable_syms.contains(mir_sym):
                 self.sema_callable_syms.insert(mir_sym, MirCallableClass.Generic as i32)
         let builtins = sema.intrinsic_fn_syms()
-        for bi in 0..builtins.len():
-            let mir_sym = pool.intern(sema.pool_resolve(builtins[bi]))
+        for builtin in builtins:
+            let mir_sym = pool.intern(sema.pool_resolve(builtin))
             if not self.sema_callable_syms.contains(mir_sym):
                 self.sema_callable_syms.insert(mir_sym, MirCallableClass.Intrinsic as i32)
         let generic_builtins = sema.generic_builtin_syms()
-        for bi in 0..generic_builtins.len():
-            let mir_sym = pool.intern(sema.pool_resolve(generic_builtins[bi]))
+        for generic_builtin in generic_builtins:
+            let mir_sym = pool.intern(sema.pool_resolve(generic_builtin))
             if not self.sema_callable_syms.contains(mir_sym):
                 self.sema_callable_syms.insert(mir_sym, MirCallableClass.Intrinsic as i32)
         // #1735, #1742: each name's canonical signature (the one get_sig
@@ -88,7 +88,7 @@ impl MirModule:
     // (#1414). Reads the place type through the typed validator's own walk,
     // so the ownership validator looks a place up by the same type.
     mut fn snapshot_moved_drop_types(sema: &Sema):
-        var moved: List[i32] = List.new()
+        let moved: List[i32] = []
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
             for op in 0..body.operand_kinds.len():
@@ -98,12 +98,12 @@ impl MirModule:
                 if place < 0 or place >= body.place_locals.len():
                     continue
                 moved.push(mir_validate_place_type(self, body, place))
-        for i in 0..moved.len():
-            let ty = moved[i]
+        for moved_item in moved:
+            let ty = moved_item
             if ty > 0 and not self.sema_moved_drop_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
                 self.sema_moved_drop_types.insert(ty, 1)
         // #1559: every dropped place's type with drop glue.
-        var dropped: List[i32] = List.new()
+        let dropped: List[i32] = []
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
             for si in 0..body.stmt_kinds.len():
@@ -112,24 +112,24 @@ impl MirModule:
             for bb in 0..body.block_count():
                 if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO and body.term_data0(bb) >= 0 and body.term_data0(bb) < body.place_locals.len():
                     dropped.push(mir_validate_place_type(self, body, body.term_data0(bb)))
-        for i in 0..dropped.len():
-            let ty = dropped[i]
+        for dropped_item in dropped:
+            let ty = dropped_item
             if ty > 0 and not self.sema_dropped_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
                 self.sema_dropped_types.insert(ty, 1)
         // #2702: every local whose storage ends, by its type with drop glue.
-        var dead: List[i32] = List.new()
+        let dead: List[i32] = []
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
             for si in 0..body.stmt_kinds.len():
                 let local = body.stmt_d0[si]
                 if body.stmt_kinds[si] == StmtKind.StorageDead and local > 0 and local < body.local_type_ids.len():
                     dead.push(body.local_type_ids[local])
-        for i in 0..dead.len():
-            let ty = dead[i]
+        for dead_item in dead:
+            let ty = dead_item
             if ty > 0 and not self.sema_storage_dead_drop_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
                 self.sema_storage_dead_drop_types.insert(ty, 1)
         // #1814: every non-Copy element type an `array_fill` copies.
-        var filled: List[i32] = List.new()
+        let filled: List[i32] = []
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
             for si in 0..body.stmt_kinds.len():
@@ -141,8 +141,8 @@ impl MirModule:
                 if arr_ty > 0 and sema.get_type_kind(sema.resolve_alias(arr_ty as TypeId)) == TypeKind.TY_ARRAY:
                     filled.push(sema.get_type_d0(sema.resolve_alias(arr_ty as TypeId)))
         // D111: a Copy element with drop glue (a str) needs a copy per slot too.
-        for i in 0..filled.len():
-            let ty = filled[i]
+        for filled_item in filled:
+            let ty = filled_item
             if ty > 0 and not self.sema_non_copy_fill_types.contains(ty) and (sema.is_copy_frozen(ty) == 0 or sema.type_needs_drop_frozen(ty) != 0):
                 self.sema_non_copy_fill_types.insert(ty, 1)
         // #2108: every local typed as a generic declaration itself.
@@ -163,7 +163,7 @@ impl MirModule:
 
 
 fn MirBody.init(fn_sym: i32, sema: &Sema) -> MirBody:
-    var body = MirBody.init_for_fn(fn_sym)
+    let body = MirBody.init_for_fn(fn_sym)
     if sema.ty_void != 0:
         body.local_type_ids[0] = sema.ty_void
     body
@@ -239,7 +239,7 @@ fn dump_mir_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
 
         let stmt_start = body.bb_stmt_starts[bb]
         let raw_stmt_count = body.bb_stmt_counts[bb]
-        var stmt_count: i32 = raw_stmt_count
+        var stmt_count = raw_stmt_count
         if stmt_start < 0 or raw_stmt_count < 0 or stmt_start > stmt_total:
             out = out ++ "    <invalid statement span>\n"
             stmt_count = 0
@@ -305,7 +305,7 @@ fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, sema: &Sema) -> str
         if d1 >= 0 and d1 < body.switch_table_starts.len():
             let start = body.switch_table_starts[d1]
             let raw_count = body.switch_table_counts[d1]
-            var count: i32 = raw_count
+            var count = raw_count
             let vals_len = body.switch_table_vals.len()
             let tgts_len = body.switch_table_targets.len()
             if start < 0 or raw_count < 0 or start > vals_len or start > tgts_len:
@@ -604,7 +604,7 @@ fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Se
 // str copied the whole dump per body, quadratic over a stage1 module that
 // lowers every embedded corpus body (13k bodies, never finished).
 fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     out.push_str(f"drop-state module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
@@ -616,9 +616,9 @@ fn trace_ownership_body(body: &MirBody, pool: &InternPool, sema: &Sema, spec: &s
     var out = ""
     out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
     var hits = 0
-    var blocks = mir_drop_state_compute_blocks(body)
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(bb)
+        let state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
@@ -666,12 +666,12 @@ fn mir_drop_plan_place_line(body: &MirBody, pool: &InternPool, sema: &Sema, plac
 
 
 fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     out.push_str("fn " ++ mir_debug_body_label(body, pool) ++ "\n")
     var hits = 0
-    var blocks = mir_drop_state_compute_blocks(body)
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(bb)
+        let state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
@@ -697,7 +697,7 @@ fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
 
 
 fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     out.push_str(f"drop-plan module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
@@ -719,7 +719,7 @@ fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) ->
 // original drops; the Nops are applied afterward.
 
 fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     out.push_str(f"place-map module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
@@ -744,7 +744,7 @@ fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema
             continue
         if not mir_drop_state_block_has_successor(body, from_bb, to_bb):
             continue
-        var blocks = mir_drop_state_compute_blocks(body)
+        let blocks = mir_drop_state_compute_blocks(body)
         let from_out = blocks.load_block(from_bb)
         let to_in = blocks.input(to_bb)
         out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ f" edge=bb{from_bb}->bb{to_bb}\n"

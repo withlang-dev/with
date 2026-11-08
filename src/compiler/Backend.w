@@ -40,7 +40,7 @@ impl Zcu:
         let sema_symbols = self.last_sema.pool.symbol_count()
         let backend_pool = if sema_decls > 0: self.last_sema.ast.clone() else: pool.clone()
         let backend_intern = if sema_symbols > 0: self.last_sema.pool.clone() else: self.pool.clone()
-        var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
+        let cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         // Cloned, never moved (here and at the other Codegen seams): the root
         // file's warnings render after codegen (#1447).
@@ -65,9 +65,9 @@ impl Zcu:
             backend_dump_struct_extras(backend_pool, cg.intern)
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
         let t_codegen = runtime_clock_nanos()
-        var backend_mir = move self.last_mir_module
+        let backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
-        var tracked_paths = move self.tracked_input_paths
+        let tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, cg.tracked_input_paths)
         self.last_bundle_unlowered_globals = sema_clone_str_list(cg.bundle_unlowered_globals)
         self.last_bundle_carried_paths = sema_clone_str_list(cg.bundle_carried_paths)
@@ -107,9 +107,9 @@ impl Zcu:
     // optimize+emit the small bitcodes concurrently.
     mut fn compile_units_generated(pool: &AstPool, opt_level: i32, output_path: &str, debug_info: bool, release: bool, unit_count: i32) -> i32:
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
-        var backend_mir = move self.last_mir_module
+        let backend_mir = move self.last_mir_module
         let mir_ptr = &raw const backend_mir as i64
-        var assign = codegen_units_assign_from_mir(mir_ptr, unit_count)
+        let assign = codegen_units_assign_from_mir(mir_ptr, unit_count)
         // Pin main's body to unit 0: the exit wrapper is synthesized there
         // and must wrap the definition, not a declaration.
         let main_sym = self.last_sema.pool_lookup_symbol("main")
@@ -129,13 +129,13 @@ impl Zcu:
         // the object: `llvm-dis` on it is the only way to read the attributes
         // and metadata codegen attached, which no disassembly shows.
         let keep_bitcode = runtime_getenv("WITH_KEEP_BITCODE").len() > 0
-        var pipeline = codegen_unit_pipeline(unit_count, output_path, opt_level, do_profile, emit_window)
+        let pipeline = codegen_unit_pipeline(unit_count, output_path, opt_level, do_profile, emit_window)
         var k: i32 = 0
         while k < unit_count:
             // D17/#697: per-round take-and-return — each round's Codegen owns
             // the sema and hands it back before deinit or any early return.
             let backend_intern = if self.last_sema.pool.symbol_count() > 0: self.last_sema.pool.clone() else: self.pool.clone()
-            var cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, backend_intern, move self.last_sema)
+            let cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, backend_intern, move self.last_sema)
             cg.source_file = with_str_clone_ref(self.current_source_path)
             cg.source_text = with_str_clone_ref(self.current_source_text)
             cg.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
@@ -158,7 +158,7 @@ impl Zcu:
             // what parallel generation would have to reproduce.
             if do_profile:
                 runtime_eprint(f"[profile] llvm.unit{k}.symbols_added {cg.intern.symbol_count() - unit_symbols_before}")
-            var tracked = move self.tracked_input_paths
+            let tracked = move self.tracked_input_paths
             self.tracked_input_paths = tracked_input_merge_unique(tracked, cg.tracked_input_paths)
             if rc != 0:
                 self.last_sema = cg.take_sema()
@@ -204,7 +204,7 @@ impl Zcu:
         let sema_symbols = self.last_sema.pool.symbol_count()
         let backend_pool = if sema_decls > 0: self.last_sema.ast.clone() else: pool.clone()
         let backend_intern = if sema_symbols > 0: self.last_sema.pool.clone() else: self.pool.clone()
-        var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
+        let cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
         cg.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
@@ -218,9 +218,9 @@ impl Zcu:
             runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_decls}")
         if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or cg.intern.symbol_count() <= 3 or backend_debug_pool_flow_enabled():
             runtime_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_count()}")
-        var backend_mir = move self.last_mir_module
+        let backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
-        var tracked_paths = move self.tracked_input_paths
+        let tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, cg.tracked_input_paths)
         self.last_sema = cg.take_sema()
         if result != 0:
@@ -256,7 +256,7 @@ impl Zcu:
         cg.add_bundle_prefixes(self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         cg.enable_analysis(query)
-        var backend_mir = move self.last_mir_module
+        let backend_mir = move self.last_mir_module
         let backend_pool = if use_sema_ast: cg.sema.ast.clone() else: pool.clone()
         let rc = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         cg.audit_declared_share_place_contracts()

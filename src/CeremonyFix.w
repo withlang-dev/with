@@ -43,7 +43,9 @@ type CeremonyEdit {
 fn cf_demand_free(sema: &Sema, pool: &AstPool, node: i32) -> bool:
     if node == 0: return false
     let kind = pool.kind(node)
-    if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_CAST or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_FSTRING: return true
+    // A bare `None` (an ident that names a variant) takes its enum from the demand.
+    if kind == NodeKind.NK_IDENT: return not sema.variant_lookup.contains(pool.get_data0(node))
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_CAST or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_FSTRING: return true
     if kind == NodeKind.NK_UNARY: return cf_demand_free(sema, pool, pool.get_data1(node))
     if kind == NodeKind.NK_BINARY: return cf_demand_free(sema, pool, pool.get_data1(node)) and cf_demand_free(sema, pool, pool.get_data2(node))
     if kind == NodeKind.NK_CALL:
@@ -52,8 +54,6 @@ fn cf_demand_free(sema: &Sema, pool: &AstPool, node: i32) -> bool:
         return sema.generic_fn_node_for_symbol(callee) == 0
     false
 
-// The byte just before `at` that is a colon, skipping blanks: where a
-// `let x: T` annotation begins.
 // The `(` at `open` groups an expression, as against opening a call's or an
 // index's argument list: nothing of a name, a `)` or a `]` precedes it.
 fn cf_paren_is_grouping(text: &str, open: i32) -> bool:
@@ -63,6 +63,13 @@ fn cf_paren_is_grouping(text: &str, open: i32) -> bool:
     let c = text[i]
     not ((c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_' or c == ')' or c == ']')
 
+// The names a diagnostic quotes in backticks.
+fn cf_quoted_names(message: &str) -> List[str]:
+    let parts = message.split("`")
+    [with_str_clone_ref(parts[i]) for i in 0..parts.len() if i % 2 == 1 and parts[i].len() > 0]
+
+// The byte just before `at` that is a colon, skipping blanks: where a
+// `let x: T` annotation begins.
 fn cf_colon_before(text: &str, at: i32) -> i32:
     var i = at - 1
     while i >= 0 and (text[i] == ' ' or text[i] == '\t'): i = i - 1
@@ -88,16 +95,9 @@ fn cf_rewritable(path: &str, excludes: &List[str], std_too: bool) -> bool:
     if not std_too and (path.starts_with("lib/std/") or path.contains("/lib/std/")): return false
     path.len() > 0 and not path.starts_with("<") and not cf_excluded(path, excludes) and with_fs_read_file(path).len() > 0
 
-// The element's name for a list's: the singular when the name is a plural
-// (`parts` → `part`, `xs` → `x`), else the name with `_item`. The re-check
-// after `--apply` catches a name already bound.
-fn cf_element_name(list_name: &str) -> str:
-    if list_name.len() > 1 and list_name.ends_with("s") and not list_name.ends_with("ss"): list_name.slice(0, list_name.len() - 1) ++ ""
-    else: list_name ++ "_item"
-
 fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[CeremonyEdit]:
     let edits = []
-    let texts: HashMap[str, str] = HashMap.new()
+    let texts: HashMap[str, str] = [:]
     for (node, path) in sema.ceremony_let_paths:
         if not cf_rewritable(path, excludes, std_too): continue
         if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
@@ -127,7 +127,7 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
             if uses > 0 and uses == index_uses and not sema.ceremony_loop_written.contains(node):
                 let base = sema.ceremony_index_loop_bases.get(node).unwrap()
                 let list_name = sema.pool_resolve(pool.get_data0(base))
-                let elem = cf_element_name(list_name)
+                let elem = sema.pool_resolve(sema.ceremony_loop_elem_syms.get(node).unwrap())
                 let iterable = pool.get_data1(node)
                 // `i in 0..xs.len()`: from the counter's name to the range's end.
                 var counter_start = pool.get_start(node) + 3
@@ -159,12 +159,14 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
             let literal = if name == "HashMap": "[:]" else: "[]"
             edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_start(value), end: pool.get_end(value), replacement: literal, what: "`" ++ name ++ ".new()` under a written type is `" ++ literal ++ "` (D93)" })
         let flags = pool.get_data2(node)
-        // The annotation: the type node's span, and the colon before it.
+        // The annotation: the type node's span, and the colon before it. A cast
+        // initializer whose cast goes keeps the annotation: it is the demand
+        // the cast removal relies on (`var h: i64 = base as i64` → `var h: i64 = base`).
         if sema.ceremony_let_annotations.contains(node):
             let ann = sema.resolve_alias(sema.ceremony_let_annotations.get(node).unwrap() as TypeId) as i32
             let value = sema.ceremony_let_values.get(node).unwrap()
             let value_ty = sema.resolve_alias((sema.typed_expr_types.get(value) ?? 0) as TypeId) as i32
-            if value_ty != 0 and value_ty == ann and cf_demand_free(sema, pool, value):
+            if value_ty != 0 and value_ty == ann and cf_demand_free(sema, pool, value) and not sema.ceremony_widening_casts.contains(value):
                 let type_node = sema.ceremony_let_type_nodes.get(node).unwrap()
                 let type_start = pool.get_start(type_node)
                 let colon = cf_colon_before(text, type_start)
@@ -198,6 +200,7 @@ fn run_ceremony_fix() -> i32:
     let argv = args()
     var apply = false
     var std_too = false
+    var check_with = ""
     var entry = ""
     let excludes = []
     var i = 2
@@ -205,15 +208,18 @@ fn run_ceremony_fix() -> i32:
         if argv[i] == "--apply": apply = true
         else if argv[i] == "--std": std_too = true
         else if argv[i] == "--report": apply = false
+        else if argv[i] == "--check-with" and i + 1 < argv.len():
+            i = i + 1
+            check_with = argv[i]
         else if argv[i] == "--exclude" and i + 1 < argv.len():
             i = i + 1
             excludes.push(argv[i])
         else: entry = argv[i]
         i = i + 1
     if entry.len() == 0:
-        print("usage: with fix-ceremony [--report|--apply] [--exclude path ...] <entry.w>")
+        print("usage: with fix-ceremony [--report|--apply] [--exclude path ...] [--check-with compiler] <entry.w>")
         return 2
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     let pool = comp.compile_entry_file(entry)
     if pool.decl_count() == 0 or comp.zcu.diagnostics.has_errors():
         eprint(f"fix-ceremony: {entry} does not check; fix it first")
@@ -228,7 +234,7 @@ fn run_ceremony_fix() -> i32:
             if e.path == path: print(f"{path}:{cf_line_of(text, e.start)}: {e.what}")
     print(f"fix-ceremony: {edits.len()} rewrite(s) in {paths.len()} file(s)")
     if not apply or edits.len() == 0: return 0
-    let originals: HashMap[str, str] = HashMap.new()
+    let originals: HashMap[str, str] = [:]
     for path in paths:
         let text = with_fs_read_file(path)
         originals.insert(with_str_clone_ref(path), with_str_clone_ref(text))
@@ -238,11 +244,72 @@ fn run_ceremony_fix() -> i32:
             return 1
     // The proof: the entry still checks with every rewrite in. If not, every
     // rewritten file is restored; the report above says what was tried.
-    var again = Compilation.init()
+    let again = Compilation.init()
     let pool2 = again.compile_entry_file(entry)
     if pool2.decl_count() == 0 or again.zcu.diagnostics.has_errors():
         for (path, text) in originals: with_fs_write_file(path, text)
         eprint(f"fix-ceremony: {entry} no longer checks with the rewrites applied; every file restored (a fact the rewriter relied on is wrong — file it)")
         return 1
+    // --check-with: a second compiler must accept the result too (the pinned
+    // seed, for `src/`: stage1 is its build). A rewrite it refuses is kept as
+    // written and reported, line by line, until it checks; a refusal at a
+    // line no rewrite touched restores everything.
+    if check_with.len() > 0:
+        let edit_lines = [cf_line_of(originals.get(e.path).unwrap(), e.start) for e in edits]
+        let dropped = [false for e in edits]
+        let out_path = "out/fix-ceremony-check.out"
+        let err_path = "out/fix-ceremony-check.err"
+        while true:
+            let fin = run_to_files([with_str_clone_ref(check_with), "check", with_str_clone_ref(entry)], out_path, err_path, 0)
+            if fin.code == 0: break
+            var progress = false
+            var last_message = ""
+            for line in (with_fs_read_file(err_path)).split("\n"):
+                if line.starts_with("error"): last_message = with_str_clone_ref(line)
+                if not line.contains("--> "): continue
+                let loc = line.split("--> ")[1].split(":")
+                if loc.len() < 2: continue
+                let epath = loc[0]
+                let eline: i32 = loc[1].parse() ?? 0
+                // The refusal names a use. When its message quotes a name
+                // (`while \`x\` is a live view`, `cannot move out of global \`g\``),
+                // the rewrite that caused it is the nearest rewritten line above
+                // that mentions the name; otherwise the nearest within a few lines.
+                let names = cf_quoted_names(last_message)
+                let source_lines = originals.get(epath).unwrap().split("\n")
+                var best = -1
+                for ei in 0..edits.len():
+                    let e = &edits[ei]
+                    if dropped[ei] or e.path != epath or edit_lines[ei] > eline + 1: continue
+                    let text_at = source_lines[edit_lines[ei] - 1]
+                    var mentions = false
+                    for name in names:
+                        if text_at.contains(name): mentions = true
+                    let near = edit_lines[ei] >= eline - 12
+                    if (mentions or (names.len() == 0 and near)) and (best < 0 or edit_lines[ei] > edit_lines[best]): best = ei
+                if best < 0 and names.len() > 0:
+                    for ei in 0..edits.len():
+                        if dropped[ei] or edits[ei].path != epath or edit_lines[ei] > eline + 1 or edit_lines[ei] < eline - 12: continue
+                        if best < 0 or edit_lines[ei] > edit_lines[best]: best = ei
+                if best < 0: continue
+                for ei in 0..edits.len():
+                    let e = &edits[ei]
+                    if not dropped[ei] and e.path == epath and edit_lines[ei] == edit_lines[best]:
+                        dropped[ei] = true
+                        progress = true
+            if not progress:
+                for (path, text) in originals: with_fs_write_file(path, text)
+                eprint(f"fix-ceremony: {check_with} refuses {entry} at lines no rewrite touched (see {err_path}); every file restored")
+                return 1
+            for path in paths:
+                let mine = [edits[ei] for ei in 0..edits.len() if edits[ei].path == path and not dropped[ei]]
+                with_fs_write_file(path, cf_rewrite(originals.get(path).unwrap(), mine))
+        var kept_count = 0
+        for ei in 0..edits.len():
+            let e = &edits[ei]
+            if dropped[ei]:
+                kept_count = kept_count + 1
+                print(f"{e.path}:{edit_lines[ei]}: kept as written, {check_with} refuses it: {e.what}")
+        if kept_count > 0: print(f"fix-ceremony: {kept_count} rewrite(s) kept as written for {check_with}")
     print(f"fix-ceremony: applied; {entry} checks")
     0

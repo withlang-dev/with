@@ -56,15 +56,15 @@ fn build_graph_resolve_project_path(root: &str, path: &str) -> str:
     resolve_join(root, path)
 
 fn build_graph_resolve_paths(root: &str, paths: &List[str]) -> List[str]:
-    let out: List[str] = List.new()
-    for i in 0..paths.len():
-        out.push(build_graph_resolve_project_path(root, paths[i]))
+    let out: List[str] = []
+    for path in paths:
+        out.push(build_graph_resolve_project_path(root, path))
     out
 
 fn build_graph_clone_strings(values: &List[str]) -> List[str]:
-    let out: List[str] = List.new()
-    for i in 0..values.len():
-        out.push(runtime_str_clone(values[i]))
+    let out: List[str] = []
+    for value in values:
+        out.push(runtime_str_clone(value))
     out
 
 fn build_graph_dirname(path: &str) -> str:
@@ -308,7 +308,7 @@ fn build_graph_exec_argv(target: &BuildGraphTarget, operation_name: &str, argv_b
 // kind that runs a child reads it (actions in main.w; #965: command and
 // corpus targets, which dropped it).
 fn build_graph_apply_target_env(target: &BuildGraphTarget) -> List[str]:
-    var saved: List[str] = List.new()
+    let saved: List[str] = []
     for i in 0..target.env.len():
         let entry = target.env[i]
         let eq = entry.find("=")
@@ -347,7 +347,7 @@ fn build_graph_validate_process_args(target: &BuildGraphTarget) -> i32:
     0
 
 fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     let text_len = text.len()
     var start = 0
     var i = 0
@@ -381,13 +381,13 @@ fn build_graph_str_compare(a: &str, b: &str) -> i32:
     1
 
 fn build_graph_sorted_strings(items: &List[str]) -> List[str]:
-    var sorted: List[str] = List.new()
+    var sorted: List[str] = []
     for i in 0..items.len():
         let item = items[i]
         var inserted = false
-        var out: List[str] = List.new()
-        for j in 0..sorted.len():
-            let existing = sorted[j]
+        let out: List[str] = []
+        for sorted_item in sorted:
+            let existing = sorted_item
             if not inserted and build_graph_str_compare(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
                 inserted = true
@@ -402,9 +402,9 @@ fn collect_test_files(target_dir: &str) -> List[str]:
     if listing.len() == 0:
         return List.new()
     let all_files = build_graph_split_nonempty_lines(listing)
-    let w_files: List[str] = List.new()
-    for i in 0..all_files.len():
-        let path = all_files[i]
+    let w_files: List[str] = []
+    for all_file in all_files:
+        let path = all_file
         if path.ends_with(".w"):
             w_files.push(with_str_clone_ref(path))
     build_graph_sorted_strings(w_files)
@@ -414,8 +414,8 @@ fn build_graph_time_fmt(ns: i64) -> str:
     f"{tenths / 10}.{tenths % 10}s"
 
 fn build_graph_time_picked(picked: &List[i64], idx: i64) -> bool:
-    for i in 0..picked.len():
-        if picked[i] == idx:
+    for picked_item in picked:
+        if picked_item == idx:
             return true
     false
 
@@ -456,19 +456,19 @@ fn build_graph_times_report(root: &str, names: &List[str], ns_list: &List[i64], 
     let _mkdir = build_graph_rt_mkdir_p(state_dir)
     let _write = build_graph_rt_write_file(resolve_join(state_dir, "build-times.tsv"), text)
     var summary = "[times] total " ++ build_graph_time_fmt(total_ns) ++ f" across {names.len()} executed; slowest:"
-    let picked: List[i64] = List.new()
+    let picked: List[i64] = []
     while picked.len() < 5 and picked.len() < names.len():
         var best: i64 = -1
         for i in 0..names.len():
-            if not build_graph_time_picked(picked, i as i64):
+            if not build_graph_time_picked(picked, i):
                 if best < 0 or ns_list[i] > ns_list[best]:
-                    best = i as i64
+                    best = i
         picked.push(best)
         summary = summary ++ " " ++ names[best] ++ " " ++ build_graph_time_fmt(ns_list[best])
     var rss_best: i64 = -1
     for i in 0..rss_list.len():
         if rss_best < 0 or rss_list[i] > rss_list[rss_best]:
-            rss_best = i as i64
+            rss_best = i
     if rss_best >= 0 and rss_best < names.len() and rss_list[rss_best] > 0:
         summary = summary ++ "; peak rss " ++ build_graph_rss_fmt(rss_list[rss_best]) ++ " (" ++ names[rss_best] ++ ")"
     build_graph_rt_eprint(summary ++ " (out/.build-state/build-times.tsv)")

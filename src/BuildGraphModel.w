@@ -99,7 +99,7 @@ fn empty_build_graph_target -> BuildGraphTarget:
     build_graph_target_new(-1, "", "", 0, 0, "")
 
 fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     let text_len = text.len()
     var start = 0
     var i = 0
@@ -118,7 +118,7 @@ fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
     lines
 
 fn build_graph_split_fields(line: &str) -> List[str]:
-    let fields: List[str] = List.new()
+    let fields: List[str] = []
     var cur = ""
     var escaped = false
     for i in 0..line.len():
@@ -228,7 +228,7 @@ fn build_graph_parse_i32(text: &str) -> i32:
     value * sign
 
 fn parse_build_graph(text: &str) -> BuildGraph:
-    var graph = empty_build_graph()
+    let graph = empty_build_graph()
     graph.raw_text = with_str_clone_ref(text)
     if text.len() == 0:
         graph.error_msg = "build.w produced an empty build graph"
@@ -378,10 +378,10 @@ fn build_graph_parse_rss_limit(text: &str):
     if value > 0: value else: -1 as i64
 
 fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
-    var out = graph
+    let out = graph
     for ti in 0..out.targets.len():
         let target = &out.targets[ti]
-        let args: List[str] = List.new()
+        let args: List[str] = []
         var limit = target.rss_limit_bytes
         for ai in 0..target.args.len():
             let arg = &target.args[ai]
@@ -399,9 +399,9 @@ fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
     out
 
 fn bg_clone_str_list(values: &List[str]) -> List[str]:
-    let out: List[str] = List.new()
-    for i in 0..values.len():
-        out.push(with_str_clone_ref(values[i]))
+    let out: List[str] = []
+    for value in values:
+        out.push(with_str_clone_ref(value))
     out
 
 // A stored element copy must own its buffers: BuildGraphTarget carries nine
@@ -438,7 +438,7 @@ fn build_graph_target_deep_copy(t: &BuildGraphTarget) -> BuildGraphTarget:
 fn build_graph_output_index(paths: &List[str], path: &str) -> i64:
     for i in 0..paths.len():
         if paths[i] == path:
-            return i as i64
+            return i
     -1
 
 // A consumer of a produced path depends on its producer whether or not
@@ -453,9 +453,9 @@ fn build_graph_output_index(paths: &List[str], path: &str) -> i64:
 // graph is emitted, so cached graph text and every filtered subgraph carry
 // the completed edges.
 fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
-    var out = graph
-    let out_paths: List[str] = List.new()
-    let out_owners: List[str] = List.new()
+    let out = graph
+    let out_paths: List[str] = []
+    let out_owners: List[str] = []
     for i in 0..out.targets.len():
         let t = &out.targets[i]
         if t.output.len() > 0:
@@ -465,15 +465,15 @@ fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
             out_paths.push(with_str_clone_ref(t.extra_outputs[oi]))
             out_owners.push(with_str_clone_ref(t.name))
     for i in 0..out.targets.len():
-        let to_add: List[str] = List.new()
+        let to_add: List[str] = []
         let t = &out.targets[i]
-        let consumed: List[str] = List.new()
+        let consumed: List[str] = []
         if t.entry.len() > 0:
             consumed.push(with_str_clone_ref(t.entry))
         for ii in 0..t.inputs.len():
             consumed.push(with_str_clone_ref(t.inputs[ii]))
-        for ci in 0..consumed.len():
-            let producer_idx = build_graph_output_index(out_paths, consumed[ci])
+        for consumed_item in consumed:
+            let producer_idx = build_graph_output_index(out_paths, consumed_item)
             if producer_idx < 0:
                 continue
             let producer = out_owners[producer_idx]
@@ -482,19 +482,19 @@ fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
             if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
                 with_eprint("[graph] inferred edge " ++ t.name ++ " -> " ++ producer)
             to_add.push(with_str_clone_ref(producer))
-        for ai in 0..to_add.len():
-            out.targets[i].deps.push(with_str_clone_ref(to_add[ai]))
+        for to_add_item in to_add:
+            out.targets[i].deps.push(with_str_clone_ref(to_add_item))
     out
 
 fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
-    var names: List[str] = List.new()
+    let names: List[str] = []
     if target_name.len() > 0: names.push(with_str_clone_ref(target_name))
     build_graph_filter_targets(graph, names)
 
 // The graph restricted to the closures of every named root (`build :a
 // :b`); no roots means the whole graph, as one empty name did before.
 fn build_graph_filter_targets(graph: &BuildGraph, target_names: &List[str]) -> BuildGraph:
-    var out = empty_build_graph()
+    let out = empty_build_graph()
     out.ok = graph.ok
     out.error_msg = with_str_clone_ref(graph.error_msg)
     out.raw_text = with_str_clone_ref(graph.raw_text)
@@ -522,7 +522,7 @@ fn build_graph_filter_targets(graph: &BuildGraph, target_names: &List[str]) -> B
     out
 
 fn build_graph_filter_single_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
-    var out = empty_build_graph()
+    let out = empty_build_graph()
     out.ok = graph.ok
     out.error_msg = with_str_clone_ref(graph.error_msg)
     out.raw_text = with_str_clone_ref(graph.raw_text)
@@ -547,7 +547,7 @@ fn build_graph_filter_single_target(graph: &BuildGraph, target_name: &str) -> Bu
 
 // --no-deps over several roots: each named target alone, no dependencies.
 fn build_graph_filter_single_targets(graph: &BuildGraph, target_names: &List[str]) -> BuildGraph:
-    var out = empty_build_graph()
+    let out = empty_build_graph()
     out.ok = graph.ok
     out.error_msg = with_str_clone_ref(graph.error_msg)
     out.raw_text = with_str_clone_ref(graph.raw_text)
@@ -561,11 +561,11 @@ fn build_graph_filter_single_targets(graph: &BuildGraph, target_names: &List[str
         out.ok = false
         out.error_msg = "--no-deps requires an explicit build.w target"
         return out
-    for ni in 0..target_names.len():
-        let index = build_graph_find_target_index(graph, target_names[ni])
+    for target_name in target_names:
+        let index = build_graph_find_target_index(graph, target_name)
         if index < 0:
             out.ok = false
-            out.error_msg = "build.w did not declare target '" ++ target_names[ni] ++ "'"
+            out.error_msg = "build.w did not declare target '" ++ target_name ++ "'"
             return out
         out.targets.push(build_graph_target_deep_copy(graph.targets[index]))
     out.raw_text = build_graph_emit(out)
@@ -644,15 +644,15 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
     out
 
 fn build_graph_select_target_closure(graph: &BuildGraph, target_name: &str) -> BuildGraphSelectedTargets:
-    var selected = build_graph_selected_targets_new()
+    let selected = build_graph_selected_targets_new()
     build_graph_selected_targets_add(selected, graph, target_name)
 
 // The closure of several roots at once (`build :a :b`): each root's
 // closure is added to one selection, so shared dependencies appear once.
 fn build_graph_select_targets_closure(graph: &BuildGraph, target_names: &List[str]) -> BuildGraphSelectedTargets:
-    var selected = build_graph_selected_targets_new()
+    let selected = build_graph_selected_targets_new()
     var out = selected
-    for ni in 0..target_names.len():
-        out = build_graph_selected_targets_add(out, graph, target_names[ni])
+    for target_name in target_names:
+        out = build_graph_selected_targets_add(out, graph, target_name)
         if not out.ok: return out
     out

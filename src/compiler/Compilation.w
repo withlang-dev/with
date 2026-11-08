@@ -224,7 +224,7 @@ fn compilation_escape_with_string(value: &str) -> str:
     out
 
 fn compilation_split_escaped_fields(line: &str) -> List[str]:
-    let fields: List[str] = List.new()
+    let fields: List[str] = []
     var cur = ""
     var escaped = false
     for i in 0..line.len():
@@ -250,7 +250,7 @@ fn compilation_split_escaped_fields(line: &str) -> List[str]:
     fields
 
 fn compilation_split_nonempty_lines(text: &str) -> List[str]:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     var start = 0
     for i in 0..text.len():
         if text[i] == 10:
@@ -403,7 +403,7 @@ type CompilationBinaryLinkPlan {
 
 fn Compilation.init -> Compilation:
     compilation_debug_init("Compilation.init:start")
-    let zcu: Zcu = Zcu.init()
+    let zcu = Zcu.init()
     compilation_debug_init("Compilation.init:zcu_ready")
     Compilation {
         zcu: zcu,
@@ -433,7 +433,7 @@ fn Compilation.init -> Compilation:
 impl Compilation:
     mut fn configure(opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool):
         self.config = compilation_config_from_cli(opt_level, no_std, alloc_mode, runtime_available, self.config.prelude_mode)
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         taken_zcu.set_prelude_mode(self.config.prelude_mode)
         self.zcu = taken_zcu
 
@@ -464,7 +464,7 @@ impl Compilation:
     mut fn set_bundle_fingerprint(corpus: &str, fingerprint_path: &str):
         self.bundle_corpus = with_str_clone_ref(corpus)
         self.bundle_fingerprint_path = with_str_clone_ref(fingerprint_path)
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         taken_zcu.bundle_corpus = with_str_clone_ref(corpus)
         self.zcu = taken_zcu
 
@@ -530,10 +530,10 @@ impl Compilation:
         taken_zcu.interface_eager = true
         self.zcu = taken_zcu
         var root_text = "// bundle interface root for " ++ wi_path ++ "\n"
-        for si in 0..sections.len():
-            let dotted = bundle_module_dotted_name(sections[si])
+        for section in sections:
+            let dotted = bundle_module_dotted_name(section)
             if dotted.len() == 0:
-                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections[si] ++ "' is not under <embedded-std>/ or <embedded-rt>/")
+                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ section ++ "' is not under <embedded-std>/ or <embedded-rt>/")
                 return AstPool.new()
             root_text = root_text ++ "use " ++ dotted ++ "\n"
         // The root is the interface's own: the runtime bundle's lives in the
@@ -612,7 +612,7 @@ impl Compilation:
             // The object joins the link explicitly, so on-demand selection
             // must not extract an embedded copy of the same modules.
             link_stage_add_explicit_bundle_prefixes(prefixes)
-            var taken_zcu = move self.zcu
+            let taken_zcu = move self.zcu
             taken_zcu.add_link_bundle_prefixes(prefixes)
             self.zcu = taken_zcu
         true
@@ -627,7 +627,7 @@ impl Compilation:
     // from the tree.
     fn register_embedded_bundle_interfaces() -> bool:
         var rt_registered = false
-        var missing: List[str] = List.new()
+        let missing: List[str] = []
         for bi in 0..embedded_bundle_count():
             // #2131: a bundle's interface is its target's (D39: layouts are
             // the target's); a slot for another target is not registered.
@@ -689,8 +689,8 @@ impl Compilation:
 
     fn manifest_lies_under_bundle_corpus(manifest: &str) -> bool:
         let paths = bundle_manifest_paths(manifest)
-        for pi in 0..paths.len():
-            if bundle_corpus_contains(self.bundle_corpus, paths[pi]):
+        for path in paths:
+            if bundle_corpus_contains(self.bundle_corpus, path):
                 return true
         false
 
@@ -702,7 +702,7 @@ impl Compilation:
         wl_set_active_target_triple(target_spec_llvm_triple())
 
     fn apply_runtime_config(cfg: ProjectConfig) -> ProjectConfig:
-        var out = cfg
+        let out = cfg
         if self.config.no_std:
             out.no_std = true
         if self.config.alloc_mode:
@@ -716,7 +716,7 @@ impl Compilation:
         out
 
     fn project_config_for_source(source_path: &str) -> ProjectConfig:
-        var cfg = self.apply_runtime_config(project_config_load_for_source(source_path))
+        let cfg = self.apply_runtime_config(project_config_load_for_source(source_path))
         for path in self.link_search_paths:
             cfg.link_search_paths.push(path)
         for path in self.link_rpaths:
@@ -728,46 +728,46 @@ impl Compilation:
         self.link_rpaths = driver_clone_str_list(rpaths)
 
     mut fn set_prelude_mode(mode: i32):
-        var cfg = move self.config
+        let cfg = move self.config
         cfg.prelude_mode = compilation_normalize_prelude_mode(mode)
         let cfg_prelude_mode = cfg.prelude_mode
         self.config = cfg
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         taken_zcu.set_prelude_mode(cfg_prelude_mode)
         self.zcu = taken_zcu
 
     mut fn set_overflow_mode(mode: i32):
-        var cfg = move self.config
+        let cfg = move self.config
         cfg.overflow_mode = if overflow_mode_valid(mode): mode else: -1
         self.config = cfg
 
     mut fn set_statements_entry(enabled: bool): self.statements_entry = enabled
 
     mut fn set_debug_info(enabled: bool):
-        var cfg = move self.config
+        let cfg = move self.config
         cfg.debug_info = enabled
         self.config = cfg
 
     mut fn set_release(enabled: bool):
-        var cfg = move self.config
+        let cfg = move self.config
         cfg.release = enabled
         self.config = cfg
 
     mut fn set_compiler_hooks_enabled(enabled: bool):
-        var cfg = move self.config
+        let cfg = move self.config
         cfg.compiler_hooks_enabled = enabled
         self.config = cfg
 
     mut fn set_tool_mode_entry_path(path: &str):
-        var cfg = move self.config
+        let cfg = move self.config
         cfg.tool_mode_entry_path = with_str_clone_ref(path)
         self.config = cfg
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         taken_zcu.tool_mode_entry_path = with_str_clone_ref(path)
         self.zcu = taken_zcu
 
     mut fn set_import_root_dir(dir: &str):
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         taken_zcu.import_root_dir = dir
         self.zcu = taken_zcu
 
@@ -792,7 +792,7 @@ impl Compilation:
         compilation_debug_init("Compilation.compile_file:start " ++ path)
         if not self.load_link_bundles():
             return AstPool.new()
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         let pool = taken_zcu.compile_file_frontend_with_config(path, self.project_config_for_source(path))
         self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_file:done decls={pool.decl_count()}")
@@ -802,7 +802,7 @@ impl Compilation:
         compilation_debug_init("Compilation.compile_file_with_config:start " ++ path)
         if not self.load_link_bundles():
             return AstPool.new()
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         let pool = taken_zcu.compile_file_frontend_with_config(path, self.apply_runtime_config(cfg))
         self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_file_with_config:done decls={pool.decl_count()}")
@@ -812,7 +812,7 @@ impl Compilation:
         compilation_debug_init("Compilation.compile_entry_file:start " ++ path)
         if not self.load_link_bundles():
             return AstPool.new()
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         let pool = taken_zcu.compile_file_frontend_entry_with_config(path, self.project_config_for_source(path))
         self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_entry_file:done decls={pool.decl_count()}")
@@ -822,7 +822,7 @@ impl Compilation:
         compilation_debug_init("Compilation.compile_entry_file_with_config:start " ++ path)
         if not self.load_link_bundles():
             return AstPool.new()
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         let pool = taken_zcu.compile_file_frontend_entry_with_config(path, self.apply_runtime_config(cfg))
         self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_entry_file_with_config:done decls={pool.decl_count()}")
@@ -971,7 +971,7 @@ impl Compilation:
         let root = if taken_zcu.project_config.root_dir.len() > 0: taken_zcu.project_config.root_dir else: frontend_dirname(source_path)
         let hook_count = pool.compiler_hook_count()
         var out = "use std.compiler\n"
-        let imported: HashMap[str, i32] = HashMap.new()
+        let imported: HashMap[str, i32] = [:]
         for hi in 0..hook_count:
             let hook_node = pool.compiler_hook_node(hi)
             let di = compilation_decl_index_for_node(pool, hook_node)
@@ -1011,10 +1011,10 @@ impl Compilation:
         if diag_text.len() == 0:
             return 0
         var emitted = 0
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         let lines = compilation_split_nonempty_lines(diag_text)
-        for li in 0..lines.len():
-            let fields = compilation_split_escaped_fields(lines[li])
+        for line in lines:
+            let fields = compilation_split_escaped_fields(line)
             if fields.len() != 5:
                 continue
             if fields[0] != "error":
@@ -1068,7 +1068,7 @@ impl Compilation:
             let _cleanup_runner_fail = runtime_remove_tree(tmp_dir)
             runtime_eprint("error: could not write compiler hook runner")
             return false
-        var runner_comp = Compilation.init()
+        let runner_comp = Compilation.init()
         runner_comp.configure(self.config.opt_level, self.config.no_std, self.config.alloc_mode, self.config.runtime_available)
         runner_comp.set_prelude_mode(self.config.prelude_mode)
         runner_comp.set_debug_info(self.config.debug_info)
@@ -1177,7 +1177,7 @@ impl Compilation:
     mut fn compile_source_text(source_path: &str, source_text: &str) -> AstPool:
         if not self.load_link_bundles():
             return AstPool.new()
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
         taken_zcu.reset_for_new_invocation(source_dir, source_path, "")
         taken_zcu.project_config = self.project_config_for_source(source_path)
@@ -1193,7 +1193,7 @@ impl Compilation:
     mut fn compile_source_text_with_config(source_path: &str, source_text: &str, cfg: ProjectConfig) -> AstPool:
         if not self.load_link_bundles():
             return AstPool.new()
-        var taken_zcu = move self.zcu
+        let taken_zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
         taken_zcu.reset_for_new_invocation(source_dir, source_path, "")
         taken_zcu.project_config = self.apply_runtime_config(cfg)
@@ -1207,8 +1207,8 @@ impl Compilation:
         pool
 
     mut fn compile_entry_source_text(source_path: &str, source_text: &str) -> AstPool:
-        let source_paths: List[str] = List.new()
-        let source_texts: List[str] = List.new()
+        let source_paths: List[str] = []
+        let source_texts: List[str] = []
         source_paths.push(with_str_clone_ref(source_path))
         source_texts.push(with_str_clone_ref(source_text))
         self.compile_entry_source_texts(source_paths, source_texts)
@@ -1235,8 +1235,8 @@ impl Compilation:
             self.zcu = taken_zcu
             return AstPool.new()
         taken_zcu.set_current_source(source_dir, source_path, source_text)
-        let extra_names: List[str] = List.new()
-        let extra_texts: List[str] = List.new()
+        let extra_names: List[str] = []
+        let extra_texts: List[str] = []
         for i in 1..source_paths.len():
             extra_names.push(with_str_clone_ref(source_paths[i]))
             extra_texts.push(with_str_clone_ref(source_texts[i]))
@@ -1259,13 +1259,13 @@ impl Compilation:
         not self.has_errors()
 
     mut fn check_file_with_build_settings(source_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> bool:
-        var cfg = self.project_config_for_source(source_path)
-        for ii in 0..include_paths.len():
-            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-        for di in 0..defines.len():
-            cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-        for li in 0..link_libs.len():
-            cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
+        let cfg = self.project_config_for_source(source_path)
+        for include_path in include_paths:
+            cfg.c_import_include_paths.push(with_str_clone_ref(include_path))
+        for define in defines:
+            cfg.c_import_defines.push(with_str_clone_ref(define))
+        for link_lib in link_libs:
+            cfg.link_libs.push(with_str_clone_ref(link_lib))
         let pool = self.compile_file_with_config(source_path, cfg)
         self.check_pool(pool, source_path)
 
@@ -1298,7 +1298,7 @@ impl Compilation:
             runtime_eprint("error: " ++ source_path ++ " has no `fn main` and no top-level statement to run: a top-level `let`/`var` alone is a module global (§18.5b). Add `fn main`, or a statement for the program to run.")
             compilation_cleanup_build_products(obj_path, bin_path)
             return compilation_binary_link_plan_fail()
-        let active_pool: AstPool = self.active_pool(prepared_pool)
+        let active_pool = self.active_pool(prepared_pool)
         let opt_level = self.config.opt_level
         let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
         compilation_debug_pool_flow("build_binary_to_path:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
@@ -1310,16 +1310,16 @@ impl Compilation:
             return compilation_binary_link_plan_fail()
         compilation_debug_init("build_binary_to_path:linking")
         // Merge direct and dependency link libraries from project config.
-        var all_link_libs = move self.zcu.last_link_lib_names
+        let all_link_libs = move self.zcu.last_link_lib_names
         for lli in 0..self.zcu.project_config.link_libs.len():
             all_link_libs.push(with_str_clone_ref(self.zcu.project_config.link_libs[lli]))
         for dli in 0..self.zcu.project_config.dep_link_libs.len():
             all_link_libs.push(with_str_clone_ref(self.zcu.project_config.dep_link_libs[dli]))
-        var _sp_dla = move self.zcu.project_config.dep_link_args
+        let _sp_dla = move self.zcu.project_config.dep_link_args
         let rpath_args = link_stage_rpath_driver_args(self.zcu.project_config.link_rpaths, target_spec_os())
         for arg in rpath_args:
             _sp_dla.push(arg)
-        var unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
+        let unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
         // D38: `--link-object` objects (a stage link's .wo bundles) join the
         // link exactly as codegen units do — full linker inputs, probed for
         // undefined symbols like any other unit.
@@ -1430,7 +1430,7 @@ impl Compilation:
             return ""
         if not self.ensure_codegen_mir(prepared_pool):
             return ""
-        let active_pool: AstPool = self.active_pool(prepared_pool)
+        let active_pool = self.active_pool(prepared_pool)
         let opt_level = self.config.opt_level
         let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, self.config.release, true)
         if backend_rc != 0:
@@ -1503,9 +1503,9 @@ impl Compilation:
             text = text ++ "interface-sha " ++ interface_sha ++ "\n"
         // D39 Level 0: declarations the boundary cannot carry, one
         // `omitted <module> <name> <why>` line each (the .wi names them too)
-        for oi in 0..omitted.len():
-            text = text ++ "omitted " ++ omitted[oi].replace("\t", " ") ++ "\n"
-        let seen: List[str] = List.new()
+        for omitted_item in omitted:
+            text = text ++ "omitted " ++ omitted_item.replace("\t", " ") ++ "\n"
+        let seen: List[str] = []
         for pi in 0..self.zcu.decl_source_paths.len():
             let path = self.zcu.decl_source_paths[pi]
             if path.len() == 0:
@@ -1621,19 +1621,19 @@ impl Compilation:
         if not compilation_ensure_output_dir(output_dir):
             return ""
 
-        var cfg = self.project_config_for_source(source_path)
-        for ii in 0..include_paths.len():
-            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-        for di in 0..defines.len():
-            cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-        for li in 0..link_libs.len():
-            cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
+        let cfg = self.project_config_for_source(source_path)
+        for include_path in include_paths:
+            cfg.c_import_include_paths.push(with_str_clone_ref(include_path))
+        for define in defines:
+            cfg.c_import_defines.push(with_str_clone_ref(define))
+        for link_lib in link_libs:
+            cfg.link_libs.push(with_str_clone_ref(link_lib))
         let pool = self.compile_file_with_config(source_path, cfg)
         if pool.decl_count() == 0:
             return ""
         if not self.ensure_codegen_mir(pool):
             return ""
-        let active_pool: AstPool = self.active_pool(pool)
+        let active_pool = self.active_pool(pool)
         let opt_level = self.config.opt_level
         let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, self.config.release, true)
         if backend_rc != 0:
@@ -1676,19 +1676,19 @@ impl Compilation:
             return ""
         compilation_remove_dsym_best_effort(bin_path)
 
-        var cfg = self.project_config_for_source(source_path)
-        for ii in 0..include_paths.len():
-            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-        for di in 0..defines.len():
-            cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-        for li in 0..link_libs.len():
-            cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
+        let cfg = self.project_config_for_source(source_path)
+        for include_path in include_paths:
+            cfg.c_import_include_paths.push(with_str_clone_ref(include_path))
+        for define in defines:
+            cfg.c_import_defines.push(with_str_clone_ref(define))
+        for link_lib in link_libs:
+            cfg.link_libs.push(with_str_clone_ref(link_lib))
         let pool = self.compile_entry_file_with_config(source_path, cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
     mut fn build_binary_to_path_with_link_libs(source_path: &str, bin_path: &str, link_libs: &List[str]) -> str:
-        let include_paths: List[str] = List.new()
-        let defines: List[str] = List.new()
+        let include_paths: List[str] = []
+        let defines: List[str] = []
         self.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, defines, link_libs)
 
     mut fn build_binary_from_source_to_path(source_path: &str, source_text: &str, bin_path: &str) -> str:
@@ -1712,19 +1712,19 @@ impl Compilation:
             return ""
         compilation_remove_dsym_best_effort(bin_path)
 
-        var cfg = self.project_config_for_source(source_path)
-        for ii in 0..include_paths.len():
-            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-        for di in 0..defines.len():
-            cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-        for li in 0..link_libs.len():
-            cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
+        let cfg = self.project_config_for_source(source_path)
+        for include_path in include_paths:
+            cfg.c_import_include_paths.push(with_str_clone_ref(include_path))
+        for define in defines:
+            cfg.c_import_defines.push(with_str_clone_ref(define))
+        for link_lib in link_libs:
+            cfg.link_libs.push(with_str_clone_ref(link_lib))
         let pool = self.compile_source_text_with_config(source_path, source_text, cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
     mut fn build_entry_binary_from_source_to_path(source_path: &str, source_text: &str, bin_path: &str) -> str:
-        let source_paths: List[str] = List.new()
-        let source_texts: List[str] = List.new()
+        let source_paths: List[str] = []
+        let source_texts: List[str] = []
         source_paths.push(with_str_clone_ref(source_path))
         source_texts.push(with_str_clone_ref(source_text))
         self.build_entry_binary_from_sources_to_path(source_paths, source_texts, bin_path)
@@ -1768,7 +1768,7 @@ impl Compilation:
         if not self.ensure_codegen_mir(prepared_pool):
             runtime_eprint("error: C emission failed during MIR lowering")
             return ""
-        let typed_pool: AstPool = self.active_pool(prepared_pool)
+        let typed_pool = self.active_pool(prepared_pool)
 
         var final_output = with_str_clone_ref(output_path)
         if final_output.len() == 0:
@@ -1998,7 +1998,7 @@ impl Compilation:
         if inner_request == "explain:modules" and self.zcu.last_sema.ast.decl_count() > 0:
             return CompilerAnalysisResult { text: self.zcu.last_sema.explain_modules(), status: 0, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
         if not after_mir and analysis_request_is_semantic_snapshot(inner_request) and self.zcu.last_sema.ast.decl_count() > 0:
-            var snapshot = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
+            let snapshot = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
             // A snapshot over a failed compilation is still shown (it is what
             // Sema had), but it is never an `ok`: an audit that passes over a
             // program the compiler refused is a tool that stayed silent.
@@ -2016,7 +2016,7 @@ impl Compilation:
             if after_mir and self.zcu.last_sema.ast.decl_count() > 0:
                 return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
             return CompilerAnalysisResult { text: "error: analysis produced no MIR\n", status: 1, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
-        var result = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
+        let result = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
         if result.needs_codegen:
             let backend = self.zcu.analyze_codegen_backend(self.active_pool(active), self.config.opt_level, result.codegen_query)
             result.report.merge(backend.report)
@@ -2028,7 +2028,7 @@ impl Compilation:
 // Public one-shot entry for compiler-integrated tools. Compilation remains an
 // orchestration implementation detail; tools consume the shared analysis schema.
 fn compiler_analyze_file(source_path: &str, request: &str) -> CompilerAnalysisResult:
-    var comp = Compilation.init()
+    let comp = Compilation.init()
     comp.analyze_file(source_path, request)
 
 impl Compilation:
@@ -2079,8 +2079,8 @@ impl Compilation:
         if self.zcu.last_async_mir_module.body_count() == 0:
             return ""
         let text = dump_async_mir_module(self.zcu.last_async_mir_module, self.zcu.pool)
-        var mir_snapshot = move self.zcu.last_mir_module
-        var async_snapshot = move self.zcu.last_async_mir_module
+        let mir_snapshot = move self.zcu.last_mir_module
+        let async_snapshot = move self.zcu.last_async_mir_module
         self.zcu.set_codegen_snapshot(mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), async_snapshot, text)
         text
 
@@ -2094,7 +2094,7 @@ impl Compilation:
         self.zcu.print_warnings()
 
     fn tracked_input_paths() -> List[str]:
-        var out: List[str] = List.new()
+        let out: List[str] = []
         for i in 0..self.zcu.tracked_input_paths.len():
             out.push(with_str_clone_ref(self.zcu.tracked_input_paths[i]))
         out
@@ -2196,8 +2196,8 @@ impl Compilation:
         if tailrec_syms.len() > 0:
             let tailrec_violations = mir_mod.verify_tailrec_contracts(sema, active_pool, tailrec_syms)
             if tailrec_violations.len() > 0:
-                for vi in 0..tailrec_violations.len():
-                    let violation = tailrec_violations[vi]
+                for tailrec_violation in tailrec_violations:
+                    let violation = tailrec_violation
                     let start = active_pool.get_start(violation.node)
                     let end_raw = active_pool.get_end(violation.node)
                     let end = if end_raw > start: end_raw else: start + 1
@@ -2219,7 +2219,7 @@ impl Compilation:
         if do_profile:
             profile_emit("mir.lower", t_mir, f"bodies={mir_mod.body_count()}")
         let t_suspend_check = profile_now()
-        var _sp_diags = move sema.diags
+        let _sp_diags = move sema.diags
         // #782: the callee borrows &sema while diags is moved out — hand it a
         // whole sema (fresh empty slot; it returns the merged list).
         sema.diags = DiagnosticList.init()
@@ -2231,7 +2231,7 @@ impl Compilation:
         let pair_report = check_foreign_pairs(mir_mod, active_pool, sema)
         for fi in 0..pair_report.findings.len():
             let finding = &pair_report.findings[fi]
-            var pair_diag = Diagnostic.err(finding.message, compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
+            let pair_diag = Diagnostic.err(finding.message, compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
             if finding.note.len() > 0: pair_diag.add_note(finding.note)
             if finding.help.len() > 0: pair_diag.add_help(finding.help)
             sema.diags.emit(pair_diag)
@@ -2266,11 +2266,11 @@ impl Compilation:
             self.zcu.set_codegen_snapshot(mir_mod, "", AsyncMirModule.init(), "")
             return
         let t_async = profile_now()
-        var _async_diags = move sema.diags
+        let _async_diags = move sema.diags
         // #782: same shape as the suspend check above — whole sema borrowed
         // while diags is taken; reinit before the borrow.
         sema.diags = DiagnosticList.init()
-        var async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, self.zcu.pool, sema, _async_diags)
+        var async_artifacts = lower_async_module(mir_mod, active_pool, self.zcu.pool, sema, _async_diags)
         if do_profile:
             profile_emit("async.lower", t_async, "")
         sema.diags = move async_artifacts.diags
@@ -2281,13 +2281,13 @@ impl Compilation:
         self.zcu.diagnostics = move sema.diags
         self.zcu.sync_from_sema(sema)
         compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
-        var async_mod = move async_artifacts.out_mod
+        let async_mod = move async_artifacts.out_mod
         self.zcu.set_codegen_snapshot(mir_mod, "", async_mod, "")
 
     mut fn run_async_mir_lower(pool: &AstPool):
         self.run_mir_lower(pool)
         if self.zcu.diagnostics.has_errors():
-            var mir_snapshot = move self.zcu.last_mir_module
+            let mir_snapshot = move self.zcu.last_mir_module
             self.zcu.set_codegen_snapshot(mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), AsyncMirModule.init(), "")
             return
 

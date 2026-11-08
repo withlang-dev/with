@@ -47,7 +47,7 @@ impl BuildGraphOutputOwners:
 // on which ran last, whether or not this command runs both (#2014). Every
 // shared output is named, not only the first.
 fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str) -> i32:
-    var seen = BuildGraphOutputOwners { paths: List.new(), owners: List.new() }
+    let seen = BuildGraphOutputOwners { paths: List.new(), owners: List.new() }
     var shared = 0
     for gi in 0..graph.generated_sources.len():
         let generated = graph.generated_sources[gi]
@@ -78,8 +78,8 @@ fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i32:
     0
 
 fn build_graph_target_completed(completed: &List[str], name: &str) -> bool:
-    for i in 0..completed.len():
-        if completed[i] == name:
+    for completed_item in completed:
+        if completed_item == name:
             return true
     false
 

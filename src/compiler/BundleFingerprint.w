@@ -18,13 +18,13 @@ use rt.rt_core
 
 
 fn bf_sorted_lines(lines: &List[str]) -> List[str]:
-    var sorted: List[str] = List.new()
-    for i in 0..lines.len():
-        let item = lines[i]
-        var out: List[str] = List.new()
+    var sorted: List[str] = []
+    for line in lines:
+        let item = line
+        let out: List[str] = []
         var inserted = false
-        for j in 0..sorted.len():
-            let existing = sorted[j]
+        for sorted_item in sorted:
+            let existing = sorted_item
             if not inserted and with_str_cmp_ref(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
                 inserted = true
@@ -38,7 +38,7 @@ fn bf_sorted_lines(lines: &List[str]) -> List[str]:
 // per corpus module (the set of bundle-provided modules is part of the
 // contract) and every export's row(s), one per line, sorted.
 fn bundle_fingerprint_text(model: &BundleInterfaceModel) -> str:
-    var lines: List[str] = List.new()
+    let lines: List[str] = []
     for mi in 0..model.modules.len():
         lines.push("module\t" ++ model.modules[mi])
     for ei in 0..model.exports.len():
@@ -53,8 +53,8 @@ fn bundle_fingerprint_text(model: &BundleInterfaceModel) -> str:
             start = end + 1
     let sorted = bf_sorted_lines(lines)
     var out = "bundle-fingerprint\tv1\ttarget:" ++ target_spec_resolved_name() ++ "\tcorpus:" ++ model.corpus ++ "\n"
-    for li in 0..sorted.len():
-        out = out ++ sorted[li] ++ "\n"
+    for sorted_item in sorted:
+        out = out ++ sorted_item ++ "\n"
     out
 
 fn bundle_fingerprint_sha(text: &str) -> str: bundle_text_sha256(text)

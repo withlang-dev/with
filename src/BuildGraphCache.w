@@ -50,8 +50,8 @@ var build_cache_prerun_inputs: HashMap[str, str] = HashMap.new()
 fn build_cache_snapshot_inputs(root: &str, target: &BuildGraphTarget):
     let input_paths = build_cache_collect_input_paths(root, target)
     var lines = ""
-    for idx in 0..input_paths.len():
-        let path = input_paths[idx]
+    for input_path in input_paths:
+        let path = input_path
         lines = lines ++ path ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
     build_cache_prerun_inputs.insert(with_str_clone_ref(target.name), lines)
 
@@ -63,8 +63,8 @@ fn build_cache_input_moved_during_run(root: &str, target: &BuildGraphTarget) -> 
         return ""
     let before = with_str_clone_ref(snapshot.unwrap())
     let input_paths = build_cache_collect_input_paths(root, target)
-    for idx in 0..input_paths.len():
-        let path = input_paths[idx]
+    for input_path in input_paths:
+        let path = input_path
         let entry = path ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
         if not before.contains(entry):
             return build_cache_project_relative(root, path)
@@ -122,7 +122,7 @@ fn build_cache_is_cacheable(kind: i32) -> bool:
     false
 
 fn build_cache_sha256_text(data: &str) -> str:
-    var digest: [32]u8 = [0 as u8; 32]
+    let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
 
@@ -133,7 +133,7 @@ fn build_cache_sha256_text(data: &str) -> str:
 // implemented on sha256's single-shot API because compiler source compiles
 // against the seed's embedded stdlib and cannot use a same-change stdlib fn.
 fn build_cache_sha256_framed(framing: &str, payload: &str) -> str:
-    var digest: [32]u8 = [0 as u8; 32]
+    let digest: [32]u8 = [0 as u8; 32]
     unsafe:
         let total = framing.len() + payload.len()
         let buf = with_alloc(total)
@@ -341,15 +341,15 @@ fn build_cache_list_w_files(root: &str, dir: &str) -> List[str]:
     if listing.len() == 0:
         return List.new()
     let all_files = build_cache_split_lines(listing)
-    let w_files: List[str] = List.new()
-    for i in 0..all_files.len():
-        let path = all_files[i]
+    let w_files: List[str] = []
+    for all_file in all_files:
+        let path = all_file
         if path.ends_with(".w"):
             w_files.push(with_str_clone_ref(path))
     build_cache_sorted_strings(w_files)
 
 fn build_cache_split_lines(text: &str) -> List[str]:
-    let lines: List[str] = List.new()
+    let lines: List[str] = []
     let text_len = text.len()
     var start = 0
     var i = 0
@@ -383,13 +383,13 @@ fn build_cache_str_compare(a: &str, b: &str) -> i32:
     1
 
 fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
-    var sorted: List[str] = List.new()
+    var sorted: List[str] = []
     for i in 0..items.len():
         let item = items[i]
         var inserted = false
-        var out: List[str] = List.new()
-        for j in 0..sorted.len():
-            let existing = sorted[j]
+        let out: List[str] = []
+        for sorted_item in sorted:
+            let existing = sorted_item
             if not inserted and build_cache_str_compare(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
                 inserted = true
@@ -400,9 +400,9 @@ fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
     sorted
 
 fn build_cache_sorted_unique_strings(items: &List[str]) -> List[str]:
-    var sorted: List[str] = List.new()
-    for i in 0..items.len():
-        sorted = tracked_input_insert_unique(sorted, items[i])
+    var sorted: List[str] = []
+    for item in items:
+        sorted = tracked_input_insert_unique(sorted, item)
     sorted
 
 fn build_cache_last_colon(text: &str) -> isize:
@@ -440,15 +440,15 @@ fn build_cache_effect_env_state_line(effect_line: &str) -> str:
 fn build_cache_effects_text(effects: &List[str]) -> str:
     let sorted = build_cache_sorted_unique_strings(effects)
     var out = ""
-    for i in 0..sorted.len():
-        out = out ++ sorted[i] ++ "\n"
+    for sorted_item in sorted:
+        out = out ++ sorted_item ++ "\n"
     out
 
 fn build_cache_hash_directory_w_files(root: &str, dir: &str) -> str:
     let files = build_cache_list_w_files(root, dir)
     var combined = ""
-    for i in 0..files.len():
-        let path = files[i]
+    for file in files:
+        let path = file
         combined = combined ++ build_cache_project_relative(root, path) ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
     build_cache_sha256_text(combined)
 
@@ -464,13 +464,13 @@ fn build_cache_action_source_disk_path(root: &str, path: &str) -> str:
     root ++ "/" ++ path
 
 fn build_cache_hash_action_sources(root: &str, paths: &List[str]) -> str:
-    let unsorted: List[str] = List.new()
-    for i in 0..paths.len():
-        unsorted.push(with_str_clone_ref(paths[i]))
+    let unsorted: List[str] = []
+    for path in paths:
+        unsorted.push(with_str_clone_ref(path))
     let sorted = build_graph_sorted_strings(unsorted)
     var combined = ""
-    for i in 0..sorted.len():
-        let p = sorted[i]
+    for sorted_item in sorted:
+        let p = sorted_item
         let disk = build_cache_action_source_disk_path(root, p)
         // #1899: the module closure names files absolutely; the key names
         // them from the root, so every worktree computes the same one.
@@ -525,12 +525,12 @@ fn build_cache_test_success_manifest(root: &str, target: &BuildGraphTarget, test
     else:
         text = text ++ "compiler:\n"
         text = text ++ "compiler-sha256:\n"
-    let rel_files: List[str] = List.new()
-    for i in 0..test_files.len():
-        rel_files.push(build_cache_project_relative(root, test_files[i]))
+    let rel_files: List[str] = []
+    for test_file in test_files:
+        rel_files.push(build_cache_project_relative(root, test_file))
     let sorted = build_cache_sorted_strings(rel_files)
-    for i in 0..sorted.len():
-        let path = sorted[i]
+    for sorted_item in sorted:
+        let path = sorted_item
         text = text ++ "file:" ++ path ++ ":" ++ build_cache_sha256_file_content(build_cache_dep_path(root, path)) ++ "\n"
     text
 
@@ -674,7 +674,7 @@ fn build_cache_test_verdict_key(root: &str, target: &BuildGraphTarget, compiler_
     build_cache_sha256_text("test-verdict v2\n" ++ build_cache_test_target_sig_text(target) ++ "argv:" ++ argv_shape ++ "\ncompiler:" ++ compiler_fp ++ "\npath:" ++ build_cache_project_relative(root, test_path) ++ "\nfile:" ++ build_cache_fingerprint_file(test_path) ++ "\n" ++ build_cache_test_env_text() ++ build_cache_test_surface_text(root, test_path))
 
 fn build_cache_load_test_verdicts(root: &str, compiler_fp: &str, target_name: &str) -> HashMap[str, i32]:
-    let out: HashMap[str, i32] = HashMap.new()
+    let out: HashMap[str, i32] = [:]
     let path = build_cache_test_verdicts_path(root, compiler_fp, target_name)
     if build_graph_rt_file_exists(path) == 0:
         return out
@@ -720,7 +720,7 @@ fn build_cache_project_relative_path(root: &str, path: &str) -> str:
 type BuildCacheSigPart { name: str, text: str }
 
 fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> List[BuildCacheSigPart]:
-    var parts: List[BuildCacheSigPart] = List.new()
+    let parts: List[BuildCacheSigPart] = []
     var shape = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
     shape = shape ++ f":{target.optimize_mode}:{target.target_kind}"
     if target.rss_limit_bytes > 0:
@@ -795,7 +795,7 @@ fn build_cache_changed_signature_parts(target: &BuildGraphTarget, root: &str, st
     if changed.len() == 0: "" else: " (" ++ changed ++ ")"
 
 fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget) -> List[str]:
-    var paths: List[str] = List.new()
+    let paths: List[str] = []
     if target.entry.len() > 0:
         paths.push(root ++ "/" ++ target.entry)
     for i in 0..target.inputs.len():
@@ -808,7 +808,7 @@ fn build_cache_output_path(root: &str, output: &str) -> str:
     if build_graph_path_is_install_dest(output): build_graph_expand_install_path(root, output) else: root ++ "/" ++ output
 
 fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget) -> List[str]:
-    var paths: List[str] = List.new()
+    let paths: List[str] = []
     // An executable declares no output and still makes one (out/bin/<name>):
     // a missing binary must make it stale, or `with run` finds no program.
     let primary = if target.output.len() > 0: build_cache_output_path(root, target.output) else: build_graph_target_output_path(root, target, "", 0)
@@ -868,10 +868,10 @@ fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebui
     let expected_sig = build_cache_compute_signature(target, root)
     var state_sig = ""
     var effect_hash = ""
-    var input_hashes: List[str] = List.new()
-    var dep_hashes: List[str] = List.new()
-    var env_hashes: List[str] = List.new()
-    var output_hashes: List[str] = List.new()
+    let input_hashes: List[str] = []
+    let dep_hashes: List[str] = []
+    let env_hashes: List[str] = []
+    let output_hashes: List[str] = []
     var saw_v2 = false
     var line_start = 0
     var i = 0
@@ -925,8 +925,8 @@ fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebui
         let expected_entry = path ++ ":" ++ current_hash
         if stored != expected_entry:
             return "stale: input changed: " ++ build_cache_project_relative(root, path)
-    for idx in 0..dep_hashes.len():
-        let stored = dep_hashes[idx]
+    for dep_hashe in dep_hashes:
+        let stored = dep_hashe
         let split = build_cache_last_colon(stored)
         if split < 0:
             return "stale: malformed dependency state"
@@ -936,8 +936,8 @@ fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebui
         let expected_entry = stored_path ++ ":" ++ current_hash
         if stored != expected_entry:
             return "stale: discovered dependency changed: " ++ stored_path
-    for idx in 0..env_hashes.len():
-        let stored = env_hashes[idx]
+    for env_hashe in env_hashes:
+        let stored = env_hashe
         let split = build_cache_last_colon(stored)
         if split < 0:
             return "stale: malformed environment state"
@@ -990,16 +990,16 @@ fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &L
     if build_cache_target_uses_current_compiler(target):
         content = content ++ "compiler:" ++ build_cache_current_compiler_fingerprint() ++ "\n"
     let input_paths = build_cache_collect_input_paths(root, target)
-    for idx in 0..input_paths.len():
-        let path = input_paths[idx]
+    for input_path in input_paths:
+        let path = input_path
         let hash = build_cache_fingerprint_file(path)
         content = content ++ "in:" ++ path ++ ":" ++ hash ++ "\n"
     // #1899: a path the action read (a `read` effect, ToolFs.record_read) is
     // a discovered dependency like a compile's tracked input: the record is
     // fresh, here or restored from the build store into another worktree,
     // only while that path is as it was.
-    var deps = build_cache_sorted_unique_strings(discovered_deps)
-    var other_effects: List[str] = List.new()
+    let deps = build_cache_sorted_unique_strings(discovered_deps)
+    let other_effects: List[str] = []
     for idx in 0..effects.len():
         let effect = effects[idx]
         if effect.starts_with("read\t"):
@@ -1008,8 +1008,8 @@ fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &L
         else:
             other_effects.push(effect)
     let dep_paths = build_cache_sorted_unique_strings(deps)
-    for idx in 0..dep_paths.len():
-        let path = dep_paths[idx]
+    for dep_path in dep_paths:
+        let path = dep_path
         let hash = build_cache_fingerprint_file(path)
         let rel_path = build_cache_project_relative(root, path)
         content = content ++ "dep:" ++ rel_path ++ ":" ++ hash ++ "\n"
@@ -1019,15 +1019,15 @@ fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &L
         let _write_effects = build_graph_rt_write_file(effects_path, effects_text)
         content = content ++ "effects:" ++ build_cache_sha256_text(effects_text) ++ "\n"
         let sorted_effects = build_cache_sorted_unique_strings(other_effects)
-        for idx in 0..sorted_effects.len():
-            let env_line = build_cache_effect_env_state_line(sorted_effects[idx])
+        for sorted_effect in sorted_effects:
+            let env_line = build_cache_effect_env_state_line(sorted_effect)
             if env_line.len() > 0:
                 content = content ++ env_line ++ "\n"
     else:
         let _remove_effects = build_graph_rt_remove_file(build_cache_effects_path(root, target.name))
     let output_paths = build_cache_collect_output_paths(root, target)
-    for idx in 0..output_paths.len():
-        let path = output_paths[idx]
+    for output_path in output_paths:
+        let path = output_path
         let hash = build_cache_fingerprint_file(path)
         content = content ++ "out:" ++ path ++ ":" ++ hash ++ "\n"
     build_graph_rt_write_file(state_path, content)
@@ -1101,8 +1101,8 @@ fn build_cache_store_tree_has_symlink(path: &str) -> bool:
     if (mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFLNK: return true
     if (mode & BUILD_CACHE_S_IFMT) != BUILD_CACHE_S_IFDIR: return false
     let files = build_cache_split_lines(build_graph_rt_list_files(path))
-    for i in 0..files.len():
-        let child_mode = build_graph_rt_file_mode(files[i])
+    for file in files:
+        let child_mode = build_graph_rt_file_mode(file)
         if child_mode >= 0 and (child_mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFLNK: return true
     false
 
@@ -1122,8 +1122,8 @@ fn build_cache_store_key(root: &str, target: &BuildGraphTarget) -> str:
     if compiler_path.len() > 0:
         text = text ++ "compiler:" ++ build_cache_compiler_binary_fingerprint(compiler_path) ++ "\n"
     let inputs = build_cache_collect_input_paths(root, target)
-    for i in 0..inputs.len():
-        text = text ++ "in:" ++ build_cache_project_relative(root, inputs[i]) ++ ":" ++ build_cache_fingerprint_file(inputs[i]) ++ "\n"
+    for input in inputs:
+        text = text ++ "in:" ++ build_cache_project_relative(root, input) ++ ":" ++ build_cache_fingerprint_file(input) ++ "\n"
     build_cache_sha256_text(text)
 
 // The root spelled `<root>` wherever it is a whole path: before a `/`, and
@@ -1148,7 +1148,7 @@ fn build_cache_store_localize(root: &str, text: &str) -> str: text.replace("<roo
 // The relative output paths, as the record lists them (the capture directory
 // included: it is a declared output, and the freshness check wants it).
 fn build_cache_store_output_rel_paths(target: &BuildGraphTarget) -> List[str]:
-    var rels: List[str] = List.new()
+    let rels: List[str] = []
     rels.push(with_str_clone_ref(target.output))
     for i in 0..target.extra_outputs.len():
         if target.extra_outputs[i].len() > 0: rels.push(with_str_clone_ref(target.extra_outputs[i]))
@@ -1189,9 +1189,9 @@ fn build_cache_store_names_root(root: &str, rels: &List[str]) -> str:
         if mode < 0: continue
         if (mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFDIR:
             let files = build_cache_split_lines(build_graph_rt_list_files(path))
-            for fi in 0..files.len():
-                if build_cache_store_text_names_root(build_graph_rt_read_file(files[fi]), root):
-                    return build_cache_project_relative(root, files[fi])
+            for file in files:
+                if build_cache_store_text_names_root(build_graph_rt_read_file(file), root):
+                    return build_cache_project_relative(root, file)
         else if build_cache_store_text_names_root(build_graph_rt_read_file(path), root):
             return rel
     ""
@@ -1246,10 +1246,10 @@ fn build_cache_store_prune(dir: &str):
     // published output: 20,000 files, 8–17 s after each published target,
     // most of a battery's wall (2026-10-14).
     let entries = build_cache_split_lines(build_graph_rt_list_dir(dir))
-    var names: List[str] = List.new()
-    var stamps: List[i64] = List.new()
-    for i in 0..entries.len():
-        let entry = dir ++ "/" ++ entries[i]
+    let names: List[str] = []
+    let stamps: List[i64] = []
+    for entrie in entries:
+        let entry = dir ++ "/" ++ entrie
         let used = entry ++ "/used"
         if build_graph_rt_file_exists(used) == 0: continue
         names.push(entry)
@@ -1295,13 +1295,13 @@ fn build_cache_store_repin_effects(state_text: &str, hash: &str) -> str:
     out
 
 fn build_cache_forget_restored_fingerprints(root: &str, rels: &List[str]):
-    for i in 0..rels.len():
-        let path = root ++ "/" ++ rels[i]
+    for rel in rels:
+        let path = root ++ "/" ++ rel
         build_cache_fp_memo.remove(path)
         if build_graph_rt_is_dir(path) != 0:
             let files = build_cache_split_lines(build_graph_rt_list_files(path))
-            for fi in 0..files.len():
-                build_cache_fp_memo.remove(files[fi])
+            for file in files:
+                build_cache_fp_memo.remove(file)
     build_cache_tree_fp_memo = HashMap.new()
 
 fn build_cache_store_repin_signature(state_text: &str, target: &BuildGraphTarget, root: &str) -> str:
@@ -1481,8 +1481,8 @@ fn build_cache_graph_env_fingerprint(root: &str) -> str:
             let dir = line.slice(5, line.len())
             let names = build_cache_sorted_strings(build_cache_split_lines(build_graph_rt_list_files(dir)))
             var listing = ""
-            for ni in 0..names.len():
-                listing = listing ++ names[ni] ++ "\n"
+            for name in names:
+                listing = listing ++ name ++ "\n"
             reads = reads ++ "list:" ++ dir ++ "=" ++ build_cache_sha256_text(listing) ++ "\n"
             continue
         if not line.starts_with("env\t"):
@@ -1498,8 +1498,8 @@ fn bcg_put_str(out: &str, s: &str) -> str:
 
 fn bcg_put_list(out: &str, items: &List[str]) -> str:
     var acc = out ++ f"l{items.len()}\n"
-    for i in 0..items.len():
-        acc = bcg_put_str(acc, items[i])
+    for item in items:
+        acc = bcg_put_str(acc, item)
     acc
 
 fn build_cache_graph_write(root: &str, key: &str, graph: &BuildGraph) -> Unit:
@@ -1588,7 +1588,7 @@ impl BcgReader:
         s
 
     mut fn read_list() -> List[str]:
-        var out: List[str] = List.new()
+        let out: List[str] = []
         let header = self.read_line()
         if not self.ok or header.len() == 0 or header[0] != 108:
             self.ok = false
@@ -1599,11 +1599,11 @@ impl BcgReader:
         out
 
 fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
-    var graph = empty_build_graph()
+    let graph = empty_build_graph()
     let text = build_graph_rt_read_file(build_cache_graph_path(root))
     if text.len() == 0:
         return graph
-    var r = BcgReader { text: text, pos: 0, ok: true }
+    let r = BcgReader { text: text, pos: 0, ok: true }
     if r.read_line() != "WGRAPH3":
         return graph
     if r.read_str() != key or not r.ok:
@@ -1623,7 +1623,7 @@ fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
         let nums = iline.slice(2, iline.len()).split(" ")
         if nums.len() != 8:
             return empty_build_graph()
-        var t = empty_build_graph_target()
+        let t = empty_build_graph_target()
         t.kind = bcg_parse_i64(nums[0]) as i32
         t.target_kind = bcg_parse_i64(nums[1]) as i32
         t.optimize_mode = bcg_parse_i64(nums[2]) as i32

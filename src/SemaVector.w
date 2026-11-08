@@ -20,7 +20,7 @@ impl Sema:
     // Called once while the primitive names are registered: every alias
     // names its Vector or Mask type.
     mut fn register_vector_aliases():
-        let lanes: List[i32] = List.new()
+        let lanes: List[i32] = []
         lanes.push(self.ty_i8 as i32)
         lanes.push(self.ty_i16 as i32)
         lanes.push(self.ty_i32 as i32)
@@ -159,7 +159,7 @@ impl Sema:
         let kind = self.ast.kind(node)
         if subst != 0 and (kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_IDENT):
             let bound = self.const_int_value(subst)
-            if bound >= 0: return bound as i64
+            if bound >= 0: return bound
         -1
 
     // The generic substitution a bare lane-count name has in scope, or 0.

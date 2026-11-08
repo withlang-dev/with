@@ -81,9 +81,9 @@ fn project_config_clone_str(s: &str) -> str:
     runtime_str_clone(s)
 
 fn project_config_clone_str_list(values: &List[str]) -> List[str]:
-    let out: List[str] = List.new()
-    for i in 0..values.len():
-        out.push(project_config_clone_str(values[i]))
+    let out: List[str] = []
+    for value in values:
+        out.push(project_config_clone_str(value))
     out
 
 fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
@@ -323,7 +323,7 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: &str, key: &str, valu
     out
 
 fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, key: &str, value: &str) -> ProjectConfig:
-    var out = cfg
+    let out = cfg
     if project_config_list_contains(out.c_dep_metadata_names, dep_name):
         if out.manifest_error.len() == 0:
             out.manifest_error = "dependency c." ++ dep_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ dep_name ++ "] table"
@@ -348,16 +348,16 @@ fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, k
                 out.manifest_error = "link in [deps.c." ++ dep_name ++ "] must be an array of library names"
         else:
             let libs = project_config_parse_string_array(value)
-            for li in 0..libs.len():
-                out.dep_link_libs.push(with_str_clone_ref(libs[li]))
+            for lib in libs:
+                out.dep_link_libs.push(with_str_clone_ref(lib))
     else if key == "defines":
         if not project_config_is_string_array_value(value):
             if out.manifest_error.len() == 0:
                 out.manifest_error = "defines in [deps.c." ++ dep_name ++ "] must be an array of strings"
         else:
             let defines = project_config_parse_string_array(value)
-            for di in 0..defines.len():
-                out.c_import_defines.push(with_str_clone_ref(defines[di]))
+            for define in defines:
+                out.c_import_defines.push(with_str_clone_ref(define))
     else if out.manifest_error.len() == 0:
         out.manifest_error = "unknown key '" ++ key ++ "' in [deps.c." ++ dep_name ++ "]; expected include, lib, link, or defines"
     out
@@ -403,8 +403,8 @@ fn project_config_parse_nonnegative_i64(value: &str) -> i64:
     out
 
 fn project_config_list_contains(values: &List[str], needle: &str) -> bool:
-    for i in 0..values.len():
-        if values[i] == needle:
+    for value in values:
+        if value == needle:
             return true
     false
 
@@ -444,35 +444,35 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
         // What c_import reads, and the framework stubs `with get` wrote for
         // this package (#1915, compiler.FrameworkStubs), relative to it.
         let includes = project_config_json_str_array(meta, "include_paths")
-        for i in 0..includes.len():
-            out.c_import_include_paths.push(dep_dir ++ "/" ++ includes[i])
+        for include in includes:
+            out.c_import_include_paths.push(dep_dir ++ "/" ++ include)
         let defines = project_config_json_str_array(meta, "defines")
-        for i in 0..defines.len():
-            out.c_import_defines.push(with_str_clone_ref(defines[i]))
+        for define in defines:
+            out.c_import_defines.push(with_str_clone_ref(define))
         let framework_paths = project_config_json_str_array(meta, "framework_paths")
-        for i in 0..framework_paths.len():
-            out.dep_link_args.push("-F" ++ dep_dir ++ "/" ++ framework_paths[i])
+        for framework_path in framework_paths:
+            out.dep_link_args.push("-F" ++ dep_dir ++ "/" ++ framework_path)
     let components = project_config_json_str_array(meta, "components")
-    var wanted: List[str] = List.new()
+    let wanted: List[str] = []
     if components.len() == 0: wanted.push("")
     else if component.len() > 0 and project_config_list_contains(components, component): wanted.push(component.to_owned())
     else:
         for i in 0..components.len(): wanted.push(with_str_clone_ref(components[i]))
-    for wi in 0..wanted.len():
-        let key = package_key ++ ":" ++ wanted[wi]
+    for wanted_item in wanted:
+        let key = package_key ++ ":" ++ wanted_item
         if project_config_list_contains(out.dep_loaded, key): continue
         out.dep_loaded.push(key)
-        let suffix = if wanted[wi].len() == 0: "" else: ":" ++ wanted[wi]
+        let suffix = if wanted_item.len() == 0: "" else: ":" ++ wanted_item
         let lib_paths = project_config_json_str_array(meta, "lib_paths" ++ suffix)
-        for i in 0..lib_paths.len():
-            let path = dep_dir ++ "/" ++ lib_paths[i]
+        for lib_path in lib_paths:
+            let path = dep_dir ++ "/" ++ lib_path
             if not project_config_list_contains(out.link_search_paths, path): out.link_search_paths.push(path)
         let libs = project_config_json_str_array(meta, "libs" ++ suffix)
-        for i in 0..libs.len():
-            if not project_config_list_contains(out.dep_link_libs, libs[i]): out.dep_link_libs.push(with_str_clone_ref(libs[i]))
+        for lib in libs:
+            if not project_config_list_contains(out.dep_link_libs, lib): out.dep_link_libs.push(with_str_clone_ref(lib))
         let link_args = project_config_json_str_array(meta, "link_args" ++ suffix)
-        for i in 0..link_args.len():
-            out.dep_link_args.push(with_str_clone_ref(link_args[i]))
+        for link_arg in link_args:
+            out.dep_link_args.push(with_str_clone_ref(link_arg))
         let requires = project_config_json_str_array(meta, "requires" ++ suffix)
         for i in 0..requires.len():
             let req = requires[i]
@@ -490,7 +490,7 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
 
 fn project_config_json_str_array(json: &str, key: &str) -> List[str]:
     // Simple JSON array extractor: find "key": [...] and extract string values.
-    var result: List[str] = List.new()
+    let result: List[str] = []
     let needle = "\"" ++ key ++ "\""
     let json_len = json.len()
     var pos = 0
@@ -597,14 +597,14 @@ fn project_config_value_complete(value: &str) -> bool:
     true
 
 fn project_config_parse_path_array(value: &str, root_dir: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     let entries = project_config_parse_string_array(value)
-    for i in 0..entries.len():
-        out.push(project_config_resolve_path(root_dir, entries[i]))
+    for entrie in entries:
+        out.push(project_config_resolve_path(root_dir, entrie))
     out
 
 fn project_config_parse_string_array(value: &str) -> List[str]:
-    let out: List[str] = List.new()
+    let out: List[str] = []
     var i = 0
     let total = value.len()
     while i < total:

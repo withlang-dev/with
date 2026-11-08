@@ -52,7 +52,7 @@ fn darwin_sdk_set_configured(path: &str):
 fn es_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
     if ptr as i64 == 0 or len <= 0:
         return ""
-    var out: str = ""
+    let out = ""
     unsafe:
         let sp = &raw mut out as *mut u8
         *(sp as *mut u64) = ptr as u64

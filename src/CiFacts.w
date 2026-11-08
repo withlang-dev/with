@@ -88,7 +88,7 @@ fn facts_error(path: &str, line: isize, message: &str) -> str: path ++ f":{line}
 // `text` split at its `//`: the clause and the citation, trimmed.
 fn facts_split_cite(text: &str) -> List[str]:
     let at = text.find("//")
-    var out: List[str] = List.new()
+    let out: List[str] = []
     if at < 0:
         out.push(text.trim())
         out.push("")
@@ -105,7 +105,7 @@ fn facts_read_file(path: &str) -> Result[Facts, str]:
     facts_read(path, source)
 
 fn facts_read(path: &str, source: str) -> Result[Facts, str]:
-    var facts = Facts { package: "", entries: List.new(), utf8_cite: "" }
+    let facts = Facts { package: "", entries: List.new(), utf8_cite: "" }
     var current_fn = ""
     var in_resource = false
     var record = ""

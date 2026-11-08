@@ -233,7 +233,7 @@ unsafe fn jsmn_parse(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut J
 // ── JSON token accessors ────────────────────────────────────
 
 fn lsp_json_parse(js: &str, tokens: *mut JsonToken, num_tokens: i32) -> i32:
-    var parser = JsonParser { pos: 0, toknext: 0, toksuper: -1 }
+    let parser = JsonParser { pos: 0, toknext: 0, toksuper: -1 }
     unsafe { jsmn_parse(&raw mut parser as *mut JsonParser, js, js.len() as i32, tokens, num_tokens) }
 
 fn json_tok_str(js: &str, tokens: *mut JsonToken, idx: i32) -> str:
@@ -460,11 +460,11 @@ impl LspDocument:
     mut fn ensure_parsed():
         if self.fast_valid and self.fast_text_len == self.text.len():
             return
-        var lexer = Lexer.init(self.text, 0)
+        let lexer = Lexer.init(self.text, 0)
         let tokens = lexer.tokenize()
-        var intern = InternPool.init()
-        var diags = DiagnosticList.init()
-        var parser = Parser.init(tokens, self.text, 0, intern, diags)
+        let intern = InternPool.init()
+        let diags = DiagnosticList.init()
+        let parser = Parser.init(tokens, self.text, 0, intern, diags)
         parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
         self.fast_pool = parser.parse_module()
         self.fast_intern = intern
@@ -504,15 +504,15 @@ impl LspDocument:
                 continue
             let start = sema.impl_starts[ii]
             let count = sema.impl_counts[ii]
-            var methods: List[str] = List.new()
+            let methods: List[str] = []
             let existing = self.cached_trait_methods.get(type_name)
             if existing.is_some():
                 let prior = existing.unwrap()
-                for method_i in 0..prior.len():
+                for prior_item in prior:
                     // HashMap.get returns a view. The cache being rebuilt needs
                     // independent strings, and concatenation is the existing
                     // ownership-producing string operation available here.
-                    methods.push("" ++ prior[method_i])
+                    methods.push("" ++ prior_item)
             var ti = 0
             while ti < count:
                 let trait_sym = sema.impl_extra[(start + ti)]
@@ -551,9 +551,9 @@ impl LspDocument:
         let opt = self.cached_trait_methods.get(type_name)
         if opt.is_some():
             let prior = opt.unwrap()
-            let methods: List[str] = List.new()
-            for method_i in 0..prior.len():
-                methods.push("" ++ prior[method_i])
+            let methods: List[str] = []
+            for prior_item in prior:
+                methods.push("" ++ prior_item)
             return methods
         List.new()
 
@@ -587,7 +587,7 @@ impl LspState:
         let parsed_view = &self.documents[idx]
         if parsed_view.fast_valid and parsed_view.fast_text_len == parsed_view.text.len():
             return
-        var reparsed = LspDocument.new(parsed_view.uri, parsed_view.path, parsed_view.text, parsed_view.version)
+        let reparsed = LspDocument.new(parsed_view.uri, parsed_view.path, parsed_view.text, parsed_view.version)
         reparsed.ensure_parsed()
         let parsed_slot_idx = idx as i64
         with self.documents.slot(parsed_slot_idx) as mut slot:
@@ -599,7 +599,7 @@ impl LspState:
         let analyzed_view = &self.documents[idx]
         if analyzed_view.cache_valid and analyzed_view.cached_text_len == analyzed_view.text.len():
             return
-        var reanalyzed = LspDocument.new(analyzed_view.uri, analyzed_view.path, analyzed_view.text, analyzed_view.version)
+        let reanalyzed = LspDocument.new(analyzed_view.uri, analyzed_view.path, analyzed_view.text, analyzed_view.version)
         reanalyzed.ensure_parsed()
         reanalyzed.ensure_analyzed()
         let analyzed_slot_idx = idx as i64
@@ -678,7 +678,7 @@ impl LspState:
         // drop freed the document's buffers while the document kept its pointer
         // (the lsp-use-std shutdown crash). comp stays at function scope so the
         // fresh branch's view outlives its use.
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
         if not use_cache:
             comp.set_prelude_mode(2)
@@ -712,7 +712,7 @@ impl LspState:
     fn definition(id: i32, uri: &str, text: &str, line: i32, col: i32):
         let offset = lsp_line_col_to_offset(text, line, col)
 
-        var lexer = Lexer.init(text, 0)
+        let lexer = Lexer.init(text, 0)
         let tokens = lexer.tokenize()
         var token_text = ""
         for i in 0..tokens.len():
@@ -731,7 +731,7 @@ impl LspState:
             self.ensure_doc_analyzed(idx)
         let empty_pool = AstPool.new()
         let empty_intern = InternPool.init()
-        let empty_paths: List[str] = List.new()
+        let empty_paths: List[str] = []
         let slow_valid = idx >= 0 and (&self.documents[idx]).cache_valid
         let slow_pool = if slow_valid: &self.documents[idx].cached_pool else: &empty_pool
         let slow_intern = if slow_valid: &self.documents[idx].cached_intern else: &empty_intern
@@ -788,7 +788,7 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
     while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
         pos = pos - 1
     // Collect doc comment lines (walking backward)
-    var doc_lines: List[str] = List.new()
+    let doc_lines: List[str] = []
     while pos >= 0:
         // Find start of this line
         var line_start = pos
@@ -818,7 +818,7 @@ impl LspState:
     fn hover(id: i32, uri: &str, text: &str, line: i32, col: i32):
         let offset = lsp_line_col_to_offset(text, line, col)
 
-        var lexer = Lexer.init(text, 0)
+        let lexer = Lexer.init(text, 0)
         let tokens = lexer.tokenize()
         var token_text = ""
         for i in 0..tokens.len():
@@ -834,7 +834,7 @@ impl LspState:
         let idx = self.find_doc(uri)
         if idx >= 0:
             self.ensure_doc_analyzed(idx)
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         var fresh_pool = AstPool.new()
         let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
         if not use_cache:
@@ -886,7 +886,7 @@ impl LspState:
 
     fn dot_completion(id: i32, uri: &str, text: &str, offset: i32, dot_pos: i32):
         // Find the receiver identifier before the dot
-        var recv_end = dot_pos
+        let recv_end = dot_pos
         var recv_start = recv_end - 1
         while recv_start >= 0 and lsp_is_ident_char(text[recv_start]):
             recv_start = recv_start - 1
@@ -1015,8 +1015,8 @@ impl LspState:
             let cidx = self.find_doc(uri)
             if cidx >= 0 and (&self.documents[cidx]).cache_valid:
                 let trait_methods = (&self.documents[cidx]).trait_methods_for_type(type_name)
-                for tmi in 0..trait_methods.len():
-                    let tmname = trait_methods[tmi]
+                for trait_method in trait_methods:
+                    let tmname = trait_method
                     if not first: items = items ++ ","
                     first = false
                     items = items ++ jobj_start() ++ jkv_str("label", tmname) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
@@ -1140,8 +1140,8 @@ impl LspState:
         // Context: "use std." / "use test." → module completion (check before dot)
         if lsp_find_substr(line_text, "use std.") >= 0:
             let modules = lsp_list_embedded_modules("std/")
-            for i in 0..modules.len():
-                let m = modules[i]
+            for each_module in modules:
+                let m = each_module
                 if not first:
                     items = items ++ ","
                 first = false
@@ -1153,8 +1153,8 @@ impl LspState:
         // Context: "use test." → suggest embedded test modules
         if lsp_find_substr(line_text, "use test.") >= 0:
             let test_mods = lsp_list_embedded_modules("test/")
-            for i in 0..test_mods.len():
-                let m = test_mods[i]
+            for test_mod in test_mods:
+                let m = test_mod
                 if not first:
                     items = items ++ ","
                 first = false
@@ -1175,7 +1175,7 @@ impl LspState:
         let cidx = self.find_doc(uri)
         if cidx >= 0:
             self.ensure_doc_analyzed(cidx)
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         var fresh_pool = AstPool.new()
         let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
         if not use_cache:
@@ -1190,19 +1190,19 @@ impl LspState:
         // Fast-tier scope-aware completion (cached).
         let parsed = self.get_parsed(uri, text)
         let enclosing_fn = lsp_find_enclosing_fn(parsed.pool, offset)
-        var scope_names: List[str] = List.new()
+        let scope_names: List[str] = []
         if enclosing_fn as i32 != 0:
             let params = lsp_collect_fn_params(parsed.pool, parsed.intern, enclosing_fn)
-            for pi in 0..params.len():
-                scope_names.push(with_str_clone_ref(params[pi]))
+            for param in params:
+                scope_names.push(with_str_clone_ref(param))
             // Walk body recursively to collect bindings visible at cursor.
             let body = parsed.pool.get_data1(enclosing_fn)
             if body != 0:
                 let bindings = lsp_collect_bindings_rec(parsed.pool, parsed.intern, body, offset)
-                for bi in 0..bindings.len():
-                    scope_names.push(with_str_clone_ref(bindings[bi]))
-        for si in 0..scope_names.len():
-            let sname = scope_names[si]
+                for binding in bindings:
+                    scope_names.push(with_str_clone_ref(binding))
+        for scope_name in scope_names:
+            let sname = scope_name
             if not first:
                 items = items ++ ","
             first = false
@@ -1210,8 +1210,8 @@ impl LspState:
 
         // Keywords
         let keywords = lsp_keywords()
-        for i in 0..keywords.len():
-            let kw = keywords[i]
+        for keyword in keywords:
+            let kw = keyword
             if not first:
                 items = items ++ ","
             first = false
@@ -1275,11 +1275,11 @@ type LspParseResult {
 }
 
 fn lsp_parse_file(text: &str) -> LspParseResult:
-    var lexer = Lexer.init(text, 0)
+    let lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
-    var intern = InternPool.init()
-    var diags = DiagnosticList.init()
-    var parser = Parser.init(tokens, text, 0, intern, diags)
+    let intern = InternPool.init()
+    let diags = DiagnosticList.init()
+    let parser = Parser.init(tokens, text, 0, intern, diags)
     parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
     let pool = parser.parse_module()
     LspParseResult { pool, intern }
@@ -1288,7 +1288,7 @@ fn lsp_find_enclosing_fn(pool: &AstPool, offset: i32) -> NodeId:
     // Find the function whose span contains the cursor. Use the start of
     // the NEXT declaration as the upper bound, not get_end — the parser's
     // end span may not cover trailing blank lines inside the function.
-    var best: NodeId = 0 as NodeId
+    var best = 0 as NodeId
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_FN_DECL:
@@ -1312,7 +1312,7 @@ fn lsp_find_enclosing_fn(pool: &AstPool, offset: i32) -> NodeId:
     best
 
 fn lsp_collect_fn_params(pool: &AstPool, intern: &InternPool, fn_node: NodeId) -> List[str]:
-    let names: List[str] = List.new()
+    let names: List[str] = []
     let meta = pool.find_fn_meta(fn_node)
     if meta < 0:
         return names
@@ -1327,7 +1327,7 @@ fn lsp_collect_fn_params(pool: &AstPool, intern: &InternPool, fn_node: NodeId) -
     names
 
 fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offset: i32) -> List[str]:
-    let empty: List[str] = List.new()
+    let empty: List[str] = []
     if node == 0:
         return empty
     let nid = node as NodeId
@@ -1341,7 +1341,7 @@ fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offs
             if sym != 0:
                 let name = intern.resolve(sym)
                 if name.len() > 0:
-                    let result: List[str] = List.new()
+                    let result: List[str] = []
                     result.push(with_str_clone_ref(name))
                     return result
         return empty
@@ -1353,7 +1353,7 @@ fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offs
         return empty
 
     if kind == NodeKind.NK_FOR:
-        var result: List[str] = List.new()
+        let result: List[str] = []
         if node_start < offset and offset <= node_end and not pool.for_binding_is_pattern(nid):
             let sym = pool.get_data0(nid)
             if sym != 0:
@@ -1363,15 +1363,15 @@ fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offs
         let for_body = pool.get_data2(nid)
         if for_body != 0:
             let inner = lsp_collect_bindings_rec(pool, intern, for_body, offset)
-            for ii in 0..inner.len():
-                result.push(with_str_clone_ref(inner[ii]))
+            for inner_item in inner:
+                result.push(with_str_clone_ref(inner_item))
         return result
 
     if kind == NodeKind.NK_BLOCK:
         let extra_start = pool.get_data0(nid)
         let stmt_count = pool.get_data1(nid)
         let tail = pool.get_data2(nid)
-        var result: List[str] = List.new()
+        let result: List[str] = []
         for i in 0..stmt_count:
             let stmt = pool.get_extra(extra_start + i)
             let inner = lsp_collect_bindings_rec(pool, intern, stmt, offset)
@@ -1386,7 +1386,7 @@ fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offs
     if kind == NodeKind.NK_IF_EXPR:
         let then_body = pool.get_data1(nid)
         let else_body = pool.get_data2(nid)
-        var result: List[str] = List.new()
+        let result: List[str] = []
         if then_body != 0 and offset >= pool.get_start(then_body as NodeId) and offset <= pool.get_end(then_body as NodeId):
             let inner = lsp_collect_bindings_rec(pool, intern, then_body, offset)
             for ii in 0..inner.len():
@@ -1433,7 +1433,7 @@ fn lsp_list_embedded_modules(prefix: &str) -> List[str]:
     // Returns module names without prefix or .w extension.
     // e.g. prefix="std/" returns ["collections", "fmt", "fs", ...]
     let listing = embedded_std_list_modules()
-    let result: List[str] = List.new()
+    let result: List[str] = []
     if listing.len() == 0:
         return result
     // Split by newline and filter
@@ -1455,7 +1455,7 @@ fn lsp_list_embedded_modules(prefix: &str) -> List[str]:
     result
 
 fn lsp_keywords() -> List[str]:
-    let k: List[str] = List.new()
+    let k: List[str] = []
     k.push("fn")
     k.push("let")
     k.push("var")
@@ -1494,7 +1494,7 @@ impl LspState:
         let offset = lsp_line_col_to_offset(text, line, col)
 
         // Walk tokens backward from cursor to find the opening ( and function name.
-        var lexer = Lexer.init(text, 0)
+        let lexer = Lexer.init(text, 0)
         let tokens = lexer.tokenize()
 
         // Find the token at or just before cursor
@@ -1536,7 +1536,7 @@ impl LspState:
         // Look up the function declaration in the parsed AST (cached)
         let parsed = self.get_parsed(uri, text)
         var sig_label = ""
-        let param_labels: List[str] = List.new()
+        let param_labels: List[str] = []
 
         for di in 0..parsed.pool.decl_count():
             let decl = parsed.pool.get_decl(di)
@@ -1595,7 +1595,7 @@ impl LspState:
         let offset = lsp_line_col_to_offset(text, line, col)
 
         // Find the identifier at cursor
-        var lex0 = Lexer.init(text, 0)
+        let lex0 = Lexer.init(text, 0)
         let tok0 = lex0.tokenize()
         var target = ""
         for i in 0..tok0.len():
@@ -1639,7 +1639,7 @@ impl LspState:
         // Scan current file for matching identifiers within scope
         var locs = jarr_start()
         var first = true
-        var lex1 = Lexer.init(text, 0)
+        let lex1 = Lexer.init(text, 0)
         let toks1 = lex1.tokenize()
         for ti in 0..toks1.len():
             if toks1.get_tag(ti) != TokenKind.TK_IDENT:
@@ -1666,13 +1666,13 @@ impl LspState:
         let idx = self.find_doc(uri)
         if idx >= 0:
             self.ensure_doc_analyzed(idx)
-        let empty_paths: List[str] = List.new()
+        let empty_paths: List[str] = []
         let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
         let cached_paths = if use_cache: &self.documents[idx].cached_decl_paths else: &empty_paths
         if cached_paths.len() > 0:
             var scanned_paths = uri_to_path(uri) ++ "\n"
-            for di in 0..cached_paths.len():
-                let dpath = cached_paths[di]
+            for cached_path in cached_paths:
+                let dpath = cached_path
                 if dpath.len() == 0:
                     continue
                 if dpath.starts_with("<embedded"):
@@ -1684,7 +1684,7 @@ impl LspState:
                 if ft.len() == 0:
                     continue
                 let file_uri = "file://" ++ dpath
-                var lex2 = Lexer.init(ft, 0)
+                let lex2 = Lexer.init(ft, 0)
                 let toks2 = lex2.tokenize()
                 for ti2 in 0..toks2.len():
                     if toks2.get_tag(ti2) != TokenKind.TK_IDENT:
@@ -1709,7 +1709,7 @@ impl LspState:
         let idx = self.find_doc(uri)
         if idx >= 0:
             self.ensure_doc_analyzed(idx)
-        var comp = Compilation.init()
+        let comp = Compilation.init()
         var fresh_pool = AstPool.new()
         let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
         if not use_cache:
@@ -1774,7 +1774,7 @@ impl LspState:
         let offset = lsp_line_col_to_offset(text, line, col)
 
         // Find the identifier at cursor
-        var lex0 = Lexer.init(text, 0)
+        let lex0 = Lexer.init(text, 0)
         let tok0 = lex0.tokenize()
         var target = ""
         for i in 0..tok0.len():
@@ -1799,7 +1799,7 @@ impl LspState:
         // Current file edits
         var edits = jarr_start()
         var first = true
-        var lex1 = Lexer.init(text, 0)
+        let lex1 = Lexer.init(text, 0)
         let toks1 = lex1.tokenize()
         for ti in 0..toks1.len():
             if toks1.get_tag(ti) != TokenKind.TK_IDENT:
@@ -1822,13 +1822,13 @@ impl LspState:
         let cidx = self.find_doc(uri)
         if cidx >= 0:
             self.ensure_doc_analyzed(cidx)
-        let empty_paths: List[str] = List.new()
+        let empty_paths: List[str] = []
         let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
         let cached_paths = if use_cache: &self.documents[cidx].cached_decl_paths else: &empty_paths
         if cached_paths.len() > 0:
             var scanned_paths = uri_to_path(uri) ++ "\n"
-            for di in 0..cached_paths.len():
-                let dpath = cached_paths[di]
+            for cached_path in cached_paths:
+                let dpath = cached_path
                 if dpath.len() == 0 or dpath.starts_with("<embedded"):
                     continue
                 if lsp_find_substr(scanned_paths, dpath) >= 0:
@@ -1839,7 +1839,7 @@ impl LspState:
                     continue
                 var file_edits = jarr_start()
                 var fe_first = true
-                var lex2 = Lexer.init(ft, 0)
+                let lex2 = Lexer.init(ft, 0)
                 let toks2 = lex2.tokenize()
                 var has_edits = false
                 for ti2 in 0..toks2.len():
@@ -1883,8 +1883,8 @@ fn lsp_extract_position(msg: &str, tokens: *mut JsonToken, params_idx: i32, line
 let LSP_MAX_TOKENS: i32 = 256
 
 fn run_lsp() -> i32:
-    var state = LspState.new()
-    let tokens = with_alloc((LSP_MAX_TOKENS * 20) as i64) as *mut JsonToken
+    let state = LspState.new()
+    let tokens = with_alloc((LSP_MAX_TOKENS * 20)) as *mut JsonToken
 
     while true:
         let msg = lsp_read_message()
@@ -1963,8 +1963,8 @@ fn run_lsp() -> i32:
 
         else if method == "textDocument/hover":
             let uri = lsp_extract_uri(msg, tokens, params_idx)
-            var line: i32 = 0
-            var character: i32 = 0
+            let line: i32 = 0
+            let character: i32 = 0
             lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
@@ -1977,8 +1977,8 @@ fn run_lsp() -> i32:
 
         else if method == "textDocument/definition":
             let uri = lsp_extract_uri(msg, tokens, params_idx)
-            var line: i32 = 0
-            var character: i32 = 0
+            let line: i32 = 0
+            let character: i32 = 0
             lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
@@ -2008,8 +2008,8 @@ fn run_lsp() -> i32:
 
         else if method == "textDocument/completion":
             let uri = lsp_extract_uri(msg, tokens, params_idx)
-            var line: i32 = 0
-            var character: i32 = 0
+            let line: i32 = 0
+            let character: i32 = 0
             lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
@@ -2022,8 +2022,8 @@ fn run_lsp() -> i32:
 
         else if method == "textDocument/signatureHelp":
             let uri = lsp_extract_uri(msg, tokens, params_idx)
-            var line: i32 = 0
-            var character: i32 = 0
+            let line: i32 = 0
+            let character: i32 = 0
             lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
@@ -2036,8 +2036,8 @@ fn run_lsp() -> i32:
 
         else if method == "textDocument/references":
             let uri = lsp_extract_uri(msg, tokens, params_idx)
-            var line: i32 = 0
-            var character: i32 = 0
+            let line: i32 = 0
+            let character: i32 = 0
             lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
@@ -2061,8 +2061,8 @@ fn run_lsp() -> i32:
 
         else if method == "textDocument/rename":
             let uri = lsp_extract_uri(msg, tokens, params_idx)
-            var line: i32 = 0
-            var character: i32 = 0
+            let line: i32 = 0
+            let character: i32 = 0
             lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let new_name = json_tok_str(msg, tokens, json_find(msg, tokens, params_idx, "newName"))
             let idx = state.find_doc(uri)

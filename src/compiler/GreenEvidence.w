@@ -24,7 +24,7 @@ fn green_git_output(root: &str, args: &List[str], label: &str) -> str:
     if runtime_mkdir_p(dir) != 0: return ""
     let stdout_path = green_join(dir, label ++ ".stdout")
     var argv = build_graph_argv_append("", "git")
-    for i in 0..args.len(): argv = build_graph_argv_append(argv, args[i])
+    for arg in args: argv = build_graph_argv_append(argv, arg)
     if runtime_exec_argv_capture_cwd(argv, stdout_path, green_join(dir, label ++ ".stderr"), 60000, root) != 0: return ""
     runtime_read_file(stdout_path)
 
@@ -65,19 +65,19 @@ fn green_identity_inputs(top_level: &str, bench_level: &str) -> str:
 // The identity of the inputs as committed: the git object name of the
 // filtered listing, or "" when git fails.
 fn green_inputs_identity(root: &str) -> str:
-    let top_args: List[str] = List.new()
+    let top_args: List[str] = []
     top_args.push("ls-tree")
     top_args.push("HEAD")
     let top_level = green_git_output(root, top_args, "ls-tree")
     if top_level.len() == 0: return ""
-    let bench_args: List[str] = List.new()
+    let bench_args: List[str] = []
     bench_args.push("ls-tree")
     bench_args.push("HEAD:benchmarks")
     let bench_level = green_git_output(root, bench_args, "ls-tree-benchmarks")
     if top_level.contains("\tbenchmarks\n") and bench_level.len() == 0: return ""
     let listing = green_join(green_join(root, "out/command/install-gate"), "green-inputs.txt")
     if runtime_write_file(listing, green_identity_inputs(top_level, bench_level)) != 0: return ""
-    let hash_args: List[str] = List.new()
+    let hash_args: List[str] = []
     hash_args.push("hash-object")
     hash_args.push(listing)
     green_first_line(green_git_output(root, hash_args, "hash-object"))
@@ -97,12 +97,12 @@ fn green_status_is_not_input(status_line: &str) -> bool:
 
 // Every build input is as committed, and nothing untracked could be one.
 fn green_worktree_is_clean(root: &str) -> bool:
-    let args: List[str] = List.new()
+    let args: List[str] = []
     args.push("status")
     args.push("--porcelain")
     let status_lines = green_git_output(root, args, "status").split("\n")
-    for i in 0..status_lines.len():
-        let line = status_lines[i]
+    for status_line in status_lines:
+        let line = status_line
         if line.len() > 0 and not green_status_is_not_input(line): return false
     true
 
@@ -121,8 +121,8 @@ fn green_by_source_identity(root: &str) -> str:
     if tree.len() < 40: return ""
     let identity = tree ++ "-" ++ seeded_by ++ "-" ++ with_sysinfo_os() ++ "_" ++ with_sysinfo_arch()
     let store_lines = runtime_read_file(green_join(green_store_dir(), "green.tsv")).split("\n")
-    for i in 0..store_lines.len():
-        let line = store_lines[i]
+    for store_line in store_lines:
+        let line = store_line
         if line.starts_with(identity ++ "\t"):
             let fields = line.split("\t")
             return if fields.len() > 1: fields[1] else: "recorded"

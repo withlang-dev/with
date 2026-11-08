@@ -635,22 +635,22 @@ impl PairsReport:
     mut fn check_body(ast: &AstPool, sema: &Sema, body: &MirBody):
         if body.block_count() <= 0 or not pairs_body_relevant(sema, body):
             return
-        var pb = pairs_body_new(body)
+        let pb = pairs_body_new(body)
         pb.classify(sema, body)
         pb.prepass(sema, body)
         pb.build(sema, body)
         // Entry: parameters carry a pair the caller proved compatible (its
         // own flow checks that at the call); every other place is absent.
         let width = pb.width()
-        var entry = foreign_pair_places(width as i32)
+        let entry = foreign_pair_places(width as i32)
         for li in 1..(body.n_params + 1):
             if li < width and (pb.is_resource(li) or pb.is_ref(li)):
                 entry.values[li] = foreign_pair_initial(false)
         let flow = foreign_pair_place_flow(pb.starts, pb.counts, pb.steps, pb.edges, entry)
         if pairs_dump_enabled():
             pairs_dump(sema, body, pb, flow)
-        let reported_starts: List[i32] = List.new()
-        let reported_kinds: List[i32] = List.new()
+        let reported_starts: List[i32] = []
+        let reported_kinds: List[i32] = []
         for vi in 0..flow.violations.len():
             let si = flow.violations[vi]
             let site = pb.sites[si]
@@ -673,7 +673,7 @@ fn pairs_dump_enabled() -> bool: with_getenv_str("WITH_DUMP_PAIR_FLOW").len() > 
 // (compiler/Compilation.w run_mir_lower): a module with no callback pair
 // costs one table lookup.
 fn check_foreign_pairs(mir_mod: &MirModule, ast: &AstPool, sema: &Sema) -> PairsReport:
-    var report = PairsReport { findings: List.new() }
+    let report = PairsReport { findings: List.new() }
     if sema.facade_pair_ops.len() == 0:
         return report
     for bi in 0..mir_mod.bodies.len():

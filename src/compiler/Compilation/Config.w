@@ -65,7 +65,7 @@ fn compilation_config_default -> CompilationConfig:
     }
 
 fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> CompilationConfig:
-    var cfg = compilation_config_default()
+    let cfg = compilation_config_default()
     cfg.opt_level = opt_level
     cfg.no_std = no_std
     cfg.alloc_mode = alloc_mode

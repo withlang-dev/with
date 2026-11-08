@@ -57,7 +57,7 @@ impl Sema:
         // A builder, not `out = out ++ ...`: one join had enough arms that
         // re-copying the text per arm was the whole typed dump's cost (#2476).
         let decision = self.contextual_join_decisions[index]
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         out.push_str(f"join[{index}] node={decision.join_node} final={self.type_name(decision.final_type)}")
         out.push_str(if decision.expected_type != 0: " expected=" ++ self.type_name(decision.expected_type) else: " expected=<inferred>")
         out.push_str(f" expected-anchor={decision.expected_is_anchor} arms={decision.arm_count} owned-anchors={decision.owned_anchor_count} materialized={decision.materialized_count} views={decision.view_count} diverging={decision.diverging_count} origin-mask={decision.origin_mask} origin-deps={decision.origin_count}\n")
@@ -147,7 +147,7 @@ impl Sema:
         var msg = "wrong argument type"
         if call_name.len() > 0:
             msg = msg ++ " in call to '" ++ call_name ++ "'"
-        var diag = Diagnostic.err(msg, primary)
+        let diag = Diagnostic.err(msg, primary)
         if expr_text.len() > 0 and sema_str_contains_char(expr_text, 10) == false:
             diag.add_label(primary, "argument expression '" ++ expr_text ++ "' has type " ++ actual_name)
         else:
@@ -208,7 +208,7 @@ impl Sema:
         let target_name = self.pool_resolve(sym)
         if not self.ci_omitted_symbols.contains(target_name):
             return false
-        let record: str = with_str_clone_ref(self.ci_omitted_symbols.get(target_name).unwrap())
+        let record = with_str_clone_ref(self.ci_omitted_symbols.get(target_name).unwrap())
         let loc = ci_omitted_field(record, 0)
         let category = ci_omitted_field(record, 1)
         let reason_raw = ci_omitted_field(record, 2)
@@ -254,7 +254,7 @@ impl Sema:
     // `with check --ceremony-census`: one line per recorded ceremony site,
     // `pattern<TAB>path<TAB>line<TAB>start<TAB>end`, in the order Sema met them.
     fn ceremony_census_text() -> str:
-        var paths: HashMap[i32, str] = HashMap.new()
+        let paths: HashMap[i32, str] = [:]
         for di in 0..self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]
             if not paths.contains(file_id) and di < self.decl_source_paths.len():
@@ -296,14 +296,14 @@ impl Sema:
     mut fn emit_error(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
+        let diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(diag)
 
     mut fn emit_error_code(msg: &str, node: i32, code: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
+        let diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_code(code)
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(diag)
@@ -311,7 +311,7 @@ impl Sema:
     mut fn emit_error_with_help(msg: &str, node: i32, help: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
+        let diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         if help.len() > 0:
             diag.add_help(help)
@@ -322,18 +322,18 @@ impl Sema:
     mut fn emit_error_with_label(msg: &str, node: i32, label_node: i32, label: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
+        let diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         diag.add_label(self.diagnostic_node_span(label_node), label)
         self.diags.emit(diag)
 
     mut fn emit_warning(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
-        var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
+        let diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(diag)
 
     mut fn emit_warning_code(msg: &str, node: i32, code: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
-        var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
+        let diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_code(code)
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(diag)
@@ -523,7 +523,7 @@ impl Sema:
     // The adjustments in the program's own sources, without the embedded
     // stdlib's: what a fixture pins, unmoved by an edit to std.
     fn contextual_copy_adjustments_outside_std() -> isize:
-        var paths: HashMap[i32, str] = HashMap.new()
+        let paths: HashMap[i32, str] = [:]
         for di in 0..self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]
             if not paths.contains(file_id) and di < self.decl_source_paths.len():
@@ -537,7 +537,7 @@ impl Sema:
 
     mut fn dump_typed_module() -> str:
         self.reset_typed_dump_safety()
-        var out = StringBuilder.new()
+        let out = StringBuilder.new()
         let total_decl_count = self.ast.decl_count()
         let dump_decl_count = total_decl_count
         out.push_str(f"typed module decls={dump_decl_count}\n")

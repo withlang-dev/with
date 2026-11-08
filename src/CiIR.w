@@ -461,7 +461,7 @@ impl CiExprPool:
             ci_ir_phase_bug("BUG: CiExprPool.set_type called after freeze")
         let idx = (id as i32) as i64
         var i: i64 = 0
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         let n = st.types.len()
         while i < n:
             if i == idx:
@@ -1091,7 +1091,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
     }
 
 fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
-    let needle = "|" ++ i64_to_string(want as i64) ++ "|"
+    let needle = "|" ++ i64_to_string(want) ++ "|"
     var i = 0
     let ilen = items.len()
     let nlen = needle.len()
@@ -1117,14 +1117,14 @@ impl CiProjectSymbol:
     mut fn add_header_definer(module_id: i32):
         if module_id < 0 or ci_pipe_i32_contains(self.header_definers, module_id):
             return
-        self.header_definers = self.header_definers ++ "|" ++ i64_to_string(module_id as i64) ++ "|"
+        self.header_definers = self.header_definers ++ "|" ++ i64_to_string(module_id) ++ "|"
 
     mut fn add_consumer(module_id: i32):
         if module_id < 0:
             return
         if ci_pipe_i32_contains(self.consumers, module_id):
             return
-        self.consumers = self.consumers ++ "|" ++ i64_to_string(module_id as i64) ++ "|"
+        self.consumers = self.consumers ++ "|" ++ i64_to_string(module_id) ++ "|"
 
     // D107: size every per-parameter vector to at least `n` entries.
     mut fn grow_params(n: i32):

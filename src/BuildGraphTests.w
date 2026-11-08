@@ -16,7 +16,7 @@ type BuildGraphExternalTestJob {
 }
 
 fn build_graph_test_target_files(root: &str, entry: &str) -> List[str]:
-    let files: List[str] = List.new()
+    let files: List[str] = []
     if not build_graph_path_has_glob(entry):
         files.push(resolve_join(root, entry))
         return files
@@ -195,13 +195,13 @@ fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compil
     let compiler_fp = build_cache_test_compiler_fingerprint(compiler_path)
     let argv_shape = build_graph_argv_append(build_graph_append_test_args(build_graph_argv_append("", "test"), target), "--quiet")
     let prior = build_cache_load_test_verdicts(root, compiler_fp, target.name)
-    var pass_keys: List[str] = List.new()
-    var pass_paths: List[str] = List.new()
-    var run_files: List[str] = List.new()
-    var run_keys: List[str] = List.new()
+    let pass_keys: List[str] = []
+    let pass_paths: List[str] = []
+    let run_files: List[str] = []
+    let run_keys: List[str] = []
     var cached_count = 0
-    for i in 0..test_files.len():
-        let test_path = test_files[i]
+    for test_file in test_files:
+        let test_path = test_file
         let key = build_cache_test_verdict_key(root, target, compiler_fp, argv_shape, test_path)
         if prior.contains(key):
             cached_count = cached_count + 1
@@ -218,16 +218,16 @@ fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compil
     let js_slots = build_graph_test_parse_jobs(build_graph_rt_getenv("WITH_BUILD_JOBSERVER_SLOTS"))
     let use_js = js_dir.len() > 0 and js_slots > 0
     let jobs_limit = if use_js: 32 else: build_graph_test_jobs()
-    let slot_of: List[i32] = List.new()
-    var failed_paths: List[str] = List.new()
+    let slot_of: List[i32] = []
+    let failed_paths: List[str] = []
     var first_failure: i32 = 0
     var next: i32 = 0
     var finished = 0
-    let active: List[BuildGraphExternalTestJob] = List.new()
-    let active_keys: List[str] = List.new()
-    let started_ns: List[i64] = List.new()
+    let active: List[BuildGraphExternalTestJob] = []
+    let active_keys: List[str] = []
+    let started_ns: List[i64] = []
     // Indices into `active` of the children still running (at most jobs_limit).
-    var live: List[i32] = List.new()
+    let live: List[i32] = []
     // Sliding window: keep jobs_limit children in flight and refill a slot the
     // moment ANY child exits. Retiring only the oldest held the window behind
     // one slow file: a lane's 43 s test near the front of the alphabet let the
@@ -293,8 +293,8 @@ fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compil
 
     if failed_paths.len() > 0:
         build_graph_rt_eprint(f"error: test target '{target.name}': {failed_paths.len()} of {test_files.len()} files failed ({cached_count} cached, {run_files.len()} ran):")
-        for fi in 0..failed_paths.len():
-            build_graph_rt_eprint("error:   failed: " ++ failed_paths[fi])
+        for failed_path in failed_paths:
+            build_graph_rt_eprint("error:   failed: " ++ failed_path)
         return first_failure
     build_graph_rt_eprint(f"test target '{target.name}': {test_files.len()} files ok ({cached_count} cached, {run_files.len()} ran)")
     0

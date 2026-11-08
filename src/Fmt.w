@@ -172,7 +172,7 @@ fn token_span(source: &str, tokens: &TokenList, a: isize, b: isize) -> str:
     source.slice(tokens.get_start(a), tokens.get_end(b))
 
 fn flatten_nested_arrays_once(source: &str) -> str:
-    var lexer = Lexer.init(source, 0)
+    let lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
     let n = tokens.len()
     for i in 0..n - 1:
@@ -220,7 +220,7 @@ fn flatten_nested_arrays_once(source: &str) -> str:
 
 fn format_source_styled(input: &str, style: i32) -> str:
     let source = flatten_nested_arrays(input)
-    var lexer = Lexer.init(source, 0)
+    let lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
     let count = tokens.len()
     var out = ""
@@ -230,8 +230,8 @@ fn format_source_styled(input: &str, style: i32) -> str:
     var prev_was_newline = false
     var line_indent: i32 = 0
     var block_kw_active = false
-    var close_stack: List[i32] = List.new()
-    var suppress_stack: List[i32] = List.new()
+    let close_stack: List[i32] = []
+    let suppress_stack: List[i32] = []
     var brace_depth: i32 = 0
     var semi_indent: i32 = -1
     // prefer-brace: `}`s owed on this line by inline `: expr` conversions

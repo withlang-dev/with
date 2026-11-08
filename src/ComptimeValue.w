@@ -201,8 +201,8 @@ fn comptime_value_capability(type_id: i32, capability_kind: i32, handle_id: i32,
     ComptimeValue {
         kind: ComptimeValueKind.CV_CAPABILITY,
         type_id,
-        data0: capability_kind as i64,
-        data1: handle_id as i64,
+        data0: capability_kind,
+        data1: handle_id,
         real: 0.0,
         text: "",
         extra_start: generation,
@@ -213,7 +213,7 @@ fn comptime_value_fn(type_id: i32, fn_sym: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_FN,
         type_id,
-        data0: fn_sym as i64,
+        data0: fn_sym,
         data1: 0,
         real: 0.0,
         text: "",
@@ -225,7 +225,7 @@ fn comptime_value_enum(type_id: i32, variant_sym: i32, extra_start: i32, extra_c
     ComptimeValue {
         kind: ComptimeValueKind.CV_ENUM,
         type_id,
-        data0: variant_sym as i64,
+        data0: variant_sym,
         data1: 0,
         real: 0.0,
         text: "",
@@ -358,7 +358,7 @@ fn comptime_value_format(value: &ComptimeValue, extras: &List[ComptimeValue], se
     if value.kind == ComptimeValueKind.CV_FN:
         return "<fn " ++ sema.pool_resolve(value.data0 as i32) ++ ">"
     if value.kind == ComptimeValueKind.CV_ENUM:
-        var out: str = with_str_clone_ref(sema.pool_resolve(value.data0 as i32))
+        var out = with_str_clone_ref(sema.pool_resolve(value.data0 as i32))
         if value.extra_count > 0:
             out = out ++ "("
             for i in 0..value.extra_count:

@@ -100,8 +100,8 @@ impl Diagnostic:
     mut fn add_help(text: &str): self.helps.push(diagnostic_owned_text(text))
 
     fn render(source: &Source):
-        let no_paths: List[str] = List.new()
-        let no_texts: List[str] = List.new()
+        let no_paths: List[str] = []
+        let no_texts: List[str] = []
         self.render_with_label_sources(source, no_paths, no_texts)
 
     // Render with the primary span shifted back into an original file's
@@ -109,8 +109,8 @@ impl Diagnostic:
     // mutated copy: copying a Diagnostic out of a stored list aliases its
     // label/note buffers and double-frees on drop (#715 class).
     fn render_at_offset(source: &Source, gen_start: i32):
-        let no_paths: List[str] = List.new()
-        let no_texts: List[str] = List.new()
+        let no_paths: List[str] = []
+        let no_texts: List[str] = []
         self.render_with_label_sources_at_offset(source, no_paths, no_texts, gen_start)
 
     // #670: a label whose span lives in another file must resolve line/col
@@ -126,21 +126,21 @@ impl Diagnostic:
         var pend = self.primary.end - gen_start
         if pend <= pstart:
             pend = pstart + 1
-        let diag_code: str = with_str_clone_ref(self.code)
-        let diag_message: str = with_str_clone_ref(self.message)
+        let diag_code = with_str_clone_ref(self.code)
+        let diag_message = with_str_clone_ref(self.message)
         with_eprint(render_diag_header(self.severity, diag_code, diag_message))
 
         let loc = source.offset_to_location(pstart)
-        let source_path: str = with_str_clone_ref(source.path)
+        let source_path = with_str_clone_ref(source.path)
         with_eprint(render_diag_location(source_path, loc.line, loc.col))
 
-        let line_text: str = source.line_text(loc.line)
+        let line_text = source.line_text(loc.line)
         with_eprint(render_diag_source_line(loc.line, line_text))
         with_eprint(render_diag_marker_line(loc.col, span_underline_len(pstart, pend)))
 
         for i in 0..self.labels.len():
             let lab = &self.labels[i]
-            let label_message: str = with_str_clone_ref(lab.message)
+            let label_message = with_str_clone_ref(lab.message)
             var label_path = ""
             if i < label_paths.len():
                 label_path = with_str_clone_ref(label_paths[i])
@@ -156,10 +156,10 @@ impl Diagnostic:
                 with_eprint(render_diag_label_line(lloc.line, lloc.col, label_message))
 
         for i in 0..self.notes.len():
-            let note: str = with_str_clone_ref(self.notes[i])
+            let note = with_str_clone_ref(self.notes[i])
             with_eprint(render_diag_note_line(note))
         for i in 0..self.helps.len():
-            let help: str = with_str_clone_ref(self.helps[i])
+            let help = with_str_clone_ref(self.helps[i])
             with_eprint(render_diag_help_line(help))
 
 type DiagnosticList {
@@ -198,7 +198,7 @@ impl DiagnosticList:
     // work order is not the program's (bodies checked callee first, or in
     // parallel) reports in the program's order.
     mut fn sort_from(start: i32):
-        var rest: List[Diagnostic] = List.new()
+        let rest: List[Diagnostic] = []
         while self.items.len() > start:
             rest.push(self.items.remove(start))
         while rest.len() > 0:

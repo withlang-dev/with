@@ -49,7 +49,7 @@ type InternStringArena {
 
 fn InternStringArena.new() -> InternStringArena:
     let first = with_alloc(INTERN_PAGE_SIZE)
-    var arena = InternStringArena { pages: List.new(), offset: INTERN_PAGE_LEAD }
+    let arena = InternStringArena { pages: List.new(), offset: INTERN_PAGE_LEAD }
     arena.pages.push(first)
     arena
 
@@ -75,7 +75,7 @@ impl InternStringArena:
         with_memcpy(dest, src, len)
         unsafe *((dest as i64 + len) as *mut u8) = 0
         self.offset = self.offset + need
-        var raw: [2]i64 = [dest as i64, len]
+        let raw: [2]i64 = [dest as i64, len]
         let p = &raw as *const str
         unsafe *p
 
@@ -97,7 +97,7 @@ type InternPool {
 }
 
 fn intern_new_map_str_i32 -> HashMap[str, i32]:
-    let map: HashMap[str, i32] = HashMap.new()
+    let map: HashMap[str, i32] = [:]
     map
 
 fn InternPool.init -> InternPool:

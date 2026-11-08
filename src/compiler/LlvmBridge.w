@@ -621,8 +621,8 @@ fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
     unsafe:
         let default_triple = LLVMGetDefaultTargetTriple()
         let triple = llvm_object_triple(default_triple)
-        var target: *mut u8 = 0 as *mut u8
-        var err: *mut u8 = 0 as *mut u8
+        let target = 0 as *mut u8
+        let err = 0 as *mut u8
         if LLVMGetTargetFromTriple(triple, &raw mut target, &raw mut err) != 0:
             if err as i64 != 0:
                 let err_len = c_strlen(err as *const u8)
@@ -683,7 +683,7 @@ fn wl_struct_set_body(ty: i64, elems_ptr: i64, count: i32, packed: i32):
 
 fn wl_struct_set_body_2(ty: i64, t0: i64, t1: i64, packed: i32):
     unsafe:
-        var elems: [2]i64 = [t0, t1]
+        let elems: [2]i64 = [t0, t1]
         LLVMStructSetBody(ty as *mut u8, &elems as *const *mut u8, 2, packed)
 
 fn wl_struct_get_type_at(ty: i64, idx: i32) -> i64: unsafe { LLVMStructGetTypeAtIndex(ty as *mut u8, idx as u32) as i64 }
@@ -746,7 +746,7 @@ fn wl_const_int(ty: i64, val: i64, sign_ext: i32) -> i64:
 
 fn wl_const_int_words(ty: i64, lo: i64, hi: i64, word_count: i32) -> i64:
     unsafe:
-        var words: [2]u64 = [lo as u64, hi as u64]
+        let words: [2]u64 = [lo as u64, hi as u64]
         LLVMConstIntOfArbitraryPrecision(ty as *mut u8, word_count as u32, &words as *const u64) as i64
 
 fn wl_const_real(ty: i64, val: f64) -> i64: unsafe { LLVMConstReal(ty as *mut u8, val) as i64 }
@@ -1071,8 +1071,8 @@ fn wl_write_bitcode(m: i64, path: &str) -> i32:
 
 fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
     unsafe:
-        var mem_buf: *mut u8 = 0 as *mut u8
-        var err: *mut u8 = 0 as *mut u8
+        let mem_buf = 0 as *mut u8
+        let err = 0 as *mut u8
         if LLVMCreateMemoryBufferWithContentsOfFile(to_cstr(path), &raw mut mem_buf, &raw mut err) != 0:
             if err as i64 != 0:
                 let err_len = c_strlen(err as *const u8)
@@ -1081,8 +1081,8 @@ fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
                     rt_write(2, "\n" as *const u8, 1)
                 LLVMDisposeMessage(err)
             return 0
-        var m: *mut u8 = 0 as *mut u8
-        var parse_err: *mut u8 = 0 as *mut u8
+        let m = 0 as *mut u8
+        let parse_err = 0 as *mut u8
         // LLVMParseIRInContext2 takes ownership of the buffer and accepts
         // bitcode as well as textual IR.
         if LLVMParseIRInContext2(ctx as *mut u8, mem_buf, &raw mut m, &raw mut parse_err) != 0:
@@ -1280,7 +1280,7 @@ fn wl_clear_initializer(g: i64) -> Unit:
 
 fn wl_get_value_name(v: i64) -> str:
     unsafe:
-        var len: u64 = 0
+        let len: u64 = 0
         let p = LLVMGetValueName2(v as *mut u8, &raw mut len)
         if p as i64 == 0 or len == 0:
             return ""
@@ -1406,7 +1406,7 @@ fn wl_get_struct_name(ty: i64) -> str:
         let name = LLVMGetStructName(ty as *mut u8)
         if name as i64 == 0: return ""
         let len = c_strlen(name)
-        var raw: [2]i64 = [name as i64, len]
+        let raw: [2]i64 = [name as i64, len]
         let p = &raw as *const str
         *p
 
@@ -1433,7 +1433,7 @@ fn wl_get_fn_param_type(fn_ty: i64, index: i32) -> i64:
 
 fn wl_verify_module(m: i64) -> i32:
     unsafe:
-        var err: *mut u8 = 0 as *mut u8
+        let err = 0 as *mut u8
         let result = LLVMVerifyModule(m as *mut u8, LLVM_ReturnStatusAction, &raw mut err)
         if err as i64 != 0:
             if result != 0:
@@ -1456,12 +1456,12 @@ fn wl_emit_object(tm: i64, m: i64, path: &str) -> i32:
             let msg = "LLVM emit error: null module\n"
             rt_write(2, msg as *const u8, 29)
             return 1
-        var path_buf: [4096]u8 = [0 as u8; 4096]
+        let path_buf: [4096]u8 = [0 as u8; 4096]
         let n = if path.len() < 4095: path.len() else: 4095
         let sp = *(path as *const str as *const *const u8)
         with_memcpy(&path_buf as *mut u8, sp, n)
         path_buf[n] = 0
-        var err: *mut u8 = 0 as *mut u8
+        let err = 0 as *mut u8
         let result = LLVMTargetMachineEmitToFile(tm as *mut u8, m as *mut u8, &path_buf as *mut u8, LLVM_ObjectFile, &raw mut err)
         if result != 0 and err as i64 != 0:
             let msg = "LLVM emit error\n"
@@ -1719,7 +1719,7 @@ fn wl_di_create_expression(builder: i64) -> i64:
 
 // `DW_OP_deref`: the variable is at the address its storage holds.
 fn wl_di_create_deref_expression(builder: i64) -> i64:
-    var ops: [1]i64 = [0x06 as i64; 1]
+    let ops: [1]i64 = [0x06 as i64; 1]
     unsafe:
         LLVMDIBuilderCreateExpression(builder as *mut u8, &ops[0] as *const i64, 1) as i64
 
@@ -1825,10 +1825,10 @@ fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple
         wl_init_native_target()
         wl_init_native_asm_printer()
         wl_init_native_asm_parser()
-        var src_buf: [4096]u8 = [0 as u8; 4096]
+        let src_buf: [4096]u8 = [0 as u8; 4096]
         let src_cstr = path_to_cstr(source_path, &src_buf as *mut u8)
-        var mem_buf: *mut u8 = 0 as *mut u8
-        var err: *mut u8 = 0 as *mut u8
+        let mem_buf = 0 as *mut u8
+        let err = 0 as *mut u8
         if LLVMCreateMemoryBufferWithContentsOfFile(src_cstr, &raw mut mem_buf, &raw mut err) != 0:
             if err as i64 != 0:
                 rt_write(2, "error: could not read assembly file\n" as *const u8, 36)
@@ -1843,8 +1843,8 @@ fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple
         LLVMSetTarget(m, triple)
         LLVMSetModuleInlineAsm2(m, asm_ptr, asm_len)
         LLVMDisposeMemoryBuffer(mem_buf)
-        var target: *mut u8 = 0 as *mut u8
-        var terr: *mut u8 = 0 as *mut u8
+        let target = 0 as *mut u8
+        let terr = 0 as *mut u8
         if LLVMGetTargetFromTriple(triple, &raw mut target, &raw mut terr) != 0:
             if terr as i64 != 0: LLVMDisposeMessage(terr)
             LLVMDisposeMessage(default_triple)
@@ -1853,9 +1853,9 @@ fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple
             return 1
         let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr, c"".ptr, LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
         LLVMDisposeMessage(default_triple)
-        var out_buf: [4096]u8 = [0 as u8; 4096]
+        let out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
-        var emit_err: *mut u8 = 0 as *mut u8
+        let emit_err = 0 as *mut u8
         let rc = LLVMTargetMachineEmitToFile(tm, m, out_cstr as *mut u8, LLVM_ObjectFile, &raw mut emit_err)
         if rc != 0 and emit_err as i64 != 0:
             rt_write(2, "error: assembly emit failed\n" as *const u8, 28)
@@ -1869,18 +1869,18 @@ fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
     unsafe:
         wl_init_native_target()
         wl_init_native_asm_printer()
-        var src_buf: [4096]u8 = [0 as u8; 4096]
+        let src_buf: [4096]u8 = [0 as u8; 4096]
         let src_cstr = path_to_cstr(source_path, &src_buf as *mut u8)
-        var mem_buf: *mut u8 = 0 as *mut u8
-        var err: *mut u8 = 0 as *mut u8
+        let mem_buf = 0 as *mut u8
+        let err = 0 as *mut u8
         if LLVMCreateMemoryBufferWithContentsOfFile(src_cstr, &raw mut mem_buf, &raw mut err) != 0:
             if err as i64 != 0:
                 rt_write(2, "error: could not read IR file\n" as *const u8, 30)
                 LLVMDisposeMessage(err)
             return 1
         let ctx = LLVMContextCreate()
-        var m: *mut u8 = 0 as *mut u8
-        var parse_err: *mut u8 = 0 as *mut u8
+        let m = 0 as *mut u8
+        let parse_err = 0 as *mut u8
         if LLVMParseIRInContext2(ctx, mem_buf, &raw mut m, &raw mut parse_err) != 0:
             if parse_err as i64 != 0:
                 rt_write(2, "error: IR parse failed\n" as *const u8, 22)
@@ -1896,8 +1896,8 @@ fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
         if triple as i64 == 0 or *(triple) == 0:
             triple = llvm_object_triple(default_triple)
             LLVMSetTarget(m, triple)
-        var target: *mut u8 = 0 as *mut u8
-        var terr: *mut u8 = 0 as *mut u8
+        let target = 0 as *mut u8
+        let terr = 0 as *mut u8
         if LLVMGetTargetFromTriple(triple, &raw mut target, &raw mut terr) != 0:
             if terr as i64 != 0: LLVMDisposeMessage(terr)
             LLVMDisposeMessage(default_triple)
@@ -1930,9 +1930,9 @@ fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
         // undefined symbol. The O1 module-simplification pipeline includes
         // GlobalDCE, removing the whole dead chain portably — matching darwin.
         wl_optimize(m as i64, tm as i64, 1)
-        var out_buf: [4096]u8 = [0 as u8; 4096]
+        let out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
-        var emit_err: *mut u8 = 0 as *mut u8
+        let emit_err = 0 as *mut u8
         let rc = LLVMTargetMachineEmitToFile(tm, m, out_cstr as *mut u8, LLVM_ObjectFile, &raw mut emit_err)
         if rc != 0 and emit_err as i64 != 0:
             rt_write(2, "error: IR emit failed\n" as *const u8, 21)

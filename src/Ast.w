@@ -1358,7 +1358,7 @@ fn exact_int_parse_digits(digits: &str, radix: i32) -> ExactIntValue:
         acc = exact_int_mul_small(acc, radix)
         if acc.overflow != 0:
             return acc
-        acc = exact_int_add_small(acc, digit as i64)
+        acc = exact_int_add_small(acc, digit)
         if acc.overflow != 0:
             return acc
     acc
@@ -1881,8 +1881,8 @@ impl AstPool:
             // trait declared elsewhere falls back to first match. Taking
             // the first same-named trait made a user's `trait One` impl
             // inherit std One's (absent) receiver.
-            var trait_node: NodeId = 0 as NodeId
-            var fallback_node: NodeId = 0 as NodeId
+            var trait_node = 0 as NodeId
+            var fallback_node = 0 as NodeId
             for trait_di in 0..self.decl_count():
                 let candidate = self.get_decl(trait_di)
                 if self.kind(candidate) == NodeKind.NK_TRAIT_DECL and self.get_data0(candidate) == trait_sym:
@@ -1982,11 +1982,11 @@ impl AstPool:
         if st.frozen != 0:
             ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
         let self_sym = intern.intern("self")
-        let generated: HashMap[i32, i32] = HashMap.new()
-        for gi in 0..generated_files.len():
-            generated.insert(generated_files[gi], 1)
-        let struct_decls: HashMap[i64, i32] = HashMap.new()
-        let decl_nodes: HashMap[i32, i32] = HashMap.new()
+        let generated: HashMap[i32, i32] = [:]
+        for generated_file in generated_files:
+            generated.insert(generated_file, 1)
+        let struct_decls: HashMap[i64, i32] = [:]
+        let decl_nodes: HashMap[i32, i32] = [:]
         for di in 0..self.decl_count():
             let decl = self.get_decl(di)
             decl_nodes.insert(decl as i32, 1)
@@ -2047,13 +2047,13 @@ impl AstPool:
         var below = fn_node as i32 - 1
         while below > 0 and not decl_nodes.contains(below): below = below - 1
         // A nested fn is its own scope, with no receiver.
-        let nested_starts: List[i32] = List.new()
-        let nested_ends: List[i32] = List.new()
-        let callees: HashMap[i32, i32] = HashMap.new()
+        let nested_starts: List[i32] = []
+        let nested_ends: List[i32] = []
+        let callees: HashMap[i32, i32] = [:]
         // Names a binding in the body takes. Sema refuses that binding
         // (§29.8); its uses stay the binding's, so the refusal is the one
         // diagnostic rather than the head of a cascade through `self.<name>`.
-        let bound: HashMap[i32, i32] = HashMap.new()
+        let bound: HashMap[i32, i32] = [:]
         for n in below + 1..fn_node as i32:
             let node = n as NodeId
             let kind = self.kind(node)
@@ -2416,7 +2416,7 @@ impl AstPool:
 
     // The argument type nodes of the bound record `meta`.
     fn type_bound_arg_nodes(meta: i32) -> List[i32]:
-        var out: List[i32] = List.new()
+        let out: List[i32] = []
         let start: i32 = self.state.type_bound_args[(meta + 1)]
         for i in 0..self.state.type_bound_args[(meta + 2)]:
             out.push(self.state.type_bound_arg_nodes[(start + i)])
@@ -2488,13 +2488,13 @@ impl AstPool:
     mut fn build_for_carrier_alt(for_node: i32, binding_is_pat: bool, payload_sym: i32, fail_sym: i32) -> NodeId:
         let start = self.get_start(for_node)
         let binding = self.get_data0(for_node)
-        let pats: List[i32] = List.new()
+        let pats: List[i32] = []
         pats.push(if binding_is_pat: binding else: self.add_node(NodeKind.NK_PAT_IDENT, start, start, binding, 0, 0))
-        let exprs: List[i32] = List.new()
+        let exprs: List[i32] = []
         exprs.push(self.get_data1(for_node))
-        let kinds: List[i32] = List.new()
+        let kinds: List[i32] = []
         kinds.push(0)
-        let fail_syms: List[i32] = List.new()
+        let fail_syms: List[i32] = []
         fail_syms.push(fail_sym)
         let body = self.get_data2(for_node)
         let yielded = ast_for_body_yield_value(self, body)

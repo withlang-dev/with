@@ -101,4 +101,4 @@ fn const_literal_len(pool: &AstPool, sema: &Sema, call_node: i32) -> i64:
     if pool.kind(callee) != NodeKind.NK_FIELD_ACCESS or sema.pool_resolve(pool.get_data1(callee)) != "len": return -1
     let seq = const_literal_part_node(pool, sema, pool.get_data0(callee))
     if seq == 0 or pool.kind(seq) != NodeKind.NK_ARRAY_LIT or pool.get_data2(seq) != 0: return -1
-    pool.get_data1(seq) as i64
+    pool.get_data1(seq)

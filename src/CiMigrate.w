@@ -429,7 +429,7 @@ fn ci_migrate_source_module_path(path: &str) -> str:
     prefix ++ "." ++ suffix
 
 fn ci_migrate_pipe_i32_contains(items: &str, want: i32) -> bool:
-    let needle = "|" ++ i64_to_string(want as i64) ++ "|"
+    let needle = "|" ++ i64_to_string(want) ++ "|"
     ci_find_str(items, needle) >= 0
 
 fn ci_migrate_add_import_once(imports: &str, module_path: &str) -> str:
@@ -542,7 +542,7 @@ fn ci_migrate_publicize_types(text: &str) -> str: ci_migrate_publicize_lines(tex
 const CI_MIGRATE_HELPER_LOCALS: [15]str = ["a", "b", "c", "out", "result", "a_hi", "b_hi", "a_lo", "b_lo", "cross", "low", "neg", "ua", "ub", "limit"]
 
 fn ci_migrate_hygienic(text: &str) -> str:
-    var out = StringBuilder.new()
+    let out = StringBuilder.new()
     var i = 0
     while i < text.len():
         let ch = text[i]
@@ -640,7 +640,7 @@ fn ci_migrate_render_overflow_helpers(ty: &str, is_signed: bool):
 // Write the shared defs module (defs.w) to output_dir.
 // Contains: preamble + hardcoded extras + shared declarations.
 fn ci_migrate_write_shared_defs(output_dir: &str):
-    var defs = StringBuilder.new()
+    let defs = StringBuilder.new()
     defs.push_str("// ")
     defs.push_str(g_migrate_shared_defs_prefix)
     defs.push_str(" — shared definitions for migrated PCRE2\n\n")
@@ -651,8 +651,8 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
     // Shared declarations collected during migration.
     if g_migrate_shared_decl_buf.len() > 0:
         defs.push_str("\n")
-        for di in 0..g_migrate_shared_decl_buf.len():
-            defs.push_str(g_migrate_shared_decl_buf[di])
+        for g_migrate_shared_decl_buf_item in g_migrate_shared_decl_buf:
+            defs.push_str(g_migrate_shared_decl_buf_item)
     var pending_i = 0
     while pending_i < g_migrate_shared_pending_extern_vars.len():
         let pending = g_migrate_shared_pending_extern_vars[pending_i]
@@ -674,9 +674,9 @@ fn ci_migrate_write_shared_fragment(path: &str):
         eprint(f"migrate: failed to write shared fragment: {path}")
 
 fn ci_migrate_shared_fragment_text() -> str:
-    var fragment = StringBuilder.new()
-    for di in 0..g_migrate_shared_decl_records.len():
-        fragment.push_str(g_migrate_shared_decl_records[di])
+    let fragment = StringBuilder.new()
+    for g_migrate_shared_decl_record in g_migrate_shared_decl_records:
+        fragment.push_str(g_migrate_shared_decl_record)
     var pending_i = 0
     while pending_i < g_migrate_shared_pending_extern_vars.len():
         let pending = g_migrate_shared_pending_extern_vars[pending_i]
@@ -1009,10 +1009,10 @@ fn ci_migrate_prepare_include_path(input_path: &str):
         dir_end = dir_end - 1
     if dir_end > 0:
         with_cimport_add_include_path(input_path.slice(0, dir_end as i64))
-    for i in 0..g_migrate_include_paths.len():
-        with_cimport_add_include_path(g_migrate_include_paths[i])
-    for i in 0..g_migrate_macro_prefix_maps.len():
-        with_cimport_add_clang_arg("-fmacro-prefix-map=" ++ g_migrate_macro_prefix_maps[i])
+    for g_migrate_include_path in g_migrate_include_paths:
+        with_cimport_add_include_path(g_migrate_include_path)
+    for g_migrate_macro_prefix_map in g_migrate_macro_prefix_maps:
+        with_cimport_add_clang_arg("-fmacro-prefix-map=" ++ g_migrate_macro_prefix_map)
 
 // Portable-baseline migration preamble: undefine host CPU-feature macros so C
 // libraries select their generic, portable code path instead of host-specific
@@ -1045,8 +1045,8 @@ fn ci_migrate_portable_baseline_preamble() -> str:
 fn ci_migrate_source_prefix() -> str:
     let compat_preamble = migrate_host_compat_preamble()
     var prefix = ci_migrate_portable_baseline_preamble() ++ g_migrate_defines ++ compat_preamble
-    for i in 0..g_migrate_forced_includes.len():
-        prefix = prefix ++ "#include \"" ++ g_migrate_forced_includes[i] ++ "\"\n"
+    for g_migrate_forced_include in g_migrate_forced_includes:
+        prefix = prefix ++ "#include \"" ++ g_migrate_forced_include ++ "\"\n"
     prefix
 
 fn ci_migrate_wrapped_source(input_path: &str) -> str:
@@ -1393,7 +1393,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
         g_migrate_macro_session = macro_session
         ci_capture_macro_values(macro_session)
 
-    let output_parts: List[str] = List.new()
+    let output_parts: List[str] = []
 
     // C3: in shared-defs mode, skip the preamble and emit `use <prefix>` instead.
     // The preamble goes into defs.w (written by ci_migrate_write_shared_defs).
@@ -1535,7 +1535,7 @@ fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     ci_migrate_writes_reset()
     // D107: a lone unit is its own corpus — its definitions' body evidence
     // and NULL callers decide their function-pointer parameters.
-    var one: List[str] = List.new()
+    let one: List[str] = []
     one.push(input_path)
     project.register_modules(one)
     if project.migrate_scan_file(input_path) != 0: return 1
@@ -1647,7 +1647,7 @@ fn ci_migrate_file_before(a: &str, b: &str) -> bool:
     ci_str_compare(abase, bbase) < 0
 
 fn ci_migrate_sorted_files(files: &List[str]) -> List[str]:
-    let sorted: List[str] = List.new()
+    let sorted: List[str] = []
     var rank = 10
     while rank <= 320:
         var i = 0
@@ -1669,7 +1669,7 @@ fn ci_migrate_directory_output_path(input_dir: &str, output_dir: &str, file_path
     output_dir ++ "/" ++ ci_migrate_module_relative_path(input_dir, file_path) ++ ".w"
 
 fn ci_migrate_validate_module_paths(input_dir: &str, files: &List[str]):
-    var owners: HashMap[str, str] = HashMap.new()
+    let owners: HashMap[str, str] = [:]
     for path in files:
         let module_path = ci_migrate_module_relative_path(input_dir, path)
         if ci_migrate_shared_defs_active() and module_path == "defs":
@@ -1702,7 +1702,7 @@ fn ci_migrate_basename_is_hidden(path: &str) -> bool:
     base.len() > 0 and base[0] == 46
 
 fn ci_migrate_sorted_insert(files: &List[str], path: &str) -> List[str]:
-    let sorted: List[str] = List.new()
+    let sorted: List[str] = []
     var inserted = false
     var i = 0
     while i < files.len():
@@ -1717,7 +1717,7 @@ fn ci_migrate_sorted_insert(files: &List[str], path: &str) -> List[str]:
     sorted
 
 fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> List[str]:
-    var files: List[str] = List.new()
+    var files: List[str] = []
     let listing = with_fs_list_files(input_dir)
     var pos = 0
     let n = listing.len()
@@ -1784,7 +1784,7 @@ impl CiProject:
 
     mut fn record_fn_evidence(session: i64, decl_idx: i32, cursor: i32, symbol_id: i32):
         let count = with_cimport_fn_param_count(session, decl_idx)
-        var names: List[str] = List.new()
+        let names: List[str] = []
         for pi in 0..count:
             names.push(ci_escape_reserved(with_cimport_fn_param_name(session, decl_idx, pi)))
         self.symbols[symbol_id].grow_params(count)
@@ -1831,7 +1831,7 @@ impl CiProject:
     // calls: a NULL it passes to a corpus function is caller evidence
     // (pcre2test's `pcre2_jit_stack_assign(ctx, NULL, NULL)`).
     mut fn record_call_evidence(session: i64, cursor: i32, fname: &str):
-        let none: List[str] = List.new()
+        let none: List[str] = []
         for line in ci_body_call_evidence(session, cursor, none).split("\n"):
             let parts = line.split(":")
             if parts.len() != 3 or parts[0] != "null": continue
@@ -1963,7 +1963,7 @@ fn ci_index_of_name(names: &List[str], name: &str) -> i32:
     -1
 
 fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List[str]) -> i32:
-    let fragments: List[str] = List.new()
+    let fragments: List[str] = []
     with_fs_mkdir_p(output_dir)
     var migrated = 0
     var i = 0
@@ -2014,15 +2014,15 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
 // `-o FILE`) and the report, one line per function, to stderr.
 // Every `*.gir` under `input_dir`, sorted.
 fn ci_migrate_collect_gir_files(input_dir: &str) -> List[str]:
-    var files: List[str] = List.new()
+    var files: List[str] = []
     for line in with_fs_list_files(input_dir).split("\n"):
         if line.ends_with(".gir") and not ci_migrate_basename_is_hidden(line): files = ci_migrate_sorted_insert(files, line)
     files
 
 fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str, output_arg: &str, gir_arg: &str, facts_arg: &str) -> i32:
     let input = ci_migrate_fs_path(input_arg)
-    var files: List[str] = List.new()
-    var gir_files: List[str] = List.new()
+    var files: List[str] = []
+    var gir_files: List[str] = []
     if with_fs_is_dir(input) != 0:
         g_migrate_directory_input_dir = with_str_clone_ref(input)
         files = ci_migrate_sorted_files(ci_migrate_collect_c_files(input, exclude_basenames))
@@ -2032,7 +2032,7 @@ fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str,
         gir_files = ci_migrate_collect_gir_files(input)
     else: files.push(input)
     if gir_arg.len() > 0: gir_files.push(ci_migrate_fs_path(gir_arg))
-    var project = match ci_facade_project(files, facade_name, gir_files, facts_arg, false):
+    let project = match ci_facade_project(files, facade_name, gir_files, facts_arg, false):
         Ok(p) => p
         Err(message) =>
             if message.len() > 0: eprint("migrate: " ++ message)
@@ -2059,7 +2059,7 @@ fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str,
 // skipped: a function only that unit defines stays raw and the report says
 // why. An empty Err was already said on stderr.
 fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str], facts_path: &str, tolerate_unread: bool) -> Result[CiProject, str]:
-    var project = CiProject.new()
+    let project = CiProject.new()
     project.register_modules(files)
     for path in files:
         if project.migrate_scan_file(path) != 0:
@@ -2118,9 +2118,9 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     for define in defines: migrate_add_define(define)
     g_migrate_directory_input_dir = ci_migrate_fs_path(source_dir)
     let gir_files = ci_migrate_collect_gir_files(ci_migrate_fs_path(source_dir))
-    var files: List[str] = List.new()
+    let files: List[str] = []
     for unit in units: files.push(ci_migrate_fs_path(unit))
-    var project = match ci_facade_project(files, facade_name, gir_files, facts_path, true):
+    let project = match ci_facade_project(files, facade_name, gir_files, facts_path, true):
         Ok(p) => p
         Err(message) =>
             if message.len() > 0: eprint("with get: facade of " ++ facade_name ++ ": " ++ message)
@@ -2136,7 +2136,7 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         uninstalled_count = uninstalled_count + 1
         if uninstalled_count <= 12: uninstalled = uninstalled ++ (if uninstalled.len() > 0: ", " else: "") ++ project.symbols[si].name
     let draft = project.facade_draft(facade_name)
-    var spellings: List[str] = List.new()
+    var spellings: List[str] = []
     for si in project.presented:
         if project.symbols[si].header_file.len() == 0: continue
         let rel = ci_facade_import_spelling(project.symbols[si].header_file, import_dirs)
@@ -2154,8 +2154,8 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     // tree, and a configured-only tree has not made it yet: said apart
     // from a source unit the parser refused.
     let source_root = ci_migrate_fs_path(source_dir)
-    var unread: List[str] = List.new()
-    var generated: List[str] = List.new()
+    let unread: List[str] = []
+    let generated: List[str] = []
     for line in project.unread:
         if line.starts_with(source_root): unread.push(line) else: generated.push(line)
     if unread.len() > 0:
@@ -2337,8 +2337,8 @@ fn ci_migrate_impl_add(record: &str, text: &str):
     g_migrate_impl_texts.push(text.to_owned())
 
 fn ci_migrate_take_impl_blocks() -> str:
-    var names: List[str] = List.new()
-    for i in 0..g_migrate_impl_records.len(): names.push(g_migrate_impl_records[i])
+    let names: List[str] = []
+    for g_migrate_impl_record in g_migrate_impl_records: names.push(g_migrate_impl_record)
     names.sort()
     var out = ""
     for name in names:
@@ -2351,7 +2351,7 @@ fn ci_migrate_take_impl_blocks() -> str:
 // The shapes of the corpus's proved functions, by their With name
 // (CiContracts resolve_method_shapes): `record|method|out|out_ty|view|status|ret`.
 fn ci_migrate_method_shapes_for(project_active: bool, project: &CiProject) -> HashMap[str, str]:
-    var shapes: HashMap[str, str] = HashMap.new()
+    let shapes: HashMap[str, str] = [:]
     if not project_active: return shapes
     for si in 0..project.symbols.len():
         if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or project.symbols[si].method_record.len() == 0: continue
@@ -2465,23 +2465,23 @@ fn ci_migrate_taken_raw_mut(text: &str, tokens: &TokenList, i: i32) -> bool:
 // nothing), over every file this migration wrote. 0 on success.
 fn ci_migrate_apply_writes_clauses() -> i32:
     // The exported globals: `pub var` in the output.
-    var globals: HashMap[str, i32] = HashMap.new()
-    for pi in 0..g_migrate_writes_paths.len():
-        let text = with_fs_read_file(g_migrate_writes_paths[pi])
-        var lexer = Lexer.init(text, 0)
+    let globals: HashMap[str, i32] = [:]
+    for g_migrate_writes_path in g_migrate_writes_paths:
+        let text = with_fs_read_file(g_migrate_writes_path)
+        let lexer = Lexer.init(text, 0)
         let tokens = lexer.tokenize()
         for i in 0..tokens.len() - 2:
             if tokens.get_tag(i) == TokenKind.TK_KW_PUB and tokens.get_tag(i + 1) == TokenKind.TK_KW_VAR and tokens.get_tag(i + 2) == TokenKind.TK_IDENT:
                 globals.insert(ci_migrate_token_text(text, tokens, i + 2), 1)
-    var fn_index: HashMap[str, i32] = HashMap.new()
+    let fn_index: HashMap[str, i32] = [:]
     for fi in 0..g_migrate_writes_fn_names.len():
         fn_index.insert(with_str_clone_ref(g_migrate_writes_fn_names[fi]), fi as i32)
     // Each function's direct writes and corpus callees, "|a|b|" sets.
-    var writes: List[str] = List.new()
-    var callees: List[str] = List.new()
-    for fi in 0..g_migrate_writes_fn_bodies.len():
-        let body = g_migrate_writes_fn_bodies[fi]
-        var lexer = Lexer.init(body, 0)
+    let writes: List[str] = []
+    let callees: List[str] = []
+    for g_migrate_writes_fn_bodie in g_migrate_writes_fn_bodies:
+        let body = g_migrate_writes_fn_bodie
+        let lexer = Lexer.init(body, 0)
         let tokens = lexer.tokenize()
         var w = "|"
         var c = "|"
@@ -2504,12 +2504,12 @@ fn ci_migrate_apply_writes_clauses() -> i32:
         changed = false
         for fi in 0..writes.len():
             let calls = callees[fi].split("|")
-            for ci in 0..calls.len():
-                if calls[ci].len() == 0 or not fn_index.contains(calls[ci]):
+            for call in calls:
+                if call.len() == 0 or not fn_index.contains(call):
                     continue
-                let callee_writes = writes[fn_index.get(calls[ci]).unwrap()].split("|")
-                for wi in 0..callee_writes.len():
-                    let g = callee_writes[wi]
+                let callee_writes = writes[fn_index.get(call).unwrap()].split("|")
+                for callee_write in callee_writes:
+                    let g = callee_write
                     if g.len() > 0 and ci_find_str(writes[fi], "|" ++ g ++ "|") < 0:
                         writes[fi] = writes[fi] ++ g ++ "|"
                         changed = true
@@ -2525,9 +2525,9 @@ fn ci_migrate_apply_writes_clauses() -> i32:
                 continue
             // Sorted by name, so the clause is deterministic.
             let parts = writes[fi].split("|")
-            var used: List[bool] = List.new()
-            for wi in 0..parts.len():
-                used.push(parts[wi].len() == 0)
+            let used: List[bool] = []
+            for part in parts:
+                used.push(part.len() == 0)
             var clause = ""
             var printed = 0
             while true:
@@ -2647,7 +2647,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         if pi > 0:
             params = params ++ ", "
         let raw_ptype = ci_migrated_param_type(session, idx, pi)   // D107: the corpus verdict
-        var ptype = ci_pointer_type_explicit_mut(raw_ptype)
+        let ptype = ci_pointer_type_explicit_mut(raw_ptype)
 
         if ci_starts_with(ptype, "__UNSUPPORTED:"):
             has_unsupported = true
@@ -3113,7 +3113,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
     rendered
 
 fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: &str, project_active: bool, project: &CiProject) -> str:
-    var output = StringBuilder.new()
+    let output = StringBuilder.new()
     var i: i32 = 0
     while i < count:
         if with_cimport_decl_kind(session, i) == CK_VAR:

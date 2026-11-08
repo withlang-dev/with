@@ -74,7 +74,7 @@ impl Sema:
         self.colliding_type_names = sema_new_map_i32_i32()
         self.type_identity_syms = sema_new_map_i64_i32()
         self.impl_identity_traits = sema_new_map_i64_i32()
-        let first_paths: HashMap[i32, i32] = HashMap.new()
+        let first_paths: HashMap[i32, i32] = [:]
         let dc = self.ast.decl_count()
         for di in 0..dc:
             let decl = self.ast.get_decl(di)
@@ -97,7 +97,7 @@ impl Sema:
             let name = self.ast.get_data0(decl)
             if not self.colliding_type_names.contains(name):
                 continue
-            let path: str = self.decl_source_path_for_index(di)
+            let path = self.decl_source_path_for_index(di)
             let key = sema_pair_key(name, self.pool_intern(path))
             if not self.type_identity_syms.contains(key):
                 let identity = self.pool_intern(self.pool_resolve(name) ++ "$m$" ++ f"{sema_extension_path_hash(path)}")
@@ -110,13 +110,13 @@ impl Sema:
         // after: without the entry the lookup fell to visibility, found a
         // different key once the type was registered, and registered the
         // method's signature without a name.
-        var package_identity: HashMap[i64, i32] = HashMap.new()
+        let package_identity: HashMap[i64, i32] = [:]
         for di in 0..dc:
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL: continue
             let name = self.ast.get_data0(decl)
             if not self.colliding_type_names.contains(name): continue
-            let path: str = self.decl_source_path_for_index(di)
+            let path = self.decl_source_path_for_index(di)
             let by_package = sema_pair_key(name, self.pool_intern(self.package_of(path)))
             if not package_identity.contains(by_package):
                 package_identity.insert(by_package, self.type_identity_syms.get(sema_pair_key(name, self.pool_intern(path))).unwrap())
@@ -125,7 +125,7 @@ impl Sema:
             if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL: continue
             let name = self.ast.get_data0(decl)
             if not self.colliding_type_names.contains(name): continue
-            let path: str = self.decl_source_path_for_index(di)
+            let path = self.decl_source_path_for_index(di)
             let key = sema_pair_key(name, self.pool_intern(path))
             if self.type_identity_syms.contains(key): continue
             let identity = package_identity.get(sema_pair_key(name, self.pool_intern(self.package_of(path))))
@@ -139,7 +139,7 @@ impl Sema:
         self.colliding_trait_names = sema_new_map_i32_i32()
         self.trait_identity_syms = sema_new_map_i64_i32()
         self.trait_identity_first = sema_new_map_i32_i32()
-        let first_paths: HashMap[i32, i32] = HashMap.new()
+        let first_paths: HashMap[i32, i32] = [:]
         let dc = self.ast.decl_count()
         for di in 0..dc:
             let decl = self.ast.get_decl(di)
@@ -159,7 +159,7 @@ impl Sema:
             let name = self.ast.get_data0(decl)
             if not self.colliding_trait_names.contains(name):
                 continue
-            let path: str = self.decl_source_path_for_index(di)
+            let path = self.decl_source_path_for_index(di)
             let key = sema_pair_key(name, self.pool_intern(path))
             if not self.trait_identity_syms.contains(key):
                 let identity = self.pool_intern(self.pool_resolve(name) ++ "$m$" ++ f"{sema_extension_path_hash(path)}")
@@ -208,7 +208,7 @@ impl Sema:
             return ""
         if not self.colliding_trait_names.contains(trait_sym):
             return with_str_clone_ref(self.pool_resolve(trait_sym))
-        let path: str = self.decl_source_path_for_index(self.find_decl_index(impl_node))
+        let path = self.decl_source_path_for_index(self.find_decl_index(impl_node))
         let path_sym = self.pool_lookup_symbol(path)
         if path_sym != 0:
             let key = sema_pair_key(trait_sym, path_sym)
@@ -245,7 +245,7 @@ impl Sema:
     fn owner_key_symbol_from(owner: i32, decl: i32) -> i32:
         if owner == 0 or not self.colliding_type_names.contains(owner):
             return owner
-        let own_path: str = self.decl_source_path_for_node(decl)
+        let own_path = self.decl_source_path_for_node(decl)
         let own_path_sym = self.pool_lookup_symbol(own_path)
         if own_path_sym != 0 and self.type_identity_syms.contains(sema_pair_key(owner, own_path_sym)):
             return self.type_identity_syms.get(sema_pair_key(owner, own_path_sym)).unwrap()
@@ -273,8 +273,8 @@ impl Sema:
     // exactly that, #2043). Reads only the decl table, before any type is
     // registered; every declaration counts, demanded or not.
     mut fn report_duplicate_type_declarations():
-        let first_types: HashMap[i64, i32] = HashMap.new()
-        let first_traits: HashMap[i64, i32] = HashMap.new()
+        let first_types: HashMap[i64, i32] = [:]
+        let first_traits: HashMap[i64, i32] = [:]
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
@@ -297,7 +297,7 @@ impl Sema:
             if first == decl:
                 continue
             let what = if kind == NodeKind.NK_TYPE_DECL: "type" else: "trait"
-            var diag = Diagnostic.err(f"{what} `{self.pool_resolve(name)}` is declared twice in this module", self.diagnostic_node_span(decl))
+            let diag = Diagnostic.err(f"{what} `{self.pool_resolve(name)}` is declared twice in this module", self.diagnostic_node_span(decl))
             diag.add_label(self.diagnostic_node_span(first), "first declared here")
             diag.add_label(self.diagnostic_node_span(decl), "declared again here")
             self.diags.emit(diag)
@@ -309,10 +309,10 @@ impl Sema:
     // A method is not a free function: a declaration inside an `impl`,
     // `extend` or `trait` block, or one spelled `T.m`, is skipped.
     mut fn report_function_named_like_global():
-        let globals: HashMap[i64, i32] = HashMap.new()
-        let block_files: List[i32] = List.new()
-        let block_starts: List[i32] = List.new()
-        let block_ends: List[i32] = List.new()
+        let globals: HashMap[i64, i32] = [:]
+        let block_files: List[i32] = []
+        let block_starts: List[i32] = []
+        let block_ends: List[i32] = []
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
@@ -345,7 +345,7 @@ impl Sema:
                     in_block = true
             if in_block:
                 continue
-            var diag = Diagnostic.err(f"`{self.pool_resolve(name)}` is declared as a function and as a global in this module", self.diagnostic_node_span(decl))
+            let diag = Diagnostic.err(f"`{self.pool_resolve(name)}` is declared as a function and as a global in this module", self.diagnostic_node_span(decl))
             diag.add_label(self.diagnostic_node_span(global_decl), "the global")
             diag.add_label(self.diagnostic_node_span(decl), "the function")
             self.diags.emit(diag)
@@ -1242,9 +1242,9 @@ impl Sema:
             let field_count = self.ast.get_extra(extra_start)
             // Resolve all field types first — resolve_type_expr can push to type_extra
             // (e.g. for generic instances), so we must capture te_start AFTER resolving.
-            let field_names: List[i32] = List.new()
-            let field_tids: List[i32] = List.new()
-            let field_defaults: List[i32] = List.new()
+            let field_names: List[i32] = []
+            let field_tids: List[i32] = []
+            let field_defaults: List[i32] = []
             for fi in 0..field_count:
                 let base = extra_start + 1 + fi * 3
                 let f_name = self.ast.get_extra(base)
@@ -1313,9 +1313,9 @@ impl Sema:
 
         if sub_kind == TypeDeclKind.Enum:
             let variant_count = self.ast.get_extra(extra_start)
-            let variant_names: List[i32] = List.new()
-            let payload_counts: List[i32] = List.new()
-            let payload_tids: List[i32] = List.new()
+            let variant_names: List[i32] = []
+            let payload_counts: List[i32] = []
+            let payload_tids: List[i32] = []
             var epos = extra_start + 1
             for vi in 0..variant_count:
                 let v_name = self.ast.get_extra(epos)
@@ -1347,7 +1347,7 @@ impl Sema:
             self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
             // Re-register variants with actual enum TypeId (bare + qualified names)
-            let plain_type_name_str: str = with_str_clone_ref(self.pool_resolve(name))
+            let plain_type_name_str = with_str_clone_ref(self.pool_resolve(name))
             var vpos = te_start
             for vi in 0..variant_count:
                 let v_name: i32 = self.type_extra[vpos]
@@ -1365,9 +1365,9 @@ impl Sema:
             let repr_type_node = self.ast.get_extra(extra_start)
             let repr_type_tid = self.resolve_type_expr(repr_type_node)
             let variant_count = self.ast.get_extra(extra_start + 1)
-            let variant_names: List[i32] = List.new()
-            let payload_counts: List[i32] = List.new()
-            let payload_tids: List[i32] = List.new()
+            let variant_names: List[i32] = []
+            let payload_counts: List[i32] = []
+            let payload_tids: List[i32] = []
             var epos = extra_start + 2
             // §4.4a: each variant's discriminant is its `= N` literal, else the
             // previous value plus one (doubled under @[flags]), from 0 (1 under
@@ -1378,7 +1378,7 @@ impl Sema:
             let repr_is_int = self.get_type_kind(repr_resolved) == TypeKind.TY_INT
             let repr_bits = if repr_is_int: self.get_type_d0(repr_resolved) else: 64
             let repr_signed = not repr_is_int or self.get_type_d1(repr_resolved) != 0
-            var disc_vals: List[i64] = List.new()
+            let disc_vals: List[i64] = []
             for vi in 0..variant_count:
                 let v_name = self.ast.get_extra(epos)
                 epos = epos + 1
@@ -1414,8 +1414,8 @@ impl Sema:
                         disc_ok = false
                     disc_value = next.value
                 // Check for duplicate discriminant values
-                for prev in 0..disc_vals.len():
-                    if disc_ok and disc_vals[prev] == disc_value:
+                for disc_val in disc_vals:
+                    if disc_ok and disc_val == disc_value:
                         self.emit_error(f"duplicate discriminant value {disc_text(disc_value, repr_signed)}", node)
                 // §4.4a (#1003): an explicit discriminant fits the repr it is
                 // declared in — every width and signedness (only i8 and i16
@@ -1462,7 +1462,7 @@ impl Sema:
             // Re-register variants with actual enum TypeId.
             // Register BOTH bare name (for unqualified pattern matching) and
             // qualified name "TypeName.Variant" (for explicit EnumType.Variant access).
-            let type_name_str: str = with_str_clone_ref(self.pool_resolve(name))
+            let type_name_str = with_str_clone_ref(self.pool_resolve(name))
             var vpos = te_start
             for vi in 0..variant_count:
                 let v_name: i32 = self.type_extra[vpos]
@@ -1512,9 +1512,9 @@ impl Sema:
         if sub_kind == TypeDeclKind.Union:
             // Union type: register fields like a struct (codegen handles layout)
             let field_count = self.ast.get_extra(extra_start)
-            let field_names: List[i32] = List.new()
-            let field_tids: List[i32] = List.new()
-            let field_defaults: List[i32] = List.new()
+            let field_names: List[i32] = []
+            let field_tids: List[i32] = []
+            let field_defaults: List[i32] = []
             for fi in 0..field_count:
                 let base = extra_start + 1 + fi * 3
                 let f_name = self.ast.get_extra(base)
@@ -1602,7 +1602,7 @@ impl Sema:
     // The type nodes a declaration holds by value: struct fields, enum
     // payloads, an alias's or distinct type's target.
     fn type_decl_value_type_nodes(decl: i32) -> List[i32]:
-        let out: List[i32] = List.new()
+        let out: List[i32] = []
         let extra_start = self.ast.get_data1(decl)
         let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
         if sub_kind == TypeDeclKind.Struct:
@@ -1692,9 +1692,9 @@ impl Sema:
         // dep_edge_count tracks how many edges we've collected.
 
         // Actually simplest: save len before collect, push owner info after.
-        var edge_from: List[i32] = List.new()
-        var edge_to: List[i32] = List.new()
-        var edge_node: List[i32] = List.new()
+        let edge_from: List[i32] = []
+        let edge_to: List[i32] = []
+        let edge_node: List[i32] = []
 
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
@@ -1724,10 +1724,10 @@ impl Sema:
 
         // DFS cycle detection with coloring.
         // 0=white, 1=gray (in path), 2=black (done)
-        var color: HashMap[i32, i32] = sema_new_map_i32_i32()
+        let color = sema_new_map_i32_i32()
         // Parent tracking for cycle path reconstruction.
-        var parent_sym: HashMap[i32, i32] = sema_new_map_i32_i32()
-        var parent_edge: HashMap[i32, i32] = sema_new_map_i32_i32()
+        let parent_sym = sema_new_map_i32_i32()
+        let parent_edge = sema_new_map_i32_i32()
 
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
@@ -1739,7 +1739,7 @@ impl Sema:
             if color.contains(name) and color.get(name).unwrap() != 0:
                 continue
             // Iterative DFS using explicit stack.
-            var stack: List[i32] = List.new()
+            let stack: List[i32] = []
             stack.push(name)
             while stack.len() > 0:
                 let cur: i32 = stack[stack.len() - 1]
@@ -1768,8 +1768,8 @@ impl Sema:
 
     mut fn emit_type_cycle_error(cycle_start: i32, cycle_end: i32, closing_edge_node: i32, parent_sym: &HashMap[i32, i32], parent_edge: &HashMap[i32, i32]):
         // Reconstruct cycle path: cycle_start → ... → cycle_end → cycle_start
-        var path_syms: List[i32] = List.new()
-        var path_edges: List[i32] = List.new()
+        let path_syms: List[i32] = []
+        let path_edges: List[i32] = []
 
         // Walk from cycle_end back to cycle_start via parent chain.
         var cur = cycle_end
@@ -1785,8 +1785,8 @@ impl Sema:
         path_syms.push(cycle_start)
 
         // Reverse to get forward order: cycle_start → ... → cycle_end
-        var fwd_syms: List[i32] = List.new()
-        var fwd_edges: List[i32] = List.new()
+        let fwd_syms: List[i32] = []
+        let fwd_edges: List[i32] = []
         for i in 0..path_syms.len():
             fwd_syms.push(path_syms[(path_syms.len() - 1 - i)])
         for i in 0..path_edges.len():
@@ -1801,7 +1801,7 @@ impl Sema:
         let first_node = if self.type_decl_nodes.contains(first_sym): self.type_decl_nodes.get(first_sym).unwrap() else: 0
         let primary_start = self.ast.get_start(first_node)
         let primary_end = self.ast.get_end(first_node)
-        var diag = Diagnostic.err(f"dependency loop with length {loop_len}", Span { file: self.local_file_id, start: primary_start, end: primary_end })
+        let diag = Diagnostic.err(f"dependency loop with length {loop_len}", Span { file: self.local_file_id, start: primary_start, end: primary_end })
 
         // Add a label for each edge in the loop.
         for i in 0..loop_len:
@@ -1899,7 +1899,7 @@ impl Sema:
 
         let state_name = f"__with_generator_state_{fn_sym}"
         let state_sym = self.pool_intern(state_name)
-        let field_types: List[i32] = List.new()
+        let field_types: List[i32] = []
         for pi in 0..param_count:
             let param_ty = self.sig_params[(sig_param_start + pi)]
             field_types.push(if pi == 0 and borrow_receiver: self.ensure_exact_type(TypeKind.TY_REF, param_ty as TypeId, 0, 0) as i32 else: param_ty)
@@ -1964,7 +1964,7 @@ impl Sema:
     // The body a generator hands each element to: fn(T) -> bool, where
     // `false` stops the generator at its `yield` (§13.4).
     mut fn generator_body_fn_type(yield_ty: i32) -> i32:
-        let params: List[i32] = List.new()
+        let params: List[i32] = []
         params.push(yield_ty)
         self.ensure_fn_type(params, 1, self.ty_bool) as i32
 
@@ -2061,7 +2061,7 @@ impl Sema:
             if self.fn_clause_group_clause(group, i) == node:
                 ordinal = i
                 break
-        let base: str = with_str_clone_ref(self.pool_resolve(dispatch_sym))
+        let base = with_str_clone_ref(self.pool_resolve(dispatch_sym))
         self.pool_intern(base ++ "$clause$" ++ f"{ordinal}")
 
     mut fn prepare_fn_clause(dispatch_sym: i32, node: i32, decl_index: i32) -> i32:
@@ -2082,7 +2082,7 @@ impl Sema:
     mut fn fn_signature_return_type(flags: i32, declared_ret_type: TypeId) -> TypeId:
         if (flags / FnFlags.ASYNC) % 2 == 0:
             return declared_ret_type
-        let task_args: List[i32] = List.new()
+        let task_args: List[i32] = []
         task_args.push(declared_ret_type as i32)
         let task_ty = self.ensure_generic_inst_type(self.pool_intern("Task"), task_args, 1)
         if task_ty != 0: task_ty else: declared_ret_type
@@ -2331,7 +2331,7 @@ impl Sema:
 
         // Resolve param types
         let sig_param_start = self.sig_params.len() as i32
-        let implicit_type_ids: List[i32] = List.new()
+        let implicit_type_ids: List[i32] = []
         for pi in 0..param_count:
             let p_name_sym = self.ast.fn_param_name(param_start, pi)
             if is_local:
@@ -2358,8 +2358,8 @@ impl Sema:
                 self.emit_error("`once` marks a callable parameter (`f: once fn(A) -> R`, §12.4); `" ++ self.type_name(p_tid as i32) ++ "` is not callable", p_type_node)
             // Check for duplicate implicit parameter types (spec §F6)
             if fn_param_is_implicit(p_flags) != 0:
-                for prev in 0..implicit_type_ids.len():
-                    if implicit_type_ids[prev] == p_tid as i32:
+                for implicit_type_id in implicit_type_ids:
+                    if implicit_type_id == p_tid as i32:
                         self.emit_error("function has multiple implicit parameters of the same type", p_type_node)
                 implicit_type_ids.push(p_tid as i32)
             self.sig_params.push(p_tid as i32)
@@ -2695,7 +2695,7 @@ impl Sema:
         0
 
     mut fn extension_method_unique_symbol_at(decl_index: i32, qualified_sym: i32) -> i32:
-        let qualified: str = with_str_clone_ref(self.pool_resolve(qualified_sym))
+        let qualified = with_str_clone_ref(self.pool_resolve(qualified_sym))
         if qualified.len() == 0:
             return qualified_sym
         self.pool_intern(qualified ++ "$ext$" ++ f"{sema_extension_path_hash(self.decl_source_path_for_index(decl_index))}")
@@ -2890,7 +2890,7 @@ impl Sema:
     mut fn install_trait_default_type_args(trait_sym: i32, impl_node: i32, outer_syms: &List[i32], outer_tys: &List[i32]):
         if trait_sym == 0 or impl_node == 0:
             return
-        let trait_idx: i32 = self.trait_idx_for_impl(impl_node)
+        let trait_idx = self.trait_idx_for_impl(impl_node)
         if trait_idx < 0:
             return
         let tp_count: i32 = self.trait_tp_counts[trait_idx]
@@ -2988,10 +2988,10 @@ impl Sema:
         // D111), so a plain save followed the switch and the restore put the
         // trait's module back (seed-bound; a plain copy once a post-D111
         // seed is pinned).
-        let saved_module_path: str = with_str_clone_ref(self.current_module_path)
+        let saved_module_path = with_str_clone_ref(self.current_module_path)
         let saved_file_id = self.local_file_id
         let saved_module_has_ci = self.current_module_has_ci
-        let trait_module: str = self.node_module_path_view(type_node)
+        let trait_module = self.node_module_path_view(type_node)
         if trait_module.len() > 0 and trait_module != self.current_module_path:
             self.update_source_context_path(trait_module)
         let resolved = self.resolve_type_expr(type_node) as i32
@@ -3013,7 +3013,7 @@ impl Sema:
     mut fn check_trait_impl_complete(trait_sym: i32, impl_node: i32):
         if self.ast.get_data0(impl_node) == 0:
             return
-        let trait_idx: i32 = self.trait_idx_for_impl(impl_node)
+        let trait_idx = self.trait_idx_for_impl(impl_node)
         if trait_idx < 0:
             return
         let mt_start: i32 = self.trait_method_starts[trait_idx]
@@ -3026,7 +3026,7 @@ impl Sema:
                 self.emit_error(f"impl of `{self.pool_resolve(trait_sym)}` for `{self.pool_resolve(self.ast.get_data0(impl_node))}` does not define `{self.pool_resolve(method_sym)}`, which the trait declares with no default body", impl_node)
 
     mut fn register_trait_default_method_for_impl(trait_sym: i32, impl_node: i32):
-        let trait_idx: i32 = self.trait_idx_for_impl(impl_node)
+        let trait_idx = self.trait_idx_for_impl(impl_node)
         if trait_idx < 0:
             return
         let impl_type_sym = self.ast.get_data0(impl_node)
@@ -3049,8 +3049,8 @@ impl Sema:
             if self.trait_default_method_sig_exists(impl_key, method_sym):
                 continue
 
-            let type_name: str = with_str_clone_ref(self.pool_resolve(impl_key))
-            let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
+            let type_name = with_str_clone_ref(self.pool_resolve(impl_key))
+            let method_name = with_str_clone_ref(self.pool_resolve(method_sym))
             let fn_sym = self.pool_intern(type_name ++ "." ++ method_name)
             let param_start: i32 = self.trait_method_param_starts[mt_idx]
             let param_count: i32 = self.trait_method_param_counts[mt_idx]
@@ -3110,7 +3110,7 @@ impl Sema:
         // with a more helpful message than the generic immutable-binding error.
         if let_decl_is_global(flags) != 0 and let_decl_is_global_var(flags) == 0:
             self.stable_global_syms.insert(name, 1)
-        var bind_ty: TypeId = 0 as TypeId
+        var bind_ty = 0 as TypeId
         let type_extra = self.top_level_let_type_ann_extra(flags)
         if type_extra >= 0:
             let type_node = self.ast.get_extra(type_extra)
@@ -3277,7 +3277,7 @@ impl Sema:
                 if self.select_trait_impl(type_name, bound_trait) == 0:
                     all_ok = 0
             if all_ok != 0:
-                let tn: str = with_str_clone_ref(self.pool_resolve(trait_sym))
+                let tn = with_str_clone_ref(self.pool_resolve(trait_sym))
                 self.emit_error_code("overlapping implementations of '" ++ tn ++ "'", node, "E1201")
 
     // Check if a new blanket impl overlaps with any existing direct impl
@@ -3304,7 +3304,7 @@ impl Sema:
                 if self.select_trait_impl(t_sym, bound_trait) == 0:
                     all_ok = 0
             if all_ok != 0:
-                let tn: str = with_str_clone_ref(self.pool_resolve(trait_sym))
+                let tn = with_str_clone_ref(self.pool_resolve(trait_sym))
                 self.emit_error_code("overlapping implementations of '" ++ tn ++ "'", node, "E1201")
 
     mut fn warn_large_copy_type(type_name: i32, type_tid: i32, node: i32):
@@ -3431,7 +3431,7 @@ impl Sema:
 
         // Validate associated types: impl must provide all required (no-default) associated types
         if not is_lang_trait and self.trait_idx_for_impl(node) >= 0:
-            let trait_idx: i32 = self.trait_idx_for_impl(node)
+            let trait_idx = self.trait_idx_for_impl(node)
             let at_start = self.trait_assoc_starts[trait_idx]
             let at_count = self.trait_assoc_counts[trait_idx]
             if at_count > 0:
@@ -3474,8 +3474,8 @@ impl Sema:
                                         for bi in 0..ab_count:
                                             let bound_sym = self.trait_assoc_bound_syms[(ab_start + bi)]
                                             if self.select_trait_impl(impl_at_type_sym, bound_sym) == 0:
-                                                let tname: str = with_str_clone_ref(self.pool_resolve(at_name_sym))
-                                                let bname: str = with_str_clone_ref(self.pool_resolve(bound_sym))
+                                                let tname = with_str_clone_ref(self.pool_resolve(at_name_sym))
+                                                let bname = with_str_clone_ref(self.pool_resolve(bound_sym))
                                                 self.emit_error("associated type '" ++ tname ++ "' does not satisfy bound '" ++ bname ++ "'", node)
                                                 return
 
@@ -3487,7 +3487,7 @@ impl Sema:
             let tp_count = self.ast.state.impl_type_params[(tp_meta_idx + 2)]
             let bound_start = self.blanket_bound_syms.len() as i32
             var total_bounds: i32 = 0
-            var tp_off: i32 = tp_start
+            var tp_off = tp_start
             for tpi in 0..tp_count:
                 let bound_count = self.ast.get_extra(tp_off + 1)
                 tp_off = tp_off + 2
@@ -3653,8 +3653,8 @@ impl Sema:
         0 as NodeId
 
     mut fn emit_trait_object_safety_error(trait_sym: i32, method_sym: i32, reason: &str, node: i32):
-        let trait_name: str = with_str_clone_ref(self.pool_resolve(trait_sym))
-        let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
+        let trait_name = with_str_clone_ref(self.pool_resolve(trait_sym))
+        let method_name = with_str_clone_ref(self.pool_resolve(method_sym))
         self.emit_error("trait '" ++ trait_name ++ "' is not object-safe: method '" ++ method_name ++ "' " ++ reason, node)
 
     fn type_node_mentions_self(type_node: i32) -> bool:
@@ -3757,7 +3757,7 @@ impl Sema:
         false
 
     mut fn emit_pub_signature_private_type(node: i32, fn_name: i32, sym: i32):
-        let type_text: str = with_str_clone_ref(self.pool_resolve(sym))
+        let type_text = with_str_clone_ref(self.pool_resolve(sym))
         self.emit_error_with_help("pub fn '" ++ self.pool_resolve(fn_name) ++ "' names private type '" ++ type_text ++ "' in its signature; a public signature names only public types (§18.1)", node, "add `pub` to the declaration of '" ++ type_text ++ "'")
 
     mut fn check_pub_signature_names_public_types(node: i32, fn_name: i32, owner_sym: i32, meta: i32):
@@ -3889,18 +3889,18 @@ impl Sema:
             return
         let where_start = self.ast.state.where_meta[(where_idx + 1)]
         let where_count = self.ast.state.where_meta[(where_idx + 2)]
-        var pos: i32 = where_start
+        var pos = where_start
         for wi in 0..where_count:
             let wp_name = self.ast.get_extra(pos)
             let bound_count = self.ast.get_extra(pos + 1)
             // Validate type param references a known type parameter
             if self.type_param_exists(tp_start, tp_count, wp_name) == false:
-                let wp_str: str = with_str_clone_ref(self.pool_resolve(wp_name))
+                let wp_str = with_str_clone_ref(self.pool_resolve(wp_name))
                 self.emit_error("where clause references unknown type parameter '" ++ wp_str ++ "'", fn_node)
             // Validate each bound references a known trait
             for bi in 0..bound_count:
                 let trait_sym = self.ast.get_extra(pos + 2 + bi)
-                let trait_name: str = with_str_clone_ref(self.pool_resolve(trait_sym))
+                let trait_name = with_str_clone_ref(self.pool_resolve(trait_sym))
                 if trait_name == "type":
                     continue
                 if not self.lang_trait_syms.contains(trait_sym) and not self.trait_name_known(trait_sym):
@@ -3944,7 +3944,7 @@ impl Sema:
         let arg_count = self.ast.get_data2(target)
         let tp_start = self.ast.state.impl_type_params[(tp_meta + 1)]
         let tp_count = self.ast.state.impl_type_params[(tp_meta + 2)]
-        var pos: i32 = tp_start
+        var pos = tp_start
         for _ in 0..tp_count:
             let param = self.ast.get_extra(pos)
             let bound_count = self.ast.get_extra(pos + 1)
@@ -3962,9 +3962,9 @@ impl Sema:
                     for di in 0..self.ast.get_extra(decl_pos + 1):
                         if self.ast.get_extra(decl_pos + 2 + di) == bound: declared = true
                 if not declared:
-                    let pname: str = with_str_clone_ref(self.pool_resolve(param))
-                    let bname: str = with_str_clone_ref(self.pool_resolve(bound))
-                    let tname: str = with_str_clone_ref(self.pool_resolve(type_name))
+                    let pname = with_str_clone_ref(self.pool_resolve(param))
+                    let bname = with_str_clone_ref(self.pool_resolve(bound))
+                    let tname = with_str_clone_ref(self.pool_resolve(type_name))
                     self.emit_error(f"a `Drop` impl's bounds are the type's own: `{tname}` does not declare `{pname}: {bname}`, and a destructor runs for every instantiation (§2.4)", impl_node)
                     return true
             pos = pos + 2 + bound_count
@@ -4053,7 +4053,7 @@ impl Sema:
         for hi in 0..self.ast.compiler_hook_count():
             let hook_node = self.ast.compiler_hook_node(hi)
             let phase_sym = self.ast.compiler_hook_phase_at(hi)
-            let phase_name: str = with_str_clone_ref(self.pool_resolve_symbol(phase_sym))
+            let phase_name = with_str_clone_ref(self.pool_resolve_symbol(phase_sym))
             if phase_name != "after_typecheck":
                 self.emit_error("unknown compiler_hook phase '" ++ phase_name ++ "'", hook_node)
             let meta = self.ast.find_fn_meta(hook_node)
@@ -4201,7 +4201,7 @@ impl Sema:
         false
 
     mut fn ensure_generic_substitutions(tp_start: i32, tp_count: i32, param_start: i32, param_count: i32, call_node: i32):
-        var pos: i32 = tp_start
+        var pos = tp_start
         for ti in 0..tp_count:
             let tp_name = self.ast.get_extra(pos)
             let bound_count = self.ast.get_extra(pos + 1)

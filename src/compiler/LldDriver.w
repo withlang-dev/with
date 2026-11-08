@@ -105,13 +105,13 @@ fn with_ld_main() -> i32:
             runtime_eprint("error: with __ld: unknown -flavor '" ++ with_arg_at(3) ++ "' (darwin, gnu, link or wasm)")
             return 2
         first = 4
-    let rest: List[str] = List.new()
+    let rest: List[str] = []
     for i in first..with_arg_count(): rest.push(with_arg_at(i))
     if flavor == "elf" and lld_gnu_is_mingw(rest):
         flavor = "mingw"
-    let args: List[str] = List.new()
+    let args: List[str] = []
     args.push(lld_tool_name(flavor))
-    for i in 0..rest.len(): args.push(rest[i])
+    for rest_item in rest: args.push(rest_item)
     lld_link(flavor, args)
 
 // Run as one of lld's own tool names (a link named ld64.lld to this binary,
@@ -127,7 +127,7 @@ fn lld_flavor_for_tool_name(argv0: &str) -> str:
 
 // argv[0] is the tool name; every other argument is lld's.
 fn with_ld_tool_main(flavor: &str) -> i32:
-    let args: List[str] = List.new()
+    let args: List[str] = []
     args.push(lld_tool_name(flavor))
     for i in 1..with_arg_count(): args.push(with_arg_at(i))
     let chosen = if flavor == "elf" and lld_gnu_is_mingw(args): "mingw" else: flavor.to_owned()

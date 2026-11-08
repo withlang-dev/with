@@ -12,7 +12,7 @@ fn suspend_bit_index(local_count: i32, bb: i32, local: i32) -> i32:
     bb * local_count + local
 
 fn suspend_list_fill(count: i32, value: i32) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     for _ in 0..count:
         out.push(value)
     out
@@ -62,20 +62,20 @@ fn suspend_set_bit(bits: SuspendBits, local: i32, value: i32):
 fn suspend_get_bit(bits: SuspendBits, local: i32) -> i32:
     if local < 0 or local >= bits.vlen() as i32:
         return 0
-    bits.vget(local as i64)
+    bits.vget(local)
 
 fn suspend_copy_block_bits(src: SuspendBits, local_count: i32, bb: i32) -> SuspendBits:
     let out = suspend_bits_fill(0, 0)
     for li in 0..local_count:
-        out.vpush(src.vget(suspend_bit_index(local_count, bb, li) as i64))
+        out.vpush(src.vget(suspend_bit_index(local_count, bb, li)))
     out
 
 fn suspend_store_block_bits(dst: SuspendBits, local_count: i32, bb: i32, src: SuspendBits) -> i32:
     var changed: i32 = 0
     for li in 0..local_count:
         let idx = suspend_bit_index(local_count, bb, li)
-        let old = dst.vget(idx as i64)
-        let next = src.vget(li as i64)
+        let old = dst.vget(idx)
+        let next = src.vget(li)
         if old != next:
             dst.vset(idx, next)
             changed = 1
@@ -233,7 +233,7 @@ fn suspend_add_successor_live(body: &MirBody, live_in: SuspendBits, local_count:
     if target_bb < 0 or target_bb >= body.block_count():
         return
     for li in 0..local_count:
-        if live_in.vget(suspend_bit_index(local_count, target_bb, li) as i64) != 0:
+        if live_in.vget(suspend_bit_index(local_count, target_bb, li)) != 0:
             out_bits.vset(li, 1)
 
 fn suspend_compute_live_out_for_block(body: &MirBody, live_in: SuspendBits, local_count: i32, bb: i32) -> SuspendBits:
@@ -297,7 +297,7 @@ fn suspend_term_directly_yields(body: &MirBody, bb: i32) -> bool:
     suspend_is_scheduler_yield_intrinsic(body.call_intrinsic(call_id))
 
 fn suspend_build_body_index(mir_mod: &MirModule) -> HashMap[i32, i32]:
-    let body_by_fn: HashMap[i32, i32] = HashMap.new()
+    let body_by_fn: HashMap[i32, i32] = [:]
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.fn_sym != 0:
@@ -356,7 +356,7 @@ fn suspend_call_passes_suspending_closure(body: &MirBody, body_by_fn: &HashMap[i
     let start = body.call_arg_starts[call_id]
     for ai in 0..body.call_arg_counts[call_id]:
         let closure_idx = suspend_closure_arg_body(body, body_by_fn, body.call_arg_operands[(start + ai)])
-        if closure_idx >= 0 and closure_idx < body_may_suspend.vlen() as i32 and body_may_suspend.vget(closure_idx as i64) != 0:
+        if closure_idx >= 0 and closure_idx < body_may_suspend.vlen() as i32 and body_may_suspend.vget(closure_idx) != 0:
             return true
     false
 
@@ -370,7 +370,7 @@ fn suspend_body_calls_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32]
         let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
         if callee_idx < 0 or callee_idx >= body_may_suspend.vlen() as i32:
             continue
-        if body_may_suspend.vget(callee_idx as i64) != 0:
+        if body_may_suspend.vget(callee_idx) != 0:
             return true
     false
 
@@ -386,7 +386,7 @@ fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i3
     while changed != 0:
         changed = 0
         for bi2 in 0..body_count:
-            if body_may_suspend.vget(bi2 as i64) != 0:
+            if body_may_suspend.vget(bi2) != 0:
                 continue
             let body = &mir_mod.bodies[bi2]
             if suspend_body_calls_may_suspend(body, body_by_fn, body_may_suspend):
@@ -405,7 +405,7 @@ fn suspend_term_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body
     let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
     if callee_idx < 0 or callee_idx >= body_may_suspend.vlen() as i32:
         return 0
-    body_may_suspend.vget(callee_idx as i64)
+    body_may_suspend.vget(callee_idx)
 
 fn suspend_type_is_no_await_guard(sema: &Sema, tid: i32) -> bool:
     sema.type_is_no_await_guard(tid)
@@ -437,7 +437,7 @@ fn suspend_body_has_may_suspend_term(body: &MirBody, body_by_fn: &HashMap[i32, i
     false
 
 fn suspend_collect_guard_locals(sema: &Sema, body: &MirBody) -> List[i32]:
-    let out: List[i32] = List.new()
+    let out: List[i32] = []
     for li in 0..body.local_count():
         let local_ty = body.local_type_ids[li]
         if suspend_type_is_no_await_guard(sema, local_ty):
@@ -470,7 +470,7 @@ fn suspend_prov_copy_block_bits(src: SuspendBits, local_count: i32, guard_count:
     let out = suspend_bits_fill(0, 0)
     for li in 0..local_count:
         for gi in 0..guard_count:
-            out.vpush(src.vget(suspend_prov_index(local_count, guard_count, bb, li, gi) as i64))
+            out.vpush(src.vget(suspend_prov_index(local_count, guard_count, bb, li, gi)))
     out
 
 fn suspend_prov_get_local_origin(bits: SuspendBits, guard_count: i32, local: i32, guard_idx: i32) -> i32:
@@ -479,7 +479,7 @@ fn suspend_prov_get_local_origin(bits: SuspendBits, guard_count: i32, local: i32
     let idx = suspend_prov_local_index(guard_count, local, guard_idx)
     if idx < 0 or idx >= bits.vlen() as i32:
         return 0
-    bits.vget(idx as i64)
+    bits.vget(idx)
 
 fn suspend_prov_set_local_origin(bits: SuspendBits, guard_count: i32, local: i32, guard_idx: i32, value: i32):
     if local < 0 or guard_idx < 0:
@@ -499,7 +499,7 @@ fn suspend_prov_set_local_origins(bits: SuspendBits, local_count: i32, guard_cou
     if local < 0 or local >= local_count:
         return
     for gi in 0..guard_count:
-        if gi < origins.vlen() as i32 and origins.vget(gi as i64) != 0:
+        if gi < origins.vlen() as i32 and origins.vget(gi) != 0:
             suspend_prov_set_local_origin(bits, guard_count, local, gi, 1)
 
 fn suspend_prov_origins_empty(guard_count: i32) -> SuspendBits:
@@ -514,7 +514,7 @@ fn suspend_prov_copy_origins_from_local(bits: SuspendBits, guard_count: i32, loc
 
 fn suspend_prov_or_origins(dst: SuspendBits, src: SuspendBits, guard_count: i32):
     for gi in 0..guard_count:
-        if gi < src.vlen() as i32 and src.vget(gi as i64) != 0:
+        if gi < src.vlen() as i32 and src.vget(gi) != 0:
             dst.vset(gi, 1)
 
 fn suspend_prov_origins_from_value_place(bits: SuspendBits, body: &MirBody, guard_count: i32, place_id: i32) -> SuspendBits:
@@ -658,12 +658,12 @@ fn suspend_prov_or_block_into(dst: SuspendBits, local_count: i32, guard_count: i
     var changed: i32 = 0
     for li in 0..local_count:
         for gi in 0..guard_count:
-            if src.vget(suspend_prov_local_index(guard_count, li, gi) as i64) == 0:
+            if src.vget(suspend_prov_local_index(guard_count, li, gi)) == 0:
                 continue
             let idx = suspend_prov_index(local_count, guard_count, target_bb, li, gi)
             if idx < 0 or idx >= dst.vlen() as i32:
                 continue
-            if dst.vget(idx as i64) == 0:
+            if dst.vget(idx) == 0:
                 dst.vset(idx, 1)
                 changed = 1
     changed
@@ -751,7 +751,7 @@ fn suspend_reported_site(reported_starts: &List[i32], reported_ends: &List[i32],
     false
 
 fn suspend_no_suspend_site_span(ast: &AstPool, body: &MirBody, bb: i32, no_suspend_node: i32) -> SuspendSiteSpan:
-    var site = suspend_site_span(ast, body, bb)
+    let site = suspend_site_span(ast, body, bb)
     if site.start <= 0 and no_suspend_node != 0:
         site.start = ast.get_start(no_suspend_node)
         site.end = ast.get_end(no_suspend_node)
@@ -767,8 +767,8 @@ fn suspend_reported_no_suspend_site(reported_starts: &List[i32], reported_ends: 
     false
 
 fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, site: SuspendSiteSpan, bb: i32) -> DiagnosticList:
-    var out = diags
-    var diag = Diagnostic.err("E0702: suspension is not allowed inside no_suspend block", Span { file: sema.local_file_id, start: site.start, end: site.end })
+    let out = diags
+    let diag = Diagnostic.err("E0702: suspension is not allowed inside no_suspend block", Span { file: sema.local_file_id, start: site.start, end: site.end })
     let call_id = body.term_data1(bb)
     let intrinsic = body.call_intrinsic(call_id)
     if suspend_is_scheduler_yield_intrinsic(intrinsic):
@@ -779,7 +779,7 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirB
     else:
         let callee = suspend_callee_sym(body, body.term_data0(bb))
         let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
-        if callee != 0 and callee_idx >= 0 and callee_idx < body_may_suspend.vlen() as i32 and body_may_suspend.vget(callee_idx as i64) != 0:
+        if callee != 0 and callee_idx >= 0 and callee_idx < body_may_suspend.vlen() as i32 and body_may_suspend.vget(callee_idx) != 0:
             // D69: the loop over a generator runs the generator's body.
             if sema.generator_mir_only_fns.contains(callee):
                 let gen_fn: i32 = sema.generator_mir_only_fns.get(callee).unwrap()
@@ -800,12 +800,12 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirB
     out
 
 fn suspend_emit_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, site: SuspendSiteSpan, guard_local: i32) -> DiagnosticList:
-    var out = diags
+    let out = diags
     let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len(): body.local_type_ids[guard_local] else: 0
     let guard_name_sym = if guard_local >= 0 and guard_local < body.local_names.len(): body.local_names[guard_local] else: 0
     let guard_name = if guard_name_sym != 0: with_str_clone_ref(sema.pool_resolve(guard_name_sym)) else: "guard"
     let guard_type_name = sema.type_name(guard_ty)
-    var diag = Diagnostic.err("E0701: " ++ guard_type_name ++ " value is live across a suspension point", Span { file: sema.local_file_id, start: site.start, end: site.end })
+    let diag = Diagnostic.err("E0701: " ++ guard_type_name ++ " value is live across a suspension point", Span { file: sema.local_file_id, start: site.start, end: site.end })
     if guard_name.len() > 0:
         diag.add_note("`" ++ guard_name ++ "` is still live here")
     diag.add_help("move, copy, or clone the needed data before awaiting, or drop the guard before the suspension point")
@@ -813,14 +813,14 @@ fn suspend_emit_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, 
     out
 
 fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, site: SuspendSiteSpan, view_local: i32, guard_local: i32) -> DiagnosticList:
-    var out = diags
+    let out = diags
     let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len(): body.local_type_ids[guard_local] else: 0
     let guard_name_sym = if guard_local >= 0 and guard_local < body.local_names.len(): body.local_names[guard_local] else: 0
     let view_name_sym = if view_local >= 0 and view_local < body.local_names.len(): body.local_names[view_local] else: 0
     let guard_name = if guard_name_sym != 0: with_str_clone_ref(sema.pool_resolve(guard_name_sym)) else: "guard"
     let view_name = if view_name_sym != 0: with_str_clone_ref(sema.pool_resolve(view_name_sym)) else: "derived view"
     let guard_type_name = sema.type_name(guard_ty)
-    var diag = Diagnostic.err("E0701: view derived from " ++ guard_type_name ++ " value is live across a suspension point", Span { file: sema.local_file_id, start: site.start, end: site.end })
+    let diag = Diagnostic.err("E0701: view derived from " ++ guard_type_name ++ " value is live across a suspension point", Span { file: sema.local_file_id, start: site.start, end: site.end })
     if view_name.len() > 0:
         diag.add_note("`" ++ view_name ++ "` keeps access to guarded state here")
     if guard_name.len() > 0:
@@ -845,10 +845,10 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
     let liveness = suspend_liveness(sema, body)
     let live_out = liveness.live_out
     let prov_in = suspend_compute_prov_in_for_body(sema, body, guard_locals)
-    let reported_starts: List[i32] = List.new()
-    let reported_ends: List[i32] = List.new()
-    let reported_locals: List[i32] = List.new()
-    let reported_origins: List[i32] = List.new()
+    let reported_starts: List[i32] = []
+    let reported_ends: List[i32] = []
+    let reported_locals: List[i32] = []
+    let reported_origins: List[i32] = []
 
     for bb in 0..bb_count:
         if suspend_term_may_suspend(body, body_by_fn, body_may_suspend, bb) == 0:
@@ -899,9 +899,9 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
 
 fn suspend_check_no_suspend_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
-    let reported_starts: List[i32] = List.new()
-    let reported_ends: List[i32] = List.new()
-    let reported_nodes: List[i32] = List.new()
+    let reported_starts: List[i32] = []
+    let reported_ends: List[i32] = []
+    let reported_nodes: List[i32] = []
     for bb in 0..body.block_count():
         let no_suspend_node = body.term_no_suspend_node(bb)
         if no_suspend_node == 0:
@@ -946,7 +946,7 @@ fn suspend_liveness(sema: &Sema, body: &MirBody) -> SuspendLiveness:
 // The operand ids a statement's rvalue reads — the operands
 // suspend_gen_rvalue gens.
 fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
-    var out: List[i32] = List.new()
+    var out: List[i32] = []
     if rval_id < 0 or rval_id >= body.rval_kinds.len():
         return out
     let kind = body.rval_kinds[rval_id]
@@ -970,7 +970,7 @@ fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
     out
 
 fn suspend_call_operands(body: &MirBody, call_id: i32) -> List[i32]:
-    var out: List[i32] = List.new()
+    let out: List[i32] = []
     if call_id < 0 or call_id >= body.call_arg_starts.len():
         return out
     for ai in 0..body.call_arg_counts[call_id]:
@@ -992,8 +992,8 @@ fn last_use_stmt_event(body: &MirBody, stmt_id: i32, local: i32, drops_read: boo
     if kind == StmtKind.Assign:
         let rval = body.stmt_data1(stmt_id)
         let operands = suspend_rvalue_operands(body, rval)
-        for oi in 0..operands.len():
-            let op = operands[oi]
+        for operand in operands:
+            let op = operand
             if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
                 return 1
         if rval >= 0 and rval < body.rval_kinds.len():
@@ -1022,8 +1022,8 @@ fn last_use_term_event(body: &MirBody, bb: i32, local: i32, drops_read: bool) ->
     if kind == TermKind.TK_CALL:
         let operands = suspend_call_operands(body, body.term_data1(bb))
         operands.push(body.term_data0(bb))
-        for oi in 0..operands.len():
-            let op = operands[oi]
+        for operand in operands:
+            let op = operand
             if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
                 return 1
         if suspend_direct_place_local(body, body.term_data2(bb)) == local:
@@ -1046,7 +1046,7 @@ fn last_use_term_event(body: &MirBody, bb: i32, local: i32, drops_read: bool) ->
     0
 
 fn last_use_successors(body: &MirBody, bb: i32) -> List[i32]:
-    var out: List[i32] = List.new()
+    let out: List[i32] = []
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_GOTO:
         out.push(body.term_data0(bb))
@@ -1067,7 +1067,7 @@ fn last_use_successors(body: &MirBody, bb: i32) -> List[i32]:
 // point).
 fn last_use_live_in(body: &MirBody, local: i32, drops_read: bool) -> List[i32]:
     let bb_count = body.block_count()
-    var first: List[i32] = List.new()
+    let first: List[i32] = []
     for bb in 0..bb_count:
         var event: i32 = 0
         var si: i32 = 0
@@ -1077,7 +1077,7 @@ fn last_use_live_in(body: &MirBody, local: i32, drops_read: bool) -> List[i32]:
         if event == 0:
             event = last_use_term_event(body, bb, local, drops_read)
         first.push(event)
-    var live: List[i32] = List.new()
+    let live: List[i32] = []
     for bb in 0..bb_count: live.push((first[bb] == 1) as i32)
     var changed = true
     while changed:
@@ -1086,8 +1086,8 @@ fn last_use_live_in(body: &MirBody, local: i32, drops_read: bool) -> List[i32]:
         while bb >= 0:
             if live[bb] == 0 and first[bb] == 0:
                 let succs = last_use_successors(body, bb)
-                for si in 0..succs.len():
-                    if succs[si] >= 0 and succs[si] < bb_count and live[succs[si]] != 0:
+                for succ in succs:
+                    if succ >= 0 and succ < bb_count and live[succ] != 0:
                         live[bb] = 1
                         changed = true
                         break
@@ -1108,8 +1108,8 @@ fn last_use_live_after(body: &MirBody, live_in: &List[i32], bb: i32, stmt_index:
         if term_event != 0:
             return term_event == 1
     let succs = last_use_successors(body, bb)
-    for i in 0..succs.len():
-        if succs[i] >= 0 and succs[i] < live_in.len() and live_in[succs[i]] != 0:
+    for succ in succs:
+        if succ >= 0 and succ < live_in.len() and live_in[succ] != 0:
             return true
     false
 
@@ -1144,8 +1144,8 @@ fn last_use_operand_can_carry_view(sema: &Sema, body: &MirBody, op: i32) -> bool
 // (reference, slice, iterator, or projection) into `src`'s buffer.
 fn last_use_build_view_edges(sema: &Sema, body: &MirBody) -> List[List[i32]]:
     let local_count = body.local_count()
-    var edges: List[List[i32]] = List.new()
-    var ref_target: List[i32] = List.new()
+    let edges: List[List[i32]] = []
+    let ref_target: List[i32] = []
     for _ in 0..local_count:
         edges.push(List.new())
         ref_target.push(-1)
@@ -1228,11 +1228,11 @@ fn last_use_build_view_edges(sema: &Sema, body: &MirBody) -> List[List[i32]]:
 
 fn last_use_reachable_views(edges: &List[List[i32]], local: i32) -> (List[i32], List[i32]):
     let local_count = edges.len()
-    var in_views: List[i32] = List.new()
+    let in_views: List[i32] = []
     for _ in 0..local_count:
         in_views.push(0)
-    var view_locals: List[i32] = List.new()
-    var work: List[i32] = [local]
+    let view_locals: List[i32] = []
+    let work: List[i32] = [local]
     while work.len() > 0:
         let u = work.pop().unwrap()
         for i in 0..edges[u].len():
@@ -1247,7 +1247,7 @@ fn last_use_site_operands(body: &MirBody, bb: i32, si: i32) -> List[i32]:
     if si < body.bb_stmt_counts[bb]:
         let stmt_id = body.bb_stmt_starts[bb] + si
         return suspend_rvalue_operands(body, body.stmt_data1(stmt_id))
-    var ops = suspend_call_operands(body, body.term_data1(bb))
+    let ops = suspend_call_operands(body, body.term_data1(bb))
     ops.push(body.term_data0(bb))
     ops
 
@@ -1291,12 +1291,12 @@ fn last_use_quick_after_verdict(body: &MirBody, bb: i32, stmt_index: i32, local:
 // projections, or mutations of the local qualify as long as no view derived
 // from the local is read at or after the take point.
 fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
-    var out = body
+    let out = body
     if out.operand_holds.len() == 0:
         return out
     let local_count = out.local_count()
-    var held: List[i32] = List.new()
-    var may_have_views: List[i32] = List.new()
+    let held: List[i32] = []
+    let may_have_views: List[i32] = []
     for _ in 0..local_count:
         held.push(0)
         may_have_views.push(0)
@@ -1323,14 +1323,14 @@ fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
         let b_root = suspend_place_root_local(out, b)
         if b_root > 0 and b_root < local_count:
             may_have_views[b_root] = 1
-    var local_sites: List[List[i32]] = List.new()
+    let local_sites: List[List[i32]] = []
     for _ in 0..local_count:
         local_sites.push(List.new())
     var any_site = false
     for bb in 0..out.block_count():
         for si in 0..out.bb_stmt_counts[bb] + 1:
             var dst_root: i32 = -1
-            var operands: List[i32] = List.new()
+            var operands: List[i32] = []
             if si < out.bb_stmt_counts[bb]:
                 let stmt_id = out.bb_stmt_starts[bb] + si
                 if out.stmt_kind(stmt_id) != StmtKind.Assign:
@@ -1349,8 +1349,8 @@ fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
                 operands.push(out.term_data0(bb))
             else:
                 continue
-            for oi in 0..operands.len():
-                let op = operands[oi]
+            for operand in operands:
+                let op = operand
                 let local = suspend_held_copy_local(out, op)
                 if local <= 0 or local >= local_count or held[local] == 0 or dst_root == local:
                     continue
@@ -1368,18 +1368,18 @@ fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
     if not any_site:
         return out
     let trace = with_getenv_str("WITH_TRACE_COW").len() > 0
-    var live_in_cache: List[List[i32]] = List.new()
+    let live_in_cache: List[List[i32]] = []
     for _ in 0..local_count:
         live_in_cache.push(List.new())
     var view_edges_built = false
-    var view_edges: List[List[i32]] = List.new()
+    var view_edges: List[List[i32]] = []
     for local in 1..local_count:
         let sites = &local_sites[local]
         if sites.len() == 0:
             continue
         var views_computed = false
-        var in_views: List[i32] = List.new()
-        var view_locals: List[i32] = List.new()
+        var in_views: List[i32] = []
+        var view_locals: List[i32] = []
         var idx = 0
         while idx < sites.len():
             let bb = sites[idx]
@@ -1421,8 +1421,8 @@ fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
                             any_view_live = true
                             break
                 if not any_view_live:
-                    for vi in 0..view_locals.len():
-                        let v = view_locals[vi]
+                    for view_local in view_locals:
+                        let v = view_local
                         let vq = last_use_quick_after_verdict(out, bb, si, v, false)
                         if vq == 1:
                             if trace: with_eprint(f"[cow-last-use] fn_sym={out.fn_sym} _{local} at bb{bb}:{si}: kept, view _{v} read soon after")
