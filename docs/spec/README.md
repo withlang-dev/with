@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.41
+# The With Programming Language — Specification v7.42
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.42:** D197 (delegated, 2026-11-09, #3072). §4.2.4: a shift count is any integer type; a signed count converts to `u32` with a range check as §4.2.6 converts a value at a narrower demand, so a negative count panics; an untyped literal count stays `u32`; D160's `u32` demand on a literal-typed local retires (the local is typed by its other uses and converts). The sentence "a signed right operand is a type error; callers must cast explicitly" is struck: the cast stated nothing about the shift (law 1), and the error only caught a logic mistake (law 11).
+
 **Changelog v7.41:** D196 (Eric, 2026-11-08, #2372). §11.7: the per-process seed is the default hasher for every key type; a map or set keyed by integer IDs the program minted may name the unseeded `Minted` hasher as a type argument (`HashMap[K, V, Minted]`, `HashSet[T, Minted]`), a multiply-mix, refused over a non-integer key, never chosen by key type. A declared generic type now refuses a wrong argument count (`HashMap[i32, i32, i32]` was accepted and miscompiled).
 
 **Changelog v7.40:** D195 (delegated, 2026-11-07, #3052). §14.3: a fiber-aware runtime operation is one whose declaration says it may suspend (`@[suspends]` on a std method, or the compiler's own declaration of a builtin); the compiler keeps no list of names. Implemented in the same change, with #2977 (concurrency evidence counts only where the program reaches it) and #2636 (`T.zeroed()` is a value, not the reset-on-move blank).

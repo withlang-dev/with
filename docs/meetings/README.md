@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D197 — A shift count is any integer; a signed count converts to `u32` with a range check, so a negative count panics (delegated; strikes §4.2.4's cast rule)](2026-11-09-D197-a-shift-count-is-any-integer-a-signed-count-converts-with-a-range-check.md)
 - [D196 — A map of IDs the program minted names the unseeded hasher where it is declared (`HashMap[K, V, Minted]`); the seed stays the default for every key type](2026-11-08-D196-a-map-of-minted-ids-names-the-unseeded-hasher.md)
 - [D195 — A fiber-aware runtime operation is one whose declaration says it may suspend (`@[suspends]`; delegated, D98)](2026-11-07-D195-a-may-suspend-operation-is-declared-not-listed.md)
 - [D194 — A retained pointer case of a variadic contract borrows caller-managed storage, held under the retained-borrow window; a pointer with a separately set length is one `&[u8]` operation](2026-11-07-D194-a-retained-pointer-case-borrows-caller-managed-storage.md)
