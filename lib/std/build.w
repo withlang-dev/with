@@ -2563,10 +2563,10 @@ fn build_https_fetch_source() -> str:
     "            return 3\n" ++
     "        let _ = socket_close(fd)\n" ++
     "    for attempt in 1i32..ATTEMPTS + 1:\n" ++
-    "        if https_download_timeout(url.clone(), output.clone(), connect_ms, idle_ms) == 0: return 0\n" ++
-    "        if attempt < ATTEMPTS:\n" ++
-    "            print(f\"HTTPS download failed (attempt {attempt} of {ATTEMPTS}), retrying: \" ++ url)\n" ++
-    "            sleep_secs(2 * attempt)\n" ++
+    "        let reason = https_download_reason(url, output, connect_ms, idle_ms)\n" ++
+    "        if reason.len() == 0: return 0\n" ++
+    "        print(f\"HTTPS download failed (attempt {attempt} of {ATTEMPTS}): {reason}\")\n" ++
+    "        if attempt < ATTEMPTS: sleep_secs(2 * attempt)\n" ++
     "    if idle_ms > 0:\n" ++
     "        print(f\"connected, but no complete response in {ATTEMPTS} attempts (each gives up after {idle_ms / 1000} s of silence)\")\n" ++
     "    else:\n" ++
