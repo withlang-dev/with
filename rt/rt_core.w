@@ -907,6 +907,32 @@ fn rt_value_is_zero(ptr: *const u8, size: i64) -> i32:
 fn small_block_ptr(block: i64) -> *mut u8:
     (block + RT_ALLOC_HEADER_SIZE) as *mut u8
 
+// The slab block map (#3094): the slab's first RT_SLAB_MAP_BYTES bytes, one
+// bit per RT_ALLOC_HEADER_SIZE bytes of the slab, set where a live block's
+// header begins (at carve and at freelist pop) and cleared when the block
+// is freed, so "an owned payload start" is read from the map, never from
+// the bytes at the pointer.
+let RT_SLAB_MAP_BYTES: i64 = RT_PAGE_SIZE / RT_ALLOC_HEADER_SIZE / 8
+var slab_base: i64 = 0
+
+fn rt_slab_mark_block(slab: i64, block: i64):
+    let unit = (block - slab) / RT_ALLOC_HEADER_SIZE
+    let byte = (slab + unit / 8) as *mut u8
+    unsafe *byte = (unsafe *byte) | ((1 as u8) << ((unit % 8) as u32))
+
+fn rt_slab_clear_block(slab: i64, block: i64):
+    if slab == 0: return
+    let unit = (block - slab) / RT_ALLOC_HEADER_SIZE
+    let byte = (slab + unit / 8) as *mut u8
+    unsafe *byte = (unsafe *byte) & (255 as u8 ^ ((1 as u8) << ((unit % 8) as u32)))
+
+// Whether `header` is where a block of slab `slab` begins.
+fn rt_slab_block_begins(slab: i64, header: i64) -> i32:
+    if header < slab + RT_SLAB_MAP_BYTES or header >= slab + RT_PAGE_SIZE: return 0
+    let unit = (header - slab) / RT_ALLOC_HEADER_SIZE
+    let byte: i32 = unsafe *((slab + unit / 8) as *const u8)
+    (byte >> ((unit % 8) as u32)) & 1
+
 fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     if ptr as i64 == 0:
         return 0
@@ -922,23 +948,19 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     // on any non-owned slot content, blanked or not.
     if payload < RT_ALLOC_HEADER_SIZE:
         return 0
+    // #3094: every block is RT_ALLOC_HEADER_SIZE-aligned (block sizes are
+    // multiples of it and a slab is page-aligned), so an unaligned pointer
+    // is an interior view, whatever the bytes before it read as.
+    if payload % RT_ALLOC_HEADER_SIZE != 0:
+        return 0
     let header = payload - RT_ALLOC_HEADER_SIZE
     // The page index names the slab in O(1); every slab is RT_PAGE_SIZE.
     let start = rt_owned_slab_start(header)
     if start != 0:
-        let end = start + RT_PAGE_SIZE
-        if header >= start and header + RT_ALLOC_HEADER_SIZE <= end:
-            let size = unsafe *(header as *const i64)
-            if size <= 0 or size > RT_LARGE_THRESHOLD:
-                return 0
-            let idx = size_class_index(size)
-            let cls_size = size_class_size(idx)
-            if size != cls_size:
-                return 0
-            let block_size = RT_ALLOC_HEADER_SIZE + size
-            if header + block_size > end:
-                return 0
-            return 1
+        // #3094: the slab's block map says where blocks begin; the bytes at
+        // `header` are not consulted, since an interior view of a payload
+        // whose bytes happen to read as a header is not a block.
+        return rt_slab_block_begins(start, header)
     // Large ranges are kept sorted by start; each region's start is unique,
     // so an exact-match binary search replaces the former linear scan.
     var llo: isize = 0
@@ -1057,6 +1079,9 @@ fn dbg_invalid_free_forensics(payload: i64):
     dbg_puts("debug-alloc: invalid-free forensics: address is in no slab or large range\n")
 
 fn free_small_block(block: i64, idx: i32):
+    // The block is no longer an owned payload: its map bit clears, so a str
+    // naming it is a double free for the ledger, not a holder release.
+    rt_slab_clear_block(rt_owned_slab_start(block), block)
     if alloc_no_reuse_on() != 0:
         unsafe *(block as *mut i64) = -1
         return
@@ -1836,25 +1861,31 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         // Pop from freelist. Zero the payload — recycled memory is dirty.
         let next = unsafe *(head as *const i64)
         set_freelist(idx, next)
+        rt_slab_mark_block(rt_owned_slab_start(head), head)
         alloc_store_small_header(head, cls_size)
         let ptr = small_block_ptr(head)
         rt_zero_aligned(ptr as i64, if alloc_zero_class_on() != 0: cls_size else: size)
         return ptr
 
-    // Carve from slab
+    // Carve from slab. A slab's first RT_SLAB_MAP_BYTES hold its block map
+    // (#3094): one bit per RT_ALLOC_HEADER_SIZE bytes, set where a block
+    // begins, so a pointer into the slab is known to be a block start or an
+    // interior one without reading the bytes before it. mmap gives it zeroed.
     if slab_remaining < block_size:
         rt_alloc_reserve_mmap_bytes(RT_PAGE_SIZE)
         let new_slab = rt_mmap(RT_PAGE_SIZE)
         if new_slab as i64 == 0:
             rt_alloc_release_mmap_bytes(RT_PAGE_SIZE)
             rt_alloc_report_out_of_memory(RT_PAGE_SIZE)
-        slab_ptr = new_slab as i64
-        slab_remaining = RT_PAGE_SIZE
-        rt_record_slab_range(slab_ptr, RT_PAGE_SIZE)
+        slab_base = new_slab as i64
+        slab_ptr = slab_base + RT_SLAB_MAP_BYTES
+        slab_remaining = RT_PAGE_SIZE - RT_SLAB_MAP_BYTES
+        rt_record_slab_range(slab_base, RT_PAGE_SIZE)
 
     let block = slab_ptr
     slab_ptr = slab_ptr + block_size
     slab_remaining = slab_remaining - block_size
+    rt_slab_mark_block(slab_base, block)
     alloc_store_small_header(block, cls_size)
     small_block_ptr(block)
 
