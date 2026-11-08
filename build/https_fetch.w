@@ -66,9 +66,18 @@ fn main -> i32:
     let url = argv[1] ++ ""
     let output = argv[2] ++ ""
     for attempt in 1i32..ATTEMPTS + 1:
-        if https_download(url.clone(), output.clone()) == 0: return 0
-        if attempt < ATTEMPTS:
-            print(f"HTTPS download failed (attempt {attempt} of {ATTEMPTS}), retrying: " ++ url)
-            sleep_secs(2 * attempt)
+        // Each failed attempt says what it got (#3083). Seed-bound: this
+        // program is compiled by the pinned seed, whose std has no
+        // `https_download_reason` yet; once a seed carries it, call that and
+        // print its reason (lib/std/build.w's twin already does).
+        let response = https_get_response_timeout(url.clone(), 5, 20000, 30000)
+        if response.status == 200:
+            if with_fs_write_file(output, response.body) == 0: return 0
+            print(f"HTTPS download failed (attempt {attempt} of {ATTEMPTS}): could not write {output}")
+        else if response.status == -1:
+            print(f"HTTPS download failed (attempt {attempt} of {ATTEMPTS}): no response (a connection, TLS, redirect or short-body failure)")
+        else:
+            print(f"HTTPS download failed (attempt {attempt} of {ATTEMPTS}): HTTP {response.status}")
+        if attempt < ATTEMPTS: sleep_secs(2 * attempt)
     print(f"HTTPS download failed after {ATTEMPTS} attempts: " ++ url)
     1

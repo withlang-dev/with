@@ -15,10 +15,16 @@ pub type HttpResponse {
     pub headers: str,
     pub body: str,
     pub location: str,
+    /// Why there is no response (`status` -1): the step that failed, named.
+    /// `""` when the server answered.
+    pub reason: str,
 }
 
 fn http_empty_response(status: i32) -> HttpResponse:
-    HttpResponse { status, headers: "", body: "", location: "" }
+    HttpResponse { status, headers: "", body: "", location: "", reason: "" }
+
+fn http_failed(reason: str) -> HttpResponse:
+    HttpResponse { status: -1, headers: "", body: "", location: "", reason }
 
 fn http_parse_url(url: &str) -> HttpUrl:
     var host: str = ""
@@ -198,11 +204,11 @@ fn http_content_length(headers: &str) -> i64:
 fn https_get_once(url: &str, connect_ms: i32, idle_ms: i32) -> HttpResponse:
     let parsed = http_parse_url(url)
     if parsed.host.len() == 0:
-        return http_empty_response(-1)
+        return http_failed("not an https URL: " ++ url)
 
     var conn = tls_connect_timeout(parsed.host, parsed.port, connect_ms, idle_ms)
     if conn.fd < 0:
-        return http_empty_response(-1)
+        return http_failed(f"no TLS connection to {parsed.host}:{parsed.port}" ++ (if connect_ms > 0: f" within {connect_ms} ms" else: ""))
 
     let req = http_build_get(parsed.host, parsed.path)
     let req_len = req.len() as i32
@@ -213,7 +219,7 @@ fn https_get_once(url: &str, connect_ms: i32, idle_ms: i32) -> HttpResponse:
         n
     if sent < 0:
         socket_close(conn.fd)
-        return http_empty_response(-1)
+        return http_failed(f"the request to {parsed.host} was not sent (TLS write failed)")
 
     var response = StringBuilder.new()
     var done = false
@@ -237,7 +243,7 @@ fn https_get_once(url: &str, connect_ms: i32, idle_ms: i32) -> HttpResponse:
     let raw = response.to_str()
     let hdr_end = http_find_header_end(raw)
     if hdr_end < 0:
-        return http_empty_response(-1)
+        return http_failed(f"{parsed.host} closed the connection after {raw.len()} byte(s), before the response headers ended")
 
     let headers = raw.slice(0, hdr_end as i64)
     let status = http_status(headers)
@@ -249,9 +255,9 @@ fn https_get_once(url: &str, connect_ms: i32, idle_ms: i32) -> HttpResponse:
         // body the server declared is a failed response, never a short 200.
         let declared = http_content_length(headers)
         if declared >= 0 and body.len() < declared:
-            return http_empty_response(-1)
+            return http_failed(f"the connection to {parsed.host} ended after {body.len()} of the {declared} body bytes it declared (HTTP {status})")
     let location = http_header_value(headers, "Location")
-    HttpResponse { status, headers, body, location }
+    HttpResponse { status, headers, body, location, reason: "" }
 
 pub fn https_get_response(url: str, max_redirects: i32) -> HttpResponse: https_get_response_timeout(url, max_redirects, 20000, 30000)
 
@@ -265,13 +271,13 @@ pub fn https_get_response_timeout(url: str, max_redirects: i32, connect_ms: i32,
         if not http_is_redirect(response.status):
             return response
         if redirects >= max_redirects:
-            return http_empty_response(-1)
+            return http_failed(f"more than {max_redirects} redirect(s); the last was from {current}")
         let next = http_resolve_redirect(current, move response.location)
         if next.len() == 0:
-            return http_empty_response(-1)
+            return http_failed(f"HTTP {response.status} from {current} without a Location to follow")
         current = next
         redirects = redirects + 1
-    http_empty_response(-1)
+    http_failed("unreachable")
 
 pub fn https_get(url: str) -> str:
     var response = https_get_response(url, 5)
@@ -284,7 +290,14 @@ pub fn https_download(url: str, dest_path: str) -> i32: https_download_timeout(u
 /// https_download that gives up on a server that does not accept the
 /// connection within `connect_ms`, or says nothing for `idle_ms`.
 pub fn https_download_timeout(url: str, dest_path: str, connect_ms: i32, idle_ms: i32) -> i32:
+    if https_download_reason(url, dest_path, connect_ms, idle_ms).len() > 0: -1 else: 0
+
+/// https_download_timeout that says why it failed: `""` when `dest_path`
+/// holds the body, else the step that failed or the status the server gave
+/// (#3083: a seed fetch that "failed after 5 attempts" named none of them).
+pub fn https_download_reason(url: str, dest_path: str, connect_ms: i32, idle_ms: i32) -> str:
     let response = https_get_response_timeout(url, 5, connect_ms, idle_ms)
-    if response.status != 200:
-        return -1
-    with_fs_write_file(dest_path, response.body)
+    if response.status == -1: return response.reason
+    if response.status != 200: return f"HTTP {response.status} for {url}"
+    if with_fs_write_file(dest_path, response.body) != 0: return f"could not write {dest_path}"
+    ""
