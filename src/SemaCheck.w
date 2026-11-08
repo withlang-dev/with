@@ -43111,7 +43111,7 @@ impl Sema:
 // when the name is a plural (`parts` → `part`, `xs` → `x`), else the name
 // with `_item`; `each_` in front when that is a keyword or the reserved `it`.
 // Sema chooses it where the scope is known; the rewriter reads it.
-pub fn ceremony_element_name(list_name: &str) -> str:
+fn ceremony_element_name(list_name: &str) -> str:
     let singular = if list_name.len() > 1 and list_name.ends_with("s") and not list_name.ends_with("ss"): list_name.slice(0, list_name.len() - 1) ++ "" else: list_name ++ "_item"
     if singular == "it" or tag_from_keyword(singular) != -1: "each_" ++ singular else: singular
 

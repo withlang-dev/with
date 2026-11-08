@@ -165,7 +165,7 @@ enum TokenKind: i32:
     TK_PLUS_PLUS_EQ = 141
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
-pub fn tag_from_keyword(s: &str) -> i32:
+fn tag_from_keyword(s: &str) -> i32:
     if s == "fn": return TokenKind.TK_KW_FN
     if s == "let": return TokenKind.TK_KW_LET
     if s == "var": return TokenKind.TK_KW_VAR
