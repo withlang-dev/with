@@ -486,6 +486,32 @@ fn conan_resolve_version(name: &str, version_hint: &str) -> str:
             best = version
     best
 
+// #3170: the recipe names Conan Center's search returns for `name` when
+// none is `name` itself (a user types nghttp2; the recipe is libnghttp2),
+// at most five, for the refusal to name.
+fn conan_near_names(name: &str) -> str:
+    let response = conan_http_get(CONAN_CENTER_URL() ++ "/v2/conans/search?q=" ++ name)
+    conan_near_names_in(json_extract_string_array(response, "results"), name)
+
+// The distinct recipe names among search `results` (`name/version@user/channel`)
+// other than `name`, the first five spelled for a message.
+fn conan_near_names_in(results: List[str], name: &str) -> str:
+    let seen = []
+    var more = 0
+    for result in results:
+        let slash = conan_find_char(result, 47)
+        if slash <= 0: continue
+        let got = result.slice(0, slash)
+        if got == name or seen.contains(got): continue
+        if seen.len() == 5:
+            more = more + 1
+            continue
+        seen.push(got.to_owned())
+    var names = ""
+    for got in seen: names = names ++ (if names.len() > 0: ", " else: "") ++ "`" ++ got ++ "`"
+    if more > 0: names = names ++ f" and {more} more"
+    names
+
 fn conan_get_latest_recipe_rev(name: &str, version: &str) -> str:
     let url = CONAN_CENTER_URL() ++ "/v2/conans/" ++ name ++ "/" ++ version ++ "/_/_/latest"
     let response = conan_http_get(url)
@@ -2090,7 +2116,8 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         return ""
     let version = conan_resolve_version(name, version_hint)
     if version.len() == 0:
-        runtime_eprint("error: could not resolve package " ++ name ++ "/" ++ version_hint ++ " on Conan Center")
+        let near = conan_near_names(name)
+        runtime_eprint("error: could not resolve package " ++ name ++ "/" ++ version_hint ++ " on Conan Center" ++ (if near.len() > 0: "; its search finds " ++ near ++ " (`with get c.<name>`)" else: ""))
         return ""
     let meta_path = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json"
     if not force_reinstall and runtime_file_exists(meta_path) != 0:
