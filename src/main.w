@@ -3856,7 +3856,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
             // 2026-11-10). The battery reaches the gate the same way.
             var wants_gate = false
             for name in selected_names:
-                if name == "gate" or name == "battery": wants_gate = true
+                if name in ["gate", "battery"]: wants_gate = true
             if wants_gate and not graph_options.no_deps and build_graph_find_target_index_by_name(graph, "gate-fast") >= 0:
                 let fast_names: List[str] = ["gate-fast"]
                 let fast_graph = build_graph_filter_targets(graph, fast_names)
