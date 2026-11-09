@@ -1343,6 +1343,12 @@ impl Sema:
                     if origin_node > 0:
                         origin_mask = origin_mask | self.compute_expr_view_origin_mask(origin_node)
                         gathered_origins = self.collect_expr_view_deps(origin_node, gathered_origins)
+                        // #962, #3165: a join of a view into a statement
+                        // temporary is a view into it too; a binding takes
+                        // the Copy value (copied in the arm) and a return is
+                        // refused (§21.1), as for the arm itself.
+                        let temp_ty = self.view_into_temporary_type(self.join_arm_value_node(origin_node))
+                        if temp_ty != 0: self.expr_view_into_temporary.insert(report_node, temp_ty)
                 else if self.get_type_kind(resolved) == TypeKind.TY_REF:
                     if self.can_contextually_copy_ref(final_type, arm_ty) == false:
                         self.emit_contextual_join_mismatch(join_name, final_type, arm_ty, report_node, arm_node)
@@ -19176,6 +19182,9 @@ impl Sema:
                 param_mask = param_mask | self.compute_expr_view_origin_mask(source_node)
                 storage_mask = storage_mask | self.compute_expr_storage_origin_mask(source_node)
                 deps = self.collect_expr_view_deps(source_node, deps)
+                // #962, #3165: a carrier of a view into a temporary is a view into it too.
+                let temp_ty = self.view_into_temporary_type(source_node)
+                if temp_ty != 0: self.expr_view_into_temporary.insert(result_node, temp_ty)
         self.set_expr_view_deps(result_node, param_mask, deps)
         self.set_expr_view_storage_mask(result_node, storage_mask)
 
