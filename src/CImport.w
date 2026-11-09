@@ -19048,6 +19048,12 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
         let operand = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
         if with_ci_cursor_kind(session, operand) == CXK_DECL_REF and root.starts_with("local:"):
             out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
+    // #3195: a for statement's increment runs after its body; recorded in
+    // that order, `for (cur = t; cur; cur = next) { next = cur->next;
+    // free(cur); }` reads as the walk it is (fd_local_alias_param).
+    if kind == CXK_FOR_STMT and nc == 4:
+        for child in [0, 1, 3, 2]: out = out ++ ci_own_walk(session, with_ci_child(session, cursor, child), params, locals)
+        return out
     var i = 0
     while i < nc:
         out = out ++ ci_own_walk(session, with_ci_child(session, cursor, i), params, locals)

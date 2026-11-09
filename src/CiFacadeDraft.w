@@ -441,17 +441,46 @@ impl CiProject:
 
     // The pointer parameter a local stands for: every assignment to the
     // local is that parameter (`gz_statep state = (gz_statep)file`), else -1.
+    // #3195: a local that walks from the parameter (`cur = t; while (cur) {
+    // next = cur->next; free(cur); cur = next; }`, cJSON_Delete) stands for
+    // it at the first destroying sink. A source that is a part of the local
+    // itself, or a local made only of such parts, recorded after that sink
+    // keeps the alias (the first iteration frees the parameter); one
+    // recorded before it (`cur = cur->next; free(cur)`) breaks it. The
+    // evidence is in source order; a for statement's increment is recorded
+    // after its body (ci_own_walk).
     fn fd_local_alias_param(si: i32, local: &str) -> i32:
         var alias = -1
+        var destroyed_seen = false
         for line in self.symbols[si].own_evidence.split("\n"):
+            if line.starts_with("localsink:" ++ local ++ ":"):
+                let parts = line.split(":")
+                if parts.len() == 4 and self.fd_callee_destroys(parts[2], fd_i32(parts[3])): destroyed_seen = true
+                continue
             if not line.starts_with("localsrc:" ++ local ++ ":"): continue
             let src = line.slice(("localsrc:" ++ local ++ ":").len(), line.len())
-            if not src.starts_with("param:"): return -1
+            if not src.starts_with("param:"):
+                if destroyed_seen and self.fd_src_is_part_of_local(si, src, local): continue
+                return -1
             let pi = fd_i32(src.slice(6, src.len()))
             if alias >= 0 and alias != pi: return -1
             alias = pi
         if alias >= 0 and (alias >= self.symbols[si].param_ty.len() or not self.symbols[si].param_ty[alias].starts_with("*")): return -1
         alias
+
+    // `src` is a part of `local` (`cur->next`), or a local whose every
+    // source is such a part (`next = cur->next`).
+    fn fd_src_is_part_of_local(si: i32, src: &str, local: &str) -> bool:
+        if src == "field:local:" ++ local: return true
+        if not src.starts_with("local:"): return false
+        let other = src.slice(6, src.len())
+        if other == local: return true
+        var sources = 0
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if not line.starts_with("localsrc:" ++ other ++ ":"): continue
+            if line.slice(("localsrc:" ++ other ++ ":").len(), line.len()) != "field:local:" ++ local: return false
+            sources = sources + 1
+        sources > 0
 
     fn fd_param_is_pointer(si: i32, pi: i32) -> bool:
         pi >= 0 and pi < self.symbols[si].param_ty.len() and self.symbols[si].param_ty[pi].starts_with("*")
