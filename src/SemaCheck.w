@@ -104,7 +104,7 @@ type SemaLexicalEnv {
     moved_field_path_syms: List[i32],
     bind_provenance: List[BindingProvenance],
     scope_starts: List[i32],
-    scope_name_map: HashMap[i32, i32, Minted],
+    scope_name_map: SymTable,
     pending_generic_binding_base: HashMap[i32, i32, Minted],
     pending_generic_binding_call: HashMap[i32, i32, Minted],
     pending_generic_binding_decl: HashMap[i32, i32, Minted],
@@ -7950,7 +7950,7 @@ impl Sema:
         self.bind_provenance = List.new()
         self.scope_starts = List.new()
         self.scope_starts.push(0)
-        self.scope_name_map = HashMap.new()
+        self.scope_name_map = SymTable { slots: [] }
         self.pending_generic_binding_base = HashMap.new()
         self.pending_generic_binding_call = HashMap.new()
         self.pending_generic_binding_decl = HashMap.new()
@@ -30252,7 +30252,7 @@ impl Sema:
         let saved_module_has_ci = self.current_module_has_ci
         let saved_module_path = self.current_module_path
         let saved_scope_name_map = move self.scope_name_map
-        self.scope_name_map = HashMap.new()
+        self.scope_name_map = SymTable { slots: [] }
         let module_scope_len = if self.scope_starts.len() > 1: self.scope_starts[1] else: self.bind_names.len()
         for gi in 0..module_scope_len:
             let sym = self.bind_names[gi]
