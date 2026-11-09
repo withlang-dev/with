@@ -1835,7 +1835,15 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
         let prev = rt_getenv(c"PWD".ptr)
         if prev as i64 != 0:
             old_pwd = with_str_from_cstr(prev)
-        let _pwd = win_setenv("PWD", cwd)
+        // #3166: PWD is the directory's full path, never the string
+        // given: a relative `cwd` rooted the child's project at a
+        // relative path.
+        let cwd_c = with_str_to_cstr_ref(cwd)
+        var full: [1024]u8 = [0 as u8; 1024]
+        let resolved = win_realpath(cwd_c as *const c_char, &raw mut full[0] as *mut u8 as *mut c_char)
+        let pwd = if resolved as i64 != 0: with_str_from_cstr(resolved as *const c_char) else: cwd
+        with_free(cwd_c as *mut c_void)
+        let _pwd = win_setenv("PWD", pwd)
         pwd_set = true
     // CREATE_SUSPENDED: the child joins its job before it runs a line, so
     // nothing it spawns escapes the job (POSIX: setpgid in the forked child
