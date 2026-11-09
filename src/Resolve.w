@@ -1458,7 +1458,7 @@ fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &str) -
     // — and a program reaches it through std. Its own modules and the build's
     // generated roots (out/gen) import it too.
     if target.starts_with("<embedded-rt>/"):
-        if resolve_path_is_std(importer) or resolve_path_is_runtime(importer) or resolve_path_is_compiler_source(importer): return ""
+        if resolve_path_is_std(importer) or resolve_path_is_runtime(importer) or resolve_path_is_compiler_source(importer) or resolve_path_is_runtime_test(importer): return ""
         return f"module '{dotted}' is the compiler's runtime, internal to the standard library (D30): a program reaches it through std"
     let target_std = resolve_path_is_std(target)
     let target_norm = resolve_normalize_path(target)
@@ -1812,6 +1812,16 @@ fn resolve_dir_is_compiler_checkout(dir: &str) -> bool:
     let found = runtime_file_exists(marker) != 0
     resolve_compiler_root_memo.insert(dir, found)
     found
+
+// #3095: the runtime's own tests, `test/runtime/*.w` in a compiler checkout,
+// are the toolchain's and import `rt.*` as `src/` does: an allocator or str
+// invariant the debug allocator cannot observe is tested by calling the
+// runtime. A program anywhere else still reaches it through std.
+fn resolve_path_is_runtime_test(path: &str) -> bool:
+    let at = if path.contains("test/runtime/"): path.index_of("test/runtime/") else: path.index_of("test\\runtime\\")
+    if at < 0: return false
+    if at > 0 and path[at - 1] != '/' and path[at - 1] != '\\': return false
+    resolve_dir_is_compiler_checkout(path.slice(0, at))
 
 fn resolve_path_is_compiler_source(path: &str) -> bool:
     for i in 0..path.len():
