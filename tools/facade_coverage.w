@@ -184,6 +184,7 @@ fn classify(verdict: &str) -> str:
 fn record_class(verdict: &str) -> str:
     if verdict.starts_with("destroyed but never produced"): return "record: destroyed but never produced here (no resource)"
     if verdict.contains("no unary destroyer"): return "record: produced, but no unary destroyer in the package"
+    if verdict.contains("but no resource:"): return "record: produced and dropped, but a producer parameter is undescribed"
     "record: produced, with several unary destroyers"
 
 fn is_record_line(verdict: &str) -> bool:
