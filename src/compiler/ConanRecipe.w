@@ -56,7 +56,7 @@ fn conan_data_source(data: &str, version: &str) -> ConanSource:
 // `tried` says what happened to each.
 type ConanArchivePick { path: str, tried: str }
 
-fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &str) -> i32, digest_of: fn(&str) -> str) -> ConanArchivePick:
+fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &str) -> str, digest_of: fn(&str) -> str) -> ConanArchivePick:
     var tried = ""
     for url in source.urls:
         var slash = -1
@@ -64,8 +64,11 @@ fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &str) 
             if url[i] == '/': slash = i as i32
         let name = url.slice(slash + 1, url.len())
         let candidate = dir ++ "/" ++ name
-        if download(url, candidate) != 0:
-            tried = tried ++ "\n  " ++ url ++ ": did not download"
+        // #3169: `download` says why it failed ("" is success); the report
+        // carries it beside the URL.
+        let why = download(url, candidate)
+        if why.len() > 0:
+            tried = tried ++ "\n  " ++ url ++ ": did not download (" ++ why ++ ")"
             continue
         let digest = digest_of(candidate)
         if digest != source.sha256:
