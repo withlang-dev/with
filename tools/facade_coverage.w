@@ -16,6 +16,9 @@
 //   --work DIR       where the scratch projects live (default out/facade-coverage)
 //   --out FILE       the Markdown report (default <work>/coverage.md)
 //   --reports-only   read the reports already under <work>; fetch nothing
+//   --fetch-missing  fetch only the libraries with no report under <work>
+//                    (a second pass after transient download failures:
+//                    GitHub's release assets 504 for minutes at a time)
 //   LIB ...          a subset of the list (default: every library on it)
 //
 // The fetch is a user's action (D171): `with get` may use the host's tools,
@@ -230,11 +233,12 @@ fn facade_line(path: &str) -> str:
     let lines = text.split("\n")
     for (i, line) in lines.enumerate():
         if not (line.contains("facade:") or line.contains("with get: facade")): continue
-        // The reason may continue on the indented lines after it (the
-        // archives tried, #3169).
+        // The reason may continue on the lines after it that name the
+        // archives tried (#3169: `  https://…: did not download (…)`);
+        // the fetch's own progress lines (`  downloading …`) are not it.
         var said = line.trim().to_owned()
         var k = i + 1
-        while k < lines.len() and lines[k].starts_with("  ") and not lines[k].trim().starts_with("facade"):
+        while k < lines.len() and (lines[k].starts_with("  https://") or lines[k].starts_with("  file://")):
             said = said ++ " " ++ lines[k].trim()
             k = k + 1
         return said
@@ -310,6 +314,7 @@ if with_bin.len() == 0: with_bin = "with"
 var work = "out/facade-coverage"
 var out_path = ""
 var reports_only = false
+var fetch_missing = false
 var selected = []
 let argv = args()
 var i = 1
@@ -325,6 +330,7 @@ while i < argv.len():
         i = i + 1
         out_path = argv[i].to_owned()
     else if arg == "--reports-only": reports_only = true
+    else if arg == "--fetch-missing": fetch_missing = true
     else if arg == "--help" or arg == "-h":
         print("usage: with run tools/facade_coverage.w [--with PATH] [--work DIR] [--out FILE] [--reports-only] [LIB ...]")
         exit_code(0)
@@ -345,7 +351,8 @@ var rows = []
 var all = Clusters { kinds: [] }
 for lib in libs:
     var status = ""
-    if not reports_only:
+    let fetched_before = find_report(work, lib)
+    if not reports_only and not (fetch_missing and fetched_before.1.len() > 0):
         eprint("facade_coverage: fetching c." ++ lib)
         status = fetch(with_bin, work, lib)
     let (version, path) = find_report(work, lib)
