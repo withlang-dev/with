@@ -227,8 +227,17 @@ fn last_line(path: &str) -> str:
 // The line of a log that says why there is no facade.
 fn facade_line(path: &str) -> str:
     let text = read_file(path) ?? ""
-    for line in text.split("\n"):
-        if line.contains("facade:") or line.contains("with get: facade"): return line.trim().to_owned()
+    let lines = text.split("\n")
+    for (i, line) in lines.enumerate():
+        if not (line.contains("facade:") or line.contains("with get: facade")): continue
+        // The reason may continue on the indented lines after it (the
+        // archives tried, #3169).
+        var said = line.trim().to_owned()
+        var k = i + 1
+        while k < lines.len() and lines[k].starts_with("  ") and not lines[k].trim().starts_with("facade"):
+            said = said ++ " " ++ lines[k].trim()
+            k = k + 1
+        return said
     ""
 
 fn fetch(with_bin: &str, work: &str, lib: &str) -> str:
