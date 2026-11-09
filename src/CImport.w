@@ -18860,7 +18860,11 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
     if kind == CXK_CALL_EXPR and nc >= 1:
-        let callee = with_ci_cursor_spelling(session, cursor)
+        // #3174: a call through a function-pointer field (glfw's
+        // `_glfw.platform.setWindowTitle(window, title)`) is no call of a
+        // function named like the field; the sink names the field, marked.
+        let spelled = with_ci_cursor_spelling(session, cursor)
+        let callee = if ci_call_callee_is_member(session, with_ci_child(session, cursor, 0)): "*" ++ spelled else: spelled
         if callee.len() > 0:
             var ai = 1
             while ai < nc:
@@ -19039,7 +19043,9 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
         else:
             out = out ++ ci_own_record_store(session, rhs, params, locals)
     if kind == CXK_CALL_EXPR and nc >= 1:
-        let callee = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+        let direct = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+        // #3174: through a function-pointer field, the sink names the field, marked.
+        let callee = if direct.len() > 0 and ci_call_callee_is_member(session, with_ci_child(session, cursor, 0)): "*" ++ direct else: direct
         var ai = 1
         while ai < nc:
             let arg = with_ci_child(session, cursor, ai)

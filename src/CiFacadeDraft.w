@@ -308,6 +308,10 @@ impl CiProject:
             if not sink.contains(":"): continue
             let kv = sink.split(":")
             if not self.fd_callee_retains(kv[0], fd_i32(kv[1])): continue
+            // #3174: a sink through a function-pointer field (glfw's platform
+            // dispatch) is said as such; which function the field holds is
+            // a registry fact, not a missing unit.
+            if kv[0].starts_with("*"): return "passed through the function pointer field " ++ kv[0].slice(1, kv[0].len()) ++ ", which no unit decides"
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ kv[0] ++ ", which no unit defines"
             return "passed to " ++ kv[0] ++ " at param " ++ kv[1] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1)
@@ -316,6 +320,7 @@ impl CiProject:
             if not line.starts_with("localsink:"): continue
             let parts = line.split(":")
             if parts.len() != 4 or self.fd_local_alias_param(si, parts[1]) != pi or not self.fd_callee_retains(parts[2], fd_i32(parts[3])): continue
+            if parts[2].starts_with("*"): return "passed through the function pointer field " ++ parts[2].slice(1, parts[2].len()) ++ ", which no unit decides"
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, parts[2])
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ parts[2] ++ ", which no unit defines"
             return "passed to " ++ parts[2] ++ " at param " ++ parts[3] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1)
