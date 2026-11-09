@@ -2313,6 +2313,31 @@ fn run_release_uat_action(ctx: ActionCtx) -> i32:
     0
 
 
+// #3116: every library on the #3115 list fetched into a fresh project by the
+// release compiler, its facade report read, the coverage and the clustered
+// refusals written to out/facade-coverage/coverage.md with a TSV beside it
+// (tools/facade_coverage.w). Outside the gate and the battery: it fetches
+// from Conan Center and the libraries' sources as a user does (D171), and a
+// library this host cannot provide is a row that says so, never a red.
+fn run_facade_coverage_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        ctx.diagnostics().error("facade-coverage: missing compiler input")
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, inputs[0])
+    let out_rel = ctx.output()
+    let out_dir = build_project_dirname(out_rel)
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("facade-coverage: could not create output dir: " ++ out_dir)
+    let args = [compiler, "run", "tools/facade_coverage.w", "--with", compiler, "--work", out_dir, "--out", out_rel]
+    let stderr_rel = build_project_join(out_dir, "run.stderr")
+    let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, build_project_join(out_dir, "run.stdout")), build_project_abs(root, stderr_rel), 7200000, root)
+    print(fs.read_text(build_project_join(out_dir, "run.stdout")))
+    if result.rc != 0:
+        ctx.diagnostics().error(f"facade-coverage: the tool exited {result.rc}; stderr: " ++ build_project_abs(root, stderr_rel))
+    0
+
 fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -5047,6 +5072,19 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_uat = release_uat.dep("user-programs-safe")
     release_uat = release_uat_platform_asset_dep(release_uat)
     out = out.add_target(release_uat)
+
+    // #3116: the facade coverage report across the #3115 list, by the
+    // release compiler; outside the gate and the battery (it fetches as a
+    // user does, D171). Rerun after a facade-grammar or proof change and
+    // compare out/facade-coverage/coverage.tsv.
+    var facade_coverage = target_new(.Action, "facade-coverage", "").output("out/facade-coverage/coverage.md")
+    facade_coverage.action = run_facade_coverage_action
+    facade_coverage = facade_coverage.input(release_compiler_bin("with")).input("tools/facade_coverage.w").input("registry")
+    facade_coverage = facade_coverage.write_scope("out/facade-coverage")
+    facade_coverage = facade_coverage.allow_network()
+    facade_coverage = facade_coverage.timeout(7200000)
+    facade_coverage = facade_coverage.dep("build")
+    out = out.add_target(facade_coverage)
 
     var check_committed = target_new(.Action, "check-committed-state", "").output("out/command/check-committed-state/ok")
     check_committed.action = run_check_committed_state_action
