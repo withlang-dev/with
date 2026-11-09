@@ -114,6 +114,10 @@ impl CiProject:
         if self.fd_is_free_call(callee) or self.fd_is_alloc_call(callee) or ci_own_is_libc_observer(callee): return false
         let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
         if si < 0: return true
+        // #3179: a callee that destroys the argument keeps nothing of it: a
+        // producer's error path (`if (!fill(p)) { thing_free(p); return
+        // NULL; }`, cJSON_Duplicate_rec) read as the local being retained.
+        if index < self.symbols[si].param_destroys.len() and self.symbols[si].param_destroys[index] != 0: return false
         // A callee no unit defines retains what it is given (the asymmetry
         // rule), unless the introspection file says it takes nothing there.
         if self.symbols[si].has_definition == 0: return gir_param_transfer(self.symbols[si].gir, index) != "none"
