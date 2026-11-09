@@ -1650,13 +1650,23 @@ fn conan_source_tools(name: &str) -> ConanSourceTools:
 // it does (asking for one that is not there is a 404 printed at the user).
 type ConanFetchedRecipe { folder: str, data: str, recipe: str, recipe_cmake: str, source: ConanSource, problem: str }
 
+// #3171: which of the recipe's files could not be read, with its URL: the
+// index's config.yml names no folder for the version (libsodium's
+// cci.20220430, abseil's 20250814.0 in the #3116 survey), or conandata.yml
+// or conanfile.py did not fetch. One message hid all three.
+fn conan_recipe_problem(name: &str, version: &str, folder: &str, have_data: bool, have_recipe: bool) -> str:
+    let what = "could not read the Conan Center recipe of " ++ name ++ "/" ++ version ++ ": "
+    if folder.len() == 0: return what ++ "its config.yml names no folder for that version (" ++ conan_recipe_config_url(name) ++ ")"
+    if not have_data: return what ++ "conandata.yml did not fetch (" ++ conan_recipe_file_url(name, folder, "conandata.yml") ++ ")"
+    what ++ "conanfile.py did not fetch (" ++ conan_recipe_file_url(name, folder, "conanfile.py") ++ ")"
+
 fn conan_fetch_recipe(name: &str, version: &str) -> ConanFetchedRecipe:
     let none = ConanSource { urls: List.new(), sha256: "" }
     let folder = conan_recipe_folder(name, version)
     let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
     let recipe = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py")) else: ""
     if data.len() == 0 or recipe.len() == 0:
-        return ConanFetchedRecipe { folder, data, recipe, recipe_cmake: "", source: none, problem: "could not read the Conan Center recipe of " ++ name ++ "/" ++ version }
+        return ConanFetchedRecipe { folder, data, recipe, recipe_cmake: "", source: none, problem: conan_recipe_problem(name, version, folder, data.len() > 0, recipe.len() > 0) }
     let source = conan_data_source(data, version)
     if source.urls.len() == 0 or source.sha256.len() == 0:
         return ConanFetchedRecipe { folder, data, recipe, recipe_cmake: "", source: none, problem: "the recipe of " ++ name ++ " lists no source archive for " ++ version }
