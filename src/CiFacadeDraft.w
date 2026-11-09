@@ -903,7 +903,14 @@ impl CiProject:
                             verdict = verdict ++ f"; the proofs could not clear param {pi} (" ++ self.fd_retain_reason(si as i32, pi as i32, 0) ++ ")"
                             break
             else if self.symbols[si].owns_return != 0:
-                verdict = "raw: owned " ++ self.symbols[si].ret_ty ++ " (" ++ self.symbols[si].own_reason ++ "), but the package has no single destroyer of it: a registry fact names one"
+                // #3176: with a drop proven, the gap is elsewhere: a
+                // parameter the facade does not describe (curl_mime_init's
+                // `CURL *`), said as such; the drop message was a lie.
+                let dropped_by = if ret.len() > 0: self.fd_drop_of(ret) else: -1
+                let undescribed = if dropped_by >= 0: self.fd_unpresentable_param(si as i32, -1, modeled) else: -1
+                if undescribed >= 0: verdict = "raw: owned " ++ self.symbols[si].ret_ty ++ " (" ++ self.symbols[si].own_reason ++ f"), dropped by " ++ self.symbols[dropped_by].name ++ f", but param {undescribed} is " ++ self.symbols[si].param_ty[undescribed] ++ ", which the facade does not describe"
+                else if dropped_by >= 0: verdict = "raw: owned " ++ self.symbols[si].ret_ty ++ " (" ++ self.symbols[si].own_reason ++ "), dropped by " ++ self.symbols[dropped_by].name ++ ", but the record is not modeled"
+                else: verdict = "raw: owned " ++ self.symbols[si].ret_ty ++ " (" ++ self.symbols[si].own_reason ++ "), but the package has no single destroyer of it: a registry fact names one"
             else if self.fd_retains_any(si as i32) and not self.fd_destroys_any(si as i32):
                 var retained = 0
                 for pi in 0..self.symbols[si].param_stores.len():
@@ -950,5 +957,12 @@ impl CiProject:
             let unary = self.fd_destroyers_of(record, true).len()
             if producers == 0: head = head ++ "  " ++ record ++ ": destroyed but never produced here; no resource\n"
             else if unary == 0: head = head ++ "  " ++ record ++ f": {producers} producer(s) and no unary destroyer in the package; a registry fact names the drop\n"
+            else if unary == 1:
+                // #3176: produced and dropped, yet not a resource: every
+                // producer takes a parameter the facade does not describe.
+                let first = self.fd_producers_of(record)[0]
+                let bad = self.fd_unpresentable_param(first, -1, modeled)
+                let why = if bad >= 0: f"param {bad} of " ++ self.symbols[first].name ++ " is " ++ self.symbols[first].param_ty[bad] else: "its producers are not presentable"
+                head = head ++ "  " ++ record ++ f": {producers} producer(s) and a destroyer, but no resource: " ++ why ++ ", which the facade does not describe\n"
             else: head = head ++ "  " ++ record ++ f": {producers} producer(s) and {unary} unary destroyers; a registry fact names the drop\n"
         head ++ lines
