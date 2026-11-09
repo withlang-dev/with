@@ -47,6 +47,9 @@
 //   with run tools/ceremony_census.w --diff REV        # iterate tier: lexical counts of the
 //                                                      # files changed vs REV, worktree vs REV;
 //                                                      # typed patterns need the full run
+//   with run tools/ceremony_census.w --lexical         # the lexical patterns against the bar,
+//                                                      # no compilation: the gate runs this
+//                                                      # first and stops before any build
 //   --compiler PATH                                    # default out/release/bin/with
 
 use std.fs
@@ -252,6 +255,7 @@ fn main:
     var sites_of = ""
     var diff_rev = ""
     var compiler = "out/release/bin/with"
+    var lexical_only = false
     var i = 1
     while i < argv.len():
         if argv[i] == "--record-bar" and i + 1 < argv.len():
@@ -263,6 +267,8 @@ fn main:
         else if argv[i] == "--diff" and i + 1 < argv.len():
             i = i + 1
             diff_rev = argv[i]
+        else if argv[i] == "--lexical":
+            lexical_only = true
         else if argv[i] == "--compiler" and i + 1 < argv.len():
             i = i + 1
             compiler = argv[i]
@@ -288,7 +294,7 @@ fn main:
         if rose > 0: exit_code(1)
         print(f"ceremony-census: diff ok ({files.len()} counted files changed vs {diff_rev}; lexical patterns only)")
         return
-    let typed = typed_sites(compiler)
+    let typed = if lexical_only: "" else: typed_sites(compiler)
     if sites_of.len() > 0:
         for line in typed.split("\n"):
             if line.starts_with(sites_of ++ "\t"): print(line)
@@ -331,4 +337,4 @@ fn main:
         else if now < was:
             print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> {now}; the bar follows at the next reseed")
     if rose > 0: exit_code(1)
-    print("ceremony-census: ok")
+    print(if lexical_only: "ceremony-census: ok (lexical patterns only)" else: "ceremony-census: ok")
