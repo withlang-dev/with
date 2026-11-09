@@ -17,13 +17,17 @@ fn main:
     assert(mkdir_p(dep ++ "/include") == 0)
     assert(mkdir_p(src) == 0)
     assert(mkdir_p(build) == 0)
-    let header = "typedef struct Thing Thing;\nvoid thing_set_title(Thing *t, const char *title);\n"
+    let header = "typedef struct Thing Thing;\nvoid thing_set_title(Thing *t, const char *title);\nvoid thing_fail(Thing *t, const char *message);\n"
     assert(write_file(dep ++ "/include/thing.h", header) == 0)
     assert(write_file(src ++ "/thing.h", header) == 0)
     var unit = "#include \"thing.h\"\nstruct Thing { const char *title; };\n"
     unit = unit ++ "static void set_title_cocoa(Thing *t, const char *title) { t->title = title; }\n"
-    unit = unit ++ "static struct { void (*set_title)(Thing *, const char *); } platform = { set_title_cocoa };\n"
+    unit = unit ++ "static struct { void (*set_title)(Thing *, const char *); void (*on_error)(Thing *, const char *); } platform = { set_title_cocoa, 0 };\n"
     unit = unit ++ "void thing_set_title(Thing *t, const char *title) { platform.set_title(t, title); }\n"
+    // The explicit dereference (libpng's png_error:
+    // `(*(png_ptr->error_fn))(png_ptr, message)`) has no callee name; its
+    // arguments read as plainly "stored".
+    unit = unit ++ "void thing_fail(Thing *t, const char *message) { if (platform.on_error) (*(platform.on_error))(t, message); }\n"
     assert(write_file(src ++ "/thing.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c thing.c\",\n  \"file\": \"thing.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
@@ -32,10 +36,13 @@ fn main:
     conan_write_facade("thing", "1.0", dep, src, build)
     let report = read_file(dep ++ "/facade-report.txt") ?? ""
     var line_said = ""
+    var fail_said = ""
     for line in report.split("\n"):
         if line.starts_with("  thing_set_title:"): line_said = line.to_owned()
-    let ok = line_said.contains("through the function pointer field set_title") and not line_said.contains("no unit defines")
+        if line.starts_with("  thing_fail:"): fail_said = line.to_owned()
+    let ok = line_said.contains("through the function pointer field set_title") and not line_said.contains("no unit defines") and fail_said.contains("through the function pointer field on_error")
     if not ok: print(report)
+    assert(fail_said.contains("through the function pointer field on_error"), fail_said)
     assert(line_said.contains("through the function pointer field set_title"), line_said)
     assert(not line_said.contains("no unit defines"), line_said)
     print("ok")
