@@ -87,14 +87,18 @@ fn conan_argv_append(argv: &str, arg: &str) -> str:
 // build/https_fetch.w does.
 // A file:// URL — a local mirror, or a test's fixture — is copied the way an
 // HTTPS fetch writes its body; an absent file is a failed download.
-fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
+fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32: (conan_https_fetch_to_file(url, path, timeout_ms).len() > 0) as i32
+
+// #3169: "" when `path` holds the body, else why not — the reason the
+// archive report names beside each URL it tried.
+fn conan_https_fetch_to_file(url: &str, path: &str, timeout_ms: i32) -> str:
     if url.starts_with("file://"):
         let local = conan_file_url_path(url)
-        if runtime_file_exists(local) == 0 or runtime_is_dir(local) != 0: return 1
-        return (not (runtime_write_file(path, runtime_read_file(local)) == 0)) as i32
+        if runtime_file_exists(local) == 0 or runtime_is_dir(local) != 0: return "no such file"
+        return if runtime_write_file(path, runtime_read_file(local)) == 0: "" else: "could not write " ++ path
     if not url.starts_with("https://"):
         runtime_eprint("error: Conan download needs an https:// or file:// URL: " ++ url)
-        return 1
+        return "not an https:// or file:// URL"
     let connect_ms = if timeout_ms > 0 and timeout_ms < 20000: timeout_ms else: 20000
     let idle_ms = if timeout_ms > 0 and timeout_ms < 30000: timeout_ms else: 30000
     // #2517: five attempts with a growing pause (2, 4, 6, 8 s: 20 s in all,
@@ -107,12 +111,15 @@ fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
     for attempt in 1..6:
         let response = https_get_response_timeout(url.to_owned(), 5, connect_ms, idle_ms)
         if response.status == 200:
-            return (not (runtime_write_file(path, response.body) == 0)) as i32
+            return if runtime_write_file(path, response.body) == 0: "" else: "could not write " ++ path
         last_status = response.status
-        if attempt < 5: runtime_nanosleep(2 * attempt as i64 * 1000000000)
+        // #3169: a server that answered 5xx (GitHub's release assets 504
+        // for a minute at a time) is given longer: 5, 10, 15, 20 s.
+        let pause = if last_status >= 500: 5 * attempt else: 2 * attempt
+        if attempt < 5: runtime_nanosleep(pause as i64 * 1000000000)
     let why = if last_status < 0: "no connection or no response (a resolver or network failure)" else: f"the server answered status {last_status}"
     runtime_eprint("error: Conan download failed after 5 attempts: " ++ url ++ " -> " ++ path ++ " (" ++ why ++ ")")
-    1
+    why
 
 // The local path a file:// URL names: percent-escapes decoded, and a Windows
 // drive path (file:///C:/…) without its leading slash.
@@ -1427,7 +1434,7 @@ fn conan_source_root(raw_dir: &str) -> str:
         else if top != first: return raw_dir.to_owned()
     if top.len() == 0: raw_dir.to_owned() else: raw_dir ++ "/" ++ top
 
-fn conan_archive_download(url: &str, path: &str) -> i32: conan_http_download(url, path)
+fn conan_archive_download(url: &str, path: &str) -> str: conan_https_fetch_to_file(url, path, 300000)
 
 fn conan_archive_digest(path: &str) -> str: conan_sha256_file(path)
 

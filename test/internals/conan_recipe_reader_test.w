@@ -6,7 +6,8 @@ use compiler.RecipeInterp
 // evaluated (compiler.RecipeInterp); nothing is about any
 // one package. The shapes are the ones Conan Center's recipes use.
 // A dead first mirror, a second that serves the wrong bytes, a third that is right.
-fn fake_download(url: &str, path: &str) -> i32: if url.contains("dead"): 1 else: 0
+// #3169: a failed download says why; the report carries it beside the URL.
+fn fake_download(url: &str, path: &str) -> str: if url.contains("dead"): "the server answered status 504" else: ""
 
 fn fake_digest(path: &str) -> str: if path.contains("good"): "ab5a" else: "ffff"
 
@@ -22,7 +23,7 @@ fn main:
     let mirrors = ConanSource { urls: ["https://dead.invalid/x-dead.tgz", "https://stale.invalid/x-stale.tgz", "https://ok.invalid/x-good.tgz"], sha256: "ab5a" }
     let picked = conan_pick_archive(&mirrors, "/w", fake_download, fake_digest)
     assert(picked.path == "/w/x-good.tgz")
-    assert(picked.tried.contains("dead.invalid/x-dead.tgz: did not download") and picked.tried.contains("x-stale.tgz: sha256 ffff, the recipe expects ab5a"))
+    assert(picked.tried.contains("dead.invalid/x-dead.tgz: did not download (the server answered status 504)") and picked.tried.contains("x-stale.tgz: sha256 ffff, the recipe expects ab5a"))
     let none = ConanSource { urls: ["https://dead.invalid/x-dead.tgz"], sha256: "ab5a" }
     assert(conan_pick_archive(&none, "/w", fake_download, fake_digest).path == "")
     // A patch that names where it applies is refused, not applied somewhere else.
