@@ -1363,7 +1363,13 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_
         if cwd as i64 != 0:
             if rt_libc_chdir(cwd) != 0:
                 posix_child_fail(c"error: could not change to a command's directory '".ptr, cwd)
-            rt_libc_setenv(c"PWD".ptr, cwd, 1)
+            // #3166: PWD is the directory's real path (getcwd after the
+            // chdir), never the string given: a relative `cwd` rooted the
+            // child's project at a relative path. A stack buffer: the
+            // forked child allocates nothing.
+            var pwd_buf: [4096]u8 = [0 as u8; 4096]
+            let pwd = if rt_getcwd(&raw mut pwd_buf[0] as *mut u8, 4096) == 0: &pwd_buf[0] as *const u8 as *const c_char else: cwd
+            rt_libc_setenv(c"PWD".ptr, pwd, 1)
         let _argc2 = posix_fill_argv(blob, len, table)
         rt_libc_execvp(unsafe *table, table as *const *const u8)
         posix_child_fail(c"error: could not run '".ptr, unsafe *table as *const c_char)
