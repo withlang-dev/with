@@ -2520,6 +2520,24 @@ fn run_ceremony_census_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("ceremony-census: a count rose above main's bar\n" ++ fs.read_text(stderr_rel))
     0
 
+// The lexical patterns alone, against the bar, run by the driver (`WITH`:
+// the pinned seed under the gate) so no compiler has to be built first.
+fn run_ceremony_census_lexical_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0: return 1
+    let root = ctx.project_info().project_root()
+    let compiler = env("WITH")
+    if compiler.len() == 0: ctx.diagnostics().error("ceremony-census-lexical: WITH is unset; the driver sets it to itself")
+    let args = [compiler, "run", "tools/ceremony_census.w", "--lexical"]
+    let stdout_rel = build_project_join(out_dir, "census.stdout")
+    let stderr_rel = build_project_join(out_dir, "census.stderr")
+    let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 600000, root)
+    print(fs.read_text(stdout_rel))
+    if result.rc != 0:
+        ctx.diagnostics().error("ceremony-census-lexical: a count rose above main's bar\n" ++ fs.read_text(stderr_rel))
+    0
+
 fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let out_dir = ctx.output()
@@ -4347,6 +4365,25 @@ pub fn build(ctx: BuildCtx) -> Build:
     ceremony_census = ceremony_census.dep("build")
     ceremony_census = ceremony_census.write_scope("out/ceremony-census")
     out = out.add_target(ceremony_census)
+    // The lexical half of the census, run by the driver compiler against the
+    // bar before anything is built: the gate's first step (Eric, 2026-11-10:
+    // a census red must stop the gate before it spends a build), a second
+    // or two instead of the full census's wait for the release binary.
+    var census_lexical = target_new(.Action, "ceremony-census-lexical", "").output("out/ceremony-census-lexical")
+    census_lexical.action = run_ceremony_census_lexical_action
+    census_lexical = census_lexical.input("tools/ceremony_census.w")
+    census_lexical = census_lexical.input("build/ceremony-allowances.tsv")
+    for dir in ["src", "lib", "rt", "tools", "build", "build.w", "examples"]: census_lexical = census_lexical.input(dir)
+    census_lexical = census_lexical.write_scope("out/ceremony-census-lexical")
+    out = out.add_target(census_lexical)
+    // The gate's fast source checks: no compiler is built for them, and the
+    // driver runs them first (src/main.w run_build_command), so a red stops
+    // the gate before stage1 starts.
+    var gate_fast = target_new(.Group, "gate-fast", "")
+    gate_fast = gate_fast.dep("ceremony-census-lexical")
+    gate_fast = gate_fast.dep("doc-path-check")
+    gate_fast = gate_fast.dep("spec-inventory-check")
+    out = out.add_target(gate_fast)
     var rt_decl_audit = test_lane(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
     rt_decl_audit.action = run_rt_decl_audit_action
     rt_decl_audit = rt_decl_audit.allow_parallel()
@@ -5192,6 +5229,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     for mi in 0..gate_measured.len():
         gate = gate.dep(gate_measured[mi].clone())
     gate = gate.dep("gate-shape")
+    gate = gate.dep("gate-fast")
     out = out.add_target(gate)
 
     // Keep the seed-built helper last until every public seed carries the

@@ -3850,6 +3850,25 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
             if graph_options.graph_only or graph_options.dry_run:
                 with_write(selected_graph.raw_text)
                 return 0
+            // The gate's fast source checks (`gate-fast`: the lexical census,
+            // doc-path-check, spec-inventory-check) run first and alone, so a
+            // red stops the gate before any compiler is built (Eric,
+            // 2026-11-10). The battery reaches the gate the same way.
+            var wants_gate = false
+            for name in selected_names:
+                if name == "gate" or name == "battery": wants_gate = true
+            if wants_gate and not graph_options.no_deps and build_graph_find_target_index_by_name(graph, "gate-fast") >= 0:
+                let fast_names: List[str] = ["gate-fast"]
+                let fast_graph = build_graph_filter_targets(graph, fast_names)
+                if fast_graph.ok:
+                    if not repo_lock_acquire("gate-fast"):
+                        return 1
+                    let fast_rc = unsafe { run_build_graph(root, cfg, fast_graph, &raw mut load_result.sema as *mut Sema, actual_options, false, false) }
+                    repo_lock_release()
+                    if fast_rc != 0:
+                        with_eprint("gate: the fast source checks are red; nothing was built")
+                        build_report_wall("gate-fast", cmd_t0)
+                        return fast_rc
             if not repo_lock_acquire(selected_target_name):
                 return 1
             // #1835: what --no-deps skipped is what the target's full closure
