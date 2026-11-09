@@ -244,6 +244,9 @@ let CXCursor_Constructor: i32 = 24
 let CXCursor_Destructor: i32 = 25
 let CXCursor_CXXBaseSpecifier: i32 = 44
 let CXCursor_TranslationUnit: i32 = 350
+// Attribute cursors are 400 up to the first preprocessing kind (Index.h).
+let CXCursor_FirstAttr: i32 = 400
+let CXCursor_FirstPreprocessing: i32 = 500
 let CXCursor_MacroDefinition: i32 = 501
 let CXCursor_StaticAssert: i32 = 602
 
@@ -2963,7 +2966,56 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
             ti = ti + 1
         if tokens as i64 != 0:
             clang_disposeTokens(tu, tokens, token_count)
+        // The attributes in Clang's AST, spelled where they are written: an
+        // attribute a library passes through a function-like macro from
+        // another header (libpng's `PNG_INTERNAL_FUNCTION(…, PNG_ALLOCATED)`)
+        // leaves the declaration's extent in two files, and its tokens
+        // above read nothing.
+        g_attr_children_out = ""
+        clang_visitChildren(cursor, collect_attr_child as *const u8, s as *mut u8)
+        for entry in g_attr_children_out.split(";"):
+            if entry.len() > 0 and not (";" ++ out).contains(";" ++ entry ++ ";"): out = out ++ entry ++ ";"
+        g_attr_children_out = ""
         out
+
+var g_attr_children_out: str = ""
+
+@[callconv("c")]
+unsafe fn collect_attr_child(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    let kind = clang_getCursorKind(cursor)
+    if kind < CXCursor_FirstAttr or kind >= CXCursor_FirstPreprocessing: return CXChildVisit_Continue
+    let s = data as *mut CImportSession
+    let text = cimport_spelled_text(s, clang_Cursor_getTranslationUnit(cursor), clang_getCursorExtent(cursor))
+    if text.len() > 0: g_attr_children_out = g_attr_children_out ++ text ++ ";"
+    CXChildVisit_Continue
+
+// The tokens of `range` at its spelling (inside the macro definition that
+// wrote them), concatenated as the attribute scan writes an attribute
+// (`format(printf,1,2)`); "" when the two ends are not spelled in one file.
+unsafe fn cimport_spelled_text(s: *mut CImportSession, tu: *mut u8, range: CXSourceRange) -> str:
+    var start_file = 0 as *mut u8
+    var end_file = 0 as *mut u8
+    var line: u32 = 0
+    var col: u32 = 0
+    var start_offset: u32 = 0
+    var end_offset: u32 = 0
+    clang_getSpellingLocation(clang_getRangeStart(range), &raw mut start_file, &raw mut line, &raw mut col, &raw mut start_offset)
+    clang_getSpellingLocation(clang_getRangeEnd(range), &raw mut end_file, &raw mut line, &raw mut col, &raw mut end_offset)
+    if start_file as i64 == 0 or end_file as i64 == 0 or clang_File_isEqual(start_file, end_file) == 0 or end_offset < start_offset: return ""
+    let spelled = clang_getRange(clang_getLocationForOffset(tu, start_file, start_offset), clang_getLocationForOffset(tu, end_file, end_offset))
+    let tokens = 0 as *mut CXToken
+    let count: u32 = 0
+    clang_tokenize(tu, spelled, &raw mut tokens, &raw mut count)
+    var out = ""
+    var ti: u32 = 0
+    while ti < count:
+        let sp = clang_getTokenSpelling(tu, *((tokens as i64 + ti as i64 * 24) as *const CXToken))
+        out = out ++ session_make_str(s, clang_getCString(sp) as *const u8)
+        clang_disposeString(sp)
+        ti = ti + 1
+    if tokens as i64 != 0:
+        clang_disposeTokens(tu, tokens, count)
+    out
 
 // Whether the declaration at `idx` carries `__attribute__((packed))` in
 // its own tokens. Read from tokens, not from the resulting alignment:

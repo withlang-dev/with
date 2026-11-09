@@ -106,7 +106,15 @@ fn fd_is_char_pointer(ty: &str) -> bool:
     ty == "*mut u8" or ty == "*const u8" or ty == "*mut i8" or ty == "*const i8" or ty == "*mut c_char" or ty == "*const c_char"
 
 impl CiProject:
-    fn fd_is_alloc_call(name: &str) -> bool: ci_own_is_libc_allocator(name) or self.alloc_aliases.contains(name)
+    // An allocator call: libc's, a global initialized to one, or a function
+    // of the package the library itself annotates `__attribute__((malloc))`
+    // (#3179/libpng: png_malloc_base, PNG_ALLOCATED, returns `void *`; the
+    // annotation was honoured only on a function returning a record, so
+    // every producer that casts its result stayed raw).
+    fn fd_is_alloc_call(name: &str) -> bool:
+        if ci_own_is_libc_allocator(name) or self.alloc_aliases.contains(name): return true
+        let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, name)
+        si >= 0 and self.symbols[si].ret_ty.starts_with("*") and self.fd_has_attr(si, "malloc")
     fn fd_is_free_call(name: &str) -> bool: ci_own_is_libc_free(name) or self.free_aliases.contains(name)
 
     // Whether what is passed to `callee` at `index` is retained there.
@@ -195,15 +203,23 @@ impl CiProject:
                     joined = if joined.len() == 0: v else: fd_borrow_union(joined, v)
                     if joined.len() == 0: return "unknown:" ++ callee ++ " borrows from more than two parameters' arguments"
                 return joined
-            return "unknown:" ++ callee ++ " is unproven (" ++ self.symbols[ci].own_reason ++ ")"
+            // A callee the returns pass has not reached yet has no reason
+            // of its own: say what its type says, never an empty `()`.
+            let why = if self.symbols[ci].own_reason.len() > 0: with_str_clone_ref(self.symbols[ci].own_reason)
+                else if fd_record_pointee(self.symbols[ci].ret_ty).len() == 0: "returns no pointer to a record"
+                else: "its return is not proven"
+            return "unknown:" ++ callee ++ " is unproven (" ++ why ++ ")"
         if src == "global": return "unknown:returns global state"
         "unknown:no single source"
 
     // Whether any declaration of `si` carries the attribute `name`
     // (`malloc`, `returns_nonnull`, or `nonnull` with its list).
+    // `__name__` is GCC's reserved spelling of `name` (libpng's
+    // `__attribute__((__malloc__))`): the same attribute.
     fn fd_has_attr(si: i32, name: &str) -> bool:
+        let reserved = "__" ++ name ++ "__"
         for a in self.symbols[si].attrs.split(";"):
-            if a == name or a.starts_with(name ++ "("): return true
+            if a == name or a.starts_with(name ++ "(") or a == reserved or a.starts_with(reserved ++ "("): return true
         false
 
     // A function the proofs are about: one a unit defines, or one the
