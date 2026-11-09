@@ -744,6 +744,21 @@ impl TidTable:
         while self.slots.len() <= k: self.slots.push(0)
         self.slots[k] = v
 
+// #3100: the scope table keyed by a symbol id, also a dense small integer:
+// the scope map took 308 million lookups in one check and, with a binding
+// pushed and popped per scope, carried more tombstones than live entries.
+// -1 is no binding (binding indexes start at 0).
+type SymTable { slots: List[i32] }
+
+impl SymTable:
+    fn contains(k: i32) -> bool: k >= 0 and k < self.slots.len() and self.slots[k] >= 0
+    fn get(k: i32) -> Option[i32]: if self.contains(k): Some(self.slots[k]) else: None
+    mut fn insert(k: i32, v: i32):
+        while self.slots.len() <= k: self.slots.push(-1)
+        self.slots[k] = v
+    mut fn remove(k: i32):
+        if k >= 0 and k < self.slots.len(): self.slots[k] = -1
+
 type Sema {
     pool: InternPool,
     diags: DiagnosticList,
@@ -1618,7 +1633,7 @@ type Sema {
     // help on a later use.
     discard_lets: HashMap[i32, i32, Minted],
     scope_starts: List[i32],
-    scope_name_map: HashMap[i32, i32, Minted],
+    scope_name_map: SymTable,
     // A binding whose scope has ended: its name to its declaring node, so an
     // undefined name that was bound in a block before its use says so.
     ended_bindings: HashMap[i32, i32, Minted],
@@ -4026,7 +4041,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         binding_value_nodes: sema_new_map_i32_i32(),
         discard_lets: sema_new_map_i32_i32(),
         scope_starts: List.new(),
-        scope_name_map: HashMap.new(),
+        scope_name_map: SymTable { slots: [] },
         ended_bindings: HashMap.new(),
         pending_generic_binding_base: sema_new_map_i32_i32(),
         pending_generic_binding_call: sema_new_map_i32_i32(),
@@ -8793,7 +8808,7 @@ impl Sema:
         if sema_debug_move_enabled():
             let dbg_name = with_str_clone_ref(self.pool_resolve(sym))
             with_eprint(f"[state] sym=" ++ dbg_name ++ f" -> {state}")
-        let opt = self.scope_name_map.get(sym).copied()
+        let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             // D184 (§29.15, Law 5): a helper observes or mutates a script
             // binding it captures, never consumes it.
