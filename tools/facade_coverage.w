@@ -112,6 +112,8 @@ fn retention_class(why: &str) -> str:
     let rest = if last < 0: why.to_owned() else: why.slice(last + 2, why.len())
     let tail = rest.trim()
     if tail.starts_with("which no unit defines"): return "passed to a callee no unit defines"
+    // #3174: `passed through the function pointer field free, which no unit decides`.
+    if tail.starts_with("which no unit decides"): return "passed through a function pointer field no unit decides"
     if tail.starts_with("stored in a field"): return "stored in a field"
     if tail.starts_with("stored through local"): return "stored through a local"
     if tail.starts_with("stored through"): return "stored through a parameter"
