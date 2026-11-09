@@ -2100,7 +2100,23 @@ fn ci_facade_import_spelling(header: &str, import_dirs: &List[str]) -> str:
         if rel.starts_with("."): continue
         for dir in import_dirs:
             if with_fs_file_exists(dir ++ "/" ++ rel) != 0: return rel
-    ""
+    // #3167: the install relocated the header (cjson's `cJSON.h` installs as
+    // `include/cjson/cJSON.h`), so no suffix of the source path exists under
+    // an import dir. The installed file of that name whose bytes are the
+    // source header's is the spelling; without one, the single file of that
+    // name; two different ones name nothing (a guess imports the wrong one).
+    let base = ci_migrate_path_basename(header)
+    let source_text = with_fs_read_file(header)
+    var same_name = ""
+    var same_name_count = 0
+    for dir in import_dirs:
+        for path in with_fs_list_files(dir).split("\n"):
+            if path.len() <= dir.len() + 1 or ci_migrate_path_basename(path) != base or not path.starts_with(dir): continue
+            let rel = path.slice(dir.len() + 1, path.len())
+            if source_text.len() > 0 and with_fs_read_file(path) == source_text: return rel
+            if same_name_count == 0 or same_name != rel: same_name_count = same_name_count + 1
+            same_name = rel
+    if same_name_count == 1: same_name else: ""
 
 // D121 step 5: the facade and the report of a fetched package, written by
 // `with get` (compiler.ConanClient). The corpus is the units the package's
