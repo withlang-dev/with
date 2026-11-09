@@ -11360,6 +11360,20 @@ fn ci_fn_decl_is_unemittable(session: i64, decl_idx: i32) -> bool:
     let is_inline = with_cimport_fn_is_inline(session, decl_idx)
     storage == CX_SC_STATIC and is_inline == 0
 
+// #3172: the callee, under its transparent wrappers, is a member reference
+// (a function-pointer field), not a function.
+fn ci_call_callee_is_member(session: i64, cursor: i32) -> bool:
+    var c = cursor
+    while true:
+        let kind = with_ci_cursor_kind(session, c)
+        if kind == CXK_MEMBER_REF: return true
+        if kind == CXK_DECL_REF: return false
+        if (kind == CXK_IMPLICIT_CAST or kind == CXK_PAREN_EXPR or kind == 100) and with_ci_num_children(session, c) >= 1:
+            c = with_ci_child(session, c, 0)
+            continue
+        return false
+    false
+
 fn ci_call_callee_name(session: i64, cursor: i32) -> str:
     // Walk through transparent wrappers (IMPLICIT_CAST, PAREN_EXPR,
     // and libclang's kind-100 UnexposedExpr which is what CALL_EXPR
@@ -18949,6 +18963,11 @@ fn ci_own_source(session: i64, cursor: i32, params: &List[str], locals: &List[st
     if kind == CXK_CALL_EXPR and nc >= 1:
         let callee = ci_call_callee_name(session, with_ci_child(session, c, 0))
         if callee.len() == 0: return "mixed"
+        // #3172: a call through a function-pointer field (SDL's dynapi:
+        // `jump_table.SDL_X(...)` inside SDL_X) is no call of the function
+        // the field is named after; read as one, the proof chased SDL_X
+        // into itself and gave up with an empty reason.
+        if ci_call_callee_is_member(session, with_ci_child(session, c, 0)): return "indirect:" ++ callee
         var argmap = ""
         var ai = 1
         while ai < nc:

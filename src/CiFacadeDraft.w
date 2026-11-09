@@ -165,6 +165,9 @@ impl CiProject:
             let v = self.fd_local_verdict(si, src.slice(12, src.len()), depth)
             return if v.starts_with("borrow:"): v else if v.starts_with("unknown:"): v else: "unknown:a part of local " ++ src.slice(12, src.len()) ++ ", which is not a borrow"
         if src.starts_with("local:"): return self.fd_local_verdict(si, src.slice(6, src.len()), depth)
+        // #3172: a call through a function-pointer field has no body to
+        // read; which function the field holds is a registry fact.
+        if src.starts_with("indirect:"): return "unknown:returns what the function pointer field " ++ src.slice(9, src.len()) ++ " returns, which no unit decides"
         if src.starts_with("call:"):
             let rest = src.slice(5, src.len())
             let colon = rest.find(":")
@@ -425,6 +428,7 @@ impl CiProject:
             let rest = src.slice(5, src.len())
             let colon = rest.find(":")
             return (if colon >= 0: rest.slice(0, colon).to_owned() else: rest.to_owned()) ++ "(…)"
+        if src.starts_with("indirect:"): return "(*" ++ src.slice(9, src.len()) ++ ")(…)"
         if src.starts_with("field:param:"): return "a part of param " ++ src.slice(12, src.len())
         if src.starts_with("param:"): return "param " ++ src.slice(6, src.len())
         if src.starts_with("local:"): return src.slice(6, src.len()).to_owned()
