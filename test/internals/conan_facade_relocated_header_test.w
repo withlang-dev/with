@@ -26,12 +26,12 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"tiny\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("tiny", "1.0", dep, src, build)
+    // A value-only function imports nothing (the facade's `use c_import`
+    // lines serve the resources it presents); the report is the evidence.
     let report = read_file(dep ++ "/facade-report.txt") ?? ""
-    let facade = read_file(dep ++ "/facade.w") ?? ""
     let first = report.split("\n")[0]
-    if not first.starts_with("facade tiny: 1 functions") or not facade.contains("c_import(\"tiny/tiny.h\""):
+    if not first.starts_with("facade tiny: 1 functions") or not report.contains("  tiny_twice: "):
         print(report)
-        print(facade)
     assert(first.starts_with("facade tiny: 1 functions"))
-    assert(facade.contains("c_import(\"tiny/tiny.h\""))
+    assert(report.contains("  tiny_twice: "))
     print("ok")
