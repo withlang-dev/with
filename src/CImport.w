@@ -19036,8 +19036,11 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
                 else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
             else if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("param:") and callee.len() == 0:
                 out = out ++ "paramstore:" ++ root.slice(6, root.len()) ++ "\n"
-            else if with_ci_cursor_kind(session, a) == CXK_UNARY_OP and with_ci_unary_op(session, a) == UO_ADDR and root.starts_with("local:"):
-                // `f(&p)`: the callee may replace or keep the pointer.
+            else if with_ci_cursor_kind(session, a) == CXK_UNARY_OP and with_ci_unary_op(session, a) == UO_ADDR and root.starts_with("local:") and with_ci_cursor_kind(session, ci_peel_transparent(session, with_ci_child(session, a, 0))) == CXK_DECL_REF:
+                // `f(&p)`: the callee may replace or keep the pointer. #3179:
+                // `f(&p->field)` is the address of a part of what p names,
+                // which can neither replace nor keep p (xz's lzma_index_init:
+                // `index_tree_append(&i->streams, …)` read as i stored).
                 out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
             ai = ai + 1
     if kind == CXK_UNARY_OP and nc == 1 and with_ci_unary_op(session, cursor) == UO_ADDR:
