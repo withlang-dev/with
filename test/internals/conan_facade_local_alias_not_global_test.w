@@ -20,7 +20,10 @@ fn main:
     assert(write_file(dep ++ "/include/thing.h", header) == 0)
     assert(write_file(src ++ "/thing.h", header) == 0)
     var unit = "#include \"thing.h\"\nstatic char *kept;\n"
-    unit = unit ++ "int thing_fill(char *buf, int len) { char *str = buf; while (len-- > 0) *str++ = 'x'; return (int)(str - buf); }\n"
+    // The parameter rebound from its alias at the end (zlib's crc32_z:
+    // `buf = (const unsigned char *)words`) is a write into the callee's own
+    // frame, not a store of the local anywhere.
+    unit = unit ++ "int thing_fill(char *buf, int len) { char *str = buf; int n = len; while (n-- > 0) *str++ = 'x'; buf = str; return (int)(buf - str) + len; }\n"
     unit = unit ++ "void thing_keep(char *buf) { kept = buf; }\n"
     assert(write_file(src ++ "/thing.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c thing.c\",\n  \"file\": \"thing.c\"\n}\n]\n"

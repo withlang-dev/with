@@ -19031,6 +19031,11 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
         let lhs_root = ci_own_place_root(session, lhs, params, locals)
         if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("local:"):
             out = out ++ "localsrc:" ++ lhs_root.slice(6, lhs_root.len()) ++ ":" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
+        else if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("param:"):
+            // #3175: a write to the parameter's own variable (`buf = (const
+            // unsigned char *)words` at the end of zlib's crc32_z) lands in
+            // the callee's frame; nothing outside it keeps the value.
+            ()
         else:
             out = out ++ ci_own_record_store(session, rhs, params, locals)
     if kind == CXK_CALL_EXPR and nc >= 1:
