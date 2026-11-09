@@ -11362,17 +11362,23 @@ fn ci_fn_decl_is_unemittable(session: i64, decl_idx: i32) -> bool:
 
 // #3172: the callee, under its transparent wrappers, is a member reference
 // (a function-pointer field), not a function.
-fn ci_call_callee_is_member(session: i64, cursor: i32) -> bool:
+
+// The field a call goes through, or "": the callee, under its transparent
+// wrappers and an explicit dereference (`(*(png_ptr->error_fn))(…)`,
+// libpng's png_error), is a member reference. The dereferenced form has no
+// callee name at all, and its arguments read as plainly "stored".
+fn ci_call_field_callee(session: i64, cursor: i32) -> str:
     var c = cursor
     while true:
         let kind = with_ci_cursor_kind(session, c)
-        if kind == CXK_MEMBER_REF: return true
-        if kind == CXK_DECL_REF: return false
-        if (kind == CXK_IMPLICIT_CAST or kind == CXK_PAREN_EXPR or kind == 100) and with_ci_num_children(session, c) >= 1:
+        if kind == CXK_MEMBER_REF: return with_ci_cursor_spelling(session, c)
+        if kind == CXK_DECL_REF: return ""
+        let transparent = kind == CXK_IMPLICIT_CAST or kind == CXK_PAREN_EXPR or kind == 100 or (kind == CXK_UNARY_OP and with_ci_unary_op(session, c) == UO_DEREF)
+        if transparent and with_ci_num_children(session, c) >= 1:
             c = with_ci_child(session, c, 0)
             continue
-        return false
-    false
+        return ""
+    ""
 
 fn ci_call_callee_name(session: i64, cursor: i32) -> str:
     // Walk through transparent wrappers (IMPLICIT_CAST, PAREN_EXPR,
@@ -18863,8 +18869,8 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
         // #3174: a call through a function-pointer field (glfw's
         // `_glfw.platform.setWindowTitle(window, title)`) is no call of a
         // function named like the field; the sink names the field, marked.
-        let spelled = with_ci_cursor_spelling(session, cursor)
-        let callee = if ci_call_callee_is_member(session, with_ci_child(session, cursor, 0)): "*" ++ spelled else: spelled
+        let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
+        let callee = if field.len() > 0: "*" ++ field else: with_ci_cursor_spelling(session, cursor)
         if callee.len() > 0:
             var ai = 1
             while ai < nc:
@@ -18974,13 +18980,14 @@ fn ci_own_source(session: i64, cursor: i32, params: &List[str], locals: &List[st
         let root = ci_own_place_root(session, c, params, locals)
         return if ci_own_root_is_value(root): "field:" ++ root else: root
     if kind == CXK_CALL_EXPR and nc >= 1:
-        let callee = ci_call_callee_name(session, with_ci_child(session, c, 0))
-        if callee.len() == 0: return "mixed"
         // #3172: a call through a function-pointer field (SDL's dynapi:
         // `jump_table.SDL_X(...)` inside SDL_X) is no call of the function
         // the field is named after; read as one, the proof chased SDL_X
         // into itself and gave up with an empty reason.
-        if ci_call_callee_is_member(session, with_ci_child(session, c, 0)): return "indirect:" ++ callee
+        let field = ci_call_field_callee(session, with_ci_child(session, c, 0))
+        if field.len() > 0: return "indirect:" ++ field
+        let callee = ci_call_callee_name(session, with_ci_child(session, c, 0))
+        if callee.len() == 0: return "mixed"
         var argmap = ""
         var ai = 1
         while ai < nc:
@@ -19043,9 +19050,9 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
         else:
             out = out ++ ci_own_record_store(session, rhs, params, locals)
     if kind == CXK_CALL_EXPR and nc >= 1:
-        let direct = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
         // #3174: through a function-pointer field, the sink names the field, marked.
-        let callee = if direct.len() > 0 and ci_call_callee_is_member(session, with_ci_child(session, cursor, 0)): "*" ++ direct else: direct
+        let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
+        let callee = if field.len() > 0: "*" ++ field else: ci_call_callee_name(session, with_ci_child(session, cursor, 0))
         var ai = 1
         while ai < nc:
             let arg = with_ci_child(session, cursor, ai)
