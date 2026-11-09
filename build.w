@@ -4294,6 +4294,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     behavior_tests = behavior_tests.arg("compiler=" ++ release_compiler_bin("with"))
     behavior_tests = behavior_tests.dep("build")
     out = out.add_target(behavior_tests)
+    // #3095: the runtime's own fixtures, programs that import rt.* (Resolve.w
+    // admits test/runtime/ as the toolchain's), for allocator and str
+    // invariants the debug allocator cannot observe.
+    var runtime_tests = test_lane(.Test, "runtime-tests", "test/runtime/*.w")
+    runtime_tests = runtime_tests.arg("compiler=" ++ release_compiler_bin("with"))
+    runtime_tests = runtime_tests.dep("build")
+    out = out.add_target(runtime_tests)
 
     // Debug-allocator fixture lane (custom //! expect-debug-alloc directive; run
     // via tools/debug_drop.w, not the built-in test runner). See debug-allocator.md.
@@ -4838,6 +4845,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("selfcheck")
     tests = tests.dep("reseed-check-build-w")
     tests = tests.dep("behavior-tests")
+    tests = tests.dep("runtime-tests")
     tests = tests.dep("d-acceptance-tests")
     tests = tests.dep("native-compile-error-tests")
     tests = tests.dep("native-codegen-tests")

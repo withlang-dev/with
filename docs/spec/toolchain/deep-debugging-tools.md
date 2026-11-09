@@ -1207,6 +1207,7 @@ from invalid MIR, so reproduce with stage1, not the release binary.
 ```sh
 with build :deep-debug-tool-tests
 with build :debug-alloc-tests
+with build :runtime-tests      # test/runtime: programs that import rt.* (#3095)
 with build :drop-audit
 with build :move-audit
 with build :sema-order-check
