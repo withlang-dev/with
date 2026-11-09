@@ -269,6 +269,13 @@ type MirBuilder ephemeral {
     // the adjusted expression. While materializing that adjustment, lower the
     // same node once at its exact reference type without re-entering it.
     contextual_copy_raw_node: i32,
+    // #3165: the `if`/`match` whose arms copy out the adjustment recorded on
+    // `copy_out_adjustment_node` (D179: `let tail = if c: a.trim() else:
+    // b.slice(2, n).trim()`). Copied at the join, the view an arm yielded
+    // into its own temporary read freed memory: the arm's temporary frame
+    // closes at the arm's exit (#729), so the copy is made inside the arm.
+    copy_out_join_node: i32,
+    copy_out_adjustment_node: i32,
     // §4.3d: the node whose own value a vector splat or lane conversion is
     // being built from (MirVector.lower_vector_node).
     vector_raw_node: i32,
@@ -417,6 +424,8 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         untyped_override_type: 0,
         untyped_override_depth: 0,
         contextual_copy_raw_node: 0,
+        copy_out_join_node: 0,
+        copy_out_adjustment_node: 0,
         vector_raw_node: 0,
         contextual_fact_sig_idx: -1,
         pipeline_receiver_override_node: 0,
@@ -8356,7 +8365,12 @@ impl MirBuilder:
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, else_bb, 0)
 
-        let result_ty = if want_result != 0: self.expr_type(node) else: self.sema.ty_void as i32
+        // #3165: the arms of this join copy out a D179 demand; the result
+        // is the owned value and each arm is lowered at the exact view type.
+        let copy_join = want_result != 0 and self.copy_out_join_node == node
+        let result_ty = if copy_join: self.contextual_copy_adjustment(self.copy_out_adjustment_node).target_type
+            else if want_result != 0: self.expr_type(node)
+            else: self.sema.ty_void as i32
         let result_local = if want_result != 0: self.new_temp(result_ty) else: -1
         let result_place = if want_result != 0: self.place_for_local(result_local) else: -1
 
@@ -8364,7 +8378,9 @@ impl MirBuilder:
         // #772: never propagate a VOID result type as the arms' expected type
         // — a statement-if reached in value mode (`with … as mut c:` bodies)
         // poisoned an arm assign's RHS binop to void (invalid MIR).
-        if want_result != 0 and result_ty != 0 and result_ty != self.sema.ty_void as i32:
+        if copy_join:
+            self.expected_type = self.contextual_copy_adjustment(self.copy_out_adjustment_node).exact_source_type
+        else if want_result != 0 and result_ty != 0 and result_ty != self.sema.ty_void as i32:
             self.expected_type = result_ty
         else if want_result == 0:
             self.expected_type = self.sema.ty_void as i32
@@ -8388,7 +8404,7 @@ impl MirBuilder:
         // assign_operand_to_place before the frame closes.
         let then_temp_frame = self.push_stmt_temp_frame()
         let then_scoped = self.enter_body_scope(then_expr)
-        let then_op = if want_result != 0: self.lower_expr(then_expr) else: self.lower_expr_discard(then_expr)
+        let then_op = if want_result != 0: self.lower_join_arm_value(then_expr, copy_join) else: self.lower_expr_discard(then_expr)
         // A diverging branch has no value to contribute to the join. lower_return
         // leaves a Unit operand in its unreachable continuation; assigning that
         // operand to the if result place corrupts typed MIR.
@@ -8416,7 +8432,7 @@ impl MirBuilder:
         let else_temp_frame = self.push_stmt_temp_frame()
         let else_scoped = self.enter_body_scope(else_expr_opt)
         let else_op = if else_expr_opt != 0:
-            if want_result != 0: self.lower_expr(else_expr_opt) else: self.lower_expr_discard(else_expr_opt)
+            if want_result != 0: self.lower_join_arm_value(else_expr_opt, copy_join) else: self.lower_expr_discard(else_expr_opt)
         else:
             self.unit_operand()
         if want_result != 0 and (else_expr_opt == 0 or self.sema.body_can_fall_through(else_expr_opt)):
@@ -8458,7 +8474,9 @@ impl MirBuilder:
         // cancels a binding's scheduled drop via last_if_result_view. Mixed
         // owned/view arms keep owned typing (residual: the view arm still
         // bit-copies; see handoff 03g).
-        self.last_if_result_view = (self.sema.is_copy_frozen(result_ty) == 0 and self.operand_is_view_read(then_op) and self.operand_is_view_read(else_op)) as i32
+        // #3165: arms that copied out hold owned values; the result is a
+        // temporary of its own whatever shape the copies read.
+        self.last_if_result_view = (not copy_join and self.sema.is_copy_frozen(result_ty) == 0 and self.operand_is_view_read(then_op) and self.operand_is_view_read(else_op)) as i32
         if self.last_if_result_view != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.register_stmt_temp(result_local, result_ty)
@@ -12449,7 +12467,10 @@ impl MirBuilder:
             // queues back to the marks, which the arms then start from.
             self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
 
-        let result_ty = self.expr_type(node)
+        // #3165: the arms copy out a D179 demand (lower_if's copy_join).
+        let copy_join = want_result != 0 and self.copy_out_join_node == node
+        let result_ty = if copy_join: self.contextual_copy_adjustment(self.copy_out_adjustment_node).target_type else: self.expr_type(node)
+        let arm_expected = if copy_join: self.contextual_copy_adjustment(self.copy_out_adjustment_node).exact_source_type else: result_ty
         let result_is_void = want_result == 0 or result_ty == 0 or result_ty == self.sema.ty_void as i32
         var result_place: i32 = -1
         if not result_is_void:
@@ -12558,9 +12579,9 @@ impl MirBuilder:
                 self.lower_expr_discard(body_node)
             else:
                 let saved_arm_expected = self.expected_type
-                if result_ty != 0:
-                    self.expected_type = result_ty
-                let arm_value = self.lower_expr(body_node)
+                if arm_expected != 0:
+                    self.expected_type = arm_expected
+                let arm_value = self.lower_join_arm_value(body_node, copy_join)
                 self.expected_type = saved_arm_expected
                 // A diverging arm has no value to contribute to the join. Like
                 // lower_if, lower_return leaves Unit in its unreachable
@@ -13420,10 +13441,56 @@ impl MirBuilder:
         let saved_expected = self.expected_type
         self.contextual_copy_raw_node = node
         self.expected_type = adjustment.exact_source_type
+        // #3165: an `if`/`match` copies out in each arm, before the arm's
+        // temporaries drop (lower_join_arm_value); its result is the owned
+        // value already.
+        let leaf = self.join_arm_leaf(node)
+        let saved_join = self.copy_out_join_node
+        let saved_adjustment_node = self.copy_out_adjustment_node
+        if self.is_join_expr(leaf):
+            self.copy_out_join_node = leaf
+            self.copy_out_adjustment_node = node
         let reference_op = self.lower_expr(node)
+        self.copy_out_join_node = saved_join
+        self.copy_out_adjustment_node = saved_adjustment_node
         self.expected_type = saved_expected
         self.contextual_copy_raw_node = saved_raw_node
+        if self.is_join_expr(leaf): return reference_op
+        self.copy_out_adjusted(reference_op, adjustment, node)
 
+    // The expression an arm's value comes from: through grouping and a
+    // block's tail.
+    fn join_arm_leaf(expr: i32) -> i32:
+        var leaf = expr
+        while leaf != 0:
+            let kind = self.ast.kind(leaf)
+            if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_UNSAFE_BLOCK: leaf = self.ast.get_data0(leaf)
+            else if kind == NodeKind.NK_BLOCK and self.ast.get_data2(leaf) != 0: leaf = self.ast.get_data2(leaf)
+            else: break
+        leaf
+
+    fn is_join_expr(node: i32) -> bool:
+        node != 0 and (self.ast.kind(node) == NodeKind.NK_IF_EXPR or self.ast.kind(node) == NodeKind.NK_MATCH)
+
+    // An arm of the join `copy_out_join_node` yields the adjustment's owned
+    // value: the arm is lowered at the exact view type and copied out here,
+    // inside the arm's temporary frame. An arm whose own value is a join
+    // copies out in its arms instead (#3165). A diverging arm yields nothing.
+    mut fn lower_join_arm_value(arm_expr: i32, copy_join: bool) -> i32:
+        if not copy_join: return self.lower_expr(arm_expr)
+        let leaf = self.join_arm_leaf(arm_expr)
+        let inner_join = self.is_join_expr(leaf)
+        let saved_join = self.copy_out_join_node
+        self.copy_out_join_node = if inner_join: leaf else: 0
+        let op = self.lower_expr(arm_expr)
+        self.copy_out_join_node = saved_join
+        if inner_join or not self.sema.body_can_fall_through(arm_expr): return op
+        self.copy_out_adjusted(op, self.contextual_copy_adjustment(self.copy_out_adjustment_node), arm_expr)
+
+    // The adjustment's copy: `reference_op`, lowered at the exact view type,
+    // is dereferenced (twice through a view of a view) and the Copy pointee
+    // read; then the separately recorded ordinary value cast.
+    mut fn copy_out_adjusted(reference_op: i32, adjustment: ContextualCopyAdjustment, node: i32) -> i32:
         let reference_place = self.materialize_operand(reference_op, adjustment.exact_source_type, self.ast.get_start(node))
         var pointee_place = self.new_deref_place(reference_place)
         // D111: Sema recorded the value a view of a view reads (`&&str` to
