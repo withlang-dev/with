@@ -7978,6 +7978,13 @@ impl Sema:
             let mapped = caller.scope_name_map.get(gsym)
             if mapped.is_some() and mapped.unwrap() == gi:
                 self.scope_name_map.insert(gsym, gi as i32)
+            // #3187: a script binding injected into the caller (a helper of
+            // the script, D184) keeps its mark here, so a local of the
+            // callee's body may take its name as the helper's own may. Lost,
+            // the mark made std's `let i` in enumerate's `next` a shadowing
+            // of a program's top-level `var i`.
+            if caller.script_capture_indices.contains(gi as i32):
+                self.script_capture_indices.insert(gi as i32, 1)
         // A caller local that shadows a module global hid the global's map
         // entry; the callee does not see the caller's local.
         for sgi in 0..self.shadowed_global_syms.len():
