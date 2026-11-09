@@ -18852,6 +18852,9 @@ fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
 //   `global:<param>`               parameter assigned to something not a parameter
 // `params` are the enclosing definition's parameter names.
 fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+    ci_body_call_evidence_walk(session, cursor, params, ci_own_collect_locals(session, cursor))
+
+fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
     if ci_unevaluated(session, cursor): return ""
     var out = ""
     let kind = with_ci_cursor_kind(session, cursor)
@@ -18878,13 +18881,19 @@ fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
                 if with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:
                     out = out ++ "field:" ++ param ++ "\n"
                 else if with_ci_cursor_kind(session, l) == CXK_DECL_REF:
-                    var is_param = false
+                    // #3175: a local assigned from the parameter (`str =
+                    // buf` in zlib's gzgets) is an alias, not a global
+                    // store; only a name that is neither a parameter nor a
+                    // local of the body is a global.
+                    var is_param_or_local = false
                     for pj in 0..params.len():
-                        if ci_cursor_names(session, l, params[pj]): is_param = true
-                    if not is_param: out = out ++ "global:" ++ param ++ "\n"
+                        if ci_cursor_names(session, l, params[pj]): is_param_or_local = true
+                    for local in locals:
+                        if ci_cursor_names(session, l, local): is_param_or_local = true
+                    if not is_param_or_local: out = out ++ "global:" ++ param ++ "\n"
     var i = 0
     while i < nc:
-        out = out ++ ci_body_call_evidence(session, with_ci_child(session, cursor, i), params)
+        out = out ++ ci_body_call_evidence_walk(session, with_ci_child(session, cursor, i), params, locals)
         i = i + 1
     out
 
@@ -19022,6 +19031,11 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
         let lhs_root = ci_own_place_root(session, lhs, params, locals)
         if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("local:"):
             out = out ++ "localsrc:" ++ lhs_root.slice(6, lhs_root.len()) ++ ":" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
+        else if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("param:"):
+            // #3175: a write to the parameter's own variable (`buf = (const
+            // unsigned char *)words` at the end of zlib's crc32_z) lands in
+            // the callee's frame; nothing outside it keeps the value.
+            ()
         else:
             out = out ++ ci_own_record_store(session, rhs, params, locals)
     if kind == CXK_CALL_EXPR and nc >= 1:
