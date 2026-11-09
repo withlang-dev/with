@@ -2042,8 +2042,48 @@ fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ configured)
         let _gone = runtime_remove_tree(work)
         return
+    conan_generate_headers(tools, work ++ "/b")
     conan_write_facade(name, version, dep_dir, tree.source_dir, work ++ "/b")
     conan_remove_build_tree(work)
+
+// #3168: a configured tree has not made the headers its build generates
+// (libpng's pnglibconf.h, from scripts/pnglibconf.dfa), so every unit that
+// includes one could not be read and the facade had 0 functions (libpng,
+// and harfbuzz through it). The Ninja graph names them: the custom-command
+// outputs that are headers. Those alone are built, never the library.
+fn conan_generate_headers(tools: &ConanSourceTools, build_dir: &str):
+    let scratch = conan_scratch_dir()
+    if scratch.len() == 0: return
+    var listing_argv = conan_argv_append("", tools.ninja)
+    for arg in ["-C", build_dir, "-t", "targets", "all"]: listing_argv = conan_argv_append(listing_argv, arg)
+    if runtime_exec_argv_capture(listing_argv, scratch ++ "/targets", scratch ++ "/targets.err", 120000) != 0:
+        runtime_remove_tree(scratch)
+        return
+    let headers = conan_generated_header_targets(runtime_read_file(scratch ++ "/targets"))
+    runtime_remove_tree(scratch)
+    if headers.len() == 0: return
+    var named = ""
+    for header in headers: named = named ++ (if named.len() > 0: ", " else: "") ++ header
+    runtime_eprint(f"  generating {headers.len()} header(s) the build makes: " ++ named)
+    var build_argv = conan_argv_append(conan_argv_append(conan_argv_append("", tools.ninja), "-C"), build_dir)
+    for header in headers: build_argv = conan_argv_append(build_argv, header)
+    if conan_run_tool(build_argv, 900000) != 0: runtime_eprint("  note: the build could not make its generated headers (its output is above); a unit that includes one is unproven")
+
+// The header outputs of custom commands in `ninja -t targets all` (one
+// `path: rule` per line), relative to the build directory: Ninja lists each
+// output twice, relative and absolute, and CMake's own utility targets live
+// under CMakeFiles/.
+fn conan_generated_header_targets(listing: &str) -> List[str]:
+    let out = []
+    for line in listing.split("\n"):
+        if not line.ends_with(": CUSTOM_COMMAND"): continue
+        let path = line.slice(0, line.len() - ": CUSTOM_COMMAND".len())
+        if path.starts_with("/") or path.starts_with("CMakeFiles/") or out.contains(path): continue
+        for suffix in [".h", ".hh", ".hpp", ".hxx", ".inc"]:
+            if path.ends_with(suffix):
+                out.push(path.to_owned())
+                break
+    out
 
 // The fetched and configured source tree is removed once the facade is
 // written, unless `WITH_KEEP_BUILD` is set: then it stays under
