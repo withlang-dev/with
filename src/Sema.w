@@ -729,6 +729,21 @@ type FacadeCallEffect {
     param_sources: List[i32],
 }
 
+// #3100: a table keyed by a type id. Type ids are dense small integers, so
+// a List indexed by the id answers in one load; as a HashMap, two of these
+// (type_decl_nodes_by_tid, generic_inst_templates) took 1.1 billion
+// lookups in one check of src/main.w, more than every other map together.
+// Same surface as the HashMap it replaces; 0 means no entry (a decl node
+// and a type id are never 0).
+type TidTable { slots: List[i32] }
+
+impl TidTable:
+    fn contains(k: i32) -> bool: k >= 0 and k < self.slots.len() and self.slots[k] != 0
+    fn get(k: i32) -> Option[i32]: if self.contains(k): Some(self.slots[k]) else: None
+    mut fn insert(k: i32, v: i32):
+        while self.slots.len() <= k: self.slots.push(0)
+        self.slots[k] = v
+
 type Sema {
     pool: InternPool,
     diags: DiagnosticList,
@@ -1124,7 +1139,7 @@ type Sema {
     // recorded at type-decl registration; type_sym_tier_mask bits: 1=std, 2=user.
     // All queries stay on the flat path unless the mask reads 3 (shadowed).
     impl_extra_is_std: List[bool],
-    type_decl_nodes_by_tid: HashMap[i32, i32, Minted],
+    type_decl_nodes_by_tid: TidTable,
     // D100 (§18.3): the `pub` fields, keyed by (type declaration node, field
     // name); a field not here is private to its package (sema_field_key).
     pub_field_keys: HashSet[i64, Minted],
@@ -1181,7 +1196,7 @@ type Sema {
     // a user `type PullCore` beside std.task's `PullCore[G]` shares the
     // symbol. Recorded by resolve_generic_type and carried through
     // substitution; read by generic_inst_template_tid.
-    generic_inst_templates: HashMap[i32, i32, Minted],
+    generic_inst_templates: TidTable,
     generic_alias_inst_targets: HashMap[i32, i32, Minted],
     type_sym_tier_mask: HashMap[i32, i32, Minted],
     // Generic inst impls: impl Trait for Type[Args]
@@ -3780,7 +3795,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         trait_assoc_bound_counts: List.new(),
         impl_extra: List.new(),
         impl_extra_is_std: List.new(),
-        type_decl_nodes_by_tid: HashMap.new(),
+        type_decl_nodes_by_tid: TidTable { slots: [] },
         pub_field_keys: [],
         zeroed_call_nodes: [],
         comptime_callable_memo: Memo.new(),
@@ -3797,7 +3812,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         recursion_pass1_mismatch: 0,
         operator_operand_nodes: HashSet.new(),
         type_tid_is_std: HashMap.new(),
-        generic_inst_templates: HashMap.new(),
+        generic_inst_templates: TidTable { slots: [] },
         generic_alias_inst_targets: HashMap.new(),
         type_sym_tier_mask: HashMap.new(),
         impl_starts: List.new(),
