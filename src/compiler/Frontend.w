@@ -2286,6 +2286,10 @@ impl Zcu:
         if zcu_debug_init_enabled():
             runtime_eprint("[frontend] compile_source:sema")
         let t_sema = runtime_clock_nanos()
+        // #3099: how much of Sema is the D89 probe and the D93 rounds.
+        var probe_ns: i64 = 0
+        var rounds_ns: i64 = 0
+        var probed = 0
         // D89 (§4.3): a field whose numeric type its uses decide makes the
         // program one that is checked twice: first to hear what the uses
         // demand, with nothing reported, then with every such field at the
@@ -2295,7 +2299,10 @@ impl Zcu:
             let reported = self.diagnostics.count()
             var probe = self.new_module_sema(text, pool)
             probe.collect_field_demands = 1
+            let t_probe = runtime_clock_nanos()
             probe.check_module()
+            probe_ns = runtime_clock_nanos() - t_probe
+            probed = 1
             field_decisions = probe.inferred_field_decisions()
             self.diagnostics = move probe.diags
             self.diagnostics.truncate(reported)
@@ -2318,6 +2325,8 @@ impl Zcu:
         // last), and a binding no later round mentions keeps its decision.
         var literal_rounds = 0
         let literal_decisions: List[i32] = []
+        // Built before the rounds consume the demands; a line per binding.
+        let demand_report = sema.literal_demand_report()
         while sema.literal_demands.len() > 0 and sema.literal_demands_change_types() and literal_rounds < 8:
             for code in sema.literal_decisions_from_demands(): literal_decisions.push(code)
             self.diagnostics = move sema.diags
@@ -2325,12 +2334,15 @@ impl Zcu:
             sema = self.new_module_sema(text, pool)
             sema.field_decisions = sema_clone_i32_list(field_decisions)
             sema.literal_decisions = sema_clone_i32_list(literal_decisions)
+            let t_round = runtime_clock_nanos()
             sema.check_module()
+            rounds_ns = rounds_ns + (runtime_clock_nanos() - t_round)
             literal_rounds += 1
         if do_profile:
             let sema_ns = runtime_clock_nanos() - t_sema
-            runtime_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}  int-local-rechecks={sema.int_local_rechecks}")
+            runtime_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}  int-local-rechecks={sema.int_local_rechecks}  checks={1 + probed + literal_rounds} probe-ms={probe_ns / 1000000} literal-rounds={literal_rounds} rounds-ms={rounds_ns / 1000000}")
             for rechecked in sema.int_local_recheck_names: runtime_eprint(f"[profile] int-local-recheck {rechecked}")
+            for d in demand_report: runtime_eprint("[profile] literal-demand " ++ d)
         self.diagnostics = move sema.diags
         self.sync_from_sema(sema)
         frontend_dump_type_decl_names("post-sema", self.last_sema.ast, self.last_sema.pool)
