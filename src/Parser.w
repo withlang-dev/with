@@ -1729,6 +1729,12 @@ impl Parser:
             let type_str = self.intern.resolve(name)
             let method_str = self.intern.resolve(method_name)
             name = self.intern.intern(type_str ++ "." ++ method_str)
+        else if self.peek() == TokenKind.TK_DOT_IDENT:
+            // #3221: `.Uppercase` is lexed as one dot-identifier, so
+            // `fn Foo.Bar()` had no `.` to find and the name ended at `Foo`:
+            // "expected ':' or '{' to introduce body".
+            name = self.intern.intern(self.intern.resolve(name) ++ self.current_text())
+            self.advance()
 
         // Type parameters
         let tp_start = self.pool.extra_len()
