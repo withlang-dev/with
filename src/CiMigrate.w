@@ -1150,7 +1150,7 @@ impl CiProject:
                 let alias = underlying.len() > 0 and ci_is_c_ident(underlying) and underlying != rname
                 if rname.len() > 0 and not alias and not ci_is_system_decl(rname) and not (rloc.len() > 0 and ci_is_system_path(rloc)):
                     self.records.insert(ci_escape_reserved(rname), true)
-                // D198 (§16.2b.5): where a record is complete; a value record
+                // D198 (§16.2b.5): where a record is complete and flat; a value record
                 // must be complete in a header the package installs.
                 if rname.len() > 0 and rloc.len() > 0 and ci_decl_is_complete_record(session, i, decl_kind, rcursor): self.complete_records.insert(ci_escape_reserved(rname), ci_migrate_location_file(rloc))
             if decl_kind == CK_VAR:
@@ -3251,12 +3251,39 @@ fn ci_cursor_kind_name(kind: i32) -> str:
     f"kind={kind}"
 
 
-// D198: whether the struct or typedef declaration at `idx` names a record
-// with its fields (a typedef of an opaque `struct T;` does not).
+// D198: whether the struct or typedef declaration at `idx` names a record a
+// draft may describe as a value record: one with its fields (a typedef of
+// an opaque `struct T;` has none) and flat. A record with a pointer in it
+// is not one record to the callee: `FT_Outline_Get_CBox(const FT_Outline
+// *)` follows `outline->points`, and whoever builds the record chooses
+// where that points.
 fn ci_decl_is_complete_record(session: i64, idx: i32, decl_kind: i32, cursor: i32) -> bool:
-    if decl_kind == CK_STRUCT: return with_cimport_struct_has_definition(session, idx)
-    if decl_kind != CK_TYPEDEF or cursor < 0: return false
+    if cursor < 0 or (decl_kind != CK_STRUCT and decl_kind != CK_TYPEDEF): return false
+    if decl_kind == CK_STRUCT and not with_cimport_struct_has_definition(session, idx): return false
     let canonical = with_ci_type_canonical(session, with_ci_cursor_type(session, cursor))
     if canonical < 0 or with_ci_type_kind(session, canonical) != CXT_Record: return false
+    ci_type_is_flat(session, canonical, 0)
+
+// Whether a canonical type holds no pointer anywhere inside it: an
+// arithmetic type or an enum; a fixed array of such; a defined record
+// every field of which is such. Anything else (a pointer, a function
+// pointer, an incomplete or unknown type) is not.
+fn ci_type_is_flat(session: i64, ty: i32, depth: i32) -> bool:
+    if ty < 0 or depth > 8: return false
+    let canonical = with_ci_type_canonical(session, ty)
+    if canonical < 0: return false
+    let kind = with_ci_type_kind(session, canonical)
+    if (kind >= CXT_Bool and kind <= CXT_LongDouble) or kind == CXT_Float128 or kind == CXT_Enum: return true
+    if kind == CXT_ConstantArray: return ci_type_is_flat(session, with_ci_type_array_element(session, canonical), depth + 1)
+    if kind != CXT_Record: return false
     let record = with_ci_type_declaration(session, canonical)
-    record >= 0 and with_ci_cursor_is_definition(session, record) != 0
+    if record < 0 or with_ci_cursor_is_definition(session, record) == 0: return false
+    var fields = 0
+    var fi = 0
+    while fi < with_ci_num_children(session, record):
+        let field = with_ci_child(session, record, fi)
+        fi = fi + 1
+        if with_ci_cursor_kind(session, field) != CXK_FIELD_DECL: continue
+        if not ci_type_is_flat(session, with_ci_cursor_type(session, field), depth + 1): return false
+        fields = fields + 1
+    fields > 0

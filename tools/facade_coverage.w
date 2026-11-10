@@ -125,7 +125,7 @@ fn value_record_class(why: &str) -> str:
     let w = why.trim()
     if w.starts_with("a unit of the package"): return "a unit of the package could not be read"
     if w.starts_with("no unit defines the function"): return "no unit defines the function"
-    if w.contains("is not complete in a header the package installs"): return "the record is not complete in an installed header"
+    if w.contains("is not a flat record complete in a header the package installs"): return "the record holds a pointer, or is not complete in an installed header"
     if w.starts_with("some function of the package produces"): return "the record is a resource (something produces, destroys or retains it)"
     if w.starts_with("the body indexes it"): return "the body indexes it, moves the pointer, takes a part's address, or copies the pointer"
     if w.starts_with("it is passed to "): return "it is passed on to a function the proofs cannot clear"

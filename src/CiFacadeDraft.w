@@ -468,7 +468,9 @@ impl CiProject:
 
     // D198 (§16.2b.5): the value-record clause the proofs give parameter
     // `pi` of `si`, or "". Stated only when everything it depends on is
-    // read: the record is complete in a header the package installs and
+    // read: the record is flat (no pointer inside it, so the callee cannot
+    // leave it through its own fields) and complete in a header the
+    // package installs, and
     // has no identity; the body keeps no pointer to it or into it, touches
     // only the one record (no index, no arithmetic, no part's address, no
     // copy of the pointer), and passes it on only to functions of the
@@ -511,7 +513,7 @@ impl CiProject:
         if self.fd_value_record_word(si, pi, depth).len() > 0: return ""
         if self.unread.len() > 0: return "a unit of the package could not be read"
         if self.symbols[si].has_definition == 0: return "no unit defines the function, so nothing proves what it does with the record"
-        if not self.installed_records.contains(record): return record ++ " is not complete in a header the package installs"
+        if not self.installed_records.contains(record): return record ++ " is not a flat record complete in a header the package installs (it holds a pointer, or is opaque there)"
         if self.identity_records.contains(record): return "some function of the package produces, destroys or retains a pointer to " ++ record ++ ", so it is a resource, not a value"
         for line in self.symbols[si].own_evidence.split("\n"):
             if line == f"vx:{pi}": return "the body indexes it, moves the pointer, takes the address of a part, or copies the pointer"
