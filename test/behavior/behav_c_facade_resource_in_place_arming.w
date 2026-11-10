@@ -1,7 +1,7 @@
 //! expect-stdout: preinit tag=42 ends=0
 //! expect-stdout: failed status=-1 ends=1
 //! expect-stdout: destroys 3 ends=2
-//! expect-stdout: unread status=-1 live=true ends=3
+//! expect-stdout: unread status=-1 ends=3
 //! expect-stdout: ok
 
 // D51 ruling §13.1–13.2: Drop arming for an in-place resource. Storage is
@@ -60,8 +60,9 @@ fn main:
     let how = d.end_v2(3)
     print(f"destroys {how} ends={unsafe { *ends }}")
     let (ust, u) = Blind.init(ends, 1)
-    let ulive = u.live
+    // The resource is armed: its destroyer runs when it is dropped, which
+    // `ends` counts. (Its liveness flag is the generated type's own, §16.2b.3.)
     drop(u)
-    print(f"unread status={ust} live={ulive} ends={unsafe { *ends }}")
+    print(f"unread status={ust} ends={unsafe { *ends }}")
     unsafe { free(ends as *mut c_void) }
     print("ok")
