@@ -1630,6 +1630,10 @@ impl Sema:
             if self.facade_contract_pairs_buffer(c, pi):
                 self.emit_error(f"fn '{fname}': {word} {shown}: a pointer paired with a count is a buffer (§16.2b.8), not a value record (§16.2b.5)", clause)
                 return c
+            let held = self.pointer_holding_part(record, "")
+            if held.len() > 0:
+                self.emit_error(f"fn '{fname}': {word} {shown}: a value record is flat, and {held} is a pointer the program could set to any address; such a record is a resource, a buffer, or stays raw (§16.2b.5)", clause)
+                return c
             if word != "reads" and self.get_type_d1(ptype) == 0:
                 self.emit_error(f"fn '{fname}': {word} {shown}: the pointer is `const`, so the callee cannot write the record; `reads` is the clause (§16.2b.5)", clause)
                 return c
@@ -1697,6 +1701,11 @@ impl Sema:
                 if self.is_c_void_like_type(element as i32) or self.is_opaque_value_type(element as i32):
                     let shown = self.facade_param_display(fn_sym, sig, p)
                     self.emit_error(f"fn '{fname}': 'buffer param {p} … elements' names {shown}, whose element size is unknown; an element-count buffer requires a complete element type (§16.2b.8)", clause)
+                    return c
+                let held = self.pointer_holding_part(element as i32, "")
+                if held.len() > 0:
+                    let shown = self.facade_param_display(fn_sym, sig, p)
+                    self.emit_error(f"fn '{fname}': 'buffer param {p} … elements' names {shown}: an element-count buffer's elements are flat, and {held} is a pointer the program could set to any address (§16.2b.5, §16.2b.8)", clause)
                     return c
             if inout != 0 and self.get_type_d1(ptype) == 0:
                 let shown = self.facade_param_display(fn_sym, sig, p)

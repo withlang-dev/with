@@ -39275,6 +39275,31 @@ impl Sema:
             if inner.len() > 0: return inner
         ""
 
+    // D198 (§16.2b.5): "" when `tid` is flat; otherwise the pointer it
+    // holds, spelled from `path`. A value safe code hands to C is flat:
+    // With code may set any pointer in it to any address, and C follows
+    // it. Pointers, references, slices and function pointers are the
+    // pointers; an array, a record or union and a generic instance
+    // (`Option[extern fn]`) hold whatever is in them.
+    fn pointer_holding_part(tid: i32, path: &str) -> str:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let tk = self.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN:
+            return if path.len() == 0: f"the element ({self.type_name(tid)})" else: f"field '{path}' ({self.type_name(tid)})"
+        if tk == TypeKind.TY_ARRAY: return self.pointer_holding_part(self.get_type_d0(resolved as TypeId), path ++ "[]")
+        if tk == TypeKind.TY_GENERIC_INST:
+            for ai in 0..self.get_generic_inst_arg_count(resolved):
+                let inner = self.pointer_holding_part(self.get_generic_inst_arg(resolved, ai), path)
+                if inner.len() > 0: return inner
+            return ""
+        if tk != TypeKind.TY_STRUCT: return ""
+        let te_start = self.get_type_d1(resolved as TypeId)
+        for fi in 0..self.get_type_d2(resolved as TypeId):
+            let fname = self.pool_resolve(self.type_extra[(te_start + fi * 3)])
+            let inner = self.pointer_holding_part(self.type_extra[(te_start + fi * 3 + 1)], if path.len() == 0: fname else: path ++ "." ++ fname)
+            if inner.len() > 0: return inner
+        ""
+
     // §18.3 (D100): a field without `pub` is visible throughout its package.
     // A distinct type's `.value` is the language's unwrap, not a declared
     // field; a C type's fields are C's, which has no privacy.
