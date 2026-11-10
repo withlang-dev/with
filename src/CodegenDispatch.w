@@ -5379,6 +5379,16 @@ impl Codegen:
                     let i64_ty = wl_i64_type(self.context)
                     let wide = if src_unsigned or wl_get_int_type_width(wl_type_of(val)) >= 64: val else: wl_build_sext(self.builder, val, i64_ty)
                     return wl_build_int_to_ptr(self.builder, wide, cast_ty)
+                // #3219: Int → function value. A `fn(A) -> R` is a code
+                // pointer and a context; an integer names the code and no
+                // context. Left as the integer, a direct call of the local
+                // called it: "Called function must be a pointer".
+                if vk == wl_integer_type_kind() and ck == wl_struct_type_kind() and d1 > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(d1)) == TypeKind.TY_FN and wl_count_struct_elem_types(cast_ty) == 2:
+                    let ptr_ty = wl_ptr_type(self.context)
+                    let i64_ty = wl_i64_type(self.context)
+                    let wide = if src_unsigned or wl_get_int_type_width(wl_type_of(val)) >= 64: val else: wl_build_sext(self.builder, val, i64_ty)
+                    let code = wl_build_insert_value(self.builder, wl_get_undef(cast_ty), wl_build_int_to_ptr(self.builder, wide, ptr_ty), 0)
+                    return wl_build_insert_value(self.builder, code, wl_const_null(ptr_ty), 1)
                 // Int → Int: use zext for unsigned source OR unsigned target
                 if vk == wl_integer_type_kind() and ck == wl_integer_type_kind():
                     let dst_unsigned = if d1 > 0: self.mir_sema_type_is_unsigned(d1) else: false
