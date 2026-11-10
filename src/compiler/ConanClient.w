@@ -18,6 +18,7 @@ use compiler.Link
 use std.crypto.sha256
 use std.string.StringBuilder
 use CiMigrate
+use CiFacts
 use rt.rt_core
 
 fn CONAN_CENTER_URL -> str: "https://center2.conan.io"
@@ -1937,6 +1938,14 @@ fn conan_registry_none(commit: &str, note: &str) -> ConanRegistryFacts: ConanReg
 var g_conan_registry_commit: str = ""
 var g_conan_registry_asked: bool = false
 
+// #3241: the registry's facts for a package this run installed could not be
+// read (`<package>: <file>:<line>: <reason>`). The facts are the tier that
+// states what no proof reaches; without them the facade is not the
+// package's, so `with get` fails instead of adding it.
+var g_conan_facts_refused: str = ""
+
+fn conan_facts_refused() -> str: with_str_clone_ref(g_conan_facts_refused)
+
 fn conan_set_registry_commit(commit: &str):
     g_conan_registry_commit = commit.to_owned()
     g_conan_registry_asked = commit.len() > 0
@@ -2000,6 +2009,12 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     let link_lib: str = if libs.len() > 0: libs[0] else: ""
     let registry = conan_registry_facts(name, dep_dir)
     if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
+    if registry.path.len() > 0:
+        match facts_read_file(registry.path):
+            Ok(_) => {}
+            Err(message) =>
+                g_conan_facts_refused = g_conan_facts_refused ++ (if g_conan_facts_refused.len() > 0: "; " else: "") ++ name ++ ": " ++ message
+                return
     let report_path = dep_dir ++ "/facade-report.txt"
     migrate_parse_c_as_c_import()
     let summary = migrate_c_facade_for_package(corpus.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/facade.w", report_path)

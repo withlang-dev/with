@@ -7201,6 +7201,14 @@ fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinst
     let resolved_version = conan_install(pkg_name, pkg_version, root, force_reinstall)
     if resolved_version.len() == 0:
         return 1
+    // #3241: a facts file the reader refuses is the registry's defect, and
+    // a package without its facade is not what the program was written
+    // against: say which line, and do not add it.
+    let refused = conan_facts_refused()
+    if refused.len() > 0:
+        with_eprint("error: the registry's facts could not be read (" ++ refused ++ "); no facade was written, so c." ++ pkg_name ++ " is not added")
+        with_eprint("  the facts file is registry/c/<package>/facts.w in the toolchain's repository; `WITH_REGISTRY=<base URL>` reads another")
+        return 1
     let loaded_lock = lock_load(root)
     let updated_lock = lock_upsert_installed_c_dep_tree(loaded_lock, root, pkg_name, resolved_version)
     if updated_lock.entries.len() == 0:
