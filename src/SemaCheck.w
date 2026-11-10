@@ -12143,7 +12143,13 @@ impl Sema:
         let fn_name = self.pool_resolve(fn_sym)
         if sema_extern_is_compiler_implementation(fn_name, self.current_module_path):
             return false
-        if sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)):
+        // #3218: a header's translation declares the functions it is built
+        // on (`extern fn with_alloc`) once per compilation. From a second
+        // module's translation the name's first declaration is the
+        // runtime's own, and judging the call by that path made it a safe
+        // runtime call: the translation's `unsafe { with_alloc(…) }` was
+        // refused as vacuous. Inside a translation the call is C's.
+        if not self.current_file_is_generated("<c_import ") and sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)):
             return false
         if self.ci_raw_syms.contains(fn_sym):
             return true
@@ -14944,7 +14950,18 @@ impl Sema:
                 let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
                 let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
                 if arg_count >= 1:
-                    target_ty = self.resolve_impl_trait_arg_for_source(decl, source_ty, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
+                    // The impl's trait argument is spelled in the impl's own
+                    // module: a facade's `impl Deref[Img] for Picture` names a
+                    // record of the facade's c_import, private to that module,
+                    // and resolving it from the module that reads `p.n` called
+                    // it "private to its package".
+                    let use_path = with_str_clone_ref(self.current_module_path)
+                    let use_file = self.local_file_id
+                    self.update_decl_source_context(di)
+                    let in_impl_module = self.resolve_impl_trait_arg_for_source(decl, source_ty, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
+                    self.update_source_context_path(use_path)
+                    self.local_file_id = use_file
+                    target_ty = in_impl_module
             let sig_idx = self.get_sig(deref_fn)
             var result_ref_ty = 0
             if sig_idx >= 0:
