@@ -57,4 +57,4 @@ fn main:
     let ctx = Ctx.ctx_init()
     let held: List[DeflateStream] = List.new()
     held.push(deflater)
-    print(f"{reset} {dstatus} {ctx.live}")
+    print(f"{reset} {dstatus}")
