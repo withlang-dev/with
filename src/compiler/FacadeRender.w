@@ -3006,7 +3006,7 @@ fn facade_render_is_raw(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
     let start = pool.fn_meta_param_start(meta)
     for pi in 0..pool.fn_meta_param_count(meta):
         let p = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId))
-        if p != "*const i8" and p != "*const c_char" and facade_render_type_is_raw(p):
+        if p != "*const i8" and p != "*const c_char" and (facade_render_type_is_raw(p) or facade_render_type_holds_pointer(pool, intern, p, 0)):
             return true
     false
 

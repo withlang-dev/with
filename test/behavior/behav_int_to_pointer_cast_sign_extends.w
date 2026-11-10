@@ -7,13 +7,13 @@
 // as eight bytes, so its upper half was whatever sat next to it.
 // sqlite3_bind_text(..., SQLITE_TRANSIENT) then jumped to that address.
 
-let TRANSIENT: unsafe extern "C" fn(*mut c_void) -> Unit = (-1 as extern "C" fn(*mut c_void) -> Unit)
-let STATIC: unsafe extern "C" fn(*mut c_void) -> Unit = (0 as extern "C" fn(*mut c_void) -> Unit)
+let TRANSIENT: unsafe extern "C" fn(*mut c_void) -> Unit = (-1 as unsafe extern "C" fn(*mut c_void) -> Unit)
+let STATIC: unsafe extern "C" fn(*mut c_void) -> Unit = (0 as unsafe extern "C" fn(*mut c_void) -> Unit)
 let HIGH: *const u8 = (-4096 as *const u8)
 
 fn main:
     let all_ones = 0usize -% 1
-    let local: unsafe extern "C" fn(*mut c_void) -> Unit = (-1 as extern "C" fn(*mut c_void) -> Unit)
+    let local: unsafe extern "C" fn(*mut c_void) -> Unit = (-1 as unsafe extern "C" fn(*mut c_void) -> Unit)
     assert(local as usize == all_ones)
     assert(TRANSIENT as usize == all_ones)
     assert(STATIC as usize == 0)

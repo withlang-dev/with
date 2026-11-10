@@ -1067,6 +1067,12 @@ impl Sema:
                     return true
         false
 
+    // D198 (§16.2b.5): a parameter passed by value whose type holds a
+    // pointer is a pointer parameter. A returned record is not: the value is
+    // inert until it goes back into C.
+    fn ci_param_requires_raw_contract(tid: i32) -> bool:
+        self.ci_type_requires_raw_contract(tid) or self.pointer_holding_part(tid, "").len() > 0
+
     fn ci_type_is_const_c_string_input(tid: i32) -> bool:
         if tid == 0:
             return false
@@ -1135,7 +1141,7 @@ impl Sema:
                 return true
         for pi in 0..param_count:
             let pty = self.sig_param_type(sig_idx, pi)
-            if self.ci_type_requires_raw_contract(pty):
+            if self.ci_param_requires_raw_contract(pty):
                 // §16.3c, D47: evidence governs what With receives from C. A
                 // `const char *` parameter is lent a NUL-terminated `str` for
                 // the call (a literal directly, any other `str` through storage
@@ -1144,7 +1150,7 @@ impl Sema:
                 // argument refused at the call site.
                 if self.ci_type_is_const_c_string_input(pty):
                     continue
-                if self.facade_covers_param(fn_sym, pi):
+                if self.ci_type_requires_raw_contract(pty) and self.facade_covers_param(fn_sym, pi):
                     continue
                 return true
         false

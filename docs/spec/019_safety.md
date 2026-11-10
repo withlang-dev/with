@@ -26,6 +26,11 @@ in safe code.
 - Intrusive / self-referential structures
 - Manual memory management beyond allocators
 - Calling functions marked `unsafe`
+- Conversion to a function type from an integer, a pointer, or a function
+  of another signature (a function value is called without `unsafe`, so
+  the conversion is where its address is trusted; conversion to an
+  `unsafe fn` type, which is called in `unsafe`, is not)
+- Assigning a C global whose type holds a pointer (§16.2b.5, §16.3)
 
 ### 19.2a `unsafe fn` — Function-Level Unsafe Context
 

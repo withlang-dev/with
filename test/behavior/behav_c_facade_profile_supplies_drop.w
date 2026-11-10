@@ -14,13 +14,13 @@
 use c_import("void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
-typedef struct { int *n; } Counter;
+typedef struct { unsigned long n; } Counter;
 typedef struct obj { Counter c; int id; } obj;
-static inline Counter counter_new(void) { Counter c; c.n = (int *)calloc(1, sizeof(int)); return c; }
-static inline int counter_read(Counter c) { return *c.n; }
-static inline void counter_free(Counter c) { free(c.n); }
+static inline Counter counter_new(void) { Counter c; c.n = (unsigned long)calloc(1, sizeof(int)); return c; }
+static inline int counter_read(Counter c) { return *(int *)c.n; }
+static inline void counter_free(Counter c) { free((void *)c.n); }
 static inline obj *obj_new(Counter c, int id) { obj *o = (obj *)malloc(sizeof(obj)); o->c = c; o->id = id; return o; }
-static inline void obj_unref(obj *o) { *o->c.n = *o->c.n + 1; free(o); }
+static inline void obj_unref(obj *o) { *(int *)o->c.n = *(int *)o->c.n + 1; free(o); }
 static inline int obj_get_id(obj *o) { return o->id; }
 ")
 
