@@ -8,7 +8,7 @@ libarchive	3.8.7	453	118	335	1570
 openssl		0	0	0	0	facade: no proofs from the source of openssl/4.1.0: openssl/4.1.0 builds with its own Configure script, which needs Perl; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for
 libsodium		0	0	0	0	facade: no proofs from the source of libsodium/cci.20220430: could not read the Conan Center recipe of libsodium/cci.20220430: its config.yml names no folder for that version (https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes/libsodium/config.yml)
 libcurl	8.23.0	152	18	134	3956	
-nghttp2		0	0	0	0	no facade-report.txt was written
+nghttp2		0	0	0	0	with get exited 1: error: could not resolve package nghttp2/ on Conan Center
 libssh2	1.11.1	140	3	137	963	
 sqlite3	3.54.1	303	34	269	3073	
 libxml2	2.15.4	1400	330	1070	1563	
