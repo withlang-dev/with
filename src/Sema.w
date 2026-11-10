@@ -572,6 +572,8 @@ type ForeignContract {
     callback_userdata_of: List[i32],    // … and the userdata parameter M it receives (parallel)
     valid_on_failed: i32,              // `valid on failed`: presented on the failed-state resource too (§16.2b.4)
     nullable_params: List[i32],         // `nullable param N`: the facade establishes the parameter accepts NULL (§16.2b.8)
+    value_records: List[i32],           // D198 §16.2b.5: each parameter a `reads`/`fills`/`updates param N` describes …
+    value_record_words: List[i32],      // … and the clause's word, as its symbol (parallel)
     text_params: List[i32],             // D122 `text param N`: input text of any C character type; takes a str (§16.2b.8)
     text_return_free: i32,              // D122 `text return, owned, freed by F`: F's symbol, or 0 (§16.2b.8)
     text_bytes: i32,                    // D134 `text return bytes`: owned bytes even under a `text utf8` facade (§16.2b.8)

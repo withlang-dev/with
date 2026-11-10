@@ -2151,6 +2151,8 @@ type FacadeBridge {
     cap_type: str,     // its C integer type
     cap_of: str,       // the []mut u8 parameter it is the capacity of
     cap_unit: str,     // bytes or elements, for a bounds diagnostic
+    fills: str,        // D198: the locals `fills param N` passed zeroed, comma-separated, or ""
+    fill_types: str,   // their record types, comma-separated
 }
 
 // The fn item describing the C function the declaration `decl` names, in
@@ -2222,7 +2224,7 @@ fn facade_render_buffer_of(pool: &AstPool, intern: &InternPool, decl: i32, pi: i
     (-1, -1, 0, 0)
 
 fn facade_render_empty_bridge() -> FacadeBridge:
-    FacadeBridge { ok: true, params: "", args: "", prologue: "", cap_var: "", cap_type: "", cap_of: "", cap_unit: "" }
+    FacadeBridge { ok: true, params: "", args: "", prologue: "", cap_var: "", cap_type: "", cap_of: "", cap_unit: "", fills: "", fill_types: "" }
 
 // One parameter's projection, shared by ordinary and callback operations.
 // Clauses compose here: there is only one derivation of a buffer's slice,
@@ -2282,6 +2284,40 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
             b.cap_type = count_type
             b.cap_of = bname
             b.cap_unit = unit
+        return b
+    // D198 (§16.2b.5, §16.2b.11): a value record. `reads param N` is a `&T`
+    // argument; `updates param N` is a `mut` parameter (D172), whose place
+    // the callee writes.
+    let value_record = facade_render_value_record_kind(pool, intern, decl, pi)
+    if value_record.len() > 0:
+        let pointer = facade_render_unalias(pool, intern, ptype)
+        let record = if pointer.starts_with("*const "): pointer.slice(7, pointer.len()) else: if pointer.starts_with("*mut "): pointer.slice(5, pointer.len()) else: ""
+        if record.len() == 0:
+            b.ok = false
+            return b
+        if value_record == "reads" and facade_render_param_is_nullable(pool, intern, decl, pi):
+            // `nullable param N` composes with `reads`: `Option[&T]`, and
+            // `None` crosses as NULL (§16.2b.5).
+            let local = facade_render_fresh(pname ++ "_ptr", taken)
+            let present = facade_render_fresh(pname ++ "_present", taken)
+            b.prologue = "let " ++ local ++ ": " ++ ptype ++ " = match " ++ pname ++ ":\n    Some(" ++ present ++ ") => " ++ present ++ " as " ++ ptype ++ "\n    None => null\n"
+            b.params = pname ++ ": Option[&" ++ record ++ "]"
+            b.args = local
+        else if value_record == "reads":
+            b.params = pname ++ ": &" ++ record
+            b.args = "(" ++ pname ++ " as " ++ ptype ++ ")"
+        else if value_record == "fills":
+            // The parameter leaves the list: With passes `T.zeroed()` and
+            // the record joins what the operation presents
+            // (facade_render_bridge_body).
+            let local = facade_render_fresh(pname ++ "_filled", taken)
+            b.prologue = "var " ++ local ++ " = " ++ record ++ ".zeroed()\n"
+            b.args = "(&raw mut " ++ local ++ " as " ++ ptype ++ ")"
+            b.fills = local
+            b.fill_types = record
+        else:
+            b.params = "mut " ++ pname ++ ": " ++ record
+            b.args = "(&raw mut " ++ pname ++ " as " ++ ptype ++ ")"
         return b
     // D122 (§16.2b.8): `text param N` — input text of any C character
     // type takes a `str`, copied to a NUL-terminated temporary for the
@@ -2356,6 +2392,9 @@ fn facade_render_append_bridge(initial: FacadeBridge, part: &FacadeBridge) -> Fa
         b.cap_type = part.cap_type
         b.cap_of = part.cap_of
         b.cap_unit = part.cap_unit
+    if part.fills.len() > 0:
+        b.fills = if b.fills.len() > 0: b.fills ++ ", " ++ part.fills else: with_str_clone_ref(part.fills)
+        b.fill_types = if b.fill_types.len() > 0: b.fill_types ++ ", " ++ part.fill_types else: with_str_clone_ref(part.fill_types)
     b
 
 fn facade_render_bridge(pool: &AstPool, intern: &InternPool, decl: i32, skip: i32, slot: i32, slot_arg: &str) -> FacadeBridge:
@@ -2410,6 +2449,32 @@ fn facade_render_failed(err: &str, status: &str, failed: &str, message_call: &st
     out ++ indent ++ "    return Err(" ++ err ++ ".Failed(" ++ status ++ ", " ++ message ++ "))\n"
 
 fn facade_render_bridge_body(pool: &AstPool, intern: &InternPool, decl: i32, b: &FacadeBridge, call: &str, presented: &str, indent: &str, message_call: &str) -> (str, str):
+    // D198 (§16.2b.5, §16.2b.11): the records `fills` clauses name join
+    // what the operation presents, under the status rule of §16.2b.4. No
+    // `ok`: the status is uninterpreted, so the result is `(status, T)`,
+    // or `T` when C returns nothing. One `ok` constant: `Result[T, E]`.
+    // Several: the matched status is a value, `Result[(status, T), E]`.
+    if b.fills.len() > 0 and b.cap_var.len() == 0:
+        let several = b.fills.contains(", ")
+        let filled = if several: "(" ++ b.fills ++ ")" else: with_str_clone_ref(b.fills)
+        let filled_type = if several: "(" ++ b.fill_types ++ ")" else: with_str_clone_ref(b.fill_types)
+        let returned = facade_render_return(pool, intern, decl)
+        let status_type = if returned.len() > 4: returned.slice(4, returned.len()) else: ""
+        let fill_oks = facade_render_fn_oks(pool, intern, decl)
+        let fill_status = facade_render_fresh("status", facade_render_param_names(pool, intern, decl))
+        if fill_oks.len() == 0:
+            if status_type.len() == 0 or status_type == "Unit":
+                return (" -> " ++ filled_type, indent ++ call ++ "\n" ++ indent ++ filled ++ "\n")
+            return (" -> (" ++ status_type ++ ", " ++ b.fill_types ++ ")", indent ++ "let " ++ fill_status ++ " = " ++ call ++ "\n" ++ indent ++ "(" ++ fill_status ++ ", " ++ b.fills ++ ")\n")
+        let (fill_err, fill_empty_message) = facade_render_op_error(pool, intern, decl, presented)
+        var fill_failed = ""
+        for ok_const in fill_oks:
+            if fill_failed.len() > 0: fill_failed = fill_failed ++ " and "
+            fill_failed = fill_failed ++ fill_status ++ " != " ++ intern.resolve(ok_const)
+        let fill_checked = indent ++ "let " ++ fill_status ++ " = " ++ call ++ "\n" ++ facade_render_failed(fill_err, fill_status, fill_failed, message_call, facade_render_param_names(pool, intern, decl), indent, fill_empty_message)
+        if fill_oks.len() == 1:
+            return (" -> Result[" ++ filled_type ++ ", " ++ fill_err ++ "]", fill_checked ++ indent ++ filled ++ "\n")
+        return (" -> Result[(" ++ status_type ++ ", " ++ b.fill_types ++ "), " ++ fill_err ++ "]", fill_checked ++ indent ++ "(" ++ fill_status ++ ", " ++ b.fills ++ ")\n")
     if b.cap_var.len() == 0:
         // A status-returning operation under `ok` (ruling Amendment 3,
         // §16.2b.4): `Result[T, <Fn>Error]`. One constant: the status is the
@@ -3665,8 +3730,23 @@ fn facade_render_record_view_methods(pool: &AstPool, intern: &InternPool, ci: &L
 
 // ── text parameters and owned text returns (D122, spec §16.2b.8) ────────
 
+// D198: the word of the value-record clause that names parameter `pi`
+// (`reads`, `fills` or `updates`, §16.2b.5), or "".
+fn facade_render_value_record_kind(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> str:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0:
+        return ""
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        let kind = pool.get_data0(clause as NodeId)
+        if kind == FACADE_CLAUSE_VALUE_RECORD and facade_render_param_ref(pool, intern, decl, pool.get_extra(pool.get_data1(clause as NodeId))) == pi:
+            return intern.resolve(pool.get_extra(pool.get_data1(clause as NodeId) + 1))
+    ""
+
 // Whether `text param N` names parameter `pi` of the declaration, in its
 // fn item: input text of any C character type, taking a `str`.
+
 fn facade_render_param_is_text(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> bool:
     let item = facade_render_fn_item(pool, intern, decl)
     if item == 0:

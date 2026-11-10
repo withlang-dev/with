@@ -1059,7 +1059,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1608,6 +1608,43 @@ impl Sema:
                 return c
             c.text_return_free = free_sym
             return c
+        if kind == FACADE_CLAUSE_VALUE_RECORD:
+            // D198 (§16.2b.5 "Value records"): the parameter is a pointer to
+            // one complete record that is not a resource's representation;
+            // the clause says what the callee does with the record and
+            // asserts that it keeps no pointer to it or into it.
+            let word_sym = self.ast.get_extra(ops + 1)
+            let word = with_str_clone_ref(self.pool_resolve(word_sym))
+            let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if pi < 0:
+                return c
+            let shown = self.facade_param_display(fn_sym, sig, pi)
+            let ptype = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+            let record = if self.get_type_kind(ptype) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(ptype) as TypeId) as i32 else: 0
+            if record == 0 or self.get_type_kind(record as TypeId) != TypeKind.TY_STRUCT or self.is_opaque_value_type(record):
+                self.emit_error(f"fn '{fname}': {word} {shown}: a value record is a pointer to one complete record; this is not one (§16.2b.5)", clause)
+                return c
+            if self.facade_param_takes_resource(fn_sym, pi):
+                self.emit_error(f"fn '{fname}': {word} {shown}: the record is a resource's representation, so the operation borrows that resource; it is not a value record (§16.2b.5)", clause)
+                return c
+            if self.facade_contract_pairs_buffer(c, pi):
+                self.emit_error(f"fn '{fname}': {word} {shown}: a pointer paired with a count is a buffer (§16.2b.8), not a value record (§16.2b.5)", clause)
+                return c
+            if word != "reads" and self.get_type_d1(ptype) == 0:
+                self.emit_error(f"fn '{fname}': {word} {shown}: the pointer is `const`, so the callee cannot write the record; `reads` is the clause (§16.2b.5)", clause)
+                return c
+            if word == "fills":
+                let culprit = self.zero_invalid_part(record, "")
+                if culprit.len() > 0:
+                    self.emit_error(f"fn '{fname}': fills {shown}: With passes `{self.type_name(record)}.zeroed()`, and {culprit} has no all-zero value (§16.2b.3, §16.2b.5)", clause)
+                    return c
+            for described in c.value_records:
+                if described == pi:
+                    self.emit_error(f"fn '{fname}': {shown} is described twice; a value record has one of `reads`, `fills`, `updates` (§16.2b.5)", clause)
+                    return c
+            c.value_records.push(pi)
+            c.value_record_words.push(word_sym)
+            return c
         if kind == FACADE_CLAUSE_NULLABLE:
             // `nullable param N` (ruling §43, spec §16.2b.8: "where safe
             // modeling requires nullability and the header does not
@@ -1643,6 +1680,11 @@ impl Sema:
             let l = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
             if l < 0:
                 return c
+            // D198: a parameter a value-record clause describes is no buffer.
+            for described in c.value_records:
+                if described == p or described == l:
+                    self.emit_error(f"fn '{fname}': a pointer paired with a count is a buffer (§16.2b.8), not a value record; the `reads`/`fills`/`updates` clause on it does not apply (§16.2b.5)", clause)
+                    return c
             let inout = self.ast.get_extra(ops + 2)
             let elements = self.ast.get_extra(ops + 3)
             let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
@@ -2564,6 +2606,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
+    if kind == FACADE_CLAUSE_VALUE_RECORD: return "reads / fills / updates"
     if kind == FACADE_CLAUSE_TEXT_PARAM: return "text param"
     if kind == FACADE_CLAUSE_TEXT_UTF8: return "text utf8"
     if kind == FACADE_CLAUSE_TEXT_BYTES: return "text return bytes"
@@ -3007,10 +3050,27 @@ impl Sema:
         c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.bridged != 0 or c.variadic_node != 0 or c.returns_borrow_record != 0
 
     // Whether parameter `pi` is a buffer, a buffer's length, or fixed.
+    // D198: whether a buffer clause of the contract being built pairs `pi`.
+    fn facade_contract_pairs_buffer(c: &ForeignContract, pi: i32) -> bool:
+        c.buffer_ptr.contains(pi) or c.buffer_len.contains(pi)
+
+    // D198: whether `reads param N` names `pi` in the contract.
+    fn facade_contract_reads(ci: i32, pi: i32) -> bool:
+        let c = &self.foreign_contracts[ci]
+        var k = 0
+        for described in c.value_records:
+            if described == pi and self.pool_resolve(c.value_record_words[k]) == "reads": return true
+            k = k + 1
+        false
+
     fn facade_contract_pairs(ci: i32, pi: i32) -> bool:
         let c = &self.foreign_contracts[ci]
         for k in 0..c.buffer_ptr.len():
             if c.buffer_ptr[k] == pi or c.buffer_len[k] == pi: return true
+        // D198: a value record is reached through the presented rendering
+        // alone, as a buffer is: the raw call takes a bare pointer.
+        for described in c.value_records:
+            if described == pi: return true
         for k in 0..c.fixed_params.len():
             if c.fixed_params[k] == pi: return true
         false
@@ -4690,6 +4750,9 @@ impl Sema:
                 // `Option[&str]`, NULL for None (libxml2's optional
                 // encoding).
                 if self.facade_param_is_c_string(sig, pi): continue
+                // D198 (§16.2b.5): `nullable param N` composes with `reads` and
+                // presents `Option[&T]`.
+                if self.facade_contract_reads(ci as i32, pi): continue
                 let shown = self.facade_param_display(fn_sym, sig, pi)
                 self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6), for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9) and for a const char * (Option[&str]), and a raw pointer parameter accepts null as C declares it — a nullable resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
                 break
