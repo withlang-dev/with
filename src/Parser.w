@@ -55,6 +55,7 @@ type Parser {
     pending_inline: i32,
     pending_noinline: i32,
     pending_must_use: i32,
+    pending_threadlocal: i32,   // @[threadlocal] on the next extern variable (a C `_Thread_local` global)
     pending_suspends: i32,
     pending_no_await_guard: i32,
     pending_no_alloc: i32,
@@ -182,6 +183,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_inline: 0,
         pending_noinline: 0,
         pending_must_use: 0,
+        pending_threadlocal: 0,
         pending_suspends: 0,
         pending_no_await_guard: 0,
         pending_no_alloc: 0,
@@ -715,6 +717,7 @@ impl Parser:
         self.pending_inline = 0
         self.pending_noinline = 0
         self.pending_must_use = 0
+        self.pending_threadlocal = 0
         self.pending_suspends = 0
         self.pending_no_await_guard = 0
         self.pending_no_alloc = 0
@@ -810,6 +813,9 @@ impl Parser:
                 self.advance()
             else if self.is_ident_named("must_use"):
                 // Already handled by standalone check above
+                self.advance()
+            else if self.is_ident_named("threadlocal"):
+                self.pending_threadlocal = 1
                 self.advance()
             else if self.is_ident_named("no_await_guard"):
                 // Already handled by standalone check above
@@ -1883,7 +1889,9 @@ impl Parser:
                 self.emit_error("effect attribute can only be used on functions and extern functions")
                 self.pending_effect_params = List.new()
                 self.pending_effect_bits = List.new()
-            let ev_node = self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
+            // d2: bit 0 mutable (`extern var`), bit 1 thread-local.
+            let ev_node = self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut + 2 * self.pending_threadlocal)
+            self.pending_threadlocal = 0
             // #858: @[link_name("sym")] names the C symbol the variable links
             // against, as on an extern fn; it was dropped here, so the object
             // referenced the With name. Every other callconv-carried attribute

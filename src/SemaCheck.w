@@ -3470,6 +3470,10 @@ impl Sema:
             return
         if self.global_symbol_is_synchronized(sym):
             return
+        // §16.3: a C global the header declares thread-local is one per
+        // thread; neither a read nor a write of it races.
+        if (self.extern_var_texts.get(self.pool_resolve(sym)).copied() ?? 0) == 2:
+            return
         // #1819: the write is a write of the body it is in — in std and the
         // runtime too, whose bodies hold views of their own globals.
         if kind == GLOBAL_RACE_ACCESS_WRITE:
@@ -5224,7 +5228,15 @@ impl Sema:
             return true
         if self.global_race_mutated_syms.contains(sym):
             return true
-        false
+        self.global_is_c_written(sym)
+
+    // §16.3 (D198, #3220): an imported C global follows §9.1 rule 3 with one
+    // difference: C may write it. The proof counts With's writes, and the
+    // library is a writer the compiler cannot see, so a read needs the
+    // proof too, unless the header declares the global `const` (an
+    // `extern let`) or thread-local (never recorded as a racing access).
+    fn global_is_c_written(sym: i32) -> bool:
+        self.mutable_global_syms.contains(sym) and (self.extern_var_texts.get(self.pool_resolve(sym)).copied() ?? 0) == 1
 
     mut fn emit_global_data_race_error(idx: isize):
         let sym = self.global_race_access_syms[idx]
@@ -5233,8 +5245,10 @@ impl Sema:
         let kind = self.global_race_access_kinds[idx]
         let name = self.pool_resolve(sym)
         let access = if kind == GLOBAL_RACE_ACCESS_WRITE: "mutation" else: "read"
-        let diag = Diagnostic.err("E0921: " ++ access ++ " of global `" ++ name ++ "` may race", Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
-        let access_label = if kind == GLOBAL_RACE_ACCESS_WRITE: "global mutated here" else: "global read here; this global is mutated elsewhere"
+        let c_written = self.global_is_c_written(sym)
+        let headline = if c_written: "E0921: " ++ access ++ " of C global `" ++ name ++ "` may race: C can write it; it is safe when declared `const` or thread-local, or inside `unsafe`" else: "E0921: " ++ access ++ " of global `" ++ name ++ "` may race"
+        let diag = Diagnostic.err(headline, Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+        let access_label = if kind == GLOBAL_RACE_ACCESS_WRITE: "global mutated here" else: if c_written: "C global read here; the library may write it" else: "global read here; this global is mutated elsewhere"
         diag.add_label(Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) }, access_label)
         if self.global_race_concurrency_node != 0:
             let conc = self.global_race_concurrency_node
