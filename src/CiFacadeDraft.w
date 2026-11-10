@@ -1098,6 +1098,11 @@ impl CiProject:
         // and presents the operation on its resource.
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
+            // D198: an operation the registry states on a by-value resource
+            // is that resource's; its block is the registry's.
+            if self.registry_value_fns.contains(self.symbols[si].name):
+                if self.symbols[si].header_declared != 0: self.presented.push(si as i32)
+                continue
             if self.fd_is_lend(si as i32, modeled):
                 self.presented.push(si as i32)
                 blocks.push(si as i32)
@@ -1118,7 +1123,7 @@ impl CiProject:
             if blocks.contains(si) or self.symbols[si].registry_more.len() == 0: continue
             blocks.push(si)
             text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_registry_presentation_lines(si)
-        text
+        text ++ self.registry_value_text
 
     // One line per function: how the draft presents it, or why it stays
     // raw; a summary first.

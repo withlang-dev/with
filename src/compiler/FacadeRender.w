@@ -113,6 +113,7 @@ fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci: &Li
             // through a borrow is one `Borrowed<R>[_]` viewing that borrow.
             let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, true, false, true) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
             out = out ++ text
+            if text.len() > 0: out = out ++ facade_render_imported_name_ops(pool, intern, ci, item)
             let rname = intern.resolve(pool.get_data0(item as NodeId))
             names.push(rname)
             uses.push(use_of_error)
@@ -567,6 +568,85 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
     out
 
+// The names of a rendered parameter list, as arguments: `a: A, mut b: B`
+// is `a, b`. A comma inside a type's brackets is not a separator.
+fn facade_render_forward_names(params: &str) -> str:
+    var out = ""
+    var depth = 0
+    var start = 0
+    var i = 0
+    while i <= params.len():
+        if i < params.len():
+            let c = params[i]
+            if c == '[' or c == '(' or c == '{': depth = depth + 1
+            else if c == ']' or c == ')' or c == '}': depth = depth - 1
+            if c != ',' or depth != 0:
+                i = i + 1
+                continue
+        let part = params.slice(start, i).trim()
+        start = i + 1
+        i = i + 1
+        if part.len() == 0: continue
+        let bare = if part.starts_with("mut "): part.slice(4, part.len()) else: part
+        let colon = bare.find(":")
+        out = out ++ (if out.len() > 0: ", " else: "") ++ (if colon < 0: bare else: bare.slice(0, colon)).trim()
+    out
+
+// D198 (§16.2b.5, §16.2b.11): a by-value token's record holds a pointer, so
+// its C functions are pointer-parameter functions and raw; the resource is
+// what models the type. Its operations are presented under their imported
+// names too, over the resource — the same operations, not a second surface:
+//
+//     fn __with_facade_LoadImageFromScreen() -> LoadedImage: LoadedImage.from_screen()
+//     fn __with_facade_GetImageColor(facade_self: &LoadedImage, x: i32, y: i32) -> Color: facade_self.get_color(x, y)
+//     fn __with_facade_UnloadImage(facade_self: LoadedImage): the value ends here, and Drop is the destroyer
+//
+// A call of the C name is redirected to the rendering (Sema
+// facade_bridge_redirect), as a D64 bridge's is. Direct-return producers,
+// plain lends and the `drop` are presented this way; an operation whose
+// result is a view keeps its method alone.
+fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> str:
+    let name = intern.resolve(pool.get_data0(resource as NodeId))
+    let extra_start = pool.get_data1(resource as NodeId)
+    let repr_text = render_type_expr(pool, intern, pool.get_extra(extra_start) as NodeId)
+    let repr = facade_render_unalias(pool, intern, repr_text)
+    // A token that holds no pointer (`Fd wraps c_int`) keeps its C functions
+    // as they are: they are safe calls over a plain value.
+    if repr.starts_with("*") or facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT) or not facade_render_type_holds_pointer(pool, intern, repr, 0): return ""
+    var out = ""
+    for k in 0..pool.get_data2(resource as NodeId):
+        let clause = pool.get_extra(extra_start + 1 + k)
+        let kind = pool.get_data0(clause as NodeId)
+        let ops = pool.get_data1(clause as NodeId)
+        if kind == FACADE_CLAUSE_FROM and pool.get_extra(ops + 1) == 0:
+            let producer = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            if producer == 0: continue
+            let bridge = facade_render_bridge(pool, intern, producer, 0, -1, "")
+            if not bridge.ok: continue
+            let cname = intern.resolve(pool.get_data0(producer as NodeId))
+            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ bridge.params ++ ") -> " ++ name ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
+        else if kind == FACADE_CLAUSE_DROP:
+            let dropper = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            if dropper != 0:
+                out = out ++ "fn " ++ facade_render_bridge_name(intern.resolve(pool.get_data0(dropper as NodeId))) ++ "(facade_self: " ++ name ++ "):\n    let facade_ended = facade_self\n"
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    for item in items:
+        let li = facade_render_lend_item(pool, intern, ci, item)
+        if not facade_render_lend_hosted(pool, intern, li, resource, repr): continue
+        if li.detaches != 0 or li.text_view or li.variadic != 0 or li.record_view or li.borrow_res != 0 or li.text_free != 0: continue
+        let decl = li.decl
+        let fname = intern.resolve(pool.get_data0(decl as NodeId))
+        let mname = facade_render_present(pool, intern, ci, resource, fname)
+        let repr_arg = facade_render_repr_arg(pool, intern, decl, repr_text, "self.repr", false)
+        if repr_arg.len() == 0: continue
+        let bridge = facade_render_bridge(pool, intern, decl, 1, -1, "")
+        if not bridge.ok: continue
+        let ret = facade_render_bridge_body(pool, intern, decl, bridge, facade_render_call(pool, intern, decl, repr_arg), mname, "        ", facade_render_message_call(pool, intern, ci, resource)).0
+        let receiver = if repr_arg.starts_with("&raw mut "): "mut facade_self: " ++ name else: "facade_self: &" ++ name
+        let params = if bridge.params.len() > 0: receiver ++ ", " ++ bridge.params else: receiver
+        out = out ++ "fn " ++ facade_render_bridge_name(fname) ++ "(" ++ params ++ ")" ++ ret ++ ":\n    facade_self." ++ mname ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
+    out
+
 // The borrowed value a `returns borrow R from param N` operation yields
 // (ruling §26, spec §16.2b.6): "no Drop; cannot outlive the named origin;
 // cannot independently be consumed or destroyed". It is the distinct type
@@ -733,9 +813,15 @@ fn facade_render_present(pool: &AstPool, intern: &InternPool, ci: &List[i32], re
             return s.names[i]
         for j in 0..s.cnames.len():
             if j != i and s.names[j] == s.names[i]:
-                return cname
-        return s.names[i]
-    cname
+                return facade_render_spellable(cname)
+        return facade_render_spellable(s.names[i])
+    facade_render_spellable(cname)
+
+// A method is not spelled with a capital (`fn R.GetColor()` is no
+// declaration): a C name in Pascal case is presented in snake case
+// (`GetImageColor` is `get_image_color`, §16.2b.11).
+fn facade_render_spellable(name: &str) -> str:
+    if name.len() > 0 and name[0] >= 'A' and name[0] <= 'Z': facade_render_snake_name(name) else: name.to_owned()
 
 // Why `cname` keeps its imported name on `resource` — the other operations
 // its shortened name would also spell, as "'db_get' (a lend method), the
@@ -858,7 +944,7 @@ fn facade_render_surface_add(s0: FacadeSurface, cname: &str, prefixes: &List[str
         return facade_render_surface_push(s0, cname, rename, true, role)
     let short = facade_render_shorten(cname, prefixes)
     if short.len() == 0:
-        return facade_render_surface_push(s0, cname, cname, true, role)
+        return facade_render_surface_push(s0, cname, facade_render_spellable(cname), true, role)
     facade_render_surface_push(s0, cname, short, false, role)
 
 fn facade_render_surface_push(s0: FacadeSurface, cname: &str, name: &str, explicit: bool, role: &str) -> FacadeSurface:
@@ -2923,6 +3009,37 @@ fn facade_render_is_raw(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
         if p != "*const i8" and p != "*const c_char" and facade_render_type_is_raw(p):
             return true
     false
+
+var g_facade_holds_pool: i64 = 0
+var g_facade_holds: HashMap[str, bool] = HashMap.new()
+
+// D198 (§16.2b.5): whether the type spelled `text` holds a pointer — a
+// by-value parameter of such a type is a pointer parameter — read off the
+// declarations as Sema.pointer_holding_part reads it off the types: a
+// pointer or function pointer, or a record, union or array with a member
+// that holds one.
+fn facade_render_type_holds_pointer(pool: &AstPool, intern: &InternPool, text: &str, depth: i32) -> bool:
+    if g_facade_holds_pool != pool.shape():
+        g_facade_holds_pool = pool.shape()
+        g_facade_holds = HashMap.new()
+    let t = facade_render_unalias(pool, intern, text)
+    if t.contains("*") or t.contains("fn(") or t.starts_with("&"): return true
+    if t.starts_with("["):
+        let semi = t.find(";")
+        return semi < 0 or facade_render_type_holds_pointer(pool, intern, t.slice(1, semi).trim(), depth + 1)
+    if g_facade_holds.contains(t): return g_facade_holds.get(t).copied() ?? false
+    var holds = false
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_TYPE_DECL or intern.resolve(pool.get_data0(decl)) != t: continue
+        let sub = pool.get_data2(decl) % 8
+        if depth < 16 and (sub == TypeDeclKind.Struct as i32 or sub == TypeDeclKind.Union as i32):
+            let start = pool.get_data1(decl)
+            for fi in 0..pool.get_extra(start):
+                if facade_render_type_holds_pointer(pool, intern, render_type_expr(pool, intern, pool.get_extra(start + 1 + fi * 3 + 1) as NodeId), depth + 1): holds = true
+        break
+    g_facade_holds.insert(t, holds)
+    holds
 
 fn facade_render_type_is_raw(text: &str) -> bool: text.starts_with("*") or text.starts_with("&") or text.starts_with("[") or text.starts_with("fn(") or text.starts_with("extern") or text.starts_with("unsafe ")
 

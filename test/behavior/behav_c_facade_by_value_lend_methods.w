@@ -13,15 +13,15 @@
 // are read back after the resource is gone.
 
 use c_import("void *calloc(unsigned long count, unsigned long size);
-typedef struct { int* state; float volume; } Snd;
-static inline Snd snd_load(const char* path) { Snd s; s.state = (int*)calloc(4, sizeof(int)); s.volume = 1.0f; return s; }
-static inline void snd_unload(Snd s) { s.state[0]++; }
-static inline void snd_play(Snd s) { s.state[1]++; }
-static inline void snd_set_volume(Snd s, float v) { s.state[2] = (int)(v * 100.0f); }
+typedef struct { unsigned long state; float volume; } Snd;
+static inline Snd snd_load(const char* path) { Snd s; s.state = (unsigned long)calloc(4, sizeof(int)); s.volume = 1.0f; return s; }
+static inline void snd_unload(Snd s) { ((int*)s.state)[0]++; }
+static inline void snd_play(Snd s) { ((int*)s.state)[1]++; }
+static inline void snd_set_volume(Snd s, float v) { ((int*)s.state)[2] = (int)(v * 100.0f); }
 static inline int snd_valid(Snd s) { return s.state != 0; }
-static inline void snd_retune(Snd* s) { s->volume = 0.25f; s->state[3]++; }
+static inline void snd_retune(Snd* s) { s->volume = 0.25f; ((int*)s->state)[3]++; }
 static inline float snd_volume(const Snd* s) { return s->volume; }
-static inline int snd_count(Snd s, int i) { return s.state[i]; }
+static inline int snd_count(Snd s, int i) { return ((int*)s.state)[i]; }
 ")
 
 c facade sounds:

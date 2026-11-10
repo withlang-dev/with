@@ -49,6 +49,23 @@ impl Sema:
         self.verify_facade_callback_items()
         self.facade_index_call_effects()
         self.facade_index_pair_ops()
+        self.facade_index_imported_name_ops()
+
+    // D198 (§16.2b.11): an operation a facade renders under its imported
+    // name (`__with_facade_<name>`, FacadeRender.w
+    // facade_render_imported_name_ops) is what a call of that name means,
+    // as a D64 bridge is. The rendering is the fact; this maps the name.
+    mut fn facade_index_imported_name_ops():
+        let prefix = facade_render_bridge_name("")
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_FN_DECL: continue
+            let rendered = self.safe_symbol_text(self.ast.get_data0(decl))
+            if not rendered.starts_with(prefix) or not self.facade_decl_file_name(di).starts_with("<facade "): continue
+            let cname = rendered.slice(prefix.len(), rendered.len())
+            let csym = self.pool_lookup_symbol(cname)
+            if csym != 0 and not self.facade_bridge_of.contains(cname):
+                self.facade_bridge_of.insert(cname.to_owned(), rendered)
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an
     // fn item may describe a destroyer from a block declared after the
@@ -3174,6 +3191,16 @@ impl Sema:
         let name = self.pool_resolve(if c.rename != 0: c.rename else: c.fn_sym)
         name
 
+    // Whether the code being checked is in a file the compiler generated
+    // under `prefix`: a facade's rendering (`<facade NAME>`) or a header's
+    // translation (`<c_import HEADER>`).
+    fn current_file_is_generated(prefix: &str) -> bool:
+        var si = 0
+        for id in self.source_text_file_ids:
+            if id == self.local_file_id and si < self.source_text_names.len() and self.source_text_names[si].starts_with(prefix): return true
+            si += 1
+        false
+
     fn facade_bridge_redirect(fn_sym: i32) -> i32:
         if self.facade_bridge_of.len() == 0:
             return fn_sym
@@ -3184,6 +3211,9 @@ impl Sema:
         // Presentation applies at the With boundary, never inside C's body.
         if self.facade_fn_is_c_import_translation(self.current_fn_symbol):
             return fn_sym
+        // A facade's own rendering is where the raw operation is used: its
+        // methods and Drop call C, and the presentation is built on them.
+        if self.current_file_is_generated("<facade "): return fn_sym
         let bname = self.facade_bridge_of.get(name).unwrap()
         let bsym = self.pool_lookup_symbol(bname)
         // The bridge's own body calls the C name: the raw operation.

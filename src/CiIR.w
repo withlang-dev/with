@@ -1169,6 +1169,8 @@ type CiProject {
     // D121 step 6: the registry's facade-level `text utf8` citation, ""
     // when the file states none.
     registry_utf8: str,
+    registry_value_text: str,
+    registry_value_fns: List[str],
     // D198 (#3206): every write of a function-pointer field and every
     // escape of a record the corpus shows (CImport.w
     // ci_fnptr_field_evidence), one line each, and the verdict per
@@ -1208,6 +1210,8 @@ fn CiProject.new -> CiProject:
         sink_seen: HashMap.new(),
         alloc_aliases: List.new(),
         registry_utf8: "",
+        registry_value_text: "",
+        registry_value_fns: [],
         fnptr_evidence: "",
         fnptr_verdicts: HashMap.new(),
         fnptr_verdicts_drawn: false,

@@ -45,6 +45,13 @@ type Facts {
     // text return presents as `Option[str]`, validated at the boundary),
     // "" when the file states none.
     pub utf8_cite: str,
+    // D198: by-value resources, in the facade's own spelling with each
+    // citation as its provenance, and the functions they name. The draft
+    // carries the text as written; the facade checker judges it against
+    // the header (§16.2b.13).
+    pub value_text: str,
+    pub value_fns: List[str],
+    pub value_resources: List[str],
 }
 
 /// Whether `kind` is a presentation fact (a parameter's or a return's
@@ -105,7 +112,8 @@ fn facts_read_file(path: &str) -> Result[Facts, str]:
     facts_read(path, source)
 
 fn facts_read(path: &str, source: str) -> Result[Facts, str]:
-    let facts = Facts { package: "", entries: List.new(), utf8_cite: "" }
+    let facts = Facts { package: "", entries: List.new(), utf8_cite: "", value_text: "", value_fns: [], value_resources: [] }
+    var in_value = false
     var current_fn = ""
     var in_resource = false
     var record = ""
@@ -120,9 +128,17 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             continue
         if facts.package.len() == 0: return Err(facts_error(path, line_no, "`c facade NAME:` must come first"))
         if stripped.starts_with("resource "):
-            if not stripped.contains(" wraps *mut "): return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record`"))
             in_resource = true
             current_fn = ""
+            in_value = not stripped.contains(" wraps *mut ")
+            if in_value:
+                // A by-value token (§16.2b.3): `resource R wraps Record`.
+                let words = stripped.fields()
+                if words.len() != 4 or words[2] != "wraps": return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record` or `resource R wraps Record`"))
+                if words[1] == words[3]: return Err(facts_error(path, line_no, "a by-value resource needs a name of its own: `" ++ words[1] ++ "` is the record's"))
+                facts.value_resources.push(words[1])
+                facts.value_text = facts.value_text ++ "    " ++ stripped ++ "\n"
+                continue
             let at = stripped.find(" wraps *mut ")
             record = stripped.slice(at + 12, stripped.len()).trim()
             if record.len() == 0 or record.contains(" ") or record.contains("|"): return Err(facts_error(path, line_no, "a resource wraps one C record"))
@@ -144,10 +160,19 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         if in_resource:
             let words = clause.fields()
             if words.len() != 2 or not (words[0] == "from" or words[0] == "drop" or words[0] == "destroys"): return Err(facts_error(path, line_no, "a resource fact is `from F`, `drop F` or `destroys F`"))
+            if in_value:
+                facts.value_fns.push(words[1])
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+                continue
             facts.entries.push(FactsEntry { fn_name: words[1], kind: if words[0] == "from": "owned" else: words[0], record: record, cite: cite })
             continue
         if current_fn.len() == 0: return Err(facts_error(path, line_no, "a fact belongs to a `resource` or an `fn` item"))
-        if clause == "lend":
+        if clause.starts_with("of ") and facts.value_resources.contains(clause.slice(3, clause.len()).trim()):
+            // An operation of a by-value resource: it reads the record it
+            // is passed and keeps nothing of it.
+            facts.value_fns.push(current_fn)
+            facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+        else if clause == "lend":
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "lend", record: "", cite: cite })
         else if clause.starts_with("consumes param "):
             let n = clause.slice(15, clause.len()).trim()
