@@ -216,3 +216,20 @@ type's places).
 
 **What would reopen it.** A clause that lets a program read through a pointer
 resource; a field-level model of pointer fields.
+
+## Amendment 4 (Eric, 2026-11-10): a generated type's fields are its own
+
+Asked whether to hide `image.live`, Eric refused the special case: the
+compiler solves the general case by rule. The rule: the fields of a type a
+facade generates (its liveness flag, the views of its parents, what it keeps
+for C) belong to its generated code. Outside it a program reads the record's
+fields through the resource and names only `.repr`, in `unsafe`. This is the
+read half of the rule that already refused literals of such a type and
+writes into it. It holds for every resource, handle and borrowed view of
+every facade; nothing names a library.
+
+A record field with the name of any field the generated type keeps is a
+facade error (the generated type's actual fields are read, not a list).
+Letting such a record "just work" needs field lookup to skip the generated
+type's own fields outside its rendering in Sema and in MIR's own walk
+(MirLower's box walk re-derives the lookup); filed, not done here.

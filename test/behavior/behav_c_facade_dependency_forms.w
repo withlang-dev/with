@@ -6,7 +6,6 @@
 //! expect-stdout: two parents: b73 c4:0 c3:0
 //! expect-stdout: cursors live: true true
 //! expect-stdout: optional parent: k9 k8 c5:0
-//! expect-stdout: iterator live: true
 //! expect-stdout: in place: t10 c6:0
 //! expect-stdout: ok
 
@@ -104,8 +103,9 @@ fn main:
     log_reset(l)
     if true:
         let db = Database.new(l, 6).unwrap()
+        // Armed: the log below witnesses its destroyer. (The liveness flag
+        // is the generated type's own, §16.2b.3.)
         let iter = Iter.it_init(db, 10)
-        print(f"iterator live: {iter.live}")
     print(f"in place: {witness(l)}")
     log_free(l)
     print("ok")

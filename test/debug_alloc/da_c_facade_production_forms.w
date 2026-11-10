@@ -60,4 +60,4 @@ fn main:
     cells.push(s)
     let (_, t) = Stream.init(2)
     let moved = move t
-    print(f"{v.len()} {none.is_some()} {failed_but_produced.is_some()} {made.is_some()} {nothing.is_some()} {cells.len()} {moved.live}")
+    print(f"{v.len()} {none.is_some()} {failed_but_produced.is_some()} {made.is_some()} {nothing.is_some()} {cells.len()}")
