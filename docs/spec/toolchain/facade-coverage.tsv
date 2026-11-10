@@ -3,7 +3,7 @@ zlib	1.4	88	27	61	72
 zstd		0	0	0	0	facade: no proofs from the source of zstd/1.5.7: zstd/1.5.7 builds with a build system other than CMake; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for
 lz4		0	0	0	0	facade: no proofs from the source of lz4/1.10.0: lz4/1.10.0 builds with a build system other than CMake; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for
 bzip2	1.0.8	24	1	23	83	
-xz_utils	5.8.4	132	26	106	692	
+xz_utils	5.8.4	132	31	101	692	
 libarchive	3.8.7	453	118	335	1570	
 openssl		0	0	0	0	facade: no proofs from the source of openssl/4.1.0: openssl/4.1.0 builds with its own Configure script, which needs Perl; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for
 libsodium		0	0	0	0	facade: no proofs from the source of libsodium/cci.20220430: could not read the Conan Center recipe of libsodium/cci.20220430: its config.yml names no folder for that version (https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes/libsodium/config.yml)
@@ -23,8 +23,8 @@ freetype	2.15.0	218	14	204	1821
 harfbuzz	15.0.0	0	0	0	0	
 sdl	3.4.16	2462	493	1969	4817	
 glfw	3.4	126	23	103	180	
-raylib	6.0	834	552	282	3049	
-libuv	1.53.0	320	28	292	356	
+raylib	6.0	834	567	267	3049	
+libuv	1.53.0	320	31	289	356	
 libevent	2.1.12	459	59	400	1250	
 libgit2		0	0	0	0	facade: no proofs from the source of openssl/3.6.5: openssl/3.6.5 builds with its own Configure script, which needs Perl; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for
 protobuf-c		0	0	0	0	facade: no proofs from the source of abseil/20250814.0: could not read the Conan Center recipe of abseil/20250814.0: its config.yml names no folder for that version (https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes/abseil/config.yml)
