@@ -7046,7 +7046,7 @@ impl Codegen:
         -1
 
     mut fn declare_extern_var(node: i32):
-        // NodeKind.NK_EXTERN_VAR: d0=name(sym), d1=type_node, d2=flags(bit0=mut)
+        // NodeKind.NK_EXTERN_VAR: d0=name(sym), d1=type_node, d2=flags(bit0=mut, bit1=thread-local)
         let name_sym = self.pool.get_data0(node)
         let type_node = self.pool.get_data1(node)
         let flags = self.pool.get_data2(node)
@@ -7071,6 +7071,10 @@ impl Codegen:
         // External linkage is the default — no need to set it
         if is_mut == 0:
             wl_set_global_constant(gv, 1)
+        // #3236: a C `_Thread_local` global is one per thread; declared as
+        // an ordinary global it named the wrong storage.
+        if flags >= 2:
+            wl_set_thread_local(gv)
         self.module_constants.insert(name_sym, gv)
 
     fn canonical_extern_name(name: &str) -> str:

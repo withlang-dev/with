@@ -286,6 +286,7 @@ extern fn LLVMAddGlobal(m: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
 extern fn LLVMSetInitializer(g: *mut u8, v: *mut u8)
 extern fn LLVMSetGlobalConstant(g: *mut u8, c: i32)
 extern fn LLVMSetLinkage(g: *mut u8, linkage: i32)
+extern fn LLVMSetThreadLocal(g: *mut u8, is_thread_local: i32)
 extern fn LLVMSetFunctionCallConv(fn_val: *mut u8, cc: u32)
 extern fn LLVMGetFunctionCallConv(fn_val: *mut u8) -> u32
 extern fn LLVMSetInstructionCallConv(instr: *mut u8, cc: u32)
@@ -1049,6 +1050,7 @@ fn wl_add_global(m: i64, ty: i64, name: &str) -> i64:
 fn wl_set_initializer(g: i64, v: i64): unsafe { LLVMSetInitializer(g as *mut u8, v as *mut u8) }
 fn wl_set_global_constant(g: i64, c: i32): unsafe { LLVMSetGlobalConstant(g as *mut u8, c) }
 fn wl_set_linkage(g: i64, link: i32): unsafe { LLVMSetLinkage(g as *mut u8, link) }
+fn wl_set_thread_local(g: i64): unsafe { LLVMSetThreadLocal(g as *mut u8, 1) }
 fn wl_set_call_conv(fn_val: i64, cc: i32): unsafe { LLVMSetFunctionCallConv(fn_val as *mut u8, cc as u32) }
 
 fn wl_cc_c() -> i32: LLVM_CCallConv
