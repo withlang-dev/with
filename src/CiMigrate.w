@@ -2096,12 +2096,31 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
     project.resolve_ownership()
     Ok(project)
 
+// The installed header through which `rel`, a header that does not compile
+// on its own, is imported: one that names it in an `#include`, compiles
+// alone, and whose translation unit does read it. "" when there is none.
+fn ci_facade_umbrella_of(rel: &str, import_dirs: &List[str], defines: &List[str]) -> str:
+    let base = ci_migrate_path_basename(rel)
+    for dir in import_dirs:
+        for path in with_fs_list_files(dir).split("\n"):
+            if not path.ends_with(".h") or not path.starts_with(dir) or path.len() <= dir.len() + 1 or path.ends_with("/" ++ rel): continue
+            var names = false
+            for line in with_fs_read_file(path).split("\n"):
+                let t = line.trim()
+                if t.starts_with("#") and t.contains("include") and (t.contains(base ++ "\"") or t.contains(base ++ ">")): names = true
+            if not names: continue
+            let candidate = path.slice(dir.len() + 1, path.len())
+            if process_c_import_with_defines(candidate, defines).len() == 0: continue
+            for included in c_import_included_files().split("\n"):
+                if included.ends_with("/" ++ rel): return path.to_owned()
+    ""
+
 // The spelling a project's `c_import` gives `header` (a prototype's file in
 // the package's source), under the include directories the installed
 // package has: the shortest tail of the path that exists under one of them
 // (`…/include/libxml/tree.h` under `include/libxml2` is `libxml/tree.h`).
 // "" when the package installs no header of that name.
-fn ci_facade_import_spelling(header: &str, import_dirs: &List[str]) -> str:
+fn ci_facade_import_spelling(header: &str, import_dirs: &List[str], declares: &str = "") -> str:
     let parts = header.split("/")
     for k in 1..parts.len() + 1:
         var rel = ""
@@ -2115,9 +2134,13 @@ fn ci_facade_import_spelling(header: &str, import_dirs: &List[str]) -> str:
     // an import dir. The installed file of that name whose bytes are the
     // source header's is the spelling; without one, the single file of that
     // name; two different ones name nothing (a guess imports the wrong one).
+    // A file matched by its name alone must mention `declares`, the function
+    // the caller looks for: liblzma's internal check/check.h is not the
+    // installed lzma/check.h, and its functions are in no installed header.
     let base = ci_migrate_path_basename(header)
     let source_text = with_fs_read_file(header)
     var same_name = ""
+    var same_path = ""
     var same_name_count = 0
     for dir in import_dirs:
         for path in with_fs_list_files(dir).split("\n"):
@@ -2126,7 +2149,8 @@ fn ci_facade_import_spelling(header: &str, import_dirs: &List[str]) -> str:
             if source_text.len() > 0 and with_fs_read_file(path) == source_text: return rel
             if same_name_count == 0 or same_name != rel: same_name_count = same_name_count + 1
             same_name = rel
-    if same_name_count == 1: same_name else: ""
+            same_path = path.to_owned()
+    if same_name_count == 1 and (declares.len() == 0 or with_fs_read_file(same_path).contains(declares)): same_name else: ""
 
 // D121 step 5: the facade and the report of a fetched package, written by
 // `with get` (compiler.ConanClient). The corpus is the units the package's
@@ -2159,24 +2183,35 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     // program's `c_import` of the header searches.
     ci_set_include_paths(import_dirs)
     let header_alone: HashMap[str, bool] = HashMap.new()
+    let header_umbrella: HashMap[str, str] = HashMap.new()
     var dependent_headers = ""
     var dependent_count = 0
     for si in 0..project.symbols.len():
         if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or project.symbols[si].header_declared == 0: continue
         // A prototype written in a source file (qoaplay.c's forward
         // declarations) is in no header at all.
-        let rel = if project.symbols[si].header_file.len() == 0: "" else: ci_facade_import_spelling(project.symbols[si].header_file, import_dirs)
+        let rel = if project.symbols[si].header_file.len() == 0: "" else: ci_facade_import_spelling(project.symbols[si].header_file, import_dirs, project.symbols[si].name)
         if rel.len() > 0:
             // The facade imports each header by itself, so a header that
             // does not compile alone (raylib's rcamera.h uses raylib.h's
             // types without including it) cannot be imported either.
             if not header_alone.contains(rel):
                 let imports = process_c_import_with_defines(rel, defines).len() > 0
-                if not imports: dependent_headers = dependent_headers ++ (if dependent_headers.len() > 0: "; " else: "") ++ rel ++ " (" ++ c_import_last_error() ++ ")"
+                let why = c_import_last_error()
                 header_alone.insert(rel.to_owned(), imports)
-            if header_alone.get(rel).copied() ?? false: continue
-            project.symbols[si].header_declared = 0
-            dependent_count = dependent_count + 1
+                // Such a header is still imported through the header that
+                // includes it (liblzma's lzma/base.h through lzma.h): the
+                // function is presented, and the facade imports the umbrella.
+                let umbrella = if imports: "" else: ci_facade_umbrella_of(rel, import_dirs, defines)
+                header_umbrella.insert(rel.to_owned(), umbrella)
+                if not imports and umbrella.len() == 0: dependent_headers = dependent_headers ++ (if dependent_headers.len() > 0: "; " else: "") ++ rel ++ " (" ++ why ++ ")"
+            let alone = header_alone.get(rel).copied() ?? false
+            let through = header_umbrella.get(rel).cloned() ?? ""
+            if not alone and through.len() == 0:
+                project.symbols[si].header_declared = 0
+                dependent_count = dependent_count + 1
+                continue
+            if not alone: project.symbols[si].header_file = through
             continue
         project.symbols[si].header_declared = 0
         uninstalled_count = uninstalled_count + 1
