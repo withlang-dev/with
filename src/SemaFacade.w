@@ -690,6 +690,13 @@ impl Sema:
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
+            else if kind == NodeKind.NK_FACADE_CLAUSE and self.ast.get_data0(item) == FACADE_CLAUSE_CREATES_THREADS:
+                // §16.3: the library is the headers this facade's module
+                // imports.
+                for dj in 0..self.ast.decl_count():
+                    let other = self.ast.get_decl(dj)
+                    if self.ast.kind(other) == NodeKind.NK_C_IMPORT and dj < self.decl_source_paths.len() and di < self.decl_source_paths.len() and self.decl_source_paths[dj] == self.decl_source_paths[di]:
+                        self.facade_thread_headers.insert(sema_owned_text(self.pool_resolve(self.ast.get_data0(other))), 1)
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_RESOURCE:

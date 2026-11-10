@@ -233,3 +233,38 @@ works (#3232): outside the rendering, field lookup does not find the
 generated type's own fields, so `p.live` is the record's. MIR follows the
 steps Sema records for the lookup, so the skip lives in Sema alone. Only
 `repr`, the raw spelling, is reserved.
+
+## Amendment 5 (Eric, 2026-11-11): imported C globals (#3220, #3237)
+
+**Ruled.** An imported C global follows §9.1 rule 3 with one difference: C
+may write it, so a read needs the proof as a write does. A `const` global
+and a thread-local global are safe in any program; the header proves both.
+
+The proof is narrowed from the whole program to the library: *a C global is
+safe to access when every call into its library and every access to its
+globals is provably on one thread.* It is a proof about the program's own
+code. A callback C invokes and an exported function C calls run on a thread
+where the program calls into C; they are not concurrency of the program's
+own. No `export` line and no default `thread` domain: a default would also
+declare that the library has no threads of its own, which no default should
+state.
+
+That second claim (the library has no threads writing its globals) stays
+assumed, as it already was for a single-threaded program writing a C global;
+the alternative is Rust's, every access `unsafe`, `optind = 1` included. It
+is closed from the other side: a library that runs threads of its own says
+so in its facade (`creates threads`), and its globals are then never
+provably on one thread.
+
+**Refused.** A facade statement "C writes it only during calls the program
+makes": true in a program with tasks while one task is in the call and
+another reads. Rewriting `examples/c-interop` to read through a C function:
+a program that reads a C global is a reasonable program.
+
+**As built.** Conservative, as §9.1 allows: with any task or spawned thread
+in the program every access to a non-const, non-thread-local C global is
+raw; per-library precision (the library touched from one task only) is
+later quality work. `examples/c-interop` is unchanged and checks.
+
+**Not yet in the spec.** The §16.3 paragraph and the spelling
+`creates threads` wait for Eric's words.

@@ -1017,6 +1017,7 @@ type Sema {
     extern_chain_head: HashMap[str, i32],
     extern_chain_prev: HashMap[i32, i32, Minted],
     extern_var_texts: HashMap[str, i32],  // every collected extern var by name text (has_extern_var_decl)
+    facade_thread_headers: HashMap[str, i32],  // §16.3: headers a `creates threads` facade's module imports
     // #602: c_import/extern params that RETAIN a passed C-string pointer past
     // the call (§16.3c). Keyed by fn name sym → bitmask of retained param
     // indices. Such a param is modeled as a C-string input (cstr_in) but
@@ -3515,6 +3516,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let extern_chain_head = sema_new_map_str_i32()
     let extern_chain_prev = sema_new_map_i32_i32()
     let extern_var_texts = sema_new_map_str_i32()
+    let facade_thread_headers = sema_new_map_str_i32()
     let retained_extern_params = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
     let fn_decl_effective_syms = sema_new_map_i32_i32()
@@ -3737,6 +3739,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         extern_chain_head,
         extern_chain_prev,
         extern_var_texts,
+        facade_thread_headers,
         retained_extern_params,
         fn_decl_nodes,
         fn_decl_effective_syms,
