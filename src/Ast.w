@@ -294,7 +294,7 @@ pub const FACADE_CLAUSE_ABANDON: i32 = 29          // [fn_sym] resource-only: th
 // param N` (D102) do; the one list Sema's contract (`bridged`) and the
 // renderer's lend item read, so neither recomputes it from the clauses.
 fn facade_clause_bridges(kind: i32) -> bool:
-    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or facade_clause_is_value_record(kind)
+    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD
 pub const FACADE_CLAUSE_HANDLE: i32 = 30           // [] the parser's marker on the NK_FACADE_RESOURCE a `handle Name wraps *mut T` item makes: a callback-scope handle (§16.2b.9), never written as a clause
 pub const FACADE_CLAUSE_CALLBACK_ARGV: i32 = 31    // [callback_ref, argv_ref, argc_ref, type(node)]  (`callback param N argv param A paired with argc param C as &[H]`: A and C index the callback's own parameters, §16.2b.9, D76)
 pub const FACADE_CLAUSE_USER_DATA: i32 = 32        // [accessor_sym, type(node)]  (`user_data from <fn> as &U`: the registered userdata the facade boxed, read back through <fn>, §16.2b.9, D76)
@@ -305,9 +305,7 @@ pub const FACADE_CLAUSE_TEXT_BYTES: i32 = 37       // []  (`text return bytes`: 
 pub const FACADE_CLAUSE_DETACHES: i32 = 38         // [param_ref]  (`detaches param N`: removes the value param N borrows from its origin and yields it owned, dependent on that origin, D134 §16.2b.6)
 // D198 (§16.2b.5 "Value records"): a pointer parameter to one complete record
 // that is not a resource's representation, by what the callee does with it.
-pub const FACADE_CLAUSE_READS: i32 = 39            // [param_ref]  (`reads param N`: presented as &T)
-pub const FACADE_CLAUSE_FILLS: i32 = 40            // [param_ref]  (`fills param N`: presented as the operation's result)
-pub const FACADE_CLAUSE_UPDATES: i32 = 41          // [param_ref]  (`updates param N`: presented as a mut parameter)
+pub const FACADE_CLAUSE_VALUE_RECORD: i32 = 39     // [param_ref, word_sym]  (`reads` / `fills` / `updates param N`: the word is the clause, §16.2b.5)
 pub const FACADE_CLAUSE_MESSAGE: i32 = 33          // [fn_sym] resource-only: `message <fn>`, the operation that describes the resource's most recent failure (ruling Amendment 3, §16.2b.4)
 pub const FACADE_PARAM_REF_NAME: i32 = 0
 pub const FACADE_PARAM_REF_INDEX: i32 = 1
@@ -2807,6 +2805,3 @@ impl AstPool:
 // NodeKind.NK_PAT_REGEX:    d0=pattern_sym, d1=flags_sym, d2=0
 // NodeKind.NK_PAT_ENUM_SHORTHAND: d0=name(sym), d1=extra_start, d2=binding_count
 
-// D198: the three value-record clauses (§16.2b.5).
-fn facade_clause_is_value_record(kind: i32) -> bool:
-    kind == FACADE_CLAUSE_READS or kind == FACADE_CLAUSE_FILLS or kind == FACADE_CLAUSE_UPDATES

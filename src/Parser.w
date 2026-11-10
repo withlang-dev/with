@@ -5272,11 +5272,14 @@ impl Parser:
         else if word == "reads" or word == "fills" or word == "updates":
             // D198 (§16.2b.5 "Value records"): `reads param N`, `fills param N`,
             // `updates param N` — what the callee does with a pointer to one
-            // complete record that is no resource's representation.
-            kind = if word == "reads": FACADE_CLAUSE_READS else if word == "fills": FACADE_CLAUSE_FILLS else: FACADE_CLAUSE_UPDATES
-            let r = self.parse_facade_param_ref()
-            if r == 0: return 0
-            ops.push(r)
+            // complete record that is no resource's representation. The word is
+            // the clause's second operand.
+            kind = FACADE_CLAUSE_VALUE_RECORD
+            let word_sym = self.intern.intern(word)
+            let record_ref = self.parse_facade_param_ref()
+            if record_ref == 0: return 0
+            ops.push(record_ref)
+            ops.push(word_sym)
         else if word == "nullable":
             // `nullable param N` (§16.2b.8: where the header does not
             // establish nullability, the facade must): the parameter
