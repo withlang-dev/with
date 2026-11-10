@@ -2295,7 +2295,15 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         if record.len() == 0:
             b.ok = false
             return b
-        if value_record == "reads":
+        if value_record == "reads" and facade_render_param_is_nullable(pool, intern, decl, pi):
+            // `nullable param N` composes with `reads`: `Option[&T]`, and
+            // `None` crosses as NULL (§16.2b.5).
+            let local = facade_render_fresh(pname ++ "_ptr", taken)
+            let present = facade_render_fresh(pname ++ "_present", taken)
+            b.prologue = "let " ++ local ++ ": " ++ ptype ++ " = match " ++ pname ++ ":\n    Some(" ++ present ++ ") => " ++ present ++ " as " ++ ptype ++ "\n    None => null\n"
+            b.params = pname ++ ": Option[&" ++ record ++ "]"
+            b.args = local
+        else if value_record == "reads":
             b.params = pname ++ ": &" ++ record
             b.args = "(" ++ pname ++ " as " ++ ptype ++ ")"
         else if value_record == "fills":

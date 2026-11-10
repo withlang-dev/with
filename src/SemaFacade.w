@@ -1627,6 +1627,9 @@ impl Sema:
             if self.facade_param_takes_resource(fn_sym, pi):
                 self.emit_error(f"fn '{fname}': {word} {shown}: the record is a resource's representation, so the operation borrows that resource; it is not a value record (§16.2b.5)", clause)
                 return c
+            if self.facade_contract_pairs_buffer(c, pi):
+                self.emit_error(f"fn '{fname}': {word} {shown}: a pointer paired with a count is a buffer (§16.2b.8), not a value record (§16.2b.5)", clause)
+                return c
             if word != "reads" and self.get_type_d1(ptype) == 0:
                 self.emit_error(f"fn '{fname}': {word} {shown}: the pointer is `const`, so the callee cannot write the record; `reads` is the clause (§16.2b.5)", clause)
                 return c
@@ -1677,6 +1680,11 @@ impl Sema:
             let l = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
             if l < 0:
                 return c
+            // D198: a parameter a value-record clause describes is no buffer.
+            for described in c.value_records:
+                if described == p or described == l:
+                    self.emit_error(f"fn '{fname}': a pointer paired with a count is a buffer (§16.2b.8), not a value record; the `reads`/`fills`/`updates` clause on it does not apply (§16.2b.5)", clause)
+                    return c
             let inout = self.ast.get_extra(ops + 2)
             let elements = self.ast.get_extra(ops + 3)
             let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
@@ -3042,6 +3050,19 @@ impl Sema:
         c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.bridged != 0 or c.variadic_node != 0 or c.returns_borrow_record != 0
 
     // Whether parameter `pi` is a buffer, a buffer's length, or fixed.
+    // D198: whether a buffer clause of the contract being built pairs `pi`.
+    fn facade_contract_pairs_buffer(c: &ForeignContract, pi: i32) -> bool:
+        c.buffer_ptr.contains(pi) or c.buffer_len.contains(pi)
+
+    // D198: whether `reads param N` names `pi` in the contract.
+    fn facade_contract_reads(ci: i32, pi: i32) -> bool:
+        let c = &self.foreign_contracts[ci]
+        var k = 0
+        for described in c.value_records:
+            if described == pi and self.pool_resolve(c.value_record_words[k]) == "reads": return true
+            k = k + 1
+        false
+
     fn facade_contract_pairs(ci: i32, pi: i32) -> bool:
         let c = &self.foreign_contracts[ci]
         for k in 0..c.buffer_ptr.len():
@@ -4729,6 +4750,9 @@ impl Sema:
                 // `Option[&str]`, NULL for None (libxml2's optional
                 // encoding).
                 if self.facade_param_is_c_string(sig, pi): continue
+                // D198 (§16.2b.5): `nullable param N` composes with `reads` and
+                // presents `Option[&T]`.
+                if self.facade_contract_reads(ci as i32, pi): continue
                 let shown = self.facade_param_display(fn_sym, sig, pi)
                 self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6), for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9) and for a const char * (Option[&str]), and a raw pointer parameter accepts null as C declares it — a nullable resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
                 break
