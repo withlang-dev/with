@@ -22231,10 +22231,18 @@ impl Sema:
         let step_fns: List[i32] = []
         let step_tys: List[i32] = []
         var depth = 0
+        // #3232 (§16.2b.3): outside a facade's rendering the fields of the
+        // type it generates are not there to find, so a record's own field
+        // of that name (`live`) is the one a program reads. When nothing
+        // further has the field, the walk answers with the generated type,
+        // and the access is refused by name.
+        var generated: TypeId = 0 as TypeId
         while depth < 32:
             if self.autoderef_type_has_field(current, field):
-                self.autoderef_record_steps(expr, step_fns, step_tys)
-                return current
+                if not self.facade_generated_field_is_hidden(current as i32, field):
+                    self.autoderef_record_steps(expr, step_fns, step_tys)
+                    return current
+                generated = current
             if sema_autoderef_seen_type(seen, current as i32):
                 self.emit_error("auto-deref cycle through Deref implementation", node)
                 return current
@@ -22245,11 +22253,17 @@ impl Sema:
                 step_tys.push(step.step_ty)
             let next = step.next as TypeId
             if next == current:
-                return current
+                return if generated != 0 as TypeId: generated else: current
             current = next
             depth = depth + 1
         self.emit_error("auto-deref cycle through Deref implementation", node)
         current
+
+    // Whether `field` is one of the fields a facade's generated type keeps
+    // for itself, seen from outside its rendering: every field but `repr`.
+    fn facade_generated_field_is_hidden(tid: i32, field: i32) -> bool:
+        let rendering = self.facade_rendered_file_of(tid)
+        rendering.len() > 0 and self.facade_current_file_name() != rendering and self.pool_resolve(field) != "repr" and self.struct_field_type_frozen(tid, field) != 0
 
     mut fn auto_deref_method_type(tid: TypeId, method: i32, node: i32, expr: i32) -> TypeId:
         var current = self.resolve_alias(tid)

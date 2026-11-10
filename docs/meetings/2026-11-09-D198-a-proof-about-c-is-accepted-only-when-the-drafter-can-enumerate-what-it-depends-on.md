@@ -228,8 +228,8 @@ read half of the rule that already refused literals of such a type and
 writes into it. It holds for every resource, handle and borrowed view of
 every facade; nothing names a library.
 
-A record field with the name of any field the generated type keeps is a
-facade error (the generated type's actual fields are read, not a list).
-Letting such a record "just work" needs field lookup to skip the generated
-type's own fields outside its rendering in Sema and in MIR's own walk
-(MirLower's box walk re-derives the lookup); filed, not done here.
+A record field with the name of a field the generated type keeps just
+works (#3232): outside the rendering, field lookup does not find the
+generated type's own fields, so `p.live` is the record's. MIR follows the
+steps Sema records for the lookup, so the skip lives in Sema alone. Only
+`repr`, the raw spelling, is reserved.
