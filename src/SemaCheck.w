@@ -20442,9 +20442,13 @@ impl Sema:
         if value_type != 0 and self.ast.kind(target) == NodeKind.NK_IDENT and self.pending_generic_binding_base.contains(self.ast.get_data0(target)):
             self.settle_pending_generic_binding(self.ast.get_data0(target), value_type as i32, target)
         // A facade-rendered type's fields are its rendering's (§16.2b.3).
-        if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
-            let written_recv_ty = self.check_expr(self.ast.get_data0(target)) as i32
-            self.reject_facade_field_write_if_needed(written_recv_ty, node)
+        // So is every place inside one: `p.repr.data = …` writes the
+        // representation as `p.repr = …` does.
+        var written = target
+        while self.ast.kind(written) == NodeKind.NK_FIELD_ACCESS or self.ast.kind(written) == NodeKind.NK_INDEX:
+            let inside = self.ast.get_data0(written)
+            if self.ast.kind(written) == NodeKind.NK_FIELD_ACCESS and self.reject_facade_field_write_if_needed(self.check_expr(inside) as i32, node): break
+            written = inside
         // §16.4 union last-written tracking.
         if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
             let u_recv = self.ast.get_data0(target)

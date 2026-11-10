@@ -214,6 +214,18 @@ impl Zcu:
             out.push(path)
         out
 
+    // D198 (§16.2b.15): a `c_import` whose header resolves to a file inside
+    // a fetched package is also this module's import of that package's
+    // facade (Resolve.w makes the edge; this parses the file in).
+    mut fn import_fetched_facade_frontend(pool: AstPool, decl: i32, di: i32) -> AstPool:
+        let dir = self.decl_source_dir_frontend(di)
+        let package = resolve_fetched_package_of_header(dir, self.pool.resolve(pool.get_data0(decl as NodeId)))
+        if package.len() == 0 or resolve_module_is_facade_of(self.decl_source_path_frontend(di), package): return pool
+        let path = self.resolve_module_path_frontend("facades." ++ package, dir)
+        if path.len() == 0 or self.has_imported_path(path) or path == self.decl_source_path_frontend(di): return pool
+        self.add_imported_path(path)
+        self.parse_imported_file_frontend(path, pool)
+
     // A `use` whose path names no module: a root group's members are
     // parsed in, anything else is reported.
     mut fn import_group_or_report_frontend(pool: AstPool, decl: i32, di: i32) -> AstPool:
@@ -2912,6 +2924,7 @@ impl Zcu:
                 root_paths.push(self.decl_source_path_frontend(ui))
                 root_file_ids.push(self.decl_source_file_id_frontend(ui))
                 root_c_import.push(if ui < self.decl_is_c_import.len(): self.decl_is_c_import[ui] else: 0)
+                if kind == NodeKind.NK_C_IMPORT: merged_pool = self.import_fetched_facade_frontend(merged_pool, decl as i32, ui)
                 continue
             let ups = merged_pool.get_data0(decl)
             let upc = merged_pool.get_data1(decl)
@@ -2940,6 +2953,7 @@ impl Zcu:
                 user_import_paths.push(self.decl_source_path_frontend(ui2))
                 user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
                 user_import_c_import.push(if ui2 < self.decl_is_c_import.len(): self.decl_is_c_import[ui2] else: 0)
+                if kind == NodeKind.NK_C_IMPORT: merged_pool = self.import_fetched_facade_frontend(merged_pool, decl as i32, ui2)
                 ui2 = ui2 + 1
                 continue
             let ups = merged_pool.get_data0(decl)

@@ -501,6 +501,35 @@ impl ResolveState:
                     let lib_sym = resolve_extra_or_zero(ast_pool, link_start + li)
                     self.record_link_lib(lib_sym)
 
+                // D198 (§16.2b.15): a facade states facts about C symbols,
+                // whichever import names them. A header that resolves to a
+                // file inside a fetched package brings that package's facade:
+                // this module's import of `facades.<name>`, as if written.
+                let package = resolve_fetched_package_of_header(self.module_dirs[module_id], header)
+                if package.len() > 0:
+                    let facade_dotted = "facades." ++ package
+                    let facade_path = self.resolve_use_file_dotted(module_id, facade_dotted)
+                    var written = facade_path.len() == 0 or facade_path == self.module_paths[module_id] or resolve_module_is_facade_of(self.module_paths[module_id], package)
+                    for other in 0..ast_pool.decl_count():
+                        let od = ast_pool.get_decl(other)
+                        if ast_pool.kind(od) == NodeKind.NK_USE_DECL and self.use_path_dotted(ast_pool, ast_pool.get_data0(od), ast_pool.get_data1(od)) == facade_dotted: written = true
+                    for imp in self.result.imports:
+                        if imp.module_id == module_id and imp.kind == ImportKind.IK_USE and imp.path_text == facade_dotted: written = true
+                    if not written:
+                        self.result.imports.push(ResolvedImport {
+                            module_id,
+                            index_in_module: import_index,
+                            kind: ImportKind.IK_USE,
+                            path_text: resolve_owned_text(facade_dotted),
+                            selected: "",
+                            namespace: resolve_owned_text(package),
+                            module_text: resolve_owned_text(facade_dotted),
+                            target_module: self.reserve_module(facade_path, resolve_dirname(facade_path), -1),
+                            span_start: start,
+                            span_end: end,
+                        })
+                        import_index = import_index + 1
+
                 let cdef = self.add_def(module_id, -1, DefKind.DK_C_IMPORT, header_sym, start, end)
                 self.add_binding(module_scope, header_sym, cdef)
                 continue
@@ -1556,6 +1585,46 @@ fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
         let cand = resolve_join(root, ".with/deps/c/" ++ name ++ "/" ++ version ++ "/facade.w")
         if resolve_file_exists(cand): return cand
     ""
+
+// D198 (§16.2b.15): the fetched package whose own file `header` resolves to
+// from a module in `module_dir`: the first `c.<name>` of with.toml whose
+// package directory holds the header under one of its include paths
+// (metadata.json). A header beside the importing module is that file, not
+// the package's, and names no package. "" when no package holds it.
+fn resolve_fetched_package_of_header(module_dir: &str, header: &str) -> str:
+    if header.len() == 0 or resolve_file_exists(resolve_join(module_dir, header)): return ""
+    let root = resolve_find_project_root(module_dir)
+    if root.len() == 0: return ""
+    for line in with_fs_read_file(resolve_join(root, "with.toml")).split("\n"):
+        let t = line.trim()
+        if not t.starts_with("c."): continue
+        let eq = t.find("=")
+        if eq < 0: continue
+        let name = t.slice(2, eq).trim()
+        let rest = t.slice(eq + 1, t.len())
+        let open = rest.find("\"")
+        if name.len() == 0 or open < 0: continue
+        let close = rest.slice(open + 1, rest.len()).find("\"")
+        if close < 0: continue
+        let dep = resolve_join(root, ".with/deps/c/" ++ name ++ "/" ++ rest.slice(open + 1, open + 1 + close))
+        let meta = with_fs_read_file(resolve_join(dep, "metadata.json"))
+        let key = meta.find("\"include_paths\"")
+        if key < 0: continue
+        let list = meta.slice(key, meta.len())
+        let end = list.find("]")
+        if end < 0: continue
+        for part in list.slice(0, end).split("\""):
+            if part.len() == 0 or part.contains("[") or part.contains(":") or part.trim() == "," or part == "include_paths": continue
+            if resolve_file_exists(resolve_join(resolve_join(dep, part), header)): return name.to_owned()
+    ""
+
+// Whether the module at `path` is itself the facade of `package`: the
+// project's own `facades/<package>.w`, or the file `with get` wrote. Its
+// `c_import` of the header is what the facade describes, never an import
+// of a facade.
+fn resolve_module_is_facade_of(path: &str, package: &str) -> bool:
+    let p = "/" ++ path.replace("\\", "/")
+    p.ends_with("/facades/" ++ package ++ ".w") or (p.ends_with("/facade.w") and p.contains("/.with/deps/c/"))
 
 fn resolve_join(a: &str, b: &str) -> str:
     if a.len() == 0:

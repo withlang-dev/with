@@ -2087,6 +2087,8 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
         if registry.package != facade_name:
             return Err("registry: " ++ facts_path ++ " states facts for `" ++ registry.package ++ "`, not `" ++ facade_name ++ "`")
         project.registry_utf8 = with_str_clone_ref(registry.utf8_cite)
+        project.registry_value_text = with_str_clone_ref(registry.value_text)
+        for name in registry.value_fns: project.registry_value_fns.push(name)
         for si in 0..project.symbols.len():
             if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
             project.symbols[si].registry = registry.of(project.symbols[si].name)
@@ -2153,9 +2155,29 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     // imported, so its function is no facade item.
     var uninstalled = ""
     var uninstalled_count = 0
+    // The directories the installed package is imported from: what a
+    // program's `c_import` of the header searches.
+    ci_set_include_paths(import_dirs)
+    let header_alone: HashMap[str, bool] = HashMap.new()
+    var dependent_headers = ""
+    var dependent_count = 0
     for si in 0..project.symbols.len():
         if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or project.symbols[si].header_declared == 0: continue
-        if project.symbols[si].header_file.len() == 0 or ci_facade_import_spelling(project.symbols[si].header_file, import_dirs).len() > 0: continue
+        // A prototype written in a source file (qoaplay.c's forward
+        // declarations) is in no header at all.
+        let rel = if project.symbols[si].header_file.len() == 0: "" else: ci_facade_import_spelling(project.symbols[si].header_file, import_dirs)
+        if rel.len() > 0:
+            // The facade imports each header by itself, so a header that
+            // does not compile alone (raylib's rcamera.h uses raylib.h's
+            // types without including it) cannot be imported either.
+            if not header_alone.contains(rel):
+                let imports = process_c_import_with_defines(rel, defines).len() > 0
+                if not imports: dependent_headers = dependent_headers ++ (if dependent_headers.len() > 0: "; " else: "") ++ rel ++ " (" ++ c_import_last_error() ++ ")"
+                header_alone.insert(rel.to_owned(), imports)
+            if header_alone.get(rel).copied() ?? false: continue
+            project.symbols[si].header_declared = 0
+            dependent_count = dependent_count + 1
+            continue
         project.symbols[si].header_declared = 0
         uninstalled_count = uninstalled_count + 1
         if uninstalled_count <= 12: uninstalled = uninstalled ++ (if uninstalled.len() > 0: ", " else: "") ++ project.symbols[si].name
@@ -2180,6 +2202,8 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         text = text ++ "use c_import(\"" ++ rel ++ "\"" ++ (if link_lib.len() > 0: ", link: \"" ++ link_lib ++ "\"" else: "") ++ ")\n"
     text = text ++ "\n" ++ draft
     var report = project.facade_report(facade_name)
+    if dependent_count > 0:
+        report = report ++ f"  {dependent_count} function(s) are declared only by headers that do not compile on their own, so no facade item presents them: " ++ dependent_headers ++ "\n"
     if uninstalled_count > 0:
         report = report ++ f"  {uninstalled_count} function(s) are declared only by headers the package does not install, so no facade item presents them: " ++ uninstalled ++ (if uninstalled_count > 12: ", …" else: "") ++ "\n"
     // #2972: a unit the build generates (libcurl's tool_hugehelp.c, its
