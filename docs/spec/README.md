@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.42
+# The With Programming Language — Specification v7.43
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.43:** D198 (Eric, 2026-11-09, #3173, #3206). §16.2b.5: value records — a pointer parameter to one complete record that is not a resource's representation is described by `reads param N` (presented as `&T`), `fills param N` (the operation's result; `T.zeroed()` is passed) or `updates param N` (a `mut` parameter); each asserts no retention of the pointer or of any pointer derived from it; with no clause the parameter stays raw, `const` included. §16.2b.11: how the three are presented. §16.2b.3: a draft proposes an in-place init and drop pair only from a proof over the library's source, never from names. §16.2b.15: a facts file may state the role of a function-pointer field (`allocator`, `reallocator`, `deallocator`, `context`), one field per line with its citation; a role is never drawn from a field's name. The compiler is NON-COMPLIANT until it implements them.
+
 **Changelog v7.42:** D197 (delegated, 2026-11-09, #3072). §4.2.4: a shift count is any integer type; a signed count converts to `u32` with a range check as §4.2.6 converts a value at a narrower demand, so a negative count panics; an untyped literal count stays `u32`; D160's `u32` demand on a literal-typed local retires (the local is typed by its other uses and converts). The sentence "a signed right operand is a type error; callers must cast explicitly" is struck: the cast stated nothing about the shift (law 1), and the error only caught a logic mistake (law 11).
 
 **Changelog v7.41:** D196 (Eric, 2026-11-08, #2372). §11.7: the per-process seed is the default hasher for every key type; a map or set keyed by integer IDs the program minted may name the unseeded `Minted` hasher as a type argument (`HashMap[K, V, Minted]`, `HashSet[T, Minted]`), a multiply-mix, refused over a non-integer key, never chosen by key type. A declared generic type now refuses a wrong argument count (`HashMap[i32, i32, i32]` was accepted and miscompiled).
