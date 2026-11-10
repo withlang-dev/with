@@ -1176,6 +1176,13 @@ type CiProject {
     fnptr_evidence: str,
     fnptr_verdicts: HashMap[str, str],
     fnptr_verdicts_drawn: bool,
+    // D198 (§16.2b.5): the records with their fields and the file that
+    // defines each; those a header the package installs defines; and the
+    // records with identity (some function produces, destroys or retains a
+    // pointer to one), which are never value records.
+    complete_records: HashMap[str, str],
+    installed_records: HashMap[str, bool],
+    identity_records: HashMap[str, bool],
     // D121 step 5: the symbols the last facade draft presented (every
     // producer, destroyer, borrow, lend and consumer it named), so the
     // facade `with get` writes can import the headers that declare them.
@@ -1204,6 +1211,9 @@ fn CiProject.new -> CiProject:
         fnptr_evidence: "",
         fnptr_verdicts: HashMap.new(),
         fnptr_verdicts_drawn: false,
+        complete_records: HashMap.new(),
+        installed_records: HashMap.new(),
+        identity_records: HashMap.new(),
         free_aliases: List.new(),
         presented: List.new(),
         unread: List.new(),

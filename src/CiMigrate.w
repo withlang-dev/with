@@ -1150,6 +1150,9 @@ impl CiProject:
                 let alias = underlying.len() > 0 and ci_is_c_ident(underlying) and underlying != rname
                 if rname.len() > 0 and not alias and not ci_is_system_decl(rname) and not (rloc.len() > 0 and ci_is_system_path(rloc)):
                     self.records.insert(ci_escape_reserved(rname), true)
+                // D198 (§16.2b.5): where a record is complete; a value record
+                // must be complete in a header the package installs.
+                if rname.len() > 0 and rloc.len() > 0 and ci_decl_is_complete_record(session, i, decl_kind, rcursor): self.complete_records.insert(ci_escape_reserved(rname), ci_migrate_location_file(rloc))
             if decl_kind == CK_VAR:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
@@ -1794,7 +1797,8 @@ impl CiProject:
         // D121: the signature's types and the body's ownership records.
         self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
         self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
-        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names))
+        // D198: with how the body uses each pointer parameter's record (`vw`/`vr`/`va`/`vx`).
+        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names) ++ ci_value_record_evidence(session, cursor, names))
         // D198: its writes of function-pointer fields and the records it lets escape.
         self.fnptr_evidence = self.fnptr_evidence ++ ci_fnptr_field_evidence(session, cursor)
         // D159: what the body proves about the pointers it is handed.
@@ -2155,6 +2159,15 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         project.symbols[si].header_declared = 0
         uninstalled_count = uninstalled_count + 1
         if uninstalled_count <= 12: uninstalled = uninstalled ++ (if uninstalled.len() > 0: ", " else: "") ++ project.symbols[si].name
+    // D198 (§16.2b.5): a value record must be complete in a header the
+    // package installs, or the facade's clause would name a record the
+    // user's import does not have.
+    let file_installed: HashMap[str, bool] = HashMap.new()
+    let installed = []
+    for (record, file) in project.complete_records:
+        if not file_installed.contains(file): file_installed.insert(file.to_owned(), ci_facade_import_spelling(file, import_dirs).len() > 0)
+        if file_installed.get(file).copied() ?? false: installed.push(record.to_owned())
+    for record in installed: project.installed_records.insert(record, true)
     let draft = project.facade_draft(facade_name)
     var spellings: List[str] = []
     for si in project.presented:
@@ -3237,3 +3250,13 @@ fn ci_cursor_kind_name(kind: i32) -> str:
     if kind == 231: return "DeclStmt"
     f"kind={kind}"
 
+
+// D198: whether the struct or typedef declaration at `idx` names a record
+// with its fields (a typedef of an opaque `struct T;` does not).
+fn ci_decl_is_complete_record(session: i64, idx: i32, decl_kind: i32, cursor: i32) -> bool:
+    if decl_kind == CK_STRUCT: return with_cimport_struct_has_definition(session, idx)
+    if decl_kind != CK_TYPEDEF or cursor < 0: return false
+    let canonical = with_ci_type_canonical(session, with_ci_cursor_type(session, cursor))
+    if canonical < 0 or with_ci_type_kind(session, canonical) != CXT_Record: return false
+    let record = with_ci_type_declaration(session, canonical)
+    record >= 0 and with_ci_cursor_is_definition(session, record) != 0

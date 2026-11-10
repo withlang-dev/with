@@ -406,7 +406,7 @@ impl CiProject:
     // The registry's presentation clauses for `si`, each with its citation,
     // in the draft's spelling.
     fn fd_registry_presentation_lines(si: i32) -> str:
-        var out = ""
+        var out = self.fd_value_record_lines(si)
         for line in self.symbols[si].registry_more.split("\n"):
             if line.len() == 0: continue
             let kind = facts_kind(line)
@@ -446,6 +446,123 @@ impl CiProject:
             return "passed " ++ self.fd_sink_text(parts[2]) ++ " at param " ++ parts[3] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1)
         "retained by evidence the report cannot restate"
 
+    // D198 (§16.2b.5): the records with identity. Some function produces,
+    // destroys or retains a pointer to one (zlib's `deflateInit` keeps the
+    // `z_stream`'s address), so a pointer to it is that resource, never a
+    // value record, whatever a signature looks like.
+    mut fn fd_draw_identity_records():
+        let found = []
+        var si: i32 = -1
+        for symbol in self.symbols:
+            si = si + 1
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si): continue
+            if symbol.owns_return != 0: found.push(fd_record_pointee(symbol.ret_ty))
+            var pi = -1
+            for p in symbol.param_ty:
+                pi = pi + 1
+                let kept = pi < symbol.param_stores.len() and symbol.param_stores[pi] != 0
+                let ended = pi < symbol.param_destroys.len() and symbol.param_destroys[pi] != 0
+                if kept or ended: found.push(fd_record_pointee(p))
+        for record in found:
+            if record.len() > 0: self.identity_records.insert(record, true)
+
+    // D198 (§16.2b.5): the value-record clause the proofs give parameter
+    // `pi` of `si`, or "". Stated only when everything it depends on is
+    // read: the record is complete in a header the package installs and
+    // has no identity; the body keeps no pointer to it or into it, touches
+    // only the one record (no index, no arithmetic, no part's address, no
+    // copy of the pointer), and passes it on only to functions of the
+    // package the same holds for. `const T *` is `reads`; `T *` written
+    // and never read is `fills`; any other `T *` is `updates`.
+    fn fd_value_record_word(si: i32, pi: i32, depth: i32) -> str:
+        if depth > 6 or self.unread.len() > 0 or self.symbols[si].has_definition == 0 or pi >= self.symbols[si].param_ty.len(): return ""
+        let p = with_str_clone_ref(self.symbols[si].param_ty[pi])
+        let is_const = p.starts_with("*const ")
+        if not is_const and not p.starts_with("*mut "): return ""
+        let record = fd_record_pointee(p)
+        if record.len() == 0 or not self.installed_records.contains(record) or self.identity_records.contains(record): return ""
+        if pi < self.symbols[si].param_stores.len() and self.symbols[si].param_stores[pi] != 0: return ""
+        if pi < self.symbols[si].param_destroys.len() and self.symbols[si].param_destroys[pi] != 0: return ""
+        var reads = false
+        var writes = false
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if line == f"vx:{pi}": return ""
+            if line == f"vr:{pi}": reads = true
+            if line == f"vw:{pi}": writes = true
+            if not line.starts_with(f"va:{pi}:"): continue
+            let parts = line.split(":")
+            if parts.len() != 4: return ""
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, parts[2])
+            if ci < 0 or not self.fd_subject(ci): return ""
+            let passed = self.fd_value_record_word(ci, fd_i32(parts[3]), depth + 1)
+            if passed.len() == 0: return ""
+            if passed != "fills": reads = true
+            if passed != "reads": writes = true
+        if is_const: return if writes: "" else: "reads"
+        if writes and not reads: "fills" else: "updates"
+
+    // Why parameter `pi` of `si`, a pointer to a record, is no value record
+    // the proofs can state ("" when it is one, or is no record pointer):
+    // fd_value_record_word's conditions, in its order, for the report.
+    fn fd_value_record_why(si: i32, pi: i32, depth: i32) -> str:
+        let p = with_str_clone_ref(self.symbols[si].param_ty[pi])
+        let record = fd_record_pointee(p)
+        if record.len() == 0 or not (p.starts_with("*const ") or p.starts_with("*mut ")): return ""
+        if self.fd_value_record_word(si, pi, depth).len() > 0: return ""
+        if self.unread.len() > 0: return "a unit of the package could not be read"
+        if self.symbols[si].has_definition == 0: return "no unit defines the function, so nothing proves what it does with the record"
+        if not self.installed_records.contains(record): return record ++ " is not complete in a header the package installs"
+        if self.identity_records.contains(record): return "some function of the package produces, destroys or retains a pointer to " ++ record ++ ", so it is a resource, not a value"
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if line == f"vx:{pi}": return "the body indexes it, moves the pointer, takes the address of a part, or copies the pointer"
+            if not line.starts_with(f"va:{pi}:"): continue
+            let parts = line.split(":")
+            let ci = if parts.len() == 4: self.find_symbol(CiProjectSymbolKind.CIPS_FN, parts[2]) else: -1
+            if ci < 0 or not self.fd_subject(ci): return "it is passed to " ++ (if parts.len() == 4 and parts[2] != "?": parts[2] else: "a function pointer") ++ ", which the proofs cannot read"
+            if depth < 6 and self.fd_value_record_word(ci, fd_i32(parts[3]), depth + 1).len() == 0: return "it is passed to " ++ parts[2] ++ ", where " ++ self.fd_value_record_why(ci, fd_i32(parts[3]), depth + 1)
+        if p.starts_with("*const "): return "the body writes through a `const` pointer"
+        "the proofs do not cover it"
+
+    // The report's verdict with value records said as such: an operation
+    // presented over them alone names its clauses; one left raw for a
+    // record pointer says why that pointer is no value record.
+    fn fd_value_record_verdict(si: i32, verdict: &str, modeled: &List[str]) -> str:
+        if verdict.starts_with("lend (proof:") and not self.fd_takes_modeled_resource(si, modeled):
+            let clauses = self.fd_value_record_lines(si)
+            if clauses.len() == 0: return verdict.to_owned()
+            var said = ""
+            for line in clauses.split("\n"):
+                let end = line.find("    //")
+                if end > 0: said = said ++ (if said.len() > 0: ", " else: "") ++ line.slice(0, end).trim()
+            return "value records: " ++ said ++ " (proof: touches only the one record, keeps no pointer to it or into it)"
+        if not verdict.starts_with("raw: parameter of unmodeled pointer type "): return verdict.to_owned()
+        var pi: i32 = -1
+        for p in self.symbols[si].param_ty:
+            pi = pi + 1
+            if not p.starts_with("*") or self.fd_param_presentable(si, pi, modeled): continue
+            let why = self.fd_value_record_why(si, pi, 0)
+            return if why.len() > 0: verdict ++ f"; param {pi} is no value record: " ++ why else: verdict.to_owned()
+        verdict.to_owned()
+
+    // The value-record clauses of `si`, one line each with its proof.
+    fn fd_value_record_lines(si: i32) -> str:
+        var out = ""
+        var pi: i32 = -1
+        for p in self.symbols[si].param_ty:
+            pi = pi + 1
+            let word = if p.starts_with("*"): self.fd_value_record_word(si, pi, 0) else: ""
+            if word.len() == 0: continue
+            let proof = if word == "reads": "reads the one record, keeps no pointer to it or into it" else if word == "fills": "writes the one record without reading it, keeps no pointer to it or into it" else: "reads and writes the one record, keeps no pointer to it or into it"
+            out = out ++ "        " ++ word ++ f" param {pi}    // proof: " ++ proof ++ "\n"
+        out
+
+    // Whether some parameter of `si` receives a modeled resource.
+    fn fd_takes_modeled_resource(si: i32, modeled: &List[str]) -> bool:
+        for p in self.symbols[si].param_ty:
+            let record = fd_record_pointee(p)
+            if record.len() > 0 and modeled.contains(record): return true
+        false
+
     // Whether parameter `pi` of `si` is one the facade language presents
     // without a clause the draft does not write (SemaFacade.w
     // facade_op_raw_beyond): a value, a `const char *` (§16.3c), a text
@@ -457,6 +574,8 @@ impl CiProject:
         if not (p.starts_with("*") or p.starts_with("&") or p.starts_with("[") or p.starts_with("fn(") or p.starts_with("extern") or p.starts_with("unsafe ") or p.starts_with("Option[")): return true
         if p == "*const i8" or p == "*const c_char": return true
         if fd_is_char_pointer(p) and self.fd_registry_names_param(si, "text_param", pi): return true
+        // D198 (§16.2b.5): a value record the proofs can describe.
+        if self.fd_value_record_word(si, pi, 0).len() > 0: return true
         let rec = fd_record_pointee(p)
         rec.len() > 0 and modeled.contains(rec)
 
@@ -937,6 +1056,8 @@ impl CiProject:
     // The facade draft: what the proofs establish, every clause with its
     // proof beside it.
     mut fn facade_draft(name: &str) -> str:
+        // D198: which records have identity, before any parameter is judged.
+        self.fd_draw_identity_records()
         let modeled = self.fd_modeled_records()
         self.presented = List.new()
         var text = "// Facade draft for " ++ name ++ ", proven from the package's own source (§16.2b.15, D121).\n// Every clause records its proof; a project may override any single fact.\n"
@@ -979,7 +1100,10 @@ impl CiProject:
                 self.presented.push(si as i32)
                 blocks.push(si as i32)
                 let verdict = self.fd_lend_verdict(si as i32, modeled)
-                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n" ++ self.fd_registry_presentation_lines(si as i32)
+                // D198: an operation over value records alone lends no
+                // resource; its clauses are its item.
+                let lends = self.fd_takes_modeled_resource(si as i32, modeled)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ (if lends: "        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n" else: "") ++ self.fd_registry_presentation_lines(si as i32)
             else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
                 self.presented.push(si as i32)
                 blocks.push(si as i32)
@@ -1067,6 +1191,9 @@ impl CiProject:
             else if ret.len() > 0:
                 verdict = "raw: returns " ++ self.symbols[si].ret_ty ++ " unproven: " ++ self.symbols[si].own_reason
             else: verdict = self.fd_lend_verdict(si as i32, modeled)
+            // D198: an operation over value records says so, and one left raw
+            // for a record pointer says why it is no value record.
+            verdict = self.fd_value_record_verdict(si as i32, verdict, modeled)
             if verdict.starts_with("raw:"): raw = raw + 1 else: safe = safe + 1
             // The annotations the library ships, for the reader: nullability
             // ones are header facts c_import reads directly (§16.2b.8).
