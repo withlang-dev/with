@@ -21,10 +21,10 @@ c facade posix:
 
 fn open_and_forget() -> c_int:
     let fd = Fd.dup(1)
-    let probe = dup(fd.repr)
+    let probe = dup(unsafe { fd.repr })
     close(probe)
     print(f"live {if probe >= 0: 1 else: 0}")
-    fd.repr
+    unsafe { fd.repr }
 
 fn main:
     let raw = open_and_forget()

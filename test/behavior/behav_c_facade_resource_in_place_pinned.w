@@ -45,7 +45,7 @@ fn main:
     let misplaced = unsafe { calloc(1, 4) as *mut c_int }
     let (_, a) = Stream.init(ends, misplaced)
     print(f"ctor {check(a)}")
-    let p = a.repr.as_ptr()
+    let p = unsafe { a.repr }.as_ptr()
     let b = move a
     print(f"moved {check(b)} raw-across-move {unsafe { z_check(p) }}")
     var v: List[Stream] = List.new()

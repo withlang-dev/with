@@ -40,15 +40,15 @@ c facade dbl:
 
 fn scope() -> *mut db:
     let d = Database.new(1).unwrap()
-    d.repr
+    unsafe { d.repr }
 
 fn early(flag: bool) -> *mut db:
     let d = Database.new(2).unwrap()
-    if flag: return d.repr
+    if flag: return unsafe { d.repr }
     print("late")
-    d.repr
+    unsafe { d.repr }
 
-fn take(d: Database) -> *mut db: d.repr
+fn take(d: Database) -> *mut db: unsafe { d.repr }
 
 fn give() -> Database:
     let d = Database.new(3).unwrap()
@@ -60,16 +60,16 @@ fn main:
     let e2 = early(false)
     let m = take(Database.new(4).unwrap())
     let g = give()
-    let gp = g.repr
+    let gp = unsafe { g.repr }
     drop(g)
     var v: List[Database] = List.new()
     v.push(Database.new(5).unwrap())
     v.push(Database.new(6).unwrap())
-    let p5 = v[0].repr
-    let p6 = v[1].repr
+    let p5 = unsafe { v[0].repr }
+    let p6 = unsafe { v[1].repr }
     drop(v)
     let t = Texture.load("x")
-    let tok = t.repr
+    let tok = unsafe { t.repr }
     drop(t)
     // The observer reads each C object through its raw pointer: raw C.
     unsafe:

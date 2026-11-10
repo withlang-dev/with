@@ -49,7 +49,7 @@ fn read_back() -> c_int:
 
 fn main:
     match CHeapStr.strdup("hello"):
-        Some(s) => print(f"string {if s.repr != null: \"ok\" else: \"bad\"}")
+        Some(s) => print(f"string {if unsafe { s.repr } != null: \"ok\" else: \"bad\"}")
         None => print("string none")
     let ffd = read_back()
     print(f"file closed {closed(ffd)}")

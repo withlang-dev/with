@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.44
+# The With Programming Language — Specification v7.45
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.45:** D198 Amendment 3 (Eric, 2026-11-10, #3173). §16.2b.3: a field of a by-value or in-place resource's record is read through the resource (`image.width`); fields are not assigned through it; the record itself is `.repr`, under the raw C rules; a field named like a presented operation, or `repr`, is a facade error; a pointer resource has no such reads.
+
 **Changelog v7.44:** D198 amendments (Eric, 2026-11-10, #3173). §16.2b.5: a value record is flat, and each clause asserts the callee touches no memory but the record's own; "holds a pointer" is defined once, and a parameter passed by value whose type holds a pointer is a pointer parameter, raw unless a facade models that type; a by-value token's operations are what their imported names mean. §16.2b.15: a `c_import` of a header that resolves inside a fetched package applies that package's facade. §16.3, §19.2: assigning a C global whose type holds a pointer is raw; conversion to a function type from an integer, a pointer or another signature requires `unsafe`.
 
 **Changelog v7.43:** D198 (Eric, 2026-11-09, #3173, #3206). §16.2b.5: value records — a pointer parameter to one complete record that is not a resource's representation is described by `reads param N` (presented as `&T`), `fills param N` (the operation's result; `T.zeroed()` is passed) or `updates param N` (a `mut` parameter); each asserts no retention of the pointer or of any pointer derived from it; with no clause the parameter stays raw, `const` included. §16.2b.11: how the three are presented. §16.2b.3: a draft proposes an in-place init and drop pair only from a proof over the library's source, never from names. §16.2b.15: a facts file may state the role of a function-pointer field (`allocator`, `reallocator`, `deallocator`, `context`), one field per line with its citation; a role is never drawn from a field's name. The compiler is NON-COMPLIANT until it implements them.

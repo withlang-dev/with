@@ -32,10 +32,10 @@ static inline void db_close(db *d) { free(d); }
 static inline int db_count(db *d) { return d->n; }
 #define S_OK 0
 #define S_PARTIAL 3
-typedef struct stream { int state; } stream;
-static inline int stream_init(stream *s, int mode) { s->state = 10 + mode; return mode == 0 ? S_OK : mode == 1 ? S_PARTIAL : -1; }
-static inline void stream_end(stream *s) { s->state = 0; }
-static inline int stream_state(stream *s) { return s->state; }
+typedef struct stream { int st; } stream;
+static inline int stream_init(stream *s, int mode) { s->st = 10 + mode; return mode == 0 ? S_OK : mode == 1 ? S_PARTIAL : -1; }
+static inline void stream_end(stream *s) { s->st = 0; }
+static inline int stream_state(stream *s) { return s->st; }
 ")
 
 c facade several:

@@ -13,14 +13,14 @@
 // are read back after the resource is gone.
 
 use c_import("void *calloc(unsigned long count, unsigned long size);
-typedef struct { unsigned long state; float volume; } Snd;
-static inline Snd snd_load(const char* path) { Snd s; s.state = (unsigned long)calloc(4, sizeof(int)); s.volume = 1.0f; return s; }
+typedef struct { unsigned long state; float gain; } Snd;
+static inline Snd snd_load(const char* path) { Snd s; s.state = (unsigned long)calloc(4, sizeof(int)); s.gain = 1.0f; return s; }
 static inline void snd_unload(Snd s) { ((int*)s.state)[0]++; }
 static inline void snd_play(Snd s) { ((int*)s.state)[1]++; }
 static inline void snd_set_volume(Snd s, float v) { ((int*)s.state)[2] = (int)(v * 100.0f); }
 static inline int snd_valid(Snd s) { return s.state != 0; }
-static inline void snd_retune(Snd* s) { s->volume = 0.25f; ((int*)s->state)[3]++; }
-static inline float snd_volume(const Snd* s) { return s->volume; }
+static inline void snd_retune(Snd* s) { s->gain = 0.25f; ((int*)s->state)[3]++; }
+static inline float snd_volume(const Snd* s) { return s->gain; }
 static inline int snd_count(Snd s, int i) { return ((int*)s.state)[i]; }
 ")
 
@@ -59,7 +59,7 @@ fn main:
     clip.play()
     clip.retune()
     assert(clip.level() == 0.25)
-    let tok = clip.repr
+    let tok = unsafe { clip.repr }
     drop(clip)
     print(f"{snd_count(tok, 0)} {snd_count(tok, 1)} {snd_count(tok, 2)} {snd_count(tok, 3)}")
     print("ok")
