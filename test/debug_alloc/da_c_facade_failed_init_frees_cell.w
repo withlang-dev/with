@@ -10,13 +10,13 @@
 use c_import("void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
 #define Z_OK 0
-typedef struct { int* n; } Counter;
-static inline Counter counter_new(void) { Counter c; c.n = (int*)calloc(1, sizeof(int)); return c; }
-static inline int counter_get(Counter c) { return *c.n; }
-static inline void counter_free(Counter c) { free(c.n); }
+typedef struct { unsigned long n; } Counter;
+static inline Counter counter_new(void) { Counter c; c.n = (unsigned long)calloc(1, sizeof(int)); return c; }
+static inline int counter_get(Counter c) { return *(int*)c.n; }
+static inline void counter_free(Counter c) { free((void*)c.n); }
 typedef struct { int state; Counter ends; } z_stream;
 static inline int z_init(z_stream* s, Counter ends, int fail) { s->ends = ends; if (fail) { return -3; } s->state = 7; return Z_OK; }
-static inline void z_end(z_stream* s) { *s->ends.n = *s->ends.n + 1; s->state = 0; }
+static inline void z_end(z_stream* s) { *(int*)s->ends.n = *(int*)s->ends.n + 1; s->state = 0; }
 ")
 
 c facade zl:
