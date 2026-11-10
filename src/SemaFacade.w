@@ -64,7 +64,19 @@ impl Sema:
             if not rendered.starts_with(prefix) or not self.facade_decl_file_name(di).starts_with("<facade "): continue
             let cname = rendered.slice(prefix.len(), rendered.len())
             let csym = self.pool_lookup_symbol(cname)
-            if csym != 0 and not self.facade_bridge_of.contains(cname):
+            if csym == 0 or self.facade_bridge_of.contains(cname): continue
+            // The operation's resource: a by-value token whose record holds
+            // a pointer makes its C functions pointer functions (§16.2b.5),
+            // and the resource is what their names then mean. A token that
+            // holds none keeps them as they are.
+            var token: isize = -1
+            var ri: isize = 0
+            for r in self.facade_resources:
+                if self.facade_same_fn(r.drop, csym) or r.producers.contains(csym): token = ri
+                ri += 1
+            let hosts = self.facade_method_host(csym)
+            if token < 0 and hosts.len() == 1: token = hosts[0]
+            if token >= 0 and self.pointer_holding_part(self.facade_resources[token].repr_tid, "").len() > 0:
                 self.facade_bridge_of.insert(cname.to_owned(), rendered)
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an

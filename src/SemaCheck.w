@@ -12768,9 +12768,15 @@ impl Sema:
                 let used = if used_idx >= 0: self.unsafe_scope_used[used_idx] else: 0
                 self.unsafe_scope_used.pop()
                 self.unsafe_scope_nodes.pop()
-                if unsafe_result != 0 and used == 0:
+                // A facade's rendering wraps every C call it makes: whether
+                // that call is raw is Sema's fact (ci_function_requires_raw_abi),
+                // not the renderer's to derive again from the declaration's
+                // text, so an `unsafe` there that turns out unneeded is no
+                // error.
+                let rendered = self.current_file_is_generated("<facade ")
+                if unsafe_result != 0 and used == 0 and not rendered:
                     self.emit_error("unsafe block contains no unsafe operations", node)
-                else if unsafe_result != 0 and used == 2:
+                else if unsafe_result != 0 and used == 2 and not rendered:
                     // Late generic bodies use completed facts immediately;
                     // ordinary bodies leave this verdict to the module pass.
                     if self.unsafe_global_scopes_resolved != 0:
