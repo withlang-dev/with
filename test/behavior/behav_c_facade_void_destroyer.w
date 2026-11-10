@@ -39,19 +39,19 @@ c facade dbl:
 
 fn main:
     let a = Database.new(1).unwrap()
-    let pa = a.repr
+    let pa = unsafe { a.repr }
     drop(a)
     unsafe { print(f"mut {db_closed(pa)}") }
     let v = View.new_const(2).unwrap()
-    let pv = v.repr
+    let pv = unsafe { v.repr }
     drop(v)
     unsafe { print(f"const {db_closed(pv)}") }
     let l = Alias.new_alias(3).unwrap()
-    let pl = l.repr
+    let pl = unsafe { l.repr }
     drop(l)
     unsafe { print(f"alias {db_closed(pl)}") }
     let d = Database.new(4).unwrap()
-    let pd = d.repr
+    let pd = unsafe { d.repr }
     let how = d.release_how(7)
     unsafe { print(f"destroys {how} {db_closed(pd)}") }
     print("ok")

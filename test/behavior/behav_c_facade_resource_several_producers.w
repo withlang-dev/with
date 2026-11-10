@@ -24,10 +24,10 @@ c facade dbl:
 
 fn main:
     let a = Database.new(1).unwrap()
-    let pa = a.repr
+    let pa = unsafe { a.repr }
     drop(a)
     let b = Database.new_named("x").unwrap()
-    let pb = b.repr
+    let pb = unsafe { b.repr }
     drop(b)
     unsafe:
         print(f"first {db_closed(pa)}")

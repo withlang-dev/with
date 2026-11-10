@@ -118,9 +118,29 @@ impl Sema:
         if not self.facade_resource_rendered(ri):
             self.emit_error(f"handle '{hname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.9)", node)
 
+    // D198 (§16.2b.3): a field of the record is read through the resource,
+    // so a field that has the name of an operation the facade presents on
+    // the resource, or the name `repr`, is two meanings for one spelling.
+    // Neither wins: the facade renames one. "" when there is no clash.
+    fn facade_field_read_clash(ri: isize) -> str:
+        let record = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId) as i32
+        if self.get_type_kind(record as TypeId) != TypeKind.TY_STRUCT: return ""
+        let ops = facade_render_presented_ops(self.ast, self.pool, self.decl_is_c_import, self.facade_resources[ri].node)
+        let te_start = self.get_type_d1(record as TypeId)
+        for fi in 0..self.get_type_d2(record as TypeId):
+            let fname = self.pool_resolve(self.type_extra[(te_start + fi * 3)])
+            if fname == "repr" or fname == "live": return f"its record has a field named '{fname}', which the resource keeps for itself"
+            for op in ops:
+                if self.facade_presented(ri, op) == fname: return f"its record's field '{fname}' and the operation '{op}', presented as '{fname}', would both be `x.{fname}`"
+        ""
+
     mut fn verify_facade_resource(ri: isize) -> bool:
         let rname = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
+        let clash = self.facade_field_read_clash(ri)
+        if clash.len() > 0:
+            self.emit_error_with_help(f"resource '{rname}': {clash}; a field of the record is read through the resource (§16.2b.3)", node, "state `rename` on the operation, or leave the record unwrapped")
+            return false
         let producer_count = self.facade_resources[ri].producers.len()
         let producer = if producer_count > 0: self.facade_resources[ri].producers[0] else: 0
         let init_fn = self.facade_resources[ri].init

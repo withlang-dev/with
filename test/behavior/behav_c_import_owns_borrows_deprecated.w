@@ -22,7 +22,7 @@ int closedir(DIR *dirp);
 
 fn main:
     match CwdOwned.cwd_owned():
-        Some(c) => print(f"cwd {if c.repr != null: \"ok\" else: \"bad\"}")
+        Some(c) => print(f"cwd {if unsafe { c.repr } != null: \"ok\" else: \"bad\"}")
         None => print("cwd none")
     let d = CDir.opendir(".").unwrap()
     print(f"tell {if d.telldir() >= 0: \"ok\" else: \"bad\"}")

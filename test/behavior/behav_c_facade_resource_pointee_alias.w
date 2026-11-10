@@ -21,7 +21,7 @@ c facade h:
 
 fn main:
     let o = Owned.open().unwrap()
-    let p = o.repr
+    let p = unsafe { o.repr }
     drop(o)
     unsafe { print(f"closed {handle_closed(p)}") }
     print("ok")

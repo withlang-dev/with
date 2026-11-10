@@ -301,7 +301,7 @@ fn facade_render_public(text: &str) -> str:
         let line = text.slice(start, end)
         // A generic impl (`impl[Origin] BorrowedR[Origin]:`, D134) is an
         // impl too.
-        if line.starts_with("impl Drop for ") or line.starts_with("impl[Origin] Drop for "): in_drop = true
+        if line.starts_with("impl Drop for ") or line.starts_with("impl[Origin] Drop for ") or line.starts_with("impl Deref["): in_drop = true
         else if line.starts_with("impl ") or line.starts_with("impl["): in_drop = false
         var shown = line
         if line.starts_with("type ") or line.starts_with("error ") or line.starts_with("fn "):
@@ -1368,6 +1368,12 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             // The retaining origin never outlives what it retains (§25):
             // the destroyer has run; now the retained values are released.
             out = out ++ "        for facade_i in 0..self.retained_ptrs.len():\n            let facade_free = self.retained_frees[facade_i]\n            facade_free(self.retained_ptrs[facade_i])\n"
+    // D198 (§16.2b.3): a field of a by-value or in-place resource's record is
+    // read through the resource (`image.width`). Field lookup follows this
+    // `Deref` to the record; nothing is assigned through it, and the record
+    // itself is `.repr`, under the raw C rules.
+    if facade_render_is_record(pool, intern, repr_text):
+        out = out ++ "impl Deref[" ++ repr_text ++ "] for " ++ name ++ ":\n    fn deref(self: &Self) -> &" ++ repr_text ++ ": " ++ (if pinned: "self.repr.as_ref()" else: "&self.repr") ++ "\n"
     if destroyers.len() > 0 or methods.len() > 0:
         out = out ++ "impl " ++ name ++ ":\n" ++ methods
         for destroyer in destroyers:
@@ -3008,6 +3014,20 @@ fn facade_render_is_raw(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
         let p = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId))
         if p != "*const i8" and p != "*const c_char" and (facade_render_type_is_raw(p) or facade_render_type_holds_pointer(pool, intern, p, 0)):
             return true
+    false
+
+// Whether `text` names a record (a struct or union declaration): the
+// representation of a by-value or in-place resource whose fields a program
+// reads. A pointer, an integer token (`Fd wraps c_int`) or an opaque type
+// has none.
+fn facade_render_is_record(pool: &AstPool, intern: &InternPool, text: &str) -> bool:
+    let t = facade_render_unalias(pool, intern, text)
+    if t.starts_with("*") or t.starts_with("[") or t.starts_with("&"): return false
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_TYPE_DECL or intern.resolve(pool.get_data0(decl)) != t: continue
+        let sub = pool.get_data2(decl) % 8
+        return (sub == TypeDeclKind.Struct as i32 or sub == TypeDeclKind.Union as i32) and pool.get_extra(pool.get_data1(decl)) > 0
     false
 
 var g_facade_holds_pool: i64 = 0

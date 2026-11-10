@@ -22395,6 +22395,13 @@ impl Sema:
             return 0
 
         let field_base = self.auto_deref_field_type(obj_type, field, node, expr)
+        // D198 (§16.2b.3): the record a resource wraps is reached as `.repr`,
+        // under the raw C rules; its fields are read through the resource.
+        if self.pool_resolve(field) == "repr":
+            let rendering = self.facade_rendered_file_of(field_base as i32)
+            if rendering.len() > 0 and self.facade_current_file_name() != rendering:
+                if self.require_unsafe_operation(f"the representation of '{self.type_name(field_base as i32)}' is reached as `.repr` under the raw C rules and requires unsafe context; a field of its record is read through the resource, as `x.field` (§16.2b.3)", node) == false:
+                    return 0
         if self.type_is_raw_pointer_value(obj_type as i32):
             self.note_raw_pointer_validity_precondition(expr)
             if self.type_is_compiler_handle_state_pointer(obj_type as i32) == false and sema_path_is_migrated_regex_implementation(self.current_module_path) == false and self.require_unsafe_operation("raw pointer field access requires unsafe context", node) == false:

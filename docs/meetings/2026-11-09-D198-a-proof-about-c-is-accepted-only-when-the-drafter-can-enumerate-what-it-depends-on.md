@@ -186,3 +186,33 @@ result with a pointer field).
 
 **What would reopen it.** A by-value record whose pointer fields the
 checker can prove C never follows; a field-level model.
+
+## Amendment 3 (Eric, 2026-11-10): reading a resource's fields
+
+**Ruled: reads look through the wrapper** (`image.width`), for by-value and
+in-place resources. The record does not become the resource: that would make
+`Image` non-copyable inside translated C bodies, which breaks the corpora for
+the same reads.
+
+1. `.repr` is the raw spelling and needs `unsafe`. Left readable it was a
+   second spelling for one read, it made the compiler's own diagnostic false
+   ("under the raw C rules"), and `let raw = image.repr` copied out a second
+   handle to the same buffer. It is also the answer to "how is raw access
+   spelled": `unsafe` never changes what `UnloadImage` resolves to.
+2. A record field with the name of a presented operation, or `repr`, is a
+   facade error until one is renamed. Neither silently wins.
+3. A read-through obeys the rules of the field it reads.
+4. A consumed resource has no fields: the ordinary use-after-move error.
+5. In-place resources: yes. A read sees what C last wrote during a call; a
+   library that keeps the pointer and writes from another thread makes the
+   facade false, not the read.
+6. Pointer resources: excluded. Reading through one is a claim about C's
+   memory and needs its own clause.
+
+**How it is built.** The facade renders `impl Deref[Record] for R`; field
+lookup already follows `Deref`, a bare `*x` does not, and nothing is assigned
+through the resource (the existing refusal of writes to a facade-rendered
+type's places).
+
+**What would reopen it.** A clause that lets a program read through a pointer
+resource; a field-level model of pointer fields.

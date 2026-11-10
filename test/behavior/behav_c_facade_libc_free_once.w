@@ -19,12 +19,12 @@ fn size(p: *const c_void) -> u64: unsafe { malloc_size(p) }
 
 fn main:
     let a = CHeapStr.strdup("hello").unwrap()
-    let pa = a.repr as *const c_void
+    let pa = unsafe { a.repr } as *const c_void
     let la = if size(pa) > 0: 1 else: 0
     drop(a)
     print(f"strdup live {la} freed {if size(pa) == 0: 1 else: 0}")
     let b = CHeapStr.strndup("hello", 2).unwrap()
-    let pb = b.repr as *const c_void
+    let pb = unsafe { b.repr } as *const c_void
     let lb = if size(pb) > 0: 1 else: 0
     drop(b)
     print(f"strndup live {lb} freed {if size(pb) == 0: 1 else: 0}")

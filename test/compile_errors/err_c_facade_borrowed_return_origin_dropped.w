@@ -23,4 +23,4 @@ fn main:
     let s = Statement.new(db, 10).unwrap()
     let handle = s.db().unwrap()
     drop(s)
-    print(f"{handle.repr == null}")
+    print(f"{unsafe { handle.repr } == null}")

@@ -3352,6 +3352,12 @@ impl Sema:
             let name = self.pool_resolve(type_name)
             self.emit_warning(f"large Copy type '{name}' is {size} bytes; implicit copies may be expensive (copy_warn_threshold={threshold})", node)
 
+    fn impl_and_type_share_a_file(impl_node: i32, type_tid: i32) -> bool:
+        if type_tid <= 0 or not self.type_decl_nodes_by_tid.contains(type_tid): return false
+        let impl_di = self.find_decl_index(impl_node)
+        let type_di = self.find_decl_index(self.type_decl_nodes_by_tid.get(type_tid).unwrap())
+        impl_di >= 0 and type_di >= 0 and impl_di < self.decl_source_file_ids.len() and type_di < self.decl_source_file_ids.len() and self.decl_source_file_ids[impl_di] == self.decl_source_file_ids[type_di]
+
     mut fn collect_impl_decl(node: i32, is_local_impl: bool):
         let type_name = self.ast.get_data0(node)
         let trait_sym = self.ast.get_data2(node)
@@ -3376,7 +3382,11 @@ impl Sema:
         // Orphan rule: only enforced for local (user) impls, not prelude/imported
         if is_local_impl:
             let trait_is_local = self.local_trait_names.contains(trait_sym) or is_lang_trait
-            let type_is_local = self.local_type_names.contains(type_name)
+            // A type declared in the file the impl is in is local to it. The
+            // positional count above cuts through a facade's rendering,
+            // which is spliced in after the root's declarations: an impl
+            // there was local while the type rendered just before it was not.
+            let type_is_local = self.local_type_names.contains(type_name) or self.impl_and_type_share_a_file(node, declared_target)
             if not trait_is_local and not type_is_local:
                 self.emit_error_code("orphan rule violation: impl requires a local trait or local type", node, "E1101")
                 return

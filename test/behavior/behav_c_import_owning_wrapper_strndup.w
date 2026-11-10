@@ -15,5 +15,5 @@ void free(void *p);
 
 fn main:
     let short = CHeapStr.strndup("hello", 3).unwrap()
-    print(f"strndup {strlen(short.repr as *const c_char)}")
+    print(f"strndup {strlen(unsafe { short.repr } as *const c_char)}")
     print("ok")
