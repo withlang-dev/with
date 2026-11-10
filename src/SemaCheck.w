@@ -12040,7 +12040,7 @@ impl Sema:
         if self.fn_symbol_is_unsafe(fn_sym) and not presented:
             return "unsafe function call requires unsafe context"
         if self.fn_symbol_is_raw_c_import(fn_sym):
-            return "raw c_import function call requires unsafe context"
+            return "raw c_import function call requires unsafe context" ++ self.by_value_pointer_param_note(fn_sym)
         if self.fn_symbol_is_manual_extern(fn_sym):
             let name = self.pool_resolve(fn_sym)
             // D30: a program declaring the compiler's runtime by hand is told
@@ -12048,6 +12048,27 @@ impl Sema:
             if sema_name_is_compiler_abi_extern(name) and sema_path_is_user_lint_source(self.current_module_path):
                 return f"manual extern function call requires unsafe context; '{name}' is the compiler's own runtime (D30), not an interface for programs: call the std API that wraps it"
             return "manual extern function call requires unsafe context"
+        ""
+
+    // D198 (§16.2b.5): when what makes `fn_sym` raw is a parameter passed by
+    // value whose type holds a pointer, the diagnostic names the function,
+    // the type, the pointer and the fix, and says when a fetched package's
+    // facade is applied and does not model the type. "" otherwise.
+    fn by_value_pointer_param_note(fn_sym: i32) -> str:
+        let sig_idx = self.get_sig(fn_sym)
+        if sig_idx < 0: return ""
+        for pi in 0..self.sig_get_param_count(sig_idx):
+            let pty = self.sig_param_type(sig_idx, pi)
+            if self.ci_type_requires_raw_contract(pty): return ""
+            let held = self.pointer_holding_part(pty, "")
+            if held.len() == 0: continue
+            let ty = self.type_name(pty)
+            var applied = ""
+            for di in 0..self.ast.decl_count():
+                if self.ast.kind(self.ast.get_decl(di)) != NodeKind.NK_C_FACADE or di >= self.decl_source_paths.len(): continue
+                let path = self.decl_source_paths[di].replace("\\", "/")
+                if path.contains("/.with/deps/c/") or path.starts_with(".with/deps/c/"): applied = f"; the facade of {self.pool_resolve(self.ast.get_data0(self.ast.get_decl(di)))} ({path}) is applied and does not model `{ty}`"
+            return f": `{self.pool_resolve(fn_sym)}` takes `{ty}` by value, and {held} is a pointer; model `{ty}` as a resource or call it in `unsafe`{applied}"
         ""
 
     // The module being checked declared this extern itself (#1695): its own
@@ -12112,7 +12133,7 @@ impl Sema:
             return true
         let param_count = self.sig_get_param_count(sig_idx)
         for pi in 0..param_count:
-            if self.ci_type_requires_raw_contract(self.sig_param_type(sig_idx, pi)):
+            if self.ci_param_requires_raw_contract(self.sig_param_type(sig_idx, pi)):
                 return true
         false
 
@@ -12643,6 +12664,17 @@ impl Sema:
                 if src_kind == TypeKind.TY_PTR and (cast_kind == TypeKind.TY_REF or cast_kind == TypeKind.TY_SLICE):
                     self.note_raw_pointer_validity_precondition(self.ast.get_data0(node))
                     if self.require_unsafe_operation("raw pointer to safe memory abstraction conversion requires unsafe context", node) == false:
+                        return 0 as TypeId
+                // D198: a function value is called without `unsafe`, so the
+                // cast that makes one from an integer, a pointer or a function
+                // of another signature is where its address is trusted. An
+                // `unsafe fn` type is called in `unsafe`, so a cast to one
+                // trusts nothing yet.
+                // A header's translation is C itself: its sentinels
+                // (`SQLITE_STATIC`, `SIG_IGN`) are C's constants, typed
+                // `unsafe fn` by the translation.
+                if (cast_kind == TypeKind.TY_FN or cast_kind == TypeKind.TY_EXTERN_FN) and src_resolved != cast_resolved and not self.fn_type_is_unsafe(cast_resolved as i32) and not self.current_file_is_generated("<c_import ") and (src_kind == TypeKind.TY_INT or src_kind == TypeKind.TY_PTR or src_kind == TypeKind.TY_FN or src_kind == TypeKind.TY_EXTERN_FN):
+                    if self.require_unsafe_operation(f"conversion of `{self.type_name(src_tid as i32)}` to the function type `{self.type_name(cast_tid as i32)}` requires unsafe context: the result is called without `unsafe`", node) == false:
                         return 0 as TypeId
                 let cast_result = self.classify_cast_ownership(node, src_node, src_tid as i32, cast_tid as i32)
                 if cast_result != cast_tid as i32:
@@ -20467,6 +20499,12 @@ impl Sema:
         // Check mutability
         if self.ast.kind(target) == NodeKind.NK_IDENT:
             let target_sym = self.ast.get_data0(target)
+            // D198 (§16.3): C reads a global's pointer as its own; assigning
+            // one whose type holds a pointer is a raw operation.
+            if self.binding_decl_node(target_sym) == 0 and self.extern_var_texts.contains(self.pool_resolve(target_sym)):
+                let held = self.pointer_holding_part(target_type as i32, "")
+                if held.len() > 0 and self.require_unsafe_operation(f"assigning the C global `{self.pool_resolve(target_sym)}` requires unsafe context: its type holds a pointer, which C follows", node) == false:
+                    return 0
             if self.scope_has(target_sym):
                 if self.scope_lookup_mut(target_sym) == 0:
                     // mut.md Rev 8 §15.12 — when the immutable binding is

@@ -10,12 +10,12 @@
 
 use c_import("void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
-typedef struct { int* n; } Counter;
+typedef struct { unsigned long n; } Counter;
 typedef struct db { Counter c; } db;
-static inline Counter counter_new(void) { Counter c; c.n = (int*)calloc(1, sizeof(int)); return c; }
-static inline int counter_get(Counter c) { return *c.n; }
+static inline Counter counter_new(void) { Counter c; c.n = (unsigned long)calloc(1, sizeof(int)); return c; }
+static inline int counter_get(Counter c) { return *(int*)c.n; }
 static inline db* db_new(Counter c, int id) { if (id < 0) return 0; db* d = (db*)malloc(sizeof(db)); d->c = c; return d; }
-static inline void db_close(db* d) { (*d->c.n)++; }
+static inline void db_close(db* d) { (*(int*)d->c.n)++; }
 ")
 
 c facade dbl:

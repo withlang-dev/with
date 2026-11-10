@@ -143,3 +143,46 @@ the receiver only when the operation is presented as a method of `T`.
 **Status of the implementation: NON-COMPLIANT** until the drafter writes
 the three clauses from proofs, the facade checker and renderer accept and
 present them, and the facts grammar reads the four field roles.
+
+## Amendment 2 (Eric, 2026-11-10): a type that holds a pointer
+
+**What was found.** A true `reads` clause still let safe code crash C:
+`Span { items: 4096 as *const i32, n: 1 }` passed to a callee that follows
+`items`. Running every route by which a user's raw pointer reaches C (the
+matrix on #3173) showed the clause was the small case: a record passed **by
+value** needed no facade at all, and a record C produced could be copied and
+destroyed twice with no forged pointer.
+
+**Ruled.**
+
+1. A value record is flat (unions and nested records included); `fills` is
+   under the same rule; each clause also asserts the callee touches no
+   memory but the record's own, so an address carried as an integer is a
+   false facade (§16.2b.13), not a gap in the rule.
+2. By value, the call is the gate and the only gate: a parameter passed by
+   value whose type holds a pointer is a pointer parameter, raw unless a
+   facade models that type. Gating construction of such a record was
+   refused: it is a second rule over the same fact, and it leaves the
+   double destroy open. Returning such a record stays safe.
+3. A facade applies through any import of its header: its facts belong to
+   the symbol. The match is by resolved file; disagreement fails loudly;
+   both routes see one set of types; the applied facade is visible.
+4. `unsafe` never changes what a name resolves to. A by-value token's
+   operations are what their imported names mean.
+5. Conversion to a function type from an integer, a pointer or another
+   signature requires `unsafe` (not refused: `dlsym`, `SIG_IGN`,
+   `SQLITE_TRANSIENT` need it). Assigning a C global whose type holds a
+   pointer is raw; whether safe code should write any C global is a
+   separate question, filed, not folded in.
+6. The drafter never learns `Load*`/`Unload*`: a by-value pair comes from a
+   proof, from cited registry facts, or from an adopted profile.
+
+**Why a wrapper and not the record itself.** The resource is
+`{ repr: Image, live }`, so `image.width` is not readable through it. Making
+the record itself the resource keeps the fields and lets safe code write
+`image.data`, which is the hole the rule closes. Reopen when pointer fields
+can be modeled one by one (a `name` field as a borrowed `CStr`, a `fills`
+result with a pointer field).
+
+**What would reopen it.** A by-value record whose pointer fields the
+checker can prove C never follows; a field-level model.

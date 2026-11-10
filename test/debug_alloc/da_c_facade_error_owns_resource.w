@@ -20,10 +20,10 @@ use c_import("void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
 #define DB_OK 0
-typedef struct { int* n; } Counter;
-static inline Counter counter_new(void) { Counter c; c.n = (int*)calloc(1, sizeof(int)); return c; }
-static inline int counter_get(Counter c) { return *c.n; }
-static inline void counter_free(Counter c) { free(c.n); }
+typedef struct { unsigned long n; } Counter;
+static inline Counter counter_new(void) { Counter c; c.n = (unsigned long)calloc(1, sizeof(int)); return c; }
+static inline int counter_get(Counter c) { return *(int*)c.n; }
+static inline void counter_free(Counter c) { free((void*)c.n); }
 typedef struct db { int tag; Counter closes; } db;
 static inline int db_open(Counter closes, int mode, db** out) {
     if (mode == 1) { return 5; }
@@ -32,7 +32,7 @@ static inline int db_open(Counter closes, int mode, db** out) {
     if (mode == 2) { return 14; }
     return DB_OK;
 }
-static inline void db_close(db* d) { *d->closes.n = *d->closes.n + 1; free(d); }
+static inline void db_close(db* d) { *(int*)d->closes.n = *(int*)d->closes.n + 1; free(d); }
 static inline int db_tag(db* d) { return d->tag; }
 ")
 

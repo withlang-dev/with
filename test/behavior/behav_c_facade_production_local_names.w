@@ -15,15 +15,15 @@
 use c_import("void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
-typedef struct { int* closes; } Counter;
+typedef struct { unsigned long closes; } Counter;
 typedef struct db { Counter c; int tag; } db;
-static inline Counter counter_new(void) { Counter c; c.closes = (int*)calloc(1, sizeof(int)); return c; }
-static inline int counter_closes(Counter c) { return *c.closes; }
-static inline void counter_free(Counter c) { free(c.closes); }
+static inline Counter counter_new(void) { Counter c; c.closes = (unsigned long)calloc(1, sizeof(int)); return c; }
+static inline int counter_closes(Counter c) { return *(int*)c.closes; }
+static inline void counter_free(Counter c) { free((void*)c.closes); }
 static inline db* db_new(Counter c, int repr) { db* d = (db*)malloc(sizeof(db)); d->c = c; d->tag = repr; return d; }
 static inline int db_open(Counter c, int status, db** slot) { db* d = (db*)malloc(sizeof(db)); d->c = c; d->tag = status; *slot = d; return 0; }
 static inline int db_tag(db* d) { return d->tag; }
-static inline void db_close(db* d) { *d->c.closes = *d->c.closes + 1; free(d); }
+static inline void db_close(db* d) { *(int*)d->c.closes = *(int*)d->c.closes + 1; free(d); }
 typedef struct { int tag; int* ends; } z_stream;
 static inline int z_init(z_stream* s, int* ends, int repr, int status) { s->ends = ends; s->tag = repr + status; return 0; }
 static inline int z_tag(const z_stream* s) { return s->tag; }

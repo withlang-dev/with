@@ -2771,7 +2771,7 @@ impl Sema:
             if ci >= 0 and self.facade_contract_pairs(ci, pi):
                 continue
             let pty = self.sig_param_type(sig, pi)
-            if self.ci_type_requires_raw_contract(pty) and self.ci_type_is_const_c_string_input(pty) == false and not self.facade_param_is_text(fn_sym, pi) and not self.facade_covers_param(fn_sym, pi):
+            if self.ci_param_requires_raw_contract(pty) and self.ci_type_is_const_c_string_input(pty) == false and not self.facade_param_is_text(fn_sym, pi) and not self.facade_covers_param(fn_sym, pi):
                 return true
         false
 
@@ -3294,7 +3294,7 @@ impl Sema:
             if pi == out_param or self.facade_contract_pairs(ci, pi) or self.facade_contract_models_param(ci, pi) or self.facade_contract_nullable_param(ci, pi):
                 continue
             let pty = self.sig_param_type(sig, pi)
-            if self.ci_type_requires_raw_contract(pty) == false or self.ci_type_is_const_c_string_input(pty) or self.facade_param_is_text(fn_sym, pi):
+            if self.ci_param_requires_raw_contract(pty) == false or self.ci_type_is_const_c_string_input(pty) or self.facade_param_is_text(fn_sym, pi):
                 continue
             // A parameter that receives a modeled resource is reached through
             // the resource — the receiver, or a borrow `&P` (a shape a borrow

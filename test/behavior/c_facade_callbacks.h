@@ -13,13 +13,17 @@ void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
 
-typedef struct { int *n; int *ev; } Log;
-static inline Log log_new(void) { Log l; l.n = (int *)calloc(1, sizeof(int)); l.ev = (int *)calloc(64, sizeof(int)); return l; }
-static inline void log_free(Log l) { free(l.n); free(l.ev); }
-static inline void log_push(Log l, int e) { if (*l.n < 64) { l.ev[*l.n] = e; *l.n = *l.n + 1; } }
-static inline int log_len(Log l) { return *l.n; }
-static inline int log_at(Log l, int i) { return l.ev[i]; }
-static inline void log_reset(Log l) { *l.n = 0; }
+/* The log is named by a flat record: the addresses of its storage, as
+ * integers. A record passed by value that held the pointers themselves
+ * would make every function taking it a pointer function (D198,
+ * spec 16.2b.5), and the fixtures pass the log from safe code. */
+typedef struct { unsigned long n; unsigned long ev; } Log;
+static inline Log log_new(void) { Log l; l.n = (unsigned long)calloc(1, sizeof(int)); l.ev = (unsigned long)calloc(64, sizeof(int)); return l; }
+static inline void log_free(Log l) { free((void *)l.n); free((void *)l.ev); }
+static inline void log_push(Log l, int e) { int *n = (int *)l.n; int *ev = (int *)l.ev; if (*n < 64) { ev[*n] = e; *n = *n + 1; } }
+static inline int log_len(Log l) { return *(int *)l.n; }
+static inline int log_at(Log l, int i) { return ((int *)l.ev)[i]; }
+static inline void log_reset(Log l) { *(int *)l.n = 0; }
 
 typedef int (*db_cb)(void *ud, int n);
 typedef void (*db_dtor)(void *ud);
