@@ -2089,6 +2089,10 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
         project.registry_utf8 = with_str_clone_ref(registry.utf8_cite)
         project.registry_value_text = with_str_clone_ref(registry.value_text)
         for name in registry.value_fns: project.registry_value_fns.push(name)
+        for (field, role) in registry.field_roles:
+            let dot = field.find(".")
+            project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is " ++ facts_kind(role) ++ "    // registry: " ++ facts_cite(role) ++ "\n"
+            project.field_roles.insert(field, role)
         for si in 0..project.symbols.len():
             if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
             project.symbols[si].registry = registry.of(project.symbols[si].name)
@@ -2110,7 +2114,7 @@ fn ci_facade_umbrella_of(rel: &str, import_dirs: &List[str], defines: &List[str]
                 if t.starts_with("#") and t.contains("include") and (t.contains(base ++ "\"") or t.contains(base ++ ">")): names = true
             if not names: continue
             let candidate = path.slice(dir.len() + 1, path.len())
-            if process_c_import_with_defines(candidate, defines).len() == 0: continue
+            if process_c_import_with_defines(candidate, defines).len() == 0 and c_import_last_error().len() > 0: continue
             for included in c_import_included_files().split("\n"):
                 if included.ends_with("/" ++ rel): return path.to_owned()
     ""
@@ -2196,8 +2200,13 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
             // does not compile alone (raylib's rcamera.h uses raylib.h's
             // types without including it) cannot be imported either.
             if not header_alone.contains(rel):
-                let imports = process_c_import_with_defines(rel, defines).len() > 0
+                // The translation's text says nothing: the translator emits
+                // each declaration once per process, so a header already
+                // translated (a second package, a second draft) comes back
+                // empty. The error is the verdict.
+                let translated = process_c_import_with_defines(rel, defines)
                 let why = c_import_last_error()
+                let imports = translated.len() > 0 or why.len() == 0
                 header_alone.insert(rel.to_owned(), imports)
                 // Such a header is still imported through the header that
                 // includes it (liblzma's lzma/base.h through lzma.h): the

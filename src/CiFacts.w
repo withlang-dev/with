@@ -52,6 +52,9 @@ type Facts {
     pub value_text: str,
     pub value_fns: List[str],
     pub value_resources: List[str],
+    // §16.2b.15: the role of a function-pointer field, one per line:
+    // `Record.field` and `role|Record|cite`.
+    pub field_roles: List[(str, str)],
 }
 
 /// Whether `kind` is a presentation fact (a parameter's or a return's
@@ -112,7 +115,7 @@ fn facts_read_file(path: &str) -> Result[Facts, str]:
     facts_read(path, source)
 
 fn facts_read(path: &str, source: str) -> Result[Facts, str]:
-    let facts = Facts { package: "", entries: List.new(), utf8_cite: "", value_text: "", value_fns: [], value_resources: [] }
+    let facts = Facts { package: "", entries: List.new(), utf8_cite: "", value_text: "", value_fns: [], value_resources: [], field_roles: [] }
     var in_value = false
     var current_fn = ""
     var in_resource = false
@@ -153,6 +156,14 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         let cite = parts[1]
         if cite.len() == 0: return Err(facts_error(path, line_no, "a fact needs its citation after `//`: the source line or document that proves it"))
         if cite.contains("|"): return Err(facts_error(path, line_no, "a citation cannot hold `|`"))
+        if clause.starts_with("field "):
+            // `field F of R is allocator|reallocator|deallocator|context`
+            let words = clause.fields()
+            if words.len() != 6 or words[2] != "of" or words[4] != "is" or not (words[5] == "allocator" or words[5] == "reallocator" or words[5] == "deallocator" or words[5] == "context"): return Err(facts_error(path, line_no, "a field's role is `field F of R is allocator`, `reallocator`, `deallocator` or `context`"))
+            in_resource = false
+            current_fn = ""
+            facts.field_roles.push((words[3] ++ "." ++ words[1], words[5] ++ "|" ++ words[3] ++ "|" ++ cite))
+            continue
         if clause == "text utf8" and not in_resource and current_fn.len() == 0:
             if facts.utf8_cite.len() > 0: return Err(facts_error(path, line_no, "`text utf8` is stated twice"))
             facts.utf8_cite = cite
