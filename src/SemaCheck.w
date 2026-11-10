@@ -12143,7 +12143,13 @@ impl Sema:
         let fn_name = self.pool_resolve(fn_sym)
         if sema_extern_is_compiler_implementation(fn_name, self.current_module_path):
             return false
-        if sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)):
+        // #3218: a header's translation declares the functions it is built
+        // on (`extern fn with_alloc`) once per compilation. From a second
+        // module's translation the name's first declaration is the
+        // runtime's own, and judging the call by that path made it a safe
+        // runtime call: the translation's `unsafe { with_alloc(…) }` was
+        // refused as vacuous. Inside a translation the call is C's.
+        if not self.current_file_is_generated("<c_import ") and sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)):
             return false
         if self.ci_raw_syms.contains(fn_sym):
             return true
@@ -14944,7 +14950,18 @@ impl Sema:
                 let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
                 let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
                 if arg_count >= 1:
-                    target_ty = self.resolve_impl_trait_arg_for_source(decl, source_ty, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
+                    // The impl's trait argument is spelled in the impl's own
+                    // module: a facade's `impl Deref[Img] for Picture` names a
+                    // record of the facade's c_import, private to that module,
+                    // and resolving it from the module that reads `p.n` called
+                    // it "private to its package".
+                    let use_path = with_str_clone_ref(self.current_module_path)
+                    let use_file = self.local_file_id
+                    self.update_decl_source_context(di)
+                    let in_impl_module = self.resolve_impl_trait_arg_for_source(decl, source_ty, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
+                    self.update_source_context_path(use_path)
+                    self.local_file_id = use_file
+                    target_ty = in_impl_module
             let sig_idx = self.get_sig(deref_fn)
             var result_ref_ty = 0
             if sig_idx >= 0:
@@ -20480,6 +20497,12 @@ impl Sema:
         while self.ast.kind(written) == NodeKind.NK_FIELD_ACCESS or self.ast.kind(written) == NodeKind.NK_INDEX:
             let inside = self.ast.get_data0(written)
             if self.ast.kind(written) == NodeKind.NK_FIELD_ACCESS and self.reject_facade_field_write_if_needed(self.check_expr(inside) as i32, node): break
+            // #3228: a field found through `Deref.deref` is a field of what a
+            // shared `&T` views. There is no mutable deref, so nothing is
+            // assigned through one (§15.1).
+            if self.ast.kind(written) == NodeKind.NK_FIELD_ACCESS and self.autoderef_goes_through_deref_impl(inside):
+                self.emit_error_with_help(f"cannot assign to `{self.pool_resolve(self.ast.get_data1(written))}`: it is reached through a `Deref` implementation, which lends a shared view", node, "assign through the value that owns the field, or give the type a `mut fn` that sets it")
+                return 0
             written = inside
         // §16.4 union last-written tracking.
         if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
@@ -22091,6 +22114,16 @@ impl Sema:
                 return self.ty_i64 as i32
         0
 
+    // Whether the field lookup on `expr` took a step through a user
+    // `Deref` implementation (a step with a function; `&T` and `*T` steps
+    // have none).
+    fn autoderef_goes_through_deref_impl(expr: i32) -> bool:
+        if not self.autoderef_step_starts.contains(expr): return false
+        let start = self.autoderef_step_starts.get(expr).unwrap()
+        for k in 0..(self.autoderef_step_counts.get(expr).copied() ?? 0):
+            if self.autoderef_step_fns[start + k] != 0: return true
+        false
+
     mut fn autoderef_record_steps(expr: i32, step_fns: &List[i32], step_tys: &List[i32]):
         if with_getenv_str("WITH_DEBUG_DEREF").len() > 0:
             with_eprint(f"[deref-record] expr={expr} steps={step_fns.len()}")
@@ -22198,10 +22231,18 @@ impl Sema:
         let step_fns: List[i32] = []
         let step_tys: List[i32] = []
         var depth = 0
+        // #3232 (§16.2b.3): outside a facade's rendering the fields of the
+        // type it generates are not there to find, so a record's own field
+        // of that name (`live`) is the one a program reads. When nothing
+        // further has the field, the walk answers with the generated type,
+        // and the access is refused by name.
+        var generated: TypeId = 0 as TypeId
         while depth < 32:
             if self.autoderef_type_has_field(current, field):
-                self.autoderef_record_steps(expr, step_fns, step_tys)
-                return current
+                if not self.facade_generated_field_is_hidden(current as i32, field):
+                    self.autoderef_record_steps(expr, step_fns, step_tys)
+                    return current
+                generated = current
             if sema_autoderef_seen_type(seen, current as i32):
                 self.emit_error("auto-deref cycle through Deref implementation", node)
                 return current
@@ -22212,11 +22253,17 @@ impl Sema:
                 step_tys.push(step.step_ty)
             let next = step.next as TypeId
             if next == current:
-                return current
+                return if generated != 0 as TypeId: generated else: current
             current = next
             depth = depth + 1
         self.emit_error("auto-deref cycle through Deref implementation", node)
         current
+
+    // Whether `field` is one of the fields a facade's generated type keeps
+    // for itself, seen from outside its rendering: every field but `repr`.
+    fn facade_generated_field_is_hidden(tid: i32, field: i32) -> bool:
+        let rendering = self.facade_rendered_file_of(tid)
+        rendering.len() > 0 and self.facade_current_file_name() != rendering and self.pool_resolve(field) != "repr" and self.struct_field_type_frozen(tid, field) != 0
 
     mut fn auto_deref_method_type(tid: TypeId, method: i32, node: i32, expr: i32) -> TypeId:
         var current = self.resolve_alias(tid)

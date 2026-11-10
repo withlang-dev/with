@@ -122,17 +122,14 @@ impl Sema:
     // so a field that has the name of an operation the facade presents on
     // the resource, or the name `repr`, is two meanings for one spelling.
     // Neither wins: the facade renames one. "" when there is no clash.
-    mut fn facade_field_read_clash(ri: isize) -> str:
+    fn facade_field_read_clash(ri: isize) -> str:
         let record = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId) as i32
         if self.get_type_kind(record as TypeId) != TypeKind.TY_STRUCT: return ""
         let ops = facade_render_presented_ops(self.ast, self.pool, self.decl_is_c_import, self.facade_resources[ri].node)
         let te_start = self.get_type_d1(record as TypeId)
-        // The generated type's own fields, whatever they are for this
-        // resource (its flag, a parent's view, what it retains).
-        let generated = self.resolve_alias(self.lookup_named_type_visible(self.facade_resources[ri].name) as TypeId) as i32
         for fi in 0..self.get_type_d2(record as TypeId):
             let fname = self.pool_resolve(self.type_extra[(te_start + fi * 3)])
-            if fname == "repr" or (generated > 0 and self.struct_field_type(generated, self.type_extra[(te_start + fi * 3)]) != 0): return f"its record has a field named '{fname}', which the type generated for the resource keeps for itself"
+            if fname == "repr": return "its record has a field named 'repr', which is the raw spelling of the record itself"
             for op in ops:
                 if self.facade_presented(ri, op) == fname: return f"its record's field '{fname}' and the operation '{op}', presented as '{fname}', would both be `x.{fname}`"
         ""
