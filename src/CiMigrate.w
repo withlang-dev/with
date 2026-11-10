@@ -1150,6 +1150,9 @@ impl CiProject:
                 let alias = underlying.len() > 0 and ci_is_c_ident(underlying) and underlying != rname
                 if rname.len() > 0 and not alias and not ci_is_system_decl(rname) and not (rloc.len() > 0 and ci_is_system_path(rloc)):
                     self.records.insert(ci_escape_reserved(rname), true)
+                // D198 (§16.2b.5): where a record is complete and flat; a value record
+                // must be complete in a header the package installs.
+                if rname.len() > 0 and rloc.len() > 0 and ci_decl_is_complete_record(session, i, decl_kind, rcursor): self.complete_records.insert(ci_escape_reserved(rname), ci_migrate_location_file(rloc))
             if decl_kind == CK_VAR:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
@@ -1794,7 +1797,8 @@ impl CiProject:
         // D121: the signature's types and the body's ownership records.
         self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
         self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
-        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names))
+        // D198: with how the body uses each pointer parameter's record (`vw`/`vr`/`va`/`vx`).
+        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names) ++ ci_value_record_evidence(session, cursor, names))
         // D198: its writes of function-pointer fields and the records it lets escape.
         self.fnptr_evidence = self.fnptr_evidence ++ ci_fnptr_field_evidence(session, cursor)
         // D159: what the body proves about the pointers it is handed.
@@ -2155,6 +2159,15 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         project.symbols[si].header_declared = 0
         uninstalled_count = uninstalled_count + 1
         if uninstalled_count <= 12: uninstalled = uninstalled ++ (if uninstalled.len() > 0: ", " else: "") ++ project.symbols[si].name
+    // D198 (§16.2b.5): a value record must be complete in a header the
+    // package installs, or the facade's clause would name a record the
+    // user's import does not have.
+    let file_installed: HashMap[str, bool] = HashMap.new()
+    let installed = []
+    for (record, file) in project.complete_records:
+        if not file_installed.contains(file): file_installed.insert(file.to_owned(), ci_facade_import_spelling(file, import_dirs).len() > 0)
+        if file_installed.get(file).copied() ?? false: installed.push(record.to_owned())
+    for record in installed: project.installed_records.insert(record, true)
     let draft = project.facade_draft(facade_name)
     var spellings: List[str] = []
     for si in project.presented:
@@ -3237,3 +3250,40 @@ fn ci_cursor_kind_name(kind: i32) -> str:
     if kind == 231: return "DeclStmt"
     f"kind={kind}"
 
+
+// D198: whether the struct or typedef declaration at `idx` names a record a
+// draft may describe as a value record: one with its fields (a typedef of
+// an opaque `struct T;` has none) and flat. A record with a pointer in it
+// is not one record to the callee: `FT_Outline_Get_CBox(const FT_Outline
+// *)` follows `outline->points`, and whoever builds the record chooses
+// where that points.
+fn ci_decl_is_complete_record(session: i64, idx: i32, decl_kind: i32, cursor: i32) -> bool:
+    if cursor < 0 or (decl_kind != CK_STRUCT and decl_kind != CK_TYPEDEF): return false
+    if decl_kind == CK_STRUCT and not with_cimport_struct_has_definition(session, idx): return false
+    let canonical = with_ci_type_canonical(session, with_ci_cursor_type(session, cursor))
+    if canonical < 0 or with_ci_type_kind(session, canonical) != CXT_Record: return false
+    ci_type_is_flat(session, canonical, 0)
+
+// Whether a canonical type holds no pointer anywhere inside it: an
+// arithmetic type or an enum; a fixed array of such; a defined record
+// every field of which is such. Anything else (a pointer, a function
+// pointer, an incomplete or unknown type) is not.
+fn ci_type_is_flat(session: i64, ty: i32, depth: i32) -> bool:
+    if ty < 0 or depth > 8: return false
+    let canonical = with_ci_type_canonical(session, ty)
+    if canonical < 0: return false
+    let kind = with_ci_type_kind(session, canonical)
+    if (kind >= CXT_Bool and kind <= CXT_LongDouble) or kind == CXT_Float128 or kind == CXT_Enum: return true
+    if kind == CXT_ConstantArray: return ci_type_is_flat(session, with_ci_type_array_element(session, canonical), depth + 1)
+    if kind != CXT_Record: return false
+    let record = with_ci_type_declaration(session, canonical)
+    if record < 0 or with_ci_cursor_is_definition(session, record) == 0: return false
+    var fields = 0
+    var fi = 0
+    while fi < with_ci_num_children(session, record):
+        let field = with_ci_child(session, record, fi)
+        fi = fi + 1
+        if with_ci_cursor_kind(session, field) != CXK_FIELD_DECL: continue
+        if not ci_type_is_flat(session, with_ci_cursor_type(session, field), depth + 1): return false
+        fields = fields + 1
+    fields > 0

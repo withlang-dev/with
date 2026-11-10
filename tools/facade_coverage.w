@@ -120,6 +120,18 @@ fn fnptr_field_class(why: &str) -> str:
     if w.starts_with("its record is not known"): return "its record is not known"
     w.to_owned()
 
+// D198: why a pointer to a record is no value record, names folded away.
+fn value_record_class(why: &str) -> str:
+    let w = why.trim()
+    if w.starts_with("a unit of the package"): return "a unit of the package could not be read"
+    if w.starts_with("no unit defines the function"): return "no unit defines the function"
+    if w.contains("is not a flat record complete in a header the package installs"): return "the record holds a pointer, or is not complete in an installed header"
+    if w.starts_with("some function of the package produces"): return "the record is a resource (something produces, destroys or retains it)"
+    if w.starts_with("the body indexes it"): return "the body indexes it, moves the pointer, takes a part's address, or copies the pointer"
+    if w.starts_with("it is passed to "): return "it is passed on to a function the proofs cannot clear"
+    if w.starts_with("the body writes through"): return "the body writes through a const pointer"
+    w.to_owned()
+
 fn retention_class(why: &str) -> str:
     let decided = why.find(", which no unit decides: ")
     if decided >= 0 and why.contains("the function pointer field "):
@@ -178,7 +190,11 @@ fn classify(verdict: &str) -> str:
         let ty = v.slice(8, v.find(", a pointer to no record"))
         return "returns " ++ pointer_class(ty) ++ ", a pointer to no record"
     let unmodeled = "parameter of unmodeled pointer type "
-    if v.starts_with(unmodeled): return "parameter of an unmodeled pointer type: " ++ pointer_class(v.slice(unmodeled.len(), v.len()))
+    if v.starts_with(unmodeled):
+        // D198: `…; param N is no value record: <why>` names the condition.
+        let noted = v.find(" is no value record: ")
+        if noted < 0: return "parameter of an unmodeled pointer type: " ++ pointer_class(v.slice(unmodeled.len(), v.len()))
+        return "record pointer that is no value record: " ++ value_record_class(v.slice(noted + " is no value record: ".len(), v.len()))
     if v.starts_with("parameter of a callback or array type"): return "parameter of a callback or array type"
     if v.starts_with("retains param "):
         let open = v.find("(")

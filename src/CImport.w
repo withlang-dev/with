@@ -19237,6 +19237,96 @@ fn ci_fp_init_list_writes(session: i64, list: i32, record: &str, loc: &str) -> s
         next = at + 1
     out
 
+// ── D198 (§16.2b.5): how a body uses each pointer parameter's record ──────
+//
+// A draft states `reads`, `fills` or `updates param N` only from a proof
+// that the callee touches the one record the parameter points at and keeps
+// nothing of it. The records, one per line, `i` the parameter's index:
+//   vw:<i>               a write through the parameter (`p->f = e`, `*p = e`)
+//   vr:<i>               a read through it
+//   va:<i>:<callee>:<j>  the parameter itself passed on as argument j
+//                        (`?`: a call through a pointer)
+//   vx:<i>               anything that leaves the one record or keeps a
+//                        pointer: an index, pointer arithmetic, the address
+//                        of a part (`&p->f`), the parameter stored,
+//                        returned, cast, or copied to a local
+fn ci_value_record_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+    ci_value_record_walk(session, cursor, params, 0)
+
+// The parameter a bare reference names, or -1.
+fn ci_vr_param(session: i64, cursor: i32, params: &List[str]) -> i32:
+    if with_ci_cursor_kind(session, cursor) != CXK_DECL_REF: return -1
+    let name = ci_escape_reserved(with_ci_cursor_spelling(session, cursor))
+    var index: i32 = 0
+    for param in params:
+        if param == name: return index
+        index = index + 1
+    -1
+
+// `mode`: 0 a value read, 1 the target of an assignment, 2 a null test
+// (a bare parameter there is only compared).
+fn ci_value_record_walk(session: i64, cursor: i32, params: &List[str], mode: i32) -> str:
+    if cursor < 0 or ci_unevaluated(session, cursor): return ""
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if kind == CXK_DECL_REF:
+        let pi = ci_vr_param(session, cursor, params)
+        return if pi >= 0 and mode != 2: f"vx:{pi}\n" else: ""
+    if (kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100) and nc == 1:
+        return ci_value_record_walk(session, with_ci_child(session, cursor, 0), params, mode)
+    let through = if mode == 1: "vw:" else: "vr:"
+    if kind == CXK_MEMBER_REF and nc >= 1:
+        let base = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        let pi = ci_vr_param(session, base, params)
+        if pi >= 0: return through ++ f"{pi}\n"
+        return ci_value_record_walk(session, base, params, mode)
+    if kind == CXK_UNARY_OP and nc == 1:
+        let op = with_ci_unary_op(session, cursor)
+        let operand = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        let pi = ci_vr_param(session, operand, params)
+        if op == UO_DEREF:
+            if pi >= 0: return through ++ f"{pi}\n"
+            return ci_value_record_walk(session, operand, params, mode)
+        // `&p->f`: a pointer into the record exists, and where it goes is
+        // not followed.
+        if op == UO_ADDR: return ci_value_record_walk(session, operand, params, 0).replace("vr:", "vx:").replace("vw:", "vx:")
+        if op == UO_LNOT: return ci_value_record_walk(session, operand, params, 2)
+        if op == UO_PRE_INC or op == UO_POST_INC or op == UO_PRE_DEC or op == UO_POST_DEC:
+            if pi >= 0: return f"vx:{pi}\n"
+            return ci_value_record_walk(session, operand, params, 1) ++ ci_value_record_walk(session, operand, params, 0)
+        return ci_value_record_walk(session, operand, params, 0)
+    if kind == CXK_BINARY_OP and nc == 2:
+        let op = with_ci_binary_op(session, cursor)
+        let lhs = with_ci_child(session, cursor, 0)
+        let rhs = with_ci_child(session, cursor, 1)
+        if op == BO_ASSIGN: return ci_value_record_walk(session, lhs, params, 1) ++ ci_value_record_walk(session, rhs, params, 0)
+        if op > BO_ASSIGN: return ci_value_record_walk(session, lhs, params, 1) ++ ci_value_record_walk(session, lhs, params, 0) ++ ci_value_record_walk(session, rhs, params, 0)
+        let tested = op == BO_EQ or op == BO_NE or op == BO_LAND or op == BO_LOR
+        return ci_value_record_walk(session, lhs, params, if tested: 2 else: 0) ++ ci_value_record_walk(session, rhs, params, if tested: 2 else: 0)
+    if kind == CXK_ARRAY_SUBSCRIPT and nc == 2:
+        let pi = ci_vr_param(session, ci_peel_transparent(session, with_ci_child(session, cursor, 0)), params)
+        if pi >= 0: return f"vx:{pi}\n" ++ ci_value_record_walk(session, with_ci_child(session, cursor, 1), params, 0)
+    if kind == CXK_CALL_EXPR and nc >= 1:
+        let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
+        let direct = if field.len() > 0: "" else: ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+        var out = if field.len() > 0: ci_value_record_walk(session, with_ci_child(session, cursor, 0), params, 0) else: ""
+        var ai = 1
+        while ai < nc:
+            let arg = with_ci_child(session, cursor, ai)
+            let pi = ci_vr_param(session, ci_peel_transparent(session, arg), params)
+            if pi >= 0: out = out ++ f"va:{pi}:" ++ (if direct.len() > 0: direct else: "?") ++ f":{ai - 1}\n"
+            else: out = out ++ ci_value_record_walk(session, arg, params, 0)
+            ai = ai + 1
+        return out
+    var out = ""
+    var i = 0
+    while i < nc:
+        // The condition of an `if`, a loop or `?:` only tests a bare parameter.
+        let tests = i == 0 and (kind == CXK_IF_STMT or kind == CXK_WHILE_STMT or kind == CXK_CONDITIONAL_OP)
+        out = out ++ ci_value_record_walk(session, with_ci_child(session, cursor, i), params, if tests: 2 else: 0)
+        i = i + 1
+    out
+
 fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
     let locals = ci_own_collect_locals(session, cursor)
     ci_own_walk(session, cursor, params, locals)
