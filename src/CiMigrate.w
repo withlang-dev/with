@@ -1163,6 +1163,8 @@ impl CiProject:
                     let alias = ci_var_initializer_alias(session, cursor)
                     if ci_own_is_libc_allocator(alias) and not self.alloc_aliases.contains(name): self.alloc_aliases.push(name)
                     if ci_own_is_libc_free(alias) and not self.free_aliases.contains(name): self.free_aliases.push(name)
+                    // D198: an initializer that fills a table of functions.
+                    self.fnptr_evidence = self.fnptr_evidence ++ ci_fnptr_field_evidence(session, with_ci_var_initializer(session, cursor))
                 if with_cimport_var_storage_class(session, i) == CX_SC_STATIC:
                     i = i + 1
                     continue
@@ -1793,6 +1795,8 @@ impl CiProject:
         self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
         self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
         self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names))
+        // D198: its writes of function-pointer fields and the records it lets escape.
+        self.fnptr_evidence = self.fnptr_evidence ++ ci_fnptr_field_evidence(session, cursor)
         // D159: what the body proves about the pointers it is handed.
         self.symbols[symbol_id].contract_evidence = ci_ir_owned_text(ci_body_contract_evidence(session, cursor, names))
         for pi in 0..count:
