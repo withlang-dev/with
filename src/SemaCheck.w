@@ -20497,6 +20497,12 @@ impl Sema:
         while self.ast.kind(written) == NodeKind.NK_FIELD_ACCESS or self.ast.kind(written) == NodeKind.NK_INDEX:
             let inside = self.ast.get_data0(written)
             if self.ast.kind(written) == NodeKind.NK_FIELD_ACCESS and self.reject_facade_field_write_if_needed(self.check_expr(inside) as i32, node): break
+            // #3228: a field found through `Deref.deref` is a field of what a
+            // shared `&T` views. There is no mutable deref, so nothing is
+            // assigned through one (§15.1).
+            if self.ast.kind(written) == NodeKind.NK_FIELD_ACCESS and self.autoderef_goes_through_deref_impl(inside):
+                self.emit_error_with_help(f"cannot assign to `{self.pool_resolve(self.ast.get_data1(written))}`: it is reached through a `Deref` implementation, which lends a shared view", node, "assign through the value that owns the field, or give the type a `mut fn` that sets it")
+                return 0
             written = inside
         // §16.4 union last-written tracking.
         if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
@@ -22107,6 +22113,16 @@ impl Sema:
             if self.pool_resolve(field) == "len":
                 return self.ty_i64 as i32
         0
+
+    // Whether the field lookup on `expr` took a step through a user
+    // `Deref` implementation (a step with a function; `&T` and `*T` steps
+    // have none).
+    fn autoderef_goes_through_deref_impl(expr: i32) -> bool:
+        if not self.autoderef_step_starts.contains(expr): return false
+        let start = self.autoderef_step_starts.get(expr).unwrap()
+        for k in 0..(self.autoderef_step_counts.get(expr).copied() ?? 0):
+            if self.autoderef_step_fns[start + k] != 0: return true
+        false
 
     mut fn autoderef_record_steps(expr: i32, step_fns: &List[i32], step_tys: &List[i32]):
         if with_getenv_str("WITH_DEBUG_DEREF").len() > 0:
