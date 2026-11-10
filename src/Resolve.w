@@ -509,7 +509,7 @@ impl ResolveState:
                 if package.len() > 0:
                     let facade_dotted = "facades." ++ package
                     let facade_path = self.resolve_use_file_dotted(module_id, facade_dotted)
-                    var written = facade_path.len() == 0 or facade_path == self.module_paths[module_id]
+                    var written = facade_path.len() == 0 or facade_path == self.module_paths[module_id] or resolve_module_is_facade_of(self.module_paths[module_id], package)
                     for other in 0..ast_pool.decl_count():
                         let od = ast_pool.get_decl(other)
                         if ast_pool.kind(od) == NodeKind.NK_USE_DECL and self.use_path_dotted(ast_pool, ast_pool.get_data0(od), ast_pool.get_data1(od)) == facade_dotted: written = true
@@ -1617,6 +1617,14 @@ fn resolve_fetched_package_of_header(module_dir: &str, header: &str) -> str:
             if part.len() == 0 or part.contains("[") or part.contains(":") or part.trim() == "," or part == "include_paths": continue
             if resolve_file_exists(resolve_join(resolve_join(dep, part), header)): return name.to_owned()
     ""
+
+// Whether the module at `path` is itself the facade of `package`: the
+// project's own `facades/<package>.w`, or the file `with get` wrote. Its
+// `c_import` of the header is what the facade describes, never an import
+// of a facade.
+fn resolve_module_is_facade_of(path: &str, package: &str) -> bool:
+    let p = "/" ++ path.replace("\\", "/")
+    p.ends_with("/facades/" ++ package ++ ".w") or (p.ends_with("/facade.w") and p.contains("/.with/deps/c/"))
 
 fn resolve_join(a: &str, b: &str) -> str:
     if a.len() == 0:

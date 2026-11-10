@@ -220,7 +220,7 @@ impl Zcu:
     mut fn import_fetched_facade_frontend(pool: AstPool, decl: i32, di: i32) -> AstPool:
         let dir = self.decl_source_dir_frontend(di)
         let package = resolve_fetched_package_of_header(dir, self.pool.resolve(pool.get_data0(decl as NodeId)))
-        if package.len() == 0: return pool
+        if package.len() == 0 or resolve_module_is_facade_of(self.decl_source_path_frontend(di), package): return pool
         let path = self.resolve_module_path_frontend("facades." ++ package, dir)
         if path.len() == 0 or self.has_imported_path(path) or path == self.decl_source_path_frontend(di): return pool
         self.add_imported_path(path)
