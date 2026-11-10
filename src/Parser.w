@@ -91,6 +91,9 @@ type Parser {
     // D7 eliminate-self: receiver mode for the next method's synthetic `self`
     // (0 none, 1 read `self: &Self`, 2 `mut self: Self`, 3 `move self: Self`).
     pending_receiver_mode: i32,
+    // #3112: the parameter list being parsed is a top-level function's (no
+    // receiver, §9.5); a method's list, a trait's included, is not.
+    free_fn_params: bool,
     synth_recv_type: i32,
     pending_unsafe_fn: i32,
     pending_iter_of_self: i32,
@@ -210,6 +213,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_comptime_with_names: List.new(),
         pending_comptime_with_types: List.new(),
         pending_receiver_mode: 0,
+        free_fn_params: false,
         synth_recv_type: 0,
         pending_unsafe_fn: 0,
         pending_iter_of_self: 0,
@@ -1740,6 +1744,7 @@ impl Parser:
         let pending_capability_param_count = self.pending_comptime_with_names.len()
         if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
+            self.free_fn_params = self.pending_receiver_mode == 0
             param_count = self.parse_param_list()
             required_param_count = self.last_param_required_count
             if param_count > 0:
@@ -9675,6 +9680,37 @@ impl Parser:
         self.last_param_pattern_start = pattern_start
         self.last_param_pattern_count = 0
         self.last_param_required_count = 0
+
+        // #3112 (§9.5): outside a type a function has no receiver, so a written
+        // `self` with no type (`fn Owned.set(mut self, v: i32)`) names nothing:
+        // parsed as an untyped parameter, a field write through it reached
+        // the MIR validator as an ICE, a `move self` failed in codegen, and a
+        // plain `self` said "method receiver mode is missing". Refused here
+        // with the two spellings that are accepted.
+        let free_fn = self.free_fn_params
+        self.free_fn_params = false
+        if free_fn and self.pending_receiver_mode == 0:
+            var rk = self.pos
+            while rk < self.tokens.len() and self.tokens.get_tag(rk) == TokenKind.TK_NEWLINE:
+                rk = rk + 1
+            var keyword = "fn"
+            var typed = "self: &Self"
+            if rk < self.tokens.len() and self.tokens.get_tag(rk) == TokenKind.TK_KW_MUT:
+                keyword = "mut fn"
+                typed = "mut self: Self"
+                rk = rk + 1
+            else if rk < self.tokens.len() and self.tokens.get_tag(rk) == TokenKind.TK_KW_MOVE:
+                keyword = "move fn"
+                typed = "move self: Self"
+                rk = rk + 1
+            let bare_self = rk < self.tokens.len() and self.tokens.get_tag(rk) == TokenKind.TK_IDENT and self.source.slice(self.tokens.get_start(rk) as i64, self.tokens.get_end(rk) as i64) == "self" and (rk + 1 >= self.tokens.len() or self.tokens.get_tag(rk + 1) != TokenKind.TK_COLON)
+            if bare_self:
+                self.emit_error_span("a function outside a type has no receiver (§9.5), so this `self` needs its type: write `" ++ typed ++ "`, or declare the method inside `impl Type:` as `" ++ keyword ++ " name(…)`, where `self` is implicit", self.tokens.get_start(rk), self.tokens.get_end(rk))
+                self.pos = rk + 1
+                self.skip_newlines()
+                if self.peek() == TokenKind.TK_COMMA:
+                    self.advance()
+                    self.skip_newlines()
 
         // D7: a pending receiver mode synthesizes `self` as param 0 (before any
         // comptime-with capabilities) — UNLESS the method already writes an explicit
