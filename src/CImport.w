@@ -11371,7 +11371,9 @@ fn ci_call_field_callee(session: i64, cursor: i32) -> str:
     var c = cursor
     while true:
         let kind = with_ci_cursor_kind(session, c)
-        if kind == CXK_MEMBER_REF: return with_ci_cursor_spelling(session, c)
+        // D198: named with its record (`Record.field`), which the proof of
+        // the field's one write is drawn for.
+        if kind == CXK_MEMBER_REF: return ci_fp_member_record(session, c) ++ "." ++ with_ci_cursor_spelling(session, c)
         if kind == CXK_DECL_REF: return ""
         let transparent = kind == CXK_IMPLICIT_CAST or kind == CXK_PAREN_EXPR or kind == 100 or (kind == CXK_UNARY_OP and with_ci_unary_op(session, c) == UO_DEREF)
         if transparent and with_ci_num_children(session, c) >= 1:
@@ -19085,6 +19087,154 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
     while i < nc:
         out = out ++ ci_own_walk(session, with_ci_child(session, cursor, i), params, locals)
         i = i + 1
+    out
+
+// ── D198 (#3206): what the package does with function-pointer fields ─────
+//
+// A call through a function-pointer field has a proven callee only when the
+// field is written in exactly one place, that place names a package
+// function, and the record never leaves what the drafter reads. The facts
+// that decides come from every definition and initializer of the corpus,
+// one tab-separated line each, ending in the source location (a header's
+// table is seen by every unit that includes it, and counts once):
+//   fw <Record> <field> <fn|?> <loc>   a write of the field: an assignment
+//                                      or an initializer-list entry
+//   fw <Record> * ? <loc>              an initializer list of the record
+//                                      whose entries map to no field, or
+//                                      a function-pointer field's own
+//                                      address taken
+//   ra <Record> <callee|?> <loc>       a pointer to the record passed to
+//                                      a callee (`?`: an indirect call)
+//   rc <Record> <loc>                  a pointer to the record converted
+//                                      to another pointer type outside a
+//                                      call argument
+let CXK_FIELD_DECL: i32 = 6
+// A designator names its field with a reference cursor (CXCursor_MemberRef),
+// not a member expression.
+let CXK_MEMBER_REFERENCE: i32 = 47
+
+// The record a type names, under qualifiers and typedefs ("" when none).
+fn ci_fp_record_of(session: i64, ty: i32) -> str:
+    if ty < 0: return ""
+    let canonical = with_ci_type_canonical(session, ty)
+    if canonical < 0 or with_ci_type_kind(session, canonical) != CXT_Record: return ""
+    var name = with_ci_type_spelling(session, canonical)
+    for prefix in ["const ", "volatile ", "struct ", "union "]:
+        if name.starts_with(prefix): name = name.slice(prefix.len(), name.len())
+    // An unnamed record is spelled with its location; the evidence lines and
+    // the sink records split on these characters.
+    name.replace("\t", " ").replace(":", "@").replace(";", ",")
+
+// The record a pointer type points at ("" when it is no pointer to one).
+fn ci_fp_pointee_record(session: i64, ty: i32) -> str:
+    if ty < 0: return ""
+    let canonical = with_ci_type_canonical(session, ty)
+    if canonical < 0 or with_ci_type_kind(session, canonical) != CXT_Pointer: return ""
+    ci_fp_record_of(session, with_ci_type_pointee(session, canonical))
+
+// The record that owns the member a MEMBER_REF names: its base's type, or
+// that type's pointee for `->`.
+fn ci_fp_member_record(session: i64, member: i32) -> str:
+    if with_ci_num_children(session, member) < 1: return ""
+    let base_ty = with_ci_cursor_type(session, with_ci_child(session, member, 0))
+    let direct = ci_fp_record_of(session, base_ty)
+    if direct.len() > 0: direct else: ci_fp_pointee_record(session, base_ty)
+
+// The package function an expression names (`f`, `&f`, `(T)f`), or `?`.
+fn ci_fp_named_function(session: i64, value: i32) -> str:
+    var c = ci_peel_transparent_and_cstyle(session, value)
+    if with_ci_cursor_kind(session, c) == CXK_UNARY_OP and with_ci_unary_op(session, c) == UO_ADDR and with_ci_num_children(session, c) == 1:
+        c = ci_peel_transparent_and_cstyle(session, with_ci_child(session, c, 0))
+    if with_ci_cursor_kind(session, c) != CXK_DECL_REF: return "?"
+    let ty = with_ci_type_canonical(session, with_ci_cursor_type(session, c))
+    let kind = if ty >= 0: with_ci_type_kind(session, ty) else: 0
+    if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: with_ci_cursor_spelling(session, c) else: "?"
+
+fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
+    if cursor < 0 or ci_unevaluated(session, cursor): return ""
+    var out = ""
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    let loc = with_ci_cursor_location(session, cursor)
+    if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
+        let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        if with_ci_cursor_kind(session, lhs) == CXK_MEMBER_REF and with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, lhs)):
+            out = out ++ "fw\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ ci_fp_named_function(session, with_ci_child(session, cursor, 1)) ++ "\t" ++ loc ++ "\n"
+    if kind == CXK_INIT_LIST:
+        let record = ci_fp_record_of(session, with_ci_cursor_type(session, cursor))
+        if record.len() > 0: out = out ++ ci_fp_init_list_writes(session, cursor, record, loc)
+    if kind == CXK_UNARY_OP and nc == 1 and with_ci_unary_op(session, cursor) == UO_ADDR:
+        let operand = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        if with_ci_cursor_kind(session, operand) == CXK_MEMBER_REF and with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, operand)):
+            out = out ++ "fw\t" ++ ci_fp_member_record(session, operand) ++ "\t*\t?\t" ++ loc ++ "\n"
+    var call_args_from = nc
+    if kind == CXK_CALL_EXPR and nc >= 1:
+        call_args_from = 1
+        let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
+        let direct = if field.len() > 0: "" else: ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+        let callee = if direct.len() > 0: direct else: "?"
+        var ai = 1
+        while ai < nc:
+            let record = ci_fp_pointee_record(session, with_ci_cursor_type(session, ci_peel_transparent_and_cstyle(session, with_ci_child(session, cursor, ai))))
+            if record.len() > 0: out = out ++ "ra\t" ++ record ++ "\t" ++ callee ++ "\t" ++ loc ++ "\n"
+            ai = ai + 1
+    if (kind == CXK_CSTYLE_CAST or kind == CXK_IMPLICIT_CAST) and nc >= 1:
+        let from = ci_fp_pointee_record(session, with_ci_cursor_type(session, with_ci_child(session, cursor, nc - 1)))
+        if from.len() > 0 and ci_fp_pointee_record(session, with_ci_cursor_type(session, cursor)) != from:
+            out = out ++ "rc\t" ++ from ++ "\t" ++ loc ++ "\n"
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, cursor, i)
+        // A call's argument is judged by its callee (`ra`), so a conversion
+        // at the argument itself (`free(p)`'s `void *`) is no `rc`.
+        if i >= call_args_from:
+            var inner = child
+            var depth = 0
+            while depth < 16 and (with_ci_cursor_kind(session, inner) == CXK_CSTYLE_CAST or with_ci_cursor_kind(session, inner) == CXK_IMPLICIT_CAST or with_ci_cursor_kind(session, inner) == CXK_PAREN_EXPR or with_ci_cursor_kind(session, inner) == 100) and with_ci_num_children(session, inner) >= 1:
+                inner = with_ci_child(session, inner, with_ci_num_children(session, inner) - 1)
+                depth = depth + 1
+            out = out ++ ci_fnptr_field_evidence(session, inner)
+        else: out = out ++ ci_fnptr_field_evidence(session, child)
+        i = i + 1
+    out
+
+// The function-pointer fields an initializer list of `record` writes:
+// positional entries by the record's field order, a designated entry by
+// the member it names. An entry that maps to no field makes the whole
+// record's fields unknown (`*`).
+fn ci_fp_init_list_writes(session: i64, list: i32, record: &str, loc: &str) -> str:
+    let decl = with_ci_type_declaration(session, with_ci_type_canonical(session, with_ci_cursor_type(session, list)))
+    let names = []
+    let fn_pointer = []
+    if decl >= 0:
+        for fi in 0..with_ci_num_children(session, decl):
+            let field = with_ci_child(session, decl, fi)
+            if with_ci_cursor_kind(session, field) != CXK_FIELD_DECL: continue
+            names.push(with_ci_cursor_spelling(session, field))
+            fn_pointer.push(with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, field)))
+    var out = ""
+    var next: i32 = 0
+    for ei in 0..with_ci_num_children(session, list):
+        let entry = with_ci_child(session, list, ei)
+        var at = next
+        var value = entry
+        // A designated entry (`.f = v`): an unexposed expression whose
+        // first child is the member and whose last is the value.
+        let designator = if with_ci_num_children(session, entry) >= 2: with_ci_cursor_kind(session, with_ci_child(session, entry, 0)) else: 0
+        let designated = with_ci_cursor_kind(session, entry) == 100 and (designator == CXK_MEMBER_REF or designator == CXK_MEMBER_REFERENCE)
+        if designated:
+            let member = with_ci_cursor_spelling(session, with_ci_child(session, entry, 0))
+            at = -1
+            // (A counter, not `enumerate()`: the pinned seed predates #3077.)
+            var ni: i32 = 0
+            for name in names:
+                if name == member: at = ni
+                ni = ni + 1
+            value = with_ci_child(session, entry, with_ci_num_children(session, entry) - 1)
+        if at < 0 or at >= names.len():
+            return "fw\t" ++ record ++ "\t*\t?\t" ++ loc ++ "\n"
+        if fn_pointer[at]: out = out ++ "fw\t" ++ record ++ "\t" ++ names[at] ++ "\t" ++ ci_fp_named_function(session, value) ++ "\t" ++ with_ci_cursor_location(session, value) ++ "\n"
+        next = at + 1
     out
 
 fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> str:

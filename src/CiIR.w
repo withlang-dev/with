@@ -1169,6 +1169,13 @@ type CiProject {
     // D121 step 6: the registry's facade-level `text utf8` citation, ""
     // when the file states none.
     registry_utf8: str,
+    // D198 (#3206): every write of a function-pointer field and every
+    // escape of a record the corpus shows (CImport.w
+    // ci_fnptr_field_evidence), one line each, and the verdict per
+    // `Record.field` drawn from them once (fd_fnptr_field_verdict).
+    fnptr_evidence: str,
+    fnptr_verdicts: HashMap[str, str],
+    fnptr_verdicts_drawn: bool,
     // D121 step 5: the symbols the last facade draft presented (every
     // producer, destroyer, borrow, lend and consumer it named), so the
     // facade `with get` writes can import the headers that declare them.
@@ -1194,6 +1201,9 @@ fn CiProject.new -> CiProject:
         sink_seen: HashMap.new(),
         alloc_aliases: List.new(),
         registry_utf8: "",
+        fnptr_evidence: "",
+        fnptr_verdicts: HashMap.new(),
+        fnptr_verdicts_drawn: false,
         free_aliases: List.new(),
         presented: List.new(),
         unread: List.new(),

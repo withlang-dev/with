@@ -105,7 +105,25 @@ fn pointer_class(ty: &str) -> str:
     "pointer to an unmodeled record"
 
 // The last clause of a retention trail: where the parameter ended up.
+// D198: why a function-pointer field's callee is unproven, with the names
+// and locations folded away; each kind is what a registry fact must state.
+fn fnptr_field_class(why: &str) -> str:
+    let w = why.trim()
+    if w.starts_with("it is written in "): return "written in several places"
+    if w.starts_with("its one write is not a named function"): return "its one write is not a named function"
+    if w.starts_with("its one write names "): return "its one write names a function the proofs cannot read"
+    if w.starts_with("a pointer to the record is passed to "): return "the record is passed to a function the proofs cannot read"
+    if w.starts_with("a pointer to the record is converted"): return "a pointer to the record is converted to another type"
+    if w.starts_with("the package never writes it"): return "the package never writes it (the caller's value)"
+    if w.starts_with("an initializer of the record"): return "an initializer or a field address the proofs cannot map"
+    if w.starts_with("a unit of the package could not be read"): return "a unit of the package could not be read"
+    if w.starts_with("its record is not known"): return "its record is not known"
+    w.to_owned()
+
 fn retention_class(why: &str) -> str:
+    let decided = why.find(", which no unit decides: ")
+    if decided >= 0 and why.contains("the function pointer field "):
+        return "passed through a function pointer field no unit decides: " ++ fnptr_field_class(why.slice(decided + ", which no unit decides: ".len(), why.len()))
     let last = why.rfind(", ")
     // Bound before the join: a compiler before #3165 freed the slice at
     // the arm's end and the join read blank bytes.
@@ -124,6 +142,9 @@ fn retention_class(why: &str) -> str:
 // and callees folded away; a callee's reason is folded the same way.
 fn origin_class(why: &str) -> str:
     let w = why.trim()
+    let decided = w.find(", which no unit decides: ")
+    if decided >= 0 and w.contains("the function pointer field "):
+        return "returns through a function pointer field no unit decides: " ++ fnptr_field_class(w.slice(decided + ", which no unit decides: ".len(), w.len()))
     if w.starts_with("returns a part of"): return "returns a part of a parameter"
     if w.starts_with("returns global state"): return "returns global state"
     if w.starts_with("returns only NULL") or w.starts_with("no single source"): return w.to_owned()

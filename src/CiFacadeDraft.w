@@ -117,8 +117,93 @@ impl CiProject:
         si >= 0 and self.symbols[si].ret_ty.starts_with("*") and self.fd_has_attr(si, "malloc")
     fn fd_is_free_call(name: &str) -> bool: ci_own_is_libc_free(name) or self.free_aliases.contains(name)
 
+    // D198 (#3206, Eric 2026-11-09): a proof about C is accepted only when
+    // the drafter can enumerate everything it depends on. A function-pointer
+    // field's callee is proven only when the field is written in exactly
+    // one place, that place names a package function, and the record never
+    // leaves what the drafter reads (no pointer to it passed to a function
+    // without a body here, none converted to another pointer type, no
+    // initializer that maps to no field, every unit read). Anything else
+    // is a registry fact, and the verdict says which condition failed, so
+    // the facts author knows what to state.
+    //
+    // One verdict per `Record.field`, `fn:<name>` or `why:<reason>`, and
+    // one per record under `Record.*` when the record itself escapes.
+    mut fn fd_draw_fnptr_verdicts():
+        if self.fnptr_verdicts_drawn: return
+        self.fnptr_verdicts_drawn = true
+        let seen: HashMap[str, i32] = HashMap.new()
+        let count: HashMap[str, i32] = HashMap.new()
+        let named: HashMap[str, str] = HashMap.new()
+        let fields = []
+        for line in self.fnptr_evidence.split("\n"):
+            if line.len() == 0 or seen.contains(line): continue
+            seen.insert(line.to_owned(), 1)
+            let f = line.split("\t")
+            let record_key = if f.len() > 1: f[1] ++ ".*" else: ""
+            if f[0] == "fw" and f.len() == 5 and f[2] == "*":
+                if not self.fnptr_verdicts.contains(record_key): self.fnptr_verdicts.insert(record_key, "why:an initializer of the record maps to no field, or a field's address is taken (" ++ f[4] ++ ")")
+            else if f[0] == "fw" and f.len() == 5:
+                let key = f[1] ++ "." ++ f[2]
+                let so_far = count.get(key).copied() ?? 0
+                if so_far == 0:
+                    fields.push(key.to_owned())
+                    named.insert(key.to_owned(), f[3].to_owned())
+                else if so_far == 1:
+                    named.insert(key.to_owned(), with_str_clone_ref(named.get(key).unwrap()) ++ ", " ++ f[3])
+                count.insert(key, so_far + 1)
+            else if f[0] == "ra" and f.len() == 4:
+                if not self.fnptr_verdicts.contains(record_key) and not self.fd_reads_callee(f[2]):
+                    self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is passed to " ++ (if f[2] == "?": "a function pointer" else: f[2]) ++ ", which the proofs cannot read (" ++ f[3] ++ ")")
+            else if f[0] == "rc" and f.len() == 3:
+                if not self.fnptr_verdicts.contains(record_key): self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is converted to another pointer type (" ++ f[2] ++ ")")
+        for key in fields:
+            let writes = count.get(key).copied() ?? 0
+            let value = with_str_clone_ref(named.get(key).unwrap())
+            if writes > 1: self.fnptr_verdicts.insert(key, f"why:it is written in {writes} places (" ++ value ++ (if writes > 2: ", …)" else: ")"))
+            else if value == "?": self.fnptr_verdicts.insert(key, "why:its one write is not a named function")
+            else if not self.fd_reads_callee(value): self.fnptr_verdicts.insert(key, "why:its one write names " ++ value ++ ", which the proofs cannot read")
+            else: self.fnptr_verdicts.insert(key, "fn:" ++ value)
+
+    // A function whose body the proofs read (or `free`, which writes no
+    // field): a record passed to it has not left what the drafter sees.
+    fn fd_reads_callee(name: &str) -> bool:
+        if name == "?": return false
+        if self.fd_is_free_call(name): return true
+        let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, name)
+        si >= 0 and self.fd_subject(si) and self.symbols[si].has_definition != 0
+
+    // The verdict of the field a `Record.field` callee names (D198).
+    fn fd_fnptr_field_verdict(record_field: &str) -> str:
+        if self.unread.len() > 0: return "why:a unit of the package could not be read"
+        let dot = record_field.rfind(".")
+        if dot <= 0: return "why:its record is not known"
+        let record_key = record_field.slice(0, dot) ++ ".*"
+        if self.fnptr_verdicts.contains(record_key): return with_str_clone_ref(self.fnptr_verdicts.get(record_key).unwrap())
+        if self.fnptr_verdicts.contains(record_field): return with_str_clone_ref(self.fnptr_verdicts.get(record_field).unwrap())
+        "why:the package never writes it (its value is the caller's)"
+
+    // The package function a `*Record.field` callee is proven to be, or "".
+    fn fd_fnptr_proven_callee(callee: &str) -> str:
+        if not callee.starts_with("*"): return ""
+        let verdict = self.fd_fnptr_field_verdict(callee.slice(1, callee.len()))
+        if verdict.starts_with("fn:"): verdict.slice(3, verdict.len()) else: ""
+
+    // What the report says of an unproven `*Record.field` callee.
+    fn fd_fnptr_why(callee: &str) -> str:
+        let record_field = callee.slice(1, callee.len())
+        let dot = record_field.rfind(".")
+        let field = if dot >= 0: record_field.slice(dot + 1, record_field.len()) else: record_field
+        let verdict = self.fd_fnptr_field_verdict(record_field)
+        "the function pointer field " ++ field ++ ", which no unit decides: " ++ verdict.slice(4, verdict.len())
+
     // Whether what is passed to `callee` at `index` is retained there.
     fn fd_callee_retains(callee: &str, index: i32) -> bool:
+        // D198: through a function-pointer field, the one function it is
+        // proven to hold decides; an unproven field retains.
+        if callee.starts_with("*"):
+            let proven = self.fd_fnptr_proven_callee(callee)
+            return proven.len() == 0 or self.fd_callee_retains(proven, index)
         if self.fd_is_free_call(callee) or self.fd_is_alloc_call(callee) or ci_own_is_libc_observer(callee): return false
         let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
         if si < 0: return true
@@ -131,7 +216,22 @@ impl CiProject:
         if self.symbols[si].has_definition == 0: return gir_param_transfer(self.symbols[si].gir, index) != "none"
         index < self.symbols[si].param_stores.len() and self.symbols[si].param_stores[index] != 0
 
+    // A sink's callee by name: the function a `*Record.field` is proven to hold (D198).
+    fn fd_sink_callee(callee: &str) -> str:
+        let proven = self.fd_fnptr_proven_callee(callee)
+        if proven.len() > 0: proven else: callee.to_owned()
+
+    // `to f`, or for a proven `*Record.field`: `through the function
+    // pointer field F (only ever f) to f`.
+    fn fd_sink_text(callee: &str) -> str:
+        let proven = self.fd_fnptr_proven_callee(callee)
+        if proven.len() == 0: return "to " ++ callee
+        "through the function pointer field " ++ fd_field_of(callee) ++ " (only ever " ++ proven ++ ") to " ++ proven
+
     fn fd_callee_destroys(callee: &str, index: i32) -> bool:
+        if callee.starts_with("*"):
+            let proven = self.fd_fnptr_proven_callee(callee)
+            return proven.len() > 0 and self.fd_callee_destroys(proven, index)
         if self.fd_is_free_call(callee): return true
         let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
         if si < 0 or not self.fd_subject(si): return false
@@ -179,7 +279,11 @@ impl CiProject:
         if src.starts_with("local:"): return self.fd_local_verdict(si, src.slice(6, src.len()), depth)
         // #3172: a call through a function-pointer field has no body to
         // read; which function the field holds is a registry fact.
-        if src.starts_with("indirect:"): return "unknown:returns what the function pointer field " ++ src.slice(9, src.len()) ++ " returns, which no unit decides"
+        if src.starts_with("indirect:"):
+            // D198: the one function the field is proven to hold decides.
+            let proven = self.fd_fnptr_proven_callee("*" ++ src.slice(9, src.len()))
+            if proven.len() > 0: return self.fd_source_verdict(si, "call:" ++ proven ++ ":", depth + 1)
+            return "unknown:returns what " ++ self.fd_fnptr_why("*" ++ src.slice(9, src.len()))
         if src.starts_with("call:"):
             let rest = src.slice(5, src.len())
             let colon = rest.find(":")
@@ -327,19 +431,19 @@ impl CiProject:
             // #3174: a sink through a function-pointer field (glfw's platform
             // dispatch) is said as such; which function the field holds is
             // a registry fact, not a missing unit.
-            if kv[0].starts_with("*"): return "passed through the function pointer field " ++ kv[0].slice(1, kv[0].len()) ++ ", which no unit decides"
-            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
+            if kv[0].starts_with("*") and self.fd_fnptr_proven_callee(kv[0]).len() == 0: return "passed through " ++ self.fd_fnptr_why(kv[0])
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(kv[0]))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ kv[0] ++ ", which no unit defines"
-            return "passed to " ++ kv[0] ++ " at param " ++ kv[1] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1)
+            return "passed " ++ self.fd_sink_text(kv[0]) ++ " at param " ++ kv[1] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1)
         for line in self.symbols[si].own_evidence.split("\n"):
             if line.starts_with("localstore:") and self.fd_local_alias_param(si, line.slice(11, line.len())) == pi: return "stored through local " ++ line.slice(11, line.len())
             if not line.starts_with("localsink:"): continue
             let parts = line.split(":")
             if parts.len() != 4 or self.fd_local_alias_param(si, parts[1]) != pi or not self.fd_callee_retains(parts[2], fd_i32(parts[3])): continue
-            if parts[2].starts_with("*"): return "passed through the function pointer field " ++ parts[2].slice(1, parts[2].len()) ++ ", which no unit decides"
-            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, parts[2])
+            if parts[2].starts_with("*") and self.fd_fnptr_proven_callee(parts[2]).len() == 0: return "passed through " ++ self.fd_fnptr_why(parts[2])
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(parts[2]))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ parts[2] ++ ", which no unit defines"
-            return "passed to " ++ parts[2] ++ " at param " ++ parts[3] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1)
+            return "passed " ++ self.fd_sink_text(parts[2]) ++ " at param " ++ parts[3] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1)
         "retained by evidence the report cannot restate"
 
     // Whether parameter `pi` of `si` is one the facade language presents
@@ -453,7 +557,9 @@ impl CiProject:
             let rest = src.slice(5, src.len())
             let colon = rest.find(":")
             return (if colon >= 0: rest.slice(0, colon).to_owned() else: rest.to_owned()) ++ "(…)"
-        if src.starts_with("indirect:"): return "(*" ++ src.slice(9, src.len()) ++ ")(…)"
+        if src.starts_with("indirect:"):
+            let proven = self.fd_fnptr_proven_callee("*" ++ src.slice(9, src.len()))
+            return if proven.len() > 0: proven ++ "(…) through the function pointer field " ++ fd_field_of(src.slice(9, src.len())) else: "(*" ++ fd_field_of(src.slice(9, src.len())) ++ ")(…)"
         if src.starts_with("field:param:"): return "a part of param " ++ src.slice(12, src.len())
         if src.starts_with("param:"): return "param " ++ src.slice(6, src.len())
         if src.starts_with("local:"): return src.slice(6, src.len()).to_owned()
@@ -541,6 +647,8 @@ impl CiProject:
     // never enters. Retention and destruction are facts about pointer
     // parameters, reached directly or through a local that stands for one.
     mut fn resolve_ownership():
+        // D198: which function-pointer fields have a proven callee.
+        self.fd_draw_fnptr_verdicts()
         let n = self.symbols.len()
         // 1. Retention.
         for si in 0..n:
@@ -982,3 +1090,8 @@ impl CiProject:
                 head = head ++ "  " ++ record ++ f": {producers} producer(s) and a destroyer, but no resource: " ++ why ++ ", which the facade does not describe\n"
             else: head = head ++ "  " ++ record ++ f": {producers} producer(s) and {unary} unary destroyers; a registry fact names the drop\n"
         head ++ lines
+
+// The field of a `Record.field` (or `*Record.field`) callee.
+fn fd_field_of(record_field: &str) -> str:
+    let dot = record_field.rfind(".")
+    if dot >= 0: record_field.slice(dot + 1, record_field.len()) else: record_field.to_owned()
