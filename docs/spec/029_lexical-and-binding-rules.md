@@ -430,7 +430,7 @@ not marked internal is invalid.
 
 **Implementation-internal (unstable):** `@[bench]`, `@[test]`,
 `@[before]`, `@[after]`, `@[stack_size]`, `@[callconv]`,
-`@[compiler_hook]`, `@[packed]`, `@[weak]`. These exist for compiler,
+`@[compiler_hook]`, `@[packed]`, `@[weak]`, `@[threadlocal]`. These exist for compiler,
 test harness, migrator/runtime, and stdlib development, may change or
 vanish without notice, and are not part of the language. The
 type-position operator `@TypeOf(expr)` (compile-time type of an

@@ -3420,7 +3420,10 @@ impl Sema:
     // function the program reaches — a root, or a function a reachable one
     // calls or takes as a value. The first counted site labels the
     // diagnostics (emit_global_data_race_error).
-    mut fn resolve_global_race_concurrency() -> bool:
+    // `tasks_only`: count With's own concurrency alone (tasks, spawned
+    // threads). A callback C invokes and an exported function C calls run
+    // on a thread where the program calls into C (§16.3).
+    mut fn resolve_global_race_concurrency(tasks_only: bool = false) -> bool:
         if self.global_race_evidence.len() == 0: return false
         let reachable: HashMap[i32, i32, Minted] = [:]
         let work = [e.fn_sym for e in self.global_race_evidence if self.race_root_fn(e.fn_sym)]
@@ -3436,6 +3439,7 @@ impl Sema:
                 if not reachable.contains(callee): work.push(callee)
                 ei = self.race_call_edge_next[ei]
         for e in self.global_race_evidence:
+            if tasks_only and (e.reason == "@[c_export]" or e.reason == "extern C callback coercion"): continue
             if reachable.contains(e.fn_sym):
                 self.global_race_concurrency_node = e.node
                 self.global_race_concurrency_file = e.file
@@ -3469,6 +3473,10 @@ impl Sema:
         if bound.is_some() and not self.binding_index_is_global(bound.unwrap(), sym):
             return
         if self.global_symbol_is_synchronized(sym):
+            return
+        // §16.3: a C global the header declares thread-local is one per
+        // thread; neither a read nor a write of it races.
+        if (self.extern_var_texts.get(self.pool_resolve(sym)).copied() ?? 0) == 2:
             return
         // #1819: the write is a write of the body it is in — in std and the
         // runtime too, whose bodies hold views of their own globals.
@@ -5224,6 +5232,25 @@ impl Sema:
             return true
         if self.global_race_mutated_syms.contains(sym):
             return true
+        self.global_is_c_written(sym)
+
+    // §16.3 (D198, #3220): an imported C global follows §9.1 rule 3 with one
+    // difference: C may write it. The proof counts With's writes, and the
+    // library is a writer the compiler cannot see, so a read needs the
+    // proof too, unless the header declares the global `const` (an
+    // `extern let`) or thread-local (never recorded as a racing access).
+    fn global_is_c_written(sym: i32) -> bool:
+        self.mutable_global_syms.contains(sym) and (self.extern_var_texts.get(self.pool_resolve(sym)).copied() ?? 0) == 1
+
+    // Whether the facade of the library that declares the C global `sym`
+    // says `creates threads`.
+    fn c_global_library_creates_threads(sym: i32) -> bool:
+        if self.facade_thread_headers.len() == 0: return false
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR or self.ast.get_data0(decl) != sym: continue
+            let file = self.facade_decl_file_name(di)
+            if file.starts_with("<c_import ") and file.ends_with(">"): return self.facade_thread_headers.contains(file.slice(10, file.len() - 1))
         false
 
     mut fn emit_global_data_race_error(idx: isize):
@@ -5233,8 +5260,10 @@ impl Sema:
         let kind = self.global_race_access_kinds[idx]
         let name = self.pool_resolve(sym)
         let access = if kind == GLOBAL_RACE_ACCESS_WRITE: "mutation" else: "read"
-        let diag = Diagnostic.err("E0921: " ++ access ++ " of global `" ++ name ++ "` may race", Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
-        let access_label = if kind == GLOBAL_RACE_ACCESS_WRITE: "global mutated here" else: "global read here; this global is mutated elsewhere"
+        let c_written = self.global_is_c_written(sym)
+        let headline = if c_written: "E0921: " ++ access ++ " of C global `" ++ name ++ "` may race: C can write it; it is safe when declared `const` or thread-local, or inside `unsafe`" else: "E0921: " ++ access ++ " of global `" ++ name ++ "` may race"
+        let diag = Diagnostic.err(headline, Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+        let access_label = if kind == GLOBAL_RACE_ACCESS_WRITE: "global mutated here" else: if c_written: "C global read here; the library may write it" else: "global read here; this global is mutated elsewhere"
         diag.add_label(Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) }, access_label)
         if self.global_race_concurrency_node != 0:
             let conc = self.global_race_concurrency_node
@@ -5247,19 +5276,42 @@ impl Sema:
             let tid: i32 = self.bind_types[bind]
             if tid != 0:
                 atomic = "Atomic[" ++ self.type_name(tid) ++ "]"
-        diag.add_help("use " ++ atomic ++ ", wrap in Mutex, or assert with `unsafe`")
+        if c_written:
+            if self.global_race_concurrency_node == 0: diag.add_note("its library's facade says `creates threads`: the library may write the global at any time")
+            diag.add_help("read it on the one thread that calls the library, or assert with `unsafe`")
+        else:
+            diag.add_help("use " ++ atomic ++ ", wrap in Mutex, or assert with `unsafe`")
         self.diags.emit(diag)
 
     mut fn validate_global_data_race_accesses():
+        // §16.3 (#3220, #3237): a C global is safe to access when every
+        // call into its library and every access to its globals is provably
+        // on one thread. Conservatively: the program has no task and no
+        // spawned thread, and the library's facade does not say it runs
+        // threads of its own.
+        let tasks = self.resolve_global_race_concurrency(true)
+        let tasks_node = self.global_race_concurrency_node
+        let tasks_file = self.global_race_concurrency_file
+        let tasks_reason = with_str_clone_ref(self.global_race_concurrency_reason)
+        self.global_race_concurrency_node = 0
         let proof_failed = self.resolve_global_race_concurrency()
+        let any_node = self.global_race_concurrency_node
+        let any_file = self.global_race_concurrency_file
+        let any_reason = with_str_clone_ref(self.global_race_concurrency_reason)
         for i in 0..self.global_race_access_syms.len():
             if self.global_data_race_access_needs_proof(i) == false:
                 continue
             let in_unsafe: i32 = self.global_race_access_unsafe[i]
-            if proof_failed:
+            let c_global = self.global_is_c_written(self.global_race_access_syms[i])
+            let library_threads = c_global and self.c_global_library_creates_threads(self.global_race_access_syms[i])
+            let failed = if c_global: tasks or library_threads else: proof_failed
+            self.global_race_concurrency_node = if c_global: (if tasks: tasks_node else: 0) else: any_node
+            self.global_race_concurrency_file = if c_global: tasks_file else: any_file
+            self.global_race_concurrency_reason = if c_global: (if tasks: with_str_clone_ref(tasks_reason) else: "") else: with_str_clone_ref(any_reason)
+            if failed:
                 if in_unsafe == 0:
                     self.emit_global_data_race_error(i)
-            else if in_unsafe != 0:
+            else if in_unsafe != 0 and not c_global:
                 let path = self.global_race_access_paths[i]
                 if sema_path_is_user_lint_source(path) == false:
                     continue

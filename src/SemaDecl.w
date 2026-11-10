@@ -2594,14 +2594,15 @@ impl Sema:
     mut fn collect_extern_var(node: i32, is_local: bool):
         let name = self.ast.get_data0(node)
         self.record_decl_visibility(name, node, 1)
-        self.extern_var_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
+        // 1: an ordinary C global; 2: one the header declares thread-local.
+        self.extern_var_texts.insert(sema_owned_text(self.pool_resolve(name)), if self.ast.get_data2(node) >= 2: 2 else: 1)
         let type_node = self.ast.get_data1(node)
         let tid = self.resolve_type_expr(type_node)
         self.extern_var_type_ids.insert(node, tid as i32)
         if self.is_opaque_value_type(tid):
             self.emit_error("opaque types cannot be declared as extern values; use a pointer or reference", type_node)
         // Register the extern var for scope lookup
-        let is_mut = (self.ast.get_data2(node) != 0) as i32
+        let is_mut = self.ast.get_data2(node) % 2
         if is_mut != 0:
             self.mutable_global_syms.insert(name, 1)
         self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)

@@ -368,6 +368,16 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
             let held = if holder.len() > 0: f"retained by {holder} ({contract_param(sema, c.fn_sym, by)})" else: f"retained by {contract_param(sema, c.fn_sym, by)}, which receives no modeled resource"
             contract_row(report, sema, site, subject, CONTRACT_FN, clause, c.fn_sym, owner, pi, "effect", f"{shown}: {held}{recv_note}", contract_clause_at(sema, site, clause))
             stated = true
+        // D198 (§16.2b.5): a value record, by what the callee does with it.
+        var vk = 0
+        for described in c.value_records:
+            if described == pi:
+                let clause = contract_clause(sema, node, FACADE_CLAUSE_VALUE_RECORD, vk)
+                let word = sema.pool_resolve(c.value_record_words[vk])
+                let presented = if word == "reads": (if c.nullable_params.contains(pi): "presented as Option[&T]" else: "presented as &T") else: if word == "fills": "With passes T.zeroed() and the record joins what the operation presents" else: "presented as a mut parameter"
+                contract_row(report, sema, site, subject, CONTRACT_FN, clause, c.fn_sym, owner, pi, "effect", f"{shown}: value record, {word}; {presented}; the callee keeps no pointer to it or into it and touches no memory but the record's own{recv_note}", contract_clause_at(sema, site, clause))
+                stated = true
+            vk += 1
         for k in 0..c.callback_consumes.len():
             if c.callback_consumes[k] != pi: continue
             let clause = contract_clause(sema, node, FACADE_CLAUSE_CALLBACK_CONSUMES, k as i32)
