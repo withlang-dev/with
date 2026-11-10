@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.45
+# The With Programming Language — Specification v7.46
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.46:** D198 Amendment 4 (Eric, 2026-11-10, #3173). §16.2b.3: the fields of a type a facade generates belong to its generated code; outside it the only one a program can name is `.repr`, and that needs `unsafe`.
+
 **Changelog v7.45:** D198 Amendment 3 (Eric, 2026-11-10, #3173). §16.2b.3: a field of a by-value or in-place resource's record is read through the resource (`image.width`); fields are not assigned through it; the record itself is `.repr`, under the raw C rules; a field named like a presented operation, or `repr`, is a facade error; a pointer resource has no such reads.
 
 **Changelog v7.44:** D198 amendments (Eric, 2026-11-10, #3173). §16.2b.5: a value record is flat, and each clause asserts the callee touches no memory but the record's own; "holds a pointer" is defined once, and a parameter passed by value whose type holds a pointer is a pointer parameter, raw unless a facade models that type; a by-value token's operations are what their imported names mean. §16.2b.15: a `c_import` of a header that resolves inside a fetched package applies that package's facade. §16.3, §19.2: assigning a C global whose type holds a pointer is raw; conversion to a function type from an integer, a pointer or another signature requires `unsafe`.
