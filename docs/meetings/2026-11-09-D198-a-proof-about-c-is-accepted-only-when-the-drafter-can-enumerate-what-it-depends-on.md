@@ -103,3 +103,43 @@ say three things:
 **What would reopen it.** A drafter that can finish the alias analysis
 (a whole-program points-to result it can show its work for) reopens the
 shape-A refusal; nothing else does.
+
+## Amendment, the same day: the words are blessed (spec v7.43)
+
+Eric settled the six points the draft wording left open and wrote the
+replacement text, which is §16.2b.5 "Value records", the §16.2b.11
+sentence, the sentence appended to §16.2b.3's in-place paragraph, and the
+facts-file paragraph of §16.2b.15, verbatim.
+
+1. **Clause words or none: keep the words** (`reads`, `fills`, `updates
+   param N`). With no clause, a listed operation taking `const T *` would
+   be presented as `&T` on the strength of its spelling, which infers
+   non-retention from `const` (Law 4). A hand-written facade over a
+   library with no readable source has no proof and needs a way to state
+   the fact. Where the source exists, the draft writes the clause and the
+   user writes nothing.
+2. **`resource R in T`: dropped.** The form already exists: `resource
+   InflateStream wraps z_stream` with `init inflateInit(self)`.
+3. **`fills` beside a status: the existing rule decides.** With `ok` it is
+   `Result[T, E]`; without `ok` the status is uninterpreted, so it is
+   `(status, T)`.
+4. **Where non-movable lives: nowhere.** §16.2b.3 already pins the
+   representation and keeps the resource value movable. The draft's "an R
+   is not movable" (and this entry's first reading of "pinned") contradicted
+   that and does not land.
+5. **One field per line.** Each fact carries its own citation.
+6. **The context pointer is stated** (`field memory_data of R is
+   context`). A hook setter retains it, and the drafter must not read it
+   as an escaping argument.
+
+§16.2b.9 gets no new sentence: its Reentrancy paragraph already covers a
+library invoking a registered callback from inside an operation.
+
+Where the first half of this entry and the amendment disagree (the
+non-movable resource, `mut fn` for an in-out record), the amendment and
+the spec text stand: an `updates` parameter is a `mut` parameter (D172),
+the receiver only when the operation is presented as a method of `T`.
+
+**Status of the implementation: NON-COMPLIANT** until the drafter writes
+the three clauses from proofs, the facade checker and renderer accept and
+present them, and the facts grammar reads the four field roles.
