@@ -2283,6 +2283,23 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
             b.cap_of = bname
             b.cap_unit = unit
         return b
+    // D198 (§16.2b.5, §16.2b.11): a value record. `reads param N` is a `&T`
+    // argument; `updates param N` is a `mut` parameter (D172), whose place
+    // the callee writes.
+    let value_record = facade_render_value_record_kind(pool, intern, decl, pi)
+    if value_record == FACADE_CLAUSE_READS or value_record == FACADE_CLAUSE_UPDATES:
+        let pointer = facade_render_unalias(pool, intern, ptype)
+        let record = if pointer.starts_with("*const "): pointer.slice(7, pointer.len()) else: if pointer.starts_with("*mut "): pointer.slice(5, pointer.len()) else: ""
+        if record.len() == 0:
+            b.ok = false
+            return b
+        if value_record == FACADE_CLAUSE_READS:
+            b.params = pname ++ ": &" ++ record
+            b.args = "(" ++ pname ++ " as " ++ ptype ++ ")"
+        else:
+            b.params = "mut " ++ pname ++ ": " ++ record
+            b.args = "(&raw mut " ++ pname ++ " as " ++ ptype ++ ")"
+        return b
     // D122 (§16.2b.8): `text param N` — input text of any C character
     // type takes a `str`, copied to a NUL-terminated temporary for the
     // call; an interior NUL is refused as §16.3c refuses it for `const
@@ -3667,6 +3684,20 @@ fn facade_render_record_view_methods(pool: &AstPool, intern: &InternPool, ci: &L
 
 // Whether `text param N` names parameter `pi` of the declaration, in its
 // fn item: input text of any C character type, taking a `str`.
+// D198: the value-record clause that names parameter `pi` (`reads`, `fills`
+// or `updates`, as its FACADE_CLAUSE_ kind), or 0.
+fn facade_render_value_record_kind(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> i32:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0:
+        return 0
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        let kind = pool.get_data0(clause as NodeId)
+        if facade_clause_is_value_record(kind) and facade_render_param_ref(pool, intern, decl, pool.get_extra(pool.get_data1(clause as NodeId))) == pi:
+            return kind
+    0
+
 fn facade_render_param_is_text(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> bool:
     let item = facade_render_fn_item(pool, intern, decl)
     if item == 0:
