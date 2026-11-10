@@ -1170,6 +1170,8 @@ type CiProject {
     // when the file states none.
     registry_utf8: str,
     registry_value_text: str,
+    field_role_text: str,             // the stated roles as the draft's provenance lines, in the file's order
+    field_roles: HashMap[str, str],   // §16.2b.15: `Record.field` -> `role|record|cite`, from the registry
     registry_value_fns: List[str],
     // D198 (#3206): every write of a function-pointer field and every
     // escape of a record the corpus shows (CImport.w
@@ -1211,6 +1213,8 @@ fn CiProject.new -> CiProject:
         alloc_aliases: List.new(),
         registry_utf8: "",
         registry_value_text: "",
+        field_role_text: "",
+        field_roles: HashMap.new(),
         registry_value_fns: [],
         fnptr_evidence: "",
         fnptr_verdicts: HashMap.new(),

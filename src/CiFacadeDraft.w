@@ -113,9 +113,24 @@ impl CiProject:
     // every producer that casts its result stayed raw).
     fn fd_is_alloc_call(name: &str) -> bool:
         if ci_own_is_libc_allocator(name) or self.alloc_aliases.contains(name): return true
+        let role = self.fd_field_role(name)
+        if role == "allocator" or role == "reallocator": return true
         let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, name)
         si >= 0 and self.symbols[si].ret_ty.starts_with("*") and self.fd_has_attr(si, "malloc")
-    fn fd_is_free_call(name: &str) -> bool: ci_own_is_libc_free(name) or self.free_aliases.contains(name)
+    fn fd_is_free_call(name: &str) -> bool:
+        if ci_own_is_libc_free(name) or self.free_aliases.contains(name): return true
+        let role = self.fd_field_role(name)
+        role == "deallocator" or role == "reallocator"
+
+    // §16.2b.15: the role the registry states for the function-pointer
+    // field a `*Record.field` callee names: a call through an `allocator`
+    // returns a fresh allocation the caller owns, one through a
+    // `reallocator` consumes its argument and returns one, one through a
+    // `deallocator` destroys its argument. "" when none is stated; a role is
+    // never drawn from the field's name.
+    fn fd_field_role(callee: &str) -> str:
+        if not callee.starts_with("*") or not self.field_roles.contains(callee.slice(1, callee.len())): return ""
+        facts_kind(self.field_roles.get(callee.slice(1, callee.len())).unwrap())
 
     // D198 (#3206, Eric 2026-11-09): a proof about C is accepted only when
     // the drafter can enumerate everything it depends on. A function-pointer
@@ -202,6 +217,7 @@ impl CiProject:
         // D198: through a function-pointer field, the one function it is
         // proven to hold decides; an unproven field retains.
         if callee.starts_with("*"):
+            if self.fd_field_role(callee).len() > 0: return false
             let proven = self.fd_fnptr_proven_callee(callee)
             return proven.len() == 0 or self.fd_callee_retains(proven, index)
         if self.fd_is_free_call(callee) or self.fd_is_alloc_call(callee) or ci_own_is_libc_observer(callee): return false
@@ -230,6 +246,7 @@ impl CiProject:
 
     fn fd_callee_destroys(callee: &str, index: i32) -> bool:
         if callee.starts_with("*"):
+            if self.fd_is_free_call(callee): return true
             let proven = self.fd_fnptr_proven_callee(callee)
             return proven.len() > 0 and self.fd_callee_destroys(proven, index)
         if self.fd_is_free_call(callee): return true
@@ -281,6 +298,7 @@ impl CiProject:
         // read; which function the field holds is a registry fact.
         if src.starts_with("indirect:"):
             // D198: the one function the field is proven to hold decides.
+            if self.fd_is_alloc_call("*" ++ src.slice(9, src.len())): return "owned"
             let proven = self.fd_fnptr_proven_callee("*" ++ src.slice(9, src.len()))
             if proven.len() > 0: return self.fd_source_verdict(si, "call:" ++ proven ++ ":", depth + 1)
             return "unknown:returns what " ++ self.fd_fnptr_why("*" ++ src.slice(9, src.len()))
@@ -1063,6 +1081,10 @@ impl CiProject:
         let modeled = self.fd_modeled_records()
         self.presented = List.new()
         var text = "// Facade draft for " ++ name ++ ", proven from the package's own source (§16.2b.15, D121).\n// Every clause records its proof; a project may override any single fact.\n"
+        // §16.2b.15: the roles the registry states for function-pointer
+        // fields; a proof below that says "a fresh allocation" or "frees"
+        // over a call through one rests on these.
+        if self.field_role_text.len() > 0: text = text ++ "// Function-pointer fields, as the registry states them:\n" ++ self.field_role_text
         text = text ++ "c facade " ++ name ++ ":\n"
         if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
         for record in modeled:
