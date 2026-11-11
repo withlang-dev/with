@@ -23,7 +23,9 @@ With (D51).
 - A **clause** is a line of a contract.
 - A **claim** is a clause that rests on a person's word rather than a proof.
 - A **facts file** (`c facts name:`) is a contract every clause of which is a
-  claim; each carries a citation.
+  claim; each carries a citation. (On main the registry's files are headed
+  `c facade name:`; `c facts` is the header this draft proposes, question
+  11.9.)
 - A **convention profile** (`c convention name.vN:`) is a named set of rules
   that produce clauses by pattern; a contract adopts one.
 - A **facade** is not part of this language. The word means the hand-written
@@ -389,6 +391,9 @@ decided here.
    `contract-report.txt`, `contract.json`, a project's `contracts/`
    directory and the `contracts.<name>` module path are derived from the
    ruling, not stated in it.
+9. **A facts file's header.** `c facts name:` (this draft) or `c contract
+   name:`. The file is named `facts.w` either way. A distinct header lets
+   the reader require a citation on every clause by the header alone.
 8. **`handle`'s keyword.** A callback-scope handle is a kind of resource
    with no clauses. It keeps its own item word here because the parser has
    one; it could be `resource N wraps *mut T` with a `callback scope`

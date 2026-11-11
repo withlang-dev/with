@@ -257,7 +257,11 @@ the proposal left loose:
   the proposals.
 - The D51 ruling's own text and dated meeting records. They are history; the
   decision log gets one entry pointing at this ruling.
-- `c facts`, which already has the right name.
+- `c facts`, which already has the right name. (Checked 2026-11-11: the
+  name is the file's, `facts.w`, and this proposal's; the registry files on
+  main are headed `c facade NAME:`, which the facts reader requires. The
+  header is respelled with the keyword; whether to `c facts NAME:` is asked
+  in docs/proposals/wcl-implementation-plan.md.)
 
 **Derived from the ruling, not stated in it** (each needs a yes before the
 migration does it): the file a fetch writes, `.with/deps/c/<name>/<version>/
