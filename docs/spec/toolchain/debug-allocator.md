@@ -97,6 +97,12 @@ All additive to `rt/rt_core.w`; pure `.w`.
   `debug-alloc: DOUBLE FREE addr=<a> size=<n> origin=<site> first_drop=<tag> second_drop=<tag>`
   and abort (exit 134); else mark freed and remember the first drop tag. This sees freelist
   double-pushes the existing `rt_payload_start_can_be_owned` panic can miss.
+- **Sites (#1014, Darwin).** The entry also keeps the calling chain of the allocation and
+  of the first free. A `DOUBLE FREE` line is followed by `debug-alloc: first free` and
+  `debug-alloc: second free`, each a symbolized chain, innermost first; the first 16 `LEAK`
+  lines are each followed by `debug-alloc:   allocated at`. `atos -o <binary> <addr>` turns
+  a frame into a line. The other backends have no in-process unwinder yet and print the
+  tags only; there the address trap under lldb is still the route.
 - **Scribble on free (opt-in: `WITH_DEBUG_ALLOC_SCRIBBLE`).** Freed small payloads are
   overwritten with `0xDE` so use-after-free reads corrupt loudly. It is **off by default**
   because, for a `List[Drop]` buffer, poisoning the freed payload turns a subsequent

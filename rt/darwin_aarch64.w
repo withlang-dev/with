@@ -423,6 +423,13 @@ pub fn rt_backtrace_print():
     rt_write(2, header as *const u8, header.len())
     backtrace_symbols_fd(&raw mut frames as *mut [64]*mut u8 as *mut *mut u8, n, 2)
 
+// #1014: the calling chain's return addresses, innermost first, for a
+// caller that keeps them (the debug allocator stores a block's first free).
+pub fn rt_backtrace_capture(buf: *mut i64, cap: i32) -> i32: backtrace(buf as *mut *mut u8, cap)
+
+pub fn rt_backtrace_print_frames(buf: *const i64, n: i32):
+    if n > 0: backtrace_symbols_fd(buf as *mut *mut u8, n, 2)
+
 pub fn rt_getpid() -> i32:
     rt_libc_getpid()
 

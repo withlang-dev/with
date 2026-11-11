@@ -619,6 +619,13 @@ pub fn rt_nanosleep(ns: i64) -> i32:
 pub fn rt_backtrace_print() -> Unit:
     return
 
+// #1014: no in-process unwinder on this backend, so the debug allocator
+// records no free site here and its reports name the drop tag only.
+pub fn rt_backtrace_capture(buf: *mut i64, cap: i32) -> i32: 0
+
+pub fn rt_backtrace_print_frames(buf: *const i64, n: i32) -> Unit:
+    return
+
 pub fn rt_getpid() -> i32:
     GetCurrentProcessId()
 

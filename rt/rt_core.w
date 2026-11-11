@@ -42,6 +42,8 @@ extern fn rt_libc_malloc(size: i64) -> *mut u8
 @[link_name("free")]
 extern fn rt_libc_free(ptr: *mut u8) -> Unit
 extern fn rt_exit(code: i32) -> Never
+extern fn rt_backtrace_capture(buf: *mut i64, cap: i32) -> i32
+extern fn rt_backtrace_print_frames(buf: *const i64, n: i32)
 extern fn rt_clock_ns() -> i64
 extern fn rt_wall_clock_sec() -> i64
 extern fn rt_wall_clock_ns() -> i64
@@ -1185,10 +1187,12 @@ fn free_small_block(block: i64, idx: i32):
 // ── Debug allocator (issue #606 instrument) ────────────────────────
 // A pure-With memory-error ledger gated at runtime by --debug-alloc /
 // WITH_DEBUG_ALLOC. It does DETECTION only: per-payload-address tracking that
-// aborts loudly on a double-free and lists un-freed blocks at exit. Source SITES
-// (which alloc/free call) are resolved out-of-process by the harness via lldb
-// conditioned on the address reported here — With codegen does not maintain a
-// walkable frame-pointer chain. The exception is a panic on Windows x64, where
+// aborts loudly on a double-free and lists un-freed blocks at exit. A double
+// free names both free sites where the backend can unwind in-process (Darwin,
+// #1014: the ledger keeps the first free's chain). Other source SITES (which
+// alloc call, and frees elsewhere) are resolved out-of-process by the harness
+// via lldb conditioned on the address reported here — With codegen does not
+// maintain a walkable frame-pointer chain. Another exception is a panic on Windows x64, where
 // the unwind tables let rt_backtrace_print name the chain in-process, so a
 // WITH_DEBUG_ALLOC_TRAP_FREE_HIT stop needs no debugger there (#1081).
 // All ledger ops run under the allocator lock (called from rt_alloc/rt_free).
@@ -1197,7 +1201,17 @@ fn free_small_block(block: i64, idx: i32):
 // exactly where it is needed (#1081: a stage compiler's own double free).
 // 4M slots x 72 bytes is a 302 MB reservation, touched only as it fills.
 let DBG_CAP: i64 = 4194304
-let DBG_ENTRY_WORDS: i64 = 9        // addr, size, freed, alloc_origin, first_drop_ptr, first_drop_len, root_flag, root_reason_ptr, root_reason_len
+let DBG_ENTRY_WORDS: i64 = 23       // addr, size, freed, alloc_origin, first_drop_ptr, first_drop_len, root_flag, root_reason_ptr, root_reason_len, then the two sites
+// #1014: the return addresses of the first free and of the allocation
+// (innermost first, 0 ends a list), so a DOUBLE FREE names both free sites
+// and a LEAK names where the block was made, with no debugger.
+let DBG_SITE_FRAMES: i64 = 8
+let DBG_SITE_OFFSET: i64 = 72
+let DBG_ALLOC_SITE_FRAMES: i64 = 6
+let DBG_ALLOC_SITE_OFFSET: i64 = 136
+// A leak report names the allocation site of its first blocks only: a
+// program that leaks in a loop leaks thousands from one site.
+let DBG_LEAK_SITES_SHOWN: i64 = 16
 
 let DBG_ORIGIN_UNKNOWN: i64 = 0
 let DBG_ORIGIN_WITH_ALLOC: i64 = 1
@@ -1660,12 +1674,59 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
             unsafe *((e + 48) as *mut i64) = 0
             unsafe *((e + 56) as *mut i64) = 0
             unsafe *((e + 64) as *mut i64) = 0
+            unsafe *((e + DBG_SITE_OFFSET) as *mut i64) = 0
+            dbg_capture_site(e + DBG_ALLOC_SITE_OFFSET, DBG_ALLOC_SITE_FRAMES)
             return
         slot = (slot + 1) & (DBG_CAP - 1)
         probes = probes + 1
     if dbg_full_warned == 0:
         dbg_full_warned = 1
         dbg_puts("debug-alloc: ledger full, tracking truncated\n")
+
+// The calling chain, `count` frames of it, into the ledger words at `at`.
+// Frame 0 is this function; the rest of the runtime's own frames stay,
+// since inlining decides how many there are.
+fn dbg_capture_site(at: i64, count: i64):
+    var frames: [9]i64 = [0 as i64; 9]
+    let n = rt_backtrace_capture(&raw mut frames as *mut [9]i64 as *mut i64, 9)
+    for k in 0..count:
+        unsafe *((at + k * 8) as *mut i64) = if k + 1 < n: frames[k + 1] else: 0
+
+// How many frames the site at `at` holds.
+fn dbg_site_len(at: i64, count: i64) -> i32:
+    var n: i32 = 0
+    while n < count and (unsafe *((at + n * 8) as *const i64)) != 0: n += 1
+    n
+
+// The ledger entry of `addr`, or 0.
+fn dbg_ledger_entry(addr: i64) -> i64:
+    if dbg_base == 0: return 0
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0: return 0
+        if a == addr: return e
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+    0
+
+// Both sites of a double free of `addr`: the stored chain of the first
+// free, then this one's. Silent where the backend captured nothing.
+fn dbg_put_free_sites(addr: i64):
+    let e = dbg_ledger_entry(addr)
+    if e == 0: return
+    let n = dbg_site_len(e + DBG_SITE_OFFSET, DBG_SITE_FRAMES)
+    if n == 0: return
+    dbg_puts("debug-alloc: first free (innermost first; `atos -o <binary> <addr>` for a line):\n")
+    rt_backtrace_print_frames((e + DBG_SITE_OFFSET) as *const i64, n)
+    dbg_puts("debug-alloc: second free:\n")
+    // Captured, not rt_backtrace_print: this runs under the allocator lock,
+    // and that function frees a str.
+    var frames: [32]i64 = [0 as i64; 32]
+    let here = rt_backtrace_capture(&raw mut frames as *mut [32]i64 as *mut i64, 32)
+    rt_backtrace_print_frames(&raw const frames as *const [32]i64 as *const i64, here)
 
 // Mark a free. Returns 1 if this is a double free (already freed, not reused).
 fn dbg_mark_free(addr: i64, drop_origin_ptr: i64, drop_origin_len: i64) -> i32:
@@ -1686,6 +1747,7 @@ fn dbg_mark_free(addr: i64, drop_origin_ptr: i64, drop_origin_len: i64) -> i32:
             unsafe *((e + 16) as *mut i64) = 1
             unsafe *((e + 32) as *mut i64) = drop_origin_ptr
             unsafe *((e + 40) as *mut i64) = drop_origin_len
+            dbg_capture_site(e + DBG_SITE_OFFSET, DBG_SITE_FRAMES)
             return 0
         slot = (slot + 1) & (DBG_CAP - 1)
         probes = probes + 1
@@ -1841,6 +1903,7 @@ fn dbg_report_double_free(addr: i64, size: i64, origin: i64, first_drop_ptr: i64
     dbg_puts(" second_drop=")
     dbg_put_drop_origin(second_drop_ptr, second_drop_len)
     dbg_puts("\n")
+    dbg_put_free_sites(addr)
     rt_exit(134)
 
 // Poison a freed small-block payload so use-after-free reads corrupt loudly.
@@ -1897,6 +1960,10 @@ pub fn with_debug_alloc_report_leaks() -> Unit:
                 dbg_put_origin(origin)
                 dbg_put_root_reason(e)
                 dbg_puts("\n")
+                let site_len = dbg_site_len(e + DBG_ALLOC_SITE_OFFSET, DBG_ALLOC_SITE_FRAMES)
+                if leaks < DBG_LEAK_SITES_SHOWN and site_len > 0:
+                    dbg_puts("debug-alloc:   allocated at (innermost first):\n")
+                    rt_backtrace_print_frames((e + DBG_ALLOC_SITE_OFFSET) as *const i64, site_len)
                 leaks = leaks + 1
         slot = slot + 1
     dbg_report_peak()
