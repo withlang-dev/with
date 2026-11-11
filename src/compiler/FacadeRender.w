@@ -1695,7 +1695,11 @@ fn facade_render_received(pool: &AstPool, intern: &InternPool, ptext: &str) -> i
     for item in items:
         let res = item
         let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(res as NodeId)) as NodeId))
-        if not repr.starts_with("*") and not facade_render_has_clause(pool, res, FACADE_CLAUSE_INIT):
+        // A by-value token is recognized by its type when it is a record:
+        // `int` is an `Fd` only where an `of` says so (#1669), but a C
+        // record a resource wraps is that resource wherever it is passed
+        // (§16.2b.3: one resource per representation).
+        if not repr.starts_with("*") and not facade_render_has_clause(pool, res, FACADE_CLAUSE_INIT) and not facade_render_is_record(pool, intern, repr):
             continue
         if p == repr or p == "*mut " ++ repr or p == "*const " ++ repr or facade_render_const_of(p, repr):
             if found != 0:

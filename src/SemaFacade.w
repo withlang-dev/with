@@ -2851,7 +2851,9 @@ impl Sema:
         let pointee = if self.get_type_kind(p) == TypeKind.TY_PTR: self.get_type_d0(p) else: 0
         for i in 0..self.facade_resources.len():
             let repr = self.resolve_alias(self.facade_resources[i].repr_tid as TypeId)
-            if self.get_type_kind(repr) != TypeKind.TY_PTR and self.facade_resources[i].init == 0:
+            // A by-value token is recognized by its type when it is a
+            // record (FacadeRender.w facade_render_received).
+            if self.get_type_kind(repr) != TypeKind.TY_PTR and self.facade_resources[i].init == 0 and self.get_type_kind(repr) != TypeKind.TY_STRUCT:
                 continue
             if self.facade_param_matches_repr(p as i32, repr as i32) or (pointee != 0 and self.facade_same_type(pointee, repr as i32)):
                 out.push(i as i32)
