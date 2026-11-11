@@ -12108,7 +12108,8 @@ impl Sema:
             // the translation cannot read: `buf_free(w.inner)` in an inline
             // `wrap_free` refused the whole header.
             if self.current_file_is_generated("<c_import ") and self.fn_is_raw_by_value_record_only(fn_sym): return ""
-            return "raw c_import function call requires unsafe context" ++ self.by_value_pointer_param_note(fn_sym)
+            let by_value = self.by_value_pointer_param_note(fn_sym)
+            return "raw c_import function call requires unsafe context" ++ (if by_value.len() > 0: by_value else: self.fetched_facade_raw_note(fn_sym))
         if self.fn_symbol_is_manual_extern(fn_sym):
             let name = self.pool_resolve(fn_sym)
             // D30: a program declaring the compiler's runtime by hand is told
@@ -12116,6 +12117,21 @@ impl Sema:
             if sema_name_is_compiler_abi_extern(name) and sema_path_is_user_lint_source(self.current_module_path):
                 return f"manual extern function call requires unsafe context; '{name}' is the compiler's own runtime (D30), not an interface for programs: call the std API that wraps it"
             return "manual extern function call requires unsafe context"
+        ""
+
+    // #3117: when a fetched package's facade is applied and its report says
+    // why it left `fn_sym` raw, the diagnostic says so and names the command
+    // that prints the line. "" otherwise.
+    fn fetched_facade_raw_note(fn_sym: i32) -> str:
+        let name = self.pool_resolve(fn_sym)
+        for di in 0..self.ast.decl_count():
+            if self.ast.kind(self.ast.get_decl(di)) != NodeKind.NK_C_FACADE or di >= self.decl_source_paths.len(): continue
+            let path = self.decl_source_paths[di].replace("\\", "/")
+            if not (path.contains("/.with/deps/c/") or path.starts_with(".with/deps/c/")): continue
+            let why = resolve_facade_report_line(resolve_fetched_facade_report(path), name)
+            if not why.starts_with("raw: "): continue
+            let package = self.pool_resolve(self.ast.get_data0(self.ast.get_decl(di)))
+            return f": the facade of {package} leaves `{name}` raw: {why.slice(5, why.len())} (`with facade report c.{package} {name}`)"
         ""
 
     // D198 (§16.2b.5): when what makes `fn_sym` raw is a parameter passed by
