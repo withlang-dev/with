@@ -66,6 +66,38 @@ already uses the word `contract` for other things (a facade fn item's
 `contract` in `Sema.w`, the contract view, D159's migrator contracts), so
 the identifier rename is planned name by name, not by pattern.
 
+## Decided 2026-11-11 (Eric)
+
+1. **A registry file is headed `c facts NAME:`.** A registry file is a facts
+   file; a contract is what the program or the drafter writes. "Every line
+   here needs a citation" is readable from the header.
+2. **Two landings.** The in-tree keyword rename lands when its battery is
+   green. The registry files' respelling lands with the release, because
+   every released compiler refuses a respelled file and falls back to its
+   own release's facts (D199). Between the two, the facts reader accepts
+   both headers on a registry file, `c facts NAME:` and `c facade NAME:`;
+   that is the one place two spellings stand, and the old one is deleted in
+   the release's stack.
+3. **The names are part of the ruling, stated, not derived:** `contract.w`,
+   `contract-report.txt` and `contract.json` in a fetched package; a
+   project's `contracts/` directory; `use contracts.<name>`; `with migrate
+   --contract`. `lib/facades/` becomes `lib/contracts/` (its five files hold
+   contract blocks). A directory that holds the library layer keeps its
+   name.
+4. **The specification gets its own chapter**, with §16.2b reduced to an
+   introduction that points at it.
+5. **Every unproven grant is a claim**, counted and printed by `with analyze
+   … contract` and the census, the program's own beside the registry's. A
+   citation is required in the standard library, the runtime and the
+   registry, not in a program's own source. A claim in a user program is not
+   refused; `:user-programs-safe` reports the count for the fixtures and
+   examples.
+6. **The provenance words are renamed in the keyword stack.**
+7. **A field role may be stated in a program's contract**, like every other
+   grant.
+8. **`thread creator` written out is flagged redundant.** `handle` keeps its
+   word. The `callback` field role needs its own brief.
+
 ## Stack A: the keyword migration
 
 Its own stack, separate from the formal specification. One battery.
@@ -96,9 +128,8 @@ report.**
 "`c facade` is now `c contract` (the With Contract Language); run
 `with fix-contracts`". No period in which both are accepted: the seed does
 not need one, and two spellings of one meaning are a defect (law 9).
-The facts reader (`CiFacts.w`) takes `c facts NAME:` as its header and
-refuses `c facade NAME:` the same way. **Question for Eric:** `c facts` or
-`c contract` for a registry file's header.
+The facts reader (`CiFacts.w`) takes `c facts NAME:` as its header, and
+until the release also `c facade NAME:` on a registry file (decision 2).
 
 **A3. The rewrite tool.** `with fix-contracts [--apply] [path…]`, built in
 (Lexer-based, the shape of `with migrate-receivers`): rewrites `c facade` at
@@ -115,8 +146,7 @@ files), listed. Generated corpora under `lib/std/engines` and
 
 **A5. Paths.** `lib/facades/` becomes `lib/contracts/`; the module path
 `facades.<name>` becomes `contracts.<name>` (`Resolve.w`: the path
-recognizers at lines 1435, 1600, 1642 on main; `Frontend.w` 3444). Derived
-from the ruling, needing a yes each: a fetch writes `contract.w`,
+recognizers at lines 1435, 1600, 1642 on main; `Frontend.w` 3444). By the ruling (decision 3): a fetch writes `contract.w`,
 `contract-report.txt`, `contract.json`; a project's override directory is
 `contracts/`. An existing `.with/deps` tree written by an older compiler has
 `facade.w`: the resolver reads the old name with a note for one release, or
@@ -133,6 +163,16 @@ it, and a build that finds only `facade.w` says "run `with get`".
 test expectations that quote them move with them (`test/compile_errors`,
 `build/selfhost.w`). Done with the classifier's *string* list, each string
 read once; a string that means the library layer stays.
+
+**A7b. Provenance words and the claim count.** The contract view prints
+`stated`, `proof`, `annotation`, `registry`, `profile`, `default`
+(wcl-spec.md 6.3), marks each claim, and ends with the count. The fixtures
+that snapshot the view move with it. The census gains the claim count;
+`:user-programs-safe` reports it for the fixtures and examples. A stated
+grant with no citation is refused in `lib/std`, `rt/` and the registry: the
+runtime's own contracts and the standard library's are read first, and each
+grant there gets its citation in this stack or the stack stops and lists
+them.
 
 **A8. Compiler identifiers.** `NK_C_FACADE`, `FACADE_CLAUSE_*`,
 `SemaFacade.w`, `FacadeRender.w`, `CiFacadeDraft.w`, `facade_render_*`,

@@ -263,12 +263,22 @@ the proposal left loose:
   header is respelled with the keyword; whether to `c facts NAME:` is asked
   in docs/proposals/wcl-implementation-plan.md.)
 
-**Derived from the ruling, not stated in it** (each needs a yes before the
-migration does it): the file a fetch writes, `.with/deps/c/<name>/<version>/
+**Added to the ruling on 2026-11-11, so they are stated, not derived:** the file a fetch writes, `.with/deps/c/<name>/<version>/
 facade.w` with `facade-report.txt` and `facade.json` beside it, holds a
-contract block and would become `contract.w`, `contract-report.txt`,
+contract block and becomes `contract.w`, `contract-report.txt`,
 `contract.json`; a project's own `facades/<name>.w` override directory
-would become `contracts/`; `with migrate --facade` drafts a contract.
+becomes `contracts/`, with `use contracts.<name>`; `with migrate --facade`
+becomes `--contract`. `lib/facades/` becomes `lib/contracts/`. A directory
+that holds the library layer keeps its name. A registry file is headed
+`c facts NAME:`.
+
+**A claim is every unproven grant** (Eric, 2026-11-11): the definition is
+about what the clause rests on, not which file it is in. A grant a program
+states in its own contract is a claim: counted and printed with the
+registry's by `with analyze … contract` and the census, cited where the
+standard library, the runtime or the registry states it, uncited and
+unrefused in a program's own source, with the count for the UAT fixtures and
+examples reported by `:user-programs-safe`.
 
 **Counts taken before any edit** (2026-11-11, main at 36ced4302):
 
