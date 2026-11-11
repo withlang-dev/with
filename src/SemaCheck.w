@@ -12099,7 +12099,10 @@ impl Sema:
     // presented, so a value use passes `presented` false.
     fn fn_symbol_unsafe_call_reason(fn_sym: i32, presented: bool) -> str:
         if self.fn_symbol_is_unsafe(fn_sym) and not presented:
-            return "unsafe function call requires unsafe context"
+            // A header's inline function the translation made `unsafe fn` is
+            // the package's function too (#3117): the note is "" unless an
+            // applied package's report lists this name as raw.
+            return "unsafe function call requires unsafe context" ++ self.fetched_facade_raw_note(fn_sym)
         if self.fn_symbol_is_raw_c_import(fn_sym):
             // A header's own inline body calling the header's functions is
             // C calling C. The translator wraps the calls it knows are raw
