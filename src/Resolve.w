@@ -1513,12 +1513,27 @@ fn resolve_path_is_std(path: &str) -> bool: path.starts_with("<embedded-std>/") 
 // build's generated roots under out/gen (the runtime bundle's root, the
 // compat runtime). The one owner of the judgment; Sema's
 // sema_path_is_runtime_implementation reads it.
+// The runtime's sources are `rt/` and `out/gen/` of a compiler checkout and
+// the embedded copy. A directory that merely has the name is a program's:
+// `/rt/` anywhere in the path made every file under a folder called `rt`
+// the runtime (a build.w there could not call its own `with_*` helper at
+// compile time, and a program there could import `rt.*`).
 fn resolve_path_is_runtime(path: &str) -> bool:
-    if path.starts_with("<embedded-rt>/") or path.starts_with("rt/") or path.starts_with("rt\\"):
-        return true
-    if path.starts_with("out/gen/") or path.starts_with("out\\gen\\"):
-        return true
-    path.contains("/rt/") or path.contains("\\rt\\") or path.contains("/out/gen/") or path.contains("\\out\\gen\\")
+    path.starts_with("<embedded-rt>/") or resolve_path_is_under_checkout_dir(path, "rt") or resolve_path_is_under_checkout_dir(path, "out/gen")
+
+/// Whether `path` lies under `dir` (a `/`-spelled relative directory) of a
+/// compiler checkout.
+fn resolve_path_is_under_checkout_dir(path: &str, dir: &str) -> bool:
+    let normal = path.replace("\\", "/")
+    let needle = dir ++ "/"
+    var from: isize = 0
+    while from + needle.len() <= normal.len():
+        let found = normal.slice(from, normal.len()).index_of(needle)
+        if found < 0: return false
+        let at = from + found
+        if (at == 0 or normal[at - 1] == '/') and resolve_dir_is_compiler_checkout(path.slice(0, at)): return true
+        from = at + 1
+    false
 
 fn import_not_found_message(dotted: &str) -> str:
     // A bundled corpus is in the compiler as an object and an interface,
