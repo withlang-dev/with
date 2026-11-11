@@ -4629,6 +4629,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_elision.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_once.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_writes.w")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_var_droppable.w")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_var_rebound.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_origin.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_origin_writes.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_elision_mismatch.w")

@@ -10991,6 +10991,12 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_drop", "type Res: has a drop method")
     if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_var_droppable", "no body rebinds it, so spell it `let` (`pub let NAMES: List[str]`)")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_var_rebound", "it is rebound at ")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_var_rebound", "wi_refuse_var_rebound.w:6, so it cannot be a `let`")
+    if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_const", "const ORIGIN: constant does not fold to a literal")
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_elision", "fn choose: returns a reference with no unambiguous origin")

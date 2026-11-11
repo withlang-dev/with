@@ -20615,6 +20615,11 @@ impl Sema:
         // If assignment target's root is a parameter, record EFF_WRITE
         self.note_place_effect(target, EFF_WRITE)
         self.record_global_place_write(target, node)
+        if self.ast.kind(target) == NodeKind.NK_IDENT:
+            let rebound = self.ast.get_data0(target)
+            let bound = self.scope_name_map.get(rebound)
+            if self.is_mutable_global(rebound) and not self.global_rebind_sites.contains(rebound) and (bound.is_none() or self.binding_index_is_global(bound.unwrap(), rebound)):
+                self.global_rebind_sites.insert(rebound, f"{self.current_module_path}:{self.node_line(node)}")
         // #1827 (§2.4): the assignment drops the place's old value first.
         let reassign_views: List[i32] = []
         self.note_drop_global_effects(node, node, GLOBAL_SITE_REASSIGN_DROP, self.place_root_sym(target), target_type as i32, reassign_views, true)
