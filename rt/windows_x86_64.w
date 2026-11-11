@@ -2271,7 +2271,7 @@ pub fn with_net_close(sock: i32) -> i32:
 // it, so the runtime-domain-audit lane records each call's effect by its C
 // symbol instead (build/compiler.w comp_process_state_alterers; spec
 // §16.2b.14, D76).
-c facade win32:
+c contract win32:
     domain errno thread
     domain environ process
     domain locale process

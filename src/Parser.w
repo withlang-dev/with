@@ -282,7 +282,7 @@ impl Parser:
                 p = p + 1
                 continue
             if tag == TokenKind.TK_IDENT:
-                if not (self.token_text_is(p, "c") and (self.token_text_is(p + 1, "facade") or self.token_text_is(p + 1, "convention"))):
+                if not (self.token_text_is(p, "c") and (self.token_text_is(p + 1, "contract") or self.token_text_is(p + 1, "facade") or self.token_text_is(p + 1, "convention"))):
                     return true
             else if tag == TokenKind.TK_INT_LIT or tag == TokenKind.TK_STRING_LIT or tag == TokenKind.TK_FLOAT_LIT or tag == TokenKind.TK_KW_IF or tag == TokenKind.TK_KW_MATCH or tag == TokenKind.TK_KW_FOR or tag == TokenKind.TK_KW_WHILE or tag == TokenKind.TK_KW_LOOP or tag == TokenKind.TK_KW_RETURN or tag == TokenKind.TK_KW_WITH or tag == TokenKind.TK_KW_DEFER or tag == TokenKind.TK_L_PAREN or tag == TokenKind.TK_L_BRACKET or tag == TokenKind.TK_MINUS or tag == TokenKind.TK_KW_NOT or tag == TokenKind.TK_BANG:
                 return true
@@ -380,7 +380,7 @@ impl Parser:
             return true
         // D51 §16.2b: `c facade name:` is a declaration; without this an
         // implicit-main file read the block as executable statements.
-        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and (self.token_text_is(self.pos + 1, "facade") or self.token_text_is(self.pos + 1, "convention")):
+        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and (self.token_text_is(self.pos + 1, "contract") or self.token_text_is(self.pos + 1, "facade") or self.token_text_is(self.pos + 1, "convention")):
             return true
         if t == TokenKind.TK_KW_UNSAFE or t == TokenKind.TK_KW_ASYNC or t == TokenKind.TK_KW_GEN:
             if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_FN:
@@ -1517,9 +1517,18 @@ impl Parser:
             return self.parse_error_decl(is_pub, start)
         if t == TokenKind.TK_KW_CONST:
             return self.parse_const_decl(is_pub, start)
-        // D51 §16.2b: `c facade name:` — two contextual identifiers, so neither
-        // `c` nor `facade` is taken from user programs.
+        // D51 §16.2b: `c contract name:` — two contextual identifiers, so
+        // neither `c` nor `contract` is taken from user programs.
+        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and self.token_text_is(self.pos + 1, "contract"):
+            return self.parse_c_facade(start)
+        // The With Contract Language's block was spelled `c facade` (Eric,
+        // 2026-11-11). The old spelling is refused, naming the new one and
+        // the tool that respells a file; the block is still read, so its
+        // own errors are not hidden behind this one.
         if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and self.token_text_is(self.pos + 1, "facade"):
+            let old = Diagnostic.err("`c facade` is now `c contract`: the With Contract Language", Span { file: self.file_id, start: self.current_start(), end: self.tokens.get_end(self.pos + 1) })
+            old.add_help("run `with fix-contracts --apply <file>` to respell it")
+            self.diags.emit(old)
             return self.parse_c_facade(start)
         // D51 stage 11 (§16.2b.12): `c convention pkg.vN:` — a convention
         // profile, the same two-contextual-identifier shape.

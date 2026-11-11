@@ -47,6 +47,7 @@ use compiler.WasmHost
 use Analysis
 use ReceiverMigration
 use CeremonyFix
+use ContractRename
 use Uat
 use TargetSpec
 use compiler.Compilation
@@ -1070,6 +1071,8 @@ fn run_cli(full_argc: i32) -> i32:
         return result.status
     if cli_command(argc) == "fix-ceremony":
         return run_ceremony_fix()
+    if cli_command(argc) == "fix-contracts":
+        return run_fix_contracts()
     if cli_command(argc) == "migrate-receivers":
         return run_receiver_migration()
     if cli_command(argc) == "ast":
@@ -6295,6 +6298,7 @@ fn print_usage:
     with_write("  analyze          Query and audit live Sema, MIR, ABI, and codegen state\n")
     with_write("  migrate-receivers  Prove or apply compiler-selected receiver relocation\n")
     with_write("  fix-ceremony       Report or apply the ceremony removals Sema proves safe (#3061)\n")
+    with_write("  fix-contracts      Respell `c facade` and `use facades.` as the With Contract Language writes them\n")
     with_write("  reduce           Minimize a single-file compiler repro\n")
     with_write("  fixpoint-diff    Explain the first differing fixpoint-object byte\n")
     with_write("\n")

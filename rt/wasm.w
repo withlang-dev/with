@@ -1450,7 +1450,7 @@ pub fn memchr(s: *const u8, c: i32, n: i64) -> *mut u8:
 // the runtime-domain-audit lane records each call's effect by its C symbol
 // instead (spec §16.2b.14, D76). The memory.size/memory.grow declarations
 // are LLVM intrinsics, not foreign calls.
-c facade wasi:
+c contract wasi:
     domain errno thread
     domain environ process
     domain locale process

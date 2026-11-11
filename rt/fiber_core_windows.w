@@ -1291,7 +1291,7 @@ pub fn with_fiber_cross_thread_cancels() -> i64:
 // it, so the runtime-domain-audit lane records each call's effect by its C
 // symbol instead (build/compiler.w comp_process_state_alterers; spec
 // §16.2b.14, D76).
-c facade ucrt:
+c contract ucrt:
     domain errno thread
     domain environ process
     domain locale process
