@@ -2784,6 +2784,22 @@ fn with_cimport_fn_return_type(session: i64, idx: i32) -> str:
         let ret = clang_getResultType(ty)
         get_type_spelling(s, ret)
 
+// The return type and a parameter's type as the header writes them, typedef
+// names kept (`CURL *`, where the canonical spelling above is `void *`).
+fn with_cimport_fn_return_type_written(session: i64, idx: i32) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
+        let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+        clang_str_to_with(s, clang_getTypeSpelling(clang_getResultType(clang_getCursorType(cursor))))
+
+fn with_cimport_fn_param_type_written(session: i64, idx: i32, param: i32) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
+        let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+        clang_str_to_with(s, clang_getTypeSpelling(clang_getCursorType(clang_Cursor_getArgument(cursor, param as u32))))
+
 fn with_cimport_fn_param_count(session: i64, idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession

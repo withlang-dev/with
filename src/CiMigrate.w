@@ -1755,7 +1755,34 @@ fn ci_migrate_fn_param_reason(name: &str, index: isize) -> str:
     if index < 0 or index >= parts.len(): return ""
     parts[index].to_owned()
 
+// #3123: a pointer the header spells through a typedef of `void`
+// (`CURL *`, where `typedef void CURL;`) translates to `*mut c_void`, and the
+// typedef's name is the only identity it has. The proofs keep that name
+// (`*mut CURL`): a name a producer returns and a destroyer frees is a handle
+// (D121), while a name that is only ever a synonym for `void` (`GLvoid`)
+// gains no producer and stays what it was. `translated` otherwise.
+fn ci_void_typedef_pointer(translated: &str, spelled: &str) -> str:
+    if translated != "*mut c_void" and translated != "*const c_void": return translated.to_owned()
+    var c = spelled.trim()
+    if not c.ends_with("*"): return translated.to_owned()
+    c = c.slice(0, c.len() - 1).trim()
+    if c.starts_with("const "): c = c.slice(6, c.len()).trim()
+    if c.ends_with(" const"): c = c.slice(0, c.len() - 6).trim()
+    if c.len() == 0 or c == "void": return translated.to_owned()
+    for ch in c.bytes():
+        if not ((ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') or (ch >= '0' and ch <= '9') or ch == '_'): return translated.to_owned()
+    translated.slice(0, translated.len() - "c_void".len()) ++ c
+
 impl CiProject:
+    // A signature type for the proofs: the void typedef's name kept
+    // (ci_void_typedef_pointer) and remembered.
+    mut fn signature_type(translated: &str, written: &str) -> str:
+        let kept = ci_void_typedef_pointer(translated, written)
+        if kept != translated:
+            let name = kept.slice(kept.find(" ") + 1, kept.len())
+            if not self.void_typedefs.contains(name): self.void_typedefs.push(name)
+        kept
+
     // The evidence definition `decl_idx` (cursor `cursor`) gives: which
     // parameters are function pointers, whether the body tests each for
     // NULL (and how), the NULL literals it passes to corpus callees, and
@@ -1765,10 +1792,10 @@ impl CiProject:
     mut fn record_fn_signature(session: i64, decl_idx: i32, symbol_id: i32):
         let count = with_cimport_fn_param_count(session, decl_idx)
         self.symbols[symbol_id].grow_params(count)
-        self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
+        self.symbols[symbol_id].ret_ty = ci_ir_owned_text(self.signature_type(with_cimport_fn_return_type_translated(session, decl_idx), with_cimport_fn_return_type_written(session, decl_idx)))
         self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
         for pi in 0..count:
-            self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(with_cimport_fn_param_type_translated(session, decl_idx, pi))
+            self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(self.signature_type(with_cimport_fn_param_type_translated(session, decl_idx, pi), with_cimport_fn_param_type_written(session, decl_idx, pi)))
 
     mut fn record_fn_evidence(session: i64, decl_idx: i32, cursor: i32, symbol_id: i32):
         let count = with_cimport_fn_param_count(session, decl_idx)
@@ -1778,7 +1805,7 @@ impl CiProject:
         self.symbols[symbol_id].grow_params(count)
         self.symbols[symbol_id].has_definition = 1
         // D121: the signature's types and the body's ownership records.
-        self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
+        self.symbols[symbol_id].ret_ty = ci_ir_owned_text(self.signature_type(with_cimport_fn_return_type_translated(session, decl_idx), with_cimport_fn_return_type_written(session, decl_idx)))
         self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
         // D198: with how the body uses each pointer parameter's record (`vw`/`vr`/`va`/`vx`).
         self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names) ++ ci_value_record_evidence(session, cursor, names))
@@ -1787,7 +1814,7 @@ impl CiProject:
         // D159: what the body proves about the pointers it is handed.
         self.symbols[symbol_id].contract_evidence = ci_ir_owned_text(ci_body_contract_evidence(session, cursor, names))
         for pi in 0..count:
-            let ptype = with_cimport_fn_param_type_translated(session, decl_idx, pi)
+            let ptype = self.signature_type(with_cimport_fn_param_type_translated(session, decl_idx, pi), with_cimport_fn_param_type_written(session, decl_idx, pi))
             self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(ptype)
             // D159 step 2: the first pointer's NULL test too — a handle the
             // body accepts as NULL (`if (ctx == NULL) return ERR`) is no
