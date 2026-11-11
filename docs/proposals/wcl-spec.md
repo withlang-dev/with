@@ -1,34 +1,20 @@
-# The With Contract Language (WCL): formal specification, draft 2
+# The With Contract Language (WCL): formal specification, draft 3
 
-Status: draft, not ready to bless (Eric's review, 2026-11-11). Nothing here
-is normative. §16.2b of the specification is normative until a chapter of
-this form lands. This draft changes no rule: it names the language, gives it
-one grammar, and states for every clause what it grants, what stands when it
-is absent, where it may come from, and what the compiler checks of it.
+Status: draft 3, for Eric's blessing. Nothing here is normative and nothing
+lands until he blesses it. §16.2b of the specification is normative until a
+chapter of this form replaces it, with §16.2b reduced to an introduction.
 
-Two checks have not been done and are owed before blessing:
+Sections 1 to 12 restate today's rules and change none. Every proposed rule
+change is in section 13, each with the current rule, the proposed rule and
+what it breaks. What the checks of this draft found (the grammar against the
+parser, every row against §16.2b, the checker's treatment of `destroys`) is
+listed in docs/proposals/wcl-spec-findings.md, not folded into the text.
 
-- **Grammar against the parser.** Section 5 was read against `Parser.w`
-  production by production on 2026-11-11 (the item parser, the clause
-  parser, the variadic case parser, the convention rule parser, on main at
-  e33c3932a) and corrected: a `len` buffer is never `inout` and a `capacity`
-  buffer always is; `preinit` takes `(self)` as `init` does; a borrow from
-  two parameters names exactly two. What has not been done is the converse:
-  a fixture that writes every production and is accepted by the compiler.
-  That fixture belongs in the keyword stack, born with the new spelling.
-- **Rows against §16.2b.** Each row of section 8 cites the subsection that
-  owns its rule. Where a row and §16.2b disagree, §16.2b is right and the
-  row is a defect in this draft.
+The keyword is written `contract` throughout.
 
-Decided for this document (Eric, 2026-11-11): it becomes its own chapter,
-with §16.2b reduced to an introduction that points at it; the provenance
-words are renamed in the keyword stack; every unproven grant is a claim and
-is counted; a field role may be stated in a program's contract; `thread
-creator` written out is flagged redundant; `handle` keeps its word; a facts
-file is headed `c facts NAME:`.
-
-The keyword is written `contract` throughout. The compiler accepts
-`c facade` until the keyword migrates.
+> A foreign capability may enter safe With through a verified fact or an
+> explicitly attributable trusted claim. The absence of evidence must not
+> silently establish a memory-safety guarantee.
 
 ## 1. Names
 
@@ -59,7 +45,7 @@ A contract describes functions. Three kinds of function can be a subject.
 |---|---|---|
 | An imported C function | a function, with its types and constants, that a `c_import` of the library's headers brings into scope | specified here; implemented |
 | A corpus function | a function of a migrated engine: With source the migrator wrote from C, whose body proves part of its contract and whose remaining facts a person knows (claims.md tier 1) | not yet: the facts-file form is proposed, the migrator does not read it |
-| A With function | a hand-written `unsafe fn`, whose caller today has only `unsafe` to say what it knows | not yet: no form is proposed. The expression `claim <fact>` (claims.md tier 2) is the same act at an expression and is specified with the language, not here |
+| A With function | a hand-written `unsafe fn`, whose caller today has only `unsafe` to say what it knows | not yet. The direction (Eric, 2026-11-11): clauses on an `unsafe fn`, written only in its defining module, with a clause the checker can prove refused as redundant. The expression `claim <fact>` (claims.md tier 2) is the same act at an expression and is specified with the language, not here |
 
 Everything from section 3 on is written for the first subject. The clause
 vocabulary is not specific to C: ownership, borrowing, retention,
@@ -97,20 +83,21 @@ otherwise:
 | What | Rule |
 |---|---|
 | A pointer parameter | raw. Its spelling, `const` included, proves nothing (§16.2b.5). A character pointer is no exception (§16.2b.8). |
-| A pointer return | raw: nothing says who owns it, how long it lives, or whether it is NULL. |
+| A pointer return | raw in the compiler today. §16.2b does not state this row; see section 13.6. |
 | A parameter passed by value whose type holds a pointer | raw. A type holds a pointer when it is a pointer or function pointer, or a record, union or array with a member that holds one (§16.2b.5). Returning such a record is not raw: the value is inert until it goes back into C. |
 | A function-pointer parameter, and a call through a function pointer | raw (§16.2b.9, §16.11). |
 | A variadic function | raw: a variadic signature is an unmodeled contract (§16.3c). |
-| A C global | safe to read or write only where every call in the program that can reach the library is on one thread and the library runs no thread of its own; otherwise raw. A global whose type holds a pointer is raw in every program (§16.3). |
+| A C global | one the header declares `const` or thread-local is safe to read in any program. Any other is safe to read or write when every call into the library that declares it and every access to its globals is provably on one thread, and the library's contract does not say `runs threads`; otherwise reading or writing it is raw. Assigning a global whose type holds a pointer is raw in every program; reading one is not (§16.3b). |
 | A function over value records and scalars only | safe as imported. No clause is needed. |
 
 A contract can only move a function from raw to safe by stating what the
 base rule could not know, or leave it raw. It never makes a safe import raw
 except by a restriction the program asks for.
 
-Inside a rendered type, the record itself is reached as `.repr`, under these
-raw rules; `.repr` is the one field of a rendered type a program can name,
-and it needs `unsafe` (§16.2b.3).
+The record a resource wraps is reached as `.repr`, and only so: `.repr` is
+under these raw rules and needs `unsafe`. The record's own fields are read
+through the resource without it (section 8.2). Of the fields of the type a
+contract generates, `.repr` is the only one a program can name (§16.2b.3).
 
 ## 5. Grammar
 
@@ -243,20 +230,23 @@ the library's coarse domain, raw.
   capability (§16.2b.10). Leaving the clause out grants.
 
 Both are stated as restrictions in section 8 because writing them restricts.
-Whether the absence of each should stay a grant is question 12.1.
+Section 13.2 proposes removing both.
 
 **6.3 Provenance.** Where the clause came from. Every effective clause
 records it, and `with analyze … contract` prints it:
 
-| Provenance | Meaning | A claim? |
+| Provenance | Meaning | Who vouches |
 |---|---|---|
-| `header` | an ABI or header fact: a type, a layout, a constant, a nullability annotation the header carries | no |
-| `proof` | drawn by the compiler from the library's own source, with the proof printed beside it | no |
-| `annotation` | an ownership annotation the library ships (`__attribute__((malloc))`, an introspection file) | no |
-| `stated` | written in a contract in the program, the standard library or the runtime | yes, when it grants and no proof stands under it |
-| `registry` | a line of the package's facts file, with its citation | yes |
-| `profile` | produced by a rule of an adopted convention profile | yes |
-| `default` | no clause; the restriction of 6.2 | no |
+| `header` | an ABI or header fact: a type, a layout, a constant, a nullability annotation the header carries | the compiler, reading the header |
+| `proof` | drawn by the compiler from the library's own source, with the proof printed beside it | the compiler |
+| `annotation` | an ownership annotation the library ships (`__attribute__((malloc))`, `returns_nonnull`, an introspection file). It is the library author's word, not a proof | the library's author |
+| `registry` | a line of the package's facts file, with its citation | the registry |
+| `stated` | written in a contract in the program, the standard library or the runtime | the program (or the toolchain, for its own) |
+| `profile` | produced by a rule of a convention profile the contract adopted | the profile's author, by the program's adoption |
+| `default` | no clause; the restriction of 6.2 | nobody: it grants nothing, with the two exceptions of 6.2 |
+
+A clause that grants and that the compiler does not vouch for is a claim
+(section 9).
 
 The contract view prints these words today as `clause`, `default`, `proof`,
 `annotation`, `registry`; the rename to this table's words is part of the
@@ -281,12 +271,18 @@ default
 ```
 
 A stated clause refines, overrides or suppresses anything below it. It cannot
-override a header fact. A proof overrides a stated clause only when it shows
-the stated contract impossible, never because it reached a different
-conclusion. A registry claim that contradicts a proof is an error naming
-both. A clause that restates what is already effective from a lower line is
-accepted and reported as redundant by the contract audit. (§16.2b.2,
-§16.2b.15.)
+override a header fact. Two rules hold today for a grant a proof disagrees
+with, and they differ by where the grant is written:
+
+- **A stated clause** stands unless the compiler genuinely proves the
+  asserted contract impossible; it never falls merely because the compiler
+  reached a conclusion of its own (§16.2b.2).
+- **A registry line** that contradicts a proof is an error naming both
+  (§16.2b.15).
+
+A clause that restates what is already effective from a lower line is
+accepted and reported as redundant by the contract audit. Section 13.1
+proposes one rule for both.
 
 ## 8. Clause reference
 
@@ -296,11 +292,11 @@ G = grants, R = restricts, P = presents.
 
 | Item | Meaning | Dir | Rule |
 |---|---|---|---|
-| `resource N wraps T` | `N` is a With type that owns one value of representation `T`: a pointer to a record, an integer handle, a record passed by value, or a record initialized in place. It has identity: it moves, never copies, and its destroyer runs once. | G | §16.2b.3 |
+| `resource N wraps T` | `N` is a With ownership type whose representation `T` is foreign, in one of three forms: an opaque pointer, a by-value token, an in-place struct. It is not Copy, whatever C's copying of `T` is, and its destroyer runs once. | G | §16.2b.3 |
 | `handle N wraps *mut T` | `N` is a callback-scope handle: C passes a `T *` to a callback and the handle is valid for that call. No clauses. | R | §16.2b.9 |
-| `fn f` | `f` is described. With no clause it lends every parameter: it keeps nothing and frees nothing. This default is the contract's assertion, not a proof and not a conservative inference. | G | §16.2b.5 |
+| `fn f` | `f` is described. With no clause it lends every parameter: it keeps nothing and frees nothing. This default is the contract's assertion, not a proof and not a conservative inference: an empty `fn f` is one claim, and is counted as one. | G | §16.2b.5 |
 | `domain D kind` | `D` names ownerless C state with that extent. | R | §16.2b.7 |
-| `text utf8` | every text return of the library is valid UTF-8 and presents as `str`, validated at the boundary. | G | §16.2b.8 |
+| `text utf8` | every text return of the library presents as `Option[str]`, validated at the boundary; a return that is not UTF-8 is a contract failure naming the C function, and nothing is repaired. | G | §16.2b.8 |
 | `runs threads` | the library runs threads of its own; its globals are shared with them. | R (absence grants, 6.2) | §16.3 |
 | `use convention P` | the contract adopts profile `P`'s rules. | the rules' | §16.2b.12 |
 | `field F of R is role` | a call through function-pointer field `F` of record `R` is an allocation (returns a fresh allocation the caller owns), a reallocation (consumes its argument and returns one), a deallocation (destroys its argument), or `F` is the hooks' own data (passing it to a hook is not an escape; a function that installs it retains it). A role is never drawn from a field's name. | G | §16.2b.15 |
@@ -314,8 +310,8 @@ produced. (§16.2b.15.)
 
 | Clause | Meaning | Dir | Default when absent | Rule |
 |---|---|---|---|---|
-| `from f` | `f` returns a new `N` the caller owns. | G | no producer; `N` cannot be made | §16.2b.4 |
-| `from f(out param p)` | `f` stores a new `N` through `p`. | G | | §16.2b.4 |
+| `from f` | `f` returns a new `N` the caller owns. Whether its NULL means failure is a nullability fact about the return (below). | G | no producer; `N` cannot be made | §16.2b.4 |
+| `from f(out param p)` | `f` stores a new `N` through `p`. The compiler sets the slot to NULL, calls `f`, and inspects it: non-null is a produced resource, owned at once, whatever the status says. | G | | §16.2b.4 |
 | `from f, nullable field a.b` | a by-value producer: a NULL in field `a.b` of the result means nothing was produced; presents `Option[N]`. Checked when the call returns. | G | | §16.2b.4 |
 | `from f, nonnull field a.b` | as above, and a NULL there is a contract failure naming `f`; presents `N`. | G | | §16.2b.4 |
 | `init f(self)` | `f` initializes caller-provided storage in place; `N` is pinned: its representation has one address until destruction completes. | G | | §16.2b.4 |
@@ -323,8 +319,8 @@ produced. (§16.2b.15.)
 | `drop f` | `f`, taking only the representation, destroys it; `Drop` calls it. | G | a resource with a producer and no destruction path is refused | §16.2b.3 |
 | `destroys f` | `f` destroys the resource and takes further arguments; called explicitly, consuming. A resource with `destroys` and no `drop` is refused. | G | | §16.2b.3 |
 | `abandon f` | `f`, which invokes no callbacks, runs before the destroyer on a drop path that abandons a half-configured callback pair. | G | | §16.2b.9 |
-| `ok C1, C2` | the producers' integer status is success when it is one of these constants. | G | no status convention; failure is `None` | §16.2b.4 |
-| `message f` | `f` describes the resource's most recent failure. | P | | §16.2b.4 |
+| `ok C1, C2` | the producers' status is success when it is one of these constants; with several, the `Ok` side carries the one that matched. A success status with nothing produced is `NothingProduced`, an error. | G | the status is uninterpreted: the constructor's result is `(status, Option[N])`. There is no rule that 0 means success | §16.2b.4 |
+| `message f` | `f` describes the resource's most recent failure; an error from an operation on the resource carries `message: str`, an owned copy read before any other operation on it. | G | | §16.2b.4 |
 | `borrows param p` | the product depends on the resource received at `p` and cannot outlive it. | R | every resource parameter of a producer is a dependency | §16.2b.6 |
 | `independent` | the product depends on no parameter. | G | dependent | §16.2b.6 |
 | `movable` | an in-place resource may move: no operation retains the representation's address. | G | pinned | §16.2b.3 |
@@ -346,11 +342,21 @@ produced. (§16.2b.15.)
 The tree uses both: 38 resource-level `destroys f` lines and 31 bare
 fn-item `destroys` lines, including `lib/facades/sqlite3.w` and the
 c-interop example. One fact has two spellings and the rule that reconciles
-them is a refusal. Which one owns it is question 12.2.
+them is a refusal. Section 13.5 proposes one owner.
+
+**The nullability of a pointer producer's return.** `NULL` is information.
+A machine-readable annotation is used directly: a return the header or the
+library marks nullable presents `Option[N]`, one marked non-null presents
+`N`, and unknown nullability is nullable; it never silently becomes
+non-null. No clause of the language states it for a pointer producer today;
+the by-value producer has one (`nullable field`, `nonnull field`). Section
+13.4. (§16.2b.8.)
 
 **The fields of a resource's record.** A field of a by-value or in-place
 resource's record is read through the resource (`image.width`): a read
-copies the field's value. Fields are not assigned through the resource. A
+copies the field's value, and is permitted wherever reading that field of
+the bare record is permitted (a union member stays raw). Fields are not
+assigned through the resource. A
 field with the name of an operation the contract presents on the resource,
 or the name `repr`, is an error until one is renamed. A pointer resource has
 no such reads: reading through it is a claim about C's memory. (§16.2b.3.)
@@ -416,8 +422,9 @@ operation borrows that resource. (§16.2b.5, D198.)
 
 ## 9. Claims
 
-A claim is a clause that grants and has no proof, annotation or header fact
-under it: a `stated` grant, a `registry` line, a `profile` match.
+A claim is a clause that grants and that the compiler does not vouch for: a
+`stated` grant, a `registry` line, a `profile` match, an `annotation`. An
+empty `fn f` is one claim: it asserts that `f` keeps and frees nothing.
 
 1. **Claims are counted and printed.** `with analyze … contract` marks each
    claim and ends with the count, the program's own beside the registry's.
@@ -480,19 +487,35 @@ the renderer cannot express is a compiler defect, reported as one.
 ## 11. Run-time checks
 
 Some clauses state a fact the compiler can test when the program runs. Each
-is tested in every build, debug and release. A failed test is a **contract
-failure**: the program stops, as it does for an index out of range, with a
-message that names the function or the call the rule names.
+is tested in every build, debug and release.
+
+**A contract failure** takes the one failure path an index out of range
+takes: today a panic, which prints its message and the calling chain and
+exits with status 134. Its message names the function, the clause, and
+where the clause came from:
+
+```
+panic: LoadImageFromScreen: `from LoadImageFromScreen, nonnull field data` (registry/c/raylib/facts.w:17): C returned it NULL
+```
+
+For a registry line the place is the facts file and line; for a stated
+clause, the contract's file and line; for an annotation, the header's.
 
 | Clause | Tested | A failure names |
 |---|---|---|
 | `from f, nonnull field a.b` | when `f` returns: the field is not NULL | `f` |
 | `from f, nullable field a.b` | when `f` returns: a NULL is `None`, not a failure | |
-| `requires domain D` | when the operation is called: `D` is established. Omitted where the compiler proves it; a live resource of `D` proves it, so only producers and functions that take no resource of `D` carry the test. | the function |
+| a pointer return marked non-null | when the function returns: it is not NULL (§16.2b.8 names the failure; no clause spells the fact, section 13.4) | the function |
+| `text utf8` | when text returns: it is valid UTF-8 | the function |
+| a `str` passed as C text (`text param p`, a `str` variadic case) | before the call: the text has no interior NUL, which a C string cannot carry | the function |
+| `buffer … len` / `capacity` | before the call: the slice's length fits the C count type | the function |
+| `buffer … capacity … inout` | after the call: the length C wrote back is within the capacity | the function |
+| `requires domain D` | when the operation is called: `D` is established. Omitted where the compiler proves it; a live resource of `D` proves it, so only producers and functions that take no resource of `D` carry the test | the function |
 | `establishes domain D` | when called: `D` is not already established | the call |
 | `ends domain D` | when called: no resource of `D` is live | the call |
-| `ok C` | when the function returns: the status is compared; a status that is not `ok` is an `Err`, not a failure | |
-| `text utf8` | when text returns: it is validated; invalid UTF-8 is `None` or an error value, not a failure | |
+
+Not failures: a status that is not `ok` is an `Err`; a NULL in a `nullable`
+position is `None`.
 
 Where the compiler proves a test must fail (`requires` with `D` proven not
 established; `ends` with a resource of `D` proven live), the call is a
@@ -501,23 +524,193 @@ compile error. For `ends` the error names the live resource and the fix.
 
 ## 12. Open questions
 
-1. **The two default grants** (6.2). Whether a library must state that it
-   runs no thread of its own before its globals are safe, and whether a
-   retained callback must state its thread, or the present defaults stand.
-   Changing either removes capability from programs that compile today.
-2. **Who owns "f destroys N"** (8.2). Two candidates. The fn item owns it:
-   `destroys` is a fact about what a function does with its parameter, like
-   `consumes` and `lend`, and the resource-level `destroys f` goes; `drop f`
-   stays on the resource because it is what `Drop` calls. Or the resource
-   owns it and a bare fn-item `destroys` is refused. The first matches how
-   every other effect is stated and removes the agree-or-refuse rule. Either
-   way one spelling is deleted from about thirty-five lines of contracts,
-   one of them a published example.
-3. **The `callback` field role** (#3124): a fifth role for a
+1. **The `callback` field role** (#3124): a fifth role for a
    function-pointer field that holds the program's own function, whose
-   arguments are lent for the call. It needs its own brief.
-4. **Corpus functions and With functions as subjects** (section 2): the
-   forms. Tier 1 of claims.md is the proposal for the first.
-5. **What a contract failure prints**, exactly, and whether it is the panic
-   path (unwinding drops) or an abort. The specification says "a contract
-   failure naming the function"; the form is not written anywhere.
+   arguments are lent for the call. It gets its own brief.
+2. **Corpus functions as a subject** (section 2): the facts-file form of
+   claims.md tier 1.
+3. **With functions as a subject**: not yet; the direction is recorded in
+   section 2.
+
+## 13. Proposed rule changes
+
+None of these is adopted. Sections 1 to 12 describe the rules as they are.
+
+### 13.1 One precedence rule for a grant a proof disagrees with
+
+**Current.** A registry line that contradicts a proof is an error naming
+both. A stated clause stands unless the compiler proves the asserted
+contract impossible (§16.2b.2, §16.2b.15; section 7).
+
+**Proposed.** Now that a stated grant is a claim like a registry line, one
+rule for every claim, wherever it is written:
+
+- A proof **contradicts** a grant when it establishes a fact the grant
+  denies: the grant says `lend` and the proof shows the function frees or
+  stores the parameter; the grant says `from f` (a fresh allocation) and
+  the proof shows every return is a part of a parameter; the grant says
+  `returns static` and the proof shows the return is a freed block.
+  A contradicted grant is an error naming the grant's line and the proof.
+- A proof is **weaker** than a grant when it fails to establish what the
+  grant says and establishes nothing against it: the proof stopped at a
+  callee no unit defines, or at a function-pointer field no unit decides.
+  A weaker proof changes nothing: the grant stands and is counted as a
+  claim.
+
+**What it breaks.** A program whose own contract states a grant the
+drafter's proof contradicts compiles today and would stop compiling. No
+such contract is known in the tree; the count needs a run of the drafter
+over every stated contract's library source, which exists only for fetched
+packages.
+
+### 13.2 The two default grants
+
+**Current.** With no `runs threads`, a library is taken to run no thread of
+its own, which is half of the proof that makes its C globals safe to touch
+(§16.3b). With no `callback_thread any`, a retained callback is taken to
+run on the registering thread, so its captured state needs no send or
+share capability (§16.2b.10).
+
+**Proposed** (Eric's intent, 2026-11-11). The absence of evidence grants
+nothing. A library states that it runs no threads, and a retained callback
+states its thread, each a counted claim:
+
+```
+c facts zlib:
+    runs no threads        // <citation: where the library's source or manual shows it starts no thread>
+
+fn curl_easy_setopt
+    variadic param 2 selected by param option:
+        case CURLOPT_WRITEFUNCTION: callback param 2 as curl_write_callback userdata param CURLOPT_WRITEDATA
+    callback_thread registering     // <citation: where the manual says which thread calls it>
+```
+
+`runs no threads` is the positive of `runs threads`; a contract states one
+or neither, and with neither a C global of the library is raw.
+`callback_thread registering` is the positive of `callback_thread any`;
+with neither, a retained callback's captured state must be sendable and
+shareable.
+
+**What it breaks: the count** (published programs only: `uat/fixtures`,
+`examples`, the README programs; `docs/blog` holds no program).
+
+| What | Programs | Contract lines needed |
+|---|---|---|
+| Touches a C global | 0 found | 0 |
+| Registers a retained callback capturing state that is not sendable | 1: `uat/fixtures/libcurl_main.w` (its sink closure captures and mutates the local `total`, and the easy handle retains it) | 1, in `lib/facades/libcurl.w`, which `uat/libcurl.uat` copies into the project: `callback_thread registering` on the write-callback case |
+| Registers a retained callback capturing only sendable state | 2: `examples/c-interop/src/main.w` and its test (`create_function_v2` with a plain record) | 0 |
+
+How the first row was counted: a search of the 7 UAT fixtures, the 48
+example sources and the README for the globals C's standard library and
+these seven libraries declare (`errno`, `stdin`, `stdout`, `stderr`,
+`environ`, `optarg`, `tzname` and the like). It was not counted by
+compiling each program and asking the checker which imported globals it
+reads, which is the reliable count and needs each program's packages
+fetched. The second and third rows were read from the programs.
+
+The fixture's own text does not change in either case. The contract file a
+UAT scenario copies does, by one line: that file is published with the
+scenario, so it comes to Eric before it is edited.
+
+**Fallback, if the count is judged painful.** Keep both defaults, except
+that a library whose contract says `runs threads` gets no callback
+default: its retained callbacks state their thread.
+
+### 13.3 A contracted library with an undescribed teardown
+
+**Current.** A function over scalars and value records is safe as imported
+(section 4). `void engine_shutdown(void)` takes no pointer and is safe to
+call, and it can invalidate every live resource of its library. This can
+only bite a library whose contract declares resources, since resources come
+only from contracts.
+
+**Proposed (a candidate, not adopted).** Once a contract declares a
+resource, a function of that library the contract does not describe is raw.
+
+**What it breaks.**
+
+- **raylib.** The registry's facts declare two resources (`ImageData`,
+  `WaveData`). The spiral fixture and the spiral example call 19 raylib
+  functions; the facts describe 3 (`LoadImageFromScreen`, `UnloadImage`,
+  `GetImageColor`). The other 16 (`InitWindow`, `BeginDrawing`,
+  `DrawCircle`, `ClearBackground`, `CloseWindow` and the rest) would become
+  raw, and both published programs would need `unsafe`, which a user
+  program never writes. To keep them safe the facts would describe every
+  function a program may call, each bare `fn` a counted claim: raylib's
+  header declares several hundred.
+- **SDL.** `lib/facades/sdl.w` declares two resources. The SDL fixture calls
+  `SDL_Init` and other undescribed functions directly; the same follows.
+
+A narrower rule reaches the same danger with less breakage: only a function
+the contract marks can end a resource's validity, which is what `ends
+domain D` now states (§16.2b.7, D200). Under D200 a teardown the contract
+describes is checked; the gap that remains is a teardown the contract's
+author did not know about, and no rule about undescribed functions can
+close that without making every undescribed function raw.
+
+### 13.4 A clause for a pointer producer's non-null return
+
+**Current.** §16.2b.8 says `nullable -> Option`, `nonnull -> direct value`,
+and that a violated `nonnull` is a contract failure naming the C function.
+For a by-value producer the contract spells it (`from f, nonnull field
+a.b`). For a pointer producer nothing does: the fact comes only from an
+annotation the library ships (`returns_nonnull`, `_Nonnull`), and without
+one every pointer producer presents `Option[N]`.
+
+**Proposed.** `from f, nonnull` on a pointer producer: presents `N`; a NULL
+return is a contract failure naming `f`. `from f, nullable` states the
+default and is redundant.
+
+**What it breaks.** Nothing: it adds a grant. It is the `nonnull` claims.md
+tier 1 asks for on a corpus function's return.
+
+### 13.5 One owner for "f destroys N"
+
+**Current.** Both spellings are accepted and each decides: `destroys f`
+under `resource N`, and a bare `destroys` on `fn f`. Stated in both places
+they must agree; `destroys f` on the resource with an fn item that lends is
+refused. The tree has 38 resource-level lines and 31 fn-item lines.
+
+**Proposed.** The fn item owns it: `destroys` is a fact about what a
+function does with its parameter, like `consumes` and `lend`. The resource
+keeps `drop f`, which is what `Drop` calls. `destroys f` on a resource is
+refused, naming the fn-item form.
+
+**What it breaks.** The 38 resource-level lines are respelled, among them
+lines in `lib/facades/sqlite3.w` and its copy in the c-interop example, a
+published program.
+
+### 13.6 A pointer return: raw, or inert
+
+**Current.** The compiler makes a function that returns a pointer raw
+(`ci_function_requires_raw_abi`: a return type that is a pointer). §16.2b
+does not say so. What it says is narrower: a parameter passed by value whose
+type holds a pointer makes the function raw, and "returning such a record is
+not raw: the value is inert until it goes back into C" (§16.2b.5). §16.11
+states the boundary the same way: address computation is safe; memory
+access or a validity assertion is unsafe. By both sentences a bare returned
+pointer is as inert as a returned record that holds one: holding a `*mut T`
+asserts nothing, and reading through it already needs `unsafe`.
+
+So the specification does not draw the line the compiler draws, and gives
+no reason for it.
+
+**Two ways to make them agree.**
+
+- **The return is inert.** A function whose only raw part is its pointer
+  return is safe to call; the pointer is a raw pointer the program can hold,
+  compare and pass back to raw code. What it loses: a program can then call
+  `curl_easy_init()` safely and drop the pointer, a leak with no `unsafe` in
+  sight; With calls leaking a defect. That is a reason, and it is about
+  ownership, not about memory access.
+- **The return is raw, and the chapter says why.** "A returned pointer may
+  be the caller's to free; a call that discards it leaks, and a program that
+  frees it twice corrupts memory. Until a contract says whose it is, the
+  call is raw." The same reason then applies to a returned record that
+  holds a pointer (raylib's `Image`), which §16.2b.5 calls inert: that
+  sentence would change, and `LoadImage` without a contract would be raw.
+
+**What each breaks.** The first makes safe a class of calls that are raw
+today; no program stops compiling. The second makes raw every function
+that returns a record holding a pointer and has no contract; the count
+needs a run over the fetched libraries' headers.
