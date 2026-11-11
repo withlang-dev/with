@@ -4,6 +4,9 @@
 use c_import("SDL3/SDL.h")
 
 c facade sdl:
+    // SDL_audio.h (SDL_AudioPostmixCallback): "This will run from a
+    // background thread owned by SDL."
+    runs threads
     resource Window wraps *mut SDL_Window
         from SDL_CreateWindow
         drop SDL_DestroyWindow

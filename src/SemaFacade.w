@@ -702,7 +702,7 @@ impl Sema:
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
-            else if kind == NodeKind.NK_FACADE_CLAUSE and self.ast.get_data0(item) == FACADE_CLAUSE_CREATES_THREADS:
+            else if kind == NodeKind.NK_FACADE_CLAUSE and self.ast.get_data0(item) == FACADE_CLAUSE_RUNS_THREADS:
                 // §16.3: the library is the headers this facade's module
                 // imports.
                 for dj in 0..self.ast.decl_count():
@@ -956,6 +956,34 @@ impl Sema:
                     let rt = self.type_name(self.sig_return_type(sig))
                     let pn = self.pool_resolve(producer)
                     self.emit_error(f"resource '{rname}': producer '{pn}' returns {rt}, not the representation (§16.2b.13)", clause)
+            return r
+        if kind == FACADE_CLAUSE_PRODUCED_FIELD:
+            // §16.2b.4: the field whose NULL means a by-value producer
+            // produced nothing. The producer is the `from` it follows; the
+            // path walks the record and ends at a pointer.
+            let producer = self.ast.get_extra(ops)
+            let pn = self.pool_resolve(producer)
+            let word = self.pool_resolve(self.ast.get_extra(ops + 1))
+            if r.producers.len() == 0 or r.producers[r.producers.len() - 1] != producer or r.out_params[r.out_params.len() - 1] >= 0:
+                return r
+            var ty = self.resolve_alias(r.repr_tid as TypeId) as i32
+            if self.get_type_kind(ty as TypeId) != TypeKind.TY_STRUCT:
+                let rt = self.type_name(r.repr_tid)
+                self.emit_error(f"resource '{rname}': 'from {pn}, {word} field' names a field of a record passed by value; '{rname}' wraps {rt}, whose NULL is the representation's own (§16.2b.4)", clause)
+                return r
+            var path = ""
+            for k in 2..self.ast.get_data2(clause):
+                let seg = self.ast.get_extra(ops + k)
+                path = path ++ (if k > 2: "." else: "") ++ self.pool_resolve(seg)
+                let next = if self.get_type_kind(ty as TypeId) == TypeKind.TY_STRUCT: self.struct_field_type(ty, seg) else: 0
+                if next == 0:
+                    let rt = self.type_name(r.repr_tid)
+                    self.emit_error(f"resource '{rname}': 'from {pn}, {word} field {path}': {rt} has no field {path} (§16.2b.13)", clause)
+                    return r
+                ty = self.resolve_alias(next as TypeId) as i32
+            if self.get_type_kind(ty as TypeId) != TypeKind.TY_PTR:
+                let ft = self.type_name(ty)
+                self.emit_error(f"resource '{rname}': 'from {pn}, {word} field {path}': the field is {ft}, not a pointer; only a pointer has a NULL that means nothing was produced (§16.2b.4)", clause)
             return r
         if kind == FACADE_CLAUSE_PREINIT:
             // `preinit` constructs the storage (ruling §13.1): it returns the
@@ -2674,6 +2702,8 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_VALUE_RECORD: return "reads / fills / updates"
     if kind == FACADE_CLAUSE_TEXT_PARAM: return "text param"
     if kind == FACADE_CLAUSE_TEXT_UTF8: return "text utf8"
+    if kind == FACADE_CLAUSE_RUNS_THREADS: return "runs threads"
+    if kind == FACADE_CLAUSE_PRODUCED_FIELD: return "nullable field / nonnull field"
     if kind == FACADE_CLAUSE_TEXT_BYTES: return "text return bytes"
     if kind == FACADE_CLAUSE_DETACHES: return "detaches"
     if kind == FACADE_CLAUSE_TEXT_RETURN: return "text return"

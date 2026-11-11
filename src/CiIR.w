@@ -1169,6 +1169,9 @@ type CiProject {
     // D121 step 6: the registry's facade-level `text utf8` citation, ""
     // when the file states none.
     registry_utf8: str,
+    // §16.3: the registry's facade-level `runs threads` citation, "" when
+    // the file states none.
+    registry_threads: str,
     registry_value_text: str,
     field_role_text: str,             // the stated roles as the draft's provenance lines, in the file's order
     field_roles: HashMap[str, str],   // §16.2b.15: `Record.field` -> `role|record|cite`, from the registry
@@ -1212,6 +1215,7 @@ fn CiProject.new -> CiProject:
         sink_seen: HashMap.new(),
         alloc_aliases: List.new(),
         registry_utf8: "",
+        registry_threads: "",
         registry_value_text: "",
         field_role_text: "",
         field_roles: HashMap.new(),

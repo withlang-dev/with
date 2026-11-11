@@ -2087,6 +2087,7 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
         if registry.package != facade_name:
             return Err("registry: " ++ facts_path ++ " states facts for `" ++ registry.package ++ "`, not `" ++ facade_name ++ "`")
         project.registry_utf8 = with_str_clone_ref(registry.utf8_cite)
+        project.registry_threads = with_str_clone_ref(registry.threads_cite)
         project.registry_value_text = with_str_clone_ref(registry.value_text)
         for name in registry.value_fns: project.registry_value_fns.push(name)
         for (field, role) in registry.field_roles:

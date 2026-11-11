@@ -605,6 +605,22 @@ fn facade_render_forward_names(params: &str) -> str:
 // facade_bridge_redirect), as a D64 bridge's is. Direct-return producers,
 // plain lends and the `drop` are presented this way; an operation whose
 // result is a view keeps its method alone.
+// §16.2b.4: the field a by-value producer states (`from F, nullable field
+// a.b`), as (word, "a.b"): the word is `nullable` or `nonnull`, "" when the
+// producer states none.
+fn facade_render_produced_field(pool: &AstPool, intern: &InternPool, resource: i32, producer_name: &str) -> (str, str):
+    let extra_start = pool.get_data1(resource as NodeId)
+    for k in 0..pool.get_data2(resource as NodeId):
+        let clause = pool.get_extra(extra_start + 1 + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_PRODUCED_FIELD: continue
+        let ops = pool.get_data1(clause as NodeId)
+        if intern.resolve(pool.get_extra(ops)) != producer_name: continue
+        var path = ""
+        for s in 2..pool.get_data2(clause as NodeId):
+            path = path ++ (if s > 2: "." else: "") ++ intern.resolve(pool.get_extra(ops + s))
+        return (intern.resolve(pool.get_extra(ops + 1)), path)
+    ("", "")
+
 fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> str:
     let name = intern.resolve(pool.get_data0(resource as NodeId))
     let extra_start = pool.get_data1(resource as NodeId)
@@ -627,7 +643,8 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             let bridge = facade_render_bridge(pool, intern, producer, 0, -1, "")
             if not bridge.ok: continue
             let cname = intern.resolve(pool.get_data0(producer as NodeId))
-            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ bridge.params ++ ") -> " ++ name ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
+            let made = if facade_render_produced_field(pool, intern, resource, cname).0 == "nullable": "Option[" ++ name ++ "]" else: with_str_clone_ref(name)
+            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ bridge.params ++ ") -> " ++ made ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
         else if kind == FACADE_CLAUSE_DROP:
             let dropper = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
             if dropper != 0:
@@ -1452,7 +1469,21 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             let repr = facade_render_fresh("repr", facade_render_param_names(pool, intern, producer))
             out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ result ++ ":\n" ++ pro ++ "    let " ++ repr ++ " = " ++ call ++ "\n    if " ++ repr ++ " == null: None else: Some(" ++ name ++ " { " ++ made_deps ++ "repr: " ++ repr ++ ", live: true })\n"
         else:
-            out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ result ++ ":\n" ++ pro ++ "    " ++ name ++ " { " ++ made_deps ++ "repr: " ++ call ++ ", live: true }\n"
+            // §16.2b.4: a by-value producer states the field whose NULL
+            // means nothing was produced, checked when the call returns:
+            // `nullable field` presents `Option[R]`; `nonnull field`
+            // presents `R`, and a NULL there is a contract failure.
+            let cname = intern.resolve(pool.get_data0(producer as NodeId))
+            let (field_mode, field_path) = facade_render_produced_field(pool, intern, item, cname)
+            let repr = facade_render_fresh("repr", facade_render_param_names(pool, intern, producer))
+            let value = name ++ " { " ++ made_deps ++ "repr: " ++ (if field_mode.len() == 0: call else: repr) ++ ", live: true }"
+            if field_mode == "nullable": result = "Option[" ++ name ++ "]"
+            let head = "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ result ++ ":\n" ++ pro
+            if field_mode.len() == 0: out = out ++ head ++ "    " ++ value ++ "\n"
+            else:
+                let produced = head ++ "    let " ++ repr ++ " = " ++ call ++ "\n"
+                if field_mode == "nullable": out = out ++ produced ++ "    if " ++ repr ++ "." ++ field_path ++ " == null: None else: Some(" ++ value ++ ")\n"
+                else: out = out ++ produced ++ "    if " ++ repr ++ "." ++ field_path ++ " == null: panic(\"" ++ cname ++ ": the facade states 'nonnull field " ++ field_path ++ "', and C returned it NULL (§16.2b.4)\")\n    " ++ value ++ "\n"
         out = out ++ facade_render_receiver_method(pool, intern, ci, item, producer, -1, pname, result)
     if init_fn != 0:
         let iname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(init_fn as NodeId)))

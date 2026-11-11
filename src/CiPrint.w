@@ -609,8 +609,12 @@ fn ci_print_return_stmt(exprs: CiExprPool, types: CiTypePool, e: CiExprId, inden
 // D30 R4c: with_memcpy is the runtime's own safe definition wherever a
 // migration declares it, so the copy needs no `unsafe` of its own in a
 // plain fn either; a block holding only that call is vacuous and refused.
-fn ci_print_unsafe_stmt(indent: &str, call: &str) -> str:
-    indent ++ call ++ "\n"
+// A record assignment's copy. In a `c_import` translation `with_memcpy` is
+// the translation's own extern, a raw call (#3218); in `with migrate` output
+// it is the runtime's safe definition, where a wrapper would be vacuous
+// (R4c). ci_migrate_wrap_call_if_needed knows which.
+fn ci_print_memcpy_stmt(indent: &str, call: &str) -> str:
+    indent ++ ci_migrate_wrap_call_if_needed("with_memcpy", call) ++ "\n"
 
 // D147: a designated-init pair of a bitfield member is a setter pair,
 // its name index encoded negative; the record is built from the plain
@@ -674,9 +678,9 @@ fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool
     if not rhs_is_place:
         let copy_name = "__ci_copy_" ++ i32_to_string(rhs as i32)
         let bound = indent ++ "let " ++ copy_name ++ ": " ++ ci_print_type(types, ty) ++ " = " ++ ci_print_expr(exprs, types, rhs, 0, 0) ++ "\n"
-        return bound ++ ci_print_unsafe_stmt(indent, "with_memcpy((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), (&raw const " ++ copy_name ++ " as " ++ ci_rt_ptr_const() ++ "), sizeof[" ++ ty_text ++ "]())")
+        return bound ++ ci_print_memcpy_stmt(indent, "with_memcpy((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), (&raw const " ++ copy_name ++ " as " ++ ci_rt_ptr_const() ++ "), sizeof[" ++ ty_text ++ "]())")
     let rhs_str = ci_print_expr(exprs, types, rhs, 0, 1)
-    ci_print_unsafe_stmt(indent, "with_memcpy((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), (&raw const " ++ rhs_str ++ " as " ++ ci_rt_ptr_const() ++ "), sizeof[" ++ ty_text ++ "]())")
+    ci_print_memcpy_stmt(indent, "with_memcpy((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), (&raw const " ++ rhs_str ++ " as " ++ ci_rt_ptr_const() ++ "), sizeof[" ++ ty_text ++ "]())")
 
 fn ci_print_sizeof_type_text(text: &str) -> str:
     if ci_starts_with_str(text, "*const "):
