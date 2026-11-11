@@ -12101,6 +12101,13 @@ impl Sema:
         if self.fn_symbol_is_unsafe(fn_sym) and not presented:
             return "unsafe function call requires unsafe context"
         if self.fn_symbol_is_raw_c_import(fn_sym):
+            // A header's own inline body calling the header's functions is
+            // C calling C. The translator wraps the calls it knows are raw
+            // (a pointer parameter or return, a variadic); that a record
+            // passed by value holds a pointer (D198) is Sema's fact, which
+            // the translation cannot read: `buf_free(w.inner)` in an inline
+            // `wrap_free` refused the whole header.
+            if self.current_file_is_generated("<c_import ") and self.fn_is_raw_by_value_record_only(fn_sym): return ""
             return "raw c_import function call requires unsafe context" ++ self.by_value_pointer_param_note(fn_sym)
         if self.fn_symbol_is_manual_extern(fn_sym):
             let name = self.pool_resolve(fn_sym)
@@ -12115,6 +12122,15 @@ impl Sema:
     // value whose type holds a pointer, the diagnostic names the function,
     // the type, the pointer and the fix, and says when a fetched package's
     // facade is applied and does not model the type. "" otherwise.
+    // Whether `fn_sym` is raw for one reason only: a parameter passed by
+    // value whose type holds a pointer (§16.2b.5).
+    fn fn_is_raw_by_value_record_only(fn_sym: i32) -> bool:
+        let sig = self.get_sig(fn_sym)
+        if sig < 0 or self.sig_is_variadic(sig) != 0 or self.ci_type_requires_raw_contract(self.sig_return_type(sig)): return false
+        for pi in 0..self.sig_get_param_count(sig):
+            if self.ci_type_requires_raw_contract(self.sig_param_type(sig, pi)): return false
+        self.by_value_pointer_param_note(fn_sym).len() > 0
+
     fn by_value_pointer_param_note(fn_sym: i32) -> str:
         let sig_idx = self.get_sig(fn_sym)
         if sig_idx < 0: return ""

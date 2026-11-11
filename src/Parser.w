@@ -4989,8 +4989,38 @@ impl Parser:
             let clause = self.parse_facade_clause(in_resource)
             if clause == 0: return (clauses, false)
             clauses.push(clause)
+            if in_resource and self.peek() == TokenKind.TK_COMMA and self.pool.get_data0(clause as NodeId) == FACADE_CLAUSE_FROM:
+                let field = self.parse_facade_produced_field(self.pool.get_extra(self.pool.get_data1(clause as NodeId)))
+                if field == 0: return (clauses, false)
+                clauses.push(field)
             self.skip_newlines()
         (clauses, true)
+
+    // §16.2b.4: `from F, nullable field a.b` / `from F, nonnull field a.b` —
+    // the field whose NULL means a by-value producer produced nothing. Its
+    // own clause beside the `from`, naming the producer.
+    mut fn parse_facade_produced_field(producer: i32) -> i32:
+        let start = self.current_start()
+        self.advance()
+        let word = if self.current_ident_is("nullable") or self.current_ident_is("nonnull"): self.expect_ident() else: 0
+        if word == 0 or not self.current_ident_is("field"):
+            self.emit_error("after 'from <producer>,' a by-value producer states 'nullable field <F>' or 'nonnull field <F>' (§16.2b.4)")
+            return 0
+        self.advance()
+        let ops = [producer, word]
+        var count: i32 = 3
+        let first = self.expect_ident()
+        if first == 0: return 0
+        ops.push(first)
+        while self.peek() == TokenKind.TK_DOT:
+            self.advance()
+            let seg = self.expect_ident()
+            if seg == 0: return 0
+            ops.push(seg)
+            count += 1
+        let extra_start = self.pool.extra_len()
+        for op in ops: self.pool.add_extra(op)
+        self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_PRODUCED_FIELD, extra_start, count) as i32
 
     mut fn parse_facade_param_ref() -> i32:
         let start = self.current_start()
