@@ -655,7 +655,7 @@ fn run_uat_command(argv: &List[str]) -> i32:
             print(uat_dots(sc.name) ++ applies ++ (if reqs.len() > 0: "  requires: " ++ reqs else: "") ++ (if plats.len() > 0: "  platforms: " ++ plats else: ""))
             continue
         if why.len() > 0:
-            if strict and not why.starts_with("platforms: ") or why.starts_with("platforms: unknown"):
+            if strict and (not why.starts_with("platforms: ") or why.starts_with("platforms: unknown")):
                 print(uat_dots(sc.name) ++ "BLOCKED  (" ++ why ++ ")")
                 fail = fail + 1
                 continue
