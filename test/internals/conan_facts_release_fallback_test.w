@@ -28,9 +28,9 @@ fn main:
     assert(write_file(build ++ "/compile_commands.json", "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c tiny.c\",\n  \"file\": \"tiny.c\"\n}\n]\n") == 0)
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"tiny\"]}\n") == 0)
     // Main's file: a statement from the future.
-    assert(write_file(newer ++ "/registry/c/tiny/facts.w", "c contract tiny:\n    hovers gently    // tiny.h, a word no compiler reads yet\n") == 0)
+    assert(write_file(newer ++ "/registry/c/tiny/facts.w", "c facts tiny:\n    hovers gently    // tiny.h, a word no compiler reads yet\n") == 0)
     // The release's file: words this compiler reads.
-    let published = "c contract tiny:\n    runs threads    // tiny.h, the release's own fact\n"
+    let published = "c facts tiny:\n    runs threads    // tiny.h, the release's own fact\n"
     assert(write_file(release ++ "/registry/c/tiny/facts.w", published) == 0)
     assert(set_env("WITH_REGISTRY", "file://" ++ current_dir() ++ "/" ++ newer) == 0)
     assert(set_env("WITH_REGISTRY_RELEASE", "file://" ++ current_dir() ++ "/" ++ release) == 0)

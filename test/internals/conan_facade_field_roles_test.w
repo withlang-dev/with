@@ -28,7 +28,7 @@ fn draft(root: &str, with_facts: bool) -> str:
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c hooked.c\",\n  \"file\": \"hooked.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"hooked\"]}\n") == 0)
-    assert(write_file(registry ++ "/registry/c/hooked/facts.w", "c contract hooked:\n    field alloc of hooks is allocator    // hooked.h: alloc returns a block the caller owns\n    field release of hooks is deallocator    // hooked.h: release frees the block\n    field data of hooks is context    // hooked.h: handed back to both hooks\n") == 0)
+    assert(write_file(registry ++ "/registry/c/hooked/facts.w", "c facts hooked:\n    field alloc of hooks is allocator    // hooked.h: alloc returns a block the caller owns\n    field release of hooks is deallocator    // hooked.h: release frees the block\n    field data of hooks is context    // hooked.h: handed back to both hooks\n") == 0)
     assert(set_env("WITH_REGISTRY", if with_facts: "file://" ++ current_dir() ++ "/" ++ registry else: "file:///nonexistent-registry") == 0)
     conan_write_facade("hooked", "1.0", dep, src, build)
     (read_file(dep ++ "/contract.w") ?? "") ++ "\n====\n" ++ (read_file(dep ++ "/contract-report.txt") ?? "")

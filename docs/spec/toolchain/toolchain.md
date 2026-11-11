@@ -13,6 +13,7 @@ with repl                                    # interactive session
 with init                                    # create a new project
 with uat [<scenario>]                        # run the project's acceptance scenarios (uat/*.uat, §18.5d)
 with migrate <c-sources>                     # translate C to With (§13.5b, §16)
+with fix-contracts [--list | --apply] <path>...  # respell `c facade` and `use facades.` as the With Contract Language writes them
 with emit-c-header <file>                    # emit C declarations for @[c_export] (§16.5)
 with cc <clang arguments>                    # the C compiler inside this binary (§18.8)
 with version [--abi-sha | --self-id] | with help   # --abi-sha: the ABI identity .wo bundles key on; --self-id: the sha256 of this compiler's unstamped image (empty for an unstamped binary), the build cache's identity for a compiler

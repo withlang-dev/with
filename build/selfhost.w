@@ -4575,7 +4575,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     // A fact without its citation is refused: the review rule the tool
     // enforces.
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "bad_facts.w"), "c contract mini:\n    resource Pool wraps *mut pool\n        drop pool_free\n", "facade by evidence uncited fact")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "bad_facts.w"), "c facts mini:\n    resource Pool wraps *mut pool\n        drop pool_free\n", "facade by evidence uncited fact")
     if rc != 0: return rc
     // D121 step 3, the introspection half: `item` has two unary destroyers
     // and the file names one; `buf_fetch` and `doc_last` have no body in

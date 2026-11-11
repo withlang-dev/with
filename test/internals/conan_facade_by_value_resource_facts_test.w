@@ -27,7 +27,7 @@ fn main:
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c pix.c\",\n  \"file\": \"pix.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"pix\"]}\n") == 0)
-    assert(write_file(registry ++ "/registry/c/pix/facts.w", "c contract pix:\n    resource Pixels wraps Pix\n        from pix_load    // pix.h: the caller owns the buffer\n        drop pix_unload    // pix.h: frees the buffer\n    fn pix_at\n        of Pixels    // pix.c: reads data[i], stores nothing\n") == 0)
+    assert(write_file(registry ++ "/registry/c/pix/facts.w", "c facts pix:\n    resource Pixels wraps Pix\n        from pix_load    // pix.h: the caller owns the buffer\n        drop pix_unload    // pix.h: frees the buffer\n    fn pix_at\n        of Pixels    // pix.c: reads data[i], stores nothing\n") == 0)
     assert(set_env("WITH_REGISTRY", "file://" ++ current_dir() ++ "/" ++ registry) == 0)
     conan_write_facade("pix", "1.0", dep, src, build)
     let facade = read_file(dep ++ "/contract.w") ?? ""
