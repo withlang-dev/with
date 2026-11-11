@@ -1202,7 +1202,7 @@ fn run_cli(full_argc: i32) -> i32:
             with_write("\n")
             return 0
         with_write("with ")
-        with_write(with_str_from_cstr(c"WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr))
+        with_write(compiler_version_text())
         with_write("\n")
         return 0
     if cli_command(argc) == "help" or cli_command(argc) == "--help" or cli_command(argc) == "-h":
@@ -7197,7 +7197,12 @@ fn run_get_command(argc: i32) -> i32:
 
 // Install `c.<pkg_name>` at `pkg_version` ("" for the newest), lock it and
 // pin it in with.toml.
+// This compiler's version, `v0.16.0`: the build writes it over the slot
+// (build/compiler.w), so the slot is spelled once.
+fn compiler_version_text() -> str: with_str_from_cstr(c"WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
+
 fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinstall: bool) -> i32:
+    conan_set_compiler_version(compiler_version_text())
     let resolved_version = conan_install(pkg_name, pkg_version, root, force_reinstall)
     if resolved_version.len() == 0:
         return 1
@@ -7207,7 +7212,7 @@ fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinst
     let refused = conan_facts_refused()
     if refused.len() > 0:
         with_eprint("error: the registry's facts could not be read (" ++ refused ++ "); no facade was written, so c." ++ pkg_name ++ " is not added")
-        with_eprint("  the facts file is registry/c/<package>/facts.w in the toolchain's repository; `WITH_REGISTRY=<base URL>` reads another")
+        with_eprint("  the facts file is registry/c/<package>/facts.w in the toolchain's repository; `WITH_REGISTRY=<base URL>` reads another; a released compiler falls back to the facts its release published")
         return 1
     let loaded_lock = lock_load(root)
     let updated_lock = lock_upsert_installed_c_dep_tree(loaded_lock, root, pkg_name, resolved_version)
