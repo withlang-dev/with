@@ -624,12 +624,17 @@ fn comp_path_separator() -> i32:
         return 59
     58
 
+// Which compiler "seed" names is an input of everything it builds (#2761):
+// the reads are recorded with the target, so a build store entry made by a
+// `with` found on PATH is not served to a run whose WITH names the pinned
+// seed. Unrecorded, the entry verified (its recorded compiler file was
+// unchanged) and the producer record named the wrong generation.
 fn comp_resolve_seed_compiler(ctx: &ActionCtx) -> str:
-    let explicit = env("WITH")
+    let explicit = ctx.env_input("WITH")
     if explicit.len() > 0:
         return explicit
     let fs = ctx.fs()
-    let path_env = env("PATH")
+    let path_env = ctx.env_input("PATH")
     if path_env.len() > 0:
         var start = 0
         for i in 0..path_env.len() + 1:
