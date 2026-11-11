@@ -74,13 +74,17 @@ fn build_graph_dirname(path: &str) -> str:
             last_slash = i as i32
     if last_slash < 0:
         return "."
+    // The root's parent is the root (POSIX dirname): `/` and `/a` (#1021).
+    if last_slash == 0: return "/"
     path.slice(0, last_slash as i64)
 
 fn build_graph_path_basename(path: &str) -> str:
+    // POSIX basename of the root is the root (#1021).
+    if path == "/": return "/"
     let dir = build_graph_dirname(path)
     if dir == ".":
         return with_str_clone_ref(path)
-    path.slice((dir.len() + 1) as i64, path.len())
+    path.slice(if dir == "/": 1 else: dir.len() + 1, path.len())
 
 fn build_graph_path_has_glob(path: &str) -> bool:
     path.contains("*")

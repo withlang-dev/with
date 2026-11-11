@@ -76,9 +76,12 @@ fn render_decl(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
         else:
             out.push_str("type " ++ name)
 
-        if sub_kind == TypeDeclKind.Struct:
+        // A union's body is the struct body's layout (Parser.parse_struct_body);
+        // it had no branch and rendered as `<unknown type decl>` (#1023).
+        if sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Union:
             let field_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
+            if sub_kind == TypeDeclKind.Union: out.push_str(" = union")
             out.push_str(" " ++ render_lbrace() ++ " ")
             for fi in 0..field_count:
                 if fi > 0:

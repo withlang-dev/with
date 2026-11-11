@@ -525,12 +525,12 @@ enum CiStmtKind: i32:
     CIS_BLOCK = 3            // d0 = stmts_extra_start, d1 = stmts_count, d2 = label_sym (0 if none)
     CIS_IF = 4               // d0 = cond_expr, d1 = then_block, d2 = else_block (0 if none)
     CIS_WHILE = 5            // d0 = cond_expr, d1 = body_block, d2 = label_sym (0 if none)
-    CIS_DO_WHILE = 6         // d0 = body_block, d1 = cond_expr
+    CIS_DO_WHILE = 6         // d0 = body_block, d1 = cond_expr, d2 = cond_setup (0 if none)
     CIS_FOR = 7              // d0 = extra_start holding [init_stmt, cond_expr, inc_expr], d1 = body_block
     CIS_MATCH = 8            // d0 = subject_expr, d1 = arms_extra_start, d2 = arm_count
     CIS_BREAK = 9            // d0 = label_sym (0 if none)
     CIS_CONTINUE = 10        // d0 = label_sym (0 if none)
-    CIS_VAR_DECL = 11        // d0 = name_sym, d1 = type_id, d2 = init_expr (0 if none); flags in extra
+    CIS_VAR_DECL = 11        // d0 = name_sym, d1 = type_id, d2 = init_expr (0 if none); flags column: bit0 = is_mut, bit1 = has_init
     CIS_ASSIGN = 12          // d0 = lhs_expr, d1 = rhs_expr
     CIS_LABEL = 13           // d0 = label_sym
     CIS_GOTO = 14            // d0 = label_sym
