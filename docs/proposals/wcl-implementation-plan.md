@@ -43,11 +43,28 @@ question for Eric (A2). Either way a released compiler refuses the
 respelled file and falls back to the facts its own release published
 (D199), with its note, on every fetch until the user upgrades.
 
-**Prose uses by meaning.** Not yet classified. Raw counts of the word, any
-meaning: `src/` 4582, `lib/std` 1439, `test/` 1091, `docs/meetings` 387,
-`docs/spec` 269, `docs/proposals` 234, `build/` 195, `docs/completed` 173,
-`tools/` 125, `lib/facades` 39, `rt/` 21. Step 1 below produces the
-classification, and it is reported before any prose is touched.
+**Uses by place and meaning.** A first pass, by a read-only classifier
+(place from the line's own syntax; meaning from the words beside the use and
+from the file it is in). It edits nothing.
+
+| Kind | Count | What happens to it |
+|---|---|---|
+| Code: the keyword `c facade` | 421 (399 in `test/`, 12 `rt/`, 5 `lib/facades/`, 3 `registry/`, 2 `examples/`) | respelled by the tool |
+| Code: a `use facades.…` path | 27 (18 `test/`, 6 `uat/`, 3 `examples/`) | respelled by the tool |
+| Code: a compiler identifier (`FACADE_CLAUSE_*`, `SemaFacade`, `facade_render_*`, a field named `facade`) | 3438 (3368 in `src/`) | step A8, a compiler-driven rename |
+| Code: other (a local or field named `facade` in expression position) | 149 | read with A8 |
+| Comment, string or prose that means a contract | 2214 | becomes "contract" |
+| Comment, string or prose that means the library layer | 1626 (1346 of them in one generated file, `lib/std/engines/mlib/facade_shapes.w`, which is never edited) | stays |
+| Not decided by the classifier | 677 lines | read by a person before any prose is touched |
+
+The 677 undecided lines: `src/` 175, `docs/meetings` 133, `tools/` 104,
+`docs/spec` 70, `docs/proposals` 65, `test/` 62, `docs/completed` 34,
+`build/` 22, `examples/` 5, `uat/` 2. The dated meeting records and
+`docs/completed` are history and are not edited whatever they mean, which
+removes 167 of them from the reading. One caution for A8: the compiler
+already uses the word `contract` for other things (a facade fn item's
+`contract` in `Sema.w`, the contract view, D159's migrator contracts), so
+the identifier rename is planned name by name, not by pattern.
 
 ## Stack A: the keyword migration
 
