@@ -4,6 +4,7 @@
 // No c_import — all operations go through with_fs_* runtime functions
 // which are backed by rt_* platform calls.
 
+use std.result
 use rt.rt_core
 
 /// Check if a file exists at the given path.

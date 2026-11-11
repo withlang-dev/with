@@ -77,7 +77,7 @@ unsafe fn _read_pass(buf: *mut u8, size: i64):
     var sink: i64 = 0
     var i: i64 = 0
     while i < size:
-        sink = sink + unsafe *(buf + i) as i64
+        sink = sink + *(buf + i) as i64
         i = i + 64
     // DoNotOptimize: "+r"(sink) makes sink both input and output of the
     // asm block. LLVM cannot eliminate the loop because the result feeds
@@ -90,6 +90,6 @@ unsafe fn _write_pass(buf: *mut u8, size: i64):
     // subsequent read pass.
     var i: i64 = 0
     while i < size:
-        unsafe *(buf + i) = (i % 251) as u8
+        *(buf + i) = (i % 251) as u8
         i = i + 64
     unsafe { asm volatile("" ::: "memory") }

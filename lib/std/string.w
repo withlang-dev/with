@@ -18,6 +18,9 @@
 // This module provides additional utility functions.
 // No c_import — uses with_* runtime functions.
 
+use std.traits
+use std.option
+use std.result
 use std.collections
 use rt.rt_core
 

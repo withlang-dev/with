@@ -14,6 +14,7 @@
 // a generator gives one through `g.pull()` (std.task Pulled[T]).
 
 /// `g |> map(f)`: each element of `g` passed through `f`.
+use std.collections
 pub type MapStage[G, T, U] { g: G, f: fn(T) -> U }
 
 impl[G: Gen[T], T, U] Gen[U] for MapStage[G, T, U]:

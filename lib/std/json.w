@@ -4,6 +4,9 @@
 // Single-pass tokenizer. Tokens store byte offsets into the source string.
 // Always includes parent links. Non-strict mode.
 
+use std.traits
+use std.collections
+use std.option
 use rt.rt_core
 
 pub type JsonWriter {

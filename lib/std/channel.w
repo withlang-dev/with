@@ -13,6 +13,8 @@
 // chan[T](capacity) is a compiler builtin that returns (Sender[T], Receiver[T]).
 // Sender and Receiver enforce directionality at compile time.
 
+use std.traits
+use std.option
 use rt.channel_runtime
 
 // chan[T](capacity) is a compiler builtin — defined in CodegenDispatch.w.

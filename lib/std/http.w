@@ -2,6 +2,7 @@
 //
 // This is intentionally small: HTTPS GET, response parsing, and redirects.
 
+use std.string
 use std.tls
 use std.net
 use std.internal.str_abi

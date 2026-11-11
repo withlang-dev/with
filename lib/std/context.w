@@ -1,5 +1,6 @@
 // std.context — conventional implicit execution context.
 
+use std.traits
 use std.alloc
 
 pub type TraceId: Copy {
