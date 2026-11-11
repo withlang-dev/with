@@ -57,7 +57,6 @@ enum TokenKind: i32:
     TK_KW_GEN = 43
     TK_KW_YIELD = 44
     TK_KW_DEFER = 45
-    TK_KW_ERROR = 46
     TK_KW_EXTERN = 47
     TK_KW_C_IMPORT = 48
     TK_KW_EPHEMERAL = 49
@@ -198,7 +197,6 @@ fn tag_from_keyword(s: &str) -> i32:
     if s == "gen": return TokenKind.TK_KW_GEN
     if s == "yield": return TokenKind.TK_KW_YIELD
     if s == "defer": return TokenKind.TK_KW_DEFER
-    if s == "error": return TokenKind.TK_KW_ERROR
     if s == "extern": return TokenKind.TK_KW_EXTERN
     if s == "c_import": return TokenKind.TK_KW_C_IMPORT
     if s == "ephemeral": return TokenKind.TK_KW_EPHEMERAL
@@ -273,7 +271,6 @@ fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_KW_GEN: return "'gen'"
     if tag == TokenKind.TK_KW_YIELD: return "'yield'"
     if tag == TokenKind.TK_KW_DEFER: return "'defer'"
-    if tag == TokenKind.TK_KW_ERROR: return "'error'"
     if tag == TokenKind.TK_KW_EXTERN: return "'extern'"
     if tag == TokenKind.TK_KW_C_IMPORT: return "'c_import'"
     if tag == TokenKind.TK_KW_EPHEMERAL: return "'ephemeral'"
