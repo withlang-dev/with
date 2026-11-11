@@ -1118,3 +1118,16 @@ fn tls_connect_timeout(hostname: &str, port: i32, connect_ms: i32, idle_ms: i32)
         socket_close(fd)
         return TlsConn.new(-1)
     conn
+
+// Known answer (#1063): the TLS working group's P_SHA256 vector (secret
+// 9bbe436b…db35, label "test label", seed a0ba9f93…198c, 100 bytes of
+// output), compared on its first 32 bytes. 0 on pass.
+pub fn tls_prf_sha256_kat() -> i32:
+    let secret: [u8; 16] = [0x9bu8, 0xbeu8, 0x43u8, 0x6bu8, 0xa9u8, 0x40u8, 0xf0u8, 0x17u8, 0xb1u8, 0x76u8, 0x52u8, 0x84u8, 0x9au8, 0x71u8, 0xdbu8, 0x35u8]
+    let seed: [u8; 16] = [0xa0u8, 0xbau8, 0x9fu8, 0x93u8, 0x6cu8, 0xdau8, 0x31u8, 0x18u8, 0x27u8, 0xa6u8, 0xf7u8, 0x96u8, 0xffu8, 0xd5u8, 0x19u8, 0x8cu8]
+    // "test label"
+    let label: [u8; 10] = [0x74u8, 0x65u8, 0x73u8, 0x74u8, 0x20u8, 0x6cu8, 0x61u8, 0x62u8, 0x65u8, 0x6cu8]
+    var out: [u8; 100] = [0u8; 100]
+    unsafe { tls_prf_sha256(&raw const secret[0] as *const u8, 16, &raw const label[0] as *const u8, 10, &raw const seed[0] as *const u8, 16, &raw mut out[0] as *mut u8, 100) }
+    if sha256_hex(&raw const out[0] as *const u8) != "e3f229ba727be17b8d122620557cd453c2aab21d07c3d495329b52d4e61edb5a": return 1
+    0

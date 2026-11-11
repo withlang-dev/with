@@ -288,3 +288,30 @@ unsafe fn i31_is_zero(x: *const u32) -> u32:
         i = i + 1
     let z = acc | (0u32 -% acc)
     1u32 -% (z >> 31u32)
+
+// `base ^ exponent mod modulus` through the Montgomery ladder, for one-byte
+// operands and a two-byte modulus: the known-answer driver.
+fn i31_modpow_small(base: u8, exponent: u8, modulus: [u8; 2]) -> i32:
+    var m: [u32; 4] = [0u32; 4]
+    var x: [u32; 4] = [0u32; 4]
+    var t1: [u32; 4] = [0u32; 4]
+    var t2: [u32; 4] = [0u32; 4]
+    let x_bytes: [u8; 1] = [base]
+    let e: [u8; 1] = [exponent]
+    var result: [u8; 2] = [0u8; 2]
+    unsafe:
+        let mp = &raw mut m[0] as *mut u32
+        let xp = &raw mut x[0] as *mut u32
+        i31_decode(mp, &raw const modulus[0] as *const u8, 2)
+        let m0i = i31_ninv31(m[1])
+        i31_decode_reduce(xp, &raw const x_bytes[0] as *const u8, 1, mp as *const u32)
+        i31_modpow(xp, &raw const e[0] as *const u8, 1, mp as *const u32, m0i, &raw mut t1[0] as *mut u32, &raw mut t2[0] as *mut u32)
+        i31_encode(&raw mut result[0] as *mut u8, 2, xp as *const u32)
+    (result[0] as i32) * 256 + result[1] as i32
+
+// Known answers (#1053): 3^7 mod 13 = 3 and 4^13 mod 497 = 445. 0 on pass,
+// else the number of the case that diverged.
+pub fn i31_modpow_kat() -> i32:
+    if i31_modpow_small(3, 7, [0u8, 13u8]) != 3: return 1
+    if i31_modpow_small(4, 13, [0x01u8, 0xF1u8]) != 445: return 2
+    0
