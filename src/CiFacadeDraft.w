@@ -256,7 +256,45 @@ impl CiProject:
 
     // The verdict for a local of `si`: "owned", "borrow:<i>", "null" (never
     // assigned a pointer), or "unknown:<reason>".
-    fn fd_local_verdict(si: i32, local: &str, depth: i32) -> str:
+    // #3123: whether `callee` hands its caller a fresh allocation through
+    // the slot its parameter `index` points at: every `*param = value` in
+    // its body stores NULL or an allocation nothing else keeps, at least
+    // one stores an allocation, and the slot's address is not kept.
+    fn fd_out_fresh(callee: &str, index: i32, depth: i32) -> bool:
+        if depth > 8: return false
+        let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
+        if ci < 0 or not self.fd_subject(ci) or self.symbols[ci].has_definition == 0: return false
+        if index < self.symbols[ci].param_stores.len() and self.symbols[ci].param_stores[index] != 0: return false
+        let head = f"outstore:{index}:"
+        var fresh = false
+        for line in self.symbols[ci].own_evidence.split("\n"):
+            if not line.starts_with(head): continue
+            let v = self.fd_source_verdict(ci, line.slice(head.len(), line.len()), depth + 1, index)
+            if v == "null": continue
+            if v != "owned": return false
+            fresh = true
+        fresh
+
+    // Whether `callee` frees what the slot its parameter `index` points at
+    // holds: a local loaded from the slot (`data = *datap`) reaches a
+    // destroyer.
+    fn fd_slot_destroys(callee: &str, index: i32) -> bool:
+        let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
+        if ci < 0 or not self.fd_subject(ci) or self.symbols[ci].has_definition == 0: return false
+        for line in self.symbols[ci].own_evidence.split("\n"):
+            if not line.starts_with("localslot:"): continue
+            let slot = line.split(":")
+            if slot.len() != 3 or fd_i32(slot[2]) != index: continue
+            for sink in self.symbols[ci].own_evidence.split("\n"):
+                if not sink.starts_with("localsink:" ++ slot[1] ++ ":"): continue
+                let parts = sink.split(":")
+                if parts.len() == 4 and self.fd_callee_destroys(parts[2], fd_i32(parts[3])): return true
+        false
+
+    // `out_ctx` is the slot parameter whose stores are being judged
+    // (fd_out_fresh), -1 for a return: a local stored through that slot is
+    // what is handed over, and through any other it is stored.
+    fn fd_local_verdict(si: i32, local: &str, depth: i32, out_ctx: i32) -> str:
         if depth > 8: return "unknown:a chain of locals too deep to follow"
         var verdict = "null"
         var assigned = false
@@ -264,6 +302,15 @@ impl CiProject:
             let parts = line.split(":")
             if parts.len() < 2 or parts[1] != local: continue
             if parts[0] == "localstore": return "unknown:local " ++ local ++ " is stored or its address taken"
+            if parts[0] == "localout" and parts.len() == 3:
+                if fd_i32(parts[2]) == out_ctx: continue
+                return "unknown:local " ++ local ++ " is also stored through an out parameter"
+            if parts[0] == "localaddr" and parts.len() == 4:
+                if not self.fd_out_fresh(parts[2], fd_i32(parts[3]), depth + 1): return "unknown:local " ++ local ++ " is stored or its address taken"
+                assigned = true
+                if verdict == "null": verdict = "owned"
+                else if verdict != "owned": return "unknown:local " ++ local ++ " has more than one source"
+                continue
             if parts[0] == "localsink" and parts.len() == 4:
                 if self.fd_callee_retains(parts[2], fd_i32(parts[3])): return "unknown:local " ++ local ++ " is passed to " ++ parts[2] ++ ", which retains it"
             if parts[0] == "localsrc" and parts.len() >= 3:
@@ -273,7 +320,7 @@ impl CiProject:
                 // still whatever its other assignments gave it.
                 if src == "local:" ++ local or src == "field:local:" ++ local: continue
                 assigned = true
-                let v = self.fd_source_verdict(si, src, depth + 1)
+                let v = self.fd_source_verdict(si, src, depth + 1, out_ctx)
                 if v == "null": continue
                 if verdict == "null": verdict = v
                 else if verdict != v:
@@ -286,21 +333,21 @@ impl CiProject:
         verdict
 
     // The verdict for one <src> record (CImport.w ci_body_ownership_evidence).
-    fn fd_source_verdict(si: i32, src: &str, depth: i32) -> str:
+    fn fd_source_verdict(si: i32, src: &str, depth: i32, out_ctx: i32) -> str:
         if src == "null": return "null"
         if src.starts_with("param:"): return "borrow:" ++ src.slice(6, src.len())
         if src.starts_with("field:param:"): return "borrow:" ++ src.slice(12, src.len())
         if src.starts_with("field:local:"):
-            let v = self.fd_local_verdict(si, src.slice(12, src.len()), depth)
+            let v = self.fd_local_verdict(si, src.slice(12, src.len()), depth, out_ctx)
             return if v.starts_with("borrow:"): v else if v.starts_with("unknown:"): v else: "unknown:a part of local " ++ src.slice(12, src.len()) ++ ", which is not a borrow"
-        if src.starts_with("local:"): return self.fd_local_verdict(si, src.slice(6, src.len()), depth)
+        if src.starts_with("local:"): return self.fd_local_verdict(si, src.slice(6, src.len()), depth, out_ctx)
         // #3172: a call through a function-pointer field has no body to
         // read; which function the field holds is a registry fact.
         if src.starts_with("indirect:"):
             // D198: the one function the field is proven to hold decides.
             if self.fd_is_alloc_call("*" ++ src.slice(9, src.len())): return "owned"
             let proven = self.fd_fnptr_proven_callee("*" ++ src.slice(9, src.len()))
-            if proven.len() > 0: return self.fd_source_verdict(si, "call:" ++ proven ++ ":", depth + 1)
+            if proven.len() > 0: return self.fd_source_verdict(si, "call:" ++ proven ++ ":", depth + 1, out_ctx)
             return "unknown:returns what " ++ self.fd_fnptr_why("*" ++ src.slice(9, src.len()))
         if src.starts_with("call:"):
             let rest = src.slice(5, src.len())
@@ -320,7 +367,7 @@ impl CiProject:
                     let arg = fd_argmap_at(argmap, origin)
                     var v = ""
                     if arg.starts_with("p"): v = "borrow:" ++ arg.slice(1, arg.len())
-                    else if arg.starts_with("l"): v = self.fd_local_verdict(si, arg.slice(1, arg.len()), depth)
+                    else if arg.starts_with("l"): v = self.fd_local_verdict(si, arg.slice(1, arg.len()), depth, out_ctx)
                     if not v.starts_with("borrow:"): return "unknown:" ++ callee ++ " borrows from an argument that is not a parameter"
                     joined = if joined.len() == 0: v else: fd_borrow_union(joined, v)
                     if joined.len() == 0: return "unknown:" ++ callee ++ " borrows from more than two parameters' arguments"
@@ -457,6 +504,9 @@ impl CiProject:
             return "passed " ++ self.fd_sink_text(kv[0]) ++ " at param " ++ kv[1] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1)
         for line in self.symbols[si].own_evidence.split("\n"):
             if line.starts_with("localstore:") and self.fd_local_alias_param(si, line.slice(11, line.len())) == pi: return "stored through local " ++ line.slice(11, line.len())
+            if line.starts_with("localaddr:"):
+                let addr = line.split(":")
+                if addr.len() == 4 and self.fd_local_alias_param(si, addr[1]) == pi: return "the address of local " ++ addr[1] ++ " is passed to " ++ addr[2] ++ ", which is not proven to free what it holds"
             if not line.starts_with("localsink:"): continue
             let parts = line.split(":")
             if parts.len() != 4 or self.fd_local_alias_param(si, parts[1]) != pi or not self.fd_callee_retains(parts[2], fd_i32(parts[3])): continue
@@ -806,6 +856,17 @@ impl CiProject:
                     if self.fd_callee_destroys(parts[2], fd_i32(parts[3])):
                         self.symbols[si].param_destroys[pi] = 1
                         changed = true
+                // #3123: `close(&local)` where the local stands for the
+                // parameter and the callee frees what the slot holds.
+                for line in self.symbols[si].own_evidence.split("\n"):
+                    if not line.starts_with("localaddr:"): continue
+                    let parts = line.split(":")
+                    if parts.len() != 4: continue
+                    let pi = self.fd_local_alias_param(si as i32, parts[1])
+                    if pi < 0 or self.symbols[si].param_destroys[pi] != 0: continue
+                    if self.fd_slot_destroys(parts[2], fd_i32(parts[3])):
+                        self.symbols[si].param_destroys[pi] = 1
+                        changed = true
 
     // D121: the corpus-wide ownership proofs, drawn once after every unit
     // is scanned. Each phase is a monotone fixed point; the order of units
@@ -829,6 +890,33 @@ impl CiProject:
                 if line.starts_with("localstore:"):
                     let pi = self.fd_local_alias_param(si as i32, line.slice(11, line.len()))
                     if pi >= 0: self.symbols[si].param_stores[pi] = 1
+        self.fd_propagate_retention()
+        // 2. Destruction: the bodies' proofs first; then the introspection
+        // file's `free-function` seeds a unary pointer-parameter function
+        // no body proved (D121 step 3), and the fixed point reaches its
+        // callers.
+        self.fd_propagate_destruction()
+        // #3123: the address of a local that stands for a parameter, passed
+        // to a callee not proven to free what the slot holds, is the store
+        // it always was. Judged here, once destruction is known.
+        var late_store = false
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
+            for line in self.symbols[si].own_evidence.split("\n"):
+                if not line.starts_with("localaddr:"): continue
+                let parts = line.split(":")
+                if parts.len() != 4: continue
+                let pi = self.fd_local_alias_param(si as i32, parts[1])
+                if pi < 0 or self.symbols[si].param_stores[pi] != 0 or self.symbols[si].param_destroys[pi] != 0: continue
+                self.symbols[si].param_stores[pi] = 1
+                late_store = true
+        if late_store: self.fd_propagate_retention()
+        self.resolve_ownership_after_retention()
+
+    // Retention reaches callers: a parameter passed, itself or through a
+    // local that stands for it, to a callee that retains it.
+    mut fn fd_propagate_retention():
+        let n = self.symbols.len()
         var changed = true
         while changed:
             changed = false
@@ -853,11 +941,10 @@ impl CiProject:
                     if self.fd_callee_retains(parts[2], fd_i32(parts[3])):
                         self.symbols[si].param_stores[pi] = 1
                         changed = true
-        // 2. Destruction: the bodies' proofs first; then the introspection
-        // file's `free-function` seeds a unary pointer-parameter function
-        // no body proved (D121 step 3), and the fixed point reaches its
-        // callers.
-        self.fd_propagate_destruction()
+
+    // The seeds of destruction that are not body proofs, then returns.
+    mut fn resolve_ownership_after_retention():
+        let n = self.symbols.len()
         var seeded = false
         for si in 0..n:
             if not self.fd_subject(si as i32) or not self.symbols[si].gir.contains("drop=1"): continue
@@ -880,7 +967,7 @@ impl CiProject:
                 break
         if seeded: self.fd_propagate_destruction()
         // 3. Returns.
-        changed = true
+        var changed = true
         while changed:
             changed = false
             for si in 0..n:
@@ -896,7 +983,7 @@ impl CiProject:
                     if not line.starts_with("ret:"): continue
                     returns = returns + 1
                     let src = line.slice(4, line.len())
-                    let v = self.fd_source_verdict(si as i32, src, 0)
+                    let v = self.fd_source_verdict(si as i32, src, 0, -1)
                     if v == "null": continue
                     if v.starts_with("unknown:"):
                         verdict = v

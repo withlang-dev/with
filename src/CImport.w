@@ -19002,6 +19002,13 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
 //   `localsink:<local>:<callee>:<i>` a local passed to a direct call
 //   `paramstore:<i>`                 parameter i stored through a pointer or
 //                                    into an element, or passed indirectly
+//   `localaddr:<local>:<callee>:<i>` `callee(&local)` at argument i: what
+//                                    the callee does through that slot decides
+//   `outstore:<i>:<src>`             `*param_i = <src>`: a store through the
+//                                    slot parameter i points at
+//   `localout:<local>:<i>`           the local stored by such a store
+//   `localslot:<local>:<i>`          `local = *param_i`: the local holds what
+//                                    the slot held
 // and <src> is one of `null`, `param:<i>`, `local:<name>`,
 // `field:param:<i>`, `field:local:<name>` (a part of that value's memory:
 // a field, an element, an offset), `call:<callee>:<argmap>` (<argmap> lists
@@ -19103,6 +19110,27 @@ fn ci_own_collect_locals(session: i64, cursor: i32) -> List[str]:
         i = i + 1
     locals
 
+// The parameter `cursor` dereferences, when it is exactly `*param`; -1 otherwise.
+fn ci_own_deref_param(session: i64, cursor: i32, params: &List[str]) -> i32:
+    let c = ci_own_peel(session, cursor)
+    if with_ci_cursor_kind(session, c) != CXK_UNARY_OP or with_ci_num_children(session, c) != 1 or with_ci_unary_op(session, c) != UO_DEREF: return -1
+    let operand = ci_own_peel(session, with_ci_child(session, c, 0))
+    if with_ci_cursor_kind(session, operand) != CXK_DECL_REF: return -1
+    let spelled = with_ci_cursor_spelling(session, operand)
+    var at = 0
+    for param in params:
+        if spelled == param or ci_escape_reserved(spelled) == param: return at
+        at += 1
+    -1
+
+// The local whose address `cursor` takes, when it is exactly `&local`; "" otherwise.
+fn ci_own_addr_of_local(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
+    let a = ci_own_peel(session, cursor)
+    if with_ci_cursor_kind(session, a) != CXK_UNARY_OP or with_ci_num_children(session, a) != 1 or with_ci_unary_op(session, a) != UO_ADDR: return ""
+    if with_ci_cursor_kind(session, ci_peel_transparent(session, with_ci_child(session, a, 0))) != CXK_DECL_REF: return ""
+    let root = ci_own_place_root(session, a, params, locals)
+    if root.starts_with("local:"): root.slice(6, root.len()) else: ""
+
 fn ci_own_record_store(session: i64, value: i32, params: &List[str], locals: &List[str]) -> str:
     let root = ci_own_place_root(session, value, params, locals)
     let v = ci_own_peel(session, value)
@@ -19121,19 +19149,32 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
         let init = with_ci_var_initializer(session, cursor)
         if init >= 0:
             out = out ++ "localsrc:" ++ with_ci_cursor_spelling(session, cursor) ++ ":" ++ ci_own_source(session, init, params, locals) ++ "\n"
+            let slot = ci_own_deref_param(session, init, params)
+            if slot >= 0: out = out ++ "localslot:" ++ with_ci_cursor_spelling(session, cursor) ++ f":{slot}\n"
     if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
         let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
         let rhs = with_ci_child(session, cursor, 1)
         let lhs_root = ci_own_place_root(session, lhs, params, locals)
         if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("local:"):
             out = out ++ "localsrc:" ++ lhs_root.slice(6, lhs_root.len()) ++ ":" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
+            let slot = ci_own_deref_param(session, rhs, params)
+            if slot >= 0: out = out ++ "localslot:" ++ lhs_root.slice(6, lhs_root.len()) ++ f":{slot}\n"
         else if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("param:"):
             // #3175: a write to the parameter's own variable (`buf = (const
             // unsigned char *)words` at the end of zlib's crc32_z) lands in
             // the callee's frame; nothing outside it keeps the value.
             ()
         else:
-            out = out ++ ci_own_record_store(session, rhs, params, locals)
+            // `*out = value`: a store through the slot a parameter points
+            // at. Whether that hands the caller a fresh allocation is the
+            // proof's to say (fd_out_fresh); the local is recorded as
+            // stored there, not as stored anywhere.
+            let slot = ci_own_deref_param(session, lhs, params)
+            let store = ci_own_record_store(session, rhs, params, locals)
+            if slot >= 0:
+                out = out ++ f"outstore:{slot}:" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
+                out = out ++ (if store.starts_with("localstore:"): "localout:" ++ store.slice(11, store.len() - 1) ++ f":{slot}\n" else: store)
+            else: out = out ++ store
     if kind == CXK_CALL_EXPR and nc >= 1:
         // #3174: through a function-pointer field, the sink names the field, marked.
         let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
@@ -19153,8 +19194,22 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
                 // `f(&p->field)` is the address of a part of what p names,
                 // which can neither replace nor keep p (xz's lzma_index_init:
                 // `index_tree_append(&i->streams, …)` read as i stored).
-                out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
+                // To a named callee the record names it and the position:
+                // a callee proven to fill the slot with a fresh allocation,
+                // or to free what it holds, decides (libcurl's
+                // `Curl_open(&data)`, `Curl_close(&data)`); any other is the
+                // store it always was.
+                if callee.len() > 0 and not callee.starts_with("*"): out = out ++ "localaddr:" ++ root.slice(6, root.len()) ++ ":" ++ callee ++ f":{ai - 1}\n"
+                else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
             ai = ai + 1
+        // The arguments recorded as `localaddr` are not also the bare
+        // address-of below.
+        if callee.len() > 0 and not callee.starts_with("*"):
+            for ci in 0..nc:
+                let child = with_ci_child(session, cursor, ci)
+                if ci >= 1 and ci_own_addr_of_local(session, child, params, locals).len() > 0: continue
+                out = out ++ ci_own_walk(session, child, params, locals)
+            return out
     if kind == CXK_UNARY_OP and nc == 1 and with_ci_unary_op(session, cursor) == UO_ADDR:
         let root = ci_own_place_root(session, with_ci_child(session, cursor, 0), params, locals)
         let operand = ci_peel_transparent(session, with_ci_child(session, cursor, 0))

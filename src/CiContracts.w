@@ -381,7 +381,7 @@ impl CiProject:
     // Whether a `return` of the body may hand back NULL.
     fn ct_returns_null(si: i32) -> bool:
         for line in self.symbols[si].own_evidence.split("\n"):
-            if line.starts_with("ret:") and self.fd_source_verdict(si, line.slice(4, line.len()), 0) == "null": return true
+            if line.starts_with("ret:") and self.fd_source_verdict(si, line.slice(4, line.len()), 0, -1) == "null": return true
         false
 
     // The shape one function prints in, `record|method|out|out_ty|view`, or
