@@ -1,5 +1,6 @@
 use MirCore
 use SemaTypes
+use InternPool
 
 // Construct malformed MIR directly: testing only corrected source lowering
 // would leave the validator's original false-green result untested.
@@ -1755,7 +1756,29 @@ fn structural_verdict(shape: i32) -> str:
         body.set_terminator(entry, TermKind.TK_SWITCH_INT, body.new_operand(OperandKind.OK_COPY, place), table, 0, 0, 0)
     validate_mir_body(body)
 
+// #989: the use-after-kill validator. `_a` is blanked by a reset-on-move
+// zero fill; `revived` writes it again before `_b` reads it.
+fn use_after_kill_verdict(revived: bool) -> str:
+    let pool = InternPool.init()
+    var body = MirBody.init_for_fn(0)
+    let a = body.new_temp(1)
+    let b = body.new_temp(1)
+    let a_place = body.new_place(a)
+    let b_place = body.new_place(b)
+    let entry = body.new_block()
+    let blank = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_CONSTANT, body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, 1)), 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, a_place, blank, 0)
+    if revived:
+        let seven = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_CONSTANT, body.new_const(ConstKind.CK_INT, 7, 0, 0, 1)), 0, 0)
+        body.push_stmt(entry, StmtKind.Assign, a_place, seven, 0)
+    let read = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_COPY, a_place), 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, b_place, read, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_use_after_kill_body(body, pool)
+
 pub fn mir_test_structural_validator() -> Unit:
+    assert(use_after_kill_verdict(false).contains("is read at bb0 after its reset-on-move blank zeroed it"))
+    assert(use_after_kill_verdict(true) == "")
     assert(structural_verdict(0) == "")
     assert(structural_verdict(1) == "missing basic blocks")
     assert(structural_verdict(2).contains("goto target out of range"))

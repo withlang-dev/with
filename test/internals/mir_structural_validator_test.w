@@ -2,7 +2,9 @@
 
 // #984, #989: the structural validator refuses a body with no block, a goto
 // out of range, and a switch whose default is the entry block (one
-// contract for both backends: a switch default is a block after bb0).
+// contract for both backends: a switch default is a block after bb0); the
+// use-after-kill validator refuses a read of a local a zero fill blanked
+// and accepts it once the local is written again.
 
 use MirValidationTests
 
