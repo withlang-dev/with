@@ -1055,7 +1055,9 @@ let none: List[i32] = []                // empty sequence (type from context)
    only one collection has (`push`). An empty literal waits for the first
    push or the first use to say what it holds. Uses that demand two
    different types are an error at the second, naming both. Demands are
-   taken from the literal's own function only. A slice demand supplies the
+   taken from the literal's own function only; a private module-level
+   binding's demands are taken from its own module, and a `pub` binding
+   states its type. A slice demand supplies the
    element type to a literal in argument position and views it; it demands
    no collection (a `List` coerces to `[]T`, §4.8a; D126). The repeat
    form `[value; N]` follows the same rule: a `List` of N elements unless a
