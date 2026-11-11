@@ -719,6 +719,9 @@ BuildTarget.windows_x86_64
 Unsupported targets fail loudly. The language design does not privilege one
 operating system over another.
 
+`--target wasm32` needs no sysroot: `rt/wasm.w` is the target's libc, and a
+wasm32 link joins the runtime bundle and the wasm fiber stubs.
+
 ---
 
 ## Safety Rules

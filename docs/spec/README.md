@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.48
+# The With Programming Language — Specification v7.49
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.49:** D200 (Eric, 2026-11-11). §16.2b.7: established domains. A facade states the calls that establish and end a domain; an operation that `requires domain D` is checked when it is called; establishing an established domain and ending a domain with a live resource of it are contract failures naming the call; a resource that `requires domain D` is a resource of `D`. `with-build.md`: `--target wasm32` needs no sysroot (#2981).
+
 **Changelog v7.48:** D198 Amendment 6 (Eric, 2026-11-11). §16.2b.4: a by-value producer states the field whose NULL means nothing was produced, checked when the call returns: `nullable field F` presents `Option[R]`; `nonnull field F` presents `R`, and a NULL there is a contract failure naming the function. `F` may be a path.
 **Changelog v7.47:** D198 Amendment 5 (Eric, 2026-11-11, #3220, #3237). §16.3: an imported C global follows §9.1 rule 3, with one difference: C may write it; it is safe to access when every call into the library that declares it and every access to its globals is provably on one thread, or the header declares it `const` or thread-local; a library whose facade says `runs threads` has no such proof.
 **Changelog v7.46:** D198 Amendment 4 (Eric, 2026-11-10, #3173). §16.2b.3: the fields of a type a facade generates belong to its generated code; outside it the only one a program can name is `.repr`, and that needs `unsafe`.

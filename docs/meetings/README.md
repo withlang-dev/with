@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D200 — A domain established between two calls is checked at the calls; a resource that requires it is the domain's](2026-11-11-D200-a-domain-established-between-two-calls-is-checked-at-the-calls.md)
 - [D199 — A compiler that cannot read the registry's facts for a package uses the facts its own release published (delegated, D98; amends D136)](2026-11-11-D199-a-compiler-that-cannot-read-the-registrys-facts-uses-the-facts-its-release-published.md)
 - [D198 — A proof about C is accepted only when the drafter can enumerate everything it depends on; where the library lets the program or the build vary it, it is a stated fact (ruled: function-pointer fields #3206, caller-allocated structs #3173)](2026-11-09-D198-a-proof-about-c-is-accepted-only-when-the-drafter-can-enumerate-what-it-depends-on.md)
 - [D197 — A shift count is any integer; a signed count converts to `u32` with a range check, so a negative count panics (delegated; strikes §4.2.4's cast rule)](2026-11-09-D197-a-shift-count-is-any-integer-a-signed-count-converts-with-a-range-check.md)
