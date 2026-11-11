@@ -1225,8 +1225,6 @@ fn run_cli(full_argc: i32) -> i32:
         return run_get_command(argc)
     if cli_command(argc) == "remove":
         return run_remove_command(argc)
-    if cli_command(argc) == "facade":
-        return run_facade_command(argc)
     if cli_command(argc) == "update":
         return run_update_command(argc)
     if cli_command(argc) == "lsp":
@@ -6287,7 +6285,6 @@ fn print_usage:
     with_write("  init             Initialize a With project\n")
     with_write("  get              Add or reinstall a package dependency\n")
     with_write("  remove           Remove a package dependency\n")
-    with_write("  facade report    Say what a fetched C package's facade presents and why the rest is raw\n")
     with_write("  update           Update package dependencies\n")
     with_write("  clean            Delete build artifacts\n")
     with_write("  install-user     Install compiler to ~/.local/bin\n")
@@ -7229,33 +7226,6 @@ fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinst
         let updated = cli_update_manifest_dep(toml, pkg_name, resolved_version)
         with_fs_write_file(manifest_path, updated)
     with_eprint("added c." ++ pkg_name ++ "@" ++ resolved_version)
-    0
-
-// #3117: `with facade report c.<package> [function]` prints the report
-// `with get` wrote beside the package's facade: what is presented, and for
-// each raw function why. With a function, its line alone.
-fn run_facade_command(argc: i32) -> i32:
-    if argc < 4 or argc > 5 or with_arg_at(2) != "report" or not with_arg_at(3).starts_with("c.") or with_arg_at(3).len() == 2:
-        with_eprint("usage: with facade report c.<package> [function]")
-        return 1
-    let package = with_arg_at(3).slice(2, with_arg_at(3).len())
-    let root = project_config_find_root(".")
-    if root.len() == 0:
-        with_eprint("error: no with.toml found. Run 'with init' first.")
-        return 1
-    let report = resolve_fetched_facade_report(resolve_fetched_facade_candidate(root, "facades/" ++ package ++ ".w"))
-    if report.len() == 0:
-        with_eprint(f"error: c.{package} has no fetched facade in this project; run `with get c.{package}`")
-        return 1
-    if argc == 4:
-        with_write(report)
-        return 0
-    let function = with_arg_at(4)
-    let line = resolve_facade_report_line(report, function)
-    if line.len() == 0:
-        with_eprint(f"error: the report of c.{package} has no line for `{function}`: no header the package installs declares it")
-        return 1
-    print(f"{function}: {line}")
     0
 
 fn run_remove_command(argc: i32) -> i32:

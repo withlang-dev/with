@@ -33,7 +33,10 @@ fn main:
     for line in report.split("\n"):
         if line.starts_with("  log_line:"): log_line = line.to_owned()
         if line.starts_with("  plain:"): plain_line = line.to_owned()
-    let ok = log_line.contains("[attributes: format(printf,fmt,arg)]") and not report.contains("#") and plain_line.contains("[attributes: const]")
+    // The variadic function is raw, and with no item to state no facade
+    // file is written (an empty `c facade` block is refused).
+    let facade = read_file(dep ++ "/facade.w") ?? ""
+    let ok = log_line.contains("[attributes: format(printf,fmt,arg)]") and not report.contains("#") and plain_line.contains("[attributes: const]") and log_line.contains("raw: variadic") and facade.len() == 0 and report.contains("1 presented safely, 1 raw") and report.contains("no facade is written")
     if not ok: print(report)
     assert(ok)
     print("ok")

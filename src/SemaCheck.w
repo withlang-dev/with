@@ -12123,8 +12123,8 @@ impl Sema:
         ""
 
     // #3117: when a fetched package's facade is applied and its report says
-    // why it left `fn_sym` raw, the diagnostic says so and names the command
-    // that prints the line. "" otherwise.
+    // why it left `fn_sym` raw, the diagnostic says so and names the report.
+    // "" otherwise.
     fn fetched_facade_raw_note(fn_sym: i32) -> str:
         let name = self.pool_resolve(fn_sym)
         for di in 0..self.ast.decl_count():
@@ -12134,7 +12134,7 @@ impl Sema:
             let why = resolve_facade_report_line(resolve_fetched_facade_report(path), name)
             if not why.starts_with("raw: "): continue
             let package = self.pool_resolve(self.ast.get_data0(self.ast.get_decl(di)))
-            return f": the facade of {package} leaves `{name}` raw: {why.slice(5, why.len())} (`with facade report c.{package} {name}`)"
+            return f": the facade of {package} leaves `{name}` raw: {why.slice(5, why.len())} ({path.slice(0, path.len() - "facade.w".len())}facade-report.txt)"
         ""
 
     // D198 (§16.2b.5): when what makes `fn_sym` raw is a parameter passed by

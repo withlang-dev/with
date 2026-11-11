@@ -674,6 +674,10 @@ impl CiProject:
     // destroyer, a value-only call, a lend (every pointer parameter is a
     // modeled resource it reads and keeps), or `raw:` with the reason.
     fn fd_lend_verdict(si: i32, modeled: &List[str]) -> str:
+        // A variadic call stays raw until a facade states its cases
+        // (§16.2b.5): the draft has none to state, and the report said
+        // `lend ... presented safely` of a printf-style function.
+        if self.symbols[si].variadic != 0: return "raw: variadic: the arguments after the fixed ones are an unmodeled contract; a facade states them as cases (§16.2b.5)"
         // A character pointer the registry says is new text the caller owns
         // (`text return, owned, freed by F`) is presented; any other pointer
         // to no record stays raw.
