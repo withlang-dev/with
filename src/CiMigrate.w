@@ -2250,7 +2250,13 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         report = report ++ f"  {generated.len()} unit(s) the build generates were not there (the package was configured, not built); a function only one of them defines is unproven:\n"
         for line in generated: report = report ++ "    " ++ line ++ "\n"
     ci_migrate_ensure_parent_dir(ci_migrate_fs_path(facade_path))
-    if with_fs_write_file(ci_migrate_fs_path(facade_path), text) != 0:
+    // A draft with nothing to state (every function a value-only call, or
+    // raw) is no facade: an empty `c facade` block is refused (§16.2b), and
+    // the file is applied through every c_import of the package's headers.
+    if draft.ends_with("c facade " ++ facade_name ++ ":\n"):
+        let _stale = with_fs_remove_file(ci_migrate_fs_path(facade_path))
+        report = report ++ "  no facade is written: the proofs state nothing about these functions (a value-only call is safe as imported)\n"
+    else if with_fs_write_file(ci_migrate_fs_path(facade_path), text) != 0:
         eprint("with get: could not write " ++ facade_path)
         return ""
     if with_fs_write_file(ci_migrate_fs_path(report_path), report) != 0:

@@ -2932,7 +2932,12 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
         let tu = clang_Cursor_getTranslationUnit(cursor)
         let tokens = 0 as *mut CXToken
         let token_count: u32 = 0
-        clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
+        // An extent with an end a macro produced (`f(...) TEMP_PRINTF(1, 2);`)
+        // ends inside the macro's definition: its tokens are the header's
+        // text between there and the declaration, `#else` and `#define`
+        // lines included. Those attributes are read from the AST below.
+        if location_is_written(clang_getRangeStart(extent)) and location_is_written(clang_getRangeEnd(extent)):
+            clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
         var out = ""
         var depth: i32 = 0        // parentheses open inside an __attribute__
         var armed = false         // the last token was `__attribute__`
@@ -2980,6 +2985,18 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
 
 var g_attr_children_out: str = ""
 
+// Whether `loc` is text at the place it is used, not what a macro expanded to.
+unsafe fn location_is_written(loc: CXSourceLocation) -> bool:
+    var spelled_file = 0 as *mut u8
+    var used_file = 0 as *mut u8
+    var spelled_at: u32 = 0
+    var used_at: u32 = 0
+    var line: u32 = 0
+    var col: u32 = 0
+    clang_getSpellingLocation(loc, &raw mut spelled_file, &raw mut line, &raw mut col, &raw mut spelled_at)
+    clang_getExpansionLocation(loc, &raw mut used_file, &raw mut line, &raw mut col, &raw mut used_at)
+    spelled_file as i64 == used_file as i64 and spelled_at == used_at
+
 @[callconv("c")]
 unsafe fn collect_attr_child(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let kind = clang_getCursorKind(cursor)
@@ -3006,12 +3023,24 @@ unsafe fn cimport_spelled_text(s: *mut CImportSession, tu: *mut u8, range: CXSou
     let tokens = 0 as *mut CXToken
     let count: u32 = 0
     clang_tokenize(tu, spelled, &raw mut tokens, &raw mut count)
+    // One attribute: its name and, when one follows, its balanced argument
+    // list. The range may run further: a macro argument is spelled where the
+    // macro is used (`arg` of `TEMP_PRINTF(fmt, arg)` at `TEMP_PRINTF(1, 2)`),
+    // which put the header's text from the definition to the declaration
+    // into the attribute (curl's printf functions).
     var out = ""
+    var depth: i32 = 0
     var ti: u32 = 0
     while ti < count:
         let sp = clang_getTokenSpelling(tu, *((tokens as i64 + ti as i64 * 24) as *const CXToken))
-        out = out ++ session_make_str(s, clang_getCString(sp) as *const u8)
+        let text = session_make_str(s, clang_getCString(sp) as *const u8)
         clang_disposeString(sp)
+        if depth == 0 and ti > 0 and text != "(": break
+        out = out ++ text
+        if text == "(": depth = depth + 1
+        else if text == ")":
+            depth = depth - 1
+            if depth == 0: break
         ti = ti + 1
     if tokens as i64 != 0:
         clang_disposeTokens(tu, tokens, count)

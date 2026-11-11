@@ -1601,6 +1601,19 @@ fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
         if resolve_file_exists(cand): return cand
     ""
 
+// #3117: the report `with get` wrote beside a fetched package's facade.
+fn resolve_fetched_facade_report(facade_path: &str) -> str:
+    if not facade_path.ends_with("/facade.w"): return ""
+    with_fs_read_file(facade_path.slice(0, facade_path.len() - "facade.w".len()) ++ "facade-report.txt")
+
+// The report's line for `name` ("" when it has none): `<verdict>: <why>`,
+// `raw: ...` for a function the facade leaves raw.
+fn resolve_facade_report_line(report: &str, name: &str) -> str:
+    let head = "  " ++ name ++ ": "
+    for line in report.split("\n"):
+        if line.starts_with(head): return line.slice(head.len(), line.len())
+    ""
+
 // D198 (§16.2b.15): the fetched package whose own file `header` resolves to
 // from a module in `module_dir`: the first `c.<name>` of with.toml whose
 // package directory holds the header under one of its include paths
