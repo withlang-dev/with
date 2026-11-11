@@ -229,9 +229,11 @@ the proposal left loose:
    drafter or the migrator drew it from a body), annotated (the library's own
    header says it), or claimed (a person wrote it, with a citation). The
    contract view (`with analyze … contract`) and the migrator's contracts
-   artifact already print the first two; "claimed" is the third value of the
-   same field, not a second mechanism. D121's precedence is the order of
-   those three, then a convention profile.
+   artifact already print the first two; "claimed" is one more value of the
+   same field, not a second mechanism. The precedence is §16.2b.2's: a
+   clause the program states, then a proof, then an annotation, then the
+   registry's claim, then a convention profile, then the conservative
+   default (docs/proposals/wcl-spec.md, section 5).
 2. **Tier 1 is not a special case for migrated engines.** `c facts` is the
    file where a package's claims live; a claim about a `c_import`ed function
    and a claim about a function a corpus defines are the same clause in the
