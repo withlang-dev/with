@@ -172,7 +172,7 @@ fn red_report(log: &str) -> str:
 fn uat_failed(log: &str) -> str:
     var out = ""
     for line in (read_file(log) ?? "").split("\n"):
-        if line.starts_with("uat: ") and line.contains(" FAIL "): out = out ++ (if out.len() > 0: " " else: "") ++ line.split(" ")[1]
+        if line.starts_with("uat: ") and (line.contains(" FAIL ") or line.contains(" BLOCKED ")): out = out ++ (if out.len() > 0: " " else: "") ++ line.split(" ")[1]
     if out.len() > 0: out else: "with uat failed; read out/battery/uat.log"
 
 // The step's argument vector, one argument per line, and its log.

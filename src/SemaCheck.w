@@ -3484,6 +3484,12 @@ impl Sema:
             self.record_body_global_write(sym, node)
         if sema_path_is_std_implementation(self.current_module_path) or sema_path_is_runtime_implementation(self.current_module_path):
             return
+        // A header's translation is C: what it does with its own statics is
+        // the library's, as it is for a library linked as an object, whose
+        // state the compiler never sees. The program's accesses are judged
+        // (global_is_c_written).
+        if self.current_file_is_generated("<c_import "):
+            return
         self.global_race_access_syms.push(sym)
         self.global_race_access_nodes.push(node)
         self.global_race_access_files.push(self.local_file_id)
@@ -5240,7 +5246,10 @@ impl Sema:
     // proof too, unless the header declares the global `const` (an
     // `extern let`) or thread-local (never recorded as a racing access).
     fn global_is_c_written(sym: i32) -> bool:
-        self.mutable_global_syms.contains(sym) and (self.extern_var_texts.get(self.pool_resolve(sym)).copied() ?? 0) == 1
+        // An imported `extern var`, or a file-scope static its header
+        // defines (a c_import-origin binding).
+        if (self.extern_var_texts.get(self.pool_resolve(sym)).copied() ?? 0) == 2: return false
+        self.mutable_global_syms.contains(sym) and (self.extern_var_texts.contains(self.pool_resolve(sym)) or self.ci_syms.contains(sym))
 
     // Whether the facade of the library that declares the C global `sym`
     // says `creates threads`.
@@ -12768,9 +12777,15 @@ impl Sema:
                 let used = if used_idx >= 0: self.unsafe_scope_used[used_idx] else: 0
                 self.unsafe_scope_used.pop()
                 self.unsafe_scope_nodes.pop()
-                if unsafe_result != 0 and used == 0:
+                // A facade's rendering wraps every C call it makes: whether
+                // that call is raw is Sema's fact (ci_function_requires_raw_abi),
+                // not the renderer's to derive again from the declaration's
+                // text, so an `unsafe` there that turns out unneeded is no
+                // error.
+                let rendered = self.current_file_is_generated("<facade ")
+                if unsafe_result != 0 and used == 0 and not rendered:
                     self.emit_error("unsafe block contains no unsafe operations", node)
-                else if unsafe_result != 0 and used == 2:
+                else if unsafe_result != 0 and used == 2 and not rendered:
                     // Late generic bodies use completed facts immediately;
                     // ordinary bodies leave this verdict to the module pass.
                     if self.unsafe_global_scopes_resolved != 0:

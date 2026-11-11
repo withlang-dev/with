@@ -599,16 +599,21 @@ fn uat_list_scenarios(root: &str) -> List[str]:
 fn run_uat_command(argv: &List[str]) -> i32:
     var list_only = false
     var keep = false
+    // `--strict` (the battery's mode): a scenario this host is listed for
+    // and cannot run is BLOCKED, and the run fails. A scenario that is not
+    // for this platform is still a skip.
+    var strict = false
     var wanted = ""
     for i in 2..argv.len():
         let a = argv[i]
         if a == "--list": list_only = true
         else if a == "--keep": keep = true
+        else if a == "--strict": strict = true
         else if a == "--help" or a == "-h":
-            print("usage: with uat [<scenario>] [--list] [--keep]\n  runs the project's acceptance scenarios (uat/*.uat, spec §18.5d);\n  WITH_UAT_WITH=<path> names the toolchain a scenario's `with` runs")
+            print("usage: with uat [<scenario>] [--list] [--keep] [--strict]\n  runs the project's acceptance scenarios (uat/*.uat, spec §18.5d);\n  WITH_UAT_WITH=<path> names the toolchain a scenario's `with` runs")
             return 0
         else if a.starts_with("-"):
-            eprint("error: unknown option '" ++ a ++ "' (with uat [<scenario>] [--list] [--keep])")
+            eprint("error: unknown option '" ++ a ++ "' (with uat [<scenario>] [--list] [--keep] [--strict])")
             return 2
         else if wanted.len() == 0: wanted = a
         else:
@@ -650,6 +655,10 @@ fn run_uat_command(argv: &List[str]) -> i32:
             print(uat_dots(sc.name) ++ applies ++ (if reqs.len() > 0: "  requires: " ++ reqs else: "") ++ (if plats.len() > 0: "  platforms: " ++ plats else: ""))
             continue
         if why.len() > 0:
+            if strict and (not why.starts_with("platforms: ") or why.starts_with("platforms: unknown")):
+                print(uat_dots(sc.name) ++ "BLOCKED  (" ++ why ++ ")")
+                fail = fail + 1
+                continue
             print(uat_dots(sc.name) ++ "skip  (" ++ why ++ ")")
             skip = skip + 1
             continue

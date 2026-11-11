@@ -21,13 +21,15 @@
 use c_import("void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 typedef struct db { int id; int closed; } db;
-typedef struct { unsigned long closed; } Tok;
+/* The count is this snippet's own static state; a Tok holds no address (D198, spec 16.2b.5). */
+static int tok_closed_;
+typedef struct { int id; } Tok;
 static inline db* db_new(int id) { db* d = (db*)malloc(sizeof(db)); d->id = id; d->closed = 0; return d; }
 static inline void db_close(db* d) { d->closed++; }
 static inline int db_closed(db* d) { return d->closed; }
-static inline Tok tok_load(const char* path) { Tok t; t.closed = (unsigned long)calloc(1, sizeof(int)); return t; }
-static inline void tok_unload(Tok t) { (*(int*)t.closed)++; }
-static inline int tok_unloads(Tok t) { return *(int*)t.closed; }
+static inline Tok tok_load(const char* path) { Tok t; t.id = 1; tok_closed_ = 0; return t; }
+static inline void tok_unload(Tok t) { tok_closed_++; }
+static inline int tok_unloads(Tok t) { return tok_closed_; }
 ")
 
 c facade dbl:

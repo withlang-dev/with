@@ -610,9 +610,12 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
     let extra_start = pool.get_data1(resource as NodeId)
     let repr_text = render_type_expr(pool, intern, pool.get_extra(extra_start) as NodeId)
     let repr = facade_render_unalias(pool, intern, repr_text)
-    // A token that holds no pointer (`Fd wraps c_int`) keeps its C functions
-    // as they are: they are safe calls over a plain value.
-    if repr.starts_with("*") or facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT) or not facade_render_type_holds_pointer(pool, intern, repr, 0): return ""
+    // Rendered for every by-value token. Whether a call of the imported
+    // name means the rendering is Sema's to say: it does when the token's
+    // record holds a pointer, and a token that holds none (`Fd wraps
+    // c_int`) keeps its C functions as they are
+    // (SemaFacade.facade_index_imported_name_ops).
+    if repr.starts_with("*") or facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT): return ""
     var out = ""
     for k in 0..pool.get_data2(resource as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -813,15 +816,9 @@ fn facade_render_present(pool: &AstPool, intern: &InternPool, ci: &List[i32], re
             return s.names[i]
         for j in 0..s.cnames.len():
             if j != i and s.names[j] == s.names[i]:
-                return facade_render_spellable(cname)
-        return facade_render_spellable(s.names[i])
-    facade_render_spellable(cname)
-
-// A method is not spelled with a capital (`fn R.GetColor()` is no
-// declaration): a C name in Pascal case is presented in snake case
-// (`GetImageColor` is `get_image_color`, §16.2b.11).
-fn facade_render_spellable(name: &str) -> str:
-    if name.len() > 0 and name[0] >= 'A' and name[0] <= 'Z': facade_render_snake_name(name) else: name.to_owned()
+                return cname
+        return s.names[i]
+    cname
 
 // Why `cname` keeps its imported name on `resource` — the other operations
 // its shortened name would also spell, as "'db_get' (a lend method), the
@@ -944,7 +941,7 @@ fn facade_render_surface_add(s0: FacadeSurface, cname: &str, prefixes: &List[str
         return facade_render_surface_push(s0, cname, rename, true, role)
     let short = facade_render_shorten(cname, prefixes)
     if short.len() == 0:
-        return facade_render_surface_push(s0, cname, facade_render_spellable(cname), true, role)
+        return facade_render_surface_push(s0, cname, cname, true, role)
     facade_render_surface_push(s0, cname, short, false, role)
 
 fn facade_render_surface_push(s0: FacadeSurface, cname: &str, name: &str, explicit: bool, role: &str) -> FacadeSurface:
@@ -1698,7 +1695,11 @@ fn facade_render_received(pool: &AstPool, intern: &InternPool, ptext: &str) -> i
     for item in items:
         let res = item
         let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(res as NodeId)) as NodeId))
-        if not repr.starts_with("*") and not facade_render_has_clause(pool, res, FACADE_CLAUSE_INIT):
+        // A by-value token is recognized by its type when it is a record:
+        // `int` is an `Fd` only where an `of` says so (#1669), but a C
+        // record a resource wraps is that resource wherever it is passed
+        // (§16.2b.3: one resource per representation).
+        if not repr.starts_with("*") and not facade_render_has_clause(pool, res, FACADE_CLAUSE_INIT) and not facade_render_is_record(pool, intern, repr):
             continue
         if p == repr or p == "*mut " ++ repr or p == "*const " ++ repr or facade_render_const_of(p, repr):
             if found != 0:
@@ -2993,28 +2994,7 @@ fn facade_render_return(pool: &AstPool, intern: &InternPool, decl: i32) -> str:
 fn facade_render_call(pool: &AstPool, intern: &InternPool, decl: i32, args: &str) -> str:
     let fname = intern.resolve(pool.get_data0(decl as NodeId))
     let call = fname ++ "(" ++ args ++ ")"
-    if facade_render_is_raw(pool, intern, decl): "unsafe { " ++ call ++ " }" else: call
-
-fn facade_render_is_raw(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
-    let kind = pool.kind(decl as NodeId)
-    if kind == NodeKind.NK_FN_DECL:
-        let body = pool.get_data1(decl as NodeId)
-        if body != 0 and pool.kind(body as NodeId) == NodeKind.NK_UNSAFE_BLOCK and pool.get_data2(body as NodeId) == UNSAFE_ORIGIN_FN_BODY:
-            return true
-    if kind == NodeKind.NK_EXTERN_FN and (pool.get_data2(decl as NodeId) & 1) != 0:
-        return true
-    let meta = pool.find_fn_meta(decl as NodeId)
-    if meta < 0:
-        return false
-    let ret = pool.fn_meta_ret(meta)
-    if ret != 0 and facade_render_type_is_raw(facade_render_unalias(pool, intern, render_type_expr(pool, intern, ret as NodeId))):
-        return true
-    let start = pool.fn_meta_param_start(meta)
-    for pi in 0..pool.fn_meta_param_count(meta):
-        let p = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId))
-        if p != "*const i8" and p != "*const c_char" and (facade_render_type_is_raw(p) or facade_render_type_holds_pointer(pool, intern, p, 0)):
-            return true
-    false
+    "unsafe { " ++ call ++ " }"
 
 // Whether `text` names a record (a struct or union declaration): the
 // representation of a by-value or in-place resource whose fields a program
@@ -3029,39 +3009,6 @@ fn facade_render_is_record(pool: &AstPool, intern: &InternPool, text: &str) -> b
         let sub = pool.get_data2(decl) % 8
         return (sub == TypeDeclKind.Struct as i32 or sub == TypeDeclKind.Union as i32) and pool.get_extra(pool.get_data1(decl)) > 0
     false
-
-var g_facade_holds_pool: i64 = 0
-var g_facade_holds: HashMap[str, bool] = HashMap.new()
-
-// D198 (§16.2b.5): whether the type spelled `text` holds a pointer — a
-// by-value parameter of such a type is a pointer parameter — read off the
-// declarations as Sema.pointer_holding_part reads it off the types: a
-// pointer or function pointer, or a record, union or array with a member
-// that holds one.
-fn facade_render_type_holds_pointer(pool: &AstPool, intern: &InternPool, text: &str, depth: i32) -> bool:
-    if g_facade_holds_pool != pool.shape():
-        g_facade_holds_pool = pool.shape()
-        g_facade_holds = HashMap.new()
-    let t = facade_render_unalias(pool, intern, text)
-    if t.contains("*") or t.contains("fn(") or t.starts_with("&"): return true
-    if t.starts_with("["):
-        let semi = t.find(";")
-        return semi < 0 or facade_render_type_holds_pointer(pool, intern, t.slice(1, semi).trim(), depth + 1)
-    if g_facade_holds.contains(t): return g_facade_holds.get(t).copied() ?? false
-    var holds = false
-    for di in 0..pool.decl_count():
-        let decl = pool.get_decl(di)
-        if pool.kind(decl) != NodeKind.NK_TYPE_DECL or intern.resolve(pool.get_data0(decl)) != t: continue
-        let sub = pool.get_data2(decl) % 8
-        if depth < 16 and (sub == TypeDeclKind.Struct as i32 or sub == TypeDeclKind.Union as i32):
-            let start = pool.get_data1(decl)
-            for fi in 0..pool.get_extra(start):
-                if facade_render_type_holds_pointer(pool, intern, render_type_expr(pool, intern, pool.get_extra(start + 1 + fi * 3 + 1) as NodeId), depth + 1): holds = true
-        break
-    g_facade_holds.insert(t, holds)
-    holds
-
-fn facade_render_type_is_raw(text: &str) -> bool: text.starts_with("*") or text.starts_with("&") or text.starts_with("[") or text.starts_with("fn(") or text.starts_with("extern") or text.starts_with("unsafe ")
 
 // ── stage 9: callbacks (ruling §44-§47, spec §16.2b.9) ──────────────────
 //

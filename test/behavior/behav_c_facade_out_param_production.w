@@ -26,15 +26,18 @@
 use c_import("void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
-typedef struct { unsigned long closes; unsigned long dirty; } Counter;
+/* The counters are this snippet's own static state; a Counter names them and holds nothing (D198, spec 16.2b.5). */
+static int counter_closes_;
+static int counter_dirty_;
+typedef struct { int id; } Counter;
 typedef struct db { Counter c; } db;
-static inline Counter counter_new(void) { Counter c; c.closes = (unsigned long)calloc(1, sizeof(int)); c.dirty = (unsigned long)calloc(1, sizeof(int)); return c; }
-static inline int counter_closes(Counter c) { return *(int*)c.closes; }
-static inline int counter_dirty(Counter c) { return *(int*)c.dirty; }
-static inline void counter_free(Counter c) { free((void*)c.closes); free((void*)c.dirty); }
+static inline Counter counter_new(void) { Counter c; c.id = 1; counter_closes_ = 0; counter_dirty_ = 0; return c; }
+static inline int counter_closes(Counter c) { return counter_closes_; }
+static inline int counter_dirty(Counter c) { return counter_dirty_; }
+static inline void counter_free(Counter c) { }
 static inline db* db_alloc(Counter c) { db* d = (db*)malloc(sizeof(db)); d->c = c; return d; }
 static inline int db_open(Counter c, int mode, db** out) {
-    if (*out != 0) { *(int*)c.dirty = *(int*)c.dirty + 1; }
+    if (*out != 0) { counter_dirty_ = counter_dirty_ + 1; }
     if (mode == 1) { return -1; }
     if (mode == 3) { return 0; }
     *out = db_alloc(c);
@@ -42,10 +45,10 @@ static inline int db_open(Counter c, int mode, db** out) {
     return 0;
 }
 static inline void db_make(Counter c, int produce, db** out) {
-    if (*out != 0) { *(int*)c.dirty = *(int*)c.dirty + 1; }
+    if (*out != 0) { counter_dirty_ = counter_dirty_ + 1; }
     if (produce != 0) { *out = db_alloc(c); }
 }
-static inline void db_close(db* d) { *(int*)d->c.closes = *(int*)d->c.closes + 1; free(d); }
+static inline void db_close(db* d) { counter_closes_ = counter_closes_ + 1; free(d); }
 ")
 
 c facade dbl:

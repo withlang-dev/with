@@ -3463,12 +3463,17 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: &str) -> str:
         // const without initializer is always extern (defined elsewhere)
         tl_attr ++ "extern let " ++ safe_name ++ ": " ++ actual_type ++ "\n"
     else:
-        if g_migrate_no_c_export != 0:
+        // A file-scope `static` variable is this translation unit's own:
+        // the header that declares it defines it, and nothing else does.
+        // Emitted as `extern var` it was a reference to a symbol no object
+        // has ("undefined symbol: _cells").
+        let defined_here = g_migrate_no_c_export != 0 or with_cimport_var_storage_class(session, idx) == CX_SC_STATIC
+        if defined_here:
             let init_val = ci_try_eval_var_init_for_type(session, idx, actual_type)
             if init_val.len() > 0:
                 return tl_attr ++ "var " ++ safe_name ++ ": " ++ actual_type ++ " = " ++ init_val ++ "\n"
         // --no-c-export: mutable vars are module-local definitions
-        let var_kw = if g_migrate_no_c_export != 0: "var " else: "extern var "
+        let var_kw = if defined_here: "var " else: "extern var "
         tl_attr ++ var_kw ++ safe_name ++ ": " ++ actual_type ++ "\n"
 
 

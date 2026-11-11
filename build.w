@@ -2218,6 +2218,9 @@ fn run_battery_uat_action(ctx: ActionCtx) -> i32:
     var argv: List[str] = List.new()
     argv.push(compiler)
     argv.push("uat")
+    // A scenario that cannot run here is not a pass (Eric, 2026-11-11):
+    // an unmet requirement fails the battery.
+    argv.push("--strict")
     let stdout_path = build_project_abs(root, build_project_join(out_dir, "uat.stdout"))
     let stderr_path = build_project_abs(root, build_project_join(out_dir, "uat.stderr"))
     let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, 1800000, process_env().set("WITH_UAT_WITH", compiler))
