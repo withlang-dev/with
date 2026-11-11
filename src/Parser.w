@@ -4735,7 +4735,7 @@ impl Parser:
             items.push(item)
             self.skip_newlines()
         if items.len() == header_items:
-            self.emit_error("c facade block is empty; expected resource, fn, domain or use convention (§16.2b)")
+            self.emit_error("c contract block is empty; expected resource, fn, domain or use convention (§16.2b)")
             return self.poisoned_expr()
         let extra_start = self.pool.extra_len()
         for item in items: self.pool.add_extra(item)
@@ -4872,7 +4872,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_KW_USE:
             self.advance()
             if not self.current_ident_is("convention"):
-                self.emit_error("expected 'use convention <profile>' in c facade (§16.2b.12)")
+                self.emit_error("expected 'use convention <profile>' in c contract (§16.2b.12)")
                 return 0
             self.advance()
             let first = self.expect_ident()
@@ -4986,9 +4986,9 @@ impl Parser:
         // §16.2b.4 (D97): the facade-wide error type is stated in the
         // header, `c facade F error E:`, never as an item (#2953).
         if self.current_ident_is("error"):
-            self.emit_error("a facade-wide error type is stated in the header, `c facade F error E:`, not as an item (§16.2b.4)")
+            self.emit_error("a facade-wide error type is stated in the header, `c contract F error E:`, not as an item (§16.2b.4)")
             return 0
-        self.emit_error("expected 'resource', 'handle', 'fn', 'domain', 'text utf8', 'runs threads' or 'use convention' in c facade (§16.2b)")
+        self.emit_error("expected 'resource', 'handle', 'fn', 'domain', 'text utf8', 'runs threads' or 'use convention' in c contract (§16.2b)")
         0
 
     // The clauses indented deeper than their item. Collected first and written

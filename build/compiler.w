@@ -1757,9 +1757,9 @@ fn comp_runtime_domain_violations(path: &str, text: &str, viewed: &str) -> List[
                 else if trimmed.starts_with("preserves domain ") and row.len() > 0: row_preserves = row_preserves ++ row ++ ":" ++ comp_trim(trimmed.slice(17, trimmed.len())) ++ "|"
                 continue
             in_facade = false
-        if line.starts_with("c facade "):
+        if line.starts_with("c contract "):
             facades = facades + 1
-            facade_name = comp_ident_prefix(line.slice(9, line.len()))
+            facade_name = comp_ident_prefix(line.slice(11, line.len()))
             facade_line = nr as i32
             in_facade = true
     // A facade presenting a safe view over process-global state it has not
@@ -1772,10 +1772,10 @@ fn comp_runtime_domain_violations(path: &str, text: &str, viewed: &str) -> List[
         return out
     if facades == 0:
         let first = seams[0].split("|")
-        out.push(f"{path}:{first[2]}: runtime file reaches {seams.len()} foreign symbol(s) and has no `c facade` block; describe each foreign extern with an fn row under the libc domains (`domain errno thread`, `domain environ process`, `domain locale process`) (ruling §52)")
+        out.push(f"{path}:{first[2]}: runtime file reaches {seams.len()} foreign symbol(s) and has no `c contract` block; describe each foreign extern with an fn row under the libc domains (`domain errno thread`, `domain environ process`, `domain locale process`) (ruling §52)")
         return out
     if facades > 1:
-        out.push(f"{path}:{facade_line}: {facades} `c facade` blocks; a runtime file has one, holding every domain row (ruling §52)")
+        out.push(f"{path}:{facade_line}: {facades} `c contract` blocks; a runtime file has one, holding every domain row (ruling §52)")
     for required in ["errno thread", "environ process", "locale process"]:
         if not domains.contains("|" ++ required ++ "|"):
             out.push(f"{path}:{facade_line}: facade '{facade_name}' does not declare `domain {required}`; the runtime's rows state the effect on every libc domain (ruling §33-§36, §52)")

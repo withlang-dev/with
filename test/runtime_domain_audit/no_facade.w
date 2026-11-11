@@ -1,4 +1,4 @@
-//! expect-violation: has no `c facade` block
+//! expect-violation: has no `c contract` block
 // runtime-domain-audit negative fixture (ruling §52): a runtime file that
 // reaches foreign symbols — one by @[link_name], one by its bare C name —
 // and carries no facade at all.

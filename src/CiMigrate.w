@@ -2267,7 +2267,7 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         let rel = ci_facade_import_spelling(project.symbols[si].header_file, import_dirs)
         if rel.len() > 0 and not spellings.contains(rel): spellings = ci_migrate_sorted_insert(spellings, rel)
 
-    var text = "// Facade of " ++ facade_name ++ " " ++ version ++ ", written by `with get` from the package's evidence (§16.2b.15, D121);\n// the report beside it says how each function is presented and why. A project's own\n// `c facade " ++ facade_name ++ ":` block overrides any item here (§16.2b.2).\n"
+    var text = "// Facade of " ++ facade_name ++ " " ++ version ++ ", written by `with get` from the package's evidence (§16.2b.15, D121);\n// the report beside it says how each function is presented and why. A project's own\n// `c contract " ++ facade_name ++ ":` block overrides any item here (§16.2b.2).\n"
     for rel in spellings:
         text = text ++ "use c_import(\"" ++ rel ++ "\"" ++ (if link_lib.len() > 0: ", link: \"" ++ link_lib ++ "\"" else: "") ++ ")\n"
     text = text ++ "\n" ++ draft
