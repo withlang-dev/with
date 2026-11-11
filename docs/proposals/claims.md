@@ -1,7 +1,20 @@
 # Claims: a human-known fact enters the type system through the front door
 
 Status: proposal (Eric, 2026-10-25: "write both tiers into a proposal, not
-a decision"). Nothing here is normative until its words land in the spec.
+a decision"), with one part decided: the language a claim is written in has
+a name, the With Contract Language (Eric, 2026-11-11; the ruling is quoted
+under "The With Contract Language" below). Nothing else here is normative
+until its words land in the spec.
+
+Vocabulary, from that ruling, used through the rest of this document:
+
+- **contract**: a block of the With Contract Language (WCL), what D51 calls
+  a modeled-C facade: `c contract name:` (spelled `c facade name:` until the
+  keyword migrates).
+- **clause**: a line of a contract.
+- **claim**: a clause that rests on a person's word rather than a proof.
+- **facade**: one thing only, the hand-written With layer that presents a
+  migrated engine as the standard library (D37, D148).
 
 ## Summary
 
@@ -9,10 +22,10 @@ a decision"). Nothing here is normative until its words land in the spec.
 on facts — a view's origin, a pointer's non-nullness, an index's range — and
 today a fact the programmer knows but the compiler cannot prove has one
 spelling, `unsafe`, which says neither what is claimed nor why, so nothing
-can check it, count it by kind, or carry it forward in a type. A modeled-C
-facade already has the other spelling: a clause the compiler treats as true
+can check it, count it by kind, or carry it forward in a type. A contract
+already has the other spelling: a clause the compiler treats as true
 (`returns borrow R from param N`, `nullable param N`), cited, reviewed,
-applied below a proof. This proposal gives With code the same door, in two
+applied below a proof. Such a clause is a claim. This proposal gives With code the same door, in two
 tiers that ask different amounts of the language:
 
 1. **Declaration-site claims about a migrated engine**, written in the
@@ -43,7 +56,7 @@ after step 5, most of them this shape.
 
 The STC maintainer knows the fact: after `idx < size`, `data + idx` is a
 valid element of the stack's own buffer, never null. For a `c_import`'d
-header the With author would state exactly that in a facade clause, with a
+header the With author would state exactly that in a contract clause, with a
 citation, and the compiler would treat it as true. For a migrated engine
 and for With code there is no such form. The reference projects offer only
 the unchecked escape: Rust's `unsafe { NonNull::new_unchecked(p) }` and
@@ -52,7 +65,7 @@ runtime safety off; Swift's `unsafelyUnwrapped` is the one that checks in a
 debug build and trusts in release, which is the split this proposal keeps.
 SPARK's `pragma Assume` and Dafny's `assume` are the proof-system form: a
 stated fact the prover takes, flagged for review. Nobody ties the claim to a
-citation; With already does, for facades.
+citation; With already does, in contracts.
 
 The mission line fits exactly: the compiler cannot decide, so the programmer
 spells the choice, and the spelling is a guardrail. `unsafe` fails the
@@ -63,7 +76,8 @@ guardrail half.
 ### Tier 1: declaration-site claims about a migrated engine
 
 **Where.** The package's facts file (`CiFacts.w`, §16.2b.15 item 3), the
-file a facade registry already uses, in the facade language's own spelling.
+file the contract registry already uses, in the contract language's own
+spelling: a facts file is a contract every clause of which is a claim.
 A corpus's facts file lives beside the corpus's build record (`build/stc.w`
 names it), never inside the generated modules (D112: a corpus is never
 edited by hand; the facts file is the human's input to the migrator).
@@ -71,7 +85,7 @@ edited by hand; the facts file is the human's input to the migrator).
 **What a line says.** The existing clauses, applied to a function the
 corpus defines rather than a header it imports: `returns borrow R from
 param N`, `nullable param N`, and one addition, `nonnull`, on a return,
-which the facade language does not need (a header's nullability is a
+which the contract language does not need today (a header's nullability is a
 separate import rule, §16.2b.9) and a migrated engine does:
 
 ```
@@ -90,7 +104,7 @@ only where the proof said nothing: the migrator's `receiver`/`receiver-mut`
 verdict is the proof's, and the facts line supplies the return's origin and
 non-nullness that inference (c) could not. A facts line that contradicts a
 proof is an error naming both (the engine already says `DISAGREES` for a
-facade; a corpus gets the same).
+contract; a corpus gets the same).
 
 **What the migrator does with it.** A read receiver whose return the facts
 file makes `returns borrow R from param 0, nonnull` is printed
@@ -190,6 +204,99 @@ migrator, not by a fix-it, not by a formatter. An agent answering a checker
 complaint with a claim is the failure mode the boundary rules exist for;
 the redundancy refusal and the census bar are the mechanical halves, the PR
 the rest.
+
+## The With Contract Language
+
+Decided 2026-11-11. Eric's ruling:
+
+> **With Contract Language (WCL).** The language D51 calls the facade
+> language is named the With Contract Language. A block of it is a contract,
+> a line is a clause, and a clause that rests on a person's word rather than
+> a proof is a claim. The keyword `facade` in `c facade name:` is respelled
+> `contract`. D51 is unchanged: where it says "facade" for a modeled-C
+> block, read "contract".
+>
+> "Facade" from here on means one thing: the hand-written With layer that
+> presents a migrated engine as the standard library (D37).
+
+**Why the name matters to this proposal.** The two tiers were written as
+two doors with one idea behind them. The ruling makes the idea the
+vocabulary: a claim is not a new construct beside a contract clause, it is
+the kind of clause that has no proof under it. That settles three things
+the proposal left loose:
+
+1. **Provenance is a property of every clause.** A clause is proven (the
+   drafter or the migrator drew it from a body), annotated (the library's own
+   header says it), or claimed (a person wrote it, with a citation). The
+   contract view (`with analyze … contract`) and the migrator's contracts
+   artifact already print the first two; "claimed" is the third value of the
+   same field, not a second mechanism. D121's precedence is the order of
+   those three, then a convention profile.
+2. **Tier 1 is not a special case for migrated engines.** `c facts` is the
+   file where a package's claims live; a claim about a `c_import`ed function
+   and a claim about a function a corpus defines are the same clause in the
+   same file under the same citation rule.
+3. **Tier 2 keeps the word.** `claim <fact>` in With code is the same act at
+   an expression: a fact with no proof under it, stated by a person. One
+   word for one meaning in both places.
+
+**What changes** (the ruling's list):
+
+- The keyword, in the parser and in every contract file: `c contract name:`.
+- `lib/facades/` and the `facades.*` module path, where those files hold
+  contract blocks (they do: five files).
+- Command and tool names that use the word for this meaning, such as
+  `with facade report`.
+- Spec text in §16.2b, diagnostics, and tests that expect the old spelling.
+
+**What does not change:**
+
+- "Facade" wherever it means the library layer: code comments, D37, D148,
+  the proposals.
+- The D51 ruling's own text and dated meeting records. They are history; the
+  decision log gets one entry pointing at this ruling.
+- `c facts`, which already has the right name.
+
+**Derived from the ruling, not stated in it** (each needs a yes before the
+migration does it): the file a fetch writes, `.with/deps/c/<name>/<version>/
+facade.w` with `facade-report.txt` and `facade.json` beside it, holds a
+contract block and would become `contract.w`, `contract-report.txt`,
+`contract.json`; a project's own `facades/<name>.w` override directory
+would become `contracts/`; `with migrate --facade` drafts a contract.
+
+**Counts taken before any edit** (2026-11-11, main at 36ced4302):
+
+| What | Count |
+|---|---|
+| Published programs with `use facades.…` | 6 files under `uat/`, 4 under `examples/`, `README.md` |
+| Published programs with a `c facade` block | 2 files under `examples/` |
+| Contract files in the tree | 5 under `lib/facades/`, 4 under `registry/c/` |
+| Sources with a `c facade` block the build compiles | 12, all under `rt/` (the runtime's own libc contracts); none in `src/`, `build/`, `build.w`, `lib/std`, `tools/` |
+| Test files that write the old spelling | 411 |
+| Uses of the word "facade", any meaning | `src/` 4582, `lib/std` 1439, `test/` 1091, `docs/meetings` 387, `docs/spec` 269, `docs/proposals` 234, `build/` 195, `docs/completed` 173, `tools/` 125, `lib/facades` 39, `rt/` 21 |
+
+The prose uses are not yet classified by meaning; the classification is
+the first step of the migration and is reported before any prose is
+touched. Whether the pinned seed parses any of the twelve `rt/` files (it
+reads the runtime through its own embedded interface, so probably not) is
+settled by running it, not by reasoning: if it does, the parser accepts both
+spellings until a seed is cut and the old one is deleted in that pin's
+stack.
+
+**Order of work** (Eric, 2026-11-11):
+
+1. This document, updated with the design and the decision.
+2. A formal specification of the With Contract Language: its grammar, the
+   meaning of each clause, the three provenances and their precedence, what
+   a claim must carry (a citation), and what the compiler checks of each.
+   Today those rules are spread over §16.2b.1 to §16.2b.15.
+3. An implementation plan.
+4. The keyword migration, as its own stack, separate from the formal spec:
+   the keyword and module paths by a Lexer-based rewrite, never a text
+   replace; prose classified as contract or library layer before it is
+   touched; the old spelling refused with a message naming the new one; a
+   rewrite tool for users' own files; the published programs edited under
+   the ruling and listed in the PR.
 
 ## Why this is not `unsafe` with a nicer name
 
@@ -303,3 +410,11 @@ decidable, counted by kind, never written by a tool). Eric:
 > none of those.
 
 Asked for as a proposal, not a decision; the spec words wait for a ruling.
+
+**2026-11-11, the name.** Eric named the language (the ruling quoted under
+"The With Contract Language") and set the order: this document first, then
+a formal specification of WCL, then an implementation plan, then the keyword
+migration as its own stack. Three checks come before any edit of the
+migration: the published programs that use the old spelling, the files the
+pinned seed compiles that use it, and the prose uses by meaning. The first
+two are counted above; the third is the migration's first step.
