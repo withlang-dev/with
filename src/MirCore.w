@@ -3456,8 +3456,12 @@ fn validate_mir_body(body: &MirBody) -> str:
                 return f"bb{bb}: switch operand out of range"
             if not mir_index_in_range(d1, switch_count):
                 return f"bb{bb}: switch table id out of range"
-            if d2 != 0 and not mir_index_in_range(d2, bb_count):
-                return f"bb{bb}: switch default target out of range"
+            // #984: a switch always has a default, and it is a block after
+            // the entry (bb0 has no predecessor: LLVM forbids one). The C
+            // backend read a default of 0 as "none: abort()" and the LLVM
+            // backend as "bb0"; no producer writes 0, and none may.
+            if d2 <= 0 or not mir_index_in_range(d2, bb_count):
+                return f"bb{bb}: switch default is not a block after the entry (bb{d2})"
             continue
         if term_kind == TermKind.TK_CALL:
             if not mir_index_in_range(d0, operand_count):
@@ -4579,6 +4583,13 @@ fn mir_validate_scalar_field_projection(mir_mod: &MirModule, body: &MirBody) -> 
             let base_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(base_ty))
             if base_kind == TypeKind.TY_INT or base_kind == TypeKind.TY_FLOAT or base_kind == TypeKind.TY_BOOL or base_kind == TypeKind.TY_VOID or base_kind == TypeKind.TY_NEVER:
                 return f"place {mir_place_text(body, place)} projects component {body.proj_d0[(proj_start + pi)]} of a scalar (ty={base_ty})"
+            // #2269: a field of a reference is a field of what it refers
+            // to, and the place says so with a deref (`_1.*.a`). Lowering
+            // that forgot it (`_7.a` with `_7: &Pair`) declared the field's
+            // type on the place, which is all this validator read, and
+            // codegen indexed the pointer itself.
+            if kind == ProjKind.PK_FIELD and (base_kind == TypeKind.TY_REF or base_kind == TypeKind.TY_PTR) and not (pi > 0 and body.proj_kinds[(proj_start + pi - 1)] == ProjKind.PK_DOWNCAST):
+                return f"place {mir_place_text(body, place)} projects field {body.proj_d0[(proj_start + pi)]} of a reference with no dereference (ty={base_ty})"
     ""
 
 // A dereference reads through a reference or a pointer. The place's declared

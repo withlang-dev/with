@@ -9352,18 +9352,15 @@ impl CCodegen:
         let cond = self.operand_text(body, d0)
         if d1 < 0 or d1 >= body.switch_table_starts.len():
             self.fail(f"invalid switch table id {d1}")
-            if d2 != 0:
-                return f"    goto bb{d2};"
-            return "    abort();"
+            return f"    goto bb{d2};"
 
         let start = body.switch_table_starts[d1]
         let count = body.switch_table_counts[d1]
         // A switch with no arms (D69's exit-code switch after a generator
         // loop whose body neither breaks nor returns) is its default alone.
+        // The default is a real block (validate_mir_body, #984).
         if count == 0:
-            if d2 != 0:
-                return f"    (void)({cond});\n    goto bb{d2};"
-            return f"    (void)({cond});\n    abort();"
+            return f"    (void)({cond});\n    goto bb{d2};"
         var out = ""
         for i in 0..count:
             let val: i64 = body.switch_table_vals[(start + i)]
@@ -9373,10 +9370,7 @@ impl CCodegen:
             out = out ++ f"        goto bb{tgt};\n"
             out = out ++ "    " ++ cc_rbrace() ++ "\n"
         out = out ++ "    else " ++ cc_lbrace() ++ "\n"
-        if d2 != 0:
-            out = out ++ f"        goto bb{d2};\n"
-        else:
-            out = out ++ "        abort();\n"
+        out = out ++ f"        goto bb{d2};\n"
         out = out ++ "    " ++ cc_rbrace()
         out
 

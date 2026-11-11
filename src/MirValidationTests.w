@@ -1,5 +1,6 @@
 use MirCore
 use SemaTypes
+use InternPool
 
 // Construct malformed MIR directly: testing only corrected source lowering
 // would leave the validator's original false-green result untested.
@@ -1737,3 +1738,83 @@ pub fn mir_test_moved_owned_read:
     assert(not moved_owned_read_verdict(false, true).contains("already moved out"))
     assert(not moved_owned_read_verdict(true, false).contains("already moved out"))
 
+// #984, #989: malformed MIR for the structural validator (validate_mir_body).
+// `shape`: 0 a well-formed body, 1 no basic block, 2 a goto to a block that
+// does not exist, 3 a switch whose default is the entry block.
+fn structural_verdict(shape: i32) -> str:
+    var body = MirBody.init_for_fn(1)
+    if shape == 1: return validate_mir_body(body)
+    let local = body.new_temp(1)
+    let place = body.new_place(local)
+    let entry = body.new_block()
+    let exit = body.new_block()
+    body.set_terminator(exit, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    if shape == 0: body.set_terminator(entry, TermKind.TK_GOTO, exit, 0, 0, 0, 0)
+    else if shape == 2: body.set_terminator(entry, TermKind.TK_GOTO, 9, 0, 0, 0, 0)
+    else:
+        let table = body.new_switch_table([0i64], [exit])
+        body.set_terminator(entry, TermKind.TK_SWITCH_INT, body.new_operand(OperandKind.OK_COPY, place), table, 0, 0, 0)
+    validate_mir_body(body)
+
+// #989: the use-after-kill validator. `_a` is blanked by a reset-on-move
+// zero fill; `revived` writes it again before `_b` reads it.
+fn use_after_kill_verdict(revived: bool) -> str:
+    let pool = InternPool.init()
+    var body = MirBody.init_for_fn(0)
+    let a = body.new_temp(1)
+    let b = body.new_temp(1)
+    let a_place = body.new_place(a)
+    let b_place = body.new_place(b)
+    let entry = body.new_block()
+    let blank = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_CONSTANT, body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, 1)), 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, a_place, blank, 0)
+    if revived:
+        let seven = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_CONSTANT, body.new_const(ConstKind.CK_INT, 7, 0, 0, 1)), 0, 0)
+        body.push_stmt(entry, StmtKind.Assign, a_place, seven, 0)
+    let read = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_COPY, a_place), 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, b_place, read, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_use_after_kill_body(body, pool)
+
+// #2269: `_r.a` where `_r` is a reference to a struct. With `deref` the
+// place is `_r.*.a`, the form lowering writes.
+fn field_through_reference_verdict(deref: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_VOID, TypeKind.TY_INT, TypeKind.TY_STRUCT, TypeKind.TY_REF]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let int_ty = 2
+    let struct_ty = 3
+    let ref_ty = 4
+    let field_sym = 9
+    // The struct: its name, its fields (name, type, default), one field.
+    mir_mod.sema_type_d0[struct_ty] = 7
+    mir_mod.sema_type_d1[struct_ty] = mir_mod.sema_type_extra.len()
+    mir_mod.sema_type_d2[struct_ty] = 1
+    mir_mod.sema_type_extra.push(field_sym)
+    mir_mod.sema_type_extra.push(int_ty)
+    mir_mod.sema_type_extra.push(0)
+    mir_mod.sema_type_d0[ref_ty] = struct_ty
+    var body = MirBody.init_for_fn(1)
+    let r = body.new_place(body.new_temp(ref_ty))
+    let destination = body.new_place(body.new_temp(int_ty))
+    let base = if deref: body.new_deref_place(r, struct_ty) else: r
+    let field = body.new_field_place(base, field_sym, int_ty)
+    let entry = body.new_block()
+    let read = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_COPY, field), 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, destination, read, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_structural_validator():
+    assert(field_through_reference_verdict(true) == "", field_through_reference_verdict(true))
+    assert(field_through_reference_verdict(false).contains("of a reference with no dereference"), field_through_reference_verdict(false))
+    assert(use_after_kill_verdict(false).contains("is read at bb0 after its reset-on-move blank zeroed it"))
+    assert(use_after_kill_verdict(true) == "")
+    assert(structural_verdict(0) == "")
+    assert(structural_verdict(1) == "missing basic blocks")
+    assert(structural_verdict(2).contains("goto target out of range"))
+    assert(structural_verdict(3).contains("switch default is not a block after the entry"))
