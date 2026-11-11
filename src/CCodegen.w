@@ -1440,7 +1440,7 @@ impl CCodegen:
 
     // The discriminant of the enum value `expr`.
     fn enum_tag_text(enum_tid: i32, expr: &str) -> str:
-        // An enum with no payloads is its discriminant (an int32_t).
+        // An enum with no payloads is its discriminant, at its declared width.
         if self.type_is_payload_enum(enum_tid) == false:
             return "(" ++ expr ++ ")"
         if not self.option_is_nullable_pointer(enum_tid):
@@ -2293,7 +2293,12 @@ impl CCodegen:
         if tk == TypeKind.TY_ENUM:
             if self.type_is_payload_enum(resolved as i32):
                 return self.struct_c_name(resolved)
-            return "int32_t"
+            // #990: a fieldless enum is its discriminant at the width its
+            // declaration states (`enum Big: i64`), as the LLVM backend's
+            // is (§13.3). Every one was `int32_t`: a `u8` enum took four
+            // bytes in a struct and a discriminant above i32 was truncated.
+            let repr = self.sema.enum_repr_type(resolved as i32)
+            return if repr != 0: self.c_type(repr, 0) else: "int32_t"
         // #1810: a shared `&str` is a view, `{ptr, len}` by value — the
         // with_str itself (TypeLayout.type_layout_is_str_view).
         if self.sema.type_layout_is_str_view(resolved as i32):
