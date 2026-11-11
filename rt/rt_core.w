@@ -1683,12 +1683,19 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
         dbg_full_warned = 1
         dbg_puts("debug-alloc: ledger full, tracking truncated\n")
 
+// The calling chain, or nothing on a fiber: a fiber's stack ends where the
+// fiber began, with no caller the unwinder can read, and walking it crashed
+// every task that allocated (exit 139 in the cancel and channel fixtures).
+fn dbg_backtrace(buf: *mut i64, cap: i32) -> i32:
+    if with_fiber_in_fiber() != 0: return 0
+    rt_backtrace_capture(buf, cap)
+
 // The calling chain, `count` frames of it, into the ledger words at `at`.
 // Frame 0 is this function; the rest of the runtime's own frames stay,
 // since inlining decides how many there are.
 fn dbg_capture_site(at: i64, count: i64):
     var frames: [9]i64 = [0 as i64; 9]
-    let n = rt_backtrace_capture(&raw mut frames as *mut [9]i64 as *mut i64, 9)
+    let n = dbg_backtrace(&raw mut frames as *mut [9]i64 as *mut i64, 9)
     for k in 0..count:
         unsafe *((at + k * 8) as *mut i64) = if k + 1 < n: frames[k + 1] else: 0
 
@@ -1725,7 +1732,7 @@ fn dbg_put_free_sites(addr: i64):
     // Captured, not rt_backtrace_print: this runs under the allocator lock,
     // and that function frees a str.
     var frames: [32]i64 = [0 as i64; 32]
-    let here = rt_backtrace_capture(&raw mut frames as *mut [32]i64 as *mut i64, 32)
+    let here = dbg_backtrace(&raw mut frames as *mut [32]i64 as *mut i64, 32)
     rt_backtrace_print_frames(&raw const frames as *const [32]i64 as *const i64, here)
 
 // Mark a free. Returns 1 if this is a double free (already freed, not reused).

@@ -101,7 +101,8 @@ All additive to `rt/rt_core.w`; pure `.w`.
   of the first free. A `DOUBLE FREE` line is followed by `debug-alloc: first free` and
   `debug-alloc: second free`, each a symbolized chain, innermost first; the first 16 `LEAK`
   lines are each followed by `debug-alloc:   allocated at`. `atos -o <binary> <addr>` turns
-  a frame into a line. The other backends have no in-process unwinder yet and print the
+  a frame into a line. Nothing is captured on a fiber (its stack has no caller to unwind
+  to), and the other backends have no in-process unwinder yet: both print the
   tags only; there the address trap under lldb is still the route.
 - **Scribble on free (opt-in: `WITH_DEBUG_ALLOC_SCRIBBLE`).** Freed small payloads are
   overwritten with `0xDE` so use-after-free reads corrupt loudly. It is **off by default**

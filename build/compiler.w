@@ -1461,7 +1461,10 @@ fn comp_libc_standard_externs() -> str:
     "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|remove|ungetc|fscanf|strcoll|strspn|strcspn|strpbrk|strncat|" ++
     "strcpy|strncpy|strrchr|strstr|strerror|atoi|strtol|strtoul|strtod|setlocale|" ++
     "strtoll|strtoull|strtof|" ++
-    "abort|exit|clock|time|rand|srand|qsort|rewind|putchar|strftime|mktime|"
+    "abort|exit|clock|time|rand|srand|qsort|rewind|putchar|strftime|mktime|" ++
+    // C99 <math.h> outside the §17.6a builtins (#2680).
+    "fma|fmaf|fmin|fminf|fmax|fmaxf|fdim|fdimf|nextafter|nextafterf|remainder|remainderf|ldexp|ldexpf|scalbn|scalbnf|" ++
+    "frexp|frexpf|modf|modff|logb|logbf|ilogb|ilogbf|llround|llroundf|llrint|llrintf|"
 
 /// The identifier at the start of `text` ("" when none).
 fn comp_ident_prefix(text: &str) -> str:
