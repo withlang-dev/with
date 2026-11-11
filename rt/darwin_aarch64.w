@@ -1744,6 +1744,11 @@ c facade libsystem:
     fn backtrace
         preserves domain environ
         preserves domain locale
+    // #1014: the thread's stack bounds. No domain is claimed preserved:
+    // the two `_np` calls are not POSIX.
+    fn pthread_self
+    fn pthread_get_stackaddr_np
+    fn pthread_get_stacksize_np
     fn backtrace_symbols_fd
         preserves domain environ
         preserves domain locale
