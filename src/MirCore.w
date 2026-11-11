@@ -3456,8 +3456,12 @@ fn validate_mir_body(body: &MirBody) -> str:
                 return f"bb{bb}: switch operand out of range"
             if not mir_index_in_range(d1, switch_count):
                 return f"bb{bb}: switch table id out of range"
-            if d2 != 0 and not mir_index_in_range(d2, bb_count):
-                return f"bb{bb}: switch default target out of range"
+            // #984: a switch always has a default, and it is a block after
+            // the entry (bb0 has no predecessor: LLVM forbids one). The C
+            // backend read a default of 0 as "none: abort()" and the LLVM
+            // backend as "bb0"; no producer writes 0, and none may.
+            if d2 <= 0 or not mir_index_in_range(d2, bb_count):
+                return f"bb{bb}: switch default is not a block after the entry (bb{d2})"
             continue
         if term_kind == TermKind.TK_CALL:
             if not mir_index_in_range(d0, operand_count):

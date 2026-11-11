@@ -1737,3 +1737,26 @@ pub fn mir_test_moved_owned_read:
     assert(not moved_owned_read_verdict(false, true).contains("already moved out"))
     assert(not moved_owned_read_verdict(true, false).contains("already moved out"))
 
+// #984, #989: malformed MIR for the structural validator (validate_mir_body).
+// `shape`: 0 a well-formed body, 1 no basic block, 2 a goto to a block that
+// does not exist, 3 a switch whose default is the entry block.
+fn structural_verdict(shape: i32) -> str:
+    var body = MirBody.init_for_fn(1)
+    if shape == 1: return validate_mir_body(body)
+    let local = body.new_temp(1)
+    let place = body.new_place(local)
+    let entry = body.new_block()
+    let exit = body.new_block()
+    body.set_terminator(exit, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    if shape == 0: body.set_terminator(entry, TermKind.TK_GOTO, exit, 0, 0, 0, 0)
+    else if shape == 2: body.set_terminator(entry, TermKind.TK_GOTO, 9, 0, 0, 0, 0)
+    else:
+        let table = body.new_switch_table([0i64], [exit])
+        body.set_terminator(entry, TermKind.TK_SWITCH_INT, body.new_operand(OperandKind.OK_COPY, place), table, 0, 0, 0)
+    validate_mir_body(body)
+
+pub fn mir_test_structural_validator() -> Unit:
+    assert(structural_verdict(0) == "")
+    assert(structural_verdict(1) == "missing basic blocks")
+    assert(structural_verdict(2).contains("goto target out of range"))
+    assert(structural_verdict(3).contains("switch default is not a block after the entry"))
