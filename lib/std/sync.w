@@ -1,5 +1,9 @@
 // std.sync — synchronization primitives.
 
+// The module names what it uses: a `--no-prelude` program (every corpus
+// test lane) has no prelude to supply `Ok`/`Err` (#2555).
+use std.result
+use std.option
 use rt.rt_core
 use rt.fiber_core
 use rt.fiber_runtime
