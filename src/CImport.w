@@ -19045,6 +19045,9 @@ fn ci_own_source(session: i64, cursor: i32, params: &List[str], locals: &List[st
     if ci_cursor_is_null_like(session, c): return "null"
     let kind = with_ci_cursor_kind(session, c)
     let nc = with_ci_num_children(session, c)
+    // #3127: a string literal is static text: it names no parameter, no
+    // local and no allocation, and lives as long as the program.
+    if kind == CXK_STRING_LITERAL: return "literal"
     if kind == CXK_DECL_REF: return ci_own_place_root(session, c, params, locals)
     if kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_UNARY_OP or kind == CXK_BINARY_OP:
         if kind == CXK_UNARY_OP and nc == 1:

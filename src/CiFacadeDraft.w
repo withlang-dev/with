@@ -425,6 +425,8 @@ impl CiProject:
     // in the draft's spelling.
     fn fd_registry_presentation_lines(si: i32) -> str:
         var out = self.fd_value_record_lines(si)
+        if self.fd_registry_text_return(si).len() == 0 and self.fd_returns_literal_text(si, 0):
+            out = out ++ "        returns static CStr    // proof: every return is a string literal\n"
         for line in self.symbols[si].registry_more.split("\n"):
             if line.len() == 0: continue
             let kind = facts_kind(line)
@@ -648,6 +650,26 @@ impl CiProject:
             if self.symbols[si].param_destroys[pi] != 0: return true
         false
 
+    // #3127 (§16.2b.8): a function returns static text when every `return`
+    // of its body is a string literal, or a call of a function of the
+    // package that returns static text. The proof depends on the body
+    // alone (D198): a literal is not the caller's, not allocated, never
+    // freed and never written.
+    fn fd_returns_literal_text(si: i32, depth: i32) -> bool:
+        if depth > 8 or not fd_is_char_pointer(self.symbols[si].ret_ty) or not self.fd_subject(si): return false
+        var returns = 0
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if not line.starts_with("ret:"): continue
+            returns = returns + 1
+            let src = line.slice(4, line.len())
+            if src == "literal": continue
+            if not src.starts_with("call:"): return false
+            let rest = src.slice(5, src.len())
+            let colon = rest.find(":")
+            let callee = self.find_symbol(CiProjectSymbolKind.CIPS_FN, if colon >= 0: rest.slice(0, colon) else: rest)
+            if callee < 0 or callee == si or not self.fd_returns_literal_text(callee, depth + 1): return false
+        returns > 0
+
     // How a function with no record-pointer return is presented: a
     // destroyer, a value-only call, a lend (every pointer parameter is a
     // modeled resource it reads and keeps), or `raw:` with the reason.
@@ -655,7 +677,7 @@ impl CiProject:
         // A character pointer the registry says is new text the caller owns
         // (`text return, owned, freed by F`) is presented; any other pointer
         // to no record stays raw.
-        if self.symbols[si].ret_ty.starts_with("*") and not (fd_is_char_pointer(self.symbols[si].ret_ty) and self.fd_registry_text_return(si).len() > 0): return "raw: returns " ++ self.symbols[si].ret_ty ++ ", a pointer to no record"
+        if self.symbols[si].ret_ty.starts_with("*") and not (fd_is_char_pointer(self.symbols[si].ret_ty) and self.fd_registry_text_return(si).len() > 0) and not self.fd_returns_literal_text(si, 0): return "raw: returns " ++ self.symbols[si].ret_ty ++ ", a pointer to no record"
         var pointer_params = 0
         var destroyed = -1
         var retained = -1
@@ -1139,6 +1161,12 @@ impl CiProject:
                 blocks.push(si as i32)
                 let consumed = self.fd_consumed_param(si as i32, modeled)
                 text = text ++ "    fn " ++ self.symbols[si].name ++ f"\n        consumes param {consumed}    // " ++ self.fd_consumed_reason(si as i32, consumed) ++ "\n" ++ self.fd_registry_presentation_lines(si as i32)
+            else if self.symbols[si].header_declared != 0 and self.fd_returns_literal_text(si as i32, 0) and self.fd_lend_verdict(si as i32, modeled) == "value-only call":
+                // #3127: a value-only call that returns static text has one
+                // fact to state, its return's.
+                self.presented.push(si as i32)
+                blocks.push(si as i32)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_registry_presentation_lines(si as i32)
         // A producer or a destroyer has no fn block above; the registry's
         // presentation facts on one (`xmlReadFile`'s nullable encoding) get
         // their own.
