@@ -8127,6 +8127,28 @@ impl CCodegen:
         out = out ++ " " ++ dst ++ " = (" ++ self.c_type(val_tid, 0) ++ ")(__with_n == 0 ? __with_v : (" ++ unsigned_ty ++ ")((__with_v " ++ first ++ " __with_n) | (__with_v " ++ second ++ f" ({width}u - __with_n)))); " ++ cc_rbrace()
         out
 
+    // The C expression of a bit intrinsic over `val` at the width W of
+    // `val_tid`. A count of leading or trailing zeros of 0 is W (the
+    // builtins are undefined there); a width under 32 is widened unsigned
+    // and the 32-bit count corrected.
+    mut fn bit_intrinsic_text(kind: CcBuiltin, val_tid: i32, val: &str) -> str:
+        let resolved = self.sema.resolve_alias(val_tid as TypeId)
+        let width = if self.sema.get_type_kind(resolved) == TypeKind.TY_INT: self.sema.get_type_d0(resolved) else: 0
+        if width != 8 and width != 16 and width != 32 and width != 64:
+            self.fail("emit-c has no bit intrinsic for " ++ self.sema.type_name(val_tid))
+            return "0"
+        let u = f"(uint{width}_t)({val})"
+        let wide = width == 64
+        if kind == CcBuiltin.INT_SWAP_BYTES:
+            return if width == 8: u else: f"__builtin_bswap{width}({u})"
+        if kind == CcBuiltin.BITREVERSE:
+            return f"__builtin_bitreverse{width}({u})"
+        if kind == CcBuiltin.POPCOUNT:
+            return if wide: f"__builtin_popcountll({u})" else: f"__builtin_popcount((unsigned int){u})"
+        if kind == CcBuiltin.CLZ:
+            return if wide: f"{u} == 0 ? 64 : __builtin_clzll({u})" else: f"{u} == 0 ? {width} : __builtin_clz((unsigned int){u}) - {32 - width}"
+        if wide: f"{u} == 0 ? 64 : __builtin_ctzll({u})" else: f"{u} == 0 ? {width} : __builtin_ctz((unsigned int){u})"
+
     mut fn emit_builtin_numeric_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
         if kind == CcBuiltin.ROTATE_LEFT or kind == CcBuiltin.ROTATE_RIGHT:
             let left = kind == CcBuiltin.ROTATE_LEFT
@@ -8146,73 +8168,21 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.INT_SWAP_BYTES:
+        // #1006: a bit intrinsic works at its operand's own width, as the
+        // LLVM backend's llvm.bswap/ctpop/ctlz/cttz/bitreverse do. Each was
+        // 32-bit text whatever the operand: `256i64.swap_bytes()` swapped the
+        // low word.
+        if kind == CcBuiltin.INT_SWAP_BYTES or kind == CcBuiltin.POPCOUNT or kind == CcBuiltin.CLZ or kind == CcBuiltin.CTZ or kind == CcBuiltin.BITREVERSE:
             if argc < 1:
-                self.fail("int_swap_bytes expects one argument")
+                self.fail("a bit intrinsic expects one argument")
                 return "    abort();"
-            let val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+            let operand = self.call_arg_operand(body, args_id, 0)
+            let val = self.operand_text(body, operand)
             var out = ""
             if has_ret != 0:
-                let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ dst ++ " = (int32_t)__builtin_bswap32((uint32_t)(" ++ val ++ "));\n"
-            else:
-                out = out ++ "    (void)__builtin_bswap32((uint32_t)(" ++ val ++ "));\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.POPCOUNT:
-            if argc < 1:
-                self.fail("popcount expects one argument")
-                return "    abort();"
-            let pc_val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var out = ""
-            if has_ret != 0:
-                let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ dst ++ " = (int32_t)__builtin_popcount((unsigned int)(" ++ pc_val ++ "));\n"
-            else:
-                out = out ++ "    (void)__builtin_popcount((unsigned int)(" ++ pc_val ++ "));\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.CLZ:
-            if argc < 1:
-                self.fail("clz expects one argument")
-                return "    abort();"
-            let clz_val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var out = ""
-            if has_ret != 0:
-                let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ dst ++ " = (" ++ clz_val ++ ") == 0 ? 32 : (int32_t)__builtin_clz((unsigned int)(" ++ clz_val ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (" ++ self.c_type(ret_tid, 0) ++ ")(" ++ self.bit_intrinsic_text(kind, self.operand_tid(body, operand), val) ++ ");\n"
             else:
                 out = out ++ "    (void)0;\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.CTZ:
-            if argc < 1:
-                self.fail("ctz expects one argument")
-                return "    abort();"
-            let ctz_val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var out = ""
-            if has_ret != 0:
-                let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ dst ++ " = (" ++ ctz_val ++ ") == 0 ? 32 : (int32_t)__builtin_ctz((unsigned int)(" ++ ctz_val ++ "));\n"
-            else:
-                out = out ++ "    (void)0;\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.BITREVERSE:
-            if argc < 1:
-                self.fail("bitreverse expects one argument")
-                return "    abort();"
-            let brv_val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var out = ""
-            if has_ret != 0:
-                let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ dst ++ " = (int32_t)__builtin_bitreverse32((uint32_t)(" ++ brv_val ++ "));\n"
-            else:
-                out = out ++ "    (void)__builtin_bitreverse32((uint32_t)(" ++ brv_val ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
