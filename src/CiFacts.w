@@ -177,7 +177,13 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             continue
         if in_resource:
             let words = clause.fields()
-            if words.len() != 2 or not (words[0] == "from" or words[0] == "drop" or words[0] == "destroys"): return Err(facts_error(path, line_no, "a resource fact is `from F`, `drop F` or `destroys F`"))
+            // §16.2b.4: a by-value producer may state the field whose NULL
+            // means nothing was produced: `from F, nullable field a.b`.
+            if in_value and words.len() == 5 and words[0] == "from" and words[1].ends_with(",") and (words[2] == "nullable" or words[2] == "nonnull") and words[3] == "field":
+                facts.value_fns.push(words[1].slice(0, words[1].len() - 1))
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+                continue
+            if words.len() != 2 or not (words[0] == "from" or words[0] == "drop" or words[0] == "destroys"): return Err(facts_error(path, line_no, "a resource fact is `from F`, `drop F` or `destroys F`; a by-value producer may add `, nullable field F` or `, nonnull field F`"))
             if in_value:
                 facts.value_fns.push(words[1])
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"

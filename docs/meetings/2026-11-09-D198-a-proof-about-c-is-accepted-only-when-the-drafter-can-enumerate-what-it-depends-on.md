@@ -273,3 +273,34 @@ capability `thread creator` (§16.2b.10), which restricts the program (the
 resource is used on the thread that made it), where this one removes a
 proof (the library's globals are never provably on one thread). The raylib
 facts and the SDL facade state it: both run an audio thread.
+
+## Amendment 6 (Eric, 2026-11-11): a by-value producer that can fail
+
+**The question.** `LoadImage` returns an `Image` by value; when the file
+cannot be read the record is zeroed and its `data` is NULL. A resource made
+from it was live with no buffer, and an operation's fact (`GetImageColor`
+reads `image.data` inside the bounds) held only for a valid image.
+
+**Two facts.** The callee returns a record whose buffer pointer is NULL when
+it fails. The record is a resource, so an invalid one must not exist.
+
+**Ruling.** Both words the pointer producers already have (§16.2b.8,
+`nullable` and `nonnull`), stated on the field that decides production, in
+Eric's sentence (spec v7.48, §16.2b.4): "A by-value producer states the
+field whose NULL means nothing was produced, checked when the call returns:
+`nullable field F` presents `Option[R]`; `nonnull field F` presents `R`, and
+a NULL there is a contract failure naming the function." His edits to the
+draft: the field is a path (`Sound` fails through `stream.buffer`); the
+sentence says where the check runs; and `nullable` is assigned only after
+counting the published programs that use the producer directly, since each
+stops compiling.
+
+**The count.** No UAT fixture, example, book, website or README program
+calls `LoadImage`, `LoadWave`, `LoadSound` or `LoadFont`. `LoadImageFromScreen`
+is used directly by the raylib spiral fixture; it is `nonnull field data`,
+so the fixture is unchanged and an `Image` with no buffer never exists.
+`LoadImage` and `LoadWave` are `nullable field data`.
+
+**Run.** `let img: Image = LoadImage(path)` with `ImageData wraps Image` is
+refused ("type mismatch in binding"): the record is not copied out of the
+resource.
