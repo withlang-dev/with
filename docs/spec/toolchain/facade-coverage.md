@@ -2,7 +2,7 @@
 
 # Facade coverage across the #3115 list
 
-Written by `with run tools/facade_coverage.w` (/Users/eric/.local/bin/with on Macos aarch64): each library fetched into a fresh project with `with get c.<lib>`, its `facade-report.txt` read. Regenerate after every facade-grammar or proof-engine change and compare the TSV beside this file.
+Written by `with run tools/facade_coverage.w` (/Users/eric/.local/bin/with on Macos aarch64): each library fetched into a fresh project with `with get c.<lib>`, its `contract-report.txt` read. Regenerate after every facade-grammar or proof-engine change and compare the TSV beside this file.
 
 ## Coverage
 

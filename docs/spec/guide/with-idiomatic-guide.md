@@ -1235,7 +1235,7 @@ impl Drop for Database:
 // ✓ idiomatic — the facade states the contract; the compiler generates
 //   Database.open -> Result[Database, DatabaseError], closes it by scope,
 //   and finalizes every Statement before its connection
-c facade sqlite:
+c contract sqlite:
     resource Database wraps *mut sqlite3
         from sqlite3_open(out param 1)
         drop sqlite3_close

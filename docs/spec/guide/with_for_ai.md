@@ -1017,7 +1017,7 @@ once — ownership, destruction, status, borrowed text, callbacks — and the
 program uses the presented methods:
 
 ```with
-use facades.sqlite3            // lib/facades/sqlite3.w, the project's own
+use contracts.sqlite3            // lib/contracts/sqlite3.w, the project's own
 use c_import("sqlite3.h")
 
 fn print_values -> Result[Unit, SqliteError]:
@@ -1030,7 +1030,7 @@ fn print_values -> Result[Unit, SqliteError]:
 A C call whose return is a status is a `Result` where the facade states its
 success (`ok SQLITE_OK`; `ok SQLITE_ROW, SQLITE_DONE` when there are two, and
 `Ok` carries the one that matched). The error is the one the facade states
-for the library (`c facade sqlite error SqliteError`), and a failure is
+for the library (`c contract sqlite error SqliteError`), and a failure is
 `Failed(status, message)`: the status C returned and the library's own text
 for it.
 

@@ -53,6 +53,6 @@ Facade-generation tooling may emit a draft facade from the heuristics
 §16.2b.2 permits tooling to use. Every capability-granting line it proposes
 is commented out with its provenance; the author uncomments what they trust,
 and the compiler verifies each clause (§16.2b.13). A generated facade is
-ordinary With source in the project's source or package space (a `facades/`
+ordinary With source in the project's source or package space (a `contracts/`
 directory is a convention, not a compiler location) and is never adopted
 silently.
