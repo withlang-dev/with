@@ -1,5 +1,7 @@
 // std.compiler — compiler-hook introspection and tool capabilities.
 
+use std.traits
+use std.collections
 use rt.rt_core
 // The process ends here (the debug allocator's peak report prints first, #2407).
 pub fn exit(code: i32) -> Never: with_exit(code)

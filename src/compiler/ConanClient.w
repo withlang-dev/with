@@ -497,9 +497,13 @@ fn conan_resolve_version(name: &str, version_hint: &str) -> str:
 // #3170: the recipe names Conan Center's search returns for `name` when
 // none is `name` itself (a user types nghttp2; the recipe is libnghttp2),
 // at most five, for the refusal to name.
-fn conan_near_names(name: &str) -> str:
-    let response = conan_http_get(CONAN_CENTER_URL() ++ "/v2/conans/search?q=" ++ name)
-    conan_near_names_in(json_extract_string_array(response, "results"), name)
+/// The recipe `name` most likely means when it is not one: the name with
+/// or without C's `lib` prefix, when the search `results` hold it.
+fn conan_lib_twin_in(results: &List[str], name: &str) -> str:
+    let twin = if name.starts_with("lib") and name.len() > 3: name.slice(3, name.len()) else: "lib" ++ name
+    for result in results:
+        if result.starts_with(twin ++ "/"): return twin
+    ""
 
 // The distinct recipe names among search `results` (`name/version@user/channel`)
 // other than `name`, the first five spelled for a message.
@@ -2237,8 +2241,13 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         return ""
     let version = conan_resolve_version(name, version_hint)
     if version.len() == 0:
-        let near = conan_near_names(name)
-        runtime_eprint("error: could not resolve package " ++ name ++ "/" ++ version_hint ++ " on Conan Center" ++ (if near.len() > 0: "; its search finds " ++ near ++ " (`with get c.<name>`)" else: ""))
+        // #2974: the search matches whole names, so `curl` found nothing
+        // while the recipe is `libcurl`: the name is searched as a part of
+        // one (`*curl*`).
+        let results = json_extract_string_array(conan_http_get(CONAN_CENTER_URL() ++ "/v2/conans/search?q=*" ++ name ++ "*"), "results")
+        let twin = conan_lib_twin_in(results, name)
+        let near = conan_near_names_in(results, name)
+        runtime_eprint("error: could not resolve package " ++ name ++ "/" ++ version_hint ++ " on Conan Center" ++ (if twin.len() > 0: "; the package is `" ++ twin ++ "`: `with get c." ++ twin ++ "`" else if near.len() > 0: "; its search finds " ++ near ++ " (`with get c.<name>`)" else: ""))
         return ""
     let meta_path = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json"
     if not force_reinstall and runtime_file_exists(meta_path) != 0:

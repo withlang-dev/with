@@ -10,6 +10,8 @@
 /// Use `.unwrap()` to extract Ok (panics on Err),
 /// `.is_ok()` / `.is_err()` to check,
 /// `.map(fn)` / `.map_err(fn)` to transform.
+use std.traits
+use std.option
 pub enum Result[T, E] { Ok(T) | Err(E) }
 
 /// Error type returned by compiler-generated `@[derive(Builder)]`

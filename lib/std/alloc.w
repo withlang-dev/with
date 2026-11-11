@@ -1,5 +1,7 @@
 // std.alloc — first-class allocation helpers built on std.mem.
 
+use std.traits
+use std.collections
 use std.mem
 
 fn alloc_default_block_size(size: i32) -> i32:
