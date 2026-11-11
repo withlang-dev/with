@@ -328,13 +328,21 @@ produced. (§16.2b.15.)
 | `thread creator` | the default, written out. Accepted and reported as redundant. | R | | §16.2b.10 |
 | `requires domain D` | the resource is a resource of `D`: live from its producer's return to its destroyer's call; its producers, destroyer and operations require `D`. | R | no domain | §16.2b.7 |
 
-**Who owns "f destroys N".** The resource does: `drop f` or `destroys f`
-under `resource N` is the statement of the fact. An fn item for the same
-function, written to carry other clauses, states `destroys` and names no
-function; it agrees with the resource, it does not decide. An fn item that
-describes a destroyer as a lend is refused. (§16.2b.3, §16.2b.5. That a bare
-fn-item `destroys` with no resource clause is refused is to be confirmed in
-the checker: question 12.2.)
+**Who owns "f destroys N".** Today both places state it, and each decides
+(run 2026-11-11 on main):
+
+- `destroys f` under `resource N`, with no fn item for `f`: accepted.
+- `fn f` with a bare `destroys` and no resource clause naming `f`:
+  accepted; `f` is presented as a consuming operation of the resource its
+  first parameter receives.
+- `destroys f` under the resource and `fn f` written with no `destroys`:
+  refused ("a destroying operation must not be callable as a lend; state
+  'destroys' on the fn item").
+
+The tree uses both: 38 resource-level `destroys f` lines and 31 bare
+fn-item `destroys` lines, including `lib/facades/sqlite3.w` and the
+c-interop example. One fact has two spellings and the rule that reconciles
+them is a refusal. Which one owns it is question 12.2.
 
 **The fields of a resource's record.** A field of a by-value or in-place
 resource's record is read through the resource (`image.width`): a read
@@ -353,7 +361,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | Clause | Meaning | Dir | Default when absent | Rule |
 |---|---|---|---|---|
 | `lend` | the function keeps and frees nothing of its resource parameters. | G | on a described fn: lend. On an undescribed function: section 4. | §16.2b.5 |
-| `destroys` | the fn item's agreement that the function destroys the resource (see 8.2). | G | | §16.2b.5 |
+| `destroys` | the function destroys the resource its first parameter receives; presented as a consuming operation of that resource (see 8.2). | G | | §16.2b.5 |
 | `consumes param p` | the callee takes ownership of what `p` receives. `destroyed_by param q` names the callback C later invokes to destroy it. If registration can fail without taking ownership the contract says when transfer occurs; absent that, the caller keeps ownership. | G | observed | §16.2b.5 |
 | `detaches param p` | removes the value `p` borrows from its origin and yields it owned, dependent on that origin as a `borrows` child is. | G | | §16.2b.6 |
 | `retains param p by param q` | the value at `p` must outlive the resource at `q`; ownership stays outside C. A modeled unregister may release it. | G | a retained pointer makes the function raw | §16.2b.5 |
@@ -493,9 +501,14 @@ compile error. For `ends` the error names the live resource and the fix.
    runs no thread of its own before its globals are safe, and whether a
    retained callback must state its thread, or the present defaults stand.
    Changing either removes capability from programs that compile today.
-2. **A bare fn-item `destroys`.** Whether the checker refuses `fn f` with
-   `destroys` when no resource names `f` as its destroyer. The draft says
-   the resource owns the fact; the code is to be read.
+2. **Who owns "f destroys N"** (8.2). Two candidates. The fn item owns it:
+   `destroys` is a fact about what a function does with its parameter, like
+   `consumes` and `lend`, and the resource-level `destroys f` goes; `drop f`
+   stays on the resource because it is what `Drop` calls. Or the resource
+   owns it and a bare fn-item `destroys` is refused. The first matches how
+   every other effect is stated and removes the agree-or-refuse rule. Either
+   way one spelling is deleted from about thirty-five lines of contracts,
+   one of them a published example.
 3. **The `callback` field role** (#3124): a fifth role for a
    function-pointer field that holds the program's own function, whose
    arguments are lent for the call. It needs its own brief.
