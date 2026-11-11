@@ -20,17 +20,20 @@ void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
 
-/* The log is named by a flat record: the addresses of its storage, as
- * integers. A record passed by value that held the pointers themselves
- * would make every function taking it a pointer function (D198,
- * spec 16.2b.5), and the fixtures pass the log from safe code. */
-typedef struct { unsigned long n; unsigned long ev; } Log;
-static inline Log log_new(void) { Log l; l.n = (unsigned long)calloc(1, sizeof(int)); l.ev = (unsigned long)calloc(64, sizeof(int)); return l; }
-static inline void log_free(Log l) { free((void *)l.n); free((void *)l.ev); }
-static inline void log_push(Log l, int e) { int *n = (int *)l.n; int *ev = (int *)l.ev; if (*n < 64) { ev[*n] = e; *n = *n + 1; } }
-static inline int log_len(Log l) { return *(int *)l.n; }
-static inline int log_at(Log l, int i) { return ((int *)l.ev)[i]; }
-static inline void log_reset(Log l) { *(int *)l.n = 0; }
+/* The witness is this header's own state: file-scope statics, written
+ * by the C below and read back by the fixture. A Log names it and holds
+ * nothing, so it crosses by value freely (D198, spec 16.2b.5: a record
+ * that held the storage's pointers would make every function taking it a
+ * pointer function). One log per program. */
+static int log_count_;
+static int log_events_[64];
+typedef struct { int id; } Log;
+static inline Log log_new(void) { Log l; l.id = 1; log_count_ = 0; return l; }
+static inline void log_free(Log l) { }
+static inline void log_push(Log l, int e) { if (log_count_ < 64) { log_events_[log_count_] = e; log_count_ = log_count_ + 1; } }
+static inline int log_len(Log l) { return log_count_; }
+static inline int log_at(Log l, int i) { return log_events_[i]; }
+static inline void log_reset(Log l) { log_count_ = 0; }
 
 typedef struct db { Log log; int id; int open; } db;
 typedef struct st { db *owner; int id; } st;

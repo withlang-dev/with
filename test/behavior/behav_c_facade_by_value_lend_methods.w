@@ -13,15 +13,17 @@
 // are read back after the resource is gone.
 
 use c_import("void *calloc(unsigned long count, unsigned long size);
-typedef struct { unsigned long state; float gain; } Snd;
-static inline Snd snd_load(const char* path) { Snd s; s.state = (unsigned long)calloc(4, sizeof(int)); s.gain = 1.0f; return s; }
-static inline void snd_unload(Snd s) { ((int*)s.state)[0]++; }
-static inline void snd_play(Snd s) { ((int*)s.state)[1]++; }
-static inline void snd_set_volume(Snd s, float v) { ((int*)s.state)[2] = (int)(v * 100.0f); }
-static inline int snd_valid(Snd s) { return s.state != 0; }
-static inline void snd_retune(Snd* s) { s->gain = 0.25f; ((int*)s->state)[3]++; }
+/* The counters are this snippet's own static state; a Snd holds its gain and no address (D198, spec 16.2b.5). */
+static int snd_state_[4];
+typedef struct { int loaded; float gain; } Snd;
+static inline Snd snd_load(const char* path) { Snd s; s.loaded = 1; s.gain = 1.0f; snd_state_[0] = 0; snd_state_[1] = 0; snd_state_[2] = 0; snd_state_[3] = 0; return s; }
+static inline void snd_unload(Snd s) { snd_state_[0]++; }
+static inline void snd_play(Snd s) { snd_state_[1]++; }
+static inline void snd_set_volume(Snd s, float v) { snd_state_[2] = (int)(v * 100.0f); }
+static inline int snd_valid(Snd s) { return s.loaded != 0; }
+static inline void snd_retune(Snd* s) { s->gain = 0.25f; snd_state_[3]++; }
 static inline float snd_volume(const Snd* s) { return s->gain; }
-static inline int snd_count(Snd s, int i) { return ((int*)s.state)[i]; }
+static inline int snd_count(Snd s, int i) { return snd_state_[i]; }
 ")
 
 c facade sounds:
