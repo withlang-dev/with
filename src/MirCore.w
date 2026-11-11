@@ -4583,6 +4583,13 @@ fn mir_validate_scalar_field_projection(mir_mod: &MirModule, body: &MirBody) -> 
             let base_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(base_ty))
             if base_kind == TypeKind.TY_INT or base_kind == TypeKind.TY_FLOAT or base_kind == TypeKind.TY_BOOL or base_kind == TypeKind.TY_VOID or base_kind == TypeKind.TY_NEVER:
                 return f"place {mir_place_text(body, place)} projects component {body.proj_d0[(proj_start + pi)]} of a scalar (ty={base_ty})"
+            // #2269: a field of a reference is a field of what it refers
+            // to, and the place says so with a deref (`_1.*.a`). Lowering
+            // that forgot it (`_7.a` with `_7: &Pair`) declared the field's
+            // type on the place, which is all this validator read, and
+            // codegen indexed the pointer itself.
+            if kind == ProjKind.PK_FIELD and (base_kind == TypeKind.TY_REF or base_kind == TypeKind.TY_PTR) and not (pi > 0 and body.proj_kinds[(proj_start + pi - 1)] == ProjKind.PK_DOWNCAST):
+                return f"place {mir_place_text(body, place)} projects field {body.proj_d0[(proj_start + pi)]} of a reference with no dereference (ty={base_ty})"
     ""
 
 // A dereference reads through a reference or a pointer. The place's declared

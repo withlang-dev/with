@@ -1776,7 +1776,42 @@ fn use_after_kill_verdict(revived: bool) -> str:
     body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
     validate_use_after_kill_body(body, pool)
 
-pub fn mir_test_structural_validator() -> Unit:
+// #2269: `_r.a` where `_r` is a reference to a struct. With `deref` the
+// place is `_r.*.a`, the form lowering writes.
+fn field_through_reference_verdict(deref: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_VOID, TypeKind.TY_INT, TypeKind.TY_STRUCT, TypeKind.TY_REF]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let int_ty = 2
+    let struct_ty = 3
+    let ref_ty = 4
+    let field_sym = 9
+    // The struct: its name, its fields (name, type, default), one field.
+    mir_mod.sema_type_d0[struct_ty] = 7
+    mir_mod.sema_type_d1[struct_ty] = mir_mod.sema_type_extra.len()
+    mir_mod.sema_type_d2[struct_ty] = 1
+    mir_mod.sema_type_extra.push(field_sym)
+    mir_mod.sema_type_extra.push(int_ty)
+    mir_mod.sema_type_extra.push(0)
+    mir_mod.sema_type_d0[ref_ty] = struct_ty
+    var body = MirBody.init_for_fn(1)
+    let r = body.new_place(body.new_temp(ref_ty))
+    let destination = body.new_place(body.new_temp(int_ty))
+    let base = if deref: body.new_deref_place(r, struct_ty) else: r
+    let field = body.new_field_place(base, field_sym, int_ty)
+    let entry = body.new_block()
+    let read = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_COPY, field), 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, destination, read, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_structural_validator():
+    assert(field_through_reference_verdict(true) == "", field_through_reference_verdict(true))
+    assert(field_through_reference_verdict(false).contains("of a reference with no dereference"), field_through_reference_verdict(false))
     assert(use_after_kill_verdict(false).contains("is read at bb0 after its reset-on-move blank zeroed it"))
     assert(use_after_kill_verdict(true) == "")
     assert(structural_verdict(0) == "")
