@@ -1959,6 +1959,58 @@ fn conan_registry_commit() -> str:
     if response.status == 200: g_conan_registry_commit = json_extract_string(response.body, "sha")
     with_str_clone_ref(g_conan_registry_commit)
 
+// The compiler's own version (`v0.16.0`), which is its release's tag in the
+// registry's repository; "" until the driver says.
+var g_conan_compiler_version: str = ""
+
+fn conan_set_compiler_version(version: &str): g_conan_compiler_version = version.to_owned()
+
+// The registry as this compiler's release published it: the commit its
+// version tags, "" when no such tag exists (a development build) or the
+// repository cannot be asked.
+fn conan_registry_release_commit() -> str:
+    if g_conan_compiler_version.len() == 0: return ""
+    let response = https_get_response_timeout("https://api.github.com/repos/" ++ CONAN_REGISTRY_REPOSITORY() ++ "/commits/" ++ g_conan_compiler_version, 5, 20000, 20000)
+    if response.status == 200: json_extract_string(response.body, "sha") else: ""
+
+// The registry's main may state a fact in words a released compiler does not
+// read yet. That compiler's own release holds the newest facts it provably
+// reads (its battery ran over them), so a facts file it refuses is read
+// there instead, with a note. `refusal` is the reader's message.
+// `WITH_REGISTRY_RELEASE=<base URL>` names that tree (a mirror's, or a
+// test's fixture), as `WITH_REGISTRY` names main's. A mirror without one,
+// and a build no release tags, have no such fallback: the caller fails by
+// name (#3241).
+fn conan_registry_facts_of_release(name: &str, dep_dir: &str, refusal: &str) -> Option[ConanRegistryFacts]:
+    var base = runtime_getenv("WITH_REGISTRY_RELEASE")
+    var commit = ""
+    if base.len() == 0:
+        if runtime_getenv("WITH_REGISTRY").len() > 0: return None
+        commit = conan_registry_release_commit()
+        if commit.len() == 0: return None
+        base = "https://raw.githubusercontent.com/" ++ CONAN_REGISTRY_REPOSITORY() ++ "/" ++ commit
+    let (status, text) = conan_registry_tree_facts(base, name)
+    let path = dep_dir ++ "/facts.w"
+    let release = if g_conan_compiler_version.len() > 0: with_str_clone_ref(g_conan_compiler_version) else: "this compiler's release"
+    let why = "the registry's facts for " ++ name ++ " need a newer compiler (" ++ refusal ++ "); "
+    if status == 404:
+        let _gone = runtime_remove_file(path)
+        return conan_registry_none(commit, why ++ release ++ " published none, so none are used")
+    if status != 200 or runtime_write_file(path, text) != 0: return None
+    match facts_read_file(path):
+        Ok(_) => ConanRegistryFacts { path, commit, sha256: conan_sha256_text(text), note: why ++ "using the facts " ++ release ++ " published" }
+        Err(_) => None
+
+/// `registry/c/<name>/facts.w` of the registry tree at `base` (https:// or
+/// file://): the HTTP status (404 when the tree has no file) and the text.
+fn conan_registry_tree_facts(base: &str, name: &str) -> (i32, str):
+    let url = base ++ "/registry/c/" ++ name ++ "/facts.w"
+    if url.starts_with("file://"):
+        let local = conan_file_url_path(url)
+        return if runtime_file_exists(local) == 0: (404, "") else: (200, runtime_read_file(local))
+    let response = https_get_response_timeout(url, 5, 20000, 20000)
+    (response.status, response.body)
+
 fn conan_registry_facts(name: &str, dep_dir: &str) -> ConanRegistryFacts:
 
     let path = dep_dir ++ "/facts.w"
@@ -1966,23 +2018,17 @@ fn conan_registry_facts(name: &str, dep_dir: &str) -> ConanRegistryFacts:
     var text = ""
     var commit = ""
     if base.len() > 0:
-        let url = base ++ "/registry/c/" ++ name ++ "/facts.w"
-        if url.starts_with("file://"):
-            let local = conan_file_url_path(url)
-            if runtime_file_exists(local) == 0: return conan_registry_none("", "")
-            text = runtime_read_file(local)
-        else:
-            let response = https_get_response_timeout(url, 5, 20000, 20000)
-            if response.status == 404: return conan_registry_none("", "")
-            if response.status != 200: return conan_registry_none("", "the registry at " ++ base ++ " could not be read (status " ++ f"{response.status}" ++ ")")
-            text = response.body
+        let (status, body) = conan_registry_tree_facts(base, name)
+        if status == 404: return conan_registry_none("", "")
+        if status != 200: return conan_registry_none("", "the registry at " ++ base ++ " could not be read (status " ++ f"{status}" ++ ")")
+        text = body
     else:
         commit = conan_registry_commit()
         if commit.len() == 0: return conan_registry_none("", "the registry (github.com/" ++ CONAN_REGISTRY_REPOSITORY() ++ ") could not be reached, so its facts for " ++ name ++ " are not used")
-        let response = https_get_response_timeout("https://raw.githubusercontent.com/" ++ CONAN_REGISTRY_REPOSITORY() ++ "/" ++ commit ++ "/registry/c/" ++ name ++ "/facts.w", 5, 20000, 20000)
-        if response.status == 404: return conan_registry_none(commit, "")
-        if response.status != 200: return conan_registry_none(commit, "the registry's facts for " ++ name ++ " could not be read (status " ++ f"{response.status}" ++ ")")
-        text = response.body
+        let (status, body) = conan_registry_tree_facts("https://raw.githubusercontent.com/" ++ CONAN_REGISTRY_REPOSITORY() ++ "/" ++ commit, name)
+        if status == 404: return conan_registry_none(commit, "")
+        if status != 200: return conan_registry_none(commit, "the registry's facts for " ++ name ++ " could not be read (status " ++ f"{status}" ++ ")")
+        text = body
     if runtime_write_file(path, text) != 0: return conan_registry_none(commit, "could not write " ++ path)
     ConanRegistryFacts { path, commit, sha256: conan_sha256_text(text), note: "" }
 
@@ -2007,14 +2053,17 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     for rel in json_extract_string_array(meta, "include_paths"): import_dirs.push(dep_dir ++ "/" ++ rel)
     let libs = json_extract_string_array(meta, "libs")
     let link_lib: str = if libs.len() > 0: libs[0] else: ""
-    let registry = conan_registry_facts(name, dep_dir)
-    if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
+    var registry = conan_registry_facts(name, dep_dir)
     if registry.path.len() > 0:
         match facts_read_file(registry.path):
             Ok(_) => {}
             Err(message) =>
-                g_conan_facts_refused = g_conan_facts_refused ++ (if g_conan_facts_refused.len() > 0: "; " else: "") ++ name ++ ": " ++ message
-                return
+                match conan_registry_facts_of_release(name, dep_dir, message):
+                    Some(published) => registry = published
+                    None =>
+                        g_conan_facts_refused = g_conan_facts_refused ++ (if g_conan_facts_refused.len() > 0: "; " else: "") ++ name ++ ": " ++ message
+                        return
+    if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
     let report_path = dep_dir ++ "/facade-report.txt"
     migrate_parse_c_as_c_import()
     let summary = migrate_c_facade_for_package(corpus.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/facade.w", report_path)
