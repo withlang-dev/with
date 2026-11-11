@@ -100,8 +100,7 @@ fn bt_put_dec(v: i64):
 // far; here its reports name the drop tag, and a panic names its own chain.
 pub fn rt_backtrace_capture(buf: *mut i64, cap: i32) -> i32: 0
 
-pub fn rt_backtrace_print_frames(buf: *const i64, n: i32) -> Unit:
-    return
+pub fn rt_backtrace_print_frames(buf: *const i64, n: i32) {}
 
 pub fn rt_backtrace_print() -> Unit:
     var frames: [64]i64 = [0 as i64; 64]

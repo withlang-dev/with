@@ -5577,7 +5577,7 @@ fn bs_check_migrate_c99_math(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-c99-math", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "fma(2.0, 3.0, 1.0)", "c99 math: fma by name")
+    rc = bs_assert_contains(ctx, out_text, "fma((2.0 as f64), (3.0 as f64), (1.0 as f64))", "c99 math: fma by name")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "extern fn sqrt", "c99 math: a builtin is not declared extern")
     if rc != 0: return rc
