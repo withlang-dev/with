@@ -4662,6 +4662,13 @@ fn with_ci_cursor_linkage(session: i64, cursor_idx: i32) -> i32:
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         clang_getCursorLinkage(cursor)
 
+fn with_ci_cursor_is_threadlocal(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        clang_getCursorTLSKind(cursor)
+
 fn with_ci_cursor_storage_class(session: i64, cursor_idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession

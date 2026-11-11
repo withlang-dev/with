@@ -14780,7 +14780,12 @@ fn ci_option_fn_init_fixup(text: &str, ty: &str) -> str:
 fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: &str) -> str:
     // Evaluate a variable initializer using the actual declaration cursor,
     // not a name-based re-lookup that may bind a forward declaration.
-    let var_cursor = with_cimport_decl_cursor(session, idx)
+    ci_eval_var_init_at(session, with_cimport_decl_cursor(session, idx), target_type)
+
+/// The constant initializer of the variable `var_cursor` declares, as With
+/// text for `target_type` (the cursor's own type when empty); empty when
+/// the variable has none or it has no With spelling.
+fn ci_eval_var_init_at(session: i64, var_cursor: i32, target_type: &str) -> str:
     if var_cursor >= 0:
         let cursor_type = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
         let init_type = if target_type.len() > 0: with_str_clone_ref(target_type) else: cursor_type
@@ -15205,7 +15210,37 @@ fn ci_goto_decl_suffix_from_location(loc: &str, fallback_id: i32) -> str:
                 return "__goto_" ++ line ++ "_" ++ col
     "__goto_" ++ i64_to_string(fallback_id)
 
+// C11 6.2.4p3: a local declared `static` has static storage duration: one
+// object for the whole program, initialized once, before startup, by its
+// constant initializer. It is a module-level variable only its function
+// names: declared beside the function (g_ci_body_hoisted_decls) under
+// `__static_<function>_<name>`, and the body's name for it maps there. Two
+// blocks of one function that each declare the name get two objects.
+var g_ci_static_local_by_cursor: HashMap[i32, str] = HashMap.new()
+var g_ci_static_local_by_name: HashMap[str, i32] = HashMap.new()
+
+fn ci_static_local_name(session: i64, var_cursor: i32) -> str:
+    if g_ci_static_local_by_cursor.contains(var_cursor): return g_ci_static_local_by_cursor.get(var_cursor).unwrap()
+    let base = "__static_" ++ g_ci_rule_fn ++ "_" ++ with_ci_cursor_spelling(session, var_cursor)
+    var name = base
+    var n = 2
+    while g_ci_static_local_by_name.contains(name):
+        name = f"{base}_{n}"
+        n = n + 1
+    g_ci_static_local_by_cursor.insert(var_cursor, name)
+    g_ci_static_local_by_name.insert(name, var_cursor)
+    name
+
+fn ci_file_scope_var_is_declared(session: i64, name: &str) -> bool:
+    for i in 0..with_cimport_decl_count(session):
+        if with_cimport_decl_kind(session, i) == CK_VAR and with_cimport_decl_name(session, i) == name: return true
+    false
+
+fn ci_var_decl_is_static_local(session: i64, cursor: i32) -> bool:
+    with_ci_cursor_kind(session, cursor) == CXK_VAR_DECL and with_ci_cursor_storage_class(session, cursor) == CX_SC_STATIC
+
 fn ci_goto_hoisted_var_name(session: i64, var_cursor: i32) -> str:
+    if ci_var_decl_is_static_local(session, var_cursor): return ci_static_local_name(session, var_cursor)
     ci_local_storage_name(ci_escape_reserved(with_ci_cursor_spelling(session, var_cursor)), var_cursor) ++ ci_goto_decl_suffix(session, var_cursor)
 
 fn ci_goto_scope_add_decl_mappings(session: i64, cursor: i32, scope: CiScope) -> CiScope:
@@ -15216,7 +15251,7 @@ fn ci_goto_scope_add_decl_mappings(session: i64, cursor: i32, scope: CiScope) ->
     var i = 0
     while i < nc:
         let child = with_ci_child(session, cursor, i)
-        if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
+        if with_ci_cursor_kind(session, child) == CXK_VAR_DECL and with_ci_cursor_storage_class(session, child) != CX_SC_EXTERN:
             let raw_name = with_ci_cursor_spelling(session, child)
             let escaped = ci_escape_reserved(raw_name)
             let storage_name = ci_goto_hoisted_var_name(session, child)
@@ -15453,6 +15488,38 @@ impl CiStmtPool:
                     new_scope = ci_scope_add_mangled(new_scope, cname, cname)
                     ci_fn_var_names_register(cname)
                     child_stmt_ids.push((self.var_decl(self.add_string(cname), c_int_ty, lit, 0)) as i32)
+                hoisted_record = true
+            else if with_ci_cursor_kind(session, child) == CXK_VAR_DECL and with_ci_cursor_storage_class(session, child) == CX_SC_EXTERN:
+                // C11 6.2.2p4: `extern int shared;` in a body declares no
+                // object: the name is the file-scope variable's. It was a
+                // fresh local, so the function wrote a copy nobody read.
+                let escaped = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+                if ci_scope_contains(new_scope, escaped):
+                    ci_va_bail(session, child, "'extern " ++ escaped ++ "' in a body whose local of that name is in scope")
+                    return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+                if not ci_file_scope_var_is_declared(session, with_ci_cursor_spelling(session, child)):
+                    ci_va_bail(session, child, "'extern " ++ escaped ++ "' names a variable no file-scope declaration in this translation unit gives a type")
+                    return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+                hoisted_record = true
+            else if ci_var_decl_is_static_local(session, child):
+                let escaped = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+                let vty = with_ci_cursor_type(session, child)
+                var vty_id = types.type_from_libclang(session, vty)
+                if vty_id != 0 and with_ci_type_is_fn_pointer(session, vty): vty_id = ci_nullable_fn_type(types, vty_id)
+                if vty_id == 0:
+                    ci_va_bail(session, child, "static local '" ++ escaped ++ "' has a type with no With spelling")
+                    return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+                let ty_text = ci_print_type(types, vty_id)
+                let init_text = ci_eval_var_init_at(session, child, ty_text)
+                if init_text.len() == 0 and with_ci_var_initializer(session, child) >= 0:
+                    ci_va_bail(session, child, "the initializer of static local '" ++ escaped ++ "' has no With spelling")
+                    return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+                let storage_name = ci_static_local_name(session, child)
+                let tl_attr = if with_ci_cursor_is_threadlocal(session, child) != 0: "@[threadlocal]\n" else: ""
+                let init_suffix = if init_text.len() > 0: " = " ++ init_text else: ""
+                g_ci_body_hoisted_decls = g_ci_body_hoisted_decls ++ tl_attr ++ "var " ++ storage_name ++ ": " ++ ty_text ++ init_suffix ++ "\n"
+                new_scope = ci_scope_add_mangled(new_scope, escaped, storage_name)
+                if with_ci_type_is_fn_pointer(session, vty): new_scope = ci_scope_add_type(new_scope, escaped, ty_text)
                 hoisted_record = true
             else if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
                 let raw_name = with_ci_cursor_spelling(session, child)
@@ -15737,6 +15804,8 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
     // this one: every caller takes the records right after this returns.
     let _stale = ci_print_take_unknowns()
     g_ci_body_hoisted_decls = ""
+    g_ci_static_local_by_cursor.clear()
+    g_ci_static_local_by_name.clear()
     g_ci_body_tail_unit = false
     ci_clear_bail_location()
     ci_set_rule_fn(with_cimport_decl_name(session, decl_idx))
@@ -19683,7 +19752,7 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: List[CiHoistedVarDe
         var i = 0
         while i < nc:
             let child = with_ci_child(session, cursor, i)
-            if with_ci_cursor_kind(session, child) == 9:  // CXK_VAR_DECL
+            if with_ci_cursor_kind(session, child) == CXK_VAR_DECL and with_ci_cursor_storage_class(session, child) != CX_SC_STATIC and with_ci_cursor_storage_class(session, child) != CX_SC_EXTERN:
                 let vname = ci_goto_hoisted_var_name(session, child)
                 let vty = with_ci_cursor_type(session, child)
                 var vty_id = types.type_from_libclang(session, vty)
