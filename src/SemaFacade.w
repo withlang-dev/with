@@ -1902,6 +1902,8 @@ impl Sema:
                 self.emit_error(f"fn '{fname}': 'variadic param …' is stated twice; one variadic function has one closed set of cases (§16.2b.5)", clause)
                 return c
             let case_count = self.ast.get_data2(clause) - 2
+            // The place the next case takes in the contract's case lists.
+            var next_case: i32 = 0
             for k in 0..case_count:
                 let case_node = self.ast.get_extra(ops + 2 + k)
                 let cops = self.ast.get_data1(case_node)
@@ -1937,7 +1939,12 @@ impl Sema:
                 let callback_ref = self.ast.get_extra(cops + 2)
                 let retainer_ref = self.ast.get_extra(cops + 4)
                 if callback_ref != 0 or retainer_ref != 0:
-                    let slot = self.facade_resolve_variadic_slot(fn_sym, sig, case_node, tid, k)
+                    // #3113: the slot names its case by the case's place
+                    // in the contract's case lists, where every callback
+                    // case before it also added its implied userdata case;
+                    // the written position `k` named the wrong case from
+                    // the second callback on ("cannot infer … 'U'").
+                    let slot = self.facade_resolve_variadic_slot(fn_sym, sig, case_node, tid, next_case)
                     if slot.resource < 0: return c
                     c.variadic_slots.push(slot)
                     ckind = if callback_ref != 0: .Callback else: .Retained
@@ -1952,6 +1959,7 @@ impl Sema:
                 c.variadic_case_values.push(value)
                 c.variadic_case_tids.push(tid)
                 c.variadic_case_kinds.push(case_kind)
+                next_case += 1
                 if case_kind == .Callback:
                     // A callback case installs the callback for later
                     // calls, so it states its retention — never inferred
@@ -1974,6 +1982,7 @@ impl Sema:
                     c.variadic_case_values.push(ud_value)
                     c.variadic_case_tids.push(tid)
                     c.variadic_case_kinds.push(.Userdata)
+                    next_case += 1
             c.variadic_node = clause
             c.variadic_selector = p
             // D194 (§16.2b.5): a retained pointer case's length option is
@@ -3946,6 +3955,15 @@ impl Sema:
             let sig = self.get_sig(fn_sym)
             if sig < 0:
                 continue
+            // #3114: a resource is rendered from its destruction contract; one
+            // with neither a producer nor a `drop` renders nothing, and the
+            // borrowed type this item returns then named no type
+            // (`BorrowedPart` undefined, in generated code).
+            if self.facade_resource_index.contains(res):
+                let bri: i32 = self.facade_resource_index.get(res).unwrap()
+                if self.facade_resources[bri].drop == 0 and self.facade_resources[bri].init == 0 and self.facade_resources[bri].producers.len() == 0 and self.facade_resources[bri].destroyers.len() == 0:
+                    self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' borrows a resource that states no producer and no 'drop', so '{rn}' has no presented type to borrow (§16.2b.3, §16.2b.6)", node, f"state how a '{rn}' is produced and destroyed ('from <fn>' and 'drop <fn>') on the resource; a resource that is only ever borrowed is not modeled yet")
+                    continue
             let origin = self.facade_param_receives(fn_sym, from)
             let shown = self.facade_param_display(fn_sym, sig, from)
             if origin.len() != 1:

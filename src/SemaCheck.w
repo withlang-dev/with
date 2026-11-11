@@ -18355,6 +18355,10 @@ impl Sema:
         if scoped:
             self.pop_scope()
 
+    // A bare `[]`: no elements, no `[value; N]` count.
+    fn expr_is_empty_bracket_literal(node: i32) -> bool:
+        node > 0 and self.ast.kind(node) == NodeKind.NK_ARRAY_LIT and self.ast.get_data1(node) == 0 and self.ast.get_data2(node) == 0
+
     mut fn check_if_expr(node: i32) -> i32:
         let cond = self.ast.get_data0(node)
         let then_body = self.ast.get_data1(node)
@@ -18417,8 +18421,15 @@ impl Sema:
         // line) is still the arm's scope: its binding was visible, and
         // uninitialized, after an `if` that did not take the arm.
         let then_scoped = self.enter_body_scope(then_body)
-        let then_type = if outer_expected != 0:
+        // #3060 (§4.3c rule 1): an arm that is a bare `[]` waits for its
+        // first use, and beside another arm that use is the join: it holds
+        // what the other arm does. The literal moves nothing, so it is
+        // checked once the other arm's type is known.
+        let then_waits = outer_expected == 0 and in_value_context and else_body != 0 and self.expr_is_empty_bracket_literal(then_body) and not self.expr_is_empty_bracket_literal(else_body)
+        var then_type = if outer_expected != 0:
             self.check_expr_with_expected(then_body, outer_expected)
+        else if then_waits:
+            0
         else if in_value_context:
             self.infer_tail_node = if is_infer_tail: then_body else: saved_infer_tail
             self.check_expr_value_context(then_body)
@@ -18426,7 +18437,7 @@ impl Sema:
             self.check_expr_statement_context(then_body)
         else:
             self.check_expr(then_body)
-        if in_value_context:
+        if in_value_context and not then_waits:
             self.note_arm_tail(then_body, outer_expected as i32)
         self.leave_body_scope(then_scoped)
         self.infer_tail_node = saved_infer_tail
@@ -18449,8 +18460,11 @@ impl Sema:
                 self.drop_control_flow_depth = self.drop_control_flow_depth + 1
             self.push_move_control_flow_context(1)
             let else_scoped = self.enter_body_scope(else_body)
+            let else_waits = outer_expected == 0 and in_value_context and not then_waits and then_type != 0 and self.expr_is_empty_bracket_literal(else_body)
             let else_type = if outer_expected != 0:
                 self.check_expr_with_expected(else_body, outer_expected)
+            else if else_waits:
+                self.check_expr_with_expected(else_body, then_type as TypeId)
             else if in_value_context:
                 self.infer_tail_node = if is_infer_tail: else_body else: saved_infer_tail
                 self.check_expr_value_context(else_body)
@@ -18460,6 +18474,9 @@ impl Sema:
                 self.check_expr(else_body)
             if in_value_context:
                 self.note_arm_tail(else_body, outer_expected as i32)
+            if then_waits:
+                then_type = if else_type != 0: self.check_expr_with_expected(then_body, else_type as TypeId) else: self.check_expr_value_context(then_body)
+                self.note_arm_tail(then_body, 0)
             self.leave_body_scope(else_scoped)
             self.infer_tail_node = saved_infer_tail
             self.pop_move_control_flow_context()

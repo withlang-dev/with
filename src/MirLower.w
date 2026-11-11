@@ -5386,7 +5386,13 @@ impl MirBuilder:
         // destination struct type". The bare-None-vs-pointer case keeps its
         // existing special handling. (#586 established the per-operand rebind.)
         let is_cmp = op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
-        if self.is_bare_none(lhs_expr) and (rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF):
+        // #3057: a view of an `Option[T]` (a pattern binding out of an
+        // element view) beside a bare `None` compares the value it views:
+        // the `None` is that Option's, never a null of the reference's type
+        // (codegen compared the aggregate with `i32 0`).
+        if self.is_bare_none(lhs_expr) and rhs_tk == TypeKind.TY_REF:
+            self.expected_type = self.sema.auto_deref_ref_ptr_type(rhs_resolved) as i32
+        else if self.is_bare_none(lhs_expr) and rhs_tk == TypeKind.TY_PTR:
             self.expected_type = rhs_ty
         else if is_cmp and rhs_ty != 0:
             self.expected_type = rhs_ty
@@ -5402,7 +5408,9 @@ impl MirBuilder:
         let saved_observing = self.observing_str_read
         if observes_strings: self.observing_str_read = lhs_expr
         let lhs = if observes_strings and self.type_id_is_str(lhs_ty): self.lower_observer_probe_arg(lhs_expr) else: self.lower_comparison_operand(is_cmp, lhs_expr)
-        if self.is_bare_none(rhs_expr) and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF):
+        if self.is_bare_none(rhs_expr) and lhs_tk == TypeKind.TY_REF:
+            self.expected_type = self.sema.auto_deref_ref_ptr_type(lhs_resolved) as i32
+        else if self.is_bare_none(rhs_expr) and lhs_tk == TypeKind.TY_PTR:
             self.expected_type = lhs_ty
         else if is_cmp and lhs_ty != 0:
             self.expected_type = lhs_ty

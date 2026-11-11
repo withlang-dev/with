@@ -6640,7 +6640,23 @@ impl ComptimeEvaluator:
         let start = self.extra_values.len() as i32
         for elem in elems.into_iter():
             self.push_extra_value(elem)
-        comptime_control_value(comptime_value_array(self.node_type_or(node, 0), start, count))
+        // #2760: Sema owns what the brackets built (D113: a List unless a
+        // fixed array is demanded). A literal it typed `List[T]` is a list
+        // here too, as a comprehension's is; as CV_ARRAY its `.len()` and
+        // `push` were "not comptime-evaluable yet".
+        // A constant's initializer is evaluated before its literal is
+        // checked: the demand at the site (an annotation, #2220) stands in.
+        var type_id = self.node_type_or(node, 0)
+        if type_id == 0 and self.expected_types.len() > 0: type_id = self.list_demand(self.expected_types[self.expected_types.len() - 1])
+        if type_id != 0 and self.sema.std_generic_of(type_id) == StdGeneric.List:
+            return comptime_control_value(comptime_value_list(type_id, start, count))
+        comptime_control_value(comptime_value_array(type_id, start, count))
+
+    // `demanded` when it is a `List[T]`, or a reference to one; else 0.
+    fn list_demand(demanded: i32) -> i32:
+        if demanded == 0: return 0
+        let through = self.sema.auto_deref_ref_ptr_type(self.sema.resolve_alias(demanded as TypeId)) as i32
+        if self.sema.std_generic_of(through) == StdGeneric.List: through else: 0
 
     mut fn eval_tuple(node: i32) -> ComptimeControl:
         let extra_start = self.ast.get_data0(node)
@@ -8560,7 +8576,13 @@ impl ComptimeEvaluator:
             let param_flags = self.ast.fn_param_flags(param_start, i)
             let param_mut = fn_param_is_mut_self(param_flags)
             if i < arg_count:
-                self.bind_value(param_name, comptime_value_clone(arg_values[i]), param_mut)
+                // #2760: an argument literal evaluated before Sema typed it
+                // is an array value; at a `List` parameter it is the list
+                // the parameter's type says it is.
+                let arg = comptime_value_clone(arg_values[i])
+                let param_sig = self.sema.get_sig(fn_sym)
+                let as_list = if arg.kind == ComptimeValueKind.CV_ARRAY and param_sig >= 0 and i < self.sema.sig_get_param_count(param_sig): self.list_demand(self.sema.sig_param_type(param_sig, i)) else: 0
+                self.bind_value(param_name, if as_list != 0: comptime_value_list(as_list, arg.extra_start, arg.extra_count) else: arg, param_mut)
             else:
                 let default_node = self.ast.get_fn_param_default(param_start, i)
                 if default_node == 0:
