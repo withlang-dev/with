@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.46
+# The With Programming Language — Specification v7.47
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,7 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.47:** D198 Amendment 5 (Eric, 2026-11-11, #3220, #3237). §16.3: an imported C global follows §9.1 rule 3, with one difference: C may write it; it is safe to access when every call into the library that declares it and every access to its globals is provably on one thread, or the header declares it `const` or thread-local; a library whose facade says `runs threads` has no such proof.
 **Changelog v7.46:** D198 Amendment 4 (Eric, 2026-11-10, #3173). §16.2b.3: the fields of a type a facade generates belong to its generated code; outside it the only one a program can name is `.repr`, and that needs `unsafe`.
 
 **Changelog v7.45:** D198 Amendment 3 (Eric, 2026-11-10, #3173). §16.2b.3: a field of a by-value or in-place resource's record is read through the resource (`image.width`); fields are not assigned through it; the record itself is `.repr`, under the raw C rules; a field named like a presented operation, or `repr`, is a facade error; a pointer resource has no such reads.

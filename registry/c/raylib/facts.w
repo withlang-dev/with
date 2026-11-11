@@ -12,6 +12,7 @@
 // generators such as GenImageColor (a large width*height writes through a
 // failed allocation).
 c facade raylib:
+    runs threads    // raudio.c 464-511, InitAudioDevice: ma_device_init(&AUDIO.System.context, &config, &AUDIO.System.device) with config.dataCallback = OnSendAudioDataToDevice, then ma_device_start; miniaudio calls OnSendAudioDataToDevice (raudio.c 2558) on its own device thread
     resource ImageData wraps Image
         from LoadImageFromScreen    // raylib.h 6.0: "Image LoadImageFromScreen(void); // Load image from screen buffer and (screenshot)"; rtextures.c 584-595, LoadImageFromScreen: image.data = rlReadScreenPixels(width, height), a buffer the caller owns
         from LoadImage    // raylib.h 6.0: "Image LoadImage(const char *fileName); // Load image from file into CPU memory (RAM)"; rtextures.c 263-300, LoadImage: the file is read into a buffer the image owns, a zeroed Image when it cannot be read

@@ -702,7 +702,7 @@ impl Sema:
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
-            else if kind == NodeKind.NK_FACADE_CLAUSE and self.ast.get_data0(item) == FACADE_CLAUSE_CREATES_THREADS:
+            else if kind == NodeKind.NK_FACADE_CLAUSE and self.ast.get_data0(item) == FACADE_CLAUSE_RUNS_THREADS:
                 // §16.3: the library is the headers this facade's module
                 // imports.
                 for dj in 0..self.ast.decl_count():
@@ -2674,6 +2674,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_VALUE_RECORD: return "reads / fills / updates"
     if kind == FACADE_CLAUSE_TEXT_PARAM: return "text param"
     if kind == FACADE_CLAUSE_TEXT_UTF8: return "text utf8"
+    if kind == FACADE_CLAUSE_RUNS_THREADS: return "runs threads"
     if kind == FACADE_CLAUSE_TEXT_BYTES: return "text return bytes"
     if kind == FACADE_CLAUSE_DETACHES: return "detaches"
     if kind == FACADE_CLAUSE_TEXT_RETURN: return "text return"

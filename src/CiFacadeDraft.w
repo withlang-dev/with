@@ -1087,6 +1087,7 @@ impl CiProject:
         if self.field_role_text.len() > 0: text = text ++ "// Function-pointer fields, as the registry states them:\n" ++ self.field_role_text
         text = text ++ "c facade " ++ name ++ ":\n"
         if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
+        if self.registry_threads.len() > 0: text = text ++ "    runs threads    // registry: " ++ self.registry_threads ++ "\n"
         for record in modeled:
             text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
             let producers = self.fd_presentable_producers_of(record, modeled)

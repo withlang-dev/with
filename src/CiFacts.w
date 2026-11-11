@@ -45,6 +45,9 @@ type Facts {
     // text return presents as `Option[str]`, validated at the boundary),
     // "" when the file states none.
     pub utf8_cite: str,
+    // The citation of a facade-level `runs threads` (§16.3: the library
+    // runs threads of its own), "" when the file states none.
+    pub threads_cite: str,
     // D198: by-value resources, in the facade's own spelling with each
     // citation as its provenance, and the functions they name. The draft
     // carries the text as written; the facade checker judges it against
@@ -115,7 +118,7 @@ fn facts_read_file(path: &str) -> Result[Facts, str]:
     facts_read(path, source)
 
 fn facts_read(path: &str, source: str) -> Result[Facts, str]:
-    let facts = Facts { package: "", entries: List.new(), utf8_cite: "", value_text: "", value_fns: [], value_resources: [], field_roles: [] }
+    let facts = Facts { package: "", entries: List.new(), utf8_cite: "", threads_cite: "", value_text: "", value_fns: [], value_resources: [], field_roles: [] }
     var in_value = false
     var current_fn = ""
     var in_resource = false
@@ -167,6 +170,10 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         if clause == "text utf8" and not in_resource and current_fn.len() == 0:
             if facts.utf8_cite.len() > 0: return Err(facts_error(path, line_no, "`text utf8` is stated twice"))
             facts.utf8_cite = cite
+            continue
+        if clause == "runs threads" and not in_resource and current_fn.len() == 0:
+            if facts.threads_cite.len() > 0: return Err(facts_error(path, line_no, "`runs threads` is stated twice"))
+            facts.threads_cite = cite
             continue
         if in_resource:
             let words = clause.fields()

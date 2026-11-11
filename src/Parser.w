@@ -4952,21 +4952,21 @@ impl Parser:
                 return 0
             self.advance()
             return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_TEXT_UTF8, self.pool.extra_len(), 0) as i32
-        if self.current_ident_is("creates"):
-            // §16.3 (#3237): `creates threads` — the library runs threads of
+        if self.current_ident_is("runs"):
+            // §16.3 (#3237): `runs threads` — the library runs threads of
             // its own, which may write its globals at any time.
             self.advance()
             if not self.current_ident_is("threads"):
-                self.emit_error("a facade says its library runs threads of its own with 'creates threads' (§16.3)")
+                self.emit_error("a facade says its library runs threads of its own with 'runs threads' (§16.3)")
                 return 0
             self.advance()
-            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_CREATES_THREADS, self.pool.extra_len(), 0) as i32
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_RUNS_THREADS, self.pool.extra_len(), 0) as i32
         // §16.2b.4 (D97): the facade-wide error type is stated in the
         // header, `c facade F error E:`, never as an item (#2953).
         if self.peek() == TokenKind.TK_KW_ERROR:
             self.emit_error("a facade-wide error type is stated in the header, `c facade F error E:`, not as an item (§16.2b.4)")
             return 0
-        self.emit_error("expected 'resource', 'handle', 'fn', 'domain', 'text utf8', 'creates threads' or 'use convention' in c facade (§16.2b)")
+        self.emit_error("expected 'resource', 'handle', 'fn', 'domain', 'text utf8', 'runs threads' or 'use convention' in c facade (§16.2b)")
         0
 
     // The clauses indented deeper than their item. Collected first and written

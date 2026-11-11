@@ -305,7 +305,7 @@ pub const FACADE_CLAUSE_TEXT_BYTES: i32 = 37       // []  (`text return bytes`: 
 pub const FACADE_CLAUSE_DETACHES: i32 = 38         // [param_ref]  (`detaches param N`: removes the value param N borrows from its origin and yields it owned, dependent on that origin, D134 §16.2b.6)
 // D198 (§16.2b.5 "Value records"): a pointer parameter to one complete record
 // that is not a resource's representation, by what the callee does with it.
-pub const FACADE_CLAUSE_CREATES_THREADS: i32 = 40  // []  a facade-level item, `creates threads`: the library runs threads of its own, so its globals are never provably on one thread (§16.3)
+pub const FACADE_CLAUSE_RUNS_THREADS: i32 = 40  // []  a facade-level item, `runs threads`: the library runs threads of its own, so its globals are never provably on one thread (§16.3)
 pub const FACADE_CLAUSE_VALUE_RECORD: i32 = 39     // [param_ref, word_sym]  (`reads` / `fills` / `updates param N`: the word is the clause, §16.2b.5)
 pub const FACADE_CLAUSE_MESSAGE: i32 = 33          // [fn_sym] resource-only: `message <fn>`, the operation that describes the resource's most recent failure (ruling Amendment 3, §16.2b.4)
 pub const FACADE_PARAM_REF_NAME: i32 = 0

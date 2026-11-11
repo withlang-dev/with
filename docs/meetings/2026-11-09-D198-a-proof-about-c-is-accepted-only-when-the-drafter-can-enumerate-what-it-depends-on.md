@@ -253,7 +253,7 @@ That second claim (the library has no threads writing its globals) stays
 assumed, as it already was for a single-threaded program writing a C global;
 the alternative is Rust's, every access `unsafe`, `optind = 1` included. It
 is closed from the other side: a library that runs threads of its own says
-so in its facade (`creates threads`), and its globals are then never
+so in its facade (`runs threads`), and its globals are then never
 provably on one thread.
 
 **Refused.** A facade statement "C writes it only during calls the program
@@ -266,5 +266,10 @@ in the program every access to a non-const, non-thread-local C global is
 raw; per-library precision (the library touched from one task only) is
 later quality work. `examples/c-interop` is unchanged and checks.
 
-**Not yet in the spec.** The §16.3 paragraph and the spelling
-`creates threads` wait for Eric's words.
+**In the spec (v7.47, Eric 2026-11-11).** The §16.3 paragraph, with "the
+library that declares it" in place of "its library", and the spelling
+`runs threads`: `creates threads` read too much like the resource
+capability `thread creator` (§16.2b.10), which restricts the program (the
+resource is used on the thread that made it), where this one removes a
+proof (the library's globals are never provably on one thread). The raylib
+facts and the SDL facade state it: both run an audio thread.

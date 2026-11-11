@@ -5252,8 +5252,8 @@ impl Sema:
         self.mutable_global_syms.contains(sym) and (self.extern_var_texts.contains(self.pool_resolve(sym)) or self.ci_syms.contains(sym))
 
     // Whether the facade of the library that declares the C global `sym`
-    // says `creates threads`.
-    fn c_global_library_creates_threads(sym: i32) -> bool:
+    // says `runs threads`.
+    fn c_global_library_runs_threads(sym: i32) -> bool:
         if self.facade_thread_headers.len() == 0: return false
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
@@ -5286,7 +5286,7 @@ impl Sema:
             if tid != 0:
                 atomic = "Atomic[" ++ self.type_name(tid) ++ "]"
         if c_written:
-            if self.global_race_concurrency_node == 0: diag.add_note("its library's facade says `creates threads`: the library may write the global at any time")
+            if self.global_race_concurrency_node == 0: diag.add_note("its library's facade says `runs threads`: the library may write the global at any time")
             diag.add_help("read it on the one thread that calls the library, or assert with `unsafe`")
         else:
             diag.add_help("use " ++ atomic ++ ", wrap in Mutex, or assert with `unsafe`")
@@ -5312,7 +5312,7 @@ impl Sema:
                 continue
             let in_unsafe: i32 = self.global_race_access_unsafe[i]
             let c_global = self.global_is_c_written(self.global_race_access_syms[i])
-            let library_threads = c_global and self.c_global_library_creates_threads(self.global_race_access_syms[i])
+            let library_threads = c_global and self.c_global_library_runs_threads(self.global_race_access_syms[i])
             let failed = if c_global: tasks or library_threads else: proof_failed
             self.global_race_concurrency_node = if c_global: (if tasks: tasks_node else: 0) else: any_node
             self.global_race_concurrency_file = if c_global: tasks_file else: any_file
