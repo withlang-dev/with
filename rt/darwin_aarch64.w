@@ -428,15 +428,15 @@ pub fn rt_backtrace_print():
 // Nothing off the thread's own stack: a fiber's or a generator's stack ends
 // where it began, with no caller the unwinder can read, and walking one
 // crashed every task that allocated (exit 139).
-extern fn pthread_self() -> *mut u8
-extern fn pthread_get_stackaddr_np(thread: *mut u8) -> *mut u8
-extern fn pthread_get_stacksize_np(thread: *mut u8) -> u64
+extern fn pthread_self() -> i64
+extern fn pthread_get_stackaddr_np(thread: i64) -> i64
+extern fn pthread_get_stacksize_np(thread: i64) -> u64
 
 pub fn rt_backtrace_capture(buf: *mut i64, cap: i32) -> i32:
     var probe: i64 = 0
     let here = &raw const probe as i64
     let thread = pthread_self()
-    let top = pthread_get_stackaddr_np(thread) as i64
+    let top = pthread_get_stackaddr_np(thread)
     if here > top or here < top - pthread_get_stacksize_np(thread) as i64: return 0
     backtrace(buf as *mut *mut u8, cap)
 
