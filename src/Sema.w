@@ -1397,6 +1397,10 @@ type Sema {
     global_race_access_unsafe: List[i32],
     global_race_mutated_syms: HashMap[i32, i32, Minted],
     global_race_mutation_nodes: HashMap[i32, i32, Minted],
+    // #2369: a mutable global some body rebinds whole (`G = value`), with
+    // the first such site as `module path:line`. A write into it (a field,
+    // an element, a `mut fn` call) is not a rebinding (§9.1c).
+    global_rebind_sites: HashMap[i32, str, Minted],
     global_race_concurrency_node: i32,
     global_race_concurrency_file: i32,
     global_race_concurrency_reason: str,
@@ -3937,6 +3941,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         global_race_access_unsafe: List.new(),
         global_race_mutated_syms,
         global_race_mutation_nodes,
+        global_rebind_sites: sema_new_map_i32_str(),
         global_race_concurrency_node: 0,
         global_race_concurrency_file: 0,
         global_race_concurrency_reason: "",

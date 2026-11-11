@@ -123,6 +123,50 @@ pub extern fn strtof(nptr: *const c_char, endptr: *mut *mut c_char) -> f32
 pub fn strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64: with_libc_strtold(nptr, endptr)
 pub extern fn setlocale(category: i32, locale: *const c_char) -> *mut c_char
 
+// C99 <math.h> outside the §17.6a builtins (#2680): what migrated numeric C
+// calls by name. The builtins (`sqrt`, `cos`, `fmod`, ...) are not here.
+pub extern fn fma(x: f64, y: f64, z: f64) -> f64
+pub extern fn fmaf(x: f32, y: f32, z: f32) -> f32
+pub extern fn fmin(x: f64, y: f64) -> f64
+pub extern fn fminf(x: f32, y: f32) -> f32
+pub extern fn fmax(x: f64, y: f64) -> f64
+pub extern fn fmaxf(x: f32, y: f32) -> f32
+pub extern fn fdim(x: f64, y: f64) -> f64
+pub extern fn fdimf(x: f32, y: f32) -> f32
+pub extern fn nextafter(x: f64, y: f64) -> f64
+pub extern fn nextafterf(x: f32, y: f32) -> f32
+pub extern fn remainder(x: f64, y: f64) -> f64
+pub extern fn remainderf(x: f32, y: f32) -> f32
+pub extern fn ldexp(x: f64, exp: i32) -> f64
+pub extern fn ldexpf(x: f32, exp: i32) -> f32
+pub extern fn scalbn(x: f64, exp: i32) -> f64
+pub extern fn scalbnf(x: f32, exp: i32) -> f32
+pub extern fn frexp(x: f64, exp: *mut i32) -> f64
+pub extern fn frexpf(x: f32, exp: *mut i32) -> f32
+pub extern fn modf(x: f64, whole: *mut f64) -> f64
+pub extern fn modff(x: f32, whole: *mut f32) -> f32
+pub extern fn logb(x: f64) -> f64
+pub extern fn logbf(x: f32) -> f32
+pub extern fn ilogb(x: f64) -> i32
+pub extern fn ilogbf(x: f32) -> i32
+pub extern fn llround(x: f64) -> i64
+pub extern fn llroundf(x: f32) -> i64
+pub extern fn llrint(x: f64) -> i64
+pub extern fn llrintf(x: f32) -> i64
+// C's long is 64 bits on every target here (D114, as strtol): the long
+// forms are the long long ones.
+pub fn lround(x: f64) -> i64: llround(x)
+pub fn lroundf(x: f32) -> i64: llroundf(x)
+pub fn lrint(x: f64) -> i64: llrint(x)
+pub fn lrintf(x: f32) -> i64: llrintf(x)
+// C's classification macros, which each libc spells its own way
+// (`__inline_isnand`, `__builtin_isnan`, `__isnan`). An f32 widens exactly,
+// so one f64 form serves every width.
+pub fn isnan(x: f64) -> i32: (x != x) as i32
+pub fn isinf(x: f64) -> i32: (x == x and x - x != x - x) as i32
+pub fn isfinite(x: f64) -> i32: (x - x == 0.0) as i32
+pub fn signbit(x: f64) -> i32: (copysign(1.0, x) < 0.0) as i32
+
 // errno: C's lvalue macro reaches a per-libc accessor (Darwin `__error()`,
 // glibc `__errno_location()`, UCRT `_errno()`); migrated code derefs this.
 pub fn errno_ptr() -> *mut i32: with_libc_errno()

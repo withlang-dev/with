@@ -537,7 +537,12 @@ impl BundleEmitter:
             return
         let is_mut = flags % 2 != 0
         if is_mut and sema.type_needs_drop_frozen(tid) != 0:
-            self.refuse("is a mutable global of a droppable type (" ++ spelling ++ "); nobody drops bundle storage (Level 0)")
+            // #2369: `let` is the fix when no body rebinds it, and only the
+            // author may make it: `var` to `let` changes the declaration's
+            // meaning, which the emitter never does.
+            let rebound_at = sema.global_rebind_sites.get(ast.get_data0(node))
+            let fix = if rebound_at.is_some(): "; it is rebound at " ++ rebound_at.unwrap() ++ ", so it cannot be a `let`" else: "; no body rebinds it, so spell it `let` (`pub let " ++ name ++ ": " ++ spelling ++ "`): writes into a `let` global stay legal (§9.1c)"
+            self.refuse("is a mutable global of a droppable type (" ++ spelling ++ "); nobody drops bundle storage (Level 0)" ++ fix)
             return
         // D38 Level 0: codegen could not fold this global's initializer to
         // data, so the object does not define it — corpus-internal, omitted

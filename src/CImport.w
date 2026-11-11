@@ -12791,6 +12791,12 @@ impl CiExprPool:
             return self.cast(result_ty, arg_ids[0] as CiExprId)
         if callee_text == "__builtin_add_overflow" or callee_text == "__builtin_sub_overflow" or callee_text == "__builtin_mul_overflow":
             return self.build_overflow_builtin_call(session, cursor, callee_text, arg_ids, types)
+        let float_class = ci_float_class_fn(callee_text)
+        if float_class.len() > 0:
+            if arg_ids.len() != 1:
+                return self.reject_builtin_call(session, cursor, callee_text, "expected one argument")
+            ci_migrate_note_libc_symbol(float_class)
+            return self.build_named_call_expr_typed(float_class, arg_ids, types.named_type_from_text("i32"))
         let bit_method = ci_builtin_bit_method(callee_text)
         if bit_method.len() > 0:
             // __builtin_clz(x) is `(x as u32).clz()`, the ll/l forms are the
@@ -21672,7 +21678,21 @@ fn ci_libc_modeled_return_type(name: &str) -> str:
         return ""
     ""
 
+// The std.libc classification function a host spelling of C's `isnan`,
+// `isinf`, `isfinite` or `signbit` macro names, or "" (#2680). Darwin expands
+// the macros to `__inline_<m>{f,d,l}`, clang and glibc to `__builtin_<m>`,
+// older glibc to `__<m>{,f,l}` (`__finite` for isfinite).
+fn ci_float_class_fn(name: &str) -> str:
+    for m in ["isnan", "isinf", "isfinite", "signbit"]:
+        if name == m: return m
+        for prefix in ["__inline_", "__builtin_", "__"]:
+            let stem = prefix ++ (if prefix == "__" and m == "isfinite": "finite" else: m)
+            if name == stem or name == stem ++ "f" or name == stem ++ "d" or name == stem ++ "l": return m
+    ""
+
 fn ci_libc_portable_callee(name: &str) -> str:
+    let float_class = ci_float_class_fn(name)
+    if float_class.len() > 0: return float_class
     if name == "__error" or name == "__errno_location" or name == "_errno": return "errno_ptr"
     if name == "_fileno": return "fileno"
     if name == "_isatty": return "isatty"
@@ -21702,6 +21722,14 @@ fn ci_builtin_bit_operand_type(name: &str) -> str:
 // call — Sema types it itself and an `extern fn` of the name yields to it
 // (SemaCheck math_extern_yields) — so it is never an unsafe operation (#1876).
 fn ci_is_libm_fn(name: &str) -> bool: math_fn_lookup(name) >= 0
+
+// C99 <math.h> functions std.libc binds by name (#2680): the ones outside
+// the builtin table, each with its `f` form.
+fn ci_is_libc_math_fn(name: &str) -> bool:
+    let base = if name.ends_with("f") and name != "modf": name.slice(0, name.len() - 1) else: name
+    base == "fma" or base == "fmin" or base == "fmax" or base == "fdim" or base == "nextafter" or base == "remainder" or
+        base == "ldexp" or base == "scalbn" or base == "frexp" or base == "modf" or base == "logb" or base == "ilogb" or
+        base == "llround" or base == "llrint" or base == "lround" or base == "lrint"
 
 fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "rlimit": return CI_LIBC_KIND_TYPE
@@ -21735,7 +21763,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint": return CI_LIBC_KIND_FN
     if name == "isgraph" or name == "ispunct" or name == "iscntrl": return CI_LIBC_KIND_FN
     if name == "tolower" or name == "toupper": return CI_LIBC_KIND_FN
-    if ci_is_libm_fn(name): return CI_LIBC_KIND_FN
+    if ci_is_libm_fn(name) or ci_is_libc_math_fn(name) or ci_float_class_fn(name).len() > 0: return CI_LIBC_KIND_FN
     if name == "abort" or name == "exit" or name == "clock" or name == "time" or name == "isatty": return CI_LIBC_KIND_FN
     if name == "__assert_rtn" or name == "__assert_fail" or name == "_assert": return CI_LIBC_KIND_FN
     if name == "mkstemp" or name == "realpath": return CI_LIBC_KIND_FN

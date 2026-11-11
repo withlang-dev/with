@@ -624,12 +624,17 @@ fn comp_path_separator() -> i32:
         return 59
     58
 
+// Which compiler "seed" names is an input of everything it builds (#2761):
+// the reads are recorded with the target, so a build store entry made by a
+// `with` found on PATH is not served to a run whose WITH names the pinned
+// seed. Unrecorded, the entry verified (its recorded compiler file was
+// unchanged) and the producer record named the wrong generation.
 fn comp_resolve_seed_compiler(ctx: &ActionCtx) -> str:
-    let explicit = env("WITH")
+    let explicit = ctx.env_input("WITH")
     if explicit.len() > 0:
         return explicit
     let fs = ctx.fs()
-    let path_env = env("PATH")
+    let path_env = ctx.env_input("PATH")
     if path_env.len() > 0:
         var start = 0
         for i in 0..path_env.len() + 1:
@@ -1456,7 +1461,10 @@ fn comp_libc_standard_externs() -> str:
     "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|remove|ungetc|fscanf|strcoll|strspn|strcspn|strpbrk|strncat|" ++
     "strcpy|strncpy|strrchr|strstr|strerror|atoi|strtol|strtoul|strtod|setlocale|" ++
     "strtoll|strtoull|strtof|" ++
-    "abort|exit|clock|time|rand|srand|qsort|rewind|putchar|strftime|mktime|"
+    "abort|exit|clock|time|rand|srand|qsort|rewind|putchar|strftime|mktime|" ++
+    // C99 <math.h> outside the §17.6a builtins (#2680).
+    "fma|fmaf|fmin|fminf|fmax|fmaxf|fdim|fdimf|nextafter|nextafterf|remainder|remainderf|ldexp|ldexpf|scalbn|scalbnf|" ++
+    "frexp|frexpf|modf|modff|logb|logbf|ilogb|ilogbf|llround|llroundf|llrint|llrintf|"
 
 /// The identifier at the start of `text` ("" when none).
 fn comp_ident_prefix(text: &str) -> str:

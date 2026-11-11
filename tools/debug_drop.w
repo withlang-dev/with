@@ -201,7 +201,7 @@ fn main:
             let started = now_ns()
             let run = run_under_debug_alloc(with_bin, fx, filter)
             let elapsed_ms = (now_ns() - started) / 1000000
-            let expects_abort = want.contains("DOUBLE FREE") or want.contains("first_drop=")
+            let expects_abort = want.contains("DOUBLE FREE") or want.contains("first_drop=") or want.contains("first free")
             let expected = expected_stdout_lines(source)
             let stdout_diff = if expected.len() > 0: stdout_mismatch(&expected, run.stdout) else: ""
             if want.len() > 0 and run.report.contains(want) and (expects_abort or run.rc == 0) and stdout_diff.len() == 0:

@@ -5563,6 +5563,29 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if run.rc != 0: return run.rc
     bs_assert_contains(ctx, run.stdout, "4 4294967295 3 44 5000000000 7 8 9 4 4", "D119 arrays: values survive")
 
+// #2680: C99 <math.h> outside the §17.6a builtins migrates through
+// std.libc, and the classification macros through its four functions
+// whatever the host header expands them to. #1153: a builtin (`sqrt`, `cos`)
+// is called as the builtin; the output declares no extern of its name.
+fn bs_check_migrate_c99_math(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "c99_math.c")
+    let out_w = bs_join(case_dir, "c99_math.w")
+    var rc = bs_write_fixture(ctx, src, "#include <math.h>\nstatic double zero = 0.0;\nint main(void) {\n  int e = 0;\n  double whole = 0.0;\n  double nan = zero / zero, inf = 1.0 / zero;\n  if (fma(2.0, 3.0, 1.0) != 7.0) return 1;\n  if (fmin(1.0, 4.0) + fmax(1.0, 4.0) + fdim(4.0, 1.0) != 8.0) return 2;\n  if (frexp(8.0, &e) != 0.5 || e != 4) return 3;\n  if (ldexp(1.0, 3) + scalbn(1.0, 3) != 16.0) return 4;\n  if (modf(3.25, &whole) != 0.25 || whole != 3.0) return 5;\n  if (nextafter(1.0, 2.0) <= 1.0 || remainder(5.0, 3.0) != -1.0 || logb(8.0) != 3.0) return 6;\n  if (ilogb(8.0) != 3) return 7;\n  if (lround(2.5) != 3 || llrint(2.5) != 2) return 8;\n  if (!isnan(nan) || isnan(1.0) || !isinf(-inf) || isinf(nan) || !isfinite(1.0) || isfinite(inf)) return 9;\n  if (!signbit(-0.0) || signbit(0.0)) return 10;\n  if (fmaf(2.0f, 3.0f, 1.0f) != 7.0f || sqrt(16.0) != 4.0 || cos(0.0) != 1.0) return 11;\n  return 0;\n}\n", "migrate c99 math")
+    if rc != 0: return rc
+    let args = ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)]
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-c99-math", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "fma((2.0 as f64), (3.0 as f64), (1.0 as f64))", "c99 math: fma by name")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "extern fn sqrt", "c99 math: a builtin is not declared extern")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "extern fn cos", "c99 math: a builtin is not declared extern")
+    if rc != 0: return rc
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-c99-math", ["run", bs_abs(root, out_w)])
+    run.rc
+
 fn bs_check_migrate_offsetof(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "offsetof.c")
@@ -6722,6 +6745,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_rvalue_sequencing(ctx, compiler_path, bs_join(output_dir, "rvalue_sequencing"))
     if rc != 0: return rc
     rc = bs_check_migrate_offsetof(ctx, compiler_path, bs_join(output_dir, "offsetof"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_c99_math(ctx, compiler_path, bs_join(output_dir, "c99_math"))
     if rc != 0: return rc
     rc = bs_check_migrate_d119_arrays(ctx, compiler_path, bs_join(output_dir, "d119_arrays"))
     if rc != 0: return rc
@@ -10965,6 +10990,12 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_global_init", "global `LIMITS` is read by `limit_x`, but its initializer does not fold to data (`side()` is not a compile-time value)")
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_drop", "type Res: has a drop method")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_var_droppable", "no body rebinds it, so spell it `let` (`pub let TABLE: List[i32]`)")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_var_rebound", "it is rebound at ")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_var_rebound", "wi_refuse_var_rebound.w:6, so it cannot be a `let`")
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_const", "const ORIGIN: constant does not fold to a literal")
     if rc != 0: return rc

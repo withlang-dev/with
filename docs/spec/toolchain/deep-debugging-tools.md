@@ -84,8 +84,10 @@ and the runtime, so lldb on the *program* resolves `rt_core.w` lines
    put unconditional breakpoints on
    `rt_alloc`/`rt_free` with backtraces — that is thousands of stops and
    times out on a four-test fixture.
-5. **Resolve the first free and every touch of the block** with the
-   allocator's own trap. **Run it under lldb**: outside lldb macOS
+5. **Resolve the first free and every touch of the block.** On Darwin the
+   `DOUBLE FREE` report already names both free sites, and a `LEAK` line
+   its allocation site (#1014): read them first. For every other touch, and
+   on the other hosts, use the allocator's own trap. **Run it under lldb**: outside lldb macOS
    randomizes the heap, so the address changes every run and a trap set
    from an earlier run never hits. Under lldb (ASLR off) the address is the
    same run to run, with or without `WITH_DEBUG_ALLOC`:

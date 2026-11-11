@@ -784,23 +784,6 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn iscntrl(c: i32) -> i32\n"
     p = p ++ "extern fn tolower(c: i32) -> i32\n"
     p = p ++ "extern fn toupper(c: i32) -> i32\n"
-    p = p ++ "extern fn sqrt(x: f64) -> f64\n"
-    p = p ++ "extern fn pow(base: f64, exp: f64) -> f64\n"
-    p = p ++ "extern fn floor(x: f64) -> f64\n"
-    p = p ++ "extern fn ceil(x: f64) -> f64\n"
-    p = p ++ "extern fn round(x: f64) -> f64\n"
-    p = p ++ "extern fn sin(x: f64) -> f64\n"
-    p = p ++ "extern fn cos(x: f64) -> f64\n"
-    p = p ++ "extern fn tan(x: f64) -> f64\n"
-    p = p ++ "extern fn log(x: f64) -> f64\n"
-    p = p ++ "extern fn log10(x: f64) -> f64\n"
-    p = p ++ "extern fn exp(x: f64) -> f64\n"
-    p = p ++ "extern fn fabs(x: f64) -> f64\n"
-    p = p ++ "extern fn fmod(x: f64, y: f64) -> f64\n"
-    p = p ++ "extern fn asin(x: f64) -> f64\n"
-    p = p ++ "extern fn acos(x: f64) -> f64\n"
-    p = p ++ "extern fn atan(x: f64) -> f64\n"
-    p = p ++ "extern fn atan2(y: f64, x: f64) -> f64\n"
     // c_void comes from the prelude's builtins; re-declaring it here would
     // shadow the foundation module out of the program (#750).
     //

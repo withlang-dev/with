@@ -423,6 +423,26 @@ pub fn rt_backtrace_print():
     rt_write(2, header as *const u8, header.len())
     backtrace_symbols_fd(&raw mut frames as *mut [64]*mut u8 as *mut *mut u8, n, 2)
 
+// #1014: the calling chain's return addresses, innermost first, for a
+// caller that keeps them (the debug allocator stores a block's first free).
+// Nothing off the thread's own stack: a fiber's or a generator's stack ends
+// where it began, with no caller the unwinder can read, and walking one
+// crashed every task that allocated (exit 139).
+extern fn pthread_self() -> i64
+extern fn pthread_get_stackaddr_np(thread: i64) -> i64
+extern fn pthread_get_stacksize_np(thread: i64) -> u64
+
+pub fn rt_backtrace_capture(buf: *mut i64, cap: i32) -> i32:
+    var probe: i64 = 0
+    let here = &raw const probe as i64
+    let thread = pthread_self()
+    let top = pthread_get_stackaddr_np(thread)
+    if here > top or here < top - pthread_get_stacksize_np(thread) as i64: return 0
+    backtrace(buf as *mut *mut u8, cap)
+
+pub fn rt_backtrace_print_frames(buf: *const i64, n: i32):
+    if n > 0: backtrace_symbols_fd(buf as *mut *mut u8, n, 2)
+
 pub fn rt_getpid() -> i32:
     rt_libc_getpid()
 
@@ -1724,6 +1744,11 @@ c facade libsystem:
     fn backtrace
         preserves domain environ
         preserves domain locale
+    // #1014: the thread's stack bounds. No domain is claimed preserved:
+    // the two `_np` calls are not POSIX.
+    fn pthread_self
+    fn pthread_get_stackaddr_np
+    fn pthread_get_stacksize_np
     fn backtrace_symbols_fd
         preserves domain environ
         preserves domain locale
