@@ -74,6 +74,7 @@ impl Zcu:
         if result != 0:
             self.last_sema = cg.take_sema()
             runtime_eprint(codegen_failure_message("error: code generation failed", cg.codegen_error_detail))
+            cg.deinit()
             return 1
         if do_profile:
             let codegen_ns = runtime_clock_nanos() - t_codegen
@@ -88,6 +89,11 @@ impl Zcu:
         let t_emit = runtime_clock_nanos()
         let emit_result = cg.emit_object_file(output_path)
         self.last_sema = cg.take_sema()
+        // #1027: the single-unit path never disposed its Codegen's LLVM
+        // resources (the debug-info builder, the module, the context, the
+        // target machine); only the per-unit path did. `leaks` named the
+        // builder: ROOT LEAK: <malloc in LLVMCreateDIBuilder>.
+        cg.deinit()
         if emit_result != 0:
             runtime_eprint("error: failed to emit object file")
             return 1
