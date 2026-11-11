@@ -407,7 +407,7 @@ unsafe fn point_to_affine(x_out: *mut u8, y_out: *mut u8, pt: *const u32, p: *co
     i31_encode(x_out, field_bytes, axp as *const u32)
     i31_encode(y_out, field_bytes, ayp as *const u32)
 
-// ── Public API ─────────────────────────────────────────────────────
+// ── Package API (std.tls and std.crypto.ecdsa call these; a program reaches P-256 through std.tls) ──
 
 // Compute public key from private key on the curve whose constants are
 // loaded: Q = k * G. private_key is `width` bytes (big-endian scalar);
@@ -544,3 +544,19 @@ unsafe fn p384_load_gy(dst: *mut u32, p: *const u32):
         0x7Au8, 0x43u8, 0x1Du8, 0x7Cu8, 0x90u8, 0xEAu8, 0x0Eu8, 0x5Fu8,
     ]
     i31_decode_reduce(dst, &gy_bytes[0] as *const u8, 48, p)
+
+// Known answer (#1055): the public key of the private key 1 is the base
+// point G (SEC 2, secp256r1). 0 on pass; 1 when the encoding is not
+// uncompressed, 2 when x diverges, 3 when y does.
+pub fn p256_public_kat() -> i32:
+    var private_key: [u8; 32] = [0u8; 32]
+    private_key[31] = 1
+    var public_key: [u8; 65] = [0u8; 65]
+    let gx: [u8; 32] = [0x6Bu8, 0x17u8, 0xD1u8, 0xF2u8, 0xE1u8, 0x2Cu8, 0x42u8, 0x47u8, 0xF8u8, 0xBCu8, 0xE6u8, 0xE5u8, 0x63u8, 0xA4u8, 0x40u8, 0xF2u8, 0x77u8, 0x03u8, 0x7Du8, 0x81u8, 0x2Du8, 0xEBu8, 0x33u8, 0xA0u8, 0xF4u8, 0xA1u8, 0x39u8, 0x45u8, 0xD8u8, 0x98u8, 0xC2u8, 0x96u8]
+    let gy: [u8; 32] = [0x4Fu8, 0xE3u8, 0x42u8, 0xE2u8, 0xFEu8, 0x1Au8, 0x7Fu8, 0x9Bu8, 0x8Eu8, 0xE7u8, 0xEBu8, 0x4Au8, 0x7Cu8, 0x0Fu8, 0x9Eu8, 0x16u8, 0x2Bu8, 0xCEu8, 0x33u8, 0x57u8, 0x6Bu8, 0x31u8, 0x5Eu8, 0xCEu8, 0xCBu8, 0xB6u8, 0x40u8, 0x68u8, 0x37u8, 0xBFu8, 0x51u8, 0xF5u8]
+    unsafe { p256_compute_public(&raw const private_key[0] as *const u8, &raw mut public_key[0] as *mut u8) }
+    if public_key[0] != 4: return 1
+    for i in 0..32:
+        if public_key[1 + i] != gx[i]: return 2
+        if public_key[33 + i] != gy[i]: return 3
+    0

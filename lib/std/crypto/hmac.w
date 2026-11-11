@@ -72,3 +72,11 @@ fn hmac_sha256_str(key: str, data: str, out: *mut u8):
         hmac_sha256(key_bytes as *const u8, key.len() as i32, data_bytes as *const u8, data.len() as i32, out)
         str_free_bytes(data_bytes)
         str_free_bytes(key_bytes)
+
+// Known answer (#1053): RFC 4231 test case 2, HMAC-SHA256 of "what do ya
+// want for nothing?" under the key "Jefe". 0 on pass.
+pub fn hmac_sha256_kat() -> i32:
+    var mac: [u8; 32] = [0u8; 32]
+    hmac_sha256_str("Jefe", "what do ya want for nothing?", &raw mut mac[0] as *mut u8)
+    if sha256_hex(&raw const mac[0] as *const u8) != "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843": return 1
+    0
