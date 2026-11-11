@@ -8,10 +8,14 @@ is absent, where it may come from, and what the compiler checks of it.
 
 Two checks have not been done and are owed before blessing:
 
-- **Grammar against the parser.** Section 5 was drawn from `Parser.w`
-  (`parse_c_facade`, the clause parser, the variadic case parser) and
-  §16.2b's examples on main at 36ced4302. It has not been checked production
-  by production.
+- **Grammar against the parser.** Section 5 was read against `Parser.w`
+  production by production on 2026-11-11 (the item parser, the clause
+  parser, the variadic case parser, the convention rule parser, on main at
+  e33c3932a) and corrected: a `len` buffer is never `inout` and a `capacity`
+  buffer always is; `preinit` takes `(self)` as `init` does; a borrow from
+  two parameters names exactly two. What has not been done is the converse:
+  a fixture that writes every production and is accepted by the compiler.
+  That fixture belongs in the keyword stack, born with the new spelling.
 - **Rows against §16.2b.** Each row of section 8 cites the subsection that
   owns its rule. Where a row and §16.2b disagree, §16.2b is right and the
   row is a defect in this draft.
@@ -134,7 +138,7 @@ resource_clause = production | destruction | status | dependency
                 | capability | domain_use | presentation
 production      = "from" c_name [ "(" "out" param_ref ")" ] [ "," field_check ]
                 | "init" c_name [ "(" "self" ")" ]
-                | "preinit" c_name
+                | "preinit" c_name [ "(" "self" ")" ]
 field_check     = ( "nullable" | "nonnull" ) "field" field_path
 destruction     = "drop" c_name | "destroys" c_name | "abandon" c_name
 status          = "ok" CONST { "," CONST } | "message" c_name
@@ -154,14 +158,14 @@ effect          = "lend" | "destroys"
                 | "nullable" param_ref
 return_clause   = "returns" "borrow" TypeName "from" origin
                 | "returns" "static" type
-origin          = param_ref | "params" param_list
+origin          = param_ref | "params" ref "," ref
                 | "parent" TypeName "of" param_ref
                 | "domain" name
 origin_clause   = "preserves" param_ref | "preserves" "domain" name
 text_clause     = "text" param_ref
                 | "text" "return" "," "owned" "," "freed" "by" c_name
                 | "text" "return" "bytes"
-buffer_clause   = "buffer" param_ref ( "len" | "capacity" ) param_ref [ "inout" ] [ "elements" ]
+buffer_clause   = "buffer" param_ref ( "len" param_ref | "capacity" param_ref "inout" ) [ "elements" ]
 callback_clause = "callback" "consumes" param_ref
                 | "callback" param_ref "userdata" param_ref
                 | "callback" param_ref "argv" param_ref "paired" "with" "argc" param_ref "as" type
@@ -178,7 +182,7 @@ domain_clause   = "establishes" "domain" name | "ends" "domain" name | "requires
 presentation    = "of" TypeName | "rename" name | param_ref "fixed" literal
 
 param_ref       = "param" ( name | INTEGER | "type" type )
-param_list      = INTEGER { "," INTEGER }
+ref             = name | INTEGER
 field_path      = name { "." name }
 literal         = [ "-" ] INTEGER | "null" | "true" | "false"
 
@@ -375,7 +379,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `text param p` | `p` is input text read to its NUL and not kept. | G | bytes | §16.2b.8 |
 | `text return, owned, freed by f` | the result is new text the caller owns, released with `f`. | G | raw | §16.2b.8 |
 | `text return bytes` | under `text utf8`, this result stays bytes. | R | | §16.2b.8 |
-| `buffer param b len param n` | `b` and `n` are one slice; `capacity`, `inout`, `elements` state the count's meaning. Never inferred from the C types. | G | two unrelated parameters; the pointer is raw | §16.2b.8 |
+| `buffer param b len param n` | `b` and `n` are one input slice C only reads. `capacity param n inout`: one writable slice whose length C writes back. `elements`: the count is in elements, not bytes. Never inferred from the C types. | G | two unrelated parameters; the pointer is raw | §16.2b.8 |
 | `callback param c userdata param u` | `c` is called with `u`; a With closure is passed as the pair. | G | raw | §16.2b.9 |
 | `callback consumes param p` | the callback takes ownership of `p`. | G | | §16.2b.9 |
 | `callback param c argv param a paired with argc param n as &[H]` | the callback's vector is a slice of handles. | G | | §16.2b.9 |
