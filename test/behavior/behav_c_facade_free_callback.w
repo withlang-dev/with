@@ -9,7 +9,7 @@ static inline int maybe_apply(visit_fn visit, void *ctx) { return visit ? visit(
 static inline void apply_void(visit_fn visit, void *ctx) { visit(ctx, 7); }
 ")
 
-c facade calls:
+c contract calls:
     fn apply
         callback param 0 userdata param 1
     fn apply_reverse

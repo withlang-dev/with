@@ -10,7 +10,7 @@ db* db_new(int flags);
 void db_close(db* d);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close

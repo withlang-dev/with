@@ -10,7 +10,7 @@ extern fn rt_libc_chdir(path: *const u8) -> i32
 @[link_name("cwd_text")]
 extern fn rt_libc_cwd_text() -> *const u8
 
-c facade libc:
+c contract libc:
     domain errno thread
     domain environ process
     domain locale process

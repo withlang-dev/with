@@ -8,12 +8,12 @@
 
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     domain errno thread
     fn strerror
         returns borrow CStr from domain errno
 
-c facade checks:
+c contract checks:
     domain errno thread
     fn note_fail
         lend

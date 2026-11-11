@@ -24,7 +24,7 @@ static inline void db_close(db *d) { free(d); }
 static inline const db_status *db_last(db *d) { return &d->last; }
 ")
 
-c facade dbs:
+c contract dbs:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

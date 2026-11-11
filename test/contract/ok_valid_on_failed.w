@@ -18,7 +18,7 @@ int sqlite3_close(sqlite3 *db);
 const char *sqlite3_errmsg(sqlite3 *db);
 ")
 
-c facade sqlite:
+c contract sqlite:
     resource Database wraps *mut sqlite3
         from sqlite3_open(out param ppDb)
         drop sqlite3_close

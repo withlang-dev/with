@@ -4,7 +4,7 @@
 // foreign string; nothing else is ruled to carry it.
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     fn note_version
         returns static i32
 

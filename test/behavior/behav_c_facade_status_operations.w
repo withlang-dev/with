@@ -23,7 +23,7 @@
 //     own fixed arguments and its own error type.
 use c_import("c_facade_status_ops.h")
 
-c facade dbs:
+c contract dbs:
     resource Database wraps *mut db
         from db_new
         drop db_close

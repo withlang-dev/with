@@ -6,7 +6,7 @@
 
 use c_import("typedef struct db db;\nint db_register(db* d, void* app, void (*destroy)(int), int flags);\n")
 
-c facade dbl:
+c contract dbl:
     fn db_register
         consumes param 1 destroyed_by param 2
 

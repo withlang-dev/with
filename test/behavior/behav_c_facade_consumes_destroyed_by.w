@@ -9,7 +9,7 @@
 // destroy call, then the drop, each once).
 use c_import("c_facade_callbacks.h")
 
-c facade dbc:
+c contract dbc:
     resource Database wraps *mut db
         from db_new
         drop db_close

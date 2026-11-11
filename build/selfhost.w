@@ -4484,11 +4484,11 @@ fn bs_check_migrate_unity_include_is_one_definition(ctx: &ActionCtx, compiler_pa
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(lib_dir, "example_b.c"), "#include \"unity.h\"\nint main(void) { return item_count; }\n", "unity example b")
     if rc != 0: return rc
-    let draft = bs_join(case_dir, "unity_facade.w")
+    let draft = bs_join(case_dir, "unity_contract.w")
     var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, lib_dir))
-    args |> push("--facade")
+    args |> push("--contract")
     args |> push("unity")
     args |> push("-o")
     args |> push(bs_abs(root, draft))
@@ -4570,12 +4570,12 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     // introspection file. `pool` has two unary destroyers and no file
     // names one; `pool_fetch`, `pool_peek` and `pool_size` have no body;
     // `pool_push` retains a parameter the registry says it takes.
-    let facts = "// mini 1.0: what neither the bodies nor Mini-1.0.gir settle.\nc facade mini:\n    text utf8    // mini.h: every string the library hands back is UTF-8\n    resource Pool wraps *mut pool\n        drop pool_free    // mini.h: pool_free releases the pool; pool_drop is its alias\n        from pool_fetch    // pool.c (not in this package): returns a pool the caller owns\n    fn pool_push\n        consumes param 1    // pool.c: the node is linked into the pool, which frees it\n    fn pool_peek\n        returns borrow Node from param 0    // pool.c: returns p->top\n    fn pool_size\n        lend    // pool.c: counts the nodes, stores nothing\n    fn doc_open\n        nullable param 0    // doc.c: a NULL path opens an empty document\n    fn node_text\n        text return, owned, freed by lib_free    // node.c: returns a string from malloc, released with lib_free\n    fn node_named\n        text param 1    // node.c: reads name up to its NUL, stores nothing\n"
+    let facts = "// mini 1.0: what neither the bodies nor Mini-1.0.gir settle.\nc contract mini:\n    text utf8    // mini.h: every string the library hands back is UTF-8\n    resource Pool wraps *mut pool\n        drop pool_free    // mini.h: pool_free releases the pool; pool_drop is its alias\n        from pool_fetch    // pool.c (not in this package): returns a pool the caller owns\n    fn pool_push\n        consumes param 1    // pool.c: the node is linked into the pool, which frees it\n    fn pool_peek\n        returns borrow Node from param 0    // pool.c: returns p->top\n    fn pool_size\n        lend    // pool.c: counts the nodes, stores nothing\n    fn doc_open\n        nullable param 0    // doc.c: a NULL path opens an empty document\n    fn node_text\n        text return, owned, freed by lib_free    // node.c: returns a string from malloc, released with lib_free\n    fn node_named\n        text param 1    // node.c: reads name up to its NUL, stores nothing\n"
     rc = bs_write_fixture(ctx, bs_join(case_dir, "facts.w"), facts, "facade by evidence registry facts")
     if rc != 0: return rc
     // A fact without its citation is refused: the review rule the tool
     // enforces.
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "bad_facts.w"), "c facade mini:\n    resource Pool wraps *mut pool\n        drop pool_free\n", "facade by evidence uncited fact")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "bad_facts.w"), "c contract mini:\n    resource Pool wraps *mut pool\n        drop pool_free\n", "facade by evidence uncited fact")
     if rc != 0: return rc
     // D121 step 3, the introspection half: `item` has two unary destroyers
     // and the file names one; `buf_fetch` and `doc_last` have no body in
@@ -4591,11 +4591,11 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     let doc_c = "#include \"mini.h\"\nstatic struct doc *g_doc;\nstatic struct doc *alloc_doc(void) { return malloc(sizeof(struct doc)); }\nstruct doc *doc_new(void) { struct doc *d = alloc_doc(); if (d == NULL) return NULL; memset(d, 0, sizeof *d); return d; }\nstruct doc *doc_open(const char *path) { (void)path; return doc_new(); }\nstruct node *doc_root(struct doc *d) { return d->root; }\nstruct node *doc_first(struct doc *d) { return doc_root(d); }\nvoid doc_free(struct doc *d) { struct node *n = d->root; while (n) { struct node *next = n->next; node_free(n); n = next; } free(d); }\nvoid doc_discard(struct doc *d, int why) { (void)why; doc_free(d); }\nvoid doc_keep(struct doc *d) { g_doc = d; }\nstruct node *doc_add(struct doc *d, struct node *n) { n->next = d->root; d->root = n; return n; }\nstruct node *doc_pick(struct doc *d, int i) { return i ? d->root : node_new(); }\nint doc_count(struct doc *d) { return d->n; }\nvoid doc_adopt(struct doc *d, struct node *n) { n->next = d->root; d->root = n; }\nstruct node *doc_first_live(struct doc *d) { struct node *cur = d->root; while (cur != NULL) { if (cur->v) return cur; cur = cur->next; } return cur; }\n"
     rc = bs_write_fixture(ctx, bs_join(lib_dir, "doc.c"), doc_c, "facade by evidence doc unit")
     if rc != 0: return rc
-    let draft = bs_join(case_dir, "mini_facade.w")
+    let draft = bs_join(case_dir, "mini_contract.w")
     var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, lib_dir))
-    args |> push("--facade")
+    args |> push("--contract")
     args |> push("mini")
     args |> push("--facts")
     args |> push(bs_abs(root, bs_join(case_dir, "facts.w")))
@@ -4606,7 +4606,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     var bad_args: List[str] = List.new()
     bad_args |> push("migrate")
     bad_args |> push(bs_abs(root, lib_dir))
-    bad_args |> push("--facade")
+    bad_args |> push("--contract")
     bad_args |> push("mini")
     bad_args |> push("--facts")
     bad_args |> push(bs_abs(root, bs_join(case_dir, "bad_facts.w")))
@@ -4671,7 +4671,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     // parameter it started from; the registry's presentation facts
     // (nullable, text param, text return) join the item's block, and a
     // producer's get a block of their own.
-    rc = bs_file_contains(ctx, draft, "c facade mini:\n    text utf8    // registry: mini.h: every string the library hands back is UTF-8\n", "facade draft: the facade-level UTF-8 declaration the registry states")
+    rc = bs_file_contains(ctx, draft, "c contract mini:\n    text utf8    // registry: mini.h: every string the library hands back is UTF-8\n", "facade draft: the facade-level UTF-8 declaration the registry states")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, draft, "fn doc_first_live\n        returns borrow Node from param 0    // proof: returns cur\n", "facade draft: a borrow through a list walk")
     if rc != 0: return rc
@@ -4718,9 +4718,9 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-facade-by-evidence", check_args)
     if checked.rc != 0: return checked.rc
     // D121 step 5: the facade `with get` writes lives at
-    // `.with/deps/c/<name>/<version>/facade.w`, and `use facades.<name>`
+    // `.with/deps/c/<name>/<version>/contract.w`, and `use contracts.<name>`
     // reaches it when the project has no facade of that name of its own
-    // (src/Resolve.w). A `c facade <name>:` block in the project's source
+    // (src/Resolve.w). A `c contract <name>:` block in the project's source
     // overrides any single item of it (here the resource, with another
     // drop) and the rest of the written block stays (`pool_size`).
     let proj = bs_join(case_dir, "fetched")
@@ -4731,14 +4731,14 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(dep, "include/mini.h"), header, "fetched facade header")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(dep, "facade.w"), "use c_import(\"mini.h\")\n\n" ++ text, "fetched facade")
+    rc = bs_write_fixture(ctx, bs_join(dep, "contract.w"), "use c_import(\"mini.h\")\n\n" ++ text, "fetched facade")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(proj, "src/override.w"), "use facades.mini\nuse c_import(\"mini.h\")\n\nc facade mini:\n    resource Pool wraps *mut pool\n        from pool_new\n        drop pool_drop\n", "fetched facade override")
+    rc = bs_write_fixture(ctx, bs_join(proj, "src/override.w"), "use contracts.mini\nuse c_import(\"mini.h\")\n\nc contract mini:\n    resource Pool wraps *mut pool\n        from pool_new\n        drop pool_drop\n", "fetched facade override")
     if rc != 0: return rc
     // D121 step 6: the registry's shape facts render — a nullable C string
     // takes `Option[&str]`, a text parameter a `str`, and a text return is
     // released through the global holding the free function (`lib_free`).
-    rc = bs_write_fixture(ctx, bs_join(proj, "src/main.w"), "use facades.mini\nuse override\n\nfn main:\n    let Some(p) = Pool.new() else:\n        return 7\n    print(p.size())\n    let Some(d) = Doc.open(None) else:\n        return 8\n    if let Some(n) = d.first_live():\n        print(n.named(\"a\"))\n        let t = n.text()\n        print(t.is_none())\n", "fetched facade program")
+    rc = bs_write_fixture(ctx, bs_join(proj, "src/main.w"), "use contracts.mini\nuse override\n\nfn main:\n    let Some(p) = Pool.new() else:\n        return 7\n    print(p.size())\n    let Some(d) = Doc.open(None) else:\n        return 8\n    if let Some(n) = d.first_live():\n        print(n.named(\"a\"))\n        let t = n.text()\n        print(t.is_none())\n", "fetched facade program")
     if rc != 0: return rc
     var fetched_args: List[str] = List.new()
     fetched_args |> push("check")

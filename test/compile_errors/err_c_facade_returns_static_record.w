@@ -5,7 +5,7 @@
 // domain locale`), never `returns static lconv`.
 use c_import("../behavior/c_facade_record.h")
 
-c facade records:
+c contract records:
     fn localeconv
         returns static lconv
 

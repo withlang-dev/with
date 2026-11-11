@@ -5,7 +5,7 @@
 // pointer contracts (retention, a callback with its userdata) are #1652.
 use c_import("long ulimit(int cmd, ...);\n#define UL_GETFSIZE 1\n#define UL_SETFSIZE 2\n")
 
-c facade limits:
+c contract limits:
     fn ulimit
         variadic param 1 selected by param cmd:
             case UL_SETFSIZE: *mut c_long

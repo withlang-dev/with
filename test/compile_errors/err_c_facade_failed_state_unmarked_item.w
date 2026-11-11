@@ -16,7 +16,7 @@ int db_count(db* d);
 const char *db_errmsg(db* d);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

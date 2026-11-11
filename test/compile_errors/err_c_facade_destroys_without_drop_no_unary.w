@@ -6,7 +6,7 @@
 
 use c_import("typedef struct db db;\ndb* db_new(int id);\nint db_close_v2(db* d, int how);\nint db_close_v3(db* d, int how, int why);\n")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         destroys db_close_v2

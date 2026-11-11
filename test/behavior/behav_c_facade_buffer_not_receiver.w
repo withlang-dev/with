@@ -11,7 +11,7 @@
 
 use c_import("#define FILL_OK 0\nchar *strdup(const char *s);\nvoid free(void *p);\nstatic inline void fill_void(char *dst, unsigned int *dstLen) { unsigned int n = 4; if (*dstLen < 4) n = *dstLen; unsigned int i = 0; while (i < n) { dst[i] = 'x'; i++; } *dstLen = n; }\nstatic inline int fill3(char *dst, unsigned int *dstLen) { if (*dstLen < 3) return 1; dst[0] = 1; dst[1] = 2; dst[2] = 3; *dstLen = 3; return FILL_OK; }\n")
 
-c facade fills:
+c contract fills:
     fn fill_void
         buffer param dst capacity param dstLen inout
     fn fill3

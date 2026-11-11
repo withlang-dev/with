@@ -11,7 +11,7 @@ int z_init(z_stream* s, int level);
 void z_end(z_stream* s);
 ")
 
-c facade zl:
+c contract zl:
     resource Stream wraps z_stream
         preinit z_storage
         init z_init(self)

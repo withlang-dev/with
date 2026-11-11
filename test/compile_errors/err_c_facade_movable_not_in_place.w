@@ -9,7 +9,7 @@ db* db_new(int flags);
 void db_close(db* d);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         movable
         from db_new

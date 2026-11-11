@@ -6,7 +6,7 @@
 // invalidates every view of the document, the root in hand included.
 use c_import("../behavior/d122_tree.h")
 
-c facade x:
+c contract x:
     resource Document wraps *mut xdoc
         from xdoc_parse
         drop xdoc_free

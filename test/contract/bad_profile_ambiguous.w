@@ -12,7 +12,7 @@
 
 use c_import("typedef struct obj obj;\nvoid obj_unref(obj *o);\nvoid obj_later_unref(obj *o);\nint obj_get_dispose(obj *o);\n")
 
-c facade objs:
+c contract objs:
     use convention gobject.v1
     resource Object wraps *mut obj
 

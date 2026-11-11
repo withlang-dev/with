@@ -14,7 +14,7 @@
 // are err_d122_child_outlives_document and err_d122_walk_invalidates_siblings.
 use c_import("d122_tree.h")
 
-c facade x:
+c contract x:
     resource Document wraps *mut xdoc
         from xdoc_parse
         drop xdoc_free

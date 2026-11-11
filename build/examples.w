@@ -105,12 +105,12 @@ fn ex_dirname(path: &str) -> str:
 /// a stale contract.
 fn ex_facade_copies() -> List[str]:
     var out = List.new()
-    out.push("examples/c-interop/src/facades/sqlite3.w")
+    out.push("examples/c-interop/src/contracts/sqlite3.w")
     out
 
 /// The toolchain file a copy is taken from.
 fn ex_facade_original(path: &str) -> str:
-    if path == "examples/c-interop/src/facades/sqlite3.w": return "lib/facades/sqlite3.w"
+    if path == "examples/c-interop/src/contracts/sqlite3.w": return "lib/contracts/sqlite3.w"
     ""
 
 fn ex_facade_marker() -> str: "// ── verbatim: "

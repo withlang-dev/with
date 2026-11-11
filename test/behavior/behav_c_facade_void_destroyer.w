@@ -23,7 +23,7 @@ static inline int release_how(void* p, int how) { ((db*)p)->closed++; return how
 static inline int db_closed(const db* d) { return d->closed; }
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop release

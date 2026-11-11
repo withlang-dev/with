@@ -17,7 +17,7 @@
 //! expect-stdout: close_v2: 0
 //! expect-stdout: ok
 
-// D51 stage 12 (ruling §66): the SQLite facade (lib/facades/sqlite3.w),
+// D51 stage 12 (ruling §66): the SQLite facade (lib/contracts/sqlite3.w),
 // against the real library, end to end — every item of §66 in one program
 // that an application would write: no `unsafe`, no raw pointer. Open
 // (out-parameter production, `ok SQLITE_OK`), exec with a callback and
@@ -34,7 +34,7 @@
 // and 2), a failed open that still produced a handle (`FailedWithDatabase`,
 // closed when the error is dropped), and close_v2 as the explicit
 // destroyer.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 type Ctx { tag: i32 }

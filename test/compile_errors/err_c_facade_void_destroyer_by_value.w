@@ -5,7 +5,7 @@
 
 use c_import("int fd_new(int id);\nvoid release(void* p);\n")
 
-c facade fds:
+c contract fds:
     resource Fd wraps c_int
         from fd_new
         drop release

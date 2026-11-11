@@ -2,7 +2,7 @@
 
 Two C libraries used from With: one the system provides (SQLite) and one
 vendored as source (`vendor/tally.c`). The application uses both without
-`unsafe`. The C contracts live in *facades* (`src/facades/`), ordinary With
+`unsafe`. The C contracts live in *facades* (`src/contracts/`), ordinary With
 source that states what a header cannot: which call produces a resource,
 which one gives it back, what a returned pointer borrows from.
 
@@ -13,7 +13,7 @@ with build :test  # 13 tests over the real libraries
 
 ## What each file shows
 
-**`src/facades/sqlite3.w` — the facade, and `src/main.w` — the program**
+**`src/contracts/sqlite3.w` — the facade, and `src/main.w` — the program**
 
 - `use c_import("sqlite3.h", link: "sqlite3")` brings in SQLite's functions,
   its handle types and its `#define` constants. The facade names the handle
@@ -25,7 +25,7 @@ with build :test  # 13 tests over the real libraries
   Every clause quotes the SQLite sentence it relies on.
 - From those facts the compiler renders the safe surface. `Database.open`
   returns `Result[Database, SqliteError]`, the one error the facade states
-  for the library (`c facade sqlite error SqliteError`); `db.exec`, `db.prepare`,
+  for the library (`c contract sqlite error SqliteError`); `db.exec`, `db.prepare`,
   `stmt.step`, `stmt.bind_int`, `stmt.column_int`, `stmt.column_text` are
   the C functions, presented as methods. Each one whose return is a status
   is a `Result`, so the program is written with `?`: `db.exec(sql)?`,
@@ -42,9 +42,9 @@ with build :test  # 13 tests over the real libraries
   returned and SQLite's message for it, copied from the connection before
   the next call replaces it.
 - The facade is the project's own copy of the With repository's
-  `lib/facades/sqlite3.w`, until the `c.sqlite3` package ships it.
+  `lib/contracts/sqlite3.w`, until the `c.sqlite3` package ships it.
 
-**`src/facades/tally.w`, `src/tally.w` and `vendor/tally.{h,c}` — a vendored
+**`src/contracts/tally.w`, `src/tally.w` and `vendor/tally.{h,c}` — a vendored
 library, both directions**
 
 - `build.w` compiles `vendor/tally.c` and archives it. The With compiler

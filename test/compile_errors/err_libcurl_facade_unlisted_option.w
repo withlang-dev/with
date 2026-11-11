@@ -6,7 +6,7 @@
 // userdata half of the read callback, which this facade does not pair
 // (the write pair is, §16.2b.9); its raw call stays
 // available under unsafe.
-use facades.libcurl
+use contracts.libcurl
 use c_import("curl/curl.h", link: "curl")
 
 fn main:

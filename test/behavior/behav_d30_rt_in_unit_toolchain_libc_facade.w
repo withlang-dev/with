@@ -3,7 +3,7 @@
 
 // D30: compiled in-unit, the runtime's own `libc` facade blocks are in the
 // program's pool, but they are not the program's facades: the toolchain
-// libc facade keeps every name it renders, `domain environ` included. Taken
+// libc contract keeps every name it renders, `domain environ` included. Taken
 // as claims, they removed the domain from its text while its getenv row
 // named it, and every program using getenv failed ("unknown domain
 // 'environ'"). The lane twin of behav_c_facade_getenv_twice.

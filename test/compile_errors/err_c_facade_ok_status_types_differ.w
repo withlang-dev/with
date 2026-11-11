@@ -11,7 +11,7 @@ long long db_open_ex(const char* path, db** out);
 void db_close(db* d);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_open(out param 1)
         from db_open_ex(out param 1)

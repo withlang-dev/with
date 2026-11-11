@@ -8,7 +8,7 @@
 // no preservation on step, and a column text view read after the next
 // step is refused where it is used. column_bytes, which preserves, is fine
 // in between (behav_sqlite_facade_end_to_end).
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:

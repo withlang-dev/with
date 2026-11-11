@@ -16,7 +16,7 @@ type FailedDatabase {
     reason: str,
 }
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

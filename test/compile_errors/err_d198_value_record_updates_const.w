@@ -2,7 +2,7 @@
 // D198 (§16.2b.5): `updates` and `fills` need a pointer the callee may write through.
 use c_import("typedef struct { int w; int h; } Size; static inline int area(const Size *s) { return s->w * s->h; }")
 
-c facade shapes:
+c contract shapes:
     fn area
         updates param s
 

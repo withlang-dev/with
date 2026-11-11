@@ -11,7 +11,7 @@ extern fn rt_libc_setlocale(category: i32, locale: *const u8) -> *mut u8
 extern fn rt_helper(x: i32) -> i32
 extern fn with_alloc(size: i64) -> *mut u8
 
-c facade libc:
+c contract libc:
     domain errno thread
     domain environ process
     domain locale process

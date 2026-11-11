@@ -11,7 +11,7 @@ int db_size(db* d);
 int count(db* d);
 ")
 
-c facade dbf:
+c contract dbf:
     resource Database wraps *mut db
         from db_new
         drop db_close

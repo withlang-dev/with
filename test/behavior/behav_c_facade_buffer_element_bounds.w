@@ -2,7 +2,7 @@
 //! expect-stderr: C reported 4 elements written into a buffer of 3 elements
 
 use c_import("static inline void fill(int *dest, int *count) { *count = 4; }")
-c facade bounds:
+c contract bounds:
     fn fill
         buffer param dest capacity param count inout elements
 fn main:

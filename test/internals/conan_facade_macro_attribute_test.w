@@ -27,7 +27,7 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"logs\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("logs", "1.0", dep, src, build)
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
     var log_line = ""
     var plain_line = ""
     for line in report.split("\n"):
@@ -35,7 +35,7 @@ fn main:
         if line.starts_with("  plain:"): plain_line = line.to_owned()
     // The variadic function is raw, and with no item to state no facade
     // file is written (an empty `c facade` block is refused).
-    let facade = read_file(dep ++ "/facade.w") ?? ""
+    let facade = read_file(dep ++ "/contract.w") ?? ""
     let ok = log_line.contains("[attributes: format(printf,fmt,arg)]") and not report.contains("#") and plain_line.contains("[attributes: const]") and log_line.contains("raw: variadic") and facade.len() == 0 and report.contains("1 presented safely, 1 raw") and report.contains("no facade is written")
     if not ok: print(report)
     assert(ok)

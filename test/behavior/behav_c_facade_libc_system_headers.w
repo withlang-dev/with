@@ -7,7 +7,7 @@
 //! expect-stdout: ok
 
 // D51 §16.2b / ruling §5: a program that c_imports the real libc headers
-// gets the toolchain libc facade (compiler/LibcFacade.w) for what they
+// gets the toolchain libc contract (compiler/LibcFacade.w) for what they
 // declare — `CHeapStr` from <string.h> + <stdlib.h>, `CFile` from <stdio.h>,
 // `CDir` with its readdir/rewinddir lends from <dirent.h> — with no facade
 // of its own and no `unsafe` on the resources. A c_import keeps `FILE *` and
@@ -24,7 +24,7 @@ use c_import("stdio.h")
 use c_import("dirent.h")
 use c_import("unistd.h")
 
-c facade probes:
+c contract probes:
     fn fileno
         lend
     fn dirfd

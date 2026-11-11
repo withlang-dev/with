@@ -14,7 +14,7 @@ dberr* dberr_new(int code);
 void dberr_free(dberr* e);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

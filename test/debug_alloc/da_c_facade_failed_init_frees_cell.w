@@ -21,7 +21,7 @@ static inline int z_init(z_stream* s, Counter ends, int fail) { s->ends = ends; 
 static inline void z_end(z_stream* s) { counter_n_ = counter_n_ + 1; s->state = 0; }
 ")
 
-c facade zl:
+c contract zl:
     resource Stream wraps z_stream
         init z_init(self)
         ok Z_OK

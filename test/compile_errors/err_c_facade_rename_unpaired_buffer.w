@@ -8,7 +8,7 @@
 // it.
 use c_import("typedef struct db db;\nint db_count(db *d, int flags);\n")
 
-c facade dbl:
+c contract dbl:
     fn db_count
         rename count
 

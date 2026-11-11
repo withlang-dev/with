@@ -22,7 +22,7 @@ static inline xchar *zdoc_content(const zdoc *d) { if (d->n == 0) return 0; xcha
 static inline void zfree(void *p) { free(p); }
 ")
 
-c facade z:
+c contract z:
     resource Document wraps *mut zdoc
         from zdoc_read
         drop zdoc_free

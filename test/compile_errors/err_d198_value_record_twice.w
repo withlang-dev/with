@@ -2,7 +2,7 @@
 // D198 (§16.2b.5): one clause per value record.
 use c_import("typedef struct { int w; int h; } Size; static inline void grow(Size *s, int by) { s->w += by; }")
 
-c facade shapes:
+c contract shapes:
     fn grow
         reads param s
         updates param s

@@ -5,9 +5,9 @@
 // and a plain transfer need. Every sentence a clause relies on is quoted
 // beside it, from the libcurl manual (https://curl.se/libcurl/c/<fn>.html).
 //
-// Where it lives: as `lib/facades/sqlite3.w` — the project's own facade
+// Where it lives: as `lib/contracts/sqlite3.w` — the project's own facade
 // under the repository's `lib/` (§16.2b.1; `c.libcurl` ships none yet), and
-// the release UAT copies it into the fresh project as src/facades/libcurl.w.
+// the release UAT copies it into the fresh project as src/contracts/libcurl.w.
 //
 // What the ruling asks for and where it is met (D66):
 //   CURL as an owned pointer resource ............... resource Easy
@@ -34,7 +34,7 @@
 //     if code != CURLE_OK: print(curl_easy_strerror(code).unwrap())
 use c_import("curl/curl.h", link: "curl")
 
-c facade curl:
+c contract curl:
     // curl_version_info(3): "Returns a pointer to a filled in static struct
     // with information about various features in the running version of
     // libcurl." A pointer into libcurl's process-wide state: its origin is

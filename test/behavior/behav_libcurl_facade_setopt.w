@@ -23,7 +23,7 @@
 // err_libcurl_facade_version_view_invalidated); the printable text is
 // `curl_version()`, static; `curl_easy_strerror`'s text for CURLE_OK is
 // "No error" in every libcurl.
-use facades.libcurl
+use contracts.libcurl
 use c_import("curl/curl.h", link: "curl")
 
 fn configure_handle() -> i32:

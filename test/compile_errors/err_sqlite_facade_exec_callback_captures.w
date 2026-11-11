@@ -5,7 +5,7 @@
 // §12.4, §16.2b.9): sqlite3_exec's callback is a code pointer C receives
 // alone — a closure with captures is refused; its state is the typed
 // userdata the callback receives as `&U`.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 type Ctx { rows: i32 }

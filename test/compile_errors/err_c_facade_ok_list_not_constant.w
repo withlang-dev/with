@@ -5,7 +5,7 @@
 // only the first.
 use c_import("typedef struct db db;\n#define DB_OK 0\nint db_open(const char* path, db** out);\nvoid db_close(db* d);\nint db_count(db* d);\n")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

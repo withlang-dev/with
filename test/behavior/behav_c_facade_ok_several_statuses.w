@@ -38,7 +38,7 @@ static inline void stream_end(stream *s) { s->st = 0; }
 static inline int stream_state(stream *s) { return s->st; }
 ")
 
-c facade several:
+c contract several:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

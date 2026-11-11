@@ -6,7 +6,7 @@
 // prepared on (`borrows param 0`), so one kept past the connection's
 // scope — where sqlite3_finalize would touch a closed connection — is
 // refused where it is used.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:

@@ -13,7 +13,7 @@ static inline void z_step(z_stream* s, int by) { s->total = s->total + by; }
 static inline void z_end(z_stream* s) { s->state = 0; }
 ")
 
-c facade imgs:
+c contract imgs:
     resource Picture wraps Img
         from img_new
         drop img_free

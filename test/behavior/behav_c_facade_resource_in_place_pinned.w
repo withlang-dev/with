@@ -25,7 +25,7 @@ static inline int z_check(const z_stream* s) { if (s->strm != s) { (*s->misplace
 static inline void z_end(z_stream* s) { if (s->strm != s || s->state != 7) { (*s->misplaced)++; return; } s->state = 0; (*s->ends)++; }
 ")
 
-c facade zl:
+c contract zl:
     resource Stream wraps z_stream
         init z_init(self)
         drop z_end

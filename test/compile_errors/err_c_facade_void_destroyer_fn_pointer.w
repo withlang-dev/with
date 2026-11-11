@@ -6,7 +6,7 @@
 
 use c_import("typedef void (*hook)(int);\nhook hook_new(int id);\nvoid release(void* p);\n")
 
-c facade hooks:
+c contract hooks:
     resource Hook wraps hook
         from hook_new
         drop release

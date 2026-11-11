@@ -10,7 +10,7 @@
 // from a List of connections. Data destroyed twice is a DOUBLE FREE; data
 // never destroyed is a LEAK. Statements are finalized before their
 // connection on every path.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 type AppData { id: i32, name: str, seen: List[i32] }

@@ -16,7 +16,7 @@ static inline void db_close(db* d) { d->closed++; }
 static inline int db_closed(db* d) { return d->closed; }
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         from db_new_named

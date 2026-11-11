@@ -24,7 +24,7 @@ static inline void z_end(z_stream* s) { (*s->ends)++; s->state = 0; }
 static inline int z_state(const z_stream* s) { return s->state; }
 ")
 
-c facade zl:
+c contract zl:
     resource Stream wraps z_stream
         init z_init(self)
         drop z_end

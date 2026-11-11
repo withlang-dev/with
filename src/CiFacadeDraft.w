@@ -1209,7 +1209,7 @@ impl CiProject:
         // fields; a proof below that says "a fresh allocation" or "frees"
         // over a call through one rests on these.
         if self.field_role_text.len() > 0: text = text ++ "// Function-pointer fields, as the registry states them:\n" ++ self.field_role_text
-        text = text ++ "c facade " ++ name ++ ":\n"
+        text = text ++ "c contract " ++ name ++ ":\n"
         if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
         if self.registry_threads.len() > 0: text = text ++ "    runs threads    // registry: " ++ self.registry_threads ++ "\n"
         for record in modeled:

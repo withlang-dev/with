@@ -2,7 +2,7 @@
 
 use c_import("static inline int apply(int (*visit)(void *, int), void *ctx) { return visit ? visit(ctx, 7) : -1; }")
 
-c facade calls:
+c contract calls:
     fn apply
         callback param 0 userdata param 1
         nullable param 0

@@ -6,7 +6,7 @@
 @[import_module("wasi_snapshot_preview1")]
 extern fn fd_write(fd: i32, iovs: *const u8, iovs_len: i32, nwritten: *mut i32) -> i32
 
-c facade wasi:
+c contract wasi:
     domain errno thread
     domain environ process
     fn fd_write

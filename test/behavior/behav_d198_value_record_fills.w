@@ -8,7 +8,7 @@
 // `Result[T, E]`.
 use c_import("#define SHAPE_OK 0\ntypedef struct { int w; int h; } Size;\nstatic inline void default_size(Size *out) { out->w = 3; out->h = 4; }\nstatic inline int square(int n, Size *out) { out->w = n; out->h = n; return 0; }\nstatic inline int checked_square(int n, Size *out) { if (n < 0) return 1; out->w = n; out->h = n; return SHAPE_OK; }\n")
 
-c facade shapes:
+c contract shapes:
     fn default_size
         fills param out
     fn square

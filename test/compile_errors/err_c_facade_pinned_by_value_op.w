@@ -10,7 +10,7 @@ int z_init(z_stream* s);
 void z_end(z_stream s);
 ")
 
-c facade zl:
+c contract zl:
     resource Stream wraps z_stream
         init z_init(self)
         drop z_end

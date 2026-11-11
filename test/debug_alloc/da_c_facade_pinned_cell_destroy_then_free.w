@@ -15,7 +15,7 @@ static inline int z_check(const z_stream* s) { return s->strm == s ? s->state : 
 static inline void z_end(z_stream* s) { if (s->strm == s && s->state == 7) s->state = 0; }
 ")
 
-c facade zl:
+c contract zl:
     resource Stream wraps z_stream
         init z_init(self)
         ok Z_OK

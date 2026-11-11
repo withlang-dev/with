@@ -7,7 +7,7 @@ Buf buf_load(int n);
 void buf_free(Buf b);
 ")
 
-c facade bufs:
+c contract bufs:
     resource Buffer wraps Buf
         from buf_load, nullable field n
         drop buf_free

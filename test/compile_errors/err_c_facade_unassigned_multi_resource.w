@@ -14,7 +14,7 @@ void inflateEnd(z_stream* s);
 void deflateEnd(z_stream* s);
 ")
 
-c facade zlib:
+c contract zlib:
     resource InflateStream wraps z_stream
         init inflateInit(self)
         drop inflateEnd

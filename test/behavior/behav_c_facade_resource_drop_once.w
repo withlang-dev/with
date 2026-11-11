@@ -32,7 +32,7 @@ static inline void tok_unload(Tok t) { tok_closed_++; }
 static inline int tok_unloads(Tok t) { return tok_closed_; }
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close

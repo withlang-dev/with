@@ -21,7 +21,7 @@
 
 use c_import("c_facade_record.h")
 
-c facade records:
+c contract records:
     domain locale process
     resource Hold wraps *mut hold
         from hold_new

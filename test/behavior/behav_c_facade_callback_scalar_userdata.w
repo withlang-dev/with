@@ -19,7 +19,7 @@ static inline int eng_run(eng *e, void (*cb)(int n, void *ud), void *ud) {
 }
 ")
 
-c facade engines:
+c contract engines:
     resource Engine wraps *mut eng
         from eng_new
         drop eng_free

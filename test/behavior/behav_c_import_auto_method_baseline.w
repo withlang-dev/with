@@ -9,7 +9,7 @@
 
 use c_import("typedef struct Counter { int n; } Counter;\nstatic inline void counter_init(Counter *c) { c->n = 0; }\nstatic inline void counter_end(Counter *c) { c->n = -1; }\nstatic inline void counter_incr(Counter *c) { c->n = c->n + 1; }\nstatic inline int counter_get(Counter *c) { return c->n; }\n")
 
-c facade counter:
+c contract counter:
     resource Count wraps Counter
         init counter_init(self)
         drop counter_end

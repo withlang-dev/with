@@ -4,7 +4,7 @@ use pre_d_build_runner
 fn main:
     let root = p7_prepare_case("default_argument_module_scope", "default_argument_module_scope")
     p7_write(root, "src/constants.w", "pub const DEFAULT_ID: i32 = 7\n")
-    p7_write(root, "src/facade.w",
+    p7_write(root, "src/contract.w",
         "use constants\n" ++
         "pub type Pads {}\n" ++
         "const PRIVATE_ID: i32 = 11\n" ++

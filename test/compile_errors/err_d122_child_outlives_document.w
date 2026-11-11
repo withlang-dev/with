@@ -5,7 +5,7 @@
 // document, so the child cannot outlive the document either.
 use c_import("../behavior/d122_tree.h")
 
-c facade x:
+c contract x:
     resource Document wraps *mut xdoc
         from xdoc_parse
         drop xdoc_free

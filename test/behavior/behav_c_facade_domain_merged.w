@@ -8,19 +8,19 @@
 // text from it and states `note_pure` preserves it; `checks` describes
 // `note_fail` and says nothing, so it invalidates the same domain (the
 // refused spelling is err_c_facade_domain_merged_invalidated). The runtime's
-// own domain rows (rt/*.w, ruling §52) meet a program's libc facade this
+// own domain rows (rt/*.w, ruling §52) meet a program's libc contract this
 // way in one unit.
 
 use c_import("c_facade_text.h")
 
-c facade notes:
+c contract notes:
     domain errno thread
     fn strerror
         returns borrow CStr from domain errno
     fn note_pure
         preserves domain errno
 
-c facade checks:
+c contract checks:
     domain errno thread
     fn note_fail
         lend

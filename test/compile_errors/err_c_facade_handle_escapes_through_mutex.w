@@ -15,7 +15,7 @@ static inline int eng_run(eng *e, void (*cb)(ctx *c, int n, void *ud), void *ud)
 static inline void ctx_add(ctx *c, int v) { c->acc += v; }
 ")
 
-c facade engines:
+c contract engines:
     resource Engine wraps *mut eng
         from eng_new
         drop eng_free

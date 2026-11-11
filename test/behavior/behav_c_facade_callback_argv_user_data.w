@@ -52,7 +52,7 @@ static inline void ctx_add(ctx *c, int v) { c->acc += v; }
 static inline int val_get(val *v) { return v->n; }
 ")
 
-c facade engines:
+c contract engines:
     resource Engine wraps *mut eng
         from eng_new
         drop eng_free

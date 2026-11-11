@@ -25,7 +25,7 @@ int dup(int fd);
 int close(int fd);
 ")
 
-c facade dir_probe:
+c contract dir_probe:
     fn dirfd
         lend
 

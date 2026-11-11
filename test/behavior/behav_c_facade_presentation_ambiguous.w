@@ -20,7 +20,7 @@ static inline int db_drop(db *d) { return d->n + 2; }
 static inline int db_count(db *d) { return d->n; }
 ")
 
-c facade dbf:
+c contract dbf:
     resource Database wraps *mut db
         from db_new
         drop db_close

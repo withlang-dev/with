@@ -15,7 +15,7 @@
 
 use c_import("static inline int sum_bytes(const unsigned char *p, unsigned long n) { int s = 0; unsigned long i = 0; while (i < n) { s += p[i]; i++; } return s; }\nstatic inline int count_zero(const void *p, unsigned int n) { const unsigned char *b = (const unsigned char *)p; int z = 0; unsigned int i = 0; while (i < n) { if (b[i] == 0) z++; i++; } return z; }\n")
 
-c facade sums:
+c contract sums:
     fn sum_bytes
         buffer param p len param n
     fn count_zero

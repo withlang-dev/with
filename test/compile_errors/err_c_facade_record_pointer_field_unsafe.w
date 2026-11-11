@@ -6,7 +6,7 @@
 // yields the raw `*mut i8`; making text of it is the raw surface.
 use c_import("../behavior/c_facade_record.h")
 
-c facade records:
+c contract records:
     domain locale process
     fn localeconv
         returns borrow lconv from domain locale

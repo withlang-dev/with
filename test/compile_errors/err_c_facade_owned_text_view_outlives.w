@@ -5,7 +5,7 @@
 // releases it.
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     resource NoteText wraps *mut c_char
         from strdup
         drop free

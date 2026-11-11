@@ -6,7 +6,7 @@
 // means invalidate — and the help says how to state otherwise.
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     domain errno thread
     fn strerror
         returns borrow CStr from domain errno

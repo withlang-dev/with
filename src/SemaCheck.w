@@ -12142,7 +12142,7 @@ impl Sema:
             let why = resolve_facade_report_line(resolve_fetched_facade_report(path), name)
             if not why.starts_with("raw: "): continue
             let package = self.pool_resolve(self.ast.get_data0(self.ast.get_decl(di)))
-            return f": the facade of {package} leaves `{name}` raw: {why.slice(5, why.len())} ({path.slice(0, path.len() - "facade.w".len())}facade-report.txt)"
+            return f": the facade of {package} leaves `{name}` raw: {why.slice(5, why.len())} ({path.slice(0, path.len() - "contract.w".len())}contract-report.txt)"
         ""
 
     // D198 (§16.2b.5): when what makes `fn_sym` raw is a parameter passed by

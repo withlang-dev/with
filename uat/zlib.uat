@@ -6,6 +6,6 @@ run: with init .
 run: with get c.zlib
 expect stderr contains: facade zlib:
 write src/main.w from zlib_main.w
-copy lib/facades/zlib.w to src/facades/zlib.w
+copy lib/contracts/zlib.w to src/contracts/zlib.w
 run: with run
 expect stdout: zlib UAT passed

@@ -3,7 +3,7 @@
 // D64 §16.2b.8: a parameter appears in one pairing only.
 use c_import("static inline int cmp(const unsigned char *a, const unsigned char *b, unsigned long n) { return a[0] - b[0] + (int)n; }\n")
 
-c facade cmps:
+c contract cmps:
     fn cmp
         buffer param a len param n
         buffer param b len param n

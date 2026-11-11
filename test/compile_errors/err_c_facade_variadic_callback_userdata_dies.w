@@ -5,7 +5,7 @@
 // narrower scope than the handle dies while still held.
 use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nvoid h_reset(h *x);\nint h_set(h *x, int opt, ...);\nint h_run(h *x);\ntypedef int (*h_cb)(int n, void *ud);\n#define OPT_CB 1\n#define OPT_UD 2\n#define OPT_N 3\n#define H_OK 0\n")
 
-c facade hlib:
+c contract hlib:
     resource Handle wraps *mut h
         from h_new
         drop h_free

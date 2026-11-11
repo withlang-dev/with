@@ -1,4 +1,4 @@
-use facades.sdl
+use contracts.sdl
 use c_import("SDL3/SDL.h")
 
 fn sdl_error(): SDL_GetError().map(it.to_str_lossy()) ?? "unknown SDL error"

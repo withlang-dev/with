@@ -6,7 +6,7 @@
 // never destroyed is dropped by its scope. A flat record by value is safe.
 use c_import("#include <stdlib.h>\ntypedef struct { int *data; int n; } Img; static inline Img img_new(void) { Img i; i.data = malloc(sizeof(int) * 4); i.data[0] = 7; i.n = 4; return i; } static inline void img_free(Img i) { free(i.data); } static inline int img_get(Img i, int k) { return i.data[k]; } typedef struct { int x; int y; } Pt; static inline int pt_sum(Pt p) { return p.x + p.y; }")
 
-c facade imgs:
+c contract imgs:
     resource Picture wraps Img
         from img_new
         drop img_free

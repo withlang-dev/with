@@ -10,7 +10,7 @@ int tex_load(const char* path, Tex* out);
 void tex_unload(Tex t);
 ")
 
-c facade gfx:
+c contract gfx:
     resource Texture wraps Tex
         from tex_load(out param 1)
         drop tex_unload

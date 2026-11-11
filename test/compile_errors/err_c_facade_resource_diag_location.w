@@ -12,7 +12,7 @@ void db_close(db* d);
 st* st_new(int n);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close

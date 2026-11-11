@@ -6,7 +6,7 @@ use c_import("#define FILL_OK 0\nstatic inline int fill(unsigned char *dst, unsi
 
 type FillError { code: i32 }
 
-c facade fills:
+c contract fills:
     fn fill
         buffer param dst capacity param dstLen inout
         ok FILL_OK

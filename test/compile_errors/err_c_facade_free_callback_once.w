@@ -8,7 +8,7 @@ type Tok { id: i32 }
 impl Drop for Tok:
     move fn drop(): {}
 use c_import("static inline int each(int (*visit)(void *, int), void *ctx) { visit(ctx, 7); return visit(ctx, 9); }")
-c facade calls:
+c contract calls:
     fn each
         callback param 0 userdata param 1
 fn invoke(context: &fn(i32) -> i32, value: i32) -> i32: context(value)

@@ -16,7 +16,7 @@ int compress(Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)
 const char *zlibVersion(void);
 ")
 
-c facade zlib:
+c contract zlib:
     fn compress
         lend
     fn zlibVersion

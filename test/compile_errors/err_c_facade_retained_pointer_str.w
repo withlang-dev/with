@@ -4,7 +4,7 @@
 // call-scoped C string; the refusal names the owned form to bind instead.
 use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nvoid h_reset(h *x);\nint h_set(h *x, int opt, ...);\n#define OPT_BODY 1\n#define H_OK 0\n")
 
-c facade hlib:
+c contract hlib:
     resource Handle wraps *mut h
         from h_new
         drop h_free

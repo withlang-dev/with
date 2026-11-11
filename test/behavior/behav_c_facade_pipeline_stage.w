@@ -14,7 +14,7 @@
 
 use c_import("static inline int sum_bytes(const unsigned char *p, unsigned long n) { int s = 0; unsigned long i = 0; while (i < n) { s += p[i]; i++; } return s; }\nchar *getenv(const char *name);\n")
 
-c facade sums:
+c contract sums:
     fn sum_bytes
         buffer param p len param n
 

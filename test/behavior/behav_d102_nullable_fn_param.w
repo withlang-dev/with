@@ -15,7 +15,7 @@ static inline void fetch(op_t *out) { *out = add1; }
 static inline int call_field(struct box *b, int x) { return b->f ? b->f(x) : 0; }
 ")
 
-c facade ops:
+c contract ops:
     fn run
         nullable param 0
 

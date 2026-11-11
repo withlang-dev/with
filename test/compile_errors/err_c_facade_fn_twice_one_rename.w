@@ -6,7 +6,7 @@
 // or one of them stating none, describe the same operation twice.
 use c_import("typedef struct db db;\n#define DB_OK 0\ndb* db_new(void);\nvoid db_close(db* d);\nint db_run(db* d, int code);\n")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close

@@ -3,7 +3,7 @@
 
 // Conversion must fail before C receives a truncated count.
 use c_import("static inline int count(const int *values, unsigned char n) { return n; }")
-c facade counts:
+c contract counts:
     fn count
         buffer param values len param n elements
 fn main:

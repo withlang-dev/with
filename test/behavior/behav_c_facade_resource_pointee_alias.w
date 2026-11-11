@@ -14,7 +14,7 @@ static inline void handle_close(Handle* h) { h->closed++; }
 static inline int handle_closed(Handle* h) { return h->closed; }
 ")
 
-c facade h:
+c contract h:
     resource Owned wraps *mut Handle
         from handle_open
         drop handle_close

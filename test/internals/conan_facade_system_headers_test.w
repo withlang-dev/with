@@ -27,7 +27,7 @@ fn main:
     // No registry: the facade comes from the package's own evidence.
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("tiny", "1.0", dep, src, build)
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
     let lines = report.split("\n")
     let first = lines[0]
     if not first.starts_with("facade tiny: 1 functions"):

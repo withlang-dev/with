@@ -9,7 +9,7 @@ static inline Buf buf_take(int n) { Buf b; b.n = n; b.data = 0; return b; }
 static inline void buf_free(Buf b) { free(b.data); }
 ")
 
-c facade bufs:
+c contract bufs:
     resource Buffer wraps Buf
         from buf_take, nonnull field data
         drop buf_free

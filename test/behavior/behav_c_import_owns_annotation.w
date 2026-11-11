@@ -12,7 +12,7 @@ void free(void *p);
 static inline char *cwd_owned(void) { return getcwd(0, 0); }
 ")
 
-c facade cwd:
+c contract cwd:
     resource CwdString wraps *mut c_char
         from cwd_owned
         drop free

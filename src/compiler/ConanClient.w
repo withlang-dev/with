@@ -2075,14 +2075,14 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
                         g_conan_facts_refused = g_conan_facts_refused ++ (if g_conan_facts_refused.len() > 0: "; " else: "") ++ name ++ ": " ++ message
                         return
     if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
-    let report_path = dep_dir ++ "/facade-report.txt"
+    let report_path = dep_dir ++ "/contract-report.txt"
     migrate_parse_c_as_c_import()
-    let summary = migrate_c_facade_for_package(corpus.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/facade.w", report_path)
+    let summary = migrate_c_facade_for_package(corpus.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/contract.w", report_path)
     if summary.len() == 0: return
     let q = "\x22"
     let pin = "{\n  " ++ q ++ "registry_commit" ++ q ++ ": " ++ q ++ conan_json_escape(registry.commit) ++ q ++ ",\n  " ++ q ++ "facts_sha256" ++ q ++ ": " ++ q ++ registry.sha256 ++ q ++ "\n}\n"
-    let _pin = runtime_write_file(dep_dir ++ "/facade.json", pin)
-    runtime_eprint("  " ++ summary ++ " (.with/deps/c/" ++ name ++ "/" ++ version ++ "/facade-report.txt)")
+    let _pin = runtime_write_file(dep_dir ++ "/contract.json", pin)
+    runtime_eprint("  " ++ summary ++ " (.with/deps/c/" ++ name ++ "/" ++ version ++ "/contract-report.txt)")
 
 // A proof about compiled foreign code holds only for the build it analyzed
 // (§31.6.3). For a package linked as a prebuilt binary the drafter read a

@@ -28,7 +28,7 @@ void ctx_init(z_stream* s);
 void ctx_end(z_stream* s);
 ")
 
-c facade zlib:
+c contract zlib:
     resource InflateStream wraps z_stream
         init inflateInit(self)
         ok Z_OK

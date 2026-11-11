@@ -6,7 +6,7 @@
 // representation stays readable as raw access).
 use c_import("typedef struct db db;\nint db_open(const char* path, db** out);\nvoid db_close(db* d);\n")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

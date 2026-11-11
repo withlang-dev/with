@@ -8,7 +8,7 @@ void mime_free(mime *m);
 part *mime_addpart(mime *m);
 ")
 
-c facade mimes:
+c contract mimes:
     resource Mime wraps *mut mime
         from mime_new
         drop mime_free

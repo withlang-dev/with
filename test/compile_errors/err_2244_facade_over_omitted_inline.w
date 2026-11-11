@@ -6,7 +6,7 @@ struct flags { unsigned a : 3; unsigned b : 5; };
 static inline int maybe_apply(visit_fn visit, void *ctx) { struct flags f; f.a = 1; return visit ? visit(ctx, (int)f.a) : -1; }
 ")
 
-c facade calls:
+c contract calls:
     fn maybe_apply
         callback param 0 userdata param 1
         nullable param 0

@@ -10,7 +10,7 @@
 
 use c_import("c_facade_text.h")
 
-c facade notes:
+c contract notes:
     domain errno thread
     fn note_pure
         preserves domain errno
@@ -18,7 +18,7 @@ c facade notes:
 // This comment sits between the two restatements.
 fn helper() -> i32: 1
 
-c facade notes_again:
+c contract notes_again:
     domain errno thread
     fn note_pure
         preserves domain errno

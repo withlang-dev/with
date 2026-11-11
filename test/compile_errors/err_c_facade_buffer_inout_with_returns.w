@@ -4,7 +4,7 @@
 // clause presents the return. Both cannot be the one result.
 use c_import("static inline const char *name_into(char *dst, unsigned long *dstLen) { *dstLen = 0; return \"x\"; }\n")
 
-c facade names:
+c contract names:
     fn name_into
         buffer param dst capacity param dstLen inout
         returns static CStr

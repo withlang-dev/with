@@ -45,8 +45,8 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"shapes\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("shapes", "1.0", dep, src, build)
-    let facade = read_file(dep ++ "/facade.w") ?? ""
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
+    let facade = read_file(dep ++ "/contract.w") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
     let stated = [
         "    fn area\n        reads param 0",
         "    fn area_via\n        reads param 0",

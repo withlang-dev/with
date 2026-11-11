@@ -18,7 +18,7 @@
 
 use c_import("c_facade_text.h")
 
-c facade notes:
+c contract notes:
     domain errno thread
     fn strerror
         returns borrow CStr from domain errno

@@ -14,7 +14,7 @@ st* st_new(db* d, int n);
 void st_free(st* s);
 ")
 
-c facade dep:
+c contract dep:
     resource Reader wraps *mut db
         from db_reader
         drop db_close

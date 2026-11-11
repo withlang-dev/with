@@ -3,7 +3,7 @@
 use c_import("static inline int apply(int (*visit)(void *, int), void *ctx) { return visit(ctx, 7); }")
 use std.rc
 
-c facade calls:
+c contract calls:
     fn apply
         callback param 0 userdata param 1
         callback_thread any

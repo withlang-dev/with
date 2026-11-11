@@ -6,7 +6,7 @@
 
 use c_import("typedef struct obj obj;\nobj *obj_new(int id);\nvoid obj_unref(obj *o);\n")
 
-c facade objs:
+c contract objs:
     use convention nosuch.v1
     resource Object wraps *mut obj
 

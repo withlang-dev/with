@@ -16,7 +16,7 @@
 // This is a test facade: the invalid selector never enters lib/facades.
 use c_import("curl/curl.h", link: "curl")
 
-c facade curl_pair_failure:
+c contract curl_pair_failure:
     resource Easy wraps *mut CURL
         from curl_easy_init
         drop curl_easy_cleanup

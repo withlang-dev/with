@@ -20,7 +20,7 @@ static inline void db_close(db *d) { free(d); }
 static inline int db_exec(db *d, db_cb cb, void *ud, int n) { if (!cb) return ud ? -2 : -1; int r = cb(ud, n); d->total += r; return r; }
 ")
 
-c facade dbn:
+c contract dbn:
     resource Database wraps *mut db
         from db_new
         drop db_close

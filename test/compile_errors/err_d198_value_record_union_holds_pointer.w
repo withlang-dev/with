@@ -3,7 +3,7 @@
 // code writes it through the integer member.
 use c_import("typedef union { const int *p; long n; } Either; static inline int either_first(const Either *e) { return *e->p; }")
 
-c facade eithers:
+c contract eithers:
     fn either_first
         reads param e
 

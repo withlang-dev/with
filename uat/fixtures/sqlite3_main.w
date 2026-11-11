@@ -6,7 +6,7 @@
 // carries SQLite's own message, and the statement is finalized and the
 // connection closed by their scopes on every path, the statement first
 // (§16.2b.6).
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h")
 
 fn total(db: &Database) -> Result[i32, SqliteError]:

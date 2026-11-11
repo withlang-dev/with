@@ -1,4 +1,4 @@
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn seeded -> Database:

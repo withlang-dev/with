@@ -12,7 +12,7 @@
 
 use c_import("typedef struct sqlite3 sqlite3;\nsqlite3 *sqlite3_new(void);\nint sqlite3_close(sqlite3 *db);\nint sqlite3_close_v2(sqlite3 *db);\nint sqlite3_release_memory(sqlite3 *db);\n")
 
-c facade sqlite:
+c contract sqlite:
     resource Database wraps *mut sqlite3
         from sqlite3_new
         drop sqlite3_close

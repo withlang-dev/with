@@ -22,7 +22,7 @@ int dup(int fd);
 int close(int fd);
 ")
 
-c facade stdio_probe:
+c contract stdio_probe:
     fn fileno
         lend
 

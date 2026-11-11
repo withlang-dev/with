@@ -13,7 +13,7 @@ void st_finalize(st* s);
 int st_step(st* s);
 ")
 
-c facade dbf:
+c contract dbf:
     resource Database wraps *mut db
         from db_new
         drop db_close

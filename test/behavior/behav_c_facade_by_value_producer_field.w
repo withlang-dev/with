@@ -23,7 +23,7 @@ static inline void wrap_free(Wrap w) { buf_free(w.inner); }
 static inline int freed(void) { return frees; }
 ")
 
-c facade bufs:
+c contract bufs:
     resource Buffer wraps Buf
         from buf_load, nullable field data
         from buf_make, nonnull field data

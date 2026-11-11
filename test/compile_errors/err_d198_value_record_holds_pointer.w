@@ -3,7 +3,7 @@
 // code can set that field to any address; the clause is refused.
 use c_import("typedef struct { const int *items; int n; } Span; static inline int span_first(const Span *s) { return s->n > 0 ? s->items[0] : 0; }")
 
-c facade spans:
+c contract spans:
     fn span_first
         reads param s
 

@@ -2,7 +2,7 @@
 //! expect-stdout: ok
 
 // C11 7.22.4.6p4: a second `getenv` may overwrite the text the first
-// returned, so the toolchain libc facade does not state `preserves domain
+// returned, so the toolchain libc contract does not state `preserves domain
 // environ` on it, and holding the first view across the second call is
 // refused (err_c_facade_getenv_view_invalidated). An application copies the
 // first out — `to_owned()` — and then reads the second: the way the

@@ -7,7 +7,7 @@
 
 use c_import("typedef struct sqlite3 sqlite3;\ntypedef struct sqlite3_stmt sqlite3_stmt;\n#define SQLITE_OK 0\nint sqlite3_open(const char *filename, sqlite3 **ppDb);\nint sqlite3_close(sqlite3 *db);\nint sqlite3_close_v2(sqlite3 *db);\nint sqlite3_prepare_v2(sqlite3 *db, const char *zSql, int nByte, sqlite3_stmt **ppStmt);\nint sqlite3_step(sqlite3_stmt *pStmt);\nint sqlite3_finalize(sqlite3_stmt *pStmt);\nconst char *sqlite3_errmsg(sqlite3 *db);\nconst char *sqlite3_column_text(sqlite3_stmt *pStmt, int iCol);\nsqlite3 *sqlite3_db_handle(sqlite3_stmt *pStmt);\nint sqlite3_create_function_v2(sqlite3 *db, const char *zName, int nArg, int eTextRep, void *pApp, void (*xFunc)(void *), void (*xDestroy)(void *));\nint sqlite3_trace_v2(sqlite3 *db, unsigned mask, int (*xCallback)(unsigned, void *, void *, void *), void *pCtx);\nconst char *sqlite3_libversion(void);\n")
 
-c facade sqlite:
+c contract sqlite:
     domain errno thread
     resource Database wraps *mut sqlite3
         from sqlite3_open(out param ppDb)

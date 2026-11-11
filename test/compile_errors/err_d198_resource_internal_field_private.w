@@ -4,7 +4,7 @@
 // the resource and names only `.repr`, in `unsafe`.
 use c_import("typedef struct { int *data; int n; } Img; static inline Img img_new(void) { Img i; i.data = 0; i.n = 4; return i; } static inline void img_free(Img i) { }")
 
-c facade imgs:
+c contract imgs:
     resource Picture wraps Img
         from img_new
         drop img_free

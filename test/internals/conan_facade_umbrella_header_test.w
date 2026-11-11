@@ -39,8 +39,8 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"tiny\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("tiny", "1.0", dep, src, build)
-    let facade = read_file(dep ++ "/facade.w") ?? ""
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
+    let facade = read_file(dep ++ "/contract.w") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
     let ok = facade.contains("use c_import(\"tiny.h\"") and not facade.contains("tiny/part.h") and not facade.contains("orphan.h") and facade.contains("from tiny_new") and facade.contains("drop tiny_free") and not facade.contains("tiny_other") and not facade.contains("tiny_hidden") and report.contains("orphan.h")
     if not ok:
         print(facade)

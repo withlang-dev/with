@@ -16,7 +16,7 @@ extern fn abort() -> Unit
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn with_alloc(size: i64) -> *mut u8
 
-c facade libc:
+c contract libc:
     // the three libc domains (ruling §33-§36)
     domain errno thread
     domain environ process

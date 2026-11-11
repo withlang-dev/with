@@ -6,12 +6,12 @@
 
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     domain notes_cache thread
     fn note_pure
         preserves domain notes_cache
 
-c facade checks:
+c contract checks:
     domain notes_cache process
     fn note_fail
         lend

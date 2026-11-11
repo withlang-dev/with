@@ -1,10 +1,10 @@
 // Two C libraries from one program: the one the system provides (SQLite) and
 // one vendored as source (vendor/tally.c). No `unsafe` here: the SQLite
-// facade (src/facades/sqlite3.w) states what sqlite3.h cannot — which call
+// facade (src/contracts/sqlite3.w) states what sqlite3.h cannot — which call
 // produces a connection, which closes it, what a returned pointer borrows
 // from — and the compiler renders the safe surface from it. The raw import
 // names the status constants.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 use c_import("tally.h")
 use tally

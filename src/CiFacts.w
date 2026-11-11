@@ -128,11 +128,15 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         line_no += 1
         let stripped = raw.trim()
         if stripped.len() == 0 or stripped.starts_with("//"): continue
-        if stripped.starts_with("c facade ") and stripped.ends_with(":"):
-            if facts.package.len() > 0: return Err(facts_error(path, line_no, "a second `c facade` header"))
-            facts.package = stripped.slice(9, stripped.len() - 1).trim()
+        // A registry file is headed `c facts NAME:` (Eric, 2026-11-11). Its
+        // old header, `c facade NAME:`, is read until the release that
+        // respells the registry: every released compiler reads main's file.
+        let header = if stripped.starts_with("c facts "): "c facts " else if stripped.starts_with("c facade "): "c facade " else: ""
+        if header.len() > 0 and stripped.ends_with(":"):
+            if facts.package.len() > 0: return Err(facts_error(path, line_no, "a second `c facts` header"))
+            facts.package = stripped.slice(header.len(), stripped.len() - 1).trim()
             continue
-        if facts.package.len() == 0: return Err(facts_error(path, line_no, "`c facade NAME:` must come first"))
+        if facts.package.len() == 0: return Err(facts_error(path, line_no, "`c facts NAME:` must come first"))
         if stripped.starts_with("resource "):
             in_resource = true
             current_fn = ""
@@ -220,5 +224,5 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             if words.len() != 6 or words[2] != "owned" or words[3] != "freed" or words[4] != "by": return Err(facts_error(path, line_no, "a text return is `text return, owned, freed by F`"))
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_return:" ++ words[5], record: "", cite: cite })
         else: return Err(facts_error(path, line_no, "an item fact is `consumes param N`, `returns borrow R from param N`, `lend`, `nullable param N`, `text param N` or `text return, owned, freed by F`"))
-    if facts.package.len() == 0: return Err(path ++ ": no `c facade NAME:` header")
+    if facts.package.len() == 0: return Err(path ++ ": no `c facts NAME:` header")
     Ok(facts)

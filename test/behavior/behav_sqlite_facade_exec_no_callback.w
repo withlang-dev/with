@@ -13,7 +13,7 @@
 // `db.exec(sql)`, and `ok SQLITE_OK` makes it a `Result` whose error
 // carries the connection's message. A SELECT with no callback succeeds
 // and its rows are ignored, as documented.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:

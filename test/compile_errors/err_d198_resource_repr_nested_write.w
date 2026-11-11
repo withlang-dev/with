@@ -4,7 +4,7 @@
 // representation itself does. Drop handed C the forged pointer.
 use c_import("#include <stdlib.h>\ntypedef struct { int *data; int n; } Img; static inline Img img_new(void) { Img i; i.data = malloc(16); i.n = 4; return i; } static inline void img_free(Img i) { free(i.data); }")
 
-c facade imgs:
+c contract imgs:
     resource Picture wraps Img
         from img_new
         drop img_free

@@ -5,7 +5,7 @@
 // `void *`, which every pointer converts to.
 use c_import("void use_it(void *p);\n")
 
-c facade loose:
+c contract loose:
     handle Anything wraps *mut c_void
 
 fn main:

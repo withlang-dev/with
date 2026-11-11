@@ -507,7 +507,7 @@ impl ResolveState:
                 // this module's import of `facades.<name>`, as if written.
                 let package = resolve_fetched_package_of_header(self.module_dirs[module_id], header)
                 if package.len() > 0:
-                    let facade_dotted = "facades." ++ package
+                    let facade_dotted = "contracts." ++ package
                     let facade_path = self.resolve_use_file_dotted(module_id, facade_dotted)
                     var written = facade_path.len() == 0 or facade_path == self.module_paths[module_id] or resolve_module_is_facade_of(self.module_paths[module_id], package)
                     for other in 0..ast_pool.decl_count():
@@ -1432,7 +1432,7 @@ fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
         return ""
     let last = dotted.slice(last_dot + 1, dotted.len())
     let path = resolved_path.replace("\\", "/")
-    if dotted.starts_with("facades.") and path.ends_with("/facade.w") and ("/" ++ path).contains("/.with/deps/c/" ++ last ++ "/"):
+    if dotted.starts_with("contracts.") and path.ends_with("/contract.w") and ("/" ++ path).contains("/.with/deps/c/" ++ last ++ "/"):
         return ""
     last
 
@@ -1583,8 +1583,8 @@ fn resolve_project_root_candidate(module_dir: &str, rel_path: &str) -> str:
 // `.with/deps/c/<name>/<version>/facade.w` for the version with.toml pins,
 // when the project has no `facades/<name>.w` of its own under lib/ or src/.
 fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
-    if not rel_path.starts_with("facades/") or not rel_path.ends_with(".w"): return ""
-    let name = rel_path.slice("facades/".len(), rel_path.len() - 2)
+    if not rel_path.starts_with("contracts/") or not rel_path.ends_with(".w"): return ""
+    let name = rel_path.slice("contracts/".len(), rel_path.len() - 2)
     if name.len() == 0 or name.contains("/"): return ""
     let key = "c." ++ name
     for line in with_fs_read_file(resolve_join(root, "with.toml")).split("\n"):
@@ -1597,14 +1597,14 @@ fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
         let close = rest.slice(open + 1, rest.len()).find("\"")
         if close < 0: continue
         let version = rest.slice(open + 1, open + 1 + close)
-        let cand = resolve_join(root, ".with/deps/c/" ++ name ++ "/" ++ version ++ "/facade.w")
+        let cand = resolve_join(root, ".with/deps/c/" ++ name ++ "/" ++ version ++ "/contract.w")
         if resolve_file_exists(cand): return cand
     ""
 
 // #3117: the report `with get` wrote beside a fetched package's facade.
 fn resolve_fetched_facade_report(facade_path: &str) -> str:
-    if not facade_path.ends_with("/facade.w"): return ""
-    with_fs_read_file(facade_path.slice(0, facade_path.len() - "facade.w".len()) ++ "facade-report.txt")
+    if not facade_path.ends_with("/contract.w"): return ""
+    with_fs_read_file(facade_path.slice(0, facade_path.len() - "contract.w".len()) ++ "contract-report.txt")
 
 // The report's line for `name` ("" when it has none): `<verdict>: <why>`,
 // `raw: ...` for a function the facade leaves raw.
@@ -1674,7 +1674,7 @@ fn resolve_fetched_package_of_header(module_dir: &str, header: &str) -> str:
 // of a facade.
 fn resolve_module_is_facade_of(path: &str, package: &str) -> bool:
     let p = "/" ++ path.replace("\\", "/")
-    p.ends_with("/facades/" ++ package ++ ".w") or (p.ends_with("/facade.w") and p.contains("/.with/deps/c/"))
+    p.ends_with("/contracts/" ++ package ++ ".w") or (p.ends_with("/contract.w") and p.contains("/.with/deps/c/"))
 
 fn resolve_join(a: &str, b: &str) -> str:
     if a.len() == 0:
