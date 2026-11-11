@@ -1267,7 +1267,14 @@ impl CiProject:
                     // declaration's signature is kept for a function no unit
                     // defines: annotations (step 3) prove facts about it.
                     if cursor >= 0:
-                        self.symbols[symbol_id].header_declared = 1
+                        // A facade describes imported declarations, and c_import
+                        // imports no function whose name starts with `_`
+                        // (ci_translate_function): such a prototype is the
+                        // library's own, however public the header. libxml2's
+                        // `__xmlParserInputBufferCreateFilename`, once proven
+                        // a producer, was written into the facade and refused
+                        // there as 'not a declaration in scope'.
+                        if not name.starts_with("_"): self.symbols[symbol_id].header_declared = 1
                         // D121 step 5: the header this prototype is in.
                         if self.symbols[symbol_id].header_file.len() == 0 and ci_migrate_location_is_header(loc): self.symbols[symbol_id].header_file = ci_migrate_location_file(loc)
                         if self.symbols[symbol_id].has_definition == 0: self.record_fn_signature(session, i, symbol_id)
