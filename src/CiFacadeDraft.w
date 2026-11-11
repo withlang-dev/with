@@ -1099,6 +1099,17 @@ impl CiProject:
                     changed = true
         out
 
+    // #3123: every typedef of `void` is one representation to the checker
+    // (`*mut c_void`), so an operation on a handle of one names its resource:
+    // the `of` line for the first parameter the header spells through a
+    // modeled void typedef, "" when there is none.
+    fn fd_void_typedef_of(si: i32, modeled: &List[str]) -> str:
+        for p in self.symbols[si].param_ty:
+            let pointee = fd_record_pointee(p)
+            if pointee.len() > 0 and modeled.contains(pointee) and self.void_typedefs.contains(pointee):
+                return "        of " ++ fd_resource_name(pointee) ++ "    // the header spells the parameter `" ++ pointee ++ " *`\n"
+        ""
+
     // The facade draft: what the proofs establish, every clause with its
     // proof beside it.
     mut fn facade_draft(name: &str) -> str:
@@ -1159,7 +1170,7 @@ impl CiProject:
                 // D198: an operation over value records alone lends no
                 // resource; its clauses are its item.
                 let lends = self.fd_takes_modeled_resource(si as i32, modeled)
-                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ (if lends: "        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n" else: "") ++ self.fd_registry_presentation_lines(si as i32)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_void_typedef_of(si as i32, modeled) ++ (if lends: "        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n" else: "") ++ self.fd_registry_presentation_lines(si as i32)
             else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
                 self.presented.push(si as i32)
                 blocks.push(si as i32)

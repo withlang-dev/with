@@ -1176,6 +1176,9 @@ type CiProject {
     field_role_text: str,             // the stated roles as the draft's provenance lines, in the file's order
     field_roles: HashMap[str, str],   // §16.2b.15: `Record.field` -> `role|record|cite`, from the registry
     registry_value_fns: List[str],
+    // #3123: the typedefs of `void` the package's functions spell behind a
+    // pointer (`CURL`), each an alias of `c_void` in the translation.
+    void_typedefs: List[str],
     // D198 (#3206): every write of a function-pointer field and every
     // escape of a record the corpus shows (CImport.w
     // ci_fnptr_field_evidence), one line each, and the verdict per
@@ -1220,6 +1223,7 @@ fn CiProject.new -> CiProject:
         field_role_text: "",
         field_roles: HashMap.new(),
         registry_value_fns: [],
+        void_typedefs: [],
         fnptr_evidence: "",
         fnptr_verdicts: HashMap.new(),
         fnptr_verdicts_drawn: false,
