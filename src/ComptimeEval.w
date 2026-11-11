@@ -9037,7 +9037,16 @@ impl Sema:
         // substitute for checking the value.
         let type_value = if is_comptime_value and self.ast.get_data0(value) != 0: self.ast.get_data0(value) else: value
         let ann_extra = self.top_level_let_type_ann_extra(flags)
-        let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
+        var ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
+        // #3194 (§4.3c rule 1): a private module-level literal at the type
+        // its module's uses decided, as a local's is (check_let_binding).
+        if ann_extra < 0 and self.ast.kind(type_value) == NodeKind.NK_ARRAY_LIT and self.literal_decisions.len() > 0:
+            ann_type = self.literal_decision(decl) as TypeId
+        // A `pub` binding's type is the module's promise to readers who do
+        // not see its bodies (law 6): it is stated, never taken from uses.
+        if ann_extra < 0 and (flags / 2) % 2 == 1 and self.ast.kind(type_value) == NodeKind.NK_ARRAY_LIT and self.ast.get_data1(type_value) == 0:
+            self.emit_error_with_help("a `pub` binding of an empty literal states its type (§4.3c)", decl, "its uses decide a private binding's type; a `pub` one is the module's interface: `pub var " ++ with_str_clone_ref(self.pool_resolve(name)) ++ ": List[T] = []`")
+            return
         // A global binding is a binding: its value is checked as a local
         // `let`'s is, the annotation an owned demand (D22 §6.2) and an
         // unannotated value in value context. `let v: str = word().trim()`

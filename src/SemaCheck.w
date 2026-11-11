@@ -17757,6 +17757,11 @@ impl Sema:
                     return 1
         0
 
+    // The first literal binding marks the type table: a type made after it
+    // is written by structure for the second check (literal_type_encode).
+    mut fn mark_literal_watermark():
+        if self.literal_watermark == 0: self.literal_watermark = self.type_kinds.len() as i32
+
     // D93 (§4.3c rule 1): the `let` of the binding `expr` names, when that
     // binding has no annotation and an element-form literal for its
     // initializer; 0 otherwise.
@@ -17770,8 +17775,12 @@ impl Sema:
         if expr <= 0 or self.ast.kind(expr) != NodeKind.NK_IDENT:
             return 0
         let sym = self.ast.get_data0(expr)
-        // The latest such `let` of that name in this function.
-        self.fn_literal_lets.get((self.current_fn_sig_idx as i64) * 4294967296 + sym as i64) ?? 0
+        // The latest such `let` of that name in this function; else the
+        // module's own binding of that name, when no local took it (#3194).
+        let local = self.fn_literal_lets.get((self.current_fn_sig_idx as i64) * 4294967296 + sym as i64)
+        if local.is_some(): return local.unwrap()
+        if not self.names_global_place(sym): return 0
+        self.module_literal_lets.get((self.local_file_id as i64) * 4294967296 + sym as i64) ?? 0
 
     // A use of `expr` that needs the type `demanded`: a parameter, a typed
     // place, a return. The collections a list builds are demanded (`List`,
@@ -17989,7 +17998,9 @@ impl Sema:
         let decided = (self.literal_type_decode(codes, k + 4) / 4294967296) as i32
         if second_len != 0:
             let other = (self.literal_type_decode(codes, k + 5 + first_len) / 4294967296) as i32
-            self.emit_error_with_help(f"this use demands `{self.type_name(other)}` of a binding another use demands `{self.type_name(decided)}` of (§4.3c)", self.literal_decisions[k + 2], "write the binding's type")
+            // Both sites: the uses may sit in two functions of the module (#3194).
+            let first_use: i32 = self.literal_decisions[k + 1]
+            self.emit_error_with_help(f"this use demands `{self.type_name(other)}` of a binding another use demands `{self.type_name(decided)}` of (§4.3c); the other use is at {self.node_module_path_view(first_use)}:{self.node_line(first_use)}", self.literal_decisions[k + 2], "write the binding's type")
         decided
 
     // The generic type a bare name in an annotation names (`List`, `Option`,
@@ -18075,8 +18086,7 @@ impl Sema:
         // D128 (#2343): a comprehension's binding too (`let sums = [a + b for
         // (a, b) in src]` passed at `[]i32`).
         let use_typed = ann_extra < 0 and value != 0 and (self.ast.kind(value) == NodeKind.NK_ARRAY_LIT or self.ast.kind(value) == NodeKind.NK_ARRAY_COMPREHENSION)
-        if use_typed and self.literal_watermark == 0:
-            self.literal_watermark = self.type_kinds.len() as i32
+        if use_typed: self.mark_literal_watermark()
         if use_typed and (self.literal_decisions.len() > 0 or self.literal_body_decisions.len() > 0):
             let decided = self.literal_decision(node)
             if decided != 0: ann_type = decided as TypeId
