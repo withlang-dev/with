@@ -11,5 +11,10 @@ fn main:
     let many = ["a1/1@_/_", "a2/1@_/_", "a3/1@_/_", "a4/1@_/_", "a5/1@_/_", "a6/1@_/_", "a7/1@_/_"]
     assert(conan_near_names_in(many, "a") == "`a1`, `a2`, `a3`, `a4`, `a5` and 2 more")
     assert(conan_near_names_in([], "zlib") == "")
+    // #2974: C's `lib` prefix, either way round.
+    let curls = ["curlpp/0.8.1@_/_", "libcurl/8.1.0@_/_", "libcurl/8.2.0@_/_"]
+    assert(conan_lib_twin_in(curls, "curl") == "libcurl")
+    assert(conan_lib_twin_in(["zlib/1.3.2@_/_"], "libzlib") == "zlib")
+    assert(conan_lib_twin_in(curls, "png") == "")
     assert(conan_near_names_in(["zlib/1.3.2@_/_"], "zlib") == "")
     print("ok")
