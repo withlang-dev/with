@@ -958,6 +958,10 @@ type Sema {
     // scopes have closed, and a generic callee's body is checked in the
     // middle of its caller's.
     fn_literal_lets: HashMap[i64, i32, Minted],
+    // #3194 (§4.3c rule 1): a private module-level binding with no
+    // annotation and an element-form literal takes its demands from its own
+    // module's bodies. Keyed file * 2^32 + name, to the `let` declaration.
+    module_literal_lets: HashMap[i64, i32, Minted],
     // D114: per (function, name), the one unannotated `let` whose integer
     // literal chose its type, or -1 once the name is bound twice; names it
     // in a narrowing error after the binding's scope has closed (a tail).
@@ -3725,6 +3729,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         field_decisions: List.new(),
         literal_demands: List.new(),
         fn_literal_lets: HashMap.new(),
+        module_literal_lets: HashMap.new(),
         fn_int_literal_lets: HashMap.new(),
         implicit_ok_tail_sigs: HashMap.new(),
         collect_copy_elements: HashMap.new(),

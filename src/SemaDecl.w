@@ -3137,6 +3137,15 @@ impl Sema:
                 self.emit_ephemeral_storage_error("ephemeral values cannot be stored in global storage", type_node, bind_ty as i32, node)
             if self.type_expr_is_collection_with_ref(type_node) != 0:
                 self.emit_error("ephemeral references cannot be stored in generic containers", node)
+        // #3194: `var names = []` at module level, private: its uses in this
+        // module's bodies say what it holds. A `pub` binding's type is part
+        // of the module's interface and is stated (law 6).
+        let value = self.ast.get_data1(node)
+        if type_extra < 0 and decl_is_pub == 0 and value > 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT:
+            self.module_literal_lets.insert((self.local_file_id as i64) * 4294967296 + name as i64, node)
+            self.mark_literal_watermark()
+            // The type its uses decided, from the check before this one.
+            if self.literal_decisions.len() > 0: bind_ty = self.literal_decision(node) as TypeId
         let decl_kind = if self.ast.let_decl_is_interface_provided(node): GLOBAL_VALUE_DECL_INTERFACE else: GLOBAL_VALUE_DECL_DEF
         self.register_top_level_global_decl(name, bind_ty as i32, is_mut, node, decl_kind)
         // An annotated constant is refused before its value is evaluated.
