@@ -1614,15 +1614,14 @@ fn resolve_facade_report_line(report: &str, name: &str) -> str:
         if line.starts_with(head): return line.slice(head.len(), line.len())
     ""
 
-// D198 (§16.2b.15): the fetched package whose own file `header` resolves to
-// from a module in `module_dir`: the first `c.<name>` of with.toml whose
-// package directory holds the header under one of its include paths
-// (metadata.json). A header beside the importing module is that file, not
-// the package's, and names no package. "" when no package holds it.
-fn resolve_fetched_package_of_header(module_dir: &str, header: &str) -> str:
-    if header.len() == 0 or resolve_file_exists(resolve_join(module_dir, header)): return ""
+type FetchedPackage { name: str, dir: str }
+
+// The `c.<name> = "<version>"` packages of the project that holds
+// `module_dir`, each with its directory under `.with/deps/c`.
+fn resolve_fetched_packages(module_dir: &str) -> List[FetchedPackage]:
+    let out = []
     let root = resolve_find_project_root(module_dir)
-    if root.len() == 0: return ""
+    if root.len() == 0: return out
     for line in with_fs_read_file(resolve_join(root, "with.toml")).split("\n"):
         let t = line.trim()
         if not t.starts_with("c."): continue
@@ -1634,7 +1633,30 @@ fn resolve_fetched_package_of_header(module_dir: &str, header: &str) -> str:
         if name.len() == 0 or open < 0: continue
         let close = rest.slice(open + 1, rest.len()).find("\"")
         if close < 0: continue
-        let dep = resolve_join(root, ".with/deps/c/" ++ name ++ "/" ++ rest.slice(open + 1, open + 1 + close))
+        out.push(FetchedPackage { name: name.to_owned(), dir: resolve_join(root, ".with/deps/c/" ++ name ++ "/" ++ rest.slice(open + 1, open + 1 + close)) })
+    out
+
+// What deciding which fetched package a header belongs to reads: the
+// project's with.toml and each package's metadata.json. They are inputs of
+// the build that asked: a change to one can change which contract applies.
+fn resolve_fetched_package_inputs(module_dir: &str) -> List[str]:
+    let out = []
+    let root = resolve_find_project_root(module_dir)
+    if root.len() == 0: return out
+    out.push(resolve_join(root, "with.toml"))
+    for package in resolve_fetched_packages(module_dir): out.push(resolve_join(package.dir, "metadata.json"))
+    out
+
+// D198 (§16.2b.15): the fetched package whose own file `header` resolves to
+// from a module in `module_dir`: the first `c.<name>` of with.toml whose
+// package directory holds the header under one of its include paths
+// (metadata.json). A header beside the importing module is that file, not
+// the package's, and names no package. "" when no package holds it.
+fn resolve_fetched_package_of_header(module_dir: &str, header: &str) -> str:
+    if header.len() == 0 or resolve_file_exists(resolve_join(module_dir, header)): return ""
+    for package in resolve_fetched_packages(module_dir):
+        let name = package.name
+        let dep = package.dir
         let meta = with_fs_read_file(resolve_join(dep, "metadata.json"))
         let key = meta.find("\"include_paths\"")
         if key < 0: continue
@@ -1643,7 +1665,7 @@ fn resolve_fetched_package_of_header(module_dir: &str, header: &str) -> str:
         if end < 0: continue
         for part in list.slice(0, end).split("\""):
             if part.len() == 0 or part.contains("[") or part.contains(":") or part.trim() == "," or part == "include_paths": continue
-            if resolve_file_exists(resolve_join(resolve_join(dep, part), header)): return name.to_owned()
+            if resolve_file_exists(resolve_join(resolve_join(dep, part), header)): return name
     ""
 
 // Whether the module at `path` is itself the facade of `package`: the
