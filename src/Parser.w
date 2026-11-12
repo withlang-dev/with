@@ -373,7 +373,7 @@ impl Parser:
 
     fn top_level_starts_decl() -> bool:
         let t = self.peek()
-        if t == TokenKind.TK_KW_FN or t == TokenKind.TK_KW_TYPE or t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or t == TokenKind.TK_KW_EXTERN or t == TokenKind.TK_KW_ERROR or t == TokenKind.TK_KW_CONST or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_GLOBAL:
+        if t == TokenKind.TK_KW_FN or t == TokenKind.TK_KW_TYPE or t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or t == TokenKind.TK_KW_EXTERN or t == TokenKind.TK_KW_CONST or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_GLOBAL or self.at_error_decl():
             return true
         // D120 (§4.3): `resource type` is a declaration.
         if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "resource") and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_TYPE:
@@ -693,7 +693,7 @@ impl Parser:
                t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or
                t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_EXTERN or
                t == TokenKind.TK_KW_TRAIT or t == TokenKind.TK_KW_IMPL or
-               t == TokenKind.TK_KW_EXTEND or t == TokenKind.TK_KW_ERROR:
+               t == TokenKind.TK_KW_EXTEND or self.at_error_decl():
                 return
             self.advance()
 
@@ -702,7 +702,7 @@ impl Parser:
             let t = self.peek()
             if t == TokenKind.TK_AT or
                t == TokenKind.TK_KW_FN or t == TokenKind.TK_KW_TYPE or t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or t == TokenKind.TK_KW_LET or
-               t == TokenKind.TK_KW_VAR or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_EXTERN or t == TokenKind.TK_KW_ERROR or
+               t == TokenKind.TK_KW_VAR or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_EXTERN or self.at_error_decl() or
                t == TokenKind.TK_KW_TRAIT or t == TokenKind.TK_KW_IMPL or t == TokenKind.TK_KW_EXTEND or t == TokenKind.TK_KW_ASYNC or
                t == TokenKind.TK_KW_GEN or t == TokenKind.TK_KW_COMPTIME:
                 return
@@ -1513,7 +1513,7 @@ impl Parser:
             return self.parse_top_level_let(is_pub, start)
         if t == TokenKind.TK_KW_EXTERN:
             return self.parse_extern_decl(start)
-        if t == TokenKind.TK_KW_ERROR:
+        if self.at_error_decl():
             return self.parse_error_decl(is_pub, start)
         if t == TokenKind.TK_KW_CONST:
             return self.parse_const_decl(is_pub, start)
@@ -2043,7 +2043,7 @@ impl Parser:
 
         if self.peek() == TokenKind.TK_PIPE or (self.peek() == TokenKind.TK_IDENT and self.is_enum_def()):
             self.emit_legacy_enum_decl_error()
-            let extra_start = self.parse_enum_variants()
+            let extra_start = self.parse_enum_variants(start)
             self.pool.add_extra(is_pub)
             self.pool.add_extra(tp_start)
             self.pool.add_extra(tp_count)
@@ -2453,8 +2453,8 @@ impl Parser:
         self.pos = saved
         false
 
-    mut fn parse_enum_variants() -> i32:
-        let list = self.parse_enum_variant_list()
+    mut fn parse_enum_variants(decl_start: i32) -> i32:
+        let list = self.parse_enum_variant_list(decl_start)
         self.add_enum_variant_extras(list.count, list.records)
 
     // Writes the enum-variant extras block: the count, then each variant's
@@ -2468,7 +2468,11 @@ impl Parser:
 
     // Parses `| A | B(payload, ...)` variants without writing extras, so an
     // `error E from X =` declaration can put its generated wrappers first (D57).
-    mut fn parse_enum_variant_list() -> EnumVariantList:
+    // A variant on a line of its own with no `|` is indented under its
+    // declaration: a name at the declaration's own indent starts the next
+    // item (`error E = ...`, `c facade f:`, `resource type T`), #3131.
+    mut fn parse_enum_variant_list(decl_start: i32) -> EnumVariantList:
+        let decl_indent = line_indent_of(self.source, decl_start)
         let variants: List[i32] = []
         let name_starts: List[i32] = []
         let name_ends: List[i32] = []
@@ -2518,7 +2522,7 @@ impl Parser:
                 self.advance()
                 self.skip_newlines()
                 continue
-            if self.peek() == TokenKind.TK_IDENT:
+            if self.peek() == TokenKind.TK_IDENT and column_of(self.source, self.current_start()) > decl_indent:
                 continue
             break
 
@@ -3481,7 +3485,7 @@ impl Parser:
             return self.poisoned_expr()
         self.skip_newlines()
 
-        let written = self.parse_enum_variant_list()
+        let written = self.parse_enum_variant_list(start)
         var at = 0
         for wi in 0..written.count:
             let vname = written.records[at]
@@ -4690,6 +4694,11 @@ impl Parser:
 
     fn current_ident_is(text: &str) -> bool: self.token_text_is(self.pos, text)
 
+    // §10.8, §29.11: `error` is contextual. `error Name` opens a declaration;
+    // two names side by side are never an expression, so the word stays free
+    // as a binding, field and parameter name.
+    fn at_error_decl() -> bool: self.current_ident_is("error") and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_IDENT
+
     fn current_text() -> str: self.source.slice(self.current_start() as i64, self.current_end() as i64)
 
     mut fn parse_c_facade(start: i32) -> NodeId:
@@ -4700,7 +4709,7 @@ impl Parser:
         // `c facade sqlite error SqliteError:` (§16.2b.4, D97): one error
         // type for every fallible operation the facade presents.
         let items: List[i32] = []
-        if self.peek() == TokenKind.TK_KW_ERROR:
+        if self.current_ident_is("error"):
             let error_start = self.current_start()
             self.advance()
             let error_name = self.expect_ident()
@@ -4967,7 +4976,7 @@ impl Parser:
             return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), if none: FACADE_CLAUSE_RUNS_NO_THREADS else: FACADE_CLAUSE_RUNS_THREADS, self.pool.extra_len(), 0) as i32
         // §16.2b.4 (D97): the facade-wide error type is stated in the
         // header, `c facade F error E:`, never as an item (#2953).
-        if self.peek() == TokenKind.TK_KW_ERROR:
+        if self.current_ident_is("error"):
             self.emit_error("a facade-wide error type is stated in the header, `c facade F error E:`, not as an item (§16.2b.4)")
             return 0
         self.emit_error("expected 'resource', 'handle', 'fn', 'domain', 'text utf8', 'runs threads' or 'use convention' in c facade (§16.2b)")

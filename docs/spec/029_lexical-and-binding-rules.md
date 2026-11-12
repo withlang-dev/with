@@ -170,13 +170,13 @@ lexer keyword table:
 and       as        asm       async     await     break
 c_import  comptime  const     continue  copy      defer
 do        dyn       else      enum      ephemeral errdefer
-error     extend    extern    false     fn        for
-gen       global    goto      if        impl      in
-it        let       loop      match     module    move
-mut       no_suspend not      null      opaque    or
-pub       return    select    spawn     trait     true
-type      union     unsafe    use       var       where
-while     with      yield
+extend    extern    false     fn        for       gen
+global    goto      if        impl      in        it
+let       loop      match     module    move      mut
+no_suspend not      null      opaque    or        pub
+return    select    spawn     trait     true      type
+union     unsafe    use       var       where     while
+with      yield
 ```
 
 Notes:
@@ -187,6 +187,9 @@ Notes:
   meaning only in index lists (§11.7) and parameter declarations
   (§9.1a) respectively, and remain usable as ordinary identifiers
   elsewhere.
+- `error` is **contextual**: before a name it opens an error
+  declaration (§10.8) or states a facade's error type (§16.2b.4),
+  and it remains usable as an ordinary identifier elsewhere.
 - `else if` is a two-token keyword pair (§9.1), not a single
   keyword.
 - `spawn` is reserved; it currently has no construct in §14 and its
