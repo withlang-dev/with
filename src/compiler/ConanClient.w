@@ -88,18 +88,23 @@ fn conan_argv_append(argv: &str, arg: &str) -> str:
 // build/https_fetch.w does.
 // A file:// URL — a local mirror, or a test's fixture — is copied the way an
 // HTTPS fetch writes its body; an absent file is a failed download.
-fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32: (conan_https_fetch_to_file(url, path, timeout_ms).len() > 0) as i32
+// A download with nowhere else to turn: its failure is the error.
+fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
+    let why = conan_https_fetch_to_file(url, path, timeout_ms)
+    if why.len() > 0: runtime_eprint("error: Conan download failed: " ++ url ++ " -> " ++ path ++ " (" ++ why ++ ")")
+    (why.len() > 0) as i32
 
 // #3169: "" when `path` holds the body, else why not — the reason the
-// archive report names beside each URL it tried.
+// archive report names beside each URL it tried. It prints nothing: a
+// recipe's mirror that fails is not an error while another one serves the
+// archive (libiconv's first mirror refused the handshake, and a fetch that
+// succeeded printed "error:"), so the caller that has no other source says so.
 fn conan_https_fetch_to_file(url: &str, path: &str, timeout_ms: i32) -> str:
     if url.starts_with("file://"):
         let local = conan_file_url_path(url)
         if runtime_file_exists(local) == 0 or runtime_is_dir(local) != 0: return "no such file"
         return if runtime_write_file(path, runtime_read_file(local)) == 0: "" else: "could not write " ++ path
-    if not url.starts_with("https://"):
-        runtime_eprint("error: Conan download needs an https:// or file:// URL: " ++ url)
-        return "not an https:// or file:// URL"
+    if not url.starts_with("https://"): return "not an https:// or file:// URL"
     let connect_ms = if timeout_ms > 0 and timeout_ms < 20000: timeout_ms else: 20000
     let idle_ms = if timeout_ms > 0 and timeout_ms < 30000: timeout_ms else: 30000
     // #2517: five attempts with a growing pause (2, 4, 6, 8 s: 20 s in all,
@@ -109,18 +114,18 @@ fn conan_https_fetch_to_file(url: &str, path: &str, timeout_ms: i32) -> str:
     // failure (no connection, no response) reads differently from a server
     // that answered with a status.
     var last_status: i32 = -1
+    var last_reason = ""
     for attempt in 1..6:
         let response = https_get_response_timeout(url.to_owned(), 5, connect_ms, idle_ms)
         if response.status == 200:
             return if runtime_write_file(path, response.body) == 0: "" else: "could not write " ++ path
         last_status = response.status
+        last_reason = response.reason
         // #3169: a server that answered 5xx (GitHub's release assets 504
         // for a minute at a time) is given longer: 5, 10, 15, 20 s.
         let pause = if last_status >= 500: 5 * attempt else: 2 * attempt
         if attempt < 5: runtime_nanosleep(pause as i64 * 1000000000)
-    let why = if last_status < 0: "no connection or no response (a resolver or network failure)" else: f"the server answered status {last_status}"
-    runtime_eprint("error: Conan download failed after 5 attempts: " ++ url ++ " -> " ++ path ++ " (" ++ why ++ ")")
-    why
+    if last_status < 0: f"no response in 5 attempts: {last_reason}" else: f"the server answered status {last_status} in 5 attempts"
 
 // The local path a file:// URL names: percent-escapes decoded, and a Windows
 // drive path (file:///C:/…) without its leading slash.
@@ -1701,6 +1706,7 @@ fn conan_fetch_source_tree(name: &str, version: &str, fetched: &ConanFetchedReci
     let picked = conan_pick_archive(fetched.source, work, conan_archive_download, conan_archive_digest)
     let archive = picked.path
     if archive.len() == 0: return ConanSourceTree { source_dir: "", problem: "no source archive of " ++ name ++ "/" ++ version ++ " could be used:" ++ picked.tried }
+    if picked.tried.len() > 0: runtime_eprint("  note: " ++ conan_path_basename(archive) ++ " came from a later mirror of the recipe, after:" ++ picked.tried)
     if conan_extract_any(archive, raw_dir):
         return ConanSourceTree { source_dir: "", problem: "could not extract " ++ conan_path_basename(archive) ++ " (it needs `tar`" ++ (if archive.ends_with(".zip"): " with zip support, or `unzip`" else: if archive.ends_with(".xz"): " and `xz`" else: "") ++ ")" }
     let source_dir = conan_source_root(raw_dir)

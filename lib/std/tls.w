@@ -3,12 +3,15 @@
 // Supports cipher suites:
 //   TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256    (0xC02F)
 //   TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256  (0xC02B)
+//   TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256    (0xCCA8, RFC 7905)
+//   TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256  (0xCCA9, RFC 7905)
 
 use std.crypto.sha256
 use std.crypto.sha512
 use std.crypto.hmac
 use std.crypto.aes
 use std.crypto.gcm
+use std.crypto.chacha20poly1305
 use std.crypto.ec
 use std.crypto.ecdsa
 use std.crypto.x509
@@ -37,6 +40,12 @@ let HS_NEW_SESSION_TICKET: u8 = 4u8
 
 let SUITE_ECDHE_RSA_AES128_GCM: u16 = 0xC02Fu16
 let SUITE_ECDHE_ECDSA_AES128_GCM: u16 = 0xC02Bu16
+let SUITE_ECDHE_RSA_CHACHA20: u16 = 0xCCA8u16
+let SUITE_ECDHE_ECDSA_CHACHA20: u16 = 0xCCA9u16
+
+fn tls_suite_is_chacha(suite: u16): suite == SUITE_ECDHE_RSA_CHACHA20 or suite == SUITE_ECDHE_ECDSA_CHACHA20
+fn tls_suite_is_rsa(suite: u16): suite == SUITE_ECDHE_RSA_AES128_GCM or suite == SUITE_ECDHE_RSA_CHACHA20
+fn tls_suite_is_ecdsa(suite: u16): suite == SUITE_ECDHE_ECDSA_AES128_GCM or suite == SUITE_ECDHE_ECDSA_CHACHA20
 
 // ── TLS record I/O ─────────────────────────────────────────────────
 
@@ -196,10 +205,12 @@ type TlsConn  {
     client_random: [u8; 32],
     server_random: [u8; 32],
     // Encryption state
-    client_write_key: [u8; 16],
-    server_write_key: [u8; 16],
-    client_write_iv: [u8; 4],
-    server_write_iv: [u8; 4],
+    // AES-128-GCM uses 16 bytes of a key and 4 of an IV; ChaCha20-Poly1305
+    // all 32 and 12.
+    client_write_key: [u8; 32],
+    server_write_key: [u8; 32],
+    client_write_iv: [u8; 12],
+    server_write_iv: [u8; 12],
     client_seq: u64,
     server_seq: u64,
     cipher_active: i32,
@@ -218,10 +229,10 @@ fn TlsConn.new(fd: i32) -> TlsConn:
         fd: fd,
         client_random: [0u8; 32],
         server_random: [0u8; 32],
-        client_write_key: [0u8; 16],
-        server_write_key: [0u8; 16],
-        client_write_iv: [0u8; 4],
-        server_write_iv: [0u8; 4],
+        client_write_key: [0u8; 32],
+        server_write_key: [0u8; 32],
+        client_write_iv: [0u8; 12],
+        server_write_iv: [0u8; 12],
         client_seq: 0u64,
         server_seq: 0u64,
         cipher_active: 0,
@@ -247,8 +258,62 @@ unsafe fn tls_hs_hash_current(conn: *mut TlsConn, out: *mut u8):
 
 // ── Encrypted record send/recv ─────────────────────────────────────
 
-// Send an encrypted TLS record using AES-128-GCM
+unsafe fn tls_bytes(p: *const u8, len: i32) -> List[u8]:
+    let out = []
+    for i in 0..len: out.push(*(p + i as u64))
+    out
+
+// The additional data of a record (RFC 5246 §6.2.3.3): seq(8) + type(1) +
+// version(2) + plaintext length(2).
+fn tls_record_aad(seq: u64, content_type: u8, len: i32) -> List[u8]:
+    var aad: [u8; 13] = [0u8; 13]
+    u64_to_be(&raw mut aad[0] as *mut u8, 0, seq)
+    aad[8] = content_type
+    aad[9] = 0x03u8
+    aad[10] = 0x03u8
+    aad[11] = (len >> 8) as u8
+    aad[12] = (len & 0xFF) as u8
+    unsafe { tls_bytes(&aad[0] as *const u8, 13) }
+
+// RFC 7905 §2: the nonce is the 12-byte write IV with the record's sequence
+// number, big-endian, XORed into its last 8 bytes. Nothing of it is sent.
+unsafe fn tls_chacha_nonce(iv: *const u8, seq: u64) -> List[u8]:
+    var seq_be: [u8; 8] = [0u8; 8]
+    u64_to_be(&raw mut seq_be[0] as *mut u8, 0, seq)
+    let nonce = []
+    for i in 0..12: nonce.push(if i < 4: *(iv + i as u64) else: *(iv + i as u64) ^ seq_be[i - 4])
+    nonce
+
+// A ChaCha20-Poly1305 record: the ciphertext, then its tag.
+unsafe fn tls_send_chacha(conn: *mut TlsConn, content_type: u8, data: *const u8, data_len: i32) -> i32:
+    let key = tls_bytes(&conn.client_write_key[0] as *const u8, 32)
+    let nonce = tls_chacha_nonce(&conn.client_write_iv[0] as *const u8, conn.client_seq)
+    let sealed = chacha20_poly1305_seal(&key, &nonce, &tls_record_aad(conn.client_seq, content_type, data_len), tls_bytes(data, data_len))
+    conn.client_seq = conn.client_seq + 1u64
+    if sealed.is_err(): return -1
+    let record = sealed.unwrap()
+    tls_send_record(conn.fd, content_type, record.ptr as *const u8, data_len + 16)
+
+// The plaintext length of a received ChaCha20-Poly1305 record, or -1 when
+// its tag does not match.
+unsafe fn tls_decrypt_chacha(conn: *mut TlsConn, content_type: u8, enc_data: *const u8, enc_len: i32, plain: *mut u8) -> i32:
+    if enc_len < 16: return -1
+    let key = tls_bytes(&conn.server_write_key[0] as *const u8, 32)
+    let nonce = tls_chacha_nonce(&conn.server_write_iv[0] as *const u8, conn.server_seq)
+    let opened = chacha20_poly1305_open(&key, &nonce, &tls_record_aad(conn.server_seq, content_type, enc_len - 16), tls_bytes(enc_data, enc_len))
+    conn.server_seq = conn.server_seq + 1u64
+    if opened.is_err(): return -1
+    let text = opened.unwrap()
+    for i in 0..enc_len - 16: *(plain + i as u64) = text[i]
+    enc_len - 16
+
+// What a protected record carries beyond its plaintext: the tag, and for
+// AES-GCM the explicit nonce.
+unsafe fn tls_record_overhead(conn: *mut TlsConn): if tls_suite_is_chacha(conn.cipher_suite): 16 else: 24
+
+// Send an encrypted TLS record under the negotiated suite
 unsafe fn tls_send_encrypted(conn: *mut TlsConn, content_type: u8, data: *const u8, data_len: i32) -> i32:
+    if tls_suite_is_chacha(conn.cipher_suite): return tls_send_chacha(conn, content_type, data, data_len)
     // Build nonce: client_write_iv (4) + explicit nonce (8)
     var nonce: [u8; 12] = [0u8; 12]
     var ni = 0
@@ -293,9 +358,10 @@ unsafe fn tls_send_encrypted(conn: *mut TlsConn, content_type: u8, data: *const 
 
     tls_send_record(conn.fd, content_type, &ct[0] as *const u8, total)
 
-// Decrypt a received encrypted record (AES-128-GCM)
+// Decrypt a received encrypted record under the negotiated suite
 // Returns plaintext length or -1 on error/auth failure.
 unsafe fn tls_decrypt_record(conn: *mut TlsConn, content_type: u8, enc_data: *const u8, enc_len: i32, plain: *mut u8) -> i32:
+    if tls_suite_is_chacha(conn.cipher_suite): return tls_decrypt_chacha(conn, content_type, enc_data, enc_len, plain)
     if enc_len < 24:  // 8 nonce + 0 data + 16 tag minimum
         return -1
 
@@ -363,7 +429,7 @@ unsafe fn tls_recv(conn: *mut TlsConn, buf: *mut u8, buf_cap: i32) -> i32:
     if ct != TLS_APPLICATION_DATA:
         return -1
     if conn.cipher_active != 0:
-        if rec_len - 24 > buf_cap:
+        if rec_len - tls_record_overhead(conn) > buf_cap:
             return -1
         return tls_decrypt_record(conn, ct, &rec_buf[0] as *const u8, rec_len, buf)
     // Unencrypted: copy directly
@@ -411,9 +477,9 @@ unsafe fn tls_send_client_hello(conn: *mut TlsConn, hostname: *const u8, hostnam
     buf[pos] = 0u8
     pos = pos + 1
 
-    // Cipher suites (2 suites = 4 bytes + 2 length)
+    // Cipher suites (4 suites = 8 bytes + 2 length), AES-GCM preferred
     buf[pos] = 0u8
-    buf[pos + 1] = 4u8  // 4 bytes of cipher suites
+    buf[pos + 1] = 8u8  // 8 bytes of cipher suites
     pos = pos + 2
     // TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (0xC02F)
     buf[pos] = 0xC0u8
@@ -422,6 +488,14 @@ unsafe fn tls_send_client_hello(conn: *mut TlsConn, hostname: *const u8, hostnam
     // TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 (0xC02B)
     buf[pos] = 0xC0u8
     buf[pos + 1] = 0x2Bu8
+    pos = pos + 2
+    // TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 (0xCCA8)
+    buf[pos] = 0xCCu8
+    buf[pos + 1] = 0xA8u8
+    pos = pos + 2
+    // TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 (0xCCA9)
+    buf[pos] = 0xCCu8
+    buf[pos + 1] = 0xA9u8
     pos = pos + 2
 
     // Compression methods: null only
@@ -555,6 +629,10 @@ unsafe fn tls_parse_server_hello(conn: *mut TlsConn, data: *const u8, len: i32) 
     let cs_hi = *(data + i as u64)
     let cs_lo = *(data + (i + 1) as u64)
     conn.cipher_suite = ((cs_hi as u16) << 8u16) | (cs_lo as u16)
+    // A suite this client did not offer is not one it can speak.
+    if not tls_suite_is_rsa(conn.cipher_suite) and not tls_suite_is_ecdsa(conn.cipher_suite):
+        tls_trace(f"the server chose suite {conn.cipher_suite as i32}, which was not offered")
+        return -1
     i = i + 2
 
     // Compression (1 byte, must be 0)
@@ -757,22 +835,23 @@ unsafe fn tls_derive_keys(conn: *mut TlsConn, premaster: *const u8, premaster_le
         seed[32 + si] = conn.client_random[si]
         si = si + 1
 
-    // For AES-128-GCM: client_write_key(16) + server_write_key(16) + client_write_iv(4) + server_write_iv(4) = 40 bytes
-    var key_block: [u8; 40] = [0u8; 40]
+    // client_write_key + server_write_key + client_write_iv + server_write_iv:
+    // 16, 16, 4, 4 for AES-128-GCM (40 bytes); 32, 32, 12, 12 for
+    // ChaCha20-Poly1305 (88). The PRF's output is a stream, so the shorter
+    // block is the longer one's first bytes.
+    var key_block: [u8; 88] = [0u8; 88]
     var label_ke: [u8; 13] = [0x6Bu8, 0x65u8, 0x79u8, 0x20u8, 0x65u8, 0x78u8, 0x70u8, 0x61u8, 0x6Eu8, 0x73u8, 0x69u8, 0x6Fu8, 0x6Eu8]
-    tls_prf_sha256(&master_secret[0] as *const u8, 48, &label_ke[0] as *const u8, 13, &seed[0] as *const u8, 64, &raw mut key_block[0] as *mut u8, 40)
+    tls_prf_sha256(&master_secret[0] as *const u8, 48, &label_ke[0] as *const u8, 13, &seed[0] as *const u8, 64, &raw mut key_block[0] as *mut u8, 88)
 
     // Distribute keys
-    si = 0
-    while si < 16:
-        conn.client_write_key[si] = key_block[si]
-        conn.server_write_key[si] = key_block[16 + si]
-        si = si + 1
-    si = 0
-    while si < 4:
-        conn.client_write_iv[si] = key_block[32 + si]
-        conn.server_write_iv[si] = key_block[36 + si]
-        si = si + 1
+    let key_len = if tls_suite_is_chacha(conn.cipher_suite): 32 else: 16
+    let iv_len = if tls_suite_is_chacha(conn.cipher_suite): 12 else: 4
+    for k in 0..key_len:
+        conn.client_write_key[k] = key_block[k]
+        conn.server_write_key[k] = key_block[key_len + k]
+    for k in 0..iv_len:
+        conn.client_write_iv[k] = key_block[2 * key_len + k]
+        conn.server_write_iv[k] = key_block[2 * key_len + iv_len + k]
 
     // Keep the master secret for both Finished verify_data computations.
     si = 0
@@ -1023,11 +1102,11 @@ unsafe fn tls_verify_peer(
         digest_len = 64
     let leaf = &evidence.leaf as *const X509Cert
     let leaf_buf2 = cert_buf + evidence.leaf_start as u64
-    if conn.cipher_suite == SUITE_ECDHE_RSA_AES128_GCM:
+    if tls_suite_is_rsa(conn.cipher_suite):
         if evidence.ske_sig_alg != 1 or leaf.key_type != 1:
             return -1
         return if rsa_pkcs1_verify(leaf_buf2 + leaf.key_n_start as u64, leaf.key_n_len, leaf_buf2 + leaf.key_e_start as u64, leaf.key_e_len, &evidence.ske_sig[0] as *const u8, evidence.ske_sig_len, &digest[0] as *const u8, digest_len): 0 else: -1
-    if conn.cipher_suite == SUITE_ECDHE_ECDSA_AES128_GCM:
+    if tls_suite_is_ecdsa(conn.cipher_suite):
         if evidence.ske_sig_alg != 3 or leaf.key_type != 2:
             return -1
         return if x509_ecdsa_verify_der_bytes(leaf_buf2 + leaf.key_point_start as u64, leaf.key_point_len, leaf.key_curve, &evidence.ske_sig[0] as *const u8, evidence.ske_sig_len, &digest[0] as *const u8, digest_len): 0 else: -1
@@ -1130,4 +1209,37 @@ pub fn tls_prf_sha256_kat() -> i32:
     var out: [u8; 100] = [0u8; 100]
     unsafe { tls_prf_sha256(&raw const secret[0] as *const u8, 16, &raw const label[0] as *const u8, 10, &raw const seed[0] as *const u8, 16, &raw mut out[0] as *mut u8, 100) }
     if sha256_hex(&raw const out[0] as *const u8) != "e3f229ba727be17b8d122620557cd453c2aab21d07c3d495329b52d4e61edb5a": return 1
+    0
+
+// Known answer for the ChaCha20-Poly1305 record path (RFC 7905 §2). The
+// nonce of IV 40..4b and sequence number 0x0102030405060708 is the IV with
+// the number XORed into its last eight bytes; a record sealed under one
+// direction's key opens under the same key, IV and number, advances the
+// number, and is refused once a byte of it changes. 0 on pass.
+pub fn tls_chacha_record_kat() -> i32:
+    var conn = TlsConn.new(-1)
+    conn.cipher_suite = SUITE_ECDHE_RSA_CHACHA20
+    for i in 0..32: conn.server_write_key[i] = (0x80 + i) as u8
+    for i in 0..12: conn.server_write_iv[i] = (0x40 + i) as u8
+    conn.server_seq = 0x0102030405060708u64
+    let text_len = 22
+    unsafe:
+        let cp = &raw mut conn as *mut TlsConn
+        let key = tls_bytes(&conn.server_write_key[0] as *const u8, 32)
+        let nonce = tls_chacha_nonce(&conn.server_write_iv[0] as *const u8, conn.server_seq)
+        let expected: [u8; 12] = [0x40u8, 0x41u8, 0x42u8, 0x43u8, 0x45u8, 0x47u8, 0x45u8, 0x43u8, 0x4du8, 0x4fu8, 0x4du8, 0x43u8]
+        for i in 0..12:
+            if nonce[i] != expected[i]: return 1
+        let aad = tls_record_aad(conn.server_seq, TLS_APPLICATION_DATA, text_len)
+        let body = []
+        for i in 0..text_len: body.push((0x61 + i) as u8)
+        let record = chacha20_poly1305_seal(&key, &nonce, &aad, body).unwrap()
+        if record.len() != 38: return 2
+        var plain: [u8; 64] = [0u8; 64]
+        let n = tls_decrypt_record(cp, TLS_APPLICATION_DATA, record.ptr as *const u8, text_len + 16, &raw mut plain[0] as *mut u8)
+        if n != text_len or conn.server_seq != 0x0102030405060709u64: return 3
+        for i in 0..n:
+            if plain[i] != (0x61 + i) as u8: return 4
+        // The same bytes under the next sequence number are another record.
+        if tls_decrypt_record(cp, TLS_APPLICATION_DATA, record.ptr as *const u8, text_len + 16, &raw mut plain[0] as *mut u8) != -1: return 5
     0
