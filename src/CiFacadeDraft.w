@@ -1366,8 +1366,10 @@ impl CiProject:
         // fact (`text param`, `nullable param`, `text return`) is written
         // into a function's block, and a function nothing else presents has
         // none.
-        for (si, symbol) in self.symbols.enumerate():
-            if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.registry_more.len() == 0 or self.presented.contains(si as i32): continue
+        let presented_names = []
+        for si in self.presented: presented_names.push(with_str_clone_ref(self.symbols[si].name))
+        for symbol in self.symbols:
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.registry_more.len() == 0 or presented_names.contains(symbol.name): continue
             head = head ++ "  " ++ symbol.name ++ ": the registry's presentation lines are not applied: nothing presents the function (the registry states `lend`, or what it does with its pointers)\n"
         for record in self.fd_representations():
             if modeled.contains(record): continue
