@@ -77,7 +77,25 @@ fn contract_clause_at(sema: &Sema, site: &ContractSite, clause: i32) -> str:
     let rule = facade_clause_profile_rule(sema.ast, clause)
     if rule != 0: return contract_rule_at(sema, rule)
     let name = facade_clause_name(sema.ast.get_data0(clause))
-    f"clause:{name}@{site.path}:{contract_node_line(sema, site, clause)}"
+    let word = if contract_clause_is_evidence(sema, site, clause): "evidence" else: "clause"
+    f"{word}:{name}@{site.path}:{contract_node_line(sema, site, clause)}"
+
+// Whether the drafter recorded the clause as evidence: drawn from source
+// that is not established as the build linked (a prebuilt binary's), so it
+// is no proof. The drafter writes the word after the clause, on its line.
+fn contract_clause_is_evidence(sema: &Sema, site: &ContractSite, clause: i32) -> bool:
+    if clause <= 0 or clause >= sema.ast.node_count(): return false
+    var end = sema.ast.get_start(clause)
+    while end < site.source.len() and site.source[end] != '\n': end = end + 1
+    site.source.slice(sema.ast.get_start(clause), end).contains("// evidence: ")
+
+// What the drafter analyzed for a contract whose lines are evidence: the
+// `// analyzed:` line at the head of its file, or "".
+fn contract_site_analyzed(site: &ContractSite) -> str:
+    for line in site.source.split("\n"):
+        if line.starts_with("// analyzed: "): return line.slice(13, line.len()).to_owned()
+        if not line.starts_with("//"): break
+    ""
 
 fn contract_rule_at(sema: &Sema, rule: i32) -> str:
     let di = sema.facade_rule_profile_decl(rule)
@@ -808,6 +826,14 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
                 let by = if sema.facade_rule_is_fn(rule): "the fn item" else: "`" ++ facade_clause_name(sema.ast.get_data0(cands[1])) ++ "`"
                 let matched = if sema.facade_rule_is_fn(rule): what else: f"{sema.safe_symbol_text(cands[0])} for {what}"
                 report.note(f"contract-audit: profile fact shadowed: profile {profile} rule {rname} ({template}, {rat}) matched {matched}, and {by} at {contract_where(site, sema, cands[1])} states the fact explicitly; the facade's statement wins (§16.2b.2)")
+    // A contract whose lines are evidence says what was analyzed, once.
+    let evidence_paths = []
+    for c in sema.foreign_contracts:
+        let site = contract_site(sema, c.decl, source_path, source_text)
+        let analyzed = contract_site_analyzed(site)
+        if analyzed.len() == 0 or evidence_paths.contains(site.path): continue
+        evidence_paths.push(with_str_clone_ref(site.path))
+        report.note(f"contract-audit: evidence, not proof, in {site.path}: the source analyzed and the library linked are not established as the same build; analyzed: {analyzed}")
     report.note(f"contract-audit: resources={sema.facade_resources.len()} items={sema.foreign_contracts.len()} domains={sema.facade_domain_list.len()} conventions={conventions} advisories={advisories} profile-ambiguous={ambiguous} profile-shadowed={shadowed}")
 
 // ── the `contract` view ──────────────────────────────────────────────────
