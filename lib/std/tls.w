@@ -288,7 +288,7 @@ unsafe fn tls_chacha_nonce(iv: *const u8, seq: u64) -> List[u8]:
 unsafe fn tls_send_chacha(conn: *mut TlsConn, content_type: u8, data: *const u8, data_len: i32) -> i32:
     let key = tls_bytes(&conn.client_write_key[0] as *const u8, 32)
     let nonce = tls_chacha_nonce(&conn.client_write_iv[0] as *const u8, conn.client_seq)
-    let sealed = chacha20_poly1305_seal(&key, &nonce, &tls_record_aad(conn.client_seq, content_type, data_len), tls_bytes(data, data_len))
+    let sealed = chacha20_poly1305_seal(key, nonce, tls_record_aad(conn.client_seq, content_type, data_len), tls_bytes(data, data_len))
     conn.client_seq = conn.client_seq + 1u64
     if sealed.is_err(): return -1
     let record = sealed.unwrap()
@@ -300,7 +300,7 @@ unsafe fn tls_decrypt_chacha(conn: *mut TlsConn, content_type: u8, enc_data: *co
     if enc_len < 16: return -1
     let key = tls_bytes(&conn.server_write_key[0] as *const u8, 32)
     let nonce = tls_chacha_nonce(&conn.server_write_iv[0] as *const u8, conn.server_seq)
-    let opened = chacha20_poly1305_open(&key, &nonce, &tls_record_aad(conn.server_seq, content_type, enc_len - 16), tls_bytes(enc_data, enc_len))
+    let opened = chacha20_poly1305_open(key, nonce, tls_record_aad(conn.server_seq, content_type, enc_len - 16), tls_bytes(enc_data, enc_len))
     conn.server_seq = conn.server_seq + 1u64
     if opened.is_err(): return -1
     let text = opened.unwrap()
@@ -1233,7 +1233,7 @@ pub fn tls_chacha_record_kat() -> i32:
         let aad = tls_record_aad(conn.server_seq, TLS_APPLICATION_DATA, text_len)
         let body = []
         for i in 0..text_len: body.push((0x61 + i) as u8)
-        let record = chacha20_poly1305_seal(&key, &nonce, &aad, body).unwrap()
+        let record = chacha20_poly1305_seal(key, nonce, aad, body).unwrap()
         if record.len() != 38: return 2
         var plain: [u8; 64] = [0u8; 64]
         let n = tls_decrypt_record(cp, TLS_APPLICATION_DATA, record.ptr as *const u8, text_len + 16, &raw mut plain[0] as *mut u8)
