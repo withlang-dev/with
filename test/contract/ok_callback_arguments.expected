@@ -30,16 +30,16 @@ callback param 2: extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step of en
     role: retained by Engine (param 0: *mut eng e); it lives as long as its owner  [clause:retains@test/contract/ok_callback_arguments.w:20]
     arguments: its param 2 paired with its param 1, presented as a slice of Arg; valid for the invocation only  [clause:callback … argv … paired with argc@test/contract/ok_callback_arguments.w:22]
     user data: the value the facade boxed, read back through ctx_user_data and presented as &U; valid for the invocation only; the compiler generates the wrapper C calls  [clause:user_data from@test/contract/ok_callback_arguments.w:23]
-    thread: the registering thread  [default:callback executes where it was registered (§16.2b.10)]
+    thread: any, where the callback is retained; captured With state must be Send and Sync  [default:no `callback_thread registering` (§31.6.2)]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
 callback param 3: extern "C" fn(*mut ctx) -> Unit fin of eng_register; clause:fn@test/contract/ok_callback_arguments.w:18
     role: retained by Engine (param 0: *mut eng e); it lives as long as its owner  [clause:retains@test/contract/ok_callback_arguments.w:21]
     user data: the value the facade boxed, read back through ctx_user_data and presented as &U; valid for the invocation only; the compiler generates the wrapper C calls  [clause:user_data from@test/contract/ok_callback_arguments.w:23]
-    thread: the registering thread  [default:callback executes where it was registered (§16.2b.10)]
+    thread: any, where the callback is retained; captured With state must be Send and Sync  [default:no `callback_thread registering` (§31.6.2)]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
 callback param 4: extern "C" fn(*mut c_void) -> Unit destroy of eng_register; clause:fn@test/contract/ok_callback_arguments.w:18
     role: destroy path of the consumed param 1: *mut c_void ud; With destroys it through no other path  [clause:consumes@test/contract/ok_callback_arguments.w:19]
-    thread: the registering thread  [default:callback executes where it was registered (§16.2b.10)]
+    thread: any, where the callback is retained; captured With state must be Send and Sync  [default:no `callback_thread registering` (§31.6.2)]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
 fn val_get; facade:engines@test/contract/ok_callback_arguments.w; clause:fn@test/contract/ok_callback_arguments.w:24
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]

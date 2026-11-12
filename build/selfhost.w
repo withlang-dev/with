@@ -3526,7 +3526,7 @@ fn bs_check_whole_program_extern_var_redecl(ctx: &ActionCtx, compiler_path: &str
     let bin = bs_join(case_dir, "whole_program_extern_var_redecl")
     var rc = bs_write_fixture(ctx, defs_src, "pub var shared_counter: i32 = 41\n", "extern redecl defs")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, user_src, "use defs\nextern var shared_counter: i32\npub fn read_counter() -> i32: shared_counter + 1\n", "extern redecl user")
+    rc = bs_write_fixture(ctx, user_src, "use defs\nextern var shared_counter: i32\npub fn read_counter() -> i32: unsafe { shared_counter } + 1\n", "extern redecl user")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, main_src, "use user\nuse defs\n\nfn main:\n    if read_counter() == 42:\n        print(\"ok\")\n    else:\n        print(\"bad\")\n", "extern redecl main")
     if rc != 0: return rc

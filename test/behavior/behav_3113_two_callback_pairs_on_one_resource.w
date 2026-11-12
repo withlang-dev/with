@@ -21,6 +21,7 @@ c facade curl_two_pairs:
         lend
         callbacks none
     fn curl_easy_setopt
+        callback_thread registering
         rename setopt
         callbacks none
         ok CURLE_OK

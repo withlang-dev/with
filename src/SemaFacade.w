@@ -47,6 +47,7 @@ impl Sema:
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
+        self.verify_facade_callback_thread_registering()
         self.facade_index_call_effects()
         self.facade_index_pair_ops()
         self.facade_index_imported_name_ops()
@@ -702,13 +703,14 @@ impl Sema:
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
-            else if kind == NodeKind.NK_FACADE_CLAUSE and self.ast.get_data0(item) == FACADE_CLAUSE_RUNS_THREADS:
-                // §16.3: the library is the headers this facade's module
-                // imports.
+            else if kind == NodeKind.NK_FACADE_CLAUSE and (self.ast.get_data0(item) == FACADE_CLAUSE_RUNS_THREADS or self.ast.get_data0(item) == FACADE_CLAUSE_RUNS_NO_THREADS):
+                // §16.3, §31.8.1: the library is the headers this facade's module
+                // imports; 1 for `runs threads`, 2 for `runs no threads`.
+                let said = if self.ast.get_data0(item) == FACADE_CLAUSE_RUNS_NO_THREADS: 2 else: 1
                 for dj in 0..self.ast.decl_count():
                     let other = self.ast.get_decl(dj)
                     if self.ast.kind(other) == NodeKind.NK_C_IMPORT and dj < self.decl_source_paths.len() and di < self.decl_source_paths.len() and self.decl_source_paths[dj] == self.decl_source_paths[di]:
-                        self.facade_thread_headers.insert(sema_owned_text(self.pool_resolve(self.ast.get_data0(other))), 1)
+                        self.facade_thread_headers.insert(sema_owned_text(self.pool_resolve(self.ast.get_data0(other))), said)
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_RESOURCE:
@@ -1143,7 +1145,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1626,7 +1628,7 @@ impl Sema:
             c.rename = self.ast.get_extra(ops)
             return c
         if kind == FACADE_CLAUSE_CALLBACK_THREAD:
-            c.callback_thread_any = 1
+            c.callback_thread_said = if self.pool_resolve(self.ast.get_extra(ops)) == "registering": 2 else: 1
             return c
         if kind == FACADE_CLAUSE_CALLBACK_CONSUMES:
             let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
@@ -2712,6 +2714,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_TEXT_PARAM: return "text param"
     if kind == FACADE_CLAUSE_TEXT_UTF8: return "text utf8"
     if kind == FACADE_CLAUSE_RUNS_THREADS: return "runs threads"
+    if kind == FACADE_CLAUSE_RUNS_NO_THREADS: return "runs no threads"
     if kind == FACADE_CLAUSE_PRODUCED_FIELD: return "nullable field / nonnull field"
     if kind == FACADE_CLAUSE_TEXT_BYTES: return "text return bytes"
     if kind == FACADE_CLAUSE_DETACHES: return "detaches"
@@ -3318,7 +3321,7 @@ impl Sema:
         let inout = self.facade_contract_inout(ci)
         let ok_const = self.foreign_contracts[ci].ok_const
         let resource_op = self.facade_fn_is_resource_op(fn_sym)
-        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0
+        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0
         let callback_item = self.facade_contract_is_callback_item(ci)
         // D122 (§16.2b.8): a producer's buffer-plus-length input
         // (xmlReadMemory's buffer and size) is paired like a lend's; the
@@ -4743,7 +4746,7 @@ impl Sema:
 
     mut fn verify_facade_buffer_params():
         for ci in 0..self.foreign_contracts.len():
-            if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0:
+            if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0:
                 continue
             let fn_sym = self.foreign_contracts[ci].fn_sym
             let decl = self.foreign_contracts[ci].decl
@@ -4829,7 +4832,7 @@ impl Sema:
                 continue
             let borrow_res = self.foreign_contracts[ci].returns_borrow_resource
             let borrows_resource = borrow_res != 0 and self.pool_resolve(borrow_res) != "CStr"
-            let stronger = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0
+            let stronger = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0
             if stronger or borrows_resource or self.facade_fn_is_resource_op(fn_sym):
                 self.emit_error(f"fn '{fname}': 'valid on failed' marks a lend, a text view or a record view of the failed '{rname}'; a failed state is destroyed by its error's Drop and owns nothing else, so a producing, destroying, consuming, retaining or callback operation, or one returning a borrowed resource, cannot be valid on it (§16.2b.4)", node)
                 continue
@@ -5037,7 +5040,7 @@ impl Sema:
         // `callback_thread any` on a function whose callback arrives through
         // a variadic case speaks of that case's callback: the function is a
         // variadic contract, rendered case by case, not a callback item.
-        let thread_item = self.foreign_contracts[ci].callback_thread_any != 0 and not self.facade_contract_has_variadic_callback(ci)
+        let thread_item = self.foreign_contracts[ci].callback_thread_said != 0 and not self.facade_contract_has_variadic_callback(ci)
         if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or thread_item or self.foreign_contracts[ci].user_data_node != 0 or self.foreign_contracts[ci].argv_cb.len() > 0:
             return true
         for k in 0..self.foreign_contracts[ci].consumes.len():
@@ -5168,6 +5171,29 @@ impl Sema:
         true
 
     // Ruling §61 for callback contracts, and the net under the renderer.
+    // Whether a destroyer clause names `sym`: `freed by`, `drop` or `destroys`.
+    fn facade_global_is_named_destroyer(sym: i32) -> bool:
+        for c in self.foreign_contracts:
+            if c.text_return_free == sym: return true
+        for r in self.facade_resources:
+            if r.drop == sym or r.destroyers.contains(sym): return true
+        false
+
+    // §31.10 rule 5: `callback_thread registering` is true only while the
+    // resource that retains the callback cannot change threads. On a
+    // resource that is `thread send` the callback would follow it.
+    mut fn verify_facade_callback_thread_registering():
+        // (function, contract item, resource), gathered before any error is said.
+        let refused = []
+        for c in self.foreign_contracts:
+            if c.callback_thread_said != 2: continue
+            for ri in self.facade_method_host(c.fn_sym):
+                if (self.facade_resources[ri].thread_caps & 2) != 0: refused.push((c.fn_sym, c.node, ri))
+        for (fn_sym, node, ri) in refused:
+            let fname = self.pool_resolve(fn_sym)
+            let rname = self.pool_resolve(self.facade_resources[ri].name)
+            self.emit_error(f"fn '{fname}': 'callback_thread registering' says the callback runs only on the thread that registered it, but '{rname}', which retains it, is 'thread send': the resource can move to another thread and take the callback with it (§31.10)", node)
+
     mut fn verify_facade_callback_items():
         for ci in 0..self.foreign_contracts.len() as i32:
             if not self.facade_contract_is_callback_item(ci):
@@ -5225,7 +5251,7 @@ impl Sema:
             // must be able to receive — so a callback that gets the userdata
             // says so (`callback param N userdata param M`), or the userdata
             // is opaque to it. Nothing to verify beyond the pairing.
-            if self.foreign_contracts[ci].callback_thread_any != 0:
+            if self.foreign_contracts[ci].callback_thread_said != 0:
                 var callable_count = 0
                 for pi in 0..self.sig_get_param_count(sig):
                     if self.facade_param_is_callable(sig, pi): callable_count = callable_count + 1
@@ -5292,7 +5318,7 @@ impl Sema:
             for wrapped_item in wrapped:
                 let projected = self.facade_presented_param_index(ci, wrapped_item)
                 if projected >= receiver_params: wrapped_params.push(projected - receiver_params)
-            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, receiver_params, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: (self.facade_contract_userdata_retained(ci)) as i32, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable, wrapped_params })
+            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, receiver_params, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_said, retained: (self.facade_contract_userdata_retained(ci)) as i32, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable, wrapped_params })
 
     // The callback method a symbol names, or -1.
     fn facade_callback_method_for(fn_sym: i32) -> i32:
@@ -5672,7 +5698,13 @@ impl Sema:
     // thread C calls on. `pi` is the rendered index (`self` excluded).
     mut fn facade_check_callback_arg(fn_sym: i32, pi: isize, actual_ty: i32, arg_node: i32):
         let mi = self.facade_callback_method_for(fn_sym)
-        if mi < 0 or pi != self.facade_callback_methods[mi].userdata_param or self.facade_callback_methods[mi].thread_any == 0:
+        // §31.6.2: a retained callback may run on any thread unless its
+        // function says `callback_thread registering`; one borrowed for the
+        // call runs during it, on the calling thread.
+        if mi < 0 or pi != self.facade_callback_methods[mi].userdata_param: return
+        let said = self.foreign_contracts[self.facade_callback_methods[mi].contract].callback_thread_said
+        let kept = self.facade_callback_methods[mi].retained != 0 or self.facade_callback_methods[mi].consumed != 0
+        if said == 2 or (said == 0 and not kept):
             return
         self.facade_check_userdata_any_thread(self.facade_callback_methods[mi].contract, actual_ty, arg_node)
 
@@ -5686,9 +5718,10 @@ impl Sema:
         let node = if fn_sym != 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
         if node == 0 or not self.facade_pair_setter_contract.contains(node): return
         let ci: i32 = self.facade_pair_setter_contract.get(node).unwrap()
-        if self.foreign_contracts[ci].callback_thread_any != 0: self.facade_check_userdata_any_thread(ci, actual_ty, arg_node)
+        if self.foreign_contracts[ci].callback_thread_said != 2: self.facade_check_userdata_any_thread(ci, actual_ty, arg_node)
 
     mut fn facade_check_userdata_any_thread(ci: i32, actual_ty: i32, arg_node: i32):
+        let said = if self.foreign_contracts[ci].callback_thread_said == 1: "'callback_thread any'" else: "no 'callback_thread registering'"
         // A closure's type says nothing of what it captured: it is
         // shareable only when every capture is, and it writes none (two
         // threads running it would write the same place).
@@ -5701,7 +5734,7 @@ impl Sema:
             let fname = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
             let facade = self.pool_resolve(self.foreign_contracts[ci].facade)
             let why = if writes: f"writes the captured `{cap}`" else: f"captures `{cap}`, which is not Send and Sync"
-            self.emit_error(f"'{fname}' may invoke its callback from any thread ('callback_thread any' in facade {facade}), so the userdata type must be Send and Sync; the closure {why} (§16.2b.10)", arg_node)
+            self.emit_error(f"'{fname}' may invoke its callback from any thread ({said} in facade {facade}), so the userdata type must be Send and Sync; the closure {why} (§16.2b.10)", arg_node)
             return
         var ud_ty = self.resolve_alias(actual_ty as TypeId)
         if self.get_type_kind(ud_ty) == TypeKind.TY_REF:
@@ -5714,7 +5747,7 @@ impl Sema:
         let facade = self.pool_resolve(self.foreign_contracts[ci].facade)
         let tn = self.type_name(ud_ty as i32)
         let lacks = if not send and not sync: "neither Send nor Sync" else: if not send: "not Send" else: "not Sync"
-        self.emit_error(f"'{fname}' may invoke its callback from any thread ('callback_thread any' in facade {facade}), so the userdata type must be Send and Sync; '{tn}' is {lacks} (§16.2b.10)", arg_node)
+        self.emit_error(f"'{fname}' may invoke its callback from any thread ({said} in facade {facade}), so the userdata type must be Send and Sync; '{tn}' is {lacks} (§16.2b.10)", arg_node)
 
     // Whether a call argument spells an absent Option: the `None` variant.
     fn facade_arg_is_none(node: i32) -> bool:

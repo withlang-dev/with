@@ -540,11 +540,14 @@ fn contract_collect_callback(mut report: AnalysisReport, sema: &Sema, ci: i32, p
         if c.nullable_params[k] != pi: continue
         let clause = contract_clause(sema, node, FACADE_CLAUSE_NULLABLE, k as i32)
         contract_row(report, sema, site, subject, CONTRACT_CALLBACK, clause, c.fn_sym, owner, pi, "nullability", "nullable; None for the callback is None for its userdata", contract_clause_at(sema, site, clause))
-    if c.callback_thread_any != 0:
+    if c.callback_thread_said == 2:
+        let clause = contract_clause(sema, node, FACADE_CLAUSE_CALLBACK_THREAD, 0)
+        contract_row(report, sema, site, subject, CONTRACT_CALLBACK, clause, c.fn_sym, owner, pi, "thread", "the registering thread; a claim (§31.8.3)", contract_clause_at(sema, site, clause))
+    else if c.callback_thread_said != 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_CALLBACK_THREAD, 0)
         contract_row(report, sema, site, subject, CONTRACT_CALLBACK, clause, c.fn_sym, owner, pi, "thread", "any; captured With state must be Send and Sync", contract_clause_at(sema, site, clause))
     else:
-        contract_row(report, sema, site, subject, CONTRACT_CALLBACK, node, c.fn_sym, owner, pi, "thread", "the registering thread", "default:callback executes where it was registered (§16.2b.10)")
+        contract_row(report, sema, site, subject, CONTRACT_CALLBACK, node, c.fn_sym, owner, pi, "thread", "any, where the callback is retained; captured With state must be Send and Sync", "default:no `callback_thread registering` (§31.6.2)")
     contract_row(report, sema, site, subject, CONTRACT_CALLBACK, node, c.fn_sym, owner, pi, "reentrancy", "the call may invoke it; its captures' origins are affected as their capture modes allow", "default:absent a facade assertion the call is reentrant (§16.2b.9)")
 
 // ── domains and conventions ──────────────────────────────────────────────
@@ -826,6 +829,14 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
                 let by = if sema.facade_rule_is_fn(rule): "the fn item" else: "`" ++ facade_clause_name(sema.ast.get_data0(cands[1])) ++ "`"
                 let matched = if sema.facade_rule_is_fn(rule): what else: f"{sema.safe_symbol_text(cands[0])} for {what}"
                 report.note(f"contract-audit: profile fact shadowed: profile {profile} rule {rname} ({template}, {rat}) matched {matched}, and {by} at {contract_where(site, sema, cands[1])} states the fact explicitly; the facade's statement wins (§16.2b.2)")
+    // §31.6.2: with no default grant, the two clauses that state the
+    // restriction restate what holds without them. Accepted, and said.
+    for c in sema.foreign_contracts:
+        if c.callback_thread_said == 1: report.note(f"contract-audit: redundant: `callback_thread any` on fn {sema.pool_resolve(c.fn_sym)} restates the default; a retained callback may run on any thread unless its function says `callback_thread registering`")
+    var threads_said = 0
+    for (_header, said) in sema.facade_thread_headers:
+        if said == 1: threads_said = threads_said + 1
+    if threads_said > 0: report.note(f"contract-audit: redundant: `runs threads` restates the default for {threads_said} imported header(s); a library is not taken to run no threads unless its contract says `runs no threads`")
     // A contract whose lines are evidence says what was analyzed, once.
     let evidence_paths = []
     for c in sema.foreign_contracts:

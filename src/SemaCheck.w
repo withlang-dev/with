@@ -3490,6 +3490,12 @@ impl Sema:
         // (global_is_c_written).
         if self.current_file_is_generated("<c_import "):
             return
+        // §31.8.6: a function-pointer global a `freed by`, `drop` or `destroys`
+        // clause names is a hook the library assigns only in functions that
+        // stay raw; the clause says so. The read the generated call makes of
+        // it rests on that statement, not on the global rule.
+        if kind != GLOBAL_RACE_ACCESS_WRITE and self.current_file_is_generated("<facade ") and self.facade_global_is_named_destroyer(sym):
+            return
         self.global_race_access_syms.push(sym)
         self.global_race_access_nodes.push(node)
         self.global_race_access_files.push(self.local_file_id)
@@ -5251,16 +5257,16 @@ impl Sema:
         if (self.extern_var_texts.get(self.pool_resolve(sym)).copied() ?? 0) == 2: return false
         self.mutable_global_syms.contains(sym) and (self.extern_var_texts.contains(self.pool_resolve(sym)) or self.ci_syms.contains(sym))
 
-    // Whether the facade of the library that declares the C global `sym`
-    // says `runs threads`.
-    fn c_global_library_runs_threads(sym: i32) -> bool:
-        if self.facade_thread_headers.len() == 0: return false
+    // What the contract of the library that declares the C global `sym`
+    // says of its threads: 2 `runs no threads`, 1 `runs threads`, 0 neither.
+    fn c_global_library_threads(sym: i32) -> i32:
+        if self.facade_thread_headers.len() == 0: return 0
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR or self.ast.get_data0(decl) != sym: continue
             let file = self.facade_decl_file_name(di)
-            if file.starts_with("<c_import ") and file.ends_with(">"): return self.facade_thread_headers.contains(file.slice(10, file.len() - 1))
-        false
+            if file.starts_with("<c_import ") and file.ends_with(">"): return self.facade_thread_headers.get(file.slice(10, file.len() - 1)).copied() ?? 0
+        0
 
     mut fn emit_global_data_race_error(idx: isize):
         let sym = self.global_race_access_syms[idx]
@@ -5286,7 +5292,7 @@ impl Sema:
             if tid != 0:
                 atomic = "Atomic[" ++ self.type_name(tid) ++ "]"
         if c_written:
-            if self.global_race_concurrency_node == 0: diag.add_note("its library's facade says `runs threads`: the library may write the global at any time")
+            if self.global_race_concurrency_node == 0: diag.add_note(if self.c_global_library_threads(sym) == 1: "its library's contract says `runs threads`: the library may write the global at any time" else: "its library's contract does not say `runs no threads`: the library is not known to leave the global alone on other threads (§31.4)")
             diag.add_help("read it on the one thread that calls the library, or assert with `unsafe`")
         else:
             diag.add_help("use " ++ atomic ++ ", wrap in Mutex, or assert with `unsafe`")
@@ -5312,7 +5318,9 @@ impl Sema:
                 continue
             let in_unsafe: i32 = self.global_race_access_unsafe[i]
             let c_global = self.global_is_c_written(self.global_race_access_syms[i])
-            let library_threads = c_global and self.c_global_library_runs_threads(self.global_race_access_syms[i])
+            // §31.6.2: no default grant. The library runs no threads only
+            // where its contract says so, by a proof or by a claim.
+            let library_threads = c_global and self.c_global_library_threads(self.global_race_access_syms[i]) != 2
             let failed = if c_global: tasks or library_threads else: proof_failed
             self.global_race_concurrency_node = if c_global: (if tasks: tasks_node else: 0) else: any_node
             self.global_race_concurrency_file = if c_global: tasks_file else: any_file

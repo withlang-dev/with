@@ -159,10 +159,19 @@ c facade curl:
     //   CURLOPT_MAXFILESIZE_LARGE(3): "Pass a curl_off_t as parameter. This
     //                                specifies the maximum accepted size (in
     //                                bytes) of a file to download."
+    //
+    // The callback's thread (§31.8.3): libcurl's FAQ, "Does libcurl use
+    // threads?": "No, libcurl executes in the same thread you call it in.
+    // All callbacks are called in the same thread as the one you call
+    // libcurl in." `Easy` states no thread clause, so it is bound to the
+    // thread that made it: every call on it, the setter and the transfer
+    // alike, is on that thread, and so is the callback. The clause is
+    // refused on a resource that is `thread send` (§31.10 rule 5).
     fn curl_easy_setopt
         rename setopt
         preserves domain version_info
         callbacks none
+        callback_thread registering
         ok CURLE_OK
         variadic param 2 selected by param option:
             case CURLOPT_WRITEFUNCTION: callback param 2 as curl_write_callback userdata param CURLOPT_WRITEDATA retains by param 0

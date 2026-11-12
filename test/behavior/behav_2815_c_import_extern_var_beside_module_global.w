@@ -12,6 +12,6 @@ use c_import("extern char *tzname[2];")
 
 fn main:
     print(shadow_tzname.tzname)
-    let names = tzname
+    let names = unsafe { tzname }
     let _ = names
     print("ok")

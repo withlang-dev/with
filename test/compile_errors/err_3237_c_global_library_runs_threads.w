@@ -1,4 +1,4 @@
-//! expect-check-fail: its library's facade says `runs threads`
+//! expect-check-fail: its library's contract says `runs threads`
 // §16.3 (#3237): a library that runs threads of its own may write its
 // globals at any time; its facade says so, and its globals are then never
 // provably on one thread, in a single-threaded program too.
