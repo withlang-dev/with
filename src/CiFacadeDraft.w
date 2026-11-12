@@ -1362,6 +1362,13 @@ impl CiProject:
             verdict = verdict ++ self.fd_gir_summary(si as i32) ++ self.fd_registry_summary(si as i32)
             lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ "\n"
         var head = "facade " ++ name ++ f": {total} functions, {safe} presented safely, {raw} raw" ++ (if internal > 0: f"; {internal} internal (no prototype declares them)" else: "") ++ "\n"
+        // A registry line is never dropped without a word: a presentation
+        // fact (`text param`, `nullable param`, `text return`) is written
+        // into a function's block, and a function nothing else presents has
+        // none.
+        for (si, symbol) in self.symbols.enumerate():
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.registry_more.len() == 0 or self.presented.contains(si as i32): continue
+            head = head ++ "  " ++ symbol.name ++ ": the registry's presentation lines are not applied: nothing presents the function (the registry states `lend`, or what it does with its pointers)\n"
         for record in self.fd_representations():
             if modeled.contains(record): continue
             let producers = self.fd_producers_of(record).len()
