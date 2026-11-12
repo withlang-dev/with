@@ -2077,6 +2077,30 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     let _pin = runtime_write_file(dep_dir ++ "/facade.json", pin)
     runtime_eprint("  " ++ summary ++ " (.with/deps/c/" ++ name ++ "/" ++ version ++ "/facade-report.txt)")
 
+// A proof about compiled foreign code holds only for the build it analyzed.
+// For a package linked as a prebuilt binary the drafter read a separately
+// configured source tree, and nothing establishes that the two are the same
+// build: what it drew is evidence. The contract and its report say so, with
+// the configuration analyzed, where they said `proof`.
+fn conan_mark_evidence(name: &str, version: &str, dep_dir: &str):
+    if runtime_file_exists(dep_dir ++ "/facade.w") == 0: return
+    let meta = runtime_read_file(dep_dir ++ "/metadata.json")
+    let analyzed = "the source of " ++ name ++ "/" ++ version ++ " configured for this platform with the recipe's default options and not built; " ++
+        "the library linked is the Conan Center binary package " ++ json_extract_string(meta, "package_id") ++ " (revision " ++ json_extract_string(meta, "package_revision") ++ "), built elsewhere"
+    let header = "// evidence, not proof: the source analyzed and the library linked are not established as the same build.\n// analyzed: " ++ analyzed ++ "\n"
+    for file in ["facade.w", "facade-report.txt"]:
+        let path = dep_dir ++ "/" ++ file
+        let text = runtime_read_file(path)
+        if text.len() == 0: continue
+        var out = if file == "facade.w": header else: "evidence, not proof: the source analyzed and the library linked are not established as the same build.\nanalyzed: " ++ analyzed ++ "\n"
+        for line in text.split("\n"):
+            var marked = line.to_owned()
+            while marked.contains("proof: "): marked = marked.replace("proof: ", "evidence: ")
+            marked = marked.replace("proven from the package's own source", "drawn from the package's source").replace("Every clause records its proof", "Every clause records its evidence")
+            out = out ++ marked ++ "\n"
+        let _written = runtime_write_file(path, out.slice(0, out.len() - 1))
+    runtime_eprint("  note: " ++ name ++ " is linked as a prebuilt binary: what its contract records is evidence from separately configured source, not proof")
+
 // The facade of a package installed as a Conan Center binary: its source
 // is fetched and configured (never built) under `dep_dir/.build`, read, and
 // removed. Without the source build's tools the package has no proofs;
@@ -2112,6 +2136,7 @@ fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir
         return
     conan_generate_headers(tools, work ++ "/b")
     conan_write_facade(name, version, dep_dir, tree.source_dir, work ++ "/b")
+    conan_mark_evidence(name, version, dep_dir)
     conan_remove_build_tree(work)
 
 // #3168: a configured tree has not made the headers its build generates
