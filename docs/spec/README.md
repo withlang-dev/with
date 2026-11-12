@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.49
+# The With Programming Language — Specification v7.50
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.50:** D201 (Eric, 2026-11-11). §31, new: the With Contract Language, the chapter that specifies contracts: its grammar, what each clause means and whether it grants, where each fact comes from, precedence and the override, claims, verification and run-time checks. It rules where it differs from §16.2b, which opens with the list of those places and of its subsections that remain. Adopted with it and not yet implemented, each marked in the chapter: no default grants (`runs no threads`, `callback_thread registering`); `override`; a pointer return is inert; the resource owns its destroyers; `from f, nonnull`; proven invalidators; a destroyer named through a function-pointer global; a result drawn for a prebuilt binary is evidence, not proof.
+
 **Changelog v7.49:** D200 (Eric, 2026-11-11). §16.2b.7: established domains. A facade states the calls that establish and end a domain; an operation that `requires domain D` is checked when it is called; establishing an established domain and ending a domain with a live resource of it are contract failures naming the call; a resource that `requires domain D` is a resource of `D`. `with-build.md`: `--target wasm32` needs no sysroot (#2981).
 
 **Changelog v7.48:** D198 Amendment 6 (Eric, 2026-11-11). §16.2b.4: a by-value producer states the field whose NULL means nothing was produced, checked when the call returns: `nullable field F` presents `Option[R]`; `nonnull field F` presents `R`, and a NULL there is a contract failure naming the function. `F` may be a path.
@@ -591,3 +593,16 @@ the companion document: *Implementation Notes*.
   - [§30.7 Format Specification](030_grammar.md#307-format-specification)
   - [§30.8 Block Syntax](030_grammar.md#308-block-syntax)
   - [§30.9 Reserved Keywords](030_grammar.md#309-reserved-keywords)
+- [§31. The With Contract Language](031_contract-language.md)
+  - [§31.1 Names](031_contract-language.md#311-names)
+  - [§31.2 Subjects](031_contract-language.md#312-subjects)
+  - [§31.3 Lexical structure](031_contract-language.md#313-lexical-structure)
+  - [§31.4 The base rule: what is raw](031_contract-language.md#314-the-base-rule-what-is-raw)
+  - [§31.5 Grammar](031_contract-language.md#315-grammar)
+  - [§31.6 What a clause is](031_contract-language.md#316-what-a-clause-is)
+  - [§31.7 Precedence](031_contract-language.md#317-precedence)
+  - [§31.8 Clause reference](031_contract-language.md#318-clause-reference)
+  - [§31.9 Claims](031_contract-language.md#319-claims)
+  - [§31.10 Verification](031_contract-language.md#3110-verification)
+  - [§31.11 Run-time checks](031_contract-language.md#3111-run-time-checks)
+  - [§31.12 Known limits and open questions](031_contract-language.md#3112-known-limits-and-open-questions)
