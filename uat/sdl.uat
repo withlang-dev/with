@@ -1,5 +1,5 @@
 scenario: SDL opens a window and draws from a fresh project
-requires: network, display
+requires: network
 platforms: darwin, windows, linux-x86_64
 # D171: only where with get provides the whole chain cleanly. SDL's Linux
 # chain requires dbus, a Conan Center binary on linux-x86_64 and a meson
@@ -13,6 +13,10 @@ write src/main.w from sdl_main.w
 copy lib/facades/sdl.w to src/facades/sdl.w
 run: with check src/main.w
 expect stdout: ok
+# SDL's own off-screen video driver (built into SDL on every platform): the
+# window and its ten frames need no monitor, so the scenario runs on a host
+# whose screen is off or locked, and over ssh.
+env SDL_VIDEO_DRIVER=offscreen
 run: with run
 expect exit: 0
 expect stdout contains: sdl UAT passed:

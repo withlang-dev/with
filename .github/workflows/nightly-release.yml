@@ -382,7 +382,7 @@ jobs:
       - name: Record last-green (the release UAT gate reads it)
         env:
           WITH: ${{ github.workspace }}/src/main
-        run: src/main build :last-green
+        run: src/main build :last-green-record
 
       # Packaging and publish run the rebuilt binary. The release UAT below
       # stays seed-driven, as every gate is and as the Windows lanes and the
@@ -661,7 +661,7 @@ jobs:
       - name: Record last-green (the release UAT gate reads it)
         env:
           WITH: ${{ github.workspace }}/src/main
-        run: src/main build :last-green
+        run: src/main build :last-green-record
 
       # Packaging and publish run the rebuilt binary. The release UAT below
       # stays seed-driven, as every gate is and as the Windows lanes and the
@@ -934,7 +934,7 @@ jobs:
           retention-days: 7
 
       - name: Record last-green (the release UAT gate reads it)
-        run: ./src/main.exe build :last-green
+        run: ./src/main.exe build :last-green-record
 
       - name: Provide software OpenGL (Mesa llvmpipe)
         # The runner's stock driver stops at OpenGL 1.1; raylib needs 3.3. The
@@ -1206,7 +1206,7 @@ jobs:
       - name: Record last-green (the release UAT gate reads it)
         env:
           WITH: ${{ github.workspace }}/src/main
-        run: ./src/main build :last-green
+        run: ./src/main build :last-green-record
 
       - name: Provide a display and software OpenGL
         run: |
@@ -1462,7 +1462,7 @@ jobs:
           retention-days: 7
 
       - name: Record last-green (the release UAT gate reads it)
-        run: ./src/main.exe build :last-green
+        run: ./src/main.exe build :last-green-record
 
       - name: Provide software OpenGL (Mesa llvmpipe, arm64)
         # As on windows-x86_64: the spiral UAT places this opengl32.dll beside
