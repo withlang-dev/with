@@ -219,6 +219,7 @@ impl Zcu:
     // facade (Resolve.w makes the edge; this parses the file in).
     mut fn import_fetched_facade_frontend(pool: AstPool, decl: i32, di: i32) -> AstPool:
         let dir = self.decl_source_dir_frontend(di)
+        for input in resolve_fetched_package_inputs(dir): self.record_frontend_tracked_input(input)
         let package = resolve_fetched_package_of_header(dir, self.pool.resolve(pool.get_data0(decl as NodeId)))
         if package.len() == 0 or resolve_module_is_facade_of(self.decl_source_path_frontend(di), package): return pool
         let path = self.resolve_module_path_frontend("facades." ++ package, dir)

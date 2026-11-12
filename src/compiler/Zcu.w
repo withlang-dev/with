@@ -487,6 +487,11 @@ impl Zcu:
         self.source_text_file_ids.push(file_id)
         self.source_text_names.push(zcu_owned_text(name))
         self.source_texts.push(zcu_owned_text(text))
+        // A source the compilation read from disk is an input of what it
+        // builds: a module reached through `use` (a fetched package's
+        // contract among them) must make the target stale when it changes.
+        // A name that is no file (an embedded std module) is skipped there.
+        self.record_frontend_tracked_input(name)
 
     mut fn clear_stage_outputs():
         self.last_resolved = ResolveResult.init()
