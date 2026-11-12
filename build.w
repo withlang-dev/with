@@ -4983,7 +4983,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     // tested (git tree, pinned seed, host), to the store every worktree reads:
     // a squash-merge of these sources, or a checkout of them elsewhere, is
     // already green (build/retention.w).
-    out = out.add_target(install_file_target("last-green-publish", "out/.build-state/green-store.tsv", green_store_install_path(ctx), "0644", "last-green-record"))
+    // A green is published only when the acceptance scenarios passed: a
+    // battery whose UAT was red (two scenarios BLOCKED by a locked screen)
+    // published its sources as green, and the next battery ran nothing
+    // (2026-11-12). A lane that needs only the manifest builds
+    // `:last-green-record`.
+    out = out.add_target(install_file_target("last-green-publish", "out/.build-state/green-store.tsv", green_store_install_path(ctx), "0644", "last-green-record").dep("battery-uat"))
     out = out.add_target(target_new(.Group, "last-green", "").dep("last-green-publish"))
 
     // `with run tools/battery.w` runs `build`, then this: every check a
