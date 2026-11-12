@@ -37819,6 +37819,7 @@ impl Sema:
             let mc_arg_ty = if facade_ud_node != 0 and mc_arg_node == facade_ud_node: facade_ud_ty as TypeId
                 else: self.check_call_argument_expr(node, ai, mc_method_fn_for_resolution, mc_arg_node, mc_expected)
             arg_types.push(mc_arg_ty as i32)
+            if ai == facade_pair_ud_arg: self.facade_check_pair_userdata_arg(obj_type as i32, field, mc_arg_ty as i32, mc_arg_node)
             // Record the value read before viral view-origin propagation below:
             // storing a copied pointee stores T, not the argument's &T view.
             if mc_expected != 0:
