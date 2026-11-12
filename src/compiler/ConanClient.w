@@ -114,18 +114,19 @@ fn conan_https_fetch_to_file(url: &str, path: &str, timeout_ms: i32) -> str:
     // failure (no connection, no response) reads differently from a server
     // that answered with a status.
     var last_status: i32 = -1
-    var last_reason = ""
     for attempt in 1..6:
         let response = https_get_response_timeout(url.to_owned(), 5, connect_ms, idle_ms)
         if response.status == 200:
             return if runtime_write_file(path, response.body) == 0: "" else: "could not write " ++ path
         last_status = response.status
-        last_reason = response.reason
         // #3169: a server that answered 5xx (GitHub's release assets 504
         // for a minute at a time) is given longer: 5, 10, 15, 20 s.
         let pause = if last_status >= 500: 5 * attempt else: 2 * attempt
         if attempt < 5: runtime_nanosleep(pause as i64 * 1000000000)
-    if last_status < 0: f"no response in 5 attempts: {last_reason}" else: f"the server answered status {last_status} in 5 attempts"
+    // Seed-bound: the pinned seed's std.http has no `reason` on a response;
+    // the transport's own words (`response.reason`) replace this text once a
+    // seed carries it.
+    if last_status < 0: "no connection or no response in 5 attempts (a resolver, network or TLS failure)" else: f"the server answered status {last_status} in 5 attempts"
 
 // The local path a file:// URL names: percent-escapes decoded, and a Windows
 // drive path (file:///C:/…) without its leading slash.
