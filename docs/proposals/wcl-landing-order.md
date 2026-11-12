@@ -2,7 +2,9 @@
 
 The order in which the rules §31 marks "adopted 2026-11-11, not yet
 implemented" land (Eric, 2026-11-11). Section numbers below are §31's.
-Steps (a), (b) and (c) landed on 2026-11-11 (#3268, #3269, #3270).
+Steps (a), (b) and (c) landed on 2026-11-11 (#3268, #3269, #3270); step
+(d) on 2026-11-12 (#3273), and its battery was step (e): every published
+program compiled and no further line was needed. Step (f) is the last.
 
 
 The two default grants (sections 4, 6.2, 8.1, 8.3, 10) land in this order.
@@ -38,12 +40,17 @@ e. **The recount,** by compiling every published program, to confirm
 f. **Proofs for prebuilt binaries:** the cost of each way to comply with
    section 6.3 (build from source whenever a contract needs a proof; or
    keep the binary and accept no proof), then the way Eric chooses. The
-   default does not change before that.
+   default does not change before that. Chosen 2026-11-12: keep the
+   binary and accept no proof ("the contract takes the place of proof").
+   What the separately configured source shows is written to
+   `facade-evidence.txt` and grants nothing; the contract is drawn from
+   the headers and the registry. libxml2's registry file states the seven
+   claims its UAT program rests on.
 
 The thread-absence proof of section 8.5 is not in this order: it is
 specified and not built.
 
-**Note: what `with get` does today** (2026-11-11, for section 8.5's
+**Note: what `with get` did before step (f)** (2026-11-11, for section 8.5's
 "the build that was proved"). For each library it fetches:
 
 - **A system package** (`opengl`, `xorg` and the others it knows as

@@ -1805,6 +1805,14 @@ impl CiProject:
             self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(self.signature_type(with_cimport_fn_param_type_translated(session, decl_idx, pi), with_cimport_fn_param_type_written(session, decl_idx, pi)))
 
     mut fn record_fn_evidence(session: i64, decl_idx: i32, cursor: i32, symbol_id: i32):
+        // §31.6.3: for a library linked as a prebuilt binary the units read
+        // are not the build linked, so what a body shows proves nothing
+        // about it. Only the signature is recorded: the contract is drawn
+        // as for a function no unit defines, from the headers, the
+        // annotations and the registry.
+        if g_migrate_facade_without_bodies != 0:
+            self.record_fn_signature(session, decl_idx, symbol_id)
+            return
         let count = with_cimport_fn_param_count(session, decl_idx)
         let names: List[str] = []
         for pi in 0..count:
@@ -3272,6 +3280,9 @@ var g_migrate_file_error: str = ""
 // for functions defined in the same translation unit.
 // Set via migrate_set_no_c_export().
 pub var g_migrate_no_c_export: i32 = 0
+// 1 while a package's contract is drafted with no proof from its source
+// (a prebuilt binary's, §31.6.3).
+pub var g_migrate_facade_without_bodies: i32 = 0
 
 fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
