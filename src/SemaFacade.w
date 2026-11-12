@@ -5034,7 +5034,11 @@ impl Sema:
     fn facade_contract_is_callback_item(ci: isize) -> bool:
         if self.foreign_contracts[ci].destroys != 0:
             return false
-        if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].user_data_node != 0 or self.foreign_contracts[ci].argv_cb.len() > 0:
+        // `callback_thread any` on a function whose callback arrives through
+        // a variadic case speaks of that case's callback: the function is a
+        // variadic contract, rendered case by case, not a callback item.
+        let thread_item = self.foreign_contracts[ci].callback_thread_any != 0 and not self.facade_contract_has_variadic_callback(ci)
+        if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or thread_item or self.foreign_contracts[ci].user_data_node != 0 or self.foreign_contracts[ci].argv_cb.len() > 0:
             return true
         for k in 0..self.foreign_contracts[ci].consumes.len():
             if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0:
@@ -5657,12 +5661,47 @@ impl Sema:
                 return false
         true
 
+    // Whether a case of the function's variadic contract is a callback.
+    fn facade_contract_has_variadic_callback(ci: isize) -> bool:
+        for kind in self.foreign_contracts[ci].variadic_case_kinds:
+            if kind == .Callback: return true
+        false
+
     // §51 at a callback method's call: under `callback_thread any` the
     // userdata type is Send and Sync — the callback reads it from whatever
     // thread C calls on. `pi` is the rendered index (`self` excluded).
     mut fn facade_check_callback_arg(fn_sym: i32, pi: isize, actual_ty: i32, arg_node: i32):
         let mi = self.facade_callback_method_for(fn_sym)
         if mi < 0 or pi != self.facade_callback_methods[mi].userdata_param or self.facade_callback_methods[mi].thread_any == 0:
+            return
+        self.facade_check_userdata_any_thread(self.facade_callback_methods[mi].contract, actual_ty, arg_node)
+
+    // The same at a pair userdata setter's call (a callback that arrived
+    // through a variadic case): `recv_type.field(…, userdata)`.
+    mut fn facade_check_pair_userdata_arg(recv_type: i32, field: i32, actual_ty: i32, arg_node: i32):
+        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
+        let owner = self.get_type_name(resolved)
+        if owner == 0: return
+        let fn_sym = self.lookup_generic_method_fn(owner, field)
+        let node = if fn_sym != 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
+        if node == 0 or not self.facade_pair_setter_contract.contains(node): return
+        let ci: i32 = self.facade_pair_setter_contract.get(node).unwrap()
+        if self.foreign_contracts[ci].callback_thread_any != 0: self.facade_check_userdata_any_thread(ci, actual_ty, arg_node)
+
+    mut fn facade_check_userdata_any_thread(ci: i32, actual_ty: i32, arg_node: i32):
+        // A closure's type says nothing of what it captured: it is
+        // shareable only when every capture is, and it writes none (two
+        // threads running it would write the same place).
+        let closure = self.callable_expr_closure_node(arg_node)
+        for k in 0..(if closure != 0: self.closure_capture_summary_count(closure) else: 0):
+            let cap_ty = self.closure_capture_summary_type(closure, k)
+            let writes = (self.closure_capture_summary_eff(closure, k) & EFF_WRITE) != 0
+            if not writes and self.type_is_send(cap_ty) and self.type_is_sync(cap_ty): continue
+            let cap = self.pool_resolve(self.closure_capture_summary_sym(closure, k))
+            let fname = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+            let facade = self.pool_resolve(self.foreign_contracts[ci].facade)
+            let why = if writes: f"writes the captured `{cap}`" else: f"captures `{cap}`, which is not Send and Sync"
+            self.emit_error(f"'{fname}' may invoke its callback from any thread ('callback_thread any' in facade {facade}), so the userdata type must be Send and Sync; the closure {why} (§16.2b.10)", arg_node)
             return
         var ud_ty = self.resolve_alias(actual_ty as TypeId)
         if self.get_type_kind(ud_ty) == TypeKind.TY_REF:
@@ -5671,7 +5710,6 @@ impl Sema:
         let sync = self.type_is_sync(ud_ty as i32)
         if send and sync:
             return
-        let ci = self.facade_callback_methods[mi].contract
         let fname = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
         let facade = self.pool_resolve(self.foreign_contracts[ci].facade)
         let tn = self.type_name(ud_ty as i32)

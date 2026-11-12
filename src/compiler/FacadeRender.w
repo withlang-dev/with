@@ -1158,6 +1158,13 @@ type FacadeLendItem {
     detaches: i32,           // `detaches param N` (D134 §16.2b.6): the param ref, or 0
 }
 
+// Whether the fn item states a variadic contract.
+fn facade_item_is_variadic(pool: &AstPool, item: i32) -> bool:
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        if pool.get_data0(pool.get_extra(cstart + k) as NodeId) == FACADE_CLAUSE_VARIADIC: return true
+    false
+
 fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> FacadeLendItem:
     let li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false, text_free: 0, text_bytes: false, detaches: 0 }
     let cstart = pool.get_data1(item as NodeId)
@@ -1195,6 +1202,9 @@ fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
         // D102: `nullable param N` on a function-pointer parameter presents
         // `Option` of it through the bridge (facade_render_bridge_param).
         else if facade_clause_bridges(kind): li.bridged = true
+        // `callback_thread any` beside a variadic contract speaks of a case's
+        // callback (§16.2b.10): Sema checks the userdata at the pair's setter.
+        else if kind == FACADE_CLAUSE_CALLBACK_THREAD and facade_item_is_variadic(pool, item): {}
         else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES and kind != FACADE_CLAUSE_CALLBACKS_NONE: li.lends = false
     if not li.lends:
         return li
@@ -3192,7 +3202,7 @@ fn facade_render_callback_item(pool: &AstPool, intern: &InternPool, ci: &List[i3
             if npi < 0:
                 return cbi
             nullable_pis.push(npi)
-        else if kind == FACADE_CLAUSE_CALLBACK_THREAD: is_callback = true
+        else if kind == FACADE_CLAUSE_CALLBACK_THREAD: is_callback = is_callback or not facade_item_is_variadic(pool, item)
         else if kind == FACADE_CLAUSE_CALLBACK_USERDATA:
             let cb = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
             let ud = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
