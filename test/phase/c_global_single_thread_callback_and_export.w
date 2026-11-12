@@ -8,7 +8,7 @@ use c_import("int g_n; static inline void each(void (*cb)(int)) { cb(1); }")
 
 // §31.6.2: the library is the test's own, and its contract says it runs no
 // threads; without that its global is raw.
-c facade lib:
+c contract lib:
     runs no threads
 
 @[c_export("my_score")]
