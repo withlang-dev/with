@@ -22,7 +22,7 @@ pub fn chacha20_poly1305_seal(key: &List[u8], nonce: &List[u8], aad: &List[u8], 
     aead_check_lengths(key, nonce)?
     var sealed = plaintext
     unsafe { chacha20_crypt(aead_bytes(key), aead_bytes(nonce), 1 as u32, sealed.ptr as *mut u8, sealed.len()) }
-    let tag = aead_tag(key, nonce, aad, aead_bytes(&sealed), sealed.len())
+    let tag = aead_tag(key, nonce, aad, aead_bytes(sealed), sealed.len())
     for b in tag: sealed.push(b)
     sealed
 
@@ -34,7 +34,7 @@ pub fn chacha20_poly1305_open(key: &List[u8], nonce: &List[u8], aad: &List[u8], 
     if sealed.len() < 16: return Err(.Forged)
     var opened = sealed
     let ct_len = opened.len() - 16
-    let tag = aead_tag(key, nonce, aad, aead_bytes(&opened), ct_len)
+    let tag = aead_tag(key, nonce, aad, aead_bytes(opened), ct_len)
     // Constant time: every byte is compared whatever the first difference.
     var diff: u8 = 0
     for i in 0..16: diff = diff | (tag[i] ^ opened[ct_len + i])
