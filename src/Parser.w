@@ -4953,14 +4953,18 @@ impl Parser:
             self.advance()
             return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_TEXT_UTF8, self.pool.extra_len(), 0) as i32
         if self.current_ident_is("runs"):
+            // §31.6.2: `runs no threads` — the library's code and state are
+            // touched only on a thread the program called it on; a grant.
             // §16.3 (#3237): `runs threads` — the library runs threads of
             // its own, which may write its globals at any time.
             self.advance()
+            let none = self.current_ident_is("no")
+            if none: self.advance()
             if not self.current_ident_is("threads"):
-                self.emit_error("a facade says its library runs threads of its own with 'runs threads' (§16.3)")
+                self.emit_error("a contract says of its library's threads `runs threads` or `runs no threads` (§31.8.1)")
                 return 0
             self.advance()
-            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_RUNS_THREADS, self.pool.extra_len(), 0) as i32
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), if none: FACADE_CLAUSE_RUNS_NO_THREADS else: FACADE_CLAUSE_RUNS_THREADS, self.pool.extra_len(), 0) as i32
         // §16.2b.4 (D97): the facade-wide error type is stated in the
         // header, `c facade F error E:`, never as an item (#2953).
         if self.peek() == TokenKind.TK_KW_ERROR:
@@ -5357,8 +5361,8 @@ impl Parser:
             kind = FACADE_CLAUSE_CALLBACKS_NONE
         else if word == "callback_thread":
             kind = FACADE_CLAUSE_CALLBACK_THREAD
-            if not self.current_ident_is("any"):
-                self.emit_error("expected 'callback_thread any' (§16.2b.10)")
+            if not self.current_ident_is("any") and not self.current_ident_is("registering"):
+                self.emit_error("expected 'callback_thread any' or 'callback_thread registering' (§31.8.3)")
                 return 0
             ops.push(self.intern_current())
             self.advance()

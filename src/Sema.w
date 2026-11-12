@@ -565,7 +565,7 @@ type ForeignContract {
     preserves_domains: List[i32],
     of_resource: i32,
     rename: i32,
-    callback_thread_any: i32,
+    callback_thread_said: i32,   // the `callback_thread` clause: 0 none (a retained callback may run on any thread, §31.6.2), 1 `any`, 2 `registering`
     callbacks_none: i32,             // clause node; 0 means conservatively reentrant
     callback_consumes: List[i32],
     callback_userdata_cb: List[i32],    // `callback param N userdata param M`: the callback parameter N …

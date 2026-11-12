@@ -6,6 +6,10 @@
 use c_import("tally.h")
 
 c facade tally:
+    // vendor/tally.c is the whole library: four functions that loop and
+    // return. None starts a thread or registers a handler, so
+    // `tally_calls` is touched only on a thread that calls into tally.
+    runs no threads
     // "TallyRange tally_widen(TallyRange range, int by)": both parameters
     // cross by value, so C borrows nothing past the call and the call is a
     // lend. (A struct by value was already safe under the raw rules; the

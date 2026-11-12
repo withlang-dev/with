@@ -16,6 +16,7 @@ c facade hlib:
         lend
         callbacks none
     fn h_set
+        callback_thread registering
         rename set
         lend
         callbacks none

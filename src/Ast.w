@@ -275,7 +275,7 @@ pub const FACADE_CLAUSE_PRESERVES: i32 = 14        // [param_ref|0, domain_sym|0
 pub const FACADE_CLAUSE_OF: i32 = 15               // [resource_sym]
 pub const FACADE_CLAUSE_RENAME: i32 = 16           // [new_sym]
 pub const FACADE_CLAUSE_THREAD: i32 = 17           // [capability_sym...]
-pub const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any`)
+pub const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any` | `registering`)
 pub const FACADE_CLAUSE_CALLBACK_CONSUMES: i32 = 19 // [param_ref]
 pub const FACADE_CLAUSE_MOVABLE: i32 = 20          // []  (in-place resource: not pinned, D54)
 pub const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
@@ -306,6 +306,7 @@ pub const FACADE_CLAUSE_DETACHES: i32 = 38         // [param_ref]  (`detaches pa
 // D198 (§16.2b.5 "Value records"): a pointer parameter to one complete record
 // that is not a resource's representation, by what the callee does with it.
 pub const FACADE_CLAUSE_RUNS_THREADS: i32 = 40  // []  a facade-level item, `runs threads`: the library runs threads of its own, so its globals are never provably on one thread (§16.3)
+pub const FACADE_CLAUSE_RUNS_NO_THREADS: i32 = 42  // []  a facade-level item, `runs no threads`: the library's code and state are touched only on a thread the program called it on (§31.8.1, a grant)
 pub const FACADE_CLAUSE_PRODUCED_FIELD: i32 = 41   // [producer_sym, word_sym, field_sym…]  (`from F, nullable field a.b` / `nonnull field a.b`: the field whose NULL means a by-value producer produced nothing, §16.2b.4; the word, `nullable` or `nonnull`, is the clause)
 pub const FACADE_CLAUSE_VALUE_RECORD: i32 = 39     // [param_ref, word_sym]  (`reads` / `fills` / `updates param N`: the word is the clause, §16.2b.5)
 pub const FACADE_CLAUSE_MESSAGE: i32 = 33          // [fn_sym] resource-only: `message <fn>`, the operation that describes the resource's most recent failure (ruling Amendment 3, §16.2b.4)

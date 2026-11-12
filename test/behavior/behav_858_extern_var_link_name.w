@@ -8,4 +8,4 @@
 extern var process_environment: *mut *mut u8
 
 fn main:
-    print(process_environment != null)
+    print(unsafe { process_environment } != null)
