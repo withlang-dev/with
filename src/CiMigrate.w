@@ -1136,6 +1136,7 @@ impl CiProject:
                 // D198 (§16.2b.5): where a record is complete and flat; a value record
                 // must be complete in a header the package installs.
                 if rname.len() > 0 and rloc.len() > 0 and ci_decl_is_complete_record(session, i, decl_kind, rcursor): self.complete_records.insert(ci_escape_reserved(rname), ci_migrate_location_file(rloc))
+                else if rname.len() > 0 and ci_decl_is_defined_record(session, i, decl_kind, rcursor): self.pointer_records.insert(ci_escape_reserved(rname), true)
             if decl_kind == CK_VAR:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
@@ -3361,11 +3362,16 @@ fn ci_cursor_kind_name(kind: i32) -> str:
 // *)` follows `outline->points`, and whoever builds the record chooses
 // where that points.
 fn ci_decl_is_complete_record(session: i64, idx: i32, decl_kind: i32, cursor: i32) -> bool:
+    ci_decl_is_defined_record(session, idx, decl_kind, cursor) and ci_type_is_flat(session, with_ci_type_canonical(session, with_ci_cursor_type(session, cursor)), 0)
+
+// Whether the declaration is a record with a definition, or a typedef of one.
+fn ci_decl_is_defined_record(session: i64, idx: i32, decl_kind: i32, cursor: i32) -> bool:
     if cursor < 0 or (decl_kind != CK_STRUCT and decl_kind != CK_TYPEDEF): return false
     if decl_kind == CK_STRUCT and not with_cimport_struct_has_definition(session, idx): return false
     let canonical = with_ci_type_canonical(session, with_ci_cursor_type(session, cursor))
     if canonical < 0 or with_ci_type_kind(session, canonical) != CXT_Record: return false
-    ci_type_is_flat(session, canonical, 0)
+    let record = with_ci_type_declaration(session, canonical)
+    record >= 0 and with_ci_cursor_is_definition(session, record) != 0
 
 // Whether a canonical type holds no pointer anywhere inside it: an
 // arithmetic type or an enum; a fixed array of such; a defined record

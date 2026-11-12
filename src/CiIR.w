@@ -1191,6 +1191,10 @@ type CiProject {
     // records with identity (some function produces, destroys or retains a
     // pointer to one), which are never value records.
     complete_records: HashMap[str, str],
+    // The defined records that are not flat: one passed by value carries a
+    // pointer into C, so a call that takes it is raw until a contract
+    // models the record (D198).
+    pointer_records: HashMap[str, bool],
     installed_records: HashMap[str, bool],
     identity_records: HashMap[str, bool],
     // D121 step 5: the symbols the last facade draft presented (every
@@ -1228,6 +1232,7 @@ fn CiProject.new -> CiProject:
         fnptr_verdicts: HashMap.new(),
         fnptr_verdicts_drawn: false,
         complete_records: HashMap.new(),
+        pointer_records: HashMap.new(),
         installed_records: HashMap.new(),
         identity_records: HashMap.new(),
         free_aliases: List.new(),
