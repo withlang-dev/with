@@ -2077,29 +2077,34 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     let _pin = runtime_write_file(dep_dir ++ "/facade.json", pin)
     runtime_eprint("  " ++ summary ++ " (.with/deps/c/" ++ name ++ "/" ++ version ++ "/facade-report.txt)")
 
-// A proof about compiled foreign code holds only for the build it analyzed.
-// For a package linked as a prebuilt binary the drafter read a separately
-// configured source tree, and nothing establishes that the two are the same
-// build: what it drew is evidence. The contract and its report say so, with
-// the configuration analyzed, where they said `proof`.
-fn conan_mark_evidence(name: &str, version: &str, dep_dir: &str):
-    if runtime_file_exists(dep_dir ++ "/facade.w") == 0: return
+// A proof about compiled foreign code holds only for the build it analyzed
+// (§31.6.3). For a package linked as a prebuilt binary the drafter read a
+// separately configured source tree, and nothing establishes that the two
+// are the same build: what it drew is evidence. It is kept as a report,
+// `facade-evidence.txt`, with what was analyzed, and grants nothing: the
+// draft it made is removed, and the contract is drafted again with no proof
+// from the source (conan_facade_of_binary).
+fn conan_keep_evidence(name: &str, version: &str, dep_dir: &str) -> str:
+    // Which headers the installed package is imported through is a fact of
+    // its headers, not of the units: the second draft keeps these lines.
+    var imports = ""
+    for line in runtime_read_file(dep_dir ++ "/facade.w").split("\n"):
+        if line.starts_with("use c_import("): imports = imports ++ line ++ "\n"
+    let report = runtime_read_file(dep_dir ++ "/facade-report.txt")
+    for file in ["facade.w", "facade-report.txt", "facade.json"]: runtime_remove_file(dep_dir ++ "/" ++ file)
+    if report.len() == 0: return imports
     let meta = runtime_read_file(dep_dir ++ "/metadata.json")
-    let analyzed = "the source of " ++ name ++ "/" ++ version ++ " configured for this platform with the recipe's default options and not built; " ++
-        "the library linked is the Conan Center binary package " ++ json_extract_string(meta, "package_id") ++ " (revision " ++ json_extract_string(meta, "package_revision") ++ "), built elsewhere"
-    let header = "// evidence, not proof: the source analyzed and the library linked are not established as the same build.\n// analyzed: " ++ analyzed ++ "\n"
-    for file in ["facade.w", "facade-report.txt"]:
-        let path = dep_dir ++ "/" ++ file
-        let text = runtime_read_file(path)
-        if text.len() == 0: continue
-        var out = if file == "facade.w": header else: "evidence, not proof: the source analyzed and the library linked are not established as the same build.\nanalyzed: " ++ analyzed ++ "\n"
-        for line in text.split("\n"):
-            var marked = line.to_owned()
-            while marked.contains("proof: "): marked = marked.replace("proof: ", "evidence: ")
-            marked = marked.replace("proven from the package's own source", "drawn from the package's source").replace("Every clause records its proof", "Every clause records its evidence")
-            out = out ++ marked ++ "\n"
-        let _written = runtime_write_file(path, out.slice(0, out.len() - 1))
-    runtime_eprint("  note: " ++ name ++ " is linked as a prebuilt binary: what its contract records is evidence from separately configured source, not proof")
+    var out = "evidence, not proof: the source analyzed and the library linked are not established as the same build.\n" ++
+        "It grants nothing; a person may state the claim (a registry line, or a clause in the program's own contract).\n" ++
+        "analyzed: the source of " ++ name ++ "/" ++ version ++ " configured for this platform with the recipe's default options and not built; " ++
+        "the library linked is the Conan Center binary package " ++ json_extract_string(meta, "package_id") ++ " (revision " ++ json_extract_string(meta, "package_revision") ++ "), built elsewhere\n"
+    for line in report.split("\n"):
+        var marked = line.to_owned()
+        while marked.contains("proof: "): marked = marked.replace("proof: ", "evidence: ")
+        out = out ++ marked ++ "\n"
+    let _written = runtime_write_file(dep_dir ++ "/facade-evidence.txt", out.slice(0, out.len() - 1))
+    runtime_eprint("  note: " ++ name ++ " is linked as a prebuilt binary: the line above is evidence from separately configured source (.with/deps/c/" ++ name ++ "/" ++ version ++ "/facade-evidence.txt); it grants nothing, and the contract is drawn without it")
+    imports
 
 // The facade of a package installed as a Conan Center binary: its source
 // is fetched and configured (never built) under `dep_dir/.build`, read, and
@@ -2135,9 +2140,31 @@ fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir
         let _gone = runtime_remove_tree(work)
         return
     conan_generate_headers(tools, work ++ "/b")
-    conan_write_facade(name, version, dep_dir, tree.source_dir, work ++ "/b")
-    conan_mark_evidence(name, version, dep_dir)
+    conan_write_binary_contract(name, version, dep_dir, tree.source_dir, work ++ "/b")
     conan_remove_build_tree(work)
+
+// The contract of a package linked as a prebuilt binary, from a configured
+// source tree that is not the build linked (§31.6.3): what the units show
+// is kept as evidence, and the contract is drafted with no proof from them.
+fn conan_write_binary_contract(name: &str, version: &str, dep_dir: &str, source_dir: &str, build_dir: &str):
+    conan_write_facade(name, version, dep_dir, source_dir, build_dir)
+    let imports = conan_keep_evidence(name, version, dep_dir)
+    g_migrate_facade_without_bodies = 1
+    conan_write_facade(name, version, dep_dir, source_dir, build_dir)
+    g_migrate_facade_without_bodies = 0
+    // The draft's head says where its clauses come from, and it imports the
+    // headers the first draft found importable.
+    let drafted = runtime_read_file(dep_dir ++ "/facade.w")
+    if drafted.len() == 0: return
+    var text = ""
+    var placed = false
+    for line in drafted.split("\n"):
+        if line.starts_with("use c_import("): continue
+        if not placed and line.starts_with("// Facade draft for "):
+            text = text ++ imports ++ "\n"
+            placed = true
+        text = text ++ line.replace(", proven from the package's own source (§16.2b.15, D121).", " from its headers and the registry; the library is linked as a prebuilt binary, so nothing here is proven from its source (§31.6.3).").replace("// Every clause records its proof; a project may override any single fact.", "// Every clause records where it comes from; a project may override any single fact.") ++ "\n"
+    let _retitled = runtime_write_file(dep_dir ++ "/facade.w", text.slice(0, text.len() - 1))
 
 // #3168: a configured tree has not made the headers its build generates
 // (libpng's pnglibconf.h, from scripts/pnglibconf.dfa), so every unit that
