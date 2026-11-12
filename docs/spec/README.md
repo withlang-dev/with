@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.51
+# The With Programming Language — Specification v7.52
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.52:** D202 (Eric, 2026-11-11). The keyword of a contract block is `contract`: `c contract name:`. `c facade` is refused, naming `with fix-contracts`, which respells it and `use facades.` (§18.5, new line). A fetched package's contract is `contract.w` with `contract-report.txt` and `contract.json`; a project's own are under `contracts/` and are used as `contracts.<name>`; `with migrate --contract` draws one. The examples and guides are respelled.
+
 **Changelog v7.51:** (Eric, 2026-11-12). §29.11: `error` is contextual; before a name it opens an error declaration or states a contract's error type, and elsewhere it is an ordinary identifier (#3131). §4.3c rule 1: a private module-level binding of an empty literal takes its demands from its own module, and a `pub` binding states its type (#3194).
 
 **Changelog v7.50:** D201 (Eric, 2026-11-11). §31, new: the With Contract Language, the chapter that specifies contracts: its grammar, what each clause means and whether it grants, where each fact comes from, precedence and the override, claims, verification and run-time checks. It rules where it differs from §16.2b, which opens with the list of those places and of its subsections that remain. Adopted with it and not yet implemented, each marked in the chapter: no default grants (`runs no threads`, `callback_thread registering`); `override`; a pointer return is inert; the resource owns its destroyers; `from f, nonnull`; proven invalidators; a destroyer named through a function-pointer global; a result drawn for a prebuilt binary is evidence, not proof.
