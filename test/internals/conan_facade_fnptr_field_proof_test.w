@@ -48,7 +48,7 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"thing\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("thing", "1.0", dep, src, build)
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
     let wanted = [
         "  one_show: lend",
         "  two_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: it is written in 2 places (show_a, show_b))",

@@ -51,7 +51,7 @@ static inline void db_make(Counter c, int produce, db** out) {
 static inline void db_close(db* d) { counter_closes_ = counter_closes_ + 1; free(d); }
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_open(out param out)
         from db_make(out param 2)

@@ -10,7 +10,7 @@
 // through this spelling was silently accepted.
 use c_import("../behavior/c_facade_children.h")
 
-c facade dbf:
+c contract dbf:
     resource Database wraps *mut db
         from db_new
         drop db_close

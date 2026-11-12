@@ -1635,7 +1635,7 @@ sqlite3_open(":memory:", &db);
 
 ```with
 // With
-use facades.sqlite3                  // the library's facade (§16.2b)
+use contracts.sqlite3                  // the library's facade (§16.2b)
 use c_import("sqlite3.h", link: "sqlite3")
 
 let db = Database.open(":memory:")?  // an owned resource; closed by its scope

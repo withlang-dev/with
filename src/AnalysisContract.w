@@ -869,7 +869,7 @@ fn contract_view_render(report: &AnalysisReport) -> str:
         lines.push(fact.detail)
         lines.push("\n")
     if subjects == 0:
-        lines.push("no `c facade` block describes this program; the contract view is empty\n")
+        lines.push("no `c contract` block describes this program; the contract view is empty\n")
     // The audit's verdict without the report's fact count, so a checked-in
     // snapshot of the view does not move with the prelude.
     for i in 0..report.notes.len():

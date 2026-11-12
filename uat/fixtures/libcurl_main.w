@@ -8,7 +8,7 @@
 // text through curl_version — and tears down in order: the handle first
 // (its Drop resets the handle, the abandonment path, before cleanup), then
 // the library.
-use facades.libcurl
+use contracts.libcurl
 use c_import("curl/curl.h")
 use std.fs
 

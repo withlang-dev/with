@@ -6,7 +6,7 @@
 // says so: the safe path, with no `unsafe`.
 use c_import("int g_n;\nint g_bump(void);\n")
 
-c facade counter:
+c contract counter:
     runs no threads
 
 fn main:

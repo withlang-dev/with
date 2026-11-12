@@ -5,7 +5,7 @@
 //! expect-stdout: open: cantopen=true
 //! expect-stdout: ok
 
-// #2179 (D97, spec §16.2b.4): `c facade sqlite error SqliteError` states one
+// #2179 (D97, spec §16.2b.4): `c contract sqlite error SqliteError` states one
 // error type for every fallible operation of the facade. Opening, executing,
 // preparing and stepping all return `Result[_, SqliteError]`, so a function
 // that does all four needs no `error … from` declaration and no conversion;
@@ -13,7 +13,7 @@
 // status and the connection's message (`Failed`), a producer's message read
 // through its parent, and the handle a failed open still produced, owned by
 // the error as `FailedWithDatabase`.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn total(db: &Database) -> Result[i32, SqliteError]:

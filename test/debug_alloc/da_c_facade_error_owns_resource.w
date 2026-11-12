@@ -38,7 +38,7 @@ static inline void db_close(db* d) { counter_n_ = counter_n_ + 1; free(d); }
 static inline int db_tag(db* d) { return d->tag; }
 ")
 
-c facade dbf:
+c contract dbf:
     resource Database wraps *mut db
         from db_open(out param 2)
         drop db_close

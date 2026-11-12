@@ -14,7 +14,7 @@ static inline tnode *tnode_pick(tnode *a, tnode *b, int which) { return which ? 
 static inline int tnode_tag(const tnode *n) { return n->tag; }
 ")
 
-c facade pk:
+c contract pk:
     resource Document wraps *mut tdoc
         from tdoc_parse
         drop tdoc_free

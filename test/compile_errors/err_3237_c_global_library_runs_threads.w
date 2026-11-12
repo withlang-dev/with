@@ -4,7 +4,7 @@
 // provably on one thread, in a single-threaded program too.
 use c_import("int g_n;")
 
-c facade lib:
+c contract lib:
     runs threads
 
 fn main:

@@ -72,7 +72,7 @@ pub fn with_main_error_exit(msg: str) -> Never:
 // chdir alters the working directory, setrlimit the limits, fork and exec
 // the children, …). One becomes a domain, with rows here, the first time a
 // facade presents a safe view whose validity it decides.
-c facade libc:
+c contract libc:
     domain errno thread
     domain environ process
     domain locale process

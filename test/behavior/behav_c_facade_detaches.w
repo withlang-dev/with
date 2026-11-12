@@ -12,7 +12,7 @@
 
 use c_import("c_facade_tree.h")
 
-c facade tree:
+c contract tree:
     resource Doc wraps *mut dc
         from dc_new
         drop dc_free

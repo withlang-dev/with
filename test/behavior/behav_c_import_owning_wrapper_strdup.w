@@ -2,7 +2,7 @@
 //! expect-stdout: ok
 
 // D51 §16.2b / ruling §5: libc's owned strings are modeled by the toolchain
-// libc facade (compiler/LibcFacade.w), rendered like any facade — no
+// libc contract (compiler/LibcFacade.w), rendered like any facade — no
 // generated owning wrapper. strdup produces a `CHeapStr`
 // whose Drop calls free exactly once; the constructor yields
 // `Option[CHeapStr]` (NULL produced nothing, §16.2b.8) and needs no `unsafe`.

@@ -9,7 +9,7 @@ static inline zdoc *zdoc_read(const int *words) { zdoc *d = (zdoc *)malloc(sizeo
 static inline void zdoc_free(zdoc *d) { free(d); }
 ")
 
-c facade z:
+c contract z:
     resource Document wraps *mut zdoc
         from zdoc_read
         drop zdoc_free

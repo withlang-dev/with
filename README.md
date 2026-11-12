@@ -101,7 +101,7 @@ and the statement is finalized and the database closed by their scopes, on
 every path:
 
 ```
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h")
 
 error QueryError from DatabaseError, ExecError, StatementError, StepError
@@ -123,7 +123,7 @@ fn main:
 ```
 
 Today the facade is a file in your project
-([`lib/facades/sqlite3.w`](lib/facades/sqlite3.w) is the one used here).
+([`lib/contracts/sqlite3.w`](lib/contracts/sqlite3.w) is the one used here).
 The rules are in [spec §16.2b](docs/spec/016_ffi.md).
 
 ## Translate C into With

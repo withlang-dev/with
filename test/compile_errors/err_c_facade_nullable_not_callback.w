@@ -13,7 +13,7 @@ void db_close(db* d);
 int db_link(db* d, db* other);
 ")
 
-c facade dbq:
+c contract dbq:
     resource Database wraps *mut db
         from db_new
         drop db_close

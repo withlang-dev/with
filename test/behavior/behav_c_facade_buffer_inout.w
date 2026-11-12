@@ -19,7 +19,7 @@
 
 use c_import("#define FILL_OK 0\n#define FILL_TOO_SMALL 1\nstatic inline int fill(unsigned char *dst, unsigned long *dstLen, const unsigned char *src, unsigned long srcLen) { if (srcLen > *dstLen) return FILL_TOO_SMALL; unsigned long i = 0; while (i < srcLen) { dst[i] = src[i]; i++; } *dstLen = srcLen; return FILL_OK; }\nstatic inline int fill3(unsigned char *dst, unsigned long *dstLen) { if (*dstLen < 3) return FILL_TOO_SMALL; dst[0] = 1; dst[1] = 2; dst[2] = 3; *dstLen = 3; return FILL_OK; }\nstatic inline void fill_void(char *dst, unsigned int *dstLen) { unsigned int n = 4; if (*dstLen < 4) n = *dstLen; unsigned int i = 0; while (i < n) { dst[i] = 'x'; i++; } *dstLen = n; }\n")
 
-c facade fills:
+c contract fills:
     fn fill
         buffer param dst capacity param dstLen inout
         buffer param src len param srcLen

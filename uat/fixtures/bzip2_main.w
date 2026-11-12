@@ -3,7 +3,7 @@
 // `facades.bzip2` is the project's own (§16.2b.1). No `unsafe`, no pointer,
 // no length: the one-shot calls take two slices and the tuning integers,
 // return the bytes they wrote, and leave the caller's buffers as they were.
-use facades.bzip2
+use contracts.bzip2
 use c_import("bzlib.h")
 
 fn main:

@@ -12,7 +12,7 @@ void it_init(iter_state* it, int n);
 void it_end(iter_state* it);
 ")
 
-c facade dep:
+c contract dep:
     resource Database wraps *mut db
         from db_new
         drop db_close

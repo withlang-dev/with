@@ -6,7 +6,7 @@
 use c_import("../behavior/c_facade_callbacks.h")
 use std.rc
 
-c facade dbc:
+c contract dbc:
     resource Database wraps *mut db
         from db_new
         drop db_close

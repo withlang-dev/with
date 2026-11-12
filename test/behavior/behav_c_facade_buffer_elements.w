@@ -11,7 +11,7 @@ typedef struct Pair { int x; int y; } Pair;
 static inline int pairs(const Pair *values, int count) { int sum = 0; for (int i = 0; i < count; ++i) sum += values[i].x + values[i].y; return sum; }
 ")
 
-c facade arrays:
+c contract arrays:
     fn total
         buffer param values len param count elements
     fn reversed

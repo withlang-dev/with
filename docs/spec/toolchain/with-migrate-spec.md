@@ -36,10 +36,10 @@ with migrate src/ -o out/             # directory mode
 with migrate src/ --check             # dry run: exit 1 if changes needed
 with migrate src/ --diff              # show unified diff
 with migrate src/ --stats             # print translation statistics
-with migrate src/ --facade libfoo     # the facade draft the sources prove (§16.2b.15)
+with migrate src/ --contract libfoo     # the facade draft the sources prove (§16.2b.15)
 ```
 
-**`--facade NAME`** (D121, §16.2b.15 step 1) translates nothing. The units
+**`--contract NAME`** (D121, §16.2b.15 step 1) translates nothing. The units
 are scanned as one corpus, as a directory migration scans them, and the
 ownership facts their bodies prove are drawn as a least fixed point, in
 this order: retention (a parameter stored into a field or a global, or
@@ -103,16 +103,16 @@ corpus is exactly the C units that build compiles, with its include paths
 and defines (`compile_commands.json`), every `.gir` under the source, and
 the registry's facts file for the package, fetched from the toolchain's
 repository at one commit (`WITH_REGISTRY=<base URL>` names a mirror or a
-fixture instead). It writes `.with/deps/c/<name>/<version>/facade.w`, a
+fixture instead). It writes `.with/deps/c/<name>/<version>/contract.w`, a
 complete module (`use c_import` of each installed header that declares a
-presented function, then the draft), and `facade-report.txt` beside it,
+presented function, then the draft), and `contract-report.txt` beside it,
 whose summary `with get` prints; a function whose prototype is only in a
 header the package does not install is not presentable and the report
 says so, and a unit the parser could not read is named with the reason. The
 lock pins the registry commit and the facts file's digest (`registry`,
 `facts_sha256`), and a restore fetches the file at that commit. A program
-reaches the facade as `use facades.<name>` when the project has no
-`facades/<name>.w` of its own under `lib/` or `src/`; a `c facade <name>:`
+reaches the facade as `use contracts.<name>` when the project has no
+`contracts/<name>.w` of its own under `lib/` or `src/`; a `c contract <name>:`
 block in the project's source overrides any item (an fn item, or a
 resource) the written block also has, and the rest of the written block
 stays. Without CMake, Ninja or `with cc` the package installs with no

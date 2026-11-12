@@ -30,7 +30,7 @@ static inline int ctx_total(const ctx *c) { return c->acc; }
 static inline const char *ctx_label(ctx *c) { return c->label; }
 ")
 
-c facade engines:
+c contract engines:
     resource Engine wraps *mut eng
         from eng_new
         drop eng_free

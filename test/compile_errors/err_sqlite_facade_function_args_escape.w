@@ -7,7 +7,7 @@
 // the function returns, the slice would point into an invocation SQLite has
 // finished; it is ephemeral, and the storage that would outlive the
 // callback is refused.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 var LAST_ARGS: Option[&[Value]] = None

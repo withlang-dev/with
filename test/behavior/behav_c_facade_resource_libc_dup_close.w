@@ -12,7 +12,7 @@ use c_import("int dup(int fd);
 int close(int fd);
 ")
 
-c facade posix:
+c contract posix:
     resource Fd wraps c_int
         from dup
         drop close

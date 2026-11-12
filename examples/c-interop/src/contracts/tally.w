@@ -5,7 +5,7 @@
 // from the header. D64's explicit `elements` counts ints, not bytes.
 use c_import("tally.h")
 
-c facade tally:
+c contract tally:
     // vendor/tally.c is the whole library: four functions that loop and
     // return. None starts a thread or registers a handler, so
     // `tally_calls` is touched only on a thread that calls into tally.

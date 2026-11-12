@@ -9,7 +9,7 @@
 // parameter types the closure — `extern "C" fn(Context, &[Value], &U)`
 // with `U` the application data's type — so the refusal is the capture
 // itself, as for `db.exec`.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:

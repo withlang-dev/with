@@ -12,7 +12,7 @@ db* db_dup(db* d);
 int db_count(db* d);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Db wraps *mut db
         from db_new
         drop db_free

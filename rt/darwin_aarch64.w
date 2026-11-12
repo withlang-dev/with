@@ -1632,7 +1632,7 @@ pub fn rt_cpu_time_ns() -> i64:
 // chdir alters the working directory, setrlimit the limits, fork and exec
 // the children, …). One becomes a domain, with rows here, the first time a
 // facade presents a safe view whose validity it decides.
-c facade libsystem:
+c contract libsystem:
     domain errno thread
     domain environ process
     domain locale process

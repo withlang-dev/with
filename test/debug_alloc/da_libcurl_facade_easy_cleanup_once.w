@@ -5,7 +5,7 @@
 // when a List of handles drops — and the call-scoped C string a `str` case
 // makes (`CURLOPT_URL`) is freed when the presented call returns. A handle
 // cleaned up twice is a DOUBLE FREE; one never cleaned up is a LEAK.
-use facades.libcurl
+use contracts.libcurl
 use c_import("curl/curl.h", link: "curl")
 
 fn early(fail: bool) -> i32:

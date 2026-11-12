@@ -8,7 +8,7 @@
 @[link_name("chdir")]
 extern fn rt_libc_chdir(path: *const u8) -> i32
 
-c facade libc:
+c contract libc:
     domain errno thread
     domain environ process
     domain locale process

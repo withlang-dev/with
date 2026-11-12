@@ -8,7 +8,7 @@
 // success.
 use c_import("c_facade_record.h")
 
-c facade records:
+c contract records:
     domain locale process
     fn localeconv
         returns borrow lconv from domain locale

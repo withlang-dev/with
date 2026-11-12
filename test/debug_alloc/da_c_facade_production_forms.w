@@ -27,7 +27,7 @@ static inline int z_init(z_stream* s, int n) { s->buf = (int*)malloc(sizeof(int)
 static inline void z_end(z_stream* s) { free(s->buf); s->buf = 0; }
 ")
 
-c facade forms:
+c contract forms:
     resource Database wraps *mut db
         from db_new
         from db_open(out param 1)

@@ -3,7 +3,7 @@
 //
 // For each library a scratch project is made under the work directory,
 // `with init .` and `with get c.<lib>` run in it, and the package's
-// facade-report.txt is read. The output is one Markdown document: a table
+// contract-report.txt is read. The output is one Markdown document: a table
 // per library (version, functions, presented safely, raw), the raw verdicts
 // clustered by kind across the list (each cluster is a facade-grammar
 // feature or a proof-engine fix: the work list of #3115), then each
@@ -300,7 +300,7 @@ fn find_report(work: &str, lib: &str) -> (str, str):
     let deps = work ++ "/" ++ lib ++ "/.with/deps/c/" ++ lib
     for version in list_dir_text(deps).split("\n"):
         if version.len() == 0: continue
-        let path = deps ++ "/" ++ version ++ "/facade-report.txt"
+        let path = deps ++ "/" ++ version ++ "/contract-report.txt"
         if file_exists(path): return (version.to_owned(), path)
     ("", "")
 
@@ -312,7 +312,7 @@ fn cell(s: &str) -> str: s.replace("|", "\\|")
 
 fn markdown(rows: &List[Row], all: &Clusters, with_bin: &str) -> str:
     var out = "# Facade coverage across the #3115 list\n\n"
-    out = out ++ "Written by `with run tools/facade_coverage.w` (" ++ with_bin ++ " on " ++ os() ++ " " ++ arch() ++ "): each library fetched into a fresh project with `with get c.<lib>`, its `facade-report.txt` read. Regenerate after every facade-grammar or proof-engine change and compare the TSV beside this file.\n\n"
+    out = out ++ "Written by `with run tools/facade_coverage.w` (" ++ with_bin ++ " on " ++ os() ++ " " ++ arch() ++ "): each library fetched into a fresh project with `with get c.<lib>`, its `contract-report.txt` read. Regenerate after every facade-grammar or proof-engine change and compare the TSV beside this file.\n\n"
     out = out ++ "## Coverage\n\n| library | version | functions | presented safely | raw | presented | note |\n|---|---|---:|---:|---:|---:|---|\n"
     var total = 0
     var safe = 0
@@ -399,7 +399,7 @@ for lib in libs:
     if path.len() == 0:
         if status.len() == 0:
             let said = facade_line(work ++ "/" ++ lib ++ ".get.err")
-            status = if said.len() > 0: said else: "no facade-report.txt was written"
+            status = if said.len() > 0: said else: "no contract-report.txt was written"
         eprint("facade_coverage: " ++ lib ++ ": " ++ status)
         rows.push(empty_row(lib, status))
         continue

@@ -291,8 +291,8 @@ lists. The scenarios:
 - `bzip2`: `with get c.bzip2`, `use c_import("bzlib.h")`, and an in-memory
   `BZ2_bzBuffToBuffCompress`/`BZ2_bzBuffToBuffDecompress` round trip.
 - `sqlite3`: `with get c.sqlite3`, `use c_import("sqlite3.h")` behind the
-  SQLite facade (`lib/facades/sqlite3.w`, copied into the project as
-  `src/facades/sqlite3.w`; D51 ruling §66), and an in-memory `:memory:`
+  SQLite facade (`lib/contracts/sqlite3.w`, copied into the project as
+  `src/contracts/sqlite3.w`; D51 ruling §66), and an in-memory `:memory:`
   database `CREATE TABLE`/`INSERT`/`SELECT` round trip through
   `Database.open`, `db.exec`, `db.prepare`, `stmt.step` and
   `stmt.column_int` — no `unsafe`.

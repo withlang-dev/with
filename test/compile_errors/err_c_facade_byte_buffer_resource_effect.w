@@ -9,7 +9,7 @@ static inline void close_handle(Handle *h) { free(h); }
 static inline const Value *observe(Handle *h) { return &h->value; }
 static inline int touch(const unsigned char *values, int count, Handle *h) { h->value.n = count; return count; }
 ")
-c facade values:
+c contract values:
     resource Owner wraps *mut Handle
         from make
         drop close_handle

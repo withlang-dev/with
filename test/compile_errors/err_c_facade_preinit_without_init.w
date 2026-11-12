@@ -9,7 +9,7 @@ z_stream z_storage(void);
 void z_end(z_stream* s);
 ")
 
-c facade zl:
+c contract zl:
     resource Stream wraps z_stream
         preinit z_storage
         drop z_end

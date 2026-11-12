@@ -10,7 +10,7 @@ tk* tk_new(const char* text);
 void tk_free(tk* t);
 ")
 
-c facade dep:
+c contract dep:
     resource Tokens wraps *mut tk
         from tk_new
         drop tk_free

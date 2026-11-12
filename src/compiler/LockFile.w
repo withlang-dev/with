@@ -365,7 +365,7 @@ fn lock_entry_from_installed_c_dep(project_root: &str, name: &str, version: &str
     let package_rev = lock_json_extract_string(meta, "package_revision")
     let dep_name = "c." ++ name
     // D121 step 5: the registry pin the facade was built with (facade.json).
-    let pin = runtime_read_file(dep_dir ++ "/facade.json")
+    let pin = runtime_read_file(dep_dir ++ "/contract.json")
     let registry = lock_json_extract_string(pin, "registry_commit")
     let facts_sha256 = lock_json_extract_string(pin, "facts_sha256")
     if recipe_rev == "system" and package_id == "system" and package_rev == "system":

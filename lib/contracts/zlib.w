@@ -5,9 +5,9 @@
 // `uncompress` and `zlibVersion`. Every sentence a clause relies on is
 // quoted beside it, from that header.
 //
-// Where it lives: as `lib/facades/sqlite3.w` — the project's own facade
+// Where it lives: as `lib/contracts/sqlite3.w` — the project's own facade
 // under the repository's `lib/` (§16.2b.1; `c.zlib` ships none yet), and
-// the release UAT copies it into the fresh project as src/facades/zlib.w.
+// the release UAT copies it into the fresh project as src/contracts/zlib.w.
 //
 // A pairing is stated, never inferred from the C types (§16.2b.8): the
 // header alone does not prove that `destLen` is `dest`'s capacity, and a
@@ -21,7 +21,7 @@
 // it becomes a With value, and the caller's slice is never modified.
 use c_import("zlib.h", link: "z")
 
-c facade zlib:
+c contract zlib:
     // "Compresses the source buffer into the destination buffer. sourceLen
     // is the byte length of the source buffer. Upon entry, destLen is the
     // total size of the destination buffer … Upon exit, destLen is the

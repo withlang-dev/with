@@ -10,7 +10,7 @@ static inline ydoc *ydoc_read_memory(const char *buffer, int size) { ydoc *d = (
 static inline void ydoc_release(ydoc *d, const char *note, int len) { free(d); }
 ")
 
-c facade y:
+c contract y:
     resource Document wraps *mut ydoc
         from ydoc_read_memory
         drop ydoc_release

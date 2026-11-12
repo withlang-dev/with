@@ -12,7 +12,7 @@ long telldir(DIR *dirp);
 int closedir(DIR *dirp);
 ")
 
-c facade dirpos:
+c contract dirpos:
     fn telldir
         lend
 

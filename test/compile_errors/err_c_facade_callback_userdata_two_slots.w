@@ -5,7 +5,7 @@
 // be typed is capability-granting, never guessed).
 use c_import("typedef struct db db;\nvoid *malloc(unsigned long size);\nvoid free(void *p);\nstatic inline db *db_new(void) { return (db *)malloc(8); }\nstatic inline void db_close(db *d) { free(d); }\nstatic inline int db_exec2(db *d, int (*cb)(void *, void *), void *ud) { return cb(ud, ud); }\n")
 
-c facade dbc:
+c contract dbc:
     resource Database wraps *mut db
         from db_new
         drop db_close

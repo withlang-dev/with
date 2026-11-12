@@ -5,7 +5,7 @@
 // resource or a C string.
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     fn strchr
         returns borrow CStr from param 1
 

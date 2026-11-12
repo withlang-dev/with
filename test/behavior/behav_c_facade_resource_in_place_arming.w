@@ -32,7 +32,7 @@ static inline int z_end_v2(z_stream* s, int how) { (*s->ends)++; s->state = 0; r
 static inline int z_tag(const z_stream* s) { return s->tag; }
 ")
 
-c facade zl:
+c contract zl:
     resource Stream wraps z_stream
         movable
         preinit z_storage

@@ -3,7 +3,7 @@
 //! expect-stdout: ok
 
 // D51 §16.2b / ruling §5: libc's owned strings are modeled by the toolchain
-// libc facade (compiler/LibcFacade.w). strndup produces a `CHeapStr` whose
+// libc contract (compiler/LibcFacade.w). strndup produces a `CHeapStr` whose
 // Drop calls free exactly once; the constructor yields `Option[CHeapStr]`
 // (NULL produced nothing, §16.2b.8) and needs no `unsafe`. Split from
 // behav_c_import_owning_wrapper_strdup, which runs on Windows too.

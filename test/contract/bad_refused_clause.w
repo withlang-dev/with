@@ -11,7 +11,7 @@
 
 use c_import("typedef struct db db;\ndb *db_new(void);\nvoid db_close(db *d);\nint db_watch(db *d, int (*cb)(void *), int flags);\n")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close

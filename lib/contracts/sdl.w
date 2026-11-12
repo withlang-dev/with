@@ -3,7 +3,7 @@
 // the window it draws into.
 use c_import("SDL3/SDL.h")
 
-c facade sdl:
+c contract sdl:
     // SDL_audio.h (SDL_AudioPostmixCallback): "This will run from a
     // background thread owned by SDL."
     runs threads

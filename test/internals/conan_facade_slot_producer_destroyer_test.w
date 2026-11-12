@@ -68,8 +68,8 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"slots\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("slots", "1.0", dep, src, build)
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
-    let facade = read_file(dep ++ "/facade.w") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    let facade = read_file(dep ++ "/contract.w") ?? ""
     let good = line_of(report, "good_init").contains("owned producer of Good") and line_of(report, "good_cleanup").contains("destroyer, param 0") and facade.contains("resource Good wraps *mut good\n        from good_init") and facade.contains("        drop good_cleanup")
     let kept = line_of(report, "kept_init").contains("raw:") and not facade.contains("from kept_init")
     let twice = line_of(report, "twice_init").contains("raw:") and not facade.contains("from twice_init")

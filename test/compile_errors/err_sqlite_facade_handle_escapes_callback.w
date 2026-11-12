@@ -6,7 +6,7 @@
 // outlive it". Kept in global storage for use after the call returns, it
 // would be a pointer into an invocation SQLite has finished; the handle is
 // ephemeral, and the storage that would outlive the callback is refused.
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 var LAST: Option[Context] = None

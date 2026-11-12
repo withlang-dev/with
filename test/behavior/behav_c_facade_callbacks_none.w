@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 use c_import("static inline int calculate(int value) { return value + 1; }")
-c facade arithmetic:
+c contract arithmetic:
     // Verified from the complete body above: no foreign callback runs.
     fn calculate
         callbacks none

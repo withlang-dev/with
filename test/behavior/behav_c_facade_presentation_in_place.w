@@ -20,7 +20,7 @@ static inline void inflateEnd(z_stream* s) { s->state = 0; }
 static inline void deflateEnd(z_stream* s) { s->state = 0; }
 ")
 
-c facade zlib:
+c contract zlib:
     resource InflateStream wraps z_stream
         init inflateInit(self)
         drop inflateEnd

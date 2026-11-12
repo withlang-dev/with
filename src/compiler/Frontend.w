@@ -222,7 +222,7 @@ impl Zcu:
         for input in resolve_fetched_package_inputs(dir): self.record_frontend_tracked_input(input)
         let package = resolve_fetched_package_of_header(dir, self.pool.resolve(pool.get_data0(decl as NodeId)))
         if package.len() == 0 or resolve_module_is_facade_of(self.decl_source_path_frontend(di), package): return pool
-        let path = self.resolve_module_path_frontend("facades." ++ package, dir)
+        let path = self.resolve_module_path_frontend("contracts." ++ package, dir)
         if path.len() == 0 or self.has_imported_path(path) or path == self.decl_source_path_frontend(di): return pool
         self.add_imported_path(path)
         self.parse_imported_file_frontend(path, pool)
@@ -751,7 +751,7 @@ impl Zcu:
                 let rname = facade_owns_resource_name(ctor)
                 text = text ++ f"    resource {rname} wraps {ret}\n        from {ctor}\n        drop {dtor}\n"
                 let w = Diagnostic.warn(f"c_import: owns: \"{entry}\" is a deprecated spelling of a facade resource; `{ctor}` produces a `{rname}` whose Drop calls `{dtor}` (§16.2b.3)", span)
-                w.add_help(f"write it in a facade: `c facade NAME:` / `resource {rname} wraps {ret}` / `from {ctor}` / `drop {dtor}`")
+                w.add_help(f"write it in a contract: `c contract NAME:` / `resource {rname} wraps {ret}` / `from {ctor}` / `drop {dtor}`")
                 self.diagnostics.emit(w)
             for bi in 0..borrows:
                 let entry = self.c_import_borrows_entry_frontend(out, decl, bi)
@@ -768,10 +768,10 @@ impl Zcu:
                     continue
                 text = text ++ f"    fn {fname}\n        lend\n"
                 let w = Diagnostic.warn(f"c_import: borrows: \"{entry}\" is a deprecated spelling of a facade lend; `{fname}` lends the resource, as the method `{fname}` of it (§16.2b.5)", span)
-                w.add_help(f"write it in a facade: `c facade NAME:` / `fn {fname}` / `lend`")
+                w.add_help(f"write it in a contract: `c contract NAME:` / `fn {fname}` / `lend`")
                 self.diagnostics.emit(w)
             if text.len() > 0:
-                out = self.splice_facade_text_frontend(out, ("c facade c_import_annotations:\n" ++ text), "<c_import annotations>", i)
+                out = self.splice_facade_text_frontend(out, ("c contract c_import_annotations:\n" ++ text), "<c_import annotations>", i)
         out
 
     // The names a program's facade block states: its resources, its
@@ -3442,7 +3442,7 @@ fn frontend_parent_module_rel(module_rel: &str) -> str:
 // place: `.with/deps/c/<name>/<version>/facade.w`.
 fn frontend_path_is_fetched_facade(path: &str) -> bool:
     let p = path.replace("\\", "/")
-    ("/" ++ p).contains("/.with/deps/c/") and p.ends_with("/facade.w")
+    ("/" ++ p).contains("/.with/deps/c/") and p.ends_with("/contract.w")
 
 fn frontend_resolve_module_rel(module_dir: &str, rel_path: &str) -> str:
     let cand1 = resolve_join(module_dir, rel_path)

@@ -9,7 +9,7 @@
 // invalidate.
 use c_import("const char *cwd_text(void);\n")
 
-c facade posixish:
+c contract posixish:
     fn cwd_text
         returns borrow CStr from domain cwd
 

@@ -15,7 +15,7 @@ static inline int ydoc_size(const ydoc *d) { return d->size; }
 static inline int ydoc_first(const ydoc *d) { return d->first; }
 ")
 
-c facade y:
+c contract y:
     resource Document wraps *mut ydoc
         from ydoc_read_memory
         drop ydoc_free

@@ -9,7 +9,7 @@ db* db_new(int flags);
 void db_close_how(db* d, int how);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close_how

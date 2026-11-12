@@ -21,7 +21,7 @@ int db_prepare(db *d, const char *sql, st **out, const char **tail);
 int st_finalize(st *s);
 ")
 
-c facade dbf:
+c contract dbf:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

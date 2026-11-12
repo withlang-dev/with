@@ -26,7 +26,7 @@ void rw_free(rw* r);
 db* st_db(st* s);
 \")
 
-c facade dep:
+c contract dep:
     resource Database wraps *mut db
         from db_new
         from db_open(out param 1)

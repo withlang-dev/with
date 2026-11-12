@@ -33,8 +33,8 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"vt\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("vt", "1.0", dep, src, build)
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
-    let facade = read_file(dep ++ "/facade.w") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    let facade = read_file(dep ++ "/contract.w") ?? ""
     let resource = facade.contains("resource HHandle wraps *mut H\n        from h_new") and facade.contains("        drop h_free")
     let operation = facade.contains("    fn h_size\n        of HHandle")
     let synonym = report.contains("  upload: raw:") and not facade.contains("GLvoid")

@@ -3,7 +3,7 @@
 // `facades.zlib` is the project's own (§16.2b.1). No `unsafe`, no pointer,
 // no length: `compress(dest, src)` takes two slices and returns the bytes it
 // wrote, `uncompress` the same, and the caller's buffers are what they were.
-use facades.zlib
+use contracts.zlib
 use c_import("zlib.h")
 
 fn main:

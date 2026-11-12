@@ -32,7 +32,7 @@ static inline int z_tag(const z_stream* s) { return s->tag; }
 static inline void z_end(z_stream* s) { *s->ends = *s->ends + 1; }
 ")
 
-c facade names:
+c contract names:
     resource Database wraps *mut db
         from db_new
         from db_open(out param slot)

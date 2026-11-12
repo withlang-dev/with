@@ -18,7 +18,7 @@ static inline xchar *zdoc_raw(const zdoc *d) { xchar *s = (xchar *)malloc(6); s[
 static inline void zfree(void *p) { free(p); }
 ")
 
-c facade z:
+c contract z:
     text utf8
     resource Document wraps *mut zdoc
         from zdoc_new

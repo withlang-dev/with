@@ -8,7 +8,7 @@ use c_import("typedef struct db db;
 void db_close(db* d);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         drop db_close
         ok DB_OK

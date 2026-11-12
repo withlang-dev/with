@@ -5,7 +5,7 @@
 // half-model unsafely.
 use c_import("../behavior/c_facade_callbacks.h")
 
-c facade dbc:
+c contract dbc:
     resource Database wraps *mut db
         from db_new
         drop db_close

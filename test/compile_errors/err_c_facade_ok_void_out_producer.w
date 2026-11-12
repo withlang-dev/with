@@ -9,7 +9,7 @@ void db_make(db** out);
 void db_close(db* d);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_make(out param 0)
         drop db_close

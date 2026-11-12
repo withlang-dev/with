@@ -43,7 +43,7 @@ f. **Proofs for prebuilt binaries:** the cost of each way to comply with
    default does not change before that. Chosen 2026-11-12: keep the
    binary and accept no proof ("the contract takes the place of proof").
    What the separately configured source shows is written to
-   `facade-evidence.txt` and grants nothing; the contract is drawn from
+   `contract-evidence.txt` and grants nothing; the contract is drawn from
    the headers and the registry. libxml2's registry file states the seven
    claims its UAT program rests on.
 

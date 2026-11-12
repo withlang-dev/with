@@ -20,7 +20,7 @@ static inline db* db_new(Counter c, int id) { if (id < 0) return 0; db* d = (db*
 static inline void db_close(db* d) { (*d->c.n)++; }
 ")
 
-c facade dbl:
+c contract dbl:
     resource Tally wraps Counter
         from counter_new
         drop counter_free

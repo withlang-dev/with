@@ -6,7 +6,7 @@
 // one origin rule, so the two forms are not mixed for one resource.
 use c_import("typedef struct kv_db kv_db;\ntypedef struct kv_stmt kv_stmt;\n#define KV_OK 0\nint kv_open(kv_db **out);\nvoid kv_close(kv_db *d);\nint kv_prepare(kv_db *d, kv_stmt **out);\nint kv_prepare_detached(kv_stmt **out);\nvoid kv_finalize(kv_stmt *s);\nint kv_step(kv_stmt *s);\nint kv_changes(kv_db *d);\nkv_db *kv_db_handle(kv_stmt *s);\nkv_db *kv_stmt_owner(kv_stmt *s);\n")
 
-c facade kv:
+c contract kv:
     resource Database wraps *mut kv_db
         from kv_open(out param 0)
         drop kv_close

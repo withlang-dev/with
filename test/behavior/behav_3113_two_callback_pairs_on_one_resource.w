@@ -9,7 +9,7 @@
 // parameter 'U'".
 use c_import("curl/curl.h", link: "curl")
 
-c facade curl_two_pairs:
+c contract curl_two_pairs:
     resource Easy wraps *mut CURL
         from curl_easy_init
         drop curl_easy_cleanup

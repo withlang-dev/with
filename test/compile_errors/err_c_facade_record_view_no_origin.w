@@ -4,7 +4,7 @@
 // … With does not invent a lifetime".
 use c_import("../behavior/c_facade_record.h")
 
-c facade records:
+c contract records:
     fn rec_of
         returns borrow rec from param 0
 

@@ -23,7 +23,7 @@ void st_free(st *s);
 int touch(const unsigned char *values, int count, other *o);
 ")
 
-c facade proj:
+c contract proj:
     resource Database wraps *mut db
         from db_new
         drop db_close

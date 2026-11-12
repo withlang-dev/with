@@ -5,7 +5,7 @@
 
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     domain errno thread
     domain errno thread
     fn note_pure

@@ -28,7 +28,7 @@ fn main:
     conan_write_facade("tiny", "1.0", dep, src, build)
     // A value-only function imports nothing (the facade's `use c_import`
     // lines serve the resources it presents); the report is the evidence.
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
     let first = report.split("\n")[0]
     if not first.starts_with("facade tiny: 1 functions") or not report.contains("  tiny_twice: "):
         print(report)

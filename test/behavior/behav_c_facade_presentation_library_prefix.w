@@ -28,7 +28,7 @@ static inline int lib_reset(lib_stmt *s) { return 1; }
 static inline int lib_stmt_reset(lib_stmt *s) { return 2; }
 ")
 
-c facade libp:
+c contract libp:
     resource Database wraps *mut lib_db
         from lib_db_new
         drop lib_db_close

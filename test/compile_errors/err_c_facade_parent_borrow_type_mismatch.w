@@ -6,7 +6,7 @@
 // parent) is an error.
 use c_import("typedef struct kv_db kv_db;\ntypedef struct kv_stmt kv_stmt;\ntypedef struct kv_cache kv_cache;\n#define KV_OK 0\nint kv_open(kv_db **out);\nvoid kv_close(kv_db *d);\nint kv_cache_open(kv_cache **out);\nvoid kv_cache_close(kv_cache *c);\nint kv_prepare(kv_db *d, kv_stmt **out);\nvoid kv_finalize(kv_stmt *s);\nint kv_step(kv_stmt *s);\nint kv_changes(kv_db *d);\nconst char *kv_errmsg(kv_db *d);\nconst unsigned char *kv_column_text(kv_stmt *s, int col);\nkv_db *kv_db_handle(kv_stmt *s);\nkv_cache *kv_stmt_cache(kv_stmt *s);\n")
 
-c facade kv:
+c contract kv:
     resource Database wraps *mut kv_db
         from kv_open(out param 0)
         drop kv_close

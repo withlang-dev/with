@@ -4,7 +4,7 @@
 // `Option[&T]`; `None` crosses as NULL.
 use c_import("typedef struct { int w; int h; } Size; static inline int area_or(const Size *s, int fallback) { return s ? s->w * s->h : fallback; }")
 
-c facade shapes:
+c contract shapes:
     fn area_or
         reads param s
         nullable param s

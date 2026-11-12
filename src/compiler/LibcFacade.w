@@ -48,7 +48,7 @@ use InternPool
 use compiler.FacadeRender
 
 fn libc_facade_source() -> str:
-    "c facade libc:
+    "c contract libc:
     resource CHeapStr wraps *mut c_char
         from strdup
         from strndup

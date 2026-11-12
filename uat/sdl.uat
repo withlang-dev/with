@@ -10,7 +10,7 @@ new directory
 run: with init .
 run: with get c.sdl
 write src/main.w from sdl_main.w
-copy lib/facades/sdl.w to src/facades/sdl.w
+copy lib/contracts/sdl.w to src/contracts/sdl.w
 run: with check src/main.w
 expect stdout: ok
 # SDL's own off-screen video driver (built into SDL on every platform): the

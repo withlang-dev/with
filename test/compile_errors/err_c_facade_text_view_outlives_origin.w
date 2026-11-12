@@ -6,7 +6,7 @@
 // was borrowed from.
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     resource Note wraps *mut note
         from note_new
         drop note_free

@@ -6,7 +6,7 @@
 use std.string.CString
 use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nvoid h_reset(h *x);\nint h_set(h *x, int opt, ...);\nint h_other(h *x);\n#define OPT_BODY 1\n#define H_OK 0\n")
 
-c facade hlib:
+c contract hlib:
     resource Req wraps *mut h
         from h_new
         drop h_free

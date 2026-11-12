@@ -28,7 +28,7 @@ static inline void st_finalize(st *s) { free(s); }
 static inline int st_step(st *s) { return s->owner->n * 100 + s->id; }
 ")
 
-c facade dbf:
+c contract dbf:
     resource Database wraps *mut db
         from db_new
         drop db_close

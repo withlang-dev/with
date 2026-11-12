@@ -4,7 +4,7 @@
 // it" — an operation of a handle is a lend of it, never a destroyer.
 use c_import("typedef struct ctx { int acc; } ctx;\nvoid ctx_free(ctx *c);\n")
 
-c facade engines:
+c contract engines:
     handle Tally wraps *mut ctx
     fn ctx_free
         of Tally

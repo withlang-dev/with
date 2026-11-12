@@ -11,7 +11,7 @@ static inline void tex_unload(Tex t) { (void)t; }
 static inline int tex_width(int w) { return w; }
 ")
 
-c facade gfx:
+c contract gfx:
     resource Texture wraps Tex
         from tex_load
         drop tex_unload

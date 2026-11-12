@@ -3,7 +3,7 @@
 // D51 §41 / §16.1, §16.2b.8: a foreign string is a `CStr` view, and With
 // text is made from it explicitly — `to_str()` validates (a `&str` over the
 // same bytes), `to_str_lossy()` repairs, `to_owned()` copies. `strerror`
-// and `getenv` are items of the toolchain libc facade (stage 7), so their
+// and `getenv` are items of the toolchain libc contract (stage 7), so their
 // results are `Option[CStr]` borrowed from their domains; `CStr.from_ptr`
 // is the `unsafe` spelling for a pointer C handed back with no facade.
 use c_import("char *getenv(const char *name);\nchar *strerror(int code);\n")

@@ -34,7 +34,7 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"thing\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("thing", "1.0", dep, src, build)
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
     var line_said = ""
     var fail_said = ""
     for line in report.split("\n"):

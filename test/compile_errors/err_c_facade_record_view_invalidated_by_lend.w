@@ -5,7 +5,7 @@
 // unknown effect means invalidate).
 use c_import("../behavior/c_facade_record.h")
 
-c facade records:
+c contract records:
     resource Hold wraps *mut hold
         from hold_new
         drop hold_free

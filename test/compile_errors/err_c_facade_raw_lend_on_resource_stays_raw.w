@@ -11,7 +11,7 @@ void db_close(db* d);
 int db_count(db* d);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close

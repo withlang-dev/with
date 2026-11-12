@@ -9,7 +9,7 @@
 
 use c_import("#define LIE_OK 0\nstatic inline int lie(unsigned char *dst, unsigned long *dstLen) { dst[0] = 1; *dstLen = 64; return LIE_OK; }\n")
 
-c facade lies:
+c contract lies:
     fn lie
         buffer param dst capacity param dstLen inout
         ok LIE_OK

@@ -10,7 +10,7 @@
 // no facade beyond the C standard library's"). `c.sqlite3` is fetched from
 // Conan and ships none yet, so this is the project's own facade, under the
 // repository's `lib/` — the module root the resolver walks to from every
-// fixture (`use facades.sqlite3`) — and not under `lib/std`, which the
+// fixture (`use contracts.sqlite3`) — and not under `lib/std`, which the
 // compiler embeds. It moves into the package when the package can carry it.
 //
 // What the ruling asks for and where it is met (§66):
@@ -21,7 +21,7 @@
 //                                                     SQLITE_DONE) and create_function_v2
 //                                                     (Amendment 3)
 //   the failure's text .............................. message sqlite3_errmsg (Amendment 3)
-//   one error for the whole library ................. c facade sqlite error SqliteError
+//   one error for the whole library ................. c contract sqlite error SqliteError
 //                                                     (D97, #2179)
 //   failed-open resource production ................. ok on an out-parameter producer:
 //                                                     SqliteError.FailedWithDatabase
@@ -49,7 +49,7 @@ use c_import("sqlite3.h", link: "sqlite3")
 // D97): one SQLite error, as the library has one set of result codes, so a
 // program that opens, prepares, executes and steps writes one error type
 // and no conversions.
-c facade sqlite error SqliteError:
+c contract sqlite error SqliteError:
     // A connection is an owned pointer resource (§10, §11). Its producer
     // writes the handle through the second parameter, and the status it
     // returns is read against SQLITE_OK (§16, §17). Production is not

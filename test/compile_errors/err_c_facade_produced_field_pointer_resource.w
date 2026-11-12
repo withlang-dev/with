@@ -6,7 +6,7 @@ Buf *buf_open(int n);
 void buf_close(Buf *b);
 ")
 
-c facade bufs:
+c contract bufs:
     resource Buffer wraps *mut Buf
         from buf_open, nullable field data
         drop buf_close

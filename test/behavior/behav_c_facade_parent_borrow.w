@@ -22,7 +22,7 @@ static inline int kv_changes(kv_db *d) { return d->changes; }
 static inline kv_db *kv_db_handle(kv_stmt *s) { return s->owner; }
 ")
 
-c facade kv:
+c contract kv:
     resource Database wraps *mut kv_db
         from kv_open(out param 0)
         drop kv_close

@@ -2,7 +2,7 @@
 //! expect-stderr: buffer count in elements does not fit the C count type
 
 use c_import("static inline int count(const int *values, signed char n) { return n; }")
-c facade counts:
+c contract counts:
     fn count
         buffer param values len param n elements
 fn main:

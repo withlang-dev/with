@@ -26,7 +26,7 @@ static inline void obj_unref(obj *o) { counter_n_ = counter_n_ + 1; free(o); }
 static inline int obj_get_id(obj *o) { return o->id; }
 ")
 
-c facade objs:
+c contract objs:
     use convention gobject.v1
     resource Object wraps *mut obj
 

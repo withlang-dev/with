@@ -6,7 +6,7 @@
 // its rendering.
 use c_import("#include <stdlib.h>\ntypedef struct db { int n; } db;\nstatic inline int db_open(int n, db** out) { db *d = (db *)malloc(sizeof(db)); d->n = n; *out = d; return 0; }\nstatic inline void db_close(db* d) { free(d); }\n")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

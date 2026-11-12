@@ -20,7 +20,7 @@ static inline int db_count(db *d) { return d->n; }
 static inline const char *db_errmsg(db *d) { return d->n < 0 ? \"negative\" : \"fine\"; }
 ")
 
-c facade dbv:
+c contract dbv:
     resource Database wraps *mut db
         from db_open(out param 1)
         drop db_close

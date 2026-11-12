@@ -4,7 +4,7 @@
 // format string selects nothing a case can name.
 use c_import("int dprintf(int fd, const char *fmt, ...);\n#define UL_SETFSIZE 2\n")
 
-c facade prints:
+c contract prints:
     fn dprintf
         variadic param 2 selected by param fmt:
             case UL_SETFSIZE: c_long

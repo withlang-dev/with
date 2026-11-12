@@ -9,7 +9,7 @@ void db_close(db* d);
 db* db_by_name(const char* name);
 ")
 
-c facade dep:
+c contract dep:
     resource Database wraps *mut db
         from db_new
         drop db_close

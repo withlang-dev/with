@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 // D51 stage 7 (ruling §31, §41; spec §16.2b.8): `strchr` is an item of the
-// toolchain libc facade — `returns borrow CStr from param 0` — so the call
+// toolchain libc contract — `returns borrow CStr from param 0` — so the call
 // is safe and its result is `Option[CStr]` borrowed from the string it was
 // lent: `None` when absent, and the text from the hit onwards otherwise,
 // read without `unsafe`. (Until stage 7 this was the #379 overlay's raw,

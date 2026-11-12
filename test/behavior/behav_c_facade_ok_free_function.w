@@ -10,7 +10,7 @@
 // return, and the presented function is `Result[Unit, SumBytesError]`.
 use c_import("#define SUM_OK 0\nstatic inline int sum_bytes(const unsigned char *p, unsigned long n) { if (n > 0) return p[0]; return 0; }\n")
 
-c facade sums:
+c contract sums:
     fn sum_bytes
         buffer param p len param n
         ok SUM_OK

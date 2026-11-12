@@ -17,7 +17,7 @@ Tok tok_load(const char* path);
 void tok_unload(Tok t);
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close

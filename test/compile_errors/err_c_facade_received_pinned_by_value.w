@@ -12,7 +12,7 @@ sm* sum_new(z_stream s);
 void sum_free(sm* m);
 ")
 
-c facade dep:
+c contract dep:
     resource Stream wraps z_stream
         init z_init(self)
         drop z_end

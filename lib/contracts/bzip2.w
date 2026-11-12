@@ -4,9 +4,9 @@
 // header carries no documentation, so every clause quotes the bzip2 manual
 // (bzip2 and libbzip2, version 1.0.8, §3.5 "Utility functions").
 //
-// Where it lives: as `lib/facades/sqlite3.w` — the project's own facade
+// Where it lives: as `lib/contracts/sqlite3.w` — the project's own facade
 // under the repository's `lib/` (§16.2b.1; `c.bzip2` ships none yet), and
-// the release UAT copies it into the fresh project as src/facades/bzip2.w.
+// the release UAT copies it into the fresh project as src/contracts/bzip2.w.
 //
 // The three tuning integers (`blockSize100k`, `verbosity`, `workFactor`)
 // stay presented: they are the caller's choice, not facts of the facade,
@@ -14,7 +14,7 @@
 // states one meaning).
 use c_import("bzlib.h", link: "bz2")
 
-c facade bzip2:
+c contract bzip2:
     // "Attempts to compress the data in source[0 .. sourceLen-1] into the
     // destination buffer, dest[0 .. *destLen-1]. If the destination buffer
     // is big enough, *destLen is set to the size of the compressed data,

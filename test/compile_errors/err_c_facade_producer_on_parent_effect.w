@@ -24,7 +24,7 @@ int st_new(db *d, st **out, int flags, other *o);
 void st_free(st *s);
 ")
 
-c facade stp:
+c contract stp:
     resource Database wraps *mut db
         from db_new
         drop db_close

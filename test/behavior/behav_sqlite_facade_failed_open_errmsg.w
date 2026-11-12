@@ -13,7 +13,7 @@
 // text view, a view of the failed resource — and an application reads why
 // the open failed with no `unsafe` and no raw pointer. The handle is still
 // closed when the error is dropped (da_sqlite_facade_destroy_once).
-use facades.sqlite3
+use contracts.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:

@@ -7,7 +7,7 @@
 // place the callee writes. Without the clause both calls are raw.
 use c_import("typedef struct { int w; int h; } Size; static inline int area(const Size *s) { return s->w * s->h; } static inline void grow(Size *s, int by) { s->w += by; s->h += by; }")
 
-c facade shapes:
+c contract shapes:
     fn area
         reads param s
     fn grow

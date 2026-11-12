@@ -26,7 +26,7 @@ static inline float snd_volume(const Snd* s) { return s->gain; }
 static inline int snd_count(Snd s, int i) { return snd_state_[i]; }
 ")
 
-c facade sounds:
+c contract sounds:
     resource Clip wraps Snd
         from snd_load
         drop snd_unload

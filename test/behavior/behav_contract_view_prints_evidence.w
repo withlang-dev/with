@@ -12,11 +12,11 @@ fn main:
     p7_write(root, "with.toml", "[package]\nname = \"evidenceview\"\nversion = \"0.1.0\"\n\n[deps]\nc.fake = \"1.0\"\n")
     p7_write(root, ".with/deps/c/fake/1.0/metadata.json", "{\n  \"name\": \"fake\",\n  \"version\": \"1.0\",\n  \"include_paths\": [\"include\"],\n  \"lib_paths\": [],\n  \"libs\": []\n}\n")
     p7_write(root, ".with/deps/c/fake/1.0/include/fake.h", "const char *fake_name(void);\nconst char *fake_motto(void);\n")
-    p7_write(root, ".with/deps/c/fake/1.0/facade.w",
+    p7_write(root, ".with/deps/c/fake/1.0/contract.w",
         "// evidence, not proof: the source analyzed and the library linked are not established as the same build.\n" ++
         "// analyzed: the source of fake/1.0 configured for this platform; the library linked is a binary built elsewhere\n" ++
         "use c_import(\"fake.h\")\n\n" ++
-        "c facade fake:\n" ++
+        "c contract fake:\n" ++
         "    fn fake_name\n" ++
         "        returns static CStr    // evidence: every return is a string literal\n" ++
         "    fn fake_motto\n" ++
@@ -25,8 +25,8 @@ fn main:
     let view = p7_run(root, "evidence-view", p7_argv_append(p7_argv_append(p7_argv_append("", "analyze"), "src/main.w"), "contract"))
     p7_assert_success(view, "the contract view")
     let shown = view.stdout ++ view.stderr
-    assert(shown.contains("[evidence:returns static@.with/deps/c/fake/1.0/facade.w:7]"))
-    assert(shown.contains("[clause:returns static@.with/deps/c/fake/1.0/facade.w:9]"))
-    assert(shown.contains("contract-audit: evidence, not proof, in .with/deps/c/fake/1.0/facade.w"))
+    assert(shown.contains("[evidence:returns static@.with/deps/c/fake/1.0/contract.w:7]"))
+    assert(shown.contains("[clause:returns static@.with/deps/c/fake/1.0/contract.w:9]"))
+    assert(shown.contains("contract-audit: evidence, not proof, in .with/deps/c/fake/1.0/contract.w"))
     assert(shown.contains("analyzed: the source of fake/1.0 configured for this platform"))
     print("ok")

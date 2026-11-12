@@ -3,7 +3,7 @@
 // D66 (spec §16.2b.5): a case selector is an imported constant.
 use c_import("long ulimit(int cmd, ...);\n#define UL_GETFSIZE 1\n#define UL_SETFSIZE 2\n")
 
-c facade limits:
+c contract limits:
     fn ulimit
         variadic param 1 selected by param cmd:
             case nothing: c_long

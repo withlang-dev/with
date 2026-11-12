@@ -2,7 +2,7 @@
 // D198 (§16.2b.5): a value-record clause names a pointer to one complete record.
 use c_import("static inline int twice(const int *n) { return *n * 2; }")
 
-c facade shapes:
+c contract shapes:
     fn twice
         reads param n
 

@@ -19,7 +19,7 @@ static inline int db_close_v2(db* d, int how) { d->closed++; return how; }
 static inline int db_closed(db* d) { return d->closed; }
 ")
 
-c facade dbl:
+c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close

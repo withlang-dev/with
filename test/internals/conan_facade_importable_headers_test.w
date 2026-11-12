@@ -31,8 +31,8 @@ fn main:
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"box\"]}\n") == 0)
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("box", "1.0", dep, src, build)
-    let facade = read_file(dep ++ "/facade.w") ?? ""
-    let report = read_file(dep ++ "/facade-report.txt") ?? ""
+    let facade = read_file(dep ++ "/contract.w") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
     let ok = facade.contains("use c_import(\"base.h\"") and facade.contains("from box_new") and not facade.contains("extra.h") and not facade.contains("box_weight") and not facade.contains("box_hidden") and report.contains("do not compile on their own") and report.contains("extra.h")
     if not ok:
         print(facade)

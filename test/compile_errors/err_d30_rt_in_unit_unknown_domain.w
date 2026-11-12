@@ -6,7 +6,7 @@
 // declared in both, the two are one domain (ruling §35).
 use c_import("int db_count(void* d);\n")
 
-c facade dbl:
+c contract dbl:
     fn db_count
         preserves domain locale
 

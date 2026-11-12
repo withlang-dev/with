@@ -24,7 +24,7 @@ static inline void ctx_add(ctx *c, int v) { c->acc += v; }
 static inline int ctx_total(const ctx *c) { return c->acc; }
 ")
 
-c facade engines:
+c contract engines:
     resource Engine wraps *mut eng
         from eng_new
         drop eng_free

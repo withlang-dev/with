@@ -1,14 +1,14 @@
 // A vendored C library: structs by value, a C global, a callback, and C that
-// calls With. The contracts in src/facades/tally.w pair element buffers and
+// calls With. The contracts in src/contracts/tally.w pair element buffers and
 // counts and keep callback userdata typed. Application code stays safe.
 use c_import("tally.h", link: "tally")
-use facades.tally
+use contracts.tally
 
 // TallyRange is C's struct, and With's: it is built, passed and returned by
 // value with no declaration here.
 pub fn range_of(values: []i32): tally_range(values)
 
-// A by-value call is a lend (src/facades/tally.w): no `unsafe`.
+// A by-value call is a lend (src/contracts/tally.w): no `unsafe`.
 pub fn widened(range: TallyRange, by: i32) -> TallyRange: tally_widen(range, by)
 
 // A C global, read like any other.

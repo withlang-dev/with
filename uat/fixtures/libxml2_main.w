@@ -6,7 +6,7 @@
 // values and content are new text the caller owns, released through
 // `xmlFree` on every path (§16.2b.8); the encoding is an optional C string
 // the registry states nullable (§16.2b.15 item 3).
-use facades.libxml2
+use contracts.libxml2
 use std.fs
 
 fn main:

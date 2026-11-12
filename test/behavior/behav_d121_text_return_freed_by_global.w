@@ -9,7 +9,7 @@
 // snake-case one does: `zdocGetTitle` is `get_title`.
 use c_import("typedef unsigned char xchar;\ntypedef struct _zdoc zdoc;\ntypedef void (*zfreefn)(void *);\nextern zfreefn zfree;\nzdoc *zdocRead(const char *path, const char *encoding);\nvoid zdocFree(zdoc *d);\nxchar *zdocGetTitle(const zdoc *d);\n")
 
-c facade z:
+c contract z:
     text utf8
     resource Doc wraps *mut _zdoc
         from zdocRead

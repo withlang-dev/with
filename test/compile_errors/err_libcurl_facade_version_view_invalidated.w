@@ -4,7 +4,7 @@
 // D66 (spec §16.2b.6, §16.2b.7): the version record is a view of libcurl's
 // process-wide state, not `static`; an operation of the library that does
 // not preserve the domain ends it.
-use facades.libcurl
+use contracts.libcurl
 use c_import("curl/curl.h", link: "curl")
 
 fn main:

@@ -14,7 +14,7 @@
 
 use c_import("static inline int add3(int a, int b, const char *tail) { int t = 0; if (tail != 0) t = 100; return a + b + t; }\nstatic inline int has_tail(int a, const char *tail) { if (tail != 0) return 1; return 0; }\nvoid *malloc(unsigned long size);\nvoid free(void *p);\ntypedef struct note { int v; int flags; } note;\nstatic inline note *note_new(void) { note *n = (note *)malloc(sizeof(note)); n->v = 0; n->flags = 9; return n; }\nstatic inline void note_free(note *n) { free(n); }\nstatic inline void note_set(note *n, int v, int flags) { n->v = v; n->flags = flags; }\nstatic inline int note_v(note *n) { return n->v; }\nstatic inline int note_flags(note *n) { return n->flags; }\n")
 
-c facade notes:
+c contract notes:
     resource Note wraps *mut note
         from note_new
         drop note_free

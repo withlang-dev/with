@@ -5,12 +5,12 @@
 
 use c_import("../behavior/c_facade_text.h")
 
-c facade notes:
+c contract notes:
     domain errno thread
     fn note_pure
         preserves domain errno
 
-c facade notes_again:
+c contract notes_again:
     domain errno thread
     fn note_pure
         lend

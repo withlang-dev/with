@@ -6,7 +6,7 @@
 // handle's safe operations; it is refused.
 use c_import("typedef struct ctx { int acc; } ctx;\nstatic inline void ctx_add(ctx *c, int v) { c->acc += v; }\n")
 
-c facade engines:
+c contract engines:
     handle Tally wraps *mut ctx
     fn ctx_add
         of Tally

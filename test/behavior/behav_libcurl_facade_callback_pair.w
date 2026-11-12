@@ -13,7 +13,7 @@
 // outlives the handle, whose Drop runs curl_easy_reset (the abandonment
 // path) before curl_easy_cleanup. Each setter's status is checked against
 // CURLE_OK, which is what proves the pair compatible at `perform`.
-use facades.libcurl
+use contracts.libcurl
 use c_import("curl/curl.h", link: "curl")
 use std.fs
 
