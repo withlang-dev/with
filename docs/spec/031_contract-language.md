@@ -1,15 +1,16 @@
-# The With Contract Language (WCL)
+# 31. The With Contract Language
 
-Status: the design is blessed (Eric, 2026-11-11, draft 7 with the edits of
-his last review applied). This file is the text that lands as the
-specification's chapter, with §16.2b reduced to an introduction; until it
-lands §16.2b is normative.
+This chapter is normative. Where it differs from §16.2b it rules; §16.2b
+opens with the list of those places and of its subsections that remain.
 
-The body states today's rules and the rules Eric adopted on 2026-11-11.
-An adopted rule the compiler does not implement is marked **adopted
-2026-11-11, not yet implemented**. Section 13 holds the order the adopted rules land in.
+The body states the rules the compiler implements and the rules adopted on
+2026-11-11. An adopted rule the compiler does not implement is marked
+**adopted 2026-11-11, not yet implemented**: the product is non-compliant
+with it until it lands. The order they land in is kept in
+wcl-landing-order.md.
 
-The keyword is written `contract` throughout.
+The keyword is written `contract` throughout (`c contract`, `c facts`).
+The compiler accepts `c facade` until the keyword change lands.
 
 > A foreign capability may enter safe With through a verified fact or an
 > explicitly attributable trusted claim. The absence of evidence must not
@@ -21,7 +22,7 @@ cannot create unsafety") applied to foreign code: the compiler proves what
 it can and restricts what it cannot; a person may take responsibility in
 writing; the compiler records whose word each fact is.
 
-## 1. Names
+## 31.1 Names
 
 The **With Contract Language** is the language in which a person, a package
 registry, or the compiler's own evidence states what a function does with
@@ -42,7 +43,7 @@ it is safe With.
   hand-written With layer that presents a migrated engine as the standard
   library (D37, D148).
 
-## 2. Subjects
+## 31.2 Subjects
 
 A contract describes functions. Three kinds of function can be a subject.
 
@@ -52,21 +53,21 @@ A contract describes functions. Three kinds of function can be a subject.
 | A corpus function | a function of a migrated engine: With source the migrator wrote from C, whose body proves part of its contract and whose remaining facts a person knows (claims.md tier 1) | not yet: the facts-file form is proposed, the migrator does not read it |
 | A With function | a hand-written `unsafe fn`, whose caller today has only `unsafe` to say what it knows | not yet. The direction (Eric, 2026-11-11): clauses on an `unsafe fn`, written only in its defining module, with a clause the checker can prove refused as redundant. The expression `claim <fact>` (claims.md tier 2) is the same act at an expression and is specified with the language, not here |
 
-Everything from section 3 on is written for the first subject. The clause
+Everything from §31.3 on is written for the first subject. The clause
 vocabulary is not specific to C: ownership, borrowing, retention,
 destruction, nullability and thread capability are facts about any function
 whose signature is raw. What is specific to C is where the declarations come
-from (section 3) and the base rule (section 4).
+from (§31.3) and the base rule (§31.4).
 
 A contract states nothing about a function the import does not bring: a name
 beginning with `_`, or a function the header declares only under a macro the
 import does not define. A contract that names one is an error. §16.2b.13.
 
-## 3. Lexical structure
+## 31.3 Lexical structure
 
 A contract is With source: With's tokens, comments and indentation (§29). It
 adds no token. Its words (`contract`, `resource`, `wraps`, `from`, `drop`,
-`lend`, and every other word in section 5) are **contextual**: each is a
+`lend`, and every other word in §31.5) are **contextual**: each is a
 word of the language only at the position the grammar gives it, and an
 ordinary identifier everywhere else in a program. `c` is contextual in the
 same way: `c contract`, `c facts` and `c convention` are each two names side
@@ -77,9 +78,9 @@ clauses are indented under the item; a clause with sub-lines (the cases of a
 variadic contract) indents them under itself.
 
 A `//` comment after a clause is its citation where one is required
-(section 9). Elsewhere it is a comment.
+(§31.9). Elsewhere it is a comment.
 
-## 4. The base rule: what is raw
+## 31.4 The base rule: what is raw
 
 The language is defined against what an undescribed imported function is.
 A call of it is **raw**, needing `unsafe`, when any of these holds, and safe
@@ -92,9 +93,9 @@ otherwise:
 | A parameter passed by value whose type holds a pointer | raw. A type holds a pointer when it is a pointer or function pointer, or a record, union or array with a member that holds one (§16.2b.5). Returning such a record is not raw: the value is inert until it goes back into C. |
 | A function-pointer parameter, and a call through a function pointer | raw (§16.2b.9, §16.11). |
 | A variadic function | raw: a variadic signature is an unmodeled contract (§16.3c). |
-| A C global | one the header declares `const` is safe to read in any program, and one it declares thread-local is safe to read and to write. Any other is safe to read or write when every call into the library that declares it and every access to its globals is provably on one thread, and the library runs no threads of its own: its contract says `runs no threads`, by a proof or by a claim (section 8.1). Otherwise reading or writing it is raw. (**Adopted 2026-11-11, not yet implemented:** today the compiler takes a library to run no threads unless its contract says `runs threads`.) Assigning a global whose type holds a pointer is raw in every program; reading one is not (§16.3b). |
+| A C global | one the header declares `const` is safe to read in any program, and one it declares thread-local is safe to read and to write. Any other is safe to read or write when every call into the library that declares it and every access to its globals is provably on one thread, and the library runs no threads of its own: its contract says `runs no threads`, by a proof or by a claim (§31.8.1). Otherwise reading or writing it is raw. (**Adopted 2026-11-11, not yet implemented:** today the compiler takes a library to run no threads unless its contract says `runs threads`.) Assigning a global whose type holds a pointer is raw in every program; reading one is not (§16.3b). |
 | A function over value records and scalars only | safe as imported. No clause is needed. |
-| A proven invalidator | raw. Where the drafter proves that an undescribed function frees or resets memory reachable from a declared resource, a call of it is raw, with the proof printed, until a contract describes it. A function with no proof against it is unaffected. What a contract then writes is in section 8.4. **Adopted 2026-11-11, not yet implemented.** |
+| A proven invalidator | raw. Where the drafter proves that an undescribed function frees or resets memory reachable from a declared resource, a call of it is raw, with the proof printed, until a contract describes it. A function with no proof against it is unaffected. What a contract then writes is in §31.8.4. **Adopted 2026-11-11, not yet implemented.** |
 
 A contract can only move a function from raw to safe by stating what the
 base rule could not know, or leave it raw. It never makes a safe import raw
@@ -102,10 +103,10 @@ except by a restriction the program asks for. A proof can: the last row.
 
 The record a resource wraps is reached as `.repr`, and only so: `.repr` is
 under these raw rules and needs `unsafe`. The record's own fields are read
-through the resource without it (section 8.2). Of the fields of the type a
+through the resource without it (§31.8.2). Of the fields of the type a
 contract generates, `.repr` is the only one a program can name (§16.2b.3).
 
-## 5. Grammar
+## 31.5 Grammar
 
 ```
 unit            = contract | facts | convention
@@ -184,22 +185,22 @@ rule            = name ":" ( "from" | "init" | "drop" | "destroys" ) pattern [ "
 pattern         = a name with "*" wildcards: "*_unref", "g_*_new"
 ```
 
-`override` is written only before a clause that grants (section 6.1). Before
+`override` is written only before a clause that grants (§31.6.1). Before
 a clause that restricts or presents it is an error: there is nothing a proof
 could be overridden about. It is not written before an item header; the
 grant of an empty `fn f` is overridden by writing the `lend` out.
 
 `c_name` is the name of an imported function. After `freed by`, `drop` and
 `destroys` it may also be an imported global of function-pointer type
-(section 8.6). `CONST` is an imported
+(§31.8.6). `CONST` is an imported
 compile-time constant; `TypeName` a With type name the contract introduces
 or names; `type` a With type expression over the imported types.
 
-Adopted 2026-11-11 and not in the parser: `override` (section 7) and `from
+Adopted 2026-11-11 and not in the parser: `override` (§31.7) and `from
 f, nonnull` on a pointer producer. Adopted and still accepted by the parser,
 to be refused: `destroys` as an fn clause and in an fn-pattern convention
-rule (section 8.2). Adopted 2026-11-11 and not in the parser: `runs no
-threads` and `callback_thread registering` (sections 6.2, 8.1, 8.3).
+rule (§31.8.2). Adopted 2026-11-11 and not in the parser: `runs no
+threads` and `callback_thread registering` (§31.6.2, §31.8.1, §31.8.3).
 
 In the specification and not in the parser on main: `establishes`, `ends`
 and `requires domain` (§16.2b.7, v7.49, D200), and `field … is role` in a
@@ -223,11 +224,11 @@ chooses among matches. A profile is a package, versioned, never compiler
 knowledge; adopting it is what makes its rules evidence, and a stated clause
 overrides anything it produces. (§16.2b.12.)
 
-## 6. What a clause is
+## 31.6 What a clause is
 
-Every clause has four properties. Section 8 gives them for each clause.
+Every clause has four properties. §31.8 gives them for each clause.
 
-**6.1 Direction.** A clause **grants** when its being wrong can make safe
+**31.6.1 Direction.** A clause **grants** when its being wrong can make safe
 code unsafe: it gives ownership, destruction, consumption, retention,
 independence, static lifetime, a success convention, a thread capability, a
 non-null, an established state, or safety to a call that would otherwise be
@@ -236,7 +237,7 @@ or reject a valid program. A clause **presents** when it changes only the
 name or shape under which a fact is written in With, never a fact.
 (§16.2b.2, the asymmetry rule; mission law 4.)
 
-**6.2 Default.** What holds when the clause is absent. A default is a
+**31.6.2 Default.** What holds when the clause is absent. A default is a
 restriction: dependent, invalidating, nullable, bytes, creator-thread-bound,
 the library's coarse domain, raw.
 
@@ -245,8 +246,8 @@ absence of evidence grants nothing.
 
 - A library's threads. A contract says `runs threads`, `runs no threads`, or
   neither. With neither, the library is not known to run no threads, and its
-  C globals are raw (section 4). `runs no threads` is a grant: it has
-  provenance `proof` where the drafter proves it (section 8.5) and is a
+  C globals are raw (§31.4). `runs no threads` is a grant: it has
+  provenance `proof` where the drafter proves it (§31.8.5) and is a
   counted claim where a person states it.
 - A retained callback's thread. The registering function says
   `callback_thread any`, `callback_thread registering`, or neither. With
@@ -258,7 +259,7 @@ Today the compiler has both as default grants: with no `runs threads` a
 library is taken to run none, and with no `callback_thread any` a retained
 callback is taken to run on the registering thread.
 
-**6.3 Provenance.** Where the clause came from. Every effective clause
+**31.6.3 Provenance.** Where the clause came from. Every effective clause
 records it, and `with analyze … contract` prints it:
 
 | Provenance | Meaning | Who vouches |
@@ -277,23 +278,23 @@ linked artifact cannot be established as the same build, the result is
 evidence, not proof: it is printed in the report, it grants nothing, and a
 person may state the claim. (Adopted 2026-11-11, not yet implemented:
 today a result drawn for a prebuilt binary from separately configured
-source is printed and trusted as a proof. Section 8.5, "The build that was
+source is printed and trusted as a proof. §31.8.5, "The build that was
 proved".)
 
 A clause that grants and that the compiler does not vouch for is a claim
-(section 9). `override` is not a provenance: an overriding clause is
+(§31.9). `override` is not a provenance: an overriding clause is
 `stated`, and the view prints the marker and the proof it stands against
-beside it (section 7).
+beside it (§31.7).
 
 The contract view prints these words today as `clause`, `default`, `proof`,
 `annotation`, `registry`; the rename to this table's words is part of the
 keyword stack.
 
-**6.4 Check.** What the compiler verifies of the clause against the
-declarations, whatever its provenance (section 10), and what it checks when
-the program runs (section 11).
+**31.6.4 Check.** What the compiler verifies of the clause against the
+declarations, whatever its provenance (§31.10), and what it checks when
+the program runs (§31.11).
 
-## 7. Precedence
+## 31.7 Precedence
 
 For one fact about one function, the effective clause is the first of:
 
@@ -398,11 +399,11 @@ contract-audit: stale override at src/contracts/engine.w:6: `lend` on `engine_re
 A clause that restates what is already effective from a lower line is
 accepted and reported as redundant by the contract audit.
 
-## 8. Clause reference
+## 31.8 Clause reference
 
 G = grants, R = restricts, P = presents.
 
-### 8.1 Items
+### 31.8.1 Items
 
 | Item | Meaning | Dir | Rule |
 |---|---|---|---|
@@ -412,7 +413,7 @@ G = grants, R = restricts, P = presents.
 | `domain D kind` | `D` names ownerless C state with that extent. | R | §16.2b.7 |
 | `text utf8` | every text return of the library presents as `Option[str]`, validated at the boundary; a return that is not UTF-8 is a contract failure naming the C function, and nothing is repaired. | G | §16.2b.8 |
 | `runs threads` | the library runs threads of its own; its globals are shared with them. Accepted and reported as redundant once absence grants nothing (6.2); it stays the way to say so on the record. | R | §16.3 |
-| `runs no threads` | the library's code runs, and its state is read or written, only on a thread on which the program has called into the library (section 8.5), which is one half of what makes its C globals safe to touch (section 4). A claim, stated or the registry's, until the closed-world proof of section 8.5 exists; then also provenance `proof`. **Adopted 2026-11-11, not yet implemented.** | G | §16.3 |
+| `runs no threads` | the library's code runs, and its state is read or written, only on a thread on which the program has called into the library (§31.8.5), which is one half of what makes its C globals safe to touch (§31.4). A claim, stated or the registry's, until the closed-world proof of §31.8.5 exists; then also provenance `proof`. **Adopted 2026-11-11, not yet implemented.** | G | §16.3 |
 | `use convention P` | the contract adopts profile `P`'s rules. | the rules' | §16.2b.12 |
 | `field F of R is role` | a call through function-pointer field `F` of record `R` is an allocation (returns a fresh allocation the caller owns), a reallocation (consumes its argument and returns one), a deallocation (destroys its argument), or `F` is the hooks' own data (passing it to a hook is not an escape; a function that installs it retains it). A role is never drawn from a field's name. | G | §16.2b.15 |
 
@@ -421,7 +422,7 @@ resource. A function that replaces hooks shared by live resources stays raw
 unless the contract states that each resource captures its hooks when
 produced. (§16.2b.15.)
 
-### 8.2 Resource clauses
+### 31.8.2 Resource clauses
 
 | Clause | Meaning | Dir | Default when absent | Rule |
 |---|---|---|---|---|
@@ -483,11 +484,11 @@ producers, the operations and the `drop` are what their imported names mean,
 and a call of the `drop` by its imported name consumes the resource:
 `UnloadImage(image)` ends `image`. (§16.2b.5, §16.2b.11.)
 
-### 8.3 Function clauses
+### 31.8.3 Function clauses
 
 | Clause | Meaning | Dir | Default when absent | Rule |
 |---|---|---|---|---|
-| `lend` | the function keeps and frees nothing of its resource parameters. An error on a function a resource's `drop` or `destroys` names. | G | on a described fn: lend, for the resource parameters whose mode nothing else decides. On an undescribed function: section 4. | §16.2b.5 |
+| `lend` | the function keeps and frees nothing of its resource parameters. An error on a function a resource's `drop` or `destroys` names. | G | on a described fn: lend, for the resource parameters whose mode nothing else decides. On an undescribed function: §31.4. | §16.2b.5 |
 | `consumes param p` | the callee takes ownership of what `p` receives. `destroyed_by param q` names the callback C later invokes to destroy it. If registration can fail without taking ownership the contract says when transfer occurs; absent that, the caller keeps ownership. | G | observed | §16.2b.5 |
 | `detaches param p` | removes the value `p` borrows from its origin and yields it owned, dependent on that origin as a `borrows` child is. | G | | §16.2b.6 |
 | `retains param p by param q` | the value at `p` must outlive the resource at `q`; ownership stays outside C. A modeled unregister may release it. | G | a retained pointer makes the function raw | §16.2b.5 |
@@ -497,7 +498,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `nullable param p` | NULL is accepted at `p`; presents `Option`. Composes with `reads`: `Option[&T]`. | G | an input pointer the contract presents is non-null | §16.2b.8 |
 | `returns borrow R from param p` | the result is a view of the resource at `p` and cannot outlive it. `from params p, q`: of both. `from parent T of param p`: of the resource `p`'s resource itself borrows from. `from domain D`: of that foreign state. | G | the call is safe and the result is a raw pointer | §16.2b.6 |
 | `returns static T` | the result lives for the whole program. Never inferred from the absence of a visible owner. | G | the call is safe and the result is a raw pointer | §16.2b.7 |
-| `preserves param p` / `preserves domain D` | the call leaves views of that origin valid. `preserves domain D` also says the call leaves `D` established and every resource of `D` valid (adopted 2026-11-11, section 8.4). C `const` does not establish it. | G | invalidates | §16.2b.7 |
+| `preserves param p` / `preserves domain D` | the call leaves views of that origin valid. `preserves domain D` also says the call leaves `D` established and every resource of `D` valid (adopted 2026-11-11, §31.8.4). C `const` does not establish it. | G | invalidates | §16.2b.7 |
 | `text param p` | `p` is input text read to its NUL and not kept. | G | bytes | §16.2b.8 |
 | `text return, owned, freed by f` | the result is new text the caller owns, released with `f`. | G | the call is safe and the result is a raw pointer | §16.2b.8 |
 | `text return bytes` | under `text utf8`, this result stays bytes. | R | | §16.2b.8 |
@@ -508,7 +509,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `user_data from f as &U` | `f` returns the registered userdata. | G | the call is safe and the result is a raw pointer | §16.2b.9 |
 | `callbacks none` | the operation invokes no applicable callback. | G | may invoke callbacks | §16.2b.9 |
 | `callback_thread any` | a retained callback may run on any thread. The default, written out: accepted and reported as redundant once absence grants nothing (6.2). | R | any thread: the captured state must be sendable and shareable | §16.2b.10 |
-| `callback_thread registering` | a retained callback runs only on the thread that registered it, so its captured state needs no send or share capability. True only while the retaining resource cannot change threads: refused where that resource is `thread send` (section 10, rule 5). **Adopted 2026-11-11, not yet implemented.** | G | any thread | §16.2b.10 |
+| `callback_thread registering` | a retained callback runs only on the thread that registered it, so its captured state needs no send or share capability. True only while the retaining resource cannot change threads: refused where that resource is `thread send` (§31.10, rule 5). **Adopted 2026-11-11, not yet implemented.** | G | any thread | §16.2b.10 |
 | `variadic param v selected by param s:` with cases | the arguments after the fixed ones are, for each selector value stated, what its case says. | G | raw | §16.2b.5 |
 | `establishes domain D` | after the call returns, `D` is established. Wrong, every later `requires` passes against state that does not exist. | G | | §16.2b.7 |
 | `ends domain D` | after the call, `D` is not established. | R | | §16.2b.7 |
@@ -537,12 +538,12 @@ A pointer paired with a count is a buffer, not a value record. A pointer to
 the representation of an in-place resource is not a value record: the
 operation borrows that resource. (§16.2b.5, D198.)
 
-### 8.4 Describing a proven invalidator
+### 31.8.4 Describing a proven invalidator
 
 (Adopted 2026-11-11, not yet implemented.) The drafter has proven that `f`,
 which no contract describes, frees or resets memory reachable from a
 declared resource `N`; a call of `f` is raw until a contract describes it
-(section 4). The proof names one fact, and a contract answers that fact. An
+(§31.4). The proof names one fact, and a contract answers that fact. An
 override names the specific fact disputed. It is never a general exemption
 from analysis: no clause says "do not analyze `f`".
 
@@ -552,7 +553,7 @@ from analysis: no clause says "do not analyze `f`".
 |---|---|
 | takes an `N` and destroys it | `drop f` or `destroys f` under `resource N` |
 | takes an `N` and resets it: the `N` stays valid, what was borrowed from it does not | `fn f` with no `preserves`: a described function lends its resource parameter and invalidates its views, which is the default |
-| takes no `N` and tears down state every `N` depends on | `ends domain D` on `fn f`, with `requires domain D` on `resource N`. The call is then checked: a live `N` is a contract failure, or a compile error where the compiler proves one live (section 11) |
+| takes no `N` and tears down state every `N` depends on | `ends domain D` on `fn f`, with `requires domain D` on `resource N`. The call is then checked: a live `N` is a contract failure, or a compile error where the compiler proves one live (§31.11) |
 
 **The author disputes the proof.** The grant that denies the proven fact is
 written, marked `override`:
@@ -591,7 +592,7 @@ domain for this purpose:
 - with no function that `ends` it, the domain is always established and
   `engine_new` carries no run-time check;
 - with a function that `ends` it, `engine_new` carries the `requires
-  domain` check of section 11. After the ending call, a call of
+  domain` check of §31.11. After the ending call, a call of
   `engine_new` is a contract failure naming `engine_new`, and a compile
   error where the compiler proves the domain ended.
 
@@ -601,7 +602,7 @@ preservation over views only, and gains this sentence):
 > `preserves domain D` states that the call leaves `D` established, and
 > leaves valid every view of `D` and every resource of `D`.
 
-### 8.5 `runs no threads`: the property and its proof
+### 31.8.5 `runs no threads`: the property and its proof
 
 **The property.** `runs no threads` does not mean "starts no thread". It
 means:
@@ -613,7 +614,7 @@ Initialization that completes before the program's `main` begins is
 outside the property: no thread of the program exists yet, and nothing the
 program does can observe it.
 
-That is the fact the global rule of section 4 needs: with it, and with
+That is the fact the global rule of §31.4 needs: with it, and with
 every call into the library proven to be on one thread, one thread touches
 the library's state. A library can start no thread and still fail it: by
 handing its own function, or the address of its own state, to code that
@@ -755,7 +756,7 @@ and for these, that it loads code the drafter cannot see: `dlopen`,
 macros and one set of units: the same source with a different option can
 compile a file that starts a thread. So a proof is drawn only where the
 source analyzed and the artifact linked are established as the same build
-(section 6.3). This holds for every proof the drafter draws about a
+(§31.6.3). This holds for every proof the drafter draws about a
 library's code, not only this one:
 
 | How the library reaches the program | What the drafter knows | The result |
@@ -765,7 +766,7 @@ library's code, not only this one:
 | A prebuilt binary (a Conan Center package) | the package states its settings (os, arch, compiler, build type) and its options in `conaninfo.txt`. It does not state the flags its builder's environment added | evidence, not proof: printed in the report with the configuration analyzed, granting nothing. Configuring the source with the settings and options the package records does not establish that the builds are the same |
 | A system package (`c.<name> = "system"`) | nothing: there is no source | none |
 
-What `with get` does today is in the note under section 13: it prints and
+What `with get` does today is in the note in wcl-landing-order.md: it prints and
 trusts the third row's result as a proof.
 
 **What the proof is expected to cover, and what it will not.** It is
@@ -778,28 +779,41 @@ calls OpenSSL and zlib), one that starts threads or loads code (sqlite3's
 sorter and its extension loader, SDL, raylib), or a prebuilt binary. Those
 have `runs no threads` only as a claim, or do not have it.
 
-### 8.6 A destroyer named through a function-pointer global
+### 31.8.6 A destroyer named through a function-pointer global
 
-(Adopted 2026-11-11. The compiler accepts the form after `freed by` today;
-the run-time check and the tests are not yet implemented.) The function a
+(Adopted 2026-11-11. The compiler accepts the form after `freed by` today
+and puts the generated read under the global rule; the rule below for that
+read, the run-time check and the tests are not yet implemented.) The function a
 `freed by`, `drop` or `destroys` clause names is an imported function, or
 an imported global of function-pointer type. libxml2's `xmlFree` is the
 case: `xmlmemory.h` declares `XMLPUBVAR xmlFreeFunc xmlFree;`, and the
 registry's facts say `text return, owned, freed by xmlFree`.
 
-- A global so named is a hook of the library (§16.2b.15): the clause
-  states that a call through it is a deallocation.
+- A global so named is a hook of the library (§16.2b.15). The clause
+  states two facts: that a call through it is a deallocation, and that the
+  library assigns it only in functions that stay raw.
 - A function that assigns it stays raw, as a function that replaces hooks
   shared by live resources does, whatever a contract says of its
-  parameters. Assigning it from With is raw, as assigning any global that
-  holds a pointer is.
-- Reading it for the call is a read of a C global and is under the global
-  rule of section 4: it needs `runs no threads`.
+  parameters: a contract that describes one is an error naming the clause.
+  Assigning it from With is raw, as assigning any global that holds a
+  pointer is. So nothing safe code can call writes the pointer; a program
+  that replaces it does so inside `unsafe`, and answers there for no other
+  thread reading it meanwhile.
+- The read of the global that the generated call makes rests on that
+  statement. It is not under the global rule of §31.4 and does not need
+  `runs no threads`. A read of the global the program itself writes is
+  under that rule as any other.
+- Where the clause is a claim, its citation shows both facts: that the
+  pointer is the deallocator of what the clause frees, and every function
+  of the library that assigns it. Where the drafter has the library's
+  source and finds an assignment in a function the contract presents as
+  safe, that is a contradiction of the clause, an error naming both
+  (§31.7).
 - The pointer is read at each call, never cached, so a pointer a raw call
   replaced is the one called.
 - The generated code never calls a null pointer. Before each call it tests
   the pointer read from the global; NULL is a contract failure naming the
-  clause and the global (section 11).
+  clause and the global (§31.11).
 - In a build where the name is not a global (libxml2 with `xmlFree` defined
   as the macro `(*__xmlFree())`), the clause names nothing the import has,
   which is an error by verification rule 6.
@@ -808,7 +822,7 @@ Tests owed with the implementation: the global NULL at the call (the
 contract failure, with its message), and the global replaced by a raw call
 between production and release (the replacement is what runs).
 
-## 9. Claims
+## 31.9 Claims
 
 A claim is a clause that grants and that the compiler does not vouch for: a
 `stated` grant, a `registry` line, a `profile` match, an `annotation`. An
@@ -816,7 +830,7 @@ empty `fn f` is one claim: it asserts that `f` keeps and frees nothing.
 
 0. **Overrides are not claims.** A claim stands where no proof spoke; an
    override stands against one. They are counted apart, and a stale
-   override apart from both (section 7).
+   override apart from both (§31.7).
 1. **Claims are counted and printed.** `with analyze … contract` marks each
    claim and ends with the count, the program's own beside the registry's.
    The ceremony census counts them. `:user-programs-safe` reports the count
@@ -838,14 +852,14 @@ empty `fn f` is one claim: it asserts that `f` keeps and frees nothing.
 6. **A registry claim is pinned.** The lock records the registry commit and
    the facts file's digest.
 
-## 10. Verification
+## 31.10 Verification
 
 For every contract the compiler checks, against the declarations and
 independent of provenance (§16.2b.13):
 
 1. **Names.** Every `c_name` is an imported function, or, after `freed
    by`, `drop` and `destroys`, an imported global of function-pointer type
-   (section 8.6); every `CONST` an
+   (§31.8.6); every `CONST` an
    imported compile-time constant; every `param` reference resolves to one
    parameter of the function it is stated on, by name, index or unique type;
    a named domain exists.
@@ -881,7 +895,7 @@ A contract that passes is **rendered**: the compiler generates the With
 types and operations it states (§16.2b.11). A fact the checker accepted and
 the renderer cannot express is a compiler defect, reported as one.
 
-## 11. Run-time checks
+## 31.11 Run-time checks
 
 Some clauses state a fact the compiler can test when the program runs. Each
 is tested in every build, debug and release.
@@ -921,14 +935,14 @@ established; `ends` with a resource of `D` proven live), the call is a
 compile error. For `ends` the error names the live resource and the fix.
 (§16.2b.4, §16.2b.7, §16.2b.8.)
 
-## 12. Known limits and open questions
+## 31.12 Known limits and open questions
 
 **A teardown nobody described and nothing proved** (a known limit). A
 function over scalars is safe as imported. `void engine_shutdown(void)`
 takes no pointer, is safe to call, and can invalidate every live resource of
 its library. A teardown the contract describes is checked (`ends domain D`,
-section 11). One the drafter proves frees or resets memory reachable from a
-declared resource is raw until described (section 4, proven invalidators).
+§31.11). One the drafter proves frees or resets memory reachable from a
+declared resource is raw until described (§31.4, proven invalidators).
 What remains is a teardown of a library the drafter has no source for, in a
 contract whose author did not describe it: it is safe to call and unchecked.
 No rule about undescribed functions closes that without making every
@@ -938,7 +952,7 @@ in every raylib and SDL program; that rule was considered and not adopted
 
 **A sendable resource with a callback that follows it** (a future clause,
 not for now). `callback_thread registering` is refused on a `thread send`
-resource (section 10, rule 5). libcurl is the case: it invokes the write
+resource (§31.10, rule 5). libcurl is the case: it invokes the write
 callback on the thread that makes the transfer call, and an easy handle may
 be passed between threads. The clause that would say so is "the callback
 runs on the thread that calls into the library on that resource"; with it a
@@ -950,74 +964,7 @@ Open:
 1. **The `callback` field role** (#3124): a fifth role for a
    function-pointer field that holds the program's own function, whose
    arguments are lent for the call. It gets its own brief.
-2. **Corpus functions as a subject** (section 2): the facts-file form of
+2. **Corpus functions as a subject** (§31.2): the facts-file form of
    claims.md tier 1.
 3. **With functions as a subject**: not yet; the direction is recorded in
-   section 2.
-
-## 13. Landing order
-
-The two default grants (sections 4, 6.2, 8.1, 8.3, 10) land in this order.
-Nothing is trusted before the first step.
-
-a. **The build cache.** A change to any contract input causes a rebuild. A
-   changed contract that keeps an old safety verdict is a soundness bug.
-   The inputs a build reads: every module it loads through `use`, a fetched
-   package's `contract.w` among them; the project's `with.toml` and each
-   fetched package's `metadata.json`, which decide which package's contract
-   applies to an import. A registry facts file is not read by a build:
-   `with get` reads it, writes its clauses into the package's `contract.w`
-   and pins its digest in `contract.json`, so a changed facts file reaches a
-   build as a changed `contract.w`.
-b. **The checker sees a callback that arrives through a variadic case.**
-   Today `callback_thread` on `curl_easy_setopt` is refused as "takes no
-   callback".
-c. **The view prints a binary's results as evidence** (section 6.3): `with
-   analyze … contract` and the contract report print a result drawn for a
-   prebuilt binary as evidence, with the configuration analyzed. What is
-   accepted does not change in this step.
-d. **The two default grants removed,** with the claim lines they make
-   necessary landing in the same change: `runs no threads` in the c-interop
-   example's contract, the libxml2 registry line with its citation, and
-   `callback_thread registering` on `fn curl_easy_setopt` in
-   `lib/contracts/libcurl.w` on three conditions (its citation says which
-   thread libcurl invokes the callback on; the contract leaves `Easy`
-   `thread creator`; the compose check of section 10, rule 5 exists).
-e. **The recount,** by compiling every published program, to confirm
-   nothing else needs a line.
-f. **Proofs for prebuilt binaries:** the cost of each way to comply with
-   section 6.3 (build from source whenever a contract needs a proof; or
-   keep the binary and accept no proof), then the way Eric chooses. The
-   default does not change before that.
-
-The thread-absence proof of section 8.5 is not in this order: it is
-specified and not built.
-
-**Note: what `with get` does today** (2026-11-11, for section 8.5's
-"the build that was proved"). For each library it fetches:
-
-- **A system package** (`opengl`, `xorg` and the others it knows as
-  `"system"`): it writes link metadata. No source, no contract.
-- **A Conan Center binary** (what it uses on Darwin and Linux whenever one
-  is linkable): it takes the first static Release package for this os and
-  arch, and downloads its `conaninfo.txt`. `metadata.json` records the
-  recipe revision, the package id and the package revision; it does not
-  record the options. For the contract it fetches the source separately,
-  configures it (never builds it) for this platform with the recipe's
-  default options, and the drafter reads that configuration's units. The
-  configuration it proves is therefore its own, not the binary's, and
-  nothing checks that they agree. This is true of every proof the drafter
-  draws for a binary today (`drop f // proof: frees param 0`), not only of
-  a thread proof.
-- **A source build** (always on Windows; with `--from-source`; a package
-  with a CMake environment of its own; or when no binary is linkable): it
-  builds with CMake, Ninja and `with cc`, and the drafter reads that
-  build's `compile_commands.json`. The configuration proved is the one
-  linked.
-- **A package whose source it cannot configure** (libiconv: autotools;
-  OpenSSL: its own Configure script): it links the binary and writes no
-  contract ("no proofs from the source").
-
-The seven release UAT scenarios on Darwin fetch every library as a binary:
-zlib, bzip2, sqlite3, libxml2 (with zlib and libiconv), libcurl (with
-OpenSSL and zlib), SDL, raylib (with GLFW); `opengl` is a system package.
+   §31.2.
