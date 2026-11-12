@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D202 — The facade language is the With Contract Language](2026-11-11-D202-the-facade-language-is-the-with-contract-language.md)
 - [D201 — Law 12: the programmer has the last word on what the compiler cannot see](2026-11-11-D201-law-12-the-programmer-has-the-last-word-on-what-the-compiler-cannot-see.md)
 - [D200 — A domain established between two calls is checked at the calls; a resource that requires it is the domain's](2026-11-11-D200-a-domain-established-between-two-calls-is-checked-at-the-calls.md)
 - [D199 — A compiler that cannot read the registry's facts for a package uses the facts its own release published (delegated, D98; amends D136)](2026-11-11-D199-a-compiler-that-cannot-read-the-registrys-facts-uses-the-facts-its-release-published.md)
