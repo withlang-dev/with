@@ -1132,13 +1132,10 @@ impl Sema:
         for spi in 0..param_count:
             if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig_idx, spi) as TypeId)) == TypeKind.TY_SLICE:
                 return false
-        // A pointer/fn return is raw unless a facade covers it (D51 stage 3,
-        // SemaFacade.w). The #379 overlay's borrowed nullable pointer returns
-        // (getenv, strchr, …) are items of the toolchain libc facade now
-        // (compiler/LibcFacade.w), presented as `Option[CStr]`.
-        if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)):
-            if not self.facade_covers_return(fn_sym):
-                return true
+        // §31.4: a pointer return is inert. A function whose only raw part
+        // is the pointer it returns is safe to call: safe code cannot read
+        // the pointer, free it or pass it back to C without `unsafe` or a
+        // contract.
         for pi in 0..param_count:
             let pty = self.sig_param_type(sig_idx, pi)
             if self.ci_param_requires_raw_contract(pty):

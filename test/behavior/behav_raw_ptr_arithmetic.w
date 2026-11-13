@@ -3,7 +3,7 @@
 use c_import("stdlib.h")
 
 fn main:
-    let raw = unsafe { malloc(16) }
+    let raw = malloc(16)
     let ptr = raw as *mut i32
     unsafe:
         let p1 = ptr + 1

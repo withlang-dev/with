@@ -47,7 +47,7 @@ c contract zl:
         lend
 
 fn main:
-    let ends = unsafe { calloc(1, 4) as *mut c_int }
+    let ends = calloc(1, 4) as *mut c_int
     let s = Stream.init(42, ends, 0).unwrap()
     print(f"preinit tag={unsafe { z_tag(&raw const s.repr) }} ends={unsafe { *ends }}")
     drop(s)

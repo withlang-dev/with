@@ -5,7 +5,7 @@ use c_import("stdlib.h")
 pub error E = Bad
 
 fn make_handle -> i64:
-    let raw_opt = unsafe { malloc(8) }
+    let raw_opt = malloc(8)
     if raw_opt == None:
         return 0
     let raw = raw_opt
@@ -13,7 +13,7 @@ fn make_handle -> i64:
     1
 
 fn allocish -> Result[i32, E]:
-    let raw_opt = unsafe { malloc(8) }
+    let raw_opt = malloc(8)
     if raw_opt == None:
         return Err(.Bad)
     let raw = raw_opt
