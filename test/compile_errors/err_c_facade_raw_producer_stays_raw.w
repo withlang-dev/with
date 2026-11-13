@@ -1,9 +1,10 @@
-//! expect-check-fail: raw c_import function call requires unsafe context
+//! expect-check-fail: raw c_import function call requires unsafe context: `db_new` is the producer of `Database`; write `Database.new(…)`
 
-// D51 §16.2b.3/§16.2b.5: a resource's producer is safe through the
-// resource's constructor, which owns what it produces. The raw C name gives
-// the raw pointer, which is inert (§31.4): safe code cannot hand it back to
-// C, so it cannot be closed, read or used as a `Database`.
+// §31.4: a function a contract names is described, and the base rule does
+// not apply to it. A resource's producer is reached as the resource's
+// constructor, which owns what it produces; by its C name it is a raw call
+// (a safe `db_new(1)` would hand back a pointer nothing destroys), and the
+// error names the presented spelling.
 
 use c_import("typedef struct db db;
 db* db_new(int flags);
@@ -17,4 +18,3 @@ c contract dbl:
 
 fn main:
     let p = db_new(1)
-    db_close(p)

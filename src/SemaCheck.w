@@ -12120,7 +12120,8 @@ impl Sema:
             // `wrap_free` refused the whole header.
             if self.current_file_is_generated("<c_import ") and self.fn_is_raw_by_value_record_only(fn_sym): return ""
             let by_value = self.by_value_pointer_param_note(fn_sym)
-            return "raw c_import function call requires unsafe context" ++ (if by_value.len() > 0: by_value else: self.fetched_facade_raw_note(fn_sym))
+            let described = self.facade_described_op_note(fn_sym)
+            return "raw c_import function call requires unsafe context" ++ (if by_value.len() > 0: by_value else if described.len() > 0: described else: self.fetched_facade_raw_note(fn_sym))
         if self.fn_symbol_is_manual_extern(fn_sym):
             let name = self.pool_resolve(fn_sym)
             // D30: a program declaring the compiler's runtime by hand is told
