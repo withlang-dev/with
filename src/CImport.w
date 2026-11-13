@@ -970,6 +970,15 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
     // `__builtin___*_chk` forms) to with_mem*. The migrate preamble declares
     // the same set; this one lacked the mem* four, so windows.h's
     // RtlZeroMemory-style bodies named an undeclared `with_memset` (#1417).
+    // #3292: libc's allocator, for an inline body that names it through a
+    // system header (whose declarations are filtered).
+    if with_cimport_is_name_emitted("__with_ci_libc_malloc") == 0:
+        output.push_str("@[link_name(\"malloc\")]\nextern fn __with_ci_libc_malloc(size: u64) -> *mut c_void\n")
+        output.push_str("@[link_name(\"calloc\")]\nextern fn __with_ci_libc_calloc(count: u64, size: u64) -> *mut c_void\n")
+        output.push_str("@[link_name(\"realloc\")]\nextern fn __with_ci_libc_realloc(ptr: *mut c_void, size: u64) -> *mut c_void\n")
+        output.push_str("@[link_name(\"free\")]\nextern fn __with_ci_libc_free(ptr: *mut c_void)\n")
+        for support in ["__with_ci_libc_malloc", "__with_ci_libc_calloc", "__with_ci_libc_realloc", "__with_ci_libc_free"]:
+            with_cimport_mark_name_emitted(support)
     if with_cimport_is_name_emitted("with_alloc") == 0:
         output.push_str("extern fn with_alloc(size: i64) -> *mut u8\n")
         output.push_str("extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8\n")
@@ -11636,6 +11645,13 @@ impl CiExprPool:
             let function_name = ci_migrate_c_function_name(name)
             let escaped = if not ci_scope_contains(scope, ordinary_name) and ci_lookup_c_function_decl_idx(session, function_name) >= 0: function_name else: ordinary_name
             let mangled = ci_scope_lookup(scope, escaped)
+            // #3292: under c_import a header's inline code calls libc's allocator
+            // as written. <stdlib.h>'s own declarations are filtered with the rest
+            // of the system header, so the reference names the translation's
+            // declaration of the same symbol.
+            if mangled.len() == 0 and not g_ci_migrating and (name == "malloc" or name == "calloc" or name == "realloc" or name == "free"):
+                let declared_at = with_ci_cursor_referenced_location(session, cursor)
+                if declared_at.len() > 0 and ci_is_system_path(declared_at): return self.ident(self.add_string("__with_ci_libc_" ++ name), 0)
             if mangled.len() == 0 and not ci_has_value_libc_call_mapping(name):
                 if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
                     if not ci_note_filtered_system_symbol_ref_at(session, cursor, name, CI_LIBC_KIND_FN):
@@ -13634,7 +13650,7 @@ impl CiStmtPool:
                 }
             if has_mapped_call:
                 return ci_value_ir_invalid()
-            if callee_text.len() > 0 and ci_is_c_ident(callee_text) and not ci_scope_contains(scope, callee_text):
+            if callee_text.len() > 0 and ci_is_c_ident(callee_text) and not ci_scope_contains(scope, callee_text) and not callee_text.starts_with("__with_ci_libc_"):
                 let referenced_cursor = if nc > 0: with_ci_child(session, cursor, 0) else: cursor
                 if not ci_note_filtered_system_symbol_ref_at(session, referenced_cursor, callee_text, CI_LIBC_KIND_FN):
                     return ci_value_ir_invalid()
