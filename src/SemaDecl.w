@@ -1132,10 +1132,17 @@ impl Sema:
         for spi in 0..param_count:
             if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig_idx, spi) as TypeId)) == TypeKind.TY_SLICE:
                 return false
-        // §31.4: a pointer return is inert. A function whose only raw part
-        // is the pointer it returns is safe to call: safe code cannot read
-        // the pointer, free it or pass it back to C without `unsafe` or a
-        // contract.
+        // §31.4: a pointer return is inert. An undescribed function whose
+        // only raw part is the pointer it returns is safe to call: safe
+        // code cannot read the pointer, free it or pass it back to C
+        // without `unsafe` or a contract. A function a contract names is
+        // described and has the meaning the contract gives it: the base
+        // rule does not apply, and its pointer return is raw unless the
+        // contract covers it (a resource's producer is reached as the
+        // resource's constructor, never as a safe call that hands back a
+        // pointer nothing destroys).
+        if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)) and self.facade_describes_fn(fn_sym) and not self.facade_covers_return(fn_sym):
+            return true
         for pi in 0..param_count:
             let pty = self.sig_param_type(sig_idx, pi)
             if self.ci_param_requires_raw_contract(pty):

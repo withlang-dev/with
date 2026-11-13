@@ -2790,6 +2790,40 @@ impl Sema:
     // through C and let Drop destroy again, which "is not expressible in safe
     // code" (§16.2b.5), and a safe raw producer call would hand back a
     // pointer nothing destroys. Raw access remains raw (ruling §14).
+    // §31.4: whether a contract names `fn_sym`, in an fn item or in a
+    // resource's `from`, `init`, `preinit`, `drop`, `destroys` or `abandon`.
+    // (A `freed by` function takes the pointer it frees, so it is raw by
+    // its parameter whether described or not.)
+    fn facade_describes_fn(fn_sym: i32) -> bool:
+        if self.facade_contract_for(fn_sym) >= 0: return true
+        for r in self.facade_resources:
+            if r.init == fn_sym or r.preinit == fn_sym or r.drop == fn_sym or r.abandon == fn_sym or r.producers.contains(fn_sym) or r.destroyers.contains(fn_sym): return true
+        false
+
+    // How a program reaches the operation a resource's contract names
+    // `fn_sym` as, for the diagnostic of a call by its C name: "" when no
+    // resource names it.
+    fn facade_described_op_note(fn_sym: i32) -> str:
+        let cname = self.pool_resolve(fn_sym)
+        var ri: isize = 0
+        for r in self.facade_resources:
+            let rname = self.pool_resolve(r.name)
+            if r.producers.contains(fn_sym) or r.init == fn_sym:
+                return f": `{cname}` is the producer of `{rname}`; write `{rname}.{self.facade_presented(ri, cname)}(…)`"
+            if r.drop == fn_sym:
+                return f": `{cname}` is the drop of `{rname}`; it runs when the value's scope ends"
+            if r.destroyers.contains(fn_sym):
+                return f": `{cname}` destroys a `{rname}`; write `value.{self.facade_presented(ri, cname)}(…)`"
+            ri += 1
+        // An fn item's operation hosted on one resource is that resource's
+        // method.
+        if self.facade_contract_for(fn_sym) >= 0:
+            let hosts = self.facade_method_host(fn_sym)
+            if hosts.len() == 1:
+                let rname = self.pool_resolve(self.facade_resources[hosts[0]].name)
+                return f": `{cname}` is an operation of `{rname}`; write `value.{self.facade_presented(hosts[0], cname)}(…)`"
+        ""
+
     fn facade_covers_return(fn_sym: i32) -> bool:
         let ci = self.facade_contract_for(fn_sym)
         ci >= 0 and (self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0)
