@@ -643,6 +643,11 @@ impl CiProject:
     // array or a pointer to an unmodeled record leaves the call raw.
     fn fd_param_presentable(si: i32, pi: i32, modeled: &List[str]) -> bool:
         let p = with_str_clone_ref(self.symbols[si].param_ty[pi])
+        // D198: a record passed by value that holds a pointer is raw until
+        // a contract models it. A clause on such a function is refused by
+        // the compiler (raylib's DrawMeshInstanced: `Mesh` by value beside
+        // a record pointer the proofs could describe).
+        if self.pointer_records.contains(p) and not modeled.contains(p): return false
         if not (p.starts_with("*") or p.starts_with("&") or p.starts_with("[") or p.starts_with("fn(") or p.starts_with("extern") or p.starts_with("unsafe ") or p.starts_with("Option[")): return true
         if p == "*const i8" or p == "*const c_char": return true
         if fd_is_char_pointer(p) and self.fd_registry_names_param(si, "text_param", pi): return true
@@ -746,7 +751,7 @@ impl CiProject:
         // A `destroys` item hands the resource as the first parameter
         // (§16.2b.13); a destroyer of a later one is not stated.
         if destroyed > 0: return f"raw: destroys param {destroyed}, which is not its first parameter (§16.2b.13)"
-        if destroyed == 0 and unmodeled.len() > 0: return "raw: destroys param 0, but parameter of " ++ (if unmodeled.starts_with("*"): "unmodeled pointer type " else: "a callback or array type the facade does not describe: ") ++ unmodeled
+        if destroyed == 0 and unmodeled.len() > 0: return "raw: destroys param 0, but parameter of " ++ self.fd_unmodeled_text(unmodeled)
         if destroyed >= 0: return f"destroyer, param {destroyed} (" ++ self.fd_destroy_reason(si, "it") ++ ")"
         // A retained parameter the introspection file says the callee
         // takes is consumed: the caller hands it over (§16.2b.15 item 2).
@@ -756,9 +761,15 @@ impl CiProject:
         // retention the body only appears to make, an unmodeled type).
         if facts_kind(self.symbols[si].registry) == "lend" and pointer_params > 0: return "lend (registry: " ++ facts_cite(self.symbols[si].registry) ++ ")"
         if retained >= 0: return self.fd_retains_verdict(si, retained)
-        if unmodeled.len() > 0: return "raw: parameter of " ++ (if unmodeled.starts_with("*"): "unmodeled pointer type " else: "a callback or array type the facade does not describe: ") ++ unmodeled
+        if unmodeled.len() > 0: return "raw: parameter of " ++ self.fd_unmodeled_text(unmodeled)
         if pointer_params == 0: return "value-only call"
         "lend (proof: reads its resource parameters, keeps nothing)"
+
+    // How a parameter type the contract language cannot present is named.
+    fn fd_unmodeled_text(ty: &str) -> str:
+        if ty.starts_with("*"): return "unmodeled pointer type " ++ ty
+        if self.pointer_records.contains(ty): return "a record passed by value that holds a pointer and no contract models: " ++ ty
+        "a callback or array type the facade does not describe: " ++ ty
 
     fn fd_is_lend(si: i32, modeled: &List[str]) -> bool:
         self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si, modeled).starts_with("lend")

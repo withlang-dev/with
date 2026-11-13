@@ -1,8 +1,13 @@
 scenario: the raylib spiral renders
-requires: network, display, opengl
+requires: network
 platforms: darwin, linux
 
 new directory
+# raylib's memory platform with its software renderer (raylib 6.0): the
+# frames are drawn into memory and read back, so the scenario needs no
+# monitor and runs with the screen off or locked. A build variable means
+# `with get` builds raylib from source.
+env WITH_GET_CMAKE_RAYLIB=PLATFORM=Memory;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF
 run: with init .
 run: with get c.raylib
 write src/main.w from raylib_spiral_main.w
@@ -11,4 +16,3 @@ expect stdout: ok
 run: with run
 expect exit: 0
 expect stdout contains: raylib spiral UAT passed:
-expect (human): colored balls moving on a field of black

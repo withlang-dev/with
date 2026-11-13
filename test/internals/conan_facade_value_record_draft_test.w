@@ -14,6 +14,11 @@
 //   span_first    const Span *, a record holding a pointer -> raw: the
 //                 callee follows `s->items`, and whoever builds the record
 //                 chooses where that points
+//   span_len      Span by value                 -> raw: the record crosses
+//                 with its pointer, and no contract models it
+//   span_scaled   Span by value beside a const Size * it only reads -> raw
+//                 all the same: a clause on it is one the compiler refuses
+//                 (raylib's DrawMeshInstanced)
 use compiler.ConanClient
 use std.fs
 use std.process
@@ -28,7 +33,7 @@ fn main:
     assert(mkdir_p(build) == 0)
     var header = "typedef struct { int w; int h; } Size;\ntypedef struct { int n; } Kept;\ntypedef struct { const int *items; int n; } Span;\n"
     header = header ++ "int area(const Size *s);\nint area_via(const Size *s);\nvoid default_size(Size *out);\nvoid grow(Size *s, int by);\n"
-    header = header ++ "int total(const Size *items, int count);\nint width_of(Size *s);\nvoid keep(const Kept *k);\nint kept_area(const Kept *k);\nint span_first(const Span *s);\n"
+    header = header ++ "int total(const Size *items, int count);\nint width_of(Size *s);\nvoid keep(const Kept *k);\nint kept_area(const Kept *k);\nint span_first(const Span *s);\nint span_len(Span s);\nint span_scaled(Span s, const Size *by);\n"
     assert(write_file(dep ++ "/include/shapes.h", header) == 0)
     assert(write_file(src ++ "/shapes.h", header) == 0)
     var unit = "#include \"shapes.h\"\n"
@@ -38,7 +43,7 @@ fn main:
     unit = unit ++ "void grow(Size *s, int by) { s->w += by; s->h = s->h + by; }\n"
     unit = unit ++ "int total(const Size *items, int count) { int t = 0; for (int i = 0; i < count; i++) t += items[i].w; return t; }\n"
     unit = unit ++ "static int read_int(const int *p) { return *p; }\nint width_of(Size *s) { return read_int(&s->w); }\n"
-    unit = unit ++ "static const Kept *kept;\nvoid keep(const Kept *k) { kept = k; }\nint kept_area(const Kept *k) { return k->n; }\nint span_first(const Span *s) { return s->n > 0 ? s->items[0] : 0; }\n"
+    unit = unit ++ "static const Kept *kept;\nvoid keep(const Kept *k) { kept = k; }\nint kept_area(const Kept *k) { return k->n; }\nint span_first(const Span *s) { return s->n > 0 ? s->items[0] : 0; }\nint span_len(Span s) { return s.n; }\nint span_scaled(Span s, const Size *by) { return s.n * by->w; }\n"
     assert(write_file(src ++ "/shapes.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c shapes.c\",\n  \"file\": \"shapes.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
@@ -58,13 +63,13 @@ fn main:
         if not facade.contains(item):
             wrong = wrong + 1
             print("not stated: " ++ item)
-    for name in ["total", "width_of", "keep", "kept_area", "span_first"]:
+    for name in ["total", "width_of", "keep", "kept_area", "span_first", "span_len", "span_scaled"]:
         if facade.contains("    fn " ++ name ++ "\n"):
             wrong = wrong + 1
             print("stated, and must stay raw: " ++ name)
     // The report says which words were stated, and why a record pointer is
     // no value record.
-    for said in ["  area: value records: reads param 0 (proof:", "  kept_area: raw: parameter of unmodeled pointer type *const Kept; param 0 is no value record: some function of the package produces, destroys or retains a pointer to Kept", "  total: raw: parameter of unmodeled pointer type *const Size; param 0 is no value record: the body indexes it", "  span_first: raw: parameter of unmodeled pointer type *const Span; param 0 is no value record: Span is not a flat record complete in a header the package installs"]:
+    for said in ["  area: value records: reads param 0 (proof:", "  kept_area: raw: parameter of unmodeled pointer type *const Kept; param 0 is no value record: some function of the package produces, destroys or retains a pointer to Kept", "  total: raw: parameter of unmodeled pointer type *const Size; param 0 is no value record: the body indexes it", "  span_first: raw: parameter of unmodeled pointer type *const Span; param 0 is no value record: Span is not a flat record complete in a header the package installs", "  span_len: raw: parameter of a record passed by value that holds a pointer and no contract models: Span", "  span_scaled: raw: parameter of a record passed by value that holds a pointer and no contract models: Span"]:
         if not report.contains(said):
             wrong = wrong + 1
             print("not reported: " ++ said)
