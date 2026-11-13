@@ -11270,7 +11270,13 @@ impl MirBuilder:
     mut fn lower_regex_pattern_match(scrutinee_place: i32, pat_node: i32, arm_bb: i32, fail_bb: i32):
         let regex_ty = self.sema.lookup_named_type_ambient(self.sema.syms.regex)
         let regex_val = self.lower_regex_literal(pat_node)
-        let regex_place = self.materialize_operand(regex_val, regex_ty, self.ast.get_start(pat_node))
+        // #3296: a literal's value owns nothing (`owned` is 0: its code and
+        // its texts live as long as the program), so it has no drop. A later
+        // arm's is written only when the arms before it fail; registered as
+        // a statement temporary it was dropped at the match's end on every
+        // path, and the path of an earlier arm dropped storage never written.
+        let regex_place = self.place_for_local(self.new_temp(regex_ty))
+        self.assign_operand_to_place(regex_place, regex_val, self.ast.get_start(pat_node))
         let captures_opt_place = self.lower_regex_captures_places(regex_place, scrutinee_place)
         self.remember_regex_pattern_captures(pat_node, captures_opt_place)
         let result_op = self.lower_option_is_some_place(captures_opt_place, self.regex_captures_option_type())
