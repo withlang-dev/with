@@ -1,16 +1,16 @@
 foreign-contract view	v1
 resource Object wraps *mut obj; representation: pointer; facade:objs@test/contract/ok_profile_shadowed.w; clause:resource@test/contract/ok_profile_shadowed.w:17
-    producer: obj_new -> Object.new; production: direct return; NULL is None  [profile:gobject.v1:new@test/lib/gobject/v1.w:13]
+    producer: obj_new -> Object.new; production: direct return; NULL is None  [claim: profile:gobject.v1:new@test/lib/gobject/v1.w:13]
     status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
-    destroyer: obj_unref; automatic: Drop calls it while the value is live  [clause:drop@test/contract/ok_profile_shadowed.w:18]
+    destroyer: obj_unref; automatic: Drop calls it while the value is live  [claim: stated@test/contract/ok_profile_shadowed.w:18]
     dependency: none via obj_new; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
     thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
     invalidation: views invalidated by: obj_unref; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
 fn obj_get_id; facade:objs@test/contract/ok_profile_shadowed.w; clause:fn@test/contract/ok_profile_shadowed.w:19
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
-    effect: param 0: *mut obj o: lend, an assertion about foreign behavior; receives Object  [clause:lend@test/contract/ok_profile_shadowed.w:20]
+    effect: param 0: *mut obj o: lend, an assertion about foreign behavior; receives Object  [claim: stated@test/contract/ok_profile_shadowed.w:20]
     returns: i32  [default:as declared]
-    preserves: param 0: *mut obj o; views of it survive this call  [clause:preserves@test/contract/ok_profile_shadowed.w:21]
+    preserves: param 0: *mut obj o; views of it survive this call  [claim: stated@test/contract/ok_profile_shadowed.w:21]
     presentation: Object.get_id  [default:presentation sugar from the resource prefix (§16.2b.11)]
 use convention gobject.v1; clause:use convention@test/contract/ok_profile_shadowed.w:16
     rule: new (from *_new) applied to resource 'Object': obj_new  [profile:gobject.v1:new@test/lib/gobject/v1.w:13]
@@ -21,5 +21,7 @@ use convention gobject.v1; clause:use convention@test/contract/ok_profile_shadow
     rule: peek (fn *_peek lend) matched nothing  [profile:gobject.v1:peek@test/lib/gobject/v1.w:18]
 note: contract-audit: profile fact shadowed: profile gobject.v1 rule unref (drop *_unref, profile:gobject.v1:unref@test/lib/gobject/v1.w:15) matched obj_unref for resource 'Object', and `drop` at test/contract/ok_profile_shadowed.w:18 states the fact explicitly; the facade's statement wins (§16.2b.2)
 note: contract-audit: profile fact shadowed: profile gobject.v1 rule get (fn *_get* lend, profile:gobject.v1:get@test/lib/gobject/v1.w:17) matched 'obj_get_id', and the fn item at test/contract/ok_profile_shadowed.w:19 states the fact explicitly; the facade's statement wins (§16.2b.2)
+note: contract-audit: clauses=5 proven=0 claimed=5
+note: contract-audit: claims: stated=4 registry=0 profile=1 annotation=0
 note: contract-audit: resources=1 items=1 domains=0 conventions=1 advisories=0 profile-ambiguous=0 profile-shadowed=2
 contract-audit: violations=0 ok

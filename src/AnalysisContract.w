@@ -69,25 +69,57 @@ fn contract_node_line(sema: &Sema, site: &ContractSite, node: i32) -> i32:
     if node <= 0 or node >= sema.ast.node_count(): return 0
     contract_line(site.source, sema.ast.get_start(node))
 
-// `clause:<name>@<path>:<line>` — the facade clause that stated a fact; or
+// §31.6.3: the provenance of a fact row, `<word>@<path>:<line>`, the word
+// being `stated`, `proof`, `annotation`, `registry` or `evidence`; or
 // `profile:<pkg.vN>:<rule>@<path>:<line>` when an adopted convention
-// profile's rule stated it (stage 11, §16.2b.12): the rule, in the
-// profile's own file.
+// profile's rule stated it (§16.2b.12): the rule, in the profile's own file.
+// A grant the compiler does not vouch for is a claim (§31.9) and is marked
+// `claim: `.
 fn contract_clause_at(sema: &Sema, site: &ContractSite, clause: i32) -> str:
+    let grants = contract_clause_grants(sema, clause)
     let rule = facade_clause_profile_rule(sema.ast, clause)
-    if rule != 0: return contract_rule_at(sema, rule)
-    let name = facade_clause_name(sema.ast.get_data0(clause))
-    let word = if contract_clause_is_evidence(sema, site, clause): "evidence" else: "clause"
-    f"{word}:{name}@{site.path}:{contract_node_line(sema, site, clause)}"
+    if rule != 0: return (if grants: "claim: " else: "") ++ contract_rule_at(sema, rule)
+    contract_provenance(sema, site, clause, grants)
 
-// Whether the drafter recorded the clause as evidence: drawn from source
-// that is not established as the build linked (a prebuilt binary's), so it
-// is no proof. The drafter writes the word after the clause, on its line.
-fn contract_clause_is_evidence(sema: &Sema, site: &ContractSite, clause: i32) -> bool:
-    if clause <= 0 or clause >= sema.ast.node_count(): return false
-    var end = sema.ast.get_start(clause)
+fn contract_provenance(sema: &Sema, site: &ContractSite, node: i32, grants: bool) -> str:
+    let drafted = contract_drafted_word(sema, site, node)
+    let colon = drafted.find(": ")
+    let word = if colon > 0: drafted.slice(0, colon) else: "stated"
+    let vouched = word == "proof" or word == "evidence"
+    let text = if colon > 0: drafted.slice(colon, drafted.len()) else: ""
+    (if grants and not vouched: "claim: " else: "") ++ f"{word}@{site.path}:{contract_node_line(sema, site, node)}{text}"
+
+// What the drafter wrote after a clause, on its line: `proof: …`,
+// `annotation: …`, `registry: …` or `evidence: …`. Only in a contract the
+// toolchain drew, a fetched package's `contract.w`: in any other file a
+// comment vouches for nothing, and the clause is `stated` (§31.9, rule 4:
+// a claim is never printed as a proof).
+fn contract_drafted_word(sema: &Sema, site: &ContractSite, node: i32) -> str:
+    if node <= 0 or node >= sema.ast.node_count() or not site.path.ends_with("/contract.w") or not site.path.contains(".with/deps/"): return ""
+    var end = sema.ast.get_start(node)
     while end < site.source.len() and site.source[end] != '\n': end = end + 1
-    site.source.slice(sema.ast.get_start(clause), end).contains("// evidence: ")
+    let line = site.source.slice(sema.ast.get_start(node), end)
+    let at = line.find("// ")
+    if at < 0: return ""
+    let said = line.slice(at + 3, line.len())
+    for word in ["proof: ", "annotation: ", "registry: ", "evidence: "]:
+        if said.starts_with(word): return said.to_owned()
+    ""
+
+// §31.8: a clause grants when its being wrong can make safe code unsafe.
+// The restrictions and the presentations are the few; every other clause
+// grants.
+fn contract_clause_grants(sema: &Sema, clause: i32) -> bool:
+    if clause <= 0 or clause >= sema.ast.node_count(): return false
+    let kind = sema.ast.get_data0(clause)
+    let ops = sema.ast.get_data1(clause)
+    if kind == FACADE_CLAUSE_BORROWS or kind == FACADE_CLAUSE_OF or kind == FACADE_CLAUSE_RENAME or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_TEXT_BYTES or kind == FACADE_CLAUSE_RUNS_THREADS or kind == FACADE_CLAUSE_HANDLE: return false
+    if kind == FACADE_CLAUSE_CALLBACK_THREAD: return sema.pool_resolve(sema.ast.get_extra(ops)) == "registering"
+    if kind == FACADE_CLAUSE_THREAD:
+        for i in 0..sema.ast.get_data2(clause):
+            if sema.pool_resolve(sema.ast.get_extra(ops + i)) != "creator": return true
+        return false
+    true
 
 // What the drafter analyzed for a contract whose lines are evidence: the
 // `// analyzed:` line at the head of its file, or "".
@@ -110,6 +142,26 @@ fn contract_item_profile_rule(sema: &Sema, item: i32) -> i32:
 
 fn contract_item_at(sema: &Sema, site: &ContractSite, what: &str, item: i32) -> str:
     f"clause:{what}@{site.path}:{contract_node_line(sema, site, item)}"
+
+// The provenance a fact row ends with: what stands between its last `  [`
+// and its closing bracket.
+fn contract_row_provenance(detail: &str) -> str:
+    var open = detail.len() - 3
+    while open >= 0 and not detail.slice(open, open + 3).starts_with("  ["): open -= 1
+    if open < 0 or not detail.ends_with("]"): "" else: detail.slice(open + 3, detail.len() - 1).to_owned()
+
+// The provenance of a fact an item itself states (an empty `fn f` asserts
+// that `f` keeps and frees nothing, §31.9): the item's line.
+fn contract_item_prov(sema: &Sema, site: &ContractSite, item: i32, grants: bool) -> str:
+    let rule = contract_item_profile_rule(sema, item)
+    if rule != 0: return (if grants: "claim: " else: "") ++ contract_rule_at(sema, rule)
+    contract_provenance(sema, site, item, grants)
+
+// The provenance of the nth clause of `kind` on `item`; the item's own
+// where a rule or a default stands in for the clause.
+fn contract_stated_at(sema: &Sema, site: &ContractSite, item: i32, kind: i32, nth: i32) -> str:
+    let clause = contract_clause(sema, item, kind, nth)
+    if clause != 0: contract_clause_at(sema, site, clause) else: contract_item_prov(sema, site, item, true)
 
 // The nth clause of `kind` on a facade item (a resource's extra list starts
 // with its `wraps` type), or 0. Sema's vectors are filled in clause order,
@@ -313,13 +365,13 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
         let fname = sema.safe_symbol_text(c.fn_sym)
         if c.returns_borrow_resource == r.name and c.returns_borrow_parent != 0:
             // D85 (§16.2b.6): the parent of the resource the argument receives.
-            contract_row(report, sema, site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"Borrowed{rname} from {fname}, the {rname} parent of {contract_param(sema, c.fn_sym, c.returns_borrow_from)} ({contract_received(sema, c.fn_sym, c.returns_borrow_from)}); it lives as long as that parent's origin, and an operation through it is an operation on that origin", contract_item_at(sema, site, "fn", c.node))
+            contract_row(report, sema, site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"Borrowed{rname} from {fname}, the {rname} parent of {contract_param(sema, c.fn_sym, c.returns_borrow_from)} ({contract_received(sema, c.fn_sym, c.returns_borrow_from)}); it lives as long as that parent's origin, and an operation through it is an operation on that origin", contract_stated_at(sema, site, c.node, FACADE_CLAUSE_RETURNS_BORROW, 0))
         else if c.returns_borrow_resource == r.name:
-            contract_row(report, sema, site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"Borrowed{rname} from {fname}, dependent on {contract_param(sema, c.fn_sym, c.returns_borrow_from)}", contract_item_at(sema, site, "fn", c.node))
+            contract_row(report, sema, site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"Borrowed{rname} from {fname}, dependent on {contract_param(sema, c.fn_sym, c.returns_borrow_from)}", contract_stated_at(sema, site, c.node, FACADE_CLAUSE_RETURNS_BORROW, 0))
         else if c.returns_borrow_resource != 0 and c.returns_borrow_domain == 0 and c.returns_borrow_from >= 0 and sema.safe_symbol_text(c.returns_borrow_resource) == "CStr":
             let recv = sema.facade_param_receives(c.fn_sym, c.returns_borrow_from)
             if recv.len() == 1 and recv[0] == ri:
-                contract_row(report, sema, site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"CStr from {fname}, dependent on {contract_param(sema, c.fn_sym, c.returns_borrow_from)}", contract_item_at(sema, site, "fn", c.node))
+                contract_row(report, sema, site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"CStr from {fname}, dependent on {contract_param(sema, c.fn_sym, c.returns_borrow_from)}", contract_stated_at(sema, site, c.node, FACADE_CLAUSE_RETURNS_BORROW, 0))
     var invalidators: List[str] = []
     var preservers: List[str] = []
     for ei in 0..sema.facade_call_effects.len():
@@ -360,12 +412,12 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
     for ri in 0..sema.facade_resources.len():
         let r = &sema.facade_resources[ri]
         let rname = contract_resource_name(sema, ri as i32)
-        if sema.facade_same_fn(r.drop, c.fn_sym): contract_row(report, sema, site, subject, CONTRACT_FN, r.node, r.name, owner, 0, "role", f"automatic destroyer of {rname}", contract_item_at(sema, site, "resource", r.node))
+        if sema.facade_same_fn(r.drop, c.fn_sym): contract_row(report, sema, site, subject, CONTRACT_FN, r.node, r.name, owner, 0, "role", f"automatic destroyer of {rname}", contract_stated_at(sema, site, r.node, FACADE_CLAUSE_DROP, 0))
         for di in 0..r.destroyers.len():
-            if sema.facade_same_fn(r.destroyers[di], c.fn_sym): contract_row(report, sema, site, subject, CONTRACT_FN, r.node, r.name, owner, 0, "role", f"alternate destroyer of {rname}", contract_item_at(sema, site, "resource", r.node))
+            if sema.facade_same_fn(r.destroyers[di], c.fn_sym): contract_row(report, sema, site, subject, CONTRACT_FN, r.node, r.name, owner, 0, "role", f"alternate destroyer of {rname}", contract_stated_at(sema, site, r.node, FACADE_CLAUSE_DESTROYS, di as i32))
         for pi in 0..r.producers.len():
-            if sema.facade_same_fn(r.producers[pi], c.fn_sym): contract_row(report, sema, site, subject, CONTRACT_FN, r.node, r.name, owner, -1, "role", f"producer of {rname}", contract_item_at(sema, site, "resource", r.node))
-        if sema.facade_same_fn(r.init, c.fn_sym): contract_row(report, sema, site, subject, CONTRACT_FN, r.node, r.name, owner, 0, "role", f"in-place initializer of {rname}", contract_item_at(sema, site, "resource", r.node))
+            if sema.facade_same_fn(r.producers[pi], c.fn_sym): contract_row(report, sema, site, subject, CONTRACT_FN, r.node, r.name, owner, -1, "role", f"producer of {rname}", contract_stated_at(sema, site, r.node, FACADE_CLAUSE_FROM, pi as i32))
+        if sema.facade_same_fn(r.init, c.fn_sym): contract_row(report, sema, site, subject, CONTRACT_FN, r.node, r.name, owner, 0, "role", f"in-place initializer of {rname}", contract_stated_at(sema, site, r.node, FACADE_CLAUSE_INIT, 0))
     if c.callbacks_none != 0:
         contract_row(report, sema, site, subject, CONTRACT_FN, c.callbacks_none, c.fn_sym, owner, -1, "callbacks", "none: trusted foreign-library guarantee", contract_clause_at(sema, site, c.callbacks_none))
     else:
@@ -422,7 +474,7 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
             for k in 0..r.producers.len():
                 if sema.facade_same_fn(r.producers[k], c.fn_sym) and r.out_params[k] == pi:
                     let produced = contract_resource_name(sema, ri as i32)
-                    contract_row(report, sema, site, subject, CONTRACT_FN, r.node, c.fn_sym, owner, pi, "effect", f"{shown}: out parameter producing {produced}", contract_item_at(sema, site, "from", contract_from_clause(sema, r.node, k as i32)))
+                    contract_row(report, sema, site, subject, CONTRACT_FN, r.node, c.fn_sym, owner, pi, "effect", f"{shown}: out parameter producing {produced}", contract_clause_at(sema, site, contract_from_clause(sema, r.node, k as i32)))
                     stated = true
         if stated: continue
         if sema.facade_param_is_callable(sig, pi):
@@ -430,7 +482,7 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
         else if lend_clause != 0:
             contract_row(report, sema, site, subject, CONTRACT_FN, lend_clause, c.fn_sym, owner, pi, "effect", f"{shown}: lend, an assertion about foreign behavior{recv_note}", contract_clause_at(sema, site, lend_clause))
         else:
-            contract_row(report, sema, site, subject, CONTRACT_FN, node, c.fn_sym, owner, pi, "effect", f"{shown}: lend, the described fn's assertion{recv_note}", "default:a described fn lends its parameters (§16.2b.5)")
+            contract_row(report, sema, site, subject, CONTRACT_FN, node, c.fn_sym, owner, pi, "effect", f"{shown}: lend, the described fn's assertion{recv_note}", contract_item_prov(sema, site, node, true))
     // The result (§16.2b.6-8).
     let ret = sema.type_name(sema.sig_return_type(sig))
     if c.returns_borrow_resource != 0:
@@ -856,6 +908,37 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
         if analyzed.len() == 0 or evidence_paths.contains(site.path): continue
         evidence_paths.push(with_str_clone_ref(site.path))
         report.note(f"contract-audit: evidence, not proof, in {site.path}: the source analyzed and the library linked are not established as the same build; analyzed: {analyzed}")
+    // §31.9: the claims are counted. One clause is one provenance, however
+    // many rows cite it; `clauses` is the sum (§31.7). `resource N wraps T`
+    // grants (§31.8.1) and no row cites it, so each is added here.
+    let seen = []
+    for r in sema.facade_resources:
+        if r.handle == 0: seen.push(contract_item_prov(sema, contract_site(sema, r.decl, source_path, source_text), r.node, true))
+    for fact in report.facts:
+        if fact.kind != AnalysisFactKind.ForeignContract or (fact.flags & CONTRACT_FACT) == 0: continue
+        let prov = contract_row_provenance(fact.detail)
+        if not seen.contains(prov): seen.push(prov)
+    var proven = 0
+    var stated = 0
+    var registry = 0
+    var profile = 0
+    var annotation = 0
+    var evidence = 0
+    for prov in seen:
+        // src/ is compiled by the pinned seed, which has #3296 (a later regex
+        // arm drops storage never written): regex arms here wait for a seed
+        // that carries the fix, and the word is matched as text.
+        let at = prov.find("@")
+        match (if at > 0: prov.slice(0, at) else: ""):
+            "proof" => proven += 1
+            "evidence" => evidence += 1
+            "claim: stated" => stated += 1
+            "claim: registry" => registry += 1
+            "claim: annotation" => annotation += 1
+            word => if word.starts_with("claim: profile:"): profile += 1
+    let claimed = stated + registry + profile + annotation
+    report.note(f"contract-audit: clauses={proven + claimed + evidence} proven={proven} claimed={claimed}" ++ (if evidence > 0: f" evidence={evidence}" else: ""))
+    if claimed > 0: report.note(f"contract-audit: claims: stated={stated} registry={registry} profile={profile} annotation={annotation}")
     report.note(f"contract-audit: resources={sema.facade_resources.len()} items={sema.foreign_contracts.len()} domains={sema.facade_domain_list.len()} conventions={conventions} advisories={advisories} profile-ambiguous={ambiguous} profile-shadowed={shadowed}")
 
 // ── the `contract` view ──────────────────────────────────────────────────
