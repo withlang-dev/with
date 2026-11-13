@@ -699,6 +699,8 @@ type AstPoolState {
     fn_meta: List[i32],
     type_meta: List[i32],
     pattern_qualifiers: List[i32],
+    // §31.7: the contract clauses written after `override`.
+    facade_overrides: List[i32],
     fn_param_patterns: List[i32],
     fn_param_pattern_meta: List[i32],
     for_meta: List[i32],
@@ -902,6 +904,7 @@ fn AstPool.new -> AstPool:
             fn_meta: List.new(),
             type_meta: List.new(),
             pattern_qualifiers: List.new(),
+            facade_overrides: [],
             fn_param_patterns: List.new(),
             fn_param_pattern_meta: List.new(),
             for_meta: List.new(),
@@ -2190,6 +2193,10 @@ impl AstPool:
 
     fn type_meta_derive_count(meta: i32) -> i32:
         self.state.type_meta[(meta + 2)]
+
+    mut fn add_facade_override(clause: NodeId): self.state.facade_overrides.push(clause as i32)
+
+    fn facade_overridden(clause: i32): self.state.facade_overrides.contains(clause)
 
     mut fn add_pattern_qualifier(node: NodeId, type_sym: i32):
         let idx = self.state.pattern_qualifiers.len() as i32

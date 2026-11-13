@@ -44,7 +44,7 @@ fn touch; facade:proj@test/contract/ok_effect_projection.w; clause:fn@test/contr
     returns: i32  [default:as declared]
     invalidates: Other (param 2: *mut other o)  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: the C name is the surface; no resource receives param 0  [default:presentation sugar only groups by resource (§16.2b.11)]
-note: contract-audit: clauses=14 proven=0 claimed=14
+note: contract-audit: clauses=14 proven=0 claimed=14 overrides=0 stale-overrides=0
 note: contract-audit: claims: stated=14 registry=0 profile=0 annotation=0
 note: contract-audit: resources=3 items=3 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 contract-audit: violations=0 ok

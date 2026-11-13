@@ -90,6 +90,8 @@ fn astpool_clone_deep(src: &AstPool) -> AstPool:
         )
         type_meta = type_meta + 3
 
+    for clause in src.state.facade_overrides: out.add_facade_override(clause as NodeId)
+
     var patq = 0
     while patq < src.state.pattern_qualifiers.len():
         out.add_pattern_qualifier(
