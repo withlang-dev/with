@@ -10,7 +10,6 @@ with it until it lands. The order they land in is kept in
 wcl-landing-order.md.
 
 The keyword is written `contract` throughout (`c contract`, `c facts`).
-The compiler accepts `c facade` until the keyword change lands.
 
 > A foreign capability may enter safe With through a verified fact or an
 > explicitly attributable trusted claim. The absence of evidence must not
@@ -199,8 +198,7 @@ or names; `type` a With type expression over the imported types.
 Adopted 2026-11-11 and not in the parser: `override` (§31.7) and `from
 f, nonnull` on a pointer producer. Adopted and still accepted by the parser,
 to be refused: `destroys` as an fn clause and in an fn-pattern convention
-rule (§31.8.2). Adopted 2026-11-11 and not in the parser: `runs no
-threads` and `callback_thread registering` (§31.6.2, §31.8.1, §31.8.3).
+rule (§31.8.2).
 
 In the specification and not in the parser on main: `establishes`, `ends`
 and `requires domain` (§16.2b.7, v7.49, D200), and `field … is role` in a
@@ -241,8 +239,7 @@ name or shape under which a fact is written in With, never a fact.
 restriction: dependent, invalidating, nullable, bytes, creator-thread-bound,
 the library's coarse domain, raw.
 
-**No default grants** (adopted 2026-11-11, not yet implemented). The
-absence of evidence grants nothing.
+**No default grants.** The absence of evidence grants nothing.
 
 - A library's threads. A contract says `runs threads`, `runs no threads`, or
   neither. With neither, the library is not known to run no threads, and its
@@ -276,10 +273,7 @@ records it, and `with analyze … contract` prints it:
 holds only for the build it analyzed. Where the analyzed source and the
 linked artifact cannot be established as the same build, the result is
 evidence, not proof: it is printed in the report, it grants nothing, and a
-person may state the claim. (Adopted 2026-11-11, not yet implemented:
-today a result drawn for a prebuilt binary from separately configured
-source is printed and trusted as a proof. §31.8.5, "The build that was
-proved".)
+person may state the claim (§31.8.5, "The build that was proved").
 
 A clause that grants and that the compiler does not vouch for is a claim
 (§31.9). `override` is not a provenance: an overriding clause is
@@ -413,7 +407,7 @@ G = grants, R = restricts, P = presents.
 | `domain D kind` | `D` names ownerless C state with that extent. | R | §16.2b.7 |
 | `text utf8` | every text return of the library presents as `Option[str]`, validated at the boundary; a return that is not UTF-8 is a contract failure naming the C function, and nothing is repaired. | G | §16.2b.8 |
 | `runs threads` | the library runs threads of its own; its globals are shared with them. Accepted and reported as redundant once absence grants nothing (6.2); it stays the way to say so on the record. | R | §16.3 |
-| `runs no threads` | the library's code runs, and its state is read or written, only on a thread on which the program has called into the library (§31.8.5), which is one half of what makes its C globals safe to touch (§31.4). A claim, stated or the registry's, until the closed-world proof of §31.8.5 exists; then also provenance `proof`. **Adopted 2026-11-11, not yet implemented.** | G | §16.3 |
+| `runs no threads` | the library's code runs, and its state is read or written, only on a thread on which the program has called into the library (§31.8.5), which is one half of what makes its C globals safe to touch (§31.4). A claim, stated or the registry's, until the closed-world proof of §31.8.5 exists; then also provenance `proof`. | G | §16.3 |
 | `use convention P` | the contract adopts profile `P`'s rules. | the rules' | §16.2b.12 |
 | `field F of R is role` | a call through function-pointer field `F` of record `R` is an allocation (returns a fresh allocation the caller owns), a reallocation (consumes its argument and returns one), a deallocation (destroys its argument), or `F` is the hooks' own data (passing it to a hook is not an escape; a function that installs it retains it). A role is never drawn from a field's name. | G | §16.2b.15 |
 
@@ -509,7 +503,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `user_data from f as &U` | `f` returns the registered userdata. | G | the call is safe and the result is a raw pointer | §16.2b.9 |
 | `callbacks none` | the operation invokes no applicable callback. | G | may invoke callbacks | §16.2b.9 |
 | `callback_thread any` | a retained callback may run on any thread. The default, written out: accepted and reported as redundant once absence grants nothing (6.2). | R | any thread: the captured state must be sendable and shareable | §16.2b.10 |
-| `callback_thread registering` | a retained callback runs only on the thread that registered it, so its captured state needs no send or share capability. True only while the retaining resource cannot change threads: refused where that resource is `thread send` (§31.10, rule 5). **Adopted 2026-11-11, not yet implemented.** | G | any thread | §16.2b.10 |
+| `callback_thread registering` | a retained callback runs only on the thread that registered it, so its captured state needs no send or share capability. True only while the retaining resource cannot change threads: refused where that resource is `thread send` (§31.10, rule 5). | G | any thread | §16.2b.10 |
 | `variadic param v selected by param s:` with cases | the arguments after the fixed ones are, for each selector value stated, what its case says. | G | raw | §16.2b.5 |
 | `establishes domain D` | after the call returns, `D` is established. Wrong, every later `requires` passes against state that does not exist. | G | | §16.2b.7 |
 | `ends domain D` | after the call, `D` is not established. | R | | §16.2b.7 |
@@ -881,7 +875,7 @@ independent of provenance (§16.2b.13):
 5. **Capabilities compose.** `send` without `drop_any_thread` is refused.
    `callback_thread registering` on a callback retained by a resource that
    is `thread send` is refused: the resource can move to another thread and
-   take the callback with it (adopted 2026-11-11, not yet implemented). A
+   take the callback with it. A
    profile rule that grants resolves to exactly one function.
 6. **Agreement with the header it is applied to.** A contract that names a
    declaration the import lacks is an error, never a silent return to raw.
