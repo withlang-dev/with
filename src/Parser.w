@@ -5024,9 +5024,17 @@ impl Parser:
     mut fn parse_facade_produced_field(producer: i32) -> i32:
         let start = self.current_start()
         self.advance()
-        let word = if self.current_ident_is("nullable") or self.current_ident_is("nonnull"): self.expect_ident() else: 0
+        let nonnull = self.current_ident_is("nonnull")
+        let word = if nonnull or self.current_ident_is("nullable"): self.expect_ident() else: 0
+        // §31.8.2: `from F, nonnull` with no field is a pointer producer
+        // that never returns NULL.
+        if word != 0 and nonnull and not self.current_ident_is("field"):
+            let alone = self.pool.extra_len()
+            self.pool.add_extra(producer)
+            self.pool.add_extra(word)
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_PRODUCED_FIELD, alone, 2) as i32
         if word == 0 or not self.current_ident_is("field"):
-            self.emit_error("after 'from <producer>,' a by-value producer states 'nullable field <F>' or 'nonnull field <F>' (§16.2b.4)")
+            self.emit_error("after 'from <producer>,' a pointer producer states 'nonnull', and a by-value producer 'nullable field <F>' or 'nonnull field <F>' (§31.8.2)")
             return 0
         self.advance()
         let ops = [producer, word]

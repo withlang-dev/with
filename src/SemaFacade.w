@@ -966,8 +966,16 @@ impl Sema:
             let producer = self.ast.get_extra(ops)
             let pn = self.pool_resolve(producer)
             let word = self.pool_resolve(self.ast.get_extra(ops + 1))
-            if r.producers.len() == 0 or r.producers[r.producers.len() - 1] != producer or r.out_params[r.out_params.len() - 1] >= 0:
+            if r.producers.len() == 0 or r.producers[r.producers.len() - 1] != producer: return r
+            if self.ast.get_data2(clause) == 2:
+                // §31.8.2: `from F, nonnull` — a pointer producer that never
+                // returns NULL. Only a returned pointer has that NULL.
+                if r.out_params[r.out_params.len() - 1] >= 0: self.emit_error(f"resource '{rname}': 'from {pn}, nonnull': {pn} produces through an out parameter, and its status says whether anything was produced (§31.8.2)", clause)
+                else if self.get_type_kind(self.resolve_alias(r.repr_tid as TypeId)) != TypeKind.TY_PTR:
+                    let rt = self.type_name(r.repr_tid)
+                    self.emit_error(f"resource '{rname}': 'from {pn}, nonnull' is for a producer that returns a pointer; '{rname}' wraps {rt}, a record passed by value, which states the field: 'nonnull field <F>' (§31.8.2)", clause)
                 return r
+            if r.out_params[r.out_params.len() - 1] >= 0: return r
             var ty = self.resolve_alias(r.repr_tid as TypeId) as i32
             if self.get_type_kind(ty as TypeId) != TypeKind.TY_STRUCT:
                 let rt = self.type_name(r.repr_tid)
