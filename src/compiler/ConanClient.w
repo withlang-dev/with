@@ -105,6 +105,12 @@ fn conan_https_fetch_to_file(url: &str, path: &str, timeout_ms: i32) -> str:
         if runtime_file_exists(local) == 0 or runtime_is_dir(local) != 0: return "no such file"
         return if runtime_write_file(path, runtime_read_file(local)) == 0: "" else: "could not write " ++ path
     if not url.starts_with("https://"): return "not an https:// or file:// URL"
+    let recorded = conan_replay_key(url)
+    if recorded.len() > 0 and runtime_getenv("WITH_GET_REPLAY_REFRESH").len() == 0:
+        let status = conan_replay_status(recorded)
+        if status == "200": return if runtime_write_file(path, runtime_read_file(recorded ++ ".body")) == 0: "" else: "could not write " ++ path
+        if status.len() > 0: return "the server answered status " ++ status ++ " (recorded under WITH_GET_REPLAY)"
+    if runtime_getenv("WITH_GET_OFFLINE").len() > 0: return "WITH_GET_OFFLINE is set, and no recording of this URL is under WITH_GET_REPLAY"
     let connect_ms = if timeout_ms > 0 and timeout_ms < 20000: timeout_ms else: 20000
     let idle_ms = if timeout_ms > 0 and timeout_ms < 30000: timeout_ms else: 30000
     // #2517: five attempts with a growing pause (2, 4, 6, 8 s: 20 s in all,
@@ -117,6 +123,7 @@ fn conan_https_fetch_to_file(url: &str, path: &str, timeout_ms: i32) -> str:
     for attempt in 1..6:
         let response = https_get_response_timeout(url.to_owned(), 5, connect_ms, idle_ms)
         if response.status == 200:
+            conan_replay_record(recorded, url, 200, response.body)
             return if runtime_write_file(path, response.body) == 0: "" else: "could not write " ++ path
         last_status = response.status
         // #3169: a server that answered 5xx (GitHub's release assets 504
@@ -126,7 +133,41 @@ fn conan_https_fetch_to_file(url: &str, path: &str, timeout_ms: i32) -> str:
     // Seed-bound: the pinned seed's std.http has no `reason` on a response;
     // the transport's own words (`response.reason`) replace this text once a
     // seed carries it.
+    // A 4xx is the server's answer about the URL (a recipe with no such
+    // file, a search with no such name): recorded, so a replay asks nobody.
+    // A 5xx or a transport failure is about the moment, and is not.
+    if last_status >= 400 and last_status < 500: conan_replay_record(recorded, url, last_status, "")
     if last_status < 0: "no connection or no response in 5 attempts (a resolver, network or TLS failure)" else: f"the server answered status {last_status} in 5 attempts"
+
+// `WITH_GET_REPLAY=<dir>` (the UAT sets it): every HTTPS answer `with get`
+// receives is recorded under the directory, and a URL with a recording is
+// served from it, so an acceptance run does not depend on Conan Center, the
+// recipe index or a source mirror being reachable at that moment.
+// `WITH_GET_REPLAY_REFRESH` fetches and records again; `WITH_GET_OFFLINE`
+// refuses a URL that has no recording. A recording is `<sha256 of the
+// URL>.meta` (`<status>\t<url>`) and, for a 200, `.body` beside it.
+// Not a user's cache: an answer that changes (a search, a latest revision)
+// is replayed as recorded.
+fn conan_replay_key(url: &str) -> str:
+    let dir = runtime_getenv("WITH_GET_REPLAY")
+    if dir.len() == 0: return ""
+    let digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(url, &raw mut digest[0] as *mut u8)
+    dir ++ "/" ++ sha256_hex(&digest[0] as *const u8)
+
+// The recorded status of a key, or "".
+fn conan_replay_status(key: &str) -> str:
+    let meta = runtime_read_file(key ++ ".meta")
+    let tab = meta.find("\t")
+    if tab <= 0: "" else: meta.slice(0, tab).to_owned()
+
+// The body is written before the status that makes it a recording, so a
+// run cut short leaves no recording, never half of one.
+fn conan_replay_record(key: &str, url: &str, status: i32, body: &str):
+    if key.len() == 0: return
+    runtime_mkdir_p(runtime_getenv("WITH_GET_REPLAY"))
+    if (status == 200 and runtime_write_file(key ++ ".body", body) != 0) or runtime_write_file(key ++ ".meta", f"{status}\t" ++ url ++ "\n") != 0:
+        runtime_eprint("warning: could not record " ++ url ++ " under WITH_GET_REPLAY (" ++ key ++ ")")
 
 // The local path a file:// URL names: percent-escapes decoded, and a Windows
 // drive path (file:///C:/…) without its leading slash.
