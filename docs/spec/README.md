@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.52
+# The With Programming Language — Specification v7.53
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.53:** (Eric, 2026-11-13). §31.4: a function a contract names, in an `fn` item or in a resource's `from`, `init`, `drop`, `destroys`, `abandon` or `freed by`, is described; the base rule does not apply to it, and it has the meaning the contract gives it.
+
 **Changelog v7.52:** D202 (Eric, 2026-11-11). The keyword of a contract block is `contract`: `c contract name:`. `c facade` is refused, naming `with fix-contracts`, which respells it and `use facades.` (§18.5, new line). A fetched package's contract is `contract.w` with `contract-report.txt` and `contract.json`; a project's own are under `contracts/` and are used as `contracts.<name>`; `with migrate --contract` draws one. The examples and guides are respelled.
 
 **Changelog v7.51:** (Eric, 2026-11-12). §29.11: `error` is contextual; before a name it opens an error declaration or states a contract's error type, and elsewhere it is an ordinary identifier (#3131). §4.3c rule 1: a private module-level binding of an empty literal takes its demands from its own module, and a `pub` binding states its type (#3194).

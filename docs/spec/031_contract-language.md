@@ -82,6 +82,9 @@ A `//` comment after a clause is its citation where one is required
 ## 31.4 The base rule: what is raw
 
 The language is defined against what an undescribed imported function is.
+A function a contract names, in an `fn` item or in a resource's `from`,
+`init`, `drop`, `destroys`, `abandon` or `freed by`, is described. The base
+rule does not apply to it: it has the meaning the contract gives it.
 A call of it is **raw**, needing `unsafe`, when any of these holds, and safe
 otherwise:
 
