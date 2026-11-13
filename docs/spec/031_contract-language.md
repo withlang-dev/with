@@ -88,11 +88,11 @@ otherwise:
 | What | Rule |
 |---|---|
 | A pointer parameter | raw. Its spelling, `const` included, proves nothing (§16.2b.5). A character pointer is no exception (§16.2b.8). |
-| A pointer return | **inert: a function whose only raw part is a pointer return is safe to call** (adopted 2026-11-11, not yet implemented: the compiler makes such a function raw today). A raw pointer in safe code cannot be read, freed or passed back to C without `unsafe` or a contract. A possible leak is not a reason to make the call raw: a returned record, descriptor or id leaks the same way. |
+| A pointer return | **inert: a function whose only raw part is a pointer return is safe to call**. A raw pointer in safe code cannot be read, freed or passed back to C without `unsafe` or a contract. A possible leak is not a reason to make the call raw: a returned record, descriptor or id leaks the same way. |
 | A parameter passed by value whose type holds a pointer | raw. A type holds a pointer when it is a pointer or function pointer, or a record, union or array with a member that holds one (§16.2b.5). Returning such a record is not raw: the value is inert until it goes back into C. |
 | A function-pointer parameter, and a call through a function pointer | raw (§16.2b.9, §16.11). |
 | A variadic function | raw: a variadic signature is an unmodeled contract (§16.3c). |
-| A C global | one the header declares `const` is safe to read in any program, and one it declares thread-local is safe to read and to write. Any other is safe to read or write when every call into the library that declares it and every access to its globals is provably on one thread, and the library runs no threads of its own: its contract says `runs no threads`, by a proof or by a claim (§31.8.1). Otherwise reading or writing it is raw. (**Adopted 2026-11-11, not yet implemented:** today the compiler takes a library to run no threads unless its contract says `runs threads`.) Assigning a global whose type holds a pointer is raw in every program; reading one is not (§16.3b). |
+| A C global | one the header declares `const` is safe to read in any program, and one it declares thread-local is safe to read and to write. Any other is safe to read or write when every call into the library that declares it and every access to its globals is provably on one thread, and the library runs no threads of its own: its contract says `runs no threads`, by a proof or by a claim (§31.8.1). Otherwise reading or writing it is raw. Assigning a global whose type holds a pointer is raw in every program; reading one is not (§16.3b). |
 | A function over value records and scalars only | safe as imported. No clause is needed. |
 | A proven invalidator | raw. Where the drafter proves that an undescribed function frees or resets memory reachable from a declared resource, a call of it is raw, with the proof printed, until a contract describes it. A function with no proof against it is unaffected. What a contract then writes is in §31.8.4. **Adopted 2026-11-11, not yet implemented.** |
 
@@ -195,10 +195,7 @@ grant of an empty `fn f` is overridden by writing the `lend` out.
 compile-time constant; `TypeName` a With type name the contract introduces
 or names; `type` a With type expression over the imported types.
 
-Adopted 2026-11-11 and not in the parser: `override` (§31.7) and `from
-f, nonnull` on a pointer producer. Adopted and still accepted by the parser,
-to be refused: `destroys` as an fn clause and in an fn-pattern convention
-rule (§31.8.2).
+Adopted 2026-11-11 and not in the parser: `override` (§31.7).
 
 In the specification and not in the parser on main: `establishes`, `ends`
 and `requires domain` (§16.2b.7, v7.49, D200), and `field … is role` in a
@@ -421,7 +418,7 @@ produced. (§16.2b.15.)
 | Clause | Meaning | Dir | Default when absent | Rule |
 |---|---|---|---|---|
 | `from f` | `f` returns a new `N` the caller owns; presents `Option[N]`, a NULL being nothing produced. | G | no producer; `N` cannot be made | §16.2b.4 |
-| `from f, nonnull` | a pointer producer that never returns NULL: presents `N`; a NULL return is a contract failure naming `f`. **Adopted 2026-11-11, not yet implemented.** | G | `Option[N]` | §16.2b.8 |
+| `from f, nonnull` | a pointer producer that never returns NULL: presents `N`; a NULL return is a contract failure naming `f`. | G | `Option[N]` | §16.2b.8 |
 | `from f(out param p)` | `f` stores a new `N` through `p`. The compiler sets the slot to NULL, calls `f`, and inspects it: non-null is a produced resource, owned at once, whatever the status says. | G | | §16.2b.4 |
 | `from f, nullable field a.b` | a by-value producer: a NULL in field `a.b` of the result means nothing was produced; presents `Option[N]`. Checked when the call returns. | G | | §16.2b.4 |
 | `from f, nonnull field a.b` | as above, and a NULL there is a contract failure naming `f`; presents `N`. | G | | §16.2b.4 |
@@ -439,8 +436,7 @@ produced. (§16.2b.15.)
 | `thread creator` | the default, written out. Accepted and reported as redundant. | R | | §16.2b.10 |
 | `requires domain D` | the resource is a resource of `D`: live from its producer's return to its destroyer's call; its producers, destroyer and operations require `D`. | R | no domain | §16.2b.7 |
 
-**Who owns "f destroys N"** (adopted 2026-11-11, not yet implemented). The
-resource does: `drop f` or `destroys f` under `resource N` decides the mode
+**Who owns "f destroys N".** The resource does: `drop f` or `destroys f` under `resource N` decides the mode
 of `f`'s resource parameter. An fn item for `f` carries its other clauses,
 does not repeat the fact, and an explicit `lend` on it is an error. A
 `destroys` on an fn item is refused, naming the resource form.
@@ -453,10 +449,6 @@ resource Engine wraps *mut RawEngine
 fn engine_close
     rename close
 ```
-
-Today the compiler accepts both spellings and each decides (38
-resource-level lines and 31 fn-item lines in the tree), and an fn item for a
-destroyer must itself say `destroys` or be refused as a lend.
 
 **The nullability of a pointer producer's return.** `NULL` is information.
 A machine-readable annotation is used directly: a return the header or the
