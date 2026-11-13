@@ -27,7 +27,7 @@ fn main:
     // The applied facade is visible, with the file it came from.
     let contract = p7_run(dir, "contract", "analyze\0src/main.w\0contract\0")
     p7_assert_success(contract, "the contract view")
-    let shown = contract.stdout.contains("resource Picture wraps Img") and contract.stdout.contains("facade:demo@") and contract.stdout.contains(".with/deps/c/demo/1.0/contract.w")
+    let shown = contract.stdout.contains("resource Picture wraps Img") and contract.stdout.contains("contract:demo@") and contract.stdout.contains(".with/deps/c/demo/1.0/contract.w")
     if not shown: print(contract.stdout)
     assert(shown)
 
