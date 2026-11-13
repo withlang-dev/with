@@ -737,6 +737,31 @@ match event:
     .KeyDown(k) => on_key(k)
 ```
 
+**A chain of tests on text is a `match` too.** A text subject matches
+string literals and regular expressions (`regular-expressions.md`), and a
+regex arm binds its captures as `$1`, `$2`.
+
+```
+// ✗ a chain of prefix tests on one string
+if prov.starts_with("proof@"): proven += 1
+else if prov.starts_with("evidence@"): evidence += 1
+else if prov.starts_with("claim: stated@"): stated += 1
+else if prov.starts_with("claim: registry@"): registry += 1
+
+// ✓ idiomatic — one match, one arm per shape
+match prov:
+    /^proof@/           => proven += 1
+    /^evidence@/        => evidence += 1
+    /^claim: stated@/   => stated += 1
+    /^claim: registry@/ => registry += 1
+    _                   => {}
+
+// ✓ a regex arm brings its captures
+let shown = match line:
+    /^(\w+)=(\w+)$/ => $1 ++ ":" ++ $2
+    _               => "missing"
+```
+
 **Destructure in the pattern.** Don't match then access.
 
 ```
@@ -1467,7 +1492,7 @@ Before submitting code, check:
 12. **No manual lock/guard management** — use `with`
 13. **No string concatenation** — use f-string interpolation `f"hello {name}"`
 14. **No C-style loops** — use ranges and iterators
-15. **No `if/else if` chains on enums** — use `match`
+15. **No `if/else if` chains on enums or on one string** — use `match`; text matches literals and regex arms
 16. **No manual cleanup at every exit** — use `defer`
 17. **No `== true` or `== false`** — just `if active` or `if not active`
 18. **No artificial newlines** — if a trait/impl/fn fits on one line, keep it there
