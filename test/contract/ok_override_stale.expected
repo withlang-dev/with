@@ -1,18 +1,18 @@
 foreign-contract view	v1
-resource Engine wraps *mut engine; representation: pointer; facade:engine@test/contract/ok_override_stale.w; clause:resource@test/contract/ok_override_stale.w:19
+resource Engine wraps *mut engine; representation: pointer; contract:engine@test/contract/ok_override_stale.w; clause:resource@test/contract/ok_override_stale.w:19
     producer: engine_new -> Engine.new; production: direct return; NULL is None  [stale override@test/contract/ok_override_stale.w:20: no proof contradicts it]
     status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
     destroyer: engine_free; automatic: Drop calls it while the value is live  [claim: stated@test/contract/ok_override_stale.w:21]
     dependency: none via engine_new; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
     thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
     invalidation: views invalidated by: engine_free, engine_count, engine_name; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
-fn engine_count; facade:engine@test/contract/ok_override_stale.w; clause:fn@test/contract/ok_override_stale.w:22
+fn engine_count; contract:engine@test/contract/ok_override_stale.w; clause:fn@test/contract/ok_override_stale.w:22
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut engine e: lend, an assertion about foreign behavior; receives Engine  [stale override@test/contract/ok_override_stale.w:23: no proof contradicts it]
     returns: i32  [default:as declared]
     invalidates: Engine (param 0: *mut engine e)  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Engine.count  [default:presentation sugar from the resource prefix (§16.2b.11)]
-fn engine_name; facade:engine@test/contract/ok_override_stale.w; clause:fn@test/contract/ok_override_stale.w:24
+fn engine_name; contract:engine@test/contract/ok_override_stale.w; clause:fn@test/contract/ok_override_stale.w:24
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut engine e: lend, the described fn's assertion; receives Engine  [claim: stated@test/contract/ok_override_stale.w:24]
     returns: i32  [default:as declared]

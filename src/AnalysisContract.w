@@ -294,7 +294,7 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
     let repr = sema.type_name(r.repr_tid)
     let is_ptr = sema.get_type_kind(sema.resolve_alias(r.repr_tid as TypeId)) == TypeKind.TY_PTR
     let shape = if r.handle != 0: "callback-scope, borrowed for the callback's invocation" else if r.init != 0: (if r.movable != 0: "in-place, movable" else: "in-place, pinned") else if is_ptr: "pointer" else: "by-value"
-    let facade_id = f"facade:{facade}@{site.path}"
+    let facade_id = f"contract:{facade}@{site.path}"
     let word = if r.handle != 0: "handle" else: "resource"
     let at = contract_item_at(sema, site, word, r.node)
     let subject = contract_fact(report, sema, site, -1, CONTRACT_RESOURCE, r.node, r.name, r.facade, -1, rname,
@@ -420,7 +420,7 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
     let rule = contract_item_profile_rule(sema, node)
     let at = if rule != 0: contract_rule_at(sema, rule) else: contract_item_at(sema, site, "fn", node)
     let subject = contract_fact(report, sema, site, -1, CONTRACT_FN, node, c.fn_sym, owner, -1, fname,
-        f"fn {fname}; facade:{facade}@{site.path}; {at}")
+        f"fn {fname}; contract:{facade}@{site.path}; {at}")
     if sig < 0:
         contract_row(report, sema, site, subject, CONTRACT_FN, node, c.fn_sym, owner, -1, "declaration", "not in scope; the facade names no imported declaration", "default:unverified item (§16.2b.13)")
         return
@@ -648,7 +648,7 @@ fn contract_collect_domain(mut report: AnalysisReport, sema: &Sema, di: i32, sou
     let at = contract_item_at(sema, site, "domain", d.node)
     let origin = sema.safe_symbol_text(d.origin_sym)
     let subject = contract_fact(report, sema, site, -1, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, dname,
-        f"domain {dname} {kind}; origin {origin}; facade:{facade}@{site.path}; {at}")
+        f"domain {dname} {kind}; origin {origin}; contract:{facade}@{site.path}; {at}")
     let scope = if kind == "thread": "views inherit the thread restriction" else if kind == "static": "static data does not participate in invalidation" else if kind == "process": "process-wide state" else: "state of a resource"
     contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "scope", f"{kind}; {scope}", contract_item_at(sema, site, "domain", d.node))
     contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "library", f"{d.files.len()} imported translation unit(s) whose every operation touches it unless it preserves it", "default:the coarse library domain (§16.2b.7)")
