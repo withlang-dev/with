@@ -25,8 +25,6 @@ c contract dbl:
         drop db_close
         destroys db_close_v2
         destroys db_close
-    fn db_close_v2
-        destroys
 
 fn destroy_v2() -> *mut db:
     let a = Database.new(1).unwrap()

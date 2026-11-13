@@ -668,22 +668,33 @@ impl Sema:
                 return true
         false
 
+    // Whether some resource collected so far names `f` as its `drop` or a
+    // `destroys`.
+    fn facade_fn_destroys_a_resource(f: i32) -> bool:
+        for r in self.facade_resources:
+            if r.drop == f or r.destroyers.contains(f): return true
+        false
+
+    mut fn facade_inherit_destroys(fname: &str, c: ForeignContract) -> ForeignContract:
+        var out = c
+        // Marked either way, so the resource's own check reports nothing twice.
+        out.destroys = 1
+        if out.lend != 0: self.emit_error(f"fn '{fname}': a resource names it as a destroyer, and the fn item says 'lend'; a destroying operation is not callable as a lend: delete the 'lend' (§31.8.2)", out.node)
+        out
+
     mut fn verify_facade_destroyer(ri: isize, f: i32) -> bool:
         let rname = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
         let fname = self.pool_resolve(f)
-        // A destroying operation callable as a lend (§16.2b.3): an fn item
-        // describing the same function lends its parameters unless it says
-        // `destroys` or consumes the representation.
+        // §31.8.2: the fn item describing a destroyer inherits the fact
+        // from the resource (collect_facade_fn, for a resource collected
+        // before it; here for one in a later block).
         let ci = self.facade_contract_for(f)
         if ci >= 0 and self.foreign_contracts[ci].destroys == 0:
-            var consumes_repr = false
-            for k in 0..self.foreign_contracts[ci].consumes.len():
-                if self.foreign_contracts[ci].consumes[k] == 0:
-                    consumes_repr = true
-            if not consumes_repr:
-                self.emit_error(f"resource '{rname}': '{fname}' destroys the resource but the fn item describing it lends its parameters; a destroying operation must not be callable as a lend — state 'destroys' on the fn item (§16.2b.3)", node)
+            if self.foreign_contracts[ci].lend != 0:
+                self.emit_error(f"resource '{rname}': '{fname}' destroys the resource, and its fn item says 'lend'; a destroying operation is not callable as a lend: delete the 'lend' (§31.8.2)", node)
                 return false
+            self.foreign_contracts[ci].destroys = 1
         if self.facade_op_raw_beyond(f, 0, false):
             self.emit_error(f"resource '{rname}': '{fname}' is still a raw call after the facade covers the representation (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
             return false
@@ -966,8 +977,16 @@ impl Sema:
             let producer = self.ast.get_extra(ops)
             let pn = self.pool_resolve(producer)
             let word = self.pool_resolve(self.ast.get_extra(ops + 1))
-            if r.producers.len() == 0 or r.producers[r.producers.len() - 1] != producer or r.out_params[r.out_params.len() - 1] >= 0:
+            if r.producers.len() == 0 or r.producers[r.producers.len() - 1] != producer: return r
+            if self.ast.get_data2(clause) == 2:
+                // §31.8.2: `from F, nonnull` — a pointer producer that never
+                // returns NULL. Only a returned pointer has that NULL.
+                if r.out_params[r.out_params.len() - 1] >= 0: self.emit_error(f"resource '{rname}': 'from {pn}, nonnull': {pn} produces through an out parameter, and its status says whether anything was produced (§31.8.2)", clause)
+                else if self.get_type_kind(self.resolve_alias(r.repr_tid as TypeId)) != TypeKind.TY_PTR:
+                    let rt = self.type_name(r.repr_tid)
+                    self.emit_error(f"resource '{rname}': 'from {pn}, nonnull' is for a producer that returns a pointer; '{rname}' wraps {rt}, a record passed by value, which states the field: 'nonnull field <F>' (§31.8.2)", clause)
                 return r
+            if r.out_params[r.out_params.len() - 1] >= 0: return r
             var ty = self.resolve_alias(r.repr_tid as TypeId) as i32
             if self.get_type_kind(ty as TypeId) != TypeKind.TY_STRUCT:
                 let rt = self.type_name(r.repr_tid)
@@ -1151,6 +1170,10 @@ impl Sema:
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + ci)
             c = self.collect_fn_clause(fname, c, sig, clause)
+        // §31.8.2: a function a resource names as `drop` or `destroys`
+        // consumes its resource parameter; its fn item inherits the fact (a
+        // resource of a later block is verify_facade_destroyer's).
+        if self.facade_fn_destroys_a_resource(fn_sym): c = self.facade_inherit_destroys(fname, c)
         self.foreign_contract_index.insert(fn_sym, self.foreign_contracts.len() as i32)
         self.foreign_contracts.push(c)
 
@@ -1339,10 +1362,9 @@ impl Sema:
             c.callbacks_none = clause
             return c
         if kind == FACADE_CLAUSE_DESTROYS:
-            if self.sig_get_param_count(sig) == 0:
-                self.emit_error(f"fn '{fname}': a destroyer takes the resource it destroys; this fn has no parameters (§16.2b.5)", clause)
-                return c
-            c.destroys = 1
+            // §31.8.2: the resource owns "f destroys N". The fn item
+            // carries the function's other clauses and does not repeat it.
+            self.emit_error_with_help(f"fn '{fname}': 'destroys' is stated by the resource, not by the fn item (§31.8.2)", clause, f"write 'destroys {fname}' under the resource it destroys, and delete this line")
             return c
         if kind == FACADE_CLAUSE_CONSUMES:
             let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)

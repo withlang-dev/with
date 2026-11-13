@@ -1475,16 +1475,26 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             // produced nothing — no Drop is armed over it (§16.2b.4). The
             // facade's `from` is the trusted evidence that a non-null return
             // is the produced resource (§16.2b.4, ruling §19).
-            result = "Option[" ++ name ++ "]"
+            // §31.8.2: `from F, nonnull` presents `R`; a NULL return is a
+            // contract failure naming the producer.
+            let cname = intern.resolve(pool.get_data0(producer as NodeId))
+            let nonnull = facade_render_produced_field(pool, intern, item, cname).0 == "nonnull"
+            if not nonnull: result = "Option[" ++ name ++ "]"
             let repr = facade_render_fresh("repr", facade_render_param_names(pool, intern, producer))
-            out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ result ++ ":\n" ++ pro ++ "    let " ++ repr ++ " = " ++ call ++ "\n    if " ++ repr ++ " == null: None else: Some(" ++ name ++ " { " ++ made_deps ++ "repr: " ++ repr ++ ", live: true })\n"
+            let value = name ++ " { " ++ made_deps ++ "repr: " ++ repr ++ ", live: true }"
+            let produced = "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ result ++ ":\n" ++ pro ++ "    let " ++ repr ++ " = " ++ call ++ "\n"
+            if nonnull: out = out ++ produced ++ "    if " ++ repr ++ " == null: panic(\"" ++ cname ++ ": the contract states 'from " ++ cname ++ ", nonnull', and C returned NULL (§31.8.2)\")\n    " ++ value ++ "\n"
+            else: out = out ++ produced ++ "    if " ++ repr ++ " == null: None else: Some(" ++ value ++ ")\n"
         else:
             // §16.2b.4: a by-value producer states the field whose NULL
             // means nothing was produced, checked when the call returns:
             // `nullable field` presents `Option[R]`; `nonnull field`
             // presents `R`, and a NULL there is a contract failure.
             let cname = intern.resolve(pool.get_data0(producer as NodeId))
-            let (field_mode, field_path) = facade_render_produced_field(pool, intern, item, cname)
+            // A `nonnull` with no field on a by-value producer is Sema's
+            // error (§31.8.2); the rendering states no check for it.
+            let (stated_mode, field_path) = facade_render_produced_field(pool, intern, item, cname)
+            let field_mode = if field_path.len() == 0: "" else: stated_mode
             let repr = facade_render_fresh("repr", facade_render_param_names(pool, intern, producer))
             let value = name ++ " { " ++ made_deps ++ "repr: " ++ (if field_mode.len() == 0: call else: repr) ++ ", live: true }"
             if field_mode == "nullable": result = "Option[" ++ name ++ "]"

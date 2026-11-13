@@ -42,8 +42,6 @@ c contract zlib:
         movable
         init ctx_init(self)
         drop ctx_end
-    fn inflateReset
-        destroys
 
 fn inflate_reset() -> Result[c_int, InflateStreamError]:
     let inflater = InflateStream.inflateInit()?

@@ -4747,7 +4747,7 @@ impl Parser:
     // A template is a resource clause over a name pattern (`unref: drop
     // *_unref`, `new: from *_new`, `open: from *_open(out param 1)`, `init:
     // init *_init(self)`, `free: destroys *_free`) or an fn-item clause
-    // (`get: fn *_get lend`, `dispose: fn *_dispose destroys`). The pattern
+    // (`get: fn *_get lend`). The pattern
     // is `*` and name pieces written without spaces; each `*` matches any
     // run of characters. The block's name is the dotted path a facade
     // adopts it by, so the profile is the package that ships it.
@@ -4802,7 +4802,7 @@ impl Parser:
         if name == 0: return 0
         if self.expect(TokenKind.TK_COLON) == 0: return 0
         if self.peek() != TokenKind.TK_IDENT and self.peek() != TokenKind.TK_KW_FN:
-            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend|destroys' (§16.2b.12)")
+            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend' (§16.2b.12)")
             return 0
         let tstart = self.current_start()
         var is_fn: i32 = 0
@@ -4813,12 +4813,15 @@ impl Parser:
             is_fn = 1
             let pat = self.parse_convention_pattern()
             if pat == 0: return 0
-            if not self.current_ident_is("lend") and not self.current_ident_is("destroys"):
-                self.emit_error("a profile fn rule states 'lend' or 'destroys'; a clause naming one function's parameters or origins is stated on that fn item in the facade (§16.2b.12)")
+            // §31.8.2: the resource owns "f destroys N", in a profile too.
+            if self.current_ident_is("destroys"):
+                self.emit_error("a profile states a destroyer as a resource rule, '<name>: destroys <pattern>', not as an fn rule (§31.8.2)")
                 return 0
-            kind = if self.current_ident_is("lend"): FACADE_CLAUSE_LEND else: FACADE_CLAUSE_DESTROYS
+            if not self.current_ident_is("lend"):
+                self.emit_error("a profile fn rule states 'lend'; a clause naming one function's parameters or origins is stated on that fn item in the contract (§16.2b.12)")
+                return 0
+            kind = FACADE_CLAUSE_LEND
             self.advance()
-            if kind == FACADE_CLAUSE_DESTROYS: ops.push(0)
             let extra_start = self.pool.extra_len()
             for op in ops: self.pool.add_extra(op)
             let template = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, tstart, self.prev_end(), kind, extra_start, ops.len() as i32)
@@ -4829,7 +4832,7 @@ impl Parser:
         else if word == "drop": kind = FACADE_CLAUSE_DROP
         else if word == "destroys": kind = FACADE_CLAUSE_DESTROYS
         else:
-            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend|destroys' (§16.2b.12)")
+            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend' (§16.2b.12)")
             return 0
         self.advance()
         let pat = self.parse_convention_pattern()
@@ -5024,9 +5027,17 @@ impl Parser:
     mut fn parse_facade_produced_field(producer: i32) -> i32:
         let start = self.current_start()
         self.advance()
-        let word = if self.current_ident_is("nullable") or self.current_ident_is("nonnull"): self.expect_ident() else: 0
+        let nonnull = self.current_ident_is("nonnull")
+        let word = if nonnull or self.current_ident_is("nullable"): self.expect_ident() else: 0
+        // §31.8.2: `from F, nonnull` with no field is a pointer producer
+        // that never returns NULL.
+        if word != 0 and nonnull and not self.current_ident_is("field"):
+            let alone = self.pool.extra_len()
+            self.pool.add_extra(producer)
+            self.pool.add_extra(word)
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_PRODUCED_FIELD, alone, 2) as i32
         if word == 0 or not self.current_ident_is("field"):
-            self.emit_error("after 'from <producer>,' a by-value producer states 'nullable field <F>' or 'nonnull field <F>' (§16.2b.4)")
+            self.emit_error("after 'from <producer>,' a pointer producer states 'nonnull', and a by-value producer 'nullable field <F>' or 'nonnull field <F>' (§31.8.2)")
             return 0
         self.advance()
         let ops = [producer, word]
@@ -5128,7 +5139,7 @@ impl Parser:
                 ops.push(f)
             else:
                 if self.peek() == TokenKind.TK_IDENT:
-                    self.emit_error("'destroys' on an fn item takes no name: the fn is the destroyer (§16.2b.5)")
+                    self.emit_error("'destroys <fn>' is a resource clause: the resource owns the fact, and an fn item does not state it (§31.8.2)")
                     return 0
                 ops.push(0)
         else if word == "ok":

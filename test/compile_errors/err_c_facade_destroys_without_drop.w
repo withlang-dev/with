@@ -13,10 +13,6 @@ c contract dbl:
         from db_new
         destroys db_close
         destroys db_close_v2
-    fn db_close
-        destroys
-    fn db_close_v2
-        destroys
 
 fn main:
     print("ok")

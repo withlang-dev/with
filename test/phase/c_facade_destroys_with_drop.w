@@ -11,8 +11,6 @@ c contract dbl:
         drop db_close
         destroys db_close
         destroys db_close_v2
-    fn db_close_v2
-        destroys
 
 fn main:
     let d = Database.new(1).unwrap()

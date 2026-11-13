@@ -1,4 +1,4 @@
-//! expect-check-fail: a profile fn rule states 'lend' or 'destroys'; a clause naming one function's parameters or origins is stated on that fn item in the facade (§16.2b.12)
+//! expect-check-fail: a profile fn rule states 'lend'; a clause naming one function's parameters or origins is stated on that fn item in the contract (§16.2b.12)
 
 // D51 stage 11 (§16.2b.12): a profile rule is a name pattern and the
 // clause it states; an fn rule states `lend` or `destroys`. A clause that

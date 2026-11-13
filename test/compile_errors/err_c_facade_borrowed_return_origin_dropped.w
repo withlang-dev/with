@@ -12,8 +12,6 @@ c contract dbf:
     resource Statement wraps *mut st
         from st_new
         drop st_finalize
-    fn db_close_v2
-        destroys
     fn st_db
         returns borrow Database from param 0
 

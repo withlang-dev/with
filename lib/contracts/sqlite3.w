@@ -90,8 +90,6 @@ c contract sqlite error SqliteError:
         ok SQLITE_OK
         message sqlite3_errmsg
         thread creator
-    fn sqlite3_close_v2
-        destroys
     // The explicit presentation override (§55): the convention would
     // present sqlite3_prepare_v2 as `prepare_v2`; a connection prepares.
     // Two fixed arguments (D64, §16.2b.11): "If the nByte argument is
