@@ -520,6 +520,7 @@ impl Zcu:
                     for view_type in view_types:
                         nm_types.push(frontend_owned_text(view_type))
                     ci_set_no_methods(c_import_no_methods_all(nm_packed), nm_types)
+                    ci_set_migrating(false)
                     let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines, self.c_import_is_cxx_frontend(out, decl))
                     ci_clear_no_methods()
                     if self.trace_c_import_cache != 0 and libclang_result.len() > 0:

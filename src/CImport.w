@@ -38,6 +38,10 @@ var g_cimport_raw_function_names: str = ""
 var g_cimport_unprototyped_names: str = ""
 var g_cimport_report_untranslated_macros = false
 var g_ci_migrate_in_unsafe_function_body: bool = false
+// Whether the translation is `with migrate`'s (true) or an imported header's.
+var g_ci_migrating: bool = false
+
+fn ci_set_migrating(on: bool): g_ci_migrating = on
 // §16.2a no_methods opt-out. Set per-import before translation.
 var g_cimport_no_methods_all: i32 = 0
 var g_cimport_no_methods_types: List[str] = List.new()
@@ -12617,7 +12621,11 @@ impl CiExprPool:
             return self.build_named_call_expr(renamed, arg_ids)
         if ci_is_libm_fn(callee_text):
             return self.build_named_call_expr(callee_text, arg_ids)
-        if callee_text == "malloc":
+        // #3292: the allocator rewrite is `with migrate`'s, where every allocation of
+        // the program is translated together. Code translated from an imported
+        // header calls the functions the header names: it runs beside compiled
+        // C that allocates and frees with libc.
+        if g_ci_migrating and callee_text == "malloc":
             if arg_ids.len() != 1:
                 return 0
             let i64_ty = types.named_type_from_text("i64")
@@ -12634,7 +12642,7 @@ impl CiExprPool:
                 call_id = self.unsafe_expr(call_id)
             let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
             return self.cast(void_ptr_ty, call_id)
-        if callee_text == "free" or callee_text == "with_free":
+        if (g_ci_migrating and callee_text == "free") or callee_text == "with_free":
             if arg_ids.len() != 1:
                 return 0
             let free_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
@@ -12649,7 +12657,7 @@ impl CiExprPool:
             if ci_migrate_call_requires_unsafe_wrapper("with_free"):
                 call_id = self.unsafe_expr(call_id)
             return call_id
-        if callee_text == "calloc":
+        if g_ci_migrating and callee_text == "calloc":
             if arg_ids.len() != 2:
                 return 0
             let i64_ty = types.named_type_from_text("i64")
@@ -12668,7 +12676,7 @@ impl CiExprPool:
                 call_id = self.unsafe_expr(call_id)
             let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
             return self.cast(void_ptr_ty, call_id)
-        if callee_text == "realloc":
+        if g_ci_migrating and callee_text == "realloc":
             if arg_ids.len() != 2:
                 return 0
             let realloc_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
@@ -22086,7 +22094,7 @@ fn ci_is_system_decl(name: &str) -> bool:
 
 // Check if a function name is a libc function that we map to With equivalents.
 fn ci_is_mapped_libc_fn(name: &str) -> bool:
-    if name == "malloc" or name == "free" or name == "calloc" or name == "realloc": return true
+    if name == "malloc" or name == "free" or name == "calloc" or name == "realloc": return g_ci_migrating
     if name == "memcpy" or name == "memmove" or name == "memset" or name == "memcmp": return true
     if name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strchr": return true
     if name == "abort" or name == "exit": return true
@@ -22118,7 +22126,8 @@ fn ci_has_value_libc_call_mapping(callee: &str) -> bool:
         return true
     if ci_is_libm_fn(callee):
         return true
-    if callee == "malloc" or callee == "free" or callee == "calloc" or callee == "realloc":
+    // #3292: the allocator rewrite is `with migrate`'s only.
+    if g_ci_migrating and (callee == "malloc" or callee == "free" or callee == "calloc" or callee == "realloc"):
         return true
     if callee == "memcpy" or callee == "memmove" or callee == "memset" or callee == "memcmp" or callee == "memchr":
         return true
@@ -22177,7 +22186,7 @@ impl CiExprPool:
                 j = j + 1
             return self.add(CiExprKind.CIE_CALL, renamed_callee as i32, args_start, arg_count, 0)
         // malloc(N) → (with_alloc(N as i64) as *mut c_void)
-        if callee_text == "malloc":
+        if g_ci_migrating and callee_text == "malloc":
             if arg_count != 1:
                 return 0
             ci_trace_port("STRUCTURAL[b11.9.libc_call]")
@@ -22204,7 +22213,7 @@ impl CiExprPool:
             let void_ptr_ty = types.ty_pointer(cvoid_ty, 0)
             return self.cast(void_ptr_ty, call_id)
         // free(p) → with_free(p as *mut u8)
-        if callee_text == "free":
+        if g_ci_migrating and callee_text == "free":
             if arg_count != 1:
                 return 0
             ci_trace_port("STRUCTURAL[b11.9.libc_call]")
@@ -22234,17 +22243,17 @@ fn ci_map_libc_call(callee: &str, args: &str) -> str:
     // to a void*-typed variable, so wrap the cast inline instead
     // of doing it as a post-process text rewrite (which can't
     // handle nested parens in the arg text).
-    if callee == "malloc":
+    if g_ci_migrating and callee == "malloc":
         return "(" ++ ci_migrate_wrap_call_if_needed("with_alloc", "with_alloc((" ++ args ++ ") as i64)") ++ " as *mut c_void)"
-    if callee == "free":
+    if g_ci_migrating and callee == "free":
         return ci_migrate_wrap_call_if_needed("with_free", "with_free((" ++ args ++ ") as " ++ ci_rt_ptr_mut() ++ ")")
-    if callee == "calloc":
+    if g_ci_migrating and callee == "calloc":
         let count_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
         if count_arg.len() == 0 or size_arg.len() == 0:
             return ""
         return "(" ++ ci_migrate_wrap_call_if_needed("with_alloc_zeroed", "with_alloc_zeroed((" ++ count_arg ++ ") as i64, (" ++ size_arg ++ ") as i64)") ++ " as *mut c_void)"
-    if callee == "realloc":
+    if g_ci_migrating and callee == "realloc":
         let ptr_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
         if ptr_arg.len() == 0 or size_arg.len() == 0:
