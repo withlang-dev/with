@@ -438,6 +438,36 @@ impl CiProject:
         let named_by_registry = facts_kind(self.symbols[si].registry) == "drop"
         "proof: frees " ++ what ++ (if named_by_file: "; the introspection file names it the record's free function" else if named_by_registry: "; the registry names it the drop: " ++ facts_cite(self.symbols[si].registry) else: "")
 
+    // §31.7: what the package's source proves against a grant a person
+    // might state, one fact a line: `<fn>\t<fact>\t<param>\t<proof>`. The
+    // fact is `stores` (the function keeps the parameter past the call),
+    // `frees` (it destroys it) or `returns-part` (every pointer it returns
+    // is a part of the parameter). Only what a body shows is written: a
+    // proof that stopped at a callee no unit defines, at a function-pointer
+    // field no unit decides or at a chain too deep is weaker than a grant
+    // and contradicts nothing; an annotation and a registry line are not
+    // proofs.
+    fn facade_proofs() -> str:
+        var out = ""
+        var si = -1
+        for symbol in self.symbols:
+            si += 1
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.has_definition == 0: continue
+            var pi = -1
+            for ended in symbol.param_destroys:
+                pi += 1
+                if ended == 0: continue
+                let why = self.fd_destroy_reason(si, f"param {pi}")
+                if why.starts_with("proof: "): out = out ++ f"{symbol.name}\tfrees\t{pi}\t{why.slice(7, why.len())}\n"
+            pi = -1
+            for kept in symbol.param_stores:
+                pi += 1
+                if kept == 0 or (pi < symbol.param_destroys.len() and symbol.param_destroys[pi] != 0): continue
+                let why = self.fd_retain_reason(si, pi, 0)
+                if why.ends_with("stored in a field") or why.ends_with("stored in a global") or why.ends_with("stored") or why.contains("stored through local "): out = out ++ f"{symbol.name}\tstores\t{pi}\t{why}\n"
+            if symbol.borrow_from >= 0 and symbol.own_reason.starts_with("proof: "): out = out ++ f"{symbol.name}\treturns-part\t{symbol.borrow_from}\t{symbol.own_reason.slice(7, symbol.own_reason.len())}\n"
+        out
+
     // What the registry says about `si`, for the report.
     fn fd_registry_summary(si: i32) -> str:
         let r = self.symbols[si].registry

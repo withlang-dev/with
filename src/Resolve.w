@@ -1601,6 +1601,18 @@ fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
         if resolve_file_exists(cand): return cand
     ""
 
+// §31.7: the proofs `with get` recorded for the fetched package a stated
+// contract describes. `<project>/…/contracts/<name>.w` describes `c.<name>`;
+// its facts are beside the contract drawn for it. "" for any other file,
+// and for a package with nothing recorded.
+fn resolve_stated_contract_proofs(path: &str) -> str:
+    let p = path.replace("\\", "/")
+    let at = p.find("/contracts/")
+    if at < 0 or not p.ends_with(".w") or p.contains(".with/deps/"): return ""
+    let drawn = resolve_fetched_facade_candidate(resolve_find_project_root(p.slice(0, at)), p.slice(at + 1, p.len()))
+    if drawn.len() == 0: return ""
+    with_fs_read_file(drawn.slice(0, drawn.len() - "contract.w".len()) ++ "contract-proofs.txt")
+
 // #3117: the report `with get` wrote beside a fetched package's facade.
 fn resolve_fetched_facade_report(facade_path: &str) -> str:
     if not facade_path.ends_with("/contract.w"): return ""
