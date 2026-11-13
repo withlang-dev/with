@@ -25,7 +25,6 @@ fn main:
     if not IsWindowReady():
         print("raylib spiral UAT failed: window not created (no OpenGL 3.3 context)")
         return 1
-    SetTargetFPS(60)
 
     let bg = Color { r: 14, g: 16, b: 26, a: 255 }
     let cx = 450.0
