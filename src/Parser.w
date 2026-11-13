@@ -5139,7 +5139,7 @@ impl Parser:
                 ops.push(f)
             else:
                 if self.peek() == TokenKind.TK_IDENT:
-                    self.emit_error("'destroys' on an fn item takes no name: the fn is the destroyer (§16.2b.5)")
+                    self.emit_error("'destroys <fn>' is a resource clause: the resource owns the fact, and an fn item does not state it (§31.8.2)")
                     return 0
                 ops.push(0)
         else if word == "ok":
