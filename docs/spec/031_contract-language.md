@@ -770,9 +770,9 @@ have `runs no threads` only as a claim, or do not have it.
 
 ### 31.8.6 A destroyer named through a function-pointer global
 
-(Adopted 2026-11-11. The compiler accepts the form after `freed by` today
-and puts the generated read under the global rule; the rule below for that
-read, the run-time check and the tests are not yet implemented.) The function a
+(Adopted 2026-11-11. Implemented for `freed by`. Not yet implemented: the
+form after `drop` and `destroys`, the error for a contract that describes a
+function that assigns the global, and the drafter's contradiction check.) The function a
 `freed by`, `drop` or `destroys` clause names is an imported function, or
 an imported global of function-pointer type. libxml2's `xmlFree` is the
 case: `xmlmemory.h` declares `XMLPUBVAR xmlFreeFunc xmlFree;`, and the
@@ -910,7 +910,7 @@ clause, the contract's file and line; for an annotation, the header's.
 | a `str` passed as C text (`text param p`, a `str` variadic case) | before the call: the text has no interior NUL, which a C string cannot carry | the function |
 | `buffer … len` / `capacity` | before the call: the slice's length fits the C count type | the function |
 | `buffer … capacity … inout` | after the call: the length C wrote back is within the capacity | the function |
-| `freed by g`, `drop g`, `destroys g` where `g` is a function-pointer global | before each call through it: the pointer read from `g` is not NULL. **Adopted 2026-11-11, not yet implemented.** | the clause and the global |
+| `freed by g`, `drop g`, `destroys g` where `g` is a function-pointer global | before each call through it: the pointer read from `g` is not NULL. **Implemented for `freed by g`; `drop g` and `destroys g` are not yet implemented.** | the clause and the global |
 | `requires domain D` | when the operation is called: `D` is established. Omitted where the compiler proves it; a live resource of `D` proves it, so only producers and functions that take no resource of `D` carry the test | the function |
 | `establishes domain D` | when called: `D` is not already established | the call |
 | `ends domain D` | when called: no resource of `D` is live | the call |
