@@ -2202,6 +2202,11 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             // an `unsafe fn`, and the body is printed in that context.
             if not si_raw and ci_cursor_calls_raw_function(session, definition, 0):
                 si_raw = true
+            // §31.8.6, §16.3b: a function that assigns a global holding a
+            // pointer stays raw. A hook the library reads (`xmlFree`) is
+            // such a global, and nothing safe code can call may write it.
+            if not si_raw and ci_body_assigns_pointer_global(session, definition):
+                si_raw = true
         // #1678: a `static inline` function's only definition is its body
         // — no symbol exists for a manual extern to bind — so an omitted
         // body is inexpressible; a non-static inline may have an external
@@ -3452,6 +3457,13 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: &str) -> str:
     var actual_type = with_str_clone_ref(var_type)
     if ci_array_text_count(var_type) == "0":
         actual_type = "*mut " ++ ci_array_text_elem(var_type)
+
+    // §31.4: a call through a function pointer is raw. A global that holds
+    // one has the unsafe function-pointer type its parameters and locals
+    // have (`ci_unsafe_fn_ptr_type`): typed safe, `match hook: Some(f) =>
+    // f(p)` called C through it in safe code, and an inline body's `hook =
+    // f` did not type-check against the local's type.
+    if ci_type_text_is_fn_ptr(actual_type): actual_type = ci_unsafe_fn_ptr_type(actual_type)
 
     let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
 
@@ -19712,6 +19724,15 @@ fn ci_own_is_libc_free(name: &str) -> bool: name == "free"
 // is taken to retain what it is handed (the asymmetry rule, §16.2b.2).
 fn ci_own_is_libc_observer(name: &str) -> bool:
     name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "sscanf" or name == "fscanf" or name == "ungetc" or name == "strcoll" or name == "strspn" or name == "strcspn" or name == "strpbrk" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
+
+// Whether the body at `cursor` assigns a file-scope variable whose type is
+// a pointer or a function pointer.
+fn ci_body_assigns_pointer_global(session: i64, cursor: i32) -> bool:
+    for i in 0..with_cimport_decl_count(session):
+        if with_cimport_decl_kind(session, i) != CK_VAR: continue
+        let ty = with_cimport_var_type_translated(session, i)
+        if (ci_starts_with(ty, "*") or ci_type_text_is_fn_ptr(ty)) and ci_body_assigns_to(session, cursor, with_cimport_decl_name(session, i)): return true
+    false
 
 fn ci_body_assigns_to(session: i64, cursor: i32, name: &str) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)

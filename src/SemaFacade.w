@@ -1703,7 +1703,7 @@ impl Sema:
             var releases = fsig >= 0 and self.sig_get_param_count(fsig) == 1 and self.get_type_kind(self.resolve_alias(self.sig_param_type(fsig, 0) as TypeId)) == TypeKind.TY_PTR
             if not releases and free_sym == 0:
                 let var_node = self.facade_extern_var_named(named)
-                let var_tid: i32 = if var_node != 0: self.extern_var_type_ids.get(var_node) ?? 0 else: 0
+                let var_tid: i32 = if var_node != 0: self.resolve_type_expr(facade_render_global_type_node(self.ast, var_node)) as i32 else: 0
                 let fn_tid = if self.is_option_pointer_type(var_tid): self.callable_any_fn_type(self.option_pointer_payload_type(var_tid) as TypeId) else: self.callable_any_fn_type(var_tid as TypeId)
                 if fn_tid != 0 and self.get_type_d1(fn_tid as TypeId) == 1 and self.get_type_kind(self.resolve_alias(self.fn_type_param_type(fn_tid, 0) as TypeId)) == TypeKind.TY_PTR:
                     free_sym = self.ast.get_data0(var_node)
@@ -6103,6 +6103,9 @@ impl Sema:
     fn facade_extern_var_named(name: &str) -> i32:
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR: continue
-            if self.safe_symbol_text(self.ast.get_data0(decl)) == name: return decl
+            // A global the header defines (a file-scope static) is the
+            // translation's module `var`, in the header's own file.
+            let defined = self.ast.kind(decl) == NodeKind.NK_LET_DECL and di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0
+            if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR and not defined: continue
+            if facade_render_global_type_node(self.ast, decl) != 0 and self.safe_symbol_text(self.ast.get_data0(decl)) == name: return decl
         0

@@ -3913,14 +3913,22 @@ fn facade_render_text_utf8(pool: &AstPool) -> bool:
 // program may have set), or "" when no such global is imported. A nullable
 // pointer that is NULL at the call is the library breaking its contract: a
 // failure naming the C function, nothing repaired (D134).
+// The declared type of a C global, as a type node: an imported one (`extern
+// var`), or one the header defines (a file-scope `static`, translated as a
+// module `var` with its type). 0 for any other declaration.
+fn facade_render_global_type_node(pool: &AstPool, decl: i32) -> i32:
+    if pool.kind(decl as NodeId) == NodeKind.NK_EXTERN_VAR: return pool.get_data1(decl as NodeId)
+    if pool.kind(decl as NodeId) != NodeKind.NK_LET_DECL: return 0
+    let slot = pool.get_data2(decl as NodeId) / 16
+    if slot == 0: 0 else: pool.get_extra(slot - 1)
+
 fn facade_render_release_through_var(pool: &AstPool, intern: &InternPool, decl: i32, free_sym: i32, repr: &str, indent: &str) -> str:
     let want = intern.resolve(free_sym)
     for di in 0..pool.decl_count():
         let vdecl = pool.get_decl(di)
-        if pool.kind(vdecl) != NodeKind.NK_EXTERN_VAR: continue
-        let have = intern.resolve(pool.get_data0(vdecl))
-        if have != want: continue
-        var ty = render_type_expr(pool, intern, pool.get_data1(vdecl) as NodeId)
+        let type_node = facade_render_global_type_node(pool, vdecl as i32)
+        if type_node == 0 or intern.resolve(pool.get_data0(vdecl)) != want: continue
+        var ty = render_type_expr(pool, intern, type_node as NodeId)
         let nullable = ty.starts_with("Option[") and ty.ends_with("]")
         if nullable: ty = ty.slice(7, ty.len() - 1)
         let open = ty.find("fn(")
@@ -3935,7 +3943,8 @@ fn facade_render_release_through_var(pool: &AstPool, intern: &InternPool, decl: 
             close = close + 1
         if close >= ty.len(): return ""
         let ptype = ty.slice(open + 3, close)
-        let through = if ty.contains("unsafe "): "unsafe { f(" ++ repr ++ " as " ++ ptype ++ ") }" else: "f(" ++ repr ++ " as " ++ ptype ++ ")"
+        // §31.4: a call through a function pointer is raw.
+        let through = "unsafe { f(" ++ repr ++ " as " ++ ptype ++ ") }"
         if not nullable: return "let f = " ++ want ++ "\n" ++ indent ++ through
         let fname = intern.resolve(pool.get_data0(decl as NodeId))
         return "match " ++ want ++ ":\n" ++ indent ++ "    Some(f) => " ++ through ++ "\n" ++ indent ++ "    None => panic(\"" ++ fname ++ ": 'freed by " ++ want ++ "', but " ++ want ++ " is NULL (§16.2b.8)\")"
