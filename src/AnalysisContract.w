@@ -82,9 +82,9 @@ fn contract_clause_at(sema: &Sema, site: &ContractSite, clause: i32) -> str:
     contract_provenance(sema, site, clause, grants)
 
 // §31.7: an override no proof contradicts is stale: accepted, reported, and
-// counted apart from claims. Returns how many there are. No proof about a
-// library reaches the compiler beside a stated contract yet, so every
-// override is stale today.
+// counted apart from claims. Returns how many there are. One a recorded
+// proof contradicts (Sema.facade_override_against) is not stale: its row
+// prints the proof it stands against.
 fn contract_stale_override_notes(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str) -> i32:
     var stale = 0
     for di in 0..sema.ast.decl_count():
@@ -101,13 +101,18 @@ fn contract_stale_override_notes(mut report: AnalysisReport, sema: &Sema, source
             let first = sema.ast.get_data1(item) + ((kind == NodeKind.NK_FACADE_RESOURCE) as i32)
             for k in 0..sema.ast.get_data2(item):
                 let clause = sema.ast.get_extra(first + k)
-                if not sema.ast.facade_overridden(clause): continue
+                if not sema.ast.facade_overridden(clause) or sema.facade_override_against.contains(clause): continue
                 stale += 1
                 report.note(f"contract-audit: stale override at {site.path}:{contract_node_line(sema, site, clause)}: `{facade_clause_name(sema.ast.get_data0(clause))}` on `{sema.pool_resolve(sema.ast.get_data0(item))}`; no proof contradicts it, so `override` can be deleted")
     stale
 
 fn contract_provenance(sema: &Sema, site: &ContractSite, node: i32, grants: bool) -> str:
-    if sema.ast.facade_overridden(node): return f"stale override@{site.path}:{contract_node_line(sema, site, node)}: no proof contradicts it"
+    if sema.ast.facade_overridden(node):
+        var k = 0
+        for against in sema.facade_override_against:
+            if against == node: return f"override@{site.path}:{contract_node_line(sema, site, node)}, against proof: {sema.facade_override_proofs[k]}"
+            k += 1
+        return f"stale override@{site.path}:{contract_node_line(sema, site, node)}: no proof contradicts it"
     let drafted = contract_drafted_word(sema, site, node)
     let colon = drafted.find(": ")
     let word = if colon > 0: drafted.slice(0, colon) else: "stated"
@@ -949,7 +954,7 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
             word => if word.starts_with("claim: profile:"): profile += 1
     let claimed = stated + registry + profile + annotation
     let stale = contract_stale_override_notes(report, sema, source_path, source_text)
-    report.note(f"contract-audit: clauses={proven + claimed + evidence + stale} proven={proven} claimed={claimed} overrides=0 stale-overrides={stale}" ++ (if evidence > 0: f" evidence={evidence}" else: ""))
+    report.note(f"contract-audit: clauses={proven + claimed + evidence + stale + sema.facade_override_against.len()} proven={proven} claimed={claimed} overrides={sema.facade_override_against.len()} stale-overrides={stale}" ++ (if evidence > 0: f" evidence={evidence}" else: ""))
     if claimed > 0: report.note(f"contract-audit: claims: stated={stated} registry={registry} profile={profile} annotation={annotation}")
     report.note(f"contract-audit: resources={sema.facade_resources.len()} items={sema.foreign_contracts.len()} domains={sema.facade_domain_list.len()} conventions={conventions} advisories={advisories} profile-ambiguous={ambiguous} profile-shadowed={shadowed}")
 

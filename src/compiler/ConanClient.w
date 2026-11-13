@@ -2139,7 +2139,7 @@ fn conan_keep_evidence(name: &str, version: &str, dep_dir: &str) -> str:
     for line in runtime_read_file(dep_dir ++ "/contract.w").split("\n"):
         if line.starts_with("use c_import("): imports = imports ++ line ++ "\n"
     let report = runtime_read_file(dep_dir ++ "/contract-report.txt")
-    for file in ["contract.w", "contract-report.txt", "contract.json"]: runtime_remove_file(dep_dir ++ "/" ++ file)
+    for file in ["contract.w", "contract-report.txt", "contract-proofs.txt", "contract.json"]: runtime_remove_file(dep_dir ++ "/" ++ file)
     if report.len() == 0: return imports
     let meta = runtime_read_file(dep_dir ++ "/metadata.json")
     var out = "evidence, not proof: the source analyzed and the library linked are not established as the same build.\n" ++

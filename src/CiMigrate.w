@@ -2305,6 +2305,13 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     if with_fs_write_file(ci_migrate_fs_path(report_path), report) != 0:
         eprint("with get: could not write " ++ report_path)
         return ""
+    // §31.7: what the source proves against a grant, beside the report, for
+    // the compiler to hold a stated contract of this package against.
+    if report_path.ends_with("contract-report.txt"):
+        let proofs_path = report_path.slice(0, report_path.len() - "contract-report.txt".len()) ++ "contract-proofs.txt"
+        if with_fs_write_file(ci_migrate_fs_path(proofs_path), project.facade_proofs()) != 0:
+            eprint("with get: could not write " ++ proofs_path)
+            return ""
     let summary_end = report.find("\n")
     let summary = if summary_end < 0: report else: report.slice(0, summary_end)
     // #2635: a unit that could not be read is said where `with get` prints,

@@ -2138,6 +2138,10 @@ type Sema {
     facade_layout_files: List[i32],
     facade_layout_msgs: List[str],
     facade_convention_nodes: List[i32],
+    // §31.7: the overriding clauses a recorded proof contradicts, and the
+    // proof each stands against (parallel).
+    facade_override_against: List[i32],
+    facade_override_proofs: List[str],
     // Stage 9 (ruling §44-§51, spec §16.2b.9-10): the callback methods the
     // facades rendered, by method symbol text (SemaFacade.w
     // index_facade_callback_methods; SemaCheck.w consults them at generic
@@ -4254,6 +4258,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         facade_layout_files: List.new(),
         facade_layout_msgs: List.new(),
         facade_convention_nodes: List.new(),
+        facade_override_against: [],
+        facade_override_proofs: [],
         facade_callback_methods: List.new(),
         facade_callback_method_index: sema_new_map_i32_i32(),
         facade_c_invoked_userdata: sema_new_map_i32_i32(),

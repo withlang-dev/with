@@ -12,6 +12,7 @@
 // c_import option writes, so both spellings are one fact.
 
 use Sema
+use Resolve
 use Ast
 use InternPool
 use Diagnostic
@@ -737,6 +738,53 @@ impl Sema:
             let first = self.ast.get_data1(item) + ((kind == NodeKind.NK_FACADE_RESOURCE) as i32)
             for k in 0..self.ast.get_data2(item): self.check_facade_override(drawn, self.ast.get_extra(first + k))
 
+    // §31.7: a proof that contradicts a stated grant is an error, unless
+    // the clause is marked `override`; then the grant stands and the view
+    // prints the proof it stands against.
+    mut fn report_facade_contradiction(clause: i32, what: &str, proof: &str):
+        if self.ast.facade_overridden(clause):
+            if self.facade_override_against.contains(clause): return
+            self.facade_override_against.push(clause)
+            self.facade_override_proofs.push(proof.to_owned())
+            return
+        self.emit_error_with_help(f"{what}\n = proof: {proof}\n = help: if the proof is wrong about this library, the clause can be marked `override`; the program then answers for the fact", clause, "a proof believed wrong is a compiler bug: report it with this message, the function and the library's version")
+
+    // The stated contract of a fetched package, held against what `with
+    // get` proved from the package's source (contract-proofs.txt): a
+    // function the contract lends a resource to that stores or frees it; a
+    // producer whose every return is a part of a parameter.
+    mut fn check_facade_proofs(di: i32, node: i32):
+        let proofs = resolve_stated_contract_proofs(self.decl_source_path_for_index(di))
+        if proofs.len() == 0: return
+        for i in 0..self.ast.get_data2(node):
+            let item = self.ast.get_extra(self.ast.get_data1(node) + i)
+            let kind = self.ast.kind(item)
+            let name = self.pool_resolve(self.ast.get_data0(item))
+            if kind == NodeKind.NK_FACADE_RESOURCE:
+                for k in 0..self.ast.get_data2(item):
+                    let clause = self.ast.get_extra(self.ast.get_data1(item) + 1 + k)
+                    if self.ast.get_data0(clause) != FACADE_CLAUSE_FROM: continue
+                    let producer = self.pool_resolve(self.ast.get_extra(self.ast.get_data1(clause)))
+                    for line in proofs.split("\n"):
+                        let fact = line.split("\t")
+                        if fact.len() == 4 and fact[0] == producer and fact[1] == "returns-part":
+                            self.report_facade_contradiction(clause, f"`from {producer}` on `{name}` contradicts a proof: every pointer the function returns is a part of param {fact[2]}", fact[3])
+            if kind != NodeKind.NK_FACADE_FN or not self.foreign_contract_index.contains(self.ast.get_data0(item)): continue
+            let fn_sym = self.ast.get_data0(item)
+            let ci: i32 = self.foreign_contract_index.get(fn_sym).unwrap()
+            if self.foreign_contracts[ci].node != item or self.foreign_contracts[ci].destroys != 0: continue
+            var lend = item
+            for k in 0..self.ast.get_data2(item):
+                let clause = self.ast.get_extra(self.ast.get_data1(item) + k)
+                if self.ast.get_data0(clause) == FACADE_CLAUSE_LEND: lend = clause
+            for line in proofs.split("\n"):
+                let fact = line.split("\t")
+                if fact.len() != 4 or fact[0] != name or fact[1] == "returns-part": continue
+                for pi in 0..self.sig_get_param_count(self.get_sig(fn_sym)):
+                    if fact[2] != f"{pi}" or self.foreign_contracts[ci].consumes.contains(pi) or self.foreign_contracts[ci].retains.contains(pi) or self.facade_param_receives(fn_sym, pi).len() == 0: continue
+                    let said = if lend == item: f"`fn {name}` lends param {pi}, which" else: f"`lend` on `{name}`"
+                    self.report_facade_contradiction(lend, f"{said} contradicts a proof: the function {fact[1]} param {pi}", fact[3])
+
     mut fn collect_c_facade(di: i32, node: i32):
         let facade = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
@@ -768,6 +816,7 @@ impl Sema:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_FN:
                 self.collect_facade_fn(di, facade, item)
+        self.check_facade_proofs(di, node)
 
     // ── stage 11: convention profiles (ruling §7, §59; spec §16.2b.12) ──
     //
