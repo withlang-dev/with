@@ -1998,6 +1998,23 @@ var g_conan_facts_refused: str = ""
 
 fn conan_facts_refused() -> str: with_str_clone_ref(g_conan_facts_refused)
 
+// §31.9 rule 5, §31.7: a registry line a proof contradicts is an error naming
+// both; a facts file may not override. The lines of the last fetch, or "".
+var g_conan_facts_contradicted: str = ""
+
+fn conan_facts_contradicted() -> str: with_str_clone_ref(g_conan_facts_contradicted)
+
+// Called after a package built from source is drafted: its proofs are of the
+// build linked. The contract drawn over a contradicted line is removed, so
+// nothing is applied on the registry's word against the source.
+fn conan_refuse_contradicted_registry(name: &str, dep_dir: &str):
+    var found = ""
+    for line in runtime_read_file(dep_dir ++ "/contract-report.txt").split("\n"):
+        if line.contains("registry: ") and line.contains("; DISAGREES: the proof "): found = found ++ "\n  " ++ name ++ ":" ++ line
+    if found.len() == 0: return
+    for file in ["contract.w", "contract-proofs.txt", "contract.json"]: runtime_remove_file(dep_dir ++ "/" ++ file)
+    g_conan_facts_contradicted = g_conan_facts_contradicted ++ found
+
 fn conan_set_registry_commit(commit: &str):
     g_conan_registry_commit = commit.to_owned()
     g_conan_registry_asked = commit.len() > 0
@@ -2319,6 +2336,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     // D121 step 5: the facade, from the build that just ran.
     conan_write_facade(name, version, dep_dir, source_dir, work ++ "/b")
+    conan_refuse_contradicted_registry(name, dep_dir)
     conan_remove_build_tree(work)
     version.to_owned()
 

@@ -7221,6 +7221,11 @@ fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinst
         with_eprint("error: the registry's facts could not be read (" ++ refused ++ "); no facade was written, so c." ++ pkg_name ++ " is not added")
         with_eprint("  the facts file is registry/c/<package>/facts.w in the toolchain's repository; `WITH_REGISTRY=<base URL>` reads another; a released compiler falls back to the facts its release published")
         return 1
+    let contradicted = conan_facts_contradicted()
+    if contradicted.len() > 0:
+        with_eprint("error: a registry line contradicts what the package's source proves; a facts file may not override a proof (§31.7), so no contract was written and c." ++ pkg_name ++ " is not added:" ++ contradicted)
+        with_eprint("  the line is in registry/c/<package>/facts.w in the toolchain's repository, and the report beside the package says what the source shows; a proof believed wrong is a compiler bug: report it with this message")
+        return 1
     let loaded_lock = lock_load(root)
     let updated_lock = lock_upsert_installed_c_dep_tree(loaded_lock, root, pkg_name, resolved_version)
     if updated_lock.entries.len() == 0:
