@@ -575,6 +575,11 @@ impl Zcu:
             let ci_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(ci_file_id, "<c_import " ++ header_spec ++ ">", synthetic)
+            // WITH_DUMP_C_IMPORT=1: the header's translation, as the parser
+            // sees it — a diagnostic at `<c_import HEADER>:line:col` points
+            // into this (the facade's rendering has WITH_DUMP_FACADE).
+            if with_getenv_str("WITH_DUMP_C_IMPORT").len() > 0:
+                eprint("<c_import " ++ header_spec ++ ">\n" ++ synthetic)
             let lexer = Lexer.init(synthetic, ci_file_id)
             let tokens = lexer.tokenize()
             var parser = Parser.init_with_pool(tokens, synthetic, ci_file_id, self.pool, move self.diagnostics, out)
