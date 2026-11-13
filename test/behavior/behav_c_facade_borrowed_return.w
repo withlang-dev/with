@@ -27,8 +27,6 @@ c contract dbf:
     fn db_id
         lend
         preserves param 0
-    fn db_close_v2
-        destroys
     fn st_db
         returns borrow Database from param 0
     fn st_db_or_null

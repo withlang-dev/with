@@ -45,8 +45,6 @@ c contract zl:
         drop z_end
     fn z_init
         lend
-    fn z_end_v2
-        destroys
 
 fn main:
     let ends = unsafe { calloc(1, 4) as *mut c_int }

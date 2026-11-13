@@ -36,8 +36,6 @@ c contract dbl:
         retains param cb by param d
         retains param app by param d
         callback param cb userdata param app
-    fn db_close
-        destroys
 
 fn main:
     print("ok")

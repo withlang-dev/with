@@ -1,4 +1,4 @@
-//! expect-check-fail: 'db_close' destroys the resource but the fn item describing it lends its parameters
+//! expect-check-fail: fn 'db_close': a resource names it as a destroyer, and the fn item says 'lend'
 
 // D51 §16.2b.3 / ruling §9 (never half-model unsafely): a destroying
 // operation must not also be callable as a lend. The resource names db_close

@@ -15,4 +15,4 @@ c convention gobject.v1:
     unref: drop *_unref
     free: destroys *_free
     get: fn *_get* lend
-    dispose: fn *_dispose destroys
+    peek: fn *_peek lend

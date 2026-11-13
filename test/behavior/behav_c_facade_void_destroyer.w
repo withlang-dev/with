@@ -34,8 +34,6 @@ c contract dbl:
     resource Alias wraps dbp
         from db_new_alias
         drop release_const
-    fn release_how
-        destroys
 
 fn main:
     let a = Database.new(1).unwrap()

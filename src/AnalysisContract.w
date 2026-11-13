@@ -114,6 +114,17 @@ fn contract_item_at(sema: &Sema, site: &ContractSite, what: &str, item: i32) -> 
 // The nth clause of `kind` on a facade item (a resource's extra list starts
 // with its `wraps` type), or 0. Sema's vectors are filled in clause order,
 // so the i-th `consumes` record is the i-th `consumes` clause.
+// §31.8.2: the resource owns "f destroys N". The clause that says so of
+// `f`: a resource's `drop f` or `destroys f`, or 0.
+fn contract_destroy_clause_of(sema: &Sema, f: i32) -> i32:
+    for r in sema.facade_resources:
+        if r.drop == f: return contract_clause(sema, r.node, FACADE_CLAUSE_DROP, 0)
+        var nth = 0
+        for d in r.destroyers:
+            if d == f: return contract_clause(sema, r.node, FACADE_CLAUSE_DESTROYS, nth)
+            nth += 1
+    0
+
 fn contract_clause(sema: &Sema, item: i32, kind: i32, nth: i32) -> i32:
     let start = sema.ast.get_data1(item) + ((sema.ast.kind(item) == NodeKind.NK_FACADE_RESOURCE) as i32)
     var seen = 0
@@ -362,7 +373,7 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
     // Parameter effects (§16.2b.5): the strongest clause naming each
     // parameter, else the described-fn lend.
     let lend_clause = contract_clause(sema, node, FACADE_CLAUSE_LEND, 0)
-    let destroys_clause = contract_clause(sema, node, FACADE_CLAUSE_DESTROYS, 0)
+    let destroys_clause = contract_destroy_clause_of(sema, c.fn_sym)
     for pi in 0..count:
         let shown = contract_param(sema, c.fn_sym, pi)
         let received = contract_received(sema, c.fn_sym, pi)

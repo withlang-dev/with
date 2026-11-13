@@ -33,8 +33,6 @@ c contract dbl:
         retains param 1 by param 0
         retains param 2 by param 0
         callback param 1 userdata param 2
-    fn db_close
-        destroys
     domain errno thread
     domain environ process
     use convention gobject.v1

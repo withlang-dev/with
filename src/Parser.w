@@ -4747,7 +4747,7 @@ impl Parser:
     // A template is a resource clause over a name pattern (`unref: drop
     // *_unref`, `new: from *_new`, `open: from *_open(out param 1)`, `init:
     // init *_init(self)`, `free: destroys *_free`) or an fn-item clause
-    // (`get: fn *_get lend`, `dispose: fn *_dispose destroys`). The pattern
+    // (`get: fn *_get lend`). The pattern
     // is `*` and name pieces written without spaces; each `*` matches any
     // run of characters. The block's name is the dotted path a facade
     // adopts it by, so the profile is the package that ships it.
@@ -4802,7 +4802,7 @@ impl Parser:
         if name == 0: return 0
         if self.expect(TokenKind.TK_COLON) == 0: return 0
         if self.peek() != TokenKind.TK_IDENT and self.peek() != TokenKind.TK_KW_FN:
-            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend|destroys' (§16.2b.12)")
+            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend' (§16.2b.12)")
             return 0
         let tstart = self.current_start()
         var is_fn: i32 = 0
@@ -4813,12 +4813,15 @@ impl Parser:
             is_fn = 1
             let pat = self.parse_convention_pattern()
             if pat == 0: return 0
-            if not self.current_ident_is("lend") and not self.current_ident_is("destroys"):
-                self.emit_error("a profile fn rule states 'lend' or 'destroys'; a clause naming one function's parameters or origins is stated on that fn item in the facade (§16.2b.12)")
+            // §31.8.2: the resource owns "f destroys N", in a profile too.
+            if self.current_ident_is("destroys"):
+                self.emit_error("a profile states a destroyer as a resource rule, '<name>: destroys <pattern>', not as an fn rule (§31.8.2)")
                 return 0
-            kind = if self.current_ident_is("lend"): FACADE_CLAUSE_LEND else: FACADE_CLAUSE_DESTROYS
+            if not self.current_ident_is("lend"):
+                self.emit_error("a profile fn rule states 'lend'; a clause naming one function's parameters or origins is stated on that fn item in the contract (§16.2b.12)")
+                return 0
+            kind = FACADE_CLAUSE_LEND
             self.advance()
-            if kind == FACADE_CLAUSE_DESTROYS: ops.push(0)
             let extra_start = self.pool.extra_len()
             for op in ops: self.pool.add_extra(op)
             let template = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, tstart, self.prev_end(), kind, extra_start, ops.len() as i32)
@@ -4829,7 +4832,7 @@ impl Parser:
         else if word == "drop": kind = FACADE_CLAUSE_DROP
         else if word == "destroys": kind = FACADE_CLAUSE_DESTROYS
         else:
-            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend|destroys' (§16.2b.12)")
+            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend' (§16.2b.12)")
             return 0
         self.advance()
         let pat = self.parse_convention_pattern()

@@ -16,8 +16,6 @@ c contract dbf:
         drop st_finalize
     fn st_step
         lend
-    fn db_close_v2
-        destroys
 
 type App { db: Database, stmt: Statement }
 

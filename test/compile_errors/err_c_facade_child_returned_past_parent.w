@@ -15,8 +15,6 @@ c contract dbf:
         drop st_finalize
     fn st_step
         lend
-    fn db_close_v2
-        destroys
 
 fn make(l: Log) -> Statement:
     let db = Database.new(l, 1).unwrap()
