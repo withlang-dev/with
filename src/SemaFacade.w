@@ -700,12 +700,50 @@ impl Sema:
             return false
         true
 
+    // §31.8: a clause grants when its being wrong can make safe code unsafe.
+    // The restrictions and the presentations are the few; every other clause
+    // grants.
+    fn facade_clause_grants(clause: i32) -> bool:
+        if clause <= 0 or clause >= self.ast.node_count() or self.ast.kind(clause) != NodeKind.NK_FACADE_CLAUSE: return false
+        let kind = self.ast.get_data0(clause)
+        let ops = self.ast.get_data1(clause)
+        if kind == FACADE_CLAUSE_BORROWS or kind == FACADE_CLAUSE_OF or kind == FACADE_CLAUSE_RENAME or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_TEXT_BYTES or kind == FACADE_CLAUSE_RUNS_THREADS or kind == FACADE_CLAUSE_HANDLE: return false
+        if kind == FACADE_CLAUSE_CALLBACK_THREAD: return self.pool_resolve(self.ast.get_extra(ops)) == "registering"
+        if kind == FACADE_CLAUSE_THREAD:
+            for i in 0..self.ast.get_data2(clause):
+                if self.pool_resolve(self.ast.get_extra(ops + i)) != "creator": return true
+            return false
+        true
+
+    // §31.7: `override` applies only to grants (a restriction or a
+    // presentation has no proof to stand against), and only a stated
+    // contract may override: a contract the toolchain drew for a fetched
+    // package never carries one.
+    mut fn check_facade_override(drawn: bool, clause: i32):
+        if not self.ast.facade_overridden(clause): return
+        if drawn:
+            self.emit_error("`override` in a contract drawn for a fetched package: only a contract a person states may override, and no tool writes one (§31.7)", clause)
+        else if not self.facade_clause_grants(clause):
+            self.emit_error(f"`override` marks a grant, and `{facade_clause_name(self.ast.get_data0(clause))}` grants nothing: no proof can contradict it (§31.7)", clause)
+
+    mut fn check_facade_overrides(di: i32, node: i32):
+        let path = self.decl_source_path_for_index(di)
+        let drawn = path.ends_with("/contract.w") and path.contains(".with/deps/")
+        for i in 0..self.ast.get_data2(node):
+            let item = self.ast.get_extra(self.ast.get_data1(node) + i)
+            let kind = self.ast.kind(item)
+            if kind == NodeKind.NK_FACADE_CLAUSE: self.check_facade_override(drawn, item)
+            if kind != NodeKind.NK_FACADE_FN and kind != NodeKind.NK_FACADE_RESOURCE: continue
+            let first = self.ast.get_data1(item) + ((kind == NodeKind.NK_FACADE_RESOURCE) as i32)
+            for k in 0..self.ast.get_data2(item): self.check_facade_override(drawn, self.ast.get_extra(first + k))
+
     mut fn collect_c_facade(di: i32, node: i32):
         let facade = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
         let count = self.ast.get_data2(node)
         self.current_facade_sym = facade
         self.current_facade_node = node
+        self.check_facade_overrides(di, node)
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             let kind = self.ast.kind(item)

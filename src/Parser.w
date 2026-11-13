@@ -4730,8 +4730,16 @@ impl Parser:
         while self.peek() != TokenKind.TK_EOF:
             let col = column_of(self.source, self.current_start())
             if col == 0: break
+            // §31.7: `override` before a clause marks it.
+            let overriding = self.current_ident_is("override")
+            if overriding:
+                self.advance()
+                if not self.current_ident_is("runs"):
+                    self.emit_error("at a contract's own level `override` marks `runs no threads`; on a resource or an fn item it is written before the clause (§31.7)")
+                    return self.poisoned_expr()
             let item = self.parse_facade_item(col)
             if item == 0: return self.poisoned_expr()
+            if overriding: self.pool.add_facade_override(item as NodeId)
             items.push(item)
             self.skip_newlines()
         if items.len() == header_items:
@@ -5011,8 +5019,11 @@ impl Parser:
         while self.peek() != TokenKind.TK_EOF:
             let col = column_of(self.source, self.current_start())
             if col <= item_col: break
+            let overriding = self.current_ident_is("override")
+            if overriding: self.advance()
             let clause = self.parse_facade_clause(in_resource)
             if clause == 0: return (clauses, false)
+            if overriding: self.pool.add_facade_override(clause as NodeId)
             clauses.push(clause)
             if in_resource and self.peek() == TokenKind.TK_COMMA and self.pool.get_data0(clause as NodeId) == FACADE_CLAUSE_FROM:
                 let field = self.parse_facade_produced_field(self.pool.get_extra(self.pool.get_data1(clause as NodeId)))

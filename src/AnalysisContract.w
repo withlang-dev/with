@@ -76,12 +76,38 @@ fn contract_node_line(sema: &Sema, site: &ContractSite, node: i32) -> i32:
 // A grant the compiler does not vouch for is a claim (§31.9) and is marked
 // `claim: `.
 fn contract_clause_at(sema: &Sema, site: &ContractSite, clause: i32) -> str:
-    let grants = contract_clause_grants(sema, clause)
+    let grants = sema.facade_clause_grants(clause)
     let rule = facade_clause_profile_rule(sema.ast, clause)
     if rule != 0: return (if grants: "claim: " else: "") ++ contract_rule_at(sema, rule)
     contract_provenance(sema, site, clause, grants)
 
+// §31.7: an override no proof contradicts is stale: accepted, reported, and
+// counted apart from claims. Returns how many there are. No proof about a
+// library reaches the compiler beside a stated contract yet, so every
+// override is stale today.
+fn contract_stale_override_notes(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str) -> i32:
+    var stale = 0
+    for di in 0..sema.ast.decl_count():
+        let block = sema.ast.get_decl(di) as i32
+        if sema.ast.kind(block) != NodeKind.NK_C_FACADE: continue
+        let site = contract_site(sema, di as i32, source_path, source_text)
+        for i in 0..sema.ast.get_data2(block):
+            let item = sema.ast.get_extra(sema.ast.get_data1(block) + i)
+            let kind = sema.ast.kind(item)
+            if kind == NodeKind.NK_FACADE_CLAUSE and sema.ast.facade_overridden(item):
+                stale += 1
+                report.note(f"contract-audit: stale override at {site.path}:{contract_node_line(sema, site, item)}: `{facade_clause_name(sema.ast.get_data0(item))}`; no proof contradicts it, so `override` can be deleted")
+            if kind != NodeKind.NK_FACADE_FN and kind != NodeKind.NK_FACADE_RESOURCE: continue
+            let first = sema.ast.get_data1(item) + ((kind == NodeKind.NK_FACADE_RESOURCE) as i32)
+            for k in 0..sema.ast.get_data2(item):
+                let clause = sema.ast.get_extra(first + k)
+                if not sema.ast.facade_overridden(clause): continue
+                stale += 1
+                report.note(f"contract-audit: stale override at {site.path}:{contract_node_line(sema, site, clause)}: `{facade_clause_name(sema.ast.get_data0(clause))}` on `{sema.pool_resolve(sema.ast.get_data0(item))}`; no proof contradicts it, so `override` can be deleted")
+    stale
+
 fn contract_provenance(sema: &Sema, site: &ContractSite, node: i32, grants: bool) -> str:
+    if sema.ast.facade_overridden(node): return f"stale override@{site.path}:{contract_node_line(sema, site, node)}: no proof contradicts it"
     let drafted = contract_drafted_word(sema, site, node)
     let colon = drafted.find(": ")
     let word = if colon > 0: drafted.slice(0, colon) else: "stated"
@@ -105,21 +131,6 @@ fn contract_drafted_word(sema: &Sema, site: &ContractSite, node: i32) -> str:
     for word in ["proof: ", "annotation: ", "registry: ", "evidence: "]:
         if said.starts_with(word): return said.to_owned()
     ""
-
-// §31.8: a clause grants when its being wrong can make safe code unsafe.
-// The restrictions and the presentations are the few; every other clause
-// grants.
-fn contract_clause_grants(sema: &Sema, clause: i32) -> bool:
-    if clause <= 0 or clause >= sema.ast.node_count(): return false
-    let kind = sema.ast.get_data0(clause)
-    let ops = sema.ast.get_data1(clause)
-    if kind == FACADE_CLAUSE_BORROWS or kind == FACADE_CLAUSE_OF or kind == FACADE_CLAUSE_RENAME or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_TEXT_BYTES or kind == FACADE_CLAUSE_RUNS_THREADS or kind == FACADE_CLAUSE_HANDLE: return false
-    if kind == FACADE_CLAUSE_CALLBACK_THREAD: return sema.pool_resolve(sema.ast.get_extra(ops)) == "registering"
-    if kind == FACADE_CLAUSE_THREAD:
-        for i in 0..sema.ast.get_data2(clause):
-            if sema.pool_resolve(sema.ast.get_extra(ops + i)) != "creator": return true
-        return false
-    true
 
 // What the drafter analyzed for a contract whose lines are evidence: the
 // `// analyzed:` line at the head of its file, or "".
@@ -937,7 +948,8 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
             "claim: annotation" => annotation += 1
             word => if word.starts_with("claim: profile:"): profile += 1
     let claimed = stated + registry + profile + annotation
-    report.note(f"contract-audit: clauses={proven + claimed + evidence} proven={proven} claimed={claimed}" ++ (if evidence > 0: f" evidence={evidence}" else: ""))
+    let stale = contract_stale_override_notes(report, sema, source_path, source_text)
+    report.note(f"contract-audit: clauses={proven + claimed + evidence + stale} proven={proven} claimed={claimed} overrides=0 stale-overrides={stale}" ++ (if evidence > 0: f" evidence={evidence}" else: ""))
     if claimed > 0: report.note(f"contract-audit: claims: stated={stated} registry={registry} profile={profile} annotation={annotation}")
     report.note(f"contract-audit: resources={sema.facade_resources.len()} items={sema.foreign_contracts.len()} domains={sema.facade_domain_list.len()} conventions={conventions} advisories={advisories} profile-ambiguous={ambiguous} profile-shadowed={shadowed}")
 

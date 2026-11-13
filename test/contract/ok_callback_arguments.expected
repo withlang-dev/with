@@ -48,7 +48,7 @@ fn val_get; facade:engines@test/contract/ok_callback_arguments.w; clause:fn@test
     invalidates: Arg (param 0: *mut val v)  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: of Arg  [stated@test/contract/ok_callback_arguments.w:25]
     presentation: Arg.get  [default:presentation sugar from the resource prefix (§16.2b.11)]
-note: contract-audit: clauses=10 proven=0 claimed=10
+note: contract-audit: clauses=10 proven=0 claimed=10 overrides=0 stale-overrides=0
 note: contract-audit: claims: stated=10 registry=0 profile=0 annotation=0
 note: contract-audit: resources=3 items=2 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 contract-audit: violations=0 ok
