@@ -25,8 +25,8 @@ fn main:
     let view = p7_run(root, "evidence-view", p7_argv_append(p7_argv_append(p7_argv_append("", "analyze"), "src/main.w"), "contract"))
     p7_assert_success(view, "the contract view")
     let shown = view.stdout ++ view.stderr
-    assert(shown.contains("[evidence:returns static@.with/deps/c/fake/1.0/contract.w:7]"))
-    assert(shown.contains("[clause:returns static@.with/deps/c/fake/1.0/contract.w:9]"))
+    assert(shown.contains("[evidence@.with/deps/c/fake/1.0/contract.w:7: every return is a string literal]"))
+    assert(shown.contains("[claim: registry@.with/deps/c/fake/1.0/contract.w:9: fake.h 2: \"the motto is a literal\"]"))
     assert(shown.contains("contract-audit: evidence, not proof, in .with/deps/c/fake/1.0/contract.w"))
     assert(shown.contains("analyzed: the source of fake/1.0 configured for this platform"))
     print("ok")
