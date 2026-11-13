@@ -2223,7 +2223,14 @@ fn run_battery_uat_action(ctx: ActionCtx) -> i32:
     argv.push("--strict")
     let stdout_path = build_project_abs(root, build_project_join(out_dir, "uat.stdout"))
     let stderr_path = build_project_abs(root, build_project_join(out_dir, "uat.stderr"))
-    let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, 1800000, process_env().set("WITH_UAT_WITH", compiler))
+    // The scenarios' `with get` replays the answers a first run recorded
+    // (WITH_GET_REPLAY, ConanClient.w), so a battery does not go red because
+    // Conan Center or a source mirror was unreachable for a minute
+    // (2026-11-12: sqlite3 and zlib). The release UAT sets nothing and
+    // fetches live. WITH_GET_REPLAY_REFRESH=1 records again.
+    var envs = process_env().set("WITH_UAT_WITH", compiler)
+    if env("WITH_GET_REPLAY").len() == 0: envs = envs.set("WITH_GET_REPLAY", comp_home_dir_env() ++ "/.local/with-get-replay")
+    let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, 1800000, envs)
     print(result.stdout)
     if result.rc != 0:
         ctx.diagnostics().error(f"battery-uat: `with uat` exited {result.rc}; report " ++ stdout_path ++ "\n" ++ result.stderr)
