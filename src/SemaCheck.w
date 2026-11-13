@@ -12825,7 +12825,11 @@ impl Sema:
                 // not the renderer's to derive again from the declaration's
                 // text, so an `unsafe` there that turns out unneeded is no
                 // error.
-                let rendered = self.current_file_is_generated("<facade ")
+                // The same holds for a header's own translation (§31.4: a
+                // pointer return is inert, so the translation's `unsafe {
+                // with_alloc(…) }` holds nothing raw): the compiler wrote
+                // the block, and nobody can delete it.
+                let rendered = self.current_file_is_generated("<facade ") or self.current_file_is_generated("<c_import ")
                 if unsafe_result != 0 and used == 0 and not rendered:
                     self.emit_error("unsafe block contains no unsafe operations", node)
                 else if unsafe_result != 0 and used == 2 and not rendered:

@@ -4,7 +4,7 @@ use demo.core
 
 pub fn alloc(device: Device, size: Size) -> Result[Memory, DemoError]:
     let _ = device
-    let raw = unsafe { malloc(size) }
+    let raw = malloc(size)
     if raw == None:
         return Err(.OutOfMemory)
     Ok(raw as Memory)

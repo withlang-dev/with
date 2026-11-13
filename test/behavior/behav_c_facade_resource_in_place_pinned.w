@@ -41,8 +41,8 @@ fn make(ends: *mut c_int, misplaced: *mut c_int) -> Stream:
     s
 
 fn main:
-    let ends = unsafe { calloc(1, 4) as *mut c_int }
-    let misplaced = unsafe { calloc(1, 4) as *mut c_int }
+    let ends = calloc(1, 4) as *mut c_int
+    let misplaced = calloc(1, 4) as *mut c_int
     let (_, a) = Stream.init(ends, misplaced)
     print(f"ctor {check(a)}")
     let p = unsafe { a.repr }.as_ptr()

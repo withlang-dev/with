@@ -736,7 +736,14 @@ impl CiProject:
         // A character pointer the registry says is new text the caller owns
         // (`text return, owned, freed by F`) is presented; any other pointer
         // to no record stays raw.
-        if self.symbols[si].ret_ty.starts_with("*") and not (fd_is_char_pointer(self.symbols[si].ret_ty) and self.fd_registry_text_return(si).len() > 0) and not self.fd_returns_literal_text(si, 0): return "raw: returns " ++ self.symbols[si].ret_ty ++ ", a pointer to no record"
+        // §31.4: a pointer return is inert. Beside a pointer parameter the
+        // function stays raw for the parameter, and the draft states no item
+        // whose return it cannot describe; with none, the call is safe as
+        // imported and what it returns is a raw pointer.
+        let raw_return = self.symbols[si].ret_ty.starts_with("*") and not (fd_is_char_pointer(self.symbols[si].ret_ty) and self.fd_registry_text_return(si).len() > 0) and not self.fd_returns_literal_text(si, 0)
+        if raw_return:
+            for p in self.symbols[si].param_ty:
+                if p.starts_with("*"): return "raw: returns " ++ self.symbols[si].ret_ty ++ ", a pointer to no record"
         var pointer_params = 0
         var destroyed = -1
         var retained = -1
@@ -762,6 +769,7 @@ impl CiProject:
         if facts_kind(self.symbols[si].registry) == "lend" and pointer_params > 0: return "lend (registry: " ++ facts_cite(self.symbols[si].registry) ++ ")"
         if retained >= 0: return self.fd_retains_verdict(si, retained)
         if unmodeled.len() > 0: return "raw: parameter of " ++ self.fd_unmodeled_text(unmodeled)
+        if pointer_params == 0 and raw_return: return "value-only call; returns " ++ self.symbols[si].ret_ty ++ ", a raw pointer: inert until a contract describes it (§31.4)"
         if pointer_params == 0: return "value-only call"
         "lend (proof: reads its resource parameters, keeps nothing)"
 
