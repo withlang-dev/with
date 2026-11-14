@@ -402,6 +402,65 @@ fn cli_prelude_mode(argc: i32) -> i32:
 fn cli_runtime_available(argc: i32) -> bool:
     not cli_has_flag(argc, "--no-runtime") and not cli_has_flag(argc, "--freestanding")
 
+// #3117: `with contract report c.<package> [function]`. What the package's
+// contract presents is read as `with analyze <contract> contract` reads it
+// (one set of facts, one rendering); what it leaves raw, and why, is in the
+// report `with get` wrote beside it. With a function: its contract lines,
+// or its raw reason.
+fn contract_report_lines_of(view: &str, function: &str) -> str:
+    var out = ""
+    var subject = ""
+    var subject_shown = false
+    var own_item = false
+    for line in view.split("\n"):
+        if not line.starts_with("    "):
+            subject = line.to_owned()
+            own_item = line.starts_with("fn " ++ function ++ ";")
+            subject_shown = own_item
+            if own_item: out = out ++ line ++ "\n"
+            continue
+        if not (own_item or line.starts_with("    producer: " ++ function ++ " ") or line.starts_with("    destroyer: " ++ function ++ ";")): continue
+        if not subject_shown:
+            out = out ++ subject ++ "\n"
+            subject_shown = true
+        out = out ++ line ++ "\n"
+    out
+
+fn run_contract_command(argc: i32, comp: Compilation) -> i32:
+    if argc < 4 or argc > 5 or with_arg_at(2) != "report" or not with_arg_at(3).starts_with("c.") or with_arg_at(3).len() == 2:
+        with_eprint("usage: with contract report c.<package> [function]")
+        return 1
+    let package = with_arg_at(3).slice(2, with_arg_at(3).len())
+    let root = project_config_find_root(".")
+    if root.len() == 0:
+        with_eprint("error: no with.toml found. Run 'with init' first.")
+        return 1
+    let drawn = resolve_fetched_facade_candidate(root, "contracts/" ++ package ++ ".w")
+    let report = resolve_fetched_facade_report(drawn)
+    if drawn.len() == 0 and report.len() == 0:
+        with_eprint(f"error: c.{package} has no fetched contract in this project; run `with get c.{package}`")
+        return 1
+    let contract = comp.analyze_file(drawn, "contract")
+    if contract.status != 0:
+        with_write(contract.text)
+        return contract.status
+    if argc == 4:
+        with_write(contract.text)
+        for line in report.split("\n"):
+            if line.contains(": raw: "): print(line.trim())
+        return 0
+    let function = with_arg_at(4)
+    let presented = contract_report_lines_of(contract.text, function)
+    if presented.len() > 0:
+        with_write(presented)
+        return 0
+    let line = resolve_facade_report_line(report, function)
+    if line.len() == 0:
+        with_eprint(f"error: the report of c.{package} has no line for `{function}`: no header the package installs declares it")
+        return 1
+    print(f"{function}: {line}")
+    0
+
 fn cli_analysis_request(argc: i32, source: &str) -> str:
     var found_source = false
     var i = 2
@@ -1069,6 +1128,12 @@ fn run_cli(full_argc: i32) -> i32:
         let result = comp.analyze_file(source, cli_analysis_request(argc, source))
         with_write(result.text)
         return result.status
+    if cli_command(argc) == "contract":
+        let comp = Compilation.init()
+        comp.configure(opt_level, no_std, alloc_mode, runtime_available)
+        comp.set_prelude_mode(prelude_mode)
+        comp.set_overflow_mode(driver_internal_overflow_mode())
+        return run_contract_command(argc, comp)
     if cli_command(argc) == "fix-ceremony":
         return run_ceremony_fix()
     if cli_command(argc) == "fix-contracts":
@@ -6302,6 +6367,7 @@ fn print_usage:
     with_write("  migrate-receivers  Prove or apply compiler-selected receiver relocation\n")
     with_write("  fix-ceremony       Report or apply the ceremony removals Sema proves safe (#3061)\n")
     with_write("  fix-contracts      Respell `c facade` and `use facades.` as the With Contract Language writes them\n")
+    with_write("  contract report    Say what a fetched C package's contract presents and why the rest is raw\n")
     with_write("  reduce           Minimize a single-file compiler repro\n")
     with_write("  fixpoint-diff    Explain the first differing fixpoint-object byte\n")
     with_write("\n")
