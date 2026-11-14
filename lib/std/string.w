@@ -23,6 +23,7 @@ use std.option
 use std.result
 use std.collections
 use rt.rt_core
+use std.libc.strtof
 
 /// Amortized string builder for code that appends in loops.
 ///
@@ -302,11 +303,10 @@ impl str:
             end = start
         out.to_str()
 
-    /// The text as a number of the type its use demands (#959): `let n: i64
+    /// The text as a value of the type its use demands (§15.5): `let n: i64
     /// = s.parse() ?? 0`. None unless the whole text is one value of that
-    /// type: an optional sign and decimal digits for an integer, in range;
-    /// digits with an optional fraction and exponent for a float.
-    pub fn parse[T: Parse]() -> Option[T]: T.parse_text(self)
+    /// type. `base:` reads an integer as digits of that base, 2 through 36.
+    pub fn parse[T: Parse](base: i32 = 0) -> Option[T]: if base == 0: T.parse_text(self) else: T.parse_text_in(self, base)
 
     /// The bytes, one at a time (#2206): `for b in s.bytes()`.
     @[iter_of_self]
@@ -495,99 +495,214 @@ pub fn parse_u128(s: &str) -> u128:
     if s.len() == 0: return 0
     parse_u128_magnitude(s, if s[0] == 43: 1 else: 0)
 
-/// A type `str.parse()` produces (#959): `parse_text` is the value the
-/// whole of `text` spells, or None.
+/// A type made from text (§15.5, D203): `i32("42")` and `"42".parse()` are
+/// one conversion. `parse_text` is the value the whole of `text` spells, or
+/// None. An integer type also reads digits of a stated base. The call form
+/// panics where `parse` is None, and `parse_failure` is what its message
+/// says after the text: ": overflow" for a value the type cannot hold.
 pub trait Parse:
     fn parse_text(text: &str) -> Option[Self]
+    fn parse_text_in(text: &str, base: i32) -> Option[Self]: None
+    fn parse_failure(text: &str, base: i32) -> str: ""
 
-// The sign and magnitude of `text` when the whole of it is a decimal
-// integer: an optional sign, then one or more digits. None past u128.
-fn parse_integer_parts(text: &str) -> Option[(bool, u128)]:
-    if text.len() == 0: return None
-    let neg = text[0] == 45
-    var i = if neg or text[0] == 43: 1 else: 0
-    if i == text.len(): return None
+// What integer text was (§15.5).
+const PARSED_VALUE = 0
+const PARSED_NOT_A_NUMBER = 1
+const PARSED_OVERFLOW = 2
+
+// The value of a digit character in bases up to 36, or 36 for any other.
+fn digit_value(c: u8) -> u32:
+    if c >= '0' and c <= '9': return (c - '0') as u32
+    if c >= 'a' and c <= 'z': return (c - 'a') as u32 + 10
+    if c >= 'A' and c <= 'Z': return (c - 'A') as u32 + 10
+    36
+
+// The sign and magnitude the whole of `text` spells as an integer, and
+// which of the three it was. `base` 0 is With's notation: decimal, or
+// `0x`, `0o`, `0b` in either case; otherwise the digits are of that base
+// and no prefix is read. `_` stands only between two digits. A magnitude
+// past u128 is an overflow only when every character was a digit.
+fn parse_integer_parts(text: &str, base: i32) -> (i32, bool, u128):
+    if base != 0 and (base < 2 or base > 36): panic(f"base: {base} is not a base; an integer is read in base 2 through 36")
+    let neg = text.len() > 0 and text[0] == '-'
+    var i = if neg or (text.len() > 0 and text[0] == '+'): 1 else: 0
+    var radix: u128 = if base == 0: 10 else: base as u128
+    if base == 0 and i + 1 < text.len() and text[i] == '0':
+        let mark = text[i + 1]
+        let prefixed: u128 = if mark == 'x' or mark == 'X': 16 else if mark == 'o' or mark == 'O': 8 else if mark == 'b' or mark == 'B': 2 else: 0
+        if prefixed != 0:
+            radix = prefixed
+            i += 2
+    if i == text.len(): return (PARSED_NOT_A_NUMBER, neg, 0)
+    let most: u128 = 340282366920938463463374607431768211455
     var mag: u128 = 0
+    var overflow = false
+    var after_digit = false
     while i < text.len():
         let c = text[i]
-        if c < 48 or c > 57: return None
-        let digit = (c - 48) as u128
-        if mag > (340282366920938463463374607431768211455 - digit) / 10: return None
-        mag = mag * 10 + digit
         i += 1
-    (neg, mag)
+        if c == '_':
+            // Between two digits: one before it, one after it.
+            if not after_digit or i == text.len() or digit_value(text[i]) as u128 >= radix: return (PARSED_NOT_A_NUMBER, neg, 0)
+            after_digit = false
+            continue
+        let digit = digit_value(c) as u128
+        if digit >= radix: return (PARSED_NOT_A_NUMBER, neg, 0)
+        after_digit = true
+        if mag > (most - digit) / radix: overflow = true
+        else: mag = mag * radix + digit
+    (if overflow: PARSED_OVERFLOW else: PARSED_VALUE, neg, mag)
 
-// A signed integer of `bits` bits, or None out of its range.
-fn parse_signed(text: &str, bits: u32) -> Option[i128]:
-    let (neg, mag) = parse_integer_parts(text)?
+// A signed integer of `bits` bits, and which of the three the text was.
+fn parse_signed(text: &str, bits: u32, base: i32) -> (i32, i128):
+    let (what, neg, mag) = parse_integer_parts(text, base)
+    if what != PARSED_VALUE: return (what, 0)
     let limit = (1 as u128) << (bits - 1)
     if neg:
-        if mag > limit: return None
-        if mag == 0: return 0
-        return 0 - ((mag - 1) as i128) - 1
-    if mag >= limit: return None
-    mag as i128
+        if mag > limit: return (PARSED_OVERFLOW, 0)
+        if mag == 0: return (PARSED_VALUE, 0)
+        return (PARSED_VALUE, 0 - ((mag - 1) as i128) - 1)
+    if mag >= limit: return (PARSED_OVERFLOW, 0)
+    (PARSED_VALUE, mag as i128)
 
-// An unsigned integer of `bits` bits ("-0" is 0), or None out of its range.
-fn parse_unsigned(text: &str, bits: u32) -> Option[u128]:
-    let (neg, mag) = parse_integer_parts(text)?
-    if neg and mag != 0: return None
-    if bits < 128 and mag >= (1 as u128) << bits: return None
-    mag
+// An unsigned integer of `bits` bits ("-0" is 0), and which of the three
+// the text was: a negative value is one the type cannot hold.
+fn parse_unsigned(text: &str, bits: u32, base: i32) -> (i32, u128):
+    let (what, neg, mag) = parse_integer_parts(text, base)
+    if what != PARSED_VALUE: return (what, 0)
+    if (neg and mag != 0) or (bits < 128 and mag >= (1 as u128) << bits): return (PARSED_OVERFLOW, 0)
+    (PARSED_VALUE, mag)
+
+fn signed_value(text: &str, bits: u32, base: i32) -> Option[i128]:
+    let (what, value) = parse_signed(text, bits, base)
+    if what == PARSED_VALUE: Some(value) else: None
+
+fn unsigned_value(text: &str, bits: u32, base: i32) -> Option[u128]:
+    let (what, value) = parse_unsigned(text, bits, base)
+    if what == PARSED_VALUE: Some(value) else: None
+
+fn overflow_text(what: i32) -> str: if what == PARSED_OVERFLOW: ": overflow" else: ""
 
 // Whether the whole of `text` is a decimal float: an optional sign, digits
 // with an optional fraction (at least one digit in all), and an optional
 // exponent with at least one digit.
 fn float_text_is_number(text: &str) -> bool:
-    var i = if text.len() > 0 and (text[0] == 45 or text[0] == 43): 1 else: 0
+    var i = if text.len() > 0 and (text[0] == '-' or text[0] == '+'): 1 else: 0
     var digits = 0
-    while i < text.len() and text[i] >= 48 and text[i] <= 57:
+    while i < text.len() and text[i] >= '0' and text[i] <= '9':
         i += 1
         digits += 1
-    if i < text.len() and text[i] == 46:
+    if i < text.len() and text[i] == '.':
         i += 1
-        while i < text.len() and text[i] >= 48 and text[i] <= 57:
+        while i < text.len() and text[i] >= '0' and text[i] <= '9':
             i += 1
             digits += 1
     if digits == 0: return false
-    if i < text.len() and (text[i] == 101 or text[i] == 69):
+    if i < text.len() and (text[i] == 'e' or text[i] == 'E'):
         i += 1
-        if i < text.len() and (text[i] == 45 or text[i] == 43): i += 1
+        if i < text.len() and (text[i] == '-' or text[i] == '+'): i += 1
         var exp_digits = 0
-        while i < text.len() and text[i] >= 48 and text[i] <= 57:
+        while i < text.len() and text[i] >= '0' and text[i] <= '9':
             i += 1
             exp_digits += 1
         if exp_digits == 0: return false
     i == text.len()
 
-impl Parse for i8:
-    fn parse_text(text: &str) -> Option[i8]: parse_signed(text, 8)? as i8
-impl Parse for i16:
-    fn parse_text(text: &str) -> Option[i16]: parse_signed(text, 16)? as i16
-impl Parse for i32:
-    fn parse_text(text: &str) -> Option[i32]: parse_signed(text, 32)? as i32
-impl Parse for i64:
-    fn parse_text(text: &str) -> Option[i64]: parse_signed(text, 64)? as i64
-impl Parse for isize:
-    fn parse_text(text: &str) -> Option[isize]: parse_signed(text, sizeof[isize]() as u32 * 8)? as isize
-impl Parse for u8:
-    fn parse_text(text: &str) -> Option[u8]: parse_unsigned(text, 8)? as u8
-impl Parse for u16:
-    fn parse_text(text: &str) -> Option[u16]: parse_unsigned(text, 16)? as u16
-impl Parse for u32:
-    fn parse_text(text: &str) -> Option[u32]: parse_unsigned(text, 32)? as u32
-impl Parse for u64:
-    fn parse_text(text: &str) -> Option[u64]: parse_unsigned(text, 64)? as u64
-impl Parse for usize:
-    fn parse_text(text: &str) -> Option[usize]: parse_unsigned(text, sizeof[usize]() as u32 * 8)? as usize
+// The float a name spells (§15.5): `inf` and `infinity` under an optional
+// sign, `nan` under none, in any case. None for any other text.
+fn float_named(text: &str) -> Option[f64]:
+    let signed = text.len() > 0 and (text[0] == '-' or text[0] == '+')
+    let name = (if signed: text.slice(1, text.len()) else: text).to_lower()
+    if name == "inf" or name == "infinity": return if signed and text[0] == '-': -1.0 / 0.0 else: 1.0 / 0.0
+    if name == "nan" and not signed: return 0.0 / 0.0
+    None
 
-// The correctly rounded double of a validated text, strtod's (#2176).
+// The double of float text and which of the three the text was: finite
+// text too large for a double is an overflow, never infinity. The finite
+// value is strtod's, the correctly rounded one (#2176).
+fn parse_double(text: &str) -> (i32, f64):
+    match float_named(text):
+        Some(v) => return (PARSED_VALUE, v)
+        None => {}
+    if not float_text_is_number(text): return (PARSED_NOT_A_NUMBER, 0.0)
+    match text.to_cstring():
+        Ok(c) =>
+            let v = with_libc_strtold(c.as_cstr().ptr(), null)
+            if v == 1.0 / 0.0 or v == -1.0 / 0.0: (PARSED_OVERFLOW, 0.0) else: (PARSED_VALUE, v)
+        Err(_) => (PARSED_NOT_A_NUMBER, 0.0)
+
+// The same for a float: the nearest float of the text itself (strtof's),
+// not of its double.
+fn parse_float(text: &str) -> (i32, f32):
+    match float_named(text):
+        Some(v) => return (PARSED_VALUE, v as f32)
+        None => {}
+    if not float_text_is_number(text): return (PARSED_NOT_A_NUMBER, 0.0)
+    match text.to_cstring():
+        Ok(c) =>
+            let v = strtof(c.as_cstr().ptr(), null)
+            if v == (1.0 / 0.0) as f32 or v == (-1.0 / 0.0) as f32: (PARSED_OVERFLOW, 0.0) else: (PARSED_VALUE, v)
+        Err(_) => (PARSED_NOT_A_NUMBER, 0.0)
+
+impl Parse for i8:
+    fn parse_text(text: &str) -> Option[i8]: signed_value(text, 8, 0)? as i8
+    fn parse_text_in(text: &str, base: i32) -> Option[i8]: signed_value(text, 8, base)? as i8
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_signed(text, 8, base).0)
+impl Parse for i16:
+    fn parse_text(text: &str) -> Option[i16]: signed_value(text, 16, 0)? as i16
+    fn parse_text_in(text: &str, base: i32) -> Option[i16]: signed_value(text, 16, base)? as i16
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_signed(text, 16, base).0)
+impl Parse for i32:
+    fn parse_text(text: &str) -> Option[i32]: signed_value(text, 32, 0)? as i32
+    fn parse_text_in(text: &str, base: i32) -> Option[i32]: signed_value(text, 32, base)? as i32
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_signed(text, 32, base).0)
+impl Parse for i64:
+    fn parse_text(text: &str) -> Option[i64]: signed_value(text, 64, 0)? as i64
+    fn parse_text_in(text: &str, base: i32) -> Option[i64]: signed_value(text, 64, base)? as i64
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_signed(text, 64, base).0)
+impl Parse for i128:
+    fn parse_text(text: &str) -> Option[i128]: signed_value(text, 128, 0)
+    fn parse_text_in(text: &str, base: i32) -> Option[i128]: signed_value(text, 128, base)
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_signed(text, 128, base).0)
+impl Parse for isize:
+    fn parse_text(text: &str) -> Option[isize]: signed_value(text, sizeof[isize]() as u32 * 8, 0)? as isize
+    fn parse_text_in(text: &str, base: i32) -> Option[isize]: signed_value(text, sizeof[isize]() as u32 * 8, base)? as isize
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_signed(text, sizeof[isize]() as u32 * 8, base).0)
+impl Parse for u8:
+    fn parse_text(text: &str) -> Option[u8]: unsigned_value(text, 8, 0)? as u8
+    fn parse_text_in(text: &str, base: i32) -> Option[u8]: unsigned_value(text, 8, base)? as u8
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_unsigned(text, 8, base).0)
+impl Parse for u16:
+    fn parse_text(text: &str) -> Option[u16]: unsigned_value(text, 16, 0)? as u16
+    fn parse_text_in(text: &str, base: i32) -> Option[u16]: unsigned_value(text, 16, base)? as u16
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_unsigned(text, 16, base).0)
+impl Parse for u32:
+    fn parse_text(text: &str) -> Option[u32]: unsigned_value(text, 32, 0)? as u32
+    fn parse_text_in(text: &str, base: i32) -> Option[u32]: unsigned_value(text, 32, base)? as u32
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_unsigned(text, 32, base).0)
+impl Parse for u64:
+    fn parse_text(text: &str) -> Option[u64]: unsigned_value(text, 64, 0)? as u64
+    fn parse_text_in(text: &str, base: i32) -> Option[u64]: unsigned_value(text, 64, base)? as u64
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_unsigned(text, 64, base).0)
+impl Parse for u128:
+    fn parse_text(text: &str) -> Option[u128]: unsigned_value(text, 128, 0)
+    fn parse_text_in(text: &str, base: i32) -> Option[u128]: unsigned_value(text, 128, base)
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_unsigned(text, 128, base).0)
+impl Parse for usize:
+    fn parse_text(text: &str) -> Option[usize]: unsigned_value(text, sizeof[usize]() as u32 * 8, 0)? as usize
+    fn parse_text_in(text: &str, base: i32) -> Option[usize]: unsigned_value(text, sizeof[usize]() as u32 * 8, base)? as usize
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_unsigned(text, sizeof[usize]() as u32 * 8, base).0)
+
 impl Parse for f64:
     fn parse_text(text: &str) -> Option[f64]:
-        if not float_text_is_number(text): return None
-        match text.to_cstring():
-            Ok(c) => with_libc_strtold(c.as_cstr().ptr(), null)
-            Err(_) => None
+        let (what, value) = parse_double(text)
+        if what == PARSED_VALUE: Some(value) else: None
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_double(text).0)
+impl Parse for f32:
+    fn parse_text(text: &str) -> Option[f32]:
+        let (what, value) = parse_float(text)
+        if what == PARSED_VALUE: Some(value) else: None
+    fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_float(text).0)
 
 /// `it.collect[String]()` over bytes (§13.3): the bytes in order, one str.
 pub fn iter_collect_string[I: Iter[u8]](iter: I) -> str:
