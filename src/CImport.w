@@ -11658,6 +11658,10 @@ impl CiExprPool:
             // as written. <stdlib.h>'s own declarations are filtered with the rest
             // of the system header, so the reference names the translation's
             // declaration of the same symbol.
+            // #3292: under `with migrate` one of the four named as a value (a
+            // call is rewritten before its callee is lowered) names the preamble's
+            // function over the runtime's allocator.
+            if mangled.len() == 0 and g_ci_migrating and (name == "malloc" or name == "calloc" or name == "realloc" or name == "free"): return self.ident(self.add_string("__with_migrate_" ++ name), 0)
             if mangled.len() == 0 and not g_ci_migrating and (name == "malloc" or name == "calloc" or name == "realloc" or name == "free"):
                 let declared_at = with_ci_cursor_referenced_location(session, cursor)
                 if declared_at.len() > 0 and ci_is_system_path(declared_at):
@@ -13556,6 +13560,9 @@ impl CiStmtPool:
                 callee = ci_value_ir_plain(exprs.ident(callee_idx, 0))
                 callee_text = ci_migrate_c_function_name(callee_name)
                 first_arg = 0
+            // #3292: the callee was lowered as a value first; a call of one of the
+            // four is rewritten below under its libc name.
+            if callee_text.starts_with("__with_migrate_"): callee_text = callee_text.slice(15, callee_text.len()).to_owned()
             if callee_text == "cfprintf":
                 return ci_value_ir_invalid()
             // §13.5b: setjmp/longjmp have no With representation. Defensive
