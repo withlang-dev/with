@@ -2402,6 +2402,30 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
         else if not planted:
             eprint("error: " ++ f"contract-view-tests: {fixture}: a clean fixture needs a checked-in {expected_path} snapshot")
             errors = errors + 1
+    // §31.9 rule 2: a claim in the standard library or the runtime carries a
+    // citation. The uncited ones are held to the count recorded for each file
+    // (build/uncited-claims.tsv): a new uncited claim is refused, and a file
+    // that gains citations lowers its line, so the count only falls. A file
+    // the view cannot compile on this host is said and not judged.
+    var measured = 0
+    for row in fs.read_text("build/uncited-claims.tsv").split("\n"):
+        let cols = row.split("\t")
+        if cols.len() < 2 or row.starts_with("#"): continue
+        let path = cols[0]
+        let (_, view) = contract_view_run(ctx, root, compiler, path, out_dir, "uncited." ++ comp_path_basename(path) ++ ".stdout", "contract")
+        if not view.contains("contract-audit: clauses="):
+            print(f"contract-view-tests: {path}: the contract view does not compile it on this host; its uncited claims are not counted here")
+            continue
+        measured = measured + 1
+        // No claims, no `claims:` line: none uncited.
+        let counted = view.split(" uncited=")
+        let found = if counted.len() > 1: counted[1].split("\n")[0] else: "0"
+        if found != cols[1]:
+            eprint("error: " ++ f"contract-view-tests: {path} has {found} uncited claims and build/uncited-claims.tsv records {cols[1]} (§31.9 rule 2): cite the new claim, or lower the file's line when citations were added")
+            errors = errors + 1
+    if measured == 0:
+        eprint("error: contract-view-tests: no file of build/uncited-claims.tsv was measured")
+        errors = errors + 1
     if checked == 0:
         ctx.diagnostics().error("contract-view-tests: no fixtures under test/contract")
     if errors > 0:
@@ -4491,6 +4515,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     contract_view_tests.action = run_contract_view_tests_action
     contract_view_tests = contract_view_tests.input(release_compiler_bin("with"))
     contract_view_tests = contract_view_tests.input("test/contract")
+    contract_view_tests = contract_view_tests.input("build/uncited-claims.tsv").input("rt").input("lib/contracts")
     contract_view_tests = contract_view_tests.dep("build")
     contract_view_tests = contract_view_tests.write_scope("out/contract-view-tests")
     out = out.add_target(contract_view_tests)

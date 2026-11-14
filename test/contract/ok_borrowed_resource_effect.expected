@@ -46,6 +46,6 @@ fn sqlite3_db_handle; contract:sqlite@test/contract/ok_borrowed_resource_effect.
     presentation: rename database  [stated@test/contract/ok_borrowed_resource_effect.w:36]
     presentation: Statement.database  [clause:rename]
 note: contract-audit: clauses=13 proven=0 claimed=13 overrides=0 stale-overrides=0
-note: contract-audit: claims: stated=13 registry=0 profile=0 annotation=0
+note: contract-audit: claims: stated=13 registry=0 profile=0 annotation=0 uncited=13
 note: contract-audit: resources=2 items=4 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 contract-audit: violations=0 ok

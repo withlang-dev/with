@@ -102,6 +102,6 @@ fn sqlite3_libversion; contract:sqlite@test/contract/ok_sqlite_shaped.w; clause:
     presentation: the C name is the surface; no resource receives param 0  [default:presentation sugar only groups by resource (§16.2b.11)]
 note: contract-audit: redundant: `callback_thread any` on fn sqlite3_create_function_v2 restates the default; a retained callback may run on any thread unless its function says `callback_thread registering`
 note: contract-audit: clauses=27 proven=0 claimed=27 overrides=0 stale-overrides=0
-note: contract-audit: claims: stated=27 registry=0 profile=0 annotation=0
+note: contract-audit: claims: stated=27 registry=0 profile=0 annotation=0 uncited=27
 note: contract-audit: resources=2 items=8 domains=1 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 contract-audit: violations=0 ok

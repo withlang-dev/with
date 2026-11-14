@@ -81,6 +81,47 @@ fn contract_clause_at(sema: &Sema, site: &ContractSite, clause: i32) -> str:
     if rule != 0: return (if grants: "claim: " else: "") ++ contract_rule_at(sema, rule)
     contract_provenance(sema, site, clause, grants)
 
+// §31.9 rule 2: whether the stated claim at `line_no` of `source` carries a
+// citation: a comment on its own line, or on the `fn` or `resource` line it
+// stands under.
+fn contract_claim_is_cited(source: &str, line_no: i32) -> bool:
+    var at = 0
+    var owner_cited = false
+    for text in source.split("\n"):
+        at += 1
+        let said = text.trim()
+        let comment = said.find("//")
+        let cited = comment >= 0 and said.slice(comment + 2, said.len()).trim().len() > 0
+        if at == line_no: return cited or (owner_cited and not said.starts_with("fn ") and not said.starts_with("resource "))
+        if said.starts_with("fn ") or said.starts_with("resource "): owner_cited = cited
+    false
+
+// The stated claims of this compilation with no citation (§31.9 rule 2).
+// Required in the standard library and the runtime, where the build holds
+// each file to its recorded count; counted everywhere.
+fn contract_uncited_claims(sema: &Sema, seen: &List[str], source_path: &str, source_text: &str) -> i32:
+    var uncited = 0
+    for prov in seen:
+        if not prov.starts_with("claim: stated@"): continue
+        let place = prov.slice(14, prov.len())
+        var colon = place.len() - 1
+        while colon > 0 and place[colon] != ':': colon -= 1
+        if colon <= 0: continue
+        var line_no = 0
+        var k = colon + 1
+        while k < place.len():
+            line_no = line_no * 10 + (place[k] as i32 - 48)
+            k += 1
+        var source = ""
+        for di in 0..sema.ast.decl_count():
+            if sema.ast.kind(sema.ast.get_decl(di)) != NodeKind.NK_C_FACADE: continue
+            let site = contract_site(sema, di as i32, source_path, source_text)
+            if site.path == place.slice(0, colon):
+                source = site.source
+                break
+        if not contract_claim_is_cited(source, line_no): uncited += 1
+    uncited
+
 // §31.7: an override no proof contradicts is stale: accepted, reported, and
 // counted apart from claims. Returns how many there are. One a recorded
 // proof contradicts (Sema.facade_override_against) is not stale: its row
@@ -938,6 +979,27 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
         if fact.kind != AnalysisFactKind.ForeignContract or (fact.flags & CONTRACT_FACT) == 0: continue
         let prov = contract_row_provenance(fact.detail)
         if not seen.contains(prov): seen.push(prov)
+    // Every granting clause is counted, whether or not a row of the view
+    // cites it (a `buffer` pairing and an fn item's `ok` print none).
+    for di in 0..sema.ast.decl_count():
+        let block = sema.ast.get_decl(di) as i32
+        if sema.ast.kind(block) != NodeKind.NK_C_FACADE: continue
+        let site = contract_site(sema, di as i32, source_path, source_text)
+        for i in 0..sema.ast.get_data2(block):
+            let item = sema.ast.get_extra(sema.ast.get_data1(block) + i)
+            let kind = sema.ast.kind(item)
+            if kind == NodeKind.NK_FACADE_CLAUSE and sema.facade_clause_grants(item):
+                let prov = contract_clause_at(sema, site, item)
+                if not seen.contains(prov): seen.push(prov)
+            if kind != NodeKind.NK_FACADE_FN and kind != NodeKind.NK_FACADE_RESOURCE: continue
+            let first = sema.ast.get_data1(item) + ((kind == NodeKind.NK_FACADE_RESOURCE) as i32)
+            for k in 0..sema.ast.get_data2(item):
+                let clause = sema.ast.get_extra(first + k)
+                // A `lend` is a claim only where a parameter receives a resource:
+                // its rows say which (§31.8.1).
+                if not sema.facade_clause_grants(clause) or sema.ast.get_data0(clause) == FACADE_CLAUSE_LEND: continue
+                let prov = contract_clause_at(sema, site, clause)
+                if not seen.contains(prov): seen.push(prov)
     var proven = 0
     var stated = 0
     var registry = 0
@@ -959,7 +1021,7 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
     let claimed = stated + registry + profile + annotation
     let stale = contract_stale_override_notes(report, sema, source_path, source_text)
     report.note(f"contract-audit: clauses={proven + claimed + evidence + stale + sema.facade_override_against.len()} proven={proven} claimed={claimed} overrides={sema.facade_override_against.len()} stale-overrides={stale}" ++ (if evidence > 0: f" evidence={evidence}" else: ""))
-    if claimed > 0: report.note(f"contract-audit: claims: stated={stated} registry={registry} profile={profile} annotation={annotation}")
+    if claimed > 0: report.note(f"contract-audit: claims: stated={stated} registry={registry} profile={profile} annotation={annotation} uncited={contract_uncited_claims(sema, seen, source_path, source_text)}")
     report.note(f"contract-audit: resources={sema.facade_resources.len()} items={sema.foreign_contracts.len()} domains={sema.facade_domain_list.len()} conventions={conventions} advisories={advisories} profile-ambiguous={ambiguous} profile-shadowed={shadowed}")
 
 // ── the `contract` view ──────────────────────────────────────────────────

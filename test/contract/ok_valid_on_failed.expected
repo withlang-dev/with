@@ -15,6 +15,6 @@ fn sqlite3_errmsg; contract:sqlite@test/contract/ok_valid_on_failed.w; clause:fn
     failed-state: valid on the failed-state resource too (presented on Failed<R>)  [claim: stated@test/contract/ok_valid_on_failed.w:28]
     presentation: Database.errmsg  [default:presentation sugar from the resource prefix (§16.2b.11)]
 note: contract-audit: clauses=7 proven=0 claimed=7 overrides=0 stale-overrides=0
-note: contract-audit: claims: stated=7 registry=0 profile=0 annotation=0
+note: contract-audit: claims: stated=7 registry=0 profile=0 annotation=0 uncited=7
 note: contract-audit: resources=1 items=1 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 contract-audit: violations=0 ok
