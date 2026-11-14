@@ -383,6 +383,30 @@ let s = f"value: {x}"
 let s = "value: " ++ x    // error if x is not str
 ```
 
+### 15.5 Values from Text
+
+A type that implements `Parse` is called with text: `i32("42")` is
+the `i32` the text spells. Text that spells no value of the type
+is a panic naming the text and the type:
+
+```
+panic: i32("abc"): "abc" is not an i32
+```
+
+`text.parse()` is the form that reports the failure as a value. It
+returns `Option[T]`, `None` where the call would panic, and `T` is
+the type demanded of its result:
+
+```
+let n: i32 = line.parse() ?? 0
+```
+
+No type argument is written on it: `text.parse[i32]()` is an error
+that names `i32(text)`.
+
+The integer and floating-point types implement `Parse`. A
+program's type does by `impl Parse for T`.
+
 *§15.7 Output Functions moved to `docs/spec/stdlib/output-functions.md`.*
 
 *§15.8 Regular Expressions moved to `docs/spec/stdlib/regular-expressions.md`.*

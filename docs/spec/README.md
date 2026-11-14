@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.55
+# The With Programming Language — Specification v7.56
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.56:** (Eric, 2026-11-15). §15.5 (new): a type that implements `Parse` is called with text, `i32("42")`, and the result is the type; text that spells no value of it is a panic naming the text and the type. `text.parse()` reports the failure as `Option[T]`, typed by the demand on its result, and takes no type argument. The compiler is non-compliant until it implements the call form.
+
 **Changelog v7.55:** (Eric, 2026-11-15). §31.8.6: a global a `freed by`, `drop` or `destroys` clause names holds a function of one parameter, the pointer the resource wraps or the text to release; any other shape is an error, and an in-place or by-value resource names a function.
 
 **Changelog v7.54:** (Eric, 2026-11-13). §16.1: code translated from an imported header calls the functions the header names; the allocator rewrite applies only to `with migrate`. §16.2b.15: `with get` writes what the source proves against a grant (`contract-proofs.txt`) beside the contract. §31.7: the proofs a stated contract is held against are the ones recorded for the package it describes; the mark names what is implemented. §31.9: a citation on an `fn` or `resource` line covers the clauses under it that carry none.
@@ -485,6 +487,7 @@ arbitrary statements and `goto` (§13.5a, §13.5b).
   - [§15.2 Conversions](stdlib/string-conversions.md)
   - [§15.3 String Literals](015_strings.md#153-string-literals)
   - [§15.4 Formatted String Interpolation (F-Strings)](015_strings.md#154-formatted-string-interpolation-f-strings)
+  - [§15.5 Values from Text](015_strings.md#155-values-from-text)
   - [§15.7 Output Functions](stdlib/output-functions.md)
   - [§15.8 Regular Expressions](stdlib/regular-expressions.md)
 - [§16. FFI and C Interoperability](016_ffi.md)
