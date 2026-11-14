@@ -82,18 +82,21 @@ fn contract_clause_at(sema: &Sema, site: &ContractSite, clause: i32) -> str:
     contract_provenance(sema, site, clause, grants)
 
 // §31.9 rule 2: whether the stated claim at `line_no` of `source` carries a
-// citation: a comment on its own line, or on the `fn` or `resource` line it
-// stands under.
+// citation: a comment on its own line, or one on or directly above the `fn`
+// or `resource` line it stands under.
 fn contract_claim_is_cited(source: &str, line_no: i32) -> bool:
     var at = 0
     var owner_cited = false
+    var above = false
     for text in source.split("\n"):
         at += 1
         let said = text.trim()
         let comment = said.find("//")
         let cited = comment >= 0 and said.slice(comment + 2, said.len()).trim().len() > 0
-        if at == line_no: return cited or (owner_cited and not said.starts_with("fn ") and not said.starts_with("resource "))
-        if said.starts_with("fn ") or said.starts_with("resource "): owner_cited = cited
+        let owner = said.starts_with("fn ") or said.starts_with("resource ")
+        if at == line_no: return cited or (owner and above) or (owner_cited and not owner)
+        if owner: owner_cited = cited or above
+        above = cited and comment == 0
     false
 
 // The stated claims of this compilation with no citation (§31.9 rule 2).
