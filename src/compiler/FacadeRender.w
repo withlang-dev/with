@@ -1317,6 +1317,8 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     var movable = false
     var abandon_fn: i32 = 0
     let destroyers: List[i32] = []
+    // §31.8.6: `destroys g` where `g` is a function-pointer global.
+    let destroy_globals = []
     for k in 0..clause_count:
         let clause = pool.get_extra(extra_start + 1 + k)
         let kind = pool.get_data0(clause as NodeId)
@@ -1338,7 +1340,10 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
         else if kind == FACADE_CLAUSE_ABANDON:
             abandon_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_DESTROYS:
-            destroyers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
+            let destroyer = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            if destroyer != 0: destroyers.push(destroyer)
+            else if facade_render_global_fn_shape(pool, intern, pool.get_extra(ops)).0.len() > 0: destroy_globals.push(pool.get_extra(ops))
+            else: destroyers.push(0)
     // An in-place resource is pinned unless the facade says `movable` (D54):
     // its representation lives in a Box cell the value owns, so the value
     // moves and the address does not.
@@ -1405,7 +1410,9 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // itself is `.repr`, under the raw C rules.
     if facade_render_is_record(pool, intern, repr_text):
         out = out ++ "impl Deref[" ++ repr_text ++ "] for " ++ name ++ ":\n    fn deref(self: &Self) -> &" ++ repr_text ++ ": " ++ (if pinned: "self.repr.as_ref()" else: "&self.repr") ++ "\n"
-    if destroyers.len() > 0 or methods.len() > 0:
+    // A destroyer through a global takes the pointer the resource is.
+    if destroy_globals.len() > 0 and (pinned or not repr_text.starts_with("*")): return ("", facade_render_no_error_use())
+    if destroyers.len() > 0 or destroy_globals.len() > 0 or methods.len() > 0:
         out = out ++ "impl " ++ name ++ ":\n" ++ methods
         for destroyer in destroyers:
             let d = destroyer
@@ -1414,6 +1421,11 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             let repr_arg = facade_render_repr_arg(pool, intern, d, repr_text, "self.repr", pinned)
             let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg
             out = out ++ "    move fn " ++ dname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, d) ++ ":\n        self.live = false\n        " ++ facade_render_call(pool, intern, d, call_args) ++ "\n"
+        for hook in destroy_globals:
+            let hname = intern.resolve(hook)
+            let (_, result, _) = facade_render_global_fn_shape(pool, intern, hook)
+            let call = facade_render_call_through_global(pool, intern, hook, "self.repr", "        ", name ++ ": 'destroys " ++ hname ++ "', but " ++ hname ++ " is NULL (§31.11)")
+            out = out ++ "    move fn " ++ facade_render_present(pool, intern, ci, item, hname) ++ "()" ++ (if result.len() > 0: " " ++ result else: "") ++ ":\n        self.live = false\n        " ++ call ++ "\n"
     // `ok CONST` projects every status-returning producer — an out-parameter
     // producer or the in-place `init` — onto `Result[R, <R>Error]`
     // (facade_render_error_type); only out-parameter production can still
@@ -3950,6 +3962,18 @@ fn facade_render_release_through_var(pool: &AstPool, intern: &InternPool, decl: 
 // imported global of that name holds a function pointer.
 fn facade_render_call_through_global(pool: &AstPool, intern: &InternPool, free_sym: i32, repr: &str, indent: &str, failure: &str) -> str:
     let want = intern.resolve(free_sym)
+    let (ptype, _, nullable) = facade_render_global_fn_shape(pool, intern, free_sym)
+    if ptype.len() == 0: return ""
+    // §31.4: a call through a function pointer is raw.
+    let through = "unsafe { f(" ++ repr ++ " as " ++ ptype ++ ") }"
+    if not nullable: return "let f = " ++ want ++ "\n" ++ indent ++ through
+    "match " ++ want ++ ":\n" ++ indent ++ "    Some(f) => " ++ through ++ "\n" ++ indent ++ "    None => panic(\"" ++ failure ++ "\")"
+
+// The function type the imported global `sym` holds: its parameter list as
+// written, its result ("" for none), and whether the pointer may be NULL.
+// An empty parameter list text with no such global.
+fn facade_render_global_fn_shape(pool: &AstPool, intern: &InternPool, sym: i32) -> (str, str, bool):
+    let want = intern.resolve(sym)
     for di in 0..pool.decl_count():
         let vdecl = pool.get_decl(di)
         let type_node = facade_render_global_type_node(pool, vdecl as i32)
@@ -3958,7 +3982,7 @@ fn facade_render_call_through_global(pool: &AstPool, intern: &InternPool, free_s
         let nullable = ty.starts_with("Option[") and ty.ends_with("]")
         if nullable: ty = ty.slice(7, ty.len() - 1)
         let open = ty.find("fn(")
-        if open < 0: return ""
+        if open < 0: return ("", "", false)
         var depth = 0
         var close = open + 2
         while close < ty.len():
@@ -3967,14 +3991,10 @@ fn facade_render_call_through_global(pool: &AstPool, intern: &InternPool, free_s
                 depth = depth - 1
                 if depth == 0: break
             close = close + 1
-        if close >= ty.len(): return ""
-        let ptype = ty.slice(open + 3, close)
-        // §31.4: a call through a function pointer is raw.
-        let through = "unsafe { f(" ++ repr ++ " as " ++ ptype ++ ") }"
-        if not nullable: return "let f = " ++ want ++ "\n" ++ indent ++ through
-
-        return "match " ++ want ++ ":\n" ++ indent ++ "    Some(f) => " ++ through ++ "\n" ++ indent ++ "    None => panic(\"" ++ failure ++ "\")"
-    ""
+        if close >= ty.len(): return ("", "", false)
+        let result = ty.slice(close + 1, ty.len()).trim()
+        return (ty.slice(open + 3, close).to_owned(), if result == "-> Unit": "" else: result.to_owned(), nullable)
+    ("", "", false)
 
 fn facade_render_text_return(pool: &AstPool, intern: &InternPool, ci: &List[i32], decl: i32, call: &str, free_sym: i32, utf8: bool, indent: &str, prologue: &str) -> str:
     let taken = facade_render_param_names(pool, intern, decl)

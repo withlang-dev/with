@@ -1109,15 +1109,18 @@ impl Sema:
             return r
         if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS:
             let f = self.ast.get_extra(ops)
-            // §31.8.6: `drop g` names a function, or a global holding one.
-            if kind == FACADE_CLAUSE_DROP and self.get_sig(f) < 0:
+            // §31.8.6: `drop g` and `destroys g` name a function, or a
+            // global holding one.
+            if kind != FACADE_CLAUSE_INIT and self.get_sig(f) < 0:
                 let hook = self.facade_destroyer_global(f, r.repr_tid)
                 if hook != 0:
-                    r.drop = hook
+                    if kind == FACADE_CLAUSE_DROP: r.drop = hook
+                    else: r.destroyers.push(hook)
                     return r
                 if self.facade_extern_var_named(self.pool_resolve(f)) != 0:
                     let gname = self.pool_resolve(f)
-                    self.emit_error(f"resource '{rname}': 'drop {gname}' names a global that does not hold a function of one parameter taking the pointer the resource wraps (§31.8.6)", clause)
+                    let word = if kind == FACADE_CLAUSE_DROP: "drop" else: "destroys"
+                    self.emit_error(f"resource '{rname}': '{word} {gname}' names a global that does not hold a function of one parameter taking the pointer the resource wraps (§31.8.6)", clause)
                     return r
             let sig = self.facade_fn_sig(f, clause)
             if sig < 0:
