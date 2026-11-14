@@ -1308,6 +1308,8 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // The `borrows` and `independent` clauses are read by
     // facade_render_item_deps, the one dependency derivation.
     var drop_fn: i32 = 0
+    // §31.8.6: `drop g` where `g` is a function-pointer global, not a function.
+    var drop_global: i32 = 0
     var init_fn: i32 = 0
     var preinit_fn: i32 = 0
     // `ok C1, C2, …` (§16.2b.4): every listed status is success.
@@ -1332,6 +1334,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             movable = true
         else if kind == FACADE_CLAUSE_DROP:
             drop_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            if drop_fn == 0: drop_global = pool.get_extra(ops)
         else if kind == FACADE_CLAUSE_ABANDON:
             abandon_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_DESTROYS:
@@ -1345,7 +1348,11 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // leak a value dropped while live), a destroyer that takes neither the
     // representation nor a pointer to it: Sema's facade diagnostics name the
     // resource; nothing is rendered.
-    if drop_fn == 0:
+    // The call a drop through a global makes; "" when the name is no such
+    // global, or the resource is in place (the global takes the pointer the
+    // resource is).
+    let global_drop = if drop_fn == 0: facade_render_drop_call(pool, intern, name, 0, drop_global, repr_text, "self.repr", pinned, "            ") else: ""
+    if drop_fn == 0 and global_drop.len() == 0:
         return ("", facade_render_no_error_use())
     for destroyer in destroyers:
         if destroyer == 0 or facade_render_repr_arg(pool, intern, destroyer, repr_text, "self.repr", pinned).len() == 0:
@@ -1375,8 +1382,8 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // its parents, and refuses a parent's move or destruction while it lives.
     // No reference count or generation check is added (ruling §29).
     var out = if deps.slot_res.len() > 0: "type " ++ name ++ " ephemeral { " ++ facade_render_dep_fields(pool, intern, deps) ++ "repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n" else: "type " ++ name ++ " { repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n"
-    if drop_fn != 0:
-        let drop_call = facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned))
+    if drop_fn != 0 or global_drop.len() > 0:
+        let drop_call = facade_render_drop_call(pool, intern, name, drop_fn, drop_global, repr_text, "self.repr", pinned, "            ")
         // `abandon <fn>` (§16.2b.9): the `callbacks none` abandonment path
         // runs before the destroyer on a drop path whose callback pair is
         // not proven callback-free. A spurious call costs one call and a
@@ -1387,7 +1394,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             let abandon_call = facade_render_call(pool, intern, abandon_fn, facade_render_repr_arg(pool, intern, abandon_fn, repr_text, "self.repr", pinned))
             out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live:\n            " ++ abandon_call ++ "\n            " ++ drop_call ++ "\n"
         else:
-            out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ drop_call ++ "\n"
+            out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live:\n            " ++ drop_call ++ "\n"
         if keeps:
             // The retaining origin never outlives what it retains (§25):
             // the destroyer has run; now the retained values are released.
@@ -1439,7 +1446,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // `FailedWithResource`.
     let dependent = deps.slot_res.len() > 0
     if status_type.len() > 0:
-        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn, failed_methods, with_message, shared.len() > 0)
+        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn, drop_global, failed_methods, with_message, shared.len() > 0)
     // Borrowed returns of this resource (ruling §26): `Borrowed<R>`.
     out = out ++ facade_render_borrowed_type(pool, intern, ci, item, repr_text, plain_methods)
     for pi in 0..producers.len():
@@ -1458,7 +1465,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             // it has one: the variant's shape is the facade's, not this
             // resource's.
             let message_call = if with_message or shared_message: facade_render_producer_message_call(pool, intern, ci, producer) else: ""
-            let (ctor, result) = facade_render_out_producer(pool, intern, name, repr_text, producer, pname, slot, ok_syms, made_deps, drop_fn, message_call, shared, shared_message)
+            let (ctor, result) = facade_render_out_producer(pool, intern, name, repr_text, producer, pname, slot, ok_syms, made_deps, drop_fn, drop_global, message_call, shared, shared_message)
             out = out ++ ctor ++ facade_render_receiver_method(pool, intern, ci, item, producer, slot, pname, result)
             continue
         let bridge = facade_render_bridge(pool, intern, producer, 0, -1, "")
@@ -1935,7 +1942,7 @@ fn facade_render_ok_value(ok_syms: &List[i32], status: &str, made: &str) -> str:
 // `shared` is the facade's one error type, or "" for `<R>Error`; with it,
 // `shared_message` says its `Failed` carries a message even where this
 // producer reads none.
-fn facade_render_out_producer(pool: &AstPool, intern: &InternPool, name: &str, repr_text: &str, producer: i32, pname: &str, slot: i32, ok_syms: &List[i32], deps: &str, drop_fn: i32, message_call: &str, shared: &str, shared_message: bool) -> (str, str):
+fn facade_render_out_producer(pool: &AstPool, intern: &InternPool, name: &str, repr_text: &str, producer: i32, pname: &str, slot: i32, ok_syms: &List[i32], deps: &str, drop_fn: i32, drop_global: i32, message_call: &str, shared: &str, shared_message: bool) -> (str, str):
     let taken = facade_render_param_names(pool, intern, producer)
     let slot_var = facade_render_fresh("slot", taken)
     let bridge = facade_render_bridge(pool, intern, producer, 0, slot, "&raw mut " ++ slot_var)
@@ -1974,7 +1981,7 @@ fn facade_render_out_producer(pool: &AstPool, intern: &InternPool, name: &str, r
         // A dependent resource: the generated error never owns a child
         // (see facade_render_error_type), so a failure that still produced
         // is destroyed here, exactly once, and reported as `Failed`.
-        out = out ++ "        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, slot_var, false)) ++ "\n        return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n"
+        out = out ++ "        " ++ facade_render_drop_call(pool, intern, name, drop_fn, drop_global, repr_text, slot_var, false, "        ") ++ "\n        return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n"
     else:
         out = out ++ "        return Err(" ++ err ++ "." ++ facade_render_failed_with_name(name, shared.len() > 0) ++ "(" ++ status ++ ", " ++ facade_render_failed_name(name) ++ " { repr: " ++ slot_var ++ " }))\n"
     out = out ++ "    if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".NothingProduced(" ++ status ++ "))\n"
@@ -2111,12 +2118,12 @@ fn facade_render_shared_error_type(pool: &AstPool, intern: &InternPool, ci: &Lis
 //         fn errmsg() -> Option[CStr]: …                 // `valid on failed`
 // Under the facade's one error type (`shared`) only `Failed<R>` is
 // rendered here; the error is the block's (facade_render_shared_error_type).
-fn facade_render_error_type(pool: &AstPool, intern: &InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, drop_fn: i32, failed_methods: &str, with_message: bool, shared: bool) -> str:
+fn facade_render_error_type(pool: &AstPool, intern: &InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, drop_fn: i32, drop_global: i32, failed_methods: &str, with_message: bool, shared: bool) -> str:
     let err = facade_render_error_name(name)
     var out = ""
     if failed_state:
         let failed = facade_render_failed_name(name)
-        out = "type " ++ failed ++ " { repr: " ++ repr_text ++ " }\nimpl Drop for " ++ failed ++ ":\n    move fn drop():\n        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", false)) ++ "\n"
+        out = "type " ++ failed ++ " { repr: " ++ repr_text ++ " }\nimpl Drop for " ++ failed ++ ":\n    move fn drop():\n        " ++ facade_render_drop_call(pool, intern, name, drop_fn, drop_global, repr_text, "self.repr", false, "        ") ++ "\n"
         if failed_methods.len() > 0:
             out = out ++ "impl " ++ failed ++ ":\n" ++ failed_methods
     if shared: return out
@@ -2146,6 +2153,16 @@ fn facade_render_find_fn(pool: &AstPool, intern: &InternPool, ci: &List[i32], sy
     let imported: i32 = g_facade_fn_ci_decl.get(want) ?? 0
     if imported != 0: return imported
     g_facade_fn_any_decl.get(want) ?? 0
+
+// The call that destroys the representation at `place`: the `drop`
+// function's, or the one through the function-pointer global `drop` names
+// (§31.8.6), which takes the pointer the resource is. `indent` is that of
+// the line the call starts on. "" when there is neither.
+fn facade_render_drop_call(pool: &AstPool, intern: &InternPool, name: &str, drop_fn: i32, drop_global: i32, repr_text: &str, place: &str, pinned: bool, indent: &str) -> str:
+    if drop_fn != 0: return facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, place, pinned))
+    if drop_global == 0 or pinned or not repr_text.starts_with("*"): return ""
+    let hook = intern.resolve(drop_global)
+    facade_render_call_through_global(pool, intern, drop_global, place, indent, name ++ ": 'drop " ++ hook ++ "', but " ++ hook ++ " is NULL (§31.11)")
 
 fn facade_render_param_count(pool: &AstPool, decl: i32) -> i32:
     let meta = pool.find_fn_meta(decl as NodeId)
@@ -3923,6 +3940,15 @@ fn facade_render_global_type_node(pool: &AstPool, decl: i32) -> i32:
     if slot == 0: 0 else: pool.get_extra(slot - 1)
 
 fn facade_render_release_through_var(pool: &AstPool, intern: &InternPool, decl: i32, free_sym: i32, repr: &str, indent: &str) -> str:
+    let fname = intern.resolve(pool.get_data0(decl as NodeId))
+    let want = intern.resolve(free_sym)
+    facade_render_call_through_global(pool, intern, free_sym, repr, indent, fname ++ ": 'freed by " ++ want ++ "', but " ++ want ++ " is NULL (§16.2b.8)")
+
+// A call through the function-pointer global `free_sym` with `repr` as its
+// one argument (§31.8.6): the pointer is read at the call, never cached,
+// and a NULL is the contract failure `failure` (§31.11). "" when no
+// imported global of that name holds a function pointer.
+fn facade_render_call_through_global(pool: &AstPool, intern: &InternPool, free_sym: i32, repr: &str, indent: &str, failure: &str) -> str:
     let want = intern.resolve(free_sym)
     for di in 0..pool.decl_count():
         let vdecl = pool.get_decl(di)
@@ -3946,8 +3972,8 @@ fn facade_render_release_through_var(pool: &AstPool, intern: &InternPool, decl: 
         // §31.4: a call through a function pointer is raw.
         let through = "unsafe { f(" ++ repr ++ " as " ++ ptype ++ ") }"
         if not nullable: return "let f = " ++ want ++ "\n" ++ indent ++ through
-        let fname = intern.resolve(pool.get_data0(decl as NodeId))
-        return "match " ++ want ++ ":\n" ++ indent ++ "    Some(f) => " ++ through ++ "\n" ++ indent ++ "    None => panic(\"" ++ fname ++ ": 'freed by " ++ want ++ "', but " ++ want ++ " is NULL (§16.2b.8)\")"
+
+        return "match " ++ want ++ ":\n" ++ indent ++ "    Some(f) => " ++ through ++ "\n" ++ indent ++ "    None => panic(\"" ++ failure ++ "\")"
     ""
 
 fn facade_render_text_return(pool: &AstPool, intern: &InternPool, ci: &List[i32], decl: i32, call: &str, free_sym: i32, utf8: bool, indent: &str, prologue: &str) -> str:
