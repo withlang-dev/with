@@ -5327,6 +5327,45 @@ impl Sema:
         true
 
     // Ruling §61 for callback contracts, and the net under the renderer.
+    // §31.8.6: a function that assigns a global a destroyer clause names
+    // stays raw whatever a contract says of it: nothing safe code can call
+    // writes the pointer the generated call reads. A contract that
+    // describes one is an error. Run after every body is checked: the
+    // writes are each body's own, and a function that calls an assigner
+    // assigns.
+    mut fn verify_facade_hook_assigners():
+        let hooks = []
+        for c in self.foreign_contracts:
+            if c.text_return_free != 0 and self.get_sig(c.text_return_free) < 0: hooks.push(c.text_return_free)
+        for r in self.facade_resources:
+            if r.drop != 0 and self.get_sig(r.drop) < 0: hooks.push(r.drop)
+            for d in r.destroyers:
+                if self.get_sig(d) < 0: hooks.push(d)
+        if hooks.len() == 0: return
+        // (function, the node that describes it)
+        let described = []
+        for c in self.foreign_contracts: described.push((c.fn_sym, c.node))
+        for r in self.facade_resources:
+            for p in r.producers: described.push((p, r.node))
+            for d in r.destroyers: described.push((d, r.node))
+            described.push((r.init, r.node))
+            described.push((r.preinit, r.node))
+            described.push((r.drop, r.node))
+            described.push((r.abandon, r.node))
+        let index = self.global_call_index()
+        let said = []
+        for (f, node) in described:
+            let sig = if f != 0: self.get_sig(f) else: -1
+            if sig < 0 or said.contains(f): continue
+            let written = self.fn_global_effects(sig, index)
+            for hook in hooks:
+                if not written.contains(hook): continue
+                said.push(f)
+                let fname = self.pool_resolve(f)
+                let gname = self.pool_resolve(hook)
+                self.emit_error(f"'{fname}' assigns '{gname}', the global a destroyer clause names: a function that assigns it stays raw, and a contract cannot describe it (§31.8.6)", node)
+                break
+
     // Whether a destroyer clause names `sym`: `freed by`, `drop` or `destroys`.
     fn facade_global_is_named_destroyer(sym: i32) -> bool:
         for c in self.foreign_contracts:

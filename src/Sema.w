@@ -11462,6 +11462,7 @@ impl Sema:
         self.finalize_closure_arg_checks()
         self.check_script_nonescaping_helpers()
         self.check_generator_pulls()
+        self.verify_facade_hook_assigners()
         self.finalize_receiver_requirements()
         self.enforce_receiver_modes()
         // D5 superseded: free-parameter share-place is no longer inferred from
