@@ -9,6 +9,10 @@ the programmer's, chosen by the operation written).
 the first sentences; the rest of the ruling is NOT YET in the spec and NOT
 YET implemented. The compiler is non-compliant with all of it.
 
+**Amended by D204 (the same day):** the conversion is spelled `text as T`.
+The call form `i32(text)`, `i32(text, base: 16)` and the pipeline form
+`text |> i32` below are withdrawn; everything else here stands.
+
 **Context.** `"42".parse[i32]()` was refused with "cannot infer generic
 method type parameter 'T'". #598 had ruled explicit type arguments off free
 functions; the record did not say what a method call does when no demand

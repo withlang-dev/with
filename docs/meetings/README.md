@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D204 — Text converts with `as`: `"42" as i32` panics on bad text; a type is not callable for parsing and is not a pipeline stage (ruled; amends D203)](2026-11-14-D204-text-converts-with-as.md)
 - [D203 — A type called with text parses it: `i32(text)` panics, `text.parse()` is the `Option`; two modes, With's notation or digits in a stated base (ruled)](2026-11-14-D203-a-type-called-with-text-parses-it.md)
 - [D202 — The facade language is the With Contract Language](2026-11-11-D202-the-facade-language-is-the-with-contract-language.md)
 - [D201 — Law 12: the programmer has the last word on what the compiler cannot see](2026-11-11-D201-law-12-the-programmer-has-the-last-word-on-what-the-compiler-cannot-see.md)

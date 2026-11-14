@@ -579,7 +579,9 @@ sign- or zero-extends. From a float to an integer it truncates toward zero;
 a value out of range saturates to `T`'s minimum or maximum, and NaN gives
 0. From an integer to a float, and from a wider float to a narrower one, it
 rounds to nearest, ties to even; a value too large for the narrower float
-becomes ±infinity (D125).
+becomes ±infinity (D125). From text to a type that implements `Parse` it is
+the conversion of §15.5, and the one cast that can fail: text that spells
+no value of the type is a panic. Every other cast is unchanged.
 
 #### 4.2.7 Comparison Operators and Chaining
 
