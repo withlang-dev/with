@@ -5255,8 +5255,16 @@ pub fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_getrlimit(res
 pub fn with_libc_cpu_time_ns() -> i64: rt_cpu_time_ns()
 pub fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32: rt_setrlimit(resource, lim)
 pub fn with_libc_mkstemp(template_path: *mut c_char) -> i32: rt_mkstemp(template_path)
+// #3292: with a null buffer libc's realpath allocates the result with
+// malloc, and migrated code releases it with the runtime's allocator (its
+// `free` is with_free). The buffer is the runtime's instead: PATH_MAX is
+// 1024 on Darwin and 4096 on Linux, and realpath writes at most that.
 pub fn with_libc_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char:
-    rt_realpath(path, resolved_path)
+    if resolved_path != null: return rt_realpath(path, resolved_path)
+    let buffer = with_alloc(4096) as *mut c_char
+    let resolved = rt_realpath(path, buffer)
+    if resolved == null: with_free(buffer as *mut u8)
+    resolved
 
 pub fn with_fs_chmod(path: &str, mode: i32) -> i32:
     let cpath = str_to_cstr(path)

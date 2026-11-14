@@ -1525,6 +1525,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     0
 
 fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
+    ci_set_migrating(true)
     let input_path = ci_migrate_fs_path(input_path_arg)
     let output_path = ci_migrate_fs_path(output_path_arg)
     var project = CiProject.new()
@@ -2324,6 +2325,7 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     summary
 
 fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:
+    ci_set_migrating(true)
     let input_dir = ci_migrate_fs_path(input_dir_arg)
     let output_dir = ci_migrate_fs_path(output_dir_arg)
     g_migrate_fn_translated_total = 0

@@ -38,6 +38,10 @@ var g_cimport_raw_function_names: str = ""
 var g_cimport_unprototyped_names: str = ""
 var g_cimport_report_untranslated_macros = false
 var g_ci_migrate_in_unsafe_function_body: bool = false
+// Whether the translation is `with migrate`'s (true) or an imported header's.
+var g_ci_migrating: bool = false
+
+fn ci_set_migrating(on: bool): g_ci_migrating = on
 // §16.2a no_methods opt-out. Set per-import before translation.
 var g_cimport_no_methods_all: i32 = 0
 var g_cimport_no_methods_types: List[str] = List.new()
@@ -451,6 +455,22 @@ fn ci_note_overflow_helper_needed(helper: &str, op: &str, ty: &str):
     for g_ci_overflow_helpers_needed_item in g_ci_overflow_helpers_needed:
         if g_ci_overflow_helpers_needed_item == entry: return
     g_ci_overflow_helpers_needed.push(entry)
+
+// #3292: libc's allocator under a private name, declared only in a
+// translation whose inline code names it through a system header (whose own
+// declarations are filtered).
+// The names needed, each followed by a space.
+var g_ci_libc_allocator_needed = ""
+
+fn ci_render_libc_allocator_needed() -> str:
+    var out = ""
+    for name in g_ci_libc_allocator_needed.fields():
+        if with_cimport_is_name_emitted("__with_ci_libc_" ++ name) != 0: continue
+        let sig = if name == "malloc": "(size: u64) -> *mut c_void" else if name == "calloc": "(count: u64, size: u64) -> *mut c_void" else if name == "realloc": "(ptr: *mut c_void, size: u64) -> *mut c_void" else: "(ptr: *mut c_void)"
+        out = out ++ "@[link_name(\"" ++ name ++ "\")]\nextern fn __with_ci_libc_" ++ name ++ sig ++ "\n"
+        with_cimport_mark_name_emitted("__with_ci_libc_" ++ name)
+    g_ci_libc_allocator_needed = ""
+    out
 
 fn ci_render_overflow_helpers_needed() -> str:
     var out = ""
@@ -871,6 +891,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
     g_cimport_raw_function_names = ""
     g_cimport_unprototyped_names = ""
     g_ci_overflow_helpers_needed = List.new()
+    g_ci_libc_allocator_needed = ""
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
     if with_cimport_available() == 0:
@@ -1043,6 +1064,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
         output.push_str(ci_translate_macros(macro_session, session, include_text))
         with_cimport_dispose_macros(macro_session)
     output.push_str(ci_render_overflow_helpers_needed())
+    output.push_str(ci_render_libc_allocator_needed())
     with_cimport_dispose(session)
     ci_fn_decl_index_reset()
     g_macro_type_names = ""
@@ -11632,6 +11654,15 @@ impl CiExprPool:
             let function_name = ci_migrate_c_function_name(name)
             let escaped = if not ci_scope_contains(scope, ordinary_name) and ci_lookup_c_function_decl_idx(session, function_name) >= 0: function_name else: ordinary_name
             let mangled = ci_scope_lookup(scope, escaped)
+            // #3292: under c_import a header's inline code calls libc's allocator
+            // as written. <stdlib.h>'s own declarations are filtered with the rest
+            // of the system header, so the reference names the translation's
+            // declaration of the same symbol.
+            if mangled.len() == 0 and not g_ci_migrating and (name == "malloc" or name == "calloc" or name == "realloc" or name == "free"):
+                let declared_at = with_ci_cursor_referenced_location(session, cursor)
+                if declared_at.len() > 0 and ci_is_system_path(declared_at):
+                    if not g_ci_libc_allocator_needed.contains(name ++ " "): g_ci_libc_allocator_needed = g_ci_libc_allocator_needed ++ name ++ " "
+                    return self.ident(self.add_string("__with_ci_libc_" ++ name), 0)
             if mangled.len() == 0 and not ci_has_value_libc_call_mapping(name):
                 if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
                     if not ci_note_filtered_system_symbol_ref_at(session, cursor, name, CI_LIBC_KIND_FN):
@@ -12617,7 +12648,11 @@ impl CiExprPool:
             return self.build_named_call_expr(renamed, arg_ids)
         if ci_is_libm_fn(callee_text):
             return self.build_named_call_expr(callee_text, arg_ids)
-        if callee_text == "malloc":
+        // #3292: the allocator rewrite is `with migrate`'s, where every allocation of
+        // the program is translated together. Code translated from an imported
+        // header calls the functions the header names: it runs beside compiled
+        // C that allocates and frees with libc.
+        if g_ci_migrating and callee_text == "malloc":
             if arg_ids.len() != 1:
                 return 0
             let i64_ty = types.named_type_from_text("i64")
@@ -12634,7 +12669,7 @@ impl CiExprPool:
                 call_id = self.unsafe_expr(call_id)
             let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
             return self.cast(void_ptr_ty, call_id)
-        if callee_text == "free" or callee_text == "with_free":
+        if (g_ci_migrating and callee_text == "free") or callee_text == "with_free":
             if arg_ids.len() != 1:
                 return 0
             let free_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
@@ -12649,7 +12684,7 @@ impl CiExprPool:
             if ci_migrate_call_requires_unsafe_wrapper("with_free"):
                 call_id = self.unsafe_expr(call_id)
             return call_id
-        if callee_text == "calloc":
+        if g_ci_migrating and callee_text == "calloc":
             if arg_ids.len() != 2:
                 return 0
             let i64_ty = types.named_type_from_text("i64")
@@ -12668,7 +12703,7 @@ impl CiExprPool:
                 call_id = self.unsafe_expr(call_id)
             let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
             return self.cast(void_ptr_ty, call_id)
-        if callee_text == "realloc":
+        if g_ci_migrating and callee_text == "realloc":
             if arg_ids.len() != 2:
                 return 0
             let realloc_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
@@ -13626,7 +13661,7 @@ impl CiStmtPool:
                 }
             if has_mapped_call:
                 return ci_value_ir_invalid()
-            if callee_text.len() > 0 and ci_is_c_ident(callee_text) and not ci_scope_contains(scope, callee_text):
+            if callee_text.len() > 0 and ci_is_c_ident(callee_text) and not ci_scope_contains(scope, callee_text) and not callee_text.starts_with("__with_ci_libc_"):
                 let referenced_cursor = if nc > 0: with_ci_child(session, cursor, 0) else: cursor
                 if not ci_note_filtered_system_symbol_ref_at(session, referenced_cursor, callee_text, CI_LIBC_KIND_FN):
                     return ci_value_ir_invalid()
@@ -22086,7 +22121,7 @@ fn ci_is_system_decl(name: &str) -> bool:
 
 // Check if a function name is a libc function that we map to With equivalents.
 fn ci_is_mapped_libc_fn(name: &str) -> bool:
-    if name == "malloc" or name == "free" or name == "calloc" or name == "realloc": return true
+    if name == "malloc" or name == "free" or name == "calloc" or name == "realloc": return g_ci_migrating
     if name == "memcpy" or name == "memmove" or name == "memset" or name == "memcmp": return true
     if name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strchr": return true
     if name == "abort" or name == "exit": return true
@@ -22118,7 +22153,8 @@ fn ci_has_value_libc_call_mapping(callee: &str) -> bool:
         return true
     if ci_is_libm_fn(callee):
         return true
-    if callee == "malloc" or callee == "free" or callee == "calloc" or callee == "realloc":
+    // #3292: the allocator rewrite is `with migrate`'s only.
+    if g_ci_migrating and (callee == "malloc" or callee == "free" or callee == "calloc" or callee == "realloc"):
         return true
     if callee == "memcpy" or callee == "memmove" or callee == "memset" or callee == "memcmp" or callee == "memchr":
         return true
@@ -22177,7 +22213,7 @@ impl CiExprPool:
                 j = j + 1
             return self.add(CiExprKind.CIE_CALL, renamed_callee as i32, args_start, arg_count, 0)
         // malloc(N) → (with_alloc(N as i64) as *mut c_void)
-        if callee_text == "malloc":
+        if g_ci_migrating and callee_text == "malloc":
             if arg_count != 1:
                 return 0
             ci_trace_port("STRUCTURAL[b11.9.libc_call]")
@@ -22204,7 +22240,7 @@ impl CiExprPool:
             let void_ptr_ty = types.ty_pointer(cvoid_ty, 0)
             return self.cast(void_ptr_ty, call_id)
         // free(p) → with_free(p as *mut u8)
-        if callee_text == "free":
+        if g_ci_migrating and callee_text == "free":
             if arg_count != 1:
                 return 0
             ci_trace_port("STRUCTURAL[b11.9.libc_call]")
@@ -22234,17 +22270,17 @@ fn ci_map_libc_call(callee: &str, args: &str) -> str:
     // to a void*-typed variable, so wrap the cast inline instead
     // of doing it as a post-process text rewrite (which can't
     // handle nested parens in the arg text).
-    if callee == "malloc":
+    if g_ci_migrating and callee == "malloc":
         return "(" ++ ci_migrate_wrap_call_if_needed("with_alloc", "with_alloc((" ++ args ++ ") as i64)") ++ " as *mut c_void)"
-    if callee == "free":
+    if g_ci_migrating and callee == "free":
         return ci_migrate_wrap_call_if_needed("with_free", "with_free((" ++ args ++ ") as " ++ ci_rt_ptr_mut() ++ ")")
-    if callee == "calloc":
+    if g_ci_migrating and callee == "calloc":
         let count_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
         if count_arg.len() == 0 or size_arg.len() == 0:
             return ""
         return "(" ++ ci_migrate_wrap_call_if_needed("with_alloc_zeroed", "with_alloc_zeroed((" ++ count_arg ++ ") as i64, (" ++ size_arg ++ ") as i64)") ++ " as *mut c_void)"
-    if callee == "realloc":
+    if g_ci_migrating and callee == "realloc":
         let ptr_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
         if ptr_arg.len() == 0 or size_arg.len() == 0:

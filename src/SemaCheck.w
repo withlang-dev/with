@@ -3218,6 +3218,8 @@ impl Sema:
     // The bodies declaration `di` calls by name whose results its check
     // reads (an inferred return, a returned view: body_typed_decls), each
     // checked before it, a function's or a global initializer's.
+    fn decl_is_spelled_as_method(decl: i32): self.pool_resolve(self.ast.get_data0(decl)).contains(".")
+
     mut fn check_callee_bodies_first(di: i32):
         let decl = self.ast.get_decl(di)
         var n: i32 = self.body_order_lower[di] + 1
@@ -3233,7 +3235,12 @@ impl Sema:
                     // bindings it captures; never ahead of main's body.
                     let ahead_of_main = self.ast.is_script_helper(self.ast.get_decl(target) as NodeId) and self.ast.get_data0(decl) == self.pool_lookup_symbol("main")
                     // In progress means a cycle: that call is reported, not chased.
-                    if target != di and not ahead_of_main: self.check_decl_body_in_order(target)
+                    // A plain call `f(…)` from a function is not a call of a method
+                    // `Owner.f`: the walk is by name, and libc's `free` called by
+                    // `dc_free` named the method `dc.free`, whose body calls
+                    // `dc_free` back, reported as a cycle (D143) that is not one.
+                    let not_this_callee = callee_kind == NodeKind.NK_IDENT and self.decl_is_spelled_as_method(self.ast.get_decl(target)) and not self.decl_is_spelled_as_method(decl)
+                    if target != di and not ahead_of_main and not not_this_callee: self.check_decl_body_in_order(target)
                     target = self.body_typed_next[target]
             n = n + 1
 
