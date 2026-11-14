@@ -1076,7 +1076,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         registry: "",
         registry_more: "",
         variadic: 0,
-        assigned_globals: List.new(),
+        assigned_globals: [],
         header_declared: 0,
         header_file: "",
         definition_location: "",

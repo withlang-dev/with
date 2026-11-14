@@ -762,7 +762,7 @@ impl Sema:
             let item = self.ast.get_extra(self.ast.get_data1(node) + i)
             let kind = self.ast.kind(item)
             if kind != NodeKind.NK_FACADE_RESOURCE and kind != NodeKind.NK_FACADE_FN: continue
-            let first = if kind == NodeKind.NK_FACADE_RESOURCE: 1 else: 0
+            let first = (kind == NodeKind.NK_FACADE_RESOURCE) as i32
             if kind == NodeKind.NK_FACADE_FN: described.push(self.ast.get_data0(item))
             for k in 0..self.ast.get_data2(item):
                 let clause = self.ast.get_extra(self.ast.get_data1(item) + first + k)
