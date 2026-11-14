@@ -459,16 +459,17 @@ fn ci_note_overflow_helper_needed(helper: &str, op: &str, ty: &str):
 // #3292: libc's allocator under a private name, declared only in a
 // translation whose inline code names it through a system header (whose own
 // declarations are filtered).
-var g_ci_libc_allocator_needed: List[str] = List.new()
+// The names needed, each followed by a space.
+var g_ci_libc_allocator_needed = ""
 
 fn ci_render_libc_allocator_needed() -> str:
     var out = ""
-    for name in g_ci_libc_allocator_needed:
+    for name in g_ci_libc_allocator_needed.fields():
         if with_cimport_is_name_emitted("__with_ci_libc_" ++ name) != 0: continue
         let sig = if name == "malloc": "(size: u64) -> *mut c_void" else if name == "calloc": "(count: u64, size: u64) -> *mut c_void" else if name == "realloc": "(ptr: *mut c_void, size: u64) -> *mut c_void" else: "(ptr: *mut c_void)"
         out = out ++ "@[link_name(\"" ++ name ++ "\")]\nextern fn __with_ci_libc_" ++ name ++ sig ++ "\n"
         with_cimport_mark_name_emitted("__with_ci_libc_" ++ name)
-    g_ci_libc_allocator_needed = List.new()
+    g_ci_libc_allocator_needed = ""
     out
 
 fn ci_render_overflow_helpers_needed() -> str:
@@ -890,7 +891,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
     g_cimport_raw_function_names = ""
     g_cimport_unprototyped_names = ""
     g_ci_overflow_helpers_needed = List.new()
-    g_ci_libc_allocator_needed = List.new()
+    g_ci_libc_allocator_needed = ""
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
     if with_cimport_available() == 0:
@@ -11660,7 +11661,7 @@ impl CiExprPool:
             if mangled.len() == 0 and not g_ci_migrating and (name == "malloc" or name == "calloc" or name == "realloc" or name == "free"):
                 let declared_at = with_ci_cursor_referenced_location(session, cursor)
                 if declared_at.len() > 0 and ci_is_system_path(declared_at):
-                    if not g_ci_libc_allocator_needed.contains(name): g_ci_libc_allocator_needed.push(name.to_owned())
+                    if not g_ci_libc_allocator_needed.contains(name ++ " "): g_ci_libc_allocator_needed = g_ci_libc_allocator_needed ++ name ++ " "
                     return self.ident(self.add_string("__with_ci_libc_" ++ name), 0)
             if mangled.len() == 0 and not ci_has_value_libc_call_mapping(name):
                 if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
