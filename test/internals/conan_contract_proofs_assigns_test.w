@@ -1,0 +1,43 @@
+//! expect-stdout: ok
+// §31.8.6: `with get` records each function of the package's source that
+// assigns a global, by the global's name (contract-proofs.txt,
+// `<fn>\tassigns\t<global>\t<proof>`), for a destroyer clause that names
+// the global to be held against.
+//   set_release    assigns the global from its parameter -> assigns
+//   reset_release  assigns it a function                 -> assigns
+//   node_count     assigns a local                       -> nothing
+//   node_free      calls through the global              -> nothing
+use compiler.ConanClient
+use std.fs
+use std.process
+
+fn main:
+    let root = "out/tmp/conan_contract_proofs_assigns_test"
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    let header = "typedef struct Node { int n; } Node;\nNode *node_new(void);\nvoid node_free(Node *n);\nextern void (*node_release)(Node *n);\nvoid set_release(void (*f)(Node *n));\nvoid reset_release(void);\nint node_count(Node *n);\n"
+    assert(write_file(dep ++ "/include/nodes.h", header) == 0)
+    assert(write_file(src ++ "/nodes.h", header) == 0)
+    var unit = "#include <stdlib.h>\n#include \"nodes.h\"\nstatic void plain_release(Node *n) { free(n); }\nvoid (*node_release)(Node *n) = plain_release;\n"
+    unit = unit ++ "Node *node_new(void) { return calloc(1, sizeof(Node)); }\n"
+    unit = unit ++ "void node_free(Node *n) { node_release(n); }\n"
+    unit = unit ++ "void set_release(void (*f)(Node *n)) { node_release = f; }\n"
+    unit = unit ++ "void reset_release(void) { node_release = plain_release; }\n"
+    unit = unit ++ "int node_count(Node *n) { int c; c = n->n; return c; }\n"
+    assert(write_file(src ++ "/nodes.c", unit) == 0)
+    let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c nodes.c\",\n  \"file\": \"nodes.c\"\n}\n]\n"
+    assert(write_file(build ++ "/compile_commands.json", commands) == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"nodes\"]}\n") == 0)
+    assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
+    conan_write_facade("nodes", "1.0", dep, src, build)
+    let proofs = read_file(dep ++ "/contract-proofs.txt") ?? "<no contract-proofs.txt>"
+    let ok = proofs.contains("set_release\tassigns\tnode_release\tthe body of set_release assigns node_release\n") and proofs.contains("reset_release\tassigns\tnode_release\t") and not proofs.contains("node_count\tassigns") and not proofs.contains("node_free\tassigns")
+    if not ok:
+        print(proofs)
+        print(read_file(dep ++ "/contract-report.txt") ?? "")
+    assert(ok)
+    print("ok")

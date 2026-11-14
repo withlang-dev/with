@@ -1871,6 +1871,8 @@ impl CiProject:
             else if (parts[0] == "field" or parts[0] == "global") and parts.len() == 2:
                 let pi = ci_index_of_name(names, parts[1])
                 if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[0] ++ ";"
+            else if parts[0] == "assign" and parts.len() == 2:
+                if not self.symbols[symbol_id].assigned_globals.contains(parts[1]): self.symbols[symbol_id].assigned_globals.push(parts[1])
 
     // A static definition is not a project symbol, but its calls are corpus
     // calls: a NULL it passes to a corpus function is caller evidence

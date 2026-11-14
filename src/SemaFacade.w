@@ -749,6 +749,43 @@ impl Sema:
             return
         self.emit_error_with_help(f"{what}\n = proof: {proof}\n = help: if the proof is wrong about this library, the clause can be marked `override`; the program then answers for the fact", clause, "a proof believed wrong is a compiler bug: report it with this message, the function and the library's version")
 
+    // §31.8.6: a destroyer clause that names a function-pointer global says
+    // the library assigns it only in functions that stay raw. The package's
+    // source showing an assignment in a function this contract describes
+    // contradicts the clause (`F<TAB>assigns<TAB>G<TAB>proof`).
+    mut fn check_facade_assigner_proofs(node: i32, proofs: &str):
+        // (the global, the clause that names it)
+        let hooks = []
+        // The functions the contract describes.
+        let described = []
+        for i in 0..self.ast.get_data2(node):
+            let item = self.ast.get_extra(self.ast.get_data1(node) + i)
+            let kind = self.ast.kind(item)
+            if kind != NodeKind.NK_FACADE_RESOURCE and kind != NodeKind.NK_FACADE_FN: continue
+            let first = if kind == NodeKind.NK_FACADE_RESOURCE: 1 else: 0
+            if kind == NodeKind.NK_FACADE_FN: described.push(self.ast.get_data0(item))
+            for k in 0..self.ast.get_data2(item):
+                let clause = self.ast.get_extra(self.ast.get_data1(item) + first + k)
+                let what = self.ast.get_data0(clause)
+                let names_fn = what == FACADE_CLAUSE_FROM or what == FACADE_CLAUSE_INIT or what == FACADE_CLAUSE_PREINIT or what == FACADE_CLAUSE_DROP or what == FACADE_CLAUSE_DESTROYS or what == FACADE_CLAUSE_ABANDON or what == FACADE_CLAUSE_TEXT_RETURN
+                if not names_fn: continue
+                let named = self.ast.get_extra(self.ast.get_data1(clause))
+                if named == 0: continue
+                let destroyer = what == FACADE_CLAUSE_DROP or what == FACADE_CLAUSE_DESTROYS or what == FACADE_CLAUSE_TEXT_RETURN
+                if destroyer and self.get_sig(named) < 0: hooks.push((named, clause))
+                else if kind == NodeKind.NK_FACADE_RESOURCE: described.push(named)
+        if hooks.len() == 0: return
+        for line in proofs.split("\n"):
+            let fact = line.split("\t")
+            if fact.len() != 4 or fact[1] != "assigns": continue
+            for (hook, clause) in hooks:
+                let gname = self.pool_resolve(hook)
+                if fact[2] != gname: continue
+                for f in described:
+                    if self.pool_resolve(f) != fact[0]: continue
+                    self.report_facade_contradiction(clause, f"the clause names the global '{gname}', which '{fact[0]}' assigns, and this contract describes '{fact[0]}': a function that assigns the global stays raw (§31.8.6)", fact[3])
+                    break
+
     // The stated contract of a fetched package, held against what `with
     // get` proved from the package's source (contract-proofs.txt): a
     // function the contract lends a resource to that stores or frees it; a
@@ -756,6 +793,7 @@ impl Sema:
     mut fn check_facade_proofs(di: i32, node: i32):
         let proofs = resolve_stated_contract_proofs(self.decl_source_path_for_index(di))
         if proofs.len() == 0: return
+        self.check_facade_assigner_proofs(node, proofs)
         for i in 0..self.ast.get_data2(node):
             let item = self.ast.get_extra(self.ast.get_data1(node) + i)
             let kind = self.ast.kind(item)
@@ -779,7 +817,7 @@ impl Sema:
                 if self.ast.get_data0(clause) == FACADE_CLAUSE_LEND: lend = clause
             for line in proofs.split("\n"):
                 let fact = line.split("\t")
-                if fact.len() != 4 or fact[0] != name or fact[1] == "returns-part": continue
+                if fact.len() != 4 or fact[0] != name or fact[1] == "returns-part" or fact[1] == "assigns": continue
                 for pi in 0..self.sig_get_param_count(self.get_sig(fn_sym)):
                     if fact[2] != f"{pi}" or self.foreign_contracts[ci].consumes.contains(pi) or self.foreign_contracts[ci].retains.contains(pi) or self.facade_param_receives(fn_sym, pi).len() == 0: continue
                     let said = if lend == item: f"`fn {name}` lends param {pi}, which" else: f"`lend` on `{name}`"
