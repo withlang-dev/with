@@ -22,6 +22,6 @@ note: contract-audit: stale override at test/contract/ok_override_stale.w:18: `r
 note: contract-audit: stale override at test/contract/ok_override_stale.w:20: `from` on `Engine`; no proof contradicts it, so `override` can be deleted
 note: contract-audit: stale override at test/contract/ok_override_stale.w:23: `lend` on `engine_count`; no proof contradicts it, so `override` can be deleted
 note: contract-audit: clauses=6 proven=0 claimed=3 overrides=0 stale-overrides=3
-note: contract-audit: claims: stated=3 registry=0 profile=0 annotation=0
+note: contract-audit: claims: stated=3 registry=0 profile=0 annotation=0 uncited=3
 note: contract-audit: resources=1 items=2 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 contract-audit: violations=0 ok

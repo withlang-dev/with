@@ -22,6 +22,6 @@ use convention gobject.v1; clause:use convention@test/contract/ok_profile_shadow
 note: contract-audit: profile fact shadowed: profile gobject.v1 rule unref (drop *_unref, profile:gobject.v1:unref@test/lib/gobject/v1.w:15) matched obj_unref for resource 'Object', and `drop` at test/contract/ok_profile_shadowed.w:18 states the fact explicitly; the facade's statement wins (§16.2b.2)
 note: contract-audit: profile fact shadowed: profile gobject.v1 rule get (fn *_get* lend, profile:gobject.v1:get@test/lib/gobject/v1.w:17) matched 'obj_get_id', and the fn item at test/contract/ok_profile_shadowed.w:19 states the fact explicitly; the facade's statement wins (§16.2b.2)
 note: contract-audit: clauses=5 proven=0 claimed=5 overrides=0 stale-overrides=0
-note: contract-audit: claims: stated=4 registry=0 profile=1 annotation=0
+note: contract-audit: claims: stated=4 registry=0 profile=1 annotation=0 uncited=4
 note: contract-audit: resources=1 items=1 domains=0 conventions=1 advisories=0 profile-ambiguous=0 profile-shadowed=2
 contract-audit: violations=0 ok
