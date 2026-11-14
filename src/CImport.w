@@ -456,6 +456,21 @@ fn ci_note_overflow_helper_needed(helper: &str, op: &str, ty: &str):
         if g_ci_overflow_helpers_needed_item == entry: return
     g_ci_overflow_helpers_needed.push(entry)
 
+// #3292: libc's allocator under a private name, declared only in a
+// translation whose inline code names it through a system header (whose own
+// declarations are filtered).
+var g_ci_libc_allocator_needed: List[str] = List.new()
+
+fn ci_render_libc_allocator_needed() -> str:
+    var out = ""
+    for name in g_ci_libc_allocator_needed:
+        if with_cimport_is_name_emitted("__with_ci_libc_" ++ name) != 0: continue
+        let sig = if name == "malloc": "(size: u64) -> *mut c_void" else if name == "calloc": "(count: u64, size: u64) -> *mut c_void" else if name == "realloc": "(ptr: *mut c_void, size: u64) -> *mut c_void" else: "(ptr: *mut c_void)"
+        out = out ++ "@[link_name(\"" ++ name ++ "\")]\nextern fn __with_ci_libc_" ++ name ++ sig ++ "\n"
+        with_cimport_mark_name_emitted("__with_ci_libc_" ++ name)
+    g_ci_libc_allocator_needed = List.new()
+    out
+
 fn ci_render_overflow_helpers_needed() -> str:
     var out = ""
     for g_ci_overflow_helpers_needed_item in g_ci_overflow_helpers_needed:
@@ -875,6 +890,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
     g_cimport_raw_function_names = ""
     g_cimport_unprototyped_names = ""
     g_ci_overflow_helpers_needed = List.new()
+    g_ci_libc_allocator_needed = List.new()
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
     if with_cimport_available() == 0:
@@ -970,15 +986,6 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
     // `__builtin___*_chk` forms) to with_mem*. The migrate preamble declares
     // the same set; this one lacked the mem* four, so windows.h's
     // RtlZeroMemory-style bodies named an undeclared `with_memset` (#1417).
-    // #3292: libc's allocator, for an inline body that names it through a
-    // system header (whose declarations are filtered).
-    if with_cimport_is_name_emitted("__with_ci_libc_malloc") == 0:
-        output.push_str("@[link_name(\"malloc\")]\nextern fn __with_ci_libc_malloc(size: u64) -> *mut c_void\n")
-        output.push_str("@[link_name(\"calloc\")]\nextern fn __with_ci_libc_calloc(count: u64, size: u64) -> *mut c_void\n")
-        output.push_str("@[link_name(\"realloc\")]\nextern fn __with_ci_libc_realloc(ptr: *mut c_void, size: u64) -> *mut c_void\n")
-        output.push_str("@[link_name(\"free\")]\nextern fn __with_ci_libc_free(ptr: *mut c_void)\n")
-        for support in ["__with_ci_libc_malloc", "__with_ci_libc_calloc", "__with_ci_libc_realloc", "__with_ci_libc_free"]:
-            with_cimport_mark_name_emitted(support)
     if with_cimport_is_name_emitted("with_alloc") == 0:
         output.push_str("extern fn with_alloc(size: i64) -> *mut u8\n")
         output.push_str("extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8\n")
@@ -1056,6 +1063,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
         output.push_str(ci_translate_macros(macro_session, session, include_text))
         with_cimport_dispose_macros(macro_session)
     output.push_str(ci_render_overflow_helpers_needed())
+    output.push_str(ci_render_libc_allocator_needed())
     with_cimport_dispose(session)
     ci_fn_decl_index_reset()
     g_macro_type_names = ""
@@ -11651,7 +11659,9 @@ impl CiExprPool:
             // declaration of the same symbol.
             if mangled.len() == 0 and not g_ci_migrating and (name == "malloc" or name == "calloc" or name == "realloc" or name == "free"):
                 let declared_at = with_ci_cursor_referenced_location(session, cursor)
-                if declared_at.len() > 0 and ci_is_system_path(declared_at): return self.ident(self.add_string("__with_ci_libc_" ++ name), 0)
+                if declared_at.len() > 0 and ci_is_system_path(declared_at):
+                    if not g_ci_libc_allocator_needed.contains(name): g_ci_libc_allocator_needed.push(name.to_owned())
+                    return self.ident(self.add_string("__with_ci_libc_" ++ name), 0)
             if mangled.len() == 0 and not ci_has_value_libc_call_mapping(name):
                 if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
                     if not ci_note_filtered_system_symbol_ref_at(session, cursor, name, CI_LIBC_KIND_FN):

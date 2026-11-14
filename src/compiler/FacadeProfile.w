@@ -81,6 +81,9 @@ fn facade_profile_imported_fns(pool: &AstPool, intern: &InternPool, ci: &List[i3
         if kind != NodeKind.NK_EXTERN_FN and kind != NodeKind.NK_FN_DECL: continue
         if pool.find_fn_meta(decl) < 0: continue
         let name = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+        // The translation's own support declarations (libc's allocator under a
+        // private name, #3292) are not functions of the header.
+        if name.starts_with("__with_ci_"): continue
         var seen = false
         for k in 0..names.len():
             if names[k] == name: seen = true
