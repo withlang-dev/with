@@ -2988,7 +2988,9 @@ fn sema_prelude_gate_allows_name(name: &str) -> bool:
         return true
     if name == "c_void" or name == "assert_matches_failed":
         return true
-    false
+    // §4.1a: what the parser writes for a numeric type's member
+    // (`i32.max` is `__i32_max()`, std.numeric).
+    name.starts_with("__") and (name.ends_with("_min") or name.ends_with("_max") or name.ends_with("_inf") or name.ends_with("_nan"))
 
 fn sema_path_is_std_box_module(path: &str) -> bool:
     if path == "lib/std/box.w" or path == "<embedded-std>/std/box.w":
