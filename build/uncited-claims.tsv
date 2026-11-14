@@ -5,7 +5,7 @@
 lib/contracts/zlib.w	0
 lib/contracts/bzip2.w	0
 lib/contracts/libcurl.w	0
-lib/contracts/sqlite3.w	11
+lib/contracts/sqlite3.w	0
 rt/fiber_core_windows.w	2
 rt/fiber_stubs.w	2
 rt/panic_runtime.w	2
