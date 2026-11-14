@@ -25,7 +25,6 @@ use std.collections
 use rt.rt_core
 use rt.panic_runtime
 use std.numeric
-use std.libc.strtof
 
 /// Amortized string builder for code that appends in loops.
 ///
@@ -591,11 +590,13 @@ fn parse_unsigned(text: &str, bits: u32, base: i32) -> (i32, u128):
 
 fn signed_value(text: &str, bits: u32, base: i32) -> Option[i128]:
     let (what, value) = parse_signed(text, bits, base)
-    if what == PARSED_VALUE: Some(value) else: None
+    if what != PARSED_VALUE: return None
+    value
 
 fn unsigned_value(text: &str, bits: u32, base: i32) -> Option[u128]:
     let (what, value) = parse_unsigned(text, bits, base)
-    if what == PARSED_VALUE: Some(value) else: None
+    if what != PARSED_VALUE: return None
+    value
 
 fn overflow_text(what: i32) -> str: if what == PARSED_OVERFLOW: ": overflow" else: ""
 
@@ -656,7 +657,7 @@ fn parse_float(text: &str) -> (i32, f32):
     if not float_text_is_number(text): return (PARSED_NOT_A_NUMBER, 0.0)
     match text.to_cstring():
         Ok(c) =>
-            let v = strtof(c.as_cstr().ptr(), null)
+            let v = with_libc_strtof(c.as_cstr().ptr(), null)
             if v == f32.inf or v == -f32.inf: (PARSED_OVERFLOW, 0.0) else: (PARSED_VALUE, v)
         Err(_) => (PARSED_NOT_A_NUMBER, 0.0)
 
@@ -712,12 +713,14 @@ impl Parse for usize:
 impl Parse for f64:
     fn parse_text(text: &str) -> Option[f64]:
         let (what, value) = parse_double(text)
-        if what == PARSED_VALUE: Some(value) else: None
+        if what != PARSED_VALUE: return None
+        value
     fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_double(text).0)
 impl Parse for f32:
     fn parse_text(text: &str) -> Option[f32]:
         let (what, value) = parse_float(text)
-        if what == PARSED_VALUE: Some(value) else: None
+        if what != PARSED_VALUE: return None
+        value
     fn parse_failure(text: &str, base: i32) -> str: overflow_text(parse_float(text).0)
 
 /// `it.collect[String]()` over bytes (§13.3): the bytes in order, one str.

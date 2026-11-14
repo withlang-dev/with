@@ -805,6 +805,8 @@ extern fn rt_ucrt_ftelli64(stream: *mut c_void) -> i64
 // `strtold` is mingwex's 80-bit x87 one, returned through a hidden pointer.
 @[link_name("strtod")]
 extern fn rt_ucrt_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
+@[link_name("strtof")]
+extern fn rt_ucrt_strtof(nptr: *const c_char, endptr: *mut *mut c_char) -> f32
 // std.libc strtol/strtoul parse a 64-bit long on every target (D114: With
 // code sees one width); the UCRT's long is 32 bits, so its 64-bit parses.
 @[link_name("_strtoi64")]
@@ -819,6 +821,7 @@ pub fn rt_fileno(stream: *mut c_void) -> i32: rt_ucrt_fileno(stream)
 pub fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: rt_ucrt_fseeki64(stream, offset, whence)
 pub fn rt_ftell(stream: *mut c_void) -> i64: rt_ucrt_ftelli64(stream)
 pub fn rt_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64: rt_ucrt_strtold(nptr, endptr)
+pub fn rt_strtof(nptr: *const c_char, endptr: *mut *mut c_char) -> f32: rt_ucrt_strtof(nptr, endptr)
 pub fn rt_strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64: rt_ucrt_strtol(nptr, endptr, base)
 pub fn rt_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64: rt_ucrt_strtoul(nptr, endptr, base)
 pub fn rt_isatty(fd: i32) -> i32: rt_ucrt_isatty(fd)
@@ -2370,6 +2373,11 @@ c contract win32:
         preserves domain environ
         preserves domain locale
     fn rt_ucrt_strtoul
+        preserves domain environ
+        preserves domain locale
+    // strtof(3): the float nearest the text. It reads the locale's radix
+    // character and the environment is not touched.
+    fn rt_ucrt_strtof
         preserves domain environ
         preserves domain locale
     fn rt_ucrt_strtold
