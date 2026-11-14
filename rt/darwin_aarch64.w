@@ -1147,6 +1147,9 @@ pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, l
 pub fn rt_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens: *const i32, count: i32) -> i32:
     -1
 
+// The calling thread's id; never 0.
+pub fn rt_thread_id() -> i64: pthread_self()
+
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32: rt_libc_gethostname(name, len)
 
 // ── Environment ─────────────────────────────────────────────────
