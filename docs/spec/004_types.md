@@ -37,6 +37,18 @@ parameter, enabling type-generic metaprogramming. `type` is not a
 runtime value — it exists only during compilation and is erased
 before code generation.
 
+### 4.1a Members of the Numeric Types
+
+Every integer and floating-point type has `min` and `max`, its least
+and greatest values: `i32.min`, `i32.max`, `u64.max`, `f64.max`. For
+a floating-point type they are the finite ones: `f64.min` is the most
+negative finite `f64`, not the smallest positive one.
+
+A floating-point type also has `inf`, positive infinity, and `nan`,
+a quiet NaN: `f64.inf`, `f32.nan`. Negative infinity is `-f64.inf`.
+
+Each is a constant of its type.
+
 ### 4.2 Arithmetic and Operators
 
 #### 4.2.1 Numeric Literals
