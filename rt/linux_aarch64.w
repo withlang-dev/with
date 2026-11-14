@@ -389,6 +389,8 @@ extern fn rt_libc_kill(pid: i32, sig: i32) -> i32
 extern fn rt_libc_pthread_create(thread: *mut i64, attr: *const u8, start_routine: *mut u8, arg: *mut u8) -> i32
 @[link_name("pthread_join")]
 extern fn rt_libc_pthread_join(thread: i64, retval: *mut *mut u8) -> i32
+@[link_name("pthread_self")]
+extern fn rt_libc_pthread_self() -> i64
 
 // No in-process backtrace on this backend (lldb is the site tool here).
 pub fn rt_backtrace_print() -> Unit:
@@ -1063,6 +1065,9 @@ pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, l
 pub fn rt_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens: *const i32, count: i32) -> i32:
     -1
 
+// The calling thread's id; never 0.
+pub fn rt_thread_id() -> i64: rt_libc_pthread_self()
+
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32: rt_libc_gethostname(name, len)
 
 pub fn rt_getenv(name: *const c_char) -> *const c_char:
@@ -1647,6 +1652,10 @@ c contract libc:
         preserves domain environ
         preserves domain locale
     fn rt_libc_kill
+        preserves domain environ
+        preserves domain locale
+    // pthread_self(3): "returns the thread ID of the calling thread"
+    fn rt_libc_pthread_self
         preserves domain environ
         preserves domain locale
     fn rt_libc_pthread_create

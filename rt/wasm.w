@@ -359,6 +359,9 @@ pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32:
 pub fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
     -1
 
+// The calling thread's id; never 0.
+pub fn rt_thread_id() -> i64: 1
+
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32:
     if len < 5:
         return wasm_fail(WASI_EINVAL)

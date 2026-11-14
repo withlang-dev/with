@@ -1509,6 +1509,9 @@ pub fn rt_getenv(name: *const c_char) -> *const c_char:
         rt_munmap(big, big_bytes)
     buf as *const c_char
 
+// The calling thread's id; never 0.
+pub fn rt_thread_id() -> i64: GetCurrentThreadId() as i64
+
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32:
     var wname: [256]u16 = [0; 256]
     var n: u32 = 256
@@ -1516,6 +1519,9 @@ pub fn rt_gethostname(name: *mut u8, len: u64) -> i32:
         return -1
     if win_utf16_to_utf8_buf(&wname as *const [256]u16 as *const u16, name, len as i64) < 0: -1 else: 0
 
+// Seed-bound (#3311): src/ is linked with the pinned seed's runtime and
+// calls this name until a seed carries rt_thread_id; deleted in that pin's
+// stack.
 pub fn pthread_self() -> i64:
     GetCurrentThreadId() as i64
 
