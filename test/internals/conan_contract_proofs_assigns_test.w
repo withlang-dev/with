@@ -7,6 +7,9 @@
 //   reset_release  assigns it a function                 -> assigns
 //   node_count     assigns a local                       -> nothing
 //   node_free      calls through the global              -> nothing
+//   node_configure calls set_release (#3338)             -> assigns, through it
+//   node_shutdown  calls a static that assigns it        -> assigns, through it
+//   node_touch     calls a function that assigns nothing -> nothing
 use compiler.ConanClient
 use std.fs
 use std.process
@@ -19,7 +22,7 @@ fn main:
     assert(mkdir_p(dep ++ "/include") == 0)
     assert(mkdir_p(src) == 0)
     assert(mkdir_p(build) == 0)
-    let header = "typedef struct Node { int n; } Node;\nNode *node_new(void);\nvoid node_free(Node *n);\nextern void (*node_release)(Node *n);\nvoid set_release(void (*f)(Node *n));\nvoid reset_release(void);\nint node_count(Node *n);\n"
+    let header = "typedef struct Node { int n; } Node;\nNode *node_new(void);\nvoid node_free(Node *n);\nextern void (*node_release)(Node *n);\nvoid set_release(void (*f)(Node *n));\nvoid reset_release(void);\nint node_count(Node *n);\nvoid node_configure(void);\nvoid node_shutdown(void);\nvoid node_touch(Node *n);\n"
     assert(write_file(dep ++ "/include/nodes.h", header) == 0)
     assert(write_file(src ++ "/nodes.h", header) == 0)
     var unit = "#include <stdlib.h>\n#include \"nodes.h\"\nstatic void plain_release(Node *n) { free(n); }\nvoid (*node_release)(Node *n) = plain_release;\n"
@@ -28,6 +31,10 @@ fn main:
     unit = unit ++ "void set_release(void (*f)(Node *n)) { node_release = f; }\n"
     unit = unit ++ "void reset_release(void) { node_release = plain_release; }\n"
     unit = unit ++ "int node_count(Node *n) { int c; c = n->n; return c; }\n"
+    unit = unit ++ "static void quiet_reset(void) { node_release = plain_release; }\n"
+    unit = unit ++ "void node_configure(void) { set_release(plain_release); }\n"
+    unit = unit ++ "void node_shutdown(void) { quiet_reset(); }\n"
+    unit = unit ++ "void node_touch(Node *n) { node_count(n); }\n"
     assert(write_file(src ++ "/nodes.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c nodes.c\",\n  \"file\": \"nodes.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
@@ -35,7 +42,7 @@ fn main:
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("nodes", "1.0", dep, src, build)
     let proofs = read_file(dep ++ "/contract-proofs.txt") ?? "<no contract-proofs.txt>"
-    let ok = proofs.contains("set_release\tassigns\tnode_release\tthe body of set_release assigns node_release\n") and proofs.contains("reset_release\tassigns\tnode_release\t") and not proofs.contains("node_count\tassigns") and not proofs.contains("node_free\tassigns")
+    let ok = proofs.contains("set_release\tassigns\tnode_release\tthe body of set_release assigns node_release\n") and proofs.contains("reset_release\tassigns\tnode_release\t") and not proofs.contains("node_count\tassigns") and not proofs.contains("node_free\tassigns") and proofs.contains("node_configure\tassigns\tnode_release\tnode_configure reaches set_release, whose body assigns node_release\n") and proofs.contains("node_shutdown\tassigns\tnode_release\tnode_shutdown reaches quiet_reset, whose body assigns node_release\n") and not proofs.contains("node_touch\tassigns")
     if not ok:
         print(proofs)
         print(read_file(dep ++ "/contract-report.txt") ?? "")

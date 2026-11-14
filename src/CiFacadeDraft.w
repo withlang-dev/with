@@ -468,6 +468,34 @@ impl CiProject:
             if symbol.borrow_from >= 0 and symbol.own_reason.starts_with("proof: "): out = out ++ f"{symbol.name}\treturns-part\t{symbol.borrow_from}\t{symbol.own_reason.slice(7, symbol.own_reason.len())}\n"
             // §31.8.6: the third column is the global, not a parameter.
             for assigned in symbol.assigned_globals: out = out ++ f"{symbol.name}\tassigns\t{assigned}\tthe body of {symbol.name} assigns {assigned}\n"
+            // A function that calls an assigner assigns (#3338). The walk
+            // follows calls by name to functions a unit defines; a call
+            // through a pointer or to a function no unit defines ends it,
+            // which is weaker than a grant and contradicts nothing (§31.7).
+            let said = []
+            let seen = [symbol.name]
+            let stack = []
+            for callee in symbol.callees: stack.push(callee)
+            while stack.len() > 0:
+                let callee = stack.pop().unwrap()
+                if seen.contains(callee): continue
+                seen.push(callee)
+                let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
+                let reached_assigns = []
+                if ci >= 0 and self.symbols[ci].has_definition != 0:
+                    for assigned in self.symbols[ci].assigned_globals: reached_assigns.push(assigned)
+                    for next in self.symbols[ci].callees: stack.push(next)
+                else:
+                    // A static definition, by name: two units' statics of
+                    // one name are read as one, which can only add a line.
+                    for line in self.static_evidence:
+                        let fact = line.split("\t")
+                        if fact[0] != callee: continue
+                        if fact[1] == "assign": reached_assigns.push(fact[2]) else: stack.push(fact[2])
+                for assigned in reached_assigns:
+                    if symbol.assigned_globals.contains(assigned) or said.contains(assigned): continue
+                    said.push(assigned)
+                    out = out ++ f"{symbol.name}\tassigns\t{assigned}\t{symbol.name} reaches {callee}, whose body assigns {assigned}\n"
         out
 
     // What the registry says about `si`, for the report.

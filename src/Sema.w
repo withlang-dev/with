@@ -2455,6 +2455,11 @@ type Sema {
     // holds one type per node — a template's nodes carry whichever instance
     // was checked last — so MIR and the audit read the instance's answer
     // here (index_element_in_body).
+    // #3332 (D65): the type a `T.name()`, `T.size()`, `T.align()` or
+    // `nameof[T]()` call names in the body that was checked (the
+    // specialization and the call node), and that type's name.
+    type_method_types: HashMap[i64, i32, Minted],
+    type_method_names: HashMap[i64, i32, Minted],
     index_element_types: HashMap[i64, i32, Minted],
     index_base_types: HashMap[i64, i32, Minted],
     // ... and each source field access's position in the struct
@@ -4472,6 +4477,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         current_fn_symbol: 0,
         current_specialization_sym: 0,
         specialization_type_args: sema_new_map_i64_i32(),
+        type_method_types: sema_new_map_i64_i32(),
+        type_method_names: sema_new_map_i64_i32(),
         index_element_types: sema_new_map_i64_i32(),
         index_base_types: sema_new_map_i64_i32(),
         field_access_decl_indexes: sema_new_map_i64_i32(),

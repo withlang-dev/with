@@ -29585,6 +29585,9 @@ impl Sema:
             self.typed_expr_types.insert(node, self.ty_i64 as i32)
             return self.ty_i64 as i32
         if self.is_nameof_call(callee):
+            let named_node = self.sizeof_alignof_type_arg_node(callee)
+            let named_ty = if named_node != 0: self.resolve_type_level_arg_expr(named_node) else: 0
+            if named_ty > 0: self.note_type_method(node, named_ty)
             self.typed_expr_types.insert(node, self.ty_str as i32)
             return self.ty_str as i32
         if self.is_transmute_call(callee):
@@ -32284,6 +32287,20 @@ impl Sema:
     // #1647 (D65): a runtime index expression's element place type and the
     // type of the base it indexes, recorded for the body being checked (the
     // specialization's symbol, 0 outside one).
+    // #3332 (D65): a type method or `nameof` call is a constant of the type
+    // this body checked it with. Recorded per body, so a generic function's
+    // `T.name()` is each instance's own type and MIR emits the constant;
+    // a backend never reads the name from the syntax (`nameof[T]()` printed
+    // `T` in every instance).
+    mut fn note_type_method(node: i32, ty: i32):
+        let key = sema_pair_key(self.current_specialization_sym, node)
+        self.type_method_types.insert(key, ty)
+        self.type_method_names.insert(key, self.pool_intern(self.type_name(ty)))
+
+    fn type_method_type_in_body(instance_sym: i32, node: i32): self.type_method_types.get(sema_pair_key(instance_sym, node)) ?? 0
+
+    fn type_method_name_in_body(instance_sym: i32, node: i32): self.type_method_names.get(sema_pair_key(instance_sym, node)) ?? 0
+
     mut fn note_index_element(node: i32, base_ty: i32, elem_ty: i32):
         let key = sema_pair_key(self.current_specialization_sym, node)
         self.index_element_types.insert(key, elem_ty)
@@ -39886,6 +39903,7 @@ impl Sema:
             if arg_count != 0:
                 self.emit_error("type.name() takes no arguments", node)
                 return -1
+            self.note_type_method(node, obj_type)
             self.typed_expr_types.insert(node, self.ty_str as i32)
             return self.ty_str as i32
 
@@ -39893,6 +39911,7 @@ impl Sema:
             if arg_count != 0:
                 self.emit_error("type size/align methods take no arguments", node)
                 return -1
+            self.note_type_method(node, obj_type)
             self.typed_expr_types.insert(node, self.ty_usize as i32)
             return self.ty_usize as i32
 

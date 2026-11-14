@@ -1007,6 +1007,9 @@ type CiProjectSymbol {
     // ci_body_call_evidence): a destroyer clause that names one of them is
     // contradicted by a contract that describes this function.
     assigned_globals: List[str],
+    // The functions the body calls by name, for the same question asked
+    // through a call (`calls:` lines).
+    callees: List[str],
     // D159 (CiContracts.w): the body's contract evidence (CImport.w
     // ci_body_contract_evidence: `mutparam:`, `fieldstore:`, `freesmember:`,
     // `memberarg:`, `outfull:`, `outcond:` lines), `param_mutates[i]` 1 when
@@ -1077,6 +1080,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         registry_more: "",
         variadic: 0,
         assigned_globals: [],
+        callees: [],
         header_declared: 0,
         header_file: "",
         definition_location: "",
@@ -1189,6 +1193,10 @@ type CiProject {
     // ci_fnptr_field_evidence), one line each, and the verdict per
     // `Record.field` drawn from them once (fd_fnptr_field_verdict).
     fnptr_evidence: str,
+    // §31.8.6: what the static definitions assign and call, one
+    // `name<TAB>assign|calls<TAB>what` a line. A static is not a project
+    // symbol, and a function that reaches one that assigns a global assigns.
+    static_evidence: List[str],
     fnptr_verdicts: HashMap[str, str],
     fnptr_verdicts_drawn: bool,
     // D198 (§16.2b.5): the records with their fields and the file that
@@ -1234,6 +1242,7 @@ fn CiProject.new -> CiProject:
         registry_value_fns: [],
         void_typedefs: [],
         fnptr_evidence: "",
+        static_evidence: [],
         fnptr_verdicts: HashMap.new(),
         fnptr_verdicts_drawn: false,
         complete_records: HashMap.new(),
