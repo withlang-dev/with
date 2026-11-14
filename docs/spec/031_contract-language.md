@@ -789,6 +789,10 @@ registry's facts say `text return, owned, freed by xmlFree`.
 - A global so named is a hook of the library (§16.2b.15). The clause
   states two facts: that a call through it is a deallocation, and that the
   library assigns it only in functions that stay raw.
+- The global holds a function of one parameter: the pointer the
+  resource wraps, or for `freed by` the text to release. A global
+  of any other shape is an error naming the clause. An in-place or
+  by-value resource names a function, not a global.
 - A function that assigns it stays raw, as a function that replaces hooks
   shared by live resources does, whatever a contract says of its
   parameters: a contract that describes one is an error naming the clause.

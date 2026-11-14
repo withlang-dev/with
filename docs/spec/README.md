@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.54
+# The With Programming Language — Specification v7.55
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.55:** (Eric, 2026-11-15). §31.8.6: a global a `freed by`, `drop` or `destroys` clause names holds a function of one parameter, the pointer the resource wraps or the text to release; any other shape is an error, and an in-place or by-value resource names a function.
+
 **Changelog v7.54:** (Eric, 2026-11-13). §16.1: code translated from an imported header calls the functions the header names; the allocator rewrite applies only to `with migrate`. §16.2b.15: `with get` writes what the source proves against a grant (`contract-proofs.txt`) beside the contract. §31.7: the proofs a stated contract is held against are the ones recorded for the package it describes; the mark names what is implemented. §31.9: a citation on an `fn` or `resource` line covers the clauses under it that carry none.
 
 **Changelog v7.53:** (Eric, 2026-11-13). §31.4: a function a contract names, in an `fn` item or in a resource's `from`, `init`, `drop`, `destroys`, `abandon` or `freed by`, is described; the base rule does not apply to it, and it has the meaning the contract gives it.
