@@ -116,8 +116,15 @@ c contract sqlite error SqliteError:
     fn sqlite3_errmsg
         returns borrow CStr from param 0
         valid on failed
+    // sqlite3.h 3.51.0, sqlite3_errcode: "If the most recent sqlite3_* API
+    // call associated with [database connection] D failed, then the
+    // sqlite3_errcode(D) interface returns the numeric [result code]".
     fn sqlite3_errcode
         lend
+    // sqlite3.h 3.51.0, sqlite3_changes: "These functions return the number
+    // of rows modified, inserted or deleted by the most recently completed
+    // INSERT, UPDATE or DELETE statement on the database connection
+    // specified by the only parameter."
     fn sqlite3_changes
         lend
     // sqlite3_exec runs its callback once per result row, during the call
@@ -146,6 +153,11 @@ c contract sqlite error SqliteError:
         param 3 fixed null
         param errmsg fixed null
         ok SQLITE_OK
+    // sqlite3.h 3.51.0, sqlite3_exec: "If the callback function of the 3rd
+    // argument to sqlite3_exec() is not NULL, then it is invoked for each
+    // result row coming out of the evaluated SQL statements. The 4th
+    // argument to sqlite3_exec() is relayed through to the 1st argument of
+    // each callback invocation."
     fn sqlite3_exec
         rename exec_with
         callback param 2 userdata param 3
@@ -211,6 +223,8 @@ c contract sqlite error SqliteError:
     // sqlite3_value objects". They are read through the `&[Value]` the
     // wrapper hands the callback.
     handle Value wraps *mut sqlite3_value
+    // sqlite3.h 3.51.0, sqlite3_value_int: "These routines extract type,
+    // size, and content information from [protected sqlite3_value] objects."
     fn sqlite3_value_int
         of Value
     // Statement operations. The convention shortens by the library prefix
@@ -240,9 +254,14 @@ c contract sqlite error SqliteError:
     fn sqlite3_reset
         lend
         ok SQLITE_OK
+    // sqlite3.h 3.51.0, sqlite3_bind_int: "The sqlite3_bind_* routines return
+    // [SQLITE_OK] on success or an [error code] if anything goes wrong."
     fn sqlite3_bind_int
         lend
         ok SQLITE_OK
+    // sqlite3.h 3.51.0, sqlite3_column_int: "These routines return
+    // information about a single column of the current result row of a
+    // query."
     fn sqlite3_column_int
         lend
     // Reads that touch no value: the column count and a column's declared
@@ -252,6 +271,9 @@ c contract sqlite error SqliteError:
     fn sqlite3_column_count
         lend
         preserves param 0
+    // sqlite3.h 3.51.0, sqlite3_column_type: "These routines return
+    // information about a single column of the current result row of a
+    // query."
     fn sqlite3_column_type
         lend
         preserves param 0
