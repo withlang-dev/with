@@ -17501,6 +17501,12 @@ impl MirBuilder:
                 cast_tid = self.sema.typed_expr_types.get(node).unwrap() as i32
             else:
                 cast_tid = self.sema.resolve_type_expr_frozen(self.ast.get_data1(node)) as i32
+            // §15.5 (D204): a cast of text is the conversion's call.
+            if self.sema.text_cast_fns.contains(node):
+                let i32_ty = self.sema.ty_i32 as i32
+                let at = self.sema.source_location_for_file_id(self.sema.text_cast_file_ids.get(node).unwrap(), self.ast.get_start(node))
+                let args: List[i32] = [self.lower_expr(self.ast.get_data0(node)), self.lower_str_lit_as(self.sema.text_cast_names.get(node).unwrap(), 0), self.lower_str_lit_as(self.sema.text_cast_files.get(node).unwrap(), 0), self.int_const_operand((at.line + 1) as i64, i32_ty), self.int_const_operand((at.col + 1) as i64, i32_ty)]
+                return self.lower_resolved_call_with_operand_args_contract(self.sema.text_cast_fns.get(node).unwrap(), args, cast_tid, node, self.sema.resolved_call_sigs.get(node).unwrap(), self.sema.resolved_call_mono_syms.get(node).unwrap())
             return self.lower_cast(self.ast.get_data0(node), cast_tid, node)
 
         if kind == NodeKind.NK_FIELD_ACCESS:

@@ -1849,6 +1849,15 @@ type Sema {
     // §11.8 (D95): a tuple's synthesized clone, keyed by the call node to the tuple type.
     tuple_clone_nodes: HashMap[i32, i32, Minted],
     try_branch_sigs: HashMap[i32, i32, Minted],
+    // §15.5 (D204): a cast of text to a `Parse` type is a call of
+    // std.string's `__value_from_text`, instantiated for the target. Per
+    // cast node: the function, and what the call names in a panic (the
+    // type's name, and the file the cast is in: its path and its id, from
+    // which MIR reads the cast's line and column).
+    text_cast_fns: HashMap[i32, i32, Minted],
+    text_cast_names: HashMap[i32, i32, Minted],
+    text_cast_files: HashMap[i32, i32, Minted],
+    text_cast_file_ids: HashMap[i32, i32, Minted],
     try_branch_mono_syms: HashMap[i32, i32, Minted],
     try_from_break_sigs: HashMap[i32, i32, Minted],
     try_from_break_mono_syms: HashMap[i32, i32, Minted],
@@ -2990,7 +2999,7 @@ fn sema_prelude_gate_allows_name(name: &str) -> bool:
         return true
     // §4.1a: what the parser writes for a numeric type's member
     // (`i32.max` is `__i32_max()`, std.numeric).
-    name.starts_with("__") and (name.ends_with("_min") or name.ends_with("_max") or name.ends_with("_inf") or name.ends_with("_nan"))
+    name == "__value_from_text" or (name.starts_with("__") and (name.ends_with("_min") or name.ends_with("_max") or name.ends_with("_inf") or name.ends_with("_nan")))
 
 fn sema_path_is_std_box_module(path: &str) -> bool:
     if path == "lib/std/box.w" or path == "<embedded-std>/std/box.w":
@@ -4182,6 +4191,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         checked_narrowings: sema_new_map_i32_i32(),
         tuple_clone_nodes: sema_new_map_i32_i32(),
         try_branch_sigs: sema_new_map_i32_i32(),
+        text_cast_fns: sema_new_map_i32_i32(),
+        text_cast_names: sema_new_map_i32_i32(),
+        text_cast_files: sema_new_map_i32_i32(),
+        text_cast_file_ids: sema_new_map_i32_i32(),
         try_branch_mono_syms: sema_new_map_i32_i32(),
         try_from_break_sigs: sema_new_map_i32_i32(),
         try_from_break_mono_syms: sema_new_map_i32_i32(),

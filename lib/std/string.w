@@ -23,6 +23,7 @@ use std.option
 use std.result
 use std.collections
 use rt.rt_core
+use rt.panic_runtime
 use std.libc.strtof
 
 /// Amortized string builder for code that appends in loops.
@@ -505,6 +506,18 @@ pub trait Parse:
     fn parse_text_in(text: &str, base: i32) -> Option[Self]: None
     fn parse_failure(text: &str, base: i32) -> str: ""
 
+/// `text as T` (§15.5): the value the whole of `text` spells, or the panic
+/// that names the type, the text and the cast. The compiler writes the
+/// call, with the type's name and the cast's place.
+pub fn __value_from_text[T: Parse](text: str, type_name: str, file: str, line: i32, column: i32) -> T:
+    match T.parse_text(text):
+        Some(value) => value
+        None =>
+            let shown = if text.len() > 64: text.slice(0, 64) ++ "..." else: text.to_owned()
+            // The place is the cast's, stated in the message: the panic has
+            // no site of its own here.
+            with_panic(f"cannot parse {type_name} from \"{shown}\"{T.parse_failure(text, 0)}\n  at {file}:{line}:{column}", "", 0)
+
 // What integer text was (§15.5).
 const PARSED_VALUE = 0
 const PARSED_NOT_A_NUMBER = 1
@@ -613,8 +626,8 @@ fn float_text_is_number(text: &str) -> bool:
 fn float_named(text: &str) -> Option[f64]:
     let signed = text.len() > 0 and (text[0] == '-' or text[0] == '+')
     let name = (if signed: text.slice(1, text.len()) else: text).to_lower()
-    if name == "inf" or name == "infinity": return if signed and text[0] == '-': -1.0 / 0.0 else: 1.0 / 0.0
-    if name == "nan" and not signed: return 0.0 / 0.0
+    if name == "inf" or name == "infinity": return if signed and text[0] == '-': -f64.inf else: f64.inf
+    if name == "nan" and not signed: return f64.nan
     None
 
 // The double of float text and which of the three the text was: finite
@@ -628,7 +641,7 @@ fn parse_double(text: &str) -> (i32, f64):
     match text.to_cstring():
         Ok(c) =>
             let v = with_libc_strtold(c.as_cstr().ptr(), null)
-            if v == 1.0 / 0.0 or v == -1.0 / 0.0: (PARSED_OVERFLOW, 0.0) else: (PARSED_VALUE, v)
+            if v == f64.inf or v == -f64.inf: (PARSED_OVERFLOW, 0.0) else: (PARSED_VALUE, v)
         Err(_) => (PARSED_NOT_A_NUMBER, 0.0)
 
 // The same for a float: the nearest float of the text itself (strtof's),
@@ -641,7 +654,7 @@ fn parse_float(text: &str) -> (i32, f32):
     match text.to_cstring():
         Ok(c) =>
             let v = strtof(c.as_cstr().ptr(), null)
-            if v == (1.0 / 0.0) as f32 or v == (-1.0 / 0.0) as f32: (PARSED_OVERFLOW, 0.0) else: (PARSED_VALUE, v)
+            if v == f32.inf or v == -f32.inf: (PARSED_OVERFLOW, 0.0) else: (PARSED_VALUE, v)
         Err(_) => (PARSED_NOT_A_NUMBER, 0.0)
 
 impl Parse for i8:

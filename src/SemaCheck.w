@@ -12775,6 +12775,11 @@ impl Sema:
                 // #2043 (D65): acceptance is Sema's. A text or an aggregate
                 // has no number; MIR's validator met these casts only after
                 // Sema had accepted them ("invalid MIR before codegen").
+                // §15.5 (D204): text converts to a type that implements
+                // `Parse` with `as`, the one cast that can fail.
+                let src_is_text = src_kind == TypeKind.TY_STR or (src_kind == TypeKind.TY_REF and self.get_type_kind(self.resolve_alias(self.get_type_d0(src_resolved) as TypeId)) == TypeKind.TY_STR)
+                if src_is_text and cast_kind != TypeKind.TY_STR and self.type_implements_trait(cast_tid as i32, self.pool_intern("Parse")):
+                    return self.check_text_cast(node, src_node, src_tid as i32, cast_tid as i32)
                 if self.cast_to_scalar_has_no_conversion(src_resolved as i32, src_kind, cast_kind):
                     let what = if src_kind == TypeKind.TY_STR: "text" else: "compound value"
                     self.emit_error(f"cannot cast `{self.type_name(src_tid as i32)}` to `{self.type_name(cast_tid as i32)}`: a {what} has no numeric value to convert", node)
@@ -39792,6 +39797,37 @@ impl Sema:
                 sema_phase_bug("BUG: type_reflection_variant_payload_type_frozen payload count mismatch")
             return payloads[payload_index]
         self.type_extra[(pos + 2 + payload_index)]
+
+    // §15.5 (D204): `text as T` is `__value_from_text(text, "T", file, line,
+    // column)`, std.string's one conversion, which panics naming the type,
+    // the text and this cast. The function is instantiated for `T` here,
+    // under the cast's target as the demand, and MIR lowers the cast as
+    // that call (the tree is frozen: no call node is made).
+    mut fn check_text_cast(node: i32, src_node: i32, src_tid: i32, cast_tid: i32) -> TypeId:
+        let fn_sym = self.pool_intern("__value_from_text")
+        let fn_node = self.generic_fn_node_for_symbol(fn_sym)
+        if fn_node == 0:
+            self.emit_error(f"cannot cast `{self.type_name(src_tid)}` to `{self.type_name(cast_tid)}`: text converts through std.string, which this program does not have", node)
+            return 0 as TypeId
+        let arg_types: List[i32] = [src_tid, self.ty_str as i32, self.ty_str as i32, self.ty_i32 as i32, self.ty_i32 as i32]
+        let arg_nodes: List[i32] = [src_node, 0, 0, 0, 0]
+        let saved_has = self.has_expected_type
+        let saved_expected = self.expected_expr_type
+        let saved_root = self.current_value_expr_root
+        self.has_expected_type = 1
+        self.expected_expr_type = cast_tid as TypeId
+        self.current_value_expr_root = node
+        let made = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, 5, node)
+        self.has_expected_type = saved_has
+        self.expected_expr_type = saved_expected
+        self.current_value_expr_root = saved_root
+        if made == 0: return 0 as TypeId
+        self.text_cast_fns.insert(node, fn_sym)
+        self.text_cast_names.insert(node, self.pool_intern(self.type_name(cast_tid)))
+        self.text_cast_files.insert(node, self.pool_intern(self.source_path_text()))
+        self.text_cast_file_ids.insert(node, self.local_file_id)
+        self.typed_expr_types.insert(node, cast_tid)
+        cast_tid as TypeId
 
     mut fn check_static_type_method_call(obj_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
         if field == self.syms.zeroed and self.type_is_c_record(obj_type):
