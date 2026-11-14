@@ -1003,6 +1003,10 @@ type CiProjectSymbol {
     // D121 step 6: 1 when the function is variadic (never presentable
     // without a `variadic` clause the draft does not write).
     variadic: i32,
+    // §31.8.6: the globals the body assigns, by name (`assign:` lines of
+    // ci_body_call_evidence): a destroyer clause that names one of them is
+    // contradicted by a contract that describes this function.
+    assigned_globals: List[str],
     // D159 (CiContracts.w): the body's contract evidence (CImport.w
     // ci_body_contract_evidence: `mutparam:`, `fieldstore:`, `freesmember:`,
     // `memberarg:`, `outfull:`, `outcond:` lines), `param_mutates[i]` 1 when
@@ -1072,6 +1076,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         registry: "",
         registry_more: "",
         variadic: 0,
+        assigned_globals: [],
         header_declared: 0,
         header_file: "",
         definition_location: "",

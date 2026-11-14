@@ -307,9 +307,7 @@ impl str:
     /// The text as a value of the type its use demands (§15.5): `let n: i64
     /// = s.parse() ?? 0`. None unless the whole text is one value of that
     /// type. `base:` reads an integer as digits of that base, 2 through 36.
-    /// (The default is written `0i32` until #3334: a generic method's
-    /// literal default is typed without its parameter.)
-    pub fn parse[T: Parse](base: i32 = 0i32) -> Option[T]: if base == 0: T.parse_text(self) else: T.parse_text_in(self, base)
+    pub fn parse[T: Parse](base: i32 = 0) -> Option[T]: if base == 0: T.parse_text(self) else: T.parse_text_in(self, base)
 
     /// The bytes, one at a time (#2206): `for b in s.bytes()`.
     @[iter_of_self]

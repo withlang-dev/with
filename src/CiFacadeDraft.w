@@ -466,6 +466,8 @@ impl CiProject:
                 let why = self.fd_retain_reason(si, pi, 0)
                 if why.ends_with("stored in a field") or why.ends_with("stored in a global") or why.ends_with("stored") or why.contains("stored through local "): out = out ++ f"{symbol.name}\tstores\t{pi}\t{why}\n"
             if symbol.borrow_from >= 0 and symbol.own_reason.starts_with("proof: "): out = out ++ f"{symbol.name}\treturns-part\t{symbol.borrow_from}\t{symbol.own_reason.slice(7, symbol.own_reason.len())}\n"
+            // §31.8.6: the third column is the global, not a parameter.
+            for assigned in symbol.assigned_globals: out = out ++ f"{symbol.name}\tassigns\t{assigned}\tthe body of {symbol.name} assigns {assigned}\n"
         out
 
     // What the registry says about `si`, for the report.

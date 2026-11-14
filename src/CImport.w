@@ -18992,6 +18992,7 @@ fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
 //   `sink:<callee>:<index>:<param>` parameter `param` passed at that position
 //   `field:<param>`                parameter stored into a record field
 //   `global:<param>`               parameter assigned to something not a parameter
+//   `assign:<name>`                the global `name` assigned (§31.8.6)
 // `params` are the enclosing definition's parameter names.
 fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
     ci_body_call_evidence_walk(session, cursor, params, ci_own_collect_locals(session, cursor))
@@ -19021,22 +19022,22 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
     if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
         let lhs = with_ci_child(session, cursor, 0)
         let rhs = with_ci_child(session, cursor, 1)
+        let l = ci_peel_transparent(session, lhs)
+        // #3175: a local assigned from the parameter (`str = buf` in zlib's
+        // gzgets) is an alias, not a global store; only a name that is
+        // neither a parameter nor a local of the body is a global.
+        var to_global = with_ci_cursor_kind(session, l) == CXK_DECL_REF
+        if to_global:
+            for param in params:
+                if ci_cursor_names(session, l, param): to_global = false
+            for local in locals:
+                if ci_cursor_names(session, l, local): to_global = false
+        if to_global: out = out ++ "assign:" ++ with_ci_cursor_spelling(session, l) ++ "\n"
         for param in params:
             if ci_cursor_names(session, rhs, param):
-                let l = ci_peel_transparent(session, lhs)
                 if with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:
                     out = out ++ "field:" ++ param ++ "\n"
-                else if with_ci_cursor_kind(session, l) == CXK_DECL_REF:
-                    // #3175: a local assigned from the parameter (`str =
-                    // buf` in zlib's gzgets) is an alias, not a global
-                    // store; only a name that is neither a parameter nor a
-                    // local of the body is a global.
-                    var is_param_or_local = false
-                    for pj in 0..params.len():
-                        if ci_cursor_names(session, l, params[pj]): is_param_or_local = true
-                    for local in locals:
-                        if ci_cursor_names(session, l, local): is_param_or_local = true
-                    if not is_param_or_local: out = out ++ "global:" ++ param ++ "\n"
+                else if to_global: out = out ++ "global:" ++ param ++ "\n"
     var i = 0
     while i < nc:
         out = out ++ ci_body_call_evidence_walk(session, with_ci_child(session, cursor, i), params, locals)

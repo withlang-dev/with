@@ -778,9 +778,9 @@ have `runs no threads` only as a claim, or do not have it.
 
 ### 31.8.6 A destroyer named through a function-pointer global
 
-(Adopted 2026-11-11. Implemented for `freed by`, `drop` and `destroys`. Not
-yet implemented: the error for a contract that describes a function that
-assigns the global, and the drafter's contradiction check.) The function a
+(Adopted 2026-11-11. Implemented. Not yet implemented: the drafter's
+contradiction check for a function that assigns the global only through a
+function it calls.) The function a
 `freed by`, `drop` or `destroys` clause names is an imported function, or
 an imported global of function-pointer type. libxml2's `xmlFree` is the
 case: `xmlmemory.h` declares `XMLPUBVAR xmlFreeFunc xmlFree;`, and the
