@@ -1345,7 +1345,7 @@ fn cleanup_binary_artifacts(bin_path: &str):
 fn test_binary_absolute_path(bin_path: &str) -> str:
     if runtime_path_is_absolute(bin_path):
         return bin_path ++ ""
-    let cwd = with_getenv_str("PWD")
+    let cwd = runtime_cwd()
     if cwd.len() == 0:
         return bin_path ++ ""
     cwd ++ "/" ++ bin_path
@@ -5404,7 +5404,7 @@ fn test_command_pass_through_args(argc: i32) -> List[str]:
 // Where the lane keeps its per-file captures (out/test-graph/…) and how its
 // verdict keys name a file: the working directory.
 fn test_command_root() -> str:
-    let cwd = with_getenv_str("PWD")
+    let cwd = runtime_cwd()
     if cwd.len() == 0: "." else: cwd
 
 fn run_bench_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, filter: &str) -> i32:
@@ -6882,7 +6882,7 @@ fn cli_init_default_name(target_dir: &str) -> str:
         if target_name.len() > 0 and target_name != ".":
             return target_name
 
-    let cwd = with_getenv_str("PWD")
+    let cwd = runtime_cwd()
     if cwd.len() > 0:
         let cwd_name = cli_path_basename(cwd)
         if cwd_name.len() > 0 and cwd_name != ".":

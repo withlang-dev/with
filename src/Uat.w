@@ -18,6 +18,7 @@ use rt.compat_runtime
 use std.process
 use TargetSpec
 use compiler.Runtime.runtime_path_is_absolute
+use compiler.Runtime.runtime_cwd
 use std.time
 use std.builtins.print
 use std.builtins.eprint
@@ -579,7 +580,7 @@ fn uat_dots(name: &str) -> str:
 // stays as it is.
 fn uat_abs(path: &str) -> str:
     if runtime_path_is_absolute(path): return path
-    let pwd = env("PWD")
+    let pwd = runtime_cwd()
     if pwd.len() == 0: return path
     if path == ".": pwd else: pwd ++ "/" ++ path
 

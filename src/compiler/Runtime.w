@@ -58,13 +58,44 @@ fn runtime_mkdir_p(path: &str) -> i32:
 fn runtime_rename(old_path: &str, new_path: &str) -> i32:
     with_fs_rename_file(old_path, new_path)
 
-// The working directory: $PWD, which keeps the path the user typed, else
-// the process's own (getcwd) — `env -i` and some launchers set no PWD, and
-// a relative path joined onto "" named nothing (#1915).
+// The working directory: $PWD, which keeps the path the user typed, while
+// it is true, else the process's own (getcwd): `env -i` and some launchers
+// set no PWD, and a relative path joined onto "" named nothing (#1915).
+// $PWD is believed only while it names the directory the process is in
+// (POSIX `pwd -L`): a process started in another directory with the
+// variable left as it was (`env -C dir with build`, a launcher that sets the
+// directory and not the variable) resolved its project under the stale one.
 fn runtime_cwd() -> str:
+    let actual = runtime_getcwd()
     let pwd = with_getenv_str("PWD")
-    if pwd.len() > 0:
-        return pwd
+    if pwd.len() > 0 and (actual.len() == 0 or runtime_names_directory(pwd, actual)): pwd else: actual
+
+// Whether `path` names the directory `actual`: the same text, slashes
+// aside, or the same directory once symbolic links are resolved.
+fn runtime_names_directory(path: &str, actual: &str) -> bool:
+    if path.replace("\\", "/") == actual.replace("\\", "/"): return true
+    let resolved = runtime_resolved_path(path)
+    resolved.len() > 0 and (resolved == actual or resolved == runtime_resolved_path(actual))
+
+// `path` with its symbolic links resolved (realpath), or "" where the
+// platform has no such call or the path names nothing.
+fn runtime_resolved_path(path: &str) -> str:
+    unsafe:
+        let cpath = with_alloc(path.len() + 1)
+        let buf = with_alloc(4096)
+        with_memcpy(cpath, *(path as *const str as *const *const u8), path.len())
+        *((cpath as i64 + path.len()) as *mut u8) = 0
+        let found = with_libc_realpath(cpath as *const c_char, buf as *mut c_char)
+        var n: i64 = 0
+        if found as i64 != 0:
+            while n < 4096 and *((buf as i64 + n) as *const u8) != 0: n = n + 1
+        let out = with_str_from_bytes(buf as *const u8, n)
+        with_free(cpath)
+        with_free(buf)
+        out
+
+// The process's own directory (getcwd), or "".
+fn runtime_getcwd() -> str:
     unsafe:
         let buf = with_alloc(4096)
         if rt_getcwd(buf, 4096) != 0:
@@ -192,7 +223,7 @@ fn runtime_own_tree_root() -> str:
     var exe = with_arg_at(0)
     if not exe.contains("/") and not exe.contains("\\"): return ""
     if not runtime_path_is_absolute(exe):
-        let cwd = with_getenv_str("PWD")
+        let cwd = runtime_cwd()
         if cwd.len() == 0: return ""
         exe = cwd ++ "/" ++ exe
     var dir = runtime_path_parent(exe)
