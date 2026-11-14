@@ -16,6 +16,9 @@ use rt.rt_core
 // Canonical active target architecture for @[target("arch")] guards.
 // Resolved from the driver-selected --target (§18.5); native builds
 // resolve to the host arch as before.
+fn parser_is_integer_type_name(name: &str) -> bool:
+    name == "i8" or name == "i16" or name == "i32" or name == "i64" or name == "i128" or name == "isize" or name == "u8" or name == "u16" or name == "u32" or name == "u64" or name == "u128" or name == "usize"
+
 fn parser_active_arch() -> str:
     let a = target_spec_arch()
     if a == "amd64": "x86_64" else: a
@@ -6386,7 +6389,7 @@ impl Parser:
                 let text = self.source.slice((start + 1) as i64, end as i64)
                 let field = self.intern.intern(text)
                 self.advance()
-                lhs = self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), end, lhs, field, 0)
+                lhs = self.field_or_numeric_member(lhs, field, end)
             else if t == TokenKind.TK_L_BRACE:
                 if self.suppress_brace != 0:
                     return lhs
@@ -6591,7 +6594,23 @@ impl Parser:
             self.advance()
             return self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
         let field = self.expect_ident_or_keyword()
-        self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
+        self.field_or_numeric_member(lhs, field, self.prev_end())
+
+    // `lhs.field`. A numeric type's `min`, `max`, `inf` or `nan` (§4.1a) is
+    // the constant std.numeric states for it, `__<type>_<member>()`: the
+    // numeric type names are reserved (§29.8), so the spelling has one
+    // meaning.
+    mut fn field_or_numeric_member(lhs: i32, field: i32, end: i32) -> i32:
+        let start = self.pool.get_start(lhs)
+        if self.pool.kind(lhs) == NodeKind.NK_IDENT:
+            let ty = self.intern.resolve(self.pool.get_data0(lhs))
+            let member = self.intern.resolve(field)
+            let float = ty == "f32" or ty == "f64"
+            let numeric = float or parser_is_integer_type_name(ty)
+            if numeric and (member == "min" or member == "max" or (float and (member == "inf" or member == "nan"))):
+                let callee = self.pool.add_node(NodeKind.NK_IDENT, start, end, self.intern.intern("__" ++ ty ++ "_" ++ member), 0, 0)
+                return self.pool.add_node(NodeKind.NK_CALL, start, end, callee, self.pool.extra_len(), 0)
+        self.pool.add_node(NodeKind.NK_FIELD_ACCESS, start, end, lhs, field, 0)
 
     fn is_positional_struct_literal() -> bool:
         if self.peek() == TokenKind.TK_R_BRACE:

@@ -1181,7 +1181,7 @@ func loadConfig(path string) (*Config, error) {
 fn load_config(path: &str) -> Result[Config, AppError]:
     let data = fs.read_file(path)
         .context("reading config")?
-    let config = json.parse[Config](&data)
+    let config: Config = json.parse(&data)
         .context("parsing config")?
     config                           // implicit Ok wrapping
 ```
@@ -1914,7 +1914,7 @@ error AppError = NotFound | InvalidInput(str)
 fn load_config(path: &str) -> Result[Config, AppError]:
     let data = fs.read_file(path)
         .context("reading config")?
-    let config = json.parse[Config](&data)
+    let config: Config = json.parse(&data)
         .context("parsing config")?
     config                           // implicit Ok wrapping
 
@@ -2053,7 +2053,7 @@ try await withThrowingTaskGroup(of: User.self) { group in
 // With
 async fn fetch_user(id: i32) -> Result[User, ApiError]:
     let data = api.get("/users/{id}").await?
-    json.parse[User](&data)
+    json.parse(&data)                // the return type names User
 
 // async scope (= Swift's withThrowingTaskGroup)
 async scope s =>

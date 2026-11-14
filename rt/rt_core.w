@@ -29,6 +29,7 @@ extern fn rt_cpu_time_ns() -> i64
 extern fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
 extern fn rt_ftell(stream: *mut c_void) -> i64
 extern fn rt_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
+extern fn rt_strtof(nptr: *const c_char, endptr: *mut *mut c_char) -> f32
 extern fn rt_strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64
 extern fn rt_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64
 extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
@@ -5243,6 +5244,9 @@ pub fn with_libc_ftell(stream: *mut c_void) -> i64: rt_ftell(stream)
 // where that is 8 bytes (Darwin arm64, Windows); where C's is wider the parse
 // is strtod's, the correctly rounded double of the same text (#2176).
 pub fn with_libc_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64: rt_strtold(nptr, endptr)
+// strtof for `text as f32` and `parse()` (§15.5): the float nearest the text
+// itself, which the nearest double rounded again is not.
+pub fn with_libc_strtof(nptr: *const c_char, endptr: *mut *mut c_char) -> f32: rt_strtof(nptr, endptr)
 // std.libc strtol/strtoul: a 64-bit long on every target (D114). Where C's
 // long is 32 bits (the UCRT) the platform binds its 64-bit parse, so a
 // saturating overflow is the 64-bit one the LP64-modeled corpora expect

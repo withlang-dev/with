@@ -792,6 +792,33 @@ let msg = f"Hello, {name}! You have {count} items."
 
 ---
 
+## Convert Text with `as`
+
+Text becomes a number with a cast. Use it when the text has to be a
+number: bad text is a bug, and the program stops there with a message
+that names the text.
+
+```
+// ✓ the text must be a number
+let port = args()[1] as u16
+let total = (line as i64) + bonus
+
+// ✓ the text might not be a number: `parse()` gives an `Option`,
+//   typed by what it is used as
+let retries: i32 = setting.parse() ?? 3
+
+// ✗ hand-rolled conversion, or a default that hides bad input
+let port = string_to_int(args()[1])
+```
+
+The cast reads what With source reads: `"0x2A" as i32` is 42 and
+`"1_000" as i32` is 1000. Spaces are not skipped; trim first:
+`line.trim() as i32`. Digits in another base with no prefix go through
+`parse`: `let n: i32 = "2A".parse(base: 16).unwrap()`.
+
+The limits and the special floats are members of their types:
+`i32.max`, `u8.min`, `f64.inf`, `-f64.inf`, `f64.nan`.
+
 ## Ranges and Loops
 
 **Use ranges.** Don't write C-style index manipulation.
