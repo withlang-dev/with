@@ -807,6 +807,16 @@ fn ci_migrate_preamble_text() -> str:
     // C width); no `type c_*` line (D155), every width is spelled.
     let model = ci_model_name(with_cimport_target_triple())
     p = p ++ "\n// data model: " ++ model ++ "\npub const C_DATA_MODEL: str = \"" ++ model ++ "\"\n"
+    // #3292: the allocator named as a function value (`release(free, p)`).
+    // Calls of the four are rewritten to the runtime's allocator, so the
+    // value is a function with C's signature over the same allocator: memory
+    // from a rewritten `malloc` released through a `free` handed to a callee
+    // is released by the allocator that made it.
+    let size_t = ci_model_size_type(true)
+    p = p ++ ci_migrate_render_preamble_fn("unsafe fn __with_migrate_malloc(__with_n: " ++ size_t ++ ") -> *mut c_void", "with_alloc(__with_n as i64) as *mut c_void", "with_alloc(__with_n as i64) as *mut c_void")
+    p = p ++ ci_migrate_render_preamble_fn("unsafe fn __with_migrate_calloc(__with_n: " ++ size_t ++ ", __with_size: " ++ size_t ++ ") -> *mut c_void", "with_alloc_zeroed(__with_n as i64, __with_size as i64) as *mut c_void", "with_alloc_zeroed(__with_n as i64, __with_size as i64) as *mut c_void")
+    p = p ++ ci_migrate_render_preamble_fn("unsafe fn __with_migrate_realloc(__with_p: *mut c_void, __with_n: " ++ size_t ++ ") -> *mut c_void", "with_realloc(__with_p as *mut u8, 0, __with_n as i64) as *mut c_void", "with_realloc(__with_p as *mut u8, 0, __with_n as i64) as *mut c_void")
+    p = p ++ ci_migrate_render_preamble_fn("unsafe fn __with_migrate_free(__with_p: *mut c_void)", "with_free(__with_p as *mut u8)", "with_free(__with_p as *mut u8)")
     // Clang's overflow builtins both store the wrapped result and report the
     // overflow bit. Keep both effects: the structural call lowerer selects
     // the helper from the result-pointer type and rejects mixed types loudly.
