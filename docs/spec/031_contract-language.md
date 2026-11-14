@@ -308,8 +308,12 @@ registry line, a profile match and a default. It cannot change a header fact
 that would grant more. A stated grant stands too, with one condition, which
 is not a level of this list: a proof must not contradict it.
 
-**A grant and a proof** (adopted 2026-11-11, not yet implemented; mission
-law 12).
+**A grant and a proof** (adopted 2026-11-11; mission law 12. Implemented
+for `lend` and `from` in a function or resource clause. Not yet
+implemented: `returns static`, `runs no threads` and a field role against
+a proof, the gate on a stale override, the citation in the standard
+library and the runtime, and the counts in the census and
+`:user-programs-safe`).
 
 - A proof **contradicts** a grant when it establishes a fact the grant
   denies: the grant says `lend` and the proof shows the function frees or
@@ -324,6 +328,10 @@ law 12).
   marked `override`. The marker is not a precedence level: it suppresses
   the contradiction error for that one clause, and the grant then stands as
   any stated clause does.
+- The proofs a stated contract is held against are the ones `with get`
+  recorded for the package it describes: a project's `contracts/<name>.w`
+  against `contract-proofs.txt` of `c.<name>`. A package with none recorded
+  contradicts nothing.
 - `override` is available on every grant: a resource clause, a function
   clause, a library clause (`override runs no threads`, against a proof
   that the library starts a thread) and a field role. It applies only to
@@ -826,8 +834,9 @@ empty `fn f` is one claim: it asserts that `f` keeps and frees nothing.
    for the release UAT fixtures and examples, so a rising number is visible.
 2. **Where a citation is required.** In the registry (every line of a facts
    file), in the standard library, and in the runtime: a claim without one
-   is refused with its line. In a program's own source it is not required:
-   the clause is reviewed with the program.
+   is refused with its line. A citation on an `fn` or `resource` line covers
+   the clauses under it that carry none. In a program's own source it is not
+   required: the clause is reviewed with the program.
 3. **A claim in a user program is not refused.** D51 gives an application
    author the contract as the way to make their own C library safe; a
    fixture or an example may state a grant.
