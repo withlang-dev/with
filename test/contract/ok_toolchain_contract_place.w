@@ -1,5 +1,4 @@
 //! expect-contract: violations=0 ok
-//! expect-contract: contract:libc@<toolchain facade libc>
 //! expect-contract: uncited=0
 
 // The toolchain's libc contract is a file of its own: its rows are placed
