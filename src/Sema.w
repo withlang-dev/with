@@ -6608,6 +6608,13 @@ impl Sema:
                 return self.source_texts[si]
         ""
 
+    // The name a source was read under: a path, or a synthetic file's name
+    // (`<toolchain facade libc>`). "" for the root file and an unknown id.
+    fn source_name_for_file_id(file_id: i32) -> str:
+        for si in 0..self.source_text_file_ids.len():
+            if self.source_text_file_ids[si] == file_id: return with_str_clone_ref(self.source_text_names[si])
+        ""
+
     fn source_text_for_file_id(file_id: i32) -> str:
         with_str_clone_ref(self.source_text_view_for_file_id(file_id))
 

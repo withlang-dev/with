@@ -1880,10 +1880,8 @@ fn analysis_pool_view_hit(sema: &Sema, body: &MirBody, fn_name: &str, fn_path: &
 // plain-arg-to-owned-param site from the live Sema state. Semantic-snapshot
 // request — its primary use is partitioning an ERROR worklist.
 fn analysis_move_site_file_name(sema: &Sema, file_id: i32, root_path: &str) -> str:
-    for i in 0..sema.source_text_file_ids.len():
-        if sema.source_text_file_ids[i] == file_id:
-            return with_str_clone_ref(sema.source_text_names[i])
-    with_str_clone_ref(root_path)
+    let name = sema.source_name_for_file_id(file_id)
+    if name.len() > 0: name else: with_str_clone_ref(root_path)
 
 fn analysis_move_site_shape(sema: &Sema, node: i32) -> str:
     var n = node

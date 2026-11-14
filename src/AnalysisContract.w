@@ -44,8 +44,16 @@ type ContractSite {
     source: str,
 }
 
+// The toolchain's own contract (LibcFacade.w) is a synthetic file owned by
+// the module that imported libc: its lines are its own text's, so its place
+// is its own name, never the owning module's path.
+fn contract_toolchain_file(sema: &Sema, file_id: i32) -> str:
+    let name = sema.source_name_for_file_id(file_id)
+    if name.starts_with("<toolchain facade "): name else: ""
+
 fn contract_site(sema: &Sema, decl: i32, source_path: &str, source_text: &str) -> ContractSite:
-    let path = sema.decl_source_path_for_index(decl)
+    let toolchain = contract_toolchain_file(sema, sema.decl_source_file_id_for_index(decl))
+    let path = if toolchain.len() > 0: toolchain else: sema.decl_source_path_for_index(decl)
     let source = sema.source_text_for_file_id(sema.decl_source_file_id_for_index(decl))
     ContractSite {
         path: if path.len() > 0: path else: with_str_clone_ref(source_path),
@@ -105,7 +113,9 @@ fn contract_claim_is_cited(source: &str, line_no: i32) -> bool:
 fn contract_uncited_claims(sema: &Sema, seen: &List[str], source_path: &str, source_text: &str) -> i32:
     var uncited = 0
     for prov in seen:
-        if not prov.starts_with("claim: stated@"): continue
+        // The toolchain's contract is cited in its own text, once, and is no
+        // part of the count a file is held to.
+        if not prov.starts_with("claim: stated@") or prov.starts_with("claim: stated@<toolchain facade "): continue
         let place = prov.slice(14, prov.len())
         var colon = place.len() - 1
         while colon > 0 and place[colon] != ':': colon -= 1

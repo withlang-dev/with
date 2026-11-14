@@ -3,7 +3,7 @@
 # a file whose count differs from its line. Not listed, with why: rt/wasm.w (25 fn items, no
 # clauses; the view cannot compile it for the host), lib/contracts/sdl.w (needs the SDL headers).
 lib/contracts/zlib.w	0
-lib/contracts/bzip2.w	1
+lib/contracts/bzip2.w	0
 lib/contracts/libcurl.w	0
 lib/contracts/sqlite3.w	11
 rt/fiber_core_windows.w	2
