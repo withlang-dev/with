@@ -496,9 +496,13 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
         if sema.facade_param_is_callable(sig, pi):
             contract_row(report, sema, site, subject, CONTRACT_FN, node, c.fn_sym, owner, pi, "effect", f"{shown}: callback, borrowed for the call's scope; what C passes it cannot escape", "default:callback-scope borrow (§16.2b.9)")
         else if lend_clause != 0:
-            contract_row(report, sema, site, subject, CONTRACT_FN, lend_clause, c.fn_sym, owner, pi, "effect", f"{shown}: lend, an assertion about foreign behavior{recv_note}", contract_clause_at(sema, site, lend_clause))
+            // §31.8.1: a described function lends its resource parameters. A
+            // parameter that receives no resource has nothing lent: no claim.
+            let stated_lend: str = if recv_note.len() > 0: contract_clause_at(sema, site, lend_clause) else: contract_provenance(sema, site, lend_clause, false)
+            contract_row(report, sema, site, subject, CONTRACT_FN, lend_clause, c.fn_sym, owner, pi, "effect", f"{shown}: lend, an assertion about foreign behavior{recv_note}", stated_lend)
         else:
-            contract_row(report, sema, site, subject, CONTRACT_FN, node, c.fn_sym, owner, pi, "effect", f"{shown}: lend, the described fn's assertion{recv_note}", contract_item_prov(sema, site, node, true))
+            let asserted: str = if recv_note.len() > 0: contract_item_prov(sema, site, node, true) else: "default:a described fn lends its resource parameters, and this is none (§31.8.1)"
+            contract_row(report, sema, site, subject, CONTRACT_FN, node, c.fn_sym, owner, pi, "effect", f"{shown}: lend, the described fn's assertion{recv_note}", asserted)
     // The result (§16.2b.6-8).
     let ret = sema.type_name(sema.sig_return_type(sig))
     if c.returns_borrow_resource != 0:
