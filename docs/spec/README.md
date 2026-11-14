@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.56
+# The With Programming Language — Specification v7.57
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.57:** D203 (Eric, 2026-11-14). §15.5 rewritten: `T(text)` and `text.parse()` are one conversion that differ only in what failure is; the whole text is the value; an integer is With's notation, or with `base: N` (2 through 36) digits of that base with no prefix read; floating-point text is decimal, with `inf`, `infinity` and `nan`; a failed call panics with `cannot parse T from "text"` and where the call is, and says overflow. §4.1a (new): `min` and `max` on every numeric type, `inf` and `nan` on the floating-point types. The compiler implements none of it yet.
+
 **Changelog v7.56:** (Eric, 2026-11-14). §15.5 (new): a type that implements `Parse` is called with text, `i32("42")`, and the result is the type; text that spells no value of it is a panic naming the text and the type. `text.parse()` reports the failure as `Option[T]`, typed by the demand on its result, and takes no type argument. The compiler is non-compliant until it implements the call form.
 
 **Changelog v7.55:** (Eric, 2026-11-14). §31.8.6: a global a `freed by`, `drop` or `destroys` clause names holds a function of one parameter, the pointer the resource wraps or the text to release; any other shape is an error, and an in-place or by-value resource names a function.
@@ -367,6 +369,7 @@ arbitrary statements and `goto` (§13.5a, §13.5b).
   - [§3.9 Implicit Trait Object Coercion](003_borrowing.md#39-implicit-trait-object-coercion)
 - [§4. Types](004_types.md)
   - [§4.1 Primitive Types](004_types.md#41-primitive-types)
+  - [§4.1a Members of the Numeric Types](004_types.md#41a-members-of-the-numeric-types)
   - [§4.2 Arithmetic and Operators](004_types.md#42-arithmetic-and-operators)
   - [§4.2a Boolean Tests](004_types.md#42a-boolean-tests)
   - [§4.3 Structs](004_types.md#43-structs)

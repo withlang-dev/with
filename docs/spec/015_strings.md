@@ -386,26 +386,69 @@ let s = "value: " ++ x    // error if x is not str
 ### 15.5 Values from Text
 
 A type that implements `Parse` is called with text: `i32("42")` is
-the `i32` the text spells. Text that spells no value of the type
-is a panic naming the text and the type:
+the `i32` the text spells. `text.parse()` is the same conversion
+reporting failure as a value: it returns `Option[T]`, where `T` is the
+type demanded of its result, and is `None` where the call panics. The
+two accept the same text and give the same value; they differ only in
+what failure is.
 
 ```
-panic: i32("abc"): "abc" is not an i32
+let n = i32(line)                 // panics on bad text
+let n: i32 = line.parse() ?? 0    // None on bad text
 ```
 
-`text.parse()` is the form that reports the failure as a value. It
-returns `Option[T]`, `None` where the call would panic, and `T` is
-the type demanded of its result:
+No type argument is written on `parse`: `text.parse[i32]()` is an
+error that names `i32(text)`. A type is called this way with text
+only: `i32(3.9)` is an error.
+
+**The whole text is the value.** Nothing is trimmed and nothing is
+left over: `i32(" 42")` and `i32("42abc")` fail. A value the type
+cannot hold fails: one out of range, or a negative one for an
+unsigned type.
+
+**Integers** are read in one of two ways.
+
+- With no base, the text is With's integer notation (§4.2.1): an
+  optional `+` or `-`, then decimal digits, or `0x`, `0o` or `0b` in
+  either case and digits of that base. `_` may stand between two
+  digits. There is no type suffix, and a leading zero does not mean
+  octal: `i32("042")` is 42.
+- With `base: N`, 2 through 36, the text is an optional sign and
+  digits of that base, the letters in either case standing for 10
+  through 35, with `_` between digits as above. No prefix is read:
+  `i32("0b1", base: 16)` is 177, and `i32("0x1", base: 16)` fails,
+  since `x` is not a digit.
 
 ```
-let n: i32 = line.parse() ?? 0
+i32("0x2A")                          // 42
+i32("2A", base: 16)                  // 42
+i32("2A")                            // fails
+let n: i32 = line.parse(base: 16) ?? 0
 ```
 
-No type argument is written on it: `text.parse[i32]()` is an error
-that names `i32(text)`.
+**Floating-point values** are decimal: an optional sign, digits with
+an optional point, an optional exponent (`1e3`, `1E-3`). The result
+is the nearest value of the type. `inf`, `infinity` and `nan`, in any
+case, are `T.inf` and `T.nan` (§4.1a); a sign may stand before the
+infinities. Finite text too large for the type fails: it does not
+become infinity. `nan(...)`, hexadecimal floats and `base:` are not
+accepted.
 
-The integer and floating-point types implement `Parse`. A
-program's type does by `impl Parse for T`.
+**A failed call is a panic** naming the type, the text and where the
+call is. A value out of range says so:
+
+```
+panic: cannot parse i32 from "abc"
+  at main.w:12:17
+
+panic: cannot parse u8 from "300": overflow
+  at main.w:13:17
+```
+
+Text too long to print whole is cut short in the message.
+
+The integer and floating-point types implement `Parse`. A program's
+type does by `impl Parse for T`.
 
 *§15.7 Output Functions moved to `docs/spec/stdlib/output-functions.md`.*
 
