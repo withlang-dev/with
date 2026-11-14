@@ -16873,7 +16873,14 @@ impl Sema:
         let saved_negated = self.in_negated_literal_context
         if negated_literal != 0:
             self.in_negated_literal_context = self.in_negated_literal_context + 1
+        // `let n: i32 = s.parse()?`: the demand on `x?` is a demand on the
+        // payload of the call `x`, as it is under `??`.
+        let saved_payload_root = self.payload_demand_root
+        let saved_payload_type = self.payload_demand_type
+        if op == UnaryOp.UOP_TRY: self.demand_payload_of(operand_node, if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0)
         let operand = if expected_operand != 0: self.check_expr_with_expected(operand_node, expected_operand as TypeId) else: self.check_expr_value_context(operand_node)
+        self.payload_demand_root = saved_payload_root
+        self.payload_demand_type = saved_payload_type
         self.in_negated_literal_context = saved_negated
         if operand == 0:
             return 0
@@ -29610,10 +29617,17 @@ impl Sema:
             // The demand on the call is its result's, never the receiver's:
             // `[1, 2, 3].traverse(...)` under a `Result[List[T], E]`
             // annotation typed the literal by it (#3051, §4.3 / D93).
+            // An eliminator's demand is one on the receiver's payload
+            // (`let n: i32 = s.parse().unwrap()`).
             let saved_recv_demand = self.has_expected_type
+            let saved_payload_root = self.payload_demand_root
+            let saved_payload_type = self.payload_demand_type
+            if recv_field == self.syms.unwrap or recv_field == self.syms.expect: self.demand_payload_of(recv_expr, if saved_recv_demand != 0: self.expected_expr_type as i32 else: 0)
             self.has_expected_type = 0
             let checked_recv = self.check_expr(recv_expr) as i32
             self.has_expected_type = saved_recv_demand
+            self.payload_demand_root = saved_payload_root
+            self.payload_demand_type = saved_payload_type
             let recv_ty = self.adjust_static_receiver_type(recv_expr, checked_recv)
             let vector_method = self.check_vector_method(node, recv_expr, recv_ty, recv_field, arg_count)
             if vector_method >= 0:
@@ -32278,9 +32292,30 @@ impl Sema:
     // demanded type. A parameter the arguments bound keeps its binding; a
     // return type that does not match the demand binds nothing, and the
     // ordinary result mismatch reports it.
+    // `call` is asked for a carrier whose payload is `payload` (0: nothing
+    // is asked). Only a call can take the demand: it is read where the
+    // call's own type parameters are bound.
+    mut fn demand_payload_of(call: i32, payload: i32):
+        if payload == 0 or payload == self.ty_void as i32 or self.ast.kind(call) != NodeKind.NK_CALL: return
+        self.payload_demand_root = call
+        self.payload_demand_type = payload
+
     mut fn bind_unbound_type_params_from_result(ret_node: i32, tp_start: i32, tp_count: i32, call_node: i32):
+        if ret_node == 0: return
+        // A payload demand (`x?`, `x.unwrap()`) binds through the success
+        // payload of a declared `Option[..]` or `Result[.., ..]` result.
+        if self.payload_demand_root == call_node and self.payload_demand_type != 0:
+            let carrier = self.ast.kind(ret_node) == NodeKind.NK_TYPE_GENERIC and self.ast.get_data2(ret_node) >= 1 and (self.ast.get_data0(ret_node) == self.syms.option or self.ast.get_data0(ret_node) == self.syms.result)
+            if carrier: self.bind_unbound_type_params_from_demand(self.ast.get_extra(self.ast.get_data1(ret_node)), self.payload_demand_type, tp_start, tp_count, call_node)
+            return
         let expected = self.expected_expr_type as i32
-        if ret_node == 0 or self.has_expected_type == 0 or expected == 0 or expected == self.ty_void as i32 or self.current_value_expr_root != call_node: return
+        if self.has_expected_type == 0 or expected == 0 or expected == self.ty_void as i32 or self.current_value_expr_root != call_node: return
+        self.bind_unbound_type_params_from_demand(ret_node, expected, tp_start, tp_count, call_node)
+
+    // The type parameters no argument bound take what `type_node` matched
+    // against `expected` gives them; a mismatch binds nothing and says
+    // nothing (the call's own check reports it).
+    mut fn bind_unbound_type_params_from_demand(type_node: i32, expected: i32, tp_start: i32, tp_count: i32, call_node: i32):
         let unbound: List[i32] = []
         var pos = tp_start
         for _ in 0..tp_count:
@@ -32292,7 +32327,7 @@ impl Sema:
         let saved_types = sema_clone_i32_list(self.generic_subst_type_ids)
         let saved_diag_count = self.diags.items.len()
         self.clear_generic_substitution()
-        self.bind_type_params_from_type_expr(ret_node, expected, tp_start, tp_count, call_node, 0)
+        self.bind_type_params_from_type_expr(type_node, expected, tp_start, tp_count, call_node, 0)
         let clean = self.diags.items.len() == saved_diag_count
         while self.diags.items.len() > saved_diag_count:
             self.diags.items.pop()
@@ -37622,7 +37657,14 @@ impl Sema:
                 self.method_call_fields.insert(node, field)
         let static_type_sym = self.static_receiver_base_sym(expr)
         let early_method_name = with_str_clone_ref(self.pool_resolve(field))
+        // `let n: i32 = s.parse().unwrap()`: the demand on the payload an
+        // eliminator returns is a demand on the call it is applied to.
+        let saved_payload_root = self.payload_demand_root
+        let saved_payload_type = self.payload_demand_type
+        if field == self.syms.unwrap or field == self.syms.expect: self.demand_payload_of(expr, mc_call_expected_ty)
         var obj_type = if known_recv_ty != 0: known_recv_ty as TypeId else: self.check_expr(expr)
+        self.payload_demand_root = saved_payload_root
+        self.payload_demand_type = saved_payload_type
         let static_receiver_is_tiered_type = self.static_receiver_type_is_known(expr) or self.is_pending_generic_collection_base(static_type_sym) or self.symbol_requires_std_tier(static_type_sym)
         if static_type_sym != 0 and static_receiver_is_tiered_type:
             if self.require_alloc_tier_for_symbol(static_type_sym, expr) == false:

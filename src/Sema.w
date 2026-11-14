@@ -2696,6 +2696,11 @@ type Sema {
     stmt_pos_depth: i32,
     current_statement_expr_root: i32,
     current_value_expr_root: i32,
+    // The demand on the payload a call's carrier holds: `x?`, `x.unwrap()`
+    // and `x.expect(m)` under an expected type ask the call `x` for an
+    // Option or Result of it. The call node, and the payload's type.
+    payload_demand_root: i32,
+    payload_demand_type: i32,
     closure_direct_arg_depth: i32,
     // > 0 while a closure body is checked: the parameter frame
     // (current_fn_param_syms, current_fn_sig_idx) is then the closure's
@@ -4562,6 +4567,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         stmt_pos_depth: 0,
         current_statement_expr_root: 0,
         current_value_expr_root: 0,
+        payload_demand_root: 0,
+        payload_demand_type: 0,
         closure_direct_arg_depth: 0,
         closure_body_depth: 0,
         expected_expr_type: 0,
