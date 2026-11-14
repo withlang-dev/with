@@ -391,7 +391,9 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
     if r.drop != 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_DROP, 0)
         let d = sema.safe_symbol_text(r.drop)
-        contract_row(report, sema, site, subject, CONTRACT_RESOURCE, clause, r.drop, owner, 0, "destroyer", f"{d}; automatic: Drop calls it while the value is live", contract_clause_at(sema, site, clause))
+        // §31.8.6: a destroyer named through a function-pointer global.
+        let through = if sema.get_sig(r.drop) < 0 and sema.facade_extern_var_named(d) != 0: ", through the global, read at each call" else: ""
+        contract_row(report, sema, site, subject, CONTRACT_RESOURCE, clause, r.drop, owner, 0, "destroyer", f"{d}{through}; automatic: Drop calls it while the value is live", contract_clause_at(sema, site, clause))
     for di in 0..r.destroyers.len():
         let clause = contract_clause(sema, node, FACADE_CLAUSE_DESTROYS, di as i32)
         let d = sema.safe_symbol_text(r.destroyers[di])

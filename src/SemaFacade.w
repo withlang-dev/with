@@ -1109,6 +1109,19 @@ impl Sema:
             return r
         if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS:
             let f = self.ast.get_extra(ops)
+            // §31.8.6: `drop g` and `destroys g` name a function, or a
+            // global holding one.
+            if kind != FACADE_CLAUSE_INIT and self.get_sig(f) < 0:
+                let hook = self.facade_destroyer_global(f, r.repr_tid)
+                if hook != 0:
+                    if kind == FACADE_CLAUSE_DROP: r.drop = hook
+                    else: r.destroyers.push(hook)
+                    return r
+                if self.facade_extern_var_named(self.pool_resolve(f)) != 0:
+                    let gname = self.pool_resolve(f)
+                    let word = if kind == FACADE_CLAUSE_DROP: "drop" else: "destroys"
+                    self.emit_error(f"resource '{rname}': '{word} {gname}' names a global that does not hold a function of one parameter taking the pointer the resource wraps (§31.8.6)", clause)
+                    return r
             let sig = self.facade_fn_sig(f, clause)
             if sig < 0:
                 return r
@@ -6187,6 +6200,19 @@ impl Sema:
 
     // The `extern var` declaration named `name` (an imported global such as
     // libxml2's `xmlFree`), or 0.
+    // §31.8.6: the imported global `name` names when it holds a function of
+    // one parameter that takes the pointer representation `repr_tid`; 0
+    // otherwise. The generated call passes the pointer the resource is.
+    mut fn facade_destroyer_global(name: i32, repr_tid: i32) -> i32:
+        let var_node = self.facade_extern_var_named(self.pool_resolve(name))
+        if var_node == 0 or self.get_type_kind(self.resolve_alias(repr_tid as TypeId)) != TypeKind.TY_PTR: return 0
+        let var_tid = self.resolve_type_expr(facade_render_global_type_node(self.ast, var_node)) as i32
+        let fn_tid = if self.is_option_pointer_type(var_tid): self.callable_any_fn_type(self.option_pointer_payload_type(var_tid) as TypeId) else: self.callable_any_fn_type(var_tid as TypeId)
+        if fn_tid == 0 or self.get_type_d1(fn_tid as TypeId) != 1: return 0
+        let p0 = self.resolve_alias(self.fn_type_param_type(fn_tid, 0) as TypeId)
+        let takes = self.facade_same_type(p0 as i32, repr_tid) or self.facade_void_ptr_accepts(p0, self.resolve_alias(repr_tid as TypeId)) or self.facade_param_matches_repr(p0 as i32, repr_tid)
+        if takes: self.ast.get_data0(var_node) else: 0
+
     fn facade_extern_var_named(name: &str) -> i32:
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
