@@ -36,13 +36,14 @@ fn main:
     assert(shown.contains("[proof@.with/deps/c/fake/1.0/contract.w:5: every return is a string literal]"))
     assert(shown.contains("[claim: registry@.with/deps/c/fake/1.0/contract.w:7: fake.h 2: \"the motto is a literal\"]"))
     assert(shown.contains("[claim: annotation@.with/deps/c/fake/1.0/contract.w:9: the header marks the return static]"))
-    // An fn item with no proof beside it asserts that the function keeps
-    // and frees nothing: one claim, whoever wrote the file (§31.9).
-    assert(shown.contains("[claim: stated@.with/deps/c/fake/1.0/contract.w:10]"))
+    // An fn item whose function takes no resource asserts nothing: its
+    // parameter row is a default, not a claim (§31.8.1).
+    assert(not shown.contains("[claim: stated@.with/deps/c/fake/1.0/contract.w:10]"))
+    assert(shown.contains("[default:a described fn lends its resource parameters, and this is none (§31.8.1)]"))
     // A presentation grants nothing and is no claim.
     assert(shown.contains("[stated@.with/deps/c/fake/1.0/contract.w:11]"))
     assert(shown.contains("[claim: stated@src/main.w:6]"))
     assert(not shown.contains("trust me"))
-    assert(shown.contains("contract-audit: clauses=5 proven=1 claimed=4"))
-    assert(shown.contains("contract-audit: claims: stated=2 registry=1 profile=0 annotation=1"))
+    assert(shown.contains("contract-audit: clauses=4 proven=1 claimed=3"))
+    assert(shown.contains("contract-audit: claims: stated=1 registry=1 profile=0 annotation=1"))
     print("ok")

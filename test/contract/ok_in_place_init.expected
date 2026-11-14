@@ -10,8 +10,8 @@ fn z_init; contract:zl@test/contract/ok_in_place_init.w; clause:fn@test/contract
     role: in-place initializer of Stream  [claim: stated@test/contract/ok_in_place_init.w:18]
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut z_stream_s s: lend, an assertion about foreign behavior; receives Stream  [claim: stated@test/contract/ok_in_place_init.w:21]
-    effect: param 1: *mut i32 ends: lend, an assertion about foreign behavior  [claim: stated@test/contract/ok_in_place_init.w:21]
-    effect: param 2: *mut i32 misplaced: lend, an assertion about foreign behavior  [claim: stated@test/contract/ok_in_place_init.w:21]
+    effect: param 1: *mut i32 ends: lend, an assertion about foreign behavior  [stated@test/contract/ok_in_place_init.w:21]
+    effect: param 2: *mut i32 misplaced: lend, an assertion about foreign behavior  [stated@test/contract/ok_in_place_init.w:21]
     returns: i32  [default:as declared]
     invalidates: Stream (param 0: *mut z_stream_s s)  [default:unknown effect is invalidate (§16.2b.7)]
 fn z_check; contract:zl@test/contract/ok_in_place_init.w; clause:fn@test/contract/ok_in_place_init.w:22
