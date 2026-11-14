@@ -27849,9 +27849,23 @@ impl Sema:
             pos = pos + 2 + self.ast.get_extra(pos + 1)
         true
 
+    // §15.5 (D204): the type `sym` names when it implements `Parse`, else
+    // 0. Such a type is not called with text and is not a pipeline stage:
+    // text converts with `as`.
+    mut fn parse_type_named(sym: i32) -> i32:
+        let prim = self.primitive_type_by_sym(sym) as i32
+        let tid = if prim != 0: prim else: self.lookup_named_type_visible(sym) as i32
+        if tid != 0 and self.type_implements_trait(tid, self.pool_intern("Parse")): tid else: 0
+
     mut fn check_pipeline(node: i32) -> i32:
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
+        let stage = if rhs != 0 and self.ast.kind(rhs) == NodeKind.NK_CALL: self.ast.get_data0(rhs) as i32 else: rhs
+        if stage != 0 and self.ast.kind(stage) == NodeKind.NK_IDENT:
+            let stage_type = self.parse_type_named(self.ast.get_data0(stage))
+            if stage_type != 0:
+                self.emit_error(f"a type is not a pipeline stage (§15.5): text converts with `as`; write `text as {self.type_name(stage_type)}`", stage)
+                return 0
         // #1739: `[1, 2] |> stage()` meets the stage's first parameter.
         if rhs != 0 and self.ast.kind(rhs) == NodeKind.NK_CALL and self.ast.kind(self.ast.get_data0(rhs)) == NodeKind.NK_IDENT:
             let stage_fn = self.generic_fn_node_for_symbol(self.ast.get_data0(self.ast.get_data0(rhs)))
@@ -29526,6 +29540,13 @@ impl Sema:
         if self.ast.kind(callee) == NodeKind.NK_INDEX and self.ast.kind(self.ast.get_data0(callee)) == NodeKind.NK_FIELD_ACCESS:
             if self.rewrite_namespace_access(self.ast.get_data0(callee), true) < 0:
                 return 0
+        // §15.5 (D204): `text.parse[i32]()`. No type argument is written on
+        // `parse`; the cast names the type, or the demand does.
+        if self.ast.kind(callee) == NodeKind.NK_INDEX and self.ast.kind(self.ast.get_data0(callee)) == NodeKind.NK_FIELD_ACCESS and self.ast.get_data1(self.ast.get_data0(callee)) == self.pool_intern("parse"):
+            let written = self.ast.get_data1(callee)
+            let named = if self.ast.kind(written) == NodeKind.NK_IDENT: self.pool_resolve(self.ast.get_data0(written)) else: "T"
+            self.emit_error(f"no type argument is written on `parse` (§15.5): write `text as {named}`, or let the demand name the type: `let n: {named} = text.parse()`", callee)
+            return 0
         // §18.2: `builtins.sin(x)` is the intrinsic whatever else `sin` names.
         if self.builtins_intrinsic_nodes.contains(callee) and self.generic_builtin_callee_name(callee).len() == 0:
             return self.check_builtins_intrinsic_call(node, self.ast.get_data0(callee), extra_start, arg_count)
@@ -30486,6 +30507,10 @@ impl Sema:
             self.emit_error("value is not callable", callee)
             return 0
 
+        let called_type = self.parse_type_named(fn_sym)
+        if called_type != 0:
+            self.emit_error(f"a type is not called with text (§15.5): text converts with `as`; write `text as {self.type_name(called_type)}`", callee)
+            return 0
         let callee_ty = self.check_ident(fn_sym, callee)
         if callee_ty != 0:
             self.emit_error("value is not callable", callee)
@@ -34333,6 +34358,15 @@ impl Sema:
                 self.generic_subst_type_ids = saved_generic_method_subst_tys
                 return 0
             fn_pos = fn_pos + 2 + bound_count2
+        // §15.5 (D203): `text.parse(base: N)` reads integer text; floating-
+        // point text is decimal and takes no base.
+        if self.ast.kind(node) == NodeKind.NK_CALL and self.ast.get_data2(node) == 1 and fn_tp_count == 1 and self.pool_resolve(method_fn_sym).ends_with("str.parse"):
+            let target = self.lookup_generic_subst(self.ast.get_extra(fn_tp_start))
+            if self.get_type_kind(self.resolve_alias(target as TypeId)) != TypeKind.TY_INT:
+                self.emit_error(f"`base:` reads integer text (§15.5); `{self.type_name(target)}` is not read in a base", node)
+                self.generic_subst_param_syms = saved_generic_method_subst_syms
+                self.generic_subst_type_ids = saved_generic_method_subst_tys
+                return 0
         let concrete_owner = if owner_tp_count > 0:
             self.owner_inst_from_current_subst(owner_sym, owner_tp_start, owner_tp_count)
         else:
