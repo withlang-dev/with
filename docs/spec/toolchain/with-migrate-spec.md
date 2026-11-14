@@ -608,12 +608,13 @@ PCRE2 is the target use case. ~70K lines of C.
 
 ### Memory allocator
 
-PCRE2 uses `pcre2_compile_context` to pass custom allocators.
-By default it calls `malloc`/`free`. The migrated code preserves
-this — `malloc`/`free` are available via `c_import("<stdlib.h>")`.
-
-Post-migration, the allocator can be swapped to With's allocator
-by changing the context setup.
+Migrated code allocates from the runtime's allocator: a call of
+`malloc`, `calloc`, `realloc` or `free` is rewritten to it, so a
+block one migrated function allocates another can free. Memory a
+libc function allocates itself (`strdup`, `getline`, `asprintf`,
+`realpath` with a null buffer) comes from the same allocator. One
+of the four named as a function value names a function with C's
+signature over the same allocator.
 
 ### API preservation
 
