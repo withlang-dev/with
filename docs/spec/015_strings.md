@@ -385,45 +385,45 @@ let s = "value: " ++ x    // error if x is not str
 
 ### 15.5 Values from Text
 
-A type that implements `Parse` is called with text: `i32("42")` is
-the `i32` the text spells. `text.parse()` is the same conversion
-reporting failure as a value: it returns `Option[T]`, where `T` is the
-type demanded of its result, and is `None` where the call panics. The
-two accept the same text and give the same value; they differ only in
-what failure is.
+Text converts to a type that implements `Parse` with `as`:
+`"42" as i32` is the `i32` the text spells. `text.parse()` is the
+same conversion reporting failure as a value: it returns `Option[T]`,
+where `T` is the type demanded of its result, and is `None` where the
+cast panics. The two accept the same text and give the same value;
+they differ only in what failure is.
 
 ```
-let n = i32(line)                 // panics on bad text
+let n = line as i32               // panics on bad text
 let n: i32 = line.parse() ?? 0    // None on bad text
 ```
 
+A type is not called with text and is not a pipeline stage:
+`i32("42")` and `"42" |> i32` are errors that name `"42" as i32`.
 No type argument is written on `parse`: `text.parse[i32]()` is an
-error that names `i32(text)`. A type is called this way with text
-only: `i32(3.9)` is an error.
+error that names `text as i32`.
 
 **The whole text is the value.** Nothing is trimmed and nothing is
-left over: `i32(" 42")` and `i32("42abc")` fail. A value the type
-cannot hold fails: one out of range, or a negative one for an
+left over: `" 42" as i32` and `"42abc" as i32` fail. A value the
+type cannot hold fails: one out of range, or a negative one for an
 unsigned type.
 
 **Integers** are read in one of two ways.
 
-- With no base, the text is With's integer notation (§4.2.1): an
-  optional `+` or `-`, then decimal digits, or `0x`, `0o` or `0b` in
-  either case and digits of that base. `_` may stand between two
-  digits. There is no type suffix, and a leading zero does not mean
-  octal: `i32("042")` is 42.
-- With `base: N`, 2 through 36, the text is an optional sign and
+- With no base, in the cast and in `parse()`, the text is With's
+  integer notation (§4.2.1): an optional `+` or `-`, then decimal
+  digits, or `0x`, `0o` or `0b` in either case and digits of that
+  base. `_` may stand between two digits. There is no type suffix,
+  and a leading zero does not mean octal: `"042" as i32` is 42.
+- `text.parse(base: N)`, 2 through 36, reads an optional sign and
   digits of that base, the letters in either case standing for 10
   through 35, with `_` between digits as above. No prefix is read:
-  `i32("0b1", base: 16)` is 177, and `i32("0x1", base: 16)` fails,
-  since `x` is not a digit.
+  `"0b1".parse(base: 16)` is 177, and `"0x1".parse(base: 16)` is
+  `None`, since `x` is not a digit. The cast takes no base.
 
 ```
-i32("0x2A")                          // 42
-i32("2A", base: 16)                  // 42
-i32("2A")                            // fails
-let n: i32 = line.parse(base: 16) ?? 0
+"0x2A" as i32                                // 42
+"2A" as i32                                  // fails
+let n: i32 = "2A".parse(base: 16).unwrap()   // 42
 ```
 
 **Floating-point values** are decimal: an optional sign, digits with
@@ -431,11 +431,11 @@ an optional point, an optional exponent (`1e3`, `1E-3`). The result
 is the nearest value of the type. `inf`, `infinity` and `nan`, in any
 case, are `T.inf` and `T.nan` (§4.1a); a sign may stand before the
 infinities. Finite text too large for the type fails: it does not
-become infinity. `nan(...)`, hexadecimal floats and `base:` are not
+become infinity. `nan(...)`, hexadecimal floats and a base are not
 accepted.
 
-**A failed call is a panic** naming the type, the text and where the
-call is. A value out of range says so:
+**A failed cast is a panic** naming the type, the text and where the
+cast is. A value out of range says so:
 
 ```
 panic: cannot parse i32 from "abc"
