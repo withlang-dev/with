@@ -37924,6 +37924,11 @@ impl Sema:
                 // A null literal takes the fixed parameter's pointer type; a
                 // bare fn name takes its `extern "C" fn` type (#1609).
                 mc_expected = if self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT: self.null_arg_expected_type(mc_null_fn, ai, true) else: self.extern_fn_arg_expected_type(mc_null_fn, ai, true)
+            // #3334: a generic method has no signature, so its default was
+            // checked with no demand: `base: i32 = 0` was an `isize` that
+            // narrowed, with a warning at every call that omitted it.
+            if mc_expected == 0 and self.resolved_call_arg_is_default(node, ai):
+                mc_expected = self.fixed_param_expected_type(mc_default_fn, ai, true)
             // #1712: otherwise the declared parameter type, as for a free call.
             if mc_expected == 0:
                 mc_expected = self.method_sig_expected_arg_type(obj_type as i32, static_type_sym != 0 and self.static_receiver_type_is_known(expr), field, ai)
