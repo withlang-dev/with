@@ -29280,7 +29280,7 @@ impl Sema:
         // make the rewritten short name mean something else (a builtin
         // outranks an extern of its name, check_call).
         if self.module_path_is_std_math(path) and math_fn_lookup(member_name) >= 0:
-            if (self.get_visible_sig(member) >= 0 and not self.extern_fn_names.contains(member)) or self.displaced_fn_index.contains(member):
+            if (self.get_visible_sig(member) >= 0 and not self.extern_sig_modules.contains(self.get_visible_sig(member))) or self.displaced_fn_index.contains(member):
                 self.emit_error(f"'math.{member_name}' is the builtin, but '{member_name}' also names a declaration here; call the builtin as `x.{member_name}()`", node)
                 return -1
             return member
@@ -29827,7 +29827,7 @@ impl Sema:
         // (and libm decls in any corpus) would otherwise shadow the builtin
         // and silently widen an f32 argument. For f64 the two are the same
         // symbol; a real, non-extern definition still wins.
-        let math_extern_yields = sig_idx_raw >= 0 and self.extern_fn_names.contains(self.sig_names[sig_idx_raw]) and math_fn_lookup(self.pool_resolve(fn_sym)) >= 0
+        let math_extern_yields = sig_idx_raw >= 0 and self.extern_sig_modules.contains(sig_idx_raw) and math_fn_lookup(self.pool_resolve(fn_sym)) >= 0
         let sig_idx = if callable_value_tid != 0: -1
             else if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == false: -1
             else if math_extern_yields: -1

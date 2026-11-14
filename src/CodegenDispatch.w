@@ -4551,96 +4551,6 @@ impl Codegen:
         // Fallback: default format
         self.coerce_val_to_str(val, str_ty)
 
-    // ── LLVM math intrinsic recognition ──────────────────────────────
-    //
-    // When codegen sees a call to sqrt, sin, cos, etc., emit the LLVM
-    // intrinsic (e.g., @llvm.sqrt.f64) instead of a library call. This
-    // compiles to hardware instructions where available (fsqrt on ARM64)
-    // and eliminates the libm dependency for these functions.
-
-    mut fn try_emit_llvm_math_intrinsic(fn_sym: i32, args: &List[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
-        if fn_sym == 0 or args.len() == 0:
-            return false
-        let name = self.intern.resolve(fn_sym)
-        if name.len() == 0:
-            return false
-
-        // Determine LLVM intrinsic name. Only f64 variants for now.
-        var intrinsic_name = ""
-        var arg_count: i32 = 1
-        if name == "sqrt":   intrinsic_name = "llvm.sqrt.f64"
-        if name == "sin":    intrinsic_name = "llvm.sin.f64"
-        if name == "cos":    intrinsic_name = "llvm.cos.f64"
-        if name == "exp":    intrinsic_name = "llvm.exp.f64"
-        if name == "exp2":   intrinsic_name = "llvm.exp2.f64"
-        if name == "log":    intrinsic_name = "llvm.log.f64"
-        if name == "log2":   intrinsic_name = "llvm.log2.f64"
-        if name == "log10":  intrinsic_name = "llvm.log10.f64"
-        if name == "fabs":   intrinsic_name = "llvm.fabs.f64"
-        if name == "floor":  intrinsic_name = "llvm.floor.f64"
-        if name == "ceil":   intrinsic_name = "llvm.ceil.f64"
-        if name == "round":  intrinsic_name = "llvm.round.f64"
-        if name == "pow":
-            intrinsic_name = "llvm.pow.f64"
-            arg_count = 2
-        if name == "fma":
-            intrinsic_name = "llvm.fma.f64"
-            arg_count = 3
-
-        if intrinsic_name.len() == 0:
-            return false
-
-        // Verify the first argument is f64
-        let first_arg = args[0]
-        let arg_ty = wl_type_of(first_arg)
-        if wl_get_type_kind(arg_ty) != wl_double_type_kind():
-            return false
-
-        let f64_ty = wl_f64_type(self.context)
-
-        // Get or create the LLVM intrinsic declaration
-        let isym = self.intern.intern(intrinsic_name)
-        var func = 0 as i64
-        let cached = self.fn_values.get(isym)
-        if cached.is_some():
-            func = cached.unwrap() as i64
-        else:
-            let pts: List[i64] = []
-            for i in 0..arg_count:
-                pts.push(f64_ty)
-            let ft = wl_function_type(f64_ty, list_data_i64(pts), arg_count, 0)
-            func = wl_add_function(self.llmod, intrinsic_name, ft)
-            self.fn_values.insert(isym, func)
-            self.fn_fn_types.insert(isym, ft)
-
-        let ft = self.fn_fn_types.get(isym).unwrap() as i64
-
-        // Build call args (cast to f64 if needed)
-        let call_args: List[i64] = []
-        for i in 0..arg_count:
-            let a = args[i]
-            let ak = wl_get_type_kind(wl_type_of(a))
-            if ak == wl_float_type_kind():
-                call_args.push(wl_build_fp_cast(self.builder, a, f64_ty))
-            else:
-                call_args.push(a)
-
-        let result = wl_build_call(self.builder, ft, func, list_data_i64(call_args), arg_count)
-
-        // Store result to dest
-        if dest_place >= 0 and result != 0:
-            let dst_local = body.place_locals[dest_place]
-            let dst_ty = wl_type_of(result)
-            let dst_ptr = self.mir_place_ptr(body, dest_place, true, dst_ty)
-            if dst_ptr != 0:
-                wl_build_store(self.builder, result, dst_ptr)
-            self.mir_local_types.insert(dst_local, dst_ty)
-
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
-            let next_val = self.mir_bb_values[next_bb]
-            wl_build_br(self.builder, next_val)
-        true
-
     fn try_emit_llvm_va_intrinsic(fn_sym: i32, args: &List[i64], next_bb: i32) -> bool:
         if fn_sym == 0 or args.len() != 1:
             return false
@@ -13169,21 +13079,20 @@ impl Codegen:
             mf_args.push(mf_a)
             if mf_arity == 2:
                 mf_args.push(self.mir_intrinsic_arg(body, args_id, 1))
-            let mf_sym = self.intern.intern(mf_fn_name)
-            let mf_fv = self.fn_values.get(mf_sym)
-            let mf_ft = self.fn_fn_types.get(mf_sym)
-            if mf_fv.is_some() and mf_ft.is_some():
-                result = wl_build_call(self.builder, mf_ft.unwrap() as i64, mf_fv.unwrap() as i64, list_data_i64(mf_args), mf_arity)
-            else:
-                let mf_pts: List[i64] = []
-                mf_pts.push(mf_ty)
-                if mf_arity == 2:
-                    mf_pts.push(mf_ty)
-                let mf_fnt = wl_function_type(mf_ty, list_data_i64(mf_pts), mf_arity, 0)
-                let mf_func = wl_add_function(self.llmod, mf_fn_name, mf_fnt)
-                self.fn_values.insert(mf_sym, mf_func)
-                self.fn_fn_types.insert(mf_sym, mf_fnt)
-                result = wl_build_call(self.builder, mf_fnt, mf_func, list_data_i64(mf_args), mf_arity)
+            let mf_pts: List[i64] = []
+            for _ in 0..mf_arity: mf_pts.push(mf_ty)
+            let mf_fnt = wl_function_type(mf_ty, list_data_i64(mf_pts), mf_arity, 0)
+            // The callee is the C library's symbol, found by its link name and
+            // never through fn_values, where a With function of the same name
+            // sits (#3310). A With function that holds the name is internal
+            // (with-abi.md §5: an exported one is module-qualified), so it
+            // gives the name up; its callers hold the value.
+            var mf_func = wl_get_named_function(self.llmod, mf_fn_name)
+            if mf_func != 0 and wl_get_linkage(mf_func) == wl_internal_linkage():
+                wl_set_value_name(mf_func, mf_fn_name ++ ".with")
+                mf_func = 0
+            if mf_func == 0: mf_func = wl_add_function(self.llmod, mf_fn_name, mf_fnt)
+            result = wl_build_call(self.builder, mf_fnt, mf_func, list_data_i64(mf_args), mf_arity)
 
         else if intrinsic == MirIntrinsic.MIN or intrinsic == MirIntrinsic.MAX:
             let mm_a = self.mir_intrinsic_arg(body, args_id, 0)
@@ -15605,11 +15514,6 @@ impl Codegen:
                 with_eprint(f"[mir-call]   arg[{di}] ty_kind={wl_get_type_kind(wl_type_of(a))}")
         let va_intrinsic_result = self.try_emit_llvm_va_intrinsic(callee_fn_sym, args, next_bb)
         if va_intrinsic_result:
-            self.free_call_temp_ptrs(call_temp_cleanups)
-            return true
-        // LLVM intrinsic recognition: emit hardware instructions for known math functions.
-        let llvm_intrinsic_result = self.try_emit_llvm_math_intrinsic(callee_fn_sym, args, dest_place, body, next_bb)
-        if llvm_intrinsic_result:
             self.free_call_temp_ptrs(call_temp_cleanups)
             return true
 
