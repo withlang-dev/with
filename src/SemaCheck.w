@@ -37804,6 +37804,7 @@ impl Sema:
         // mut.md Rev 8 §15.8 — see check_call.
         let mc_iter_borrow_idxs: List[i32] = []
         let mc_param_offset_for_resolution = (not (self.static_receiver_type_is_known(expr))) as i32
+        if mc_param_offset_for_resolution == 0: self.static_receiver_calls.insert(node, 1)
         // #2002: a generic method has no signature; its declaration supplies the defaults.
         let mc_default_fn = if mc_owner_sym_for_effect != 0 and mc_sig_idx_for_effect < 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: mc_method_fn_for_resolution
         var mc_resolved_arg_count = self.resolve_method_implicit_default_args(node, mc_sig_idx_for_effect, mc_default_fn, mc_param_offset_for_resolution, extra_start, arg_count)

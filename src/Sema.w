@@ -1066,6 +1066,11 @@ type Sema {
     extension_method_sig_idxs: List[i32],
     extension_method_paths: List[str],
     qualified_extension_call_nodes: HashMap[i32, i32, Minted],
+    // #3335 (D65): the method calls whose receiver Sema read as a type, so
+    // the call passes no receiver. MIR asked `named_types` whether the
+    // receiver names a type, where `Self` is bound only while its body is
+    // checked: `Self.make(x)` was lowered with a receiver the callee lacks.
+    static_receiver_calls: HashMap[i32, i32, Minted],
     // Variant lookup: variant_sym → variant_index
     variant_lookup: HashMap[i32, i32, Minted],
     // Variant type IDs: variant_sym → enum_tid
@@ -3650,6 +3655,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let extension_method_sig_idxs = sema_new_list_i32()
     let extension_method_paths = sema_new_list_str()
     let qualified_extension_call_nodes = sema_new_map_i32_i32()
+    let static_receiver_calls = sema_new_map_i32_i32()
     let drop_method_cache: Memo[i32, i32] = Memo.new()
     let typed_expr_types = sema_new_map_i32_i32()
     let typed_binding_types = sema_new_map_i32_i32()
@@ -3798,6 +3804,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         extension_method_sig_idxs,
         extension_method_paths,
         qualified_extension_call_nodes,
+        static_receiver_calls,
         variant_lookup,
         variant_type_ids,
         variant_owner_tids,
