@@ -6748,7 +6748,14 @@ impl Sema:
         // are that signature's (a dyn call and a direct one run it).
         let saved_effect_body = self.current_effect_body
         self.current_effect_body = sig_idx
+        // #3335: and what the body decides is that signature's. The first
+        // pass checks the trait's one body for every impl (the per-impl
+        // copies are made after the comptime phase), so a join whose demand
+        // is `Self` was two impls' decisions recorded for one context.
+        let saved_default_sig_idx = self.current_fn_sig_idx
+        self.current_fn_sig_idx = sig_idx
         let body_ty = self.check_expr_with_expected(body, ret_tid as TypeId)
+        self.current_fn_sig_idx = saved_default_sig_idx
         self.current_effect_body = saved_effect_body
         self.typed_expr_types.insert(body, body_ty as i32)
         if ret_tid != 0 and ret_tid != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
