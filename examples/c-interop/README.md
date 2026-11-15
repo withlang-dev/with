@@ -41,8 +41,8 @@ with build :test  # 13 tests over the real libraries
 - A C error is With values: `Failed(status, message)`, the status the call
   returned and SQLite's message for it, copied from the connection before
   the next call replaces it.
-- The facade is the project's own copy of the With repository's
-  `lib/contracts/sqlite3.w`, until the `c.sqlite3` package ships it.
+- The contract is the project's own (`src/contracts/sqlite3.w`), until the
+  `c.sqlite3` package ships one.
 
 **`src/contracts/tally.w`, `src/tally.w` and `vendor/tally.{h,c}` — a vendored
 library, both directions**

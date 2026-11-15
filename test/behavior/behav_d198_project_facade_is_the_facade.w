@@ -6,7 +6,7 @@ use pre_d_build_runner
 // package. Its `c_import` of the header is what it describes, never an
 // import of a facade: resolving `facades.<name>` from inside that file
 // found another file of the same name up the directory tree (the
-// toolchain's own lib/contracts/zlib.w, from a project inside a checkout) and
+// toolchain's own zlib contract, then under its `lib/`, from a project inside a checkout) and
 // loaded both, so `with run` reported every item of the facade twice. The
 // zlib, sqlite3, bzip2 and libcurl acceptance scenarios failed this way.
 fn main:

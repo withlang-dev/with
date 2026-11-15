@@ -5,9 +5,9 @@
 // and a plain transfer need. Every sentence a clause relies on is quoted
 // beside it, from the libcurl manual (https://curl.se/libcurl/c/<fn>.html).
 //
-// Where it lives: as `lib/contracts/sqlite3.w` — the project's own facade
-// under the repository's `lib/` (§16.2b.1; `c.libcurl` ships none yet), and
-// the release UAT copies it into the fresh project as src/contracts/libcurl.w.
+// Where it lives: under `test/lib/contracts`, the module root the tests
+// resolve `use contracts.<lib>` from (§16.2b.1; `c.libcurl` ships none yet). The
+// acceptance scenario of the same library writes its own copy inline.
 //
 // What the ruling asks for and where it is met (D66):
 //   CURL as an owned pointer resource ............... resource Easy

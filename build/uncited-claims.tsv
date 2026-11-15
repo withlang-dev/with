@@ -1,12 +1,8 @@
-# §31.9 rule 2: the uncited claims of each contract file of the standard library and the runtime,
+# §31.9 rule 2: the uncited claims of each contract file of the runtime,
 # as `with analyze <file> contract` counts them. Every file is at zero (D205: one citation per
 # function, of the actual function's documented behavior): contract-view-tests refuses
 # a file with an uncited claim. Not listed, with why: rt/wasm.w (25 fn items, no
-# clauses; the view cannot compile it for the host), lib/contracts/sdl.w (needs the SDL headers).
-lib/contracts/zlib.w	0
-lib/contracts/bzip2.w	0
-lib/contracts/libcurl.w	0
-lib/contracts/sqlite3.w	0
+# clauses; the view cannot compile it for the host).
 rt/fiber_core_windows.w	0
 rt/fiber_stubs.w	0
 rt/panic_runtime.w	0

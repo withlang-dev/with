@@ -1,17 +1,8 @@
-// This project's copy of the SQLite facade, taken verbatim from the With
-// repository's lib/contracts/sqlite3.w (stage 12; ruling Amendments 1 and 2).
-// A facade is the importing project's own until the C package ships it (spec
+// This project's own contract for SQLite. A contract is the
+// importing project's until the C package ships one (spec
 // §16.2b.1; ruling §66), and it lives beside the program as
-// src/contracts/<lib>.w, where `use contracts.sqlite3` finds it. Nothing below
-// the marker line is edited: the two files diff clean.
+// src/contracts/<lib>.w, where `use contracts.sqlite3` finds it.
 //
-// What this example demonstrates is the mechanism — a project owning its
-// facade — not divergence. This copy is kept byte-identical to the
-// toolchain's by the examples lane (build/examples.w, the identity check
-// below the marker), so the example never teaches a stale contract; a real
-// project's facade is free to diverge, and states its own facts when it
-// does.
-// ── verbatim: lib/contracts/sqlite3.w ──────────────────────────────────────
 // The SQLite facade — D51 stage 12, ruling §66: the first complete facade
 // written against the ruling, and the executable test of the facade
 // language. It is written against the real `sqlite3.h` (the one `c_import`

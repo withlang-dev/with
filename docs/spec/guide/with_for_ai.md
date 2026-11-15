@@ -1017,7 +1017,7 @@ once — ownership, destruction, status, borrowed text, callbacks — and the
 program uses the presented methods:
 
 ```with
-use contracts.sqlite3            // lib/contracts/sqlite3.w, the project's own
+use contracts.sqlite3            // src/contracts/sqlite3.w, the project's own
 use c_import("sqlite3.h")
 
 fn print_values -> Result[Unit, SqliteError]:

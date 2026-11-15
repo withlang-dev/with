@@ -9,7 +9,7 @@
 // (§16.2b.1; §18.5: `facade:<package>@<version>`, "the toolchain publishes
 // no facade beyond the C standard library's"). `c.sqlite3` is fetched from
 // Conan and ships none yet, so this is the project's own facade, under the
-// repository's `lib/` — the module root the resolver walks to from every
+// tests' `test/lib/` — the module root the resolver walks to from every
 // fixture (`use contracts.sqlite3`) — and not under `lib/std`, which the
 // compiler embeds. It moves into the package when the package can carry it.
 //

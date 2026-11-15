@@ -5,9 +5,9 @@
 // `uncompress` and `zlibVersion`. Every sentence a clause relies on is
 // quoted beside it, from that header.
 //
-// Where it lives: as `lib/contracts/sqlite3.w` — the project's own facade
-// under the repository's `lib/` (§16.2b.1; `c.zlib` ships none yet), and
-// the release UAT copies it into the fresh project as src/contracts/zlib.w.
+// Where it lives: under `test/lib/contracts`, the module root the tests
+// resolve `use contracts.<lib>` from (§16.2b.1; `c.zlib` ships none yet). The
+// acceptance scenario of the same library writes its own copy inline.
 //
 // A pairing is stated, never inferred from the C types (§16.2b.8): the
 // header alone does not prove that `destLen` is `dest`'s capacity, and a
