@@ -3,7 +3,7 @@
 
 // D64 (spec §16.2b.8): the release UAT program for zlib, verbatim below
 // (build/release_uat_fixtures/zlib_main.w), against the host library through
-// the zlib acceptance scenario's contract — zero unsafe, zero pointers, zero lengths.
+// test/lib/contracts/zlib.w — zero unsafe, zero pointers, zero lengths.
 // Release UAT: zlib through its facade (D64, spec §16.2b.8). The program an
 // application developer writes over `with get c.zlib`: the facade
 // `facades.zlib` is the project's own (§16.2b.1). No `unsafe`, no pointer,

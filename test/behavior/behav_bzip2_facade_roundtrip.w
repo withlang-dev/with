@@ -3,7 +3,7 @@
 
 // D64 (spec §16.2b.8): the release UAT program for bzip2, verbatim below
 // (build/release_uat_fixtures/bzip2_main.w), against the host library through
-// the bzip2 acceptance scenario's contract — zero unsafe, zero pointers, zero lengths. The one
+// test/lib/contracts/bzip2.w — zero unsafe, zero pointers, zero lengths. The one
 // difference: the host has no `with get` package, so the import names the
 // system library to link.
 // Release UAT: bzip2 through its facade (D64, spec §16.2b.8). The program an
