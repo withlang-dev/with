@@ -1555,75 +1555,127 @@ c contract libc:
     domain errno thread
     domain environ process
     domain locale process
+    // POSIX write(2): writes bytes to a file descriptor; does not modify the
+    // process environment or locale.
     fn rt_libc_write
         preserves domain environ
         preserves domain locale
+    // POSIX read(2): reads bytes from a file descriptor; does not modify the
+    // process environment or locale.
     fn rt_libc_read
         preserves domain environ
         preserves domain locale
+    // POSIX open(2): opens or creates a file and returns its descriptor; does
+    // not modify the process environment or locale.
     fn rt_libc_open
         preserves domain environ
         preserves domain locale
+    // POSIX close(2): releases a file descriptor; does not modify the process
+    // environment or locale.
     fn rt_libc_close
         preserves domain environ
         preserves domain locale
+    // POSIX lseek(2): moves a descriptor's file offset; does not modify the
+    // process environment or locale.
     fn rt_libc_lseek
         preserves domain environ
         preserves domain locale
+    // POSIX fcntl(2): reads or changes a descriptor's flags and locks; does
+    // not modify the process environment or locale.
     fn rt_libc_fcntl
         preserves domain environ
         preserves domain locale
+    // POSIX getcwd(3): copies the working directory's path into the caller's
+    // buffer; does not modify the process environment or locale.
     fn rt_libc_getcwd
         preserves domain environ
         preserves domain locale
+    // POSIX mmap(2): maps pages into the address space; does not modify the
+    // process environment or locale.
     fn rt_libc_mmap
         preserves domain environ
         preserves domain locale
+    // POSIX munmap(2): removes a mapping; does not modify the process
+    // environment or locale.
     fn rt_libc_munmap
         preserves domain environ
         preserves domain locale
+    // C getenv(3): looks a name up in the environment list. It may rewrite
+    // the text an earlier call returned (XSH getenv), so the row claims
+    // nothing of environ; it does not modify the locale.
     fn rt_libc_getenv
         preserves domain locale
+    // POSIX stat(2): fills the caller's buffer with a file's status; does not
+    // modify the process environment or locale.
     fn rt_libc_stat
         preserves domain environ
         preserves domain locale
+    // POSIX chmod(2): changes a file's mode bits; does not modify the process
+    // environment or locale.
     fn rt_libc_chmod
         preserves domain environ
         preserves domain locale
+    // POSIX _exit(2): ends the process at once, running no atexit handler,
+    // and does not return: nothing the process holds outlives the call.
     fn rt_libc_exit
         preserves domain environ
         preserves domain locale
+    // __errno_location (glibc and musl errno.h: `errno` expands to
+    // `*__errno_location()`): returns the address of the calling thread's
+    // errno and reads or writes nothing; it does not modify the process
+    // environment or locale.
     fn rt_libc_errno_location
         preserves domain errno
         preserves domain environ
         preserves domain locale
+    // Linux getrandom(2): fills the caller's buffer with random bytes; does
+    // not modify the process environment or locale.
     fn rt_libc_getrandom
         preserves domain environ
         preserves domain locale
+    // POSIX sysconf(3): returns a configuration value of the system; does not
+    // modify the process environment or locale.
     fn rt_libc_sysconf
         preserves domain environ
         preserves domain locale
+    // POSIX gethostname(2): copies the host's name into the caller's buffer;
+    // does not modify the process environment or locale.
     fn rt_libc_gethostname
         preserves domain environ
         preserves domain locale
+    // POSIX sigaltstack(2): sets or reads the calling thread's alternate
+    // signal stack; does not modify the process environment or locale.
     fn rt_libc_sigaltstack
         preserves domain environ
         preserves domain locale
+    // POSIX sigaction(2): sets or reads one signal's disposition; does not
+    // modify the process environment or locale.
     fn rt_libc_sigaction
         preserves domain environ
         preserves domain locale
+    // POSIX fileno(3): returns a stream's descriptor; does not modify the
+    // process environment or locale.
     fn rt_libc_fileno
         preserves domain environ
         preserves domain locale
+    // POSIX fseeko(3): moves a stream's file position; does not modify the
+    // process environment or locale.
     fn rt_libc_fseeko
         preserves domain environ
         preserves domain locale
+    // POSIX ftello(3): returns a stream's file position; does not modify the
+    // process environment or locale.
     fn rt_libc_ftello
         preserves domain environ
         preserves domain locale
+    // C strtol(3): converts text to a long. It reads the locale to tell white
+    // space and modifies neither the locale nor the process environment.
     fn rt_libc_strtol
         preserves domain environ
         preserves domain locale
+    // C strtoul(3): converts text to an unsigned long. It reads the locale to
+    // tell white space and modifies neither the locale nor the process
+    // environment.
     fn rt_libc_strtoul
         preserves domain environ
         preserves domain locale
@@ -1632,30 +1684,54 @@ c contract libc:
     fn rt_libc_strtof
         preserves domain environ
         preserves domain locale
+    // C strtod(3), linked here for strtold (With's widest float is the
+    // double): converts text to a double. It reads the locale's radix
+    // character and modifies neither the locale nor the process environment.
     fn rt_libc_strtold
         preserves domain environ
         preserves domain locale
+    // POSIX isatty(3): tells whether a descriptor is a terminal; does not
+    // modify the process environment or locale.
     fn rt_libc_isatty
         preserves domain environ
         preserves domain locale
+    // POSIX mkstemp(3): creates and opens a uniquely named file, writing the
+    // name into the caller's template; does not modify the process
+    // environment or locale.
     fn rt_libc_mkstemp
         preserves domain environ
         preserves domain locale
+    // POSIX realpath(3): resolves a path to its absolute form in the caller's
+    // buffer; does not modify the process environment or locale.
     fn rt_libc_realpath
         preserves domain environ
         preserves domain locale
+    // POSIX clock_gettime(2): writes a clock's time into the caller's
+    // timespec; does not modify the process environment or locale.
     fn rt_libc_clock_gettime
         preserves domain environ
         preserves domain locale
+    // POSIX nanosleep(2): suspends the calling thread for an interval; does
+    // not modify the process environment or locale.
     fn rt_libc_nanosleep
         preserves domain environ
         preserves domain locale
+    // POSIX getpid(2): returns the process id; does not modify the process
+    // environment or locale.
     fn rt_libc_getpid
         preserves domain environ
         preserves domain locale
+    // C raise(3): sends a signal to the calling thread, and a handler for it
+    // runs before raise returns. raise itself does not modify the process
+    // environment or locale; what a handler does is the handler's effect, and
+    // the handlers this runtime installs end the process.
     fn rt_libc_raise
         preserves domain environ
         preserves domain locale
+    // POSIX kill(2): sends a signal to a process or group. kill itself does
+    // not modify the process environment or locale; a handler that runs in
+    // this process for the signal has its own effect, and the handlers this
+    // runtime installs end the process.
     fn rt_libc_kill
         preserves domain environ
         preserves domain locale
@@ -1663,116 +1739,199 @@ c contract libc:
     fn rt_libc_pthread_self
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_create(3): starts a thread running the given routine. The
+    // call itself does not modify the process environment or locale; what the
+    // routine does is the routine's effect.
     fn rt_libc_pthread_create
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_join(3): waits for a thread to end and takes its result;
+    // does not modify the process environment or locale.
     fn rt_libc_pthread_join
         preserves domain environ
         preserves domain locale
+    // POSIX mkdir(2): creates a directory; does not modify the process
+    // environment or locale.
     fn rt_libc_mkdir
         preserves domain environ
         preserves domain locale
+    // POSIX unlink(2): removes a directory entry; does not modify the process
+    // environment or locale.
     fn rt_libc_unlink
         preserves domain environ
         preserves domain locale
+    // POSIX rmdir(2): removes an empty directory; does not modify the process
+    // environment or locale.
     fn rt_libc_rmdir
         preserves domain environ
         preserves domain locale
+    // POSIX rename(2): renames a file; does not modify the process
+    // environment or locale.
     fn rt_libc_rename
         preserves domain environ
         preserves domain locale
+    // POSIX symlink(2): creates a symbolic link; does not modify the process
+    // environment or locale.
     fn rt_libc_symlink
         preserves domain environ
         preserves domain locale
+    // POSIX access(2): checks the caller's permission for a path; does not
+    // modify the process environment or locale.
     fn rt_libc_access
         preserves domain environ
         preserves domain locale
+    // POSIX lstat(2): fills the caller's buffer with a link's own status;
+    // does not modify the process environment or locale.
     fn rt_libc_lstat
         preserves domain environ
         preserves domain locale
+    // POSIX readlink(2): copies a symbolic link's target into the caller's
+    // buffer; does not modify the process environment or locale.
     fn rt_libc_readlink
         preserves domain environ
         preserves domain locale
+    // C strerror(3): returns the message text of an error number, in the
+    // language of the current locale. It reads the locale and modifies
+    // neither it nor the process environment.
     fn rt_libc_strerror
         preserves domain environ
         preserves domain locale
+    // POSIX opendir(3): opens a directory stream; does not modify the process
+    // environment or locale.
     fn rt_libc_opendir
         preserves domain environ
         preserves domain locale
+    // POSIX readdir(3): returns the stream's next entry; does not modify the
+    // process environment or locale.
     fn rt_libc_readdir
         preserves domain environ
         preserves domain locale
+    // POSIX closedir(3): closes a directory stream; does not modify the
+    // process environment or locale.
     fn rt_libc_closedir
         preserves domain environ
         preserves domain locale
+    // POSIX socket(2): creates a socket and returns its descriptor; does not
+    // modify the process environment or locale.
     fn rt_libc_socket
         preserves domain environ
         preserves domain locale
+    // POSIX connect(2): connects a socket to an address; does not modify the
+    // process environment or locale.
     fn rt_libc_connect
         preserves domain environ
         preserves domain locale
+    // POSIX bind(2): gives a socket its local address; does not modify the
+    // process environment or locale.
     fn rt_libc_bind
         preserves domain environ
         preserves domain locale
+    // POSIX listen(2): marks a socket as accepting connections; does not
+    // modify the process environment or locale.
     fn rt_libc_listen
         preserves domain environ
         preserves domain locale
+    // POSIX accept(2): takes a pending connection as a new descriptor; does
+    // not modify the process environment or locale.
     fn rt_libc_accept
         preserves domain environ
         preserves domain locale
+    // POSIX setsockopt(2): sets one option of a socket; does not modify the
+    // process environment or locale.
     fn rt_libc_setsockopt
         preserves domain environ
         preserves domain locale
+    // POSIX getsockname(2): writes a socket's local address into the caller's
+    // buffer; does not modify the process environment or locale.
     fn rt_libc_getsockname
         preserves domain environ
         preserves domain locale
+    // POSIX send(2): sends bytes on a socket; does not modify the process
+    // environment or locale.
     fn rt_libc_send
         preserves domain environ
         preserves domain locale
+    // POSIX recv(2): receives bytes from a socket; does not modify the
+    // process environment or locale.
     fn rt_libc_recv
         preserves domain environ
         preserves domain locale
+    // POSIX getaddrinfo(3): resolves a host and service to a list of
+    // addresses it allocates. It may read the resolver's configuration and
+    // environment variables; it modifies neither the process environment nor
+    // the locale.
     fn rt_libc_getaddrinfo
         preserves domain environ
         preserves domain locale
+    // POSIX freeaddrinfo(3): frees a list getaddrinfo returned; does not
+    // modify the process environment or locale.
     fn rt_libc_freeaddrinfo
         preserves domain environ
         preserves domain locale
+    // POSIX setenv(3): adds or changes one variable of the environment, so
+    // the row claims nothing of environ; it does not modify the locale.
     fn rt_libc_setenv
         preserves domain locale
+    // POSIX sigprocmask(2): reads or changes the calling thread's signal
+    // mask; does not modify the process environment or locale.
     fn rt_libc_sigprocmask
         preserves domain environ
         preserves domain locale
+    // POSIX fork(2): creates a child process that is a copy of this one. In
+    // the parent it modifies neither the process environment nor the locale,
+    // and the child starts with a copy of both.
     fn rt_libc_fork
         preserves domain environ
         preserves domain locale
+    // POSIX setpgid(2): sets a process's group id; does not modify the
+    // process environment or locale.
     fn rt_libc_setpgid
         preserves domain environ
         preserves domain locale
+    // POSIX execv(3): replaces the process image, passing the current
+    // environment on. It returns only when it failed, having replaced
+    // nothing: the process environment and locale are as they were.
     fn rt_libc_execv
         preserves domain environ
         preserves domain locale
+    // POSIX execvp(3): as execv, searching PATH for the file. It reads the
+    // environment and returns only when it failed, having replaced nothing:
+    // the process environment and locale are as they were.
     fn rt_libc_execvp
         preserves domain environ
         preserves domain locale
+    // POSIX waitpid(2): waits for a child's state to change and reports it;
+    // does not modify the process environment or locale.
     fn rt_libc_waitpid
         preserves domain environ
         preserves domain locale
+    // wait4(2): as waitpid, also writing the child's resource usage into the
+    // caller's buffer; does not modify the process environment or locale.
     fn rt_libc_wait4
         preserves domain environ
         preserves domain locale
+    // POSIX getrusage(2): writes resource usage into the caller's buffer;
+    // does not modify the process environment or locale.
     fn rt_libc_getrusage
         preserves domain environ
         preserves domain locale
+    // POSIX chdir(2): changes the working directory; does not modify the
+    // process environment or locale.
     fn rt_libc_chdir
         preserves domain environ
         preserves domain locale
+    // POSIX dup2(2): makes one descriptor a copy of another; does not modify
+    // the process environment or locale.
     fn rt_libc_dup2
         preserves domain environ
         preserves domain locale
+    // POSIX getrlimit(2): writes a resource limit into the caller's buffer;
+    // does not modify the process environment or locale.
     fn rt_libc_getrlimit
         preserves domain environ
         preserves domain locale
+    // POSIX setrlimit(2): sets a resource limit; does not modify the process
+    // environment or locale.
     fn rt_libc_setrlimit
         preserves domain environ
         preserves domain locale

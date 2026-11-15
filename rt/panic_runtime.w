@@ -76,6 +76,9 @@ c contract libc:
     domain errno thread
     domain environ process
     domain locale process
+    // _exit (POSIX _exit(2); the UCRT's _exit on Windows): ends the process
+    // at once, running no atexit handler, and does not return: nothing the
+    // process holds outlives the call.
     fn rt_libc_exit
         preserves domain environ
         preserves domain locale

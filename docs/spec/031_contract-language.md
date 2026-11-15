@@ -311,8 +311,8 @@ is not a level of this list: a proof must not contradict it.
 **A grant and a proof** (adopted 2026-11-11; mission law 12. Implemented
 for `lend` and `from` in a function or resource clause. Not yet
 implemented: `returns static`, `runs no threads` and a field role against
-a proof, the gate on a stale override, the citation in the standard
-library and the runtime, and the counts in the census and
+a proof, the gate on a stale override, the citation in the toolchain's
+libc contract, and the counts in the census and
 `:user-programs-safe`).
 
 - A proof **contradicts** a grant when it establishes a fact the grant

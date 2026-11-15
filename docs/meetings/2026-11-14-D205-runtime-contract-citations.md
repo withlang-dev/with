@@ -6,13 +6,13 @@ row).
 
 **Date:** 2026-11-14. **Status:** ruled by Eric. No specification change:
 §31.9 rule 2 already says a citation on an `fn` line covers the clauses
-under it. NOT YET done: about 500 `preserves domain` clauses in the
-runtime's contracts are uncited, held to the counts in
-`build/uncited-claims.tsv` (rt/darwin_aarch64.w 161, rt/linux_aarch64.w
-141, rt/linux_x86_64.w 141, rt/windows_aarch64.w 25, rt/windows_x86_64.w
-25, rt/fiber_core_darwin.w 28, and smaller files). When every row is
-cited, the count allowance goes and the strict requirement of §31.9 rule 2
-is what the build enforces.
+under it. Done 2026-11-14 for the runtime: every `fn` row with a claim in
+`rt/*.w` carries its citation, and `build/uncited-claims.tsv` holds every
+file at zero, so a new uncited claim is refused (it held 161 for
+rt/darwin_aarch64.w, 141 for each Linux file, 25 for each Windows file, 28
+for rt/fiber_core_darwin.w). Still uncited: the toolchain's libc contract
+(src/compiler/LibcFacade.w), whose text is selected line by line and
+cannot yet carry a comment.
 
 **The question.** Nearly every uncited runtime claim is `preserves domain
 environ` or `preserves domain locale` on one libc function, and the reason

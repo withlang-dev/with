@@ -1307,45 +1307,77 @@ c contract libc:
     domain errno thread
     domain environ process
     domain locale process
+    // POSIX mmap(2): maps pages into the address space; does not modify the
+    // process environment or locale.
     fn rt_libc_mmap
         preserves domain environ
         preserves domain locale
+    // POSIX mprotect(2): changes the protection of mapped pages; does not
+    // modify the process environment or locale.
     fn rt_libc_mprotect
         preserves domain environ
         preserves domain locale
+    // POSIX munmap(2): removes a mapping; does not modify the process
+    // environment or locale.
     fn rt_libc_munmap
         preserves domain environ
         preserves domain locale
+    // C raise(3): sends a signal to the calling thread, and a handler for it
+    // runs before raise returns. raise itself does not modify the process
+    // environment or locale; what a handler does is the handler's effect, and
+    // the handlers this runtime installs end the process.
     fn rt_libc_raise
         preserves domain environ
         preserves domain locale
+    // POSIX write(2): writes bytes to a file descriptor; does not modify the
+    // process environment or locale.
     fn rt_libc_write
         preserves domain environ
         preserves domain locale
+    // _exit (POSIX _exit(2); the UCRT's _exit on Windows): ends the process
+    // at once, running no atexit handler, and does not return: nothing the
+    // process holds outlives the call.
     fn rt_libc_exit
         preserves domain environ
         preserves domain locale
+    // C abort (C11 7.22.4.1): ends the process abnormally and does not return
+    // to its caller: nothing the process holds outlives the call.
     fn rt_libc_abort
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_self(3): returns the calling thread's id; does not modify
+    // the process environment or locale.
     fn rt_libc_pthread_self
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_mutex_init(3): initializes the caller's mutex; does not
+    // modify the process environment or locale.
     fn rt_libc_pthread_mutex_init
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_mutex_lock(3): locks a mutex, waiting until it is free;
+    // does not modify the process environment or locale.
     fn rt_libc_pthread_mutex_lock
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_mutex_unlock(3): unlocks a mutex the caller holds; does
+    // not modify the process environment or locale.
     fn rt_libc_pthread_mutex_unlock
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_cond_init(3): initializes the caller's condition
+    // variable; does not modify the process environment or locale.
     fn rt_libc_pthread_cond_init
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_cond_wait(3): releases the mutex, waits for the
+    // condition, and takes the mutex again; does not modify the process
+    // environment or locale.
     fn rt_libc_pthread_cond_wait
         preserves domain environ
         preserves domain locale
+    // POSIX pthread_cond_broadcast(3): wakes every thread waiting on the
+    // condition; does not modify the process environment or locale.
     fn rt_libc_pthread_cond_broadcast
         preserves domain environ
         preserves domain locale
