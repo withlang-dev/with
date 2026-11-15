@@ -1517,6 +1517,42 @@ unsafe fn hoist_nested_tags(s: *mut CImportSession):
         i = i + 1
     with_free(old as *mut u8)
 
+// C11 6.2.2p4: `extern T x;` in a function body declares the file-scope
+// object `x`. Where the translation unit has no file-scope declaration of
+// it (STC's `extern const uint8_t cutf8_dtab[];` inside an inline function,
+// the table defined in another unit), the block declaration is the only one
+// that gives `x` a type: it joins the declaration list as the variable's
+// declaration, once per name. Without it the function was refused as
+// untranslatable and the corpus could not be migrated (#3231).
+@[callconv("c")]
+unsafe fn collect_block_scope_extern(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    if clang_getCursorKind(cursor) != CXCursor_VarDecl or clang_Cursor_getStorageClass(cursor) != CB_CX_SC_EXTERN:
+        return CXChildVisit_Recurse
+    let s = data as *mut CImportSession
+    let spelling = clang_getCursorSpelling(cursor)
+    let name = clang_getCString(spelling)
+    var declared = false
+    var i = 0
+    while i < (*s).decl_count:
+        let other = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        if clang_getCursorKind(other) == CXCursor_VarDecl:
+            let other_spelling = clang_getCursorSpelling(other)
+            if c_strcmp(clang_getCString(other_spelling), name) == 0: declared = true
+            clang_disposeString(other_spelling)
+        i = i + 1
+    clang_disposeString(spelling)
+    if not declared: session_append_decl(s, cursor)
+    CXChildVisit_Continue
+
+unsafe fn collect_block_scope_externs(s: *mut CImportSession):
+    let n = (*s).decl_count
+    var i = 0
+    while i < n:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        if clang_getCursorKind(cursor) == CXCursor_FunctionDecl and clang_isCursorDefinition(cursor) != 0:
+            clang_visitChildren(cursor, collect_block_scope_extern as *const u8, s as *mut u8)
+        i = i + 1
+
 unsafe fn session_decl_contains(s: *mut CImportSession, cursor: CXCursor) -> bool:
     var i = 0
     while i < (*s).decl_count:
@@ -2531,6 +2567,7 @@ fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
         (*s).header_file = 0 as *mut u8
         clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
         hoist_nested_tags(s)
+        collect_block_scope_externs(s)
         collect_undefined_records(s)
         name_file_scope_anon_records(s)
         s as i64
