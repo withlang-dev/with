@@ -5754,8 +5754,10 @@ fn run_migrate_command(argc: i32) -> i32:
     if facade_name.len() > 0:
         return migrate_c_facade(source_path, facade_name, exclude_basenames, output_path, gir_path, facts_path)
 
-    // Detect if source is a directory (ends with / or doesn't end with .c/.h)
-    let is_dir = (source_path.len() > 0 and source_path[source_path.len() - 1] == 47) or (source_path.len() > 2 and source_path.slice(source_path.len() - 2, source_path.len()) != ".c" and source_path.slice(source_path.len() - 2, source_path.len()) != ".h")
+    // A directory is one the file system says is one. It was read from the
+    // spelling (no `.c` or `.h` ending, and more than two characters), so
+    // `with migrate c -o w` answered "cannot read c".
+    let is_dir = with_fs_is_dir(source_path) != 0 or source_path.ends_with("/")
 
     if is_dir:
         // Directory mode
