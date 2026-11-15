@@ -284,6 +284,13 @@ fn ci_float_type_name(bits: i32) -> str:
 // it cheap to change the convention later.
 // Inside an `unsafe fn` body the context is already unsafe, so the prefix is
 // omitted (SemaCheck warns on it); the parentheses stay so precedence does.
+// #3344: `name = value` where `name` is a raw extern global, as one
+// statement inside `unsafe` with its operands bare; "" when the target is
+// no such global or the function is already `unsafe fn`.
+fn ci_print_raw_extern_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs: CiExprId) -> str:
+    if g_ci_print_in_unsafe_fn or exprs.kind(lhs) != CiExprKind.CIE_IDENT or not ci_print_is_raw_extern_var(exprs.get_string(exprs.get_d0(lhs))): return ""
+    indent ++ "unsafe { " ++ exprs.get_string(exprs.get_d0(lhs)) ++ " = " ++ ci_print_wrapped_operand(exprs, types, rhs, 0, 0) ++ " }\n"
+
 fn ci_wrap_unsafe(inner: &str) -> str:
     if g_ci_print_in_unsafe_fn: return "(" ++ inner ++ ")"
     "(unsafe " ++ inner ++ ")"
@@ -419,6 +426,8 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
         let lhs_ty = exprs.get_type(lhs)
         if ci_type_needs_memcpy_assignment(types, lhs_ty):
             return ci_print_memcpy_assignment(indent, exprs, types, lhs, rhs, lhs_ty)
+        let raw_write = ci_print_raw_extern_assignment(indent, exprs, types, lhs, rhs)
+        if raw_write.len() > 0: return raw_write
         var rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
         if exprs.kind(rhs) == CiExprKind.CIE_CAST:
             rhs_str = "(" ++ rhs_str ++ ")"
@@ -576,6 +585,22 @@ fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
 // unsafe context when the surrounding function is not `unsafe fn` (#749:
 // value-returning carrier functions are plain fns).
 var g_ci_print_in_unsafe_fn: bool = false
+
+// #3344: the file-scope variables of the unit being printed that the
+// migration declares `extern` (no unit defines them): `|name|` keys. `raw`
+// ones are neither `const` nor thread-local; `ptr` ones are arrays of
+// unknown size, declared as pointers. Set per unit by
+// ci_migrate_collect_extern_vars.
+var g_ci_print_raw_extern_vars: str = ""
+var g_ci_print_ptr_extern_vars: str = ""
+
+fn ci_print_set_extern_vars(raw: &str, ptr: &str):
+    g_ci_print_raw_extern_vars = raw.to_owned()
+    g_ci_print_ptr_extern_vars = ptr.to_owned()
+
+fn ci_print_is_raw_extern_var(name: &str) -> bool: g_ci_print_raw_extern_vars.len() > 0 and g_ci_print_raw_extern_vars.contains("|" ++ name ++ "|")
+
+fn ci_print_is_ptr_extern_var(name: &str) -> bool: g_ci_print_ptr_extern_vars.len() > 0 and g_ci_print_ptr_extern_vars.contains("|" ++ name ++ "|")
 
 fn ci_print_set_unsafe_fn_context(enabled: bool) -> Unit:
     g_ci_print_in_unsafe_fn = enabled
@@ -735,6 +760,11 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
 
     // References
     if kind == CiExprKind.CIE_IDENT:
+        // #3344 (§31.4): a C global no unit of the migration defines, and
+        // that is neither `const` nor thread-local, is raw to read and to
+        // write; its name prints inside `unsafe`, as a raw index does.
+        // A name is no raw dereference or index, so it is the block form.
+        if not g_ci_print_in_unsafe_fn and ci_print_is_raw_extern_var(exprs.get_string(exprs.get_d0(id))): return "unsafe { " ++ exprs.get_string(exprs.get_d0(id)) ++ " }"
         return with_str_clone_ref(exprs.get_string(exprs.get_d0(id)))
 
     // Arithmetic / logical. For unsigned wrap arithmetic
@@ -809,7 +839,10 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         let idx = (exprs.get_d1(id)) as CiExprId
         let base_ty = exprs.get_type(base)
         let base_is_ptr = (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER
-        if exprs.get_d2(id) != 0 or base_is_ptr:
+        // An extern array of unknown size is declared as a pointer: its
+        // index is a raw pointer index whatever C called the type.
+        let base_is_extern_ptr = exprs.kind(base) == CiExprKind.CIE_IDENT and ci_print_is_ptr_extern_var(exprs.get_string(exprs.get_d0(base)))
+        if exprs.get_d2(id) != 0 or base_is_ptr or base_is_extern_ptr:
             return ci_wrap_unsafe(ci_print_wrapped_operand(exprs, types, base, 0, wants_ptr) ++ "[" ++ ci_print_wrapped_operand(exprs, types, idx, 0, 0) ++ "]")
         return ci_print_expr(exprs, types, base, 0, wants_ptr) ++ "[" ++ ci_print_expr(exprs, types, idx, 0, 0) ++ "]"
     if kind == CiExprKind.CIE_CAST:
@@ -883,6 +916,15 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         return "<ci:unimpl:POST_INC>"
     if kind == CiExprKind.CIE_POST_DEC:
         return "<ci:unimpl:POST_DEC>"
+    // #3344: a write of a raw extern global is the whole assignment inside
+    // `unsafe`, its operands printed bare within it.
+    if (kind == CiExprKind.CIE_COMPOUND_ASSIGN or kind == CiExprKind.CIE_ASSIGN) and not g_ci_print_in_unsafe_fn:
+        let target = (if kind == CiExprKind.CIE_ASSIGN: exprs.get_d0(id) else: exprs.get_d1(id)) as CiExprId
+        if exprs.kind(target) == CiExprKind.CIE_IDENT and ci_print_is_raw_extern_var(exprs.get_string(exprs.get_d0(target))):
+            g_ci_print_in_unsafe_fn = true
+            let assignment = ci_print_expr(exprs, types, id, parent_prec, wants_ptr)
+            g_ci_print_in_unsafe_fn = false
+            return "unsafe { " ++ assignment ++ " }"
     if kind == CiExprKind.CIE_COMPOUND_ASSIGN:
         let op = exprs.get_d0(id)
         let lhs = (exprs.get_d1(id)) as CiExprId
@@ -1271,6 +1313,8 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
         let lhs_ty = exprs.get_type(lhs)
         if ci_type_needs_memcpy_assignment(types, lhs_ty):
             return ci_print_memcpy_assignment(indent, exprs, types, lhs, rhs, lhs_ty)
+        let raw_write = ci_print_raw_extern_assignment(indent, exprs, types, lhs, rhs)
+        if raw_write.len() > 0: return raw_write
         var rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
         if exprs.kind(rhs) == CiExprKind.CIE_CAST:
             rhs_str = "(" ++ rhs_str ++ ")"
