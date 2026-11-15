@@ -10,9 +10,10 @@ under it. Done 2026-11-14 for the runtime: every `fn` row with a claim in
 `rt/*.w` carries its citation, and `build/uncited-claims.tsv` holds every
 file at zero, so a new uncited claim is refused (it held 161 for
 rt/darwin_aarch64.w, 141 for each Linux file, 25 for each Windows file, 28
-for rt/fiber_core_darwin.w). Still uncited: the toolchain's libc contract
-(src/compiler/LibcFacade.w), whose text is selected line by line and
-cannot yet carry a comment.
+for rt/fiber_core_darwin.w), and for the toolchain's libc contract
+(src/compiler/LibcFacade.w, each item by its C11 or POSIX section). Still
+uncited: `lib/contracts/sdl.w`, which the view cannot measure without the
+SDL headers.
 
 **The question.** Nearly every uncited runtime claim is `preserves domain
 environ` or `preserves domain locale` on one libc function, and the reason
