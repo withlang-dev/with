@@ -1413,6 +1413,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
 
     let count = with_cimport_decl_count(session)
     ci_migrate_collect_unsafe_extern_fns(session, count, input_path, project_active, project)
+    ci_migrate_collect_extern_vars(session, count, input_path, project_active, project)
     // D159 step 2: the functions this corpus prints as methods, for this
     // unit's definitions and its calls.
     ci_migrate_set_method_shapes(ci_migrate_method_shapes_for(project_active, project))
@@ -3062,6 +3063,35 @@ fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: 
             ci_migrate_note_unsafe_extern_fn(ci_migrate_c_function_name(name))
         i = i + 1
     return
+
+// #3344 (§31.4): the file-scope variables this unit only declares and no
+// unit of the migration defines. They are emitted `extern var` / `extern
+// let`, so a body that names one reads or writes a C global: raw unless it
+// is `const` or thread-local, and an array of unknown size is a pointer
+// whose index is a raw index. The printer wraps those names in `unsafe`
+// (ci_print_set_extern_vars); the bodies were emitted bare and the output
+// did not check.
+fn ci_migrate_collect_extern_vars(session: i64, count: i32, primary_path: &str, project_active: bool, project: &CiProject):
+    var raw = ""
+    var ptr = ""
+    // Sema's policy for an extern in a corpus migrated into a std package
+    // is the compiler-implementation one, where a wrapper is vacuous (R4c).
+    let foreign_is_safe = ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_std_zone()
+    var i: i32 = 0
+    while i < count and not foreign_is_safe:
+        let idx = i
+        i = i + 1
+        if with_cimport_decl_kind(session, idx) != CK_VAR: continue
+        let name = with_cimport_decl_name(session, idx)
+        if ci_migrate_decl_is_filtered(session, idx, name): continue
+        if ci_migrate_find_best_var_decl(session, count, name, primary_path) != idx: continue
+        if with_cimport_var_storage_class(session, idx) == CX_SC_STATIC: continue
+        if ci_migrate_var_emits_definition(session, idx, primary_path, project_active, project): continue
+        if ci_migrate_project_var_owner_path(project_active, project, name).len() > 0: continue
+        let key = "|" ++ ci_escape_reserved(name) ++ "|"
+        if with_cimport_var_is_const(session, idx) == 0 and with_cimport_var_is_threadlocal(session, idx) == 0: raw = raw ++ key
+        if ci_migrate_var_resolved_type(session, idx, count, primary_path, project_active, project).starts_with("*") and ci_cursor_is_array_type(session, with_cimport_decl_cursor(session, idx)): ptr = ptr ++ key
+    ci_print_set_extern_vars(raw, ptr)
 
 fn ci_migrate_var_emits_definition(session: i64, idx: i32, primary_path: &str, project_active: bool, project: &CiProject) -> bool:
     if ci_migrate_var_definition_kind(session, idx) == CI_VAR_DECL_ONLY:
