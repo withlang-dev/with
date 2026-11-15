@@ -123,7 +123,7 @@ fn main:
 ```
 
 Today the facade is a file in your project
-([`lib/contracts/sqlite3.w`](lib/contracts/sqlite3.w) is the one used here).
+([`examples/c-interop/src/contracts/sqlite3.w`](examples/c-interop/src/contracts/sqlite3.w) is the one used here).
 The rules are in [spec §16.2b](docs/spec/016_ffi.md).
 
 ## Translate C into With

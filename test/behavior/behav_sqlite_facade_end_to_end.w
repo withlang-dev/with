@@ -17,7 +17,7 @@
 //! expect-stdout: close_v2: 0
 //! expect-stdout: ok
 
-// D51 stage 12 (ruling §66): the SQLite facade (lib/contracts/sqlite3.w),
+// D51 stage 12 (ruling §66): the SQLite facade (the SQLite acceptance scenario's contract),
 // against the real library, end to end — every item of §66 in one program
 // that an application would write: no `unsafe`, no raw pointer. Open
 // (out-parameter production, `ok SQLITE_OK`), exec with a callback and

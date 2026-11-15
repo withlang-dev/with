@@ -4515,7 +4515,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     contract_view_tests.action = run_contract_view_tests_action
     contract_view_tests = contract_view_tests.input(release_compiler_bin("with"))
     contract_view_tests = contract_view_tests.input("test/contract")
-    contract_view_tests = contract_view_tests.input("build/uncited-claims.tsv").input("rt").input("lib/contracts")
+    contract_view_tests = contract_view_tests.input("build/uncited-claims.tsv").input("rt")
     contract_view_tests = contract_view_tests.dep("build")
     contract_view_tests = contract_view_tests.write_scope("out/contract-view-tests")
     out = out.add_target(contract_view_tests)
@@ -4701,7 +4701,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     examples_tests = examples_tests.allow_parallel()
     examples_tests.action = run_examples_tests_action
     examples_tests = examples_tests.input(release_compiler_bin("with"))
-    examples_tests = examples_tests.input("examples").input("lib/contracts")
+    examples_tests = examples_tests.input("examples")
     examples_tests = examples_tests.dep("build")
     out = out.add_target(examples_tests)
 
@@ -5102,7 +5102,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_uat = target_new(.Action, "release-uat", "").output("out/release-uat/report.txt")
     release_uat.action = run_release_uat_action
     release_uat = release_uat.input(release_platform_asset_bin())
-    release_uat = release_uat.input("uat").input("lib/contracts")
+    release_uat = release_uat.input("uat")
     let uat_opengl = ctx.env_input("WITH_UAT_OPENGL32_DLL")
     if uat_opengl.len() > 0:
         release_uat = release_uat.input(uat_opengl)
