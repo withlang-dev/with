@@ -144,6 +144,8 @@ c contract libc:
     domain errno thread
     domain environ process
     domain locale process
+    // C abort (C11 7.22.4.1): ends the process abnormally and does not return
+    // to its caller: nothing the process holds outlives the call.
     fn rt_libc_abort
         preserves domain environ
         preserves domain locale

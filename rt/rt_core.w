@@ -6048,9 +6048,13 @@ c contract libc:
     domain errno thread
     domain environ process
     domain locale process
+    // C malloc (C11 7.22.3.4): allocates a block of memory; does not modify
+    // the process environment or locale.
     fn rt_libc_malloc
         preserves domain environ
         preserves domain locale
+    // C free (C11 7.22.3.3): releases a block malloc returned; does not
+    // modify the process environment or locale.
     fn rt_libc_free
         preserves domain environ
         preserves domain locale

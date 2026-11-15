@@ -2270,7 +2270,8 @@ pub fn with_net_close(sock: i32) -> i32:
 // effect means invalidate" (§38): a Win32 or Winsock row says nothing, so
 // it invalidates every declared domain, the three libc domains: the C
 // standard does not describe those calls, and a row it cannot justify is
-// never `preserves`. The UCRT rows follow the C standard as the POSIX
+// never `preserves`. Three Winsock rows are stated and cited where they
+// stand: `bind`, `send` and `recv`. The UCRT rows follow the C standard as the POSIX
 // backends do: C11 7.5p3 (errno: any library function may set it; the
 // `_errno` accessor is the macro's lvalue, 7.5p2), C11 7.22.4.6 (environ:
 // altered by _putenv/SetEnvironmentVariable only), C11 7.11.1.1 (locale:
@@ -2353,25 +2354,44 @@ c contract win32:
     fn CertAddEncodedCertificateToStore
     fn CertGetCertificateChain
     fn CertFreeCertificateChain
+    // UCRT __acrt_iob_func (stdio.h: `stdin`, `stdout` and `stderr` expand to
+    // calls of it): returns the address of one standard stream and reads or
+    // writes nothing else; it does not modify the process environment or
+    // locale.
     fn __acrt_iob_func
         preserves domain environ
         preserves domain locale
+    // UCRT _errno (errno.h: `errno` expands to `*_errno()`): returns the
+    // address of the calling thread's errno and reads or writes nothing; it
+    // does not modify the process environment or locale.
     fn rt_ucrt_errno
         preserves domain errno
         preserves domain environ
         preserves domain locale
+    // UCRT _fileno: returns a stream's descriptor; does not modify the
+    // process environment or locale.
     fn rt_ucrt_fileno
         preserves domain environ
         preserves domain locale
+    // UCRT _fseeki64: moves a stream's file position by a 64-bit offset; does
+    // not modify the process environment or locale.
     fn rt_ucrt_fseeki64
         preserves domain environ
         preserves domain locale
+    // UCRT _ftelli64: returns a stream's file position as a 64-bit offset;
+    // does not modify the process environment or locale.
     fn rt_ucrt_ftelli64
         preserves domain environ
         preserves domain locale
+    // UCRT _strtoi64: converts text to a 64-bit integer. It reads the locale
+    // to tell white space and modifies neither the locale nor the process
+    // environment.
     fn rt_ucrt_strtol
         preserves domain environ
         preserves domain locale
+    // UCRT _strtoui64: converts text to an unsigned 64-bit integer. It reads
+    // the locale to tell white space and modifies neither the locale nor the
+    // process environment.
     fn rt_ucrt_strtoul
         preserves domain environ
         preserves domain locale
@@ -2380,9 +2400,14 @@ c contract win32:
     fn rt_ucrt_strtof
         preserves domain environ
         preserves domain locale
+    // UCRT strtod, linked here for strtold (the UCRT's long double is a
+    // double): converts text to a double. It reads the locale's radix
+    // character and modifies neither the locale nor the process environment.
     fn rt_ucrt_strtold
         preserves domain environ
         preserves domain locale
+    // UCRT _isatty: tells whether a descriptor is a character device; does
+    // not modify the process environment or locale.
     fn rt_ucrt_isatty
         preserves domain environ
         preserves domain locale
@@ -2394,15 +2419,21 @@ c contract win32:
     fn WSAStartup
     fn socket
     fn connect
+    // Winsock bind (winsock2.h): gives a socket its local address; does not
+    // modify the process environment or locale.
     fn rt_libc_bind
         preserves domain environ
         preserves domain locale
     fn listen
     fn accept
     fn getsockname
+    // Winsock send (winsock2.h): sends bytes on a connected socket; does not
+    // modify the process environment or locale.
     fn rt_libc_send
         preserves domain environ
         preserves domain locale
+    // Winsock recv (winsock2.h): receives bytes from a connected socket; does
+    // not modify the process environment or locale.
     fn rt_libc_recv
         preserves domain environ
         preserves domain locale
