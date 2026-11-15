@@ -14087,7 +14087,7 @@ impl MirBuilder:
         // static test runs only after the (rare) dyn hit — lookup_local is a
         // linear scan and must not run per method call.
         if self.sema.dyn_trait_symbol_for_type(recv_type) != 0:
-            var dyn_recv_is_static = false
+            var dyn_recv_is_static = self.sema.static_receiver_calls.contains(node)
             if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
                 let dyn_id_sym = self.ast.get_data0(self_expr)
                 if self.lookup_local(dyn_id_sym) < 0 and self.sema.named_types.contains(dyn_id_sym):
@@ -14147,7 +14147,7 @@ impl MirBuilder:
                 let gc_sig_idx = if has_recorded_method_sig: recorded_method_sig else: self.call_sig_for_sym(callee_sym)
                 // Lower self + method args so the handler can eval them.
                 // Skip receiver for static calls (type name, not value expression).
-                var gc_is_static = false
+                var gc_is_static = self.sema.static_receiver_calls.contains(node)
                 if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
                     let gc_id_sym = self.ast.get_data0(self_expr)
                     if self.lookup_local(gc_id_sym) < 0 and self.sema.named_types.contains(gc_id_sym):
@@ -14250,7 +14250,7 @@ impl MirBuilder:
         let arg_nodes: List[i32] = []
         // For static method calls (receiver is a type name, not a value),
         // don't pass the receiver as an argument.
-        var is_static_call = false
+        var is_static_call = self.sema.static_receiver_calls.contains(node)
         if self.sema.qualified_extension_call_nodes.contains(node):
             is_static_call = true
         if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
