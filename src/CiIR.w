@@ -1007,6 +1007,9 @@ type CiProjectSymbol {
     // ci_body_call_evidence): a destroyer clause that names one of them is
     // contradicted by a contract that describes this function.
     assigned_globals: List[str],
+    // The functions the body calls by name, for the same question asked
+    // through a call (`calls:` lines).
+    callees: List[str],
     // D159 (CiContracts.w): the body's contract evidence (CImport.w
     // ci_body_contract_evidence: `mutparam:`, `fieldstore:`, `freesmember:`,
     // `memberarg:`, `outfull:`, `outcond:` lines), `param_mutates[i]` 1 when
@@ -1077,6 +1080,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         registry_more: "",
         variadic: 0,
         assigned_globals: [],
+        callees: [],
         header_declared: 0,
         header_file: "",
         definition_location: "",
@@ -1189,6 +1193,13 @@ type CiProject {
     // ci_fnptr_field_evidence), one line each, and the verdict per
     // `Record.field` drawn from them once (fd_fnptr_field_verdict).
     fnptr_evidence: str,
+    // §31.8.6: what the static definitions assign and call, by the
+    // static's name. A static is not a project symbol, and a function
+    // that reaches one that assigns a destroyer global assigns it.
+    static_index: HashMap[str, isize],
+    static_names: List[str],
+    static_assigns: List[List[str]],
+    static_callees: List[List[str]],
     fnptr_verdicts: HashMap[str, str],
     fnptr_verdicts_drawn: bool,
     // D198 (§16.2b.5): the records with their fields and the file that
@@ -1234,6 +1245,10 @@ fn CiProject.new -> CiProject:
         registry_value_fns: [],
         void_typedefs: [],
         fnptr_evidence: "",
+        static_index: HashMap.new(),
+        static_names: [],
+        static_assigns: [],
+        static_callees: [],
         fnptr_verdicts: HashMap.new(),
         fnptr_verdicts_drawn: false,
         complete_records: HashMap.new(),
@@ -1257,6 +1272,21 @@ impl CiProject:
         let id = self.module_paths.len() as i32
         self.module_paths.push(ci_ir_owned_text(path))
         id
+
+    mut fn note_static_evidence(name: str, assigns: bool, what: str):
+        var at = -1
+        match self.static_index.get(name):
+            Some(i) => at = *i
+            None => {}
+        if at < 0:
+            at = self.static_names.len()
+            self.static_index.insert(name, at)
+            self.static_names.push(name)
+            self.static_assigns.push([])
+            self.static_callees.push([])
+        if assigns:
+            if not self.static_assigns[at].contains(what): self.static_assigns[at].push(what)
+        else if not self.static_callees[at].contains(what): self.static_callees[at].push(what)
 
     fn find_symbol(kind: i32, name: &str) -> i32:
         match self.symbol_index.get(ci_project_symbol_key(kind, name)):

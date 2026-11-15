@@ -18993,6 +18993,7 @@ fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
 //   `field:<param>`                parameter stored into a record field
 //   `global:<param>`               parameter assigned to something not a parameter
 //   `assign:<name>`                the global `name` assigned (§31.8.6)
+//   `calls:<callee>`               a function called by name
 // `params` are the enclosing definition's parameter names.
 fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
     ci_body_call_evidence_walk(session, cursor, params, ci_own_collect_locals(session, cursor))
@@ -19009,6 +19010,7 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
         let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
         let callee = if field.len() > 0: "*" ++ field else: with_ci_cursor_spelling(session, cursor)
         if callee.len() > 0:
+            if field.len() == 0: out = out ++ f"calls:{callee}\n"
             var ai = 1
             while ai < nc:
                 let arg = with_ci_child(session, cursor, ai)
@@ -19032,7 +19034,10 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
                 if ci_cursor_names(session, l, param): to_global = false
             for local in locals:
                 if ci_cursor_names(session, l, local): to_global = false
-        if to_global: out = out ++ "assign:" ++ with_ci_cursor_spelling(session, l) ++ "\n"
+        // Only a global that holds a function pointer: that is what a
+        // destroyer clause can name (§31.8.6), and a large library assigns
+        // thousands of other globals (SDL's `with get` timed out).
+        if to_global and ci_type_text_is_fn_ptr(ci_cursor_type_text(session, l)): out = out ++ "assign:" ++ with_ci_cursor_spelling(session, l) ++ "\n"
         for param in params:
             if ci_cursor_names(session, rhs, param):
                 if with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:

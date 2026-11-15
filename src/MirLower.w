@@ -17812,6 +17812,16 @@ impl MirBuilder:
                 with_eprint("error: internal: va_start() reached expression lowering outside its binding")
                 self.mark_unsupported()
                 return self.unit_operand()
+            // #3332 (D65): `T.name()`, `T.size()`, `T.align()` and
+            // `nameof[T]()` are constants of the type Sema checked the call
+            // with in this body, a specialization's own instance included.
+            let type_method_ty = self.sema.type_method_type_in_body(self.body.instance_sym, node)
+            if type_method_ty > 0:
+                let type_method = if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS: self.ast.get_data1(callee) else: self.sema.syms.name
+                if type_method == self.sema.syms.name:
+                    return self.lower_str_lit(self.sema.type_method_name_in_body(self.body.instance_sym, node))
+                let measured = if type_method == self.sema.syms.size: self.sema.type_layout_size_of_frozen(type_method_ty) else: self.sema.type_layout_align_of_frozen(type_method_ty)
+                return self.int_const_operand(measured, self.sema.ty_usize as i32)
             if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
                 // Distinguish method syntax from a callable field like
                 // `ctx.memctl.free(...)`, which should lower as an indirect call.

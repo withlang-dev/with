@@ -1230,7 +1230,7 @@ impl CiProject:
                     // same name in another unit keeps the first's evidence.
                     let header_inline_definition = with_cimport_fn_is_inline(session, i) != 0 and cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0 and ci_migrate_location_is_header(loc)
                     if cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0:
-                        self.record_call_evidence(session, cursor, name)
+                        self.record_call_evidence(session, cursor, name, i)
                         let static_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                         // A unit's own static keeps its raw signature; a
                         // header's inline definition is decided by who
@@ -1871,16 +1871,22 @@ impl CiProject:
             else if (parts[0] == "field" or parts[0] == "global") and parts.len() == 2:
                 let pi = ci_index_of_name(names, parts[1])
                 if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[0] ++ ";"
+            else if parts[0] == "calls" and parts.len() == 2:
+                if not self.symbols[symbol_id].callees.contains(parts[1]): self.symbols[symbol_id].callees.push(parts[1])
             else if parts[0] == "assign" and parts.len() == 2:
                 if not self.symbols[symbol_id].assigned_globals.contains(parts[1]): self.symbols[symbol_id].assigned_globals.push(parts[1])
 
     // A static definition is not a project symbol, but its calls are corpus
     // calls: a NULL it passes to a corpus function is caller evidence
     // (pcre2test's `pcre2_jit_stack_assign(ctx, NULL, NULL)`).
-    mut fn record_call_evidence(session: i64, cursor: i32, fname: &str):
-        let none: List[str] = []
-        for line in ci_body_call_evidence(session, cursor, none).split("\n"):
+    mut fn record_call_evidence(session: i64, cursor: i32, fname: &str, decl_idx: i32):
+        // The parameters by name: an assignment to one is not a global's.
+        let names = []
+        for pi in 0..with_cimport_fn_param_count(session, decl_idx): names.push(ci_escape_reserved(with_cimport_fn_param_name(session, decl_idx, pi)))
+        for line in ci_body_call_evidence(session, cursor, names).split("\n"):
             let parts = line.split(":")
+            if parts.len() == 2 and (parts[0] == "assign" or parts[0] == "calls"):
+                self.note_static_evidence(fname.to_owned(), parts[0] == "assign", parts[1])
             if parts.len() != 3 or parts[0] != "null": continue
             let callee = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, parts[1])
             let index = parse(parts[2])
