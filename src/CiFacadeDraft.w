@@ -468,34 +468,65 @@ impl CiProject:
             if symbol.borrow_from >= 0 and symbol.own_reason.starts_with("proof: "): out = out ++ f"{symbol.name}\treturns-part\t{symbol.borrow_from}\t{symbol.own_reason.slice(7, symbol.own_reason.len())}\n"
             // §31.8.6: the third column is the global, not a parameter.
             for assigned in symbol.assigned_globals: out = out ++ f"{symbol.name}\tassigns\t{assigned}\tthe body of {symbol.name} assigns {assigned}\n"
-            // A function that calls an assigner assigns (#3338). The walk
-            // follows calls by name to functions a unit defines; a call
-            // through a pointer or to a function no unit defines ends it,
-            // which is weaker than a grant and contradicts nothing (§31.7).
-            let said = []
-            let seen = [symbol.name]
-            let stack = []
-            for callee in symbol.callees: stack.push(callee)
+        // A function that reaches an assigner assigns (#3338). The walk goes
+        // from each assigner back through its callers, by name: functions a
+        // unit defines and static definitions (two units' statics of one name
+        // are read as one, which can only add a line). A call through a
+        // pointer or to a function no unit defines is no edge: the proof
+        // stops there, which is weaker than a grant and contradicts nothing
+        // (§31.7).
+        // `name<TAB>global` and `caller<TAB>callee`, as the facts are written.
+        let assigners = []
+        let edges = []
+        let said: HashMap[str, i32] = HashMap.new()
+        for symbol in self.symbols:
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.has_definition == 0: continue
+            for assigned in symbol.assigned_globals:
+                said.insert(f"{symbol.name}\t{assigned}", 1)
+                assigners.push(f"{symbol.name}\t{assigned}")
+            for callee in symbol.callees: edges.push(f"{symbol.name}\t{callee}")
+        var sti = -1
+        for name in self.static_names:
+            sti += 1
+            for assigned in self.static_assigns[sti]: assigners.push(f"{name}\t{assigned}")
+            for callee in self.static_callees[sti]: edges.push(f"{name}\t{callee}")
+        if assigners.len() == 0: return out
+        let callers_index: HashMap[str, isize] = HashMap.new()
+        let callers: List[List[str]] = []
+        for edge in edges:
+            let caller = edge.split("\t")[0]
+            let callee = edge.split("\t")[1]
+            var at = -1
+            match callers_index.get(callee):
+                Some(i) => at = *i
+                None => {}
+            if at < 0:
+                at = callers.len()
+                callers_index.insert(callee, at)
+                callers.push([])
+            callers[at].push(caller)
+        for pair in assigners:
+            let assigner = pair.split("\t")[0]
+            let assigned = pair.split("\t")[1]
+            let seen: HashMap[str, i32] = HashMap.new()
+            seen.insert(assigner, 1)
+            let stack = [assigner]
             while stack.len() > 0:
-                let callee = stack.pop().unwrap()
-                if seen.contains(callee): continue
-                seen.push(callee)
-                let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
-                let reached_assigns = []
-                if ci >= 0 and self.symbols[ci].has_definition != 0:
-                    for assigned in self.symbols[ci].assigned_globals: reached_assigns.push(assigned)
-                    for next in self.symbols[ci].callees: stack.push(next)
-                else:
-                    // A static definition, by name: two units' statics of
-                    // one name are read as one, which can only add a line.
-                    for line in self.static_evidence:
-                        let fact = line.split("\t")
-                        if fact[0] != callee: continue
-                        if fact[1] == "assign": reached_assigns.push(fact[2]) else: stack.push(fact[2])
-                for assigned in reached_assigns:
-                    if symbol.assigned_globals.contains(assigned) or said.contains(assigned): continue
-                    said.push(assigned)
-                    out = out ++ f"{symbol.name}\tassigns\t{assigned}\t{symbol.name} reaches {callee}, whose body assigns {assigned}\n"
+                let reached = stack.pop().unwrap()
+                var at = -1
+                match callers_index.get(reached):
+                    Some(i) => at = *i
+                    None => {}
+                if at < 0: continue
+                for caller in callers[at]:
+                    if seen.contains(caller): continue
+                    seen.insert(caller, 1)
+                    stack.push(caller)
+                    let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, caller)
+                    let key = f"{caller}\t{assigned}"
+                    if ci < 0 or self.symbols[ci].has_definition == 0 or said.contains(key): continue
+                    said.insert(key, 1)
+                    out = out ++ f"{caller}\tassigns\t{assigned}\t{caller} reaches {assigner}, whose body assigns {assigned}\n"
         out
 
     // What the registry says about `si`, for the report.

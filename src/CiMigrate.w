@@ -1886,8 +1886,7 @@ impl CiProject:
         for line in ci_body_call_evidence(session, cursor, names).split("\n"):
             let parts = line.split(":")
             if parts.len() == 2 and (parts[0] == "assign" or parts[0] == "calls"):
-                let fact = f"{fname}\t{parts[0]}\t{parts[1]}"
-                if not self.static_evidence.contains(fact): self.static_evidence.push(fact)
+                self.note_static_evidence(fname.to_owned(), parts[0] == "assign", parts[1])
             if parts.len() != 3 or parts[0] != "null": continue
             let callee = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, parts[1])
             let index = parse(parts[2])
