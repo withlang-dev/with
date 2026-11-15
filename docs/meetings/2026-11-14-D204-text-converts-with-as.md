@@ -5,8 +5,7 @@ conversion), 1 (the fallible form is `text.parse()`, typed by the demand).
 
 **Date:** 2026-11-14. **Status:** ruled by Eric, the same day as D203,
 before any of D203's call form was built. §15.5 and §4.2.6 (spec v7.58)
-carry it. NOT YET implemented: `"42" as i32` is still the error "cannot
-cast `str` to `i32`".
+carry it. Implemented 2026-11-14 (#3337).
 
 **What changes from D203.** D203's spelling of the conversion, `i32(text)`,
 `i32(text, base: 16)` and `text |> i32`, is withdrawn. The conversion is

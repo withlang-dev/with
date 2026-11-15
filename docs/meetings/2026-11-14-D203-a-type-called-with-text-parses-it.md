@@ -6,8 +6,9 @@
 the programmer's, chosen by the operation written).
 
 **Date:** 2026-11-14. **Status:** ruled by Eric. §15.5 (spec v7.56) carries
-the first sentences; the rest of the ruling is NOT YET in the spec and NOT
-YET implemented. The compiler is non-compliant with all of it.
+the first sentences and v7.57 the rest. Implemented 2026-11-14 as amended
+by D204 (#3337): `text as T`, `text.parse()`, `text.parse(base: N)` and the
+numeric type members.
 
 **Amended by D204 (the same day):** the conversion is spelled `text as T`.
 The call form `i32(text)`, `i32(text, base: 16)` and the pipeline form
