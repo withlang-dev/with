@@ -4601,6 +4601,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     internals_tests = internals_tests.dep("build")
     out = out.add_target(internals_tests)
 
+    // #3231: a test that imports a compiler module compiles all of the
+    // compiler (10,616 bodies; 106 s alone on an 18-core host). Beside the
+    // lanes that fill the cores, each ran past the 30-minute per-file guard
+    // on the 3-core nightly runner, as selfcheck once did beside four lanes.
+    // These run one at a time, after the lanes that fill the pool: the
+    // dependency is the graph's spelling of that order.
+    var internals_compiler_tests = test_lane(.Test, "internals-compiler-tests", "test/internals_compiler/*.w")
+    internals_compiler_tests = internals_compiler_tests.arg("compiler=" ++ release_compiler_bin("with"))
+    internals_compiler_tests = internals_compiler_tests.dep("build")
+    for lane in "behavior-tests native-compile-error-tests native-codegen-tests native-spec-tests native-phase-tests internals-tests debug-alloc-tests d-acceptance-tests".split(" "): internals_compiler_tests = internals_compiler_tests.dep(lane)
+    out = out.add_target(internals_compiler_tests)
+
     var lexer_tests = test_lane(.Test, "lexer-tests", "test/lexer/*.w")
     lexer_tests = lexer_tests.allow_parallel()
     lexer_tests = lexer_tests.arg("compiler=" ++ release_compiler_bin("with"))
@@ -4922,6 +4934,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // #2011: the async/cancel/defer corpus under `check --validate-all`.
     tests = tests.dep("validate-all-async")
     tests = tests.dep("internals-tests")
+    tests = tests.dep("internals-compiler-tests")
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")
     tests = tests.dep("deep-debug-tool-tests")
