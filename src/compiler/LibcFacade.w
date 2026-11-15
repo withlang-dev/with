@@ -49,44 +49,70 @@ use compiler.FacadeRender
 
 fn libc_facade_source() -> str:
     "c contract libc:
+    // POSIX strdup(3) and strndup(3): each returns a new string obtained from
+    // malloc, which the caller releases with free (C11 7.22.3.3).
     resource CHeapStr wraps *mut c_char
         from strdup
         from strndup
         drop free
+    // C11 7.21.5.3 fopen, POSIX fdopen(3) and C11 7.21.4.3 tmpfile: each
+    // returns a stream the caller closes with fclose (C11 7.21.5.1).
     resource CFile wraps *mut FILE
         from fopen
         from fdopen
         from tmpfile
         drop fclose
+    // POSIX opendir(3): returns a directory stream the caller closes with
+    // closedir(3).
     resource CDir wraps *mut DIR
         from opendir
         drop closedir
+    // POSIX readdir(3): returns the stream's next entry; the stream stays
+    // open and stays the caller's.
     fn readdir
         lend
         of CDir
+    // POSIX rewinddir(3): resets the stream's position; the stream stays
+    // open and stays the caller's.
     fn rewinddir
         lend
         of CDir
     domain environ process
     domain strerror_text process
+    // C11 7.22.4.6 getenv: returns a pointer to the value in the environment
+    // list, which the program shall not modify. It does not touch the buffer
+    // strerror returns.
     fn getenv
         returns borrow CStr from domain environ
         preserves domain strerror_text
+    // C11 7.24.6.2 strerror: returns a pointer to a message string the
+    // program shall not modify, which a later call of strerror may
+    // overwrite. It does not modify the environment.
     fn strerror
         returns borrow CStr from domain strerror_text
         preserves domain environ
+    // C11 7.24.5.2 strchr: returns a pointer to the located character in
+    // the string it is given, or null. It reads its arguments and nothing
+    // else.
     fn strchr
         returns borrow CStr from param 0
         preserves domain environ
         preserves domain strerror_text
+    // C11 7.24.5.5 strrchr: returns a pointer to the last occurrence of the
+    // character in the string it is given, or null. It reads its arguments
+    // and nothing else.
     fn strrchr
         returns borrow CStr from param 0
         preserves domain environ
         preserves domain strerror_text
+    // C11 7.24.5.4 strpbrk: returns a pointer to a character of the first
+    // string, or null. It reads its arguments and nothing else.
     fn strpbrk
         returns borrow CStr from param 0
         preserves domain environ
         preserves domain strerror_text
+    // C11 7.24.5.7 strstr: returns a pointer to the located sequence in the
+    // first string, or null. It reads its arguments and nothing else.
     fn strstr
         returns borrow CStr from param 0
         preserves domain environ
@@ -122,12 +148,20 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
     let domain_lines: List[str] = []
     let domain_names: List[str] = []
     var body = ""
+    // The citation above an item (§31.9 rule 2) goes with it: kept when the
+    // item is, dropped when it is not.
+    var pending_citation = ""
     var i = 1
     while i < lines.len():
         let header = lines[i]
         i = i + 1
         if header.trim().len() == 0:
             continue
+        if header.trim().starts_with("//"):
+            pending_citation = pending_citation ++ header ++ "\n"
+            continue
+        let citation = pending_citation
+        pending_citation = ""
         let clauses: List[str] = []
         while i < lines.len() and lines[i].starts_with("        "):
             clauses.push(lines[i])
@@ -160,7 +194,7 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
                         has_drop = true
                     kept = kept ++ clause ++ "\n"
             if producers > 0 and has_drop:
-                body = body ++ header ++ "\n" ++ kept
+                body = body ++ citation ++ header ++ "\n" ++ kept
                 kept_names.push(name)
                 kept_reprs.push(repr)
         else:
@@ -178,7 +212,7 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
                     if not matched:
                         ok = false
             if ok:
-                body = body ++ header ++ "\n"
+                body = body ++ citation ++ header ++ "\n"
                 for ci_ in 0..clauses.len():
                     body = body ++ clauses[ci_] ++ "\n"
     if body.len() == 0:
