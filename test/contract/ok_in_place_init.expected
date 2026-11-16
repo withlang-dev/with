@@ -1,5 +1,5 @@
 foreign-contract view	v1
-resource Stream wraps z_stream_s; representation: in-place, pinned; contract:zl@test/contract/ok_in_place_init.w; clause:resource@test/contract/ok_in_place_init.w:17
+resource Stream wraps z_stream; representation: in-place, pinned; contract:zl@test/contract/ok_in_place_init.w; clause:resource@test/contract/ok_in_place_init.w:17
     init: z_init -> Stream.init; production: in place, Drop armed by init  [claim: stated@test/contract/ok_in_place_init.w:18]
     status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
     destroyer: z_end; automatic: Drop calls it while the value is live  [claim: stated@test/contract/ok_in_place_init.w:19]
