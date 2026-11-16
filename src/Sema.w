@@ -3280,19 +3280,14 @@ impl Sema:
         self.type_extra = sema_clone_i32_list(self.type_extra)
         self.rebuild_exact_type_cache()
         self.rebuild_named_type_candidate_index()
-        self.generic_inst_cache = Memo.new()
-        self.layout_size_cache = Memo.new()
-        self.layout_align_cache = Memo.new()
-        self.layout_field_offset_cache = Memo.new()
-        self.is_copy_cache = Memo.new()
-        self.struct_copy_cache = Memo.new()
-        self.needs_drop_result_cache = Memo.new()
-        self.unwrapped_type_cache = Memo.new()
-        self.generic_struct_field_type_cache = Memo.new()
-        self.generic_struct_field_index_type_cache = Memo.new()
-        self.generic_enum_payload_cache_starts = sema_new_map_i64_i32()
-        self.generic_enum_payload_cache_counts = sema_new_map_i64_i32()
-        self.generic_enum_payload_cache_values = List.new()
+        // #3351: the type caches stay. They were emptied when this was a copy
+        // beside a live original (two holders of one table); since the
+        // evaluator takes the Sema whole (comptime_take_sema) it is the one
+        // holder, and the entries are facts of type ids, which only grow.
+        // Emptied, every evaluation left the next eager pass to compute the
+        // layout of every type again: 4.7 s for the compiler's 22,000 types,
+        // once for each specialization whose recheck evaluated something
+        // (42 of the 51 s `mir.lower` took for a test that imports Sema).
         self.generic_subst_param_syms = sema_clone_i32_list(self.generic_subst_param_syms)
         self.generic_subst_type_ids = sema_clone_i32_list(self.generic_subst_type_ids)
         self.source_text_file_ids = sema_clone_i32_list(self.source_text_file_ids)
