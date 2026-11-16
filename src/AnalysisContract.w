@@ -345,7 +345,7 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
     let site = contract_site(sema, r.decl, source_path, source_text)
     let rname = contract_resource_name(sema, ri)
     let facade = sema.safe_symbol_text(r.facade)
-    let repr = sema.type_name(r.repr_tid)
+    let repr = sema.facade_resource_spelling(ri)
     let is_ptr = sema.get_type_kind(sema.resolve_alias(r.repr_tid as TypeId)) == TypeKind.TY_PTR
     let shape = if r.handle != 0: "callback-scope, borrowed for the callback's invocation" else if r.init != 0: (if r.movable != 0: "in-place, movable" else: "in-place, pinned") else if is_ptr: "pointer" else: "by-value"
     let facade_id = f"contract:{facade}@{site.path}"

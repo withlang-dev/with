@@ -124,7 +124,7 @@ impl Sema:
         let pointee = if self.get_type_kind(repr) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(repr) as TypeId) else: 0 as TypeId
         let record = pointee != 0 and not self.facade_type_is_void_ptr(repr as i32) and not self.facade_type_is_c_string_ptr(repr as i32) and (self.get_type_kind(pointee) == TypeKind.TY_STRUCT or self.is_opaque_value_type(pointee))
         if not record:
-            let rt = self.type_name(self.facade_resources[ri].repr_tid)
+            let rt = self.facade_resource_spelling(ri)
             self.emit_error(f"handle '{hname}' wraps {rt}; a callback-scope handle wraps the pointer to a C record that C passes a callback (`*mut sqlite3_context`) — not `void *`, which every pointer converts to, nor text or a value (§16.2b.9)", node)
             return
         if self.diags.has_errors() or not self.verify_facade_generated_names(ri):
@@ -1075,7 +1075,7 @@ impl Sema:
                 // in-place shape.
                 if self.get_type_kind(self.resolve_alias(r.repr_tid as TypeId)) != TypeKind.TY_PTR:
                     let pn = self.pool_resolve(producer)
-                    let rt = self.type_name(r.repr_tid)
+                    let rt = self.facade_item_spelling(r.node)
                     self.emit_error_with_help(f"resource '{rname}': 'from {pn}(out param …)' produces through a pointer out parameter, which is initialized to NULL and inspected after the call; '{rname}' wraps {rt}, which has no NULL (§16.2b.4)", clause, f"a resource C initializes in caller storage is produced in place: 'init {pn}(self)'")
                     return r
                 let pty = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
@@ -1108,13 +1108,13 @@ impl Sema:
                 // returns NULL. Only a returned pointer has that NULL.
                 if r.out_params[r.out_params.len() - 1] >= 0: self.emit_error(f"resource '{rname}': 'from {pn}, nonnull': {pn} produces through an out parameter, and its status says whether anything was produced (§31.8.2)", clause)
                 else if self.get_type_kind(self.resolve_alias(r.repr_tid as TypeId)) != TypeKind.TY_PTR:
-                    let rt = self.type_name(r.repr_tid)
+                    let rt = self.facade_item_spelling(r.node)
                     self.emit_error(f"resource '{rname}': 'from {pn}, nonnull' is for a producer that returns a pointer; '{rname}' wraps {rt}, a record passed by value, which states the field: 'nonnull field <F>' (§31.8.2)", clause)
                 return r
             if r.out_params[r.out_params.len() - 1] >= 0: return r
             var ty = self.resolve_alias(r.repr_tid as TypeId) as i32
             if self.get_type_kind(ty as TypeId) != TypeKind.TY_STRUCT:
-                let rt = self.type_name(r.repr_tid)
+                let rt = self.facade_item_spelling(r.node)
                 self.emit_error(f"resource '{rname}': 'from {pn}, {word} field' names a field of a record passed by value; '{rname}' wraps {rt}, whose NULL is the representation's own (§16.2b.4)", clause)
                 return r
             var path = ""
@@ -1123,7 +1123,7 @@ impl Sema:
                 path = path ++ (if k > 2: "." else: "") ++ self.pool_resolve(seg)
                 let next = if self.get_type_kind(ty as TypeId) == TypeKind.TY_STRUCT: self.struct_field_type(ty, seg) else: 0
                 if next == 0:
-                    let rt = self.type_name(r.repr_tid)
+                    let rt = self.facade_item_spelling(r.node)
                     self.emit_error(f"resource '{rname}': 'from {pn}, {word} field {path}': {rt} has no field {path} (§16.2b.13)", clause)
                     return r
                 ty = self.resolve_alias(next as TypeId) as i32
@@ -2273,6 +2273,12 @@ impl Sema:
         let pname = self.facade_param_c_name(fn_sym, pi)
         let tn = self.facade_param_spelling(fn_sym, sig, pi)
         f"param {pi}: {tn} {pname}"
+
+    // A resource's wrapped type as its item spells it (§57, as a parameter's:
+    // `*mut c_char`, never the target's width).
+    fn facade_item_spelling(item: i32) -> str: render_type_expr(self.ast, self.pool, self.ast.get_extra(self.ast.get_data1(item)))
+
+    fn facade_resource_spelling(ri: isize) -> str: self.facade_item_spelling(self.facade_resources[ri].node)
 
     // The declared spelling of a facade parameter's type; the resolved type's
     // name when the declaration is not at hand.
