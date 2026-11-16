@@ -142,6 +142,17 @@ jobs:
           # a general target_os predicate is proposed separately. As each
           # underlying gap is fixed the skip is removed, greening more of the
           # battery over time.
+          #
+          # Seed-bound (#3031), deleted when a seed carrying
+          # build_graph_test_window_for is pinned: the pinned seed's driver
+          # lets a lane on the critical path run 32 tests at once, with no
+          # jobserver slots; on this 4-vCPU, 16 GiB runner that was 27
+          # compilers and 27.6 GiB committed (`lld-link: out of memory`).
+          # A driver that is handed a jobserver names no critical lane, so
+          # every lane's tests stay inside these slots.
+          mkdir -p out/.ci-jobserver
+          export WITH_BUILD_JOBSERVER="$(cygpath -m "$PWD/out/.ci-jobserver")"
+          export WITH_BUILD_JOBSERVER_SLOTS=6
           ./src/main.exe build :test
 
       - name: Stage diagnostics on failure

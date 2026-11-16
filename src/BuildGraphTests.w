@@ -88,21 +88,7 @@ fn build_graph_jobserver_lane_critical(dir: &str) -> bool:
 fn build_graph_jobserver_release(dir: &str, slot: i32):
     if slot >= 0: build_graph_rt_remove_file(dir ++ f"/slot-{slot}")
 
-fn build_graph_test_jobs -> i32:
-    let raw = build_graph_rt_getenv("WITH_BUILD_TEST_JOBS")
-    let parsed = build_graph_test_parse_jobs(raw)
-    if parsed <= 0:
-        // Default to host core width; test children are small compared to
-        // the driver, so cores — not a fixed 4 — is the right ceiling.
-        let cores = build_graph_rt_cpu_cores()
-        if cores < 1:
-            return 4
-        if cores > 32:
-            return 32
-        return cores
-    if parsed > 32:
-        return 32
-    parsed
+fn build_graph_test_jobs -> i32: build_graph_test_window_for(build_graph_test_parse_jobs(build_graph_rt_getenv("WITH_BUILD_TEST_JOBS")), build_graph_rt_cpu_cores(), build_graph_rt_memory_total())
 
 fn build_graph_external_test_argv(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_path: &str, quiet: bool) -> str:
     var argv = ""
@@ -217,7 +203,10 @@ fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compil
     let js_dir = build_graph_rt_getenv("WITH_BUILD_JOBSERVER")
     let js_slots = build_graph_test_parse_jobs(build_graph_rt_getenv("WITH_BUILD_JOBSERVER_SLOTS"))
     let use_js = js_dir.len() > 0 and js_slots > 0
-    let jobs_limit = if use_js: 32 else: build_graph_test_jobs()
+    // With a jobserver every test past the lane's first holds a slot, so
+    // the slots bound an ordinary lane; a lane on the critical path takes
+    // none, and the machine's width bounds it.
+    let jobs_limit = build_graph_test_jobs()
     let slot_of: List[i32] = []
     let failed_paths: List[str] = []
     var first_failure: i32 = 0
