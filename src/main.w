@@ -5613,6 +5613,7 @@ fn run_migrate_command(argc: i32) -> i32:
     var source_path = ""
     var output_path = ""
     var exclude_basenames = ""
+    var unchecked_output = false
     // #2060: the C model — the target and the sysroot whose headers the
     // parse reads instead of the host's. Named together or not at all.
     var c_target = ""
@@ -5689,6 +5690,7 @@ fn run_migrate_command(argc: i32) -> i32:
             ai = ai + 1
             continue
         if arg == "--no-prelude":
+            unchecked_output = true
             migrate_set_prelude_free(1)
             ai = ai + 1
             continue
@@ -5716,6 +5718,7 @@ fn run_migrate_command(argc: i32) -> i32:
             ai = ai + 2
             continue
         if arg == "--shared-defs" and ai + 1 < argc:
+            unchecked_output = true
             migrate_set_shared_defs(with_arg_at(ai + 1))
             ai = ai + 2
             continue
@@ -5763,7 +5766,16 @@ fn run_migrate_command(argc: i32) -> i32:
         // Directory mode
         if output_path.len() == 0:
             output_path = source_path ++ "_migrated"
-        return migrate_c_directory(source_path, output_path, exclude_basenames)
+        let directory_rc = migrate_c_directory(source_path, output_path, exclude_basenames)
+        // #3344: a directory's output is checked as a file's is (#2781): it
+        // said "N functions translated" over files that did not compile. A
+        // corpus migrated into a std package (`--no-prelude`,
+        // `--shared-defs`) is checked by its own lane, in its package.
+        if directory_rc != 0 or unchecked_output: return directory_rc
+        var unchecked = 0
+        for name in with_fs_list_files(output_path).split("\n"):
+            if name.ends_with(".w") and migrate_apply_std_use_fixits(name) != 0: unchecked += 1
+        return (unchecked > 0) as i32
 
     // Single file mode — default output: replace .c with .w
     if output_path.len() == 0:
