@@ -10,7 +10,7 @@ use pre_d_build_runner
 
 fn main:
     let root = p7_prepare_case("migrate_fn_cast_is_unsafe", "fncast")
-    p7_write(root, "c/t.c", "typedef void (*nullary)(void);\nstruct data { int n; };\nstatic int hits;\nstatic void run_it(struct data *d) { hits = hits + d->n; }\nstruct test { nullary run; void *data; };\nstatic struct data the_data = { 3 };\nstruct test the_test = { (nullary)run_it, &the_data };\nint count(void) { nullary f = (nullary)run_it; (void)f; return hits; }\n")
+    p7_write(root, "c/t.c", "typedef void (*nullary)(void);\nstruct data { int n; };\nstatic int hits;\nstatic void run_it(struct data *d) { hits = hits + d->n; }\nstruct test { nullary run; void *data; };\nstatic struct data the_data = { 3 };\nstruct test the_test = { (nullary)run_it, &the_data };\nint count(void) { nullary f = (nullary)run_it; (void)f; ((void (*)(struct data *))the_test.run)(&the_data); return hits; }\n")
     assert(mkdir_p(root ++ "/w") == 0)
     let migrated = p7_run(root, "migrate", p7_argv_append(p7_argv_append(p7_argv_append(p7_argv_append("", "migrate"), "c/t.c"), "-o"), "w/t.w"))
     let said = migrated.stdout ++ migrated.stderr
@@ -19,4 +19,7 @@ fn main:
     let text = read_file(root ++ "/w/t.w") ?? ""
     assert(text.contains("run: Some(unsafe { (run_it as extern \"C\" fn() -> Unit) })"))
     assert(text.contains("= Some(unsafe { (run_it as extern \"C\" fn() -> Unit) })"))
+    // #3365 (D102): a stored, nullable function pointer cast back to its
+    // signature is unwrapped first; the `Option` has no cast to a function.
+    assert(text.contains(".run.unwrap() as unsafe extern \"C\" fn(*mut data) -> Unit)"))
     print("ok")
