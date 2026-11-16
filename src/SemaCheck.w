@@ -12821,6 +12821,12 @@ impl Sema:
                     self.note_raw_pointer_validity_precondition(self.ast.get_data0(node))
                     if self.require_unsafe_operation("raw pointer to safe memory abstraction conversion requires unsafe context", node) == false:
                         return 0 as TypeId
+                // #3365: an `Option` is not its payload. MIR and codegen have no
+                // cast from one to a function type: accepted here, it was
+                // "unsupported cast in MIR", a compiler error for the user.
+                if (cast_kind == TypeKind.TY_FN or cast_kind == TypeKind.TY_EXTERN_FN) and src_kind == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(src_resolved as i32) == self.syms.option:
+                    self.emit_error(f"cannot cast `{self.type_name(src_tid as i32)}` to the function type `{self.type_name(cast_tid as i32)}`: an `Option` is not its payload; unwrap it first", node)
+                    return cast_tid
                 // D198: a function value is called without `unsafe`, so the
                 // cast that makes one from an integer, a pointer or a function
                 // of another signature is where its address is trusted. An

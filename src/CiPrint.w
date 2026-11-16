@@ -858,7 +858,14 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         if exprs.kind(operand) == CiExprKind.CIE_SIZEOF_TYPE:
             let sizeof_ty = (exprs.get_d0(operand)) as CiTypeId
             return "(sizeof[" ++ ci_print_sizeof_type_text(ci_print_type(types, sizeof_ty)) ++ "]() as " ++ target_text ++ ")"
-        let converted = "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ " as " ++ target_text ++ ")"
+        let to_fn = target_text.starts_with("extern \"C\" fn(") or target_text.starts_with("fn(") or target_text.starts_with("unsafe extern \"C\" fn(") or target_text.starts_with("unsafe fn(")
+        // #3365 (D102): a nullable function pointer cast to a function type
+        // is its unwrapped value, cast: an `Option` has no cast to one, and
+        // a NULL where C would call it panics.
+        let operand_ty = exprs.get_type(operand)
+        let operand_text = if operand_ty != 0: ci_print_type(types, operand_ty) else: ""
+        let unwrapped = if to_fn and operand_text.starts_with("Option[") and operand_text.contains("fn("): ".unwrap()" else: ""
+        let converted = "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ unwrapped ++ " as " ++ target_text ++ ")"
         // D198 (§19.2): a function value is called without `unsafe`, so the
         // cast that makes one is where its address is trusted: C's
         // `(nullary)run_it` in a table of tests. Printed bare, in a body or a
