@@ -508,6 +508,12 @@ fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
             return "Unit"
         if ci_str_contains(name, "-> void"):
             return ci_str_replace(name, "-> void", "-> Unit")
+        // #3371 (§16.1): a C type With has no type for (a `long double`
+        // wider than a double) is named by the reason it has none. A body
+        // that holds a value of it has no rendering: the marker once
+        // reached the output as a type (`x as __UNSUPPORTED:…`), and a
+        // `let` that dropped its annotation computed the value as an f64.
+        if ci_starts_with_str(name, "__UNSUPPORTED:"): ci_print_note_unknown("a value of an unsupported type (" ++ name.slice(14, name.len()) ++ ")")
         return with_str_clone_ref(name)
     if kind == CiTypeKind.CT_FN_PTR:
         let ret = (types.get_d0(id)) as CiTypeId
@@ -1013,7 +1019,7 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
                     k = k + 1
                 return "[" ++ padded ++ "]"
             return "[" ++ items ++ "]"
-        let ty_text = ci_print_type(types, ty_id)
+        let ty_text = ci_print_type_unnoted(types, ty_id)
         // #1653: a typedef'd array (`typedef unsigned char uuid_t[16]`)
         // arrives as a named type whose text is `[16]u8`; it is an array all
         // the same, padded from the size in the text.
@@ -1054,7 +1060,7 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
             let value_id = (exprs.get_extra(start + i * 2 + 1)) as CiExprId
             fields = fields ++ exprs.get_string(name_idx) ++ ": " ++ ci_print_expr(exprs, types, value_id, 0, 0)
             i = i + 1
-        let ty_text = ci_print_type(types, ty_id)
+        let ty_text = ci_print_type_unnoted(types, ty_id)
         if ty_text.len() > 0 and ty_text != "i32" and not ci_starts_with_str(ty_text, "__UNSUPPORTED"):
             // D101 (#2214): a whole-record zero (C's `{0}`) is `T.zeroed()`;
             // the lowering refused any record that is not zero-valid.
@@ -1085,6 +1091,15 @@ var g_ci_print_unknowns: List[str] = List.new()
 
 fn ci_print_note_unknown(detail: &str):
     g_ci_print_unknowns.push(detail)
+
+/// A type's text for a caller that reads it and prints no type when it is
+/// unsupported (an initializer list, which then has no type prefix): what
+/// ci_print_type notes of an unsupported type is not this caller's.
+fn ci_print_type_unnoted(types: CiTypePool, id: CiTypeId) -> str:
+    let before = g_ci_print_unknowns.len()
+    let text = ci_print_type(types, id)
+    while g_ci_print_unknowns.len() > before: g_ci_print_unknowns.pop()
+    text
 
 /// The printer's unrenderable-node records since the last take; taking clears.
 fn ci_print_take_unknowns() -> List[str]:
@@ -1486,6 +1501,17 @@ fn ci_roundtrip_exprs -> i32:
     let recorded_text = if recorded.len() == 1: recorded[0] else: f"{recorded.len()} records"
     fails = fails + ci_expect_eq("expr_unknown_recorded", recorded_text, "expression kind 9999")
     fails = fails + ci_expect_eq("expr_unknown_taken", f"{ci_print_take_unknowns().len()}", "0")
+    // #3371: a type With has none for is recorded when its text is asked
+    // for, so the function that holds a value of it is refused; a caller
+    // that prints no type for it (an initializer list) records nothing.
+    let wide_ty = types.ty_named(types.add_string("__UNSUPPORTED:long double is wider than a double on this target"))
+    let wide_cast = exprs.cast(wide_ty, a)
+    let _wide_text = ci_print_expr(exprs, types, wide_cast, 0, 0)
+    let wide_recorded = ci_print_take_unknowns()
+    let wide_text = if wide_recorded.len() >= 1: wide_recorded[0] else: "no record"
+    fails = fails + ci_expect_eq("type_unsupported_recorded", wide_text, "a value of an unsupported type (long double is wider than a double on this target)")
+    let _quiet = ci_print_type_unnoted(types, wide_ty)
+    fails = fails + ci_expect_eq("type_unsupported_unnoted", f"{ci_print_take_unknowns().len()}", "0")
     fails = fails + ci_expect_eq("expr_array_pointer_deref", ci_print_expr(exprs, types, slot_deref, 0, 0), "(unsafe *(slots[0] as *const i32))")
     fails
 
