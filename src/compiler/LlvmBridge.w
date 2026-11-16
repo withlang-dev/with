@@ -34,6 +34,9 @@ let LLVM_FunctionValueKind: i32 = 5
 let LLVM_GlobalAliasValueKind: i32 = 6
 let LLVM_GlobalIFuncValueKind: i32 = 7
 let LLVM_GlobalVariableValueKind: i32 = 8
+let LLVM_UndefValueValueKind: i32 = 14
+let LLVM_ConstantPointerNullValueKind: i32 = 20
+let LLVM_PoisonValueValueKind: i32 = 25
 let LLVM_IntEQ: i32 = 32
 let LLVM_IntNE: i32 = 33
 let LLVM_IntUGT: i32 = 34
@@ -1343,8 +1346,18 @@ fn wl_build_insert_value(b: i64, agg: i64, val: i64, idx: i32) -> i64:
 // convention differs from the function's is undefined behavior in LLVM, and
 // a `@[callconv(…)]` function was declared with one its calls never carried
 // (#1025).
+//
+// #1119: a call has a target. Every call codegen emits is built here, so
+// this is where a target that was never resolved stops the compiler: no
+// value, `undef`, `poison` or the null pointer constant. LLVM's verifier
+// accepts `call undef(…)`, and one reached a binary when a default method
+// was skipped (the vtable slot was empty too).
 fn wl_build_call(b: i64, fn_ty: i64, fn_val: i64, args_ptr: i64, cnt: isize) -> i64:
     unsafe:
+        let target_kind = if fn_val == 0: LLVM_UndefValueValueKind else: LLVMGetValueKind(fn_val as *mut u8)
+        if target_kind == LLVM_UndefValueValueKind or target_kind == LLVM_PoisonValueValueKind or target_kind == LLVM_ConstantPointerNullValueKind:
+            eprint("internal compiler error: BUG: codegen built a call whose target is undefined (#1119)")
+            abort()
         let args = if cnt > 0: args_ptr as *const *mut u8 else: 0 as *const *mut u8
         let call = LLVMBuildCall2(b as *mut u8, fn_ty as *mut u8, fn_val as *mut u8, args, cnt as u32, empty_cstr())
         if LLVMIsAFunction(fn_val as *mut u8) != null:
