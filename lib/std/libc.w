@@ -164,8 +164,50 @@ pub fn lrintf(x: f32) -> i64: llrintf(x)
 // so one f64 form serves every width.
 pub fn isnan(x: f64) -> i32: (x != x) as i32
 pub fn isinf(x: f64) -> i32: (x == x and x - x != x - x) as i32
+// glibc's `isinf` is `__builtin_isinf_sign`: -1 for negative infinity, 1 for
+// positive, 0 otherwise.
+pub fn isinf_sign(x: f64) -> i32: isinf(x) * (1 - 2 * signbit(x))
 pub fn isfinite(x: f64) -> i32: (x - x == 0.0) as i32
 pub fn signbit(x: f64) -> i32: (copysign(1.0, x) < 0.0) as i32
+
+// math.h: what `fpclassify` answers on the target (the values the FP_*
+// macros expand to in the C text: Darwin 1..5, glibc and musl 0..4, mingw
+// bit flags).
+pub const FP_NAN: i32 = comptime match Target.os:
+    .Macos => 1
+    .Linux => 0
+    .Windows => 0x0100
+    .Wasi => 0
+pub const FP_INFINITE: i32 = comptime match Target.os:
+    .Macos => 2
+    .Linux => 1
+    .Windows => 0x0500
+    .Wasi => 1
+pub const FP_ZERO: i32 = comptime match Target.os:
+    .Macos => 3
+    .Linux => 2
+    .Windows => 0x4000
+    .Wasi => 2
+pub const FP_NORMAL: i32 = comptime match Target.os:
+    .Macos => 4
+    .Linux => 4
+    .Windows => 0x0400
+    .Wasi => 4
+pub const FP_SUBNORMAL: i32 = comptime match Target.os:
+    .Macos => 5
+    .Linux => 3
+    .Windows => 0x4400
+    .Wasi => 3
+
+fn fp_class(x: f64, smallest_normal: f64) -> i32:
+    if isnan(x) != 0: return FP_NAN
+    if isinf(x) != 0: return FP_INFINITE
+    if x == 0.0: return FP_ZERO
+    if (if x < 0.0: -x else: x) < smallest_normal: return FP_SUBNORMAL
+    FP_NORMAL
+
+pub fn fpclassify(x: f64) -> i32: fp_class(x, 2.2250738585072014e-308)
+pub fn fpclassifyf(x: f32) -> i32: fp_class(x, 1.1754943508222875e-38)
 
 // errno: C's lvalue macro reaches a per-libc accessor (Darwin `__error()`,
 // glibc `__errno_location()`, UCRT `_errno()`); migrated code derefs this.
