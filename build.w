@@ -2409,7 +2409,9 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     // the view cannot compile on this host is said and not judged.
     var measured = 0
     for row in fs.read_text("build/uncited-claims.tsv").split("\n"):
-        let cols = row.split("\t")
+        // A checkout with CRLF line ends leaves the count as `0\r`: on the
+        // Windows nightly every file "has 0 uncited claims and … records 0".
+        let cols = row.trim().split("\t")
         if cols.len() < 2 or row.starts_with("#"): continue
         let path = cols[0]
         let (_, view) = contract_view_run(ctx, root, compiler, path, out_dir, "uncited." ++ comp_path_basename(path) ++ ".stdout", "contract")
@@ -2885,7 +2887,10 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     reduce_args.push("{file}")
     let reduce_stdout = build_project_abs(root, build_project_join(out_dir, "reduce.stdout"))
     let reduce_stderr = build_project_abs(root, build_project_join(out_dir, "reduce.stderr"))
-    let reduce_result = ctx.process_runner().run_capture_cwd(reduce_args, reduce_stdout, reduce_stderr, 120000, root)
+    // A hang guard, not a budget: the reducer takes seconds alone and ran
+    // past 120 s beside the test lanes on the 4-core nightly runners (#3030,
+    // #3031), where this target took 265 s.
+    let reduce_result = ctx.process_runner().run_capture_cwd(reduce_args, reduce_stdout, reduce_stderr, 900000, root)
     if reduce_result.rc != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: reduce failed; stderr=" ++ reduce_stderr)
     let reduced_text = fs.read_text(reduce_output)
