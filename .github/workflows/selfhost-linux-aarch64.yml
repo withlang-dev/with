@@ -107,12 +107,10 @@ jobs:
           WITH: ${{ github.workspace }}/with-seed
         run: ./with-seed build :no-host-toolchain
 
-      # NOTE: the `build :test` green battery is deliberately NOT run here yet
-      # (#1149). On linux-aarch64 it fails 8 target groups (behavior-tests 7 of
-      # 948 files, the three cli-selfhost suites, both c-migrator suites,
-      # embedded-runtime-regression, emit-c-smoke) while build and fixpoint are
-      # green. #1149 fixes those and adds `src/main build :test` here, so this
-      # platform matches the other selfhost workflows.
+      # This lane is a dispatch tool for the build and the fixpoint. The
+      # platform's battery (`src/main build :test`) runs every night in
+      # nightly-release.yml's "Verify and package linux-aarch64" job, with
+      # the packages its facade tests need (#1149).
 
       # A red nightly is work, not a badge: it is filed (one open issue per
       # lane; a repeat comments) and fixed like any other bug.
