@@ -6381,6 +6381,26 @@ fn bs_check_migrate_c_model(ctx: &ActionCtx, compiler_path: &str, case_dir: &str
     if rc != 0: return rc
     bs_assert_not_contains(ctx, out_text, "model_hidden", "c_model")
 
+// #3371 (§16.1): where C's `long double` is wider than a double (x86_64
+// Linux) With has no float for it. A signature that passes one was refused;
+// a body that holds one (a cast, a local) was printed with the reason where
+// a type goes (`d as __UNSUPPORTED:…`). The function is refused, by name,
+// with the reason. Read through the model, so the case runs on every host.
+fn bs_check_migrate_wide_long_double(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "wide_long_double.c")
+    let sysroot = bs_join(case_dir, "model")
+    var rc = bs_write_fixture(ctx, bs_join(sysroot, "usr/include/model.h"), "#define MODEL 1\n", "a header of the model")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, src, "int cast(double d) { return (int)((long double)d * 2); }\nint held(double d) { long double w = d; return w > 1; }\nint narrow(double d) { return d > 1; }\n", "bodies that hold a long double")
+    if rc != 0: return rc
+    let args = ["migrate", bs_abs(root, src), "--c-target", "x86_64-unknown-linux-gnu", "--c-sysroot", bs_abs(root, sysroot), "--no-c-export", "-o", bs_abs(root, bs_join(case_dir, "wide_long_double.w"))]
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-wide-long-double", args, BS_HANG_GUARD_MS, case_dir)
+    if result.rc == 0: return bs_fail(ctx, "wide long double: the migration was expected to refuse the functions that hold one")
+    rc = bs_assert_contains(ctx, result.stderr, "untranslatable function 'cast': no rendering for a value of an unsupported type (long double is wider than a double on this target", "wide long double: a cast")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, result.stderr, "untranslatable function 'held': no rendering for a value of an unsupported type (long double is wider than a double on this target", "wide long double: a local")
+
 // #1838: an omitted return type is legal only when the rendered body's tail
 // infers Unit (D43). C's `(void)p` says "p is unused": a discarded pure read
 // is no statement, so it never becomes the tail that a fn-pointer return
@@ -6799,6 +6819,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_void_omits_unit(ctx, compiler_path, bs_join(output_dir, "void_omits_unit"))
     if rc != 0: return rc
     rc = bs_check_migrate_c_model(ctx, compiler_path, bs_join(output_dir, "c_model"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_wide_long_double(ctx, compiler_path, bs_join(output_dir, "wide_long_double"))
     if rc != 0: return rc
     rc = bs_check_migrate_void_tail_is_unit(ctx, compiler_path, bs_join(output_dir, "void_tail_is_unit"))
     if rc != 0: return rc
