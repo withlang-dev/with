@@ -5716,6 +5716,149 @@ impl Sema:
                     else if not tail_to_option and not self.note_int_local_arg_demand(tail_leaf, body_expected_ret as i32, body_ty as i32):
                         self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
 
+    // #1827 (§2.4): a `return` drops every binding of its body, which begin
+    // here. Returns the enclosing body's start, for the caller to restore.
+    mut fn begin_body_bindings() -> i32:
+        let outer = self.current_fn_bind_start
+        self.current_fn_bind_start = self.bind_names.len() as i32
+        outer
+
+    // The body of a function checked under its return demand: the tail's
+    // context (D43, §4.9a), the drops at the body's end (#1827), the
+    // move-site liveness of its transfers and what the returned tail does
+    // (check_body_result). One owner (#3360): a declared function and an
+    // inherited default method are both checked here. The caller has pushed
+    // the body's scope and bound its parameters; `outer_bind_start` is the
+    // enclosing body's binding start, restored once this body's drops are
+    // noted.
+    mut fn check_body_under_return(body: i32, body_expected_ret: TypeId, ret_type: i32, has_ret_annotation: bool, is_entry: bool, fn_name: i32, outer_bind_start: i32) -> BodyResult:
+        let saved_expected_et = self.expected_expr_type
+        let saved_has_et = self.has_expected_type
+        let saved_body_value_root = self.current_value_expr_root
+        // A body checked on demand (D43: a callee with an inferred return is
+        // typed before its caller) starts with no expectation of its own: the
+        // caller's leaked into it, and an unsafe fn's brace body — one `if`
+        // under the unsafe node, which propagates an expectation — was refused
+        // as a value if without else (stc's cstr_drop).
+        self.has_expected_type = 0
+        self.expected_expr_type = 0 as TypeId
+        self.current_value_expr_root = 0
+        // Nor the caller's statement position (#3077): a generic `next`
+        // demanded by a `for` statement had its tail `match` checked as a
+        // statement, so its `None` arm, undemanded, resolved to whichever
+        // enum last declared a `None` variant and the body was refused.
+        let saved_match_stmt_pos = self.match_in_stmt_pos
+        let saved_stmt_pos_depth = self.stmt_pos_depth
+        self.match_in_stmt_pos = 0
+        self.stmt_pos_depth = 0
+        let saved_loop_depth = self.loop_depth
+        self.loop_depth = 0
+        let saved_label_registry = self.save_label_registry()
+        self.reset_label_registry()
+        self.collect_function_labels(body)
+        self.validate_function_gotos()
+        self.push_label_boundary()
+        let saved_drop_type_sym = self.current_drop_type_sym
+        let saved_drop_control_flow_depth = self.drop_control_flow_depth
+        self.current_drop_type_sym = self.drop_owner_for_fn_symbol(fn_name)
+        self.drop_control_flow_depth = 0
+        // move-sites (deep-debugging-tools.md): per-body use sequencing for
+        // the transfer-site liveness verdict. Sites recorded during this body
+        // are stamped at body end, once every use has been seen. Bodies are
+        // separated by an epoch stamped into every entry — one persistent map,
+        // one owner, no per-body header swapping.
+        let saved_use_epoch = self.binding_use_epoch
+        self.binding_use_epoch = self.binding_epoch_counter + 1
+        self.binding_epoch_counter = self.binding_epoch_counter + 1
+        let body_site_start = self.consume_call_sites.len()
+        if body_expected_ret != 0 and body_expected_ret != self.ty_void:
+            self.expected_expr_type = body_expected_ret
+            self.has_expected_type = 1
+            self.current_value_expr_root = body
+        // D43: with no annotation (and no trait contract) the function
+        // inherits its tail's type. Entry points have a fixed contract.
+        let saved_infer_tail = self.infer_tail_node
+        let saved_infer_closure = self.infer_tail_is_closure
+        self.infer_tail_node = if body_expected_ret == 0 and not is_entry: body else: 0
+        self.infer_tail_is_closure = 0
+        let saved_body_tail_block = self.body_tail_block
+        let saved_body_tail_holder = self.body_tail_holder
+        let saved_body_tail_discards = self.body_tail_discards
+        let saved_body_tail_is_statement = self.body_tail_is_statement
+        let source_body = self.fn_body_inner(body)
+        self.body_tail_block = source_body
+        self.body_tail_holder = self.body_tail_holder_of(source_body)
+        // §9.1: an entry point's tail is statement position, whatever it is.
+        let body_tail_is_statement = is_entry
+        self.body_tail_is_statement = body_tail_is_statement
+        // §9.1 / D60: under a declared non-Unit return the body's tail
+        // assignment is its value; with no annotation (D43) or `-> Unit` it
+        // is a statement.
+        let body_tail_discards = body_expected_ret == 0 or body_expected_ret == self.ty_void
+        self.body_tail_discards = body_tail_discards
+        // D43: `-> Unit` makes the tail statement position in every body
+        // spelling (#1711). check_block checks a block body's tail as a
+        // statement; a single-statement body is that tail, so it is checked
+        // the same way — checked as a value, a tail `match` joined its arms
+        // and an arm's else-less `if` was refused as an expression.
+        let unit_body_stmt = body_expected_ret == self.ty_void and self.ast.kind(source_body) != NodeKind.NK_BLOCK
+        let checked_body_ty = if unit_body_stmt: self.check_expr_statement_context(body) else: self.check_expr(body)
+        // #1827 (§2.4): the parameters drop when the body ends, its value
+        // outliving them; the value's temporaries drop there too, and the
+        // value itself unless the body returns it (not `-> Unit`, not an
+        // entry point's statement tail, D43).
+        // §9.1: a single-statement assignment body is discarded exactly when
+        // check_block discards the body block's assignment tail.
+        let body_discarded = self.discard_body_tail(source_body, body_tail_discards, body_tail_is_statement) != 0
+        let body_value = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
+        self.note_statement_temporary_drops(body_value, body_expected_ret != self.ty_void as i32 and not body_tail_is_statement and not body_discarded, false)
+        // A discarded tail (an assignment under D43's inferred `Unit`, an
+        // entry point's) is no value: nothing of it outlives the drops.
+        let body_views: List[i32] = []
+        if body_value != 0 and body_expected_ret != self.ty_void as i32 and not body_discarded and not self.tail_value_discarded(body_value) and self.expr_views_global(body_value):
+            body_views.push(body_value)
+        self.note_scope_exit_drops(source_body, GLOBAL_SITE_SCOPE_DROP, self.current_fn_bind_start, body_views, false)
+        self.current_fn_bind_start = outer_bind_start
+        self.body_tail_block = saved_body_tail_block
+        self.body_tail_holder = saved_body_tail_holder
+        self.body_tail_discards = saved_body_tail_discards
+        self.body_tail_is_statement = saved_body_tail_is_statement
+        let body_ty = if body_discarded: self.ty_void else: checked_body_ty
+        self.infer_tail_node = saved_infer_tail
+        self.infer_tail_is_closure = saved_infer_closure
+        self.stamp_move_site_liveness(body_site_start)
+        self.binding_use_epoch = saved_use_epoch
+        self.current_drop_type_sym = saved_drop_type_sym
+        self.drop_control_flow_depth = saved_drop_control_flow_depth
+        self.pop_label_frame()
+        self.emit_unused_label_warnings()
+        self.restore_label_registry(saved_label_registry)
+        self.loop_depth = saved_loop_depth
+        self.match_in_stmt_pos = saved_match_stmt_pos
+        self.stmt_pos_depth = saved_stmt_pos_depth
+        self.current_value_expr_root = saved_body_value_root
+        self.expected_expr_type = saved_expected_et
+        self.has_expected_type = saved_has_et
+        // A single-statement entry body discarded as a statement keeps its
+        // own type (#1786), as check_block keeps a block's statement tail's.
+        let body_keeps_type = body_ty == self.ty_void and body_tail_is_statement and self.expr_is_assignment(source_body) == 0
+        self.typed_expr_types.insert(body, (if body_keeps_type: checked_body_ty else: body_ty) as i32)
+        // §9.1 / D60: an assignment the body returns yields a read of its
+        // place. Under a `Unit` return (declared, or a trait's contract, as
+        // for `drop`) the tail is a statement: nothing is returned or read.
+        self.record_returned_tail_reads(body, if body_expected_ret != 0: body_expected_ret as i32 else: body_ty as i32, body_ty as i32)
+        // D32 (§2.2): returns do not all route through mark_moved_if_consumed,
+        // so check the returned tail explicitly — a bare non-Copy field here
+        // is an implicit field move and errors at the move site. Unannotated
+        // fns have no ret_type yet; the checked body's own type is the demand
+        // (`move fn finish(): self.text` escaped through the gap).
+        // #1395: an unannotated fn's signature still reads Unit here (D43
+        // sets the inferred return below), so key on the annotation, not on
+        // ret_type == 0 — that test never fired and `mut fn r(c: bool): if c:
+        // self.p else: ""` vacated the receiver's field.
+        let body_materializes_copy = self.check_body_result(body, source_body, body_ty, body_expected_ret, ret_type, has_ret_annotation, is_entry)
+        BodyResult { ty: body_ty, materializes_copy: body_materializes_copy }
+
     mut fn check_fn_body_with_sig_at(node: i32, sig_idx: i32, decl_index: i32):
         let demands_start = self.int_local_demands.len()
         let diags_start = self.diags.items.len()
@@ -6018,8 +6161,7 @@ impl Sema:
         // Push function scope
         self.push_scope()
         // #1827: a `return` drops every binding from here (§2.4).
-        let saved_fn_bind_start = self.current_fn_bind_start
-        self.current_fn_bind_start = self.bind_names.len() as i32
+        let saved_fn_bind_start = self.begin_body_bindings()
 
         // `Self` in the body is the method's own declaration, resolved from
         // the body's module: collect_fn_decl binds it for the signature and
@@ -6201,131 +6343,9 @@ impl Sema:
         // Check body — set expected type to return type for tail expression resolution.
         // For async functions, use the unwrapped body return type (T, not Task[T]).
         let body_expected_ret = self.current_return_type
-        let saved_expected_et = self.expected_expr_type
-        let saved_has_et = self.has_expected_type
-        let saved_body_value_root = self.current_value_expr_root
-        // A body checked on demand (D43: a callee with an inferred return is
-        // typed before its caller) starts with no expectation of its own: the
-        // caller's leaked into it, and an unsafe fn's brace body — one `if`
-        // under the unsafe node, which propagates an expectation — was refused
-        // as a value if without else (stc's cstr_drop).
-        self.has_expected_type = 0
-        self.expected_expr_type = 0 as TypeId
-        self.current_value_expr_root = 0
-        // Nor the caller's statement position (#3077): a generic `next`
-        // demanded by a `for` statement had its tail `match` checked as a
-        // statement, so its `None` arm, undemanded, resolved to whichever
-        // enum last declared a `None` variant and the body was refused.
-        let saved_match_stmt_pos = self.match_in_stmt_pos
-        let saved_stmt_pos_depth = self.stmt_pos_depth
-        self.match_in_stmt_pos = 0
-        self.stmt_pos_depth = 0
-        let saved_loop_depth = self.loop_depth
-        self.loop_depth = 0
-        let saved_label_registry = self.save_label_registry()
-        self.reset_label_registry()
-        self.collect_function_labels(body)
-        self.validate_function_gotos()
-        self.push_label_boundary()
-        let saved_drop_type_sym = self.current_drop_type_sym
-        let saved_drop_control_flow_depth = self.drop_control_flow_depth
-        self.current_drop_type_sym = self.drop_owner_for_fn_symbol(fn_name)
-        self.drop_control_flow_depth = 0
-        // move-sites (deep-debugging-tools.md): per-body use sequencing for
-        // the transfer-site liveness verdict. Sites recorded during this body
-        // are stamped at body end, once every use has been seen. Bodies are
-        // separated by an epoch stamped into every entry — one persistent map,
-        // one owner, no per-body header swapping.
-        let saved_use_epoch = self.binding_use_epoch
-        self.binding_use_epoch = self.binding_epoch_counter + 1
-        self.binding_epoch_counter = self.binding_epoch_counter + 1
-        let body_site_start = self.consume_call_sites.len()
-        if body_expected_ret != 0 and body_expected_ret != self.ty_void:
-            self.expected_expr_type = body_expected_ret
-            self.has_expected_type = 1
-            self.current_value_expr_root = body
-        // D43: with no annotation (and no trait contract) the function
-        // inherits its tail's type. Entry points have a fixed contract.
-        let saved_infer_tail = self.infer_tail_node
-        let saved_infer_closure = self.infer_tail_is_closure
-        self.infer_tail_node = if body_expected_ret == 0 and self.fn_decl_is_entry_point(node) == 0: body else: 0
-        self.infer_tail_is_closure = 0
-        let saved_body_tail_block = self.body_tail_block
-        let saved_body_tail_holder = self.body_tail_holder
-        let saved_body_tail_discards = self.body_tail_discards
-        let saved_body_tail_is_statement = self.body_tail_is_statement
-        let source_body = self.fn_body_inner(body)
-        self.body_tail_block = source_body
-        self.body_tail_holder = self.body_tail_holder_of(source_body)
-        // §9.1: an entry point's tail is statement position, whatever it is.
-        let body_tail_is_statement = self.fn_decl_is_entry_point(node) != 0
-        self.body_tail_is_statement = body_tail_is_statement
-        // §9.1 / D60: under a declared non-Unit return the body's tail
-        // assignment is its value; with no annotation (D43) or `-> Unit` it
-        // is a statement.
-        let body_tail_discards = body_expected_ret == 0 or body_expected_ret == self.ty_void
-        self.body_tail_discards = body_tail_discards
-        // D43: `-> Unit` makes the tail statement position in every body
-        // spelling (#1711). check_block checks a block body's tail as a
-        // statement; a single-statement body is that tail, so it is checked
-        // the same way — checked as a value, a tail `match` joined its arms
-        // and an arm's else-less `if` was refused as an expression.
-        let unit_body_stmt = body_expected_ret == self.ty_void and self.ast.kind(source_body) != NodeKind.NK_BLOCK
-        let checked_body_ty = if unit_body_stmt: self.check_expr_statement_context(body) else: self.check_expr(body)
-        // #1827 (§2.4): the parameters drop when the body ends, its value
-        // outliving them; the value's temporaries drop there too, and the
-        // value itself unless the body returns it (not `-> Unit`, not an
-        // entry point's statement tail, D43).
-        // §9.1: a single-statement assignment body is discarded exactly when
-        // check_block discards the body block's assignment tail.
-        let body_discarded = self.discard_body_tail(source_body, body_tail_discards, body_tail_is_statement) != 0
-        let body_value = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
-        self.note_statement_temporary_drops(body_value, body_expected_ret != self.ty_void as i32 and not body_tail_is_statement and not body_discarded, false)
-        // A discarded tail (an assignment under D43's inferred `Unit`, an
-        // entry point's) is no value: nothing of it outlives the drops.
-        let body_views: List[i32] = []
-        if body_value != 0 and body_expected_ret != self.ty_void as i32 and not body_discarded and not self.tail_value_discarded(body_value) and self.expr_views_global(body_value):
-            body_views.push(body_value)
-        self.note_scope_exit_drops(source_body, GLOBAL_SITE_SCOPE_DROP, self.current_fn_bind_start, body_views, false)
-        self.current_fn_bind_start = saved_fn_bind_start
-        self.body_tail_block = saved_body_tail_block
-        self.body_tail_holder = saved_body_tail_holder
-        self.body_tail_discards = saved_body_tail_discards
-        self.body_tail_is_statement = saved_body_tail_is_statement
-        let body_ty = if body_discarded: self.ty_void else: checked_body_ty
-        self.infer_tail_node = saved_infer_tail
-        self.infer_tail_is_closure = saved_infer_closure
-        self.stamp_move_site_liveness(body_site_start)
-        self.binding_use_epoch = saved_use_epoch
-        self.current_drop_type_sym = saved_drop_type_sym
-        self.drop_control_flow_depth = saved_drop_control_flow_depth
-        self.pop_label_frame()
-        self.emit_unused_label_warnings()
-        self.restore_label_registry(saved_label_registry)
-        self.loop_depth = saved_loop_depth
-        self.match_in_stmt_pos = saved_match_stmt_pos
-        self.stmt_pos_depth = saved_stmt_pos_depth
-        self.current_value_expr_root = saved_body_value_root
-        self.expected_expr_type = saved_expected_et
-        self.has_expected_type = saved_has_et
-        // A single-statement entry body discarded as a statement keeps its
-        // own type (#1786), as check_block keeps a block's statement tail's.
-        let body_keeps_type = body_ty == self.ty_void and body_tail_is_statement and self.expr_is_assignment(source_body) == 0
-        self.typed_expr_types.insert(body, (if body_keeps_type: checked_body_ty else: body_ty) as i32)
-        // §9.1 / D60: an assignment the body returns yields a read of its
-        // place. Under a `Unit` return (declared, or a trait's contract, as
-        // for `drop`) the tail is a statement: nothing is returned or read.
-        self.record_returned_tail_reads(body, if body_expected_ret != 0: body_expected_ret as i32 else: body_ty as i32, body_ty as i32)
-        // D32 (§2.2): returns do not all route through mark_moved_if_consumed,
-        // so check the returned tail explicitly — a bare non-Copy field here
-        // is an implicit field move and errors at the move site. Unannotated
-        // fns have no ret_type yet; the checked body's own type is the demand
-        // (`move fn finish(): self.text` escaped through the gap).
-        // #1395: an unannotated fn's signature still reads Unit here (D43
-        // sets the inferred return below), so key on the annotation, not on
-        // ret_type == 0 — that test never fired and `mut fn r(c: bool): if c:
-        // self.p else: ""` vacated the receiver's field.
-        let body_materializes_copy = self.check_body_result(body, source_body, body_ty, body_expected_ret, ret_type, has_ret_annotation, self.fn_decl_is_entry_point(node) != 0)
+        let checked = self.check_body_under_return(body, body_expected_ret, ret_type, has_ret_annotation, self.fn_decl_is_entry_point(node) != 0, fn_name, saved_fn_bind_start)
+        let body_ty = checked.ty
+        let body_materializes_copy = checked.materializes_copy
         if not has_ret_annotation:
             // §14.4: calling an `async fn` returns a `Task[T]` handle; the body
             // yields the T. An annotated signature is wrapped at declaration
@@ -6751,6 +6771,8 @@ impl Sema:
         let saved_receiver_field_owner = self.receiver_field_owner
         self.receiver_field_owner = 0
         self.push_scope()
+        // #1827: a `return` drops every binding from here (§2.4).
+        let saved_fn_bind_start = self.begin_body_bindings()
         let param_start: i32 = self.trait_method_param_starts[method_idx]
         let param_count = self.trait_method_param_counts[method_idx]
         for pi in 0..param_count:
@@ -6776,16 +6798,15 @@ impl Sema:
         // is `Self` was two impls' decisions recorded for one context.
         let saved_default_sig_idx = self.current_fn_sig_idx
         self.current_fn_sig_idx = sig_idx
-        let body_ty = self.check_expr_with_expected(body, ret_tid as TypeId)
+        // #3360: the body is checked as any function's is (one owner): the
+        // tail under the declared return (the implicit `Ok` MIR reads, a `T`
+        // under `Option[T]`, falling off a `Result[Unit, E]`), the drops at
+        // its end, its transfers' liveness, and what the returned tail does.
+        // A trait method's return is its contract, written or `Unit`.
+        let checked = self.check_body_under_return(body, ret_tid as TypeId, ret_tid, true, false, fn_sym, saved_fn_bind_start)
         self.current_fn_sig_idx = saved_default_sig_idx
         self.current_effect_body = saved_effect_body
-        self.typed_expr_types.insert(body, body_ty as i32)
-        // #3360: the declared return type is a demand on the tail here as in
-        // any function: the implicit `Ok` (which MIR reads), the `Option`
-        // tail, falling off a `Result[Unit, E]`. The returned tail's effects
-        // and origins (check_body_result) are still this check's own.
-        self.note_option_tail_demand(body, ret_tid as TypeId, body_ty)
-        self.check_annotated_body_result(body, body_ty, ret_tid as TypeId, ret_tid != 0 and self.can_contextually_copy_ref(ret_tid, body_ty as i32), sig_idx)
+        self.check_annotated_body_result(body, checked.ty, ret_tid as TypeId, checked.materializes_copy, sig_idx)
 
         self.pop_scope()
         if saved_self != 0:
@@ -27100,8 +27121,7 @@ impl Sema:
 
         self.push_scope()
         // #1827: a `return` in the closure drops the closure's bindings.
-        let saved_closure_bind_start = self.current_fn_bind_start
-        self.current_fn_bind_start = self.bind_names.len() as i32
+        let saved_closure_bind_start = self.begin_body_bindings()
         // The parameter types are collected first and written to type_extra
         // after the loop: resolving an annotation can itself append to
         // type_extra (a new generic instance records its arguments there), and
