@@ -158,7 +158,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
         var __ci_expr_logic_1: i32 = 0
 
         if ((*__local_str) == (*__param_needle)) {
-            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), ((__param_nlen as u64) as i64)): 1 else: 0))
         }
 
         if __ci_expr_logic_1 {
@@ -185,7 +185,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 pub unsafe fn _cco_new_fiber(__param_task: *mut cco_task, __param_data: *mut c_void) -> *mut cco_task_fiber {
     var __local_new_fb: *mut cco_task_fiber = with 0 as __ci_expr_seq_5 {
         var __ci_expr_lit_0: [cco_task_fiber; 1] = [cco_task_fiber { task: __param_task, data: __param_data, recover_state: cco_task_state.zeroed(), error_: cco_err_t.zeroed() }]
-        (c_safe_memcpy((with_alloc((((if true: (sizeof[cco_task_fiber]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void), (&__ci_expr_lit_0[0] as *mut cco_task_fiber), (sizeof[cco_task_fiber]() as i64)) as *mut cco_task_fiber)
+        (c_safe_memcpy((with_alloc((((sizeof[cco_task_fiber]() as i64) as u64) as i64)) as *mut c_void), (&__ci_expr_lit_0[0] as *mut cco_task_fiber), (sizeof[cco_task_fiber]() as i64)) as *mut cco_task_fiber)
     }
 
     ((*__local_new_fb).next = __local_new_fb)
@@ -203,7 +203,7 @@ pub unsafe fn _cco_spawn(__param_task: *mut cco_task, __param_grp: *mut cco_grou
         var __ci_expr_ternary_1: *mut cco_task_fiber = null
         if ((*__param_fib).next != null) {
             var __ci_expr_lit_0: [cco_task_fiber; 1] = [cco_task_fiber { next: (*__param_fib).next, parent: __param_fib, recover_state: cco_task_state.zeroed(), error_: cco_err_t.zeroed() }]
-            (__ci_expr_ternary_1 = ((c_safe_memcpy((with_alloc((((if true: (sizeof[cco_task_fiber]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void), (&__ci_expr_lit_0[0] as *mut cco_task_fiber), (sizeof[cco_task_fiber]() as i64)) as *mut cco_task_fiber)))
+            (__ci_expr_ternary_1 = ((c_safe_memcpy((with_alloc((((sizeof[cco_task_fiber]() as i64) as u64) as i64)) as *mut c_void), (&__ci_expr_lit_0[0] as *mut cco_task_fiber), (sizeof[cco_task_fiber]() as i64)) as *mut cco_task_fiber)))
         } else {
             (__ci_expr_ternary_1 = __param_fib)
         }

@@ -161,7 +161,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
         var __ci_expr_logic_1: i32 = 0
 
         if ((*__local_str) == (*__param_needle)) {
-            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), ((__param_nlen as u64) as i64)): 1 else: 0))
         }
 
         if __ci_expr_logic_1 {
@@ -315,13 +315,12 @@ unsafe fn cutf8_subview(__param_s: *const c_char, __param_u8pos: i64, __param_u8
 }
 
 unsafe fn cutf8_decode(__param_d: *mut cutf8_decode_t, __param_byte: u32) -> u32 {
-    var __local_cutf8_dtab: []u8
 
-    var __local_type_: u32 = ((__local_cutf8_dtab[__param_byte] as u32))
+    var __local_type_: u32 = ((cutf8_dtab[__param_byte] as u32))
 
     ((*__param_d).codep = (((if (*__param_d).state: (((((__param_byte as u32) & (63 as u32)) as u32) | ((((*__param_d).codep as u32) << (6 as u32)) as u32)) as u32) else: (((((255 as u32) >> (__local_type_ as u32)) as u32) & (__param_byte as u32)) as u32)) as u32)))
 
-    ((*__param_d).state = ((__local_cutf8_dtab[((((256 as u32) +% ((*__param_d).state as u32)) as u32) +% (__local_type_ as u32))] as u32)))
+    ((*__param_d).state = ((cutf8_dtab[((((256 as u32) +% ((*__param_d).state as u32)) as u32) +% (__local_type_ as u32))] as u32)))
 
     return (*__param_d).state
 
@@ -708,7 +707,7 @@ pub fn csview_equals_sv(__param_sv1: csview, __param_sv2: csview) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
     if ((unsafe *(&raw const __param_sv1 as *const csview)).size == (unsafe *(&raw const __param_sv2 as *const csview)).size) {
-        (__ci_expr_logic_0 = (if not with_memcmp((((unsafe *(&raw const __param_sv1 as *const csview)).buf as *const c_void) as *const u8), (((unsafe *(&raw const __param_sv2 as *const csview)).buf as *const c_void) as *const u8), (((if true: (unsafe *(&raw const __param_sv1 as *const csview)).size else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+        (__ci_expr_logic_0 = (if not with_memcmp((((unsafe *(&raw const __param_sv1 as *const csview)).buf as *const c_void) as *const u8), (((unsafe *(&raw const __param_sv2 as *const csview)).buf as *const c_void) as *const u8), (((unsafe *(&raw const __param_sv1 as *const csview)).size as u64) as i64)): 1 else: 0))
     }
 
     return (((__ci_expr_logic_0 != 0) as bool))
@@ -754,7 +753,7 @@ pub unsafe fn csview_starts_with(__param_sv: csview, __param_str: *const c_char)
     var __ci_expr_logic_0: i32 = 0
 
     if (__local_n <= (*(&raw const __param_sv as *const csview)).size) {
-        (__ci_expr_logic_0 = (if not with_memcmp((((*(&raw const __param_sv as *const csview)).buf as *const c_void) as *const u8), ((__param_str as *const c_void) as *const u8), (((if true: __local_n else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+        (__ci_expr_logic_0 = (if not with_memcmp((((*(&raw const __param_sv as *const csview)).buf as *const c_void) as *const u8), ((__param_str as *const c_void) as *const u8), ((__local_n as u64) as i64)): 1 else: 0))
     }
 
     return (((__ci_expr_logic_0 != 0) as bool))
@@ -769,7 +768,7 @@ pub unsafe fn csview_ends_with(__param_sv: csview, __param_str: *const c_char) -
     var __ci_expr_logic_0: i32 = 0
 
     if (__local_n <= (*(&raw const __param_sv as *const csview)).size) {
-        (__ci_expr_logic_0 = (if not with_memcmp((((((*(&raw const __param_sv as *const csview)).buf + (((*(&raw const __param_sv as *const csview)).size as i64) as usize)) - ((__local_n as i64) as usize)) as *const c_void) as *const u8), ((__param_str as *const c_void) as *const u8), (((if true: __local_n else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+        (__ci_expr_logic_0 = (if not with_memcmp((((((*(&raw const __param_sv as *const csview)).buf + (((*(&raw const __param_sv as *const csview)).size as i64) as usize)) - ((__local_n as i64) as usize)) as *const c_void) as *const u8), ((__param_str as *const c_void) as *const u8), ((__local_n as u64) as i64)): 1 else: 0))
     }
 
     return (((__ci_expr_logic_0 != 0) as bool))
@@ -891,7 +890,7 @@ pub fn csview_u8_valid(__param_sv: csview) -> bool {
 pub unsafe fn csview_cmp(__param_x: *const csview, __param_y: *const csview) -> i32 {
     var __local_n: i64 = (((if (*__param_x).size < (*__param_y).size: (*__param_x).size else: (*__param_y).size) as i64))
 
-    var __local_c: i32 = ((with_memcmp((((*__param_x).buf as *const c_void) as *const u8), (((*__param_y).buf as *const c_void) as *const u8), (((if true: __local_n else: (-1 as i64)) as u64) as i64)) as i32))
+    var __local_c: i32 = ((with_memcmp((((*__param_x).buf as *const c_void) as *const u8), (((*__param_y).buf as *const c_void) as *const u8), ((__local_n as u64) as i64)) as i32))
 
     return (if __local_c: __local_c else: (((if (*(&raw const (*__param_y).size as *const i64)) < (*(&raw const (*__param_x).size as *const i64)): 1 else: 0) - (if (*(&raw const (*__param_x).size as *const i64)) < (*(&raw const (*__param_y).size as *const i64)): 1 else: 0)) as i32))
 
@@ -902,7 +901,7 @@ pub unsafe fn csview_eq(__param_x: *const csview, __param_y: *const csview) -> b
     var __ci_expr_logic_0: i32 = 0
 
     if ((*__param_x).size == (*__param_y).size) {
-        (__ci_expr_logic_0 = (if not with_memcmp((((*__param_x).buf as *const c_void) as *const u8), (((*__param_y).buf as *const c_void) as *const u8), (((if true: (*__param_x).size else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+        (__ci_expr_logic_0 = (if not with_memcmp((((*__param_x).buf as *const c_void) as *const u8), (((*__param_y).buf as *const c_void) as *const u8), (((*__param_x).size as u64) as i64)): 1 else: 0))
     }
 
     return (((__ci_expr_logic_0 != 0) as bool))
