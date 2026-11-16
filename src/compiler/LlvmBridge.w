@@ -1448,6 +1448,39 @@ fn wl_verify_module(m: i64) -> i32:
             LLVMDisposeMessage(err)
         result
 
+extern fn LLVMSetSection(value: *mut u8, section: *const u8)
+extern fn LLVMGetSection(value: *mut u8) -> *const u8
+
+// On ELF every function has a section of its own (what `-ffunction-sections`
+// does). The linker's `--gc-sections` drops whole sections: in one shared
+// `.text` a function nothing calls stayed, with its references, and its
+// call of an extern no object defines was an undefined symbol at link (a
+// program that imports a module for one function; the Linux nightly's
+// link_rpath_args_test, #3030). Darwin's `-dead_strip` already works a
+// function at a time. A function that names its section keeps it.
+fn llvm_section_per_function(m: *mut u8):
+    unsafe:
+        let triple = LLVMGetTarget(m)
+        var linux = false
+        var at: i64 = 0
+        while triple as i64 != 0 and *((triple as i64 + at) as *const u8) != 0:
+            if *((triple as i64 + at) as *const u8) == 'l' and *((triple as i64 + at + 1) as *const u8) == 'i' and *((triple as i64 + at + 2) as *const u8) == 'n' and *((triple as i64 + at + 3) as *const u8) == 'u' and *((triple as i64 + at + 4) as *const u8) == 'x': linux = true
+            at = at + 1
+        if not linux: return
+        var f = LLVMGetFirstFunction(m)
+        while f as i64 != 0:
+            let named = LLVMGetSection(f)
+            if LLVMIsDeclaration(f) == 0 and (named as i64 == 0 or *named == 0):
+                var len: u64 = 0
+                let name = LLVMGetValueName2(f, &raw mut len)
+                let section = with_alloc(len as i64 + 7)
+                with_memcpy(section, c".text.".ptr as *const u8, 6)
+                with_memcpy((section as i64 + 6) as *mut u8, name, len as i64)
+                *((section as i64 + 6 + len as i64) as *mut u8) = 0
+                LLVMSetSection(f, section as *const u8)
+                with_free(section)
+            f = LLVMGetNextFunction(f)
+
 fn wl_emit_object(tm: i64, m: i64, path: &str) -> i32:
     unsafe:
         if tm == 0:
@@ -1464,6 +1497,7 @@ fn wl_emit_object(tm: i64, m: i64, path: &str) -> i32:
         with_memcpy(&path_buf as *mut u8, sp, n)
         path_buf[n] = 0
         let err = 0 as *mut u8
+        llvm_section_per_function(m as *mut u8)
         let result = LLVMTargetMachineEmitToFile(tm as *mut u8, m as *mut u8, &path_buf as *mut u8, LLVM_ObjectFile, &raw mut err)
         if result != 0 and err as i64 != 0:
             let msg = "LLVM emit error\n"
@@ -1858,6 +1892,7 @@ fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple
         let out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
         let emit_err = 0 as *mut u8
+        llvm_section_per_function(m)
         let rc = LLVMTargetMachineEmitToFile(tm, m, out_cstr as *mut u8, LLVM_ObjectFile, &raw mut emit_err)
         if rc != 0 and emit_err as i64 != 0:
             rt_write(2, "error: assembly emit failed\n" as *const u8, 28)
@@ -1935,6 +1970,7 @@ fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
         let out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
         let emit_err = 0 as *mut u8
+        llvm_section_per_function(m)
         let rc = LLVMTargetMachineEmitToFile(tm, m, out_cstr as *mut u8, LLVM_ObjectFile, &raw mut emit_err)
         if rc != 0 and emit_err as i64 != 0:
             rt_write(2, "error: IR emit failed\n" as *const u8, 21)

@@ -1,6 +1,7 @@
 //! expect-stdout: ok
 
 use pre_d_build_runner
+use std.os.Target
 
 // A scenario that cannot run is not a pass (Eric, 2026-11-11). `with uat`
 // skips a scenario whose requirement this host does not meet; under
@@ -11,7 +12,10 @@ use pre_d_build_runner
 fn main:
     let dir = p7_prepare_case("uat_strict_blocked_scenario", "uat_strict")
     p7_write(dir, "uat/needs.uat", "scenario: needs something this host lacks\nrequires: env WITH_UAT_TEST_NEVER_SET\n\nrun: with --version\n")
-    p7_write(dir, "uat/elsewhere.uat", "scenario: for another platform\nplatforms: windows-x86_64, linux-x86_64\n\nrun: with --version\n")
+    // A platform this host is not: the scenario named linux-x86_64, so on
+    // the Linux nightly it was this host's and nothing was skipped (#3030).
+    let elsewhere = if Target.os == .Linux: "darwin" else: "linux"
+    p7_write(dir, "uat/elsewhere.uat", "scenario: for another platform\nplatforms: " ++ elsewhere ++ "\n\nrun: with --version\n")
     let lenient = p7_run(dir, "lenient", "uat\0")
     p7_assert_success(lenient, "without --strict an unmet requirement skips")
     assert(lenient.stdout.contains("skip  (requires env WITH_UAT_TEST_NEVER_SET: unset)"))
