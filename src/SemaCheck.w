@@ -17960,10 +17960,64 @@ impl Sema:
             out.push(f"{self.node_module_path_view(let_node)}:{self.node_line(let_node)} `{name}` wants {self.type_name(want)} from a use at line {use_line}{weak}")
         out
 
+    // #3340 (§4.3c, D111, D22): demands on one binding that differ only where
+    // some have a view of a value and others the value are one demand, the
+    // value's: `List[(&str, str)]` and `List[(str, &str)]` are `List[(str,
+    // str)]`, each use supplying the owned demand another lacks. The joined
+    // type as an encoding (literal_type_encode's form), or an empty list
+    // when the demands differ in any other way.
+    fn literal_join_demands(wants: &List[i32]) -> List[i32]:
+        let out = []
+        let first: i32 = wants[0]
+        var same = true
+        var viewed = false
+        // The value each demand names here, a view's pointee for a view.
+        var value = first
+        var one_value = true
+        var k = -1
+        for want in wants:
+            k += 1
+            if want != first: same = false
+            let is_view = self.get_type_kind(want as TypeId) == TypeKind.TY_REF
+            if is_view: viewed = true
+            let named = if is_view: self.get_type_d0(want as TypeId) else: want
+            if k == 0: value = named
+            else if named != value: one_value = false
+        if same or (one_value and viewed and self.literal_demand_is_value(value)):
+            out.push(0)
+            out.push(if same: first else: value)
+            return out
+        let kind = self.get_type_kind(first as TypeId)
+        let count = if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_arg_count(first) else if kind == TypeKind.TY_TUPLE: self.get_type_d1(first as TypeId) else: -1
+        if count < 0: return out
+        for want in wants:
+            if self.get_type_kind(want as TypeId) != kind: return out
+            if kind == TypeKind.TY_GENERIC_INST and (self.get_generic_inst_base(want) != self.get_generic_inst_base(first) or self.get_generic_inst_arg_count(want) != count): return out
+            if kind == TypeKind.TY_TUPLE and self.get_type_d1(want as TypeId) != count: return out
+        if kind == TypeKind.TY_GENERIC_INST:
+            out.push(1)
+            out.push(self.get_generic_inst_base(first))
+        else:
+            out.push(2)
+        out.push(count)
+        for at in 0..count:
+            let parts = []
+            for want in wants: parts.push(if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_arg(want, at) else: self.type_extra[self.get_type_d0(want as TypeId) + at])
+            let part = self.literal_join_demands(parts)
+            if part.len() == 0: return part
+            for code in part: out.push(code)
+        out
+
+    // A value has no identity (D111): its view materializes at an owned
+    // demand, so a view of one and the value itself are one demand.
+    fn literal_demand_is_value(tid: i32) -> bool: tid == self.ty_str as i32 or tid == self.ty_bool as i32 or self.is_plain_numeric_type(tid)
+
     fn literal_decisions_from_demands() -> List[i32]:
         // (let, type, second type or 0, use, second use), in this check's ids.
         let found: List[i32] = []
         let found_at = sema_new_map_i32_i32()
+        // Every strong demand that differs from the first: (entry, type).
+        let others = []
         var i = 0
         while i + 2 < self.literal_demands.len():
             let let_node: i32 = self.literal_demands[i]
@@ -17984,13 +18038,27 @@ impl Sema:
             else if found[at + 3] < 0 and not weak:
                 found[at + 1] = want
                 found[at + 3] = use_node
-            else if not weak and found[at + 1] != want and found[at + 2] == 0:
+            else if not weak and found[at + 1] != want:
+                others.push(at)
+                others.push(want)
+                if found[at + 2] != 0: continue
                 found[at + 2] = want
                 found[at + 4] = use_node
         let out: List[i32] = []
         var f = 0
         while f + 4 < found.len():
-            let first = self.literal_type_encode(found[f + 1])
+            var first = self.literal_type_encode(found[f + 1])
+            // #3340: demands that are one demand are no conflict.
+            if found[f + 2] != 0:
+                let wants = [found[f + 1]]
+                var o = 0
+                while o + 1 < others.len():
+                    if others[o] == f: wants.push(others[o + 1])
+                    o = o + 2
+                let joined = self.literal_join_demands(wants)
+                if joined.len() > 0:
+                    first = joined
+                    found[f + 2] = 0
             let second = if found[f + 2] != 0: self.literal_type_encode(found[f + 2]) else: List.new()
             if first.len() > 0 and (found[f + 2] == 0 or second.len() > 0):
                 out.push(found[f])
