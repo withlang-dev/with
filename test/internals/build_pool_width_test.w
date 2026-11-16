@@ -17,4 +17,10 @@ fn main:
     assert(build_graph_pool_width_for(8, gib) == 1)
     // An unknown memory total (0) does not bound the width.
     assert(build_graph_pool_width_for(8, 0) == 8)
+    // #3031: a lane's test window is the machine's width unless one is asked
+    // for; a 4-core, 16 GiB runner runs 4 at once, never 32.
+    assert(build_graph_test_window_for(0, 4, 16 * gib) == 4)
+    assert(build_graph_test_window_for(0, 64, 16 * gib) == 8)
+    assert(build_graph_test_window_for(6, 4, 16 * gib) == 6)
+    assert(build_graph_test_window_for(99, 4, 16 * gib) == 32)
     print("ok")

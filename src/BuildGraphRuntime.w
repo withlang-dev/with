@@ -129,6 +129,16 @@ fn build_graph_pool_width_for(cores: i32, memory_total: i64) -> i32:
         if lanes < width: width = lanes
     width
 
+// The most tests one lane runs at once: what WITH_BUILD_TEST_JOBS asks
+// for, else the machine's width (its cores, bounded by its memory as the
+// lane pool is). No lane exceeds it, a lane on the critical path included:
+// such a lane takes no jobserver slots, and with a fixed window of 32 it
+// ran 32 compilers at once on a 4-core, 16 GiB Windows runner (27 seen
+// alive, 27.6 GiB committed; `lld-link: out of memory`, #3031).
+fn build_graph_test_window_for(asked: i32, cores: i32, memory_total: i64) -> i32:
+    if asked > 0: return if asked > 32: 32 else: asked
+    build_graph_pool_width_for(cores, memory_total)
+
 fn build_graph_rt_clock_nanos() -> i64:
     with_clock_nanos()
 
