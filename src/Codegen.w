@@ -7979,6 +7979,13 @@ impl Codegen:
         self.declare_generator_functions()
         self.declare_mir_only_functions()
 
+        // Pass 1.2: detect drop functions. Before any body is generated: a
+        // body that drops a type builds that type's glue once, for the whole
+        // module (ensure_structural_drop_fn), and glue built before the
+        // destructor is known calls none. A default method that dropped an
+        // owned parameter left every drop of that type in the program a no-op.
+        self.detect_drop_functions()
+
         // Pass 1.3: synthesize missing impl methods from trait defaults.
         self.generate_default_trait_methods()
 
@@ -8006,8 +8013,6 @@ impl Codegen:
             if slot_llvm == 0: continue
             self.record_module_binding_global(slot_sym, slot_llvm, self.build_default_value(slot_llvm), 1)
 
-        // Pass 1.5: detect drop functions
-        self.detect_drop_functions()
 
         // Pass 2: generate function bodies
         for i in 0..self.pool.decl_count():
