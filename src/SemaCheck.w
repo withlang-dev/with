@@ -17983,13 +17983,22 @@ impl Sema:
             let named = if is_view: self.get_type_d0(want as TypeId) else: want
             if k == 0: value = named
             else if named != value: one_value = false
-        if same or (one_value and viewed and self.literal_demand_is_value(value)):
+        // A view of a value is the value wherever the demands are joined,
+        // also where every demand has the view: the binding stores what it
+        // is given (D110), and a value copies (D111). A tuple that kept one
+        // view beside a value was no Copy type, so a loop over the list
+        // bound a view of the view.
+        if one_value and viewed and self.literal_demand_is_value(value):
             out.push(0)
-            out.push(if same: first else: value)
+            out.push(value)
             return out
         let kind = self.get_type_kind(first as TypeId)
         let count = if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_arg_count(first) else if kind == TypeKind.TY_TUPLE: self.get_type_d1(first as TypeId) else: -1
-        if count < 0: return out
+        if count < 0:
+            if same:
+                out.push(0)
+                out.push(first)
+            return out
         for want in wants:
             if self.get_type_kind(want as TypeId) != kind: return out
             if kind == TypeKind.TY_GENERIC_INST and (self.get_generic_inst_base(want) != self.get_generic_inst_base(first) or self.get_generic_inst_arg_count(want) != count): return out
