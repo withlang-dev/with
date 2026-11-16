@@ -124,6 +124,10 @@ enum LabelFrameKind: i32:
     LFK_BLOCK = 3
     LFK_LOOP = 4
 
+// What check_body_under_return decided: the body's type, and whether its
+// tail is a view the return materializes as a copy (D111).
+type BodyResult { ty: TypeId, materializes_copy: bool }
+
 type LabelRegistryState {
     label_syms: List[i32],
     label_nodes: List[i32],
