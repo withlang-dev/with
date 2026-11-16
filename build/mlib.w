@@ -35,7 +35,7 @@ pub fn mlib_corpus() -> Corpus:
         module_floor: 2, defines: ["M_USE_STDIO=0", "M_RAISE_FATAL(...)=abort()"], excludes: List.new(),
         include_dirs: List.new(), declared_externs: List.new(), forced_includes: ["stdio.h"],
         promote_after: List.new(), test_lane: "mlib-test",
-        fresh_test_lanes: ["mlib-test-fresh", "mlib-test-programs-fresh"], extra_generated_dirs: List.new(),
+        extra_generated_dirs: List.new(),
         prepare_reference: corpus_no_prepare, stage: mlib_stage,
         migrate: corpus_migrate_directory, finish_generated: corpus_no_finish,
         verify_generated: corpus_no_verify, lanes: mlib_lanes,
@@ -107,15 +107,6 @@ pub fn run_mlib_test_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if corpus_reset_dir(ctx, output) != 0: return 1
     mlib_compile_and_run(ctx, ["build", "-O1", "lib/std/engines/mlib/multimap.w"], ".")
-
-// D112: the same program on a fresh migration, for the migrator gate.
-pub fn run_mlib_test_fresh_action(ctx: ActionCtx) -> i32:
-    let output = ctx.output()
-    if corpus_reset_dir(ctx, output) != 0: return 1
-    let tree = output ++ "/tree"
-    if corpus_reset_dir(ctx, tree ++ "/lib/std/engines/mlib") != 0: return 1
-    if corpus_copy_w_files(ctx, ctx.inputs()[1], tree ++ "/lib/std/engines/mlib") != 0: return 1
-    mlib_compile_and_run(ctx, ["build", "-O1", "lib/std/engines/mlib/multimap.w", "--bundle-corpus", "std/engines/mlib"], tree)
 
 fn mlib_compile_and_run(ctx: &ActionCtx, build_args: List[str], cwd: &str) -> i32:
     let fs = ctx.fs()
@@ -238,18 +229,16 @@ pub fn run_mlib_promote_tests_action(ctx: ActionCtx) -> i32:
     0
 
 // Each program compiled by the release binary with the prelude off and
-// run; a nonzero exit is the test's own failed assertion. `fresh=<dir>`
-// runs the fresh migration for the migrator gate (D112).
+// run; a nonzero exit is the test's own failed assertion.
 pub fn run_mlib_test_programs_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let compiler = corpus_abs(ctx, ctx.inputs()[0])
     let output = ctx.output()
     if corpus_reset_dir(ctx, output) != 0: return 1
     if corpus_provenance(ctx, output, ctx.inputs()[0]) != 0: return 1
-    let fresh = wo_arg_value(ctx.args(), "fresh=")
     var report = "upstream=" ++ MLIB_REVISION ++ "\nconfiguration=tests\n"
     for name in mlib_test_programs():
-        let program = if fresh.len() > 0: fresh ++ "/tests/" ++ name ++ "/" ++ name ++ ".w" else: MLIB_TESTS_DIR ++ "/programs/" ++ name ++ "/" ++ name ++ ".w"
+        let program = MLIB_TESTS_DIR ++ "/programs/" ++ name ++ "/" ++ name ++ ".w"
         let binary = output ++ "/" ++ name ++ ".bin"
         var compile_args: List[str] = List.new()
         compile_args.push(compiler)
@@ -288,10 +277,6 @@ fn mlib_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &st
     // `:test` runs the test lane: the multimap example, then upstream's test programs.
     tests = tests.input(release_compiler).input("lib/std/engines/mlib/multimap.w").dep("build").dep("mlib-test-programs")
     graph = graph.add_target(tests)
-    var fresh = target_new(.Action, "mlib-test-fresh", "").output("out/corpus/mlib-test-fresh")
-    fresh.action = run_mlib_test_fresh_action
-    fresh = fresh.input(release_compiler).input("out/mlib_migrated").dep("build").dep("mlib-migrate")
-    graph = graph.add_target(fresh)
     var migrate_tests = target_new(.Action, "mlib-migrate-tests", "").output("out/mlib_tests_migrated")
     migrate_tests.action = run_mlib_migrate_tests_action
     migrate_tests = migrate_tests.input(corpus.upstream.reference).dep("mlib-prepare-reference")
@@ -306,10 +291,4 @@ fn mlib_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &st
     programs.action = run_mlib_test_programs_action
     programs = programs.input(release_compiler).dep("build")
     programs = mlib_with_test_inputs(programs, ctx)
-    graph = graph.add_target(programs)
-    var programs_fresh = target_new(.Action, "mlib-test-programs-fresh", "").output("out/corpus/mlib-test-programs-fresh")
-    programs_fresh.action = run_mlib_test_programs_action
-    programs_fresh = programs_fresh.input(release_compiler).input("out/mlib_tests_migrated").arg("fresh=out/mlib_tests_migrated")
-    programs_fresh = programs_fresh.dep("build").dep("mlib-migrate-tests")
-    programs_fresh = mlib_with_test_inputs(programs_fresh, ctx)
-    graph.add_target(programs_fresh)
+    graph.add_target(programs)

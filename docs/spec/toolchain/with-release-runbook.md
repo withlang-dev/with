@@ -189,8 +189,8 @@ src/main build :last-green
 ```
 
 `:release-checks` (D131) is the seed-cut and release tier the PR battery does
-not run: the fixpoint, the Sema regression rebuilds, the C migrator tests,
-the corpora migrated afresh and tested, and wo-drift.
+not run: the fixpoint, the Sema regression rebuilds, the corpora's own tests
+on the promoted corpora, and wo-drift. It migrates nothing (D206).
 
 Before `build`, confirm `src/main` is the lock's seed: `shasum -a 256
 src/main` against the asset's digest in `seed.lock`. A host whose `src/main`

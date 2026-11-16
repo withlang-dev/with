@@ -838,10 +838,11 @@ end. `--fail-fast` stops at the first red. Logs land in `out/battery/`. Then
 
 **Seed-cut and release tier.** `src/main build :release-checks`: the fixpoint
 (stage2 == stage3), the Sema regression rebuilds (issue61, the invariance
-perturbations), the C migrator tests, every corpus migrated afresh and tested
-(`corpus-migrator-gate`, the corpora lanes) and wo-drift. A seed is cut, and a
+perturbations), the corpora's own tests on the promoted corpora, and wo-drift.
+It migrates nothing (D206): a corpus is migrated when it is promoted, never
+by a gate, a report or a seed cut. A seed is cut, and a
 release made, only from a tree whose `:release-checks` is green; `release-uat`
-depends on it. A nondeterminism or corpus break that lands on main surfaces
+depends on it. A nondeterminism or bundle break that lands on main surfaces
 here and is fixed before the cut.
 
 **A red battery:** fix every reported failure on the stack with iterate-tier

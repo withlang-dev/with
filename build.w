@@ -4943,6 +4943,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")
     tests = tests.dep("deep-debug-tool-tests")
+    // The migrator's own cases (C fixtures written for them): a feature's
+    // tests like any other, on every platform `:test` runs on.
+    tests = tests.dep("c-migrator-tests")
     tests = tests.dep("contract-view-tests")
     tests = tests.dep("uat-tests")
     tests = tests.dep("abi-hash-check")
@@ -5073,21 +5076,19 @@ pub fn build(ctx: BuildCtx) -> Build:
     // battery above): main stays correct and buildable. A seed cut or a
     // release (this group, beside the battery): the toolchain reproduces
     // itself (fixpoint), the past Sema regressions stay fixed under every
-    // perturbation (issue61, the invariance rebuilds), and the migrator and
-    // every migrated corpus agree (migrate afresh, test, drift).
+    // perturbation (issue61, the invariance rebuilds), and every stored
+    // bundle is what its promoted corpus builds (the corpora' own tests,
+    // drift). It migrates nothing (Eric, 2026-11-16): a corpus is migrated
+    // when it is promoted, and the migrator's tests are `:test`'s.
     var release_checks = target_new(.Group, "release-checks", "")
     release_checks = release_checks.dep("seed-driver")
     release_checks = release_checks.dep("fixpoint")
     release_checks = release_checks.dep("issue61-regression")
     release_checks = release_checks.dep("invariance-check")
-    release_checks = release_checks.dep("c-migrator-tests")
     release_checks = release_checks.dep("wo-drift")
     // The corpora lane (stdlib_sourcing_plan.md): every migrated
     // container corpus runs its upstream test programs under With.
     release_checks = corpora_test_deps(release_checks)
-    // D112: a migrator change is gated on every corpus migrated afresh and
-    // tested; nothing is promoted.
-    release_checks = release_checks.dep("corpus-migrator-gate")
     out = out.add_target(release_checks)
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
@@ -5274,8 +5275,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(corpora_drift_group(ctx))
     out = out.add_target(corpora_integrity_group())
     out = out.add_target(corpora_promote_guard_target())
-    out = out.add_target(corpora_migrator_gate_group())
-    out = out.add_target(corpora_drift_report_group())
 
     var prune = target_new(.Action, "prune", "").output("out/.build-state/prune.always")
     prune.action = run_prune_action

@@ -31,7 +31,7 @@ pub fn tommyds_corpus() -> Corpus:
         harness: ["check_"], drift_harness: "check_.w", drift_harness_arg: "",
         module_floor: 14, defines: List.new(), excludes: List.new(), include_dirs: List.new(), declared_externs: List.new(), forced_includes: List.new(),
         promote_after: List.new(), test_lane: "tommyds-test",
-        fresh_test_lanes: ["tommyds-test-fresh"], extra_generated_dirs: List.new(),
+        extra_generated_dirs: List.new(),
         prepare_reference: corpus_no_prepare, stage: tommy_stage,
         migrate: corpus_migrate_directory, finish_generated: corpus_no_finish,
         verify_generated: corpus_no_verify, lanes: tommy_lanes,
@@ -57,17 +57,6 @@ pub fn run_tommy_test_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if corpus_reset_dir(ctx, output) != 0: return 1
     tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/engines/tommyds/check_.w"], ".")
-
-// D112: upstream's check program on a fresh migration, for the migrator
-// gate: the fresh modules in a scratch lib/std/engines/tommyds, compiled from
-// source (`--bundle-corpus`) rather than from the bundle the compiler embeds.
-pub fn run_tommy_test_fresh_action(ctx: ActionCtx) -> i32:
-    let output = ctx.output()
-    if corpus_reset_dir(ctx, output) != 0: return 1
-    let tree = output ++ "/tree"
-    if corpus_reset_dir(ctx, tree ++ "/lib/std/engines/tommyds") != 0: return 1
-    if corpus_copy_w_files(ctx, ctx.inputs()[1], tree ++ "/lib/std/engines/tommyds") != 0: return 1
-    tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/engines/tommyds/check_.w", "--bundle-corpus", "std/engines/tommyds"], tree)
 
 fn tommy_compile_and_run(ctx: &ActionCtx, build_args: List[str], cwd: &str) -> i32:
     let fs = ctx.fs()
@@ -96,7 +85,4 @@ fn tommy_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &s
     var tests = target_new(.Action, "tommyds-test", "").output("out/corpus/tommyds-test")
     tests.action = run_tommy_test_action
     tests = tests.input(release_compiler.clone()).input("lib/std/engines/tommyds/check_.w").dep("build")
-    var fresh = target_new(.Action, "tommyds-test-fresh", "").output("out/corpus/tommyds-test-fresh")
-    fresh.action = run_tommy_test_fresh_action
-    fresh = fresh.input(release_compiler.clone()).input("out/tommyds_migrated").dep("build").dep("tommyds-migrate")
-    out.add_target(tests).add_target(fresh)
+    out.add_target(tests)

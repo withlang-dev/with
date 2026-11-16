@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D206 — Nothing routine migrates a corpus that is already migrated: no gate, report or tool re-migrates one; supersedes D112 amendment 1 (ruled)](2026-11-16-D206-nothing-routine-migrates-a-corpus-that-is-already-migrated.md)
 - [D205 — Runtime contract citations: one short citation per function, of the actual function's documented behavior; the domain-wide reasoning is stated once (ruled)](2026-11-14-D205-runtime-contract-citations.md)
 - [D204 — Text converts with `as`: `"42" as i32` panics on bad text; a type is not callable for parsing and is not a pipeline stage (ruled; amends D203)](2026-11-14-D204-text-converts-with-as.md)
 - [D203 — A type called with text parses it: `i32(text)` panics, `text.parse()` is the `Option`; two modes, With's notation or digits in a stated base (ruled)](2026-11-14-D203-a-type-called-with-text-parses-it.md)
