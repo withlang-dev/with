@@ -858,7 +858,13 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         if exprs.kind(operand) == CiExprKind.CIE_SIZEOF_TYPE:
             let sizeof_ty = (exprs.get_d0(operand)) as CiTypeId
             return "(sizeof[" ++ ci_print_sizeof_type_text(ci_print_type(types, sizeof_ty)) ++ "]() as " ++ target_text ++ ")"
-        return "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ " as " ++ target_text ++ ")"
+        let converted = "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ " as " ++ target_text ++ ")"
+        // D198 (§19.2): a function value is called without `unsafe`, so the
+        // cast that makes one is where its address is trusted: C's
+        // `(nullary)run_it` in a table of tests. Printed bare, in a body or a
+        // global's initializer, the output did not check.
+        if not g_ci_print_in_unsafe_fn and (target_text.starts_with("extern \"C\" fn(") or target_text.starts_with("fn(")): return "unsafe { " ++ converted ++ " }"
+        return converted
     if kind == CiExprKind.CIE_DEREF:
         let operand = (exprs.get_d0(id)) as CiExprId
         let operand_ty = exprs.get_type(operand)

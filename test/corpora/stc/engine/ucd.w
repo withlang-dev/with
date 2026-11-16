@@ -161,7 +161,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
         var __ci_expr_logic_1: i32 = 0
 
         if ((*__local_str) == (*__param_needle)) {
-            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), ((__param_nlen as u64) as i64)): 1 else: 0))
         }
 
         if __ci_expr_logic_1 {
@@ -315,13 +315,12 @@ unsafe fn cutf8_subview(__param_s: *const c_char, __param_u8pos: i64, __param_u8
 }
 
 unsafe fn cutf8_decode(__param_d: *mut cutf8_decode_t, __param_byte: u32) -> u32 {
-    var __local_cutf8_dtab: []u8
 
-    var __local_type_: u32 = ((__local_cutf8_dtab[__param_byte] as u32))
+    var __local_type_: u32 = ((cutf8_dtab[__param_byte] as u32))
 
     ((*__param_d).codep = (((if (*__param_d).state: (((((__param_byte as u32) & (63 as u32)) as u32) | ((((*__param_d).codep as u32) << (6 as u32)) as u32)) as u32) else: (((((255 as u32) >> (__local_type_ as u32)) as u32) & (__param_byte as u32)) as u32)) as u32)))
 
-    ((*__param_d).state = ((__local_cutf8_dtab[((((256 as u32) +% ((*__param_d).state as u32)) as u32) +% (__local_type_ as u32))] as u32)))
+    ((*__param_d).state = ((cutf8_dtab[((((256 as u32) +% ((*__param_d).state as u32)) as u32) +% (__local_type_ as u32))] as u32)))
 
     return (*__param_d).state
 

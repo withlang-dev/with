@@ -159,7 +159,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
         var __ci_expr_logic_1: i32 = 0
 
         if ((*__local_str) == (*__param_needle)) {
-            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), ((__param_nlen as u64) as i64)): 1 else: 0))
         }
 
         if __ci_expr_logic_1 {
@@ -1447,7 +1447,7 @@ pub fn stc_slot_deque_with_capacity(__param_cap: i64) -> stc_slot_deque {
     var __local_cap = __param_cap
     (__local_cap = ((c_next_pow2(((__local_cap + 1) as i64)) as i64)))
 
-    var __local_out: stc_slot_deque = stc_slot_deque { cbuf: (((with_alloc((((if true: ((__local_cap * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), start: 0, end: 0, capmask: (__local_cap - 1) }
+    var __local_out: stc_slot_deque = stc_slot_deque { cbuf: (((with_alloc(((((__local_cap * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), start: 0, end: 0, capmask: (__local_cap - 1) }
 
     return __local_out
 
@@ -1669,7 +1669,7 @@ pub fn stc_word_deque_with_capacity(__param_cap: i64) -> stc_word_deque {
     var __local_cap = __param_cap
     (__local_cap = ((c_next_pow2(((__local_cap + 1) as i64)) as i64)))
 
-    var __local_out: stc_word_deque = stc_word_deque { cbuf: (((with_alloc((((if true: ((__local_cap * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), start: 0, end: 0, capmask: (__local_cap - 1) }
+    var __local_out: stc_word_deque = stc_word_deque { cbuf: (((with_alloc(((((__local_cap * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)), start: 0, end: 0, capmask: (__local_cap - 1) }
 
     return __local_out
 
@@ -1723,7 +1723,7 @@ pub fn stc_word_deque_clone(__param_q: stc_word_deque) -> stc_word_deque {
 
     (__local_out.capmask = (((c_next_pow2((((unsafe *(&raw const __local_out as *const stc_word_deque)).end + 1) as i64)) - 1) as i64)))
 
-    (__local_out.cbuf = (((with_alloc((((if true: ((((unsafe *(&raw const __local_out as *const stc_word_deque)).capmask + 1) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+    (__local_out.cbuf = (((with_alloc(((((((unsafe *(&raw const __local_out as *const stc_word_deque)).capmask + 1) * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)))
 
     var __local_i: i64 = ((0 as i64))
 
@@ -2789,9 +2789,9 @@ pub fn stc_word_set_clone(__param_map: stc_word_set) -> stc_word_set {
 
     var __local__mbytes: i64 = (((((unsafe *(&raw const __param_map as *const stc_word_set)).bucket_count + 1) * (sizeof[hmap_meta]() as i64)) as i64))
 
-    (__local_out.table = (((with_alloc((((if true: (((unsafe *(&raw const __param_map as *const stc_word_set)).bucket_count * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+    (__local_out.table = (((with_alloc((((((unsafe *(&raw const __param_map as *const stc_word_set)).bucket_count * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)))
 
-    (__local_out.meta = (((with_alloc((((if true: __local__mbytes else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
+    (__local_out.meta = (((with_alloc(((__local__mbytes as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
 
     var __ci_expr_logic_0: i32 = 0
 
@@ -2800,7 +2800,7 @@ pub fn stc_word_set_clone(__param_map: stc_word_set) -> stc_word_set {
     }
 
     if __ci_expr_logic_0 {
-        with_memcpy((((unsafe *(&raw const __local_out as *const stc_word_set)).meta as *mut c_void) as *mut u8), (((unsafe *(&raw const __param_map as *const stc_word_set)).meta as *const c_void) as *const u8), (((if true: __local__mbytes else: (-1 as i64)) as u64) as i64))
+        with_memcpy((((unsafe *(&raw const __local_out as *const stc_word_set)).meta as *mut c_void) as *mut u8), (((unsafe *(&raw const __param_map as *const stc_word_set)).meta as *const c_void) as *const u8), ((__local__mbytes as u64) as i64))
 
         var __local_i: i64 = ((0 as i64))
 
@@ -3445,14 +3445,14 @@ pub fn stc_slot_stack_init() -> stc_slot_stack {
 }
 
 pub fn stc_slot_stack_with_capacity(__param_cap: i64) -> stc_slot_stack {
-    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc((((if true: ((__param_cap * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: 0, capacity: __param_cap }
+    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc(((((__param_cap * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
 pub fn stc_slot_stack_with_size_uninit(__param_size: i64) -> stc_slot_stack {
-    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc((((if true: ((__param_size * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: __param_size, capacity: __param_size }
+    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc(((((__param_size * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
@@ -3461,7 +3461,7 @@ pub fn stc_slot_stack_with_size_uninit(__param_size: i64) -> stc_slot_stack {
 // contract: stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_stack_with_size(__param_size: i64, __param_default_raw: *mut stc_slot_head) -> stc_slot_stack {
     var __local_size = __param_size
-    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc((((if true: ((__local_size * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: __local_size, capacity: __local_size }
+    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc(((((__local_size * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: __local_size, capacity: __local_size }
 
     while __local_size {
         (__local_size = __local_size - 1)
@@ -3610,14 +3610,14 @@ pub fn stc_word_stack_init() -> stc_word_stack {
 }
 
 pub fn stc_word_stack_with_capacity(__param_cap: i64) -> stc_word_stack {
-    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc((((if true: ((__param_cap * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), size: 0, capacity: __param_cap }
+    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc(((((__param_cap * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
 pub fn stc_word_stack_with_size_uninit(__param_size: i64) -> stc_word_stack {
-    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc((((if true: ((__param_size * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), size: __param_size, capacity: __param_size }
+    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc(((((__param_size * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
@@ -3625,7 +3625,7 @@ pub fn stc_word_stack_with_size_uninit(__param_size: i64) -> stc_word_stack {
 
 pub fn stc_word_stack_with_size(__param_size: i64, __param_default_raw: u64) -> stc_word_stack {
     var __local_size = __param_size
-    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc((((if true: ((__local_size * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), size: __local_size, capacity: __local_size }
+    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc(((((__local_size * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)), size: __local_size, capacity: __local_size }
 
     while __local_size {
         (__local_size = __local_size - 1)
@@ -3849,7 +3849,7 @@ pub fn stc_slot_queue_with_capacity(__param_cap: i64) -> stc_slot_queue {
     var __local_cap = __param_cap
     (__local_cap = ((c_next_pow2(((__local_cap + 1) as i64)) as i64)))
 
-    var __local_out: stc_slot_queue = stc_slot_queue { cbuf: (((with_alloc((((if true: ((__local_cap * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), start: 0, end: 0, capmask: (__local_cap - 1) }
+    var __local_out: stc_slot_queue = stc_slot_queue { cbuf: (((with_alloc(((((__local_cap * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), start: 0, end: 0, capmask: (__local_cap - 1) }
 
     return __local_out
 
@@ -3992,7 +3992,7 @@ pub fn stc_word_queue_with_capacity(__param_cap: i64) -> stc_word_queue {
     var __local_cap = __param_cap
     (__local_cap = ((c_next_pow2(((__local_cap + 1) as i64)) as i64)))
 
-    var __local_out: stc_word_queue = stc_word_queue { cbuf: (((with_alloc((((if true: ((__local_cap * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), start: 0, end: 0, capmask: (__local_cap - 1) }
+    var __local_out: stc_word_queue = stc_word_queue { cbuf: (((with_alloc(((((__local_cap * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)), start: 0, end: 0, capmask: (__local_cap - 1) }
 
     return __local_out
 
@@ -4046,7 +4046,7 @@ pub fn stc_word_queue_clone(__param_q: stc_word_queue) -> stc_word_queue {
 
     (__local_out.capmask = (((c_next_pow2((((unsafe *(&raw const __local_out as *const stc_word_queue)).end + 1) as i64)) - 1) as i64)))
 
-    (__local_out.cbuf = (((with_alloc((((if true: ((((unsafe *(&raw const __local_out as *const stc_word_queue)).capmask + 1) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+    (__local_out.cbuf = (((with_alloc(((((((unsafe *(&raw const __local_out as *const stc_word_queue)).capmask + 1) * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)))
 
     var __local_i: i64 = ((0 as i64))
 
@@ -4126,7 +4126,7 @@ pub unsafe fn stc_slot_list_drop(__param_cself: *const stc_slot_list) {
 
 // contract: receiver-mut:stc_slot_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_push_back(__param_self_: *mut stc_slot_list, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
-    var __local_entry: *mut stc_slot_list_node = (((with_alloc((((if true: ((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
+    var __local_entry: *mut stc_slot_list_node = (((with_alloc(((((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
 
     ((*__local_entry).value = __param_value)
 
@@ -4147,7 +4147,7 @@ pub unsafe fn stc_slot_list_push_back(__param_self_: *mut stc_slot_list, __param
 
 // contract: receiver-mut:stc_slot_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_push_front(__param_self_: *mut stc_slot_list, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
-    var __local_entry: *mut stc_slot_list_node = (((with_alloc((((if true: ((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
+    var __local_entry: *mut stc_slot_list_node = (((with_alloc(((((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
 
     ((*__local_entry).value = __param_value)
 
@@ -4172,7 +4172,7 @@ pub unsafe fn stc_slot_list_push_front(__param_self_: *mut stc_slot_list, __para
 pub unsafe fn stc_slot_list_insert_at(__param_self_: *mut stc_slot_list, __param_it_: stc_slot_list_iter, __param_value: *mut stc_slot_head) -> stc_slot_list_iter {
     var __local_node: *mut stc_slot_list_node = (if (*(&raw const __param_it_ as *const stc_slot_list_iter)).ref != null: (*(&raw const __param_it_ as *const stc_slot_list_iter)).prev else: (*__param_self_).last)
 
-    var __local_entry: *mut stc_slot_list_node = (((with_alloc((((if true: ((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
+    var __local_entry: *mut stc_slot_list_node = (((with_alloc(((((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
 
     ((*__local_entry).value = __param_value)
 
@@ -4305,7 +4305,7 @@ pub unsafe fn stc_slot_list_erase_after_node(__param_self_: *mut stc_slot_list, 
 
 // contract: unproved:0:read only
 pub unsafe fn stc_slot_list_get_node(__param_pval: *mut *mut stc_slot_head) -> *mut stc_slot_list_node {
-    return (((if true: __param_pval else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node))
+    return ((__param_pval as *mut stc_slot_list_node))
 
 }
 
@@ -4577,7 +4577,7 @@ pub unsafe fn stc_word_list_erase_after_node(__param_self_: *mut stc_word_list, 
 
 // contract: unproved:0:read only
 pub unsafe fn stc_word_list_get_node(__param_pval: *mut i64) -> *mut stc_word_list_node {
-    return (((if true: __param_pval else: (null as *mut i64)) as *mut stc_word_list_node))
+    return ((__param_pval as *mut stc_word_list_node))
 
 }
 
@@ -4813,7 +4813,7 @@ pub unsafe fn _cbits_to_str(__param_set: *const u64, __param_sz: i64, __param_ou
         0
     }
 
-    with_memset(((__param_out as *mut c_void) as *mut u8), (48 as i32), (((if true: ((__local_stop - __param_start) as i64) else: (-1 as i64)) as u64) as i64))
+    with_memset(((__param_out as *mut c_void) as *mut u8), (48 as i32), ((((__local_stop - __param_start) as i64) as u64) as i64))
 
     var __local_i: i64 = __param_start
 
@@ -4902,7 +4902,7 @@ pub fn cbits_clone(__param_other: cbits) -> cbits {
 
     var __local_bytes: i64 = ((((((unsafe *(&raw const __param_other as *const cbits))._size + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64))
 
-    (__local_set.buffer = ((unsafe { c_safe_memcpy((with_alloc((((if true: __local_bytes else: (-1 as i64)) as u64) as i64)) as *mut c_void), ((*(&raw const __param_other as *const cbits)).buffer as *const c_void), __local_bytes) } as *mut u64)))
+    (__local_set.buffer = ((unsafe { c_safe_memcpy((with_alloc(((__local_bytes as u64) as i64)) as *mut c_void), ((*(&raw const __param_other as *const cbits)).buffer as *const c_void), __local_bytes) } as *mut u64)))
 
     return __local_set
 
@@ -4918,7 +4918,7 @@ pub unsafe fn cbits_copy(__param_self_: *mut cbits, __param_other: *const cbits)
         return ((((*__param_self_).take(cbits_clone((*__param_other))) as *const cbits) as *mut cbits))
     }
 
-    with_memcpy((((*__param_self_).buffer as *mut c_void) as *mut u8), (((*__param_other).buffer as *const c_void) as *const u8), (((if true: (((((*__param_other)._size + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+    with_memcpy((((*__param_self_).buffer as *mut c_void) as *mut u8), (((*__param_other).buffer as *const c_void) as *const u8), (((((((*__param_other)._size + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
     return __param_self_
 
@@ -4926,12 +4926,12 @@ pub unsafe fn cbits_copy(__param_self_: *mut cbits, __param_other: *const cbits)
 
 // contract: unproved:0:memset is outside the corpus and not a known pure reader
 pub unsafe fn cbits_set_all(__param_self_: *mut cbits, __param_value: bool) -> Unit {
-    with_memset((((*__param_self_).buffer as *mut c_void) as *mut u8), ((0 - (__param_value as i32)) as i32), (((if true: (((((*(__param_self_ as *const cbits)).size() + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+    with_memset((((*__param_self_).buffer as *mut c_void) as *mut u8), ((0 - (__param_value as i32)) as i32), (((((((*(__param_self_ as *const cbits)).size() + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
 }
 
 pub fn cbits_with_size(__param_size: i64, __param_value: bool) -> cbits {
-    var __local_set: cbits = cbits { buffer: ((with_alloc((((if true: ((((__param_size + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64), _size: __param_size }
+    var __local_set: cbits = cbits { buffer: ((with_alloc(((((((__param_size + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64), _size: __param_size }
 
     unsafe { cbits_set_all((&raw mut __local_set as *mut cbits), __param_value) }
 
@@ -4940,7 +4940,7 @@ pub fn cbits_with_size(__param_size: i64, __param_value: bool) -> cbits {
 }
 
 pub fn cbits_with_pattern(__param_size: i64, __param_pattern: u64) -> cbits {
-    var __local_set: cbits = cbits { buffer: ((with_alloc((((if true: ((((__param_size + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64), _size: __param_size }
+    var __local_set: cbits = cbits { buffer: ((with_alloc(((((((__param_size + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64), _size: __param_size }
 
     unsafe { (*(&raw mut __local_set as *mut cbits)).set_pattern(__param_pattern) }
 
@@ -5113,7 +5113,7 @@ impl cbits {
         var __local_old_w: i64 = ((((__local_osize + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
 
 
-        var __local_b: *mut u64 = (((with_realloc((((unsafe *__param_self_).buffer as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_new_w * (sizeof[u64]() as i64)) as i64) else: ((__local_old_w * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64))
+        var __local_b: *mut u64 = (((with_realloc((((unsafe *__param_self_).buffer as *mut c_void) as *mut u8), (0 as i64), ((((__local_new_w * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64))
 
         if (__local_b == null) {
             return ((false as bool))
@@ -5124,7 +5124,7 @@ impl cbits {
         ((unsafe *__param_self_)._size = __param_size)
 
         if (__param_size > __local_osize) {
-            with_memset(((((unsafe *__param_self_).buffer + ((__local_old_w as i64) as usize)) as *mut c_void) as *mut u8), ((0 - (__param_value as i32)) as i32), (((if true: (((__local_new_w - __local_old_w) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memset(((((unsafe *__param_self_).buffer + ((__local_old_w as i64) as usize)) as *mut c_void) as *mut u8), ((0 - (__param_value as i32)) as i32), (((((__local_new_w - __local_old_w) * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
             if ((__local_osize as i64) & (((8 * (sizeof[u64]() as i64)) - 1) as i64)) {
                 var __local_mask: u64 = ((((((1 as u64) << (((__local_osize as i64) & (((8 * (sizeof[u64]() as i64)) - 1) as i64)) as u32)) as u64) -% (1 as u64)) as u64))
@@ -5249,7 +5249,7 @@ impl stc_slot_deque {
             return (((((unsafe *__param_self_).cbuf != null)) as bool))
         }
 
-        var __local_d: *mut *mut stc_slot_head = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[usize]() as i64)) as i64) else: ((__local_oldpow2 * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
+        var __local_d: *mut *mut stc_slot_head = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
 
         if (__local_d == null) {
             return ((false as bool))
@@ -5259,12 +5259,12 @@ impl stc_slot_deque {
 
         if (not ((unsafe *__param_self_).start <= (unsafe *__param_self_).end)) {
             if (__local_head < (unsafe *__param_self_).end) {
-                with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_head * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+                with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_head * (sizeof[usize]() as i64)) as i64) as u64) as i64))
 
                 ((unsafe *__param_self_).start = (((__local_newpow2 - __local_head) as i64)))
 
             } else {
-                with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((if true: (((unsafe *__param_self_).end * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+                with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((((unsafe *__param_self_).end * (sizeof[usize]() as i64)) as i64) as u64) as i64))
 
                 ((unsafe *__param_self_).end = (unsafe *__param_self_).end + __local_oldpow2)
 
@@ -5309,7 +5309,7 @@ impl stc_slot_deque {
         }
 
         if ((unsafe *__param_self_).start <= (unsafe *__param_self_).end) {
-            with_memmove((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_sz * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_sz * (sizeof[usize]() as i64)) as i64) as u64) as i64))
 
             ((unsafe *__param_self_).start = ((0 as i64)))
 
@@ -5319,13 +5319,13 @@ impl stc_slot_deque {
         } else {
             var __local_n: i64 = (((((unsafe *__param_self_).capmask - (unsafe *__param_self_).start) + 1) as i64))
 
-            with_memmove(((((unsafe *__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_n * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove(((((unsafe *__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_n * (sizeof[usize]() as i64)) as i64) as u64) as i64))
 
             ((unsafe *__param_self_).start = (((__local_newpow2 - __local_n) as i64)))
 
         }
 
-        ((unsafe *__param_self_).cbuf = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[usize]() as i64)) as i64) else: ((((unsafe *__param_self_).capmask + 1) * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
+        ((unsafe *__param_self_).cbuf = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
 
         ((unsafe *__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
 
@@ -5462,7 +5462,7 @@ impl stc_slot_deque {
         ((unsafe *__param_self_).end = ((((((unsafe *__param_self_).end + __param_n) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
 
         if ((unsafe *(&raw const __local_it_ as *const stc_slot_deque_iter)).pos < (unsafe *__param_self_).end) {
-            with_memmove(((((unsafe *(&raw const __local_it_ as *const stc_slot_deque_iter)).ref + ((__param_n as i64) as usize)) as *mut c_void) as *mut u8), (((unsafe *(&raw const __local_it_ as *const stc_slot_deque_iter)).ref as *const c_void) as *const u8), (((if true: (((__local_len - __param_idx) * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove(((((unsafe *(&raw const __local_it_ as *const stc_slot_deque_iter)).ref + ((__param_n as i64) as usize)) as *mut c_void) as *mut u8), (((unsafe *(&raw const __local_it_ as *const stc_slot_deque_iter)).ref as *const c_void) as *const u8), (((((__local_len - __param_idx) * (sizeof[usize]() as i64)) as i64) as u64) as i64))
         } else {
             var __local_i: i64 = (((__local_len - 1) as i64))
 
@@ -5627,7 +5627,7 @@ impl stc_slot_deque_iter {
 impl stc_slot_list {
     pub mut fn erase_at(__param_it_: stc_slot_list_iter) -> stc_slot_list_iter {
         let __param_self_: *mut stc_slot_list = self as *mut stc_slot_list
-        var __local_node: *mut stc_slot_list_node = (((if true: (unsafe *(&raw const __param_it_ as *const stc_slot_list_iter)).ref else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node))
+        var __local_node: *mut stc_slot_list_node = (((unsafe *(&raw const __param_it_ as *const stc_slot_list_iter)).ref as *mut stc_slot_list_node))
 
         (__param_it_.ref = (if __local_node == (unsafe *__param_self_).last: (null as *mut *mut stc_slot_head) else: ((&raw const (unsafe *(*__local_node).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
 
@@ -5639,7 +5639,7 @@ impl stc_slot_list {
 
     pub mut fn erase_range(__param_it1: stc_slot_list_iter, __param_it2: stc_slot_list_iter) -> stc_slot_list_iter {
         let __param_self_: *mut stc_slot_list = self as *mut stc_slot_list
-        var __local_end: *mut stc_slot_list_node = (if (unsafe *(&raw const __param_it2 as *const stc_slot_list_iter)).ref != null: ((if true: (unsafe *(&raw const __param_it2 as *const stc_slot_list_iter)).ref else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node) else: (unsafe *(*__param_self_).last).next)
+        var __local_end: *mut stc_slot_list_node = (if (unsafe *(&raw const __param_it2 as *const stc_slot_list_iter)).ref != null: ((unsafe *(&raw const __param_it2 as *const stc_slot_list_iter)).ref as *mut stc_slot_list_node) else: (unsafe *(*__param_self_).last).next)
 
         if ((unsafe *(&raw const __param_it1 as *const stc_slot_list_iter)).ref != (unsafe *(&raw const __param_it2 as *const stc_slot_list_iter)).ref) {
             loop {
@@ -5724,7 +5724,7 @@ impl stc_slot_list {
 
         '__ci_bb_5 {
             (__local_cap_n__goto_415_21 = ((((__local_cap__goto_410_22 + (__local_cap__goto_410_22 / 2)) + 8) as i64)))
-            (__local_p__goto_411_28 = (((with_realloc(((__local_arr__goto_411_15 as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_cap_n__goto_415_21 * (sizeof[usize]() as i64)) as i64) else: ((__local_cap__goto_410_22 * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
+            (__local_p__goto_411_28 = (((with_realloc(((__local_arr__goto_411_15 as *mut c_void) as *mut u8), (0 as i64), ((((__local_cap_n__goto_415_21 * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
             if (__local_p__goto_411_28 == null) {
                 goto '__ci_bb_7
             } else {
@@ -5816,7 +5816,7 @@ impl stc_slot_list {
 
         ((unsafe *__local_p1).next = (unsafe *__local_p2).next)
 
-        ((unsafe *__local_p2).next = (((if true: (unsafe *(&raw const __param_it1 as *const stc_slot_list_iter)).ref else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node)))
+        ((unsafe *__local_p2).next = (((unsafe *(&raw const __param_it1 as *const stc_slot_list_iter)).ref as *mut stc_slot_list_node)))
 
         if ((unsafe *__param_self_).last == __local_p2) {
             ((unsafe *__param_self_).last = (if __local_p1 == __local_p2: (null as *mut stc_slot_list_node) else: __local_p1))
@@ -6048,7 +6048,7 @@ impl stc_slot_list_iter {
     pub mut fn next() {
         let __param_it_: *mut stc_slot_list_iter = self as *mut stc_slot_list_iter
         var __local_node: *mut stc_slot_list_node = with 0 as __ci_expr_seq_5 {
-            ((unsafe *__param_it_).prev = (((if true: (unsafe *__param_it_).ref else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node)))
+            ((unsafe *__param_it_).prev = (((unsafe *__param_it_).ref as *mut stc_slot_list_node)))
             (unsafe *__param_it_).prev
         }
 
@@ -6130,7 +6130,7 @@ impl stc_slot_pqueue {
         var __local_n: i64 = (((if __param_cap == 9223372036854775807: (unsafe *__param_self_).size else: __param_cap) as i64))
 
         if (((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) {
-            var __local_d: *mut *mut stc_slot_head = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[usize]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
+            var __local_d: *mut *mut stc_slot_head = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), ((((__local_n * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
 
             if (__local_d == null) {
                 return ((false as bool))
@@ -6253,7 +6253,7 @@ impl stc_slot_queue {
             return (((((unsafe *__param_self_).cbuf != null)) as bool))
         }
 
-        var __local_d: *mut *mut stc_slot_head = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[usize]() as i64)) as i64) else: ((__local_oldpow2 * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
+        var __local_d: *mut *mut stc_slot_head = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
 
         if (__local_d == null) {
             return ((false as bool))
@@ -6263,12 +6263,12 @@ impl stc_slot_queue {
 
         if (not ((unsafe *__param_self_).start <= (unsafe *__param_self_).end)) {
             if (__local_head < (unsafe *__param_self_).end) {
-                with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_head * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+                with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_head * (sizeof[usize]() as i64)) as i64) as u64) as i64))
 
                 ((unsafe *__param_self_).start = (((__local_newpow2 - __local_head) as i64)))
 
             } else {
-                with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((if true: (((unsafe *__param_self_).end * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+                with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((((unsafe *__param_self_).end * (sizeof[usize]() as i64)) as i64) as u64) as i64))
 
                 ((unsafe *__param_self_).end = (unsafe *__param_self_).end + __local_oldpow2)
 
@@ -6313,7 +6313,7 @@ impl stc_slot_queue {
         }
 
         if ((unsafe *__param_self_).start <= (unsafe *__param_self_).end) {
-            with_memmove((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_sz * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_sz * (sizeof[usize]() as i64)) as i64) as u64) as i64))
 
             ((unsafe *__param_self_).start = ((0 as i64)))
 
@@ -6323,13 +6323,13 @@ impl stc_slot_queue {
         } else {
             var __local_n: i64 = (((((unsafe *__param_self_).capmask - (unsafe *__param_self_).start) + 1) as i64))
 
-            with_memmove(((((unsafe *__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_n * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove(((((unsafe *__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_n * (sizeof[usize]() as i64)) as i64) as u64) as i64))
 
             ((unsafe *__param_self_).start = (((__local_newpow2 - __local_n) as i64)))
 
         }
 
-        ((unsafe *__param_self_).cbuf = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[usize]() as i64)) as i64) else: ((((unsafe *__param_self_).capmask + 1) * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
+        ((unsafe *__param_self_).cbuf = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
 
         ((unsafe *__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
 
@@ -6503,7 +6503,7 @@ impl stc_slot_set {
 
         ((unsafe *__param_self_).size = ((0 as i64)))
 
-        with_memset((((unsafe *__param_self_).meta as *mut c_void) as *mut u8), (0 as i32), (((if true: (((sizeof[hmap_meta]() as i64) * (unsafe *__param_self_).bucket_count) as i64) else: (-1 as i64)) as u64) as i64))
+        with_memset((((unsafe *__param_self_).meta as *mut c_void) as *mut u8), (0 as i32), (((((sizeof[hmap_meta]() as i64) * (unsafe *__param_self_).bucket_count) as i64) as u64) as i64))
 
     }
 
@@ -6534,9 +6534,9 @@ impl stc_slot_set {
 
 
 
-        (__local_map.table = (((with_alloc((((if true: ((__local__newbucks * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
+        (__local_map.table = (((with_alloc(((((__local__newbucks * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
 
-        (__local_map.meta = (((with_alloc_zeroed((((if true: ((__local__newbucks + 1) as i64) else: (-1 as i64)) as u64) as i64), (((if true: (sizeof[hmap_meta]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
+        (__local_map.meta = (((with_alloc_zeroed(((((__local__newbucks + 1) as i64) as u64) as i64), (((sizeof[hmap_meta]() as i64) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
 
         (__local_map.bucket_count = __local__newbucks)
 
@@ -6737,7 +6737,7 @@ impl stc_slot_sset {
             return ((false as bool))
         }
 
-        var __local_nodes: *mut stc_slot_sset_node = (((with_realloc((((unsafe *__param_self_).nodes as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: (((__param_cap + 1) * (sizeof[stc_slot_sset_node]() as i64)) as i64) else: ((((unsafe *__param_self_).capacity + 1) * (sizeof[stc_slot_sset_node]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_sset_node))
+        var __local_nodes: *mut stc_slot_sset_node = (((with_realloc((((unsafe *__param_self_).nodes as *mut c_void) as *mut u8), (0 as i64), (((((__param_cap + 1) * (sizeof[stc_slot_sset_node]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut stc_slot_sset_node))
 
         if (__local_nodes == null) {
             return ((false as bool))
@@ -6978,7 +6978,7 @@ impl stc_slot_stack {
         var __local_n: i64 = (((if __param_cap == 9223372036854775807: (unsafe *__param_self_).size else: __param_cap) as i64))
 
         if (((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) {
-            var __local_d: *mut *mut stc_slot_head = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[usize]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
+            var __local_d: *mut *mut stc_slot_head = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), ((((__local_n * (sizeof[usize]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
 
             if (__local_d == null) {
                 return ((false as bool))
@@ -7185,7 +7185,7 @@ impl stc_word_deque {
             return (((((unsafe *__param_self_).cbuf != null)) as bool))
         }
 
-        var __local_d: *mut u64 = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[u64]() as i64)) as i64) else: ((__local_oldpow2 * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64))
+        var __local_d: *mut u64 = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64))
 
         if (__local_d == null) {
             return ((false as bool))
@@ -7195,12 +7195,12 @@ impl stc_word_deque {
 
         if (not ((unsafe *__param_self_).start <= (unsafe *__param_self_).end)) {
             if (__local_head < (unsafe *__param_self_).end) {
-                with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_head * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+                with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_head * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
                 ((unsafe *__param_self_).start = (((__local_newpow2 - __local_head) as i64)))
 
             } else {
-                with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((if true: (((unsafe *__param_self_).end * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+                with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((((unsafe *__param_self_).end * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
                 ((unsafe *__param_self_).end = (unsafe *__param_self_).end + __local_oldpow2)
 
@@ -7268,7 +7268,7 @@ impl stc_word_deque {
         }
 
         if ((unsafe *__param_self_).start <= (unsafe *__param_self_).end) {
-            with_memmove((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_sz * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_sz * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
             ((unsafe *__param_self_).start = ((0 as i64)))
 
@@ -7278,13 +7278,13 @@ impl stc_word_deque {
         } else {
             var __local_n: i64 = (((((unsafe *__param_self_).capmask - (unsafe *__param_self_).start) + 1) as i64))
 
-            with_memmove(((((unsafe *__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_n * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove(((((unsafe *__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_n * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
             ((unsafe *__param_self_).start = (((__local_newpow2 - __local_n) as i64)))
 
         }
 
-        ((unsafe *__param_self_).cbuf = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[u64]() as i64)) as i64) else: ((((unsafe *__param_self_).capmask + 1) * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+        ((unsafe *__param_self_).cbuf = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)))
 
         ((unsafe *__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
 
@@ -7451,7 +7451,7 @@ impl stc_word_deque {
         ((unsafe *__param_self_).end = ((((((unsafe *__param_self_).end + __param_n) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
 
         if ((unsafe *(&raw const __local_it_ as *const stc_word_deque_iter)).pos < (unsafe *__param_self_).end) {
-            with_memmove(((((unsafe *(&raw const __local_it_ as *const stc_word_deque_iter)).ref + ((__param_n as i64) as usize)) as *mut c_void) as *mut u8), (((unsafe *(&raw const __local_it_ as *const stc_word_deque_iter)).ref as *const c_void) as *const u8), (((if true: (((__local_len - __param_idx) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove(((((unsafe *(&raw const __local_it_ as *const stc_word_deque_iter)).ref + ((__param_n as i64) as usize)) as *mut c_void) as *mut u8), (((unsafe *(&raw const __local_it_ as *const stc_word_deque_iter)).ref as *const c_void) as *const u8), (((((__local_len - __param_idx) * (sizeof[u64]() as i64)) as i64) as u64) as i64))
         } else {
             var __local_i: i64 = (((__local_len - 1) as i64))
 
@@ -7631,7 +7631,7 @@ impl stc_word_deque_iter {
 impl stc_word_list {
     pub mut fn push_back(__param_value: i64) -> *mut i64 {
         let __param_self_: *mut stc_word_list = self as *mut stc_word_list
-        var __local_entry: *mut stc_word_list_node = (((with_alloc((((if true: ((1 * (sizeof[stc_word_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
+        var __local_entry: *mut stc_word_list_node = (((with_alloc(((((1 * (sizeof[stc_word_list_node]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
 
         ((unsafe *__local_entry).value = __param_value)
 
@@ -7652,7 +7652,7 @@ impl stc_word_list {
 
     pub mut fn push_front(__param_value: i64) -> *mut i64 {
         let __param_self_: *mut stc_word_list = self as *mut stc_word_list
-        var __local_entry: *mut stc_word_list_node = (((with_alloc((((if true: ((1 * (sizeof[stc_word_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
+        var __local_entry: *mut stc_word_list_node = (((with_alloc(((((1 * (sizeof[stc_word_list_node]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
 
         ((unsafe *__local_entry).value = __param_value)
 
@@ -7677,7 +7677,7 @@ impl stc_word_list {
         let __param_self_: *mut stc_word_list = self as *mut stc_word_list
         var __local_node: *mut stc_word_list_node = (if (unsafe *(&raw const __param_it_ as *const stc_word_list_iter)).ref != null: (unsafe *(&raw const __param_it_ as *const stc_word_list_iter)).prev else: (unsafe *__param_self_).last)
 
-        var __local_entry: *mut stc_word_list_node = (((with_alloc((((if true: ((1 * (sizeof[stc_word_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
+        var __local_entry: *mut stc_word_list_node = (((with_alloc(((((1 * (sizeof[stc_word_list_node]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
 
         ((unsafe *__local_entry).value = __param_value)
 
@@ -7714,7 +7714,7 @@ impl stc_word_list {
 
     pub mut fn erase_at(__param_it_: stc_word_list_iter) -> stc_word_list_iter {
         let __param_self_: *mut stc_word_list = self as *mut stc_word_list
-        var __local_node: *mut stc_word_list_node = (((if true: (unsafe *(&raw const __param_it_ as *const stc_word_list_iter)).ref else: (null as *mut i64)) as *mut stc_word_list_node))
+        var __local_node: *mut stc_word_list_node = (((unsafe *(&raw const __param_it_ as *const stc_word_list_iter)).ref as *mut stc_word_list_node))
 
         (__param_it_.ref = (if __local_node == (unsafe *__param_self_).last: (null as *mut i64) else: ((&raw const (unsafe *(*__local_node).next).value as *const i64) as *mut i64)))
 
@@ -7726,7 +7726,7 @@ impl stc_word_list {
 
     pub mut fn erase_range(__param_it1: stc_word_list_iter, __param_it2: stc_word_list_iter) -> stc_word_list_iter {
         let __param_self_: *mut stc_word_list = self as *mut stc_word_list
-        var __local_end: *mut stc_word_list_node = (if (unsafe *(&raw const __param_it2 as *const stc_word_list_iter)).ref != null: ((if true: (unsafe *(&raw const __param_it2 as *const stc_word_list_iter)).ref else: (null as *mut i64)) as *mut stc_word_list_node) else: (unsafe *(*__param_self_).last).next)
+        var __local_end: *mut stc_word_list_node = (if (unsafe *(&raw const __param_it2 as *const stc_word_list_iter)).ref != null: ((unsafe *(&raw const __param_it2 as *const stc_word_list_iter)).ref as *mut stc_word_list_node) else: (unsafe *(*__param_self_).last).next)
 
         if ((unsafe *(&raw const __param_it1 as *const stc_word_list_iter)).ref != (unsafe *(&raw const __param_it2 as *const stc_word_list_iter)).ref) {
             loop {
@@ -7811,7 +7811,7 @@ impl stc_word_list {
 
         '__ci_bb_5 {
             (__local_cap_n__goto_415_21 = ((((__local_cap__goto_410_22 + (__local_cap__goto_410_22 / 2)) + 8) as i64)))
-            (__local_p__goto_411_28 = (((with_realloc(((__local_arr__goto_411_15 as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_cap_n__goto_415_21 * (sizeof[i64]() as i64)) as i64) else: ((__local_cap__goto_410_22 * (sizeof[i64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i64)))
+            (__local_p__goto_411_28 = (((with_realloc(((__local_arr__goto_411_15 as *mut c_void) as *mut u8), (0 as i64), ((((__local_cap_n__goto_415_21 * (sizeof[i64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i64)))
             if (__local_p__goto_411_28 == null) {
                 goto '__ci_bb_7
             } else {
@@ -7903,7 +7903,7 @@ impl stc_word_list {
 
         ((unsafe *__local_p1).next = (unsafe *__local_p2).next)
 
-        ((unsafe *__local_p2).next = (((if true: (unsafe *(&raw const __param_it1 as *const stc_word_list_iter)).ref else: (null as *mut i64)) as *mut stc_word_list_node)))
+        ((unsafe *__local_p2).next = (((unsafe *(&raw const __param_it1 as *const stc_word_list_iter)).ref as *mut stc_word_list_node)))
 
         if ((unsafe *__param_self_).last == __local_p2) {
             ((unsafe *__param_self_).last = (if __local_p1 == __local_p2: (null as *mut stc_word_list_node) else: __local_p1))
@@ -8148,7 +8148,7 @@ impl stc_word_list_iter {
     pub mut fn next() {
         let __param_it_: *mut stc_word_list_iter = self as *mut stc_word_list_iter
         var __local_node: *mut stc_word_list_node = with 0 as __ci_expr_seq_5 {
-            ((unsafe *__param_it_).prev = (((if true: (unsafe *__param_it_).ref else: (null as *mut i64)) as *mut stc_word_list_node)))
+            ((unsafe *__param_it_).prev = (((unsafe *__param_it_).ref as *mut stc_word_list_node)))
             (unsafe *__param_it_).prev
         }
 
@@ -8268,7 +8268,7 @@ impl stc_word_pqueue {
         var __local_n: i64 = (((if __param_cap == 9223372036854775807: (unsafe *__param_self_).size else: __param_cap) as i64))
 
         if (((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) {
-            var __local_d: *mut i64 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[i64]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[i64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i64))
+            var __local_d: *mut i64 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), ((((__local_n * (sizeof[i64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i64))
 
             if (__local_d == null) {
                 return ((false as bool))
@@ -8398,7 +8398,7 @@ impl stc_word_queue {
             return (((((unsafe *__param_self_).cbuf != null)) as bool))
         }
 
-        var __local_d: *mut u64 = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[u64]() as i64)) as i64) else: ((__local_oldpow2 * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64))
+        var __local_d: *mut u64 = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64))
 
         if (__local_d == null) {
             return ((false as bool))
@@ -8408,12 +8408,12 @@ impl stc_word_queue {
 
         if (not ((unsafe *__param_self_).start <= (unsafe *__param_self_).end)) {
             if (__local_head < (unsafe *__param_self_).end) {
-                with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_head * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+                with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_head * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
                 ((unsafe *__param_self_).start = (((__local_newpow2 - __local_head) as i64)))
 
             } else {
-                with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((if true: (((unsafe *__param_self_).end * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+                with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((((unsafe *__param_self_).end * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
                 ((unsafe *__param_self_).end = (unsafe *__param_self_).end + __local_oldpow2)
 
@@ -8481,7 +8481,7 @@ impl stc_word_queue {
         }
 
         if ((unsafe *__param_self_).start <= (unsafe *__param_self_).end) {
-            with_memmove((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_sz * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_sz * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
             ((unsafe *__param_self_).start = ((0 as i64)))
 
@@ -8491,13 +8491,13 @@ impl stc_word_queue {
         } else {
             var __local_n: i64 = (((((unsafe *__param_self_).capmask - (unsafe *__param_self_).start) + 1) as i64))
 
-            with_memmove(((((unsafe *__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_n * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memmove(((((unsafe *__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_n * (sizeof[u64]() as i64)) as i64) as u64) as i64))
 
             ((unsafe *__param_self_).start = (((__local_newpow2 - __local_n) as i64)))
 
         }
 
-        ((unsafe *__param_self_).cbuf = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[u64]() as i64)) as i64) else: ((((unsafe *__param_self_).capmask + 1) * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+        ((unsafe *__param_self_).cbuf = (((with_realloc((((unsafe *__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)))
 
         ((unsafe *__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
 
@@ -8678,7 +8678,7 @@ impl stc_word_set {
 
         ((unsafe *__param_self_).size = ((0 as i64)))
 
-        with_memset((((unsafe *__param_self_).meta as *mut c_void) as *mut u8), (0 as i32), (((if true: (((sizeof[hmap_meta]() as i64) * (unsafe *__param_self_).bucket_count) as i64) else: (-1 as i64)) as u64) as i64))
+        with_memset((((unsafe *__param_self_).meta as *mut c_void) as *mut u8), (0 as i32), (((((sizeof[hmap_meta]() as i64) * (unsafe *__param_self_).bucket_count) as i64) as u64) as i64))
 
     }
 
@@ -8709,9 +8709,9 @@ impl stc_word_set {
 
 
 
-        (__local_map.table = (((with_alloc((((if true: ((__local__newbucks * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+        (__local_map.table = (((with_alloc(((((__local__newbucks * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64)))
 
-        (__local_map.meta = (((with_alloc_zeroed((((if true: ((__local__newbucks + 1) as i64) else: (-1 as i64)) as u64) as i64), (((if true: (sizeof[hmap_meta]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
+        (__local_map.meta = (((with_alloc_zeroed(((((__local__newbucks + 1) as i64) as u64) as i64), (((sizeof[hmap_meta]() as i64) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
 
         (__local_map.bucket_count = __local__newbucks)
 
@@ -9046,7 +9046,7 @@ impl stc_word_stack {
         var __local_n: i64 = (((if __param_cap == 9223372036854775807: (unsafe *__param_self_).size else: __param_cap) as i64))
 
         if (((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) {
-            var __local_d: *mut u64 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[u64]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64))
+            var __local_d: *mut u64 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), ((((__local_n * (sizeof[u64]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut u64))
 
             if (__local_d == null) {
                 return ((false as bool))

@@ -3087,7 +3087,9 @@ fn ci_migrate_collect_extern_vars(session: i64, count: i32, primary_path: &str, 
         if ci_migrate_find_best_var_decl(session, count, name, primary_path) != idx: continue
         if with_cimport_var_storage_class(session, idx) == CX_SC_STATIC: continue
         if ci_migrate_var_emits_definition(session, idx, primary_path, project_active, project): continue
-        if ci_migrate_project_var_owner_path(project_active, project, name).len() > 0: continue
+        // A global another file of the directory owns is `extern var` here
+        // too: this file is checked alone, where the name is a C global
+        // like any other (it was left bare: E0921 in the non-owner file).
         let key = "|" ++ ci_escape_reserved(name) ++ "|"
         if with_cimport_var_is_const(session, idx) == 0 and with_cimport_var_is_threadlocal(session, idx) == 0: raw = raw ++ key
         if ci_migrate_var_resolved_type(session, idx, count, primary_path, project_active, project).starts_with("*") and ci_cursor_is_array_type(session, with_cimport_decl_cursor(session, idx)): ptr = ptr ++ key

@@ -162,7 +162,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
         var __ci_expr_logic_1: i32 = 0
 
         if ((*__local_str) == (*__param_needle)) {
-            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), ((__param_nlen as u64) as i64)): 1 else: 0))
         }
 
         if __ci_expr_logic_1 {
@@ -854,14 +854,14 @@ pub fn Stack_init() -> Stack {
 }
 
 pub fn Stack_with_capacity(__param_cap: i64) -> Stack {
-    var __local_out: Stack = Stack { data: (((with_alloc((((if true: ((__param_cap * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: 0, capacity: __param_cap }
+    var __local_out: Stack = Stack { data: (((with_alloc(((((__param_cap * (sizeof[i32]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i32)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
 pub fn Stack_with_size_uninit(__param_size: i64) -> Stack {
-    var __local_out: Stack = Stack { data: (((with_alloc((((if true: ((__param_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __param_size, capacity: __param_size }
+    var __local_out: Stack = Stack { data: (((with_alloc(((((__param_size * (sizeof[i32]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i32)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
@@ -869,7 +869,7 @@ pub fn Stack_with_size_uninit(__param_size: i64) -> Stack {
 
 pub fn Stack_with_size(__param_size: i64, __param_default_raw: i32) -> Stack {
     var __local_size = __param_size
-    var __local_out: Stack = Stack { data: (((with_alloc((((if true: ((__local_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __local_size, capacity: __local_size }
+    var __local_out: Stack = Stack { data: (((with_alloc(((((__local_size * (sizeof[i32]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i32)), size: __local_size, capacity: __local_size }
 
     while __local_size {
         (__local_size = __local_size - 1)
@@ -1285,14 +1285,14 @@ pub fn Tiles_init() -> Tiles {
 }
 
 pub fn Tiles_with_capacity(__param_cap: i64) -> Tiles {
-    var __local_out: Tiles = Tiles { data: (((with_alloc((((if true: ((__param_cap * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: 0, capacity: __param_cap }
+    var __local_out: Tiles = Tiles { data: (((with_alloc(((((__param_cap * (sizeof[Span3]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut Span3)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
 pub fn Tiles_with_size_uninit(__param_size: i64) -> Tiles {
-    var __local_out: Tiles = Tiles { data: (((with_alloc((((if true: ((__param_size * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: __param_size, capacity: __param_size }
+    var __local_out: Tiles = Tiles { data: (((with_alloc(((((__param_size * (sizeof[Span3]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut Span3)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
@@ -1300,7 +1300,7 @@ pub fn Tiles_with_size_uninit(__param_size: i64) -> Tiles {
 
 pub fn Tiles_with_size(__param_size: i64, __param_default_raw: Span3) -> Tiles {
     var __local_size = __param_size
-    var __local_out: Tiles = Tiles { data: (((with_alloc((((if true: ((__local_size * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: __local_size, capacity: __local_size }
+    var __local_out: Tiles = Tiles { data: (((with_alloc(((((__local_size * (sizeof[Span3]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut Span3)), size: __local_size, capacity: __local_size }
 
     while __local_size {
         (__local_size = __local_size - 1)
@@ -1580,7 +1580,7 @@ impl Stack {
         var __local_n: i64 = (((if __param_cap == 9223372036854775807: (unsafe *__param_self_).size else: __param_cap) as i64))
 
         if (((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) {
-            var __local_d: *mut i32 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[i32]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[i32]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32))
+            var __local_d: *mut i32 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), ((((__local_n * (sizeof[i32]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i32))
 
             if (__local_d == null) {
                 return ((false as bool))
@@ -1830,7 +1830,7 @@ impl Tiles {
         var __local_n: i64 = (((if __param_cap == 9223372036854775807: (unsafe *__param_self_).size else: __param_cap) as i64))
 
         if (((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) {
-            var __local_d: *mut Span3 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[Span3]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[Span3]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3))
+            var __local_d: *mut Span3 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), ((((__local_n * (sizeof[Span3]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut Span3))
 
             if (__local_d == null) {
                 return ((false as bool))
@@ -2060,7 +2060,7 @@ var ctest_cspan_equality: ctest = ctest { magic0: 3135025120, padding: 0, ssname
 var ctest_cspan_cube_setup_ptr: Option[unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit] = Some(ctest_cspan_cube_setup)
 var ctest_cspan_cube_teardown_ptr: Option[unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit] = Some(ctest_cspan_cube_teardown)
 var ctest_cspan_cube_slice3_data: ctest_cspan_cube_data
-var ctest_cspan_cube_slice3: ctest = ctest { magic0: 3135025120, padding: 0, ssname: (("cspan_cube" as *mut c_char) as *const c_char), ttname: (("slice3" as *mut c_char) as *const c_char), run: ctest_run_func_union { nullary: Some((ctest_cspan_cube_slice3_run as extern "C" fn() -> Unit)) }, data: ((&raw mut ctest_cspan_cube_slice3_data as *mut ctest_cspan_cube_data) as *mut c_void), setup: (((&raw const ctest_cspan_cube_setup_ptr as *const unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit) as *mut unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit) as *mut unsafe extern "C" fn(*mut c_void) -> Unit), teardown: (((&raw const ctest_cspan_cube_teardown_ptr as *const unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit) as *mut unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit) as *mut unsafe extern "C" fn(*mut c_void) -> Unit), skip: 0, magic1: 3135025121 }
+var ctest_cspan_cube_slice3: ctest = ctest { magic0: 3135025120, padding: 0, ssname: (("cspan_cube" as *mut c_char) as *const c_char), ttname: (("slice3" as *mut c_char) as *const c_char), run: ctest_run_func_union { nullary: Some(unsafe { (ctest_cspan_cube_slice3_run as extern "C" fn() -> Unit) }) }, data: ((&raw mut ctest_cspan_cube_slice3_data as *mut ctest_cspan_cube_data) as *mut c_void), setup: (((&raw const ctest_cspan_cube_setup_ptr as *const unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit) as *mut unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit) as *mut unsafe extern "C" fn(*mut c_void) -> Unit), teardown: (((&raw const ctest_cspan_cube_teardown_ptr as *const unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit) as *mut unsafe extern "C" fn(*mut ctest_cspan_cube_data) -> Unit) as *mut unsafe extern "C" fn(*mut c_void) -> Unit), skip: 0, magic1: 3135025121 }
 
 // The runner (build/stc.w): every registered test, in order.
 pub fn main() -> c_int:

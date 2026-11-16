@@ -16,7 +16,7 @@ pub unsafe fn fmt_close(__param_ss: *mut fmt_stream) {
 
 }
 
-// contract: stored-unknown:0,stored-unknown:2,variadic — stores an argument; ownership not modeled
+// contract: unproved:0:read only,stored-unknown:2,variadic — stores an argument; ownership not modeled
 pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt: *const c_char, ...) -> i32 {
     var __local_p = __param_p
     var __local_fmt = __param_fmt

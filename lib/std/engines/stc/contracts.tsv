@@ -21,7 +21,7 @@ _cspan_transpose	unproved:0:read only,unproved:1:read only
 _cstr_init	receiver-mut:cstr
 _cstr_internal_move	receiver-mut:cstr
 _cstr_set_size	receiver-mut:cstr
-_fmt_parse	stored-unknown:0,stored-unknown:2,variadic
+_fmt_parse	unproved:0:read only,stored-unknown:2,variadic
 _fmt_sprint	unproved:0:NULL is an accepted argument,stored-unknown:1,variadic
 _fmt_time	stored-unknown:0,stored-unknown:1,stored-unknown:2
 _stc32	plain
@@ -143,8 +143,8 @@ cstr_insert	receiver-mut:cstr,unproved:2:read only
 cstr_insert_sv	receiver-mut:cstr
 cstr_is_empty	receiver:cstr
 cstr_istarts_with	receiver:cstr,unproved:1:read only
-cstr_join_array	receiver-mut:cstr,stored-unknown:1,unproved:2:read only
-cstr_join_array_s	receiver-mut:cstr,stored-unknown:1,unproved:2:read only
+cstr_join_array	receiver-mut:cstr,unproved:1:read only,unproved:2:read only
+cstr_join_array_s	receiver-mut:cstr,unproved:1:read only,unproved:2:read only
 cstr_lowercase	receiver-mut:cstr
 cstr_move	receiver-mut:cstr
 cstr_next	receiver-mut:cstr_iter

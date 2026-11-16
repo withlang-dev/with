@@ -51,23 +51,6 @@ pub extern fn ispunct(c: i32) -> i32
 pub extern fn iscntrl(c: i32) -> i32
 pub extern fn tolower(c: i32) -> i32
 pub extern fn toupper(c: i32) -> i32
-pub extern fn sqrt(x: f64) -> f64
-pub extern fn pow(base: f64, exp: f64) -> f64
-pub extern fn floor(x: f64) -> f64
-pub extern fn ceil(x: f64) -> f64
-pub extern fn round(x: f64) -> f64
-pub extern fn sin(x: f64) -> f64
-pub extern fn cos(x: f64) -> f64
-pub extern fn tan(x: f64) -> f64
-pub extern fn log(x: f64) -> f64
-pub extern fn log10(x: f64) -> f64
-pub extern fn exp(x: f64) -> f64
-pub extern fn fabs(x: f64) -> f64
-pub extern fn fmod(x: f64, y: f64) -> f64
-pub extern fn asin(x: f64) -> f64
-pub extern fn acos(x: f64) -> f64
-pub extern fn atan(x: f64) -> f64
-pub extern fn atan2(y: f64, x: f64) -> f64
 
 pub type c_void = opaque
 pub extern fn abort() -> Never
@@ -75,6 +58,18 @@ pub fn __ci_unreachable() -> Never: abort()
 
 // data model: LP64 (arm64-apple-macosx11.0)
 pub const C_DATA_MODEL: str = "LP64 (arm64-apple-macosx11.0)"
+pub unsafe fn __with_migrate_malloc(__with_n: u64) -> *mut c_void {
+    with_alloc(__with_n as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_calloc(__with_n: u64, __with_size: u64) -> *mut c_void {
+    with_alloc_zeroed(__with_n as i64, __with_size as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_realloc(__with_p: *mut c_void, __with_n: u64) -> *mut c_void {
+    with_realloc(__with_p as *mut u8, 0, __with_n as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_free(__with_p: *mut c_void) {
+    with_free(__with_p as *mut u8)
+}
 pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
     let __with_result = __with_a +% __with_b
     unsafe { (*__with_out = __with_result) }
