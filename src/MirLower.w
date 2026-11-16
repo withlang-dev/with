@@ -19572,11 +19572,34 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
         out.set_stack_literal_call(call_ids[ci], if constant: MIR_LITERAL_STATIC else: MIR_LITERAL_STACK)
     out
 
+// What lowering a function's body reads of its declaration. A declared
+// function's comes from its node; a default trait method an impl inherits
+// has no declaration node, only the trait's parameter records and the
+// impl's copy of the body (#3343). One lowering serves both: the twin
+// codegen kept for default methods scheduled no drop for an owned
+// parameter (a leak), ran no defer at return and wrapped no implicit Ok.
+type FnLowerShape { flags: i32, body: i32, has_params: bool, param_start: i32, param_count: i32, drop_body: bool, pattern_node: i32, start: i32, end: i32 }
+
 fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> LoweredFunction:
     if builder.ast.fn_decl_body_is_interface(fn_node):
         sema_phase_bug("BUG: interface body reached MIR lowering (D39: lower_module skips interface declarations)")
+    let meta = builder.ast.find_fn_meta(fn_node)
+    let shape = FnLowerShape {
+        flags: builder.ast.get_data2(fn_node),
+        body: builder.ast.get_data1(fn_node),
+        has_params: meta >= 0,
+        param_start: if meta >= 0: builder.ast.fn_meta_param_start(meta) else: 0,
+        param_count: if meta >= 0: builder.ast.fn_meta_param_count(meta) else: 0,
+        drop_body: meta >= 0 and builder.fn_node_is_drop_body(fn_node),
+        pattern_node: fn_node,
+        start: builder.ast.get_start(fn_node),
+        end: builder.ast.get_end(fn_node),
+    }
+    lower_fn_shape(builder, sig_idx, shape)
+
+fn lower_fn_shape(builder: MirBuilder, sig_idx: i32, shape: FnLowerShape) -> LoweredFunction:
     builder.contextual_fact_sig_idx = sig_idx
-    let fn_flags = builder.ast.get_data2(fn_node)
+    let fn_flags = shape.flags
     // D69: a gen fn's body lowers as its producer, under the producer's
     // signature; Sema checked it — and keyed its D22 facts — under the gen
     // fn's own.
@@ -19589,7 +19612,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         builder.body.local_type_ids[0] = body_ret_ty
     else:
         // No sig — try to get return type from typed_expr_types on body expression
-        let body_expr = builder.ast.get_data1(fn_node)
+        let body_expr = shape.body
         let ret_ty = builder.expr_type(body_expr)
         if ret_ty != 0 and ret_ty != builder.sema.ty_void:
             builder.body.local_type_ids[0] = ret_ty
@@ -19597,15 +19620,14 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
             builder.body.local_type_ids[0] = builder.sema.ty_void
 
     builder.push_scope()
-    let body_expr = builder.ast.get_data1(fn_node)
+    let body_expr = shape.body
     builder.collect_goto_label_depths(body_expr, builder.drop_scope_starts.len() as i32)
 
     // Parameters: locals 1..n
-    let meta = builder.ast.find_fn_meta(fn_node)
-    if meta >= 0:
-        let param_start = builder.ast.fn_meta_param_start(meta)
-        let param_count = builder.ast.fn_meta_param_count(meta)
-        let drop_body = builder.fn_node_is_drop_body(fn_node)
+    if shape.has_params:
+        let param_start = shape.param_start
+        let param_count = shape.param_count
+        let drop_body = shape.drop_body
 
         // Parameter locals must occupy locals 1..n contiguously (codegen binds
         // incoming arguments to them in order), so create them all first and
@@ -19625,10 +19647,10 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
                     p_ty = builder.sema.ty_i32 as i32
             let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
             builder.bind_local(p_name, local_id)
-            builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, builder.ast.get_start(fn_node))
+            builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, shape.start)
             if builder.local_type_is_str(local_id):
                 builder.set_string_local_flags(local_id, 1)
-            let drop_receiver_self = drop_body != 0 and i == 0 and builder.sema.sym_is_self_value(builder.sema_symbol_for_ast_symbol(p_name))
+            let drop_receiver_self = drop_body and i == 0 and builder.sema.sym_is_self_value(builder.sema_symbol_for_ast_symbol(p_name))
             // §9.5/#641a: `mut self`/`&self` receivers are BORROWS of the
             // caller's place — the callee does not own them and must not drop
             // them at scope exit. Only consuming receivers (`move self`, and
@@ -19650,7 +19672,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
             let share_place_param = sig_idx >= 0 and builder.sema.sig_param_uses_value_ref_abi(sig_idx, i) != 0 and not move_self_receiver
             // #1822: the one decision that the callee does not own this
             // parameter, recorded for the ownership validator to read.
-            if drop_receiver_self != 0 or borrowed_receiver or share_place_param:
+            if drop_receiver_self or borrowed_receiver or share_place_param:
                 builder.body.mark_caller_place_local(local_id)
             else if not builder.copy_is_bits(p_ty):
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
@@ -19661,7 +19683,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         if (fn_flags / FnFlags.GEN) % 2 == 1:
             let body_param_ty = builder.sema.sig_param_type(sig_idx, param_count)
             let body_local = builder.body.new_local(body_param_ty, 0, builder.pool.intern("__with_gen_body"), 1)
-            builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, body_local, 0, builder.ast.get_start(fn_node))
+            builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, body_local, 0, shape.start)
             builder.schedule_drop(body_local, DropKind.DK_VALUE)
             builder.gen_body_local = body_local
             builder.body.n_params = param_count + 1
@@ -19669,7 +19691,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         // Parameter patterns (§9.7): `fn f({ x, y }: Point)` destructures the
         // incoming parameter, binding the pattern's variables. Done after all
         // param locals exist so the field-locals don't split the param range.
-        let ppmeta = builder.ast.find_fn_param_pattern_meta(fn_node)
+        let ppmeta = if shape.pattern_node != 0: builder.ast.find_fn_param_pattern_meta(shape.pattern_node) else: -1
         if ppmeta >= 0:
             let pp_start = builder.ast.fn_param_pattern_meta_start(ppmeta)
             let pp_count = builder.ast.fn_param_pattern_meta_count(ppmeta)
@@ -19701,7 +19723,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         builder.lower_expr_discard(body_expr)
     else:
         let tail_raw = builder.lower_tail_expr(body_expr)
-        let tail_adj = builder.adjust_ret_operand_auto_ref(tail_raw, body_expr, ret_ty, builder.ast.get_end(fn_node))
+        let tail_adj = builder.adjust_ret_operand_auto_ref(tail_raw, body_expr, ret_ty, shape.end)
         let body_result = if tail_adj >= 0: tail_adj else: tail_raw
         // §4.10: the implicit default applies only when the tail's own type is
         // Unit — Sema's type of the body (as the closure path reads it), never
@@ -19714,7 +19736,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         // filled in a block nothing reaches.
         let tail_diverges = sema_body_ty == builder.sema.ty_never as i32
         if body_falls_through != 0 and (tail_is_unit or (tail_diverges and builder.operand_is_unit_value(body_result))):
-            builder.lower_implicit_default_return(ret_ty, builder.ast.get_end(fn_node))
+            builder.lower_implicit_default_return(ret_ty, shape.end)
         else:
             // A value tail that lowered to no value would reach the typed
             // return slot as Unit; say so here, where the cause is known.
@@ -19735,7 +19757,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         let ok_rv = builder.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, ok_fid, 0)
         let ok_tmp = builder.new_temp(ret_ty)
         let ok_place = builder.place_for_local(ok_tmp)
-        builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ok_place, ok_rv, builder.ast.get_end(fn_node))
+        builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ok_place, ok_rv, shape.end)
         // The payload now belongs to Ok. In particular, an if or match tail
         // leaves an owned join temporary in the body frame; consume it before
         // that frame emits cleanup.
@@ -19745,7 +19767,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     // Implicit return value assignment for non-diverging tail expressions.
     if body_falls_through != 0 and not ret_is_void:
         let ret_place = builder.place_for_local(0)
-        builder.assign_operand_to_place(ret_place, result, builder.ast.get_end(fn_node))
+        builder.assign_operand_to_place(ret_place, result, shape.end)
 
     // D16/D17: close the fn-level frame — tail-created temps drop and pending
     // source-resets/move-arg temps land here, after the return value is
@@ -20380,29 +20402,8 @@ fn lower_default_trait_method_bodies(sema: &Sema, ast_pool: &AstPool, pool: &Int
             if mir_mod.find_body(fn_sym) >= 0 or seen.contains(fn_sym): continue
             seen.insert(fn_sym, 1)
             let body_node = ast_pool.impl_default_body(impl_node, trait_body)
-            var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
-            let ret = sema.sig_return_type(sig_idx)
-            let returns_value = ret != 0 and ret != sema.ty_void
-            builder.body.local_type_ids[0] = if returns_value: ret else: sema.ty_void
-            builder.push_scope()
-            for pi in 0..param_count:
-                let name = ast_pool.fn_param_name(param_start, pi)
-                builder.bind_local(name, builder.body.new_local(sema.sig_param_type(sig_idx, pi), 1, name, 1))
-            builder.body.n_params = param_count
-            builder.expected_type = builder.body.local_type_ids[0]
-            // The tail needs an ordinary function's temporary lifetime:
-            // capture the result, then release borrowed call operands.
-            let frame = builder.push_stmt_temp_frame()
-            if returns_value:
-                let result = builder.lower_expr(body_node)
-                builder.assign_operand_to_place(builder.place_for_local(0), result, ast_pool.get_end(body_node))
-            else:
-                builder.lower_expr_discard(body_node)
-            builder.finish_stmt_temp_frame(frame)
-            builder.pop_scope_inline()
-            builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
-            let lowered = LoweredFunction { body: builder.body, anonymous_bodies: builder.anonymous_bodies }
-            out.push(lowered)
+            let builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
+            out.push(lower_fn_shape(builder, sig_idx, FnLowerShape { flags: 0, body: body_node, has_params: true, param_start, param_count, drop_body: false, pattern_node: 0, start: ast_pool.get_start(body_node), end: ast_pool.get_end(body_node) }))
     out
 
 fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirLowerResult:
