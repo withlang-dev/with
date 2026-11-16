@@ -157,7 +157,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
         var __ci_expr_logic_1: i32 = 0
 
         if ((*__local_str) == (*__param_needle)) {
-            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), ((__param_nlen as u64) as i64)): 1 else: 0))
         }
 
         if __ci_expr_logic_1 {
@@ -228,10 +228,10 @@ pub unsafe fn crand64_normal_r(__param_rng: *mut crand64, __param_stream: u64, _
 
 }
 
+var __static__stc64_rng: crand64 = crand64 { data: [(-7046029247804630288 as u64), 8027708214854509594, (-2152535657050944081 as u64), 1] }
 pub fn _stc64() -> *mut crand64 {
-    var __local_rng: crand64 = crand64 { data: [(-7046029247804630288 as u64), 8027708214854509594, (-2152535657050944081 as u64), 1] }
 
-    return ((&raw mut __local_rng as *mut crand64))
+    return ((&raw mut __static__stc64_rng as *mut crand64))
 
 }
 
@@ -298,10 +298,10 @@ pub unsafe fn crand64_uniform_r(__param_rng: *mut crand64, __param_stream: u64, 
 
 }
 
+var __static__stc32_rng: crand32 = crand32 { data: [2654463886, 1856707489, 1684164658, 1] }
 pub fn _stc32() -> *mut crand32 {
-    var __local_rng: crand32 = crand32 { data: [2654463886, 1856707489, 1684164658, 1] }
 
-    return ((&raw mut __local_rng as *mut crand32))
+    return ((&raw mut __static__stc32_rng as *mut crand32))
 
 }
 

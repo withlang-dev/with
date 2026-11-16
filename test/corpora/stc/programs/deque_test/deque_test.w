@@ -169,7 +169,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
         var __ci_expr_logic_1: i32 = 0
 
         if ((*__local_str) == (*__param_needle)) {
-            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), ((__param_nlen as u64) as i64)): 1 else: 0))
         }
 
         if __ci_expr_logic_1 {
@@ -201,7 +201,7 @@ unsafe fn IDeq_reserve(__param_self_: *mut IDeq, __param_cap: i64) -> bool {
         return (((((*__param_self_).cbuf != null)) as bool))
     }
 
-    var __local_d: *mut i32 = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[i32]() as i64)) as i64) else: ((__local_oldpow2 * (sizeof[i32]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32))
+    var __local_d: *mut i32 = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[i32]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i32))
 
     if (__local_d == null) {
         return ((false as bool))
@@ -211,12 +211,12 @@ unsafe fn IDeq_reserve(__param_self_: *mut IDeq, __param_cap: i64) -> bool {
 
     if (not ((*__param_self_).start <= (*__param_self_).end)) {
         if (__local_head < (*__param_self_).end) {
-            with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_head * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_head * (sizeof[i32]() as i64)) as i64) as u64) as i64))
 
             ((*__param_self_).start = (((__local_newpow2 - __local_head) as i64)))
 
         } else {
-            with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((if true: (((*__param_self_).end * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+            with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((((*__param_self_).end * (sizeof[i32]() as i64)) as i64) as u64) as i64))
 
             ((*__param_self_).end = (*__param_self_).end + __local_oldpow2)
 
@@ -295,7 +295,7 @@ unsafe fn IDeq_shrink_to_fit(__param_self_: *mut IDeq) {
     }
 
     if ((*__param_self_).start <= (*__param_self_).end) {
-        with_memmove((((*__param_self_).cbuf as *mut c_void) as *mut u8), ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_sz * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+        with_memmove((((*__param_self_).cbuf as *mut c_void) as *mut u8), ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_sz * (sizeof[i32]() as i64)) as i64) as u64) as i64))
 
         ((*__param_self_).start = ((0 as i64)))
 
@@ -305,13 +305,13 @@ unsafe fn IDeq_shrink_to_fit(__param_self_: *mut IDeq) {
     } else {
         var __local_n: i64 = (((((*__param_self_).capmask - (*__param_self_).start) + 1) as i64))
 
-        with_memmove(((((*__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if true: ((__local_n * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+        with_memmove(((((*__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), ((((__local_n * (sizeof[i32]() as i64)) as i64) as u64) as i64))
 
         ((*__param_self_).start = (((__local_newpow2 - __local_n) as i64)))
 
     }
 
-    ((*__param_self_).cbuf = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_newpow2 * (sizeof[i32]() as i64)) as i64) else: ((((*__param_self_).capmask + 1) * (sizeof[i32]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)))
+    ((*__param_self_).cbuf = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), ((((__local_newpow2 * (sizeof[i32]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i32)))
 
     ((*__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
 
@@ -374,7 +374,7 @@ pub fn IDeq_with_capacity(__param_cap: i64) -> IDeq {
     var __local_cap = __param_cap
     (__local_cap = ((c_next_pow2(((__local_cap + 1) as i64)) as i64)))
 
-    var __local_out: IDeq = IDeq { cbuf: (((with_alloc((((if true: ((__local_cap * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), start: 0, end: 0, capmask: (__local_cap - 1) }
+    var __local_out: IDeq = IDeq { cbuf: (((with_alloc(((((__local_cap * (sizeof[i32]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i32)), start: 0, end: 0, capmask: (__local_cap - 1) }
 
     return __local_out
 
@@ -462,7 +462,7 @@ fn IDeq_clone(__param_q: IDeq) -> IDeq {
 
     (__local_out.capmask = (((c_next_pow2((((unsafe *(&raw const __local_out as *const IDeq)).end + 1) as i64)) - 1) as i64)))
 
-    (__local_out.cbuf = (((with_alloc((((if true: ((((unsafe *(&raw const __local_out as *const IDeq)).capmask + 1) * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)))
+    (__local_out.cbuf = (((with_alloc(((((((unsafe *(&raw const __local_out as *const IDeq)).capmask + 1) * (sizeof[i32]() as i64)) as i64) as u64) as i64)) as *mut c_void) as *mut i32)))
 
     var __local_i: i64 = ((0 as i64))
 
@@ -594,7 +594,7 @@ unsafe fn IDeq_insert_uninit(__param_self_: *mut IDeq, __param_idx: i64, __param
     ((*__param_self_).end = ((((((*__param_self_).end + __param_n) as i64) & ((*__param_self_).capmask as i64)) as i64)))
 
     if ((*(&raw const __local_it_ as *const IDeq_iter)).pos < (*__param_self_).end) {
-        with_memmove(((((*(&raw const __local_it_ as *const IDeq_iter)).ref + ((__param_n as i64) as usize)) as *mut c_void) as *mut u8), (((*(&raw const __local_it_ as *const IDeq_iter)).ref as *const c_void) as *const u8), (((if true: (((__local_len - __param_idx) * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+        with_memmove(((((*(&raw const __local_it_ as *const IDeq_iter)).ref + ((__param_n as i64) as usize)) as *mut c_void) as *mut u8), (((*(&raw const __local_it_ as *const IDeq_iter)).ref as *const c_void) as *const u8), (((((__local_len - __param_idx) * (sizeof[i32]() as i64)) as i64) as u64) as i64))
     } else {
         var __local_i: i64 = (((__local_len - 1) as i64))
 
