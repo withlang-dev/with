@@ -1869,7 +1869,7 @@ impl CiProject:
             else if parts[0] == "sink" and parts.len() == 4:
                 let pi = ci_index_of_name(names, parts[3])
                 if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[1] ++ ":" ++ parts[2] ++ ";"
-            else if (parts[0] == "field" or parts[0] == "global") and parts.len() == 2:
+            else if (parts[0] == "field" or parts[0] == "frame" or parts[0] == "global") and parts.len() == 2:
                 let pi = ci_index_of_name(names, parts[1])
                 if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[0] ++ ";"
             else if parts[0] == "calls" and parts.len() == 2:
@@ -1919,7 +1919,7 @@ impl CiProject:
                 else if self.symbols[si].param_null_caller[pi].len() > 0:
                     self.symbols[si].param_nullable[pi] = 1
                     self.symbols[si].param_reason[pi] = "Option: caller " ++ self.symbols[si].param_null_caller[pi] ++ " passes NULL"
-                else if self.symbols[si].param_sinks[pi].contains("field;"):
+                else if self.symbols[si].param_sinks[pi].contains("field;") or self.symbols[si].param_sinks[pi].contains("frame;"):
                     self.symbols[si].param_nullable[pi] = 1
                     self.symbols[si].param_reason[pi] = "Option: stored into a record field"
                 else if self.symbols[si].param_sinks[pi].contains("global;"):

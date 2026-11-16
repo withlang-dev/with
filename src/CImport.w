@@ -190,6 +190,7 @@ pub let CK_STATIC_ASSERT: i32 = 602
 // CX_StorageClass constants
 let CX_SC_EXTERN: i32 = 2
 pub let CX_SC_STATIC: i32 = 3
+let CX_SC_PRIVATE_EXTERN: i32 = 4
 
 // Global variable definition kinds.
 pub let CI_VAR_DECL_ONLY: i32 = 0
@@ -19000,14 +19001,72 @@ fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
 //   `null:<callee>:<index>`        a NULL literal passed at that position
 //   `sink:<callee>:<index>:<param>` parameter `param` passed at that position
 //   `field:<param>`                parameter stored into a record field
+//   `frame:<param>`                parameter stored into a field of a record
+//                                  in the body's own frame (#3374)
 //   `global:<param>`               parameter assigned to something not a parameter
 //   `assign:<name>`                the global `name` assigned (§31.8.6)
 //   `calls:<callee>`               a function called by name
 // `params` are the enclosing definition's parameter names.
 fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
-    ci_body_call_evidence_walk(session, cursor, params, ci_own_collect_locals(session, cursor))
+    ci_body_call_evidence_walk(session, cursor, params, ci_own_collect_locals(session, cursor), ci_frame_records(session, cursor, params))
 
-fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
+// The names a store into whose field stays in the frame: the frame's locals
+// and the parameters, less every one the body uses as a whole value (the
+// record assigned somewhere, returned, or passed by value: a copy that can
+// outlive the call). Its address taken is not such a use.
+fn ci_frame_records(session: i64, cursor: i32, params: &List[str]) -> List[str]:
+    let copied = ci_whole_value_uses(session, cursor)
+    let frame = []
+    for name in ci_frame_locals(session, cursor):
+        if not copied.contains(name): frame.push(name)
+    for param in params:
+        if not copied.contains(param): frame.push(param)
+    frame
+
+// Every name the body reads as a whole value: a reference that is not the
+// base of `name.field`, the operand of `&name`, or the left side of an
+// assignment.
+fn ci_whole_value_uses(session: i64, cursor: i32) -> List[str]:
+    let uses = []
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if kind == CXK_DECL_REF:
+        uses.push(with_ci_cursor_spelling(session, cursor))
+        return uses
+    let place_first = nc >= 1 and ((kind == CXK_MEMBER_REF and not with_ci_member_is_arrow(session, cursor)) or (kind == CXK_UNARY_OP and with_ci_unary_op(session, cursor) == UO_ADDR) or (kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN))
+    for i in 0..nc:
+        let child = with_ci_child(session, cursor, i)
+        if i == 0 and place_first and with_ci_cursor_kind(session, ci_peel_transparent(session, child)) == CXK_DECL_REF: continue
+        for inner in ci_whole_value_uses(session, child): uses.push(inner)
+    uses
+
+// The body's locals that live in its frame: not `static`, not a block-scope
+// `extern` declaration of a global.
+fn ci_frame_locals(session: i64, cursor: i32) -> List[str]:
+    let locals = []
+    if with_ci_cursor_kind(session, cursor) == CXK_VAR_DECL:
+        let name = with_ci_cursor_spelling(session, cursor)
+        let storage = with_ci_cursor_storage_class(session, cursor)
+        if name.len() > 0 and storage != CX_SC_STATIC and storage != CX_SC_EXTERN and storage != CX_SC_PRIVATE_EXTERN: locals.push(name)
+    for i in 0..with_ci_num_children(session, cursor):
+        for inner in ci_frame_locals(session, with_ci_child(session, cursor, i)): locals.push(inner)
+    locals
+
+// #3374: whether `place` is `name.f` or `name.f.g`, a field of a record
+// that is itself a frame local or a by-value parameter (`sParse.db = db` in
+// sqlite3Prepare, where `Parse sParse;` is a local). The store lands in the
+// callee's frame: by itself it keeps nothing past the call.
+fn ci_place_in_frame_record(session: i64, place: i32, frame: &List[str]) -> bool:
+    var c = ci_peel_transparent(session, place)
+    var depth = 0
+    while depth < 16 and with_ci_cursor_kind(session, c) == CXK_MEMBER_REF and with_ci_num_children(session, c) >= 1:
+        if with_ci_member_is_arrow(session, c): return false
+        c = ci_peel_transparent(session, with_ci_child(session, c, 0))
+        depth += 1
+    if depth == 0 or with_ci_cursor_kind(session, c) != CXK_DECL_REF: return false
+    frame.contains(with_ci_cursor_spelling(session, c))
+
+fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str], frame: &List[str]) -> str:
     if ci_unevaluated(session, cursor): return ""
     var out = ""
     let kind = with_ci_cursor_kind(session, cursor)
@@ -19050,11 +19109,11 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
         for param in params:
             if ci_cursor_names(session, rhs, param):
                 if with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:
-                    out = out ++ "field:" ++ param ++ "\n"
+                    out = out ++ (if ci_place_in_frame_record(session, l, frame): "frame:" else: "field:") ++ param ++ "\n"
                 else if to_global: out = out ++ "global:" ++ param ++ "\n"
     var i = 0
     while i < nc:
-        out = out ++ ci_body_call_evidence_walk(session, with_ci_child(session, cursor, i), params, locals)
+        out = out ++ ci_body_call_evidence_walk(session, with_ci_child(session, cursor, i), params, locals, frame)
         i = i + 1
     out
 
@@ -19208,7 +19267,7 @@ fn ci_own_record_store(session: i64, value: i32, params: &List[str], locals: &Li
     if root.starts_with("param:"): return "paramstore:" ++ root.slice(6, root.len()) ++ "\n"
     ""
 
-fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
+fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str], frame: &List[str]) -> str:
     var out = ""
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
@@ -19239,7 +19298,11 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             // proof's to say (fd_out_fresh); the local is recorded as
             // stored there, not as stored anywhere.
             let slot = ci_own_deref_param(session, lhs, params)
-            let store = ci_own_record_store(session, rhs, params, locals)
+            // #3374: a parameter stored into a field of a record in the
+            // body's own frame is the call evidence's `frame:` record, not
+            // a store. A local stored there stays the store it was.
+            let recorded = ci_own_record_store(session, rhs, params, locals)
+            let store = if recorded.starts_with("paramstore:") and ci_place_in_frame_record(session, lhs, frame): "" else: recorded
             if slot >= 0:
                 out = out ++ f"outstore:{slot}:" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
                 out = out ++ (if store.starts_with("localstore:"): "localout:" ++ store.slice(11, store.len() - 1) ++ f":{slot}\n" else: store)
@@ -19277,7 +19340,7 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             for ci in 0..nc:
                 let child = with_ci_child(session, cursor, ci)
                 if ci >= 1 and ci_own_addr_of_local(session, child, params, locals).len() > 0: continue
-                out = out ++ ci_own_walk(session, child, params, locals)
+                out = out ++ ci_own_walk(session, child, params, locals, frame)
             return out
     if kind == CXK_UNARY_OP and nc == 1 and with_ci_unary_op(session, cursor) == UO_ADDR:
         let root = ci_own_place_root(session, with_ci_child(session, cursor, 0), params, locals)
@@ -19288,11 +19351,11 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
     // that order, `for (cur = t; cur; cur = next) { next = cur->next;
     // free(cur); }` reads as the walk it is (fd_local_alias_param).
     if kind == CXK_FOR_STMT and nc == 4:
-        for child in [0, 1, 3, 2]: out = out ++ ci_own_walk(session, with_ci_child(session, cursor, child), params, locals)
+        for child in [0, 1, 3, 2]: out = out ++ ci_own_walk(session, with_ci_child(session, cursor, child), params, locals, frame)
         return out
     var i = 0
     while i < nc:
-        out = out ++ ci_own_walk(session, with_ci_child(session, cursor, i), params, locals)
+        out = out ++ ci_own_walk(session, with_ci_child(session, cursor, i), params, locals, frame)
         i = i + 1
     out
 
@@ -19536,7 +19599,7 @@ fn ci_value_record_walk(session: i64, cursor: i32, params: &List[str], mode: i32
 
 fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
     let locals = ci_own_collect_locals(session, cursor)
-    ci_own_walk(session, cursor, params, locals)
+    ci_own_walk(session, cursor, params, locals, ci_frame_records(session, cursor, params))
 
 // ── D159: contract evidence for a migrated function's own signature ──────
 //

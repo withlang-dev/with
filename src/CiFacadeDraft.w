@@ -605,6 +605,10 @@ impl CiProject:
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(parts[2]))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ parts[2] ++ ", which no unit defines"
             return "passed " ++ self.fd_sink_text(parts[2]) ++ " at param " ++ parts[3] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1)
+        // #3374: last, so a store the bodies do show is the one reported.
+        // Whether the frame's record outlives the call is not followed:
+        // weaker than a grant, and it contradicts nothing (§31.7).
+        if sinks.contains("frame;"): return "held in a record of the function's own frame, which is not followed"
         "retained by evidence the report cannot restate"
 
     // D198 (§16.2b.5): the records with identity. Some function produces,
@@ -992,7 +996,11 @@ impl CiProject:
             let count = self.symbols[si].param_sinks.len()
             for pi in 0..count:
                 if not self.fd_param_is_pointer(si as i32, pi as i32): continue
-                if self.symbols[si].param_sinks[pi].contains("field;") or self.symbols[si].param_sinks[pi].contains("global;"): self.symbols[si].param_stores[pi] = 1
+                // A store into a record of the body's own frame (`frame;`)
+                // counts here: the record may be copied out or read by a
+                // callee, so a drawn contract keeps the parameter raw. It is
+                // no proof of a store (fd_retain_reason, #3374).
+                if self.symbols[si].param_sinks[pi].contains("field;") or self.symbols[si].param_sinks[pi].contains("global;") or self.symbols[si].param_sinks[pi].contains("frame;"): self.symbols[si].param_stores[pi] = 1
             for line in self.symbols[si].own_evidence.split("\n"):
                 if line.starts_with("paramstore:"):
                     let pi = fd_i32(line.slice(11, line.len()))
