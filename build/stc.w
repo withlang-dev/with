@@ -64,7 +64,7 @@ pub fn stc_corpus() -> Corpus:
         module_floor: 10, defines: ["STC_HEADER"], excludes: List.new(),
         include_dirs: ["include"], declared_externs: List.new(), forced_includes: List.new(),
         promote_after: ["stc-promote-tests"], test_lane: "stc-test",
-        fresh_test_lanes: ["stc-test-fresh"], extra_generated_dirs: [STC_TESTS_DIR],
+        extra_generated_dirs: [STC_TESTS_DIR],
         prepare_reference: corpus_no_prepare, stage: stc_stage,
         migrate: corpus_migrate_directory, finish_generated: corpus_no_finish,
         verify_generated: corpus_no_verify, lanes: stc_lanes,
@@ -424,19 +424,12 @@ pub fn run_stc_test_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if corpus_reset_dir(ctx, output) != 0: return 1
     var report = "upstream=" ++ STC_REVISION ++ "\nconfiguration=tests\n"
-    // D112: `fresh=<dir>` runs the fresh migration (each program whole under
-    // <dir>/tests/<name>) for the migrator gate; otherwise the promoted
-    // programs and their shared engine.
-    let fresh = wo_arg_value(ctx.args(), "fresh=")
     for name in stc_test_programs():
         let program_root = output ++ "/" ++ name
         let module_dir = program_root ++ "/" ++ stc_tests_package_dir()
         if fs.mkdir_all(module_dir) != 0: return 1
-        if fresh.len() > 0:
-            if corpus_copy_w_files(ctx, fresh ++ "/tests/" ++ name, module_dir) != 0: return 1
-        else:
-            if corpus_copy_w_files(ctx, STC_TESTS_DIR ++ "/engine", module_dir) != 0: return 1
-            if corpus_copy_w_files(ctx, STC_TESTS_DIR ++ "/programs/" ++ name, module_dir) != 0: return 1
+        if corpus_copy_w_files(ctx, STC_TESTS_DIR ++ "/engine", module_dir) != 0: return 1
+        if corpus_copy_w_files(ctx, STC_TESTS_DIR ++ "/programs/" ++ name, module_dir) != 0: return 1
         if corpus_copy_w_files(ctx, STC_HARNESS_DIR, module_dir) != 0: return 1
         let binary = output ++ "/" ++ name ++ ".bin"
         var compile_args: List[str] = List.new()
@@ -486,11 +479,4 @@ fn stc_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str
     tests.action = run_stc_test_action
     tests = tests.input(release_compiler).dep("build")
     tests = stc_with_test_inputs(tests, ctx)
-    graph = graph.add_target(tests)
-    // D112: the same programs from a fresh migration, for the migrator gate.
-    var fresh = target_new(.Action, "stc-test-fresh", "").output("out/corpus/stc-test-fresh")
-    fresh.action = run_stc_test_action
-    fresh = fresh.input(release_compiler).input("out/stc_tests_migrated").arg("fresh=out/stc_tests_migrated")
-    fresh = fresh.dep("build").dep("stc-migrate-tests")
-    fresh = stc_with_test_inputs(fresh, ctx)
-    graph.add_target(fresh)
+    graph.add_target(tests)

@@ -241,9 +241,9 @@ fn corpus_w_names(ctx: &ActionCtx, dir: &str) -> List[str]:
 // hash (integrity) and run upstream's tests (the lanes); they never
 // re-migrate to compare. A corpus re-promotes when its upstream pin moves,
 // when its migrator pin is bumped for a fix it needs, or when a language
-// ruling breaks or obsoletes its output. A migrator change is gated by
-// `corpus-migrator-gate`: every corpus migrated afresh into scratch,
-// type-checked and tested there, nothing promoted.
+// ruling breaks or obsoletes its output. Nothing else migrates a corpus
+// that is already migrated (Eric, 2026-11-16): no gate, no report and no
+// tool runs the migrator over one, into scratch or anywhere.
 
 /// The sources that make up `with migrate`; their hash names a migrator
 /// generation.
@@ -317,65 +317,6 @@ pub fn run_corpus_integrity_action(ctx: ActionCtx) -> i32:
     if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
     0
 
-/// How the checked-in corpus differs from a fresh migration: one line per
-/// module that differs, is missing or is extra. The migration is against
-/// the C model (build/corpus.w, #2060), so it means the same on every host.
-fn corpus_drift_lines(ctx: &ActionCtx, corpus: &Corpus) -> List[str]:
-    let fs = ctx.fs()
-    var lines: List[str] = List.new()
-    let generated = corpus_scratch(ctx) ++ "/generated"
-    if corpus_generate(ctx, corpus, generated) != 0:
-        lines.push("  the fresh migration failed; see the log above")
-        return lines
-    let fresh = corpus_w_names(ctx, generated)
-    let checked_in = corpus_w_names(ctx, corpus.corpus_dir)
-    for name in fresh:
-        if not checked_in.contains(name): lines.push("  would add: " ++ corpus.corpus_dir ++ "/" ++ name)
-        else:
-            let now = fs.read_text(corpus.corpus_dir ++ "/" ++ name)
-            let next = fs.read_text(generated ++ "/" ++ name)
-            if now != next: lines.push("  would change: " ++ corpus.corpus_dir ++ "/" ++ name ++ f" ({now.len()} -> {next.len()} bytes)")
-    for name in checked_in:
-        if not fresh.contains(name): lines.push("  would remove: " ++ corpus.corpus_dir ++ "/" ++ name)
-    // D159: the inferred contracts are body-derived facts; a change is
-    // printed line by line, so a human sees which function's proof moved.
-    let promoted_contracts = corpus.corpus_dir ++ "/contracts.tsv"
-    let fresh_contracts = generated ++ "/contracts.tsv"
-    if fs.exists(fresh_contracts):
-        let now = if fs.exists(promoted_contracts): fs.read_text(promoted_contracts) else: ""
-        let next = fs.read_text(fresh_contracts)
-        if now != next:
-            lines.push("  contracts would change: " ++ promoted_contracts)
-            for line in corpus_contract_diff_lines(now, next): lines.push(line)
-    lines
-
-/// `<stem>-drift-report` (nightly, never a gate): which modules a
-/// re-promotion with today's migrator would change, and by how much.
-pub fn run_corpus_drift_report_action(ctx: ActionCtx) -> i32:
-    let owned = action_corpus(ctx)
-    let lines = corpus_drift_lines(&ctx, &owned)
-    var report = owned.name ++ f": {lines.len()} modules would change on re-promotion"
-    for line in lines: report = report ++ "\n" ++ line
-    print(report)
-    if ctx.fs().write_text(ctx.output(), report ++ "\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
-    0
-
-/// `<stem>-stamp`: records the stamp for a corpus that is already today's
-/// migrator output (the corpora that predate D112). It refuses a corpus a
-/// fresh migration would change: that one moves only by promotion.
-pub fn run_corpus_stamp_action(ctx: ActionCtx) -> i32:
-    let owned = action_corpus(ctx)
-    let corpus = &owned
-    let lines = corpus_drift_lines(&ctx, corpus)
-    if lines.len() > 0:
-        var detail = ""
-        for line in lines: detail = detail ++ "\n" ++ line
-        return corpus_fail(ctx, corpus.name ++ ": not today's migrator output, so it is stamped only by promotion:" ++ detail)
-    if corpus_write_stamp(&ctx, corpus, "stamped as today's migrator output (predates D112)") != 0: return 1
-    print("stamped " ++ corpus_stamp_path(corpus))
-    if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
-    0
-
 // ── the pipeline ────────────────────────────────────────────────
 
 // A corpus lane's ceiling is a hang guard, not a speed budget (#2902): an
@@ -445,9 +386,7 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     graph = graph.add_target(root_check)
     graph = graph.add_target(wo_drift_target(ctx, &plan, release_compiler, "build", corpus.corpus_dir ++ "/" ++ corpus.drift_harness, corpus.drift_harness_arg))
 
-    // D112: integrity (no migration) gates every battery; the drift report
-    // is the nightly's; the stamp tool stamps a corpus that is already
-    // today's migrator output.
+    // D112: integrity (no migration) gates every battery.
     var integrity = corpus_target(.Action, corpus, "integrity", "out/corpus-integrity/" ++ corpus.stem ++ ".ok")
     integrity.action = run_corpus_integrity_action
     integrity = integrity.input(corpus_stamp_path(corpus))
@@ -459,24 +398,6 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
             if path.ends_with(".w"): integrity = integrity.input(path.clone())
     integrity = integrity.write_scope("out/corpus-integrity").allow_parallel()
     graph = graph.add_target(integrity)
-
-    var drift = corpus_target(.Action, corpus, "drift-report", "out/corpus-drift/" ++ corpus.stem ++ ".txt")
-    drift.action = run_corpus_drift_report_action
-    drift = corpus_migrating_target(drift, release_compiler)
-    drift = drift.input(up.reference.clone()).input(corpus.corpus_dir ++ "/bundle.w")
-    drift = target_with_corpus_module_inputs(drift, ctx, corpus)
-    drift = drift.dep(corpus.stem ++ "-prepare-reference")
-    drift = drift.write_scope("out/corpus-drift").allow_parallel()
-    graph = graph.add_target(drift)
-
-    var stamp = corpus_target(.Action, corpus, "stamp", "out/corpus-stamp/" ++ corpus.stem ++ ".ok")
-    stamp.action = run_corpus_stamp_action
-    stamp = corpus_migrating_target(stamp, release_compiler)
-    stamp = stamp.input(up.reference.clone()).input(corpus.corpus_dir ++ "/bundle.w")
-    stamp = target_with_corpus_module_inputs(stamp, ctx, corpus)
-    stamp = stamp.dep(corpus.stem ++ "-prepare-reference")
-    stamp = stamp.write_scope("out/corpus-stamp").write_scope(corpus.corpus_dir.clone())
-    graph = graph.add_target(stamp)
 
     corpus.lanes(graph, ctx, corpus, release_compiler)
 
@@ -502,24 +423,6 @@ pub fn corpora_promote_guard_target() -> Target:
 pub fn corpora_integrity_group() -> Target:
     var group = target_new(.Group, "corpus-integrity-check", "")
     for i in 0..corpus_count(): group = group.dep(corpus_at(i).stem ++ "-integrity")
-    group
-
-/// `corpus-migrator-gate` (D112 amendment 1): every corpus migrated afresh
-/// with this tree's migrator, type-checked with its harness, and its
-/// upstream tests run on the fresh output. Nothing is promoted.
-pub fn corpora_migrator_gate_group() -> Target:
-    var group = target_new(.Group, "corpus-migrator-gate", "")
-    for i in 0..corpus_count():
-        let corpus = corpus_at(i)
-        group = group.dep(corpus.stem ++ "-check-generated")
-        for lane in corpus.fresh_test_lanes: group = group.dep(lane.clone())
-    group
-
-/// `corpus-drift-report` (nightly, informational): which corpora a
-/// re-promotion would change, and by how much.
-pub fn corpora_drift_report_group() -> Target:
-    var group = target_new(.Group, "corpus-drift-report", "")
-    for i in 0..corpus_count(): group = group.dep(corpus_at(i).stem ++ "-drift-report")
     group
 
 /// The corpora lanes `:test` runs.

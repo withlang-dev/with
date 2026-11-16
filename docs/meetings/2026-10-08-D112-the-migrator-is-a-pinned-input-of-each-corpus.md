@@ -72,6 +72,11 @@ which point amendment 3 takes over."
 compiling without a ruling, or a migrator regression the re-migration gate
 did not catch.
 
+**Superseded in part (2026-11-16, D206).** Amendment 1 (the re-migration gate)
+and the nightly drift report are withdrawn: nothing routine migrates a corpus
+that is already migrated. The gate, the fresh-test lanes and the report are
+removed.
+
 **Enforcement (2026-10-22).** The rule was broken once: a preamble change
 (`strlen` is `size_t`) collided with the five promoted corpora's own copies
 of the declaration, and all five were re-promoted to agree. Eric: "changing

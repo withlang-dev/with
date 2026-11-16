@@ -170,8 +170,8 @@ corpus change, and `:release-checks` before every seed cut and release.
 **A seed cut or a release.** `src/main build :release-checks` runs what the
 battery does not: the fixpoint (stage2 compiles the compiler into stage3, and
 the two are byte-identical), the Sema regression rebuilds (issue61, the
-invariance perturbations), the C migrator tests, every corpus migrated afresh
-and tested, and wo-drift. A seed is cut, and a release made, only from a tree
+invariance perturbations), the corpora's own tests on the promoted corpora,
+and wo-drift. It migrates nothing (D206). A seed is cut, and a release made, only from a tree
 whose `:release-checks` is green; `release-uat` depends on it. Then follow
 [docs/spec/toolchain/with-release-runbook.md](docs/spec/toolchain/with-release-runbook.md).
 A newer seed lands as its own PR: bump `seed.lock`, `with run
