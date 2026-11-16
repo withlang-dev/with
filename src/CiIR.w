@@ -935,7 +935,7 @@ type CiProjectSymbol {
     // body tests it for NULL and the NULL branch continues;
     // `param_aborting[i]` 1 when every test's NULL branch aborts;
     // `param_null_caller[i]` names the first corpus caller passing NULL;
-    // `param_sinks[i]` lists `callee:index`, `field` and `global` sinks
+    // `param_sinks[i]` lists `callee:index`, `field`, `frame` and `global` sinks
     // the body passes it to; `param_nullable[i]` is the verdict (1 Option)
     // and `param_reason[i]` its one-line reason. `has_definition` is 1 when
     // a corpus unit defines the function; `unanalyzable` 1 when a body
