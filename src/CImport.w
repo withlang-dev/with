@@ -12842,6 +12842,15 @@ impl CiExprPool:
             return self.cast(result_ty, arg_ids[0] as CiExprId)
         if callee_text == "__builtin_add_overflow" or callee_text == "__builtin_sub_overflow" or callee_text == "__builtin_mul_overflow":
             return self.build_overflow_builtin_call(session, cursor, callee_text, arg_ids, types)
+        // glibc's `fpclassify(x)`: the five FP_* values, then the operand.
+        // std.libc's function answers with the target's same five.
+        if callee_text == "__builtin_fpclassify":
+            if arg_ids.len() != 6:
+                return self.reject_builtin_call(session, cursor, callee_text, "expected six arguments")
+            let operand_ty = self.get_type(arg_ids[5] as CiExprId)
+            let classify = if operand_ty != 0 and ci_print_type(types, operand_ty) == "f32": "fpclassifyf" else: "fpclassify"
+            ci_migrate_note_libc_symbol(classify)
+            return self.build_named_call_expr_typed(classify, [arg_ids[5]], types.named_type_from_text("i32"))
         let float_class = ci_float_class_fn(callee_text)
         if float_class.len() > 0:
             if arg_ids.len() != 1:
@@ -21232,9 +21241,10 @@ fn ci_unexposed_expr_form(session: i64, cursor: i32) -> i32:
             expr_children += 1
     if expr_children <= 1:
         return CI_UNEXPOSED_WRAPPER
-    // `__builtin_choose_expr` spelled in the source (through a macro its
-    // text is the macro's, and it is refused rather than guessed).
-    if nc == 3 and ci_starts_with(ci_trim(with_ci_cursor_source_text(session, cursor)), "__builtin_choose_expr"):
+    // `__builtin_choose_expr`, spelled in the source or in the macro that
+    // expands to it (mingw's `isnan`, `signbit`, `fpclassify`): the token
+    // where the expression is spelled says which, with no guess.
+    if nc == 3 and (ci_starts_with(ci_trim(with_ci_cursor_source_text(session, cursor)), "__builtin_choose_expr") or with_ci_cursor_spelling_head(session, cursor) == "__builtin_choose_expr"):
         return CI_UNEXPOSED_CHOOSE
     // GNU `a ?: b`: libclang visits the common operand, then its two opaque
     // uses as that same expression (one cursor), then the fallback.
@@ -21807,6 +21817,9 @@ fn ci_libc_modeled_return_type(name: &str) -> str:
 // the macros to `__inline_<m>{f,d,l}`, clang and glibc to `__builtin_<m>`,
 // older glibc to `__<m>{,f,l}` (`__finite` for isfinite).
 fn ci_float_class_fn(name: &str) -> str:
+    // glibc's <math.h> spells `isinf(x)` as this builtin, whose value
+    // carries the sign (the c99_math case had no lowering on Linux).
+    if name == "__builtin_isinf_sign": return "isinf_sign"
     for m in ["isnan", "isinf", "isfinite", "signbit"]:
         if name == m: return m
         for prefix in ["__inline_", "__builtin_", "__"]:
@@ -21817,6 +21830,12 @@ fn ci_float_class_fn(name: &str) -> str:
 fn ci_libc_portable_callee(name: &str) -> str:
     let float_class = ci_float_class_fn(name)
     if float_class.len() > 0: return float_class
+    // What `fpclassify(x)` expands to: Darwin's `__fpclassifyd`, mingw's
+    // and musl's `__fpclassify` (the `l` form as the `l` classification
+    // macros are: through f64). std.libc's answers with the target's own
+    // FP_* values, which is what the C text compares it with.
+    if name == "__fpclassify" or name == "__fpclassifyd" or name == "__fpclassifyl": return "fpclassify"
+    if name == "__fpclassifyf": return "fpclassifyf"
     if name == "__error" or name == "__errno_location" or name == "_errno": return "errno_ptr"
     if name == "_fileno": return "fileno"
     if name == "_isatty": return "isatty"
@@ -21888,6 +21907,8 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "isgraph" or name == "ispunct" or name == "iscntrl": return CI_LIBC_KIND_FN
     if name == "tolower" or name == "toupper": return CI_LIBC_KIND_FN
     if ci_is_libm_fn(name) or ci_is_libc_math_fn(name) or ci_float_class_fn(name).len() > 0: return CI_LIBC_KIND_FN
+    // `fpclassify` and the spellings it expands to (ci_libc_portable_callee).
+    if name == "fpclassify" or name == "fpclassifyf" or name == "__fpclassify" or name == "__fpclassifyd" or name == "__fpclassifyf" or name == "__fpclassifyl": return CI_LIBC_KIND_FN
     if name == "abort" or name == "exit" or name == "clock" or name == "time" or name == "isatty": return CI_LIBC_KIND_FN
     if name == "__assert_rtn" or name == "__assert_fail" or name == "_assert": return CI_LIBC_KIND_FN
     if name == "mkstemp" or name == "realpath": return CI_LIBC_KIND_FN
