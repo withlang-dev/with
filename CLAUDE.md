@@ -1109,7 +1109,8 @@ continue debugging until it passes.
 All changes reach `main` through a PR. Branch protection requires a PR with
 zero approvals (Eric, 2026-09-23): the seed-driven battery is the gate (D56).
 Batch related commits into one PR as the battery batches them. GitHub lanes are
-not a merge signal (a lane takes hours; they run nightly and on dispatch,
+not a merge signal (a lane takes hours; the nightly release runs every
+platform once a night and the per-platform lanes run on dispatch only,
 post-hoc); a PR is a draft until its seed-driven battery is green and posted,
 then marked ready. The SDK is built only on release (`sdk-release.yml`).
 

@@ -1,14 +1,14 @@
 name: windows aarch64
 
 on:
-  # Lanes run nightly and on request; never on a push or a PR (D56, Eric
+  # On request only: the nightly release (nightly-release.yml) builds,
+  # fixpoints and tests every platform each night, and a second scheduled run
+  # of that work was waste (Eric 2026-11-16). Never on a push or a PR (D56, Eric
   # 2026-09-22: CI was overzealous in what it did on every push). A lane
   # takes hours on a 4-core runner (compiler build, fixpoint, battery), so
   # it is not a merge signal: the seed-driven battery on the maintainer
   # machine gates a PR and is posted on it. The SDK is built only on
   # release (sdk-release.yml), never here.
-  schedule:
-    - cron: "20 9 * * *"
   workflow_dispatch:
 
 # Never cancel a run: it is the evidence for that night's main.

@@ -77,6 +77,17 @@ and the nightly drift report are withdrawn: nothing routine migrates a corpus
 that is already migrated. The gate, the fresh-test lanes and the report are
 removed.
 
+**Correction to this record (2026-11-16).** This entry quotes the three
+numbered amendments inside the ruling, as Eric's words. Eric, 2026-11-16: "I
+never authorized a routine seed cut to migrate anything (discarded or not)."
+Amendment 1 is therefore not his authorization and must not be cited as one.
+What was built went further than the amendment as written: it speaks of a PR
+that touches the migrator, and the fresh-migration lanes ran at every seed
+cut and release (D131 placed the corpus lanes in `:release-checks`), whether
+or not the migrator had changed. The ruling itself is the paragraph that
+begins "Take A"; amendments 2 and 3 stand as the practice they describe
+(CLAUDE.md's rule on corpus idioms; a ruling carries its re-promotions).
+
 **Enforcement (2026-10-22).** The rule was broken once: a preamble change
 (`strlen` is `size_t`) collided with the five promoted corpora's own copies
 of the declaration, and all five were re-promoted to agree. Eric: "changing

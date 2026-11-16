@@ -80,6 +80,19 @@ fn publish_env(version: &str, channel: &str, assets: &str, extras: &str, builder
     set_env("RELEASE_BUILDER", builder)
     set_env("RELEASE_REPO", "withlang-dev/with")
 
+/// Whether the committed sources already have a published green under the
+/// pinned seed (`:sources-green`, as tools/battery.w asks it).
+fn sources_are_green(seed: &str) -> bool:
+    run_to_files(&argv3("git", "rev-parse", "HEAD"), "out/release-local-head.txt", "out/release-local-head.stderr", 0)
+    let head = text_of("out/release-local-head.txt").trim().to_owned()
+    set_env("WITH_DRIVER_SHA256", lock_value(text_of("seed.lock"), "with-darwin-aarch64"))
+    set_env("WITH_SOURCES_COMMIT", head)
+    let rc = step("darwin :sources-green", &argv3(seed, "build", ":sources-green"))
+    set_env("WITH_DRIVER_SHA256", "")
+    set_env("WITH_SOURCES_COMMIT", "")
+    if rc == 0: print("== these sources are already green; :test, :test-green and :last-green are not run again")
+    rc == 0
+
 fn darwin_leg(version: &str, channel: &str) -> i32:
     let root = env("PWD")
     let seed = root ++ "/src/main"
@@ -93,18 +106,22 @@ fn darwin_leg(version: &str, channel: &str) -> i32:
     // same graph the CI lanes do; the #2887 hand-run `:selfcheck` hid that
     // the test group never ran it, through two tags.
     set_env("WITH", seed)
+    let build_argv = argv2(seed, "build")
+    if step("darwin build", &build_argv) != 0: return 1
+    // A green belongs to the sources (D49): when these sources already have
+    // a published green under this seed, the battery that produced it is not
+    // run a second time (Eric 2026-11-16). `:release-uat` reads the same
+    // published green (require-last-green).
     var gates: List[str] = List.new()
     gates.push(":fixpoint")
-    gates.push(":test")
-    gates.push(":test-green")
-    gates.push(":last-green")
+    if not sources_are_green(seed):
+        gates.push(":test")
+        gates.push(":test-green")
+        gates.push(":last-green")
     gates.push(":release-uat")
     gates.push(":package-current-host")
     gates.push(":package-llvm-sdk")
-    let build_argv = argv2(seed, "build")
-    if step("darwin build", &build_argv) != 0: return 1
-    for gi in 0..gates.len():
-        let target = gates[gi]
+    for target in gates:
         let argv = argv3(seed, "build", target)
         if step("darwin " ++ target, &argv) != 0: return 1
     // The rebuilt compiler publishes.
