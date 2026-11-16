@@ -67,6 +67,9 @@ impl Codegen:
         // its body is the bundle's object, selected at link time.
         if self.fn_is_bundle_provided(fn_sym):
             return
+        // #3351: nothing the roots reach names it. It stays a declaration
+        // (externalize_unreached_declarations gives it a declaration's linkage).
+        if self.mir_fn_unreached(fn_sym): return
         let body_idx = self.mir_find_body_idx(fn_sym)
         if body_idx >= 0:
             let body = self.mir_body_at(body_idx)
@@ -363,6 +366,7 @@ impl Codegen:
     // `Regex.__literal_code`, `Regex.__capture_count`) as this unit generated
     // it; a missing one is a loud error, never a fresh declaration.
     mut fn regex_facade_fn(name: &str) -> i64:
+        if not sema_codegen_named_fns().contains(name): sema_phase_bug("BUG: codegen names " ++ name ++ ", which sema_codegen_named_fns does not list")
         let helper_sym = self.intern.intern(name)
         let fn_opt = self.fn_values.get(helper_sym)
         if fn_opt.is_some():

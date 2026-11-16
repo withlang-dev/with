@@ -3297,6 +3297,10 @@ impl Sema:
         // text on every comptime eval leaked ~8.5 MB × N evals = GBs of dead copies.
         self
 
+// #3351: the functions codegen calls by name: the regex facade's literal
+// helpers. Codegen refuses to look up a name that is not here.
+fn sema_codegen_named_fns() -> List[str]: ["Regex.__literal_code", "Regex.__capture_count", "Regex.__literal_free_all"]
+
 fn sema_pair_key(a: isize, b: isize) -> i64:
     (a as i64) * 4294967296 + (b as i64)
 
