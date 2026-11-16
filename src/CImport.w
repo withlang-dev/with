@@ -1492,7 +1492,7 @@ fn ci_record_decl_directly_demoted_cursor(session: i64, decl_cursor: i32) -> boo
     var i = 0
     while i < nc:
         let child = with_ci_child(session, decl_cursor, i)
-        if with_ci_cursor_kind(session, child) == CK_FIELD:
+        if with_ci_cursor_kind(session, child) == CK_FIELD or with_ci_cursor_is_anon_record_member(session, child) != 0:
             // §16.9: a record with bitfields is opaque, named or not. Under
             // `with migrate` a file-scope record keeps its layout (D147,
             // ci_is_directly_demoted); a member record with one is refused
@@ -1543,7 +1543,7 @@ fn ci_record_decl_has_demoted_field_cursor(session: i64, decl_cursor: i32, demot
     var i = 0
     while i < nc:
         let child = with_ci_child(session, decl_cursor, i)
-        if with_ci_cursor_kind(session, child) == CK_FIELD:
+        if with_ci_cursor_kind(session, child) == CK_FIELD or with_ci_cursor_is_anon_record_member(session, child) != 0:
             let anon_decl = ci_field_cursor_anon_record_decl(session, child)
             if anon_decl >= 0:
                 if ci_record_decl_has_demoted_field_cursor(session, anon_decl, demoted):
