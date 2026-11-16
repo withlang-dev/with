@@ -32376,6 +32376,18 @@ impl Sema:
     // `T.name()` is each instance's own type and MIR emits the constant;
     // a backend never reads the name from the syntax (`nameof[T]()` printed
     // `T` in every instance).
+    // #3351: whether a function declaration is the program's `main` (MIR
+    // lowering asks Sema; it never compares a name itself, D65).
+    fn fn_decl_is_main(decl: i32) -> bool: self.pool_resolve(self.ast.get_data0(decl)) == "main"
+
+    // #3343: the symbol of a method of an impl, its own or one it inherits
+    // from its trait: the owner key (§18.1) and the method's name.
+    fn impl_method_symbol_text(impl_node: i32, method_sym: i32) -> str: self.pool_resolve(self.impl_owner_key_symbol(impl_node)) ++ "." ++ self.pool_resolve(method_sym)
+
+    // #3351: a function codegen calls by name (no MIR names it), so one the
+    // roots reach whenever it is declared.
+    fn fn_sym_is_codegen_named(sym: i32) -> bool: sema_codegen_named_fns().contains(self.pool_resolve(sym))
+
     mut fn note_type_method(node: i32, ty: i32):
         let key = sema_pair_key(self.current_specialization_sym, node)
         self.type_method_types.insert(key, ty)

@@ -20278,6 +20278,133 @@ fn global_initializer_creates_bodies(sema: &Sema, ast_pool: &AstPool, di: i32) -
         n = n + 1
     false
 
+fn mir_body_fn_refs(body: &MirBody) -> List[i32]:
+    let out = []
+    var ci = 0
+    for kind in body.const_kinds:
+        if kind == ConstKind.CK_FN: out.push(body.const_d0[ci])
+        ci += 1
+    out
+
+// #3351: the declared functions no code reaches, which codegen leaves as
+// declarations (a 31-line test that imports one compiler module generated
+// code for 10,616 functions to run 11). Every body is lowered and checked
+// whatever this says: it decides what is emitted, never what is accepted.
+// A program is walked from its roots: `main` and the entry, test and hook
+// functions, a function with a calling convention attribute (C calls it),
+// a function codegen calls by name, and every body that is not a declared
+// function's own (a specialization, a trait method an impl inherits, a
+// closure, a formatter, an initializer). Every method of a trait impl is a
+// root: codegen reaches those through tables. Each reached body adds the
+// functions its MIR names; a global's initializer the backends evaluate
+// themselves is lowered here to be read for the functions it names. A unit
+// with no `main` (a library, an object) keeps everything.
+fn mir_unreached_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mir_mod: &MirModule) -> HashMap[i32, i32, Minted]:
+    let unreached = sema_new_map_i32_i32()
+    // The trait impls, as (file, start, end): a method is its impl's by span.
+    let impl_spans = []
+    var has_main = false
+    for di in 0..ast_pool.decl_count():
+        let decl = ast_pool.get_decl(di)
+        if ast_pool.kind(decl) == NodeKind.NK_FN_DECL and (sema.fn_decl_is_main(decl as i32) or (ast_pool.get_data2(decl) / FnFlags.ENTRY) % 2 == 1): has_main = true
+        if ast_pool.kind(decl) != NodeKind.NK_IMPL_DECL or ast_pool.get_data2(decl) == 0: continue
+        impl_spans.push(ast_pool.state.files[decl])
+        impl_spans.push(ast_pool.get_start(decl))
+        impl_spans.push(ast_pool.get_end(decl))
+    if not has_main: return unreached
+
+    let pending = []
+    for di in 0..ast_pool.decl_count():
+        let decl = ast_pool.get_decl(di)
+        if ast_pool.kind(decl) != NodeKind.NK_FN_DECL or ast_pool.fn_decl_body_is_interface(decl): continue
+        if mir_fn_is_generic_template_at(sema, ast_pool, pool, decl as i32, di): continue
+        let fn_sym = sema.fn_decl_semantic_symbol_at(decl as i32, ast_pool.get_data0(decl), di)
+        let body_sym = mir_symbol_for_pool(sema, pool, fn_sym)
+        if mir_mod.find_body(body_sym) < 0: continue
+        let flags = ast_pool.get_data2(decl)
+        let meta = ast_pool.find_fn_meta(decl)
+        var root = sema.fn_decl_is_main(decl as i32) or sema.fn_sym_is_codegen_named(fn_sym) or (flags / FnFlags.ENTRY) % 2 == 1 or (flags / FnFlags.TEST) % 2 == 1 or (flags / FnFlags.BENCH) % 2 == 1 or (flags / FnFlags.BEFORE) % 2 == 1 or (flags / FnFlags.AFTER) % 2 == 1 or (flags / FnFlags.PANIC_HANDLER) % 2 == 1 or (meta >= 0 and ast_pool.fn_meta_tp_count(meta) == 0 and ast_pool.fn_meta_tp_start(meta) != 0)
+        var s = 0
+        while not root and s + 2 < impl_spans.len():
+            root = impl_spans[s] == ast_pool.state.files[decl] and ast_pool.get_start(decl) >= impl_spans[s + 1] and ast_pool.get_end(decl) <= impl_spans[s + 2]
+            s = s + 3
+        if root: pending.push(body_sym) else: unreached.insert(body_sym, 1)
+    // Every body that is not a declared function's own is a root.
+    for sym in mir_mod.body_fn_syms:
+        if not unreached.contains(sym): pending.push(sym)
+    for di in sema.global_init_order:
+        let decl = ast_pool.get_decl(di)
+        let value = ast_pool.get_data1(decl)
+        let tid = sema.typed_binding_types.get(decl as i32) ?? 0
+        if tid == 0 or mir_mod.global_init_body_syms.contains(value): continue
+        var builder = MirBuilder.init(sema, ast_pool, pool, pool.intern(f"__with_init_body_{decl as i32}"))
+        builder.lower_global_initializer(value, tid)
+        for named in mir_body_fn_refs(builder.body):
+            if unreached.remove(named).is_some(): pending.push(named)
+
+    var next = 0
+    while next < pending.len():
+        let at = mir_mod.find_body(pending[next])
+        next += 1
+        if at < 0: continue
+        for named in mir_body_fn_refs(mir_mod.bodies[at]):
+            if unreached.remove(named).is_some(): pending.push(named)
+    unreached
+
+// #3343: the body an impl inherits from its trait is a function of that
+// impl, lowered with the module like any other: the checks made on MIR
+// (the validators, the audits, the callback-pair proof) read it, a closure
+// it creates joins the module, and the functions it names are known before
+// codegen. Codegen built this body itself, after every check had run.
+// The set is Sema's (check_trait_default_method_bodies), in its order.
+fn lower_default_trait_method_bodies(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mir_mod: &MirModule) -> List[LoweredFunction]:
+    let out = []
+    let seen = sema_new_map_i32_i32()
+    for di in 0..ast_pool.decl_count():
+        if sema.decl_is_lazy_skipped(di as i32): continue
+        let impl_node = ast_pool.get_decl(di) as i32
+        if ast_pool.kind(impl_node) != NodeKind.NK_IMPL_DECL or ast_pool.get_data2(impl_node) == 0: continue
+        let trait_idx = sema.trait_idx_for_impl(impl_node)
+        if trait_idx < 0: continue
+        let first: i32 = sema.trait_method_starts[trait_idx]
+        let count: i32 = sema.trait_method_counts[trait_idx]
+        for method_idx in first..first + count:
+            let trait_body: i32 = sema.trait_method_default_bodies[method_idx]
+            let method_sym: i32 = sema.trait_method_names[method_idx]
+            if trait_body == 0 or sema.impl_decl_has_method(impl_node, method_sym): continue
+            let sig_idx = sema.lookup_method_sig(sema.impl_owner_key_symbol(impl_node), method_sym)
+            let param_start: i32 = sema.trait_method_param_starts[method_idx]
+            let param_count: i32 = sema.trait_method_param_counts[method_idx]
+            if sig_idx < 0 or param_start < 0 or sema.sig_get_param_count(sig_idx) != param_count: continue
+            let fn_sym = pool.intern(sema.impl_method_symbol_text(impl_node, method_sym))
+            if mir_mod.find_body(fn_sym) >= 0 or seen.contains(fn_sym): continue
+            seen.insert(fn_sym, 1)
+            let body_node = ast_pool.impl_default_body(impl_node, trait_body)
+            var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
+            let ret = sema.sig_return_type(sig_idx)
+            let returns_value = ret != 0 and ret != sema.ty_void
+            builder.body.local_type_ids[0] = if returns_value: ret else: sema.ty_void
+            builder.push_scope()
+            for pi in 0..param_count:
+                let name = ast_pool.fn_param_name(param_start, pi)
+                builder.bind_local(name, builder.body.new_local(sema.sig_param_type(sig_idx, pi), 1, name, 1))
+            builder.body.n_params = param_count
+            builder.expected_type = builder.body.local_type_ids[0]
+            // The tail needs an ordinary function's temporary lifetime:
+            // capture the result, then release borrowed call operands.
+            let frame = builder.push_stmt_temp_frame()
+            if returns_value:
+                let result = builder.lower_expr(body_node)
+                builder.assign_operand_to_place(builder.place_for_local(0), result, ast_pool.get_end(body_node))
+            else:
+                builder.lower_expr_discard(body_node)
+            builder.finish_stmt_temp_frame(frame)
+            builder.pop_scope_inline()
+            builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+            let lowered = LoweredFunction { body: builder.body, anonymous_bodies: builder.anonymous_bodies }
+            out.push(lowered)
+    out
+
 fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirLowerResult:
     var sema = input_sema
     sema.prepare_source_line_offsets()
@@ -20342,6 +20469,8 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
         mir_mod.global_init_body_syms.insert(value, init_sym)
         mir_mod.add_lowered_function(LoweredFunction { body: move builder.body, anonymous_bodies: move builder.anonymous_bodies })
 
+    for inherited in lower_default_trait_method_bodies(sema, ast_pool, pool, mir_mod): mir_mod.add_lowered_function(inherited)
+
     // Lower the dynamic specialization queue to a fixpoint. Rechecking a body
     // can discover nested calls, and preregistration can expose concrete
     // generic Drop implementations that have no source call node of their own.
@@ -20374,6 +20503,8 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
     for entry in 0..sema.debug_fmt_tids.len():
         if sema.debug_fmt_kinds[entry] == DebugFmtKind.SYNTH as i32:
             mir_mod.add_body(lower_debug_formatter(sema, ast_pool, pool, entry as i32))
+
+    mir_mod.unreached_fns = mir_unreached_functions(sema, ast_pool, pool, mir_mod)
 
     mir_mod.validate_generic_call_contracts(sema)
 

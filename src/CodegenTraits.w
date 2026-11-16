@@ -596,6 +596,10 @@ impl Codegen:
         self.fn_values.insert(fn_sym, function)
         self.fn_fn_types.insert(fn_sym, fn_ty)
         self.bind_fn_abi(fn_sym, abi_index, function)
+        // #3343: its body is the module's, so the unit plan gives it to one
+        // unit like any function; the others declare it. (Outside the plan
+        // every unit emitted it and all but unit 0 deleted theirs.)
+        if not self.unit_owns(fn_sym): return
 
         let saved_fn = self.current_function
         let saved_fn_name_sym = self.current_function_name_sym
@@ -715,35 +719,11 @@ impl Codegen:
         self.mir_bb_values = dtm_fresh_mir_bbs
         self.mir_default_unreachable_bbs = dtm_fresh_mir_unr
 
-        var dtm_builder = MirBuilder.init(self.sema, self.pool, self.intern, fn_sym)
-        // Set return type
-        let dtm_ret_sema = self.sema.sig_return_type(sig_idx)
-        if dtm_ret_sema != 0 and dtm_ret_sema != self.sema.ty_void:
-            dtm_builder.body.local_type_ids[0] = dtm_ret_sema
-        else:
-            dtm_builder.body.local_type_ids[0] = self.sema.ty_i32
-
-        dtm_builder.push_scope()
-
-        // Register params as MIR locals
-        for dtm_pi in 0..param_count:
-            let dtm_p_name = self.pool.fn_param_name(param_start, dtm_pi)
-            let dtm_p_sema_ty = self.sema.sig_param_type(sig_idx, dtm_pi)
-            let dtm_p_local = dtm_builder.body.new_local(dtm_p_sema_ty, 1, dtm_p_name, 1)
-            dtm_builder.bind_local(dtm_p_name, dtm_p_local)
-
-        dtm_builder.expected_type = dtm_builder.body.local_type_ids[0]
-
-        // Default-method tails need the same temporary lifetime as ordinary
-        // functions: capture the result, then release borrowed call operands.
-        let body_frame = dtm_builder.push_stmt_temp_frame()
-        let dtm_result = dtm_builder.lower_expr(body_node)
-        let dtm_ret_place = dtm_builder.place_for_local(0)
-        dtm_builder.assign_operand_to_place(dtm_ret_place, dtm_result, self.pool.get_end(body_node))
-        dtm_builder.finish_stmt_temp_frame(body_frame)
-        dtm_builder.pop_scope_inline()
-        dtm_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
-        let dtm_body = move dtm_builder.body
+        // #3343: the body is the module's, lowered and checked with every
+        // other function (lower_default_trait_method_bodies).
+        let dtm_body_idx = self.mir_find_body_idx(fn_sym)
+        if dtm_body_idx < 0: sema_phase_bug("BUG: default method " ++ mangled ++ " has no MIR body")
+        let dtm_body = self.mir_body_at(dtm_body_idx)
 
         // Set up return alloca (MIR local 0). Void returns keep the dead i32
         // slot the normal MIR emitter uses — alloca of void is invalid LLVM and

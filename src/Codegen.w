@@ -1841,6 +1841,9 @@ impl Codegen:
     fn mir_fn_syms_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms.len() }
     fn mir_fn_sym_at(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms[i] }
     fn mir_find_body_idx(sym: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).find_body(sym) }
+    // #3351: a declared function nothing reaches is left a declaration.
+    fn mir_fn_unreached(sym: i32) -> bool: unsafe { (*(self.mir_ptr as *const MirModule)).unreached_fns.contains(sym) }
+    fn mir_has_unreached_fns() -> bool: unsafe { (*(self.mir_ptr as *const MirModule)).unreached_fns.len() > 0 }
     // The module's body for the global initializer whose value is `value`
     // (MirModule.global_init_body_syms), or 0 when its backend lowers it.
     fn mir_global_init_body_sym(value: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).global_init_body_syms.get(value) ?? 0 }
@@ -1883,6 +1886,17 @@ impl Codegen:
     // are emitted by passes shared across units). Deterministic module walk;
     // renamed __wcu$ fns are owner-defined already, internal/private fns are
     // legitimately per-unit (trampolines), declarations are untouched.
+    // #3351: a function the roots do not reach was declared and has no body.
+    // It stays a declaration, which is external: an internal function with
+    // no body is no module ("Global is external, but doesn't have external
+    // or weak linkage").
+    fn externalize_unreached_declarations():
+        if not self.mir_has_unreached_fns(): return
+        var f = wl_get_first_function(self.llmod)
+        while f != 0:
+            if wl_fn_is_declaration(f) != 0 and wl_get_linkage(f) == wl_internal_linkage(): wl_set_linkage(f, wl_external_linkage())
+            f = wl_get_next_function(f)
+
     fn unit_demote_foreign_definitions():
         if self.unit_total <= 1 or self.unit_index == 0:
             return
@@ -8038,6 +8052,7 @@ impl Codegen:
             self.wrap_main_for_exit()
 
         self.unit_demote_foreign_definitions()
+        self.externalize_unreached_declarations()
 
         // Finalize debug info before verification
         self.debug_finalize_module()

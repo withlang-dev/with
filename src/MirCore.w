@@ -333,6 +333,11 @@ type MirModule {
     // closure or an async block, whose bodies must join the module): its
     // value node to its body's symbol. Both backends run that body.
     global_init_body_syms: HashMap[i32, i32, Minted],
+    // #3351: the declared functions nothing reaches (mir_unreached_functions).
+    // Their bodies are lowered and checked like every other; codegen leaves
+    // each an external declaration, so a reference the walk missed is an
+    // undefined symbol at link, never a wrong program.
+    unreached_fns: HashMap[i32, i32, Minted],
     // Snapshot of sema type tables at lowering time.
     // MirLower takes sema by value; its List reallocs can free
     // the shared buffer that the caller's sema copy points to.
@@ -414,6 +419,7 @@ fn MirModule.init -> MirModule:
         body_fn_syms: List.new(),
         body_index_by_fn_sym: HashMap.new(),
         global_init_body_syms: HashMap.new(),
+        unreached_fns: HashMap.new(),
         sema_type_kinds: List.new(),
         sema_type_d0: List.new(),
         sema_type_d1: List.new(),
