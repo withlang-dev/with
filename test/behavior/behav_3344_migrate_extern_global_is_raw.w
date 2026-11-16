@@ -24,4 +24,10 @@ fn main:
     // A `const` scalar extern and the unit's own global are not.
     assert(not text.contains("unsafe { limit"))
     assert(not text.contains("unsafe { own"))
+    // A directory is checked as a file is: it said "4 functions translated"
+    // over this same output when it did not compile.
+    let whole = p7_run(root, "migrate-dir", p7_argv_append(p7_argv_append(p7_argv_append(p7_argv_append("", "migrate"), "c"), "-o"), "wd"))
+    p7_assert_success(whole, "migrating the directory")
+    let checked = p7_run(root, "check-dir-output", p7_argv_append(p7_argv_append("", "check"), "wd/p.w"))
+    p7_assert_success(checked, "the directory's output checks")
     print("ok")

@@ -32,8 +32,10 @@ let lines = said.split("\n")
 assert(lines.len() >= 2)
 let pwd = lines[0].slice(4, lines[0].len())
 let cwd = lines[1].slice(4, lines[1].len())
-assert(pwd.starts_with("/"), "PWD is relative: " ++ pwd)
+// Absolute as the host spells it: a drive path on Windows, where this read
+// "PWD is relative" of an absolute path (#3031).
+assert(pwd.starts_with("/") or (pwd.len() > 1 and pwd.slice(1, 2) == ":"), "PWD is relative: " ++ pwd)
 assert(pwd == cwd, "PWD " ++ pwd ++ " is not the directory " ++ cwd)
-assert(pwd.ends_with(dir))
+assert(pwd.replace("\\", "/").ends_with(dir))
 remove_tree(dir)
 print("ok")
