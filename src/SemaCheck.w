@@ -5603,6 +5603,119 @@ impl Sema:
             n = n + 1
         false
 
+    // What a body's result owes its function: the effects and origins of the
+    // returned tail, and the declared return type as a demand on it. One
+    // owner for a declared function's body and for a default trait method's
+    // (#3360: that body had a smaller copy, and an implicit `Ok` tail in it
+    // was accepted and never recorded, an ICE in MIR). Returns whether the
+    // tail is returned as a Copy value of what it views.
+    // §4.9a (D103): the return type is a demand on the tail; a `T` tail under
+    // an `Option[T]` return is `Some(tail)`, recorded before any other rule
+    // reads the tail.
+    mut fn note_option_tail_demand(body: i32, body_expected_ret: TypeId, body_ty: TypeId):
+        if body_expected_ret == 0 or body_ty == 0 or body_ty == self.ty_void or body_ty == self.ty_never: return
+        let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+        self.value_to_option_at_demand(tail, body_expected_ret, body_ty)
+
+    mut fn check_body_result(body: i32, source_body: i32, body_ty: TypeId, body_expected_ret: TypeId, ret_type: i32, has_ret_annotation: bool, is_entry: bool) -> bool:
+        if has_ret_annotation and ret_type != 0 and ret_type != self.ty_void as i32:
+            self.check_returned_field_move(body, ret_type)
+        else if not has_ret_annotation and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+            self.check_returned_field_move(body, body_ty as i32)
+        // Tail expression bodies participate in effect inference the same way an
+        // explicit `return expr` does. Without this, `fn id(x: T) -> T: x` fails
+        // to record escape_value/escape_view on `x`.
+        // §4.9a (D103): the return type is a demand on the tail. Convert a
+        // `T` tail under an `Option[T]` return here, before any leaf check
+        // reads the record (a specialization's body meets no demand while
+        // it is checked, so the block-tail propagation did not reach it).
+        self.note_option_tail_demand(body, body_expected_ret, body_ty)
+        // An unannotated body's tail viewing a temporary is returned as the
+        // Copy value (infer_unannotated_function_return_type).
+        let body_tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+        let body_copied_out = body_expected_ret == 0 and not is_entry and self.copy_out_of_temporary(body_tail, body_ty as i32) != 0
+        let body_materializes_copy = body_copied_out or (body_expected_ret != 0 and self.can_contextually_copy_ref(body_expected_ret as i32, body_ty as i32))
+        if body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+            if self.is_copy(body_ty) == 0:
+                self.note_returned_place_effect(body, EFF_ESCAPE_VALUE)
+            let body_kind = self.get_type_kind(self.resolve_alias(body_ty))
+            if body_kind == TypeKind.TY_REF and body_materializes_copy == 0:
+                self.note_returned_place_effect(body, EFF_ESCAPE_VIEW)
+                self.note_returned_transparent_view_effects(body)
+                let body_root = self.place_root_sym(body)
+                if body_root != 0:
+                    self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), self.compute_expr_storage_origin_mask(body), body)
+                self.check_returned_view_origins(body, body)
+            else if has_ret_annotation and body_materializes_copy == 0 and self.type_is_ephemeral_value(body_ty as i32) == false and self.expr_is_ephemeral_value(body) == false:
+                self.check_returned_owned_as_view(body, body_ty as i32, ret_type, body)
+            else if body_materializes_copy == 0 and (self.type_is_ephemeral_value(body_ty as i32) or self.expr_is_ephemeral_value(body)):
+                self.note_returned_transparent_view_effects(body)
+                self.check_returned_ephemeral_value_origins(body, body)
+            self.check_returned_closure_env(body, body)
+        // The declared return type is an owned demand on the tail (#1803),
+        // as on a `return` (check_return).
+        if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+            let tail_block = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
+            self.reject_implicit_numeric_narrowing(if tail_block != 0: tail_block else: body, self.implicit_ok_payload_demand(body_expected_ret as i32, body_ty as i32), body_ty as i32)
+        if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1):
+            // §4.9 / D111: the tail may be a Copy view of the Ok payload.
+            let tail_copies = self.can_contextually_copy_ref(self.tail_ok_payload(body_expected_ret as i32, body_ty as i32), body_ty as i32)
+            let tail_demand = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+            // §4.9a (D103): the return type is a demand on the tail; a `T`
+            // tail under an `Option[T]` return is `Some(tail)`.
+            let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
+            if not tail_to_option and self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == false and body_materializes_copy == 0 and not tail_copies and not self.note_int_local_arg_demand(tail_demand, body_expected_ret as i32, body_ty as i32):
+                self.report_inferred_return_mismatch(body)
+        body_materializes_copy
+
+    // The declared return type against the tail's: the conventions of §4.9
+    // (implicit `Ok`, falling off a `Result[Unit, E]`), §4.9a and §4.10.
+    mut fn check_annotated_body_result(body: i32, body_ty: TypeId, body_expected_ret: TypeId, body_materializes_copy: bool, sig_idx: i32):
+        if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
+            let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
+            // §4.9: falling off the end of a `Result[Unit, E]` body is `Ok(())`,
+            // also after an early `return Err(...)`.
+            if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) and self.body_can_fall_through(body) and self.type_is_result_of_unit(body_expected_ret as i32) == false:
+                self.emit_error("missing return", body)
+            else if self.body_can_fall_through(body) and self.type_has_default_value(body_expected_ret as i32) == 0:
+                // A body that cannot fall through (its last statement is
+                // `while true` with no break, or diverges) returns on every
+                // path it has; only one that can reach its end needs a value.
+                self.emit_error("return type does not implement Default", body)
+        else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_never and self.resolve_alias(body_expected_ret) == self.ty_never:
+            // #1493: a `-> Never` body must diverge on every path; a valued
+            // tail passed the arm below (types_compatible is one-sided on
+            // Never) and surfaced as a MIR validator failure at the wrong layer.
+            self.emit_error("return type mismatch: a `-> Never` function must not produce a value", body)
+        else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_expected_ret != self.ty_void:
+            let explicit_tail_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
+            // Check tail expression type against body's expected return type
+            let compat = if body_materializes_copy != 0: true else: self.types_compatible(body_expected_ret as i32, body_ty as i32)
+            if explicit_tail_results_ok != 0 and compat == 0:
+                let arith = self.arithmetic_result_type(body_expected_ret as i32, body_ty as i32)
+                if arith == 0:
+                    // Implicit Ok wrapping: if body_expected_ret is Result[T, E] and body_ty is compatible with T
+                    var ok_wrapped = false
+                    let ret_resolved = self.resolve_alias(body_expected_ret)
+                    if self.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST:
+                        let base_sym = self.get_generic_inst_base(ret_resolved)
+                        if base_sym == self.syms.result and self.get_generic_inst_arg_count(ret_resolved) == 2:
+                            let ok_type = self.get_generic_inst_arg(ret_resolved, 0)
+                            if self.types_compatible(ok_type, body_ty) or self.arithmetic_result_type(ok_type, body_ty) != 0:
+                                ok_wrapped = true
+                            else:
+                                // D111 / D22 §6.2: a Copy view (`&str`) meets the owned
+                                // payload by a copy, as it meets a plain `-> str`.
+                                let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+                                ok_wrapped = self.record_contextual_copy_adjustment(tail, ok_type, body_ty as i32) != 0
+                    let tail_leaf = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+                    // §4.9a (D103): a `T` tail under an `Option[T]` return.
+                    let tail_to_option = not ok_wrapped and self.value_to_option_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty
+                    if ok_wrapped:
+                        self.implicit_ok_tail_sigs.insert(sig_idx, 1)
+                    else if not tail_to_option and not self.note_int_local_arg_demand(tail_leaf, body_expected_ret as i32, body_ty as i32):
+                        self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
+
     mut fn check_fn_body_with_sig_at(node: i32, sig_idx: i32, decl_index: i32):
         let demands_start = self.int_local_demands.len()
         let diags_start = self.diags.items.len()
@@ -6212,56 +6325,7 @@ impl Sema:
         // sets the inferred return below), so key on the annotation, not on
         // ret_type == 0 — that test never fired and `mut fn r(c: bool): if c:
         // self.p else: ""` vacated the receiver's field.
-        if has_ret_annotation and ret_type != 0 and ret_type != self.ty_void as i32:
-            self.check_returned_field_move(body, ret_type)
-        else if not has_ret_annotation and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
-            self.check_returned_field_move(body, body_ty as i32)
-        // Tail expression bodies participate in effect inference the same way an
-        // explicit `return expr` does. Without this, `fn id(x: T) -> T: x` fails
-        // to record escape_value/escape_view on `x`.
-        // §4.9a (D103): the return type is a demand on the tail. Convert a
-        // `T` tail under an `Option[T]` return here, before any leaf check
-        // reads the record (a specialization's body meets no demand while
-        // it is checked, so the block-tail propagation did not reach it).
-        if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
-            let early_tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-            self.value_to_option_at_demand(early_tail, body_expected_ret, body_ty)
-        // An unannotated body's tail viewing a temporary is returned as the
-        // Copy value (infer_unannotated_function_return_type).
-        let body_tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-        let body_copied_out = body_expected_ret == 0 and self.fn_decl_is_entry_point(node) == 0 and self.copy_out_of_temporary(body_tail, body_ty as i32) != 0
-        let body_materializes_copy = body_copied_out or (body_expected_ret != 0 and self.can_contextually_copy_ref(body_expected_ret as i32, body_ty as i32))
-        if body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
-            if self.is_copy(body_ty) == 0:
-                self.note_returned_place_effect(body, EFF_ESCAPE_VALUE)
-            let body_kind = self.get_type_kind(self.resolve_alias(body_ty))
-            if body_kind == TypeKind.TY_REF and body_materializes_copy == 0:
-                self.note_returned_place_effect(body, EFF_ESCAPE_VIEW)
-                self.note_returned_transparent_view_effects(body)
-                let body_root = self.place_root_sym(body)
-                if body_root != 0:
-                    self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), self.compute_expr_storage_origin_mask(body), body)
-                self.check_returned_view_origins(body, body)
-            else if has_ret_annotation and body_materializes_copy == 0 and self.type_is_ephemeral_value(body_ty as i32) == false and self.expr_is_ephemeral_value(body) == false:
-                self.check_returned_owned_as_view(body, body_ty as i32, ret_type, body)
-            else if body_materializes_copy == 0 and (self.type_is_ephemeral_value(body_ty as i32) or self.expr_is_ephemeral_value(body)):
-                self.note_returned_transparent_view_effects(body)
-                self.check_returned_ephemeral_value_origins(body, body)
-            self.check_returned_closure_env(body, body)
-        // The declared return type is an owned demand on the tail (#1803),
-        // as on a `return` (check_return).
-        if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
-            let tail_block = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
-            self.reject_implicit_numeric_narrowing(if tail_block != 0: tail_block else: body, self.implicit_ok_payload_demand(body_expected_ret as i32, body_ty as i32), body_ty as i32)
-        if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1):
-            // §4.9 / D111: the tail may be a Copy view of the Ok payload.
-            let tail_copies = self.can_contextually_copy_ref(self.tail_ok_payload(body_expected_ret as i32, body_ty as i32), body_ty as i32)
-            let tail_demand = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-            // §4.9a (D103): the return type is a demand on the tail; a `T`
-            // tail under an `Option[T]` return is `Some(tail)`.
-            let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
-            if not tail_to_option and self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == false and body_materializes_copy == 0 and not tail_copies and not self.note_int_local_arg_demand(tail_demand, body_expected_ret as i32, body_ty as i32):
-                self.report_inferred_return_mismatch(body)
+        let body_materializes_copy = self.check_body_result(body, source_body, body_ty, body_expected_ret, ret_type, has_ret_annotation, self.fn_decl_is_entry_point(node) != 0)
         if not has_ret_annotation:
             // §14.4: calling an `async fn` returns a `Task[T]` handle; the body
             // yields the T. An annotated signature is wrapped at declaration
@@ -6276,50 +6340,8 @@ impl Sema:
                 let sig_ret = self.fn_signature_return_type(flags, inferred_ret as TypeId)
                 self.set_sig_return_type(sig_idx, sig_ret as i32)
             self.body_typed_sigs.insert(sig_idx, 1)
-        else if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
-            let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
-            // §4.9: falling off the end of a `Result[Unit, E]` body is `Ok(())`,
-            // also after an early `return Err(...)`.
-            if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) and self.body_can_fall_through(body) and self.type_is_result_of_unit(body_expected_ret as i32) == false:
-                self.emit_error("missing return", body)
-            else if self.body_can_fall_through(body) and self.type_has_default_value(body_expected_ret as i32) == 0:
-                // A body that cannot fall through (its last statement is
-                // `while true` with no break, or diverges) returns on every
-                // path it has; only one that can reach its end needs a value.
-                self.emit_error("return type does not implement Default", body)
-        else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_never and self.resolve_alias(body_expected_ret) == self.ty_never:
-            // #1493: a `-> Never` body must diverge on every path; a valued
-            // tail passed the arm below (types_compatible is one-sided on
-            // Never) and surfaced as a MIR validator failure at the wrong layer.
-            self.emit_error("return type mismatch: a `-> Never` function must not produce a value", body)
-        else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_expected_ret != self.ty_void:
-            let explicit_tail_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
-            // Check tail expression type against body's expected return type
-            let compat = if body_materializes_copy != 0: true else: self.types_compatible(body_expected_ret as i32, body_ty as i32)
-            if explicit_tail_results_ok != 0 and compat == 0:
-                let arith = self.arithmetic_result_type(body_expected_ret as i32, body_ty as i32)
-                if arith == 0:
-                    // Implicit Ok wrapping: if body_expected_ret is Result[T, E] and body_ty is compatible with T
-                    var ok_wrapped = false
-                    let ret_resolved = self.resolve_alias(body_expected_ret)
-                    if self.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST:
-                        let base_sym = self.get_generic_inst_base(ret_resolved)
-                        if base_sym == self.syms.result and self.get_generic_inst_arg_count(ret_resolved) == 2:
-                            let ok_type = self.get_generic_inst_arg(ret_resolved, 0)
-                            if self.types_compatible(ok_type, body_ty) or self.arithmetic_result_type(ok_type, body_ty) != 0:
-                                ok_wrapped = true
-                            else:
-                                // D111 / D22 §6.2: a Copy view (`&str`) meets the owned
-                                // payload by a copy, as it meets a plain `-> str`.
-                                let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-                                ok_wrapped = self.record_contextual_copy_adjustment(tail, ok_type, body_ty as i32) != 0
-                    let tail_leaf = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-                    // §4.9a (D103): a `T` tail under an `Option[T]` return.
-                    let tail_to_option = not ok_wrapped and self.value_to_option_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty
-                    if ok_wrapped:
-                        self.implicit_ok_tail_sigs.insert(sig_idx, 1)
-                    else if not tail_to_option and not self.note_int_local_arg_demand(tail_leaf, body_expected_ret as i32, body_ty as i32):
-                        self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
+        else:
+            self.check_annotated_body_result(body, body_ty, body_expected_ret, body_materializes_copy, sig_idx)
 
         // @[tailrec] enforcement: verify all recursive calls are in tail position
         if (flags / FnFlags.TAILREC) % 2 == 1:
@@ -6758,8 +6780,12 @@ impl Sema:
         self.current_fn_sig_idx = saved_default_sig_idx
         self.current_effect_body = saved_effect_body
         self.typed_expr_types.insert(body, body_ty as i32)
-        if ret_tid != 0 and ret_tid != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
-            self.check_body_explicit_value_results(body, 1, ret_tid, "return type mismatch")
+        // #3360: the declared return type is a demand on the tail here as in
+        // any function: the implicit `Ok` (which MIR reads), the `Option`
+        // tail, falling off a `Result[Unit, E]`. The returned tail's effects
+        // and origins (check_body_result) are still this check's own.
+        self.note_option_tail_demand(body, ret_tid as TypeId, body_ty)
+        self.check_annotated_body_result(body, body_ty, ret_tid as TypeId, ret_tid != 0 and self.can_contextually_copy_ref(ret_tid, body_ty as i32), sig_idx)
 
         self.pop_scope()
         if saved_self != 0:
