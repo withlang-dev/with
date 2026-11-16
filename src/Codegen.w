@@ -1841,9 +1841,12 @@ impl Codegen:
     fn mir_fn_syms_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms.len() }
     fn mir_fn_sym_at(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms[i] }
     fn mir_find_body_idx(sym: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).find_body(sym) }
-    // #3351: a declared function nothing reaches is left a declaration.
-    fn mir_fn_unreached(sym: i32) -> bool: unsafe { (*(self.mir_ptr as *const MirModule)).unreached_fns.contains(sym) }
-    fn mir_has_unreached_fns() -> bool: unsafe { (*(self.mir_ptr as *const MirModule)).unreached_fns.len() > 0 }
+    // #3351: a declared function nothing reaches is left a declaration. An
+    // analysis generates every function: its facts are the compiler's
+    // decisions for a declaration, reached or not (`matrix:name~T.method` of
+    // a method `main` never calls).
+    fn mir_fn_unreached(sym: i32) -> bool: self.analysis_enabled == 0 and unsafe { (*(self.mir_ptr as *const MirModule)).unreached_fns.contains(sym) }
+    fn mir_has_unreached_fns() -> bool: self.analysis_enabled == 0 and unsafe { (*(self.mir_ptr as *const MirModule)).unreached_fns.len() > 0 }
     // The module's body for the global initializer whose value is `value`
     // (MirModule.global_init_body_syms), or 0 when its backend lowers it.
     fn mir_global_init_body_sym(value: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).global_init_body_syms.get(value) ?? 0 }
