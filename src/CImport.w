@@ -12854,10 +12854,17 @@ impl CiExprPool:
             return self.build_named_call_expr_typed(classify, [arg_ids[5]], types.named_type_from_text("i32"))
         let float_class = ci_float_class_fn(callee_text)
         if float_class.len() > 0:
-            if arg_ids.len() != 1:
+            // The comparison macros take two operands (C99 7.12.14).
+            let compares = float_class.starts_with("isgreater") or float_class.starts_with("isless") or float_class == "isunordered"
+            if compares and arg_ids.len() != 2:
+                return self.reject_builtin_call(session, cursor, callee_text, "expected two arguments")
+            if not compares and arg_ids.len() != 1:
                 return self.reject_builtin_call(session, cursor, callee_text, "expected one argument")
-            ci_migrate_note_libc_symbol(float_class)
-            return self.build_named_call_expr_typed(float_class, arg_ids, types.named_type_from_text("i32"))
+            // `__builtin_isnormal` is generic: the operand's width decides.
+            let operand_ty = self.get_type(arg_ids[0] as CiExprId)
+            let class_fn = if float_class == "isnormal" and operand_ty != 0 and ci_print_type(types, operand_ty) == "f32": "isnormalf" else: float_class
+            ci_migrate_note_libc_symbol(class_fn)
+            return self.build_named_call_expr_typed(class_fn, arg_ids, types.named_type_from_text("i32"))
         let bit_method = ci_builtin_bit_method(callee_text)
         if bit_method.len() > 0:
             // __builtin_clz(x) is `(x as u32).clz()`, the ll/l forms are the
@@ -21883,6 +21890,16 @@ fn ci_float_class_fn(name: &str) -> str:
     // glibc's <math.h> spells `isinf(x)` as this builtin, whose value
     // carries the sign (the c99_math case had no lowering on Linux).
     if name == "__builtin_isinf_sign": return "isinf_sign"
+    // #3371 (C99 7.12.14): the comparison macros are these builtins on
+    // Darwin, glibc and mingw alike.
+    for m in ["isgreater", "isgreaterequal", "isless", "islessequal", "islessgreater", "isunordered", "isnormal", "isnormalf"]:
+        if name == m or (name == "__builtin_" ++ m and m != "isnormalf"): return m
+    // `isnormal` depends on the width (a float denormal widens to a normal
+    // double): the `f` forms are std.libc's `isnormalf`, and the builtin is
+    // by its operand's type (the caller). mingw's is `fpclassify(x) ==
+    // FP_NORMAL`.
+    if name == "__inline_isnormalf" or name == "__isnormalf": return "isnormalf"
+    if name == "__builtin_isnormal" or name == "__inline_isnormald" or name == "__inline_isnormall" or name == "__isnormal" or name == "__isnormald" or name == "__isnormall": return "isnormal"
     for m in ["isnan", "isinf", "isfinite", "signbit"]:
         if name == m: return m
         for prefix in ["__inline_", "__builtin_", "__"]:

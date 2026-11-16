@@ -18516,7 +18516,12 @@ impl Sema:
         kind == NodeKind.NK_INT_LIT and self.is_soft_numeric_literal(node) != 0
 
     mut fn check_bool_condition(cond: i32, what: &str) -> TypeId:
-        let t = if self.cond_is_soft_literal_join(cond): self.check_expr_with_expected(cond, self.ty_i32) else: self.check_expr(cond)
+        // A condition is a value wherever its `if` or loop stands: checked in
+        // the enclosing statement's context, an `if` or `match` expression
+        // tested by a statement `if` was itself a statement, of type Unit,
+        // and `if (if c: f() else: g()):` was refused (what C's `isnan(x)`
+        // migrates to on Darwin, #3371).
+        let t = if self.cond_is_soft_literal_join(cond): self.check_expr_with_expected(cond, self.ty_i32) else: self.check_expr_value_context(cond)
         if t == 0:
             return t
         let resolved = self.resolve_alias(t as TypeId)

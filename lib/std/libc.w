@@ -169,6 +169,18 @@ pub fn isinf(x: f64) -> i32: (x == x and x - x != x - x) as i32
 pub fn isinf_sign(x: f64) -> i32: isinf(x) * (1 - 2 * signbit(x))
 pub fn isfinite(x: f64) -> i32: (x - x == 0.0) as i32
 pub fn signbit(x: f64) -> i32: (copysign(1.0, x) < 0.0) as i32
+// `isnormal` is by width: a float denormal is a normal double. The bounds
+// are DBL_MIN and FLT_MIN, the smallest normal magnitudes.
+pub fn isnormal(x: f64) -> i32: (x - x == 0.0 and (x >= 2.2250738585072014e-308 or x <= -2.2250738585072014e-308)) as i32
+pub fn isnormalf(x: f32) -> i32: (x - x == 0.0 and (x >= 1.17549435e-38 or x <= -1.17549435e-38)) as i32
+// C99 7.12.14: the comparison macros, false when either operand is a NaN
+// (With's float comparisons raise nothing, so each is the plain operator).
+pub fn isgreater(x: f64, y: f64) -> i32: (x > y) as i32
+pub fn isgreaterequal(x: f64, y: f64) -> i32: (x >= y) as i32
+pub fn isless(x: f64, y: f64) -> i32: (x < y) as i32
+pub fn islessequal(x: f64, y: f64) -> i32: (x <= y) as i32
+pub fn islessgreater(x: f64, y: f64) -> i32: (x < y or x > y) as i32
+pub fn isunordered(x: f64, y: f64) -> i32: (x != x or y != y) as i32
 
 // math.h: what `fpclassify` answers on the target (the values the FP_*
 // macros expand to in the C text: Darwin 1..5, glibc and musl 0..4, mingw
