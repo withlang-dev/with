@@ -913,7 +913,15 @@ jobs:
       - name: Green battery (build :test)
         # last-green requires the test-green evidence `:test` records; driven
         # with the seed as the selfhost lane does.
-        run: ./src/main.exe build :test
+        # Seed-bound (#3031), deleted with the seed pin that carries
+        # build_graph_test_window_for: the pinned seed's driver lets a
+        # critical-path lane run 32 tests at once; a driver handed a
+        # jobserver names no critical lane (see selfhost-windows.yml).
+        run: |
+          mkdir -p out/.ci-jobserver
+          export WITH_BUILD_JOBSERVER="$(cygpath -m "$PWD/out/.ci-jobserver")"
+          export WITH_BUILD_JOBSERVER_SLOTS=6
+          ./src/main.exe build :test
 
       # A red battery leaves its evidence on the runner: the per-test captures
       # and the complexity rows are what a fix needs (D137: a red run is filed
@@ -1441,7 +1449,15 @@ jobs:
       - name: Green battery (build :test)
         # last-green requires the test-green evidence `:test` records; driven
         # with the seed as the selfhost lane does.
-        run: ./src/main.exe build :test
+        # Seed-bound (#3031), deleted with the seed pin that carries
+        # build_graph_test_window_for: the pinned seed's driver lets a
+        # critical-path lane run 32 tests at once; a driver handed a
+        # jobserver names no critical lane (see selfhost-windows.yml).
+        run: |
+          mkdir -p out/.ci-jobserver
+          export WITH_BUILD_JOBSERVER="$(cygpath -m "$PWD/out/.ci-jobserver")"
+          export WITH_BUILD_JOBSERVER_SLOTS=6
+          ./src/main.exe build :test
 
       # A red battery leaves its evidence on the runner: the per-test captures
       # and the complexity rows are what a fix needs (D137: a red run is filed
