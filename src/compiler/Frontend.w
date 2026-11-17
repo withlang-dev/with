@@ -3247,8 +3247,15 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool,
                 j = j + 1
                 continue
             let other_rank = frontend_fn_decl_rank(jk)
+            // #3351: two modules of one interface that declare one name (a
+            // tree bundle's `span_zero` in `Span` and `compiler.foundation.Span`)
+            // read whole, as the interface's own check reads them: each is its
+            // module's, as two source functions are (#1350) and as the
+            // on-demand merge makes them (displace_colliding_interface_fns).
+            // The earlier was dropped, and its fingerprint row with it.
+            let interface_twins = current_kind == NodeKind.NK_FN_DECL and jk == NodeKind.NK_FN_DECL and pool.fn_decl_body_is_interface(current as NodeId) and pool.fn_decl_body_is_interface(jd as NodeId) and not codegen_is_runtime_abi_symbol(intern.resolve(iname))
             if other_rank >= current_rank:
-                return if displaceable and paths[idx] != paths[j]: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
+                return if (displaceable or interface_twins) and paths[idx] != paths[j]: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
         j = j + 1
     FRONTEND_FN_KEEP
 

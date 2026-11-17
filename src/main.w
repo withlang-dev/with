@@ -5353,6 +5353,9 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     comp.set_debug_info(debug_info)
     comp.set_release(cli_release_flag())
     comp.set_target_kind(cli_platform_target_kind)
+    // `with test --link-bundle <prefix>`: a test of a tree's own modules
+    // links the tree's bundle (#3351), as `build` and `check` read the flag.
+    comp.set_link_bundles(driver_link_bundle_args(with_arg_count()))
     let synthetic_source = maybe_synthesize_test_source(target)
     comp.set_link_paths(link_search_paths, link_rpaths)
     let test_bin_path = test_unique_binary_path(target)
