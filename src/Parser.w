@@ -4148,7 +4148,18 @@ impl Parser:
             if self.peek() != TokenKind.TK_L_PAREN:
                 self.emit_error("expected '(' after the method name: `x .= f(args)` assigns `x.f(args)` to `x`")
                 return self.poisoned_expr()
-            let call = self.parse_call(member)
+            var call = self.parse_call(member)
+            // Further method calls apply to the result: `x .= f().g()` is
+            // `x = x.f().g()`. Nothing else follows: an operator, a field or an
+            // index is where a second reading could begin.
+            while self.peek() == TokenKind.TK_DOT and self.pos + 2 < self.tokens.len() and self.tokens.get_tag(self.pos + 2) == TokenKind.TK_L_PAREN:
+                self.advance()
+                let next_method = self.expect_ident_or_keyword()
+                let next_member = self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), call, next_method, 0)
+                call = self.parse_call(next_member)
+            if self.peek() == TokenKind.TK_DOT or self.peek() == TokenKind.TK_L_BRACKET or self.peek() == TokenKind.TK_QUESTION or self.peek() == TokenKind.TK_KW_AS or self.infix_op() != 0:
+                self.emit_error("only method calls follow `.=`: write the assignment out, `x = x.f(args)` and the rest")
+                return self.poisoned_expr()
             return self.pool.add_node(NodeKind.NK_ASSIGN, self.pool.get_start(lhs), self.prev_end(), lhs, call, 0)
 
         lhs

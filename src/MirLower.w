@@ -6566,9 +6566,14 @@ impl MirBuilder:
     // A method assignment (§4.2.5, `x .= f(args)`): the parser gives the
     // call the target's own node as its receiver.
     fn is_method_assign(place_expr: i32, rhs_expr: i32) -> bool:
-        if rhs_expr == 0 or self.ast.kind(rhs_expr) != NodeKind.NK_CALL: return false
-        let callee = self.ast.get_data0(rhs_expr)
-        callee != 0 and self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.ast.get_data0(callee) == place_expr
+        // A chain (`x .= f().g()`) holds the target under its first call.
+        var call = rhs_expr
+        while call != 0 and self.ast.kind(call) == NodeKind.NK_CALL:
+            let callee = self.ast.get_data0(call)
+            if callee == 0 or self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS: return false
+            call = self.ast.get_data0(callee)
+            if call == place_expr: return true
+        false
 
     // Lowers `expr` with every read of `node` inside it taken from `place`:
     // a place an assignment already evaluated is not evaluated again.
