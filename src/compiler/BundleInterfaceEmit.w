@@ -139,6 +139,18 @@ type BundleInterfaceText {
     errors: List[str],
 }
 
+// Whether the source declares `Copy` for this type: a derive, or an impl.
+fn bx_type_declares_copy(sema: &Sema, node: i32, name_sym: i32) -> bool:
+    let ast = sema.ast
+    let type_meta = ast.find_type_meta(node)
+    if type_meta >= 0:
+        for dvi in 0..ast.type_meta_derive_count(type_meta):
+            if sema.pool_resolve(ast.get_extra(ast.type_meta_derive_start(type_meta) + dvi)) == "Copy": return true
+    for di in 0..ast.decl_count():
+        let decl = ast.get_decl(di) as i32
+        if ast.kind(decl) == NodeKind.NK_IMPL_DECL and ast.get_data0(decl) == name_sym and sema.pool_resolve(ast.get_data2(decl)) == "Copy": return true
+    false
+
 fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
     BundleEmitter {
         corpus: with_str_clone_ref(corpus),
@@ -791,9 +803,10 @@ impl BundleEmitter:
         let must_use = (flags / FnFlags.MUST_USE) % 2 != 0
         var printed_name = with_str_clone_ref(full)
         if in_impl:
-            let dot = sema_str_find_char(full, '.')
+            // A trait method's semantic name is `Type.Trait.method`.
+            let dot = full.rfind(".")
             if dot >= 0:
-                printed_name = with_str_clone_ref(full.slice((dot + 1) as i64, full.len()))
+                printed_name = full.slice(dot + 1, full.len())
         // The `writes` clause is the declaration's last clause (§21.1 rule 1).
         let writes_text = if written_clause.len() > 0: " " ++ written_clause else: ""
         var head = cc_attr ++ bx_effect_pins_text(sema, node) ++ (if must_use: "@[must_use]\n" else: "")
@@ -1270,7 +1283,10 @@ impl BundleEmitter:
             decl = decl ++ "\n"
         var copy_line = ""
         var copy_row = "0"
-        if sub_kind != TypeDeclKind.Alias and sub_kind != TypeDeclKind.Distinct and sema.is_copy_frozen(tid) != 0:
+        // A tree bundle prints `impl Copy` where the source declares it: a
+        // record that is a value by its fields (D120) is one to the importer
+        // by the same fields, and an `impl Copy` over a List field is refused.
+        if sub_kind != TypeDeclKind.Alias and sub_kind != TypeDeclKind.Distinct and sema.is_copy_frozen(tid) != 0 and (not self.tree or bx_type_declares_copy(sema, node, name_sym)):
             copy_line = "impl Copy for " ++ name ++ "\n"
             copy_row = "1"
         if sub_kind == TypeDeclKind.Distinct and sema.is_copy_frozen(tid) != 0:
@@ -1472,7 +1488,9 @@ fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> BundleI
                 continue
             let target_index = sema.module_import_targets[(edge_start + ei) as i64]
             let target = codegen_canonical_module_path(sema.module_paths[target_index])
-            if not bundle_corpus_contains(model.corpus, target) and not model.needed_imports.contains(mod_path ++ "\t" ++ target):
+            // A tree section keeps every import of its module: its
+            // signatures name what the module's own source names.
+            if not bundle_corpus_is_tree(model.corpus) and not bundle_corpus_contains(model.corpus, target) and not model.needed_imports.contains(mod_path ++ "\t" ++ target):
                 continue
             out.push_str("use " ++ import_path ++ "\n")
             line_count = line_count + 1
