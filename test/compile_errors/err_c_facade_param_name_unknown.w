@@ -1,4 +1,5 @@
 //! expect-check-fail: has no parameter named 'handle'
+//! expect-check-fail: = help: use one of those names, or the position: 'param 0'
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

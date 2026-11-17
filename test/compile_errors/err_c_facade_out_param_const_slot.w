@@ -1,4 +1,5 @@
 //! expect-check-fail: the out parameter param 1: *const *mut db out is a pointer to const; C cannot store the produced resource through it
+//! expect-check-fail: = help: name the non-const 'T **' parameter, or write 'from <fn>' when the function returns the pointer
 
 // D51 stage 5, ruling §61 "producer return/out parameter matches", spec
 // §16.2b.4: the out slot is where C stores the produced resource, so it is a

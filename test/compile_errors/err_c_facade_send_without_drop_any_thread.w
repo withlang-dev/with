@@ -1,4 +1,5 @@
 //! expect-check-fail: 'send' requires 'drop_any_thread'
+//! expect-check-fail: = help: add 'drop_any_thread' when the library allows destruction on any thread; otherwise delete 'send'
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

@@ -1,4 +1,5 @@
 //! expect-check-fail: 'userdata param 3' names param 3: i32 n, which is not a 'void *'
+//! expect-check-fail: = help: after 'userdata' name the 'void *' parameter C passes back to the callback
 
 // D51 stage 9 (spec §16.2b.9): a callback's userdata is the untyped pointer
 // C hands back; naming another parameter is refused, with the resolved C

@@ -1,4 +1,5 @@
 //! expect-check-fail: not a pointer, there is nothing to transfer
+//! expect-check-fail: = help: delete the 'consumes' clause: a value passed by copy is not transferred
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

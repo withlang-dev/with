@@ -1,4 +1,5 @@
 //! expect-check-fail: cannot assign a field of 'Database', a type the facade renders
+//! expect-check-fail: = help: change the foreign state through an operation the facade presents
 
 // Spec §16.2b.3: a resource's representation is what its producer made.
 // Replacing it would have Drop destroy a pointer the program chose in safe

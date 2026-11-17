@@ -1,4 +1,5 @@
 //! expect-check-fail: a value record is flat, and field 'items'
+//! expect-check-fail: = help: declare the record a resource ('resource Name wraps *mut T' with its producer and 'drop'), or leave the function raw
 // D198 (§16.2b.5): the callee follows a pointer the record holds, and safe
 // code can set that field to any address; the clause is refused.
 use c_import("typedef struct { const int *items; int n; } Span; static inline int span_first(const Span *s) { return s->n > 0 ? s->items[0] : 0; }")

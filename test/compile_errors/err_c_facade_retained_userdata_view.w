@@ -1,4 +1,5 @@
 //! expect-check-fail: an ephemeral value cannot be stored on the heap: it borrows stack-scoped storage (§5.1)
+//! expect-check-fail: = help: wrap the shared state so it is Send and Sync: a Mutex or an Atomic in place of 'View'
 
 // D51 stage 9 (ruling §44-§45, spec §16.2b.9): a value borrowed for a call
 // cannot be retained past it. A view (an ephemeral value) is accepted as

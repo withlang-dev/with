@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Database': 'db_count' is not an imported compile-time constant
+//! expect-check-fail: = help: after 'ok' write the status constant as the header names it: 'ok SQLITE_OK'
 
 // Spec §16.2b.4, §16.2b.13 (ruling Amendment 1, #1432): every success status
 // an `ok` list names is verified as an imported compile-time constant, not

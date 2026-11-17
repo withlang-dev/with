@@ -1,4 +1,5 @@
 //! expect-check-fail: 'movable' releases the pinning of an in-place resource, and this resource has no 'init'
+//! expect-check-fail: = help: delete 'movable'
 
 // Spec §16.2b.3, D54: `movable` is the facade's claim that no operation
 // keeps an in-place representation's address. A pointer or by-value

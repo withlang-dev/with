@@ -1,4 +1,5 @@
 //! expect-check-fail: is described twice; a value record has one of `reads`, `fills`, `updates` (§16.2b.5)
+//! expect-check-fail: = help: delete one of the two clauses
 // D198 (§16.2b.5): one clause per value record.
 use c_import("typedef struct { int w; int h; } Size; static inline void grow(Size *s, int by) { s->w += by; }")
 

@@ -103,7 +103,7 @@ impl Sema:
             if self.verify_facade_resource(ri) and self.facade_resources[ri].drop != 0 and not self.diags.has_errors() and self.verify_facade_generated_names(ri):
                 if not self.facade_resource_rendered(ri):
                     let rname = self.pool_resolve(self.facade_resources[ri].name)
-                    self.emit_error(f"resource '{rname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.3)", self.facade_resources[ri].node)
+                    self.emit_error_with_help(f"resource '{rname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.3)", self.facade_resources[ri].node, "this is a compiler bug: report it with this contract and the header it describes")
                 else:
                     self.verify_facade_constructors(ri)
 
@@ -125,12 +125,12 @@ impl Sema:
         let record = pointee != 0 and not self.facade_type_is_void_ptr(repr as i32) and not self.facade_type_is_c_string_ptr(repr as i32) and (self.get_type_kind(pointee) == TypeKind.TY_STRUCT or self.is_opaque_value_type(pointee))
         if not record:
             let rt = self.facade_resource_spelling(ri)
-            self.emit_error(f"handle '{hname}' wraps {rt}; a callback-scope handle wraps the pointer to a C record that C passes a callback (`*mut sqlite3_context`) — not `void *`, which every pointer converts to, nor text or a value (§16.2b.9)", node)
+            self.emit_error_with_help(f"handle '{hname}' wraps {rt}; a callback-scope handle wraps the pointer to a C record that C passes a callback (`*mut sqlite3_context`) — not `void *`, which every pointer converts to, nor text or a value (§16.2b.9)", node, f"write 'handle {hname} wraps *mut T', with T the record type of the callback's parameter")
             return
         if self.diags.has_errors() or not self.verify_facade_generated_names(ri):
             return
         if not self.facade_resource_rendered(ri):
-            self.emit_error(f"handle '{hname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.9)", node)
+            self.emit_error_with_help(f"handle '{hname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.9)", node, "this is a compiler bug: report it with this contract and the header it describes")
 
     // D198 (§16.2b.3): a field of the record is read through the resource,
     // so a field that has the name of an operation the facade presents on
@@ -162,17 +162,17 @@ impl Sema:
         let drop_fn = self.facade_resources[ri].drop
         let destroyer_count = self.facade_resources[ri].destroyers.len()
         if producer != 0 and init_fn != 0:
-            self.emit_error(f"resource '{rname}' names both 'from' and 'init'; a resource is produced by direct return, by out parameter, or by in-place initialization — one shape (§16.2b.4)", node)
+            self.emit_error_with_help(f"resource '{rname}' names both 'from' and 'init'; a resource is produced by direct return, by out parameter, or by in-place initialization — one shape (§16.2b.4)", node, "delete one: 'from <fn>' when C returns or stores the pointer, 'init <fn>(self)' when C fills storage the caller holds")
             return false
         if preinit_fn != 0 and init_fn == 0:
-            self.emit_error(f"resource '{rname}': 'preinit' constructs storage for an 'init' operation; state 'init <fn>(self)' (§16.2b.4)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'preinit' constructs storage for an 'init' operation; state 'init <fn>(self)' (§16.2b.4)", node, "add 'init <fn>(self)' naming the function that fills the storage, or delete 'preinit'")
             return false
         if self.facade_resources[ri].movable != 0 and init_fn == 0:
-            self.emit_error(f"resource '{rname}': 'movable' releases the pinning of an in-place resource, and this resource has no 'init'; a pointer or by-value resource is already movable (§16.2b.3)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'movable' releases the pinning of an in-place resource, and this resource has no 'init'; a pointer or by-value resource is already movable (§16.2b.3)", node, "delete 'movable'")
             return false
         if (producer != 0 or init_fn != 0) and drop_fn == 0 and destroyer_count == 0:
             let pn = self.pool_resolve(if producer != 0: producer else: init_fn)
-            self.emit_error(f"resource '{rname}': producer '{pn}' with no 'drop' and no 'destroys' — never half-model unsafely: a safe constructor needs a destruction contract (§16.2b.3)", node)
+            self.emit_error_with_help(f"resource '{rname}': producer '{pn}' with no 'drop' and no 'destroys' — never half-model unsafely: a safe constructor needs a destruction contract (§16.2b.3)", node, "add 'drop <fn>', naming the C function that releases what the producer returns")
             return false
         if drop_fn == 0 and destroyer_count > 0:
             // Ruling (Eric, 2026-09-22): a value dropped while live would
@@ -188,7 +188,7 @@ impl Sema:
                     unary = unary ++ (if unary_count > 0: ", " else: "") ++ f"'drop {dn}'"
                     unary_count = unary_count + 1
             if unary_count == 0:
-                self.emit_error(f"resource '{rname}' has 'destroys' operations but no 'drop'; every destroyer takes further arguments, so name a 'drop' operation or model the representation differently — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node)
+                self.emit_error_with_help(f"resource '{rname}' has 'destroys' operations but no 'drop'; every destroyer takes further arguments, so name a 'drop' operation or model the representation differently — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node, "add 'drop <fn>' naming a function that takes only the representation; with none in the library, leave the producer raw")
             else if unary_count == 1:
                 self.emit_error_with_help(f"resource '{rname}' has 'destroys' operations but no 'drop' — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node, f"name the unary destroyer as the drop operation: {unary}")
             else:
@@ -200,7 +200,7 @@ impl Sema:
             if dsig >= 0 and self.sig_get_param_count(dsig) != 1:
                 let dn = self.pool_resolve(drop_fn)
                 let n = self.sig_get_param_count(dsig)
-                self.emit_error(f"resource '{rname}': 'drop {dn}' takes {n} parameters; the drop operation takes only the representation — an operation with further arguments is a 'destroys' (§16.2b.3)", node)
+                self.emit_error_with_help(f"resource '{rname}': 'drop {dn}' takes {n} parameters; the drop operation takes only the representation — an operation with further arguments is a 'destroys' (§16.2b.3)", node, f"write 'destroys {dn}' and name a one-parameter function as 'drop'")
                 return false
             if not self.verify_facade_destroyer(ri, drop_fn):
                 return false
@@ -214,10 +214,10 @@ impl Sema:
             let slot = self.facade_resources[ri].out_params[pi]
             let pn = self.pool_resolve(p)
             if slot < 0 and self.facade_op_raw_beyond(p, -1, true):
-                self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+                self.emit_error_with_help(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node, f"add 'fn {pn}' with a clause for each pointer parameter ('text param N', 'buffer param P len param L', 'param N fixed null')")
                 return false
             if slot >= 0 and self.facade_op_raw_beyond(p, slot, false):
-                self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its out parameter (a variadic, a raw status return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+                self.emit_error_with_help(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its out parameter (a variadic, a raw status return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node, f"add 'fn {pn}' with a clause for each pointer parameter ('text param N', 'buffer param P len param L', 'param N fixed null')")
                 return false
         if self.facade_resources[ri].ok_consts.len() > 0 and init_fn == 0 and not self.verify_facade_ok_producers(ri):
             return false
@@ -272,7 +272,7 @@ impl Sema:
                     let pn = self.pool_resolve(reader)
                     let ft = self.type_name(first_ret)
                     let rt = self.type_name(ret)
-                    self.emit_error(f"facade states one error type '{err}', whose status is one type, but '{fnm}' returns {ft} and '{pn}' returns {rt} (§16.2b.4)", decl as i32)
+                    self.emit_error_with_help(f"facade states one error type '{err}', whose status is one type, but '{fnm}' returns {ft} and '{pn}' returns {rt} (§16.2b.4)", decl as i32, f"delete 'error {err}' so each operation keeps its own generated error type, or describe the functions of the other status type in a contract of their own")
                     break
 
     mut fn verify_facade_ok_producers(ri: isize) -> bool:
@@ -297,7 +297,7 @@ impl Sema:
                 continue
             if self.get_type_kind(self.numeric_operand_type(ret)) != TypeKind.TY_INT:
                 let rt = self.type_name(ret)
-                self.emit_error(f"resource '{rname}': 'ok {cn}' compares an integer status, but producer '{pn}' returns {rt} (§16.2b.4)", node)
+                self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' compares an integer status, but producer '{pn}' returns {rt} (§16.2b.4)", node, "delete 'ok': a producer that returns the pointer reports failure as NULL")
                 return false
             if first == 0:
                 first = p
@@ -307,14 +307,14 @@ impl Sema:
                 let ft = self.type_name(first_ret)
                 let rt = self.type_name(ret)
                 let err = self.facade_resource_error_name(ri)
-                self.emit_error(f"resource '{rname}': 'ok {cn}' reads producer '{fnm}''s status as {ft} and producer '{pn}''s as {rt}; the one error type '{err}' carries a status of one type (§16.2b.4)", node)
+                self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' reads producer '{fnm}''s status as {ft} and producer '{pn}''s as {rt}; the one error type '{err}' carries a status of one type (§16.2b.4)", node, f"delete 'error {err}' so each producer keeps its own generated error type, or describe the producer of the other status type in a contract of its own")
                 return false
             statuses = statuses + 1
         if statuses == 0 and shapes.len() == 0:
-            self.emit_error(f"resource '{rname}': 'ok {cn}' names a status, but '{rname}' has no producer to read one from (§16.2b.4)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' names a status, but '{rname}' has no producer to read one from (§16.2b.4)", node, "delete 'ok', or add the producer whose status it reads: 'from <fn>(out param N)'")
             return false
         if statuses == 0:
-            self.emit_error(f"resource '{rname}': 'ok {cn}' names a status, but no producer returns one to compare it with: {shapes} (§16.2b.4)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' names a status, but no producer returns one to compare it with: {shapes} (§16.2b.4)", node, "delete 'ok': it applies to a producer that returns an integer status and stores the resource through an out parameter")
             return false
         true
 
@@ -394,7 +394,7 @@ impl Sema:
                 let n = names[ni]
                 let role = roles[ni]
                 let word = if self.facade_resources[ri].handle != 0: "handle" else: "resource"
-                self.emit_error(f"{word} '{rname}' renders '{n}', {role}, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", self.facade_resources[ri].node)
+                self.emit_error_with_help(f"{word} '{rname}' renders '{n}', {role}, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", self.facade_resources[ri].node, "rename the resource or the handle; the C record keeps its name")
                 return false
         true
 
@@ -496,7 +496,7 @@ impl Sema:
         if file.len() == 0 or self.facade_current_file_name() == file:
             return false
         let tname = self.type_name(recv_tid)
-        self.emit_error(f"cannot assign a field of '{tname}', a type the facade renders: its fields are the foreign state its rendering keeps, and a write would put a value the program chose under its safe surface (§16.2b.3, §16.2b.9)", node)
+        self.emit_error_with_help(f"cannot assign a field of '{tname}', a type the facade renders: its fields are the foreign state its rendering keeps, and a write would put a value the program chose under its safe surface (§16.2b.3, §16.2b.9)", node, "change the foreign state through an operation the facade presents")
         true
 
     // `file:line:col` of a declaration, for a diagnostic that names a second
@@ -534,7 +534,7 @@ impl Sema:
             let pn = self.pool_resolve(p)
             if not self.facade_constructor_rendered(ri, p):
                 let mn = self.facade_presented(ri, pn)
-                self.emit_error(f"resource '{rname}': producer '{pn}' passed every facade check but no constructor '{rname}.{mn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node)
+                self.emit_error_with_help(f"resource '{rname}': producer '{pn}' passed every facade check but no constructor '{rname}.{mn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node, "this is a compiler bug: report it with this contract and the header it describes")
         self.verify_facade_dependency_shape(ri)
         self.apply_facade_dependency_effects(ri)
 
@@ -609,19 +609,19 @@ impl Sema:
             return false
         let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
         if self.facade_same_type(self.sig_param_type(isig, 0), repr as i32):
-            self.emit_error(f"resource '{rname}': 'init {iname}' takes the representation by value, so it would initialize a copy; an in-place initializer takes a pointer to the storage (§16.2b.4)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'init {iname}' takes the representation by value, so it would initialize a copy; an in-place initializer takes a pointer to the storage (§16.2b.4)", node, "name the initializer that takes a pointer to the record; a function that returns the record by value is 'from <fn>'")
             return false
         if self.facade_resources[ri].ok_consts.len() > 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) == TypeKind.TY_VOID:
             let cn = self.facade_ok_text(ri)
-            self.emit_error(f"resource '{rname}': 'ok {cn}' names a status but 'init {iname}' returns nothing to compare it with (§16.2b.4)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' names a status but 'init {iname}' returns nothing to compare it with (§16.2b.4)", node, "delete 'ok'")
             return false
         if self.facade_resources[ri].ok_consts.len() > 0 and self.get_type_kind(self.numeric_operand_type(self.sig_return_type(isig))) != TypeKind.TY_INT:
             let cn = self.facade_ok_text(ri)
             let rt = self.type_name(self.sig_return_type(isig))
-            self.emit_error(f"resource '{rname}': 'ok {cn}' compares an integer status, but 'init {iname}' returns {rt} (§16.2b.4)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' compares an integer status, but 'init {iname}' returns {rt} (§16.2b.4)", node, "delete 'ok': it compares the integer an initializer returns")
             return false
         if self.facade_op_raw_beyond(init_fn, 0, false):
-            self.emit_error(f"resource '{rname}': 'init {iname}' is still a raw call after the facade covers the storage (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'init {iname}' is still a raw call after the facade covers the storage (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node, f"add 'fn {iname}' with a clause for each pointer parameter ('text param N', 'buffer param P len param L', 'param N fixed null')")
             return false
         // A pinned resource's representation lives in its cell (D54): every
         // operation reaches it by address. One taking it by value would act
@@ -636,7 +636,7 @@ impl Sema:
         let preinit_fn = self.facade_resources[ri].preinit
         if preinit_fn != 0 and self.facade_op_raw_beyond(preinit_fn, -1, true):
             let pn = self.pool_resolve(preinit_fn)
-            self.emit_error(f"resource '{rname}': 'preinit {pn}' is still a raw call after the facade covers its return (a variadic or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+            self.emit_error_with_help(f"resource '{rname}': 'preinit {pn}' is still a raw call after the facade covers its return (a variadic or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node, f"add 'fn {pn}' with a clause for each pointer parameter ('text param N', 'buffer param P len param L', 'param N fixed null')")
             return false
         // The constructor takes preinit's parameters and then init's: a C
         // name both spell would be one With parameter with two meanings.
@@ -647,7 +647,7 @@ impl Sema:
                 for ii in 1..self.sig_get_param_count(isig):
                     if self.facade_param_c_name(init_fn, ii) == pname:
                         let pn = self.pool_resolve(preinit_fn)
-                        self.emit_error(f"resource '{rname}': 'preinit {pn}' and 'init {iname}' both take a parameter named '{pname}'; the constructor takes both operations' parameters and cannot tell them apart (§16.2b.4)", node)
+                        self.emit_error_with_help(f"resource '{rname}': 'preinit {pn}' and 'init {iname}' both take a parameter named '{pname}'; the constructor takes both operations' parameters and cannot tell them apart (§16.2b.4)", node, "fix one of the two with 'param N fixed <literal>' under its fn item, or leave the resource raw: the header names the parameters")
                         return false
         true
 
@@ -657,7 +657,7 @@ impl Sema:
             return true
         let rname = self.pool_resolve(self.facade_resources[ri].name)
         let fname = self.pool_resolve(f)
-        self.emit_error(f"resource '{rname}': '{fname}' takes the representation by value, but an in-place resource is pinned — its operations take the address of the representation; state 'movable' if no operation keeps that address (§16.2b.3)", self.facade_resources[ri].node)
+        self.emit_error_with_help(f"resource '{rname}': '{fname}' takes the representation by value, but an in-place resource is pinned — its operations take the address of the representation; state 'movable' if no operation keeps that address (§16.2b.3)", self.facade_resources[ri].node, "add 'movable' to the resource when no operation keeps the address of its storage")
         false
 
     // The rendered type: a struct declared under the resource's own name.
@@ -680,7 +680,7 @@ impl Sema:
         var out = c
         // Marked either way, so the resource's own check reports nothing twice.
         out.destroys = 1
-        if out.lend != 0: self.emit_error(f"fn '{fname}': a resource names it as a destroyer, and the fn item says 'lend'; a destroying operation is not callable as a lend: delete the 'lend' (§31.8.2)", out.node)
+        if out.lend != 0: self.emit_error_with_help(f"fn '{fname}': a resource names it as a destroyer, and the fn item says 'lend'; a destroying operation is not callable as a lend: delete the 'lend' (§31.8.2)", out.node, "delete the 'lend' line under this fn item")
         out
 
     mut fn verify_facade_destroyer(ri: isize, f: i32) -> bool:
@@ -693,11 +693,11 @@ impl Sema:
         let ci = self.facade_contract_for(f)
         if ci >= 0 and self.foreign_contracts[ci].destroys == 0:
             if self.foreign_contracts[ci].lend != 0:
-                self.emit_error(f"resource '{rname}': '{fname}' destroys the resource, and its fn item says 'lend'; a destroying operation is not callable as a lend: delete the 'lend' (§31.8.2)", node)
+                self.emit_error_with_help(f"resource '{rname}': '{fname}' destroys the resource, and its fn item says 'lend'; a destroying operation is not callable as a lend: delete the 'lend' (§31.8.2)", node, f"delete the 'lend' line under 'fn {fname}'")
                 return false
             self.foreign_contracts[ci].destroys = 1
         if self.facade_op_raw_beyond(f, 0, false):
-            self.emit_error(f"resource '{rname}': '{fname}' is still a raw call after the facade covers the representation (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+            self.emit_error_with_help(f"resource '{rname}': '{fname}' is still a raw call after the facade covers the representation (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node, f"add 'fn {fname}' with a clause for each pointer parameter ('text param N', 'buffer param P len param L', 'param N fixed null')")
             return false
         true
 
@@ -723,9 +723,9 @@ impl Sema:
     mut fn check_facade_override(drawn: bool, clause: i32):
         if not self.ast.facade_overridden(clause): return
         if drawn:
-            self.emit_error("`override` in a contract drawn for a fetched package: only a contract a person states may override, and no tool writes one (§31.7)", clause)
+            self.emit_error_with_help("`override` in a contract drawn for a fetched package: only a contract a person states may override, and no tool writes one (§31.7)", clause, "delete the word `override`; state the override in a contract of your own beside your program")
         else if not self.facade_clause_grants(clause):
-            self.emit_error(f"`override` marks a grant, and `{facade_clause_name(self.ast.get_data0(clause))}` grants nothing: no proof can contradict it (§31.7)", clause)
+            self.emit_error_with_help(f"`override` marks a grant, and `{facade_clause_name(self.ast.get_data0(clause))}` grants nothing: no proof can contradict it (§31.7)", clause, "delete the word `override`")
 
     mut fn check_facade_overrides(di: i32, node: i32):
         let path = self.decl_source_path_for_index(di)
@@ -998,14 +998,14 @@ impl Sema:
             if self.facade_domain_list[di].kind != self.ast.get_data1(item):
                 let have = self.pool_resolve(self.facade_domain_list[di].kind)
                 let want = self.pool_resolve(self.ast.get_data1(item))
-                self.emit_error(f"domain '{dn}' is '{have}' in facade '{self.pool_resolve(self.facade_domain_list[di].facade)}' and '{want}' here; one state has one scope (§16.2b.7)", item)
+                self.emit_error_with_help(f"domain '{dn}' is '{have}' in facade '{self.pool_resolve(self.facade_domain_list[di].facade)}' and '{want}' here; one state has one scope (§16.2b.7)", item, f"use '{have}' here, or name a second domain for the other scope")
                 return
             // Identity is the block, not the name: the runtime's files each
             // carry a block named `libc`, and a program may spread one
             // facade over files too.
             for bi in 0..self.facade_domain_list[di].blocks.len():
                 if self.facade_domain_list[di].blocks[bi] == self.current_facade_node:
-                    self.emit_error(f"domain '{dn}' is declared twice (§16.2b.7)", item)
+                    self.emit_error_with_help(f"domain '{dn}' is declared twice (§16.2b.7)", item, "delete one of the two declarations, or rename it if it is a different state")
                     return
             self.facade_domain_list[di].blocks.push(self.current_facade_node)
             var known = false
@@ -1033,7 +1033,7 @@ impl Sema:
         let name = self.ast.get_data0(item)
         let rname = self.pool_resolve(name)
         if self.facade_resource_index.contains(name):
-            self.emit_error(f"resource '{rname}' is declared twice (§16.2b.3)", item)
+            self.emit_error_with_help(f"resource '{rname}' is declared twice (§16.2b.3)", item, "delete one of the two declarations; a second wrapper of the same record takes another name")
             return
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
@@ -1081,11 +1081,11 @@ impl Sema:
                 let pty = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
                 if self.get_type_kind(pty) != TypeKind.TY_PTR or not self.facade_same_type(self.get_type_d0(pty), r.repr_tid):
                     let shown = self.facade_param_display(producer, sig, pi)
-                    self.emit_error(f"resource '{rname}': the out parameter {shown} is not a pointer to the representation (§16.2b.13)", clause)
+                    self.emit_error_with_help(f"resource '{rname}': the out parameter {shown} is not a pointer to the representation (§16.2b.13)", clause, "after 'out param' name the parameter C stores the new pointer through: 'from <fn>(out param N)', N a 'T **'")
                     return r
                 if self.get_type_d1(pty) == 0:
                     let shown = self.facade_param_display(producer, sig, pi)
-                    self.emit_error(f"resource '{rname}': the out parameter {shown} is a pointer to const; C cannot store the produced resource through it (§16.2b.4, §16.2b.13)", clause)
+                    self.emit_error_with_help(f"resource '{rname}': the out parameter {shown} is a pointer to const; C cannot store the produced resource through it (§16.2b.4, §16.2b.13)", clause, "name the non-const 'T **' parameter, or write 'from <fn>' when the function returns the pointer")
                     return r
                 let last = r.out_params.len() - 1
                 r.out_params[last] = pi
@@ -1093,7 +1093,7 @@ impl Sema:
                 if not self.facade_same_type(self.sig_return_type(sig), r.repr_tid):
                     let rt = self.type_name(self.sig_return_type(sig))
                     let pn = self.pool_resolve(producer)
-                    self.emit_error(f"resource '{rname}': producer '{pn}' returns {rt}, not the representation (§16.2b.13)", clause)
+                    self.emit_error_with_help(f"resource '{rname}': producer '{pn}' returns {rt}, not the representation (§16.2b.13)", clause, f"'from' names a function that returns what '{rname}' wraps; when it stores it through a parameter, write 'from {pn}(out param N)'")
             return r
         if kind == FACADE_CLAUSE_PRODUCED_FIELD:
             // §16.2b.4: the field whose NULL means a by-value producer
@@ -1106,16 +1106,16 @@ impl Sema:
             if self.ast.get_data2(clause) == 2:
                 // §31.8.2: `from F, nonnull` — a pointer producer that never
                 // returns NULL. Only a returned pointer has that NULL.
-                if r.out_params[r.out_params.len() - 1] >= 0: self.emit_error(f"resource '{rname}': 'from {pn}, nonnull': {pn} produces through an out parameter, and its status says whether anything was produced (§31.8.2)", clause)
+                if r.out_params[r.out_params.len() - 1] >= 0: self.emit_error_with_help(f"resource '{rname}': 'from {pn}, nonnull': {pn} produces through an out parameter, and its status says whether anything was produced (§31.8.2)", clause, f"delete ', nonnull': write 'from {pn}(out param N)' and state the success status with 'ok <CONST>'")
                 else if self.get_type_kind(self.resolve_alias(r.repr_tid as TypeId)) != TypeKind.TY_PTR:
                     let rt = self.facade_item_spelling(r.node)
-                    self.emit_error(f"resource '{rname}': 'from {pn}, nonnull' is for a producer that returns a pointer; '{rname}' wraps {rt}, a record passed by value, which states the field: 'nonnull field <F>' (§31.8.2)", clause)
+                    self.emit_error_with_help(f"resource '{rname}': 'from {pn}, nonnull' is for a producer that returns a pointer; '{rname}' wraps {rt}, a record passed by value, which states the field: 'nonnull field <F>' (§31.8.2)", clause, f"write 'from {pn}, nonnull field <F>', with <F> the pointer field that is never NULL")
                 return r
             if r.out_params[r.out_params.len() - 1] >= 0: return r
             var ty = self.resolve_alias(r.repr_tid as TypeId) as i32
             if self.get_type_kind(ty as TypeId) != TypeKind.TY_STRUCT:
                 let rt = self.facade_item_spelling(r.node)
-                self.emit_error(f"resource '{rname}': 'from {pn}, {word} field' names a field of a record passed by value; '{rname}' wraps {rt}, whose NULL is the representation's own (§16.2b.4)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'from {pn}, {word} field' names a field of a record passed by value; '{rname}' wraps {rt}, whose NULL is the representation's own (§16.2b.4)", clause, f"write 'from {pn}, {word}': the returned pointer is the one that may be NULL")
                 return r
             var path = ""
             for k in 2..self.ast.get_data2(clause):
@@ -1124,12 +1124,12 @@ impl Sema:
                 let next = if self.get_type_kind(ty as TypeId) == TypeKind.TY_STRUCT: self.struct_field_type(ty, seg) else: 0
                 if next == 0:
                     let rt = self.facade_item_spelling(r.node)
-                    self.emit_error(f"resource '{rname}': 'from {pn}, {word} field {path}': {rt} has no field {path} (§16.2b.13)", clause)
+                    self.emit_error_with_help(f"resource '{rname}': 'from {pn}, {word} field {path}': {rt} has no field {path} (§16.2b.13)", clause, "name a field of the record as the header declares it; a nested one is written 'outer.inner'")
                     return r
                 ty = self.resolve_alias(next as TypeId) as i32
             if self.get_type_kind(ty as TypeId) != TypeKind.TY_PTR:
                 let ft = self.type_name(ty)
-                self.emit_error(f"resource '{rname}': 'from {pn}, {word} field {path}': the field is {ft}, not a pointer; only a pointer has a NULL that means nothing was produced (§16.2b.4)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'from {pn}, {word} field {path}': the field is {ft}, not a pointer; only a pointer has a NULL that means nothing was produced (§16.2b.4)", clause, "name the record's pointer field, the one that is NULL when nothing was produced")
             return r
         if kind == FACADE_CLAUSE_PREINIT:
             // `preinit` constructs the storage (ruling §13.1): it returns the
@@ -1141,7 +1141,7 @@ impl Sema:
             if not self.facade_same_type(self.sig_return_type(sig), r.repr_tid):
                 let fnm = self.pool_resolve(f)
                 let rt = self.type_name(self.sig_return_type(sig))
-                self.emit_error(f"resource '{rname}': 'preinit {fnm}' returns {rt}, not the representation; preinit constructs the storage that init fills (§16.2b.4)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'preinit {fnm}' returns {rt}, not the representation; preinit constructs the storage that init fills (§16.2b.4)", clause, "after 'preinit' name a function that returns the record by value; the function that fills caller storage is 'init <fn>(self)'")
                 return r
             r.preinit = f
             return r
@@ -1158,14 +1158,14 @@ impl Sema:
                 if self.facade_extern_var_named(self.pool_resolve(f)) != 0:
                     let gname = self.pool_resolve(f)
                     let word = if kind == FACADE_CLAUSE_DROP: "drop" else: "destroys"
-                    self.emit_error(f"resource '{rname}': '{word} {gname}' names a global that does not hold a function of one parameter taking the pointer the resource wraps (§31.8.6)", clause)
+                    self.emit_error_with_help(f"resource '{rname}': '{word} {gname}' names a global that does not hold a function of one parameter taking the pointer the resource wraps (§31.8.6)", clause, f"after '{word}' name an imported function, or a global function pointer, that takes the wrapped pointer and nothing else")
                     return r
             let sig = self.facade_fn_sig(f, clause)
             if sig < 0:
                 return r
             if not self.facade_accepts_repr(sig, r.repr_tid):
                 let fnm = self.pool_resolve(f)
-                self.emit_error(f"resource '{rname}': '{fnm}' does not take the representation as its first parameter (§16.2b.13)", clause)
+                self.emit_error_with_help(f"resource '{rname}': '{fnm}' does not take the representation as its first parameter (§16.2b.13)", clause, f"an operation of '{rname}' takes what it wraps first; describe '{fnm}' with an fn item when the resource is a later parameter (no destroyer form exists for that: #3177)")
                 return r
             if kind == FACADE_CLAUSE_INIT:
                 r.init = f
@@ -1178,18 +1178,18 @@ impl Sema:
             // listed constant is success. Every one is stated and verified
             // (§16.2b.13); one success statement per resource.
             if r.ok_node != 0:
-                self.emit_error(f"resource '{rname}': 'ok' is stated twice; list every success status in one clause: 'ok C1, C2' (§16.2b.4)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'ok' is stated twice; list every success status in one clause: 'ok C1, C2' (§16.2b.4)", clause, "merge the two lines into one: 'ok C1, C2'")
                 return r
             let listed: List[i32] = []
             for k in 0..self.ast.get_data2(clause):
                 let c = self.ast.get_extra(ops + k)
                 let cn = self.pool_resolve(c)
                 if not self.facade_status_constant_ok(c):
-                    self.emit_error(f"resource '{rname}': '{cn}' is not an imported compile-time constant (§16.2b.4, §16.2b.13)", clause)
+                    self.emit_error_with_help(f"resource '{rname}': '{cn}' is not an imported compile-time constant (§16.2b.4, §16.2b.13)", clause, "after 'ok' write the status constant as the header names it: 'ok SQLITE_OK'")
                     return r
                 for listed_item in listed:
                     if listed_item == c:
-                        self.emit_error(f"resource '{rname}': 'ok' lists '{cn}' twice (§16.2b.4)", clause)
+                        self.emit_error_with_help(f"resource '{rname}': 'ok' lists '{cn}' twice (§16.2b.4)", clause, f"delete one '{cn}'")
                         return r
                 listed.push(c)
             r.ok_consts = listed
@@ -1200,7 +1200,7 @@ impl Sema:
             // a `from`, or the `init` (spec §16.2b.6 — "a facade may make the
             // relationship precise").
             if r.last_producer == -2:
-                self.emit_error(f"resource '{rname}': 'borrows' names a parameter of the producer; state 'from <producer>' first, or 'init <fn>(self)' (§16.2b.6)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'borrows' names a parameter of the producer; state 'from <producer>' first, or 'init <fn>(self)' (§16.2b.6)", clause, "put the 'from <fn>' line (or 'init <fn>(self)') above 'borrows'")
                 return r
             let producer = if r.last_producer == FACADE_DEP_INIT: r.init else: r.producers[r.last_producer]
             let sig = self.get_sig(producer)
@@ -1214,7 +1214,7 @@ impl Sema:
             let slot = if r.last_producer == FACADE_DEP_INIT: 0 else: r.out_params[r.last_producer]
             if pi == slot:
                 let what = if r.last_producer == FACADE_DEP_INIT: "the storage 'init' initializes" else: "the out parameter the resource is produced through"
-                self.emit_error(f"resource '{rname}': 'borrows' names {shown} of '{pn}', {what}; 'borrows' names a parent resource the producer receives (§16.2b.6)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'borrows' names {shown} of '{pn}', {what}; 'borrows' names a parent resource the producer receives (§16.2b.6)", clause, "after 'borrows' name the producer's parameter that receives the parent resource: 'borrows param 0'")
                 return r
             // That the parameter receives a modeled resource is verified once
             // every facade's resources are known (verify_facade_dependency).
@@ -1239,10 +1239,10 @@ impl Sema:
                 return r
             if not self.facade_accepts_repr(sig, r.repr_tid):
                 let fnm = self.pool_resolve(f)
-                self.emit_error(f"resource '{rname}': 'abandon {fnm}' does not take the representation as its first parameter; the abandonment path is one of the resource's own operations (§16.2b.9)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' does not take the representation as its first parameter; the abandonment path is one of the resource's own operations (§16.2b.9)", clause, f"after 'abandon' name a function whose first parameter is what '{rname}' wraps")
                 return r
             if r.abandon != 0:
-                self.emit_error(f"resource '{rname}': 'abandon' is stated twice; a resource has one abandonment path (§16.2b.9)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'abandon' is stated twice; a resource has one abandonment path (§16.2b.9)", clause, "delete one of the two 'abandon' clauses")
                 return r
             r.abandon = f
             r.abandon_node = clause
@@ -1255,7 +1255,7 @@ impl Sema:
             if self.facade_fn_sig(f, clause) < 0:
                 return r
             if r.message != 0:
-                self.emit_error(f"resource '{rname}': 'message' is stated twice; a resource has one description of its most recent failure (§16.2b.4)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'message' is stated twice; a resource has one description of its most recent failure (§16.2b.4)", clause, "delete one of the two 'message' clauses")
                 return r
             r.message = f
             r.message_node = clause
@@ -1274,10 +1274,10 @@ impl Sema:
                 else if cap == "share": r.thread_caps = r.thread_caps | 4
                 else: r.thread_caps = r.thread_caps | 8
             if (r.thread_caps & 2) != 0 and (r.thread_caps & 8) == 0:
-                self.emit_error(f"resource '{rname}': 'send' requires 'drop_any_thread' — With v1 does not marshal destruction back to the creator thread (§16.2b.10)", clause)
+                self.emit_error_with_help(f"resource '{rname}': 'send' requires 'drop_any_thread' — With v1 does not marshal destruction back to the creator thread (§16.2b.10)", clause, "add 'drop_any_thread' when the library allows destruction on any thread; otherwise delete 'send'")
             return r
         let cname = facade_clause_name(kind)
-        self.emit_error(f"resource '{rname}': clause '{cname}' applies to an fn item, not a resource (§16.2b)", clause)
+        self.emit_error_with_help(f"resource '{rname}': clause '{cname}' applies to an fn item, not a resource (§16.2b)", clause, f"move '{cname}' under the 'fn <name>' item of the function it describes")
         r
 
     // ── fn items ─────────────────────────────────────────────────────────
@@ -1300,7 +1300,7 @@ impl Sema:
             // different clauses are two contracts for one function, refused.
             if self.facade_item_words(self.foreign_contracts[prev].decl, self.foreign_contracts[prev].node) == self.facade_item_words(decl, item):
                 return
-            self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
+            self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
             return
         var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
@@ -1352,10 +1352,10 @@ impl Sema:
         let count = self.get_type_d1(callable)
         let idx = self.facade_ref_index_only(ref_node)
         if idx < 0:
-            self.emit_error(f"fn '{fname}': '{what} param …' names a parameter of the callback {cb_shown}, whose parameters C does not name; refer to it by position, counted from zero ('{what} param 2') (§16.2b.9)", ref_node)
+            self.emit_error_with_help(f"fn '{fname}': '{what} param …' names a parameter of the callback {cb_shown}, whose parameters C does not name; refer to it by position, counted from zero ('{what} param 2') (§16.2b.9)", ref_node, f"write '{what} param N', with N the callback parameter's position counted from zero")
             return -1
         if idx >= count:
-            self.emit_error(f"fn '{fname}': the callback {cb_shown} has {count} parameter(s); {what} param {idx} does not exist (parameters count from zero, §16.2b.9)", ref_node)
+            self.emit_error_with_help(f"fn '{fname}': the callback {cb_shown} has {count} parameter(s); {what} param {idx} does not exist (parameters count from zero, §16.2b.9)", ref_node, f"the callback's parameters are numbered 0 to {count - 1}")
             return -1
         idx
 
@@ -1379,7 +1379,7 @@ impl Sema:
             return c
         let cb_shown = self.facade_param_display(fn_sym, sig, cb)
         if not self.facade_param_is_callable(sig, cb):
-            self.emit_error(f"fn '{fname}': 'callback param {cb}' names {cb_shown}, which is not callable (§16.2b.9, §16.2b.13)", clause)
+            self.emit_error_with_help(f"fn '{fname}': 'callback param {cb}' names {cb_shown}, which is not callable (§16.2b.9, §16.2b.13)", clause, "after 'callback' name the function-pointer parameter: 'callback param N userdata param M'")
             return c
         let callable = self.callable_type_resolved(self.sig_param_type(sig, cb))
         let a = self.facade_resolve_callback_param(self.ast.get_extra(ops + 1), fname, cb_shown, callable, "argv")
@@ -1389,31 +1389,31 @@ impl Sema:
         if n < 0:
             return c
         if a == n:
-            self.emit_error(f"fn '{fname}': argv and argc name the same parameter {a} of the callback {cb_shown}; the vector and its count are two (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': argv and argc name the same parameter {a} of the callback {cb_shown}; the vector and its count are two (§16.2b.9)", clause, "name the 'T **' parameter after 'argv' and the integer count after 'argc'")
             return c
         let argv_tid = self.resolve_alias(self.type_extra[self.get_type_d0(callable) + a] as TypeId)
         let argc_tid = self.resolve_alias(self.type_extra[self.get_type_d0(callable) + n] as TypeId)
         let argv_tn = self.type_name(argv_tid as i32)
         let elem = if self.get_type_kind(argv_tid) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(argv_tid) as TypeId) as i32 else: 0
         if elem == 0 or self.get_type_kind(elem as TypeId) != TypeKind.TY_PTR:
-            self.emit_error(f"fn '{fname}': argv param {a} of the callback {cb_shown} is {argv_tn}; an argument vector is a pointer to the handles C passes ('T **') (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': argv param {a} of the callback {cb_shown} is {argv_tn}; an argument vector is a pointer to the handles C passes ('T **') (§16.2b.9)", clause, "after 'argv' name the callback's 'T **' parameter")
             return c
         let h = self.facade_handle_wrapping(elem)
         let elem_tn = self.type_name(elem)
         if h < 0:
-            self.emit_error(f"fn '{fname}': argv param {a} of the callback {cb_shown} is a vector of {elem_tn}, which no one callback-scope handle wraps; declare 'handle <Name> wraps {elem_tn}' (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': argv param {a} of the callback {cb_shown} is a vector of {elem_tn}, which no one callback-scope handle wraps; declare 'handle <Name> wraps {elem_tn}' (§16.2b.9)", clause, f"add 'handle <Name> wraps {elem_tn}' to the contract")
             return c
         if self.get_type_kind(argc_tid) != TypeKind.TY_INT:
             let argc_tn = self.type_name(argc_tid as i32)
-            self.emit_error(f"fn '{fname}': argc param {n} of the callback {cb_shown} is {argc_tn}; the count of an argument vector is an integer (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': argc param {n} of the callback {cb_shown} is {argc_tn}; the count of an argument vector is an integer (§16.2b.9)", clause, "after 'argc' name the callback's integer parameter that counts the vector")
             return c
         let hname = self.pool_resolve(self.facade_resources[h].name)
         if not self.facade_type_node_is_handle_slice(self.ast.get_extra(ops + 3), hname):
-            self.emit_error(f"fn '{fname}': the vector of {elem_tn} is presented as a slice of the handle that wraps it, 'as &[{hname}]' (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': the vector of {elem_tn} is presented as a slice of the handle that wraps it, 'as &[{hname}]' (§16.2b.9)", clause, f"write 'as &[{hname}]'")
             return c
         for k in 0..c.argv_cb.len():
             if c.argv_cb[k] == cb:
-                self.emit_error(f"fn '{fname}': the callback {cb_shown} is given its argument vector twice (§16.2b.9)", clause)
+                self.emit_error_with_help(f"fn '{fname}': the callback {cb_shown} is given its argument vector twice (§16.2b.9)", clause, "delete one of the two 'argv' clauses")
                 return c
         c.argv_cb.push(cb)
         c.argv_index.push(a)
@@ -1426,7 +1426,7 @@ impl Sema:
         let c = c0
         let ops = self.ast.get_data1(clause)
         if c.user_data_node != 0:
-            self.emit_error(f"fn '{fname}': 'user_data' is stated twice; a registration has one userdata (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': 'user_data' is stated twice; a registration has one userdata (§16.2b.9)", clause, "delete one of the two 'user_data' clauses")
             return c
         let accessor = self.ast.get_extra(ops)
         let aname = self.pool_resolve(accessor)
@@ -1439,11 +1439,11 @@ impl Sema:
         // is the one this function was given.
         let h = if self.sig_get_param_count(asig) == 1: self.facade_handle_wrapping(self.sig_param_type(asig, 0)) else: -1
         if h < 0:
-            self.emit_error(f"fn '{fname}': 'user_data from {aname}': {aname} takes {self.sig_get_param_count(asig)} parameter(s); the accessor of registered user data takes the callback-scope handle C passes the callback, and nothing else (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': 'user_data from {aname}': {aname} takes {self.sig_get_param_count(asig)} parameter(s); the accessor of registered user data takes the callback-scope handle C passes the callback, and nothing else (§16.2b.9)", clause, "after 'user_data from' name the library function that takes the callback's context handle and returns the 'void *' (sqlite3_user_data)")
             return c
         if not self.facade_type_is_void_ptr(self.sig_return_type(asig)):
             let rt = self.type_name(self.sig_return_type(asig))
-            self.emit_error(f"fn '{fname}': 'user_data from {aname}': {aname} returns {rt}; registered user data comes back as the 'void *' C was given (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': 'user_data from {aname}': {aname} returns {rt}; registered user data comes back as the 'void *' C was given (§16.2b.9)", clause, "after 'user_data from' name the library function that returns the registered 'void *' (sqlite3_user_data)")
             return c
         let ty = self.ast.get_extra(ops + 1)
         var spelled_u = false
@@ -1451,7 +1451,7 @@ impl Sema:
             let inner = self.ast.get_data0(ty)
             spelled_u = inner != 0 and self.ast.kind(inner) == NodeKind.NK_TYPE_NAMED and self.pool_resolve(self.ast.get_data0(inner)) == "U"
         if not spelled_u:
-            self.emit_error(f"fn '{fname}': registered user data is presented as a view of the value the facade boxed, 'user_data from {aname} as &U' (§16.2b.9)", clause)
+            self.emit_error_with_help(f"fn '{fname}': registered user data is presented as a view of the value the facade boxed, 'user_data from {aname} as &U' (§16.2b.9)", clause, f"write 'user_data from {aname} as &U'")
             return c
         c.user_data_fn = accessor
         c.user_data_handle = h
@@ -1488,11 +1488,11 @@ impl Sema:
                 return c
             if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)) != TypeKind.TY_PTR:
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': detaches {shown}: not a pointer, there is nothing to detach (§16.2b.6)", clause)
+                self.emit_error_with_help(f"fn '{fname}': detaches {shown}: not a pointer, there is nothing to detach (§16.2b.6)", clause, "delete the 'detaches' clause: it names the pointer parameter that receives a resource")
                 return c
             if self.facade_param_receives(fn_sym, pi).len() != 1:
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': detaches {shown}, which receives no one modeled resource; a detached value is the resource its parameter receives, taken out of its origin (§16.2b.6)", clause)
+                self.emit_error_with_help(f"fn '{fname}': detaches {shown}, which receives no one modeled resource; a detached value is the resource its parameter receives, taken out of its origin (§16.2b.6)", clause, "declare the resource the pointer is ('resource Name wraps *mut T'), then 'detaches param N' names the parameter that receives it")
                 return c
             c.detaches = pi
             return c
@@ -1511,7 +1511,7 @@ impl Sema:
             let pk = self.get_type_kind(self.resolve_alias(self.sig_param_type(sig, pi) as TypeId))
             if pk != TypeKind.TY_PTR:
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': consumes {shown}: not a pointer, there is nothing to transfer (§16.2b.5, §16.2b.13)", clause)
+                self.emit_error_with_help(f"fn '{fname}': consumes {shown}: not a pointer, there is nothing to transfer (§16.2b.5, §16.2b.13)", clause, "delete the 'consumes' clause: a value passed by copy is not transferred")
                 return c
             var by: i32 = -1
             let by_ref = self.ast.get_extra(ops + 1)
@@ -1524,16 +1524,16 @@ impl Sema:
                 // handle has its own destroyer (`destroys`, §16.2b.5).
                 if not self.facade_param_is_userdata(fn_sym, sig, pi):
                     let shown = self.facade_param_display(fn_sym, sig, pi)
-                    self.emit_error(f"fn '{fname}': consumes {shown} destroyed_by …: a destroy callback destroys userdata (a 'void *' no resource wraps); a consumed resource is destroyed by the operation its facade names (§16.2b.5, §16.2b.9)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': consumes {shown} destroyed_by …: a destroy callback destroys userdata (a 'void *' no resource wraps); a consumed resource is destroyed by the operation its facade names (§16.2b.5, §16.2b.9)", clause, "for a resource write 'consumes param N' alone; its own 'drop' or 'destroys' operation destroys it")
                     return c
                 if not self.facade_param_is_callable(sig, by):
                     let shown = self.facade_param_display(fn_sym, sig, by)
-                    self.emit_error(f"fn '{fname}': destroyed_by {shown} is not callable (§16.2b.9, §16.2b.13)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': destroyed_by {shown} is not callable (§16.2b.9, §16.2b.13)", clause, "after 'destroyed_by' name the function-pointer parameter C calls to destroy the userdata: 'consumes param N destroyed_by param M'")
                     return c
                 if not self.facade_callable_accepts(sig, by, pi):
                     let shown = self.facade_param_display(fn_sym, sig, by)
                     let consumed = self.facade_param_display(fn_sym, sig, pi)
-                    self.emit_error(f"fn '{fname}': destroyed_by {shown} does not take the consumed {consumed} as its first parameter (§16.2b.9, §16.2b.13)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': destroyed_by {shown} does not take the consumed {consumed} as its first parameter (§16.2b.9, §16.2b.13)", clause, "name the destroy callback whose first parameter is the consumed 'void *'")
                     return c
             else if self.facade_param_is_userdata(fn_sym, sig, pi):
                 // Never half-model (ruling §9, §24): a `void *` userdata
@@ -1558,7 +1558,7 @@ impl Sema:
             if self.facade_param_receives(fn_sym, b).len() != 1:
                 let shown = self.facade_param_display(fn_sym, sig, b)
                 let why = if self.facade_param_receives(fn_sym, b).len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
-                self.emit_error(f"fn '{fname}': 'retains … by' names {shown}, which {why}; a retained value is kept by a resource and released when that resource is destroyed (§16.2b.5, §16.2b.9)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'retains … by' names {shown}, which {why}; a retained value is kept by a resource and released when that resource is destroyed (§16.2b.5, §16.2b.9)", clause, "after 'by' name the parameter that receives the resource keeping the value, usually the first: 'retains param N by param 0'")
                 return c
             // What can be retained: a callback (a code pointer, nothing to
             // keep), its `void *` userdata (kept by the resource, ruling
@@ -1567,11 +1567,11 @@ impl Sema:
             let callable = self.facade_param_is_callable(sig, a)
             if not userdata and not callable and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, a)) == false:
                 let shown = self.facade_param_display(fn_sym, sig, a)
-                self.emit_error(f"fn '{fname}': retains {shown}; retention is modeled for a callback, its 'void *' userdata, and a C string — nothing else is kept by a resource (§16.2b.9)", clause)
+                self.emit_error_with_help(f"fn '{fname}': retains {shown}; retention is modeled for a callback, its 'void *' userdata, and a C string — nothing else is kept by a resource (§16.2b.9)", clause, "delete the 'retains' clause and leave the function raw: no clause describes a kept pointer of another type (#3120)")
                 return c
             if (userdata or callable) and b != 0:
                 let shown = self.facade_param_display(fn_sym, sig, b)
-                self.emit_error(f"fn '{fname}': 'retains … by' names {shown}, but a retained callback or userdata is kept by the resource the operation is a method of, its first parameter; retention by another parameter is not modeled (§16.2b.9)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'retains … by' names {shown}, but a retained callback or userdata is kept by the resource the operation is a method of, its first parameter; retention by another parameter is not modeled (§16.2b.9)", clause, "write 'retains param N by param 0': the keeper is the resource the operation is a method of")
                 return c
             c.retains.push(a)
             c.retains_by.push(b)
@@ -1592,21 +1592,21 @@ impl Sema:
                 return c
             if not self.facade_param_is_callable(sig, cb):
                 let shown = self.facade_param_display(fn_sym, sig, cb)
-                self.emit_error(f"fn '{fname}': 'callback param {cb}' names {shown}, which is not callable (§16.2b.9, §16.2b.13)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'callback param {cb}' names {shown}, which is not callable (§16.2b.9, §16.2b.13)", clause, "after 'callback' name the function-pointer parameter: 'callback param N userdata param M'")
                 return c
             if not self.facade_param_is_userdata(fn_sym, sig, ud):
                 let shown = self.facade_param_display(fn_sym, sig, ud)
-                self.emit_error(f"fn '{fname}': 'userdata param {ud}' names {shown}, which is not a 'void *'; a callback's userdata is the untyped pointer C hands back to it (§16.2b.9)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'userdata param {ud}' names {shown}, which is not a 'void *'; a callback's userdata is the untyped pointer C hands back to it (§16.2b.9)", clause, "after 'userdata' name the 'void *' parameter C passes back to the callback")
                 return c
             let slot = self.facade_callable_userdata_slot(sig, cb)
             if slot < 0:
                 let shown = self.facade_param_display(fn_sym, sig, cb)
                 let n = self.facade_callable_userdata_slot_count(sig, cb)
-                self.emit_error(f"fn '{fname}': the callback {shown} has {n} 'void *' parameter(s); a callback receiving userdata has exactly one, which is where the userdata arrives (§16.2b.9)", clause)
+                self.emit_error_with_help(f"fn '{fname}': the callback {shown} has {n} 'void *' parameter(s); a callback receiving userdata has exactly one, which is where the userdata arrives (§16.2b.9)", clause, "leave the function raw: a callback with no 'void *' parameter, or several, has no form (#3178)")
                 return c
             for k in 0..c.callback_userdata_cb.len():
                 if c.callback_userdata_cb[k] == cb:
-                    self.emit_error(f"fn '{fname}': 'callback param {cb}' is given its userdata twice (§16.2b.9)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'callback param {cb}' is given its userdata twice (§16.2b.9)", clause, "delete one of the two 'callback param … userdata param …' clauses")
                     return c
             c.callback_userdata_cb.push(cb)
             c.callback_userdata_of.push(ud)
@@ -1626,7 +1626,7 @@ impl Sema:
                 let rn = self.pool_resolve(res)
                 let pn = self.pool_resolve(parent)
                 if rn == "CStr" or self.facade_imported_record_type(res) != 0 or not self.facade_resource_index.contains(res):
-                    self.emit_error(f"fn '{fname}': 'returns borrow {rn} from parent {pn}' — a parent borrow hands out a modeled resource, the parent the argument's resource declares with 'borrows'; '{rn}' is no resource (§16.2b.6)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn} from parent {pn}' — a parent borrow hands out a modeled resource, the parent the argument's resource declares with 'borrows'; '{rn}' is no resource (§16.2b.6)", clause, f"declare '{rn}' as a resource, or write 'returns borrow {rn} from param N' for a view of an imported record")
                     return c
                 let pfrom = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
                 if pfrom < 0:
@@ -1634,7 +1634,7 @@ impl Sema:
                 let pri: i32 = self.facade_resource_index.get(res).unwrap()
                 if not self.facade_same_type(self.sig_return_type(sig), self.facade_resources[pri].repr_tid):
                     let rt = self.type_name(self.sig_return_type(sig))
-                    self.emit_error(f"fn '{fname}' returns {rt}, not the representation of '{rn}' (§16.2b.13)", clause)
+                    self.emit_error_with_help(f"fn '{fname}' returns {rt}, not the representation of '{rn}' (§16.2b.13)", clause, f"name the resource whose wrapped pointer type is {rt}, or delete the clause")
                     return c
                 c.returns_borrow_resource = res
                 c.returns_borrow_from = pfrom
@@ -1647,12 +1647,12 @@ impl Sema:
             if self.pool_resolve(res) == "CStr":
                 if not self.facade_type_is_c_string_ptr(self.sig_return_type(sig)):
                     let rt = self.type_name(self.sig_return_type(sig))
-                    self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *' or 'unsigned char *'); 'returns borrow CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
+                    self.emit_error_with_help(f"fn '{fname}' returns {rt}, not a C string ('char *' or 'unsigned char *'); 'returns borrow CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause, "for a returned record write 'returns borrow <Record> from param N'; for a resource, name it as that resource's producer")
                     return c
                 if domain != 0:
                     if not self.facade_domain_visible(domain):
                         let dn = self.pool_resolve(domain)
-                        self.emit_error(self.facade_unknown_domain_message(fname, dn, true), clause)
+                        self.emit_error_with_help(self.facade_unknown_domain_message(fname, dn, true), clause, f"add 'domain {dn} <scope>' to the contract, with <scope> one of process, thread, resource or static")
                         return c
                     c.returns_borrow_domain = domain
                 else:
@@ -1663,7 +1663,7 @@ impl Sema:
                     if origin.len() != 1 and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, from)) == false and not self.facade_param_is_text(fn_sym, from):
                         let shown = self.facade_param_display(fn_sym, sig, from)
                         let why = if origin.len() == 0: "receives no modeled resource and is not a C string" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
-                        self.emit_error(f"fn '{fname}': 'returns borrow CStr from param {from}' names {shown}, which {why}; a borrowed CStr is a view of the resource or the C string its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.7)", clause)
+                        self.emit_error_with_help(f"fn '{fname}': 'returns borrow CStr from param {from}' names {shown}, which {why}; a borrowed CStr is a view of the resource or the C string its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.7)", clause, "after 'from param' name the parameter that receives the resource the string lives in, or write 'from domain <name>' for memory the library owns")
                         return c
                     c.returns_borrow_from = from
                     let from2 = self.facade_second_borrow_origin(from2_ref, from, fn_sym, sig, clause, 2)
@@ -1684,12 +1684,12 @@ impl Sema:
                 let ret = self.resolve_alias(self.sig_return_type(sig) as TypeId)
                 if self.get_type_kind(ret) != TypeKind.TY_PTR or self.resolve_alias(self.get_type_d0(ret) as TypeId) != self.resolve_alias(record_tid as TypeId):
                     let rt = self.type_name(self.sig_return_type(sig))
-                    self.emit_error(f"fn '{fname}' returns {rt}, not a pointer to '{rn}'; 'returns borrow {rn}' describes the record C points at (§16.2b.6, §16.2b.13)", clause)
+                    self.emit_error_with_help(f"fn '{fname}' returns {rt}, not a pointer to '{rn}'; 'returns borrow {rn}' describes the record C points at (§16.2b.6, §16.2b.13)", clause, f"this function returns {rt}: name that record, or delete the clause")
                     return c
                 if domain != 0:
                     if not self.facade_domain_visible(domain):
                         let dn = self.pool_resolve(domain)
-                        self.emit_error(self.facade_unknown_domain_message(fname, dn, true), clause)
+                        self.emit_error_with_help(self.facade_unknown_domain_message(fname, dn, true), clause, f"add 'domain {dn} <scope>' to the contract, with <scope> one of process, thread, resource or static")
                         return c
                     c.returns_borrow_domain = domain
                 else:
@@ -1712,7 +1712,7 @@ impl Sema:
                     if origin.len() != 1:
                         let shown = self.facade_param_display(fn_sym, sig, from)
                         let why = if origin.len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
-                        self.emit_error(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed record is a view of the resource its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.6, §16.2b.7)", clause)
+                        self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed record is a view of the resource its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.6, §16.2b.7)", clause, "after 'from param' name the parameter that receives the resource the record lives in, or write 'from domain <name>' for memory the library owns")
                         return c
                     c.returns_borrow_from = from
                     let from2 = self.facade_second_borrow_origin(from2_ref, from, fn_sym, sig, clause, 1)
@@ -1723,11 +1723,11 @@ impl Sema:
                 return c
             if domain != 0:
                 let rn = self.pool_resolve(res)
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn} from domain' — a borrowed resource is a view of the resource a parameter receives ('from param <ref>'); a foreign-state domain is the origin of borrowed memory that no resource owns: a CStr, or an imported record (§16.2b.6, §16.2b.7)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn} from domain' — a borrowed resource is a view of the resource a parameter receives ('from param <ref>'); a foreign-state domain is the origin of borrowed memory that no resource owns: a CStr, or an imported record (§16.2b.6, §16.2b.7)", clause, f"write 'returns borrow {rn} from param N', with N the parameter that receives the resource it is a view of")
                 return c
             if not self.facade_resource_index.contains(res):
                 let rn = self.pool_resolve(res)
-                self.emit_error(f"fn '{fname}': unknown resource '{rn}' (§16.2b.6)", clause)
+                self.emit_error_with_help(f"fn '{fname}': unknown resource '{rn}' (§16.2b.6)", clause, f"declare it above this item ('resource {rn} wraps *mut T'), or name a resource the contract declares")
                 return c
             let from = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
             if from < 0:
@@ -1737,7 +1737,7 @@ impl Sema:
             if not self.facade_same_type(self.sig_return_type(sig), repr):
                 let rn = self.pool_resolve(res)
                 let rt = self.type_name(self.sig_return_type(sig))
-                self.emit_error(f"fn '{fname}' returns {rt}, not the representation of '{rn}' (§16.2b.13)", clause)
+                self.emit_error_with_help(f"fn '{fname}' returns {rt}, not the representation of '{rn}' (§16.2b.13)", clause, f"name the resource whose wrapped pointer type is {rt}, or delete the clause")
                 return c
             c.returns_borrow_resource = res
             c.returns_borrow_from = from
@@ -1754,11 +1754,11 @@ impl Sema:
             // another type is not ruled and stays as C declares it.
             if self.resolve_alias(tid as TypeId) != self.ty_cstr:
                 let tn = self.type_name(tid)
-                self.emit_error(f"fn '{fname}': 'returns static {tn}' — only 'returns static CStr' is ruled (§16.2b.7); a static pointer of another type stays as C declares it", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'returns static {tn}' — only 'returns static CStr' is ruled (§16.2b.7); a static pointer of another type stays as C declares it", clause, "delete the clause: the function keeps the pointer C declares; a view of a record is 'returns borrow <Record> from domain <name>'")
                 return c
             if not self.facade_type_is_c_string_ptr(self.sig_return_type(sig)):
                 let rt = self.type_name(self.sig_return_type(sig))
-                self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *' or 'unsigned char *'); 'returns static CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}' returns {rt}, not a C string ('char *' or 'unsigned char *'); 'returns static CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause, "delete the clause, or for a record the library owns write 'returns borrow <Record> from domain <name>'")
                 return c
             c.returns_static_tid = tid
             return c
@@ -1772,7 +1772,7 @@ impl Sema:
             let d = self.ast.get_extra(ops + 1)
             if not self.facade_domain_visible(d):
                 let dn = self.pool_resolve(d)
-                self.emit_error(self.facade_unknown_domain_message(fname, dn, false), clause)
+                self.emit_error_with_help(self.facade_unknown_domain_message(fname, dn, false), clause, f"add 'domain {dn} <scope>' to the contract, with <scope> one of process, thread, resource or static")
                 return c
             c.preserves_domains.push(d)
             return c
@@ -1780,7 +1780,7 @@ impl Sema:
             let res = self.ast.get_extra(ops)
             if not self.facade_resource_index.contains(res):
                 let rn = self.pool_resolve(res)
-                self.emit_error(f"fn '{fname}': unknown resource '{rn}' (§16.2b.3)", clause)
+                self.emit_error_with_help(f"fn '{fname}': unknown resource '{rn}' (§16.2b.3)", clause, f"declare it above this item ('resource {rn} wraps *mut T'), or name a resource the contract declares")
                 return c
             c.of_resource = res
             return c
@@ -1812,11 +1812,11 @@ impl Sema:
                 return c
             if not self.facade_type_is_char_pointer(self.sig_param_type(sig, pi)):
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': text {shown}: not a pointer to a C character type; 'text param' describes a `char *`, `unsigned char *` or `signed char *` input (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}': text {shown}: not a pointer to a C character type; 'text param' describes a `char *`, `unsigned char *` or `signed char *` input (§16.2b.8)", clause, f"delete 'text param {pi}': bytes with a count are 'buffer param P len param L', a record is `reads`")
                 return c
             for k in 0..c.text_params.len():
                 if c.text_params[k] == pi:
-                    self.emit_error(f"fn '{fname}': 'text param {pi}' is stated twice (§16.2b.8)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'text param {pi}' is stated twice (§16.2b.8)", clause, "delete one of the two 'text param' clauses")
                     return c
             c.text_params.push(pi)
             return c
@@ -1829,7 +1829,7 @@ impl Sema:
             let ret = self.sig_return_type(sig)
             if not self.facade_type_is_char_pointer(ret):
                 let rt = self.type_name(ret)
-                self.emit_error(f"fn '{fname}' returns {rt}, not a pointer to a C character type; 'text return' describes new text C hands back (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}' returns {rt}, not a pointer to a C character type; 'text return' describes new text C hands back (§16.2b.8)", clause, "delete 'text return': it applies to a function returning 'char *'; a returned record or resource has its own clause ('returns borrow …', or a resource's 'from')")
                 return c
             // F is an imported function taking one pointer, or an imported
             // global that holds one (libxml2's `xmlFreeFunc xmlFree`, the
@@ -1847,10 +1847,10 @@ impl Sema:
                     free_sym = self.ast.get_data0(var_node)
                     releases = true
             if not releases:
-                self.emit_error(f"fn '{fname}': 'freed by {named}' names no imported function, or global holding one, that takes one pointer, the text to release (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'freed by {named}' names no imported function, or global holding one, that takes one pointer, the text to release (§16.2b.8)", clause, "name the library's release function for this text, declared in the imported header: 'text return, owned, freed by sqlite3_free'")
                 return c
             if c.text_return_free != 0:
-                self.emit_error(f"fn '{fname}': 'text return' is stated twice (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'text return' is stated twice (§16.2b.8)", clause, "delete one of the two 'text return' clauses")
                 return c
             c.text_return_free = free_sym
             return c
@@ -1868,29 +1868,29 @@ impl Sema:
             let ptype = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
             let record = if self.get_type_kind(ptype) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(ptype) as TypeId) as i32 else: 0
             if record == 0 or self.get_type_kind(record as TypeId) != TypeKind.TY_STRUCT or self.is_opaque_value_type(record):
-                self.emit_error(f"fn '{fname}': {word} {shown}: a value record is a pointer to one complete record; this is not one (§16.2b.5)", clause)
+                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value record is a pointer to one complete record; this is not one (§16.2b.5)", clause, "a pointer with a count is 'buffer param P len param L'; text is 'text param P'; an opaque record is a resource ('resource Name wraps *mut T')")
                 return c
             if self.facade_param_takes_resource(fn_sym, pi):
-                self.emit_error(f"fn '{fname}': {word} {shown}: the record is a resource's representation, so the operation borrows that resource; it is not a value record (§16.2b.5)", clause)
+                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: the record is a resource's representation, so the operation borrows that resource; it is not a value record (§16.2b.5)", clause, f"delete the `{word}` clause: the operation is presented on the resource and borrows it")
                 return c
             if self.facade_contract_pairs_buffer(c, pi):
-                self.emit_error(f"fn '{fname}': {word} {shown}: a pointer paired with a count is a buffer (§16.2b.8), not a value record (§16.2b.5)", clause)
+                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a pointer paired with a count is a buffer (§16.2b.8), not a value record (§16.2b.5)", clause, f"delete the `{word}` clause and keep the buffer clause")
                 return c
             let held = self.pointer_holding_part(record, "")
             if held.len() > 0:
-                self.emit_error(f"fn '{fname}': {word} {shown}: a value record is flat, and {held} is a pointer the program could set to any address; such a record is a resource, a buffer, or stays raw (§16.2b.5)", clause)
+                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value record is flat, and {held} is a pointer the program could set to any address; such a record is a resource, a buffer, or stays raw (§16.2b.5)", clause, "declare the record a resource ('resource Name wraps *mut T' with its producer and 'drop'), or leave the function raw")
                 return c
             if word != "reads" and self.get_type_d1(ptype) == 0:
-                self.emit_error(f"fn '{fname}': {word} {shown}: the pointer is `const`, so the callee cannot write the record; `reads` is the clause (§16.2b.5)", clause)
+                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: the pointer is `const`, so the callee cannot write the record; `reads` is the clause (§16.2b.5)", clause, f"write `reads` in place of `{word}`")
                 return c
             if word == "fills":
                 let culprit = self.zero_invalid_part(record, "")
                 if culprit.len() > 0:
-                    self.emit_error(f"fn '{fname}': fills {shown}: With passes `{self.type_name(record)}.zeroed()`, and {culprit} has no all-zero value (§16.2b.3, §16.2b.5)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': fills {shown}: With passes `{self.type_name(record)}.zeroed()`, and {culprit} has no all-zero value (§16.2b.3, §16.2b.5)", clause, "write `updates`: the caller then passes a record it built")
                     return c
             for described in c.value_records:
                 if described == pi:
-                    self.emit_error(f"fn '{fname}': {shown} is described twice; a value record has one of `reads`, `fills`, `updates` (§16.2b.5)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': {shown} is described twice; a value record has one of `reads`, `fills`, `updates` (§16.2b.5)", clause, "delete one of the two clauses")
                     return c
             c.value_records.push(pi)
             c.value_record_words.push(word_sym)
@@ -1910,11 +1910,11 @@ impl Sema:
             let pk = self.get_type_kind(self.resolve_alias(self.sig_param_type(sig, pi) as TypeId))
             if pk != TypeKind.TY_PTR and not self.facade_param_is_callable(sig, pi):
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': nullable {shown}: not a pointer, NULL is not a value it can take (§16.2b.8, §16.2b.13)", clause)
+                self.emit_error_with_help(f"fn '{fname}': nullable {shown}: not a pointer, NULL is not a value it can take (§16.2b.8, §16.2b.13)", clause, f"delete 'nullable param {pi}'")
                 return c
             for k in 0..c.nullable_params.len():
                 if c.nullable_params[k] == pi:
-                    self.emit_error(f"fn '{fname}': 'nullable param {pi}' is stated twice (§16.2b.8)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'nullable param {pi}' is stated twice (§16.2b.8)", clause, "delete one of the two 'nullable' clauses")
                     return c
             c.nullable_params.push(pi)
             return c
@@ -1933,54 +1933,54 @@ impl Sema:
             // D198: a parameter a value-record clause describes is no buffer.
             for described in c.value_records:
                 if described == p or described == l:
-                    self.emit_error(f"fn '{fname}': a pointer paired with a count is a buffer (§16.2b.8), not a value record; the `reads`/`fills`/`updates` clause on it does not apply (§16.2b.5)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': a pointer paired with a count is a buffer (§16.2b.8), not a value record; the `reads`/`fills`/`updates` clause on it does not apply (§16.2b.5)", clause, "delete the `reads`/`fills`/`updates` clause and keep 'buffer param P len param L'")
                     return c
             let inout = self.ast.get_extra(ops + 2)
             let elements = self.ast.get_extra(ops + 3)
             let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
             if self.get_type_kind(ptype) != TypeKind.TY_PTR or (elements == 0 and not self.facade_type_is_byte(self.get_type_d0(ptype))):
                 let shown = self.facade_param_display(fn_sym, sig, p)
-                self.emit_error(f"fn '{fname}': 'buffer param {p}' names {shown}, which is not a pointer to bytes ('char *', 'unsigned char *', 'void *' or a typedef of one); an unqualified buffer counts bytes and renders []u8; state 'elements' for an element-count contract (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'buffer param {p}' names {shown}, which is not a pointer to bytes ('char *', 'unsigned char *', 'void *' or a typedef of one); an unqualified buffer counts bytes and renders []u8; state 'elements' for an element-count contract (§16.2b.8)", clause, f"for a count of elements write 'buffer param {p} len param {l} elements'; a pointer to one record is `reads`, `fills` or `updates`")
                 return c
             if elements != 0:
                 let element = self.resolve_alias(self.get_type_d0(ptype) as TypeId)
                 if self.is_c_void_like_type(element as i32) or self.is_opaque_value_type(element as i32):
                     let shown = self.facade_param_display(fn_sym, sig, p)
-                    self.emit_error(f"fn '{fname}': 'buffer param {p} … elements' names {shown}, whose element size is unknown; an element-count buffer requires a complete element type (§16.2b.8)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'buffer param {p} … elements' names {shown}, whose element size is unknown; an element-count buffer requires a complete element type (§16.2b.8)", clause, f"count bytes instead: 'buffer param {p} len param {l}' renders []u8")
                     return c
                 let held = self.pointer_holding_part(element as i32, "")
                 if held.len() > 0:
                     let shown = self.facade_param_display(fn_sym, sig, p)
-                    self.emit_error(f"fn '{fname}': 'buffer param {p} … elements' names {shown}: an element-count buffer's elements are flat, and {held} is a pointer the program could set to any address (§16.2b.5, §16.2b.8)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'buffer param {p} … elements' names {shown}: an element-count buffer's elements are flat, and {held} is a pointer the program could set to any address (§16.2b.5, §16.2b.8)", clause, "model the element's pointer as a resource, or leave the function raw: no buffer clause describes records that hold pointers")
                     return c
             if inout != 0 and self.get_type_d1(ptype) == 0:
                 let shown = self.facade_param_display(fn_sym, sig, p)
-                self.emit_error(f"fn '{fname}': 'buffer param {p} capacity … inout' names {shown}, a const pointer; C cannot write into it — a buffer C fills is 'T *', and an input buffer is paired with 'len' (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'buffer param {p} capacity … inout' names {shown}, a const pointer; C cannot write into it — a buffer C fills is 'T *', and an input buffer is paired with 'len' (§16.2b.8)", clause, f"an input buffer is 'buffer param {p} len param N', with N the integer parameter that carries its length")
                 return c
             if p == l:
                 let shown = self.facade_param_display(fn_sym, sig, p)
-                self.emit_error(f"fn '{fname}': 'buffer param {p}' pairs {shown} with itself; a pairing names the pointer and the distinct integer that carries its length (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'buffer param {p}' pairs {shown} with itself; a pairing names the pointer and the distinct integer that carries its length (§16.2b.8)", clause, f"'buffer param {p} len param N', with N the integer parameter that carries the length")
                 return c
             let ltype = self.resolve_alias(self.sig_param_type(sig, l) as TypeId)
             if inout == 0:
                 if self.get_type_kind(self.numeric_operand_type(ltype as i32)) != TypeKind.TY_INT:
                     let shown = self.facade_param_display(fn_sym, sig, l)
-                    self.emit_error(f"fn '{fname}': 'len param {l}' names {shown}, which is not an integer; the length parameter carries the byte count C reads (§16.2b.8)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'len param {l}' names {shown}, which is not an integer; the length parameter carries the byte count C reads (§16.2b.8)", clause, f"name the integer parameter after 'len'; when C reads the capacity through a pointer and writes the length back, write 'capacity param {l} inout'")
                     return c
             else if self.get_type_kind(ltype) != TypeKind.TY_PTR or self.get_type_d1(ltype) == 0 or self.get_type_kind(self.numeric_operand_type(self.get_type_d0(ltype))) != TypeKind.TY_INT:
                 let shown = self.facade_param_display(fn_sym, sig, l)
-                self.emit_error(f"fn '{fname}': 'capacity param {l} inout' names {shown}, which is not a pointer to an integer; C reads the capacity through it and writes the produced length back (§16.2b.8)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'capacity param {l} inout' names {shown}, which is not a pointer to an integer; C reads the capacity through it and writes the produced length back (§16.2b.8)", clause, f"when the count is passed by value, write 'len param {l}'")
                 return c
             for k in 0..c.buffer_ptr.len():
                 let taken = if c.buffer_ptr[k] == p or c.buffer_len[k] == p: p else if c.buffer_ptr[k] == l or c.buffer_len[k] == l: l else: -1
                 if taken >= 0:
                     let shown = self.facade_param_display(fn_sym, sig, taken)
-                    self.emit_error(f"fn '{fname}': {shown} is already part of a buffer pairing; a parameter is paired once (§16.2b.8)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': {shown} is already part of a buffer pairing; a parameter is paired once (§16.2b.8)", clause, "delete one of the two buffer clauses that name it")
                     return c
             for k in 0..c.fixed_params.len():
                 if c.fixed_params[k] == p or c.fixed_params[k] == l:
                     let shown = self.facade_param_display(fn_sym, sig, c.fixed_params[k])
-                    self.emit_error(f"fn '{fname}': {shown} is bound by 'fixed' and cannot also be a buffer or its length (§16.2b.8, §16.2b.11)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': {shown} is bound by 'fixed' and cannot also be a buffer or its length (§16.2b.8, §16.2b.11)", clause, "delete the 'fixed' clause: the buffer argument supplies the pointer and its length")
                     return c
             c.buffer_ptr.push(p)
             c.buffer_len.push(l)
@@ -2004,33 +2004,33 @@ impl Sema:
                 // A callback parameter is a C function pointer: NULL is the
                 // presentation that passes none (ruling Amendment 3).
                 if self.get_type_kind(ptype) != TypeKind.TY_PTR and not self.facade_param_is_callable(sig, pi):
-                    self.emit_error(f"fn '{fname}': 'param {pi} fixed null' binds {shown}, which is not a pointer (§16.2b.11)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed null' binds {shown}, which is not a pointer (§16.2b.11)", clause, f"fix an integer with its literal ('param {pi} fixed 0'), a bool with 'true' or 'false'")
                     return c
             else if lk == NodeKind.NK_BOOL_LIT:
                 if self.resolve_alias(ptype) != self.ty_bool:
-                    self.emit_error(f"fn '{fname}': 'param {pi} fixed' binds a boolean to {shown}, which is not a bool (§16.2b.11)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds a boolean to {shown}, which is not a bool (§16.2b.11)", clause, f"fix an integer with its literal ('param {pi} fixed 1'), a pointer with 'null'")
                     return c
             else if is_int:
                 if self.get_type_kind(self.numeric_operand_type(ptype as i32)) != TypeKind.TY_INT:
-                    self.emit_error(f"fn '{fname}': 'param {pi} fixed' binds an integer to {shown}, which is not an integer (§16.2b.11)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds an integer to {shown}, which is not an integer (§16.2b.11)", clause, f"fix a pointer with 'null' ('param {pi} fixed null'), a bool with 'true' or 'false'")
                     return c
                 let negative = lk == NodeKind.NK_UNARY or self.ast.int_lit_value(lit) < 0
                 if negative and self.is_unsigned_int_type(self.numeric_operand_type(ptype as i32)):
-                    self.emit_error(f"fn '{fname}': 'param {pi} fixed' binds a negative literal to {shown}, an unsigned integer (§16.2b.11)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds a negative literal to {shown}, an unsigned integer (§16.2b.11)", clause, "write the value the parameter receives as a literal of its own range, zero or above")
                     return c
             else:
-                self.emit_error(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true' or 'false' (§16.2b.11)", clause)
+                self.emit_error_with_help(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true' or 'false' (§16.2b.11)", clause, "'param N fixed 0', 'param N fixed null' or 'param N fixed true'; a value the caller chooses stays a parameter")
                 return c
             if self.facade_param_receives(fn_sym, pi).len() > 0:
-                self.emit_error(f"fn '{fname}': 'param {pi} fixed' binds {shown}, which receives a modeled resource; a resource is passed by the value that owns it, never fixed (§16.2b.11)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds {shown}, which receives a modeled resource; a resource is passed by the value that owns it, never fixed (§16.2b.11)", clause, f"delete 'param {pi} fixed …': the presented operation takes the resource itself, as its receiver when it is the first parameter")
                 return c
             for k in 0..c.fixed_params.len():
                 if c.fixed_params[k] == pi:
-                    self.emit_error(f"fn '{fname}': {shown} is fixed twice (§16.2b.11)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': {shown} is fixed twice (§16.2b.11)", clause, "delete one of the two 'fixed' clauses")
                     return c
             for k in 0..c.buffer_ptr.len():
                 if c.buffer_ptr[k] == pi or c.buffer_len[k] == pi:
-                    self.emit_error(f"fn '{fname}': {shown} is part of a buffer pairing and cannot also be fixed (§16.2b.8, §16.2b.11)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': {shown} is part of a buffer pairing and cannot also be fixed (§16.2b.8, §16.2b.11)", clause, "delete the 'fixed' clause: the buffer argument supplies the pointer and its length")
                     return c
             c.fixed_params.push(pi)
             c.fixed_literals.push(lit)
@@ -2044,13 +2044,13 @@ impl Sema:
             // parameter, and each case an imported constant of P's type
             // with the presented type of the variadic argument for it.
             if self.sig_is_variadic(sig) == 0:
-                self.emit_error(f"fn '{fname}': 'variadic param …' describes a variadic C function, and '{fname}' is not variadic (§16.2b.5, §16.2b.13)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'variadic param …' describes a variadic C function, and '{fname}' is not variadic (§16.2b.5, §16.2b.13)", clause, "delete the 'variadic param …' clause: every parameter of this function is named and typed")
                 return c
             let count = self.sig_get_param_count(sig)
             let n = self.facade_ref_index_only(self.ast.get_extra(ops))
             if n != count:
                 let shown_n = if n < 0: "a parameter by name or type" else: f"param {n}"
-                self.emit_error(f"fn '{fname}': 'variadic param' names {shown_n}, but the variadic position of '{fname}' is param {count}: its C parameters are params 0 to {count - 1}, and the variadic argument has no name (§16.2b.5)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'variadic param' names {shown_n}, but the variadic position of '{fname}' is param {count}: its C parameters are params 0 to {count - 1}, and the variadic argument has no name (§16.2b.5)", clause, f"write 'variadic param {count} selected by param P:', with P the parameter whose constant picks the case")
                 return c
             let p = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
             if p < 0:
@@ -2058,10 +2058,10 @@ impl Sema:
             let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
             if self.get_type_kind(self.numeric_operand_type(ptype as i32)) != TypeKind.TY_INT:
                 let shown = self.facade_param_display(fn_sym, sig, p)
-                self.emit_error(f"fn '{fname}': 'selected by param {p}' names {shown}, which is not an integer or enum; the selector is the parameter whose compile-time value picks the case (§16.2b.5)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'selected by param {p}' names {shown}, which is not an integer or enum; the selector is the parameter whose compile-time value picks the case (§16.2b.5)", clause, "after 'selected by' name the integer or enum parameter the header's option constants are passed in")
                 return c
             if c.variadic_node != 0:
-                self.emit_error(f"fn '{fname}': 'variadic param …' is stated twice; one variadic function has one closed set of cases (§16.2b.5)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'variadic param …' is stated twice; one variadic function has one closed set of cases (§16.2b.5)", clause, "put every case under one 'variadic param … selected by param …:' clause")
                 return c
             let case_count = self.ast.get_data2(clause) - 2
             // The place the next case takes in the contract's case lists.
@@ -2073,7 +2073,7 @@ impl Sema:
                 let sn = self.pool_resolve(sel)
                 let cdecl = self.facade_const_decl(sel)
                 if cdecl == 0:
-                    self.emit_error(f"fn '{fname}': 'case {sn}' names no imported integer constant; a case selector is a compile-time constant the header declares, of the selector parameter's type (§16.2b.5)", case_node)
+                    self.emit_error_with_help(f"fn '{fname}': 'case {sn}' names no imported integer constant; a case selector is a compile-time constant the header declares, of the selector parameter's type (§16.2b.5)", case_node, "write the constant's C name as the header spells it: 'case CURLOPT_URL: str'")
                     return c
                 // The constant's declared type is an integer: c_import spells
                 // an enum's constants in the enum's own width and sign
@@ -2084,14 +2084,14 @@ impl Sema:
                 if ctid != 0 and self.get_type_kind(self.numeric_operand_type(self.resolve_alias(ctid as TypeId) as i32)) != TypeKind.TY_INT:
                     let shown = self.facade_param_display(fn_sym, sig, p)
                     let ctn = self.type_name(ctid)
-                    self.emit_error(f"fn '{fname}': 'case {sn}' is a {ctn}, not an integer value of the selector {shown} (§16.2b.5, §16.2b.13)", case_node)
+                    self.emit_error_with_help(f"fn '{fname}': 'case {sn}' is a {ctn}, not an integer value of the selector {shown} (§16.2b.5, §16.2b.13)", case_node, "a case selector is one of the selector parameter's own integer or enum constants")
                     return c
                 let value = self.facade_const_int_value(self.ast.get_data1(cdecl))
                 for j in 0..c.variadic_case_syms.len():
                     if c.variadic_case_syms[j] == sel or c.variadic_case_values[j] == value:
                         let on = self.pool_resolve(c.variadic_case_syms[j])
                         let why = if c.variadic_case_syms[j] == sel: "is listed twice" else: f"has the value of 'case {on}', already listed"
-                        self.emit_error(f"fn '{fname}': 'case {sn}' {why}; one selector value has one case (§16.2b.5)", case_node)
+                        self.emit_error_with_help(f"fn '{fname}': 'case {sn}' {why}; one selector value has one case (§16.2b.5)", case_node, "delete one of the two cases")
                         return c
                 let tid = self.resolve_type_expr(self.ast.get_extra(cops + 1)) as i32
                 if tid == 0:
@@ -2115,7 +2115,7 @@ impl Sema:
                 let Some(case_kind) = ckind else:
                     let tn = self.source_spelling(self.ast.get_extra(cops + 1))
                     let hint = if self.get_type_kind(rt) == TypeKind.TY_PTR: "; a pointer the callee keeps states its retention ('&CString retains by param N', D194), and a callback its userdata pairing ('callback param N as T userdata param CONST retains by param N')" else: ""
-                    self.emit_error(f"fn '{fname}': 'case {sn}: {tn}' — a case states an integer C type ('c_long', 'curl_off_t', an enum) or 'str' (a copied input string, §16.3c){hint} (§16.2b.5)", case_node)
+                    self.emit_error_with_help(f"fn '{fname}': 'case {sn}: {tn}' — a case states an integer C type ('c_long', 'curl_off_t', an enum) or 'str' (a copied input string, §16.3c){hint} (§16.2b.5)", case_node, f"write 'case {sn}: c_long' or 'case {sn}: str'; an out-pointer case has no form yet (#3119): present that call through a With function over the raw call")
                     return c
                 c.variadic_case_syms.push(sel)
                 c.variadic_case_values.push(value)
@@ -2129,7 +2129,7 @@ impl Sema:
                     // implied by the pairing (§16.2b.5): the selector
                     // `userdata param CONST` names, taking `&U`.
                     if retainer_ref == 0:
-                        self.emit_error(f"fn '{fname}': 'case {sn}' installs a callback the library keeps for later calls; state its retention: '… userdata param CONST retains by param 0' (§16.2b.5, §16.2b.9)", case_node)
+                        self.emit_error_with_help(f"fn '{fname}': 'case {sn}' installs a callback the library keeps for later calls; state its retention: '… userdata param CONST retains by param 0' (§16.2b.5, §16.2b.9)", case_node, f"write 'case {sn}: callback param N as T userdata param CONST retains by param 0'")
                         return c
                     let slot = &c.variadic_slots[c.variadic_slots.len() - 1]
                     let ud_sel = slot.userdata_selector
@@ -2138,7 +2138,7 @@ impl Sema:
                         if c.variadic_case_syms[j] == ud_sel or c.variadic_case_values[j] == ud_value:
                             let un = self.pool_resolve(ud_sel)
                             let on = self.pool_resolve(c.variadic_case_syms[j])
-                            self.emit_error(f"fn '{fname}': 'case {sn}' pairs its userdata with {un}, whose setter the pairing implies, and 'case {on}' lists that selector value too; leave the userdata case out (§16.2b.5)", case_node)
+                            self.emit_error_with_help(f"fn '{fname}': 'case {sn}' pairs its userdata with {un}, whose setter the pairing implies, and 'case {on}' lists that selector value too; leave the userdata case out (§16.2b.5)", case_node, f"delete 'case {on}'")
                             return c
                     c.variadic_case_syms.push(ud_sel)
                     c.variadic_case_values.push(ud_value)
@@ -2157,7 +2157,7 @@ impl Sema:
                     if c.variadic_case_syms[j] == slot.length_selector or c.variadic_case_values[j] == slot.length_value:
                         let ln = self.pool_resolve(slot.length_selector)
                         let cn = self.pool_resolve(c.variadic_case_syms[slot.case_index])
-                        self.emit_error(f"fn '{fname}': 'case {cn}' sets its length through {ln}, so {ln} is not listed as a case of its own: the pointer and its length are one operation (§16.2b.5, §16.2b.8)", slot.clause)
+                        self.emit_error_with_help(f"fn '{fname}': 'case {cn}' sets its length through {ln}, so {ln} is not listed as a case of its own: the pointer and its length are one operation (§16.2b.5, §16.2b.8)", slot.clause, f"delete 'case {ln}'")
                         return c
             return c
         if kind == FACADE_CLAUSE_OK:
@@ -2173,21 +2173,21 @@ impl Sema:
                 let listed = self.ast.get_extra(ops + oi)
                 if not self.facade_status_constant_ok(listed):
                     let ln = self.pool_resolve(listed)
-                    self.emit_error(f"fn '{fname}': 'ok {ln}' names no imported integer constant; a status is compared with a compile-time constant the header declares (§16.2b.4)", clause)
+                    self.emit_error_with_help(f"fn '{fname}': 'ok {ln}' names no imported integer constant; a status is compared with a compile-time constant the header declares (§16.2b.4)", clause, "after 'ok' write the status constant as the header names it: 'ok CURLE_OK'")
                     return c
             let ret = self.sig_return_type(sig)
             if ret == 0 or self.get_type_kind(self.numeric_operand_type(ret)) != TypeKind.TY_INT:
                 let rt: str = if ret == 0: "nothing" else: self.type_name(ret)
-                self.emit_error(f"fn '{fname}': 'ok {cn}' compares an integer status, but the function returns {rt} (§16.2b.4)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'ok {cn}' compares an integer status, but the function returns {rt} (§16.2b.4)", clause, "delete 'ok': it applies to a function that returns an integer status")
                 return c
             if c.ok_const != 0:
-                self.emit_error(f"fn '{fname}': 'ok' is stated twice (§16.2b.4)", clause)
+                self.emit_error_with_help(f"fn '{fname}': 'ok' is stated twice (§16.2b.4)", clause, "merge the two lines into one: 'ok C1, C2'")
                 return c
             c.ok_const = const_sym
             c.ok_count = self.ast.get_data2(clause)
             return c
         let cname = facade_clause_name(kind)
-        self.emit_error(f"fn '{fname}': clause '{cname}' applies to a resource, not an fn item (§16.2b)", clause)
+        self.emit_error_with_help(f"fn '{fname}': clause '{cname}' applies to a resource, not an fn item (§16.2b)", clause, f"move '{cname}' under the 'resource <Name>' item it describes")
         c
 
     // ── verification helpers ─────────────────────────────────────────────
@@ -2219,7 +2219,7 @@ impl Sema:
             if self.emit_ci_omitted_symbol_error(sym, at):
                 return sig
             let n = self.pool_resolve(sym)
-            self.emit_error(f"'{n}' is not a declaration in scope: a facade describes imported declarations (§16.2b.13)", at)
+            self.emit_error_with_help(f"'{n}' is not a declaration in scope: a facade describes imported declarations (§16.2b.13)", at, f"import the header that declares '{n}' with 'use c_import(…)' in this file, or correct the spelling to the C name")
         sig
 
     // The name of parameter `pi` as the declaration spells it, or 0 — read
@@ -2303,7 +2303,7 @@ impl Sema:
             for i in 0..digits.len():
                 idx = idx * 10 + ((digits[i] as i32) - 48)
             if idx >= count:
-                self.emit_error(f"'{fname}' has {count} parameter(s); param {idx} does not exist (parameters count from zero, §16.2b.5)", ref_node)
+                self.emit_error_with_help(f"'{fname}' has {count} parameter(s); param {idx} does not exist (parameters count from zero, §16.2b.5)", ref_node, f"its parameters are numbered 0 to {count - 1}")
                 return -1
             return idx
         if rk == FACADE_PARAM_REF_NAME:
@@ -2315,7 +2315,7 @@ impl Sema:
                 if cn == wn:
                     return pi
                 names = names ++ (if pi > 0: ", " else: "") ++ f"{pi}: {cn}"
-            self.emit_error(f"'{fname}' has no parameter named '{wn}'; its parameters are {names} (§16.2b.5)", ref_node)
+            self.emit_error_with_help(f"'{fname}' has no parameter named '{wn}'; its parameters are {names} (§16.2b.5)", ref_node, "use one of those names, or the position: 'param 0'")
             return -1
         let tid = self.resolve_type_expr(self.ast.get_data1(ref_node)) as i32
         if tid == 0:
@@ -2328,7 +2328,7 @@ impl Sema:
                 found = pi
         if matches != 1:
             let tn = self.type_name(tid)
-            self.emit_error(f"'{fname}': param type {tn} matches {matches} parameter(s); a type reference must match exactly one (§16.2b.5)", ref_node)
+            self.emit_error_with_help(f"'{fname}': param type {tn} matches {matches} parameter(s); a type reference must match exactly one (§16.2b.5)", ref_node, "refer to the parameter by name or by position: 'param 2'")
             return -1
         found
 
@@ -2449,11 +2449,11 @@ impl Sema:
         if owner < 0: return result
         if callback_ref != 0:
             if self.facade_ref_index_only(callback_ref) != self.sig_get_param_count(sig):
-                self.emit_error("a variadic callback names the variadic argument position, not a fixed parameter (§16.2b.5)", node)
+                self.emit_error_with_help("a variadic callback names the variadic argument position, not a fixed parameter (§16.2b.5)", node, "after 'callback param' write the variadic position, the function's parameter count: 'callback param 2 as T userdata param CONST retains by param 0'")
                 return result
             let callable = self.callable_type_resolved(tid)
             if callable == 0 or self.get_type_kind(callable) != TypeKind.TY_EXTERN_FN:
-                self.emit_error("a variadic callback's explicit 'as' type must be a C function pointer (§16.2b.5)", node)
+                self.emit_error_with_help("a variadic callback's explicit 'as' type must be a C function pointer (§16.2b.5)", node, "after 'as' name the header's function-pointer typedef for this callback")
                 return result
             var slots = 0
             for pi in 0..self.get_type_d1(callable):
@@ -2461,27 +2461,27 @@ impl Sema:
                     slots = slots + 1
                     result.callback_userdata = pi
             if slots != 1:
-                self.emit_error("a variadic callback's C signature must have exactly one 'void *' userdata parameter (§16.2b.9)", node)
+                self.emit_error_with_help("a variadic callback's C signature must have exactly one 'void *' userdata parameter (§16.2b.9)", node, "leave this case out: a callback with no 'void *' parameter, or several, has no form (#3178)")
                 return result
             let paired_ref = self.ast.get_extra(ops + 3)
             if self.ast.get_data0(paired_ref) != FACADE_PARAM_REF_NAME:
-                self.emit_error("a variadic callback's userdata names an imported selector constant, not a parameter index (§16.2b.5)", node)
+                self.emit_error_with_help("a variadic callback's userdata names an imported selector constant, not a parameter index (§16.2b.5)", node, "after 'userdata param' write the option constant that sets the userdata (CURLOPT_WRITEDATA)")
                 return result
             let paired_sym = self.ast.get_data1(paired_ref)
             let paired_decl = self.facade_const_decl(paired_sym)
             if paired_decl == 0:
-                self.emit_error("a variadic callback's userdata selector names no imported integer constant (§16.2b.5)", node)
+                self.emit_error_with_help("a variadic callback's userdata selector names no imported integer constant (§16.2b.5)", node, "after 'userdata param' write the option constant as the header names it (CURLOPT_WRITEDATA)")
                 return result
             let paired_tid = self.facade_const_decl_type(paired_decl)
             if paired_tid == 0 or self.get_type_kind(self.numeric_operand_type(self.resolve_alias(paired_tid))) != TypeKind.TY_INT:
-                self.emit_error("a variadic callback's userdata selector must be an imported integer constant (§16.2b.5)", node)
+                self.emit_error_with_help("a variadic callback's userdata selector must be an imported integer constant (§16.2b.5)", node, "after 'userdata param' write an integer option constant of the selector's type")
                 return result
             result.callback_type = callable
             result.userdata_selector = paired_sym
             result.userdata_value = self.facade_const_int_value(self.ast.get_data1(paired_decl))
             let selector_decl = self.facade_const_decl(self.ast.get_extra(ops))
             if result.userdata_value == self.facade_const_int_value(self.ast.get_data1(selector_decl)):
-                self.emit_error("a variadic callback and its userdata need distinct selector values (§16.2b.5)", node)
+                self.emit_error_with_help("a variadic callback and its userdata need distinct selector values (§16.2b.5)", node, "name the option that sets the userdata, which differs from the one that sets the callback")
                 return result
         else:
             // D194 (§16.2b.5): the retained value is a borrow of
@@ -2507,34 +2507,34 @@ impl Sema:
                 self.emit_error_with_help("a retained byte case states the option its length is set through, so the pointer and its length are one operation (§16.2b.5, §16.2b.8)", node, "add 'length param CONST as T' after 'retains by param N', or state '&CString' when C reads the pointer as a NUL-terminated string")
                 return result
             if text_form and length_ref != 0:
-                self.emit_error("a NUL-terminated retained case has no length option; state '&[u8]' or '&str' for bytes read to a length (§16.2b.5)", node)
+                self.emit_error_with_help("a NUL-terminated retained case has no length option; state '&[u8]' or '&str' for bytes read to a length (§16.2b.5)", node, "delete 'length param …', or write '&[u8]' or '&str' as the case's type")
                 return result
             result.retained_form = if text_form: .Text else: .Sized
             if length_ref != 0:
                 if self.ast.get_data0(length_ref) != FACADE_PARAM_REF_NAME:
-                    self.emit_error("a retained case's length option names an imported selector constant, not a parameter index (§16.2b.5)", node)
+                    self.emit_error_with_help("a retained case's length option names an imported selector constant, not a parameter index (§16.2b.5)", node, "after 'length param' write the option constant that sets the length (CURLOPT_POSTFIELDSIZE_LARGE)")
                     return result
                 let length_sym = self.ast.get_data1(length_ref)
                 let length_decl = self.facade_const_decl(length_sym)
                 if length_decl == 0:
-                    self.emit_error("a retained case's length option names no imported integer constant (§16.2b.5)", node)
+                    self.emit_error_with_help("a retained case's length option names no imported integer constant (§16.2b.5)", node, "after 'length param' write the option constant as the header names it")
                     return result
                 let length_tid = self.resolve_type_expr(self.ast.get_extra(ops + 6)) as i32
                 if length_tid == 0: return result
                 if self.get_type_kind(self.numeric_operand_type(self.resolve_alias(length_tid as TypeId) as i32)) != TypeKind.TY_INT:
-                    self.emit_error("a retained case's length option takes an integer C type ('c_long', 'curl_off_t') (§16.2b.5)", node)
+                    self.emit_error_with_help("a retained case's length option takes an integer C type ('c_long', 'curl_off_t') (§16.2b.5)", node, "after the length option write its C integer type: 'length param CONST as curl_off_t'")
                     return result
                 result.length_selector = length_sym
                 result.length_value = self.facade_const_int_value(self.ast.get_data1(length_decl))
                 result.length_tid = length_tid
                 let selector_decl = self.facade_const_decl(self.ast.get_extra(ops))
                 if result.length_value == self.facade_const_int_value(self.ast.get_data1(selector_decl)):
-                    self.emit_error("a retained case and its length option need distinct selector values (§16.2b.5)", node)
+                    self.emit_error_with_help("a retained case and its length option need distinct selector values (§16.2b.5)", node, "name the option that sets the length, which differs from the one that sets the pointer")
                     return result
             for ui in 7..self.ast.get_data2(node): result.until_syms.push(self.ast.get_extra(ops + ui))
         let resources = self.facade_param_receives(fn_sym, owner)
         if resources.len() != 1:
-            self.emit_error("a retained variadic case needs one modeled resource for its retaining parameter (§16.2b.5)", node)
+            self.emit_error_with_help("a retained variadic case needs one modeled resource for its retaining parameter (§16.2b.5)", node, "after 'retains by' name the parameter that receives the declared resource keeping the pointer: 'retains by param 0'")
             return result
         result.retainer_param = owner
         result.resource = resources[0]
@@ -2662,10 +2662,10 @@ impl Sema:
             let node = self.foreign_contracts[ci].variadic_node
             let fname = self.pool_resolve(fn_sym)
             if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].buffer_ptr.len() > 0 or self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0 or self.foreign_contracts[ci].returns_borrow_record != 0:
-                self.emit_error(f"fn '{fname}': a variadic contract describes a lend (with fixed arguments at most); '{fname}' states a stronger clause, and the two renderings are not combined (§16.2b.5)", node)
+                self.emit_error_with_help(f"fn '{fname}': a variadic contract describes a lend (with fixed arguments at most); '{fname}' states a stronger clause, and the two renderings are not combined (§16.2b.5)", node, "keep the 'variadic param …' clause and 'param N fixed …'; delete the other clauses of this item")
                 continue
             if self.facade_fn_is_resource_op(fn_sym):
-                self.emit_error(f"fn '{fname}': a variadic contract describes a lend or a free operation, and '{fname}' is a resource's own operation (its producer, initializer, drop or destroyer) (§16.2b.5)", node)
+                self.emit_error_with_help(f"fn '{fname}': a variadic contract describes a lend or a free operation, and '{fname}' is a resource's own operation (its producer, initializer, drop or destroyer) (§16.2b.5)", node, "delete the 'variadic param …' clause, or remove the function from the resource's 'from', 'init', 'drop' and 'destroys' lines")
                 continue
             // D194: a sized retained case is two C calls presented as one
             // operation; the pointer is set only after the length took, so
@@ -2674,7 +2674,7 @@ impl Sema:
             for slot in self.foreign_contracts[ci].variadic_slots:
                 if slot.retained_form == .Sized and self.foreign_contracts[ci].ok_const == 0: sized_without_ok = true
             if sized_without_ok:
-                self.emit_error(f"fn '{fname}': a retained byte case sets its length option and then its pointer as one operation, so '{fname}' states 'ok CONST': the pointer is set only when the length took (§16.2b.5)", node)
+                self.emit_error_with_help(f"fn '{fname}': a retained byte case sets its length option and then its pointer as one operation, so '{fname}' states 'ok CONST': the pointer is set only when the length took (§16.2b.5)", node, f"add 'ok <CONST>' under 'fn {fname}', naming the status the library returns on success")
                 continue
             if self.diags.has_errors():
                 continue
@@ -2693,7 +2693,7 @@ impl Sema:
                     let msym = self.pool_lookup_symbol(mtext)
                     let generic = msym != 0 and self.generic_fn_node_for_symbol(msym) != 0
                     if not self.sig_text_index.contains(mtext) and not generic:
-                        self.emit_error(f"fn '{fname}': its variadic contract passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.5)", node)
+                        self.emit_error_with_help(f"fn '{fname}': its variadic contract passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.5)", node, "this is a compiler bug: report it with this contract and the header it describes")
                         break
                 self.facade_variadic_ops.insert(host ++ "." ++ mname, ci)
                 self.facade_variadic_method_names.insert(self.pool_intern(mname), 1)
@@ -2712,7 +2712,7 @@ impl Sema:
                     if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == cname and self.facade_decl_file_name(di) == rendered_file:
                         found = true
                 if not found:
-                    self.emit_error(f"fn '{fname}': its variadic contract passed every facade check but no '{cname}' was rendered — a compiler defect (§16.2b.5)", node)
+                    self.emit_error_with_help(f"fn '{fname}': its variadic contract passed every facade check but no '{cname}' was rendered — a compiler defect (§16.2b.5)", node, "this is a compiler bug: report it with this contract and the header it describes")
                     break
             self.facade_variadic_ops.insert(presented, ci)
 
@@ -2746,7 +2746,7 @@ impl Sema:
             for pi in 0..self.facade_resources.len():
                 if pi != ri and self.facade_is_parent_of(ri as i32, pi as i32) and self.facade_accepts_repr(sig, self.facade_resources[pi].repr_tid): through_parent += 1
             if through_parent != 1:
-                self.emit_error(f"resource '{rname}': 'message {fnm}' takes neither {rname}'s representation nor that of the one resource {rname} depends on, so an error from a {rname} operation has nothing to read it from (§16.2b.4)", node)
+                self.emit_error_with_help(f"resource '{rname}': 'message {fnm}' takes neither {rname}'s representation nor that of the one resource {rname} depends on, so an error from a {rname} operation has nothing to read it from (§16.2b.4)", node, f"after 'message' name a function whose first parameter is what '{rname}' wraps (sqlite3_errmsg)")
 
     mut fn verify_facade_abandon():
         for ri in 0..self.facade_resources.len():
@@ -2758,16 +2758,16 @@ impl Sema:
             let fnm = self.pool_resolve(f)
             let node = self.facade_resources[ri].abandon_node
             if self.facade_fn_is_resource_op(f):
-                self.emit_error(f"resource '{rname}': 'abandon {fnm}' names the resource's producer, initializer, drop or destroyer; the abandonment path is an operation that leaves the resource live with its callback setup undone (§16.2b.9)", node)
+                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' names the resource's producer, initializer, drop or destroyer; the abandonment path is an operation that leaves the resource live with its callback setup undone (§16.2b.9)", node, "after 'abandon' name the operation that undoes the callback setup and leaves the resource usable")
                 continue
             let hosts = self.facade_method_host(f)
             if hosts.len() != 1 or hosts[0] != ri:
-                self.emit_error(f"resource '{rname}': 'abandon {fnm}' is not an operation of '{rname}' (its first parameter does not receive this resource) (§16.2b.9)", node)
+                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' is not an operation of '{rname}' (its first parameter does not receive this resource) (§16.2b.9)", node, f"after 'abandon' name a function whose first parameter is what '{rname}' wraps")
                 continue
             let asig = self.get_sig(f)
             if asig >= 0 and self.sig_get_param_count(asig) != 1:
                 let n = self.sig_get_param_count(asig)
-                self.emit_error(f"resource '{rname}': 'abandon {fnm}' takes {n} parameters; the abandonment path takes only the representation, since generated cleanup has nothing else to pass it (§16.2b.9)", node)
+                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' takes {n} parameters; the abandonment path takes only the representation, since generated cleanup has nothing else to pass it (§16.2b.9)", node, "after 'abandon' name a function that takes the wrapped pointer and nothing else")
                 continue
             var ci = -1
             for k in 0..self.foreign_contracts.len():
@@ -3227,9 +3227,9 @@ impl Sema:
                 if not received:
                     let on = self.pool_resolve(of_res)
                     if recv.len() == 0:
-                        self.emit_error(f"fn '{fname}': 'of {on}' assigns it to a resource {shown} does not receive; it receives no modeled resource (§16.2b.3)", node)
+                        self.emit_error_with_help(f"fn '{fname}': 'of {on}' assigns it to a resource {shown} does not receive; it receives no modeled resource (§16.2b.3)", node, f"delete 'of {on}'")
                     else:
-                        self.emit_error(f"fn '{fname}': 'of {on}' assigns it to a resource {shown} does not receive; it receives {names} — state {ofs} (§16.2b.3)", node)
+                        self.emit_error_with_help(f"fn '{fname}': 'of {on}' assigns it to a resource {shown} does not receive; it receives {names} — state {ofs} (§16.2b.3)", node, "write one of those 'of' clauses")
                 continue
             if recv.len() > 1:
                 self.emit_error_with_help(f"fn '{fname}': {shown} receives a representation several resources wrap ({names}); an operation is callable through a resource only after the facade assigns it, so '{fname}' is not presented on any of them (§16.2b.3)", node, f"state {ofs} on this fn item")
@@ -3258,7 +3258,7 @@ impl Sema:
             self.update_decl_source_context(self.foreign_contracts[ci].decl)
             let fname = self.pool_resolve(fn_sym)
             let hname = self.pool_resolve(self.facade_resources[host[0]].name)
-            self.emit_error(f"fn '{fname}' is an operation of the callback-scope handle '{hname}' and states {what}; nothing produces, destroys or consumes a handle, and it lives only for the callback's invocation, so its operations are lends of it (§16.2b.9)", self.foreign_contracts[ci].node)
+            self.emit_error_with_help(f"fn '{fname}' is an operation of the callback-scope handle '{hname}' and states {what}; nothing produces, destroys or consumes a handle, and it lives only for the callback's invocation, so its operations are lends of it (§16.2b.9)", self.foreign_contracts[ci].node, "delete that clause: an operation of a callback-scope handle is a lend")
 
     // Whether a resource clause names `fn_sym` (`from`, `init`, `preinit`,
     // `drop`, `destroys`): the clause assigns it.
@@ -3328,7 +3328,7 @@ impl Sema:
                     let ci = self.facade_contract_named(ca)
                     let node = if ci >= 0: self.foreign_contracts[ci].node else: rnode
                     self.update_decl_source_context(if ci >= 0: self.foreign_contracts[ci].decl else: self.facade_resources[ri].decl)
-                    self.emit_error(f"resource '{rname}': '{ca}' is renamed '{na}', and '{cb}' is presented as '{nb}' on '{rname}' too; two operations of one resource cannot share a name — rename one (§16.2b.11)", node)
+                    self.emit_error_with_help(f"resource '{rname}': '{ca}' is renamed '{na}', and '{cb}' is presented as '{nb}' on '{rname}' too; two operations of one resource cannot share a name — rename one (§16.2b.11)", node, f"give one of them another name: 'rename <name>' under its fn item")
                     break
 
     // ── D64: buffer pairing and fixed arguments (§16.2b.8, §16.2b.11) ────
@@ -3532,20 +3532,20 @@ impl Sema:
         let own_lifecycle = resource_op and self.facade_fn_is_destroyer_or_init(fn_sym)
         if has_pairs and (own_lifecycle or (contract_item and not callback_item)):
             let what = if own_lifecycle: "a resource's own lifecycle operation (its initializer, drop or destroyer)" else: "a callback, retention or consumption contract"
-            self.emit_error(f"fn '{fname}': a buffer pairing describes a lend, a free operation or a producer, and '{fname}' is {what}; a slice in that rendering is not modeled (§16.2b.8)", node)
+            self.emit_error_with_help(f"fn '{fname}': a buffer pairing describes a lend, a free operation or a producer, and '{fname}' is {what}; a slice in that rendering is not modeled (§16.2b.8)", node, "delete the buffer clause; the function keeps its raw pointer and length parameters")
             return
         for pi in 0..self.sig_get_param_count(sig):
             if self.facade_contract_pairs(ci, pi) and self.facade_contract_models_param(ci, pi):
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': {shown} is both a buffer or fixed parameter and a callback, userdata, retention or consumption parameter; each parameter has one presented contract (§16.2b.8, §16.2b.9)", node)
+                self.emit_error_with_help(f"fn '{fname}': {shown} is both a buffer or fixed parameter and a callback, userdata, retention or consumption parameter; each parameter has one presented contract (§16.2b.8, §16.2b.9)", node, "keep one of the two clauses that name this parameter")
                 return
         if has_fixed and self.facade_fn_is_destroyer_or_init(fn_sym):
-            self.emit_error(f"fn '{fname}': a destroyer, initializer or drop takes only what the resource passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node)
+            self.emit_error_with_help(f"fn '{fname}': a destroyer, initializer or drop takes only what the resource passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node, f"delete 'param N fixed …' under 'fn {fname}'")
             return
         let ret = self.sig_return_type(sig)
         let void_ret = ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_VOID
         if inout >= 0 and (self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0):
-            self.emit_error(f"fn '{fname}': 'capacity … inout' presents the length C writes back as the operation's result, and a 'returns' clause presents the return; one operation has one result (§16.2b.8)", node)
+            self.emit_error_with_help(f"fn '{fname}': 'capacity … inout' presents the length C writes back as the operation's result, and a 'returns' clause presents the return; one operation has one result (§16.2b.8)", node, "delete the 'returns' clause, or pair the buffer with 'len' in place of 'capacity … inout'")
             return
         if inout >= 0 and not void_ret and ok_const == 0:
             let rt = self.type_name(ret)
@@ -3559,7 +3559,7 @@ impl Sema:
         // status, and a variadic setter's success edge is one status.
         if self.foreign_contracts[ci].ok_count > 1 and (inout >= 0 or self.foreign_contracts[ci].variadic_node != 0):
             let shape = if inout >= 0: "a copied-back length is presented under one success status" else: "a variadic setter has one success status"
-            self.emit_error(f"fn '{fname}': 'ok' lists several success statuses, and {shape} (§16.2b.4)", node)
+            self.emit_error_with_help(f"fn '{fname}': 'ok' lists several success statuses, and {shape} (§16.2b.4)", node, "list one success status: 'ok <CONST>'")
             return
         // A resource's own operation renders as its constructor or destroyer,
         // a callback contract as its callback method (stage 9): their
@@ -3610,7 +3610,7 @@ impl Sema:
             let err = if shared.len() > 0: shared else: facade_render_fn_error_name(presented_name)
             let other = self.facade_generated_name_clash(err, rendered_file, -1)
             if other.len() > 0:
-                self.emit_error(f"fn '{fname}' renders '{err}', the error type of its 'ok' projection, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", node)
+                self.emit_error_with_help(f"fn '{fname}' renders '{err}', the error type of its 'ok' projection, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", node, f"present the operation under another name ('rename <name>' under 'fn {fname}'), or rename the other '{err}'")
                 return
         // #2223: whether the free operation presents through a bridge is the
         // contract's one `bridged` fact (collect_fn_clause), the same one the
@@ -3627,7 +3627,7 @@ impl Sema:
                 if self.foreign_contracts[ci].rename == 0:
                     self.facade_bridge_of.insert(fname, rendered_name)
                 return
-        self.emit_error(f"fn '{fname}': its buffer pairing or fixed argument passed every facade check but no '{rendered_name}' was rendered — a compiler defect (§16.2b.8)", node)
+        self.emit_error_with_help(f"fn '{fname}': its buffer pairing or fixed argument passed every facade check but no '{rendered_name}' was rendered — a compiler defect (§16.2b.8)", node, "this is a compiler bug: report it with this contract and the header it describes")
 
     // A resource's producers, as owners of dependencies: each `from` by its
     // index, and the `init` as FACADE_DEP_INIT.
@@ -3703,7 +3703,7 @@ impl Sema:
                 let sig = self.get_sig(f)
                 let shown = self.facade_param_display(f, sig, pi)
                 let pn = self.pool_resolve(f)
-                self.emit_error(f"resource '{rname}': 'borrows' names {shown} of '{pn}', which receives no modeled resource; a resource depends on the parent resources its producer receives, and With does not invent an origin for anything else (§16.2b.6, §16.2b.7)", self.facade_resources[ri].borrows_nodes[bi])
+                self.emit_error_with_help(f"resource '{rname}': 'borrows' names {shown} of '{pn}', which receives no modeled resource; a resource depends on the parent resources its producer receives, and With does not invent an origin for anything else (§16.2b.6, §16.2b.7)", self.facade_resources[ri].borrows_nodes[bi], "after 'borrows' name the producer's parameter that receives a declared resource, or declare that resource first")
                 return false
         let owners = self.facade_owners(ri)
         for oi in 0..owners.len():
@@ -3726,12 +3726,12 @@ impl Sema:
                     for k in 0..recv.len():
                         let cn = self.pool_resolve(self.facade_resources[recv[k]].name)
                         names = names ++ (if k > 0: ", " else: "") ++ f"'{cn}'"
-                    self.emit_error(f"resource '{rname}': producer '{pn}' receives {shown}, a representation several resources wrap ({names}); the constructor cannot tell which resource it borrows (§16.2b.3)", node)
+                    self.emit_error_with_help(f"resource '{rname}': producer '{pn}' receives {shown}, a representation several resources wrap ({names}); the constructor cannot tell which resource it borrows (§16.2b.3)", node, f"state which one under 'fn {pn}': 'of <Resource>' for that parameter")
                     return false
                 if not self.facade_received_presentable(recv[0], f, pi):
                     let why = self.facade_received_unpresentable_reason(recv[0], f, pi)
                     let cn = self.pool_resolve(self.facade_resources[recv[0]].name)
-                    self.emit_error(f"resource '{rname}': producer '{pn}' receives {shown}, which a borrow of '{cn}' cannot hand to C: {why} (§16.2b.6)", node)
+                    self.emit_error_with_help(f"resource '{rname}': producer '{pn}' receives {shown}, which a borrow of '{cn}' cannot hand to C: {why} (§16.2b.6)", node, f"leave '{pn}' raw, or model '{cn}' so a borrowed one carries its pointer")
                     return false
         let preinit_fn = self.facade_resources[ri].preinit
         if preinit_fn != 0:
@@ -3740,7 +3740,7 @@ impl Sema:
                 if self.facade_param_receives(preinit_fn, pi).len() > 0:
                     let shown = self.facade_param_display(preinit_fn, psig, pi)
                     let pn = self.pool_resolve(preinit_fn)
-                    self.emit_error(f"resource '{rname}': 'preinit {pn}' receives {shown}; preinit only constructs storage, and a resource an in-place resource depends on is received by its 'init' (§16.2b.4, §16.2b.6)", node)
+                    self.emit_error_with_help(f"resource '{rname}': 'preinit {pn}' receives {shown}; preinit only constructs storage, and a resource an in-place resource depends on is received by its 'init' (§16.2b.4, §16.2b.6)", node, "pass the parent to the 'init <fn>(self)' function; 'preinit' names a function that takes no resource")
                     return false
         true
 
@@ -3811,7 +3811,7 @@ impl Sema:
             if rendered_ephemeral != dependent:
                 let rname = self.pool_resolve(name)
                 let says = if dependent: "depends on what its producers receive" else: "depends on nothing its producers receive"
-                self.emit_error(f"resource '{rname}' {says}, but its rendered type disagrees; the renderer and the dependency facts classified its producers differently — a compiler defect (§16.2b.6)", self.facade_resources[ri].node)
+                self.emit_error_with_help(f"resource '{rname}' {says}, but its rendered type disagrees; the renderer and the dependency facts classified its producers differently — a compiler defect (§16.2b.6)", self.facade_resources[ri].node, "this is a compiler bug: report it with this contract and the header it describes")
             return
 
     // The dependent resource a type carries — itself, or inside an
@@ -4122,7 +4122,7 @@ impl Sema:
         if from2 < 0:
             return -2
         if from2 == from:
-            self.emit_error(f"fn '{fname}': 'from params {from}, {from2}' names one parameter twice; a borrow from one parameter is written 'from param {from}' (§16.2b.6)", clause)
+            self.emit_error_with_help(f"fn '{fname}': 'from params {from}, {from2}' names one parameter twice; a borrow from one parameter is written 'from param {from}' (§16.2b.6)", clause, f"write 'from param {from}'")
             return -2
         if kind == 0:
             return from2
@@ -4135,7 +4135,7 @@ impl Sema:
             return from2
         let shown = self.facade_param_display(fn_sym, sig, from2)
         let why = if origin.len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
-        self.emit_error(f"fn '{fname}': 'from params {from}, {from2}' names {shown}, which {why}; a borrowed value is a view of what each origin parameter receives — With does not invent an origin (§16.2b.6, §16.2b.7)", clause)
+        self.emit_error_with_help(f"fn '{fname}': 'from params {from}, {from2}' names {shown}, which {why}; a borrowed value is a view of what each origin parameter receives — With does not invent an origin (§16.2b.6, §16.2b.7)", clause, "after 'from params' name two parameters that each receive a declared resource or a C string")
         -2
 
     mut fn verify_facade_borrowed_returns():
@@ -4172,14 +4172,14 @@ impl Sema:
             if origin.len() != 1:
                 let n = origin.len()
                 let why = if n == 0: "receives no modeled resource, and With does not invent an origin (§16.2b.7)" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed '{rn}' is a view of the resource its origin parameter receives (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed '{rn}' is a view of the resource its origin parameter receives (§16.2b.6)", node, "after 'from param' name the parameter that receives the resource the result lives in")
                 continue
             // D187: the second origin receives a resource as the first does.
             let from2 = self.foreign_contracts[ci].returns_borrow_from2
             if from2 >= 0 and self.facade_param_receives(fn_sym, from2).len() != 1:
                 let shown2 = self.facade_param_display(fn_sym, sig, from2)
                 let why2 = if self.facade_param_receives(fn_sym, from2).len() == 0: "receives no modeled resource, and With does not invent an origin (§16.2b.7)" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn} from params {from}, {from2}' names {shown2}, which {why2}; a borrowed '{rn}' is a view of the resources its origin parameters receive (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn} from params {from}, {from2}' names {shown2}, which {why2}; a borrowed '{rn}' is a view of the resources its origin parameters receive (§16.2b.6)", node, "after 'from params' name parameters that each receive a declared resource")
                 continue
             let parent = self.foreign_contracts[ci].returns_borrow_parent
             if parent != 0 and not self.verify_facade_parent_borrow(ci, origin[0], sig, shown):
@@ -4188,7 +4188,7 @@ impl Sema:
             let ci0 = self.facade_contract_for(fn_sym)
             if recv0.len() != 1 or self.foreign_contracts[ci0].destroys != 0 or self.foreign_contracts[ci0].consumes.len() > 0 or self.foreign_contracts[ci0].retains.len() > 0:
                 let shown0 = self.facade_param_display(fn_sym, sig, 0)
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' is presented as a lend method of the resource its first parameter receives, and {shown0} receives none it can be a method of (one pointer resource, with nothing stronger than a lend stated) (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' is presented as a lend method of the resource its first parameter receives, and {shown0} receives none it can be a method of (one pointer resource, with nothing stronger than a lend stated) (§16.2b.6)", node, "make the resource the result lives in the first parameter's resource, or leave the function raw")
                 continue
             // One `Borrowed<R>`, one origin view type. A parent borrow's
             // origin is the parent (`R` itself), and its operations are the
@@ -4203,7 +4203,7 @@ impl Sema:
                     let bn = facade_render_borrowed_name(rn)
                     let pf = if parent != 0: fname else: ofn
                     let cf = if parent != 0: ofn else: fname
-                    self.emit_error(f"fn '{pf}' borrows '{rn}' as the parent of its argument and fn '{cf}' from its argument ('from param'); '{bn}' is one type with one origin rule, and a borrowed value under both is not ruled (§16.2b.6)", node)
+                    self.emit_error_with_help(f"fn '{pf}' borrows '{rn}' as the parent of its argument and fn '{cf}' from its argument ('from param'); '{bn}' is one type with one origin rule, and a borrowed value under both is not ruled (§16.2b.6)", node, f"leave one of '{pf}' and '{cf}' raw")
                     clash = true
                     break
                 // D134 (§16.2b.6): a borrowed value's origin is the
@@ -4216,14 +4216,14 @@ impl Sema:
             let bn = facade_render_borrowed_name(rn)
             let bsym = self.pool_lookup_symbol(bn)
             if bsym == 0 or not self.facade_ephemeral_struct_declared(bsym):
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no type '{bn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no type '{bn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 continue
             let host = self.pool_resolve(self.facade_resources[recv0[0]].name)
             let mname = self.facade_presented(recv0[0], fname)
             let mtext = host ++ "." ++ mname
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
             if msig < 0:
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{host}.{mname}' was rendered — a compiler defect (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{host}.{mname}' was rendered — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 continue
             // D85: the parent borrow views what the argument views (its
             // parent's origin), never the argument's own storage.
@@ -4313,11 +4313,11 @@ impl Sema:
             let mtext = host ++ "." ++ facade_render_present_record(self.ast, self.pool, host, fname)
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
             if msig < 0:
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{mtext}' was rendered on the record view — a compiler defect (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{mtext}' was rendered on the record view — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 return
             if not self.facade_sig_returns_record_view(msig, rn):
                 let rt = self.type_name(self.sig_return_type(msig))
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' was rendered as '{mtext}' returning {rt}, not Option[&{rn}] — a compiler defect (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' was rendered as '{mtext}' returning {rt}, not Option[&{rn}] — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 return
             if from >= 0:
                 self.facade_declare_view_of_param(msig, 0)
@@ -4342,12 +4342,12 @@ impl Sema:
                 if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == rendered_name and self.facade_decl_file_name(di) == rendered_file:
                     found = true
             if not found:
-                self.emit_error(missing, node)
+                self.emit_error_with_help(missing, node, "this is a compiler bug: report it with this contract and the header it describes")
                 return
             let bsym = self.pool_lookup_symbol(rendered_name)
             let bsig = if bsym != 0: self.get_sig(bsym) else: -1
             if bsig < 0 or not self.facade_sig_returns_record_view(bsig, rn):
-                self.emit_error(wrong, node)
+                self.emit_error_with_help(wrong, node, "this is a compiler bug: report it with this contract and the header it describes")
                 return
             if self.foreign_contracts[ci].rename == 0:
                 self.facade_bridge_of.insert(fname, rendered_name)
@@ -4364,7 +4364,7 @@ impl Sema:
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
             if msig < 0:
                 if hi == 0 or hi == 2:
-                    self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.6)", node)
+                    self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 else if from >= 0:
                     let none: List[i32] = []
                     self.facade_note_generic(mtext, 2, fn_sym, ci, 0, none, 0, from)
@@ -4373,7 +4373,7 @@ impl Sema:
                 continue
             if not self.facade_sig_returns_record_view(msig, rn):
                 let rt = self.type_name(self.sig_return_type(msig))
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' was rendered as '{mtext}' returning {rt}, not Option[&{rn}] — a compiler defect (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' was rendered as '{mtext}' returning {rt}, not Option[&{rn}] — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 continue
             if from >= 0:
                 self.facade_declare_view_of_param(msig, from)
@@ -4423,7 +4423,7 @@ impl Sema:
             // record (facade_index_call_effects: the C string parameter or
             // the domain; static needs none).
             if self.foreign_contracts[ci].rename != 0:
-                self.emit_error(f"fn '{fname}': '{what}' is presented under the C name at its call sites; 'rename' would need a second declaration, which a presented call does not get (§16.2b.8)", node)
+                self.emit_error_with_help(f"fn '{fname}': '{what}' is presented under the C name at its call sites; 'rename' would need a second declaration, which a presented call does not get (§16.2b.8)", node, "delete the 'rename' line: the function is called by its C name")
                 return
             self.facade_presented_syms.insert(fn_sym, 1)
             return
@@ -4440,14 +4440,14 @@ impl Sema:
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
             if msig < 0:
                 if hi == 0 or hi == 2:
-                    self.emit_error(f"fn '{fname}': '{what}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.8)", node)
+                    self.emit_error_with_help(f"fn '{fname}': '{what}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.8)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 else if from >= 0:
                     let none: List[i32] = []
                     self.facade_note_generic(mtext, 2, fn_sym, ci, 0, none, 0, from)
                 continue
             if not self.facade_sig_returns_option_cstr(msig):
                 let rt = self.type_name(self.sig_return_type(msig))
-                self.emit_error(f"fn '{fname}': '{what}' was rendered as '{mtext}' returning {rt}, not Option[CStr] — a compiler defect (§16.2b.8)", node)
+                self.emit_error_with_help(f"fn '{fname}': '{what}' was rendered as '{mtext}' returning {rt}, not Option[CStr] — a compiler defect (§16.2b.8)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 continue
             if from >= 0:
                 self.facade_declare_view_of_param(msig, from)
@@ -4861,7 +4861,7 @@ impl Sema:
             if recv.len() == 1:
                 declared.push(recv[0])
         if declared.len() == 0:
-            self.emit_error(f"fn '{fname}': {written} names {shown}, which receives '{an}'; '{an}' declares no parent with 'borrows', and a parent borrow is resolved through the argument resource's declared 'borrows' clause (§16.2b.6)", node)
+            self.emit_error_with_help(f"fn '{fname}': {written} names {shown}, which receives '{an}'; '{an}' declares no parent with 'borrows', and a parent borrow is resolved through the argument resource's declared 'borrows' clause (§16.2b.6)", node, f"add 'borrows param N' to 'resource {an}', naming the producer parameter that receives its parent")
             return false
         var named = -1
         for declared_item in declared:
@@ -4873,10 +4873,10 @@ impl Sema:
                 let dn = self.pool_resolve(self.facade_resources[declared_item].name)
                 if not have.contains("'" ++ dn ++ "'"):
                     have = if have.len() == 0: f"'{dn}'" else: have ++ f", '{dn}'"
-            self.emit_error(f"fn '{fname}': {written} names {shown}, which receives '{an}'; '{an}' declares no parent of type '{pn}' (its 'borrows' parents: {have}), and naming a parent the resource does not declare is an error (§16.2b.6)", node)
+            self.emit_error_with_help(f"fn '{fname}': {written} names {shown}, which receives '{an}'; '{an}' declares no parent of type '{pn}' (its 'borrows' parents: {have}), and naming a parent the resource does not declare is an error (§16.2b.6)", node, "name one of those parents after 'from parent'")
             return false
         if res != parent:
-            self.emit_error(f"fn '{fname}': {written} names a type its parent does not have: the borrow is of the parent itself, a '{pn}', so it is written 'returns borrow {pn} from parent {pn} of param {from}' (§16.2b.6)", node)
+            self.emit_error_with_help(f"fn '{fname}': {written} names a type its parent does not have: the borrow is of the parent itself, a '{pn}', so it is written 'returns borrow {pn} from parent {pn} of param {from}' (§16.2b.6)", node, f"write 'returns borrow {pn} from parent {pn} of param {from}'")
             return false
         // One parent of that type on every product: the borrow reads it from
         // the one field each value of the argument's resource carries.
@@ -4894,7 +4894,7 @@ impl Sema:
             if count != 1:
                 let on = self.pool_resolve(self.facade_owner_fn(ari, owner))
                 let why = if count == 0: "states no 'borrows' parent of that type" else: f"states {count} of them"
-                self.emit_error(f"fn '{fname}': {written} reads the '{pn}' parent of '{an}', and its producer '{on}' {why}; a parent borrow names the one '{pn}' parent every producer of '{an}' declares with 'borrows' (§16.2b.6)", node)
+                self.emit_error_with_help(f"fn '{fname}': {written} reads the '{pn}' parent of '{an}', and its producer '{on}' {why}; a parent borrow names the one '{pn}' parent every producer of '{an}' declares with 'borrows' (§16.2b.6)", node, f"add the same 'borrows' clause for the '{pn}' parent to every producer of '{an}'")
                 return false
         true
 
@@ -5023,25 +5023,25 @@ impl Sema:
             if recv0.len() != 1:
                 let shown0 = self.facade_param_display(fn_sym, sig, 0)
                 let why = if recv0.len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
-                self.emit_error(f"fn '{fname}': 'valid on failed' marks an operation of the failed state of the resource its first parameter receives, and {shown0} {why} (§16.2b.4)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'valid on failed' marks an operation of the failed state of the resource its first parameter receives, and {shown0} {why} (§16.2b.4)", node, "delete 'valid on failed', or make the failed resource the function's first parameter")
                 continue
             let ri = recv0[0]
             let rname = self.pool_resolve(self.facade_resources[ri].name)
             if not self.facade_has_failed_state(ri):
-                self.emit_error(f"fn '{fname}': 'valid on failed', but '{rname}' has no failed state: a failure that still produced is owned by the error only for an out-parameter producer under 'ok' of a resource that depends on nothing (§16.2b.4)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'valid on failed', but '{rname}' has no failed state: a failure that still produced is owned by the error only for an out-parameter producer under 'ok' of a resource that depends on nothing (§16.2b.4)", node, "delete 'valid on failed'")
                 continue
             let borrow_res = self.foreign_contracts[ci].returns_borrow_resource
             let borrows_resource = borrow_res != 0 and self.pool_resolve(borrow_res) != "CStr"
             let stronger = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0
             if stronger or borrows_resource or self.facade_fn_is_resource_op(fn_sym):
-                self.emit_error(f"fn '{fname}': 'valid on failed' marks a lend, a text view or a record view of the failed '{rname}'; a failed state is destroyed by its error's Drop and owns nothing else, so a producing, destroying, consuming, retaining or callback operation, or one returning a borrowed resource, cannot be valid on it (§16.2b.4)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'valid on failed' marks a lend, a text view or a record view of the failed '{rname}'; a failed state is destroyed by its error's Drop and owns nothing else, so a producing, destroying, consuming, retaining or callback operation, or one returning a borrowed resource, cannot be valid on it (§16.2b.4)", node, "delete 'valid on failed': it marks a function that only reads the failed resource")
                 continue
             if self.diags.has_errors():
                 continue
             // The net: the method exists on `Failed<R>`.
             let mtext = facade_render_failed_name(rname) ++ "." ++ self.facade_presented(ri, fname)
             if not self.sig_text_index.contains(mtext):
-                self.emit_error(f"fn '{fname}': 'valid on failed' passed every facade check but no method '{mtext}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'valid on failed' passed every facade check but no method '{mtext}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node, "this is a compiler bug: report it with this contract and the header it describes")
 
     // Whether the failed state of resource `ri` carries operation `cname`:
     // its fn item states `valid on failed` (the unknown-method diagnostic
@@ -5085,7 +5085,7 @@ impl Sema:
                 // presents `Option[&T]`.
                 if self.facade_contract_reads(ci as i32, pi): continue
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6), for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9) and for a const char * (Option[&str]), and a raw pointer parameter accepts null as C declares it — a nullable resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
+                self.emit_error_with_help(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6), for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9) and for a const char * (Option[&str]), and a raw pointer parameter accepts null as C declares it — a nullable resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node, f"delete the 'nullable' clause; pass `null` at a raw call when C allows it")
                 break
 
     // Parameter `pi` of signature `sig` is a `const char *` (§16.3c: the
@@ -5122,7 +5122,7 @@ impl Sema:
                 let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
                 if msig < 0:
                     if hi == 0:
-                        self.emit_error(f"resource '{rname}' wraps a C string but no '{mtext}' view was rendered — a compiler defect (§16.2b.8)", self.facade_resources[ri].node)
+                        self.emit_error_with_help(f"resource '{rname}' wraps a C string but no '{mtext}' view was rendered — a compiler defect (§16.2b.8)", self.facade_resources[ri].node, "this is a compiler bug: report it with this contract and the header it describes")
                     continue
                 self.facade_declare_view_of_param(msig, 0)
 
@@ -5337,27 +5337,27 @@ impl Sema:
         if ud_node == 0:
             if self.foreign_contracts[ci].argv_cb.len() > 0:
                 let shown = self.facade_param_display(fn_sym, sig, self.foreign_contracts[ci].argv_cb[0])
-                self.emit_error(f"fn '{fname}': the argument vector of the callback {shown} is presented through a wrapper the compiler generates, which reaches the program's callback through the registered user data; state 'user_data from <fn> as &U' (§16.2b.9)", self.foreign_contracts[ci].argv_nodes[0])
+                self.emit_error_with_help(f"fn '{fname}': the argument vector of the callback {shown} is presented through a wrapper the compiler generates, which reaches the program's callback through the registered user data; state 'user_data from <fn> as &U' (§16.2b.9)", self.foreign_contracts[ci].argv_nodes[0], "add 'user_data from <fn> as &U', naming the library function that returns the registered 'void *'")
                 return false
             return true
         let aname = self.pool_resolve(self.foreign_contracts[ci].user_data_fn)
         let hname = self.pool_resolve(self.facade_resources[self.foreign_contracts[ci].user_data_handle].name)
         if not self.facade_contract_userdata_consumed(ci) and not self.facade_contract_userdata_retained(ci):
-            self.emit_error(f"fn '{fname}': 'user_data from {aname}' presents the value the facade boxed, and '{fname}' boxes none: no 'void *' userdata is consumed with its destroy callback ('consumes param N destroyed_by param M') or retained by the resource ('retains param N by param 0') (§16.2b.9)", ud_node)
+            self.emit_error_with_help(f"fn '{fname}': 'user_data from {aname}' presents the value the facade boxed, and '{fname}' boxes none: no 'void *' userdata is consumed with its destroy callback ('consumes param N destroyed_by param M') or retained by the resource ('retains param N by param 0') (§16.2b.9)", ud_node, "add 'consumes param N destroyed_by param M' or 'retains param N by param 0' for the 'void *' userdata, or delete 'user_data'")
             return false
         if wrapped.len() == 0:
-            self.emit_error(f"fn '{fname}': 'user_data from {aname}': no callback '{fname}' takes receives the handle '{hname}' that {aname} reads the user data from (§16.2b.9)", ud_node)
+            self.emit_error_with_help(f"fn '{fname}': 'user_data from {aname}': no callback '{fname}' takes receives the handle '{hname}' that {aname} reads the user data from (§16.2b.9)", ud_node, f"name an accessor that takes a handle the callback receives, or declare that handle: 'handle <Name> wraps *mut T'")
             return false
         for wrapped_item in wrapped:
             let cb = wrapped_item
             let shown = self.facade_param_display(fn_sym, sig, cb)
             let slots = self.facade_callable_handle_slots(sig, cb, self.foreign_contracts[ci].user_data_handle)
             if slots != 1:
-                self.emit_error(f"fn '{fname}': the callback {shown} receives the handle '{hname}' {slots} times; the wrapper reads the user data from the one C passes it (§16.2b.9)", ud_node)
+                self.emit_error_with_help(f"fn '{fname}': the callback {shown} receives the handle '{hname}' {slots} times; the wrapper reads the user data from the one C passes it (§16.2b.9)", ud_node, "leave the function raw: a callback that receives its context handle more than once has no form")
                 return false
             for k in 0..self.foreign_contracts[ci].callback_userdata_cb.len():
                 if self.foreign_contracts[ci].callback_userdata_cb[k] == cb:
-                    self.emit_error(f"fn '{fname}': the callback {shown} receives its userdata as a parameter ('callback param N userdata param M') and through {aname} ('user_data'); state one (§16.2b.9)", ud_node)
+                    self.emit_error_with_help(f"fn '{fname}': the callback {shown} receives its userdata as a parameter ('callback param N userdata param M') and through {aname} ('user_data'); state one (§16.2b.9)", ud_node, "delete either the 'callback param N userdata param M' clause or the 'user_data' clause")
                     return false
         for k in 0..self.foreign_contracts[ci].argv_cb.len():
             let cb = self.foreign_contracts[ci].argv_cb[k]
@@ -5366,7 +5366,7 @@ impl Sema:
                 if wrapped_item == cb: served = true
             if not served:
                 let shown = self.facade_param_display(fn_sym, sig, cb)
-                self.emit_error(f"fn '{fname}': the callback {shown} does not receive the handle '{hname}' that {aname} reads the user data from, so no wrapper can reach the program's callback to hand it its arguments (§16.2b.9)", self.foreign_contracts[ci].argv_nodes[k])
+                self.emit_error_with_help(f"fn '{fname}': the callback {shown} does not receive the handle '{hname}' that {aname} reads the user data from, so no wrapper can reach the program's callback to hand it its arguments (§16.2b.9)", self.foreign_contracts[ci].argv_nodes[k], "delete the 'argv' clause for this callback, or leave the function raw")
                 return false
         true
 
@@ -5407,7 +5407,7 @@ impl Sema:
                 said.push(f)
                 let fname = self.pool_resolve(f)
                 let gname = self.pool_resolve(hook)
-                self.emit_error(f"'{fname}' assigns '{gname}', the global a destroyer clause names: a function that assigns it stays raw, and a contract cannot describe it (§31.8.6)", node)
+                self.emit_error_with_help(f"'{fname}' assigns '{gname}', the global a destroyer clause names: a function that assigns it stays raw, and a contract cannot describe it (§31.8.6)", node, f"delete the 'fn {fname}' item")
                 break
 
     // Whether a destroyer clause names `sym`: `freed by`, `drop` or `destroys`.
@@ -5431,7 +5431,7 @@ impl Sema:
         for (fn_sym, node, ri) in refused:
             let fname = self.pool_resolve(fn_sym)
             let rname = self.pool_resolve(self.facade_resources[ri].name)
-            self.emit_error(f"fn '{fname}': 'callback_thread registering' says the callback runs only on the thread that registered it, but '{rname}', which retains it, is 'thread send': the resource can move to another thread and take the callback with it (§31.10)", node)
+            self.emit_error_with_help(f"fn '{fname}': 'callback_thread registering' says the callback runs only on the thread that registered it, but '{rname}', which retains it, is 'thread send': the resource can move to another thread and take the callback with it (§31.10)", node, "delete 'thread send' from the resource, or write 'callback_thread any' when the library may call from any thread")
 
     mut fn verify_facade_callback_items():
         for ci in 0..self.foreign_contracts.len() as i32:
@@ -5449,24 +5449,24 @@ impl Sema:
             if recv0.len() > 1 or (hosted and not self.facade_received_presentable(recv0[0], fn_sym, 0)):
                 let shown0 = self.facade_param_display(fn_sym, sig, 0)
                 let why = if recv0.len() == 0: "receives no modeled resource" else: if recv0.len() > 1: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)" else: self.facade_received_unpresentable_reason(recv0[0], fn_sym, 0)
-                self.emit_error(f"fn '{fname}': a callback contract is presented as a method of the resource its first parameter receives, and {shown0} {why} (§16.2b.9)", node)
+                self.emit_error_with_help(f"fn '{fname}': a callback contract is presented as a method of the resource its first parameter receives, and {shown0} {why} (§16.2b.9)", node, "make the registering resource the first parameter's resource, or leave the function raw")
                 continue
             if not hosted and self.foreign_contracts[ci].retains.len() > 0:
-                self.emit_error(f"fn '{fname}': a retained callback needs its retaining resource modeled; a free callback bridge borrows for the call only (§16.2b.9)", node)
+                self.emit_error_with_help(f"fn '{fname}': a retained callback needs its retaining resource modeled; a free callback bridge borrows for the call only (§16.2b.9)", node, "declare the resource that keeps the callback and name it: 'retains param N by param 0'")
                 continue
             // §46: a callback receiving ownership is stated, never inferred
             // — and not yet modeled: the callback receives its userdata as
             // a borrow (`&U`), and a facade saying otherwise would have
             // With free what the callback took.
             if self.foreign_contracts[ci].callback_consumes.len() > 0:
-                self.emit_error(f"fn '{fname}': 'callback consumes' is not modeled yet; a callback receives its userdata as a borrow for the callback's scope (§16.2b.9)", node)
+                self.emit_error_with_help(f"fn '{fname}': 'callback consumes' is not modeled yet; a callback receives its userdata as a borrow for the callback's scope (§16.2b.9)", node, "delete 'consumes' from the callback clause")
                 continue
             // A userdata is consumed by C (destroyed by the callback the
             // contract names) or retained by the resource — never both.
             if self.facade_contract_userdata_consumed(ci) and self.facade_contract_userdata_retained(ci):
                 let cud = self.facade_contract_userdata_param(ci)
                 let shown = self.facade_param_display(fn_sym, sig, cud)
-                self.emit_error(f"fn '{fname}': {shown} is both consumed ('consumes … destroyed_by': C owns and destroys it) and retained ('retains … by': the resource owns and releases it); state one (§16.2b.5, §16.2b.9)", node)
+                self.emit_error_with_help(f"fn '{fname}': {shown} is both consumed ('consumes … destroyed_by': C owns and destroys it) and retained ('retains … by': the resource owns and releases it); state one (§16.2b.5, §16.2b.9)", node, "keep 'consumes … destroyed_by' when C destroys the value, 'retains … by' when the resource releases it")
                 continue
             // One userdata per item: a consumed-with-destroy userdata, a
             // retained one and a paired one are the same parameter.
@@ -5482,7 +5482,7 @@ impl Sema:
             if second >= 0:
                 let s1 = self.facade_param_display(fn_sym, sig, ud)
                 let s2 = self.facade_param_display(fn_sym, sig, second)
-                self.emit_error(f"fn '{fname}' describes two userdata parameters, {s1} and {s2}; a callback contract with more than one userdata is not modeled (§16.2b.9)", node)
+                self.emit_error_with_help(f"fn '{fname}' describes two userdata parameters, {s1} and {s2}; a callback contract with more than one userdata is not modeled (§16.2b.9)", node, "leave the function raw")
                 continue
             // A retained callback's userdata, and a userdata consumed with
             // a destroy callback, are what the resource keeps or C
@@ -5495,7 +5495,7 @@ impl Sema:
                 for pi in 0..self.sig_get_param_count(sig):
                     if self.facade_param_is_callable(sig, pi): callable_count = callable_count + 1
                 if callable_count == 0:
-                    self.emit_error(f"fn '{fname}': 'callback_thread any' says the callback may run on any thread, but '{fname}' takes no callback (§16.2b.10)", node)
+                    self.emit_error_with_help(f"fn '{fname}': 'callback_thread any' says the callback may run on any thread, but '{fname}' takes no callback (§16.2b.10)", node, "delete 'callback_thread any'")
                     continue
             // `nullable param N` on a callback contract (#1618; ruling §43,
             // spec §16.2b.8-9): the paired callback is rendered
@@ -5515,7 +5515,7 @@ impl Sema:
                 else: bad = npi
             if bad >= 0:
                 let shown = self.facade_param_display(fn_sym, sig, bad)
-                self.emit_error(f"fn '{fname}': nullable {shown}; on a callback contract, nullability is rendered for the callback of a 'callback param N userdata param M' pairing that C uses during the call only — an absent callback takes its userdata with it — and a raw pointer parameter accepts null as C declares it (§16.2b.8, §16.2b.9)", node)
+                self.emit_error_with_help(f"fn '{fname}': nullable {shown}; on a callback contract, nullability is rendered for the callback of a 'callback param N userdata param M' pairing that C uses during the call only — an absent callback takes its userdata with it — and a raw pointer parameter accepts null as C declares it (§16.2b.8, §16.2b.9)", node, "delete the 'nullable' clause, or name the callback parameter of the pairing")
                 continue
             let wrapped = self.facade_contract_wrapped_callbacks(ci)
             if not self.verify_facade_wrapped_callbacks(ci, wrapped):
@@ -5533,7 +5533,7 @@ impl Sema:
             let msym = self.pool_lookup_symbol(mtext)
             let rendered = self.sig_text_index.contains(mtext) or (msym != 0 and self.generic_fn_node_for_symbol(msym) != 0)
             if not rendered:
-                self.emit_error(f"fn '{fname}': its callback contract passed every facade check but no method '{mtext}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.9)", node)
+                self.emit_error_with_help(f"fn '{fname}': its callback contract passed every facade check but no method '{mtext}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.9)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 continue
             if not hosted and self.foreign_contracts[ci].rename == 0:
                 self.facade_bridge_of.insert(fname, mtext)
@@ -5706,7 +5706,7 @@ impl Sema:
                                 if self.sig_text_index.contains(mtext): sig = self.sig_text_index.get(mtext).unwrap()
                     if sig < 0:
                         self.update_decl_source_context(self.foreign_contracts[ci].decl)
-                        self.emit_error(f"fn '{fname}': 'until {name}' names neither a case of this variadic operation nor a modeled operation of '{host}'; a retention is released by a listed case, an operation the facade describes, the abandonment path or destruction (§16.2b.5)", slot.clause)
+                        self.emit_error_with_help(f"fn '{fname}': 'until {name}' names neither a case of this variadic operation nor a modeled operation of '{host}'; a retention is released by a listed case, an operation the facade describes, the abandonment path or destruction (§16.2b.5)", slot.clause, "after 'until' name a listed case or a function the contract describes")
                         continue
                     let opi = self.facade_pair_op_for_sig(sig)
                     if opi >= 0: self.facade_pair_ops[opi].releases = self.facade_pair_ops[opi].releases | bit
@@ -5973,7 +5973,7 @@ impl Sema:
             let fname = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
             let facade = self.pool_resolve(self.foreign_contracts[ci].facade)
             let why = if writes: f"writes the captured `{cap}`" else: f"captures `{cap}`, which is not Send and Sync"
-            self.emit_error(f"'{fname}' may invoke its callback from any thread ({said} in facade {facade}), so the userdata type must be Send and Sync; the closure {why} (§16.2b.10)", arg_node)
+            self.emit_error_with_help(f"'{fname}' may invoke its callback from any thread ({said} in facade {facade}), so the userdata type must be Send and Sync; the closure {why} (§16.2b.10)", arg_node, "capture only values that are Send and Sync (an Atomic, a Mutex, a channel), or pass them as the userdata")
             return
         var ud_ty = self.resolve_alias(actual_ty as TypeId)
         if self.get_type_kind(ud_ty) == TypeKind.TY_REF:
@@ -5986,7 +5986,7 @@ impl Sema:
         let facade = self.pool_resolve(self.foreign_contracts[ci].facade)
         let tn = self.type_name(ud_ty as i32)
         let lacks = if not send and not sync: "neither Send nor Sync" else: if not send: "not Send" else: "not Sync"
-        self.emit_error(f"'{fname}' may invoke its callback from any thread ({said} in facade {facade}), so the userdata type must be Send and Sync; '{tn}' is {lacks} (§16.2b.10)", arg_node)
+        self.emit_error_with_help(f"'{fname}' may invoke its callback from any thread ({said} in facade {facade}), so the userdata type must be Send and Sync; '{tn}' is {lacks} (§16.2b.10)", arg_node, f"wrap the shared state so it is Send and Sync: a Mutex or an Atomic in place of '{tn}'")
 
     // Whether a call argument spells an absent Option: the `None` variant.
     fn facade_arg_is_none(node: i32) -> bool:
@@ -6051,9 +6051,9 @@ impl Sema:
                 let ci = self.facade_callback_methods[mi].contract
                 let cfn = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
                 if cb_absent:
-                    self.emit_error(f"'{cfn}': a userdata given with no callback to receive it; the callback and its userdata are paired ('callback param N userdata param M'), so None for the callback is None for the userdata (§16.2b.9)", ud_node)
+                    self.emit_error_with_help(f"'{cfn}': a userdata given with no callback to receive it; the callback and its userdata are paired ('callback param N userdata param M'), so None for the callback is None for the userdata (§16.2b.9)", ud_node, "pass None for the userdata too, or pass the callback")
                 else:
-                    self.emit_error(f"'{cfn}': a callback given with no userdata; the callback receives its userdata ('callback param N userdata param M'), so pass one, or None for both when no callback is wanted (§16.2b.9)", cb_node)
+                    self.emit_error_with_help(f"'{cfn}': a callback given with no userdata; the callback receives its userdata ('callback param N userdata param M'), so pass one, or None for both when no callback is wanted (§16.2b.9)", cb_node, "pass the userdata the callback receives, or None for both")
                 context.valid = false
                 return context
             if cb_absent:

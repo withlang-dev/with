@@ -1,4 +1,5 @@
 //! expect-check-fail: is a raw pointer that no clause pairs, so it is not a buffer; a presented operation renders no call without a bounds contract
+//! expect-check-fail: = help: pair it with 'buffer param d len param <L>' or 'buffer param d capacity param <L> inout', bind it with 'param d fixed <literal>', or leave the operation raw
 
 // D64 §16.2b.8: a raw pointer parameter that no clause pairs is not a
 // buffer, and a presentation clause on such a function is refused. Here a

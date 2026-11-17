@@ -1,4 +1,5 @@
 //! expect-check-fail: `override` marks a grant, and `runs threads` grants nothing: no proof can contradict it (§31.7)
+//! expect-check-fail: = help: delete the word `override`
 
 // §31.7: at a contract's own level `override` marks `runs no threads`, the
 // grant. `runs threads` is the restriction.

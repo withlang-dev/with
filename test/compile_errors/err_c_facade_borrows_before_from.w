@@ -1,4 +1,5 @@
 //! expect-check-fail: state 'from <producer>' first
+//! expect-check-fail: = help: put the 'from <fn>' line (or 'init <fn>(self)') above 'borrows'
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

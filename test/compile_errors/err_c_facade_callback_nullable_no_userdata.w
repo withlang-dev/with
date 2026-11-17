@@ -1,4 +1,5 @@
 //! expect-check-fail: 'db_exec': a callback given with no userdata; the callback receives its userdata ('callback param N userdata param M'), so pass one, or None for both when no callback is wanted (§16.2b.9)
+//! expect-check-fail: = help: pass the userdata the callback receives, or None for both
 
 // D51 stage 12b (#1618; spec §16.2b.9): a nullable callback is absent with
 // its userdata, or present with it. A callback given with `None` for the

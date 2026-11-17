@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Statement' declares no parent of type 'Cache'
+//! expect-check-fail: = help: name one of those parents after 'from parent'
 
 // D85 (#2003; spec §16.2b.6): naming a parent the resource does not
 // declare is an error. `Statement` borrows a `Database`; `from parent

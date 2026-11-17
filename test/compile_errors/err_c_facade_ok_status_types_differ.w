@@ -1,4 +1,5 @@
 //! expect-check-fail: 'ok DB_OK' reads producer 'db_open''s status as i32 and producer 'db_open_ex''s as i64
+//! expect-check-fail: = help: delete 'error DatabaseError' so each producer keeps its own generated error type, or describe the producer of the other status type in a contract of its own
 
 // D51 stage 5: `ok` projects every status-returning producer of a resource
 // onto one `Result[R, <R>Error]`, and that error type carries a status of

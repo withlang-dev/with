@@ -3785,7 +3785,7 @@ impl Sema:
         // is the c_import rule (is_ci_visible: every module with a c_import
         // of its own sees it), and a facade's rendered public surface names
         // it — `pub fn exec(…) -> c_int` on a resource type a module exports
-        // (stage 12: `lib/facades/sqlite3.w`).
+        // (stage 12: the sqlite3 contract).
         var ci = self.named_type_candidate_head(sym)
         while ci >= 0:
             if self.named_type_candidate_paths[ci] == self.current_module_path:

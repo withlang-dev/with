@@ -1,4 +1,5 @@
 //! expect-check-fail: `override` marks a grant, and `rename` grants nothing: no proof can contradict it (§31.7)
+//! expect-check-fail: = help: delete the word `override`
 
 // §31.7: `override` applies only to grants. A presentation states no fact
 // about the library, so there is no proof for it to stand against.

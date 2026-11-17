@@ -1,4 +1,5 @@
 //! expect-check-fail: does not take the consumed param 1
+//! expect-check-fail: = help: name the destroy callback whose first parameter is the consumed 'void *'
 
 // D51 §16.2b.9 / ruling §61: the callable a `destroyed_by` names takes the
 // consumed parameter first, under the destroyer rule (exact type, or a

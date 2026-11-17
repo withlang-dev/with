@@ -1,4 +1,5 @@
 //! expect-check-fail: fixed null' binds param 1: i32 b, which is not a pointer
+//! expect-check-fail: = help: fix an integer with its literal ('param 1 fixed 0'), a bool with 'true' or 'false'
 
 // D64 §16.2b.11: the literal is a value of the C parameter's type.
 use c_import("static inline int add3(int a, int b, const char *tail) { return a + b; }\n")

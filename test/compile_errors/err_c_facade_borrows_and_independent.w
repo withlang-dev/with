@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Statement' states both 'independent' and 'borrows'
+//! expect-check-fail: = help: keep 'borrows' if the resource depends on the parameters it names, 'independent' if the C API guarantees it depends on nothing it was made from
 
 // D51 stage 6 (ruling §61; spec §16.2b.6): `independent` says the resource
 // depends on nothing its producers receive and `borrows` names what it

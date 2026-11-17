@@ -1,4 +1,5 @@
 //! expect-check-fail: returned ephemeral value may outlive its origin 'db'
+//! expect-check-fail: = help: if the C API guarantees 'Statement' does not depend on the resources its producers receive, state 'independent' on resource 'Statement' in facade dbf; if it depends on only some of them, name those with 'borrows param N'
 
 // D51 stage 6 (ruling §29: "cannot escape through an invalid return"): a
 // statement cannot be returned past the database it depends on.

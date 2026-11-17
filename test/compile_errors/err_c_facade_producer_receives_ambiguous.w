@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Statement': producer 'st_new' receives param 0: *mut db d, a representation several resources wrap ('Reader', 'Writer'); the constructor cannot tell which resource it borrows (§16.2b.3)
+//! expect-check-fail: = help: state which one under 'fn st_new': 'of <Resource>' for that parameter
 
 // D51 stage 6 (ruling §14, §27): two resources wrap `*mut db`, so a producer
 // receiving one is not assigned to either; the constructor would have to

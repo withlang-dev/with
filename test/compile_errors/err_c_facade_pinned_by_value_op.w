@@ -1,4 +1,5 @@
 //! expect-check-fail: 'z_end' takes the representation by value, but an in-place resource is pinned
+//! expect-check-fail: = help: add 'movable' to the resource when no operation keeps the address of its storage
 
 // Spec §16.2b.3, D54: a pinned resource's representation lives in its cell
 // and every operation reaches it by address; a destroyer taking the struct

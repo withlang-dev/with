@@ -1,4 +1,5 @@
 //! expect-check-fail: borrows 'Database' as the parent of its argument and fn 'kv_stmt_owner' from its argument ('from param')
+//! expect-check-fail: = help: leave one of 'kv_db_handle' and 'kv_stmt_owner' raw
 
 // D85 (#2003; spec §16.2b.6): a parent borrow's origin is the parent and
 // its operations are the parent's; a `from param` borrow of the same

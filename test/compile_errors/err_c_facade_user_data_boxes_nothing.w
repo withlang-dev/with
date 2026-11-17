@@ -1,4 +1,5 @@
 //! expect-check-fail: presents the value the facade boxed, and 'eng_attach' boxes none
+//! expect-check-fail: = help: add 'consumes param N destroyed_by param M' or 'retains param N by param 0' for the 'void *' userdata, or delete 'user_data'
 
 // Spec §16.2b.9 (D76, ruling Amendment 2): 'user_data as &U' presents "the
 // value the facade boxed". A registration whose 'void *' is neither

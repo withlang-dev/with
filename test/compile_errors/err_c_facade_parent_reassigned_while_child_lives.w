@@ -1,4 +1,5 @@
 //! expect-check-fail: cannot mutate `db` while `s` is a live view into it
+//! expect-check-fail: = help: if the C API guarantees 'Statement' does not depend on the resources its producers receive, state 'independent' on resource 'Statement' in facade dbf; if it depends on only some of them, name those with 'borrows param N'
 
 // D51 stage 6 (ruling §29): replacing the database a statement depends on
 // while the statement is still used is refused.

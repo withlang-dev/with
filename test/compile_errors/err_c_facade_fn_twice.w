@@ -1,4 +1,5 @@
 //! expect-check-fail: is described twice
+//! expect-check-fail: = help: to present one C function as two operations, give each item its own 'rename' (§16.2b.11)
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

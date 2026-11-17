@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Iter': 'preinit it_storage' receives param 0: *mut db d; preinit only constructs storage, and a resource an in-place resource depends on is received by its 'init'
+//! expect-check-fail: = help: pass the parent to the 'init <fn>(self)' function; 'preinit' names a function that takes no resource
 
 // D51 stage 6 (ruling §13.1, §27): preinit constructs storage and produces
 // nothing; the parent of an in-place resource is received by its init.

@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'db_by_name': 'returns borrow Database from param 0' names param 0: *const c_char name, which receives no modeled resource, and With does not invent an origin (§16.2b.7)
+//! expect-check-fail: = help: after 'from param' name the parameter that receives the resource the result lives in
 
 // D51 stage 6 (ruling §26, §31): a borrowed return's origin parameter must
 // receive a modeled resource.

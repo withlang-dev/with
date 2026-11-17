@@ -1,4 +1,5 @@
 //! expect-check-fail: returns *mut db, not the representation of 'Statement'
+//! expect-check-fail: = help: name the resource whose wrapped pointer type is *mut db, or delete the clause
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

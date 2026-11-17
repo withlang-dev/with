@@ -1,4 +1,5 @@
 //! expect-check-fail: producer 'db_new' with no 'drop' and no 'destroys'
+//! expect-check-fail: = help: add 'drop <fn>', naming the C function that releases what the producer returns
 
 // D51 §16.2b.3 / ruling §9 (never half-model unsafely): a resource with a
 // producer and no destruction contract would be a safe constructor for a

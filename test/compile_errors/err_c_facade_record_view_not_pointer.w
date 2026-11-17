@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'hold_age' returns i32, not a pointer to 'rec'; 'returns borrow rec' describes the record C points at (§16.2b.6, §16.2b.13)
+//! expect-check-fail: = help: this function returns i32: name that record, or delete the clause
 
 // D66 (spec §16.2b.6, §16.2b.13): the clause is verified against the
 // declaration.

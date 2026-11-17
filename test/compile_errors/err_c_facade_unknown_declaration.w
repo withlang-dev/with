@@ -1,4 +1,5 @@
 //! expect-check-fail: is not a declaration in scope
+//! expect-check-fail: = help: import the header that declares 'db_open_v9' with 'use c_import(…)' in this file, or correct the spelling to the C name
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

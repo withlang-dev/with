@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Statement' declares no parent with 'borrows'
+//! expect-check-fail: = help: add 'borrows param N' to 'resource Statement', naming the producer parameter that receives its parent
 
 // D85 (#2003; spec §16.2b.6): "The parent is resolved through the argument
 // resource's declared `borrows` clause; naming a parent the resource does

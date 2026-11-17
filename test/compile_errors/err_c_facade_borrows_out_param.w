@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Statement': 'borrows' names param 1: *mut *mut st out of 'st_open', the out parameter the resource is produced through
+//! expect-check-fail: = help: after 'borrows' name the producer's parameter that receives the parent resource: 'borrows param 0'
 
 // D51 stage 6 (ruling §61): `borrows` names a parent the producer receives,
 // never the slot the resource itself is produced through.

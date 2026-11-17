@@ -1,4 +1,5 @@
 //! expect-check-fail: is not an imported compile-time constant
+//! expect-check-fail: = help: after 'ok' write the status constant as the header names it: 'ok SQLITE_OK'
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

@@ -1,4 +1,5 @@
 //! expect-check-fail: unknown resource 'Nope'
+//! expect-check-fail: = help: declare it above this item ('resource Nope wraps *mut T'), or name a resource the contract declares
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

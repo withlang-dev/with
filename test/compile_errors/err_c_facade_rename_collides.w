@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Database': 'db_size' is renamed 'count', and 'count' is presented as 'count' on 'Database' too; two operations of one resource cannot share a name — rename one (§16.2b.11)
+//! expect-check-fail: = help: give one of them another name: 'rename <name>' under its fn item
 
 // D51 stage 8 (spec §16.2b.11): a `rename` is explicit and never yields to
 // the convention; two explicit spellings of one name on one resource are

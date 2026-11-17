@@ -1,4 +1,5 @@
 //! expect-check-fail: 'message db_count' names an operation that is not a text view of its first parameter
+//! expect-check-fail: = help: state it on the fn item: 'fn db_count' with 'returns borrow CStr from param 0'
 
 // D92 (ruling Amendment 3, §16.2b.4): `message` names the operation that
 // describes the resource's most recent failure, and the error carries its

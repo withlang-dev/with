@@ -1,4 +1,5 @@
 //! expect-check-fail: facade states one error type 'KvError', whose status is one type, but 'kv_open' returns i32 and 'kv_flush' returns i64
+//! expect-check-fail: = help: delete 'error KvError' so each operation keeps its own generated error type, or describe the functions of the other status type in a contract of their own
 
 // #2179 (D97, spec §16.2b.4): `c contract kv error KvError` gives every `ok`
 // operation of the facade one error, whose `Failed(status)` holds one status

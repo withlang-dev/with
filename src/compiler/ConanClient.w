@@ -2140,7 +2140,9 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     let q = "\x22"
     let pin = "{\n  " ++ q ++ "registry_commit" ++ q ++ ": " ++ q ++ conan_json_escape(registry.commit) ++ q ++ ",\n  " ++ q ++ "facts_sha256" ++ q ++ ": " ++ q ++ registry.sha256 ++ q ++ "\n}\n"
     let _pin = runtime_write_file(dep_dir ++ "/contract.json", pin)
-    runtime_eprint("  " ++ summary ++ " (.with/deps/c/" ++ name ++ "/" ++ version ++ "/contract-report.txt)")
+    // #3117: the coverage line says where the raw ones are explained.
+    let explain = if summary.contains(", 0 raw"): "" else: "; `with contract report c." ++ name ++ "` says why each raw one is raw"
+    runtime_eprint("  " ++ summary ++ explain ++ " (.with/deps/c/" ++ name ++ "/" ++ version ++ "/contract-report.txt)")
 
 // A proof about compiled foreign code holds only for the build it analyzed
 // (§31.6.3). For a package linked as a prebuilt binary the drafter read a

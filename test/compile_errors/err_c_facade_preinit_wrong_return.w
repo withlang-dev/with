@@ -1,4 +1,5 @@
 //! expect-check-fail: 'preinit z_storage' returns Unit, not the representation; preinit constructs the storage that init fills
+//! expect-check-fail: = help: after 'preinit' name a function that returns the record by value; the function that fills caller storage is 'init <fn>(self)'
 
 // D51 ruling §13.1 stage 4b: `preinit` constructs the storage `init` fills,
 // standing where `Representation.zeroed()` would — so it returns the

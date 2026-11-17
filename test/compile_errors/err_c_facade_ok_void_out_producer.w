@@ -1,4 +1,5 @@
 //! expect-check-fail: 'ok DB_OK' names a status, but no producer returns one to compare it with: 'db_make' returns nothing
+//! expect-check-fail: = help: delete 'ok': it applies to a producer that returns an integer status and stores the resource through an out parameter
 
 // D51 stage 5, spec §16.2b.4: a void out-parameter producer has production
 // (the slot) and no status, so `ok` has nothing to read.

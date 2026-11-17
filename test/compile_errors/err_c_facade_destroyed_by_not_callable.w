@@ -1,4 +1,5 @@
 //! expect-check-fail: is not callable
+//! expect-check-fail: = help: after 'destroyed_by' name the function-pointer parameter C calls to destroy the userdata: 'consumes param N destroyed_by param M'
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

@@ -1,4 +1,5 @@
 //! expect-check-fail: does not take the representation as its first parameter
+//! expect-check-fail: = help: an operation of 'Database' takes what it wraps first; describe 'st_finalize' with an fn item when the resource is a later parameter (no destroyer form exists for that: #3177)
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

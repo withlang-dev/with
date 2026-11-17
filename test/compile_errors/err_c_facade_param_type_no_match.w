@@ -1,4 +1,5 @@
 //! expect-check-fail: matches 0 parameter(s)
+//! expect-check-fail: = help: refer to the parameter by name or by position: 'param 2'
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

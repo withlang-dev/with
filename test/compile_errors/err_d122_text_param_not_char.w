@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'zdoc_read': text param 0: *const i32 words: not a pointer to a C character type; 'text param' describes a `char *`, `unsigned char *` or `signed char *` input (§16.2b.8)
+//! expect-check-fail: = help: delete 'text param 0': bytes with a count are 'buffer param P len param L', a record is `reads`
 
 // D122 (spec §16.2b.8): `text param N` describes input text, a pointer to
 // a C character type read to its NUL; any other pointer is a buffer or a

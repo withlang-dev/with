@@ -1,4 +1,5 @@
 //! expect-check-fail: 'from box_open, nonnull': box_open produces through an out parameter
+//! expect-check-fail: = help: delete ', nonnull': write 'from box_open(out param N)' and state the success status with 'ok <CONST>'
 
 // §31.8.2: an out-parameter producer's status says whether anything was
 // produced; `nonnull` is about a returned pointer.

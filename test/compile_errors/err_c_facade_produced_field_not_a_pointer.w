@@ -1,4 +1,5 @@
 //! expect-check-fail: 'from buf_load, nullable field n': the field is i32, not a pointer
+//! expect-check-fail: = help: name the record's pointer field, the one that is NULL when nothing was produced
 
 // §16.2b.4: only a pointer has a NULL that means nothing was produced.
 use c_import("void free(void *p);

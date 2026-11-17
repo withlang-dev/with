@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'compress': a lend would make the call safe, but param 0: *mut u8 dest is a caller-owned buffer that no clause pairs
+//! expect-check-fail: = help: pair it with 'buffer param dest len param <L>' or 'buffer param dest capacity param <L> inout', bind it with 'param dest fixed <literal>', or leave the operation raw (D64)
 
 // D51 stage 12b (#1621; spec §16.2b.3, §16.2b.5, §16.2b.8): a `lend` on a
 // function whose parameters include a caller-owned buffer and its length

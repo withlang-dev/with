@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'db_link': nullable param 1: *mut db other; nullability is rendered for a function-pointer parameter (§16.6), for the callback of a 'callback param N userdata param M' pairing
+//! expect-check-fail: = help: delete the 'nullable' clause; pass `null` at a raw call when C allows it
 
 // D51 stage 12b (#1618; ruling §43, spec §16.2b.8): `nullable param N` is
 // rendered for the callback of a userdata pairing, whose absence takes its

@@ -1,4 +1,5 @@
 //! expect-check-fail: 'callback_thread registering' says the callback runs only on the thread that registered it, but 'Handle', which retains it, is 'thread send'
+//! expect-check-fail: = help: delete 'thread send' from the resource, or write 'callback_thread any' when the library may call from any thread
 
 // §31.10 rule 5: `callback_thread registering` is true only while the
 // resource that retains the callback cannot change threads.

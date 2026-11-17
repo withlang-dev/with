@@ -1,4 +1,5 @@
 //! expect-check-fail: userdata type must be Send and Sync
+//! expect-check-fail: = help: wrap the shared state so it is Send and Sync: a Mutex or an Atomic in place of 'Context'
 
 use c_import("static inline int apply(int (*visit)(void *, int), void *ctx) { return visit(ctx, 7); }")
 use std.rc
