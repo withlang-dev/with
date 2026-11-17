@@ -13251,6 +13251,11 @@ impl MirBuilder:
         // the place into a fat-pointer view. Never materialize the collection —
         // no header copy, no drop schedule (the lower_for_iter_ref discipline);
         // the caller's binding keeps sole ownership across the call.
+        if (self.sema.slice_coerce_args.get(arg_node).copied() ?? 0) == SLICE_COERCE_STR_BYTES:
+            // §16.2b.8: a `str` at a contract's input buffer is `s as []u8`.
+            let bytes = self.lower_cast(arg_node, expected_ty, arg_node)
+            self.expected_type = saved_expected
+            return bytes
         if self.sema.slice_coerce_args.contains(arg_node):
             let sc_place = self.lower_expr_place(arg_node)
             if (self.sema.slice_coerce_args.get(arg_node).copied() ?? 0) >= 2:
@@ -13970,11 +13975,29 @@ impl MirBuilder:
         self.body.new_operand(if self.sema.is_copy_frozen(tuple_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, tmp_place)
 
 
+    // `v.as_ptr()` on a slice: a cast of the slice value to the pointer to
+    // its element, which codegen reads as the data pointer. A receiver held
+    // through a reference is read through it first.
+    mut fn lower_slice_ptr(recv: i32, ptr_ty: i32, node: i32) -> i32:
+        var op = self.lower_expr(recv)
+        var src_ty = self.operand_type(op)
+        if src_ty == 0 or src_ty == self.sema.ty_void as i32: src_ty = self.expr_type(recv)
+        var resolved = self.sema.resolve_alias(src_ty as TypeId)
+        while self.sema.get_type_kind(resolved) == TypeKind.TY_REF:
+            let ref_place = self.materialize_operand(op, src_ty, self.ast.get_start(recv))
+            op = self.body.new_operand(OperandKind.OK_COPY, self.new_deref_place(ref_place))
+            src_ty = self.sema.get_type_d0(resolved) as i32
+            resolved = self.sema.resolve_alias(src_ty as TypeId)
+        if self.body.operand_kinds[op] == OperandKind.OK_MOVE: op = self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
+        self.lower_value_cast(op, src_ty, ptr_ty, self.ast.get_start(node))
+
     mut fn lower_method_call(self_expr: i32, method_sym0: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
         // §11.8 (D95): the tuple clone Sema synthesized.
         if self.sema.tuple_clone_nodes.contains(node): return self.lower_tuple_clone(self_expr, node)
         // §16.2b.3: Sema decided this `T.zeroed()` is the all-zero C record.
         if self.sema.zeroed_call_nodes.contains(node): return self.body.gen_zeroed_value_operand(self.expr_type(node))
+        // A slice's data pointer (`v.as_ptr()`): Sema decided the pointer type.
+        if self.sema.slice_ptr_calls.contains(node): return self.lower_slice_ptr(self_expr, self.sema.slice_ptr_calls.get(node).unwrap(), node)
         // D65 phase 5 (#2043): the method Sema resolved the call to when it
         // is not the one the spelling names (method_call_fields).
         let method_sym: i32 = self.sema.method_call_fields.get(node) ?? method_sym0

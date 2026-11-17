@@ -5240,6 +5240,17 @@ impl Codegen:
                         if wl_type_of(str_ptr) != cast_ty:
                             return wl_build_bitcast(self.builder, str_ptr, cast_ty)
                         return str_ptr
+                // A slice cast to a pointer to its element is its data
+                // pointer (`v.as_ptr()`), as a str cast to a byte pointer
+                // is. Any other pointer target keeps the slice's address.
+                if src_tk == TypeKind.TY_SLICE and d1 > 0 and d2 > 0 and self.sema.slice_cast_reads_data_pointer(d2, d1):
+                    let slice_val = self.mir_eval_operand(body, d0, 0)
+                    if wl_get_type_kind(wl_type_of(slice_val)) != wl_struct_type_kind():
+                        sema_phase_bug("BUG: a slice cast to its element pointer is not a fat value")
+                    let slice_data = wl_build_extract_value(self.builder, slice_val, 0)
+                    if wl_type_of(slice_data) != cast_ty:
+                        return wl_build_bitcast(self.builder, slice_data, cast_ty)
+                    return slice_data
                 // Only aggregate/array place-to-pointer casts should use the
                 // address of the operand place. Integer-to-pointer and
                 // pointer-to-pointer casts must use the operand value.

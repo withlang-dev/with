@@ -8,7 +8,7 @@ use rt.rt_core
 
 pub unsafe fn str_copy_bytes(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
-    let data = *(s as *const str as *const *const u8)
+    let data = s.as_bytes().as_ptr()
     var i: i64 = 0
     while i < s.len():
         *((out as i64 + i) as *mut u8) = data[i]

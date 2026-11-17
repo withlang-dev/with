@@ -4078,6 +4078,9 @@ impl CCodegen:
                     return "((" ++ dst_c ++ ")(" ++ src ++ ".ptr))"
                 if src_tk == TypeKind.TY_STRUCT:
                     return "((" ++ dst_c ++ ")(&(" ++ src ++ ")))"
+                // A slice cast to a pointer to its element is its data pointer.
+                if src_tk == TypeKind.TY_SLICE and self.sema.slice_cast_reads_data_pointer(src_tid as i32, dst_tid as i32):
+                    return "((" ++ dst_c ++ ")((" ++ src ++ ").ptr))"
             // `s as []u8` (§16.5): the byte view is the string's bytes and
             // length — a C cast of the str struct is not a slice (the prelude's
             // str.as_bytes() failed to compile under emit-c).

@@ -94,6 +94,7 @@ fn binding_provenance_empty -> BindingProvenance:
 
 // D39 declared view origin (SemaCheck.declared_view_origin): a parameter
 // index, or one of these.
+pub const SLICE_COERCE_STR_BYTES: i32 = -1
 pub const DECLARED_ORIGIN_NONE: i32 = -2
 pub const DECLARED_ORIGIN_AMBIGUOUS: i32 = -1
 // §21.1 rule 6: the resolved `from static` entry (resolve_declared_view_origins)
@@ -1940,8 +1941,13 @@ type Sema {
     autoderef_step_counts: HashMap[i32, i32, Minted],
     // #604 stage 1: call-arg nodes coerced collection→slice (1=imm, 3=mut);
     // consumed by MirLower.lower_call_arg to borrow the place instead of
-    // moving the collection.
+    // moving the collection. SLICE_COERCE_STR_BYTES: a `str` whose bytes a
+    // contract's input buffer reads (§16.2b.8).
     slice_coerce_args: HashMap[i32, i32, Minted],
+    // `v.as_ptr()` / `v.as_mut_ptr()` on a slice: the call node and the
+    // pointer type it has. The slice's data pointer, named as List's is;
+    // MirLower lowers it as a cast of the slice to that pointer.
+    slice_ptr_calls: HashMap[i32, i32, Minted],
     // #1739: a sequence or map literal with no expected instance whose
     // declared destination names a collection with undecided type
     // arguments (a generic struct field `items: List[T]`): literal node ->
@@ -4246,6 +4252,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         autoderef_step_starts: sema_new_map_i32_i32(),
         autoderef_step_counts: sema_new_map_i32_i32(),
         slice_coerce_args: sema_new_map_i32_i32(),
+        slice_ptr_calls: sema_new_map_i32_i32(),
         collection_literal_hints: sema_new_map_i32_i32(),
         array_fill_counts: sema_new_map_i32_i32(),
         borrow_pointee_join_node: 0,
@@ -12161,6 +12168,14 @@ impl Sema:
         if act_k == TypeKind.TY_GENERIC_INST and self.get_type_d0(act_r) == self.syms.list and self.get_generic_inst_arg_count(act_r as i32) > 0:
             return self.get_generic_inst_arg(act_r as i32, 0)
         0
+
+    // Whether a cast of the slice type `src` to `dst` reads the slice's data
+    // pointer: `dst` is a raw pointer to the slice's element.
+    fn slice_cast_reads_data_pointer(src: i32, dst: i32) -> bool:
+        let s = self.resolve_alias(src as TypeId)
+        let d = self.resolve_alias(dst as TypeId)
+        if self.get_type_kind(s) != TypeKind.TY_SLICE or self.get_type_kind(d) != TypeKind.TY_PTR: return false
+        self.resolve_alias(self.get_type_d0(s) as TypeId) == self.resolve_alias(self.get_type_d0(d) as TypeId)
 
     fn can_coerce_collection_to_slice(expected: TypeId, actual: TypeId) -> bool:
         let exp_r = self.resolve_alias(expected)
