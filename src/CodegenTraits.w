@@ -1,5 +1,6 @@
 use Codegen
 use FnAbi
+use compiler.BundleInterfaces
 use Ast
 use Mir
 use Sema
@@ -2583,7 +2584,7 @@ impl Codegen:
             // undefined in the object, so a corpus reference to it fails the
             // link loudly. (Sema folds every use of such a global; codegen
             // meets one only through `pub let` storage of migrated macros.)
-            if self.module_object_mode != 0 and self.decl_path_is_bundle_owned(self.current_decl_source_file):
+            if self.module_object_mode != 0 and self.decl_path_is_bundle_owned(self.current_decl_source_file) and not bundle_corpus_is_tree(self.bundle_corpus):
                 self.bundle_unlowered_globals.push(codegen_canonical_module_path(self.current_decl_source_file) ++ "\t" ++ self.intern.resolve(name_sym))
                 // #2219: the part that did not fold, for the refusal a body
                 // reading this global gets (mir_bind_global_locals).

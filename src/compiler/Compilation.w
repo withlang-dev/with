@@ -594,6 +594,8 @@ impl Compilation:
             if wi_text.len() == 0:
                 with_eprint("error: --link-bundle: missing or empty bundle interface " ++ wi_path)
                 return false
+            let init_symbol = link_stage_bundle_manifest_field(manifest, "init")
+            if init_symbol.len() > 0: bundle_register_init_symbol(init_symbol)
             // D39 pairing check: the interface the object was built with is
             // the one being loaded — interface N never pairs with object N+1.
             let manifest_wi_sha = link_stage_bundle_manifest_field(manifest, "interface-sha")
@@ -1526,6 +1528,9 @@ impl Compilation:
         // module's change rebuilds the bundle, as a corpus change does).
         for ci in 0..self.zcu.last_bundle_carried_paths.len():
             text = text ++ "carried " ++ self.zcu.last_bundle_carried_paths[ci] ++ "\n"
+        // #3351: the initializer a program that links this tree bundle runs.
+        if bundle_corpus_is_tree(self.bundle_corpus):
+            text = text ++ "init " ++ bundle_init_symbol(self.bundle_corpus) ++ "\n"
         let contracts = self.bundle_contract_rows(obj_path, model)
         if contracts == "<failed>":
             return false
@@ -1595,6 +1600,10 @@ impl Compilation:
                 symbol = symbol.slice(1, symbol.len())
             // A module-link-named With symbol: a module the object should
             // have carried, which nothing at a consumer's link defines.
+            // #3351: a tree bundle is linked by the compiler that built it,
+            // whose embedded bundles define their modules' symbols; that
+            // link selects them on demand, as it does for a program.
+            if bundle_corpus_is_tree(self.bundle_corpus) and (embedded_bundle_prefixes() |> any(symbol.starts_with(it))): continue
             if symbol.starts_with("__with_mod_"):
                 with_eprint("error: --emit-bundle-manifest: " ++ obj_path ++ " references `" ++ symbol ++ "`, a module-link-named symbol of a module the object does not carry: nothing at a consumer's link defines it (wo_bundles.md, carried copies)")
                 return "<failed>"

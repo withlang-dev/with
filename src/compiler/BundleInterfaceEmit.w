@@ -513,7 +513,7 @@ impl BundleEmitter:
         let is_const = ast.is_const_decl_node(node)
         // A private global is printed only as a returned view's origin.
         let is_pub = (flags / 2) % 2 != 0
-        if not is_pub and (is_const or not self.origin_global_names.contains(name)):
+        if not is_pub and not bundle_corpus_is_tree(self.corpus) and (is_const or not self.origin_global_names.contains(name)):
             return
         let mod_path = with_str_clone_ref(self.decl_modules[di])
         self.context = mod_path ++ ": " ++ (if is_const: "const " else: "global ") ++ name
@@ -536,7 +536,9 @@ impl BundleEmitter:
             self.push_export(BX_CONST, mod_path, name, "pub const " ++ name ++ ": " ++ spelling ++ " = " ++ value ++ "\n", "const\t" ++ mod_path ++ "\t" ++ name ++ "\t" ++ spelling ++ "\t" ++ value ++ "\n")
             return
         let is_mut = flags % 2 != 0
-        if is_mut and sema.type_needs_drop_frozen(tid) != 0:
+        // A tree bundle's storage lives as long as the program that links
+        // it, as a program's own globals do (#3351).
+        if is_mut and sema.type_needs_drop_frozen(tid) != 0 and not bundle_corpus_is_tree(self.corpus):
             // #2369: `let` is the fix when no body rebinds it, and only the
             // author may make it: `var` to `let` changes the declaration's
             // meaning, which the emitter never does.
@@ -578,7 +580,9 @@ impl BundleEmitter:
         let is_pub = flags % 2 != 0
         self.context = mod_path ++ ": fn " ++ full
         self.failed = false
-        if not is_pub and not all_visibilities:
+        // #3351: a tree bundle's importers are of its package (its tests):
+        // every declaration is theirs to name, `pub` or not (D100).
+        if not is_pub and not all_visibilities and not bundle_corpus_is_tree(self.corpus):
             return ""
         if full.contains("$ext$") or sema.method_decl_is_extension(node) != 0:
             self.refuse("is an extension method; extensions do not cross a bundle boundary")
@@ -1329,7 +1333,7 @@ impl BundleEmitter:
                 self.emit_extern(sema, di, decl)
                 continue
             if kind == NodeKind.NK_TYPE_DECL:
-                if self.decl_is_pub_type(sema, decl):
+                if self.decl_is_pub_type(sema, decl) or bundle_corpus_is_tree(self.corpus):
                     self.note_named_type(ast.get_data0(decl))
                 continue
             if kind == NodeKind.NK_IMPL_DECL:

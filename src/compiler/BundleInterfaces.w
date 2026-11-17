@@ -14,6 +14,7 @@
 use std.collections.HashMap
 use std.crypto.sha256
 use rt.rt_core
+use FnAbi
 
 var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
 
@@ -30,13 +31,36 @@ fn bundle_text_sha256(text: &str) -> str:
 fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
     if corpus.len() == 0:
         return false
-    let base = bundle_corpus_base(corpus)
-    canonical_path == base ++ ".w" or canonical_path.starts_with(base ++ "/")
+    // A tree bundle may name several directories, comma-separated.
+    for base in bundle_corpus_base(corpus).split(","):
+        if canonical_path == base ++ ".w" or canonical_path.starts_with(base ++ "/"): return true
+    false
 
-// The embedded tree a corpus lives in: the runtime's (D30 R3, `rt`) is
-// `<embedded-rt>/rt`, every migrated corpus's `<embedded-std>/<rel>`.
+// The tree a corpus lives in: the runtime's (D30 R3, `rt`) is
+// `<embedded-rt>/rt`, every migrated corpus's `<embedded-std>/<rel>`, and a
+// tree bundle's (`tree:<dir>`, #3351) the directory itself, canonical.
 fn bundle_corpus_base(corpus: &str) -> str:
-    if corpus == "rt": "<embedded-rt>/rt" else: "<embedded-std>/" ++ corpus
+    if corpus == "rt": "<embedded-rt>/rt" else if bundle_corpus_is_tree(corpus): corpus.slice(5, corpus.len()) else: "<embedded-std>/" ++ corpus
+
+// #3351: `--bundle-corpus tree:<dir>` bundles the modules of a directory of
+// one checkout (the compiler's own `src/`). It is never embedded or chosen
+// on demand: a program names it with `--link-bundle`, so the program knows
+// at compile time that it links it, and runs its initializer before its own
+// (a migrated corpus's object runs none, D38 Level 0).
+fn bundle_corpus_is_tree(corpus: &str) -> bool: corpus.starts_with("tree:")
+
+// The initializers of the tree bundles this compile links (`init <symbol>`
+// in each manifest), in `--link-bundle` order.
+var g_bundle_init_symbols: List[str] = []
+
+fn bundle_register_init_symbol(symbol: &str):
+    if not g_bundle_init_symbols.contains(symbol): g_bundle_init_symbols.push(symbol.to_owned())
+
+fn bundle_init_symbols() -> List[str]: g_bundle_init_symbols.clone()
+
+// #3351: the initializer a tree bundle's object defines, named from the
+// corpus directory as a module's functions are from its path.
+fn bundle_init_symbol(corpus: &str) -> str: fn_abi_module_link_prefix(bundle_corpus_base(corpus)) ++ "bundle_init"
 
 // `<embedded-std>/std/engines/pcre2/defs.w` → `std.engines.pcre2.defs`, `<embedded-rt>/rt/rt_core.w`
 // → `rt.rt_core`; "" for any other path.
