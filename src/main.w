@@ -1874,6 +1874,7 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
         // message about that action, not about this link.
         with_eprint("error: build runner compile failed (diagnostics above; linked against " ++ link_root ++ "); actions fall back to comptime evaluation by the driver, which may not evaluate every action of this tree")
         let _rm = with_fs_remove_file(key_path)
+        build_runner_fell_back = true
         return ""
     let _k = with_fs_write_file(key_path, key)
     with_eprint("[build] runner compiled " ++ build_graph_time_fmt(with_clock_nanos() - t0))
@@ -2065,7 +2066,7 @@ fn build_runner_postprocess(root: &str, target: &BuildGraphTarget, raw_rc: i32, 
     0
 
 fn build_pool_finalize_retire(root: &str, graph: &BuildGraph, options: &BuildCommandOptions, retire: &PoolRetireResult) -> i32:
-    if retire.rc == 0 and build_graph_enforce_rss(root, graph, retire.name, retire.maxrss) != 0:
+    if retire.rc == 0 and build_graph_enforce_rss(root, graph, retire.name, retire.maxrss, false) != 0:
         return 1
     if retire.via_runner == 0:
         return retire.rc
@@ -2857,9 +2858,21 @@ fn build_graph_time_eprint(line: &str):
     else:
         with_eprint(line)
 
-fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64):
+// #2489: set when the build runner could not be compiled and the driver
+// evaluates the actions itself. An in-process target's peak is then the
+// driver's own growth (the comptime evaluator's), not the target's.
+var build_runner_fell_back: bool = false
+
+// `in_process`: `peak` is the driver's high-water delta around the target;
+// otherwise it is the child's own (wait4).
+fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64, in_process: bool):
     let message = build_graph_rss_budget_error(graph, name, peak)
     if message.len() == 0: return 0
+    if not build_graph_rss_budget_judged(in_process, build_runner_fell_back):
+        // Said, not judged: the failed runner compile is already an error
+        // line of this build.
+        with_eprint("note: " ++ build_graph_rss_unjudged_note(name, peak))
+        return 0
     with_eprint("error: " ++ message)
     // Workers and synchronous dispatch may already have recorded outputs.
     // A failed budget must not become a successful cache hit on the next run.
@@ -3051,7 +3064,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let peak = build_graph_rt_self_maxrss() - timing_rss0
             timed_rss.push(peak)
             build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
-            if build_graph_enforce_rss(root, graph, timing_name, peak) != 0:
+            if build_graph_enforce_rss(root, graph, timing_name, peak, true) != 0:
                 if not build_graph_quiet_times: build_graph_times_report(root, timed_names, timed_ns, timed_rss, with_clock_nanos() - run_t0)
                 return 1
             timing_name = ""
@@ -3454,7 +3467,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         let peak = build_graph_rt_self_maxrss() - timing_rss0
         timed_rss.push(peak)
         build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
-        if build_graph_enforce_rss(root, graph, timing_name, peak) != 0:
+        if build_graph_enforce_rss(root, graph, timing_name, peak, true) != 0:
             if not build_graph_quiet_times: build_graph_times_report(root, timed_names, timed_ns, timed_rss, with_clock_nanos() - run_t0)
             return 1
     if times_top_level:
