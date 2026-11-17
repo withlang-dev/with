@@ -97,6 +97,11 @@ type BundleEmitter {
     module_sources: List[str],
     // corpus type declarations: name symbol → decl index
     type_decl_index: HashMap[i32, i32, Minted],
+    // #3351: a tree may declare one type name in two modules (`Span`,
+    // `compiler.foundation.Span`): the later declarations, by declaration
+    // index and by name.
+    type_decl_twins: List[i32],
+    type_twin_syms: List[i32],
     // impl blocks in the corpus: target type symbol and decl index, parallel
     impl_type_syms: List[i32],
     impl_decl_indices: List[i32],
@@ -139,6 +144,13 @@ type BundleInterfaceText {
     errors: List[str],
 }
 
+fn bx_without_module_identity(name: &str) -> str:
+    let at = name.find("$m$")
+    if at < 0: return name ++ ""
+    var end = at + 3
+    while end < name.len() and (name[end] == '-' or (name[end] >= '0' and name[end] <= '9')): end = end + 1
+    name.slice(0, at) ++ name.slice(end, name.len())
+
 // Whether the source declares `Copy` for this type: a derive, or an impl.
 fn bx_type_declares_copy(sema: &Sema, node: i32, name_sym: i32) -> bool:
     let ast = sema.ast
@@ -163,6 +175,8 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
         modules: List.new(),
         module_sources: List.new(),
         type_decl_index: HashMap.new(),
+        type_decl_twins: [],
+        type_twin_syms: [],
         impl_type_syms: List.new(),
         impl_decl_indices: List.new(),
         named_type_syms: List.new(),
@@ -801,7 +815,9 @@ impl BundleEmitter:
                         from_row = from_row ++ "global:" ++ entrie ++ ";"
         let is_unsafe = sema.fn_symbol_is_unsafe(fn_sym)
         let must_use = (flags / FnFlags.MUST_USE) % 2 != 0
-        var printed_name = with_str_clone_ref(full)
+        // An owner two modules both declare is `Owner$m$<path hash>` in Sema;
+        // the section it is printed in is the module.
+        var printed_name = bx_without_module_identity(full)
         if in_impl:
             // A trait method's semantic name is `Type.Trait.method`.
             let dot = full.rfind(".")
@@ -1034,6 +1050,8 @@ impl BundleEmitter:
             let idi = self.impl_decl_indices[ii]
             let impl_node = ast.get_decl(idi) as i32
             let mod_path = with_str_clone_ref(self.decl_modules[idi])
+            // A name two modules declare: each type's impls are its module's.
+            if self.type_twin_syms.contains(type_sym) and mod_path != self.current_module: continue
             let trait_sym = ast.get_data2(impl_node)
             let trait_name = if trait_sym != 0: with_str_clone_ref(sema.pool_resolve(trait_sym)) else: ""
             self.context = mod_path ++ ": impl " ++ (if trait_sym != 0: trait_name ++ " for " else: "") ++ type_name
@@ -1317,7 +1335,10 @@ impl BundleEmitter:
             if bundle_corpus_contains(self.corpus, canonical):
                 self.decl_modules.push(with_str_clone_ref(canonical))
                 self.add_module(canonical, path)
-                if kind == NodeKind.NK_TYPE_DECL:
+                if kind == NodeKind.NK_TYPE_DECL and self.tree and self.type_decl_index.contains(ast.get_data0(decl)):
+                    self.type_decl_twins.push(di)
+                    self.type_twin_syms.push(ast.get_data0(decl))
+                else if kind == NodeKind.NK_TYPE_DECL:
                     self.type_decl_index.insert(ast.get_data0(decl), di)
                 else if kind == NodeKind.NK_IMPL_DECL:
                     self.impl_type_syms.push(ast.get_data0(decl))
@@ -1417,6 +1438,10 @@ impl BundleEmitter:
             if not self.type_decl_index.contains(sym):
                 continue
             let di: i32 = self.type_decl_index.get(sym).unwrap()
+            self.current_module = with_str_clone_ref(self.decl_modules[di])
+            self.emit_type(sema, di, ast.get_decl(di) as i32)
+        for twin in 0..self.type_decl_twins.len():
+            let di = self.type_decl_twins[twin]
             self.current_module = with_str_clone_ref(self.decl_modules[di])
             self.emit_type(sema, di, ast.get_decl(di) as i32)
         self.current_module = ""
