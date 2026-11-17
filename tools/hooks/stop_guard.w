@@ -30,7 +30,7 @@ use std.process
 
 fn slot_dir -> str: env("HOME") ++ "/.local/with-green/battery-slots"
 
-fn alive(pid: &str) -> bool: pid.len() > 0 and run_to_files(&["ps", "-p", pid.clone(), "-o", "pid="], "/dev/null", "/dev/null", 5000).code == 0
+fn alive(pid: str) -> bool: pid.len() > 0 and run_to_files(&["ps", "-p", pid, "-o", "pid="], "/dev/null", "/dev/null", 5000).code == 0
 
 fn battery_running() -> bool:
     for i in 0..2:
@@ -56,7 +56,7 @@ let root = env("CLAUDE_PROJECT_DIR")
 if root.len() == 0 or not file_exists(root ++ "/goal-prompt.md"): exit_code(0)
 if battery_running(): exit_code(0)
 
-let open: List[str] = []
+let open = []
 for line in queue().split("\n"):
     if line.len() > 0: open.push(line)
 if open.len() == 0: exit_code(0)
