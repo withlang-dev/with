@@ -9892,6 +9892,36 @@ impl CiExprPool:
             ij = ij + 1
         self.init_list(items_start, item_ids.len() as i32, init_ty_id)
 
+    // #3371 (C99 7.12.14): under clang, glibc's <math.h> spells `isgreater`
+    // and its five siblings generically, since it keeps the builtins for
+    // gcc: `(__extension__ ({ __typeof__ (x) __x = (x); __typeof__ (y) __y =
+    // (y); !isunordered (__x, __y) && __x > __y; }))`. A statement
+    // expression that is the expansion of one of the six, in that shape
+    // (two operand copies, then the comparison), is the libc function the
+    // builtin form is on Darwin and mingw. 0 for any other.
+    fn lower_c99_comparison_stmt_expr(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+        let invocation = with_ci_cursor_expansion_text(session, cursor)
+        let open = invocation.find("(")
+        if open <= 0: return 0
+        let class_fn = ci_float_class_fn(invocation.slice(0, open).trim())
+        if not (class_fn.starts_with("isgreater") or class_fn.starts_with("isless") or class_fn == "isunordered"): return 0
+        if with_ci_num_children(session, cursor) != 1: return 0
+        let body = with_ci_child(session, cursor, 0)
+        if with_ci_cursor_kind(session, body) != CXK_COMPOUND_STMT or with_ci_num_children(session, body) != 3: return 0
+        let operands = []
+        for i in 0..2:
+            let saved = with_ci_child(session, body, i)
+            if with_ci_cursor_kind(session, saved) != CXK_DECL_STMT or with_ci_num_children(session, saved) != 1: return 0
+            let variable = with_ci_child(session, saved, 0)
+            if with_ci_cursor_kind(session, variable) != CXK_VAR_DECL: return 0
+            let init = ci_find_last_expr_child(session, variable)
+            if init < 0: return 0
+            let operand = self.lower_expr_ir(session, init, types, scope)
+            if operand == 0: return 0
+            operands.push(operand as i32)
+        ci_migrate_note_libc_symbol(class_fn)
+        self.build_named_call_expr_typed(class_fn, operands, types.named_type_from_text("i32"))
+
     fn lower_expr_ir(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         // An initializer element already computed into a temporary reads
         // as that temporary (hoist_init_list_element_setups).
@@ -9899,6 +9929,10 @@ impl CiExprPool:
         if substituted != 0:
             return substituted as CiExprId
         let kind = with_ci_cursor_kind(session, cursor)
+
+        if kind == CXK_STMT_EXPR:
+            let compared = self.lower_c99_comparison_stmt_expr(session, cursor, types, scope)
+            if compared != 0: return compared
 
         // D90: a libc constant is named. The literal kind holds its text,
         // so it takes every conversion a literal in its place would.
