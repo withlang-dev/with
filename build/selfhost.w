@@ -5435,9 +5435,11 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "(__local_chunk = (__local_chunk -% 1))", "assignment_compat")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "if (__local_chunk != 0) {\n                continue", "assignment_compat")
+    // #507 (§13.5b): the do-while's `continue` is With's, which reaches the
+    // condition; the condition's assignment is the first statement of its block.
+    rc = bs_assert_contains(ctx, out_text, "        if (__local_total == 0) {\n            continue", "assignment_compat")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "                continue\n            }\n            break", "assignment_compat")
+    rc = bs_assert_contains(ctx, out_text, "    } while {\n        (__local_chunk = (__local_chunk -% 1))\n        (__local_chunk != 0)\n    }", "assignment_compat")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -5628,6 +5630,25 @@ fn bs_check_migrate_program_names_like_system(ctx: &ActionCtx, compiler_path: &s
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-system-like-names", ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)])
     if result.rc != 0: return result.rc
     bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-system-like-names", ["run", bs_abs(root, out_w)]).rc
+
+// #507 (§13.5b): C's `do { … } while (cond)` migrates to With's `do … while
+// cond`, never to a loop with a negated break; a `continue` reaches the
+// condition, side effects included, and a condition that needs statements
+// first is a block.
+fn bs_check_migrate_do_while(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "do_while.c")
+    let out_w = bs_join(case_dir, "do_while.w")
+    var rc = bs_write_fixture(ctx, src, "static int calls = 0;\nstatic int next(int *i) { calls++; (*i)++; return *i < 7; }\nint main(void) {\n  int i = 0, seen = 0;\n  do { i++; if (i % 2 == 0) continue; seen++; } while (i < 7);\n  if (i != 7 || seen != 4) return 1;\n  int j = 0, even = 0;\n  do { if (j & 1) continue; even++; } while (next(&j));\n  if (j != 7 || calls != 7 || even != 4) return 2;\n  int k = 3, n = 0;\n  do { n++; if (n > 10) break; } while ((k = k - 1) > 0);\n  if (n != 3) return 3;\n  do { n = 100; break; } while (0);\n  if (n != 100) return 4;\n  return 0;\n}\n", "migrate do-while")
+    if rc != 0: return rc
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-do-while", ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)])
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "} while ", "do-while is printed as do … while")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "loop {", "do-while is not a loop with a break")
+    if rc != 0: return rc
+    bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-do-while", ["run", bs_abs(root, out_w)]).rc
 
 fn bs_check_migrate_offsetof(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -6814,6 +6835,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_glibc_comparison_macros(ctx, compiler_path, bs_join(output_dir, "glibc_compare"))
     if rc != 0: return rc
     rc = bs_check_migrate_program_names_like_system(ctx, compiler_path, bs_join(output_dir, "system_like_names"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_do_while(ctx, compiler_path, bs_join(output_dir, "do_while"))
     if rc != 0: return rc
     rc = bs_check_migrate_d119_arrays(ctx, compiler_path, bs_join(output_dir, "d119_arrays"))
     if rc != 0: return rc
