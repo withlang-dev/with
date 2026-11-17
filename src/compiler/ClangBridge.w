@@ -1249,7 +1249,10 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     // `return a & FLAG` a narrowing).
     if kind == CXType_Enum:
         let decl = clang_getTypeDeclaration(canonical)
-        let probe = EnumFitProbe { fits: 1 }
+        let int_ty = clang_getEnumDeclIntegerType(decl)
+        let int_kind = int_ty.kind
+        let unsigned_type = int_kind == CXType_Char_U or int_kind == CXType_UChar or int_kind == CXType_UShort or int_kind == CXType_UInt or int_kind == CXType_ULong or int_kind == CXType_ULongLong
+        let probe = EnumFitProbe { fits: 1, unsigned_bits: if unsigned_type: clang_Type_getSizeOf(int_ty) * 8 else: 0 }
         clang_visitChildren(decl, probe_enum_const_fits as *const u8, &raw mut probe as *mut EnumFitProbe as *mut u8)
         if probe.fits != 0:
             return session_strdup(s, "i32\0" as *const u8)
@@ -2092,15 +2095,22 @@ unsafe fn ensure_fields_cached(s: *mut CImportSession, idx: isize):
     (*cache).field_count = fc.count
 
 // Whether every enumerator of an enum fits `int` (translate_type's enum rule).
-type EnumFitProbe { fits: i32 }
+// `unsigned_bits`: the width of the enum's integer type when it is unsigned,
+// else 0. clang hands an enumerator's value sign-extended from that width,
+// so `0x80000000u` reads as -2147483648 and looked as if it fit `int`: the
+// enum's alias was `u32` and every use of it `i32` (CImport's
+// ci_enum_const_value makes the same correction for the declaration).
+type EnumFitProbe { fits: i32, unsigned_bits: i64 }
 
 @[callconv("c")]
 unsafe fn probe_enum_const_fits(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     if clang_getCursorKind(cursor) != CXCursor_EnumConstantDecl:
         return CXChildVisit_Continue
-    let value = clang_getEnumConstantDeclValue(cursor)
+    let probe = data as *mut EnumFitProbe
+    var value = clang_getEnumConstantDeclValue(cursor)
+    if value < 0 and (*probe).unsigned_bits > 0 and (*probe).unsigned_bits < 64: value = value + ((1 as i64) << ((*probe).unsigned_bits as u32))
     if value < -2147483648 or value > 2147483647:
-        (*(data as *mut EnumFitProbe)).fits = 0
+        (*probe).fits = 0
     CXChildVisit_Continue
 
 @[callconv("c")]
