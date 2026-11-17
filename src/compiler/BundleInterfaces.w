@@ -85,6 +85,14 @@ fn bundle_module_dotted_name(canonical_path: &str) -> str:
         out = out ++ (if rel[i] == '/': "." else: rel.slice(i, i + 1))
     out
 
+// A tree bundle's module as its tree imports it: `<dir>/compiler/Link.w` of
+// corpus directory `<dir>` is `compiler.Link`; "" outside the corpus.
+fn bundle_tree_module_dotted_name(corpus: &str, canonical_path: &str) -> str:
+    if not canonical_path.ends_with(".w"): return ""
+    for base in bundle_corpus_base(corpus).split(","):
+        if canonical_path.starts_with(base ++ "/"): return canonical_path.slice(base.len() + 1, canonical_path.len() - 2).replace("/", ".")
+    ""
+
 // The `module <path>` section paths of an interface file, in file order.
 fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
     let out: List[str] = []

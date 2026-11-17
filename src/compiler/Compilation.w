@@ -531,9 +531,9 @@ impl Compilation:
         self.zcu = taken_zcu
         var root_text = "// bundle interface root for " ++ wi_path ++ "\n"
         for section in sections:
-            let dotted = bundle_module_dotted_name(section)
+            let dotted = if bundle_corpus_is_tree(self.bundle_corpus): bundle_tree_module_dotted_name(self.bundle_corpus, section) else: bundle_module_dotted_name(section)
             if dotted.len() == 0:
-                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ section ++ "' is not under <embedded-std>/ or <embedded-rt>/")
+                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ section ++ "' is not under <embedded-std>/ or <embedded-rt>/, or a directory of the tree corpus")
                 return AstPool.new()
             root_text = root_text ++ "use " ++ dotted ++ "\n"
         // The root is the interface's own: the runtime bundle's lives in the
