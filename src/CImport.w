@@ -8859,6 +8859,11 @@ fn ci_cursor_type_is_pointerish(session: i64, cursor: i32) -> bool:
     let ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
     ci_starts_with(ty_str, "*")
 
+// Whether argument `index` of the call at `cursor` is a C `float` (a call's
+// children are its callee, then its arguments).
+fn ci_call_arg_is_c_float(session: i64, cursor: i32, index: i32) -> bool:
+    index + 1 < with_ci_num_children(session, cursor) and ci_cursor_type_text(session, with_ci_child(session, cursor, index + 1)) == "f32"
+
 fn ci_cursor_type_text(session: i64, cursor: i32) -> str:
     if cursor < 0:
         return ""
@@ -12682,6 +12687,13 @@ impl CiExprPool:
             sized_args.push(arg_ids[1])
             sized_args.push((self.cast(size_ty, (arg_ids[2]) as CiExprId)) as i32)
             return self.build_named_call_expr("strncmp", sized_args)
+        // `__builtin_isnormal` is generic, and its callee is already named
+        // `isnormal`, the double form, when the call is lowered: a float
+        // argument takes std.libc's `isnormalf` (a float denormal widens to a
+        // normal double).
+        if callee_text == "isnormal" and arg_ids.len() == 1 and ci_call_arg_is_c_float(session, cursor, 0):
+            ci_migrate_note_libc_symbol("isnormalf")
+            return self.build_named_call_expr_typed("isnormalf", arg_ids, types.named_type_from_text("i32"))
         let renamed = ci_libc_simple_rename(callee_text)
         if renamed.len() > 0:
             return self.build_named_call_expr(renamed, arg_ids)
@@ -12882,8 +12894,7 @@ impl CiExprPool:
         if callee_text == "__builtin_fpclassify":
             if arg_ids.len() != 6:
                 return self.reject_builtin_call(session, cursor, callee_text, "expected six arguments")
-            let operand_ty = self.get_type(arg_ids[5] as CiExprId)
-            let classify = if operand_ty != 0 and ci_print_type(types, operand_ty) == "f32": "fpclassifyf" else: "fpclassify"
+            let classify = if ci_call_arg_is_c_float(session, cursor, 5): "fpclassifyf" else: "fpclassify"
             ci_migrate_note_libc_symbol(classify)
             return self.build_named_call_expr_typed(classify, [arg_ids[5]], types.named_type_from_text("i32"))
         let float_class = ci_float_class_fn(callee_text)
@@ -12894,9 +12905,11 @@ impl CiExprPool:
                 return self.reject_builtin_call(session, cursor, callee_text, "expected two arguments")
             if not compares and arg_ids.len() != 1:
                 return self.reject_builtin_call(session, cursor, callee_text, "expected one argument")
-            // `__builtin_isnormal` is generic: the operand's width decides.
-            let operand_ty = self.get_type(arg_ids[0] as CiExprId)
-            let class_fn = if float_class == "isnormal" and operand_ty != 0 and ci_print_type(types, operand_ty) == "f32": "isnormalf" else: float_class
+            // `__builtin_isnormal` is generic: the operand's width decides,
+            // and C states it. (The lowered operand does not: a literal
+            // `1e-40f` is `1e-40`, a normal double, and glibc's `isnormal`
+            // of it answered true.)
+            let class_fn = if float_class == "isnormal" and ci_call_arg_is_c_float(session, cursor, 0): "isnormalf" else: float_class
             ci_migrate_note_libc_symbol(class_fn)
             return self.build_named_call_expr_typed(class_fn, arg_ids, types.named_type_from_text("i32"))
         let bit_method = ci_builtin_bit_method(callee_text)
@@ -22312,7 +22325,7 @@ fn ci_has_value_libc_call_mapping(callee: &str) -> bool:
     // pointer normalization as their libc spellings (#740, #880).
     if callee == "with_free" or callee == "with_memcpy" or callee == "with_memmove" or callee == "with_memset" or callee == "with_memcmp":
         return true
-    if ci_starts_with(callee, "__builtin"):
+    if ci_starts_with(callee, "__builtin") or callee == "isnormal":
         return true
     false
 
