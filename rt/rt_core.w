@@ -1197,11 +1197,14 @@ fn free_small_block(block: i64, idx: i32):
 // the unwind tables let rt_backtrace_print name the chain in-process, so a
 // WITH_DEBUG_ALLOC_TRAP_FREE_HIT stop needs no debugger there (#1081).
 // All ledger ops run under the allocator lock (called from rt_alloc/rt_free).
-// Hash slots (power of two). 65536 truncated on every compiler-sized run
-// ("ledger full, tracking truncated"), which voids the double-free verdict
-// exactly where it is needed (#1081: a stage compiler's own double free).
-// 4M slots x 72 bytes is a 302 MB reservation, touched only as it fills.
-let DBG_CAP: i64 = 4194304
+// Hash slots (a power of two), open addressing. The table doubles when it
+// is half full (#703): fixed at 65536 it truncated on every compiler-sized
+// run ("ledger full, tracking truncated"), which voids the double-free
+// verdict exactly where it is needed (#1081), and fixed at 4M a check of the
+// compiler filled it and every operation then probed millions of slots (it
+// did not finish in 99 minutes). A freed entry stays until its address is
+// reused: it is what a second free of that address is judged against.
+let DBG_CAP_INITIAL: i64 = 65536
 let DBG_ENTRY_WORDS: i64 = 23       // addr, size, freed, alloc_origin, first_drop_ptr, first_drop_len, root_flag, root_reason_ptr, root_reason_len, then the two sites
 // #1014: the return addresses of the first free and of the allocation
 // (innermost first, 0 ends a list), so a DOUBLE FREE names both free sites
@@ -1230,6 +1233,8 @@ var dbg_state: i32 = 0              // 0=unread, 1=off, 2=on (cached, read once)
 var dbg_scribble_state: i32 = 0    // 0=unread, 1=off, 2=on (cached, read once)
 var dbg_filter_state: i32 = 0      // 0=unread, 1=all, 2=non-root, 3=roots
 var dbg_base: i64 = 0              // mmap'd ledger table, 0 = uninitialised
+var dbg_cap: i64 = 0               // its slots
+var dbg_count: i64 = 0             // slots that hold an address
 var dbg_full_warned: i32 = 0
 var dbg_alloc_total: i64 = 0       // allocations recorded this run (the exit report states it)
 
@@ -1533,12 +1538,36 @@ pub fn with_set_memory_limit_bytes(limit: i64) -> Unit:
 fn dbg_ledger_init():
     if dbg_base != 0:
         return
-    let bytes = DBG_CAP * DBG_ENTRY_WORDS * 8
+    let bytes = DBG_CAP_INITIAL * DBG_ENTRY_WORDS * 8
     let p = rt_mmap(bytes)
     if p as i64 == 0:
         dbg_state = 1                // mmap failed: disable rather than crash
         return
     dbg_base = p as i64             // MAP_ANON is zero-filled; no memset needed
+    dbg_cap = DBG_CAP_INITIAL
+
+// Doubles the table and moves every entry to its slot in the new one. Runs
+// under the allocator lock and takes its memory from rt_mmap, never from
+// the allocator it watches. When the mapping fails the table stays as it
+// is and fills: the run then says "ledger full, tracking truncated".
+fn dbg_ledger_grow():
+    let new_cap = dbg_cap * 2
+    let entry_bytes = DBG_ENTRY_WORDS * 8
+    let p = rt_mmap(new_cap * entry_bytes)
+    if p as i64 == 0: return
+    let new_base = p as i64
+    for old in 0..dbg_cap:
+        let from = dbg_base + old * entry_bytes
+        let addr = unsafe *(from as *const i64)
+        if addr == 0: continue
+        var slot = (addr >> 4) & (new_cap - 1)
+        while (unsafe *((new_base + slot * entry_bytes) as *const i64)) != 0: slot = (slot + 1) & (new_cap - 1)
+        let to = new_base + slot * entry_bytes
+        for w in 0..DBG_ENTRY_WORDS:
+            unsafe *((to + w * 8) as *mut i64) = unsafe *((from + w * 8) as *const i64)
+    rt_munmap(dbg_base as *mut u8, dbg_cap * entry_bytes)
+    dbg_base = new_base
+    dbg_cap = new_cap
 
 // Peak live memory with its shape (#2407): bytes and blocks live now and at
 // the peak, split by origin kind and by size class (log2 buckets), and the
@@ -1656,12 +1685,16 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
         dbg_ledger_init()
     if dbg_base == 0:
         return
-    var slot = (addr >> 4) & (DBG_CAP - 1)
+    // #703: the table stays at most half full, so a probe is short however
+    // many addresses a run uses.
+    if (dbg_count + 1) * 2 > dbg_cap: dbg_ledger_grow()
+    var slot = (addr >> 4) & (dbg_cap - 1)
     var probes: i64 = 0
-    while probes < DBG_CAP:
+    while probes < dbg_cap:
         let e = dbg_entry_addr(slot)
         let a = unsafe *(e as *const i64)
         if a == 0 or a == addr:
+            if a == 0: dbg_count += 1
             // A reused address whose entry was never marked freed (an untracked
             // free, or the ledger truncated): its bytes leave the live count here.
             if a == addr and (unsafe *((e + 16) as *const i64)) == 0: dbg_account_free(unsafe *((e + 8) as *const i64), unsafe *((e + 24) as *const i64))
@@ -1678,7 +1711,7 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
             unsafe *((e + DBG_SITE_OFFSET) as *mut i64) = 0
             dbg_capture_site(e + DBG_ALLOC_SITE_OFFSET, DBG_ALLOC_SITE_FRAMES)
             return
-        slot = (slot + 1) & (DBG_CAP - 1)
+        slot = (slot + 1) & (dbg_cap - 1)
         probes = probes + 1
     if dbg_full_warned == 0:
         dbg_full_warned = 1
@@ -1702,14 +1735,14 @@ fn dbg_site_len(at: i64, count: i64) -> i32:
 // The ledger entry of `addr`, or 0.
 fn dbg_ledger_entry(addr: i64) -> i64:
     if dbg_base == 0: return 0
-    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var slot = (addr >> 4) & (dbg_cap - 1)
     var probes: i64 = 0
-    while probes < DBG_CAP:
+    while probes < dbg_cap:
         let e = dbg_entry_addr(slot)
         let a = unsafe *(e as *const i64)
         if a == 0: return 0
         if a == addr: return e
-        slot = (slot + 1) & (DBG_CAP - 1)
+        slot = (slot + 1) & (dbg_cap - 1)
         probes = probes + 1
     0
 
@@ -1731,130 +1764,42 @@ fn dbg_put_free_sites(addr: i64):
 
 // Mark a free. Returns 1 if this is a double free (already freed, not reused).
 fn dbg_mark_free(addr: i64, drop_origin_ptr: i64, drop_origin_len: i64) -> i32:
-    if dbg_base == 0:
-        return 0
-    var slot = (addr >> 4) & (DBG_CAP - 1)
-    var probes: i64 = 0
-    while probes < DBG_CAP:
-        let e = dbg_entry_addr(slot)
-        let a = unsafe *(e as *const i64)
-        if a == 0:
-            return 0                 // untracked address
-        if a == addr:
-            let freed = unsafe *((e + 16) as *const i64)
-            if freed != 0:
-                return 1
-            dbg_account_free(unsafe *((e + 8) as *const i64), unsafe *((e + 24) as *const i64))
-            unsafe *((e + 16) as *mut i64) = 1
-            unsafe *((e + 32) as *mut i64) = drop_origin_ptr
-            unsafe *((e + 40) as *mut i64) = drop_origin_len
-            dbg_capture_site(e + DBG_SITE_OFFSET, DBG_SITE_FRAMES)
-            return 0
-        slot = (slot + 1) & (DBG_CAP - 1)
-        probes = probes + 1
+    let e = dbg_ledger_entry(addr)
+    if e == 0: return 0                  // untracked address
+    if (unsafe *((e + 16) as *const i64)) != 0: return 1
+    dbg_account_free(unsafe *((e + 8) as *const i64), unsafe *((e + 24) as *const i64))
+    unsafe *((e + 16) as *mut i64) = 1
+    unsafe *((e + 32) as *mut i64) = drop_origin_ptr
+    unsafe *((e + 40) as *mut i64) = drop_origin_len
+    dbg_capture_site(e + DBG_SITE_OFFSET, DBG_SITE_FRAMES)
     0
+
+// One word of `addr`'s ledger entry, or 0 when the ledger has none.
+fn dbg_entry_word(addr: i64, offset: i64) -> i64:
+    let e = dbg_ledger_entry(addr)
+    if e == 0: 0 else: unsafe *((e + offset) as *const i64)
 
 // Authoritative payload size from the ledger (the freed header word is reused as
 // the freelist link, so it can't be trusted on a double-free).
-fn dbg_ledger_size(addr: i64) -> i64:
-    if dbg_base == 0:
-        return 0
-    var slot = (addr >> 4) & (DBG_CAP - 1)
-    var probes: i64 = 0
-    while probes < DBG_CAP:
-        let e = dbg_entry_addr(slot)
-        let a = unsafe *(e as *const i64)
-        if a == 0:
-            return 0
-        if a == addr:
-            return unsafe *((e + 8) as *const i64)
-        slot = (slot + 1) & (DBG_CAP - 1)
-        probes = probes + 1
-    0
+fn dbg_ledger_size(addr: i64) -> i64: dbg_entry_word(addr, 8)
 
-fn dbg_ledger_origin(addr: i64) -> i64:
-    if dbg_base == 0:
-        return DBG_ORIGIN_UNKNOWN
-    var slot = (addr >> 4) & (DBG_CAP - 1)
-    var probes: i64 = 0
-    while probes < DBG_CAP:
-        let e = dbg_entry_addr(slot)
-        let a = unsafe *(e as *const i64)
-        if a == 0:
-            return DBG_ORIGIN_UNKNOWN
-        if a == addr:
-            return unsafe *((e + 24) as *const i64)
-        slot = (slot + 1) & (DBG_CAP - 1)
-        probes = probes + 1
-    DBG_ORIGIN_UNKNOWN
+// DBG_ORIGIN_UNKNOWN is 0, which is also what an absent entry reads.
+fn dbg_ledger_origin(addr: i64) -> i64: dbg_entry_word(addr, 24)
 
-fn dbg_ledger_first_drop_ptr(addr: i64) -> i64:
-    if dbg_base == 0:
-        return 0
-    var slot = (addr >> 4) & (DBG_CAP - 1)
-    var probes: i64 = 0
-    while probes < DBG_CAP:
-        let e = dbg_entry_addr(slot)
-        let a = unsafe *(e as *const i64)
-        if a == 0:
-            return 0
-        if a == addr:
-            return unsafe *((e + 32) as *const i64)
-        slot = (slot + 1) & (DBG_CAP - 1)
-        probes = probes + 1
-    0
+fn dbg_ledger_first_drop_ptr(addr: i64) -> i64: dbg_entry_word(addr, 32)
 
-fn dbg_ledger_first_drop_len(addr: i64) -> i64:
-    if dbg_base == 0:
-        return 0
-    var slot = (addr >> 4) & (DBG_CAP - 1)
-    var probes: i64 = 0
-    while probes < DBG_CAP:
-        let e = dbg_entry_addr(slot)
-        let a = unsafe *(e as *const i64)
-        if a == 0:
-            return 0
-        if a == addr:
-            return unsafe *((e + 40) as *const i64)
-        slot = (slot + 1) & (DBG_CAP - 1)
-        probes = probes + 1
-    0
+fn dbg_ledger_first_drop_len(addr: i64) -> i64: dbg_entry_word(addr, 40)
 
 // Whether the ledger holds `addr` as an allocation that was freed and not
 // reused since. Read-only; the caller holds the allocator lock.
-fn dbg_ledger_freed(addr: i64) -> i32:
-    if dbg_base == 0:
-        return 0
-    var slot = (addr >> 4) & (DBG_CAP - 1)
-    var probes: i64 = 0
-    while probes < DBG_CAP:
-        let e = dbg_entry_addr(slot)
-        let a = unsafe *(e as *const i64)
-        if a == 0:
-            return 0
-        if a == addr:
-            return if unsafe *((e + 16) as *const i64) != 0: 1 else: 0
-        slot = (slot + 1) & (DBG_CAP - 1)
-        probes = probes + 1
-    0
+fn dbg_ledger_freed(addr: i64) -> i32: (dbg_entry_word(addr, 16) != 0) as i32
 
 fn dbg_mark_root(addr: i64, reason_ptr: i64, reason_len: i64):
-    if dbg_base == 0:
-        return
-    var slot = (addr >> 4) & (DBG_CAP - 1)
-    var probes: i64 = 0
-    while probes < DBG_CAP:
-        let e = dbg_entry_addr(slot)
-        let a = unsafe *(e as *const i64)
-        if a == 0:
-            return
-        if a == addr:
-            unsafe *((e + 48) as *mut i64) = 1
-            unsafe *((e + 56) as *mut i64) = reason_ptr
-            unsafe *((e + 64) as *mut i64) = reason_len
-            return
-        slot = (slot + 1) & (DBG_CAP - 1)
-        probes = probes + 1
+    let e = dbg_ledger_entry(addr)
+    if e == 0: return
+    unsafe *((e + 48) as *mut i64) = 1
+    unsafe *((e + 56) as *mut i64) = reason_ptr
+    unsafe *((e + 64) as *mut i64) = reason_len
 
 fn dbg_ledger_root_flag_entry(e: i64) -> i64:
     unsafe *((e + 48) as *const i64)
@@ -1931,11 +1876,11 @@ pub fn with_debug_alloc_report_leaks() -> Unit:
     // The report is unconditional: a program that never allocated has no
     // ledger (dbg_base == 0) and still says so — silence was the same output
     // as the allocator not running at all.
-    var slot: i64 = if dbg_base == 0: DBG_CAP else: 0
+    var slot: i64 = if dbg_base == 0: dbg_cap else: 0
     var leaks: i64 = 0
     var suppressed: i64 = 0
     let filter = dbg_filter_mode()
-    while slot < DBG_CAP:
+    while slot < dbg_cap:
         let e = dbg_entry_addr(slot)
         let a = unsafe *(e as *const i64)
         if a != 0:
