@@ -3918,7 +3918,7 @@ impl Parser:
         let impl_seen_modes: List[i32] = []
         let impl_seen_nodes: List[i32] = []
 
-        while self.peek() == TokenKind.TK_AT or self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_UNSAFE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_GEN or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
+        while self.peek() == TokenKind.TK_AT or self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_UNSAFE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_GEN or self.peek() == TokenKind.TK_KW_COMPTIME or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
             if impl_braced and self.peek() == TokenKind.TK_R_BRACE:
                 break
             if not self.decl_member_continues(construct, form, start, introducer_end, (method_count + impl_assoc_names.len()) as i32):
@@ -3955,6 +3955,13 @@ impl Parser:
             var m_unsafe = 0
             if self.peek() == TokenKind.TK_KW_UNSAFE:
                 m_unsafe = 1
+                self.advance()
+            // §17.1 (D104): `comptime fn` declares that a function runs at
+            // compile time and is checked at its declaration; a method is a
+            // function, and takes the keyword where a function does (#665).
+            var m_comptime = false
+            if self.peek() == TokenKind.TK_KW_COMPTIME:
+                m_comptime = true
                 self.advance()
             var m_async: i32 = 0
             if self.peek() == TokenKind.TK_KW_ASYNC:
@@ -4061,6 +4068,7 @@ impl Parser:
                 flags = flags + FnFlags.ASYNC
             if m_gen != 0:
                 flags = flags + FnFlags.GEN
+            if m_comptime: flags = flags + FnFlags.COMPTIME
 
             var final_method_body = body
             if m_unsafe != 0:
