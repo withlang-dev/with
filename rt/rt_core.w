@@ -684,13 +684,13 @@ fn rt_owned_key_at(base: i64, i: i64) -> i64:
 fn rt_owned_start_at(base: i64, i: i64) -> i64:
     unsafe *((base + i * 16 + 8) as *const i64)
 
-// Stores `key -> start`; 1 when the key took a new slot, 0 when it was
-// already there (the page of a released slab, mapped again, #685).
-fn rt_owned_put(base: i64, cap: i64, key: i64, start: i64) -> i64:
+// Stores `key -> start`; whether the key took a new slot (false: it was
+// already there, the page of a released slab mapped again, #685).
+fn rt_owned_put(base: i64, cap: i64, key: i64, start: i64) -> bool:
     var i = rt_owned_hash(key, cap)
     while rt_owned_key_at(base, i) != 0 and rt_owned_key_at(base, i) != key:
         i = (i + 1) & (cap - 1)
-    let fresh: i64 = if rt_owned_key_at(base, i) == 0: 1 else: 0
+    let fresh = rt_owned_key_at(base, i) == 0
     unsafe *((base + i * 16) as *mut i64) = key
     unsafe *((base + i * 16 + 8) as *mut i64) = start
     fresh
@@ -722,7 +722,7 @@ fn rt_owned_record_slab(start: i64, size: i64):
         rt_owned_count = rt_owned_live
     var page: i64 = 0
     while page < pages:
-        rt_owned_count = rt_owned_count + rt_owned_put(rt_owned_base, rt_owned_cap, (start >> (RT_OWNED_PAGE_SHIFT as u32)) + page, start)
+        if rt_owned_put(rt_owned_base, rt_owned_cap, (start >> (RT_OWNED_PAGE_SHIFT as u32)) + page, start): rt_owned_count = rt_owned_count + 1
         page = page + 1
     rt_owned_live = rt_owned_live + pages
 
