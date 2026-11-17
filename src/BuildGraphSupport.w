@@ -448,6 +448,18 @@ fn build_graph_rss_budget_error(graph: &BuildGraph, name: &str, peak: i64) -> st
         return ""
     ""
 
+// #2489: whether a measured peak is the target's, so a budget can be held
+// against it. A pooled child's is (wait4). An in-process target's is the
+// driver's high-water delta, which is the compile's footprint when the
+// build runner evaluates the actions and the driver's own comptime
+// evaluator's when the runner did not compile and the driver falls back:
+// stage1 then read 4.4 GB against a 2 GB budget on a tree whose compile
+// peaks near 1.5 GB.
+fn build_graph_rss_budget_judged(in_process: bool, runner_fell_back: bool) -> bool: not (in_process and runner_fell_back)
+
+fn build_graph_rss_unjudged_note(name: &str, peak: i64) -> str:
+    "the memory budget of '" ++ name ++ f"' is not judged in this run: the build runner did not compile and the driver evaluated the build's actions itself, so the {peak} bytes measured are the driver's"
+
 fn build_graph_times_report(root: &str, names: &List[str], ns_list: &List[i64], rss_list: &List[i64], total_ns: i64):
     if names.len() == 0:
         return

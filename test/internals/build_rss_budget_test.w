@@ -51,4 +51,12 @@ fn main:
         assert(rejected.error_msg.contains("positive i64 byte count"))
     let duplicate = graph_with_budget("arg\t0\trss-limit-bytes=1\narg\t0\trss-limit-bytes=2\n")
     assert(not duplicate.ok)
+    // #2489: a peak measured in the driver is the target's only while the
+    // build runner evaluates the actions; a child's own peak always is.
+    assert(build_graph_rss_budget_judged(false, false))
+    assert(build_graph_rss_budget_judged(false, true))
+    assert(build_graph_rss_budget_judged(true, false))
+    assert(not build_graph_rss_budget_judged(true, true))
+    assert(build_graph_rss_unjudged_note("stage1", 4650745856).contains("'stage1' is not judged"))
+    assert(build_graph_rss_unjudged_note("stage1", 4650745856).contains("4650745856 bytes measured are the driver's"))
     print("ok")
