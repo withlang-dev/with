@@ -58,6 +58,17 @@ fn bundle_register_init_symbol(symbol: &str):
 
 fn bundle_init_symbols() -> List[str]: g_bundle_init_symbols.clone()
 
+// An owner two modules of one unit both declare is `Owner$m$<path hash>` in
+// Sema (SemaDecl). A module's link names and its interface section carry
+// the module already, and name the owner as a unit that sees one of the two
+// modules does: plain.
+fn bundle_name_without_module_identity(name: &str) -> str:
+    let at = name.find("$m$")
+    if at < 0: return name ++ ""
+    var end = at + 3
+    while end < name.len() and (name[end] == '-' or (name[end] >= '0' and name[end] <= '9')): end = end + 1
+    name.slice(0, at) ++ name.slice(end, name.len())
+
 // #3351: the initializer a tree bundle's object defines, named from the
 // corpus directory as a module's functions are from its path.
 fn bundle_init_symbol(corpus: &str) -> str: fn_abi_module_link_prefix(bundle_corpus_base(corpus)) ++ "bundle_init"

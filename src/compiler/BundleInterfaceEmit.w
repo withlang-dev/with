@@ -144,13 +144,6 @@ type BundleInterfaceText {
     errors: List[str],
 }
 
-fn bx_without_module_identity(name: &str) -> str:
-    let at = name.find("$m$")
-    if at < 0: return name ++ ""
-    var end = at + 3
-    while end < name.len() and (name[end] == '-' or (name[end] >= '0' and name[end] <= '9')): end = end + 1
-    name.slice(0, at) ++ name.slice(end, name.len())
-
 // Whether the source declares `Copy` for this type: a derive, or an impl.
 fn bx_type_declares_copy(sema: &Sema, node: i32, name_sym: i32) -> bool:
     let ast = sema.ast
@@ -544,7 +537,9 @@ impl BundleEmitter:
         let is_const = ast.is_const_decl_node(node)
         // A private global is printed only as a returned view's origin.
         let is_pub = (flags / 2) % 2 != 0
-        if not is_pub and (is_const or not self.origin_global_names.contains(name)):
+        // A tree bundle prints every constant: it is a folded value, and a
+        // test of its package names it.
+        if not is_pub and not (is_const and self.tree) and (is_const or not self.origin_global_names.contains(name)):
             return
         let mod_path = with_str_clone_ref(self.decl_modules[di])
         self.context = mod_path ++ ": " ++ (if is_const: "const " else: "global ") ++ name
@@ -817,7 +812,7 @@ impl BundleEmitter:
         let must_use = (flags / FnFlags.MUST_USE) % 2 != 0
         // An owner two modules both declare is `Owner$m$<path hash>` in Sema;
         // the section it is printed in is the module.
-        var printed_name = bx_without_module_identity(full)
+        var printed_name = bundle_name_without_module_identity(full)
         if in_impl:
             // A trait method's semantic name is `Type.Trait.method`.
             let dot = full.rfind(".")

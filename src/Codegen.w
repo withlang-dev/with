@@ -5585,7 +5585,7 @@ impl Codegen:
 
     fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
         let mode = (self.path_uses_module_link_names(source_path)) as i32
-        fn_abi_module_link_name(mode, source_path, base_name)
+        fn_abi_module_link_name(mode, source_path, if mode != 0: bundle_name_without_module_identity(base_name) else: base_name ++ "")
 
     // D39: the prefixes of `--link-bundle` manifests join the embedded ones,
     // so a compiler with an empty embedded index (stage1) compiles exactly
