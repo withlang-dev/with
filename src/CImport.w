@@ -22193,7 +22193,7 @@ fn ci_note_filtered_system_symbol_ref(session: i64, name: &str, kind: i32) -> bo
         ci_migrate_note_libc_symbol(name)
         return true
     let loc = ci_get_decl_location(session, name)
-    let filtered = ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc))
+    let filtered = ci_symbol_is_system(name, loc)
     if not filtered:
         return true
     let loc_suffix = if loc.len() > 0: " from " ++ loc else: ""
@@ -22207,7 +22207,7 @@ fn ci_note_filtered_system_symbol_ref_at(session: i64, cursor: i32, name: &str, 
         ci_migrate_note_libc_symbol(name)
         return true
     let loc = with_ci_cursor_referenced_location(session, cursor)
-    let filtered = ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc))
+    let filtered = ci_symbol_is_system(name, loc)
     if not filtered:
         return true
     let loc_suffix = if loc.len() > 0: " from " ++ loc else: ""
@@ -22225,6 +22225,14 @@ fn ci_is_wait_status_macro_name(name: &str) -> bool:
         if not ((ch >= 65 and ch <= 90) or (ch >= 48 and ch <= 57) or ch == 95):
             return false
     true
+
+// #3398: where a declaration is says whether it is the system's. Its
+// spelling is consulted only when it has no location (a builtin, a record
+// named only inside another): a program's own `WIDE_HI`, `SIGMA` or
+// `SA_COUNT`, declared in its own file, was refused as a system symbol by
+// its prefix.
+fn ci_symbol_is_system(name: &str, loc: &str) -> bool:
+    if loc.len() > 0: ci_is_system_path(loc) else: ci_is_system_decl(name)
 
 fn ci_is_system_decl(name: &str) -> bool:
     if name.len() == 0: return true

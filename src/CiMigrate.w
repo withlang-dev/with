@@ -1141,7 +1141,7 @@ impl CiProject:
                 // its `impl` would attach to no type.
                 let underlying = if decl_kind == CK_TYPEDEF: ci_trim(with_cimport_typedef_underlying_translated(session, i)) else: ""
                 let alias = underlying.len() > 0 and ci_is_c_ident(underlying) and underlying != rname
-                if rname.len() > 0 and not alias and not ci_is_system_decl(rname) and not (rloc.len() > 0 and ci_is_system_path(rloc)):
+                if rname.len() > 0 and not alias and not ci_symbol_is_system(rname, rloc):
                     self.records.insert(ci_escape_reserved(rname), true)
                 // D198 (§16.2b.5): where a record is complete and flat; a value record
                 // must be complete in a header the package installs.
@@ -1151,7 +1151,7 @@ impl CiProject:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-                if name.len() == 0 or ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc)):
+                if name.len() == 0 or ci_symbol_is_system(name, loc):
                     i = i + 1
                     continue
                 // D121: a global initialized to an allocator or to `free`
@@ -1213,7 +1213,7 @@ impl CiProject:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-                if name.len() == 0 or ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc)):
+                if name.len() == 0 or ci_symbol_is_system(name, loc):
                     i = i + 1
                     continue
                 // #2972/#2980: `main` is an entry point per unit, never a
@@ -1318,13 +1318,13 @@ impl CiProject:
 // index has no location for it and it was emitted into the migration as
 // `type __locale_data = opaque`: a libc-internal name in the output.
 fn ci_migrate_decl_is_filtered(session: i64, idx: i32, name: &str):
-    if name.len() == 0 or ci_is_system_decl(name):
+    if name.len() == 0:
         return true
     var loc = ci_get_decl_location(session, name)
     if loc.len() == 0:
         let cursor = with_cimport_decl_cursor(session, idx)
         if cursor >= 0: loc = with_ci_cursor_location(session, cursor)
-    if loc.len() > 0 and ci_is_system_path(loc):
+    if ci_symbol_is_system(name, loc):
         return true
     ci_migrate_is_width_family_name(name)
 
@@ -3314,7 +3314,7 @@ fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: &str, proje
             if not ci_migrate_is_width_family_name(name):
                 let cursor = with_cimport_decl_cursor(session, i)
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-                if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
+                if not ci_symbol_is_system(name, loc):
                     output.push_str(ci_migrate_translate_var(session, i, count, primary_path, true, project_active, project))
         i = i + 1
     i = 0
@@ -3324,7 +3324,7 @@ fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: &str, proje
             if not ci_migrate_is_width_family_name(name):
                 let cursor = with_cimport_decl_cursor(session, i)
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-                if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
+                if not ci_symbol_is_system(name, loc):
                     output.push_str(ci_migrate_translate_var(session, i, count, primary_path, false, project_active, project))
         i = i + 1
     output.to_str()

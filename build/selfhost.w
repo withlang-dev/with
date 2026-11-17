@@ -5615,6 +5615,20 @@ fn bs_check_migrate_glibc_comparison_macros(ctx: &ActionCtx, compiler_path: &str
     if rc != 0: return rc
     bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-glibc-comparison-macros", ["run", bs_abs(root, out_w)]).rc
 
+// #3398: a declaration is the system's by where it is, never by how it is
+// spelled. A program's own enumerator and globals named like signal, wait
+// and cast macros (`WIDE_`, `SA_`, `SIG`, `CAST_`) were refused as "filtered
+// system" symbols though their declarations are in the program's file.
+fn bs_check_migrate_program_names_like_system(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "system_like_names.c")
+    let out_w = bs_join(case_dir, "system_like_names.w")
+    let rc = bs_write_fixture(ctx, src, "enum reach { WIDE_HI = 0x80000000u };\nstatic unsigned SA_COUNT = 3;\nstatic unsigned SIGMA = 4;\nstatic unsigned CAST_SHADOW = 5;\nint main(void) {\n  enum reach r = WIDE_HI;\n  if ((unsigned)r != 0x80000000u) return 1;\n  if (SA_COUNT + SIGMA + CAST_SHADOW != 12) return 2;\n  return 0;\n}\n", "migrate program names like system names")
+    if rc != 0: return rc
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-system-like-names", ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)])
+    if result.rc != 0: return result.rc
+    bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-system-like-names", ["run", bs_abs(root, out_w)]).rc
+
 fn bs_check_migrate_offsetof(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "offsetof.c")
@@ -6798,6 +6812,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_c99_math(ctx, compiler_path, bs_join(output_dir, "c99_math"))
     if rc != 0: return rc
     rc = bs_check_migrate_glibc_comparison_macros(ctx, compiler_path, bs_join(output_dir, "glibc_compare"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_program_names_like_system(ctx, compiler_path, bs_join(output_dir, "system_like_names"))
     if rc != 0: return rc
     rc = bs_check_migrate_d119_arrays(ctx, compiler_path, bs_join(output_dir, "d119_arrays"))
     if rc != 0: return rc
