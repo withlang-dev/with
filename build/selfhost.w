@@ -5487,7 +5487,7 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "enum_constants_are_int.c")
     let out_w = bs_join(case_dir, "enum_constants_are_int.w")
-    let c_text = "enum { ESC_A = 1, ESC_B };\ntypedef enum { RED, GREEN = 5 } color;\nenum { SMALL = 2, BIG = 0x80000000u };\nstatic const short int escapes[] = { -ESC_A, -ESC_B };\n\nenum wide { WIDE_HI = 0x80000000u };\nstruct holder { enum wide field; };\nunsigned wide_value(enum wide v) { return (unsigned)v; }\nunsigned wide_ptr(enum wide *p) { return (unsigned)*p; }\nint pick(color c) { return c == GREEN ? -ESC_B : 0; }\nunsigned masked(unsigned flags) { return flags & GREEN; }\n\nint main(void) {\n  enum wide w = WIDE_HI;\n  struct holder h = { WIDE_HI };\n  if (wide_value(WIDE_HI) != 0x80000000u || wide_ptr(&w) != 0x80000000u || (unsigned)h.field != 0x80000000u) return 9;\n  if (escapes[1] != -2) return 1;\n  if (pick(GREEN) != -2) return 2;\n  if (masked(7u) != 5u) return 3;\n  if (BIG != 2147483648u) return 4;\n  if (-SMALL < 0) return 5;\n  return 0;\n}\n"
+    let c_text = "enum { ESC_A = 1, ESC_B };\ntypedef enum { RED, GREEN = 5 } color;\nenum { SMALL = 2, BIG = 0x80000000u };\nstatic const short int escapes[] = { -ESC_A, -ESC_B };\n\nenum far { FAR_TOP = 0x80000000u };\nstruct holder { enum far field; };\nunsigned far_value(enum far v) { return (unsigned)v; }\nunsigned far_ptr(enum far *p) { return (unsigned)*p; }\nint pick(color c) { return c == GREEN ? -ESC_B : 0; }\nunsigned masked(unsigned flags) { return flags & GREEN; }\n\nint main(void) {\n  enum far w = FAR_TOP;\n  struct holder h = { FAR_TOP };\n  if (far_value(FAR_TOP) != 0x80000000u || far_ptr(&w) != 0x80000000u || (unsigned)h.field != 0x80000000u) return 9;\n  if (escapes[1] != -2) return 1;\n  if (pick(GREEN) != -2) return 2;\n  if (masked(7u) != 5u) return 3;\n  if (BIG != 2147483648u) return 4;\n  if (-SMALL < 0) return 5;\n  return 0;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate enum constants are int")
     if rc != 0: return rc
     var args: List[str] = List.new()
@@ -5511,8 +5511,8 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     if rc != 0: return rc
     // An enum with an enumerator `int` cannot hold is its underlying type
     // wherever it is used, not only in its alias: by value, behind a
-    // pointer, and as a field (each was `i32` beside `type wide = u32`).
-    for use_text in ["fn wide_value(__param_v: u32)", "fn wide_ptr(__param_p: *mut u32)", "field: u32"]:
+    // pointer, and as a field (each was `i32` beside `type far = u32`).
+    for use_text in ["fn far_value(__param_v: u32)", "fn far_ptr(__param_p: *mut u32)", "field: u32"]:
         rc = bs_assert_contains(ctx, out_text, use_text, "enum_constants_are_int: a use of an unsigned enum")
         if rc != 0: return rc
     var run_args: List[str] = List.new()
@@ -6133,7 +6133,7 @@ fn bs_check_migrate_enum_one_type(ctx: &ActionCtx, compiler_path: &str, case_dir
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "enum_one_type.c")
     let out_w = bs_join(case_dir, "enum_one_type.w")
-    let c_text = "typedef enum { OK = 0, FAIL = 2 } rc_t;\nenum wide { SMALL = 1, BIG = 0x80000000u };\nrc_t combine(rc_t a, int b) { rc_t ret = a; ret |= b; return ret & FAIL; }\nenum wide pick(enum wide w) { return w; }\n"
+    let c_text = "typedef enum { OK = 0, FAIL = 2 } rc_t;\nenum far { SMALL = 1, BIG = 0x80000000u };\nrc_t combine(rc_t a, int b) { rc_t ret = a; ret |= b; return ret & FAIL; }\nenum far pick(enum far w) { return w; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "enum one type")
     if rc != 0: return rc
     var args: List[str] = List.new()
