@@ -18558,15 +18558,15 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, targ
 //  during D3 cleanup. Only globals used by shared CImport code remain
 //  here, along with the macro type globals that aren't migrate-specific.)
 
-pub var g_migrate_macro_values: HashMap[str, str] = HashMap.new()
-pub var g_migrate_macro_miss_names: HashMap[str, bool] = HashMap.new()
-pub var g_migrate_macro_session: i64 = 0
+var g_migrate_macro_values: HashMap[str, str] = HashMap.new()
+var g_migrate_macro_miss_names: HashMap[str, bool] = HashMap.new()
+var g_migrate_macro_session: i64 = 0
 // #348: raw source of the file being migrated; macro expansion happens
 // on demand via ci_expand_macros_in_text (no cc -E dump).
-pub var g_migrate_raw_source: str = ""
-pub var g_migrate_current_input_path: str = ""
-pub var g_macro_type_names: str = ""
-pub var g_macro_type_aliases: str = ""
+var g_migrate_raw_source: str = ""
+var g_migrate_current_input_path: str = ""
+var g_macro_type_names: str = ""
+var g_macro_type_aliases: str = ""
 
 // Per-function temp counter state (B9). The same cursor can be
 // visited multiple times during string-based lowering — the

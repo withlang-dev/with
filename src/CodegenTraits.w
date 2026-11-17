@@ -1,5 +1,6 @@
 use Codegen
 use FnAbi
+use compiler.BundleInterfaces
 use Ast
 use Mir
 use Sema
@@ -1234,6 +1235,9 @@ impl Codegen:
     // A module-object build defines the root's symbols and declares every
     // imported module's — except, in a bundle build, the corpus modules this
     // object owns (D38 batch C3, Codegen.decl_path_is_bundle_owned).
+    fn tree_bundle_carries_current_decl() -> bool:
+        bundle_corpus_is_tree(self.bundle_corpus) and self.decl_path_is_bundle_carried(self.current_decl_source_file)
+
     fn current_decl_is_imported_module_symbol() -> bool:
         self.path_is_imported_module_symbol(self.current_decl_source_file)
 
@@ -1424,6 +1428,16 @@ impl Codegen:
         gv
 
     mut fn record_module_binding_global(name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
+        // #3351: a tree bundle carries a private copy of a global of a
+        // module it carries (std.crypto.sha256's round constants, std.tls's
+        // trace memo), as it carries that module's functions, which are the
+        // only code that reads the copy: nothing at its importer's link
+        // defines the module-named symbol. The importer's own copy of that
+        // module, functions and state, is separate.
+        if self.tree_bundle_carries_current_decl():
+            let carried = self.define_module_binding_global(name_sym, global_ty, init, is_mut)
+            wl_set_linkage(carried, wl_internal_linkage())
+            return carried
         if self.current_decl_is_imported_module_symbol():
             return self.declare_module_binding_global(name_sym, global_ty, is_mut)
         self.define_module_binding_global(name_sym, global_ty, init, is_mut)
@@ -1456,7 +1470,7 @@ impl Codegen:
             // Runtime-init storage is writable even for `let` bindings, so its
             // heap-owning value registers for the exit drop regardless of mut.
             self.register_module_global_drop(name_sym, result_tid)
-        if self.current_decl_is_imported_module_symbol():
+        if self.current_decl_is_imported_module_symbol() and not self.tree_bundle_carries_current_decl():
             return true
         self.module_runtime_init_syms.push(name_sym)
         self.module_runtime_init_nodes.push(value_node)
@@ -2583,7 +2597,7 @@ impl Codegen:
             // undefined in the object, so a corpus reference to it fails the
             // link loudly. (Sema folds every use of such a global; codegen
             // meets one only through `pub let` storage of migrated macros.)
-            if self.module_object_mode != 0 and self.decl_path_is_bundle_owned(self.current_decl_source_file):
+            if self.module_object_mode != 0 and self.decl_path_is_bundle_owned(self.current_decl_source_file) and not bundle_corpus_is_tree(self.bundle_corpus):
                 self.bundle_unlowered_globals.push(codegen_canonical_module_path(self.current_decl_source_file) ++ "\t" ++ self.intern.resolve(name_sym))
                 // #2219: the part that did not fold, for the refusal a body
                 // reading this global gets (mir_bind_global_locals).

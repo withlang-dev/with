@@ -923,3 +923,63 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
   world), and the compiler's own `src/` externs becoming `use rt.*`
   (`tools/sweep_rt_externs.w`; the resolver admits the compiler's sources,
   the pinned seed's does not).
+
+## Tree bundles (#3351, 2026-11-17)
+
+A **tree bundle** is the modules of one checkout's directories compiled
+once, for that checkout's own tests: `--bundle-corpus tree:<dir>[,<dir>]`
+(canonical directory paths) beside the flags every bundle build takes. The
+first is the compiler's own (`build/compiler_bundle.w`: `src/` and
+`out/gen/`, target `compiler-bundle`, `out/compiler-bundle/compiler.{o,wi,
+manifest}`). A test that says `use Sema` used to check, lower and generate
+every body of the compiler: 34 s of Sema for a 31-line test, 260 s for
+`internals-tests`. Linked with `with test --link-bundle
+out/compiler-bundle/compiler`, the same test's Sema is 1 s and the lane 16 s.
+
+It is a build artifact, not a stored `.wo`: never embedded, never chosen on
+demand, never published, and read only by the compiler that wrote it in the
+same build. That is what lets it carry what Level 0 keeps out of a stored
+bundle:
+
+- **An initializer.** A global whose initializer does not fold
+  (`HashMap.new()`) is storage the object defines and an initializer the
+  object's `<prefix>bundle_init` runs. The manifest names it (`init
+  <symbol>`), and the main wrapper of a program that links the bundle calls
+  it before the program's own initializers (a program names a tree bundle
+  with `--link-bundle`, so it knows at compile time that it links it).
+- **The package's view.** Its importers are tests of the same package, so
+  the interface prints every function, type and constant, `pub` or not
+  (D100). Globals stay out unless `pub`: a function's writes of exported
+  globals are a declared contract (§21.1 rule 1), and the tree's functions
+  declare none.
+- **Declarations as written.** A parameter default and a field default are
+  printed as the source wrote them; `@[callconv]`, a `mut` parameter, an
+  ephemeral type and a type with `Drop` are printed; every import of a
+  module is kept in its section. A generic type, and a function whose
+  returned view names no one origin, are left to the bundle with a note
+  (`omitted` in the manifest): an importer that names one is told the name
+  is unknown.
+- **Carried state.** A stored bundle carries private copies of the
+  functions of the std modules it reaches and never of their globals. A
+  tree bundle carries the globals too: its copy of `std.tls` reads its own
+  trace memo. The importer's copy of that module, functions and state, is
+  separate.
+- **Other bundles.** A reference to a module an embedded bundle provides
+  (std's STC shapes) stays undefined in the object; the importer's link
+  selects that bundle on demand, as it does for a program.
+
+What it does not carry: a write of *another* bundle's exported global
+reached through that bundle's functions (the compiler's regex use writes one
+pcre2 default-context global). A test can observe that only by importing the
+engine raw and holding a view of that global across a call into the tree.
+
+Two modules of a tree may declare one type name (`Span` and
+`compiler.foundation.Span`) or one function name (`span_zero`): each
+section prints its own, a module's link names carry no `$m$` identity (the
+module prefix is the identity), and an interface read whole displaces the
+second function to its module, as the on-demand merge does.
+
+The interface is checked like every bundle's: `with check <x>.wi
+--bundle-corpus tree:… --bundle-fingerprint` must reproduce the source
+pass's fingerprint, or the target fails. That check is what found the `mut`
+parameters the interface first printed without their mode.

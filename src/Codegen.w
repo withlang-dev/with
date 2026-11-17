@@ -627,7 +627,7 @@ fn Codegen.init(module_name: &str) -> Codegen:
 // Sema during emission — the caller's binding is blank in between, never
 // aliased — and hands it back via take_sema. The swap leaves a placeholder so
 // every cg teardown path (explicit deinit or scope exit) stays untouched.
-extend Codegen:
+impl Codegen:
     mut fn take_sema() -> Sema:
         let s = move self.sema
         self.sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
@@ -5585,7 +5585,7 @@ impl Codegen:
 
     fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
         let mode = (self.path_uses_module_link_names(source_path)) as i32
-        fn_abi_module_link_name(mode, source_path, base_name)
+        fn_abi_module_link_name(mode, source_path, if mode != 0: bundle_name_without_module_identity(base_name) else: base_name ++ "")
 
     // D39: the prefixes of `--link-bundle` manifests join the embedded ones,
     // so a compiler with an empty embedded index (stage1) compiles exactly
@@ -8052,6 +8052,7 @@ impl Codegen:
         // land together).
         if self.unit_total <= 1 or self.unit_index == 0:
             self.emit_module_runtime_init_helpers()
+            self.emit_bundle_initializer()
         if self.had_error != 0:
             return 1
 
@@ -8105,6 +8106,29 @@ impl Codegen:
         let panic_loc_val = self.build_str_value(wl_build_global_string_ptr(self.builder, ""), wl_const_int(i64_ty, 0, 0))
         self.emit_runtime_panic_value(panic_msg_val, panic_loc_val)
         wl_position_at_end(self.builder, ok_bb)
+
+    // Runs every queued runtime initializer, in the order
+    // emit_module_runtime_init_helpers ranked them, storing each result.
+    mut fn emit_run_module_runtime_inits():
+        for i in 0..self.module_runtime_init_fns.len():
+            let init_fn = self.module_runtime_init_fns[i]
+            let init_global = self.module_runtime_init_globals[i]
+            if init_fn == 0 or self.module_runtime_init_types[i] == 0:
+                continue
+            let init_value = wl_build_call(self.builder, wl_global_get_value_type(init_fn), init_fn, 0, 0)
+            // A `Unit` binding has no storage: its initializer ran for its effects.
+            if init_global != 0:
+                wl_build_store(self.builder, init_value, init_global)
+
+    // #3351: a tree bundle's object defines one initializer, which the
+    // program that links it calls before its own (wrap_main_for_exit); the
+    // manifest names it (`init <symbol>`).
+    mut fn emit_bundle_initializer():
+        if self.module_object_mode == 0 or not bundle_corpus_is_tree(self.bundle_corpus): return
+        let function = wl_add_function(self.llmod, bundle_init_symbol(self.bundle_corpus), wl_function_type(wl_void_type(self.context), 0, 0, 0))
+        wl_position_at_end(self.builder, wl_append_bb(self.context, function, "entry"))
+        self.emit_run_module_runtime_inits()
+        wl_build_ret_void(self.builder)
 
     mut fn wrap_main_for_exit() -> Unit:
         if self.sema.no_std != 0:
@@ -8183,17 +8207,12 @@ impl Codegen:
         let runtime_init_ft = wl_global_get_value_type(runtime_init_fn)
         wl_build_call(self.builder, runtime_init_ft, runtime_init_fn, 0, 0)
 
-        for i in 0..self.module_runtime_init_fns.len():
-            let init_fn = self.module_runtime_init_fns[i]
-            let init_ty = self.module_runtime_init_types[i]
-            let init_global = self.module_runtime_init_globals[i]
-            if init_fn == 0 or init_ty == 0:
-                continue
-            let init_ft = wl_global_get_value_type(init_fn)
-            let init_value = wl_build_call(self.builder, init_ft, init_fn, 0, 0)
-            // A `Unit` binding has no storage: its initializer ran for its effects.
-            if init_global != 0:
-                wl_build_store(self.builder, init_value, init_global)
+        // #3351: the tree bundles this program links initialize their
+        // globals first; the program's own initializers may read them.
+        let bundle_init_ft = wl_function_type(wl_void_type(self.context), 0, 0, 0)
+        for symbol in bundle_init_symbols():
+            wl_build_call(self.builder, bundle_init_ft, wl_add_function(self.llmod, symbol, bundle_init_ft), 0, 0)
+        self.emit_run_module_runtime_inits()
 
         let main_param_count = wl_count_param_types(main_ft)
         var main_call: i64 = 0

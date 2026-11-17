@@ -14,6 +14,7 @@
 use std.collections.HashMap
 use std.crypto.sha256
 use rt.rt_core
+use FnAbi
 
 var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
 
@@ -30,13 +31,47 @@ fn bundle_text_sha256(text: &str) -> str:
 fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
     if corpus.len() == 0:
         return false
-    let base = bundle_corpus_base(corpus)
-    canonical_path == base ++ ".w" or canonical_path.starts_with(base ++ "/")
+    // A tree bundle may name several directories, comma-separated.
+    for base in bundle_corpus_base(corpus).split(","):
+        if canonical_path == base ++ ".w" or canonical_path.starts_with(base ++ "/"): return true
+    false
 
-// The embedded tree a corpus lives in: the runtime's (D30 R3, `rt`) is
-// `<embedded-rt>/rt`, every migrated corpus's `<embedded-std>/<rel>`.
+// The tree a corpus lives in: the runtime's (D30 R3, `rt`) is
+// `<embedded-rt>/rt`, every migrated corpus's `<embedded-std>/<rel>`, and a
+// tree bundle's (`tree:<dir>`, #3351) the directory itself, canonical.
 fn bundle_corpus_base(corpus: &str) -> str:
-    if corpus == "rt": "<embedded-rt>/rt" else: "<embedded-std>/" ++ corpus
+    if corpus == "rt": "<embedded-rt>/rt" else if bundle_corpus_is_tree(corpus): corpus.slice(5, corpus.len()) else: "<embedded-std>/" ++ corpus
+
+// #3351: `--bundle-corpus tree:<dir>` bundles the modules of a directory of
+// one checkout (the compiler's own `src/`). It is never embedded or chosen
+// on demand: a program names it with `--link-bundle`, so the program knows
+// at compile time that it links it, and runs its initializer before its own
+// (a migrated corpus's object runs none, D38 Level 0).
+fn bundle_corpus_is_tree(corpus: &str) -> bool: corpus.starts_with("tree:")
+
+// The initializers of the tree bundles this compile links (`init <symbol>`
+// in each manifest), in `--link-bundle` order.
+var g_bundle_init_symbols: List[str] = []
+
+fn bundle_register_init_symbol(symbol: &str):
+    if not g_bundle_init_symbols.contains(symbol): g_bundle_init_symbols.push(symbol.to_owned())
+
+fn bundle_init_symbols() -> List[str]: g_bundle_init_symbols.clone()
+
+// An owner two modules of one unit both declare is `Owner$m$<path hash>` in
+// Sema (SemaDecl). A module's link names and its interface section carry
+// the module already, and name the owner as a unit that sees one of the two
+// modules does: plain.
+fn bundle_name_without_module_identity(name: &str) -> str:
+    let at = name.find("$m$")
+    if at < 0: return name ++ ""
+    var end = at + 3
+    while end < name.len() and (name[end] == '-' or (name[end] >= '0' and name[end] <= '9')): end = end + 1
+    name.slice(0, at) ++ name.slice(end, name.len())
+
+// #3351: the initializer a tree bundle's object defines, named from the
+// corpus directory as a module's functions are from its path.
+fn bundle_init_symbol(corpus: &str) -> str: fn_abi_module_link_prefix(bundle_corpus_base(corpus)) ++ "bundle_init"
 
 // `<embedded-std>/std/engines/pcre2/defs.w` → `std.engines.pcre2.defs`, `<embedded-rt>/rt/rt_core.w`
 // → `rt.rt_core`; "" for any other path.
@@ -49,6 +84,14 @@ fn bundle_module_dotted_name(canonical_path: &str) -> str:
     for i in 0..rel.len():
         out = out ++ (if rel[i] == '/': "." else: rel.slice(i, i + 1))
     out
+
+// A tree bundle's module as its tree imports it: `<dir>/compiler/Link.w` of
+// corpus directory `<dir>` is `compiler.Link`; "" outside the corpus.
+fn bundle_tree_module_dotted_name(corpus: &str, canonical_path: &str) -> str:
+    if not canonical_path.ends_with(".w"): return ""
+    for base in bundle_corpus_base(corpus).split(","):
+        if canonical_path.starts_with(base ++ "/"): return canonical_path.slice(base.len() + 1, canonical_path.len() - 2).replace("/", ".")
+    ""
 
 // The `module <path>` section paths of an interface file, in file order.
 fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
@@ -67,15 +110,23 @@ fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
 // The interface section registered for a canonical module path; "" when the
 // path is not bundle-provided.
 fn bundle_interface_text(path: &str) -> str:
-    let found = g_bundle_interface_texts.get(path)
+    let found = g_bundle_interface_texts.get(bundle_interface_key(path))
     if found.is_none():
         return ""
     with_str_clone_ref(found.unwrap())
 
+// A tree bundle's sections are named by canonical file paths (#3351), and
+// the resolver hands a file module's path as it found it (`src/Sema.w`):
+// once a tree section is registered, a file path is looked up canonical.
+var g_bundle_tree_sections: bool = false
+
+fn bundle_interface_key(path: &str) -> str:
+    if not g_bundle_tree_sections or path.starts_with("<"): path ++ "" else: codegen_canonical_module_path(path)
+
 // A path some registered interface names as a section, even an empty one
 // (a bundle root `bundle.w` holds only `use` lines).
 fn bundle_interface_registered(path: &str) -> bool:
-    g_bundle_interface_texts.contains(path)
+    g_bundle_interface_texts.contains(bundle_interface_key(path))
 
 fn bundle_interface_trim(s: &str) -> str:
     var a: i64 = 0
@@ -87,6 +138,7 @@ fn bundle_interface_trim(s: &str) -> str:
     with_str_clone_ref(s.slice(a, b))
 
 fn bundle_interfaces_register_section(path: &str, text: &str):
+    if not path.starts_with("<"): g_bundle_tree_sections = true
     g_bundle_interface_texts.insert(with_str_clone_ref(path), with_str_clone_ref(text))
 
 // Register every `module <path>` section of an interface file. Returns the
