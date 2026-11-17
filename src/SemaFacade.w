@@ -448,9 +448,11 @@ impl Sema:
     // The display name of the file a top-level declaration came from
     // (`<facade dbl>` for a rendered one), "" when unknown.
     fn facade_decl_file_name(di: i32) -> str:
-        if di < 0 or di >= self.decl_source_file_ids.len():
-            return ""
-        let file_id = self.decl_source_file_ids[di]
+        if di < 0 or di >= self.decl_source_file_ids.len(): return ""
+        self.source_text_name_of(self.decl_source_file_ids[di])
+
+    // The display name of a source file, "" when unknown.
+    fn source_text_name_of(file_id: i32) -> str:
         for si in 0..self.source_text_file_ids.len():
             if self.source_text_file_ids[si] == file_id and si < self.source_text_names.len():
                 return with_str_clone_ref(self.source_text_names[si])
@@ -468,11 +470,7 @@ impl Sema:
         if file.starts_with("<facade "): file else: ""
 
     // The display name of the file being checked.
-    fn facade_current_file_name() -> str:
-        for si in 0..self.source_text_file_ids.len():
-            if self.source_text_file_ids[si] == self.local_file_id and si < self.source_text_names.len():
-                return with_str_clone_ref(self.source_text_names[si])
-        ""
+    fn facade_current_file_name() -> str: self.source_text_name_of(self.local_file_id)
 
     // A type a facade rendered — a resource, the failed state its error
     // owns, a borrowed view, a callback-scope handle — holds foreign state

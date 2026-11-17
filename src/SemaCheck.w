@@ -1739,17 +1739,34 @@ impl Sema:
         self.note_call_arg_coercion(expected, actual, arg_node, arg_node)
         true
 
+    // §16.2b.8 (#3130): a `str` is accepted where a contract renders an
+    // input buffer: its bytes and their length are supplied, as `s as []u8`
+    // supplies them. The parameter is a read-only `[]u8` of a function the
+    // contract rendered; `[]mut u8` is storage C writes, and a `[]u8`
+    // parameter of the program's own function stays a byte slice.
+    fn str_lends_bytes_to_contract(expected: i32, actual: i32, callee_sym: i32) -> bool:
+        let exp = self.resolve_alias(expected as TypeId)
+        if self.get_type_kind(exp) != TypeKind.TY_SLICE or self.get_type_d1(exp) != 0 or self.resolve_alias(self.get_type_d0(exp) as TypeId) != self.resolve_alias(self.ty_u8 as TypeId): return false
+        var act = self.resolve_alias(actual as TypeId)
+        if self.get_type_kind(act) == TypeKind.TY_REF: act = self.resolve_alias(self.get_type_d0(act) as TypeId)
+        if self.get_type_kind(act) != TypeKind.TY_STR: return false
+        let decl = self.fn_decl_nodes.get(callee_sym) ?? 0
+        if decl == 0: return false
+        self.source_text_name_of(self.ast.file(decl as NodeId) as i32).starts_with("<facade ")
+
     // #604 stage 1: a List/array argument coerces to a []T / []mut T parameter.
     // Returns 0 when the coercion does not apply (caller emits the ordinary
     // mismatch), 1 when handled as an immutable view, 2 when handled as a `[]mut`
     // view (caller collects it for the call-local exclusivity pass). The `[]mut`
     // case demands a mutable place — the split_at_mut receiver discipline — since
     // the callee writes into the caller's collection through the view.
-    mut fn note_slice_coerce_call_arg(expected: i32, actual: i32, arg_node: i32, err_node: i32) -> i32:
+    mut fn note_slice_coerce_call_arg(expected: i32, actual: i32, arg_node: i32, err_node: i32, callee_sym: i32) -> i32:
         if arg_node <= 0:
             return 0
         if self.can_coerce_collection_to_slice(expected as TypeId, actual as TypeId) == false:
-            return 0
+            if not self.str_lends_bytes_to_contract(expected, actual, callee_sym): return 0
+            self.slice_coerce_args.insert(arg_node, SLICE_COERCE_STR_BYTES)
+            return 1
         let sc_exp = self.resolve_alias(expected as TypeId)
         let sc_is_mut = self.get_type_d1(sc_exp) != 0
         let sc_packed = self.classify_place(arg_node)
@@ -30462,7 +30479,7 @@ impl Sema:
                         let err_arg_node = if has_resolved: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                         if self.call_arg_type_compatible(expected_ty, arg_ty) == 0:
                             // #604 stage 1: List/array → []T / []mut T call-site coercion.
-                            let sc_kind = self.note_slice_coerce_call_arg(expected_ty, arg_ty, err_arg_node, if err_arg_node > 0: err_arg_node else: node)
+                            let sc_kind = self.note_slice_coerce_call_arg(expected_ty, arg_ty, err_arg_node, if err_arg_node > 0: err_arg_node else: node, fn_sym)
                             if sc_kind == 2:
                                 sc_mut_args.push(err_arg_node)
                             if sc_kind == 0:
@@ -32092,7 +32109,7 @@ impl Sema:
             let arg_node = if ai < arg_nodes.len(): arg_nodes[ai] else: call_node
             actual_ty = self.retype_literal_call_arg(arg_node, expected_ty, actual_ty)
             if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
-                let slice_kind = self.note_slice_coerce_call_arg(expected_ty, actual_ty, arg_node, if arg_node > 0: arg_node else: call_node)
+                let slice_kind = self.note_slice_coerce_call_arg(expected_ty, actual_ty, arg_node, if arg_node > 0: arg_node else: call_node, fn_sym)
                 if slice_kind == 2: slice_mut_args.push(arg_node)
                 if slice_kind == 0:
                     self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, ai, expected_ty, actual_ty, if arg_node > 0: arg_node else: call_node)
@@ -34597,7 +34614,7 @@ impl Sema:
                 let gen_method_arg = self.ast.get_extra(extra_start + ai3)
                 actual_ty = self.retype_literal_call_arg(gen_method_arg, expected_ty, actual_ty)
                 if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
-                    let sc_kind = self.note_slice_coerce_call_arg(expected_ty, actual_ty, gen_method_arg, gen_method_arg)
+                    let sc_kind = self.note_slice_coerce_call_arg(expected_ty, actual_ty, gen_method_arg, gen_method_arg, method_fn_sym)
                     if sc_kind == 2:
                         sc_mut_args.push(gen_method_arg)
                     if sc_kind == 0:
@@ -38656,7 +38673,7 @@ impl Sema:
                                 let mc_perr_arg = if mc_has_resolved_args: self.get_resolved_call_arg(node, mc_pai) else: self.ast.get_extra(extra_start + mc_pai)
                                 let mc_compat = self.call_arg_type_compatible(mc_exp_ty, mc_act_ty)
                                 if mc_compat == 0:
-                                    let mc_sc_kind = self.note_slice_coerce_call_arg(mc_exp_ty, mc_act_ty, mc_perr_arg, if mc_perr_arg > 0: mc_perr_arg else: node)
+                                    let mc_sc_kind = self.note_slice_coerce_call_arg(mc_exp_ty, mc_act_ty, mc_perr_arg, if mc_perr_arg > 0: mc_perr_arg else: node, method_fn_sym)
                                     if mc_sc_kind == 2:
                                         mc_sc_mut_args.push(mc_perr_arg)
                                     if mc_sc_kind == 0:
@@ -39198,6 +39215,16 @@ impl Sema:
                         if self.check_builtin_method_call_arg("str." ++ self.pool_resolve(field), sai, str_param_ty, arg_types[sai], sa_node) == false:
                             return 0
                 return str_builtin_ret
+        // A slice's data pointer, named as List's is (#3130). Making the
+        // pointer is safe; reading through it is `unsafe`.
+        if resolved_tk == TypeKind.TY_SLICE and mc_resolved_arg_count == 0 and (self.pool_resolve(field) == "as_ptr" or self.pool_resolve(field) == "as_mut_ptr"):
+            let wants_mut = self.pool_resolve(field) == "as_mut_ptr"
+            if wants_mut and self.get_type_d1(recv_type) == 0:
+                self.emit_error_with_help("as_mut_ptr() needs a slice that may be written: this one is read-only", node, "use as_ptr(), or take the slice as `[]mut`")
+                return 0
+            let slice_ptr = self.ensure_exact_type(TypeKind.TY_PTR, self.get_type_d0(recv_type), wants_mut as i32, 0) as i32
+            self.slice_ptr_calls.insert(node, slice_ptr)
+            return slice_ptr
         if resolved_tk == TypeKind.TY_ARRAY or resolved_tk == TypeKind.TY_SLICE:
             if primitive_len_ret != 0:
                 return primitive_len_ret
