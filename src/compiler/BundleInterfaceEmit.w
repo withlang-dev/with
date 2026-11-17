@@ -921,6 +921,12 @@ impl BundleEmitter:
                 if actual.contains(entrie):
                     continue
                 actual.push(with_str_clone_ref(entrie))
+                // #3351: a tree bundle states its writes of its own exported
+                // globals. A write of another bundle's global, reached through
+                // that bundle's functions, is not carried: its importers are
+                // the tree's own tests, which reach such a global only by
+                // importing that engine raw.
+                if self.tree and not self.corpus_global_names.contains(name): continue
                 if not declared.contains(entrie):
                     let fix = if has_clause: "add '" ++ name ++ "' to " ++ fn_name ++ "'s `writes` clause" else: "add 'writes " ++ name ++ "' to " ++ fn_name ++ "'s declaration"
                     let what = if self.origin_global_names.contains(name) and not self.global_is_pub_export(name): "global `" ++ name ++ "`, an origin of an exported function's returned view," else: "exported global `" ++ name ++ "`"

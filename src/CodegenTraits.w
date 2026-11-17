@@ -1425,6 +1425,15 @@ impl Codegen:
         gv
 
     mut fn record_module_binding_global(name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
+        // #3351: a tree bundle carries a private copy of an immutable global
+        // of a module it carries (std.crypto.sha256's round constants), as
+        // it carries that module's functions: nothing at its importer's
+        // link defines the module-named symbol. Mutable state is never
+        // copied; a reference to it stays declared and fails the bundle.
+        if is_mut == 0 and bundle_corpus_is_tree(self.bundle_corpus) and self.decl_path_is_bundle_carried(self.current_decl_source_file):
+            let carried = self.define_module_binding_global(name_sym, global_ty, init, is_mut)
+            wl_set_linkage(carried, wl_internal_linkage())
+            return carried
         if self.current_decl_is_imported_module_symbol():
             return self.declare_module_binding_global(name_sym, global_ty, is_mut)
         self.define_module_binding_global(name_sym, global_ty, init, is_mut)
