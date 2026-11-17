@@ -29,46 +29,47 @@ pub fn Source.from_file(path: &str, file_id: FileId) -> Source:
     let text = with_fs_read_file(path)
     Source.from_string(path, text, file_id)
 
-pub fn Source.line_count(self: &Self) -> i32:
-    self.line_offsets.len()
+impl Source:
+    pub fn line_count() -> i32:
+        self.line_offsets.len()
 
-pub fn Source.offset_to_location(self: &Self, offset: i32) -> SourceLocation:
-    if offset <= 0:
-        return SourceLocation { line: 0, col: 0 }
+    pub fn offset_to_location(offset: i32) -> SourceLocation:
+        if offset <= 0:
+            return SourceLocation { line: 0, col: 0 }
 
-    var clamped = offset
-    if clamped > self.text.len():
-        clamped = self.text.len()
+        var clamped = offset
+        if clamped > self.text.len():
+            clamped = self.text.len()
 
-    var lo = 0
-    var hi = self.line_offsets.len()
-    while lo < hi:
-        let mid = lo + ((hi - lo) / 2)
-        if self.line_offsets[mid] <= clamped:
-            lo = mid + 1
-        else:
-            hi = mid
+        var lo = 0
+        var hi = self.line_offsets.len()
+        while lo < hi:
+            let mid = lo + ((hi - lo) / 2)
+            if self.line_offsets[mid] <= clamped:
+                lo = mid + 1
+            else:
+                hi = mid
 
-    let line = lo - 1
-    let line_start = self.line_offsets[line]
-    SourceLocation {
-        line,
-        col: clamped - line_start,
-    }
+        let line = lo - 1
+        let line_start = self.line_offsets[line]
+        SourceLocation {
+            line,
+            col: clamped - line_start,
+        }
 
-pub fn Source.line_text(self: &Self, line: i32) -> str:
-    if line < 0 or line >= self.line_offsets.len():
-        return ""
+    pub fn line_text(line: i32) -> str:
+        if line < 0 or line >= self.line_offsets.len():
+            return ""
 
-    let start = self.line_offsets[line]
-    var end = self.text.len()
-    if line + 1 < self.line_offsets.len():
-        end = self.line_offsets[(line + 1)]
+        let start = self.line_offsets[line]
+        var end = self.text.len()
+        if line + 1 < self.line_offsets.len():
+            end = self.line_offsets[(line + 1)]
 
-    let slice = self.text.slice(start as i64, end as i64)
-    if slice.len() > 0 and slice[slice.len() - 1] == 10:
-        return slice.slice(0, (slice.len() - 1) as i64)
-    slice
+        let slice = self.text.slice(start as i64, end as i64)
+        if slice.len() > 0 and slice[slice.len() - 1] == 10:
+            return slice.slice(0, (slice.len() - 1) as i64)
+        slice
 
 fn source_compute_line_offsets(text: &str) -> List[i32]:
     var offsets: List[i32] = List.new()
