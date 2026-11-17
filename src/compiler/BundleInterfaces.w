@@ -91,15 +91,23 @@ fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
 // The interface section registered for a canonical module path; "" when the
 // path is not bundle-provided.
 fn bundle_interface_text(path: &str) -> str:
-    let found = g_bundle_interface_texts.get(path)
+    let found = g_bundle_interface_texts.get(bundle_interface_key(path))
     if found.is_none():
         return ""
     with_str_clone_ref(found.unwrap())
 
+// A tree bundle's sections are named by canonical file paths (#3351), and
+// the resolver hands a file module's path as it found it (`src/Sema.w`):
+// once a tree section is registered, a file path is looked up canonical.
+var g_bundle_tree_sections: bool = false
+
+fn bundle_interface_key(path: &str) -> str:
+    if not g_bundle_tree_sections or path.starts_with("<"): path ++ "" else: codegen_canonical_module_path(path)
+
 // A path some registered interface names as a section, even an empty one
 // (a bundle root `bundle.w` holds only `use` lines).
 fn bundle_interface_registered(path: &str) -> bool:
-    g_bundle_interface_texts.contains(path)
+    g_bundle_interface_texts.contains(bundle_interface_key(path))
 
 fn bundle_interface_trim(s: &str) -> str:
     var a: i64 = 0
@@ -111,6 +119,7 @@ fn bundle_interface_trim(s: &str) -> str:
     with_str_clone_ref(s.slice(a, b))
 
 fn bundle_interfaces_register_section(path: &str, text: &str):
+    if not path.starts_with("<"): g_bundle_tree_sections = true
     g_bundle_interface_texts.insert(with_str_clone_ref(path), with_str_clone_ref(text))
 
 // Register every `module <path>` section of an interface file. Returns the

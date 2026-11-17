@@ -513,7 +513,7 @@ impl BundleEmitter:
         let is_const = ast.is_const_decl_node(node)
         // A private global is printed only as a returned view's origin.
         let is_pub = (flags / 2) % 2 != 0
-        if not is_pub and not bundle_corpus_is_tree(self.corpus) and (is_const or not self.origin_global_names.contains(name)):
+        if not is_pub and (is_const or not self.origin_global_names.contains(name)):
             return
         let mod_path = with_str_clone_ref(self.decl_modules[di])
         self.context = mod_path ++ ": " ++ (if is_const: "const " else: "global ") ++ name
