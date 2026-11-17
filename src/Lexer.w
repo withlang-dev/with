@@ -385,6 +385,10 @@ impl Lexer:
                         self.pos = self.pos + 1
                         return TokenKind.TK_DOT_DOT_DOT
                     return TokenKind.TK_DOT_DOT
+                // `.=` (§4.2.5): method assignment, after `..=` and `..`
+                if c2 == CharCode.Eq:
+                    self.pos = self.pos + 1
+                    return TokenKind.TK_DOT_EQ
                 // .Uppercase = dot identifier
                 if c2 >= CharCode.A and c2 <= CharCode.Z:
                     return self.lex_dot_ident()

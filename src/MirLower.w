@@ -6563,6 +6563,25 @@ impl MirBuilder:
             return alias_field
         -1
 
+    // A method assignment (§4.2.5, `x .= f(args)`): the parser gives the
+    // call the target's own node as its receiver.
+    fn is_method_assign(place_expr: i32, rhs_expr: i32) -> bool:
+        if rhs_expr == 0 or self.ast.kind(rhs_expr) != NodeKind.NK_CALL: return false
+        let callee = self.ast.get_data0(rhs_expr)
+        callee != 0 and self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.ast.get_data0(callee) == place_expr
+
+    // Lowers `expr` with every read of `node` inside it taken from `place`:
+    // a place an assignment already evaluated is not evaluated again.
+    mut fn lower_expr_reading_place(node: i32, place: i32, expr: i32) -> i32:
+        let saved_node = self.pipeline_receiver_override_node
+        let saved_place = self.pipeline_receiver_override_place
+        self.pipeline_receiver_override_node = node
+        self.pipeline_receiver_override_place = place
+        let value = self.lower_expr(expr)
+        self.pipeline_receiver_override_node = saved_node
+        self.pipeline_receiver_override_place = saved_place
+        value
+
     // Whether two expressions name one place: the same node (a compound
     // assignment reuses its target node as the operator's left operand), or
     // the same local by name.
@@ -7365,15 +7384,22 @@ impl MirBuilder:
                 self.assign_operand_to_place(ip_idx_place, ip_idx_op, self.ast.get_start(place_expr))
                 var ip_val_op: i32 = 0
                 let ip_is_compound = self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr
-                if ip_is_compound:
+                // A compound store and a method assignment (`c[k] .= f()`) read
+                // the element through `get` first, with the receiver and index
+                // evaluated above.
+                if ip_is_compound or self.is_method_assign(place_expr, rhs_expr):
                     let ip_cur_ty = self.expr_type(place_expr)
                     let ip_get_args: List[i32] = []
                     ip_get_args.push(self.index_place_borrowed_receiver(ip_recv_place, ip_recv_expr_ty, ip_get_sig, self.ast.get_start(place_expr)))
                     ip_get_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                     let ip_cur_val = self.lower_resolved_call_with_operand_args_contract(ip_get_fn, ip_get_args, ip_cur_ty, place_expr, ip_get_sig, ip_get_mono)
-                    let ip_ca_op = self.ast.get_data0(rhs_expr)
-                    let ip_inc_val = self.lower_expr(self.ast.get_data2(rhs_expr))
-                    ip_val_op = self.lower_bin_op_operand(ip_ca_op, ip_cur_val, ip_inc_val, ip_cur_ty, self.ast.get_start(place_expr))
+                    if ip_is_compound:
+                        let ip_ca_op = self.ast.get_data0(rhs_expr)
+                        let ip_inc_val = self.lower_expr(self.ast.get_data2(rhs_expr))
+                        ip_val_op = self.lower_bin_op_operand(ip_ca_op, ip_cur_val, ip_inc_val, ip_cur_ty, self.ast.get_start(place_expr))
+                    else:
+                        let ip_cur_place = self.materialize_operand(ip_cur_val, ip_cur_ty, self.ast.get_start(place_expr))
+                        ip_val_op = self.lower_expr_reading_place(place_expr, ip_cur_place, rhs_expr)
                 else:
                     ip_val_op = self.lower_expr(rhs_expr)
                 let ip_args: List[i32] = []
@@ -7423,7 +7449,8 @@ impl MirBuilder:
         let rhs_move_temp_start = self.pending_move_temp_locals.len()
         if dest_ty != 0 and dest_ty != self.sema.ty_void:
             self.expected_type = dest_ty
-        let rhs = self.lower_expr(rhs_expr)
+        // `x .= f(args)`: the call's receiver is this place, evaluated above.
+        let rhs = if self.is_method_assign(place_expr, rhs_expr): self.lower_expr_reading_place(place_expr, place, rhs_expr) else: self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
         self.finish_assignment_to_place(place_expr, place, dest_ty, rhs, rhs_reset_start, rhs_field_reset_start, rhs_move_temp_start)
         if read_back != 0: self.read_assigned_place(place_expr, place, read_back) else: -1

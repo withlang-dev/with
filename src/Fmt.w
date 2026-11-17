@@ -54,6 +54,7 @@ fn is_assign_op(tag: i32) -> bool:
     if tag == TokenKind.TK_GT_GT_EQ: return true
     if tag == TokenKind.TK_PLUS_WRAP_EQ: return true
     if tag == TokenKind.TK_MINUS_WRAP_EQ: return true
+    if tag == TokenKind.TK_DOT_EQ: return true
     false
 
 fn is_open_delim(tag: i32) -> bool:

@@ -4138,6 +4138,19 @@ impl Parser:
             let bin = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), cop, lhs, rhs)
             return self.pool.add_node(NodeKind.NK_ASSIGN, self.pool.get_start(lhs), self.prev_end(), lhs, bin, 0)
 
+        // Method assignment (§4.2.5, #924): `x .= f(args)` is `x = x.f(args)`.
+        // The call's receiver is the target's own node, as a compound
+        // assignment's left operand is, so the place is evaluated once.
+        if self.peek() == TokenKind.TK_DOT_EQ:
+            self.advance()
+            let method = self.expect_ident_or_keyword()
+            let member = self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, method, 0)
+            if self.peek() != TokenKind.TK_L_PAREN:
+                self.emit_error("expected '(' after the method name: `x .= f(args)` assigns `x.f(args)` to `x`")
+                return self.poisoned_expr()
+            let call = self.parse_call(member)
+            return self.pool.add_node(NodeKind.NK_ASSIGN, self.pool.get_start(lhs), self.prev_end(), lhs, call, 0)
+
         lhs
 
     fn compound_assign_op() -> i32: parser_compound_assign_op(self.peek())
