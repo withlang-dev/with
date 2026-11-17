@@ -29,6 +29,13 @@ fn ci_make_indent(n: i32) -> str:
         i = i + 1
     out
 
+// The end of a migrated `do … while` (§13.5b, §13.5c). A condition that
+// needs statements first is a block whose value is the condition, so a
+// `continue` runs them too, as C's does.
+fn ci_do_while_tail(indent: &str, depth: i32, setup_text: &str, cond_text: &str) -> str:
+    if setup_text.len() == 0: return indent ++ "} while " ++ cond_text ++ "\n"
+    indent ++ "} while {\n" ++ setup_text ++ ci_make_indent(depth + 4) ++ cond_text ++ "\n" ++ indent ++ "}\n"
+
 // Prepend `spaces` spaces to non-empty lines of `text`.
 //
 // The bare `\n` separators that CIS_BLOCK inserts between children
@@ -388,21 +395,17 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
         let body = (stmts.get_d0(id)) as CiStmtId
         let cond = (stmts.get_d1(id)) as CiExprId
         let cond_setup = (stmts.get_d2(id)) as CiStmtId
-        var out = indent ++ "loop {\n"
+        // §13.5b: C's `do { … } while (cond)` is With's `do … while cond`;
+        // `continue` reaches the condition in both.
+        var out = indent ++ "do {\n"
         let body_text = ci_print_compact_stmt_local(stmts, exprs, types, body, depth + 4)
         if body_text.len() > 0:
             out = out ++ body_text
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         let cond_text = ci_print_expr(exprs, types, cond, 0, 0)
-        if (cond_setup as i32) != 0:
-            out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, cond_setup, depth + 4)
-        let inner_indent = ci_make_indent(depth + 4)
-        out = out ++ inner_indent ++ "if not (" ++ cond_text ++ ") {\n"
-        out = out ++ inner_indent ++ "    break\n"
-        out = out ++ inner_indent ++ "}\n"
-        out = out ++ indent ++ "}\n"
-        return out
+        let setup_text = if (cond_setup as i32) != 0: ci_print_compact_stmt_local(stmts, exprs, types, cond_setup, depth + 4) else: ""
+        return out ++ ci_do_while_tail(indent, depth, setup_text, cond_text)
 
     if kind == CiStmtKind.CIS_VAR_DECL:
         let name_sym = stmts.get_d0(id)
@@ -1229,21 +1232,15 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
         let body = (stmts.get_d0(id)) as CiStmtId
         let cond = (stmts.get_d1(id)) as CiExprId
         let cond_setup = (stmts.get_d2(id)) as CiStmtId
-        var out = indent ++ "loop {\n"
+        var out = indent ++ "do {\n"
         let body_text = ci_print_stmt(stmts, exprs, types, body, 0)
         if body_text.len() > 0:
             out = out ++ ci_reindent_spaces(body_text, 4)
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         let cond_text = ci_print_expr(exprs, types, cond, 0, 0)
-        if (cond_setup as i32) != 0:
-            let setup_text = ci_print_stmt(stmts, exprs, types, cond_setup, 0)
-            out = out ++ ci_reindent_spaces(setup_text, 4)
-        out = out ++ ci_make_indent(depth + 4) ++ "if not (" ++ cond_text ++ ") {\n"
-        out = out ++ ci_make_indent(depth + 8) ++ "break\n"
-        out = out ++ ci_make_indent(depth + 4) ++ "}\n"
-        out = out ++ indent ++ "}\n"
-        return out
+        let setup_text = if (cond_setup as i32) != 0: ci_reindent_spaces(ci_print_stmt(stmts, exprs, types, cond_setup, 0), 4) else: ""
+        return out ++ ci_do_while_tail(indent, depth, setup_text, cond_text)
 
     if kind == CiStmtKind.CIS_FOR:
         return indent ++ "<ci:unimpl:FOR>\n"

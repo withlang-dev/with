@@ -7498,71 +7498,6 @@ impl CiStmtPool:
             return stmt_id
         stmt_id
 
-    fn do_continue_runs_cond_ir(stmt_id: CiStmtId, cond_setup_id: CiStmtId, cond_id: CiExprId) -> CiStmtId:
-        if stmt_id == 0 or cond_id == 0:
-            return stmt_id
-        let kind = self.kind(stmt_id)
-        if kind == CiStmtKind.CIS_CONTINUE:
-            let cond_continue = self.continue_()
-            let cond_break = self.break_()
-            let cond_branch = self.if_stmt(cond_id, cond_continue, cond_break)
-            return self.merge_ir( cond_setup_id, cond_branch)
-        if kind == CiStmtKind.CIS_BLOCK:
-            let extra_start = self.get_d0(stmt_id)
-            let count = self.get_d1(stmt_id)
-            let rewritten_ids: List[i32] = []
-            var i: i32 = 0
-            while i < count:
-                let child_id = (self.get_extra(extra_start + i)) as CiStmtId
-                let rewritten = self.do_continue_runs_cond_ir(child_id, cond_setup_id, cond_id)
-                rewritten_ids.push(rewritten as i32)
-                i = i + 1
-            let new_start = self.extra_len()
-            var ri: i64 = 0
-            while ri < rewritten_ids.len():
-                self.add_extra(rewritten_ids[ri])
-                ri = ri + 1
-            return self.block(new_start, count)
-        if kind == CiStmtKind.CIS_IF:
-            let test_id = (self.get_d0(stmt_id)) as CiExprId
-            let then_id = (self.get_d1(stmt_id)) as CiStmtId
-            let else_id = (self.get_d2(stmt_id)) as CiStmtId
-            let rewritten_then = self.do_continue_runs_cond_ir(then_id, cond_setup_id, cond_id)
-            var rewritten_else: CiStmtId = 0
-            if else_id != 0:
-                rewritten_else = self.do_continue_runs_cond_ir(else_id, cond_setup_id, cond_id)
-            return self.if_stmt(test_id, rewritten_then, rewritten_else)
-        if kind == CiStmtKind.CIS_MATCH:
-            let subject_id = self.get_d0(stmt_id)
-            let arms_start = self.get_d1(stmt_id)
-            let arm_count = self.get_d2(stmt_id)
-            let rewritten_records: List[i32] = []
-            var cursor = arms_start
-            var ai: i32 = 0
-            while ai < arm_count:
-                let value_count = self.get_extra(cursor)
-                rewritten_records.push(value_count)
-                cursor = cursor + 1
-                var vi: i32 = 0
-                while vi < value_count:
-                    rewritten_records.push(self.get_extra(cursor))
-                    cursor = cursor + 1
-                    vi = vi + 1
-                let body_id = (self.get_extra(cursor)) as CiStmtId
-                cursor = cursor + 1
-                let rewritten_body = self.do_continue_runs_cond_ir(body_id, cond_setup_id, cond_id)
-                rewritten_records.push(rewritten_body as i32)
-                ai = ai + 1
-            let new_start = self.extra_len()
-            var ri: i64 = 0
-            while ri < rewritten_records.len():
-                self.add_extra(rewritten_records[ri])
-                ri = ri + 1
-            return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
-        if kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE or kind == CiStmtKind.CIS_FOR:
-            return stmt_id
-        stmt_id
-
 impl CiExprPool:
     fn default_expr_from_text(default_text: &str) -> CiExprId:
         if default_text.len() == 0:
@@ -14642,10 +14577,10 @@ impl CiStmtPool:
                 let prepared_cond = self.prepare_stmt_condition_ir(session, cond_cursor, exprs, types, scope)
                 if ci_value_ir_valid(prepared_cond):
                     ci_trace_port("STRUCTURAL[b11.1.do_stmt_ir]")
-                    var body_id = self.lower_stmt_ir(session, body_cursor, exprs, types, 0, scope)
-                    if body_id != 0:
-                        body_id = self.do_continue_runs_cond_ir(body_id, prepared_cond.setup_stmt, prepared_cond.value_expr)
-                        return self.do_while_stmt(body_id, prepared_cond.value_expr, prepared_cond.setup_stmt)
+                    // §13.5b: the body's `continue` reaches the condition in
+                    // With's `do … while` as in C's; it is not rewritten.
+                    let body_id = self.lower_stmt_ir(session, body_cursor, exprs, types, 0, scope)
+                    if body_id != 0: return self.do_while_stmt(body_id, prepared_cond.value_expr, prepared_cond.setup_stmt)
 
         // Compound statement with gotos. Lower the whole function body
         // to a CFG, recover structured control with std.cfg.stackify,
