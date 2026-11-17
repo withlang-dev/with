@@ -16,6 +16,7 @@ use build.sdk
 use build.source_fetch
 use build.wo
 use build.rt_bundle
+use build.compiler_bundle
 use build.examples
 use build.sema_order
 use build.tools_lane
@@ -120,6 +121,30 @@ fn rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str, host_runti
     target = target.write_scope("out/command/" ++ name)
     target = target.timeout(1800000)
     target.dep(build_owned_text(dep))
+
+let COMPILER_BUNDLE_DIR = "out/compiler-bundle"
+
+fn compiler_bundle_target() -> Target:
+    let compiler = release_compiler_bin("with")
+    var target = target_new(.Action, "compiler-bundle", "").output(COMPILER_BUNDLE_DIR ++ "/compiler.o")
+    target.action = run_compiler_bundle_action
+    target = target.compiler(compiler)
+    target = target.input(compiler)
+    target = target.arg("compiler=" ++ compiler)
+    target = target.arg("dir=" ++ COMPILER_BUNDLE_DIR)
+    target = target.input("src")
+    target = target.input("out/gen/compiler")
+    target = target.input("build/compiler_bundle.w")
+    target = target.extra_output(COMPILER_BUNDLE_DIR ++ "/compiler.wi")
+    target = target.extra_output(COMPILER_BUNDLE_DIR ++ "/compiler.manifest")
+    target = target.write_scope(COMPILER_BUNDLE_DIR)
+    target = target.write_scope("out/command/compiler-bundle")
+    target = target.timeout(1800000)
+    target.dep("build")
+
+// A test lane whose files import the compiler's modules links their bundle.
+fn links_compiler_bundle(lane: Target) -> Target:
+    lane.arg("--link-bundle").arg(COMPILER_BUNDLE_DIR ++ "/compiler").input(COMPILER_BUNDLE_DIR ++ "/compiler.o").dep("compiler-bundle")
 
 // The runtime bundle as the `wo_rt_*` blobs of an embed target.
 fn target_with_rt_bundle_blobs(target: Target, dir: &str, dep: &str) -> Target:
@@ -4623,11 +4648,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     native_phase_tests = native_phase_tests.dep("build")
     out = out.add_target(native_phase_tests)
 
+    // #3351: the compiler's modules, compiled once; the two internals lanes
+    // link it instead of compiling the compiler into every test.
+    out = out.add_target(compiler_bundle_target())
+
     var internals_tests = test_lane(.Test, "internals-tests", "test/internals/*.w")
     internals_tests = internals_tests.allow_parallel()
     internals_tests = internals_tests.arg("compiler=" ++ release_compiler_bin("with"))
     internals_tests = internals_tests.dep("build")
-    out = out.add_target(internals_tests)
+    out = out.add_target(links_compiler_bundle(internals_tests))
 
     // #3231: a test that imports a compiler module compiles all of the
     // compiler (10,616 bodies; 106 s alone on an 18-core host). Beside the
@@ -4639,7 +4668,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     internals_compiler_tests = internals_compiler_tests.arg("compiler=" ++ release_compiler_bin("with"))
     internals_compiler_tests = internals_compiler_tests.dep("build")
     for lane in "behavior-tests native-compile-error-tests native-codegen-tests native-spec-tests native-phase-tests internals-tests debug-alloc-tests d-acceptance-tests".split(" "): internals_compiler_tests = internals_compiler_tests.dep(lane)
-    out = out.add_target(internals_compiler_tests)
+    out = out.add_target(links_compiler_bundle(internals_compiler_tests))
 
     var lexer_tests = test_lane(.Test, "lexer-tests", "test/lexer/*.w")
     lexer_tests = lexer_tests.allow_parallel()
