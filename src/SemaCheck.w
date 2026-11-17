@@ -5442,6 +5442,7 @@ impl Sema:
         let tasks_node = self.global_race_concurrency_node
         let tasks_file = self.global_race_concurrency_file
         let tasks_reason = with_str_clone_ref(self.global_race_concurrency_reason)
+        self.validate_rewritten_domain_view_calls(tasks, tasks_node, tasks_file, tasks_reason)
         self.global_race_concurrency_node = 0
         let proof_failed = self.resolve_global_race_concurrency()
         let any_node = self.global_race_concurrency_node
@@ -20288,7 +20289,52 @@ impl Sema:
         self.record_call_view_origins_args(call_node, sig_idx, param_offset == 1, args)
         let fx = self.facade_call_effect_for(sig_idx)
         if fx >= 0:
+            self.note_rewritten_domain_view_call(fx, call_node)
             self.facade_apply_call_touches(fx, call_node, sig_idx, param_offset, recv_node, extra_start, arg_count, has_resolved)
+
+    // #3127 (§16.2b.7): a call whose result is a view of a process domain
+    // the call does not preserve rewrites the state it hands a view of: a
+    // function returning its own static buffer. That is a C global with a
+    // function in front of it, and it follows the global's rule (§16.3):
+    // safe where every call into the library is provably on one thread and
+    // the library's contract says `runs no threads`; otherwise the call is
+    // raw. A thread domain's buffer is each thread's own. The rendering's
+    // own call of the C function is not the program's.
+    mut fn note_rewritten_domain_view_call(fx: i32, call_node: i32):
+        let domain = self.facade_call_effects[fx].borrow_domain
+        if domain < 0 or self.current_file_is_generated("<facade "): return
+        if self.pool_resolve(self.facade_domain_list[domain].kind) != "process": return
+        if not self.facade_call_effects[fx].touch_domains.contains(domain): return
+        self.rewritten_view_calls.push(RewrittenViewCall { node: call_node, file: self.local_file_id, fn_sym: self.facade_call_effects[fx].fn_sym, domain, in_unsafe: self.in_unsafe })
+
+    // What the contract of the library that declares the C function says
+    // of its threads: 2 `runs no threads`, 1 `runs threads`, 0 neither.
+    fn c_function_library_threads(fn_sym: i32) -> i32:
+        let file = self.source_text_name_of(self.facade_fn_file(fn_sym))
+        if file.starts_with("<c_import ") and file.ends_with(">"): self.facade_thread_headers.get(file.slice(10, file.len() - 1)).copied() ?? 0 else: 0
+
+    mut fn validate_rewritten_domain_view_calls(tasks: bool, tasks_node: i32, tasks_file: i32, tasks_reason: &str):
+        // #3239: with tasks in the program, the library is still on one
+        // thread when everything that reaches it runs only on `main`'s path.
+        let calls = self.rewritten_view_calls
+        for c in calls:
+            if c.in_unsafe != 0: continue
+            let fn_sym = c.fn_sym
+            let threads = self.c_function_library_threads(fn_sym)
+            let off_main = if tasks: self.c_library_off_main_reason(self.source_text_name_of(self.facade_fn_file(fn_sym))) else: ""
+            if off_main.len() == 0 and threads == 2: continue
+            let node = c.node
+            let span = Span { file: c.file, start: self.ast.get_start(node), end: self.ast.get_end(node) }
+            let fname = self.pool_resolve(fn_sym)
+            let dname = self.pool_resolve(self.facade_domain_list[c.domain].name)
+            let diag = Diagnostic.err(f"E0921: call of `{fname}` may race: it returns a view of `{dname}`, state the call itself rewrites; it is safe when every call into the library is on one thread and its contract says `runs no threads`, or inside `unsafe`", span)
+            diag.add_label(span, "each call rewrites what this view reads")
+            if off_main.len() > 0:
+                diag.add_label(Span { file: tasks_file, start: self.ast.get_start(tasks_node), end: self.ast.get_end(tasks_node) }, f"program may run concurrently here ({tasks_reason})")
+                diag.add_note(off_main)
+            if threads != 2: diag.add_note(if threads == 1: "its library's contract says `runs threads`: the library may make the call at any time" else: "its library's contract does not say `runs no threads` (§31.6.2: no default grant)")
+            diag.add_help("call it on the one thread that calls the library, or assert with `unsafe`")
+            self.diags.emit(diag)
 
     // The result of the call `call_node` views what the signature's
     // escape_view parameters' arguments view. `args` is the argument node

@@ -677,6 +677,8 @@ type RaceEvidence {
 // global, each with the function it is in (0: top level) and its site.
 type RaceEdge { from: i32, to: i32, node: i32 }
 type RaceAccess { sym: i32, node: i32, fn_sym: i32 }
+// #3127: a call that returns a view of a process domain it rewrites.
+type RewrittenViewCall { node: i32, file: i32, fn_sym: i32, domain: i32, in_unsafe: i32 }
 
 // D66 retained variadic pairs (#1652, §16.2b.9): what one operation of a
 // resource that has a callback pair does to that pair, keyed by the concrete
@@ -1415,6 +1417,10 @@ type Sema {
     global_race_access_kinds: List[i32],
     global_race_access_unsafe: List[i32],
     race_accesses: List[RaceAccess],                       // every recorded access, with the function it is in
+    // #3127 (§16.2b.7): calls that return a view of a process domain the
+    // call itself rewrites (it does not state `preserves domain D`): the
+    // node, its file, the C function, and whether it sat in `unsafe`.
+    rewritten_view_calls: List[RewrittenViewCall],
     global_race_mutated_syms: HashMap[i32, i32, Minted],
     global_race_mutation_nodes: HashMap[i32, i32, Minted],
     // #2369: a mutable global some body rebinds whole (`G = value`), with
@@ -4022,6 +4028,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         global_race_access_kinds: List.new(),
         global_race_access_unsafe: List.new(),
         race_accesses: [],
+        rewritten_view_calls: [],
         global_race_mutated_syms,
         global_race_mutation_nodes,
         global_rebind_sites: sema_new_map_i32_str(),

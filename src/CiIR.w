@@ -1220,6 +1220,9 @@ type CiProject {
     // producer, destroyer, borrow, lend and consumer it named), so the
     // facade `with get` writes can import the headers that declare them.
     presented: List[i32],
+    // #3127: the contract the draft is written under; a function that
+    // returns its own static buffer borrows from the domain of that name.
+    draft_name: str,
     // D121 step 5: the units `with get` could not read, each with the
     // parser's reason; the report names them (a function only an unread
     // unit defines stays raw, and the reader learns why).
@@ -1260,6 +1263,7 @@ fn CiProject.new -> CiProject:
         identity_records: HashMap.new(),
         free_aliases: List.new(),
         presented: List.new(),
+        draft_name: "",
         unread: List.new(),
         scan_problem: "",
         records: HashMap.new(),
