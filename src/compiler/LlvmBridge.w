@@ -1357,7 +1357,9 @@ fn wl_build_call(b: i64, fn_ty: i64, fn_val: i64, args_ptr: i64, cnt: isize) -> 
         let target_kind = if fn_val == 0: LLVM_UndefValueValueKind else: LLVMGetValueKind(fn_val as *mut u8)
         if target_kind == LLVM_UndefValueValueKind or target_kind == LLVM_PoisonValueValueKind or target_kind == LLVM_ConstantPointerNullValueKind:
             eprint("internal compiler error: BUG: codegen built a call whose target is undefined (#1119)")
-            abort()
+            // The exit a panic makes, on every platform: `abort()` is
+            // 0xC0000409 on Windows, and the test of this line reads 134.
+            with_exit(134)
         let args = if cnt > 0: args_ptr as *const *mut u8 else: 0 as *const *mut u8
         let call = LLVMBuildCall2(b as *mut u8, fn_ty as *mut u8, fn_val as *mut u8, args, cnt as u32, empty_cstr())
         if LLVMIsAFunction(fn_val as *mut u8) != null:

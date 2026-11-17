@@ -5586,6 +5586,26 @@ fn bs_check_migrate_c99_math(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-c99-math", ["run", bs_abs(root, out_w)])
     run.rc
 
+// #3371 (C99 7.12.14): under clang, glibc spells the six comparison macros
+// as GNU statement expressions (it keeps the builtins for gcc), so a Linux
+// migration of `isgreater(a, b)` met a construct the migrator does not
+// translate as a value, and no other host's header shows it. The fixture
+// defines glibc's own spelling, so every host runs the Linux path.
+fn bs_check_migrate_glibc_comparison_macros(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "glibc_compare.c")
+    let out_w = bs_join(case_dir, "glibc_compare.w")
+    var rc = bs_write_fixture(ctx, src, "#include <math.h>\n#undef isgreater\n#undef isgreaterequal\n#undef isless\n#undef islessequal\n#undef islessgreater\n#undef isunordered\n#define isgreater(x, y) (__extension__ ({ __typeof__ (x) __x = (x); __typeof__ (y) __y = (y); !isunordered (__x, __y) && __x > __y; }))\n#define isgreaterequal(x, y) (__extension__ ({ __typeof__ (x) __x = (x); __typeof__ (y) __y = (y); !isunordered (__x, __y) && __x >= __y; }))\n#define isless(x, y) (__extension__ ({ __typeof__ (x) __x = (x); __typeof__ (y) __y = (y); !isunordered (__x, __y) && __x < __y; }))\n#define islessequal(x, y) (__extension__ ({ __typeof__ (x) __x = (x); __typeof__ (y) __y = (y); !isunordered (__x, __y) && __x <= __y; }))\n#define islessgreater(x, y) (__extension__ ({ __typeof__ (x) __x = (x); __typeof__ (y) __y = (y); !isunordered (__x, __y) && __x != __y; }))\n#define isunordered(x, y) (__extension__ ({ __typeof__ (x) __u = (x); __typeof__ (y) __v = (y); __u != __v && (__u != __u || __v != __v); }))\nstatic double zero = 0.0;\nint main(void) {\n  double nan = zero / zero;\n  if (!isgreater(2.0, 1.0) || isgreater(nan, 1.0) || !isgreaterequal(2.0, 2.0) || isgreaterequal(1.0, nan)) return 1;\n  if (!isless(1.0, 2.0) || isless(nan, nan) || !islessequal(2.0, 2.0) || islessequal(nan, 2.0)) return 2;\n  if (!islessgreater(1.0, 2.0) || islessgreater(2.0, 2.0) || islessgreater(nan, 2.0)) return 3;\n  if (!isunordered(nan, 1.0) || isunordered(1.0, 2.0) || !isless(1.0f, 2.0)) return 4;\n  int both = isgreater(3.0, 2.0) + isless(2.0, 3.0);\n  return both == 2 ? 0 : 5;\n}\n", "migrate glibc comparison macros")
+    if rc != 0: return rc
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-glibc-comparison-macros", ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)])
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "isunordered(", "glibc comparison macros: the libc function by name")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "__x", "glibc comparison macros: the macro's operand copies are not translated")
+    if rc != 0: return rc
+    bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-glibc-comparison-macros", ["run", bs_abs(root, out_w)]).rc
+
 fn bs_check_migrate_offsetof(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "offsetof.c")
@@ -6767,6 +6787,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_offsetof(ctx, compiler_path, bs_join(output_dir, "offsetof"))
     if rc != 0: return rc
     rc = bs_check_migrate_c99_math(ctx, compiler_path, bs_join(output_dir, "c99_math"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_glibc_comparison_macros(ctx, compiler_path, bs_join(output_dir, "glibc_compare"))
     if rc != 0: return rc
     rc = bs_check_migrate_d119_arrays(ctx, compiler_path, bs_join(output_dir, "d119_arrays"))
     if rc != 0: return rc
