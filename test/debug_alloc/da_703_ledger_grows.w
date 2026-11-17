@@ -1,10 +1,10 @@
-//! only-on: darwin
-//! expect-debug-alloc: debug-alloc: first free (innermost first
+//! expect-debug-alloc: size=64 origin=with_alloc first_drop=<untagged> second_drop=<untagged>
 // #703: the ledger doubles when it is half full, and every entry moves with
 // its history. `first` is recorded while the table has 65,536 slots; the
 // 200,000 blocks held beside it grow the table three times. Freed twice
-// afterwards, `first` is still found: the double free names the first
-// free's chain, which the moved entry carries.
+// afterwards, `first` is still found, and the double free states its size
+// and origin, which only the moved entry holds. (Every platform prints that
+// line; the first free's calling chain, Darwin's, is da_1014's.)
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut c_void)
 fn main:
