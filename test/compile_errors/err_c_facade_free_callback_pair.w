@@ -1,4 +1,5 @@
 //! expect-check-fail: a callback given with no userdata
+//! expect-check-fail: = help: pass the userdata the callback receives, or None for both
 
 use c_import("static inline int apply(int (*visit)(void *, int), void *ctx) { return visit ? visit(ctx, 7) : -1; }")
 

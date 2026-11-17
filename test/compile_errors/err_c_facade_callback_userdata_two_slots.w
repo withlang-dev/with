@@ -1,4 +1,5 @@
 //! expect-check-fail: has 2 'void *' parameter(s); a callback receiving userdata has exactly one
+//! expect-check-fail: = help: leave the function raw: a callback with no 'void *' parameter, or several, has no form (#3178)
 
 // D51 stage 9 (spec §16.2b.9): the userdata arrives in the callback's one
 // `void *` parameter; a callback with two is not paired (which one would

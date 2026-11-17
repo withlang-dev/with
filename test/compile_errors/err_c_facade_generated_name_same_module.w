@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Database' renders 'FailedDatabase', the type of a resource a failed producer still produced, and
+//! expect-check-fail: = help: rename the resource or the handle; the C record keeps its name
 
 // D51 stage 5 (Eric, 2026-09-23, on #1426): `ok` over an out-parameter
 // producer renders `<R>Error` and `Failed<R>` beside the resource. A type of

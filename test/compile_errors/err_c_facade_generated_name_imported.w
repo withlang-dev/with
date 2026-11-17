@@ -1,4 +1,5 @@
 //! expect-check-fail: errors.w:4:1 declares a type 'DatabaseError', which this module imports
+//! expect-check-fail: = help: rename the resource or the handle; the C record keeps its name
 
 // D51 stage 5 (Eric, 2026-09-23, on #1426): `ok` renders `<R>Error` beside
 // the resource. When the facade's module already sees a type of that name

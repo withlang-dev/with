@@ -1,4 +1,5 @@
 //! expect-check-fail: a retained pointer case keeps the caller's storage past the call, and a 'str' is copied to a C string that dies at the return
+//! expect-check-fail: = help: state '&CString' (an owned C string the caller binds to a local that outlives the retention: 'let body = s.to_cstring()?'), '&CStr', or '&[u8]' / '&str' with 'length param CONST as T' when C reads the bytes to a length
 
 // D194 (spec §16.2b.5, §16.3c): a `str` by value in a retained case is a
 // call-scoped C string; the refusal names the owned form to bind instead.

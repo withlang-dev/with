@@ -1,4 +1,5 @@
 //! expect-check-fail: is not a pointer to the representation
+//! expect-check-fail: = help: after 'out param' name the parameter C stores the new pointer through: 'from <fn>(out param N)', N a 'T **'
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

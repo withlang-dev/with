@@ -1,4 +1,5 @@
 //! expect-check-fail: 'drop db_close_how' takes 2 parameters; the drop operation takes only the representation
+//! expect-check-fail: = help: write 'destroys db_close_how' and name a one-parameter function as 'drop'
 
 // D51 §16.2b.3 stage 4a: Drop can pass nothing but the representation, so a
 // `drop` operation with further parameters is rejected at the resource; an

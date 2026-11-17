@@ -1,5 +1,6 @@
 //! expect-check-fail: 'lib_use_other' assigns 'engine_release', the global a destroyer clause names: a function that assigns it stays raw, and a contract cannot describe it
 //! expect-check-fail: 'lib_reset' assigns 'engine_release', the global a destroyer clause names
+//! expect-check-fail: = help: delete the 'fn lib_use_other' item
 
 // §31.8.6: a function that assigns the global a `drop` names stays raw
 // whatever a contract says of its parameters: nothing safe code can call

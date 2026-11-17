@@ -1,4 +1,5 @@
 //! expect-check-fail: 'ok Z_OK' compares an integer status, but 'init z_init' returns f64
+//! expect-check-fail: = help: delete 'ok': it compares the integer an initializer returns
 
 // D51 stage 5, spec §16.2b.4/§16.2b.13: an in-place initializer's `ok`
 // compares its status with an imported integer constant, so the status is

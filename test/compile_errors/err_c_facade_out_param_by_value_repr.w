@@ -1,4 +1,5 @@
 //! expect-check-fail: which is initialized to NULL and inspected after the call; 'Texture' wraps Tex, which has no NULL
+//! expect-check-fail: = help: a resource C initializes in caller storage is produced in place: 'init tex_load(self)'
 
 // D51 stage 5, ruling §16, spec §16.2b.4/§16.2b.13: out-parameter
 // production initializes the slot to NULL and inspects it after the call, so

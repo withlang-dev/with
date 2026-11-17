@@ -1,4 +1,5 @@
 //! expect-check-fail: 'release' does not take the representation as its first parameter
+//! expect-check-fail: = help: 'from' names a function that returns what 'Hook' wraps; when it stores it through a parameter, write 'from hook_new(out param N)'
 
 // Ruling §61 (Eric, 2026-09-22): a `void *` destroyer accepts object pointer
 // representations only. A function pointer does not convert to `void *` in

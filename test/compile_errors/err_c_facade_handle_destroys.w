@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'ctx_free': 'destroys' is stated by the resource, not by the fn item
+//! expect-check-fail: = help: write 'destroys ctx_free' under the resource it destroys, and delete this line
 
 // Spec §16.2b.9 (ruling Amendment 1, #1611): "Nothing produces or destroys
 // it" — an operation of a handle is a lend of it, never a destroyer. Since

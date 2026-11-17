@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Database' is a type the facade renders, and only its rendering makes one
+//! expect-check-fail: = help: obtain it from the facade — its constructor, or the callback C invokes; raw access is the representation under the raw C rules (`unsafe`)
 
 // Spec §16.2b.3: a resource is produced by its producers, and its Drop
 // destroys what they produced. A literal over a pointer the program chose

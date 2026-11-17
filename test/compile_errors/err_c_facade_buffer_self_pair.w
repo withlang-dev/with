@@ -1,4 +1,5 @@
 //! expect-check-fail: with itself; a pairing names the pointer and the distinct integer
+//! expect-check-fail: = help: 'buffer param 0 len param N', with N the integer parameter that carries the length
 
 // D64 §16.2b.8: both parameters of a pairing exist and are distinct.
 use c_import("static inline int sum_bytes(const unsigned char *p, unsigned long n) { if (n > 0) return p[0]; return 0; }\n")

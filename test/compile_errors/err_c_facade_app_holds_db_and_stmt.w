@@ -1,4 +1,5 @@
 //! expect-check-fail: help: borrow the parent instead of owning it, so App lives no longer than it: `type App ephemeral { db: &Database, stmt: Statement }`
+//! expect-check-fail: = help: borrow the parent instead of owning it, so App lives no longer than it: `type App ephemeral { db: &Database, stmt: Statement }`; or keep the 'Statement' in a local declared after its parent
 
 // D51 stage 6 (ruling §30): a type holding a database and a statement that
 // borrows from it is a self-referential layout; the fix that compiles is

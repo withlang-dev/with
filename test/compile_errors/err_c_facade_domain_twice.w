@@ -1,4 +1,5 @@
 //! expect-check-fail: domain 'errno' is declared twice (§16.2b.7)
+//! expect-check-fail: = help: delete one of the two declarations, or rename it if it is a different state
 
 // Ruling §35 merges a domain two facades declare; one facade declaring it
 // twice is a duplicate, not a merge.

@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'note_pure' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)
+//! expect-check-fail: = help: delete one of the two 'fn note_pure' items, or make their clauses identical
 
 // One function has one contract: a second block may restate it word for
 // word (behav_c_facade_fn_restated), never with different clauses.

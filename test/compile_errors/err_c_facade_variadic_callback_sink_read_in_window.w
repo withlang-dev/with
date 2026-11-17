@@ -1,4 +1,5 @@
 //! expect-check-fail: cannot read `total` while `sink` is a live mutating view into it
+//! expect-check-fail: = help: capture only values that are Send and Sync (an Atomic, a Mutex, a channel), or pass them as the userdata
 
 // D66 (spec §16.2b.9 "Retained borrows"): the userdata a setter installs
 // is held by the handle until its last callback-capable operation, so the

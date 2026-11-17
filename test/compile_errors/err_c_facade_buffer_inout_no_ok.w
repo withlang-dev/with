@@ -1,4 +1,5 @@
 //! expect-check-fail: with no status contract
+//! expect-check-fail: = help: state the success status: 'ok <CONST>' (§16.2b.4)
 
 // D64 §16.2b.8: the copied-back length is presented only on success, which
 // a status-returning operation states with `ok`.

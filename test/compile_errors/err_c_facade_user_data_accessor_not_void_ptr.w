@@ -1,4 +1,5 @@
 //! expect-check-fail: 'user_data from ctx_count': ctx_count returns i32; registered user data comes back as the 'void *' C was given
+//! expect-check-fail: = help: after 'user_data from' name the library function that returns the registered 'void *' (sqlite3_user_data)
 
 // Spec §16.2b.9 (D76, ruling Amendment 2): which C function hands the
 // registered user data back is stated, and checked for the shape it must

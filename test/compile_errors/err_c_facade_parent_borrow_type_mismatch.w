@@ -1,4 +1,5 @@
 //! expect-check-fail: names a type its parent does not have
+//! expect-check-fail: = help: write 'returns borrow Database from parent Database of param 0'
 
 // D85 (#2003; spec §16.2b.6): `returns borrow T from parent T` hands out
 // the parent itself, so the borrowed type is the parent's type. Naming a

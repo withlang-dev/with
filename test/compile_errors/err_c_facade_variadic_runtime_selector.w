@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'ulimit': the selector cmd must be a compile-time constant at the call — the case it picks decides the type of the variadic argument, and only a listed case is presented safely (§16.2b.5)
+//! expect-check-fail: = help: pass one of the constants listed under 'variadic param 1 selected by param cmd:' in facade limits, or call the raw ulimit under unsafe
 
 // D66 (spec §16.2b.5): "the selector must be a compile-time constant at
 // the call"; a value computed at run time picks no case.

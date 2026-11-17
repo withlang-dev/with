@@ -1,4 +1,5 @@
 //! expect-check-fail: 'ok DB_OK' compares an integer status, but producer 'db_open' returns f64
+//! expect-check-fail: = help: delete 'ok': a producer that returns the pointer reports failure as NULL
 
 // D51 stage 5, spec §16.2b.4/§16.2b.13: `ok` compares the status with an
 // imported integer constant, so the status is an integer (a C enum is one).

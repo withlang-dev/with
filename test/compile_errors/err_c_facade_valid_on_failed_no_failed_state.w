@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'db_count': 'valid on failed', but 'Database' has no failed state
+//! expect-check-fail: = help: delete 'valid on failed'
 
 // D51 stage 12b (#1612; spec §16.2b.4): `valid on failed` marks an
 // operation of a failed-state resource, and only an out-parameter producer

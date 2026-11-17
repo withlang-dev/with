@@ -1,4 +1,5 @@
 //! expect-check-fail: c_import symbol 'maybe_apply' was omitted: inline body needs the layout of 'flags'
+//! expect-check-fail: = help: import the header that declares 'maybe_apply' with 'use c_import(…)' in this file, or correct the spelling to the C name
 // (it needs the layout of a bitfield record, imported opaque, #1417)
 // must be a compile error naming the function and the reason (#2244).
 use c_import("typedef int (*visit_fn)(void *, int);

@@ -1,4 +1,5 @@
 //! expect-check-fail: renders 'FillError', the error type of its 'ok' projection, and
+//! expect-check-fail: = help: present the operation under another name ('rename <name>' under 'fn fill'), or rename the other 'FillError'
 
 // D64 §16.2b.8, §16.2b.4: the generated `<Fn>Error` never silently
 // shadows or is shadowed by a type of the same name.

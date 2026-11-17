@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Database' has 'destroys' operations but no 'drop'; every destroyer takes further arguments, so name a 'drop' operation or model the representation differently
+//! expect-check-fail: = help: add 'drop <fn>' naming a function that takes only the representation; with none in the library, leave the producer raw
 
 // Ruling (Eric, 2026-09-22): a resource with `destroys` operations and no
 // `drop` is a compile error; when no destroyer is unary there is nothing to

@@ -1,4 +1,5 @@
 //! expect-check-fail: which is not an integer; the length parameter carries the byte count
+//! expect-check-fail: = help: name the integer parameter after 'len'; when C reads the capacity through a pointer and writes the length back, write 'capacity param 1 inout'
 
 // D64 §16.2b.8: the length parameter is the integer C reads.
 use c_import("static inline int scan(const unsigned char *p, const char *n) { return p[0] + n[0]; }\n")

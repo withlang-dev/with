@@ -1,4 +1,5 @@
 //! expect-check-fail: cannot assign a field of 'Picture', a type the facade renders
+//! expect-check-fail: = help: change the foreign state through an operation the facade presents
 // §16.2b.3: a write to a place inside a resource's representation puts an
 // address the program chose under its safe surface, as a write to the
 // representation itself does. Drop handed C the forged pointer.

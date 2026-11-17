@@ -1,4 +1,5 @@
 //! expect-check-fail: its producer 'kv_prepare_detached' states no 'borrows' parent of that type
+//! expect-check-fail: = help: add the same 'borrows' clause for the 'Database' parent to every producer of 'Statement'
 
 // D85 (#2003; spec §16.2b.6): the parent is resolved through the
 // argument resource's declared `borrows` clause. A `Statement` made by

@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Stream' names both 'from' and 'init'
+//! expect-check-fail: = help: delete one: 'from <fn>' when C returns or stores the pointer, 'init <fn>(self)' when C fills storage the caller holds
 
 // D51 §16.2b.4 stage 4b: a resource is produced one way — direct return,
 // out parameter, or in-place initialization — never two.

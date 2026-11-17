@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'st_step': 'of Database' assigns it to a resource param 0: *mut st s does not receive; it receives 'Statement' — state 'of Statement' (§16.2b.3)
+//! expect-check-fail: = help: write one of those 'of' clauses
 
 // D51 stage 8 (ruling §53, §61): `of` assigns an operation to a resource
 // its first parameter receives; naming one it does not is a facade

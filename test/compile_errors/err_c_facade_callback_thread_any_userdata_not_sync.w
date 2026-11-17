@@ -1,4 +1,5 @@
 //! expect-check-fail: 'db_exec' may invoke its callback from any thread ('callback_thread any' in facade dbc), so the userdata type must be Send and Sync; 'Ctx' is neither Send nor Sync
+//! expect-check-fail: = help: wrap the shared state so it is Send and Sync: a Mutex or an Atomic in place of 'Ctx'
 
 // D51 stage 9 (ruling §51, spec §16.2b.10): under `callback_thread any`
 // the userdata crosses threads with the callback, so its type must be

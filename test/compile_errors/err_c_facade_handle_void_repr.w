@@ -1,4 +1,5 @@
 //! expect-check-fail: handle 'Anything' wraps *mut c_void; a callback-scope handle wraps the pointer to a C record
+//! expect-check-fail: = help: write 'handle Anything wraps *mut T', with T the record type of the callback's parameter
 
 // Spec §16.2b.9 (ruling Amendment 1, #1611): a handle wraps the pointer to
 // the C record a callback is passed (`*mut sqlite3_context`) — never

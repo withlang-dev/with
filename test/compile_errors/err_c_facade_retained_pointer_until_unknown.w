@@ -1,4 +1,5 @@
 //! expect-check-fail: 'until h_other' names neither a case of this variadic operation nor a modeled operation of 'Req'
+//! expect-check-fail: = help: after 'until' name a listed case or a function the contract describes
 
 // D194 (spec §16.2b.5): each name after `until` is a case of the same
 // variadic operation or a modeled operation of the retaining resource; a

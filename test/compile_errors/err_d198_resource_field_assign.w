@@ -1,4 +1,5 @@
 //! expect-check-fail: cannot assign a field of 'Picture'
+//! expect-check-fail: = help: change the foreign state through an operation the facade presents
 // D198 (§16.2b.3): fields are not assigned through the resource.
 use c_import("typedef struct { int *data; int n; } Img; static inline Img img_new(void) { Img i; i.data = 0; i.n = 4; return i; } static inline void img_free(Img i) { } static inline int img_count(Img i) { return i.n; }")
 

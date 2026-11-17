@@ -1,4 +1,5 @@
 //! expect-check-fail: which receives a modeled resource; a resource is passed by the value that owns it, never fixed
+//! expect-check-fail: = help: delete 'param 0 fixed …': the presented operation takes the resource itself, as its receiver when it is the first parameter
 
 // D64 §16.2b.11: a parameter that receives a resource is the resource's.
 use c_import("void *malloc(unsigned long size);\nvoid free(void *p);\ntypedef struct note { int v; } note;\nstatic inline note *note_new(void) { return (note *)malloc(sizeof(note)); }\nstatic inline void note_free(note *n) { free(n); }\nstatic inline int note_v(note *n) { return n->v; }\n")

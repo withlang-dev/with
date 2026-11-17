@@ -1,4 +1,5 @@
 //! expect-check-fail: 'init z_init' takes the representation by value, so it would initialize a copy
+//! expect-check-fail: = help: name the initializer that takes a pointer to the record; a function that returns the record by value is 'from <fn>'
 
 // D51 §16.2b.4 stage 4b: an in-place initializer fills caller-allocated
 // storage, so it takes a pointer to the representation; one that takes the

@@ -1,4 +1,5 @@
 //! expect-check-fail: 'callback consumes' is not modeled yet; a callback receives its userdata as a borrow for the callback's scope
+//! expect-check-fail: = help: delete 'consumes' from the callback clause
 
 // D51 stage 9 (ruling §46, spec §16.2b.9): a callback receiving ownership
 // is stated, never inferred — and not yet modeled: the clause parses and is

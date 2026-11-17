@@ -1,4 +1,5 @@
 //! expect-check-fail: is presented through a wrapper the compiler generates, which reaches the program's callback through the registered user data
+//! expect-check-fail: = help: add 'user_data from <fn> as &U', naming the library function that returns the registered 'void *'
 
 // Spec §16.2b.9 (D76, ruling Amendment 2): the argument vector is handed to
 // the program's callback by a wrapper the compiler generates, and C calls

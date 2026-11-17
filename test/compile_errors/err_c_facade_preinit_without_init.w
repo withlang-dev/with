@@ -1,4 +1,5 @@
 //! expect-check-fail: 'preinit' constructs storage for an 'init' operation; state 'init <fn>(self)'
+//! expect-check-fail: = help: add 'init <fn>(self)' naming the function that fills the storage, or delete 'preinit'
 
 // D51 ruling §13.1 stage 4b: pre-initialization is the first state of an
 // in-place resource; without an `init` there is nothing for the storage to

@@ -1,4 +1,5 @@
 //! expect-check-fail: a retained byte case states the option its length is set through, so the pointer and its length are one operation
+//! expect-check-fail: = help: add 'length param CONST as T' after 'retains by param N', or state '&CString' when C reads the pointer as a NUL-terminated string
 
 // D194 (spec §16.2b.5, §16.2b.8): `&[u8]` / `&str` in a retained case is
 // bytes C reads to a length, and the case names the option that length is

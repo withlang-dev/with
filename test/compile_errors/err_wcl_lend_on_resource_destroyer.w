@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'engine_close': a resource names it as a destroyer, and the fn item says 'lend'
+//! expect-check-fail: = help: delete the 'lend' line under this fn item
 
 // §31.8.2: the resource owns "f destroys N"; an explicit `lend` on the fn
 // item of a destroyer is an error.

@@ -1,4 +1,5 @@
 //! expect-check-fail: an ephemeral value cannot be stored on the heap
+//! expect-check-fail: = help: wrap the shared state so it is Send and Sync: a Mutex or an Atomic in place of 'Keep'
 
 // Spec §16.2b.9 (D76), §5.1: the user data a registration consumes moves
 // into a box C keeps past the call, and the callbacks read it as '&U' for

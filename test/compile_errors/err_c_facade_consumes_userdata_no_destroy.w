@@ -1,4 +1,5 @@
 //! expect-check-fail: consumes param 1: *mut c_void owned, a 'void *' userdata, with no destroy contract
+//! expect-check-fail: = help: name the callback C invokes to destroy it: 'consumes param N destroyed_by param M'
 
 // D51 stage 9 (ruling §9, §24; spec §16.2b.5): userdata moved into C with
 // no destroy callback would be owned by nothing that destroys it — never

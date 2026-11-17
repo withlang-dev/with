@@ -1,4 +1,5 @@
 //! expect-check-fail: err_c_facade_resource_diag_location.w:19:5
+//! expect-check-fail: = help: add 'drop <fn>', naming the C function that releases what the producer returns
 
 // A resource-level facade diagnostic points at the resource in the file that
 // declares it — not into the rendered `<facade NAME>` text the last pass

@@ -1,4 +1,5 @@
 //! expect-check-fail: param 7 does not exist
+//! expect-check-fail: = help: its parameters are numbered 0 to 3
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

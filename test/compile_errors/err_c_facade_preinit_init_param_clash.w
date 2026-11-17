@@ -1,4 +1,5 @@
 //! expect-check-fail: 'preinit z_storage' and 'init z_init' both take a parameter named 'level'
+//! expect-check-fail: = help: fix one of the two with 'param N fixed <literal>' under its fn item, or leave the resource raw: the header names the parameters
 
 // D51 §16.2b.4 stage 4b: the in-place constructor takes the preinit
 // operation's parameters and then the initializer's; a C name both spell

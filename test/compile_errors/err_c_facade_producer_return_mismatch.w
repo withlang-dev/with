@@ -1,4 +1,5 @@
 //! expect-check-fail: returns i32, not the representation
+//! expect-check-fail: = help: 'from' names a function that returns what 'Database' wraps; when it stores it through a parameter, write 'from db_count(out param N)'
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

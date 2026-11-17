@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Tally' is a type the facade renders, and only its rendering makes one
+//! expect-check-fail: = help: obtain it from the facade — its constructor, or the callback C invokes; raw access is the representation under the raw C rules (`unsafe`)
 
 // Spec §16.2b.9 (ruling Amendment 1, #1611): nothing produces a
 // callback-scope handle but C, which passes it to the callback. A literal

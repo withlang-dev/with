@@ -1,4 +1,5 @@
 //! expect-check-fail: 'from buf_load, nonnull field inner': Buf has no field inner
+//! expect-check-fail: = help: name a field of the record as the header declares it; a nested one is written 'outer.inner'
 
 // §16.2b.13: the field path is checked against the record.
 use c_import("void free(void *p);

@@ -1,4 +1,5 @@
 //! expect-check-fail: 'h_set' may invoke its callback from any thread ('callback_thread any' in facade hlib), so the userdata type must be Send and Sync
+//! expect-check-fail: = help: capture only values that are Send and Sync (an Atomic, a Mutex, a channel), or pass them as the userdata
 
 // §16.2b.10: `callback_thread any` on a function whose callback arrives
 // through a variadic case speaks of that callback. The checker did not see

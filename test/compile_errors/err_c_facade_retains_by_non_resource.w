@@ -1,4 +1,5 @@
 //! expect-check-fail: 'retains … by' names param 3: i32 n, which receives no modeled resource
+//! expect-check-fail: = help: after 'by' name the parameter that receives the resource keeping the value, usually the first: 'retains param N by param 0'
 
 // D51 stage 9 (ruling §25, §45; spec §16.2b.5): retention is by a resource,
 // and lasts until that resource is destroyed; `by` naming an int is refused.

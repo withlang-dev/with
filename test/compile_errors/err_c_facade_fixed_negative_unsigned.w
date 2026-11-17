@@ -1,4 +1,5 @@
 //! expect-check-fail: binds a negative literal to param 1: u32 b, an unsigned integer
+//! expect-check-fail: = help: write the value the parameter receives as a literal of its own range, zero or above
 
 // D64 §16.2b.11: a negative literal is not a value of an unsigned parameter.
 use c_import("static inline int addu(int a, unsigned int b) { return a + (int)b; }\n")

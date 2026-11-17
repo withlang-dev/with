@@ -1,4 +1,5 @@
 //! expect-check-fail: 'ok' is stated twice; list every success status in one clause
+//! expect-check-fail: = help: merge the two lines into one: 'ok C1, C2'
 
 // Spec §16.2b.4 (ruling Amendment 1, #1432): a producer's success statuses
 // are one `ok` clause, `ok C1, C2`. A second clause is refused, never

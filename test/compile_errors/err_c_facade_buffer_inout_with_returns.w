@@ -1,4 +1,5 @@
 //! expect-check-fail: one operation has one result
+//! expect-check-fail: = help: delete the 'returns' clause, or pair the buffer with 'len' in place of 'capacity … inout'
 
 // D64 §16.2b.8: an inout capacity is presented as the result; a `returns`
 // clause presents the return. Both cannot be the one result.

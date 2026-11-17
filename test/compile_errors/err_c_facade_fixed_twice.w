@@ -1,4 +1,5 @@
 //! expect-check-fail: is fixed twice
+//! expect-check-fail: = help: delete one of the two 'fixed' clauses
 
 // D64 §16.2b.11: one parameter, one literal.
 use c_import("static inline int add3(int a, int b) { return a + b; }\n")

@@ -1,4 +1,5 @@
 //! expect-check-fail: 'ok Z_OK' names a status but 'init z_init' returns nothing to compare it with
+//! expect-check-fail: = help: delete 'ok'
 
 // D51 §16.2b.4 stage 4b: `ok` interprets the initializer's status; a void
 // initializer has none, so the clause states nothing the compiler can read.

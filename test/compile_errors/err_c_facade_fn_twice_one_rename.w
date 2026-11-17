@@ -1,5 +1,6 @@
 //! expect-check-fail: fn 'db_run' is described twice in this facade
 //! expect-check-fail: give each item its own 'rename'
+//! expect-check-fail: = help: to present one C function as two operations, give each item its own 'rename' (§16.2b.11)
 
 // D92 (ruling Amendment 3, §16.2b.11): one C function is presented as two
 // operations only under two distinct renames. Two items sharing a rename,
