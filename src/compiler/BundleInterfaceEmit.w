@@ -712,7 +712,10 @@ impl BundleEmitter:
             let once = fn_param_is_once(pflags)
             // A tree bundle prints a default as the source wrote it.
             let default_text = if pdefault != 0: " = " ++ render_expr(sema.ast, sema.pool, pdefault as NodeId, 0) else: ""
-            params = params ++ (if noalias: "@[noalias] " else: "") ++ pname ++ ": " ++ (if once: "once " else: "") ++ spelling ++ default_text
+            // A `mut` parameter (D172, §3.8a) is the caller's place: its
+            // mode is its calling convention, so the interface states it.
+            let mut_text = if fn_param_is_mut_self(pflags) != 0: "mut " else: ""
+            params = params ++ (if noalias: "@[noalias] " else: "") ++ mut_text ++ pname ++ ": " ++ (if once: "once " else: "") ++ spelling ++ default_text
             params_row = params_row ++ pname ++ ":" ++ spelling ++ f":{vra}:{eff}" ++ (if noalias: ":noalias" else: "") ++ (if once: ":once" else: "") ++ default_text ++ ";"
             printed = printed + 1
             // A `once` callable is consumed by its one invocation: the
