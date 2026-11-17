@@ -11,6 +11,8 @@
 //   1a. exits GREEN without running when these sources already have a
 //      published green (`:sources-green`): a docs-only change never costs a
 //      battery;
+//   1b. runs the gate's ceremony census first and stops on a count that rose
+//      (`RED (census)`), before anything is built;
 //   2. takes one of two machine-wide battery slots, so a third battery cannot
 //      start by accident (a slot whose owner died is reclaimed);
 //   3. runs ONE `src/main build :battery` (the gate, battery-uat and
@@ -298,6 +300,14 @@ if green_rc == 0:
     assert(write_file("out/battery/status.txt", f"{head} {cwd}\n" ++ recorded ++ "\nGREEN\nBATTERY_DONE\n") == 0)
     print(f"battery: {head} — these sources are already green; nothing to run ({recorded.trim()})")
     exit_code(0)
+// The gate's ceremony census of the committed tree takes seconds, and the
+// gate reports it minutes in, beside everything else. A count that rose
+// stops the battery here: on 2026-11-17 three batteries were started past a
+// census line the agent had already read, and each ran to RED on it.
+if run_logged(&[seed_path, "build", ":ceremony-census-lexical", "--no-deps"], "out/battery/census.log") != 0:
+    assert(write_file("out/battery/status.txt", f"{head} {cwd}\nRED (census): ceremony-census-lexical\nBATTERY_DONE\n") == 0)
+    eprint("battery: RED (census): a ceremony count rose; nothing else was run. Read it with `with run tools/ceremony_census.w --diff origin/main`, remove the ceremony, commit, and run the battery again")
+    exit_code(1)
 let slot = take_slot(f"{pid()}\t{cwd}\t{head}\n")
 if slot.len() == 0:
     eprint("battery: two batteries are already running:")
