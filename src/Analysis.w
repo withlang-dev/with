@@ -1157,6 +1157,43 @@ fn analysis_audit_pool(mut report: AnalysisReport, sema: &Sema):
 
     report.note(f"pool-audit: nodes={ast.node_count()} fn_meta={ast.state.fn_meta.len() / 7} for_meta={ast.state.for_meta.len() / 3} pattern-bindings={ast.state.pattern_binding_pairs.len()} decls={ast.decl_count()}")
 
+// #692: the type table is well formed and every typed expression names a
+// type in it. A generic instance's argument vector once was read from a
+// type that is not an instance: the garbage depended on the table's layout
+// and typed a literal as a sub-byte integer, and no audit said so. A slot
+// read under the wrong kind shows here as a range that leaves the table.
+fn analysis_audit_type_table(mut report: AnalysisReport, sema: &Sema, node_count: i32):
+    let types = sema.type_kinds.len()
+    if sema.type_d0.len() != types or sema.type_d1.len() != types or sema.type_d2.len() != types:
+        report.fail(f"type table: columns diverge (kinds={types} d0={sema.type_d0.len()} d1={sema.type_d1.len()} d2={sema.type_d2.len()})")
+        return
+    for violation in analysis_generic_instance_violations(sema.type_kinds, sema.type_d1, sema.type_d2, sema.type_extra): report.fail(violation)
+    var typed = 0
+    for node in 1..node_count:
+        if not sema.typed_expr_types.contains(node): continue
+        typed += 1
+        let tid = sema.typed_expr_types.get(node).unwrap()
+        if tid < 0 or tid >= types: report.fail(f"typed expression {node}: type {tid} is not a type id (types={types})")
+    report.note(f"types={types} typed-expressions={typed}")
+
+// The generic instances of a type table whose argument vector is not one:
+// a range that leaves `extra`, or an argument that is no type id. The
+// columns are the table's (kind, d1 = the vector's start, d2 = its length).
+fn analysis_generic_instance_violations(kinds: &List[i32], starts: &List[i32], counts: &List[i32], extra: &List[i32]) -> List[str]:
+    let found = []
+    let types = kinds.len()
+    for tid in 1..types:
+        if kinds[tid] != TypeKind.TY_GENERIC_INST: continue
+        let start = starts[tid]
+        let count = counts[tid]
+        if start < 0 or count < 0 or start + count > extra.len():
+            found.push(f"type {tid}: generic instance argument range start={start} count={count} leaves type_extra ({extra.len()})")
+            continue
+        for ai in 0..count:
+            let arg = extra[start + ai]
+            if arg < 0 or arg >= types: found.push(f"type {tid}: generic instance argument {ai} is {arg}, not a type id (types={types})")
+    found
+
 fn analysis_audit_storage(mut report: AnalysisReport, sema: &Sema):
     let node_count = sema.ast.node_count()
     var resolved_calls: i32 = 0
@@ -1191,6 +1228,7 @@ fn analysis_audit_storage(mut report: AnalysisReport, sema: &Sema):
                 report.fail(f"resolved call {node} arg {ai}: key={key} expected={expected}")
     if node_count > 65537 and sema.resolved_call_arg_key(1, 0) == sema.resolved_call_arg_key(65537, 0):
         report.fail("resolved-call argument keys collide across the former 16-bit node boundary")
+    analysis_audit_type_table(report, sema, node_count)
     let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Invariant)
     fact.id = node_count
     fact.index = resolved_calls
