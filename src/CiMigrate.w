@@ -3339,10 +3339,10 @@ var g_migrate_file_error: str = ""
 // When true, skip @[c_export] attributes and extern fn declarations
 // for functions defined in the same translation unit.
 // Set via migrate_set_no_c_export().
-pub var g_migrate_no_c_export: i32 = 0
+var g_migrate_no_c_export: i32 = 0
 // 1 while a package's contract is drafted with no proof from its source
 // (a prebuilt binary's, §31.6.3).
-pub var g_migrate_facade_without_bodies: i32 = 0
+var g_migrate_facade_without_bodies: i32 = 0
 
 fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val

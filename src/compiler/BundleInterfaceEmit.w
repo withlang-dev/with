@@ -80,6 +80,10 @@ type BundleEmitter {
     // "<canonical module>\t<name>" per owned global codegen could not fold
     // to data (Codegen.bundle_unlowered_globals); empty on the .wi pass
     unlowered_globals: List[str],
+    // #3351: a tree bundle is a build artifact of one checkout, read by
+    // the same compiler that wrote it: its interface prints what a stored
+    // corpus's may not (defaults as written, ephemeral and Drop types).
+    tree: bool,
     errors: List[str],
     warnings: List[str],
     // An extern's contract is its symbol's, however many corpus modules
@@ -139,6 +143,7 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
     BundleEmitter {
         corpus: with_str_clone_ref(corpus),
         unlowered_globals: sema_clone_str_list(unlowered_globals),
+        tree: bundle_corpus_is_tree(corpus),
         errors: List.new(),
         warnings: List.new(),
         extern_rows: HashMap.new(),
@@ -607,13 +612,15 @@ impl BundleEmitter:
             self.omit_generic_fn(mod_path, full)
             return ""
         let cc_sym = ast.fn_meta_tp_start(meta)
+        var cc_attr = ""
         if cc_sym != 0:
             let cc = with_str_clone_ref(sema.pool_resolve(cc_sym))
             if cc.starts_with("c_export:"):
                 self.refuse("is @[c_export]; a bundle exports a With surface, never a C one (wo_bundles.md)")
-            else:
+            else if not self.tree:
                 self.refuse("carries calling-convention attribute '" ++ cc ++ "', which has no interface spelling")
-            return ""
+            if not self.tree or self.failed: return ""
+            cc_attr = "@[callconv(\"" ++ cc ++ "\")]\n"
         if sema.fn_clause_group_lookup.contains(fn_sym):
             self.refuse("has multiple clauses; no interface spelling")
             return ""
@@ -648,7 +655,8 @@ impl BundleEmitter:
             let name_sym = ast.fn_param_name(param_start, pi)
             let pflags = ast.fn_param_flags(param_start, pi)
             let pname = with_str_clone_ref(sema.pool_resolve(name_sym))
-            if ast.get_fn_param_default(param_start, pi) != 0:
+            let pdefault = ast.get_fn_param_default(param_start, pi)
+            if pdefault != 0 and not self.tree:
                 self.refuse("parameter '" ++ pname ++ "' has a default value; no interface spelling (Level 0)")
                 return ""
             if fn_param_is_implicit(pflags) != 0:
@@ -681,8 +689,10 @@ impl BundleEmitter:
             // §12.4 (D75): the bundle interface records `once` — a consumer
             // may pass a consuming closure only to such a parameter.
             let once = fn_param_is_once(pflags)
-            params = params ++ (if noalias: "@[noalias] " else: "") ++ pname ++ ": " ++ (if once: "once " else: "") ++ spelling
-            params_row = params_row ++ pname ++ ":" ++ spelling ++ f":{vra}:{eff}" ++ (if noalias: ":noalias" else: "") ++ (if once: ":once" else: "") ++ ";"
+            // A tree bundle prints a default as the source wrote it.
+            let default_text = if pdefault != 0: " = " ++ render_expr(sema.ast, sema.pool, pdefault as NodeId, 0) else: ""
+            params = params ++ (if noalias: "@[noalias] " else: "") ++ pname ++ ": " ++ (if once: "once " else: "") ++ spelling ++ default_text
+            params_row = params_row ++ pname ++ ":" ++ spelling ++ f":{vra}:{eff}" ++ (if noalias: ":noalias" else: "") ++ (if once: ":once" else: "") ++ default_text ++ ";"
             printed = printed + 1
             // A `once` callable is consumed by its one invocation: the
             // declared consume is the contract, not a mistaken `&T`; a pin
@@ -743,10 +753,20 @@ impl BundleEmitter:
                     clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ pname
                     if pi != origin and stray.len() == 0:
                         stray = pname
+                if stray.len() > 0 and self.tree:
+                    self.omitted.push(mod_path ++ "\t" ++ full ++ "\tundeclared-origin")
+                    self.push_export(BX_NOTE, mod_path, full, "// not exported (its returned view's origin is not the elided one): fn " ++ full ++ "\n", "")
+                    return ""
                 if stray.len() > 0:
                     let elided = if origin >= 0: "`" ++ sema.pool_resolve(ast.fn_param_name(param_start, origin)) ++ "`" else: "none"
                     self.refuse("returns a view derived from `" ++ stray ++ "`, but with no `from` clause its origin at a bundle boundary is the §21.1 elision (" ++ elided ++ ": the receiver, else the single borrowed parameter); write `" ++ clause ++ "` after the return type")
                     return ""
+        if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from and self.tree:
+            // Left to the bundle: its callers are the bundle's own modules,
+            // which read its body. An importer that names it is told so.
+            self.omitted.push(mod_path ++ "\t" ++ full ++ "\tambiguous-origin")
+            self.push_export(BX_NOTE, mod_path, full, "// not exported (its returned view names no one origin): fn " ++ full ++ "\n", "")
+            return ""
         if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from:
             self.refuse("returns a reference with no unambiguous origin: name the origin in the source signature (D39 elision: receiver, else the single borrowed parameter), or write `from static` for a view of static data (§21.1 rule 6)")
             return ""
@@ -776,7 +796,7 @@ impl BundleEmitter:
                 printed_name = with_str_clone_ref(full.slice((dot + 1) as i64, full.len()))
         // The `writes` clause is the declaration's last clause (§21.1 rule 1).
         let writes_text = if written_clause.len() > 0: " " ++ written_clause else: ""
-        var head = bx_effect_pins_text(sema, node) ++ (if must_use: "@[must_use]\n" else: "")
+        var head = cc_attr ++ bx_effect_pins_text(sema, node) ++ (if must_use: "@[must_use]\n" else: "")
         head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ from_text ++ writes_text ++ "\n"
         let vis = if is_pub: "pub" else: "priv"
         let unsafe_text = if is_unsafe: "1" else: "0"
@@ -1073,8 +1093,15 @@ impl BundleEmitter:
         self.context = mod_path ++ ": type " ++ name
         self.failed = false
         let is_pub = self.decl_is_pub_type(sema, node)
-        if type_decl_is_ephemeral(packed) != 0:
+        if type_decl_is_ephemeral(packed) != 0 and not self.tree:
             self.refuse("is ephemeral; not a bundle interface surface")
+            return
+        if sema.type_decl_tp_count(node) > 0 and self.tree:
+            // Left to the bundle, as a generic function is: a declaration
+            // that names it fails to spell, and says so.
+            let in_module: str = self.current_module
+            self.omitted.push(in_module ++ "\t" ++ name ++ "\tgeneric-type")
+            self.push_export(BX_NOTE, in_module, name, "// not exported (generic): type " ++ name ++ "\n", "")
             return
         if sema.type_decl_tp_count(node) > 0:
             self.refuse("is generic; a bundle boundary is Level 0 (abi_roadmap.md)")
@@ -1092,7 +1119,7 @@ impl BundleEmitter:
             return
         let tid: i32 = sema.type_decl_tids.get(node).unwrap()
         let resolved = sema.resolve_alias(tid)
-        if sub_kind != TypeDeclKind.Alias and sema.has_drop_method(name_sym) != 0:
+        if sub_kind != TypeDeclKind.Alias and sema.has_drop_method(name_sym) != 0 and not self.tree:
             self.refuse("has a drop method; a .wi carries no Drop impl and nobody drops bundle storage (Level 0)")
             return
         var attrs = ""
@@ -1139,7 +1166,7 @@ impl BundleEmitter:
                     return
                 var f_default_text = ""
                 if f_default != 0:
-                    f_default_text = self.literal_text(sema, f_default, false)
+                    f_default_text = if self.tree: render_expr(sema.ast, sema.pool, f_default as NodeId, 0) else: self.literal_text(sema, f_default, false)
                     if self.failed:
                         return
                 if fi > 0:
@@ -1159,7 +1186,8 @@ impl BundleEmitter:
             // D120 (§4.3): a resource crosses as one — spelled plain, a
             // struct of values would be a value to the consumer's compiler.
             let resource_text = if sub_kind != TypeDeclKind.Union and sema.resource_type_names.contains(name_sym): "resource " else: ""
-            decl = if sub_kind == TypeDeclKind.Union: pub_text ++ "type " ++ name ++ " = union " ++ body else: pub_text ++ resource_text ++ "type " ++ name ++ " " ++ body
+            let ephemeral_text = if type_decl_is_ephemeral(packed) != 0: "ephemeral " else: ""
+            decl = if sub_kind == TypeDeclKind.Union: pub_text ++ "type " ++ name ++ " = union " ++ body else: pub_text ++ resource_text ++ "type " ++ name ++ " " ++ ephemeral_text ++ body
         else if sub_kind == TypeDeclKind.Opaque:
             kind_row = "opaque"
             has_layout = false

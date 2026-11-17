@@ -627,7 +627,7 @@ fn Codegen.init(module_name: &str) -> Codegen:
 // Sema during emission — the caller's binding is blank in between, never
 // aliased — and hands it back via take_sema. The swap leaves a placeholder so
 // every cg teardown path (explicit deinit or scope exit) stays untouched.
-extend Codegen:
+impl Codegen:
     mut fn take_sema() -> Sema:
         let s = move self.sema
         self.sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
