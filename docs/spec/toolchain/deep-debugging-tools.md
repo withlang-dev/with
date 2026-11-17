@@ -795,6 +795,18 @@ Options:
 with reduce fixture.w --test test_needs_two_lines
 ```
 
+- `--baseline <compiler>` also requires `<compiler> check {file}` to accept
+  each candidate. Use it for a regression: the predicate's compiler refuses
+  a program the last good one takes. Without it the reducer deletes a
+  declaration the program needs as long as the target diagnostic is still
+  printed, and the result carries a second, unrelated error (#1100).
+
+```sh
+with reduce repro.w --baseline ~/.local/bin/with \
+    --contains "may outlive its origin" \
+    -- out/bootstrap/bin/with-stage1 check {file}
+```
+
 The source path must immediately follow `reduce`. Use `{file}` in the predicate
 argv for the candidate path; without it, the candidate path is appended.
 
