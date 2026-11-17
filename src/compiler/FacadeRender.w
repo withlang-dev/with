@@ -3506,6 +3506,9 @@ fn facade_render_wrapper(pool: &AstPool, intern: &InternPool, ci: &List[i32], cb
     var body = indent ++ "let " ++ wname ++ ": " ++ raw ++ " = (" ++ params ++ ") => {\n"
     body = body ++ inner ++ "let " ++ d ++ " = " ++ facade_render_call(pool, intern, acc_decl, names[h]) ++ " as *const " ++ cell_type ++ "\n"
     let k = facade_render_argv_of(cbi, pi)
+    // A position the callback does not have renders nothing: the checker
+    // refuses it ("param 7 does not exist"), where indexing here panicked.
+    if k >= 0 and (cbi.argc_index[k] >= names.len() or cbi.argv_index[k] >= names.len()): return ""
     if k >= 0:
         let argc = names[cbi.argc_index[k]]
         let argv = names[cbi.argv_index[k]]
