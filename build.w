@@ -4658,16 +4658,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     internals_tests = internals_tests.dep("build")
     out = out.add_target(links_compiler_bundle(internals_tests))
 
-    // #3231: a test that imports a compiler module compiles all of the
-    // compiler (10,616 bodies; 106 s alone on an 18-core host). Beside the
-    // lanes that fill the cores, each ran past the 30-minute per-file guard
-    // on the 3-core nightly runner, as selfcheck once did beside four lanes.
-    // These run one at a time, after the lanes that fill the pool: the
-    // dependency is the graph's spelling of that order.
+    // The tests that reach deep into the compiler. Each once compiled all of
+    // the compiler (#3231: 106 s alone, past the per-file guard on a 3-core
+    // runner) and so ran last, one at a time; linking the bundle, the lane
+    // takes ten seconds (#3351).
     var internals_compiler_tests = test_lane(.Test, "internals-compiler-tests", "test/internals_compiler/*.w")
     internals_compiler_tests = internals_compiler_tests.arg("compiler=" ++ release_compiler_bin("with"))
     internals_compiler_tests = internals_compiler_tests.dep("build")
-    for lane in "behavior-tests native-compile-error-tests native-codegen-tests native-spec-tests native-phase-tests internals-tests debug-alloc-tests d-acceptance-tests".split(" "): internals_compiler_tests = internals_compiler_tests.dep(lane)
     out = out.add_target(links_compiler_bundle(internals_compiler_tests))
 
     var lexer_tests = test_lane(.Test, "lexer-tests", "test/lexer/*.w")

@@ -37,7 +37,7 @@ fn cb_first_line(text: &str) -> str:
 // One `use` per module of `src/`, in path order: `src/compiler/Link.w` is
 // `compiler.Link`. The two files with a `main` are the compiler's own roots.
 fn cb_root_text(ctx: &ActionCtx) -> str:
-    let uses: List[str] = []
+    let uses = []
     for path in ctx.fs().list_files("src"):
         if not path.ends_with(".w") or path == "src/main.w" or path == "src/bootstrap_main.w": continue
         let line = "use " ++ path.slice(4, path.len() - 2).replace("/", ".") ++ "\n"
