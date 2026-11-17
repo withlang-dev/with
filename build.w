@@ -2897,6 +2897,29 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     if not reduced_text.contains("missing_symbol"):
         ctx.diagnostics().error("deep-debug-tool-tests: reducer output lost predicate line")
 
+    // #1100: --baseline keeps what a known-good compiler needs. The
+    // predicate (`ast`, which parses and resolves nothing) holds while the
+    // call is there; without a baseline the reducer deletes `helper`'s
+    // declaration, with one (`check` must accept each candidate) it stays.
+    let reduce_base_input = build_project_join(out_dir, "reduce-baseline-input.w")
+    if fs.write_text(reduce_base_input, "fn helper(x: i32) -> i32: x\n\nfn main:\n    print(helper(3))\n") != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write reduce --baseline fixture")
+    for with_baseline in [false, true]:
+        let reduce_base_output = build_project_join(out_dir, if with_baseline: "reduce-baseline-output.w" else: "reduce-no-baseline-output.w")
+        let reduce_base_args = [build_owned_text(compiler), "reduce", build_project_abs(root, reduce_base_input), "--out", build_project_abs(root, reduce_base_output)]
+        if with_baseline:
+            reduce_base_args.push("--baseline")
+            reduce_base_args.push(build_owned_text(compiler))
+        for arg in ["--contains", "helper(3)", "--", build_owned_text(compiler), "ast", "{file}"]: reduce_base_args.push(arg)
+        let reduce_base_result = ctx.process_runner().run_capture_cwd(reduce_base_args, reduce_stdout, reduce_stderr, 900000, root)
+        if reduce_base_result.rc != 0:
+            ctx.diagnostics().error("deep-debug-tool-tests: reduce --baseline case failed; stderr=" ++ reduce_stderr)
+        let kept_declaration = fs.read_text(reduce_base_output).contains("fn helper")
+        if with_baseline and not kept_declaration:
+            ctx.diagnostics().error("deep-debug-tool-tests: reduce --baseline deleted a declaration the baseline compiler needs")
+        if not with_baseline and kept_declaration:
+            ctx.diagnostics().error("deep-debug-tool-tests: the reduce --baseline fixture no longer distinguishes: the plain reduction kept the declaration")
+
     // #1015: --test reduces a `fn test_*` fixture through the runner. The
     // red test needs both of its lines (dropping either turns the failure
     // into a build error or a pass), so exactly those survive.

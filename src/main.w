@@ -273,7 +273,7 @@ fn cli_value_or_prefix(argc: i32, flag: &str, prefix: &str) -> str:
 // Every flag the driver reads, for any command (#2198). A flag is known by
 // its name, the part before any `=`.
 fn cli_known_flags() -> List[str]:
-    ["--abi-sha", "--alloc", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--contract", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-all", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-contracts", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--facade", "--facts", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--gir", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--macro-prefix-map", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
+    ["--abi-sha", "--alloc", "--baseline", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--contract", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-all", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-contracts", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--facade", "--facts", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--gir", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--macro-prefix-map", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
 
 // The first argument that looks like a flag and names none the driver
 // knows, or "". A flag's value (`-o out`, `--target x`) is skipped.
@@ -307,7 +307,7 @@ fn cli_option_takes_value(arg: &str) -> bool:
     arg == "-o" or arg == "--output" or arg == "--target" or
     arg == "--trace-place" or arg == "--explain-mir-origin" or
     arg == "--trace-ownership" or arg == "--trace-cleanup-edge" or
-    arg == "--contains" or arg == "--exit-code" or arg == "--test" or
+    arg == "--contains" or arg == "--baseline" or arg == "--exit-code" or arg == "--test" or
     arg == "--debug-alloc-filter" or arg == "--out" or
     arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest" or
     arg == "--emit-bundle-interface" or arg == "--bundle-fingerprint" or arg == "--bundle-corpus"
@@ -1521,7 +1521,20 @@ type ReducePredicate {
     original_rc: i32,
     test_name: str,
     want_stage: str,
+    // #1100: `--baseline <compiler>`: a candidate also has to be accepted
+    // by that compiler (`<compiler> check {file}` exits 0), so what is left
+    // is a program a known-good compiler takes and the one under test does
+    // not, with nothing else wrong in it.
+    baseline: str,
 }
+
+// Whether the baseline compiler accepts `candidate` (true with no baseline).
+fn reduce_baseline_accepts(pred: &ReducePredicate, candidate: &str, timeout_ms: i32) -> bool:
+    if pred.baseline.len() == 0: return true
+    var argv = build_graph_argv_append("", pred.baseline)
+    argv = build_graph_argv_append(argv, "check")
+    argv = build_graph_argv_append(argv, candidate)
+    with_exec_argv_capture(argv, "out/reduce/baseline.stdout.txt", "out/reduce/baseline.stderr.txt", timeout_ms) == 0
 
 fn reduce_make_argv(argc: i32, pred: &ReducePredicate, candidate: &str) -> str:
     var argv = ""
@@ -1588,6 +1601,7 @@ fn reduce_discard_kept_test_binary(text: &str):
             cleanup_binary_artifacts(line.slice(prefix.len(), line.len()))
 
 fn reduce_candidate_matches(argc: i32, pred: &ReducePredicate, candidate_path: &str, timeout_ms: i32) -> bool:
+    if not reduce_baseline_accepts(pred, candidate_path, timeout_ms): return false
     let out_path = "out/reduce/stdout.txt"
     let err_path = "out/reduce/stderr.txt"
     let _rm_out = with_fs_remove_file(out_path)
@@ -1640,7 +1654,11 @@ fn run_reduce_command(argc: i32) -> i32:
         original_rc: 0,
         test_name: test_name,
         want_stage: "",
+        baseline: cli_value_or_prefix(argc, "--baseline", "--baseline="),
     }
+    if not reduce_baseline_accepts(pred, candidate_path, 120000):
+        with_eprint("error: reduce --baseline: '" ++ pred.baseline ++ " check' does not accept the original input (out/reduce/baseline.stderr.txt); a baseline is a compiler that takes the program")
+        return 1
     let original_argv = reduce_make_argv(argc, pred, candidate_path)
     let out_path = "out/reduce/original.stdout.txt"
     let err_path = "out/reduce/original.stderr.txt"
@@ -6584,6 +6602,10 @@ fn print_reduce_usage:
     with_write("                   --filter <name>, which sets WITH_TEST_FILTER for the child) and\n")
     with_write("                   hold while <name> still fails in the same stage (build vs run)\n")
     with_write("                   and, with --contains, with the same text. Not with -- or --exit-code.\n")
+    with_write("  --baseline <compiler>\n")
+    with_write("                   Also require '<compiler> check {file}' to accept each candidate:\n")
+    with_write("                   the result is a program a known-good compiler takes and the\n")
+    with_write("                   predicate's does not, with nothing else wrong in it\n")
 
 fn print_fixpoint_diff_usage:
     with_write("Usage: with fixpoint-diff [left-object] [right-object]\n")
