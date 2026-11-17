@@ -3586,7 +3586,17 @@ impl Zcu:
         // D39: a registered interface section is not parsed here: its `use`
         // lines, read as text, put its imports on the worklist, and its
         // declarations are parsed on demand once every source module is in.
-        let on_demand = src.interface and not (self.interface_eager or self.bundle_corpus.len() > 0)
+        // A tree bundle is built from its modules' sources (#3351): the
+        // interfaces they import (the runtime's, an embedded bundle's) are
+        // read on demand, exactly as a compile of the same sources reads
+        // them. Read whole, the Windows runtime's `pthread_self` took the
+        // name LlvmBridge's own extern declares, and the bundle did not
+        // build there.
+        // The interface's own check reads the bundle's sections whole and
+        // the others on demand too, so both passes see one set of
+        // declarations.
+        let read_whole = if bundle_corpus_is_tree(self.bundle_corpus): self.interface_eager and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(path)) else: self.interface_eager or self.bundle_corpus.len() > 0
+        let on_demand = src.interface and not read_whole
         if on_demand:
             let section_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1

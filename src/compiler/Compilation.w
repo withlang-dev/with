@@ -1616,6 +1616,13 @@ impl Compilation:
                 // libcalls: bzero, memcpy) has none.
                 text = text ++ "import\t" ++ symbol ++ "\tforeign\t" ++ (if contract.len() > 0: contract else: "-") ++ "\n"
                 continue
+            // A tree bundle reads the runtime's interface on demand, so a
+            // call the compiler emits on its own (a fiber's cancelled
+            // return) has no declaration in the unit: it was emitted against
+            // this compiler's runtime, whose contract is the one recorded.
+            if contract.len() == 0 and bundle_corpus_is_tree(self.bundle_corpus):
+                text = text ++ "import\t" ++ symbol ++ "\trt\t" ++ provided ++ "\n"
+                continue
             if contract.len() == 0:
                 with_eprint("error: --emit-bundle-manifest: " ++ obj_path ++ " references the runtime symbol `" ++ symbol ++ "` without a declaration in the bundle's unit; a bundle calls the runtime through its interface")
                 return "<failed>"
