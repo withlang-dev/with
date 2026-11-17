@@ -112,6 +112,7 @@ write src/contracts/sqlite3.w:
             rename prepare
             param nByte fixed -1
             param pzTail fixed null
+            override lend      // sqlite3.c, sqlite3ValueNew: `p->db = db` is the back-pointer of db's own error value (db->pErr), freed by sqlite3_close
         // "Memory to hold the error message string is managed internally …
         // the error string might be overwritten or deallocated by subsequent
         // calls to other SQLite interface functions": a view of the
@@ -161,6 +162,7 @@ write src/contracts/sqlite3.w:
             param 2 fixed null
             param 3 fixed null
             param errmsg fixed null
+            override lend      // the same store, reached through sqlite3_prepare_v2; the statement it prepares is finalized before sqlite3_exec returns
             ok SQLITE_OK
         // sqlite3.h 3.51.0, sqlite3_exec: "If the callback function of the 3rd
         // argument to sqlite3_exec() is not NULL, then it is invoked for each
