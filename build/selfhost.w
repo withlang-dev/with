@@ -1586,6 +1586,13 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p", bs_one_liner_args("-p", "line = line.upper()"), "a\r\nb\n", "A\nB")
     if rc != 0: return rc
 
+    // §4.2.5 (#924): method assignment, one call and a chain.
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-method-assign", bs_one_liner_args("-p", "line .= replace(\"b\", \"X\")"), "abc\n", "aXc")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-method-assign-chain", bs_one_liner_args("-p", "line .= trim().upper()"), "  a b \n", "A B")
+    if rc != 0: return rc
+
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-semicolon", bs_one_liner_args("-p", "line = line.upper(); line = line ++ \"!\""), "a\n", "A!")
     if rc != 0: return rc
 

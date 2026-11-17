@@ -515,6 +515,8 @@ Compound assignment requires `a` to be a mutable binding (`var`)
 or a mutable reference. The operation and assignment are atomic
 from the language's perspective (no intermediate observable state).
 
+Method assignment `a .= f(args)` assigns the result of the method call `a.f(args)` to `a`. Further method calls may follow and apply to the result: `a .= f().g()` is `a = a.f().g()`. The place `a` is evaluated once.
+
 For Drop types, compound assignment is equivalent to: evaluate
 `a op b`, drop the old value of `a`, store the result. This
 ensures resources are properly released.
