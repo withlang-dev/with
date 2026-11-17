@@ -16,6 +16,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "with run \"$CLAUDE_PROJECT_DIR\"/tools/hooks/stop_guard.w",
+            "timeout": 60
+          }
+        ]
+      }
     ]
   }
 }
