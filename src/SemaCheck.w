@@ -6597,7 +6597,13 @@ impl Sema:
         let saved_module_path = move self.current_module_path
         let saved_module_has_ci = self.current_module_has_ci
         let caller_env = self.enter_callee_lexical_env()
+        // The callee's body is compile-time code by its own declaration, never
+        // by the caller's: `print`, checked from inside a `comptime fn`, was
+        // refused for its own `unsafe` (#665).
+        let caller_comptime = self.in_comptime_fn
+        self.in_comptime_fn = 0
         self.check_decl_body_in_order(di)
+        self.in_comptime_fn = caller_comptime
         self.leave_callee_lexical_env(caller_env)
         self.local_file_id = saved_file_id
         self.current_module_path = saved_module_path
@@ -18758,6 +18764,11 @@ impl Sema:
             return ""
         let fn_node = self.fn_symbol_decl_node(fn_sym)
         if fn_node == 0: return name ++ " (no With body)"
+        // The walk reads the calls the callee's own check resolved, so its
+        // body is checked first (a method's is checked after the functions',
+        // and read unchecked it had no calls: every method passed, #665).
+        let callee_di = self.find_decl_index(fn_node)
+        if callee_di >= 0 and callee_di < self.body_order_state.len(): self.check_decl_body_from_use(callee_di)
         self.comptime_callable_visiting.insert(fn_sym)
         var chain = ""
         let body_start = self.ast.get_start(fn_node)
@@ -18773,15 +18784,18 @@ impl Sema:
             if self.call_callable_types.contains(n):
                 chain = name ++ " (a call through a function value: no static callee)"
                 break
-            // A concrete callee through its signature; a generic callee
-            // through the declaration selected at this call.
+            // A generic callee through the declaration selected at this
+            // call (its checked call also has a signature, the
+            // specialization's, whose name has no declaration: `print` in
+            // a checked body read as "no With body"); a concrete callee
+            // through its signature.
             var callee: i32 = 0
-            if self.resolved_call_sigs.contains(n):
-                let sig = self.resolved_call_sigs.get(n).unwrap()
-                if sig >= 0 and sig < self.sig_names.len(): callee = self.sig_names[sig]
-            if callee == 0 and self.resolved_generic_call_nodes.contains(n):
+            if self.resolved_generic_call_nodes.contains(n):
                 let decl = self.resolved_generic_call_nodes.get(n).unwrap()
                 if decl != 0: callee = self.ast.get_data0(decl)
+            if callee == 0 and self.resolved_call_sigs.contains(n):
+                let sig = self.resolved_call_sigs.get(n).unwrap()
+                if sig >= 0 and sig < self.sig_names.len(): callee = self.sig_names[sig]
             // An extern or an intrinsic has no signature record here; the
             // callee is the name the call spells.
             if callee == 0:
@@ -18961,11 +18975,19 @@ impl Sema:
             return false
         if self.fn_symbol_is_builtin_list_comptime_allowed(method_sym):
             return false
-        if self.fn_symbol_is_comptime(method_sym) == false:
-            let cm_name = self.pool_resolve(method_sym)
-            self.emit_error(f"comptime can only call comptime functions ('{cm_name}')", node)
-            return true
-        false
+        // D104 (§17.1): a method is judged as a function is. A plain method
+        // is fine when everything it reaches runs at compile time; the
+        // refusal names the chain to the first operation that does not. (A
+        // plain method was refused outright, #665: `p.twice()` in a
+        // `comptime fn`, where the free `twice(p)` was accepted.)
+        if self.fn_symbol_is_comptime(method_sym): return false
+        let chain = self.comptime_callable_chain(method_sym)
+        if chain.len() == 0: return false
+        let cm_name = self.pool_resolve(method_sym)
+        let cm_msg = f"'{cm_name}' is not comptime-callable: it reaches " ++ chain ++ " (§17.1); a comptime fn may call only what runs at compile time"
+        if chain.contains("with_getenv"): self.emit_error_with_help(cm_msg, node, COMPTIME_ENV_HELP)
+        else: self.emit_error(cm_msg, node)
+        true
 
     fn push_unique_i32(xs: List[i32], value: i32) -> List[i32]:
         if value == 0:
