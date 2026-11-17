@@ -961,53 +961,56 @@ fn rt_slab_block_begins(slab: i64, header: i64) -> i32:
 //
 // A freed small block joined its class's freelist and its slab stayed mapped
 // for the life of the process: a program's small-object memory was its
-// high-water mark. Each slab now counts its live blocks and the blocks ever
-// carved from it, in the map bits of the map's own 32 units (two u16s: a
-// slab holds at most 2,032 blocks), which rt_slab_block_begins never reads.
-// A slab whose last live block is freed is empty: every block carved from
-// it is on a freelist. When the empty slabs are RT_SLAB_RELEASE_MIN or more
-// and hold a quarter of all free blocks, one sweep unlinks their blocks
-// from the freelists and unmaps them; the walk costs at most four steps a
-// block released, and a released block is never walked again. The slab
-// being carved is never released, and WITH_ALLOC_NO_REUSE, which keeps
-// every freed block out of the freelists, releases nothing.
+// high-water mark. A slab whose block map has no bit set holds no live
+// block, so every block carved from it is on a freelist; a sweep finds
+// those slabs, unlinks their blocks from the freelists and unmaps them. An
+// allocation and a free pay one counter for it: the sweep runs when the
+// free blocks have doubled since the last one (and are RT_SLAB_SWEEP_FLOOR
+// more), so its walk of the freelists is paid by the frees that grew them,
+// and a program whose free blocks hold steady never sweeps. The slab being
+// carved is never released; WITH_ALLOC_NO_REUSE, which keeps every freed
+// block out of the freelists, never counts one and never sweeps.
+let RT_SLAB_SWEEP_FLOOR: i64 = 32768
 let RT_SLAB_RELEASE_MIN: i64 = 16
+let RT_SLAB_RELEASING: u32 = 1
 var rt_small_free_blocks: i64 = 0
-var rt_empty_slabs: i64 = 0
-var rt_empty_slab_blocks: i64 = 0
+var rt_slab_sweep_at: i64 = RT_SLAB_SWEEP_FLOOR
 
-fn rt_slab_live(slab: i64) -> i64: (unsafe *(slab as *const u16)) as i64
+fn rt_slab_map_is_empty(slab: i64) -> bool:
+    var at: i64 = 0
+    while at < RT_SLAB_MAP_BYTES:
+        if unsafe *((slab + at) as *const i64) != 0: return false
+        at = at + 8
+    true
 
-fn rt_slab_carved(slab: i64) -> i64: (unsafe *((slab + 2) as *const u16)) as i64
-
-// A block of `slab` comes to life: carved, or taken from a freelist.
-fn rt_slab_block_taken(slab: i64, carving: bool):
-    let live = rt_slab_live(slab)
-    let carved = rt_slab_carved(slab)
-    if live == 0 and carved > 0:
-        rt_empty_slabs = rt_empty_slabs - 1
-        rt_empty_slab_blocks = rt_empty_slab_blocks - carved
-    unsafe *(slab as *mut u16) = (live + 1) as u16
-    if carving: unsafe *((slab + 2) as *mut u16) = (carved + 1) as u16
-
-fn rt_slab_block_freed(slab: i64):
-    let live = rt_slab_live(slab) - 1
-    unsafe *(slab as *mut u16) = live as u16
-    if live == 0:
-        rt_empty_slabs = rt_empty_slabs + 1
-        rt_empty_slab_blocks = rt_empty_slab_blocks + rt_slab_carved(slab)
-
-fn rt_slab_is_releasable(slab: i64) -> bool:
-    slab != 0 and slab != slab_base and rt_slab_live(slab) == 0 and rt_slab_carved(slab) > 0
+// The sweep marks a slab it releases in the map bits of the map's own
+// units, which no block sets and rt_slab_block_begins never reads.
+fn rt_slab_is_releasing(slab: i64) -> bool:
+    slab != 0 and unsafe *(slab as *const u32) == RT_SLAB_RELEASING
 
 fn rt_release_empty_slabs():
+    if not rt_unmap_returns_pages():
+        rt_slab_sweep_at = 9223372036854775807
+        return
+    var empty: i64 = 0
+    for i in 0..rt_slab_range_count:
+        let start = rt_range_start(rt_slab_range_base, i)
+        if start != slab_base and rt_slab_map_is_empty(start):
+            unsafe *(start as *mut u32) = RT_SLAB_RELEASING
+            empty = empty + 1
+    if empty < RT_SLAB_RELEASE_MIN:
+        for i in 0..rt_slab_range_count:
+            let start = rt_range_start(rt_slab_range_base, i)
+            if rt_slab_is_releasing(start): unsafe *(start as *mut u32) = 0
+        rt_slab_sweep_at = rt_small_free_blocks * 2 + RT_SLAB_SWEEP_FLOOR
+        return
     for idx in 0..RT_NUM_SIZE_CLASSES:
         var kept_head: i64 = 0
         var kept_tail: i64 = 0
         var block = get_freelist(idx)
         while block != 0:
             let next = unsafe *(block as *const i64)
-            if rt_slab_is_releasable(rt_owned_slab_start(block)):
+            if rt_slab_is_releasing(rt_owned_slab_start(block)):
                 rt_small_free_blocks = rt_small_free_blocks - 1
             else:
                 if kept_tail == 0: kept_head = block
@@ -1019,9 +1022,7 @@ fn rt_release_empty_slabs():
     var kept: isize = 0
     for i in 0..rt_slab_range_count:
         let start = rt_range_start(rt_slab_range_base, i)
-        if rt_slab_is_releasable(start):
-            rt_empty_slabs = rt_empty_slabs - 1
-            rt_empty_slab_blocks = rt_empty_slab_blocks - rt_slab_carved(start)
+        if rt_slab_is_releasing(start):
             rt_owned_forget_slab(start, RT_PAGE_SIZE)
             rt_munmap(start as *mut u8, RT_PAGE_SIZE)
             rt_alloc_release_mmap_bytes(RT_PAGE_SIZE)
@@ -1029,6 +1030,7 @@ fn rt_release_empty_slabs():
             if kept != i: rt_range_store(rt_slab_range_base, rt_slab_range_cap, kept, start, rt_range_end(rt_slab_range_base, rt_slab_range_cap, i))
             kept = kept + 1
     rt_slab_range_count = kept
+    rt_slab_sweep_at = rt_small_free_blocks * 2 + RT_SLAB_SWEEP_FLOOR
 
 fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     if ptr as i64 == 0:
@@ -1271,8 +1273,7 @@ fn dbg_invalid_free_forensics(payload: i64):
 fn free_small_block(block: i64, idx: i32):
     // The block is no longer an owned payload: its map bit clears, so a str
     // naming it is a double free for the ledger, not a holder release.
-    let slab = rt_owned_slab_start(block)
-    rt_slab_clear_block(slab, block)
+    rt_slab_clear_block(rt_owned_slab_start(block), block)
     if alloc_no_reuse_on() != 0:
         unsafe *(block as *mut i64) = -1
         return
@@ -1280,9 +1281,7 @@ fn free_small_block(block: i64, idx: i32):
     unsafe *(block as *mut i64) = old_head
     set_freelist(idx, block)
     rt_small_free_blocks = rt_small_free_blocks + 1
-    rt_slab_block_freed(slab)
-    if rt_empty_slabs >= RT_SLAB_RELEASE_MIN and rt_empty_slab_blocks * 4 >= rt_small_free_blocks and rt_unmap_returns_pages():
-        rt_release_empty_slabs()
+    if rt_small_free_blocks >= rt_slab_sweep_at: rt_release_empty_slabs()
 
 // ── Debug allocator (issue #606 instrument) ────────────────────────
 // A pure-With memory-error ledger gated at runtime by --debug-alloc /
@@ -2076,10 +2075,8 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         // Pop from freelist. Zero the payload — recycled memory is dirty.
         let next = unsafe *(head as *const i64)
         set_freelist(idx, next)
-        let head_slab = rt_owned_slab_start(head)
-        rt_slab_mark_block(head_slab, head)
+        rt_slab_mark_block(rt_owned_slab_start(head), head)
         rt_small_free_blocks = rt_small_free_blocks - 1
-        rt_slab_block_taken(head_slab, false)
         alloc_store_small_header(head, cls_size)
         let ptr = small_block_ptr(head)
         rt_zero_aligned(ptr as i64, if alloc_zero_class_on() != 0: cls_size else: size)
@@ -2104,7 +2101,6 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     slab_ptr = slab_ptr + block_size
     slab_remaining = slab_remaining - block_size
     rt_slab_mark_block(slab_base, block)
-    rt_slab_block_taken(slab_base, true)
     alloc_store_small_header(block, cls_size)
     small_block_ptr(block)
 
