@@ -330,6 +330,10 @@ pub fn rt_mmap(size: i64) -> *mut u8:
         return 0 as *mut u8
     p
 
+// An unmapped region goes back to the system (rt_core releases empty
+// slabs, #685).
+pub fn rt_unmap_returns_pages() -> bool: true
+
 pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
     rt_libc_munmap(ptr, size as u64)
 

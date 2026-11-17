@@ -288,6 +288,10 @@ pub fn rt_mmap(size: i64) -> *mut u8:
     wasm_heap_cur = start + need
     start as *mut u8
 
+// Linear memory never shrinks, and the recycler below holds a bounded set
+// of freed runs: rt_core keeps its empty slabs on the freelists (#685).
+pub fn rt_unmap_returns_pages() -> bool: false
+
 pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
     if ptr as i64 == 0 or size <= 0:
         return

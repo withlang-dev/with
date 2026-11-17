@@ -38,6 +38,7 @@ extern fn rt_mkstemp(template_path: *mut c_char) -> i32
 extern fn rt_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char
 extern fn rt_mmap(size: i64) -> *mut u8
 extern fn rt_munmap(ptr: *mut u8, size: i64)
+extern fn rt_unmap_returns_pages() -> bool
 @[link_name("malloc")]
 extern fn rt_libc_malloc(size: i64) -> *mut u8
 @[link_name("free")]
@@ -670,7 +671,9 @@ let RT_OWNED_PAGE_SHIFT: i64 = 12
 let RT_OWNED_TABLE_MIN: i64 = 4096
 var rt_owned_base: i64 = 0
 var rt_owned_cap: i64 = 0
+// Occupied slots (the load a probe sees), and the pages that are slabs now.
 var rt_owned_count: i64 = 0
+var rt_owned_live: i64 = 0
 
 fn rt_owned_hash(key: i64, cap: i64) -> i64:
     ((key *% 7046029254386353131) >> (17 as u32)) & (cap - 1)
@@ -681,20 +684,27 @@ fn rt_owned_key_at(base: i64, i: i64) -> i64:
 fn rt_owned_start_at(base: i64, i: i64) -> i64:
     unsafe *((base + i * 16 + 8) as *const i64)
 
-fn rt_owned_put(base: i64, cap: i64, key: i64, start: i64):
+// Stores `key -> start`; 1 when the key took a new slot, 0 when it was
+// already there (the page of a released slab, mapped again, #685).
+fn rt_owned_put(base: i64, cap: i64, key: i64, start: i64) -> i64:
     var i = rt_owned_hash(key, cap)
-    while rt_owned_key_at(base, i) != 0:
+    while rt_owned_key_at(base, i) != 0 and rt_owned_key_at(base, i) != key:
         i = (i + 1) & (cap - 1)
+    let fresh: i64 = if rt_owned_key_at(base, i) == 0: 1 else: 0
     unsafe *((base + i * 16) as *mut i64) = key
     unsafe *((base + i * 16 + 8) as *mut i64) = start
+    fresh
 
 // Index every page of a slab. Grows the table first when the new pages
 // would push it past half load.
 fn rt_owned_record_slab(start: i64, size: i64):
     let pages = size >> (RT_OWNED_PAGE_SHIFT as u32)
     if (rt_owned_count + pages) * 2 > rt_owned_cap:
-        var new_cap = if rt_owned_cap == 0: RT_OWNED_TABLE_MIN else: rt_owned_cap * 2
-        while (rt_owned_count + pages) * 2 > new_cap:
+        // Sized by the pages that are slabs now: the slots of released
+        // slabs (#685) are left behind, so a program that maps and releases
+        // in turn rebuilds a table no larger than its live slabs need.
+        var new_cap = RT_OWNED_TABLE_MIN
+        while (rt_owned_live + pages) * 4 > new_cap:
             new_cap = new_cap * 2
         let new_base = rt_mmap(new_cap * 16) as i64
         if new_base == 0:
@@ -702,18 +712,29 @@ fn rt_owned_record_slab(start: i64, size: i64):
         var i: i64 = 0
         while i < rt_owned_cap:
             let key = rt_owned_key_at(rt_owned_base, i)
-            if key != 0:
+            if key != 0 and rt_owned_start_at(rt_owned_base, i) != 0:
                 rt_owned_put(new_base, new_cap, key, rt_owned_start_at(rt_owned_base, i))
             i = i + 1
         if rt_owned_base != 0:
             rt_munmap(rt_owned_base as *mut u8, rt_owned_cap * 16)
         rt_owned_base = new_base
         rt_owned_cap = new_cap
+        rt_owned_count = rt_owned_live
     var page: i64 = 0
     while page < pages:
-        rt_owned_put(rt_owned_base, rt_owned_cap, (start >> (RT_OWNED_PAGE_SHIFT as u32)) + page, start)
+        rt_owned_count = rt_owned_count + rt_owned_put(rt_owned_base, rt_owned_cap, (start >> (RT_OWNED_PAGE_SHIFT as u32)) + page, start)
         page = page + 1
-    rt_owned_count = rt_owned_count + pages
+    rt_owned_live = rt_owned_live + pages
+
+// A released slab's pages (#685): each key stays, with no start, so a probe
+// past it still finds what was stored after it; the next rebuild drops it.
+fn rt_owned_forget_slab(start: i64, size: i64):
+    let pages = size >> (RT_OWNED_PAGE_SHIFT as u32)
+    var page: i64 = 0
+    while page < pages:
+        rt_owned_put(rt_owned_base, rt_owned_cap, (start >> (RT_OWNED_PAGE_SHIFT as u32)) + page, 0)
+        page = page + 1
+    rt_owned_live = rt_owned_live - pages
 
 // The slab holding `header`, or 0.
 fn rt_owned_slab_start(header: i64) -> i64:
@@ -935,6 +956,79 @@ fn rt_slab_block_begins(slab: i64, header: i64) -> i32:
     let unit = (header - slab) / RT_ALLOC_HEADER_SIZE
     let byte: i32 = unsafe *((slab + unit / 8) as *const u8)
     (byte >> ((unit % 8) as u32)) & 1
+
+// ── Empty slabs go back to the system (#685) ───────────────────────
+//
+// A freed small block joined its class's freelist and its slab stayed mapped
+// for the life of the process: a program's small-object memory was its
+// high-water mark. Each slab now counts its live blocks and the blocks ever
+// carved from it, in the map bits of the map's own 32 units (two u16s: a
+// slab holds at most 2,032 blocks), which rt_slab_block_begins never reads.
+// A slab whose last live block is freed is empty: every block carved from
+// it is on a freelist. When the empty slabs are RT_SLAB_RELEASE_MIN or more
+// and hold a quarter of all free blocks, one sweep unlinks their blocks
+// from the freelists and unmaps them; the walk costs at most four steps a
+// block released, and a released block is never walked again. The slab
+// being carved is never released, and WITH_ALLOC_NO_REUSE, which keeps
+// every freed block out of the freelists, releases nothing.
+let RT_SLAB_RELEASE_MIN: i64 = 16
+var rt_small_free_blocks: i64 = 0
+var rt_empty_slabs: i64 = 0
+var rt_empty_slab_blocks: i64 = 0
+
+fn rt_slab_live(slab: i64) -> i64: (unsafe *(slab as *const u16)) as i64
+
+fn rt_slab_carved(slab: i64) -> i64: (unsafe *((slab + 2) as *const u16)) as i64
+
+// A block of `slab` comes to life: carved, or taken from a freelist.
+fn rt_slab_block_taken(slab: i64, carving: bool):
+    let live = rt_slab_live(slab)
+    let carved = rt_slab_carved(slab)
+    if live == 0 and carved > 0:
+        rt_empty_slabs = rt_empty_slabs - 1
+        rt_empty_slab_blocks = rt_empty_slab_blocks - carved
+    unsafe *(slab as *mut u16) = (live + 1) as u16
+    if carving: unsafe *((slab + 2) as *mut u16) = (carved + 1) as u16
+
+fn rt_slab_block_freed(slab: i64):
+    let live = rt_slab_live(slab) - 1
+    unsafe *(slab as *mut u16) = live as u16
+    if live == 0:
+        rt_empty_slabs = rt_empty_slabs + 1
+        rt_empty_slab_blocks = rt_empty_slab_blocks + rt_slab_carved(slab)
+
+fn rt_slab_is_releasable(slab: i64) -> bool:
+    slab != 0 and slab != slab_base and rt_slab_live(slab) == 0 and rt_slab_carved(slab) > 0
+
+fn rt_release_empty_slabs():
+    for idx in 0..RT_NUM_SIZE_CLASSES:
+        var kept_head: i64 = 0
+        var kept_tail: i64 = 0
+        var block = get_freelist(idx)
+        while block != 0:
+            let next = unsafe *(block as *const i64)
+            if rt_slab_is_releasable(rt_owned_slab_start(block)):
+                rt_small_free_blocks = rt_small_free_blocks - 1
+            else:
+                if kept_tail == 0: kept_head = block
+                else: unsafe *(kept_tail as *mut i64) = block
+                kept_tail = block
+            block = next
+        if kept_tail != 0: unsafe *(kept_tail as *mut i64) = 0
+        set_freelist(idx, kept_head)
+    var kept: isize = 0
+    for i in 0..rt_slab_range_count:
+        let start = rt_range_start(rt_slab_range_base, i)
+        if rt_slab_is_releasable(start):
+            rt_empty_slabs = rt_empty_slabs - 1
+            rt_empty_slab_blocks = rt_empty_slab_blocks - rt_slab_carved(start)
+            rt_owned_forget_slab(start, RT_PAGE_SIZE)
+            rt_munmap(start as *mut u8, RT_PAGE_SIZE)
+            rt_alloc_release_mmap_bytes(RT_PAGE_SIZE)
+        else:
+            if kept != i: rt_range_store(rt_slab_range_base, rt_slab_range_cap, kept, start, rt_range_end(rt_slab_range_base, rt_slab_range_cap, i))
+            kept = kept + 1
+    rt_slab_range_count = kept
 
 fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     if ptr as i64 == 0:
@@ -1177,13 +1271,18 @@ fn dbg_invalid_free_forensics(payload: i64):
 fn free_small_block(block: i64, idx: i32):
     // The block is no longer an owned payload: its map bit clears, so a str
     // naming it is a double free for the ledger, not a holder release.
-    rt_slab_clear_block(rt_owned_slab_start(block), block)
+    let slab = rt_owned_slab_start(block)
+    rt_slab_clear_block(slab, block)
     if alloc_no_reuse_on() != 0:
         unsafe *(block as *mut i64) = -1
         return
     let old_head = get_freelist(idx)
     unsafe *(block as *mut i64) = old_head
     set_freelist(idx, block)
+    rt_small_free_blocks = rt_small_free_blocks + 1
+    rt_slab_block_freed(slab)
+    if rt_empty_slabs >= RT_SLAB_RELEASE_MIN and rt_empty_slab_blocks * 4 >= rt_small_free_blocks and rt_unmap_returns_pages():
+        rt_release_empty_slabs()
 
 // ── Debug allocator (issue #606 instrument) ────────────────────────
 // A pure-With memory-error ledger gated at runtime by --debug-alloc /
@@ -1977,7 +2076,10 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         // Pop from freelist. Zero the payload — recycled memory is dirty.
         let next = unsafe *(head as *const i64)
         set_freelist(idx, next)
-        rt_slab_mark_block(rt_owned_slab_start(head), head)
+        let head_slab = rt_owned_slab_start(head)
+        rt_slab_mark_block(head_slab, head)
+        rt_small_free_blocks = rt_small_free_blocks - 1
+        rt_slab_block_taken(head_slab, false)
         alloc_store_small_header(head, cls_size)
         let ptr = small_block_ptr(head)
         rt_zero_aligned(ptr as i64, if alloc_zero_class_on() != 0: cls_size else: size)
@@ -2002,6 +2104,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     slab_ptr = slab_ptr + block_size
     slab_remaining = slab_remaining - block_size
     rt_slab_mark_block(slab_base, block)
+    rt_slab_block_taken(slab_base, true)
     alloc_store_small_header(block, cls_size)
     small_block_ptr(block)
 

@@ -709,6 +709,10 @@ pub fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
 pub fn rt_mmap(size: i64) -> *mut u8:
     VirtualAlloc(0 as *mut u8, size as u64, MEM_COMMIT_RESERVE, PAGE_READWRITE)
 
+// An unmapped region goes back to the system (rt_core releases empty
+// slabs, #685).
+pub fn rt_unmap_returns_pages() -> bool: true
+
 pub fn rt_munmap(ptr: *mut u8, size: i64):
     let _free = VirtualFree(ptr, 0, MEM_RELEASE)
 
