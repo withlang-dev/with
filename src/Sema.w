@@ -672,6 +672,10 @@ type RaceEvidence {
     reason: str,
     fn_sym: i32,
 }
+// #3239: one call or value use the race proof walks, and one access to a
+// global, each with the function it is in (0: top level) and its site.
+type RaceEdge { from: i32, to: i32, node: i32 }
+type RaceAccess { sym: i32, node: i32, fn_sym: i32 }
 
 // D66 retained variadic pairs (#1652, §16.2b.9): what one operation of a
 // resource that has a callback pair does to that pair, keyed by the concrete
@@ -1409,6 +1413,7 @@ type Sema {
     global_race_access_paths: List[str],
     global_race_access_kinds: List[i32],
     global_race_access_unsafe: List[i32],
+    race_accesses: List[RaceAccess],                       // every recorded access, with the function it is in
     global_race_mutated_syms: HashMap[i32, i32, Minted],
     global_race_mutation_nodes: HashMap[i32, i32, Minted],
     // #2369: a mutable global some body rebinds whole (`G = value`), with
@@ -1426,6 +1431,17 @@ type Sema {
     race_call_edge_first: HashMap[i32, isize, Minted],     // a caller's first edge into race_call_edge_to; race_call_edge_next chains the rest
     race_call_edge_to: List[i32],
     race_call_edge_next: List[isize],
+    race_edges: List[RaceEdge],                            // every edge, with its caller and its site
+    // #3239: the functions taken as values (callable from anywhere), and
+    // the functions that may run other than through direct calls from
+    // `main`, computed once (race_off_main_ready).
+    race_fn_value_syms: HashMap[i32, i32, Minted],
+    race_off_main_fns: HashMap[i32, i32, Minted],
+    race_off_main_names: HashMap[str, i32],                // their names: one C function may have two symbol ids
+    race_runtime_fn_names: HashMap[str, i32],              // the runtime's functions, which every translation redeclares
+    race_deferred_spans: List[i32],                        // (file, start, end) of each closure, async block and scope
+    race_off_main_ready: bool,
+    global_race_off_main_reason: str,                      // why the access being reported has no per-library proof
     // #1819 (§9.1c: globals are places; §21.1 rule 1): a call whose callee
     // writes a global — itself, or through its own calls — writes it at the
     // call site. Bodies are keyed by sema_global_effect_body: a signature
@@ -3985,6 +4001,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         global_race_access_paths: sema_new_list_str(),
         global_race_access_kinds: List.new(),
         global_race_access_unsafe: List.new(),
+        race_accesses: [],
         global_race_mutated_syms,
         global_race_mutation_nodes,
         global_rebind_sites: sema_new_map_i32_str(),
@@ -3995,6 +4012,14 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         race_call_edge_first: HashMap.new(),
         race_call_edge_to: [],
         race_call_edge_next: [],
+        race_edges: [],
+        race_fn_value_syms: HashMap.new(),
+        race_off_main_fns: HashMap.new(),
+        race_off_main_names: HashMap.new(),
+        race_runtime_fn_names: HashMap.new(),
+        race_deferred_spans: [],
+        race_off_main_ready: false,
+        global_race_off_main_reason: "",
         global_write_records: List.new(),
         global_read_records: List.new(),
         global_init_order: List.new(),
