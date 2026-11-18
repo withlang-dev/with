@@ -33,14 +33,13 @@
 // presented under its C name as `Option[CStr]`. Each domain names the
 // functions that rewrite it (D208, §16.2b.7), and every other function
 // preserves it: a view from `getenv` survives a `strchr` over it. `getenv`
-// is a writer of `environ`: C11 7.22.4.6p4 — the string it points to "may
-// be overwritten by a subsequent call to the getenv function" — so a second
-// getenv invalidates the view an earlier one returned, and a program that
-// needs both copies the first out (`to_owned()`) before the second call.
-// Leaving it off the list would grant a capability the standard does not
-// back (ruling: never state what can create unsafety); the runtime's own
-// getenv row (rt/*.w, ruling §52) says the same. A writer the program did
-// not import is left off the list it is given: it cannot be called.
+// is no writer of `environ` (Eric, 2026-11-18): C11 7.22.4.6 lets the
+// string be overwritten by a later getenv, but POSIX.1-2024 requires the
+// pointer to point into the environment data itself, and on a list where
+// getenv is a writer the call is refused beside every contract that is
+// silent on its threads. A view from getenv dies at a call that modifies
+// the environment. A writer the program did not import is left off the
+// list it is given: it cannot be called.
 
 use Ast
 use InternPool
@@ -81,10 +80,11 @@ fn libc_facade_source() -> str:
     // behaves as if no library function calls getenv (7.22.4.6) or strerror
     // (7.24.6.2).
     runs no threads
-    // C11 7.22.4.6p4: the string getenv returns may be overwritten by a
-    // subsequent call of getenv. POSIX setenv(3), unsetenv(3), putenv(3)
-    // and clearenv(3) modify the environment list.
-    domain environ process written by getenv, setenv, unsetenv, putenv, clearenv
+    // POSIX.1-2024 getenv: the pointer returned by getenv points to a string
+    // within the environment data pointed to by environ. setenv(3),
+    // unsetenv(3), putenv(3) and clearenv(3) modify that data, as the C
+    // runtime's _putenv and _putenv_s do on Windows.
+    domain environ process written by setenv, unsetenv, putenv, clearenv, _putenv, _putenv_s
     // C11 7.24.6.2p4: the array strerror returns may be overwritten by a
     // subsequent call of strerror.
     domain strerror_text process written by strerror
