@@ -123,9 +123,9 @@ item            = resource | handle | fn_item | domain | library_clause
 resource        = "resource" TypeName "wraps" type NEWLINE INDENT resource_clause+ DEDENT
 handle          = "handle" TypeName "wraps" type
 fn_item         = "fn" c_name NEWLINE [ INDENT fn_clause+ DEDENT ]
-domain          = "domain" name domain_kind
+domain          = "domain" name domain_kind [ "written" "by" ( "any" | c_name { "," c_name } ) ]
 domain_kind     = "process" | "thread" | "resource" | "static"
-library_clause  = [ "override" ] ( "text" "utf8" | "runs" [ "no" ] "threads" )
+library_clause  = [ "override" ] ( "text" "utf8" | "runs" [ "no" ] "threads" | "preserves" "domain" name )
 adoption        = "use" "convention" dotted_name
 field_role      = [ "override" ] "field" name "of" c_name "is" role
 role            = "allocator" | "reallocator" | "deallocator" | "context"
@@ -136,7 +136,7 @@ production      = "from" c_name [ "(" "out" param_ref ")" ] [ "," ( field_check 
                 | "init" c_name [ "(" "self" ")" ]
                 | "preinit" c_name [ "(" "self" ")" ]
 field_check     = ( "nullable" | "nonnull" ) "field" field_path
-destruction     = "drop" c_name | "destroys" c_name | "abandon" c_name
+destruction     = ( "drop" | "destroys" ) c_name [ "(" param_ref ")" ] | "abandon" c_name
 status          = "ok" CONST { "," CONST } | "message" c_name
 dependency      = "borrows" param_ref | "independent"
 capability      = "movable" | "thread" thread_cap { thread_cap }
@@ -176,7 +176,7 @@ retention       = "retains" "by" param_ref
                   [ "length" "param" CONST "as" type ]
                   [ "until" name { "," name } ]
 domain_clause   = "establishes" "domain" name | "ends" "domain" name | "requires" "domain" name
-presentation    = "of" TypeName | "rename" name | param_ref "fixed" literal
+presentation    = "of" TypeName | "rename" name | param_ref "fixed" literal | param_ref "discarded"
 
 param_ref       = "param" ( name | INTEGER | "type" type )
 ref             = name | INTEGER
@@ -435,8 +435,8 @@ produced. (§16.2b.15.)
 | `from f, nonnull field a.b` | as above, and a NULL there is a contract failure naming `f`; presents `N`. | G | | §16.2b.4 |
 | `init f(self)` | `f` initializes caller-provided storage in place; `N` is pinned: its representation has one address until destruction completes. | G | | §16.2b.4 |
 | `preinit f` | `f` constructs the storage `init` fills. Without it the storage begins as the zeroed representation. | G | | §16.2b.4 |
-| `drop f` | `f`, taking only the representation, destroys it; `Drop` calls it. | G | a resource with a producer and no destruction path is refused | §16.2b.3 |
-| `destroys f` | `f` destroys the resource and takes further arguments; called explicitly, consuming. A resource with `destroys` and no `drop` is refused. The resource owns this fact, with `from`, `init`, `drop` and `abandon`. | G | | §16.2b.3 |
+| `drop f` | `f`, taking only the representation, destroys it; `Drop` calls it. `drop f(param N)`: the representation is parameter N, and every other parameter is fixed on `fn f`. | G | a resource with a producer and no destruction path is refused | §16.2b.3 |
+| `destroys f` | `f` destroys the resource and takes further arguments; `destroys f(param N)`: the resource is parameter N, the first when the parentheses are absent; called explicitly, consuming. A resource with `destroys` and no `drop` is refused. The resource owns this fact, with `from`, `init`, `drop` and `abandon`. | G | | §16.2b.3 |
 | `abandon f` | `f`, which invokes no callbacks, runs before the destroyer on a drop path that abandons a half-configured callback pair. | G | | §16.2b.9 |
 | `ok C1, C2` | the producers' status is success when it is one of these constants; with several, the `Ok` side carries the one that matched. A success status with nothing produced is `NothingProduced`, an error. | G | the status is uninterpreted: the constructor's result is `(status, Option[N])`. There is no rule that 0 means success | §16.2b.4 |
 | `message f` | `f` describes the resource's most recent failure; an error from an operation on the resource carries `message: str`, an owned copy read before any other operation on it. | G | | §16.2b.4 |
@@ -517,6 +517,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `of R` | the operation is presented on resource `R`. Required when its resource parameter's representation is wrapped by more than one resource. | P | the one resource that wraps the representation | §16.2b.3 |
 | `rename n` | the With name of the operation. | P | the convention's shortening of the C name | §16.2b.11 |
 | `param p fixed literal` | the presented operation omits `p` and always passes the literal. | P | | §16.2b.11 |
+| `param p discarded` | `p` is an out-pointer fixed as discarded: the wrapper passes scratch storage and ignores what C writes. | P | | §16.2b.11 |
 
 **Value records** (`reads`, `fills`, `updates`). The parameter points to one
 complete record that is not a resource's representation. Three conditions,
@@ -865,8 +866,9 @@ independent of provenance (§16.2b.13):
    parameter of the function it is stated on, by name, index or unique type;
    a named domain exists.
 2. **Shapes.** A producer returns the representation, or stores it through
-   the stated out parameter; `drop` takes only the representation;
-   `destroys` takes it first; an `ok` status is an integer; a `buffer`'s
+   the stated out parameter; `drop` takes only the representation, or with
+   `(param N)` takes it at N and every other parameter is fixed;
+   `destroys` takes it first, or at the stated parameter; an `ok` status is an integer; a `buffer`'s
    count is an integer; a `callback`'s parameter is callable; `consumes`
    names a compatible value. A destroyer parameter of type `void *` accepts
    every object-pointer representation and no function-pointer or by-value

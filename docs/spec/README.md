@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.61
+# The With Programming Language — Specification v7.62
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.62:** D208's derived words and D209 (Eric, 2026-11-18). §31 grammar: a domain's `written by` list and the contract-level `preserves domain D`; §16.2b.7: what `written by any` means, what the contract-level line says, and that the condition on a writer's call applies where some function returns a view; the `environ` and curl examples name their writers, and `curl_version()` is a view of its own static buffer. D209: `drop f(param N)` and `destroys f(param N)` name the parameter that receives the resource, the first when the parentheses are absent; `drop f(param N)` requires every other parameter fixed; `param p discarded` fixes an out-pointer as discarded. The domain words are implemented; D209 is not: a destroyer takes its resource first, and no parameter can be discarded.
+
 **Changelog v7.61:** #3178 (Eric, 2026-11-18). §16.2b.9, §31: `callback param N` describes a callback with no userdata parameter; the argument is a function or a closure that captures nothing, and a callback the library retains states `callback_thread`. Implemented with these words; the drafter writes the clause where the C body only calls the pointer or tests it for NULL.
 
 **Changelog v7.60:** D208 (Eric, 2026-11-18). §16.2b.7: a process domain names the functions that rewrite it, `domain D process written by f, g` or `written by any`, and one that says neither is an error; functions not named preserve it; a call of a named writer is safe where every call of the domain's writers and of the functions returning views of it is provably on one thread and every linked contract says `runs no threads` or `preserves domain D`, and is raw otherwise. The compiler implements none of it yet: a process domain names no writers, and every function of its library invalidates its views unless it says `preserves`.

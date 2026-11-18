@@ -12,6 +12,10 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D212 — `with get` builds a C package from source by default: cached per user, proofs drawn from the patched tree that is compiled, a non-CMake requirement taken as a binary, and one line per package saying which it was (ruled)](2026-11-18-D212-with-get-builds-from-source-by-default.md)
+- [D211 — A call through a function-pointer field the package fills: several writers join, and a record passed to such a call has not left the proofs; `field F of R holds f, g` is the cited fallback (ruled; extends D198)](2026-11-18-D211-function-pointer-fields-the-package-fills.md)
+- [D210 — A buffer paired with fields of a resource's record: `buffer field P remaining field N`, fields cleared after the call, a generated result record (ruled)](2026-11-18-D210-a-buffer-paired-with-fields-of-the-record.md)
+- [D209 — A destroyer names the parameter that receives the resource; an out-pointer can be fixed as discarded (ruled)](2026-11-18-D209-a-destroyer-names-its-resource-parameter.md)
 - [D208 — A process domain names its writers: `written by f, g` or `written by any`, never neither; a writer's call is safe on one thread when every linked contract runs no threads or preserves the domain (ruled)](2026-11-18-D208-a-process-domain-names-its-writers.md)
 - [D207 — `c_char` is a type of its own on every target: one byte, the target's sign, never an alias; a conversion is implicit only when it keeps the value on every target (ruled; amends D155)](2026-11-18-D207-c-char-is-a-type-of-its-own-on-every-target.md)
 - [D206 — Nothing routine migrates a corpus that is already migrated: no gate, report or tool re-migrates one; supersedes D112 amendment 1 (ruled)](2026-11-16-D206-nothing-routine-migrates-a-corpus-that-is-already-migrated.md)
