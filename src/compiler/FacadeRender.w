@@ -265,7 +265,7 @@ fn facade_render_producer_message_call(pool: &AstPool, intern: &InternPool, ci: 
 fn facade_render_hosted_fn_errors(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> str:
     let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
     let repr = facade_render_unalias(pool, intern, repr_text)
-    var out = ""
+    var out = facade_render_drop_helper(pool, intern, ci, resource)
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for item in items:
         let li = facade_render_lend_item(pool, intern, ci, item)
@@ -1365,10 +1365,15 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     let global_drop = if drop_fn == 0: facade_render_drop_call(pool, intern, name, 0, drop_global, repr_text, "self.repr", pinned, "            ") else: ""
     if drop_fn == 0 and global_drop.len() == 0:
         return ("", facade_render_no_error_use())
+    // D209: each takes the representation at the parameter its clause
+    // names; a drop with other parameters calls through its helper, which
+    // exists only when every one of them is fixed or discarded.
     for destroyer in destroyers:
-        if destroyer == 0 or facade_render_repr_arg(pool, intern, destroyer, repr_text, "self.repr", pinned).len() == 0:
+        if destroyer == 0 or facade_render_repr_arg_at(pool, intern, destroyer, facade_render_destroyer_at(pool, intern, item, destroyer), repr_text, "self.repr", pinned).len() == 0:
             return ("", facade_render_no_error_use())
-    if drop_fn != 0 and (facade_render_param_count(pool, drop_fn) != 1 or facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned).len() == 0):
+    if drop_fn != 0 and facade_render_repr_arg_at(pool, intern, drop_fn, facade_render_destroyer_at(pool, intern, item, drop_fn), repr_text, "self.repr", pinned).len() == 0:
+        return ("", facade_render_no_error_use())
+    if drop_fn != 0 and facade_render_param_count(pool, drop_fn) != 1 and facade_render_drop_helper(pool, intern, ci, item).len() == 0:
         return ("", facade_render_no_error_use())
     // Stage 6 (spec §16.2b.6, ruling §26-§30): what each producer's result
     // depends on. A producer whose received resources the renderer cannot
@@ -1423,6 +1428,13 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
         for destroyer in destroyers:
             let d = destroyer
             let dname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(d as NodeId)))
+            // D209: `destroys f(param N)` hands the resource at N; the
+            // other parameters are the method's, fixed or discarded.
+            let at = facade_render_destroyer_at(pool, intern, item, d)
+            if at != 0 or facade_render_fixes_or_discards(pool, intern, d):
+                let placed = facade_render_bridge(pool, intern, d, 0, at, facade_render_repr_arg_at(pool, intern, d, at, repr_text, "self.repr", pinned))
+                if placed.ok: out = out ++ "    move fn " ++ dname ++ "(" ++ placed.params ++ ")" ++ facade_render_return(pool, intern, d) ++ ":\n" ++ facade_render_indent(placed.prologue, "        ") ++ "        self.live = false\n        " ++ facade_render_call(pool, intern, d, placed.args) ++ "\n"
+                continue
             let (params, args) = facade_render_params(pool, intern, d, 1)
             let repr_arg = facade_render_repr_arg(pool, intern, d, repr_text, "self.repr", pinned)
             let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg
@@ -2177,6 +2189,11 @@ fn facade_render_find_fn(pool: &AstPool, intern: &InternPool, ci: &List[i32], sy
 // (§31.8.6), which takes the pointer the resource is. `indent` is that of
 // the line the call starts on. "" when there is neither.
 fn facade_render_drop_call(pool: &AstPool, intern: &InternPool, name: &str, drop_fn: i32, drop_global: i32, repr_text: &str, place: &str, pinned: bool, indent: &str) -> str:
+    // D209: with other parameters fixed or discarded the call is the
+    // helper's (facade_render_drop_helper).
+    if facade_render_drop_needs_helper(pool, intern, name, drop_fn):
+        let resource = facade_render_resource_item(pool, intern, name)
+        return "unsafe { " ++ facade_render_drop_helper_name(name) ++ "(" ++ facade_render_repr_arg_at(pool, intern, drop_fn, facade_render_destroyer_at(pool, intern, resource, drop_fn), repr_text, place, pinned) ++ ") }"
     if drop_fn != 0: return facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, place, pinned))
     if drop_global == 0 or pinned or not repr_text.starts_with("*"): return ""
     let hook = intern.resolve(drop_global)
@@ -2195,11 +2212,15 @@ fn facade_render_param_count(pool: &AstPool, decl: i32) -> i32:
 // (`inflateEnd(z_stream *)` over `z_stream`) — the cell's address when the
 // resource is pinned, where a by-value parameter has nothing to receive.
 // Empty when the parameter is none of these — Sema names it.
-fn facade_render_repr_arg(pool: &AstPool, intern: &InternPool, decl: i32, repr_text: &str, place: &str, pinned: bool) -> str:
+fn facade_render_repr_arg(pool: &AstPool, intern: &InternPool, decl: i32, repr_text: &str, place: &str, pinned: bool) -> str: facade_render_repr_arg_at(pool, intern, decl, 0, repr_text, place, pinned)
+
+// The same for the parameter a destroyer states it receives the resource in
+// (D209: `drop f(param N)`, `destroys f(param N)`).
+fn facade_render_repr_arg_at(pool: &AstPool, intern: &InternPool, decl: i32, at: i32, repr_text: &str, place: &str, pinned: bool) -> str:
     let meta = pool.find_fn_meta(decl as NodeId)
-    if meta < 0 or pool.fn_meta_param_count(meta) == 0:
+    if meta < 0 or pool.fn_meta_param_count(meta) <= at:
         return ""
-    let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId))
+    let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), at) as NodeId))
     let repr = facade_render_unalias(pool, intern, repr_text)
     if p0 == repr: return if pinned: "" else: place
     if facade_render_const_of(p0, repr): return place ++ " as " ++ p0
@@ -2361,6 +2382,69 @@ fn facade_render_fixed_literal(pool: &AstPool, intern: &InternPool, decl: i32, p
         return facade_render_literal(pool, pool.get_extra(ops + 1))
     ""
 
+// D209 (§16.2b.11): whether `param N discarded` names parameter `pi`.
+fn facade_render_discarded(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> bool:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0: return false
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_DISCARDED and facade_render_param_ref(pool, intern, decl, pool.get_extra(pool.get_data1(clause as NodeId))) == pi: return true
+    false
+
+// Whether the function's item fixes or discards a parameter.
+fn facade_render_fixes_or_discards(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0: return false
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let kind = pool.get_data0(pool.get_extra(cstart + k) as NodeId)
+        if kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_DISCARDED: return true
+    false
+
+// D209 (§31): the parameter of `decl` that receives `resource` when a
+// `drop` or `destroys` clause of the resource names it; the first otherwise.
+fn facade_render_destroyer_at(pool: &AstPool, intern: &InternPool, resource: i32, decl: i32) -> i32:
+    let fname = intern.resolve(pool.get_data0(decl as NodeId))
+    let cstart = pool.get_data1(resource as NodeId)
+    for k in 1..pool.get_data2(resource as NodeId) + 1:
+        let clause = pool.get_extra(cstart + k)
+        let kind = pool.get_data0(clause as NodeId)
+        if kind != FACADE_CLAUSE_DROP and kind != FACADE_CLAUSE_DESTROYS: continue
+        let ops = pool.get_data1(clause as NodeId)
+        if pool.get_data2(clause as NodeId) < 2 or pool.get_extra(ops + 1) == 0 or intern.resolve(pool.get_extra(ops)) != fname: continue
+        let at = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
+        return if at < 0: 0 else: at
+    0
+
+// The resource item named `name`, or 0.
+fn facade_render_resource_item(pool: &AstPool, intern: &InternPool, name: &str) -> i32:
+    for item in facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE):
+        if intern.resolve(pool.get_data0(item as NodeId)) == name: return item
+    0
+
+// Whether `Drop` reaches the `drop` function through a helper: the
+// resource is not its only parameter, so the others are fixed or discarded
+// and the call has lines of its own.
+fn facade_render_drop_needs_helper(pool: &AstPool, intern: &InternPool, name: &str, drop_fn: i32) -> bool:
+    let resource = facade_render_resource_item(pool, intern, name)
+    resource != 0 and drop_fn != 0 and (facade_render_destroyer_at(pool, intern, resource, drop_fn) != 0 or facade_render_param_count(pool, drop_fn) > 1)
+
+fn facade_render_drop_helper_name(name: &str) -> str: "__with_facade_drop_" ++ name
+
+// `fn __with_facade_drop_<R>(facade_repr: <the parameter's type>)`: the
+// call `Drop` makes when `drop f(param N)` passes the resource at N and the
+// contract fixes or discards every other parameter. "" when no helper is
+// needed, or the shape is one Sema names.
+fn facade_render_drop_helper(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> str:
+    let name = intern.resolve(pool.get_data0(resource as NodeId))
+    let drop_fn = facade_render_drop_decl(pool, intern, ci, resource)
+    if not facade_render_drop_needs_helper(pool, intern, name, drop_fn): return ""
+    let at = facade_render_destroyer_at(pool, intern, resource, drop_fn)
+    let bridge = facade_render_bridge(pool, intern, drop_fn, 0, at, "facade_repr")
+    if not bridge.ok or bridge.params.len() > 0: return ""
+    "unsafe fn " ++ facade_render_drop_helper_name(name) ++ "(facade_repr: " ++ facade_render_param_type(pool, intern, drop_fn, at) ++ "):\n" ++ facade_render_indent(bridge.prologue, "    ") ++ "    " ++ facade_render_call(pool, intern, drop_fn, bridge.args) ++ "\n"
+
 // D102 (§16.2b.8): whether `nullable param N` names parameter `pi` of the
 // declaration, in its fn item.
 fn facade_render_param_is_nullable(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> bool:
@@ -2416,6 +2500,18 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
     let fixed = facade_render_fixed_literal(pool, intern, decl, pi)
     let pname = facade_render_param_name(pool, intern, start, pi)
     let ptype = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
+    if facade_render_discarded(pool, intern, decl, pi):
+        // D209: scratch storage C writes and nobody reads.
+        let pointer = facade_render_unalias(pool, intern, ptype)
+        if not pointer.starts_with("*mut "):
+            b.ok = false
+            return b
+        let pointee = pointer.slice(5, pointer.len())
+        let local = facade_render_fresh(pname ++ "_discarded", taken)
+        let zero = if pointee.starts_with("*"): "null" else if pointee == "f32" or pointee == "f64": "0.0" else if pointee == "bool": "false" else: "0 as " ++ pointee
+        b.prologue = "var " ++ local ++ ": " ++ pointee ++ " = " ++ zero ++ "\n"
+        b.args = "&raw mut " ++ local
+        return b
     if fixed.len() > 0:
         // D102: a function-pointer parameter is non-null; `fixed null` is
         // the facade's claim that C takes NULL there, so the absent pointer
