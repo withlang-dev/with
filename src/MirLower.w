@@ -17405,6 +17405,10 @@ impl MirBuilder:
                 // the node keeps its own type for the leaf checks.
                 if self.sema.value_to_option_nodes.contains(node):
                     sema_ty = self.concrete_type(self.sema.value_to_option_nodes.get(node).unwrap())
+                // D183 (§4.2.6): a checked narrowing Sema recorded is the
+                // adjustment applied above; the operand has the narrow type.
+                else if self.sema.checked_narrowings.contains(node):
+                    sema_ty = self.concrete_type(self.sema.checked_narrowings.get(node).unwrap())
                 else if self.sema.vector_splats.contains(node):
                     sema_ty = self.concrete_type(self.sema.vector_splats.get(node).unwrap())
                 else if self.sema.vector_conversions.contains(node):
