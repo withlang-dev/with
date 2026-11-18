@@ -272,9 +272,11 @@ fn facade_render_hosted_fn_errors(pool: &AstPool, intern: &InternPool, ci: &List
         if not li.bridged or li.text_view or li.borrow_res != 0 or not facade_render_lend_hosted(pool, intern, li, resource, repr):
             continue
         let bridge = facade_render_bridge(pool, intern, li.decl, 1, -1, "")
+        let fname = intern.resolve(pool.get_data0(li.decl as NodeId))
+        // D210: the record a field-paired operation returns.
+        if bridge.ok: out = out ++ facade_render_step_type(pool, intern, li.decl, intern.resolve(pool.get_data0(resource as NodeId)), facade_render_present(pool, intern, ci, resource, fname))
         if not bridge.ok or facade_render_fn_oks(pool, intern, li.decl).len() == 0:
             continue
-        let fname = intern.resolve(pool.get_data0(li.decl as NodeId))
         out = out ++ facade_render_fn_error_type(pool, intern, li.decl, facade_render_present(pool, intern, ci, resource, fname), facade_render_message_call(pool, intern, ci, resource).len() > 0)
     // A callback operation hosted here (`db.exec(sql, callback, userdata)`).
     for item in items:
@@ -563,6 +565,9 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
         if li.text_free != 0:
             let text_ret = facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)
             if text_ret.len() > 0: out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ text_ret
+            continue
+        if facade_render_field_buffers(pool, intern, decl).len() > 0:
+            out = out ++ facade_render_field_buffer_method(pool, intern, decl, intern.resolve(pool.get_data0(resource as NodeId)), head, mname, repr_arg, bridge, if failed_only: "" else: facade_render_message_call(pool, intern, ci, resource))
             continue
         let (ret, body) = facade_render_bridge_body(pool, intern, decl, bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", if failed_only: "" else: facade_render_message_call(pool, intern, ci, resource))
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
@@ -2726,6 +2731,151 @@ fn facade_render_fn_error_name(presented: &str) -> str:
     for part in presented.split("_"):
         if part.len() > 0: out = out ++ part.slice(0, 1).to_upper() ++ part.slice(1, part.len())
     out ++ "Error"
+
+// ── D210 (§16.2b.8): a buffer paired with fields of the resource's record ──
+//
+//     fn deflate
+//         lend
+//         buffer field next_in remaining field avail_in
+//         buffer field next_out remaining field avail_out
+//
+// presents `d.deflate(next_in: []u8, next_out: []mut u8, flush) -> DeflateStep`.
+// The wrapper stores each slice's pointer and length in the two fields,
+// calls, reads back what remains, and clears the fields: no pointer into
+// the program's slice stays in the record between calls. An empty slice is
+// a non-null pointer with count 0 (deflate rejects a null next_out). A
+// slice longer than the count field holds is passed in part, and the
+// result says how much moved.
+
+// The (pointer field, count field) names an fn item pairs, flat.
+fn facade_render_field_buffers(pool: &AstPool, intern: &InternPool, decl: i32) -> List[str]:
+    let out: List[str] = []
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0: return out
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_BUFFER_FIELD: continue
+        let ops = pool.get_data1(clause as NodeId)
+        out.push(intern.resolve(pool.get_extra(ops)))
+        out.push(intern.resolve(pool.get_extra(ops + 1)))
+    out
+
+// The declared type of `field` in the record `record`, or "".
+fn facade_render_record_field_type(pool: &AstPool, intern: &InternPool, record: &str, field: &str) -> str:
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_TYPE_DECL or intern.resolve(pool.get_data0(decl)) != record: continue
+        let start = pool.get_data1(decl)
+        for fi in 0..pool.get_extra(start):
+            if intern.resolve(pool.get_extra(start + 1 + fi * 3)) == field: return render_type_expr(pool, intern, pool.get_extra(start + 1 + fi * 3 + 1) as NodeId)
+    ""
+
+// The record the operation's first parameter points at.
+fn facade_render_field_buffer_record(pool: &AstPool, intern: &InternPool, decl: i32) -> str:
+    let p0 = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, 0))
+    if p0.starts_with("*mut "): p0.slice(5, p0.len()) else: ""
+
+// The result record's count fields, one per pairing: what C read from an
+// input buffer is `consumed`, what it wrote to an output buffer `produced`;
+// with several of a kind each carries its pointer field's name.
+fn facade_render_step_fields(pool: &AstPool, intern: &InternPool, decl: i32) -> List[str]:
+    let pairs = facade_render_field_buffers(pool, intern, decl)
+    let record = facade_render_field_buffer_record(pool, intern, decl)
+    var inputs = 0
+    var outputs = 0
+    var k = 0
+    while k < pairs.len():
+        if facade_render_unalias(pool, intern, facade_render_record_field_type(pool, intern, record, pairs[k])).starts_with("*mut "): outputs += 1 else: inputs += 1
+        k += 2
+    let names: List[str] = []
+    k = 0
+    while k < pairs.len():
+        let writable = facade_render_unalias(pool, intern, facade_render_record_field_type(pool, intern, record, pairs[k])).starts_with("*mut ")
+        let word = if writable: "produced" else: "consumed"
+        names.push(if (if writable: outputs else: inputs) == 1: word else: pairs[k] ++ "_" ++ word)
+        k += 2
+    names
+
+// `deflate` returns a `DeflateStep`; an operation already named `step`
+// returns its resource's (`Stream.step` a `StreamStep`).
+fn facade_render_step_name(host: &str, presented: &str) -> str:
+    let err = facade_render_fn_error_name(presented)
+    let camel = err.slice(0, err.len() - 5)
+    if camel.ends_with("Step"): host ++ camel else: camel ++ "Step"
+
+// The record a field-paired operation returns, declared beside its
+// resource. It carries the status when the status is a value: no `ok`
+// (uninterpreted) or several (the one that matched), §16.2b.4.
+fn facade_render_step_type(pool: &AstPool, intern: &InternPool, decl: i32, host: &str, presented: &str) -> str:
+    let names = facade_render_step_fields(pool, intern, decl)
+    if names.len() == 0: return ""
+    let ret = facade_render_return(pool, intern, decl)
+    var out = "type " ++ facade_render_step_name(host, presented) ++ " { "
+    if ret.len() > 4 and facade_render_fn_oks(pool, intern, decl).len() != 1: out = out ++ "status: " ++ ret.slice(4, ret.len()) ++ ", "
+    var first = true
+    for name in names:
+        out = out ++ (if first: "" else: ", ") ++ name ++ ": usize"
+        first = false
+    out ++ " }\n"
+
+fn facade_render_field_buffer_method(pool: &AstPool, intern: &InternPool, decl: i32, host: &str, head: &str, mname: &str, repr_arg: &str, bridge: &FacadeBridge, message_call: &str) -> str:
+    let pairs = facade_render_field_buffers(pool, intern, decl)
+    let names = facade_render_step_fields(pool, intern, decl)
+    let record = facade_render_field_buffer_record(pool, intern, decl)
+    let taken = facade_render_param_names(pool, intern, decl)
+    let rec = facade_render_fresh("facade_record", taken)
+    let scratch = facade_render_fresh("facade_scratch", taken)
+    let status = facade_render_fresh("status", taken)
+    let i8s = "        "
+    let i12 = "            "
+    var params = ""
+    var takes = ""
+    var store = ""
+    var read = ""
+    var clear = ""
+    var check = ""
+    var fields = ""
+    var k = 0
+    while k < pairs.len():
+        let p = pairs[k]
+        let n = pairs[k + 1]
+        let ptype = facade_render_record_field_type(pool, intern, record, p)
+        let ctype = facade_render_record_field_type(pool, intern, record, n)
+        let writable = facade_render_unalias(pool, intern, ptype).starts_with("*mut ")
+        let raw = if writable: "&raw mut " else: "&raw const "
+        let take = p ++ "_take"
+        let left = p ++ "_left"
+        let at = p ++ "_at"
+        params = params ++ (if params.len() > 0: ", " else: "") ++ p ++ (if writable: ": []mut u8" else: ": []u8")
+        // The largest part of the slice the count field can state.
+        takes = takes ++ i8s ++ "var " ++ take ++ ": usize = " ++ p ++ ".len() as usize\n"
+        takes = takes ++ i8s ++ "while (" ++ take ++ " as " ++ ctype ++ ") < (0 as " ++ ctype ++ ") or (" ++ take ++ " as " ++ ctype ++ ") as usize != " ++ take ++ ": " ++ take ++ " = " ++ take ++ " / 2\n"
+        takes = takes ++ i8s ++ "let " ++ at ++ ": " ++ ptype ++ " = if " ++ p ++ ".len() == 0: " ++ raw ++ scratch ++ " as " ++ ptype ++ " else: " ++ raw ++ p ++ "[0] as " ++ ptype ++ "\n"
+        store = store ++ i12 ++ "(*" ++ rec ++ ")." ++ p ++ " = " ++ at ++ "\n" ++ i12 ++ "(*" ++ rec ++ ")." ++ n ++ " = " ++ take ++ " as " ++ ctype ++ "\n"
+        read = read ++ i8s ++ "let " ++ left ++ " = unsafe { (*" ++ rec ++ ")." ++ n ++ " } as usize\n"
+        clear = clear ++ i12 ++ "(*" ++ rec ++ ")." ++ p ++ " = null\n" ++ i12 ++ "(*" ++ rec ++ ")." ++ n ++ " = 0 as " ++ ctype ++ "\n"
+        check = check ++ i8s ++ "if " ++ left ++ " > " ++ take ++ ": panic(\"" ++ mname ++ ": C left more in " ++ n ++ " than it was given\")\n"
+        fields = fields ++ (if fields.len() > 0: ", " else: "") ++ names[k / 2] ++ ": " ++ take ++ " - " ++ left
+        k += 2
+    if bridge.params.len() > 0: params = params ++ ", " ++ bridge.params
+    let call = facade_render_call(pool, intern, decl, if bridge.args.len() > 0: rec ++ ", " ++ bridge.args else: with_str_clone_ref(rec))
+    let ret = facade_render_return(pool, intern, decl)
+    let oks = facade_render_fn_oks(pool, intern, decl)
+    let step = facade_render_step_name(host, mname)
+    var body = facade_render_indent(bridge.prologue, i8s)
+    body = body ++ i8s ++ "var " ++ scratch ++ ": u8 = 0\n" ++ i8s ++ "let " ++ rec ++ " = " ++ repr_arg ++ "\n" ++ takes
+    body = body ++ i8s ++ "unsafe:\n" ++ store
+    body = body ++ i8s ++ (if ret.len() > 4: "let " ++ status ++ " = " else: "") ++ call ++ "\n"
+    body = body ++ read ++ i8s ++ "unsafe:\n" ++ clear ++ check
+    let value = step ++ " { " ++ (if ret.len() > 4 and oks.len() != 1: "status: " ++ status ++ ", " else: "") ++ fields ++ " }"
+    if oks.len() == 0: return head ++ mname ++ "(" ++ params ++ ") -> " ++ step ++ ":\n" ++ body ++ i8s ++ value ++ "\n"
+    let (err, empty_message) = facade_render_op_error(pool, intern, decl, mname)
+    var failed = ""
+    for ok_const in oks:
+        failed = failed ++ (if failed.len() > 0: " and " else: "") ++ status ++ " != " ++ intern.resolve(ok_const)
+    body = body ++ facade_render_failed(err, status, failed, message_call, taken, i8s, empty_message)
+    head ++ mname ++ "(" ++ params ++ ") -> Result[" ++ step ++ ", " ++ err ++ "]:\n" ++ body ++ i8s ++ value ++ "\n"
 
 // The error type an inout operation under `ok` returns: `Failed` alone —
 // nothing is produced, so there is no resource to own.

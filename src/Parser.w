@@ -5562,6 +5562,26 @@ impl Parser:
             if ty == 0: return 0
             ops.push(f)
             ops.push(ty as i32)
+        else if word == "buffer" and self.current_ident_is("field"):
+            // `buffer field P remaining field N` (D210, §16.2b.8): the
+            // resource's record carries the pointer and the count C reads
+            // or writes through. The pairing is stated, never inferred.
+            kind = FACADE_CLAUSE_BUFFER_FIELD
+            self.advance()
+            let pointer = self.expect_ident()
+            if pointer == 0: return 0
+            if not self.current_ident_is("remaining"):
+                self.emit_error("a buffer held in the resource's record is written 'buffer field <P> remaining field <N>' (§16.2b.8)")
+                return 0
+            self.advance()
+            if not self.current_ident_is("field"):
+                self.emit_error("a buffer held in the resource's record is written 'buffer field <P> remaining field <N>' (§16.2b.8)")
+                return 0
+            self.advance()
+            let count = self.expect_ident()
+            if count == 0: return 0
+            ops.push(pointer)
+            ops.push(count)
         else if word == "buffer":
             // `buffer param P len param L` / `buffer param P capacity param L
             // inout` (D64, §16.2b.8): the pointer and the integer that

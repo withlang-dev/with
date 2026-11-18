@@ -23001,7 +23001,9 @@ impl Sema:
         // code (its liveness flag, the views of its parents, what it keeps
         // for C): outside it the only one a program names is `.repr`.
         let rendering = self.facade_rendered_file_of(field_base as i32)
-        if rendering.len() > 0 and self.facade_current_file_name() != rendering and self.struct_field_type(field_base as i32, field) != 0:
+        // A record an operation returns (D210's step result) is plain data
+        // for the program: it wraps nothing, so it has no `repr`.
+        if rendering.len() > 0 and self.facade_current_file_name() != rendering and self.struct_field_type(field_base as i32, field) != 0 and self.struct_field_type(field_base as i32, self.pool_lookup_symbol("repr")) != 0:
             if self.pool_resolve(field) != "repr":
                 self.emit_error(f"'{self.pool_resolve(field)}' is a field of the type the facade generates for '{self.type_name(field_base as i32)}' and belongs to its generated code; a field of the record is read through the resource (`x.field`), and the record itself is `.repr`, under the raw C rules (§16.2b.3)", node)
                 return 0

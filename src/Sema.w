@@ -574,6 +574,8 @@ type ForeignContract {
     callbacks_none: i32,             // clause node; 0 means conservatively reentrant
     callback_consumes: List[i32],
     bare_callbacks: List[i32],          // `callback param N`: a callback with no userdata (#3178)
+    field_buffer_ptrs: List[i32],       // D210: `buffer field P remaining field N` — each pointer field P (symbol) …
+    field_buffer_counts: List[i32],     // … and its count field N (parallel)
     callback_userdata_cb: List[i32],    // `callback param N userdata param M`: the callback parameter N …
     callback_userdata_of: List[i32],    // … and the userdata parameter M it receives (parallel)
     valid_on_failed: i32,              // `valid on failed`: presented on the failed-state resource too (§16.2b.4)
