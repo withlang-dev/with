@@ -112,6 +112,9 @@ fn fnptr_field_class(why: &str) -> str:
     if w.starts_with("it is written in "): return "written in several places"
     if w.starts_with("its one write is not a named function"): return "its one write is not a named function"
     if w.starts_with("its one write names "): return "its one write names a function the proofs cannot read"
+    // #3174: a call through another function-pointer field is the case a
+    // closed set of callees would decide; an outside function is not.
+    if w.starts_with("a pointer to the record is passed to a function pointer"): return "the record is passed to a call through a function pointer"
     if w.starts_with("a pointer to the record is passed to "): return "the record is passed to a function the proofs cannot read"
     if w.starts_with("a pointer to the record is converted"): return "a pointer to the record is converted to another type"
     if w.starts_with("the package never writes it"): return "the package never writes it (the caller's value)"
@@ -408,8 +411,20 @@ for lib in libs:
         eprint("facade_coverage: " ++ lib ++ ": " ++ status)
         rows.push(empty_row(lib, status))
         continue
-    let row = parse_report(lib, version, read_file(path) ?? "")
+    var row = parse_report(lib, version, read_file(path) ?? "")
     eprint(f"facade_coverage: {lib} {version}: {row.total} functions, {row.safe} presented safely, {row.raw} raw")
+    // A library linked as a prebuilt binary is presented from a contract
+    // drawn without its source, and the proofs over its separately
+    // configured source are evidence beside it. The counts are what a
+    // program gets; why a function would be raw is the evidence's to say.
+    let evidence = path.slice(0, path.rfind("/")) ++ "/contract-evidence.txt"
+    if file_exists(evidence):
+        // The evidence opens with what it is and what was analyzed.
+        let text = read_file(evidence) ?? ""
+        let summary = text.find("\nfacade ")
+        let source = parse_report(lib, version, if summary >= 0: text.slice(summary + 1, text.len()) else: text)
+        row.kinds = source.kinds
+        row.note = row.note ++ (if row.note.len() > 0: " " else: "") ++ f"Linked as a prebuilt binary: the verdicts below are its source evidence's ({source.total} functions, {source.safe} presentable, {source.raw} raw), which grants nothing."
     for kind in row.kinds.kinds:
         for k in 0..kind.count: all.add(kind.name, kind.example.slice(kind.example.find(": ") + 2, kind.example.len()), lib)
     rows.push(row)
