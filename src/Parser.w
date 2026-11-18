@@ -5019,16 +5019,19 @@ impl Parser:
                     return 0
                 self.advance()
                 let names = []
+                var named = -1
                 let any = self.current_ident_is("any")
                 if any: self.advance()
+                else: named = 0
                 while not any:
                     let writer = self.expect_ident()
                     if writer == 0: return 0
                     names.push(writer)
+                    named += 1
                     if self.peek() != TokenKind.TK_COMMA: break
                     self.advance()
                 writers = self.pool.extra_len() + 1
-                self.pool.add_extra(if any: -1 else: names.len() as i32)
+                self.pool.add_extra(named)
                 for writer in names: self.pool.add_extra(writer)
             return self.pool.add_node(NodeKind.NK_FACADE_DOMAIN, start, self.prev_end(), name, kind, writers) as i32
 
