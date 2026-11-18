@@ -1023,7 +1023,16 @@ impl Sema:
         facades.push(self.current_facade_sym)
         let blocks: List[i32] = []
         blocks.push(self.current_facade_node)
-        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: List.new() })
+        // #3127: the functions `written by` names; none means every
+        // function of the library may rewrite the state (§34).
+        let writers = []
+        let writers_at = self.ast.get_data2(item)
+        if writers_at > 0:
+            for wi in 0..self.ast.get_extra(writers_at - 1):
+                let writer = self.ast.get_extra(writers_at + wi)
+                if self.facade_fn_file(writer) == 0: self.emit_error_with_help(f"domain '{dn}': 'written by {self.pool_resolve(writer)}' names no imported function (§16.2b.7)", item, "after 'written by' name the functions of the library that rewrite this state")
+                writers.push(with_str_clone_ref(self.safe_symbol_text(writer)))
+        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: List.new(), writers })
 
     // ── resources ────────────────────────────────────────────────────────
 
@@ -4528,7 +4537,7 @@ impl Sema:
                 if sigs.len() == 0:
                     continue
                 let ci = self.facade_contract_for(f)
-                let domains = self.facade_domains_touched(self.facade_fn_file(f), ci)
+                let domains = self.facade_domains_touched(self.facade_fn_file(f), ci, f)
                 var shift: i32 = 0
                 if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
                     shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
@@ -4577,7 +4586,7 @@ impl Sema:
                 continue
             let ci = self.facade_contract_for(fn_sym)
             let file = self.decl_source_file_id_for_index(di)
-            let domains = self.facade_domains_touched(file, ci)
+            let domains = self.facade_domains_touched(file, ci, fn_sym)
             let borrow = if ci >= 0 and self.foreign_contracts[ci].returns_borrow_domain != 0: self.facade_domain_index.get(self.foreign_contracts[ci].returns_borrow_domain).unwrap() else: -1
             // A presented call (facade_presented_syms) borrows from the C
             // string parameter its item names, a by-value pointer the
@@ -4730,9 +4739,12 @@ impl Sema:
 
     // The domains a function declared in `file` touches: those of its
     // library, less the ones its fn item preserves.
-    fn facade_domains_touched(file: i32, ci: i32) -> List[i32]:
+    fn facade_domains_touched(file: i32, ci: i32, fn_sym: i32) -> List[i32]:
         let out: List[i32] = []
         for di in 0..self.facade_domain_list.len():
+            // #3127: a domain that names its writers is preserved by every
+            // other function.
+            if self.facade_domain_list[di].writers.len() > 0 and not self.facade_domain_list[di].writers.contains(self.safe_symbol_text(fn_sym)): continue
             var in_library = false
             for fi in 0..self.facade_domain_list[di].files.len():
                 if self.facade_domain_list[di].files[fi] == file: in_library = true
@@ -5603,7 +5615,8 @@ impl Sema:
             self.facade_c_invoked_userdata.insert(sig, ud + self.facade_callback_methods[mi].receiver_params)
         let ci = self.facade_callback_methods[mi].contract
         let c_fn = self.foreign_contracts[ci].fn_sym
-        let domains = self.facade_domains_touched(self.facade_fn_file(c_fn), ci)
+        let domains = self.facade_domains_touched(self.facade_fn_file(c_fn), ci, c_fn)
+
         self.facade_add_call_effect(sig, c_fn, ci, self.facade_presented_touch_mask(c_fn, ci), domains, -1, -1)
 
     // ── D66 retained variadic pairs (#1652, §16.2b.9) ──────────────────────

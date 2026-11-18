@@ -566,7 +566,7 @@ impl CiProject:
         if self.fd_registry_text_return(si).len() == 0 and self.fd_returns_literal_text(si, 0):
             out = out ++ "        returns static CStr    // proof: every return is a string literal\n"
         else if self.fd_registry_text_return(si).len() == 0 and self.fd_returns_own_static_buffer(si, 0):
-            out = out ++ "        returns borrow CStr from domain " ++ self.draft_name ++ "    // proof: every return is the function's own static array, which each call rewrites\n"
+            out = out ++ "        returns borrow CStr from domain " ++ self.symbols[si].name ++ "    // proof: every return is the function's own static array, which each call rewrites\n"
         for line in self.symbols[si].registry_more.split("\n"):
             if line.len() == 0: continue
             let kind = facts_kind(line)
@@ -872,15 +872,11 @@ impl CiProject:
             if not line.starts_with("ret:"): continue
             returns = returns + 1
             let src = line.slice(4, line.len())
-            if src.starts_with("local:") and self.symbols[si].own_evidence.contains("localstatic:" ++ src.slice(6, src.len()) ++ "\n"):
-                own = own + 1
-                continue
-            if not src.starts_with("call:"): return false
-            let rest = src.slice(5, src.len())
-            let colon = rest.find(":")
-            let callee = self.find_symbol(CiProjectSymbolKind.CIPS_FN, if colon >= 0: rest.slice(0, colon) else: rest)
-            if callee < 0 or callee == si or not self.fd_returns_own_static_buffer(callee, depth + 1): return false
+            // Its own array only: a function that returns another's buffer
+            // is not that buffer's writer, and stays raw.
+            if not (src.starts_with("local:") and self.symbols[si].own_evidence.contains("localstatic:" ++ src.slice(6, src.len()) ++ "\n")): return false
             own = own + 1
+
         returns > 0 and own == returns
 
     // How a function with no record-pointer return is presented: a
@@ -1480,8 +1476,17 @@ impl CiProject:
             text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_registry_presentation_lines(si)
         // #3127: a function presented as a view of the library's own static
         // buffer needs the domain that view borrows from declared.
+        // Each is a domain of its own, written only by its function: a
+        // static array of a body is named nowhere else.
         let header = "c contract " ++ name ++ ":\n"
-        if text.contains("returns borrow CStr from domain " ++ name ++ "    // proof: every return is the function's own static array"): text = text.replace(header, header ++ "    domain " ++ name ++ " process    // proof: the library's own static buffers, rewritten by the calls that return them\n")
+        var domains = ""
+        for line in text.split("\n"):
+            let at = line.find("returns borrow CStr from domain ")
+            if at < 0 or not line.contains("own static array"): continue
+            let rest = line.slice(at + 32, line.len())
+            let writer = rest.slice(0, rest.find(" "))
+            domains = domains ++ "    domain " ++ writer ++ " process written by " ++ writer ++ "    // proof: a static array of " ++ writer ++ "'s body, rewritten by each call of it\n"
+        if domains.len() > 0: text = text.replace(header, header ++ domains)
         text ++ self.registry_value_text
 
     // One line per function: how the draft presents it, or why it stays

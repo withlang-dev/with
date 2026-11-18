@@ -603,7 +603,8 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
         for k in 0..c.preserves_params.len():
             if c.preserves_params[k] == pi: kept = true
         if not kept: touched.push(f"{contract_received(sema, c.fn_sym, pi)} ({contract_param(sema, c.fn_sym, pi)})")
-    let domains = sema.facade_domains_touched(sema.facade_fn_file(c.fn_sym), ci)
+    let domains = sema.facade_domains_touched(sema.facade_fn_file(c.fn_sym), ci, c.fn_sym)
+
     for domain in domains:
         touched.push("domain " ++ sema.safe_symbol_text(sema.facade_domain_list[domain].name))
     if touched.len() > 0:

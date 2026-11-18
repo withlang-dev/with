@@ -721,7 +721,9 @@ type FacadeDomain {
     node: i32,
     origin_sym: i32,
     files: List[i32],
+    writers: List[str],  // #3127: `written by` names; empty: every function of the library
 }
+
 
 // What a call to signature `sig` does to foreign views (ruling §38): the
 // parameters whose received resource's views it invalidates (a bit per

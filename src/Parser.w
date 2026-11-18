@@ -5006,7 +5006,28 @@ impl Parser:
                 self.emit_error("a domain is 'process', 'thread', 'resource' or 'static' (§16.2b.7)")
                 return 0
             let kind = self.expect_ident()
-            return self.pool.add_node(NodeKind.NK_FACADE_DOMAIN, start, self.prev_end(), name, kind, 0) as i32
+            // #3127: `written by f, g` names the only functions that rewrite
+            // the state; every other function of the library preserves it.
+            // d2 is one past the extra slot holding the count, then the names.
+            var writers = 0
+            if self.current_ident_is("written"):
+                self.advance()
+                if not self.current_ident_is("by"):
+                    self.emit_error("a domain's writers are stated 'written by <fn>, <fn>' (§16.2b.7)")
+                    return 0
+                self.advance()
+                let names = []
+                while true:
+                    let writer = self.expect_ident()
+                    if writer == 0: return 0
+                    names.push(writer)
+                    if self.peek() != TokenKind.TK_COMMA: break
+                    self.advance()
+                writers = self.pool.extra_len() + 1
+                self.pool.add_extra(names.len() as i32)
+                for writer in names: self.pool.add_extra(writer)
+            return self.pool.add_node(NodeKind.NK_FACADE_DOMAIN, start, self.prev_end(), name, kind, writers) as i32
+
         if self.current_ident_is("text"):
             // D134 (§16.2b.8): `text utf8`, once per facade — every text
             // return presents as Option[str], validated at the boundary;

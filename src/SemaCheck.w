@@ -20301,11 +20301,19 @@ impl Sema:
     // raw. A thread domain's buffer is each thread's own. The rendering's
     // own call of the C function is not the program's.
     mut fn note_rewritten_domain_view_call(fx: i32, call_node: i32):
-        let domain = self.facade_call_effects[fx].borrow_domain
-        if domain < 0 or self.current_file_is_generated("<facade "): return
-        if self.pool_resolve(self.facade_domain_list[domain].kind) != "process": return
-        if not self.facade_call_effects[fx].touch_domains.contains(domain): return
-        self.rewritten_view_calls.push(RewrittenViewCall { node: call_node, file: self.local_file_id, fn_sym: self.facade_call_effects[fx].fn_sym, domain, in_unsafe: self.in_unsafe })
+        if self.current_file_is_generated("<facade "): return
+        for domain in self.facade_call_effects[fx].touch_domains:
+            if self.pool_resolve(self.facade_domain_list[domain].kind) != "process" or not self.facade_domain_is_viewed(domain): continue
+            self.rewritten_view_calls.push(RewrittenViewCall { node: call_node, file: self.local_file_id, fn_sym: self.facade_call_effects[fx].fn_sym, domain, in_unsafe: self.in_unsafe })
+            return
+
+    // Whether some function returns a view of the domain: only then is
+    // there a holder for a rewriting call to race with.
+    fn facade_domain_is_viewed(domain: i32) -> bool:
+        for effect in self.facade_call_effects:
+            if effect.borrow_domain == domain: return true
+        false
+
 
     // What the contract of the library that declares the C function says
     // of its threads: 2 `runs no threads`, 1 `runs threads`, 0 neither.
@@ -20313,22 +20321,43 @@ impl Sema:
         let file = self.source_text_name_of(self.facade_fn_file(fn_sym))
         if file.starts_with("<c_import ") and file.ends_with(">"): self.facade_thread_headers.get(file.slice(10, file.len() - 1)).copied() ?? 0 else: 0
 
+    // Why the state of `domain` is not reached only on `main`'s own path,
+    // or "". A domain that names its writers is reached by them and by the
+    // functions that return views of it; any other is its library's.
+    mut fn c_domain_off_main_reason(domain: i32, fn_sym: i32) -> str:
+        if self.facade_domain_list[domain].writers.len() == 0: return self.c_library_off_main_reason(self.source_text_name_of(self.facade_fn_file(fn_sym)))
+        self.race_compute_off_main_fns()
+        let dname = self.pool_resolve(self.facade_domain_list[domain].name)
+        for writer in self.facade_domain_list[domain].writers:
+            if self.race_off_main_names.contains(writer): return f"`{writer}`, which rewrites `{dname}`, is called from code that may run off `main`'s own path"
+        for effect in self.facade_call_effects:
+            let reader = self.safe_symbol_text(effect.fn_sym)
+            if effect.borrow_domain == domain and self.race_off_main_names.contains(reader): return f"`{reader}`, which returns a view of `{dname}`, is called from code that may run off `main`'s own path"
+        ""
+
     mut fn validate_rewritten_domain_view_calls(tasks: bool, tasks_node: i32, tasks_file: i32, tasks_reason: &str):
+
         // #3239: with tasks in the program, the library is still on one
         // thread when everything that reaches it runs only on `main`'s path.
         let calls = self.rewritten_view_calls
+        self.race_compute_off_main_fns()
         for c in calls:
             if c.in_unsafe != 0: continue
             let fn_sym = c.fn_sym
+            // A translation redeclares the runtime functions it is built on
+            // (`with_free`); those are the runtime's, not the library's.
+            if self.race_runtime_fn_names.contains(self.safe_symbol_text(fn_sym)): continue
+
             let threads = self.c_function_library_threads(fn_sym)
-            let off_main = if tasks: self.c_library_off_main_reason(self.source_text_name_of(self.facade_fn_file(fn_sym))) else: ""
+            let off_main = if tasks: self.c_domain_off_main_reason(c.domain, fn_sym) else: ""
             if off_main.len() == 0 and threads == 2: continue
             let node = c.node
             let span = Span { file: c.file, start: self.ast.get_start(node), end: self.ast.get_end(node) }
             let fname = self.pool_resolve(fn_sym)
             let dname = self.pool_resolve(self.facade_domain_list[c.domain].name)
-            let diag = Diagnostic.err(f"E0921: call of `{fname}` may race: it returns a view of `{dname}`, state the call itself rewrites; it is safe when every call into the library is on one thread and its contract says `runs no threads`, or inside `unsafe`", span)
-            diag.add_label(span, "each call rewrites what this view reads")
+            let diag = Diagnostic.err(f"E0921: call of `{fname}` may race: it does not preserve `{dname}`, process state a view is taken of; it is safe when every call into the library is on one thread and its contract says `runs no threads`, or inside `unsafe`", span)
+            diag.add_label(span, f"this call may rewrite what a view of `{dname}` reads")
+
             if off_main.len() > 0:
                 diag.add_label(Span { file: tasks_file, start: self.ast.get_start(tasks_node), end: self.ast.get_end(tasks_node) }, f"program may run concurrently here ({tasks_reason})")
                 diag.add_note(off_main)
