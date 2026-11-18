@@ -843,17 +843,20 @@ impl CiProject:
         var destroyed = -1
         var retained = -1
         var unmodeled = ""
+        var unmodeled_at = -1
         for pi in 0..self.symbols[si].param_ty.len():
             let p = self.symbols[si].param_ty[pi]
             let is_pointer = p.starts_with("*")
             if is_pointer: pointer_params = pointer_params + 1
             if is_pointer and self.symbols[si].param_destroys[pi] != 0: destroyed = pi as i32
             else if is_pointer and self.symbols[si].param_stores[pi] != 0: retained = pi as i32
-            else if unmodeled.len() == 0 and not self.fd_param_presentable(si, pi as i32, modeled): unmodeled = p
+            else if unmodeled.len() == 0 and not self.fd_param_presentable(si, pi as i32, modeled):
+                unmodeled = p
+                unmodeled_at = pi as i32
         // A `destroys` item hands the resource as the first parameter
         // (§16.2b.13); a destroyer of a later one is not stated.
         if destroyed > 0: return f"raw: destroys param {destroyed}, which is not its first parameter (§16.2b.13)"
-        if destroyed == 0 and unmodeled.len() > 0: return "raw: destroys param 0, but parameter of " ++ self.fd_unmodeled_text(unmodeled)
+        if destroyed == 0 and unmodeled.len() > 0: return "raw: destroys param 0, but parameter of " ++ self.fd_unmodeled_text(si, unmodeled_at, unmodeled)
         if destroyed >= 0: return f"destroyer, param {destroyed} (" ++ self.fd_destroy_reason(si, "it") ++ ")"
         // A retained parameter the introspection file says the callee
         // takes is consumed: the caller hands it over (§16.2b.15 item 2).
@@ -863,16 +866,27 @@ impl CiProject:
         // retention the body only appears to make, an unmodeled type).
         if facts_kind(self.symbols[si].registry) == "lend" and pointer_params > 0: return "lend (registry: " ++ facts_cite(self.symbols[si].registry) ++ ")"
         if retained >= 0: return self.fd_retains_verdict(si, retained)
-        if unmodeled.len() > 0: return "raw: parameter of " ++ self.fd_unmodeled_text(unmodeled)
+        if unmodeled.len() > 0: return "raw: parameter of " ++ self.fd_unmodeled_text(si, unmodeled_at, unmodeled)
         if pointer_params == 0 and raw_return: return "value-only call; returns " ++ self.symbols[si].ret_ty ++ ", a raw pointer: inert until a contract describes it (§31.4)"
         if pointer_params == 0: return "value-only call"
         "lend (proof: reads its resource parameters, keeps nothing)"
 
     // How a parameter type the contract language cannot present is named.
-    fn fd_unmodeled_text(ty: &str) -> str:
+    // #3178: for a callback or an array it says which parameter, and the
+    // clause that would describe it.
+    fn fd_unmodeled_text(si: i32, pi: i32, ty: &str) -> str:
         if ty.starts_with("*"): return "unmodeled pointer type " ++ ty
         if self.pointer_records.contains(ty): return "a record passed by value that holds a pointer and no contract models: " ++ ty
-        "a callback or array type the facade does not describe: " ++ ty
+        let what = "a callback or array type the facade does not describe: " ++ ty ++ f" (param {pi})"
+        if not ty.contains("fn("): return what ++ "; a fixed array has no clause yet"
+        // The `void *` that carries a callback's userdata, when there is one.
+        var userdata = -1
+        var at = 0
+        for p in self.symbols[si].param_ty:
+            if userdata < 0 and (p == "*mut c_void" or p == "*const c_void"): userdata = at
+            at += 1
+        if userdata < 0: return what ++ "; it has no `void *` userdata parameter, so a closure has nowhere to travel: no clause yet"
+        what ++ f"; a contract describes it with 'callback param {pi} userdata param {userdata}', and 'retains param {pi} by param N', N the resource that keeps it, when the library keeps it (§16.2b.9)"
 
     fn fd_is_lend(si: i32, modeled: &List[str]) -> bool:
         self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si, modeled).starts_with("lend")
