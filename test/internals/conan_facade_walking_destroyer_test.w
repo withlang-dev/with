@@ -50,4 +50,6 @@ fn main:
     assert(free_line.contains("destroyer"), free_line)
     assert(free_for_line.contains("destroyer"), free_for_line)
     assert(not skip_line.contains("destroyer"), skip_line)
+    // #3176: the record's line names the two, so the fact can be written.
+    assert(report.contains("  Thing: 1 producer(s) and 2 unary destroyers (thing_free, thing_free_for); a registry fact names which one is the drop (§16.2b.3)"), report)
     print("ok")
