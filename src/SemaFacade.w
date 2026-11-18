@@ -1348,7 +1348,7 @@ impl Sema:
                 return
             self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), bare_callbacks: [], callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), bare_callbacks: [], field_buffer_ptrs: [], field_buffer_counts: [], callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1838,6 +1838,12 @@ impl Sema:
             return c
         if kind == FACADE_CLAUSE_RENAME:
             c.rename = self.ast.get_extra(ops)
+            return c
+        if kind == FACADE_CLAUSE_BUFFER_FIELD:
+            // Verified once the hosting resource is known
+            // (verify_facade_field_buffers).
+            c.field_buffer_ptrs.push(self.ast.get_extra(ops))
+            c.field_buffer_counts.push(self.ast.get_extra(ops + 1))
             return c
         if kind == FACADE_CLAUSE_CALLBACK:
             // `callback param N` (§16.2b.9, #3178): no userdata travels with
@@ -2953,6 +2959,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_DETACHES: return "detaches"
     if kind == FACADE_CLAUSE_TEXT_RETURN: return "text return"
     if kind == FACADE_CLAUSE_BUFFER: return "buffer"
+    if kind == FACADE_CLAUSE_BUFFER_FIELD: return "buffer field"
     if kind == FACADE_CLAUSE_FIXED: return "param … fixed"
     if kind == FACADE_CLAUSE_VARIADIC: return "variadic param … selected by param …"
     if kind == FACADE_CLAUSE_VARIADIC_CASE: return "case"
@@ -3416,6 +3423,51 @@ impl Sema:
     mut fn verify_facade_buffers():
         for ci in 0..self.foreign_contracts.len():
             self.verify_facade_buffer_item(ci as i32)
+            self.verify_facade_field_buffers(ci as i32)
+
+    // D210 (§16.2b.8): `buffer field P remaining field N` pairs two fields
+    // of the record the operation's resource wraps: P a pointer to bytes, N
+    // the integer count C reads on entry and leaves as what remains. The
+    // wrapper writes both before the call, so the operation takes the
+    // record by a pointer it may write through.
+    mut fn verify_facade_field_buffers(ci: i32):
+        if self.foreign_contracts[ci].field_buffer_ptrs.len() == 0: return
+        self.update_decl_source_context(self.foreign_contracts[ci].decl)
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let node = self.foreign_contracts[ci].node
+        let fname = self.pool_resolve(fn_sym)
+        let sig = self.get_sig(fn_sym)
+        if sig < 0: return
+        let hosts = self.facade_method_host(fn_sym)
+        let stronger = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.facade_fn_is_resource_op(fn_sym)
+        if hosts.len() != 1 or stronger:
+            self.emit_error_with_help(f"fn '{fname}': 'buffer field' pairs two fields of the record a lent resource wraps, and '{fname}' is no lend of one resource (§16.2b.8)", node, "state it on an operation whose first parameter receives the resource whose record carries the pointer and its count")
+            return
+        let rname = self.pool_resolve(self.facade_resources[hosts[0]].name)
+        let first = self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)
+        if self.get_type_kind(first) != TypeKind.TY_PTR or self.get_type_d1(first as i32) == 0:
+            self.emit_error_with_help(f"fn '{fname}': 'buffer field' stores the slice in {rname}'s record before the call, and {self.facade_param_display(fn_sym, sig, 0)} is not a pointer the wrapper may write through (§16.2b.8)", node, "leave the function raw: an operation that takes the record by a const pointer does not read a buffer the caller sets for the call")
+            return
+        let record = self.resolve_alias(self.get_type_d0(first as i32) as TypeId)
+        var k = 0
+        for pointer in self.foreign_contracts[ci].field_buffer_ptrs:
+            let count = self.foreign_contracts[ci].field_buffer_counts[k]
+            k += 1
+            let pn = self.pool_resolve(pointer)
+            let cn = self.pool_resolve(count)
+            let pt = self.struct_field_type_frozen(record as i32, pointer)
+            let ct = self.struct_field_type_frozen(record as i32, count)
+            if pt == 0 or ct == 0:
+                let missing = if pt == 0: pn else: cn
+                self.emit_error_with_help(f"fn '{fname}': 'buffer field {pn} remaining field {cn}' names '{missing}', which is no field of the record {rname} wraps (§16.2b.8)", node, "name the pointer field and the count field as the header declares them")
+                continue
+            let pr = self.resolve_alias(pt as TypeId)
+            let pointee = if self.get_type_kind(pr) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(pr as i32) as TypeId) else: pr
+            if self.get_type_kind(pr) != TypeKind.TY_PTR or self.get_type_kind(pointee) != TypeKind.TY_INT or self.get_type_d0(pointee as i32) != 8:
+                self.emit_error_with_help(f"fn '{fname}': 'buffer field {pn}' names a field of type {self.type_name(pt)}, not a pointer to bytes (§16.2b.8)", node, "after 'buffer field' name the field that points at the bytes; its count follows 'remaining field'")
+                continue
+            if self.get_type_kind(self.resolve_alias(self.numeric_operand_type(ct) as TypeId)) != TypeKind.TY_INT:
+                self.emit_error_with_help(f"fn '{fname}': 'remaining field {cn}' names a field of type {self.type_name(ct)}, not an integer count (§16.2b.8)", node, "after 'remaining field' name the integer field that holds how many bytes are left")
 
     fn facade_contract_presented(ci: i32) -> bool:
         let c = &self.foreign_contracts[ci]
