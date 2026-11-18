@@ -2750,7 +2750,7 @@ fn facade_render_fn_error_name(presented: &str) -> str:
 
 // The (pointer field, count field) names an fn item pairs, flat.
 fn facade_render_field_buffers(pool: &AstPool, intern: &InternPool, decl: i32) -> List[str]:
-    let out: List[str] = []
+    let out = []
     let item = facade_render_fn_item(pool, intern, decl)
     if item == 0: return out
     let cstart = pool.get_data1(item as NodeId)
@@ -2799,7 +2799,7 @@ fn facade_render_step_fields(pool: &AstPool, intern: &InternPool, decl: i32) -> 
     while k < pairs.len():
         if facade_render_unalias(pool, intern, facade_render_record_field_type(pool, intern, record, pairs[k])).starts_with("*mut "): outputs += 1 else: inputs += 1
         k += 2
-    let names: List[str] = []
+    let names = []
     k = 0
     while k < pairs.len():
         let writable = facade_render_unalias(pool, intern, facade_render_record_field_type(pool, intern, record, pairs[k])).starts_with("*mut ")
