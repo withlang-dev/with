@@ -753,8 +753,28 @@ impl CiProject:
     // parameter the registry states, or a pointer to a modeled record (a
     // borrow of that resource). A callback, a pointer to a pointer, an
     // array or a pointer to an unmodeled record leaves the call raw.
+    // #3178 (§16.2b.9): a function-pointer parameter the body only calls or
+    // tests for NULL, on a function with no `void *` to carry userdata: the
+    // bare `callback param N`. With a `void *` the pairing is the contract,
+    // and that is stated, never drawn.
+    fn fd_called_only_callback(si: i32, pi: i32) -> bool:
+        if self.symbols[si].has_definition == 0 or self.symbols[si].unanalyzable != 0 or pi >= self.symbols[si].param_called_only.len() or self.symbols[si].param_called_only[pi] == 0: return false
+        for p in self.symbols[si].param_ty:
+            if p == "*mut c_void" or p == "*const c_void": return false
+        true
+
+    // The `callback param N` lines of a function's item, each with its proof.
+    fn fd_callback_lines(si: i32) -> str:
+        var out = ""
+        var pi = 0
+        for _ in self.symbols[si].param_ty:
+            if self.fd_called_only_callback(si, pi): out = out ++ f"        callback param {pi}    // proof: the function calls it, and neither stores it, passes it on nor returns it\n"
+            pi += 1
+        out
+
     fn fd_param_presentable(si: i32, pi: i32, modeled: &List[str]) -> bool:
         let p = with_str_clone_ref(self.symbols[si].param_ty[pi])
+        if self.fd_called_only_callback(si, pi): return true
         // D198: a record passed by value that holds a pointer is raw until
         // a contract models it. A clause on such a function is refused by
         // the compiler (raylib's DrawMeshInstanced: `Mesh` by value beside
@@ -1406,7 +1426,13 @@ impl CiProject:
                 // D198: an operation over value records alone lends no
                 // resource; its clauses are its item.
                 let lends = self.fd_takes_modeled_resource(si as i32, modeled)
-                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_void_typedef_of(si as i32, modeled) ++ (if lends: "        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n" else: "") ++ self.fd_registry_presentation_lines(si as i32)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_void_typedef_of(si as i32, modeled) ++ (if lends: "        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n" else: "") ++ self.fd_callback_lines(si as i32) ++ self.fd_registry_presentation_lines(si as i32)
+            else if self.symbols[si].header_declared != 0 and self.fd_callback_lines(si as i32).len() > 0 and self.fd_lend_verdict(si as i32, modeled) == "value-only call":
+                // #3178: a call that takes only values and a callback it
+                // proves it only calls. The clause is its whole item.
+                self.presented.push(si as i32)
+                blocks.push(si as i32)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_callback_lines(si as i32)
             else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
                 self.presented.push(si as i32)
                 blocks.push(si as i32)

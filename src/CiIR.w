@@ -945,6 +945,7 @@ type CiProjectSymbol {
     param_aborting: List[i32],
     param_null_caller: List[str],
     param_sinks: List[str],
+    param_called_only: List[i32],   // #3178: 1 when the body only calls or NULL-tests the function-pointer parameter
     param_nullable: List[i32],
     param_reason: List[str],
     has_definition: i32,
@@ -1062,6 +1063,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         param_aborting: List.new(),
         param_null_caller: List.new(),
         param_sinks: List.new(),
+        param_called_only: [],
         param_nullable: List.new(),
         param_reason: List.new(),
         has_definition: 0,
@@ -1142,6 +1144,7 @@ impl CiProjectSymbol:
         while self.param_aborting.len() < n: self.param_aborting.push(0)
         while self.param_null_caller.len() < n: self.param_null_caller.push("")
         while self.param_sinks.len() < n: self.param_sinks.push("")
+        while self.param_called_only.len() < n: self.param_called_only.push(0)
         while self.param_nullable.len() < n: self.param_nullable.push(0)
         while self.param_reason.len() < n: self.param_reason.push("")
         while self.param_ty.len() < n: self.param_ty.push("")
