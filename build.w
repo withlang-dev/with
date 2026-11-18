@@ -2493,6 +2493,33 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
+// #3423: the compiler passes its own audit. `analyze src/main.w audit:all`
+// checks, over the compiler's own source, that MIR validates, that every
+// callee and operand has the type Sema gave it, and that codegen only reads
+// Sema. No gate ran it and 76 violations accumulated; the battery runs it.
+fn run_self_audit_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("self-audit: could not create output dir: " ++ out_dir)
+    let root = ctx.project_info().project_root()
+    var args: List[str] = List.new()
+    args.push(build_project_abs(root, ctx.inputs()[0]))
+    args.push("analyze")
+    args.push("src/main.w")
+    args.push("audit:all")
+    let aout_rel = build_project_join(out_dir, "audit.stdout")
+    let aout = build_project_abs(root, aout_rel)
+    let aerr = build_project_abs(root, build_project_join(out_dir, "audit.stderr"))
+    let ar = ctx.process_runner().run_capture_cwd(args, aout, aerr, 1200000, root)
+    if ar.rc != 0:
+        var shown = ""
+        for line in fs.read_text(aout_rel).split("\n"):
+            if line.starts_with("violation") or line.contains("-audit: facts="): shown = shown ++ line ++ "\n"
+        ctx.diagnostics().error(f"self-audit: `with analyze src/main.w audit:all` failed (rc={ar.rc})\n" ++ shown)
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    0
+
 // tools/rt_decl_audit.w: every `extern fn with_*` declaration in the tree
 // (lib/std, src, tools, test) matches the runtime's definition signature, so
 // a seam such as std.libc's with_libc_* cannot drift from rt/rt_core.w.
@@ -4441,6 +4468,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     drop_audit = drop_audit.dep("build")
     drop_audit = drop_audit.write_scope("out/drop-audit")
     out = out.add_target(drop_audit)
+    var self_audit = test_lane(.Action, "self-audit", "").output("out/self-audit")
+    self_audit = self_audit.allow_parallel()
+    self_audit.action = run_self_audit_action
+    self_audit = self_audit.input(release_compiler_bin("with"))
+    self_audit = self_audit.dep("build")
+    self_audit = self_audit.write_scope("out/self-audit")
+    out = out.add_target(self_audit)
     var unit_review = target_new(.Action, "unit-return-review", "").output("out/unit-return-review")
     unit_review.action = run_unit_return_review_action
     unit_review = unit_review.input(release_compiler_bin("with"))
@@ -5053,6 +5087,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var ownership_gates = target_new(.Group, "test-with-audits", "")
     ownership_gates = ownership_gates.dep("seed-driver")
     ownership_gates = ownership_gates.dep("drop-audit")
+    ownership_gates = ownership_gates.dep("self-audit")
     ownership_gates = ownership_gates.dep("move-audit")
     ownership_gates = ownership_gates.dep("test")
     out = out.add_target(ownership_gates)
