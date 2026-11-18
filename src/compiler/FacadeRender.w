@@ -566,6 +566,7 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
             let text_ret = facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)
             if text_ret.len() > 0: out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ text_ret
             continue
+        if facade_render_field_buffers(pool, intern, decl).len() > 0 and not facade_render_field_buffers_ok(pool, intern, decl): continue
         if facade_render_field_buffers(pool, intern, decl).len() > 0:
             out = out ++ facade_render_field_buffer_method(pool, intern, decl, intern.resolve(pool.get_data0(resource as NodeId)), head, mname, repr_arg, bridge, if failed_only: "" else: facade_render_message_call(pool, intern, ci, resource))
             continue
@@ -2771,6 +2772,16 @@ fn facade_render_record_field_type(pool: &AstPool, intern: &InternPool, record: 
             if intern.resolve(pool.get_extra(start + 1 + fi * 3)) == field: return render_type_expr(pool, intern, pool.get_extra(start + 1 + fi * 3 + 1) as NodeId)
     ""
 
+// Whether every pairing names two fields of the record: a shape the
+// rendering cannot serve renders nothing, and Sema names it
+// (verify_facade_field_buffers).
+fn facade_render_field_buffers_ok(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
+    let record = facade_render_field_buffer_record(pool, intern, decl)
+    if record.len() == 0: return false
+    for field in facade_render_field_buffers(pool, intern, decl):
+        if facade_render_record_field_type(pool, intern, record, field).len() == 0: return false
+    true
+
 // The record the operation's first parameter points at.
 fn facade_render_field_buffer_record(pool: &AstPool, intern: &InternPool, decl: i32) -> str:
     let p0 = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, 0))
@@ -2809,7 +2820,7 @@ fn facade_render_step_name(host: &str, presented: &str) -> str:
 // (uninterpreted) or several (the one that matched), §16.2b.4.
 fn facade_render_step_type(pool: &AstPool, intern: &InternPool, decl: i32, host: &str, presented: &str) -> str:
     let names = facade_render_step_fields(pool, intern, decl)
-    if names.len() == 0: return ""
+    if names.len() == 0 or not facade_render_field_buffers_ok(pool, intern, decl): return ""
     let ret = facade_render_return(pool, intern, decl)
     var out = "type " ++ facade_render_step_name(host, presented) ++ " { "
     if ret.len() > 4 and facade_render_fn_oks(pool, intern, decl).len() != 1: out = out ++ "status: " ++ ret.slice(4, ret.len()) ++ ", "
