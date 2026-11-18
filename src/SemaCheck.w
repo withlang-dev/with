@@ -17243,11 +17243,16 @@ impl Sema:
                 // borrowed fields so bindings observe and consumption errors.
                 self.note_view_field_projection(node, operand as i32, pointee)
                 self.record_transparent_view_origins(node, operand_node)
+                // The node's type is recorded where it is decided: a generic
+                // method's `Some(*v)` kept the pointee of the instantiation
+                // checked first, and the next one lowered against it (#3423).
+                self.typed_expr_types.insert(node, pointee)
                 return pointee
             if tk == TypeKind.TY_PTR:
                 self.current_fn_raw_derefs = 1
                 self.note_raw_pointer_validity_precondition(operand_node)
                 self.require_unsafe_operation("raw pointer dereference requires unsafe context", node)
+                self.typed_expr_types.insert(node, self.get_type_d0(resolved))
                 return self.get_type_d0(resolved)
             // mut.md Rev 8 §15.16 — deref-precedence diagnostic.
             // `*x.field` parses as `*(x.field)`; if the field type is not a
