@@ -575,8 +575,17 @@ impl CiProject:
     // Why parameter `pi` of `si` counts as retained: the store itself, or
     // the first callee that retains what it is given, followed to where the
     // proof stops (a store, or a callee no unit defines).
+    // One call of the chain a retained parameter travels, before `rest`.
+    fn fd_retain_hop(callee: &str, param: &str, rest: &str, depth: i32) -> str:
+        if depth < 6: return "passed " ++ callee ++ " at param " ++ param ++ ", " ++ rest
+        if depth == 6: return "passed " ++ callee ++ " at param " ++ param ++ ", and on through further calls: " ++ rest
+        with_str_clone_ref(rest)
+
     fn fd_retain_reason(si: i32, pi: i32, depth: i32) -> str:
-        if depth > 6: return "a chain of calls too deep to follow"
+        // #3174: a long chain is followed to its end; past the sixth call
+        // the calls between are not listed, and the store that ends the
+        // chain is. Only a recursion the walk cannot unwind has no end.
+        if depth > 48: return "calls that return to themselves, which the walk does not unwind"
         let sinks = if pi < self.symbols[si].param_sinks.len(): with_str_clone_ref(self.symbols[si].param_sinks[pi]) else: ""
         if sinks.contains("field;"): return "stored in a field"
         if sinks.contains("global;"): return "stored in a global"
@@ -592,7 +601,7 @@ impl CiProject:
             if kv[0].starts_with("*") and self.fd_fnptr_proven_callee(kv[0]).len() == 0: return "passed through " ++ self.fd_fnptr_why(kv[0])
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(kv[0]))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ kv[0] ++ ", which no unit defines"
-            return "passed " ++ self.fd_sink_text(kv[0]) ++ " at param " ++ kv[1] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1)
+            return self.fd_retain_hop(self.fd_sink_text(kv[0]), kv[1], self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1), depth)
         for line in self.symbols[si].own_evidence.split("\n"):
             if line.starts_with("localstore:") and self.fd_local_alias_param(si, line.slice(11, line.len())) == pi: return "stored through local " ++ line.slice(11, line.len())
             if line.starts_with("localaddr:"):
@@ -604,7 +613,7 @@ impl CiProject:
             if parts[2].starts_with("*") and self.fd_fnptr_proven_callee(parts[2]).len() == 0: return "passed through " ++ self.fd_fnptr_why(parts[2])
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(parts[2]))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ parts[2] ++ ", which no unit defines"
-            return "passed " ++ self.fd_sink_text(parts[2]) ++ " at param " ++ parts[3] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1)
+            return self.fd_retain_hop(self.fd_sink_text(parts[2]), parts[3], self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1), depth)
         // #3374: last, so a store the bodies do show is the one reported.
         // Whether the frame's record outlives the call is not followed:
         // weaker than a grant, and it contradicts nothing (§31.7).
