@@ -275,6 +275,9 @@ type MirBuilder ephemeral {
     // into its own temporary read freed memory: the arm's temporary frame
     // closes at the arm's exit (#729), so the copy is made inside the arm.
     copy_out_join_node: i32,
+    // The leaf arm of a copy-out join being lowered: its operand is the
+    // view the adjustment copies out of (the audit's record says so).
+    copy_out_arm_node: i32,
     copy_out_adjustment_node: i32,
     // §4.3d: the node whose own value a vector splat or lane conversion is
     // being built from (MirVector.lower_vector_node).
@@ -425,6 +428,7 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         untyped_override_depth: 0,
         contextual_copy_raw_node: 0,
         copy_out_join_node: 0,
+        copy_out_arm_node: 0,
         copy_out_adjustment_node: 0,
         vector_raw_node: 0,
         contextual_fact_sig_idx: -1,
@@ -13533,7 +13537,10 @@ impl MirBuilder:
         let inner_join = self.is_join_expr(leaf)
         let saved_join = self.copy_out_join_node
         self.copy_out_join_node = if inner_join: leaf else: 0
+        let saved_arm = self.copy_out_arm_node
+        self.copy_out_arm_node = if inner_join: 0 else: leaf
         let op = self.lower_expr(arm_expr)
+        self.copy_out_arm_node = saved_arm
         self.copy_out_join_node = saved_join
         if inner_join or not self.sema.body_can_fall_through(arm_expr): return op
         self.copy_out_adjusted(op, self.contextual_copy_adjustment(self.copy_out_adjustment_node), arm_expr)
@@ -17407,6 +17414,10 @@ impl MirBuilder:
                     sema_ty = self.concrete_type(self.sema.value_to_option_nodes.get(node).unwrap())
                 // D183 (§4.2.6): a checked narrowing Sema recorded is the
                 // adjustment applied above; the operand has the narrow type.
+                // D179: a leaf arm of a copy-out join is lowered at the view
+                // type; the join's recorded adjustment copies out of it.
+                else if node == self.copy_out_arm_node:
+                    sema_ty = self.contextual_copy_adjustment(self.copy_out_adjustment_node).exact_source_type
                 else if self.sema.checked_narrowings.contains(node):
                     sema_ty = self.concrete_type(self.sema.checked_narrowings.get(node).unwrap())
                 else if self.sema.vector_splats.contains(node):
