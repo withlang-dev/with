@@ -4902,6 +4902,9 @@ impl Parser:
                     return 0
                 self.advance()
                 if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+        // D209: a drop or destroys clause carries the parameter that
+        // receives the resource; a rule states none, so the first.
+        else if kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: ops.push(0)
         let extra_start = self.pool.extra_len()
         for op in ops: self.pool.add_extra(op)
         let template = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, tstart, self.prev_end(), kind, extra_start, ops.len() as i32)

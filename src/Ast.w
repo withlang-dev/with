@@ -323,13 +323,13 @@ pub const FACADE_PARAM_REF_TYPE: i32 = 2
 
 // D51 stage 11: a clause a convention profile supplied carries the rule
 // that supplied it as one trailing operand beyond the kind's own (a
-// resource `drop` is [fn_sym]; a profile's is [fn_sym, rule_node]). That
+// resource `drop` is [fn_sym, param_ref|0]; a profile's adds rule_node). That
 // operand is the fact's provenance (§16.2b.2): Sema and the contract view
 // read it here, the renderer reads the leading operands as it reads any
 // clause. Only the kinds a profile rule can state have a row.
 fn facade_clause_operand_count(kind: i32) -> i32:
-    if kind == FACADE_CLAUSE_FROM: return 2
-    if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 1
+    if kind == FACADE_CLAUSE_FROM or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 2
+    if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT: return 1
     if kind == FACADE_CLAUSE_LEND: return 0
     -1
 
