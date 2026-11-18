@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D213 — `field F of R is callback`: a function-pointer field that holds only callbacks the program registered through a presented setter; a call through it lends its arguments and keeps none (ruled)](2026-11-18-D213-a-field-that-holds-the-programs-callback.md)
 - [D212 — `with get` builds a C package from source by default: cached per user, proofs drawn from the patched tree that is compiled, a non-CMake requirement taken as a binary, and one line per package saying which it was (ruled)](2026-11-18-D212-with-get-builds-from-source-by-default.md)
 - [D211 — A call through a function-pointer field the package fills: several writers join, and a record passed to such a call has not left the proofs; `field F of R holds f, g` is the cited fallback (ruled; extends D198)](2026-11-18-D211-function-pointer-fields-the-package-fills.md)
 - [D210 — A buffer paired with fields of a resource's record: `buffer field P remaining field N`, fields cleared after the call, a generated result record (ruled)](2026-11-18-D210-a-buffer-paired-with-fields-of-the-record.md)
