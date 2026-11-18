@@ -226,6 +226,25 @@ for line in stdin.lines():
 `stdin.lines()` used by one-liners removes the trailing newline. For
 CRLF input, the trailing `\r` is also removed.
 
+`last` is bound to `true` on the final line and `false` on every other. A
+one-liner that declares its own `last` keeps its own.
+
+`-e CODE` before the first `-n` runs once before the loop, and `-e CODE`
+after the last `-n` runs once after it; a variable the first declares is
+the program's, so it holds across lines and is read by the second:
+
+```
+with -e 'var m = ""' -n 'if line.len() > m.len(): m = line' -e 'print(m)'
+with -n '' -e 'print(nr)'
+with -n 'if last: print(line)'
+```
+
+print the longest line, the number of lines, and the final line. A `var`
+inside `-n` code is the loop body's and starts again on every line, as in
+any loop. On empty input the loop body never runs, so `if last:` prints
+nothing, while code after the loop still runs and `print(nr)` prints `0`.
+The same holds for `-p`.
+
 #### 18.5b.4 `-p`
 
 `-p CODE` is like `-n`, but prints `line` after `CODE` runs. `line` is a

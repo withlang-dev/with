@@ -113,6 +113,8 @@ type CliOneLiner {
     mode: i32,
     error_msg: str,
     code_parts: List[str],
+    pre_parts: List[str],    // §18.5b (#957): `-e` code that runs once before the `-n`/`-p` loop
+    post_parts: List[str],   // … and once after it
     args: List[str],
     opt_level: i32,
 }
@@ -509,6 +511,8 @@ fn cli_one_liner_default(argc: i32) -> CliOneLiner:
         mode: CliOneLinerMode.None,
         error_msg: "",
         code_parts: List.new(),
+        pre_parts: [],
+        post_parts: [],
         args: List.new(),
         opt_level: cli_default_opt_level(argc),
     }
@@ -558,15 +562,34 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
         let mode = cli_one_liner_mode_for_flag(arg)
         if mode != CliOneLinerMode.None:
             result.seen = true
-            if result.mode != CliOneLinerMode.None and result.mode != mode:
-                result.ok = false
-                result.error_msg = "error: -e, -n, and -p are mutually exclusive"
-                return result
-            result.mode = mode
             if i + 1 >= argc:
                 result.ok = false
                 result.error_msg = "error: " ++ arg ++ " requires a code argument"
                 return result
+            // §18.5b (#957): `-e` code before the first `-n`/`-p` runs once
+            // before the loop, and `-e` code after the last runs once after
+            // it. `result.mode` is the loop's once a loop part is seen.
+            let looping = result.mode == CliOneLinerMode.Lines or result.mode == CliOneLinerMode.Print
+            if mode == CliOneLinerMode.Eval:
+                if looping: result.post_parts.push(with_arg_at(i + 1))
+                else:
+                    result.mode = mode
+                    result.code_parts.push(with_arg_at(i + 1))
+                i = i + 2
+                continue
+            if looping and result.mode != mode:
+                result.ok = false
+                result.error_msg = "error: -n and -p are mutually exclusive"
+                return result
+            if result.post_parts.len() > 0:
+                result.ok = false
+                result.error_msg = "error: -e between two " ++ arg ++ " parts: code that runs once before the loop comes before the first " ++ arg ++ ", and code that runs once after it comes after the last (§18.5b)"
+                return result
+            if not looping:
+                // The `-e` parts seen so far run before the loop.
+                for part in result.code_parts: result.pre_parts.push(with_str_clone_ref(part))
+                result.code_parts = List.new()
+            result.mode = mode
             result.code_parts.push(with_arg_at(i + 1))
             i = i + 2
             continue
@@ -827,9 +850,23 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
             syn = cli_synthetic_add_mapping(syn, start, uses, f"<cli {flag} #{i + 1}>")
         rewritten_parts.push(rewritten)
         use_lens.push(use_len)
+    // §18.5b (#957): code that runs once before the loop.
+    for i in 0..one.pre_parts.len():
+        let before = cli_rewrite_semicolons(one.pre_parts[i])
+        let start = source.len() as i32
+        source.push_str(before)
+        source.push_str("\n")
+        syn = cli_synthetic_add_mapping(syn, start, before, f"<cli -e #{i + 1}>")
+    // `last` is bound when the code names it and does not declare its own:
+    // the loop holds every line, so "this is the final one" is known.
+    var wants_last = false
+    for part in rewritten_parts:
+        if cli_code_names(part, "last") and not part.contains("let last") and not part.contains("var last"): wants_last = true
     source.push_str("var nr: i64 = 0\n")
-    source.push_str(if lines_mode: "for line in stdin.lines() {\n" else: "for __line in stdin.lines() {\n")
+    source.push_str("let __lines = stdin.lines()\n")
+    source.push_str(if lines_mode: "for line in __lines {\n" else: "for __line in __lines {\n")
     source.push_str("nr = nr + 1\n")
+    if wants_last: source.push_str("let last = nr == __lines.len()\n")
     if not lines_mode: source.push_str("var line = __line.clone()\n")
     for i in 0..rewritten_parts.len():
         let start = source.len() as i32
@@ -838,8 +875,29 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
         syn = cli_synthetic_add_mapping(syn, start, rewritten_parts[i], f"<cli {flag} #{i + 1}>")
     if not lines_mode: source.push_str("print(line)\n")
     source.push_str("}\n")
+    // §18.5b (#957): code that runs once after the loop.
+    for i in 0..one.post_parts.len():
+        let after = cli_rewrite_semicolons(one.post_parts[i])
+        let start = source.len() as i32
+        source.push_str(after)
+        source.push_str("\n")
+        syn = cli_synthetic_add_mapping(syn, start, after, f"<cli -e #{one.pre_parts.len() + i + 1}>")
     syn.source = source.to_str()
     syn
+
+// Whether `code` names the identifier `word`: the word with no identifier
+// character on either side.
+fn cli_code_names(code: &str, word: &str) -> bool:
+    var at = 0
+    while at + word.len() <= code.len():
+        if code.slice(at, at + word.len()) == word:
+            let before = at == 0 or not cli_ident_byte(code[at - 1])
+            let after = at + word.len() == code.len() or not cli_ident_byte(code[at + word.len()])
+            if before and after: return true
+        at += 1
+    false
+
+fn cli_ident_byte(b: u8) -> bool: (b >= 'a' and b <= 'z') or (b >= 'A' and b <= 'Z') or (b >= '0' and b <= '9') or b == '_'
 
 fn cli_one_liner_bin_path -> str:
     // The host exe suffix on Windows: CreateProcessW appends ".exe" to a

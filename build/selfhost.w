@@ -1713,14 +1713,52 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
 
     args = List.new()
-    args |> push("-e")
-    args |> push("print(\"x\")")
     args |> push("-n")
     args |> push("print(line)")
+    args |> push("-p")
+    args |> push("line = line")
     let mutual = bs_run_cli_capture(ctx, compiler_path, "one-liner-mutual-exclusion", args, BS_HANG_GUARD_MS)
     if mutual.rc == 0:
         return bs_fail(ctx, "one-liner mutual exclusion unexpectedly succeeded")
-    rc = bs_assert_contains(ctx, mutual.stderr, "mutually exclusive", "one_liners")
+    rc = bs_assert_contains(ctx, mutual.stderr, "-n and -p are mutually exclusive", "one_liners")
+    if rc != 0: return rc
+
+    // §18.5b (#957): `-e` before the first `-n` runs once before the loop,
+    // `-e` after the last once after it, and `last` is the final line.
+    args = List.new()
+    args |> push("-e")
+    args |> push("var m = \"\"")
+    args |> push("-n")
+    args |> push("if line.len() > m.len(): m = line")
+    args |> push("-e")
+    args |> push("print(m)")
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-before-and-after", args, "ab\nabcd\nabc\n", "abcd")
+    if rc != 0: return rc
+    args = List.new()
+    args |> push("-n")
+    args |> push("")
+    args |> push("-e")
+    args |> push("print(nr)")
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-count-lines", args, "a\nb\nc\n", "3")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-count-no-lines", args, "", "0")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-last", bs_one_liner_args("-n", "if last: print(line)"), "a\nb\nc\n", "c")
+    if rc != 0: return rc
+    // A one-liner's own `last` is its own: nothing is bound over it.
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-own-last", bs_one_liner_args("-n", "let last = line.len(); print(last)"), "ab\n", "2")
+    if rc != 0: return rc
+    args = List.new()
+    args |> push("-n")
+    args |> push("print(1)")
+    args |> push("-e")
+    args |> push("print(2)")
+    args |> push("-n")
+    args |> push("print(3)")
+    let between = bs_run_cli_capture(ctx, compiler_path, "one-liner-e-between-n", args, BS_HANG_GUARD_MS)
+    if between.rc == 0:
+        return bs_fail(ctx, "one-liner -e between two -n parts unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, between.stderr, "-e between two -n parts", "one_liners")
     if rc != 0: return rc
 
     let diag_e = bs_run_cli_capture(ctx, compiler_path, "one-liner-diag-e", bs_one_liner_args("-e", "let x = "), BS_HANG_GUARD_MS)

@@ -76,7 +76,10 @@ needs a `with run` script" was also wrong.
 Each row was run and failed with the diagnostic shown; the issue carries the
 proposal and the acceptance rows.
 
-**1. No persistent state and no END in `-n`/`-p` (#957).** A snippet runs
+**1. Done (D217, 2026-11-18): `last`, and `-e` code before and after the
+`-n`/`-p` loop.** `wc -l` is `with -n '' -e 'print(nr)'`, `tail -n 1` is
+`with -n 'if last: print(line)'`, and a sum or a `seen` set is declared in
+`-e` before the loop. What follows is the gap as it was. A snippet runs
 inside the per-line loop (§18.5b.3's desugaring), so a `var` it declares is
 re-created per line, an undeclared assignment is "undefined variable", and
 there is no `last`/END. Blocked: `sed '$p'`, `sed -n '/START/,/END/p'`,

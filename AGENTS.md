@@ -527,8 +527,10 @@ never Python, bash, perl or awk. With IS a scripting language.
   - `awk '{print $2}'` → `with -n 'print(line.fields()[1])'` (runs of blanks
     separate fields; `NF` is `line.fields().len()`; a short line panics (D71),
     check `.len()` first)
-  - `wc -l`, `tail`, sums → `with -e` with a loop over `stdin.lines()`; `-n`
-    gains persistent state and `last` with #957
+  - `wc -l` → `with -n '' -e 'print(nr)'`; `tail -n 1` →
+    `with -n 'if last: print(line)'`; state across lines is declared in `-e`
+    before the first `-n` and read in `-e` after the last (D217):
+    `with -e 'var m = ""' -n 'if line.len() > m.len(): m = line' -e 'print(m)'`
   - `jq -r .a.b` → `with -e 'use std.json` ⏎ `print(JsonDocument.parse(read_all()).root().field("a").field("b").raw())'`
   - `sed -i`, `awk … file` → not yet (#958): `< file` and `with run`
   - Full matrix and open gaps: `docs/spec/toolchain/improve_oneliners.md`.
