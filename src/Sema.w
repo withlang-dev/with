@@ -2028,7 +2028,25 @@ type Sema {
     regex_capture_name_counts: HashMap[i32, i32, Minted],
     regex_capture_name_syms: List[i32],
 
-    // Typed dump sidecar maps (keyed by span start byte offset)
+    // The type Sema decided for an expression node, keyed by the node.
+    //
+    // The contract (#767):
+    // - A record is the node's own type. An adjustment Sema applies at the
+    //   node (a value wrapped in Some, a splat, a checked narrowing, a copy
+    //   out of a view) has its own table and does not change the record.
+    // - An arm of check_expr that decides a type records it there, where
+    //   it is decided. A record written for one instantiation of a generic
+    //   body and not rewritten for the next is the defect class (#3423:
+    //   the deref arm returned its type without recording it).
+    // - Many nodes have no record (a binary operator, most identifiers):
+    //   the lowering derives their type from their operands. That is
+    //   allowed; a wrong derivation is a MIR type error validate-all
+    //   reports.
+    // - Wherever a record exists, the operand the lowering produced for the
+    //   node has that type, or the type of the adjustment recorded on it.
+    //   `audit:resolution` judges every lowered expression, and the battery
+    //   runs it over the compiler's own source (self-audit). Its note
+    //   counts the lowered expressions that have no record, by node kind.
     typed_expr_types: HashMap[i32, i32, Minted],
     typed_binding_types: HashMap[i32, i32, Minted],
     // D65 (#1647): the callable type an indirect call invokes — a call node

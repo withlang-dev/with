@@ -771,6 +771,10 @@ fn resolution_audit_resolved_calls(mut report: AnalysisReport, sema: &Sema, mir_
 fn resolution_audit_expr_operands(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var disagree = 0
+    // #767: expressions that lowered to a value and have no type Sema
+    // recorded (the lowering fell back to deriving one), by node kind.
+    var unrecorded = 0
+    let unrecorded_kinds: HashMap[i32, i32] = HashMap.new()
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
@@ -784,11 +788,18 @@ fn resolution_audit_expr_operands(mut report: AnalysisReport, sema: &Sema, mir_m
             let mir_ty = sema.resolve_alias(mir_raw as TypeId) as i32
             let sema_kind = sema.get_type_kind(sema_ty as TypeId)
             if sema_kind == TypeKind.TY_VOID or sema_kind == TypeKind.TY_NEVER or sema_kind == TypeKind.TY_ERR: continue
+            if not sema.typed_expr_types.contains(node):
+                unrecorded += 1
+                let kind = sema.ast.kind(node) as i32
+                unrecorded_kinds.insert(kind, (unrecorded_kinds.get(kind).copied() ?? 0) + 1)
             checked = checked + 1
             if sema_ty == mir_ty or sema.types_identical(sema_ty, mir_ty): continue
             disagree = disagree + 1
             report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: an expression lowered to an operand of another type (MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)}, node kind {sema.ast.kind(node) as i32})")
     report.note(f"resolution-audit: expression-operands judged={checked} disagree={disagree}")
+    var by_kind = ""
+    for (kind, count) in unrecorded_kinds: by_kind = by_kind ++ f" kind{kind}={count}"
+    report.note(f"resolution-audit: expression-operands with no recorded Sema type={unrecorded}{by_kind}")
     checked
 
 fn analysis_audit_resolution(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
