@@ -1,6 +1,6 @@
-# The With ABI (version 13)
+# The With ABI (version 14)
 
-Status: DRAFT v13 (2026-10-02), the convention as the compiler implements
+Status: DRAFT v14 (2026-11-18), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/spec/toolchain/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -219,6 +219,13 @@ ABI-owned file when D30's in-unit runtime retirement lands; until then a
 layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
+
+- **v14** (2026-11-18): `c_char` is a type of its own (D207, §16.1), one
+  byte with the target's `char` signedness. A bundle interface written
+  under v13 spells a C `char *` parameter as `*const i8` or `*const u8`,
+  which is no longer a pointer to `c_char`. No layout or passing rule
+  changes; the version moves so every stored bundle is rebuilt once and
+  its interface re-written.
 
 - **v13** (2026-10-02): an enum's payload area sits at the largest
   payload's alignment and the enum is aligned to the larger of tag and

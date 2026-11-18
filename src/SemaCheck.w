@@ -7617,7 +7617,7 @@ impl Sema:
         if k == TypeKind.TY_INT:
             let w = self.get_type_d0(r)
             let signed = self.get_type_d1(r)
-            if self.get_type_d2(r) != 0:
+            if self.get_type_d2(r) == 1:
                 if signed != 0: return "ptrdiff_t"
                 return "size_t"
             if w == 8: return if signed != 0: "int8_t" else: "uint8_t"
@@ -16631,6 +16631,7 @@ impl Sema:
             let contextual_pair = self.contextualize_builtin_binary_operands(lhs_node, lhs as i32, rhs_node, rhs as i32)
             lhs = (contextual_pair % 4294967296) as TypeId
             rhs = (contextual_pair / 4294967296) as TypeId
+        if self.refuse_c_char_mixed_operands(node, op, lhs as i32, rhs as i32): return 0
 
         // Comparison operators return bool
         if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
@@ -17029,8 +17030,11 @@ impl Sema:
         let lit = self.ast.int_literal_fast_i64(inner as NodeId)
         if lit.ok == 0 or lit.value < 0:
             return
-        let signed = self.get_type_d1(resolved) != 0
+        // §16.1 (D207): a byte written `200 as c_char` is the spelling; the
+        // cast keeps the byte on every target.
+        let signed = self.get_type_d1(resolved) != 0 and resolved != self.ty_c_char
         let bound: i64 = if signed: (1 as i64) << ((width - 1) as u32) else: (1 as i64) << width
+
         let max = bound - 1
         if lit.value <= max:
             return
@@ -31668,6 +31672,44 @@ impl Sema:
             return expected
         self.get_generic_inst_arg(er, 0)
 
+    // §16.1 (D207): `c_char` is a type of its own, one byte with the
+    // target's `char` signedness. A conversion happens without `as` only
+    // when it keeps the value on every target: a `c_char` widens into a
+    // wider signed type, and nothing else. An integer literal is a `c_char`
+    // where it is 0 to 127 (int_literal_fits_type).
+    mut fn refuse_c_char_conversion(node: i32, expected: i32, value: i32) -> bool:
+        let e = self.resolve_alias(expected as TypeId)
+        let v = self.resolve_alias(value as TypeId)
+        if self.get_type_kind(e) != TypeKind.TY_INT or self.get_type_kind(v) != TypeKind.TY_INT: return false
+        if (e == self.ty_c_char) == (v == self.ty_c_char): return false
+        let want = self.type_name(expected)
+        let got = self.type_name(value)
+        if v == self.ty_c_char:
+            if self.get_type_d0(e) > 8 and self.get_type_d1(e) != 0: return false
+            if self.get_type_d0(e) == 8: self.emit_error_with_help(f"a `c_char` is not a `{want}`: the conversion is written, and keeps the byte (§16.1)", node, f"write `… as {want}`")
+            else: self.emit_error_with_help(f"a `c_char` does not widen into the unsigned `{want}`: its sign is the target's `char` (§16.1)", node, f"write `… as {want}`, or widen into a signed type")
+            return true
+        if self.get_type_d0(v) == 8: self.emit_error_with_help(f"a `{got}` is not a `c_char`: the conversion is written, and keeps the byte (§16.1)", node, "write `… as c_char`")
+        else: self.emit_error_with_help(f"a `{got}` converts to `c_char` only with `as`: which values fit depends on the target's `char` (§16.1)", node, "write `… as c_char`")
+        true
+
+    // Two `c_char` values compute and compare as the target's `char` does.
+    // Beside a `u8`, an `i8` or a wider unsigned integer the result would
+    // differ by target, so one operand is converted with `as`. A shift's
+    // count is not a peer of its value.
+    mut fn refuse_c_char_mixed_operands(node: i32, op: i32, lhs: i32, rhs: i32) -> bool:
+        if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR: return false
+        let l = self.resolve_alias(self.numeric_operand_type(lhs) as TypeId)
+        let r = self.resolve_alias(self.numeric_operand_type(rhs) as TypeId)
+        if self.get_type_kind(l) != TypeKind.TY_INT or self.get_type_kind(r) != TypeKind.TY_INT: return false
+        if (l == self.ty_c_char) == (r == self.ty_c_char): return false
+        let other = if l == self.ty_c_char: r else: l
+        if self.get_type_d0(other) > 8 and self.get_type_d1(other) != 0: return false
+        let what = if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ: "equality" else: if op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE: "ordering" else: "arithmetic"
+        let name = self.type_name(other as i32)
+        self.emit_error_with_help(f"{what} between a `c_char` and a `{name}` is refused: the result would differ by target (§16.1)", node, f"convert one operand: `(c as {name})`, or `(x as c_char)`")
+        true
+
     mut fn reject_implicit_numeric_narrowing(node: i32, expected: i32, actual: i32) -> bool:
         if node <= 0 or expected == 0 or actual == 0:
             return false
@@ -31680,6 +31722,7 @@ impl Sema:
             return false
         let pointee = self.shared_copy_pointee(actual)
         let value = if pointee != 0: pointee else: actual
+        if self.refuse_c_char_conversion(node, expected, value): return true
         self.note_inferred_field_demand(value, expected, node)
         let vr = self.resolve_alias(value as TypeId)
         let vk = self.get_type_kind(vr)
@@ -33813,10 +33856,11 @@ impl Sema:
             let bits = self.get_type_d0(resolved)
             let signed = self.get_type_d1(resolved)
             let ptr_width = self.get_type_d2(resolved)
-            if ptr_width != 0:
+            if ptr_width == 1:
                 if signed != 0:
                     return self.pool_lookup_symbol("isize")
                 return self.pool_lookup_symbol("usize")
+            if ptr_width == 2: return self.pool_lookup_symbol("c_char")
             if bits == 8:
                 if signed != 0:
                     return self.pool_lookup_symbol("i8")

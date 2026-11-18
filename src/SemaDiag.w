@@ -1508,7 +1508,8 @@ impl Sema:
             let bits = self.get_type_d0(resolved)
             let signed = self.get_type_d1(resolved)
             let is_ptr_width = self.get_type_d2(resolved)
-            if is_ptr_width != 0:
+            if is_ptr_width == 2: return "c_char"
+            if is_ptr_width == 1:
                 return if signed != 0: "isize" else: "usize"
             if bits == 8:
                 return if signed != 0: "i8" else: "u8"

@@ -118,8 +118,9 @@ impl Codegen:
             let bits = self.mir_type_d0_at(resolved)
             let signed = self.mir_type_d1_at(resolved)
             let ptr_width = self.mir_type_d2_at(resolved)
-            if ptr_width != 0:
+            if ptr_width == 1:
                 return if signed != 0: self.sema.ty_isize as i32 else: self.sema.ty_usize as i32
+            if ptr_width == 2: return self.sema.ty_c_char as i32
             if bits == 8: return if signed != 0: self.sema.ty_i8 as i32 else: self.sema.ty_u8 as i32
             if bits == 16: return if signed != 0: self.sema.ty_i16 as i32 else: self.sema.ty_u16 as i32
             if bits == 32: return if signed != 0: self.sema.ty_i32 as i32 else: self.sema.ty_u32 as i32
@@ -9883,7 +9884,7 @@ impl Codegen:
             // until the collection headers take the size width, so a 32-bit
             // target narrows the read here, at the one store.
             let dest_sema = self.sema.resolve_alias(self.mir_place_sema_type(body, dest_place) as TypeId)
-            if dest_sema != 0 and self.sema.get_type_kind(dest_sema) == TypeKind.TY_INT and self.sema.get_type_d2(dest_sema) != 0 and wl_get_type_kind(wl_type_of(result)) == wl_integer_type_kind():
+            if dest_sema != 0 and self.sema.get_type_kind(dest_sema) == TypeKind.TY_INT and self.sema.get_type_d2(dest_sema) == 1 and wl_get_type_kind(wl_type_of(result)) == wl_integer_type_kind():
                 result = self.coerce_int(result, self.sema_type_to_llvm(dest_sema as i32))
             let result_ty = wl_type_of(result)
             if result_ty != wl_void_type(self.context):

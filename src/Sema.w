@@ -4872,7 +4872,7 @@ fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     // AArch64 Linux, wasm).
     for alias in ["c_char", "c_schar", "c_uchar", "c_short", "c_ushort", "c_int", "c_uint", "c_long", "c_ulong", "c_longlong", "c_ulonglong", "c_longdouble"]:
         let fixed = c_alias_fixed_spelling(alias)
-        let tid: i32 = match fixed:
+        var tid: i32 = match fixed:
             "i8" => s.ty_i8
             "u8" => s.ty_u8
             "i16" => s.ty_i16
@@ -4882,7 +4882,12 @@ fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
             "i64" => s.ty_i64
             "u64" => s.ty_u64
             _ => s.ty_f64
-        if alias == "c_char": s.ty_c_char = tid
+        if alias == "c_char":
+            // §16.1 (D207): a type of its own on every target, one byte
+            // with the target's `char` signedness; d2 = 2 marks it.
+
+            tid = s.add_type(TypeKind.TY_INT, 8, (fixed == "i8") as i32, 2)
+            s.ty_c_char = tid
         s.register_prim(alias, tid)
     // A C string literal's bytes are `c_char`s (D155): `c"…".ptr` is
     // `*const c_char` on every target.
@@ -7077,7 +7082,7 @@ impl Sema:
             return true
         // An integer's width and signedness; a float's width.
         if kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT:
-            return a0 == b0 and a1 == b1
+            return a0 == b0 and a1 == b1 and ((ar == self.ty_c_char as i32) == (br == self.ty_c_char as i32) or kind == TypeKind.TY_FLOAT)
         // A mask's lane width and count; a vector's lane type and count.
         if kind == TypeKind.TY_MASK:
             return a0 == b0 and a1 == b1
@@ -7834,8 +7839,16 @@ impl Sema:
             return true
         if kind != TypeKind.TY_INT:
             return false
+        // §16.1 (D207): 0 to 127 is a `c_char` on every target.
+        if resolved == self.ty_c_char:
+            let expr = self.ast.int_literal_exact_expr(node)
+            if expr.ok != 0:
+                return expr.overflow == 0 and expr.negative == 0 and exact_int_fits_unsigned_bits(ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }, 7)
+            let plain = self.ast.int_lit_value(node)
+            return plain >= 0 and plain <= 127
         let bits = self.get_type_d0(resolved)
         let signed = self.get_type_d1(resolved)
+
         if self.ast.has_int_literal_exact(node as NodeId):
             let value = self.ast.int_literal_exact_value(node as NodeId)
             if signed != 0:
@@ -7875,6 +7888,8 @@ impl Sema:
             return true
         if kind != TypeKind.TY_INT:
             return false
+        // §16.1 (D207): no negative literal is a `c_char` on every target.
+        if resolved == self.ty_c_char: return self.ast.int_lit_value(node as NodeId) == 0
         if self.get_type_d1(resolved) == 0:
             // Unsigned: negation is rejected by check_unary with its own
             // message. Defer to the ordinary check so the diagnostic stays
@@ -7915,7 +7930,13 @@ impl Sema:
         let width_ty = self.distinct_underlying(expected)
         if not self.is_numeric_type(width_ty):
             return 0
-        if self.in_bitwise_literal_context != 0:
+        if self.resolve_alias(width_ty as TypeId) == self.ty_c_char:
+            if not (if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, width_ty) else: self.int_literal_fits_type(node, width_ty)):
+                let spelled = self.ast.int_literal_digits(node as NodeId)
+                let digits = if spelled.len() > 0: spelled else: f"{self.ast.int_lit_value(node as NodeId)}"
+                self.emit_error_with_help(f"`{digits}` is not a `c_char` literal:
+ an integer literal from 0 to 127 is a `c_char` on every target (§16.1)", node, "write the value at an integer type and convert it: `… as c_char`")
+        else if self.in_bitwise_literal_context != 0:
             if not self.int_literal_bit_pattern_fits_type(node, width_ty):
                 self.emit_error("integer literal bit pattern does not fit expected type", node)
         else if not (if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, width_ty) else: self.int_literal_fits_type(node, width_ty)):
@@ -8284,7 +8305,7 @@ impl Sema:
         let ek = self.get_type_kind(ep)
         let ak = self.get_type_kind(ap)
         if ek == TypeKind.TY_INT and ak == TypeKind.TY_INT:
-            return self.get_type_d0(ep) != self.get_type_d0(ap) or self.get_type_d1(ep) != self.get_type_d1(ap)
+            return self.get_type_d0(ep) != self.get_type_d0(ap) or self.get_type_d1(ep) != self.get_type_d1(ap) or (ep == self.ty_c_char) != (ap == self.ty_c_char)
         if ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_FLOAT:
             return self.get_type_d0(ep) != self.get_type_d0(ap)
         (ek == TypeKind.TY_INT and ak == TypeKind.TY_FLOAT) or (ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_INT)

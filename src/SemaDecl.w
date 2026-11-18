@@ -1212,7 +1212,7 @@ impl Sema:
             let te_start = self.get_type_d1(tid as TypeId)
             for fi in 0..self.get_type_d2(tid as TypeId):
                 let f_tid = self.resolve_alias(self.type_extra[te_start + fi * 3 + 1] as TypeId)
-                if self.get_type_kind(f_tid) == TypeKind.TY_INT and self.get_type_d2(f_tid) != 0:
+                if self.get_type_kind(f_tid) == TypeKind.TY_INT and self.get_type_d2(f_tid) == 1:
                     let width = if self.get_type_d1(f_tid) != 0: "i" else: "u"
                     self.emit_warning(f"field `{self.pool_resolve(self.type_extra[te_start + fi * 3])}` of {layout} struct `{self.pool_resolve(name)}` is `{self.type_name(f_tid as i32)}`, whose width is the target's; a value that leaves the process has a fixed width, such as `{width}64` (§4.1, D114)", decl)
 

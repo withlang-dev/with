@@ -178,7 +178,7 @@ impl Sema:
             return f"Mask[{n}, {w}]"
         let lane = self.get_type_d0(resolved)
         let lane_name = self.type_name(lane)
-        let pointer_width = self.get_type_d2(self.resolve_alias(lane as TypeId)) != 0
+        let pointer_width = self.get_type_d2(self.resolve_alias(lane as TypeId)) == 1
         if not pointer_width and vector_native_total_bits(self.vector_lane_bits(lane) * n):
             return lane_name ++ f"x{n}"
         f"Vector[{lane_name}, {n}]"
