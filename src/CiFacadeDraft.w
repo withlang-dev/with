@@ -587,10 +587,17 @@ impl CiProject:
         // chain is. Only a recursion the walk cannot unwind has no end.
         if depth > 48: return "calls that return to themselves, which the walk does not unwind"
         let sinks = if pi < self.symbols[si].param_sinks.len(): with_str_clone_ref(self.symbols[si].param_sinks[pi]) else: ""
-        if sinks.contains("field;"): return "stored in a field"
-        if sinks.contains("global;"): return "stored in a global"
+        // #3175: say where, so a reader can tell a registration from a
+        // scratch slot the function restores or overwrites.
+        var place = ""
+        for at in self.symbols[si].own_evidence.split("\n"):
+            if place.len() == 0 and at.starts_with(f"paramstoreat:{pi}:"): place = ", `" ++ at.slice(f"paramstoreat:{pi}:".len(), at.len()) ++ "`"
+        if sinks.contains("field;"): return "stored in a field" ++ place
+        if sinks.contains("global;"): return "stored in a global" ++ place
         for line in self.symbols[si].own_evidence.split("\n"):
-            if line == f"paramstore:{pi}": return "stored"
+            if line == f"paramstore:{pi}": return if place.len() > 0: "stored in" ++ place.slice(1, place.len()) else: "stored"
+
+
         for sink in sinks.split(";"):
             if not sink.contains(":"): continue
             let kv = sink.split(":")

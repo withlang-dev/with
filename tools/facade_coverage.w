@@ -147,7 +147,8 @@ fn retention_class(why: &str) -> str:
     if tail.starts_with("stored in a field"): return "stored in a field"
     if tail.starts_with("stored through local"): return "stored through a local"
     if tail.starts_with("stored through"): return "stored through a parameter"
-    if tail == "stored": return "stored"
+    if tail == "stored" or tail.starts_with("stored in `"): return "stored"
+
     tail.to_owned()
 
 // Why a record-pointer return is unproven, with the function's own locals
