@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.62
+# The With Programming Language — Specification v7.63
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.63:** D210 (Eric, 2026-11-18; #3173). §16.2b.8, §31: `buffer field P remaining field N` pairs two fields of the record a lent resource wraps; the slice is stored before the call, the count read back and both fields cleared after it, and the operation returns a record of how much moved. The implementation lands with #3173's change.
+
 **Changelog v7.62:** D208's derived words and D209 (Eric, 2026-11-18). §31 grammar: a domain's `written by` list and the contract-level `preserves domain D`; §16.2b.7: what `written by any` means, what the contract-level line says, and that the condition on a writer's call applies where some function returns a view; the `environ` and curl examples name their writers, and `curl_version()` is a view of its own static buffer. D209: `drop f(param N)` and `destroys f(param N)` name the parameter that receives the resource, the first when the parentheses are absent; `drop f(param N)` requires every other parameter fixed; `param p discarded` fixes an out-pointer as discarded. The domain words are implemented; D209 is not: a destroyer takes its resource first, and no parameter can be discarded.
 
 **Changelog v7.61:** #3178 (Eric, 2026-11-18). §16.2b.9, §31: `callback param N` describes a callback with no userdata parameter; the argument is a function or a closure that captures nothing, and a callback the library retains states `callback_thread`. Implemented with these words; the drafter writes the clause where the C body only calls the pointer or tests it for NULL.
