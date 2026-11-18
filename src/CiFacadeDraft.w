@@ -1527,7 +1527,8 @@ impl CiProject:
             // #3176: each line says what a person would state. The record's
             // destroyers are named: they are what the proofs do know.
             var drops = ""
-            for di in self.fd_destroyers_of(record, false): drops = drops ++ (if drops.len() > 0: ", " else: "") ++ self.symbols[di].name
+            for only in [true, false]:
+                for di in self.fd_destroyers_of(record, only): drops = drops ++ (if drops.len() > 0: ", " else: "") ++ self.symbols[di].name
             if producers == 0: head = head ++ "  " ++ record ++ ": destroyed but never produced here; no resource (destroyed by " ++ drops ++ "; a contract states 'resource <Name> wraps *mut " ++ record ++ "' with 'from <fn>' naming what produces it, or, where the caller allocates the record and a function fills it, 'resource <Name> wraps " ++ record ++ "' with 'init <fn>(self)' (§16.2b.3))\n"
             else if unary == 0: head = head ++ "  " ++ record ++ f": {producers} producer(s) and no unary destroyer in the package; a registry fact names the drop\n"
             else if unary == 1:
