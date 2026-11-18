@@ -5344,7 +5344,7 @@ impl Sema:
             self.emit_error_with_help(f"fn '{fname}': 'user_data from {aname}' presents the value the facade boxed, and '{fname}' boxes none: no 'void *' userdata is consumed with its destroy callback ('consumes param N destroyed_by param M') or retained by the resource ('retains param N by param 0') (§16.2b.9)", ud_node, "add 'consumes param N destroyed_by param M' or 'retains param N by param 0' for the 'void *' userdata, or delete 'user_data'")
             return false
         if wrapped.len() == 0:
-            self.emit_error_with_help(f"fn '{fname}': 'user_data from {aname}': no callback '{fname}' takes receives the handle '{hname}' that {aname} reads the user data from (§16.2b.9)", ud_node, f"name an accessor that takes a handle the callback receives, or declare that handle: 'handle <Name> wraps *mut T'")
+            self.emit_error_with_help(f"fn '{fname}': 'user_data from {aname}': no callback that '{fname}' takes receives the handle '{hname}' that {aname} reads the user data from (§16.2b.9)", ud_node, f"name an accessor that takes a handle the callback receives, or declare that handle: 'handle <Name> wraps *mut T'")
             return false
         for wrapped_item in wrapped:
             let cb = wrapped_item
