@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D216 — A polled tagged message is a contract item: a tag, its cases, an open sum with `Other(tag)`, a payload that borrows the message, and a release that is its guard's drop (ruled)](2026-11-18-D216-a-polled-tagged-message.md)
 - [D215 — A described function's C name means the modeled operation, for every representation; the raw declaration has a spelling of its own that requires `unsafe` (ruled)](2026-11-18-D215-a-described-functions-c-name-means-the-modeled-operation.md)
 - [D214 — A producer has one home, chosen by `of`; an absent parent is a second constructor, stated with `param N fixed null` (ruled)](2026-11-18-D214-a-producer-has-one-home-and-an-absent-parent-is-a-second-constructor.md)
 - [D213 — `field F of R is callback`: a function-pointer field that holds only callbacks the program registered through a presented setter; a call through it lends its arguments and keeps none (ruled)](2026-11-18-D213-a-field-that-holds-the-programs-callback.md)
