@@ -463,7 +463,7 @@ impl CiProject:
             for kept in symbol.param_stores:
                 pi += 1
                 if kept == 0 or (pi < symbol.param_destroys.len() and symbol.param_destroys[pi] != 0): continue
-                let why = self.fd_retain_reason(si, pi, 0)
+                let why = self.fd_retain_reason(si, pi, 0, false)
                 if why.ends_with("stored in a field") or why.ends_with("stored in a global") or why.ends_with("stored") or why.contains("stored through local "): out = out ++ f"{symbol.name}\tstores\t{pi}\t{why}\n"
             if symbol.borrow_from >= 0 and symbol.own_reason.starts_with("proof: "): out = out ++ f"{symbol.name}\treturns-part\t{symbol.borrow_from}\t{symbol.own_reason.slice(7, symbol.own_reason.len())}\n"
             // §31.8.6: the third column is the global, not a parameter.
@@ -581,16 +581,24 @@ impl CiProject:
         if depth == 6: return "passed " ++ callee ++ " at param " ++ param ++ ", and on through further calls: " ++ rest
         with_str_clone_ref(rest)
 
-    fn fd_retain_reason(si: i32, pi: i32, depth: i32) -> str:
+    // `places`: the report names the place a store assigned; the proofs
+    // file (contract-proofs.txt), which stated contracts are held against,
+    // keeps the kind of store alone.
+    fn fd_retain_reason(si: i32, pi: i32, depth: i32, places: bool) -> str:
         // #3174: a long chain is followed to its end; past the sixth call
         // the calls between are not listed, and the store that ends the
         // chain is. Only a recursion the walk cannot unwind has no end.
         if depth > 48: return "calls that return to themselves, which the walk does not unwind"
         let sinks = if pi < self.symbols[si].param_sinks.len(): with_str_clone_ref(self.symbols[si].param_sinks[pi]) else: ""
-        if sinks.contains("field;"): return "stored in a field"
-        if sinks.contains("global;"): return "stored in a global"
+        // #3175: say where, so a reader can tell a registration from a
+        // scratch slot the function restores or overwrites.
+        var place = ""
+        for at in self.symbols[si].own_evidence.split("\n"):
+            if places and place.len() == 0 and at.starts_with(f"paramstoreat:{pi}:"): place = ", `" ++ at.slice(f"paramstoreat:{pi}:".len(), at.len()) ++ "`"
+        if sinks.contains("field;"): return "stored in a field" ++ place
+        if sinks.contains("global;"): return "stored in a global" ++ place
         for line in self.symbols[si].own_evidence.split("\n"):
-            if line == f"paramstore:{pi}": return "stored"
+            if line == f"paramstore:{pi}": return if place.len() > 0: "stored in" ++ place.slice(1, place.len()) else: "stored"
         for sink in sinks.split(";"):
             if not sink.contains(":"): continue
             let kv = sink.split(":")
@@ -601,7 +609,7 @@ impl CiProject:
             if kv[0].starts_with("*") and self.fd_fnptr_proven_callee(kv[0]).len() == 0: return "passed through " ++ self.fd_fnptr_why(kv[0])
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(kv[0]))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ kv[0] ++ ", which no unit defines"
-            return self.fd_retain_hop(self.fd_sink_text(kv[0]), kv[1], self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1), depth)
+            return self.fd_retain_hop(self.fd_sink_text(kv[0]), kv[1], self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1, places), depth)
         for line in self.symbols[si].own_evidence.split("\n"):
             if line.starts_with("localstore:") and self.fd_local_alias_param(si, line.slice(11, line.len())) == pi: return "stored through local " ++ line.slice(11, line.len())
             if line.starts_with("localaddr:"):
@@ -613,7 +621,7 @@ impl CiProject:
             if parts[2].starts_with("*") and self.fd_fnptr_proven_callee(parts[2]).len() == 0: return "passed through " ++ self.fd_fnptr_why(parts[2])
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(parts[2]))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ parts[2] ++ ", which no unit defines"
-            return self.fd_retain_hop(self.fd_sink_text(parts[2]), parts[3], self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1), depth)
+            return self.fd_retain_hop(self.fd_sink_text(parts[2]), parts[3], self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1, places), depth)
         // #3374: last, so a store the bodies do show is the one reported.
         // Whether the frame's record outlives the call is not followed:
         // weaker than a grant, and it contradicts nothing (§31.7).
@@ -777,7 +785,7 @@ impl CiProject:
         self.fd_unpresentable_param(si, repr_param, modeled) < 0
 
     fn fd_retains_verdict(si: i32, pi: i32) -> str:
-        f"raw: retains param {pi} (" ++ self.fd_retain_reason(si, pi, 0) ++ "); its lifetime contract is not proven"
+        f"raw: retains param {pi} (" ++ self.fd_retain_reason(si, pi, 0, true) ++ "); its lifetime contract is not proven"
 
     // What the introspection file says about `si`, for the report.
     fn fd_gir_summary(si: i32) -> str:
@@ -1449,7 +1457,7 @@ impl CiProject:
                 if self.symbols[si].own_reason.starts_with("registry:") and self.fd_retains_any(si as i32):
                     for pi in 0..self.symbols[si].param_stores.len():
                         if self.symbols[si].param_stores[pi] != 0:
-                            verdict = verdict ++ f"; the proofs could not clear param {pi} (" ++ self.fd_retain_reason(si as i32, pi as i32, 0) ++ ")"
+                            verdict = verdict ++ f"; the proofs could not clear param {pi} (" ++ self.fd_retain_reason(si as i32, pi as i32, 0, true) ++ ")"
                             break
             else if self.symbols[si].owns_return != 0:
                 // #3176: with a drop proven, the gap is elsewhere: a

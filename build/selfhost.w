@@ -4786,9 +4786,10 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "node_free: destroyer, param 0 (proof: frees it)", "facade report: destroyer through a cast local")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, result.stderr, "doc_keep: raw: retains param 0 (stored in a global); its lifetime contract is not proven", "facade report: global retention, with where the proof stopped")
+    rc = bs_assert_contains(ctx, result.stderr, "doc_keep: raw: retains param 0 (stored in a global, `g_doc`); its lifetime contract is not proven", "facade report: global retention, with where the proof stopped")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, result.stderr, "doc_add: raw: retains param 1 (stored in a field); its lifetime contract is not proven", "facade report: field retention, with where the proof stopped")
+    rc = bs_assert_contains(ctx, result.stderr, "doc_add: raw: retains param 1 (stored in a field, `d->root`); its lifetime contract is not proven"
+, "facade report: field retention, with where the proof stopped")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "doc_pick: raw: returns *mut node unproven: no single source", "facade report: two sources")
     if rc != 0: return rc

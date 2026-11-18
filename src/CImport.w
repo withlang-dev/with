@@ -19117,6 +19117,8 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
 //   `localstore:<local>`             a local stored into a field, a global or
 //                                    an unknown place, or its address taken
 //   `localsink:<local>:<callee>:<i>` a local passed to a direct call
+//   `paramstoreat:<i>:<place>`       the place such a store assigned, as the
+//                                    source spells it (the report names it)
 //   `paramstore:<i>`                 parameter i stored through a pointer or
 //                                    into an element, or passed indirectly
 //   `localaddr:<local>:<callee>:<i>` `callee(&local)` at argument i: what
@@ -19292,6 +19294,10 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             // a store. A local stored there stays the store it was.
             let recorded = ci_own_record_store(session, rhs, params, locals)
             let store = if recorded.starts_with("paramstore:") and ci_place_in_frame_record(session, lhs, frame): "" else: recorded
+            // #3175: where the parameter was stored, for the report: the
+            // place as the source spells it and its location. The verdict
+            // reads `paramstore:` alone.
+            if store.starts_with("paramstore:"): out = out ++ "paramstoreat:" ++ store.slice(11, store.len() - 1) ++ ":" ++ with_ci_cursor_source_text(session, lhs).replace("\n", " ").replace(":", " ") ++ "\n"
             if slot >= 0:
                 out = out ++ f"outstore:{slot}:" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
                 out = out ++ (if store.starts_with("localstore:"): "localout:" ++ store.slice(11, store.len() - 1) ++ f":{slot}\n" else: store)
