@@ -5442,7 +5442,7 @@ impl Sema:
         let tasks_node = self.global_race_concurrency_node
         let tasks_file = self.global_race_concurrency_file
         let tasks_reason = with_str_clone_ref(self.global_race_concurrency_reason)
-        self.validate_rewritten_domain_view_calls(tasks, tasks_node, tasks_file, tasks_reason)
+        self.validate_domain_writer_calls(tasks, tasks_node, tasks_file, tasks_reason)
         self.global_race_concurrency_node = 0
         let proof_failed = self.resolve_global_race_concurrency()
         let any_node = self.global_race_concurrency_node
@@ -20289,22 +20289,21 @@ impl Sema:
         self.record_call_view_origins_args(call_node, sig_idx, param_offset == 1, args)
         let fx = self.facade_call_effect_for(sig_idx)
         if fx >= 0:
-            self.note_rewritten_domain_view_call(fx, call_node)
+            self.note_domain_writer_call(fx, call_node)
             self.facade_apply_call_touches(fx, call_node, sig_idx, param_offset, recv_node, extra_start, arg_count, has_resolved)
 
-    // #3127 (§16.2b.7): a call whose result is a view of a process domain
-    // the call does not preserve rewrites the state it hands a view of: a
-    // function returning its own static buffer. That is a C global with a
-    // function in front of it, and it follows the global's rule (§16.3):
-    // safe where every call into the library is provably on one thread and
-    // the library's contract says `runs no threads`; otherwise the call is
-    // raw. A thread domain's buffer is each thread's own. The rendering's
-    // own call of the C function is not the program's.
-    mut fn note_rewritten_domain_view_call(fx: i32, call_node: i32):
+    // D208 (§16.2b.7): a call of a writer of a process domain some function
+    // returns a view of may rewrite what a holder of that view reads. It is
+    // safe where every call of the domain's writers and of the functions
+    // returning views of it is provably on one thread, and every linked
+    // contract says `runs no threads` or `preserves domain D`; otherwise the
+    // call is raw. A thread domain's state is each thread's own. The
+    // rendering's own call of the C function is not the program's.
+    mut fn note_domain_writer_call(fx: i32, call_node: i32):
         if self.current_file_is_generated("<facade "): return
         for domain in self.facade_call_effects[fx].touch_domains:
             if self.pool_resolve(self.facade_domain_list[domain].kind) != "process" or not self.facade_domain_is_viewed(domain): continue
-            self.rewritten_view_calls.push(RewrittenViewCall { node: call_node, file: self.local_file_id, fn_sym: self.facade_call_effects[fx].fn_sym, domain, in_unsafe: self.in_unsafe })
+            self.domain_writer_calls.push(DomainWriterCall { node: call_node, file: self.local_file_id, fn_sym: self.facade_call_effects[fx].fn_sym, domain, in_unsafe: self.in_unsafe })
             return
 
     // Whether some function returns a view of the domain: only then is
@@ -20314,18 +20313,12 @@ impl Sema:
             if effect.borrow_domain == domain: return true
         false
 
-
-    // What the contract of the library that declares the C function says
-    // of its threads: 2 `runs no threads`, 1 `runs threads`, 0 neither.
-    fn c_function_library_threads(fn_sym: i32) -> i32:
-        let file = self.source_text_name_of(self.facade_fn_file(fn_sym))
-        if file.starts_with("<c_import ") and file.ends_with(">"): self.facade_thread_headers.get(file.slice(10, file.len() - 1)).copied() ?? 0 else: 0
-
     // Why the state of `domain` is not reached only on `main`'s own path,
     // or "". A domain that names its writers is reached by them and by the
-    // functions that return views of it; any other is its library's.
+    // functions that return views of it; one `written by any` is reached by
+    // every function of its library.
     mut fn c_domain_off_main_reason(domain: i32, fn_sym: i32) -> str:
-        if self.facade_domain_list[domain].writers.len() == 0: return self.c_library_off_main_reason(self.source_text_name_of(self.facade_fn_file(fn_sym)))
+        if self.facade_domain_list[domain].any_writer: return self.c_library_off_main_reason(self.source_text_name_of(self.facade_fn_file(fn_sym)))
         self.race_compute_off_main_fns()
         let dname = self.pool_resolve(self.facade_domain_list[domain].name)
         for writer in self.facade_domain_list[domain].writers:
@@ -20335,11 +20328,22 @@ impl Sema:
             if effect.borrow_domain == domain and self.race_off_main_names.contains(reader): return f"`{reader}`, which returns a view of `{dname}`, is called from code that may run off `main`'s own path"
         ""
 
-    mut fn validate_rewritten_domain_view_calls(tasks: bool, tasks_node: i32, tasks_file: i32, tasks_reason: &str):
+    // The first linked contract whose own threads may rewrite the domain:
+    // it says neither `runs no threads` nor `preserves domain D`. 0: none.
+    fn contract_not_preserving_domain(domain: i32) -> i32:
+        let name = self.facade_domain_list[domain].name
+        for facade in self.contract_names:
+            if (self.contract_said.get(facade).copied() ?? 0) == 2: continue
+            var preserves = false
+            for p in self.contract_preserves:
+                if p.facade == facade and p.domain == name: preserves = true
+            if not preserves: return facade
+        0
 
-        // #3239: with tasks in the program, the library is still on one
-        // thread when everything that reaches it runs only on `main`'s path.
-        let calls = self.rewritten_view_calls
+    mut fn validate_domain_writer_calls(tasks: bool, tasks_node: i32, tasks_file: i32, tasks_reason: &str):
+        // #3239: with tasks in the program, the state is still on one thread
+        // when everything that reaches it runs only on `main`'s path.
+        let calls = self.domain_writer_calls
         self.race_compute_off_main_fns()
         for c in calls:
             if c.in_unsafe != 0: continue
@@ -20347,22 +20351,23 @@ impl Sema:
             // A translation redeclares the runtime functions it is built on
             // (`with_free`); those are the runtime's, not the library's.
             if self.race_runtime_fn_names.contains(self.safe_symbol_text(fn_sym)): continue
-
-            let threads = self.c_function_library_threads(fn_sym)
+            let blocking = self.contract_not_preserving_domain(c.domain)
             let off_main = if tasks: self.c_domain_off_main_reason(c.domain, fn_sym) else: ""
-            if off_main.len() == 0 and threads == 2: continue
+            if off_main.len() == 0 and blocking == 0: continue
             let node = c.node
             let span = Span { file: c.file, start: self.ast.get_start(node), end: self.ast.get_end(node) }
             let fname = self.pool_resolve(fn_sym)
             let dname = self.pool_resolve(self.facade_domain_list[c.domain].name)
-            let diag = Diagnostic.err(f"E0921: call of `{fname}` may race: it does not preserve `{dname}`, process state a view is taken of; it is safe when every call into the library is on one thread and its contract says `runs no threads`, or inside `unsafe`", span)
+            let diag = Diagnostic.err(f"E0921: call of `{fname}` may race: it rewrites `{dname}`, process state a view is taken of; it is safe where every call that rewrites or views `{dname}` is on one thread and every linked contract says `runs no threads` or `preserves domain {dname}`, or inside `unsafe`", span)
             diag.add_label(span, f"this call may rewrite what a view of `{dname}` reads")
-
             if off_main.len() > 0:
                 diag.add_label(Span { file: tasks_file, start: self.ast.get_start(tasks_node), end: self.ast.get_end(tasks_node) }, f"program may run concurrently here ({tasks_reason})")
                 diag.add_note(off_main)
-            if threads != 2: diag.add_note(if threads == 1: "its library's contract says `runs threads`: the library may make the call at any time" else: "its library's contract does not say `runs no threads` (§31.6.2: no default grant)")
-            diag.add_help("call it on the one thread that calls the library, or assert with `unsafe`")
+            if blocking != 0:
+                let cname = self.pool_resolve(blocking)
+                diag.add_note(if (self.contract_said.get(blocking).copied() ?? 0) == 1: f"contract `{cname}` says `runs threads` and does not say `preserves domain {dname}`: its threads may rewrite the state at any time" else: f"contract `{cname}` says neither `runs no threads` nor `preserves domain {dname}` (§31.6.2: no default grant)")
+                diag.add_help(f"when the threads of `{cname}` do not rewrite this state, add `preserves domain {dname}` to its contract; or assert with `unsafe`")
+            else: diag.add_help("call it on the one thread that rewrites and views this state, or assert with `unsafe`")
             self.diags.emit(diag)
 
     // The result of the call `call_node` views what the signature's

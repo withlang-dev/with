@@ -828,6 +828,9 @@ impl Sema:
         self.current_facade_sym = facade
         self.current_facade_node = node
         self.check_facade_overrides(di, node)
+        if not self.contract_said.contains(facade):
+            self.contract_said.insert(facade, 0)
+            self.contract_names.push(facade)
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             let kind = self.ast.kind(item)
@@ -840,10 +843,28 @@ impl Sema:
                 // §16.3, §31.8.1: the library is the headers this facade's module
                 // imports; 1 for `runs threads`, 2 for `runs no threads`.
                 let said = if self.ast.get_data0(item) == FACADE_CLAUSE_RUNS_NO_THREADS: 2 else: 1
+                // D208: what the contract says, by its name. Two blocks of
+                // one name that disagree leave the stronger claim unsaid.
+                let was = self.contract_said.get(facade).copied() ?? 0
+                self.contract_said.insert(facade, if was == 0 or was == said: said else: 1)
+                // The toolchain's libc contract is spliced into the module
+                // that imported libc: its library is libc, never the other
+                // headers that module imports.
+                if self.source_name_for_file_id(self.decl_source_file_id_for_index(di)).starts_with("<toolchain facade "): continue
                 for dj in 0..self.ast.decl_count():
                     let other = self.ast.get_decl(dj)
                     if self.ast.kind(other) == NodeKind.NK_C_IMPORT and dj < self.decl_source_paths.len() and di < self.decl_source_paths.len() and self.decl_source_paths[dj] == self.decl_source_paths[di]:
                         self.facade_thread_headers.insert(sema_owned_text(self.pool_resolve(self.ast.get_data0(other))), said)
+        // D208 (§16.2b.7): `preserves domain D` at the contract's own level,
+        // read once the block's own domains are declared.
+        for i in 0..count:
+            let item = self.ast.get_extra(extra_start + i)
+            if self.ast.kind(item) != NodeKind.NK_FACADE_CLAUSE or self.ast.get_data0(item) != FACADE_CLAUSE_CONTRACT_PRESERVES: continue
+            let d = self.ast.get_extra(self.ast.get_data1(item))
+            if self.facade_domain_visible(d): self.contract_preserves.push(ContractPreserve { facade, domain: d })
+            else:
+                let dn = self.pool_resolve(d)
+                self.emit_error_with_help(f"contract '{self.pool_resolve(facade)}': 'preserves domain {dn}' names no domain in scope (§16.2b.7)", item, f"name a domain a contract of this program declares, or add 'domain {dn} <scope>' to the contract that owns the state")
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_RESOURCE:
@@ -979,10 +1000,29 @@ impl Sema:
             return self.facade_domains.contains(d)
         self.facade_program_domains.contains(d)
 
+    // D208 (§16.2b.7): the functions a domain declaration names after
+    // `written by`, and whether it says `any`. A process domain that says
+    // neither is an error: it would have no race check.
+    mut fn facade_domain_writers(item: i32) -> (List[str], bool):
+        let dn = self.pool_resolve(self.ast.get_data0(item))
+        let writers = []
+        let at = self.ast.get_data2(item)
+        let process = self.pool_resolve(self.ast.get_data1(item)) == "process"
+        if at == 0:
+            if process: self.emit_error_with_help(f"domain '{dn}': a process domain says who rewrites it (§16.2b.7)", item, f"write 'domain {dn} process written by <fn>, <fn>', naming the functions that rewrite this state, or 'domain {dn} process written by any' when they are not known")
+            return (writers, true)
+        let count = self.ast.get_extra(at - 1)
+        if count < 0: return (writers, true)
+        for wi in 0..count:
+            let writer = self.ast.get_extra(at + wi)
+            if self.facade_fn_sig(writer, item) >= 0: writers.push(with_str_clone_ref(self.safe_symbol_text(writer)))
+        (writers, false)
+
     mut fn collect_facade_domain(item: i32):
         let name = self.ast.get_data0(item)
         if not self.current_facade_is_runtime():
             self.facade_program_domains.insert(name, 1)
+        let (writers, any_writer) = self.facade_domain_writers(item)
         if self.facade_domains.contains(name):
             let dn = self.pool_resolve(name)
             // Ruling §35: a facade "may also merge domains from distinct
@@ -1010,6 +1050,11 @@ impl Sema:
             for fi in 0..self.facade_domain_list[di].facades.len():
                 if self.facade_domain_list[di].facades[fi] == self.current_facade_sym: known = true
             if not known: self.facade_domain_list[di].facades.push(self.current_facade_sym)
+            // D208: the declarations name one state, so its writers are
+            // every function any of them names.
+            if any_writer: self.facade_domain_list[di].any_writer = true
+            for writer in writers:
+                if not self.facade_domain_list[di].writers.contains(writer): self.facade_domain_list[di].writers.push(writer)
             return
         self.facade_domains.insert(name, self.ast.get_data1(item))
         // The domain's origin symbol: what a view borrowed from it depends
@@ -1023,16 +1068,7 @@ impl Sema:
         facades.push(self.current_facade_sym)
         let blocks: List[i32] = []
         blocks.push(self.current_facade_node)
-        // #3127: the functions `written by` names; none means every
-        // function of the library may rewrite the state (§34).
-        let writers = []
-        let writers_at = self.ast.get_data2(item)
-        if writers_at > 0:
-            for wi in 0..self.ast.get_extra(writers_at - 1):
-                let writer = self.ast.get_extra(writers_at + wi)
-                if self.facade_fn_file(writer) == 0: self.emit_error_with_help(f"domain '{dn}': 'written by {self.pool_resolve(writer)}' names no imported function (§16.2b.7)", item, "after 'written by' name the functions of the library that rewrite this state")
-                writers.push(with_str_clone_ref(self.safe_symbol_text(writer)))
-        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: List.new(), writers })
+        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: List.new(), writers, any_writer })
 
     // ── resources ────────────────────────────────────────────────────────
 
@@ -4742,9 +4778,9 @@ impl Sema:
     fn facade_domains_touched(file: i32, ci: i32, fn_sym: i32) -> List[i32]:
         let out: List[i32] = []
         for di in 0..self.facade_domain_list.len():
-            // #3127: a domain that names its writers is preserved by every
+            // D208: a domain that names its writers is preserved by every
             // other function.
-            if self.facade_domain_list[di].writers.len() > 0 and not self.facade_domain_list[di].writers.contains(self.safe_symbol_text(fn_sym)): continue
+            if not self.facade_domain_list[di].any_writer and not self.facade_domain_list[di].writers.contains(self.safe_symbol_text(fn_sym)): continue
             var in_library = false
             for fi in 0..self.facade_domain_list[di].files.len():
                 if self.facade_domain_list[di].files[fi] == file: in_library = true

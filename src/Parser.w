@@ -5006,25 +5006,29 @@ impl Parser:
                 self.emit_error("a domain is 'process', 'thread', 'resource' or 'static' (§16.2b.7)")
                 return 0
             let kind = self.expect_ident()
-            // #3127: `written by f, g` names the only functions that rewrite
-            // the state; every other function of the library preserves it.
-            // d2 is one past the extra slot holding the count, then the names.
+            // D208 (§16.2b.7): `written by f, g` names the only functions
+            // that rewrite the state, and every other function preserves it;
+            // `written by any` says the writers are not known. d2 is one
+            // past the extra slot holding the count (-1 for `any`), then
+            // the names.
             var writers = 0
             if self.current_ident_is("written"):
                 self.advance()
                 if not self.current_ident_is("by"):
-                    self.emit_error("a domain's writers are stated 'written by <fn>, <fn>' (§16.2b.7)")
+                    self.emit_error("a domain's writers are stated 'written by <fn>, <fn>' or 'written by any' (§16.2b.7)")
                     return 0
                 self.advance()
                 let names = []
-                while true:
+                let any = self.current_ident_is("any")
+                if any: self.advance()
+                while not any:
                     let writer = self.expect_ident()
                     if writer == 0: return 0
                     names.push(writer)
                     if self.peek() != TokenKind.TK_COMMA: break
                     self.advance()
                 writers = self.pool.extra_len() + 1
-                self.pool.add_extra(names.len() as i32)
+                self.pool.add_extra(if any: -1 else: names.len() as i32)
                 for writer in names: self.pool.add_extra(writer)
             return self.pool.add_node(NodeKind.NK_FACADE_DOMAIN, start, self.prev_end(), name, kind, writers) as i32
 
@@ -5051,6 +5055,19 @@ impl Parser:
                 return 0
             self.advance()
             return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), if none: FACADE_CLAUSE_RUNS_NO_THREADS else: FACADE_CLAUSE_RUNS_THREADS, self.pool.extra_len(), 0) as i32
+        if self.current_ident_is("preserves"):
+            // D208 (§16.2b.7): `preserves domain D` at a contract's own
+            // level — the library's own threads do not rewrite D; a grant.
+            self.advance()
+            if not self.current_ident_is("domain"):
+                self.emit_error("at a contract's own level preservation is stated of a domain: 'preserves domain <D>' (§16.2b.7)")
+                return 0
+            self.advance()
+            let d = self.expect_ident()
+            if d == 0: return 0
+            let at = self.pool.extra_len()
+            self.pool.add_extra(d)
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_CONTRACT_PRESERVES, at, 1) as i32
         // §16.2b.4 (D97): the facade-wide error type is stated in the
         // header, `c facade F error E:`, never as an item (#2953).
         if self.current_ident_is("error"):

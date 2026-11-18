@@ -712,7 +712,9 @@ fn contract_collect_domain(mut report: AnalysisReport, sema: &Sema, di: i32, sou
         f"domain {dname} {kind}; origin {origin}; contract:{facade}@{site.path}; {at}")
     let scope = if kind == "thread": "views inherit the thread restriction" else if kind == "static": "static data does not participate in invalidation" else if kind == "process": "process-wide state" else: "state of a resource"
     contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "scope", f"{kind}; {scope}", contract_item_at(sema, site, "domain", d.node))
-    contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "library", f"{d.files.len()} imported translation unit(s) whose every operation touches it unless it preserves it", "default:the coarse library domain (§16.2b.7)")
+    contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "library", f"{d.files.len()} imported translation unit(s) " ++ (if d.any_writer: "whose every operation touches it unless it preserves it" else: "whose operations preserve it unless the domain names them"), "default:the coarse library domain (§16.2b.7)")
+    // D208 (§16.2b.7): who rewrites the state.
+    if kind == "process": contract_row(report, sema, site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "writers", if d.any_writer: "any function of its library that does not state `preserves`" else: contract_join(d.writers, ", "), contract_item_at(sema, site, "domain", d.node))
     let views: List[str] = []
     var preservers: List[str] = []
     for ci in 0..sema.foreign_contracts.len():

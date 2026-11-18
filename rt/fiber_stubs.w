@@ -142,8 +142,8 @@ pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32):
 // facade presents a safe view whose validity it decides.
 c contract libc:
     domain errno thread
-    domain environ process
-    domain locale process
+    domain environ process written by any
+    domain locale process written by any
     // C abort (C11 7.22.4.1): ends the process abnormally and does not return
     // to its caller: nothing the process holds outlives the call.
     fn rt_libc_abort

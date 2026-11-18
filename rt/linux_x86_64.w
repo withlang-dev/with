@@ -1557,8 +1557,8 @@ pub fn rt_cpu_time_ns() -> i64:
 // facade presents a safe view whose validity it decides.
 c contract libc:
     domain errno thread
-    domain environ process
-    domain locale process
+    domain environ process written by any
+    domain locale process written by any
     // POSIX write(2): writes bytes to a file descriptor; does not modify the
     // process environment or locale.
     fn rt_libc_write

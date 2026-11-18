@@ -1459,8 +1459,8 @@ pub fn memchr(s: *const u8, c: i32, n: i64) -> *mut u8:
 // are LLVM intrinsics, not foreign calls.
 c contract wasi:
     domain errno thread
-    domain environ process
-    domain locale process
+    domain environ process written by any
+    domain locale process written by any
     fn args_sizes_get
     fn args_get
     fn environ_sizes_get
