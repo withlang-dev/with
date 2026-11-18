@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D208 — A process domain names its writers: `written by f, g` or `written by any`, never neither; a writer's call is safe on one thread when every linked contract runs no threads or preserves the domain (ruled)](2026-11-18-D208-a-process-domain-names-its-writers.md)
 - [D207 — `c_char` is a type of its own on every target: one byte, the target's sign, never an alias; a conversion is implicit only when it keeps the value on every target (ruled; amends D155)](2026-11-18-D207-c-char-is-a-type-of-its-own-on-every-target.md)
 - [D206 — Nothing routine migrates a corpus that is already migrated: no gate, report or tool re-migrates one; supersedes D112 amendment 1 (ruled)](2026-11-16-D206-nothing-routine-migrates-a-corpus-that-is-already-migrated.md)
 - [D205 — Runtime contract citations: one short citation per function, of the actual function's documented behavior; the domain-wide reasoning is stated once (ruled)](2026-11-14-D205-runtime-contract-citations.md)
