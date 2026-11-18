@@ -32524,7 +32524,7 @@ impl Sema:
             return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0
         self.offsetof_owner_types.get(node) ?? 0
 
-    mut fn type_level_arg_in_body(body_sym: i32, type_node: i32) -> i32:
+    fn type_level_arg_in_body(body_sym: i32, type_node: i32) -> i32:
         if self.concrete_specialization_by_sym.contains(body_sym):
             return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0
         self.resolve_type_level_arg_expr_frozen(type_node)

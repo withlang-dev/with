@@ -2366,6 +2366,7 @@ type Sema {
     layout_field_offset_cache: Memo[i64, i64],
     is_copy_cache: Memo[i32, i32],
     needs_drop_result_cache: Memo[i32, i32],
+    carries_user_drop_cache: Memo[i32, i32],   // the frozen answer of type_carries_user_drop
     unwrapped_type_cache: Memo[i32, i32],
     generic_struct_field_type_cache: Memo[i64, i32],
     generic_struct_field_index_type_cache: Memo[i64, i32],
@@ -4467,6 +4468,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         layout_field_offset_cache: Memo.new(),
         is_copy_cache: Memo.new(),
         needs_drop_result_cache: Memo.new(),
+        carries_user_drop_cache: Memo.new(),
         unwrapped_type_cache: Memo.new(),
         generic_struct_field_type_cache: Memo.new(),
         generic_struct_field_index_type_cache: Memo.new(),
@@ -7328,6 +7330,7 @@ impl Sema:
                     self.layout_align_cache.insert(lti as i32, lt_al)
                     self.is_copy_cache.insert(lti as i32, lt_cp)
                     self.needs_drop_result_cache.insert(lti as i32, lt_nd)
+                    self.carries_user_drop_cache.insert(lti as i32, self.type_carries_user_drop(lti as i32))
                     self.unwrapped_type_cache.insert(lti as i32, lt_uw)
                     let field_count = self.type_reflection_field_count(lti as i32)
                     for fi in 0..field_count:
@@ -9894,6 +9897,13 @@ impl Sema:
         self.needs_drop_visit.remove(resolved as i32)
         result
 
+    // The frozen read of type_carries_user_drop (filled with the layout
+    // caches in preregister_mir_types): codegen asks this, never the
+    // computation, which keeps a visit set (#3423).
+    fn type_carries_user_drop_frozen(tid: i32) -> i32:
+        if self.carries_user_drop_cache.contains(tid): return self.carries_user_drop_cache.get(tid).unwrap()
+        sema_phase_bug("BUG: type_carries_user_drop_frozen miss — type not preregistered")
+
     mut fn type_carries_user_drop(tid: i32) -> i32:
         if tid == 0:
             return 0
@@ -10895,7 +10905,7 @@ impl Sema:
             return self.concrete_specialization_nodes[specialization.unwrap()]
         0
 
-    mut fn sig_is_drop_body(sig: i32) -> bool:
+    fn sig_is_drop_body(sig: i32) -> bool:
         let node = self.receiver_decl_node_for_sig(sig)
         if node == 0: return false
         let impl_node = self.impl_node_for_method_decl(node)

@@ -10201,10 +10201,10 @@ impl CCodegen:
         self.generic_inst_base_name(self.sema.resolve_alias(self.place_tid(body, dest_place) as TypeId) as i32) == "List"
 
     // Whether dropping `place` runs a user Drop impl.
-    mut fn drop_runs_user_code(body: &MirBody, place: i32) -> bool:
+    fn drop_runs_user_code(body: &MirBody, place: i32) -> bool:
         let local = self.place_local_id(body, place)
         if local < 0 or local >= body.local_type_ids.len(): return true
-        self.sema.type_carries_user_drop(body.local_type_ids[local]) != 0
+        self.sema.type_carries_user_drop_frozen(body.local_type_ids[local]) != 0
 
     // The global an initializer body stores into, or 0 for any other body.
     fn global_init_target(fn_sym: i32) -> i32:
