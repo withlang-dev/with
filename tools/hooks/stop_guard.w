@@ -9,14 +9,20 @@
 // A goal is active while `goal-prompt.md` exists at the project root (the
 // maintainer writes it and removes it). While it is, the turn may end only
 // when:
-//   - a battery is running (its slot is live): the machine is taken, and
-//     its completion wakes the agent; or
+//   - a job of the agent's is running: a battery (its slot is live, or its
+//     process is, since the battery takes its slot only after its census
+//     and sources checks), or any process working in a staging worktree (a
+//     build, a sweep, a seed leg). The machine is taken, and the job's
+//     completion wakes the agent. Refusing here made a filler turn of
+//     every battery start (2026-11-18); or
 //   - no open issue is left that the agent may work: every open issue
 //     carries `human attn needed`.
 // Otherwise the stop is refused and the open issues are named, so the next
 // action is one of them. An issue the agent cannot move is labelled
 // `human attn needed`, with the reason in a comment: that is the only way
 // to take it out of the queue, and it is visible to the maintainer.
+// An issue an open pull request closes is already being landed and is not
+// listed.
 //
 // The queue is `gh issue list`; its last good answer is kept, and is used
 // when GitHub cannot be reached (a failed lookup never opens the door).
@@ -39,6 +45,22 @@ fn battery_running() -> bool:
         if alive((read_file(path) ?? "").split("\n")[0].split("\t")[0]): return true
     false
 
+// A process whose command line names the battery tool or a staging
+// worktree. WITH_STOP_GUARD_JOBS=none says there is none (the cases use it).
+fn agent_job_running() -> bool:
+    if env("WITH_STOP_GUARD_JOBS") == "none": return false
+    for pattern in ["tools/battery.w", "/.local/with-staging/"]:
+        if run_to_files(&["pgrep", "-f", pattern], "/dev/null", "/dev/null", 5000).code == 0: return true
+    false
+
+// The issues open pull requests close, one number per line; "" when GitHub
+// cannot be reached (nothing is hidden then).
+fn landing() -> str:
+    if env("WITH_STOP_GUARD_QUEUE").len() > 0: return ""
+    let out = env("HOME") ++ "/.local/with-green/stop-guard-landing.new"
+    let listed = run_to_files(&["gh", "pr", "list", "--state", "open", "--limit", "200", "--json", "closingIssuesReferences", "--jq", ".[].closingIssuesReferences[].number"], out, "/dev/null", 30000)
+    if listed.code != 0: "" else: read_file(out) ?? ""
+
 fn cache_path -> str: env("HOME") ++ "/.local/with-green/stop-guard-queue.tsv"
 
 // `number<TAB>title` for each open issue the agent may work.
@@ -54,11 +76,14 @@ fn queue() -> str:
 
 let root = env("CLAUDE_PROJECT_DIR")
 if root.len() == 0 or not file_exists(root ++ "/goal-prompt.md"): exit_code(0)
-if battery_running(): exit_code(0)
+if battery_running() or agent_job_running(): exit_code(0)
 
+let in_flight = landing().split("\n")
 let open = []
 for line in queue().split("\n"):
-    if line.len() > 0: open.push(line)
+    if line.len() > 0 and not in_flight.contains(line.split("\t")[0]): open.push(line)
+
+
 if open.len() == 0: exit_code(0)
 
 eprint(f"stop guard: the goal is active and {open.len()} open issue(s) are yours to work. A wait on CI or on a ruling does not end a turn. Start one now:")
