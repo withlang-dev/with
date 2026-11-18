@@ -2503,11 +2503,7 @@ fn run_self_audit_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("self-audit: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    var args: List[str] = List.new()
-    args.push(build_project_abs(root, ctx.inputs()[0]))
-    args.push("analyze")
-    args.push("src/main.w")
-    args.push("audit:all")
+    let args = [build_project_abs(root, ctx.inputs()[0]), "analyze", "src/main.w", "audit:all"]
     let aout_rel = build_project_join(out_dir, "audit.stdout")
     let aout = build_project_abs(root, aout_rel)
     let aerr = build_project_abs(root, build_project_join(out_dir, "audit.stderr"))
