@@ -1,15 +1,14 @@
 //! expect-check-fail: copy `home` out (`to_owned()`) before the call
 
-// C11 7.22.4.6p4: the string `getenv` returns "may be overwritten by a
-// subsequent call to the getenv function". The toolchain libc facade
-// (compiler/LibcFacade.w) therefore states no `preserves domain environ`
-// on `getenv`: a second call invalidates the view the first returned
-// (ruling §38: unknown effect means invalidate). The accepted spelling
-// copies the first out before the second call — behav_c_facade_getenv_twice.
+// D208 (§16.2b.7): the toolchain's libc contract names the functions that
+// rewrite the environment. A view from `getenv` dies at a call of one of
+// them, here `setenv`: POSIX.1-2024 has the pointer `getenv` returns point
+// into the environment data, which `setenv` may move or free. The accepted
+// spelling copies the value out before the call.
 
-use c_import("char *getenv(const char *name);\n")
+use c_import("char *getenv(const char *name);\nint setenv(const char *name, const char *value, int overwrite);\n")
 
 fn main:
     let home = getenv("HOME").unwrap()
-    let path = getenv("PATH")
-    print(f"home: {home.to_str().unwrap()} {path.is_some()}")
+    let rc = unsafe { setenv("WITH_3127_PROBE", "1", 1) }
+    print(f"home: {home.to_str().unwrap()} {rc}")
