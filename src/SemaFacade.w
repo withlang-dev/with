@@ -1300,7 +1300,7 @@ impl Sema:
                 return
             self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), bare_callbacks: [], callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1310,6 +1310,12 @@ impl Sema:
         // consumes its resource parameter; its fn item inherits the fact (a
         // resource of a later block is verify_facade_destroyer's).
         if self.facade_fn_destroys_a_resource(fn_sym): c = self.facade_inherit_destroys(fname, c)
+        // §16.2b.9 (#3178, Eric 2026-11-18): a callback the library keeps is
+        // called later, possibly from another thread or a signal handler, so
+        // the contract says which thread; with a call that returns first
+        // there is no default to lean on.
+        for cb in c.bare_callbacks:
+            if c.retains.contains(cb) and c.callback_thread_said == 0: self.emit_error_with_help(f"fn '{fname}': 'callback param {cb}' is retained, and the contract does not say which thread calls it (§16.2b.9)", item, "add 'callback_thread any' when the library may call it from any thread, or 'callback_thread registering' when it calls it only on the thread that registered it")
         self.foreign_contract_index.insert(fn_sym, self.foreign_contracts.len() as i32)
         self.foreign_contracts.push(c)
 
@@ -1784,6 +1790,20 @@ impl Sema:
             return c
         if kind == FACADE_CLAUSE_RENAME:
             c.rename = self.ast.get_extra(ops)
+            return c
+        if kind == FACADE_CLAUSE_CALLBACK:
+            // `callback param N` (§16.2b.9, #3178): no userdata travels with
+            // it, so nothing is owned, freed or left dangling.
+            let cb = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if cb < 0: return c
+            if not self.facade_param_is_callable(sig, cb):
+                let shown = self.facade_param_display(fn_sym, sig, cb)
+                self.emit_error_with_help(f"fn '{fname}': 'callback param {cb}' names {shown}, which is not callable (§16.2b.9, §16.2b.13)", clause, "after 'callback' name the function-pointer parameter")
+                return c
+            if c.bare_callbacks.contains(cb) or c.callback_userdata_cb.contains(cb):
+                self.emit_error_with_help(f"fn '{fname}': 'callback param {cb}' is stated twice (§16.2b.9)", clause, "delete one of the two clauses")
+                return c
+            c.bare_callbacks.push(cb)
             return c
         if kind == FACADE_CLAUSE_CALLBACK_THREAD:
             c.callback_thread_said = if self.pool_resolve(self.ast.get_extra(ops)) == "registering": 2 else: 1
@@ -2871,6 +2891,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_THREAD: return "thread"
     if kind == FACADE_CLAUSE_CALLBACK_THREAD: return "callback_thread"
     if kind == FACADE_CLAUSE_CALLBACKS_NONE: return "callbacks none"
+    if kind == FACADE_CLAUSE_CALLBACK: return "callback"
     if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
@@ -5239,7 +5260,7 @@ impl Sema:
         // a variadic case speaks of that case's callback: the function is a
         // variadic contract, rendered case by case, not a callback item.
         let thread_item = self.foreign_contracts[ci].callback_thread_said != 0 and not self.facade_contract_has_variadic_callback(ci)
-        if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or thread_item or self.foreign_contracts[ci].user_data_node != 0 or self.foreign_contracts[ci].argv_cb.len() > 0:
+        if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].bare_callbacks.len() > 0 or thread_item or self.foreign_contracts[ci].user_data_node != 0 or self.foreign_contracts[ci].argv_cb.len() > 0:
             return true
         for k in 0..self.foreign_contracts[ci].consumes.len():
             if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0:

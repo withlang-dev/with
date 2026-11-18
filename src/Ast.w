@@ -278,6 +278,7 @@ pub const FACADE_CLAUSE_THREAD: i32 = 17           // [capability_sym...]
 pub const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any` | `registering`)
 pub const FACADE_CLAUSE_CALLBACK_CONSUMES: i32 = 19 // [param_ref]
 pub const FACADE_CLAUSE_MOVABLE: i32 = 20          // []  (in-place resource: not pinned, D54)
+pub const FACADE_CLAUSE_CALLBACK: i32 = 44          // [callback_ref]  (`callback param N`: a callback with no userdata, §16.2b.9)
 pub const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
 pub const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
 pub const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param N`: the facade establishes nullability, §16.2b.8)

@@ -902,7 +902,7 @@ impl CiProject:
         for p in self.symbols[si].param_ty:
             if userdata < 0 and (p == "*mut c_void" or p == "*const c_void"): userdata = at
             at += 1
-        if userdata < 0: return what ++ "; it has no `void *` userdata parameter, so a closure has nowhere to travel: no clause yet"
+        if userdata < 0: return what ++ f"; it has no `void *` userdata parameter: a contract describes it with 'callback param {pi}', which takes a function or a closure that captures nothing, and with 'retains param {pi} by param N' and 'callback_thread any' or 'callback_thread registering' when the library keeps it (§16.2b.9)"
         what ++ f"; a contract describes it with 'callback param {pi} userdata param {userdata}', and 'retains param {pi} by param N', N the resource that keeps it, when the library keeps it (§16.2b.9)"
 
     fn fd_is_lend(si: i32, modeled: &List[str]) -> bool:

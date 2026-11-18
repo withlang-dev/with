@@ -5484,14 +5484,17 @@ impl Parser:
                     ops.push(argv)
                     ops.push(argc)
                     ops.push(ty as i32)
+                else if not self.current_ident_is("userdata"):
+                    // `callback param N` (§16.2b.9, #3178): a callback with
+                    // no userdata. It carries no state, so it is a function
+                    // or a closure that captures nothing.
+                    kind = FACADE_CLAUSE_CALLBACK
+                    ops.push(cb)
                 else:
                     // `callback param N userdata param M` (§16.2b.9): the
                     // callback in parameter N receives, in its `void *`
                     // parameter, the value passed as parameter M.
                     kind = FACADE_CLAUSE_CALLBACK_USERDATA
-                    if not self.current_ident_is("userdata"):
-                        self.emit_error("a callback's userdata is written 'callback param <ref> userdata param <ref>' (§16.2b.9)")
-                        return 0
                     self.advance()
                     let ud = self.parse_facade_param_ref()
                     if ud == 0: return 0

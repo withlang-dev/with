@@ -3242,6 +3242,7 @@ fn facade_render_callback_item(pool: &AstPool, intern: &InternPool, ci: &List[i3
                 return cbi
             nullable_pis.push(npi)
         else if kind == FACADE_CLAUSE_CALLBACK_THREAD: is_callback = is_callback or not facade_item_is_variadic(pool, item)
+        else if kind == FACADE_CLAUSE_CALLBACK: is_callback = true
         else if kind == FACADE_CLAUSE_CALLBACK_USERDATA:
             let cb = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
             let ud = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
