@@ -97,6 +97,14 @@ and a separate mechanical sweep. Follow-on #2261: a `length param N`
 facade clause for the sign change at the C boundary, the shape of D102's
 `nullable param N`.
 
+**The follow-on is not needed (Eric, 2026-11-18).** D183 made the
+conversion checked everywhere, so a per-parameter clause would restate what
+the type already says. What was left was D183's warning at a C boundary,
+whose two fixes are both wrong there: the declaration is the header's, and
+`as` removes the check. The warning is not issued when the declaration on
+the other side of the conversion was imported from C: a parameter, a return
+value, a record field or a global. The range check stays in every case.
+
 **What would reopen this:** a 32-bit target where lengths beyond the
 address space are a real program's need (none exists), or a ruling that
 `Int` itself becomes pointer-width (which would make this entry moot).

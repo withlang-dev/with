@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.63
+# The With Programming Language — Specification v7.64
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.64:** #2261 (Eric, 2026-11-18). §4.2.6: the D183 lint is not issued when the declaration on the other side of the conversion was imported from C; the range check stays in every case. D108's `length param N` follow-on is recorded as not needed. Implemented.
+
 **Changelog v7.63:** D210 (Eric, 2026-11-18; #3173). §16.2b.8, §31: `buffer field P remaining field N` pairs two fields of the record a lent resource wraps; the slice is stored before the call, the count read back and both fields cleared after it, and the operation returns a record of how much moved. The implementation lands with #3173's change.
 
 **Changelog v7.62:** D208's derived words and D209 (Eric, 2026-11-18). §31 grammar: a domain's `written by` list and the contract-level `preserves domain D`; §16.2b.7: what `written by any` means, what the contract-level line says, and that the condition on a writer's call applies where some function returns a view; the `environ` and curl examples name their writers, and `curl_version()` is a view of its own static buffer. D209: `drop f(param N)` and `destroys f(param N)` name the parameter that receives the resource, the first when the parentheses are absent; `drop f(param N)` requires every other parameter fixed; `param p discarded` fixes an out-pointer as discarded. Both are implemented (D209 with #3177's change).
