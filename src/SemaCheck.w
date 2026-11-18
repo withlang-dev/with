@@ -30416,7 +30416,9 @@ impl Sema:
                         else: 0
                     if r_is_str != 0:
                         self.emit_error("this parameter retains the C-string pointer past the call, but a `str` coerces to a call-scoped temporary that is freed on return (§16.3c); pass a pointer into caller-owned storage instead, e.g. `let c = s.to_cstring()?` then the argument `c.as_cstr().ptr()`", arg_node)
-            if sig_idx >= 0 and self.extern_fn_names.contains(fn_sym) and expected_ty != 0:
+            // A function a header defines (`static inline`) is C all the
+            // same: it may hand the callback on to code that keeps it (#3178).
+            if sig_idx >= 0 and (self.extern_fn_names.contains(fn_sym) or self.ci_syms.contains(fn_sym)) and expected_ty != 0:
                 let callback_expected = self.resolve_alias(expected_ty as TypeId)
                 if self.get_type_kind(callback_expected) == TypeKind.TY_EXTERN_FN:
                     self.record_global_concurrency_evidence(arg_node, "extern C callback coercion")

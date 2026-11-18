@@ -573,6 +573,7 @@ type ForeignContract {
     callback_thread_said: i32,   // the `callback_thread` clause: 0 none (a retained callback may run on any thread, §31.6.2), 1 `any`, 2 `registering`
     callbacks_none: i32,             // clause node; 0 means conservatively reentrant
     callback_consumes: List[i32],
+    bare_callbacks: List[i32],          // `callback param N`: a callback with no userdata (#3178)
     callback_userdata_cb: List[i32],    // `callback param N userdata param M`: the callback parameter N …
     callback_userdata_of: List[i32],    // … and the userdata parameter M it receives (parallel)
     valid_on_failed: i32,              // `valid on failed`: presented on the failed-state resource too (§16.2b.4)

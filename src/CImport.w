@@ -18986,6 +18986,31 @@ fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
         i = i + 1
     verdict
 
+// #3178 (§16.2b.9): whether every use of the parameter `name` in the body
+// is the callee of a call or a test against NULL: the function calls it and
+// neither stores it, passes it on nor returns it. `as_test` says the cursor
+// stands where only its truth is read.
+fn ci_param_only_called(session: i64, cursor: i32, name: &str, as_test: bool) -> bool:
+    let c = ci_peel_transparent(session, cursor)
+    let kind = with_ci_cursor_kind(session, c)
+    let nc = with_ci_num_children(session, c)
+    if kind == CXK_DECL_REF: return as_test or not ci_cursor_names(session, c, name)
+    if kind == CXK_UNARY_OP and nc == 1 and with_ci_unary_op(session, c) == UO_LNOT: return ci_param_only_called(session, with_ci_child(session, c, 0), name, true)
+    if kind == CXK_BINARY_OP and nc == 2:
+        let op = with_ci_binary_op(session, c)
+        if op == BO_LAND or op == BO_LOR: return ci_param_only_called(session, with_ci_child(session, c, 0), name, true) and ci_param_only_called(session, with_ci_child(session, c, 1), name, true)
+        if (op == BO_EQ or op == BO_NE) and ci_condition_null_sense(session, c, name) != 0: return true
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, c, i)
+        // `f(x)` and `(*f)(x)`: the callee of a call.
+        var callee = ci_peel_transparent(session, child)
+        while with_ci_cursor_kind(session, callee) == CXK_UNARY_OP and with_ci_num_children(session, callee) == 1 and with_ci_unary_op(session, callee) == UO_DEREF: callee = ci_peel_transparent(session, with_ci_child(session, callee, 0))
+        let called = kind == CXK_CALL_EXPR and i == 0 and with_ci_cursor_kind(session, callee) == CXK_DECL_REF and ci_cursor_names(session, callee, name)
+        if not called and not ci_param_only_called(session, child, name, i == 0 and (kind == CXK_IF_STMT or kind == CXK_CONDITIONAL_OP)): return false
+        i = i + 1
+    true
+
 // The call and store evidence one body gives, one record per line:
 //   `null:<callee>:<index>`        a NULL literal passed at that position
 //   `sink:<callee>:<index>:<param>` parameter `param` passed at that position

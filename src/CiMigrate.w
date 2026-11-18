@@ -1853,6 +1853,7 @@ impl CiProject:
             if names[pi].len() == 0:
                 if not first_pointer: self.symbols[symbol_id].unanalyzable = 1
                 continue
+            if ci_type_text_is_fn_ptr(ptype) and ci_param_only_called(session, cursor, names[pi], false): self.symbols[symbol_id].param_called_only[pi] = 1
             let test = ci_body_null_test_evidence(session, cursor, names[pi])
             if test == 1: self.symbols[symbol_id].param_tested[pi] = 1
             else if test == -1: self.symbols[symbol_id].param_aborting[pi] = 1

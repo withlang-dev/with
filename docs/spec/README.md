@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.60
+# The With Programming Language — Specification v7.61
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.61:** #3178 (Eric, 2026-11-18). §16.2b.9, §31: `callback param N` describes a callback with no userdata parameter; the argument is a function or a closure that captures nothing, and a callback the library retains states `callback_thread`. Implemented with these words; the drafter writes the clause where the C body only calls the pointer or tests it for NULL.
+
 **Changelog v7.60:** D208 (Eric, 2026-11-18). §16.2b.7: a process domain names the functions that rewrite it, `domain D process written by f, g` or `written by any`, and one that says neither is an error; functions not named preserve it; a call of a named writer is safe where every call of the domain's writers and of the functions returning views of it is provably on one thread and every linked contract says `runs no threads` or `preserves domain D`, and is raw otherwise. The compiler implements none of it yet: a process domain names no writers, and every function of its library invalidates its views unless it says `preserves`.
 
 **Changelog v7.59:** D207 (Eric, 2026-11-18; amends D155). §16.1: `c_char` is a builtin integer type of its own on every target, one byte with the target's `char` signedness, never an alias of `i8` or `u8`; operations among `c_char` values behave as the target's `char`, and a conversion happens without `as` only when it keeps the value on every target. The compiler implements none of it yet: `c_char` is still an alias.
