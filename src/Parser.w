@@ -1595,14 +1595,15 @@ impl Parser:
             else:
                 name = self.default_comptime_capability_binding(type_node)
                 if name == 0:
+                    // The clause is still read to its end, so the function
+                    // after it is a function: one error, not a cascade.
                     self.emit_error("capability requires an explicit binding name, e.g. 'as ctx'")
-                    return 0
 
-            if self.pending_comptime_with_name_exists(name):
+            if name != 0 and self.pending_comptime_with_name_exists(name):
                 self.emit_error("duplicate capability binding in comptime with clause")
-                return 0
-            self.pending_comptime_with_names.push(name)
-            self.pending_comptime_with_types.push(type_node as i32)
+            else if name != 0:
+                self.pending_comptime_with_names.push(name)
+                self.pending_comptime_with_types.push(type_node as i32)
 
             self.skip_newlines()
             if self.peek() != TokenKind.TK_COMMA:
