@@ -261,8 +261,8 @@ pub const TDK_FLAG_RESOURCE: i32 = 32768
 pub const FACADE_CLAUSE_FROM: i32 = 1              // [producer_sym, out_param_ref|0]
 pub const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym]
 pub const FACADE_CLAUSE_PREINIT: i32 = 3           // [fn_sym]
-pub const FACADE_CLAUSE_DROP: i32 = 4              // [fn_sym]
-pub const FACADE_CLAUSE_DESTROYS: i32 = 5          // [fn_sym|0]   (a resource names one; an fn item is one)
+pub const FACADE_CLAUSE_DROP: i32 = 4              // [fn_sym, param_ref|0]  (`drop f(param N)`: N receives the resource, the first when 0, D209)
+pub const FACADE_CLAUSE_DESTROYS: i32 = 5          // [fn_sym|0, param_ref|0]   (a resource names one; an fn item is one)
 pub const FACADE_CLAUSE_OK: i32 = 6                // [const_sym...]  (several: any is success, §16.2b.4)
 pub const FACADE_CLAUSE_BORROWS: i32 = 7           // [param_ref]
 pub const FACADE_CLAUSE_INDEPENDENT: i32 = 8       // []
@@ -298,8 +298,9 @@ fn facade_clause_bridges(kind: i32) -> bool:
     // A `text return` on a free operation renders its bridge too (the copy
     // and the release): unlisted, the bridge was rendered and a call by the
     // C name never reached it.
-    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_BUFFER_FIELD or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD or kind == FACADE_CLAUSE_TEXT_RETURN
+    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_BUFFER_FIELD or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_DISCARDED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD or kind == FACADE_CLAUSE_TEXT_RETURN
 pub const FACADE_CLAUSE_BUFFER_FIELD: i32 = 46     // [pointer_field_sym, count_field_sym]  (`buffer field P remaining field N`: a slice carried by two fields of the resource's record, D210 §16.2b.8)
+pub const FACADE_CLAUSE_DISCARDED: i32 = 48        // [param_ref]  (`param N discarded`: an out-pointer the wrapper hands scratch storage, D209 §16.2b.11)
 pub const FACADE_CLAUSE_HANDLE: i32 = 30           // [] the parser's marker on the NK_FACADE_RESOURCE a `handle Name wraps *mut T` item makes: a callback-scope handle (§16.2b.9), never written as a clause
 pub const FACADE_CLAUSE_CALLBACK_ARGV: i32 = 31    // [callback_ref, argv_ref, argc_ref, type(node)]  (`callback param N argv param A paired with argc param C as &[H]`: A and C index the callback's own parameters, §16.2b.9, D76)
 pub const FACADE_CLAUSE_USER_DATA: i32 = 32        // [accessor_sym, type(node)]  (`user_data from <fn> as &U`: the registered userdata the facade boxed, read back through <fn>, §16.2b.9, D76)
@@ -322,13 +323,13 @@ pub const FACADE_PARAM_REF_TYPE: i32 = 2
 
 // D51 stage 11: a clause a convention profile supplied carries the rule
 // that supplied it as one trailing operand beyond the kind's own (a
-// resource `drop` is [fn_sym]; a profile's is [fn_sym, rule_node]). That
+// resource `drop` is [fn_sym, param_ref|0]; a profile's adds rule_node). That
 // operand is the fact's provenance (§16.2b.2): Sema and the contract view
 // read it here, the renderer reads the leading operands as it reads any
 // clause. Only the kinds a profile rule can state have a row.
 fn facade_clause_operand_count(kind: i32) -> i32:
-    if kind == FACADE_CLAUSE_FROM: return 2
-    if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 1
+    if kind == FACADE_CLAUSE_FROM or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 2
+    if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT: return 1
     if kind == FACADE_CLAUSE_LEND: return 0
     -1
 

@@ -1,5 +1,5 @@
 //! expect-check-fail: fn 'ydoc_release': a buffer pairing describes a lend, a free operation or a producer, and 'ydoc_release' is a resource's own lifecycle operation (its initializer, drop or destroyer); a slice in that rendering is not modeled (§16.2b.8)
-//! expect-check-fail: = help: write 'destroys ydoc_release' and name a one-parameter function as 'drop'
+//! expect-check-fail: = help: under 'fn ydoc_release' write 'param 1 fixed null', or write 'destroys ydoc_release' and name another function as 'drop'
 
 // D122 (spec §16.2b.8): a producer may pair a buffer with its length (the
 // constructor takes the slice, behav_d122_producer_buffer); an

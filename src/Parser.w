@@ -4902,6 +4902,9 @@ impl Parser:
                     return 0
                 self.advance()
                 if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+        // D209: a drop or destroys clause carries the parameter that
+        // receives the resource; a rule states none, so the first.
+        else if kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: ops.push(0)
         let extra_start = self.pool.extra_len()
         for op in ops: self.pool.add_extra(op)
         let template = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, tstart, self.prev_end(), kind, extra_start, ops.len() as i32)
@@ -5079,6 +5082,20 @@ impl Parser:
         self.emit_error("expected 'resource', 'handle', 'fn', 'domain', 'text utf8', 'runs threads' or 'use convention' in c contract (§16.2b)")
         0
 
+    // `(param N)` after `drop f` or `destroys f` (D209, §31): the parameter
+    // that receives the resource; the first when it is absent. The reference
+    // node, 0 when absent, -1 on an error.
+    mut fn parse_facade_destroyer_position(word: &str) -> i32:
+        if self.peek() != TokenKind.TK_L_PAREN: return 0
+        self.advance()
+        if not self.current_ident_is("param"):
+            self.emit_error("the parameter a destroyer receives the resource in is written '" ++ word ++ " <fn>(param <ref>)' (§31)")
+            return -1
+        let r = self.parse_facade_param_ref()
+        if r == 0: return -1
+        if self.expect(TokenKind.TK_R_PAREN) == 0: return -1
+        r
+
     // The clauses indented deeper than their item. Collected first and written
     // to extra by the caller: a clause operand may be a type expression, whose
     // own extras must not interleave with the clause list.
@@ -5219,12 +5236,18 @@ impl Parser:
             let f = self.expect_ident()
             if f == 0: return 0
             ops.push(f)
+            let at = self.parse_facade_destroyer_position("drop")
+            if at < 0: return 0
+            ops.push(at)
         else if word == "destroys":
             kind = FACADE_CLAUSE_DESTROYS
             if in_resource:
                 let f = self.expect_ident()
                 if f == 0: return 0
                 ops.push(f)
+                let at = self.parse_facade_destroyer_position("destroys")
+                if at < 0: return 0
+                ops.push(at)
             else:
                 if self.peek() == TokenKind.TK_IDENT:
                     self.emit_error("'destroys <fn>' is a resource clause: the resource owns the fact, and an fn item does not state it (§31.8.2)")
@@ -5726,6 +5749,14 @@ impl Parser:
             kind = FACADE_CLAUSE_FIXED
             let r = self.parse_facade_param_ref_after(start)
             if r == 0: return 0
+            if self.current_ident_is("discarded"):
+                // `param N discarded` (D209, §16.2b.11): an out-pointer the
+                // presented operation does not report. The wrapper passes
+                // scratch storage and ignores what C writes.
+                self.advance()
+                let at = self.pool.extra_len()
+                self.pool.add_extra(r)
+                return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_DISCARDED, at, 1) as i32
             if not self.current_ident_is("fixed"):
                 self.emit_error("a fixed argument is written 'param <ref> fixed <literal>' (§16.2b.11)")
                 return 0

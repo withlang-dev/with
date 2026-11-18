@@ -197,11 +197,18 @@ impl Sema:
         if drop_fn != 0:
             // Drop has nothing but the representation to pass.
             let dsig = self.get_sig(drop_fn)
-            if dsig >= 0 and self.sig_get_param_count(dsig) != 1:
-                let dn = self.pool_resolve(drop_fn)
-                let n = self.sig_get_param_count(dsig)
-                self.emit_error_with_help(f"resource '{rname}': 'drop {dn}' takes {n} parameters; the drop operation takes only the representation — an operation with further arguments is a 'destroys' (§16.2b.3)", node, f"write 'destroys {dn}' and name a one-parameter function as 'drop'")
-                return false
+            // D209: every parameter but the resource's is fixed or
+            // discarded on the function's own item.
+            let dat = self.facade_destroyer_at.get(drop_fn).copied() ?? 0
+            let dci = self.facade_contract_for(drop_fn)
+            if dsig >= 0:
+                for pi in 0..self.sig_get_param_count(dsig):
+                    if pi == dat or (dci >= 0 and (self.foreign_contracts[dci].fixed_params.contains(pi) or self.foreign_contracts[dci].discarded_params.contains(pi))): continue
+                    let dn = self.pool_resolve(drop_fn)
+                    let n = self.sig_get_param_count(dsig)
+                    let shown = self.facade_param_display(drop_fn, dsig, pi)
+                    self.emit_error_with_help(f"resource '{rname}': 'drop {dn}' takes {n} parameters, and Drop has only the representation to pass: {shown} is neither fixed nor discarded (§16.2b.3, §31)", node, f"under 'fn {dn}' write " ++ (if self.get_type_kind(self.resolve_alias(self.sig_param_type(dsig, pi) as TypeId)) != TypeKind.TY_PTR: f"'param {pi} fixed <literal>'" else if self.get_type_d1(self.resolve_alias(self.sig_param_type(dsig, pi) as TypeId) as i32) != 0: f"'param {pi} discarded' for an out-pointer or 'param {pi} fixed null'" else: f"'param {pi} fixed null'") ++ f", or write 'destroys {dn}' and name another function as 'drop'")
+                    return false
             if not self.verify_facade_destroyer(ri, drop_fn):
                 return false
         for di in 0..destroyer_count:
@@ -694,7 +701,7 @@ impl Sema:
                 self.emit_error_with_help(f"resource '{rname}': '{fname}' destroys the resource, and its fn item says 'lend'; a destroying operation is not callable as a lend: delete the 'lend' (§31.8.2)", node, f"delete the 'lend' line under 'fn {fname}'")
                 return false
             self.foreign_contracts[ci].destroys = 1
-        if self.facade_op_raw_beyond(f, 0, false):
+        if self.facade_op_raw_beyond(f, self.facade_destroyer_at.get(f).copied() ?? 0, false):
             self.emit_error_with_help(f"resource '{rname}': '{fname}' is still a raw call after the facade covers the representation (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node, f"add 'fn {fname}' with a clause for each pointer parameter ('text param N', 'buffer param P len param L', 'param N fixed null')")
             return false
         true
@@ -1209,7 +1216,19 @@ impl Sema:
             let sig = self.facade_fn_sig(f, clause)
             if sig < 0:
                 return r
-            if not self.facade_accepts_repr(sig, r.repr_tid):
+            // D209 (§31): `drop f(param N)` / `destroys f(param N)` names
+            // the parameter that receives the resource; the first otherwise.
+            var at = 0
+            if kind != FACADE_CLAUSE_INIT and self.ast.get_data2(clause) > 1 and self.ast.get_extra(ops + 1) != 0:
+                at = self.facade_resolve_param(self.ast.get_extra(ops + 1), f, sig)
+                if at < 0: return r
+                if not self.facade_accepts_repr_at(sig, at, r.repr_tid):
+                    let fnm = self.pool_resolve(f)
+                    let shown = self.facade_param_display(f, sig, at)
+                    self.emit_error_with_help(f"resource '{rname}': '{fnm}' does not take the representation in {shown} (§31, §16.2b.13)", clause, f"after '{fnm}' name the parameter that receives what '{rname}' wraps: '(param N)'")
+                    return r
+                if at != 0: self.facade_destroyer_at.insert(f, at)
+            if at == 0 and not self.facade_accepts_repr(sig, r.repr_tid):
                 let fnm = self.pool_resolve(f)
                 self.emit_error_with_help(f"resource '{rname}': '{fnm}' does not take the representation as its first parameter (§16.2b.13)", clause, f"an operation of '{rname}' takes what it wraps first; describe '{fnm}' with an fn item when the resource is a later parameter (no destroyer form exists for that: #3177)")
                 return r
@@ -1283,7 +1302,19 @@ impl Sema:
             let sig = self.facade_fn_sig(f, clause)
             if sig < 0:
                 return r
-            if not self.facade_accepts_repr(sig, r.repr_tid):
+            // D209 (§31): `drop f(param N)` / `destroys f(param N)` names
+            // the parameter that receives the resource; the first otherwise.
+            var at = 0
+            if kind != FACADE_CLAUSE_INIT and self.ast.get_data2(clause) > 1 and self.ast.get_extra(ops + 1) != 0:
+                at = self.facade_resolve_param(self.ast.get_extra(ops + 1), f, sig)
+                if at < 0: return r
+                if not self.facade_accepts_repr_at(sig, at, r.repr_tid):
+                    let fnm = self.pool_resolve(f)
+                    let shown = self.facade_param_display(f, sig, at)
+                    self.emit_error_with_help(f"resource '{rname}': '{fnm}' does not take the representation in {shown} (§31, §16.2b.13)", clause, f"after '{fnm}' name the parameter that receives what '{rname}' wraps: '(param N)'")
+                    return r
+                if at != 0: self.facade_destroyer_at.insert(f, at)
+            if at == 0 and not self.facade_accepts_repr(sig, r.repr_tid):
                 let fnm = self.pool_resolve(f)
                 self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' does not take the representation as its first parameter; the abandonment path is one of the resource's own operations (§16.2b.9)", clause, f"after 'abandon' name a function whose first parameter is what '{rname}' wraps")
                 return r
@@ -1348,7 +1379,7 @@ impl Sema:
                 return
             self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), bare_callbacks: [], field_buffer_ptrs: [], field_buffer_counts: [], callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1838,6 +1869,23 @@ impl Sema:
             return c
         if kind == FACADE_CLAUSE_RENAME:
             c.rename = self.ast.get_extra(ops)
+            return c
+        if kind == FACADE_CLAUSE_DISCARDED:
+            // `param N discarded` (D209, §16.2b.11): an out-pointer to a
+            // scalar. The wrapper passes scratch storage and ignores what C
+            // writes, so the operation presents no such parameter.
+            let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if pi < 0: return c
+            let shown = self.facade_param_display(fn_sym, sig, pi)
+            let pt = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+            let pointee = if self.get_type_kind(pt) == TypeKind.TY_PTR: self.get_type_kind(self.resolve_alias(self.numeric_operand_type(self.get_type_d0(pt as i32)) as TypeId)) else: TypeKind.TY_VOID
+            if self.get_type_kind(pt) != TypeKind.TY_PTR or self.get_type_d1(pt as i32) == 0 or (pointee != TypeKind.TY_INT and pointee != TypeKind.TY_FLOAT and pointee != TypeKind.TY_BOOL and pointee != TypeKind.TY_PTR):
+                self.emit_error_with_help(f"fn '{fname}': 'param {pi} discarded' names {shown}, which is not a pointer C writes a number, a flag or a pointer through (§16.2b.11)", clause, "discard an out-pointer to a scalar; a value the function reads is 'fixed', and a record it fills is 'fills'")
+                return c
+            if c.fixed_params.contains(pi) or c.discarded_params.contains(pi) or self.facade_param_receives(fn_sym, pi).len() > 0:
+                self.emit_error_with_help(f"fn '{fname}': {shown} is discarded, and another clause or a resource already accounts for it (§16.2b.11)", clause, "keep one statement for this parameter")
+                return c
+            c.discarded_params.push(pi)
             return c
         if kind == FACADE_CLAUSE_BUFFER_FIELD:
             // Verified once the hosting resource is known
@@ -2407,10 +2455,13 @@ impl Sema:
     // A destroyer, initializer or drop takes the representation first: the
     // value itself (a pointer resource), a `void *` that C converts it to, or
     // a pointer to it (in-place).
-    fn facade_accepts_repr(sig: i32, repr_tid: i32) -> bool:
-        if self.sig_get_param_count(sig) == 0:
+    fn facade_accepts_repr(sig: i32, repr_tid: i32) -> bool: self.facade_accepts_repr_at(sig, 0, repr_tid)
+
+    // The same for the parameter a destroyer states (D209).
+    fn facade_accepts_repr_at(sig: i32, at: i32, repr_tid: i32) -> bool:
+        if self.sig_get_param_count(sig) <= at:
             return false
-        let p0 = self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)
+        let p0 = self.resolve_alias(self.sig_param_type(sig, at) as TypeId)
         let repr = self.resolve_alias(repr_tid as TypeId)
         if self.facade_same_type(p0 as i32, repr as i32) or self.facade_void_ptr_accepts(p0, repr):
             return true
@@ -2960,6 +3011,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_TEXT_RETURN: return "text return"
     if kind == FACADE_CLAUSE_BUFFER: return "buffer"
     if kind == FACADE_CLAUSE_BUFFER_FIELD: return "buffer field"
+    if kind == FACADE_CLAUSE_DISCARDED: return "discarded"
     if kind == FACADE_CLAUSE_FIXED: return "param … fixed"
     if kind == FACADE_CLAUSE_VARIADIC: return "variadic param … selected by param …"
     if kind == FACADE_CLAUSE_VARIADIC_CASE: return "case"
@@ -3501,7 +3553,7 @@ impl Sema:
             if described == pi: return true
         for k in 0..c.fixed_params.len():
             if c.fixed_params[k] == pi: return true
-        false
+        c.discarded_params.contains(pi)
 
     // D102: whether `nullable param N` names `pi` (a function-pointer
     // parameter reached through that clause, §16.2b.8).
@@ -3524,7 +3576,7 @@ impl Sema:
         let c = &self.foreign_contracts[ci]
         var presented: i32 = 0
         for pi in 0..(source + 1):
-            if c.fixed_params.contains(pi) or c.buffer_len.contains(pi) or c.consumes_destroyed_by.contains(pi):
+            if c.fixed_params.contains(pi) or c.discarded_params.contains(pi) or c.buffer_len.contains(pi) or c.consumes_destroyed_by.contains(pi):
                 if pi == source: return -1
                 continue
             if pi == source: return presented
@@ -3658,8 +3710,13 @@ impl Sema:
                 let shown = self.facade_param_display(fn_sym, sig, pi)
                 self.emit_error_with_help(f"fn '{fname}': {shown} is both a buffer or fixed parameter and a callback, userdata, retention or consumption parameter; each parameter has one presented contract (§16.2b.8, §16.2b.9)", node, "keep one of the two clauses that name this parameter")
                 return
-        if has_fixed and self.facade_fn_is_destroyer_or_init(fn_sym):
-            self.emit_error_with_help(f"fn '{fname}': a destroyer, initializer or drop takes only what the resource passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node, f"delete 'param N fixed …' under 'fn {fname}'")
+        // D209: a drop or a destroyer may fix or discard its other
+        // parameters; an initializer takes only what the resource passes it.
+        var is_init = false
+        for r in self.facade_resources:
+            if r.init == fn_sym or r.preinit == fn_sym: is_init = true
+        if has_fixed and is_init:
+            self.emit_error_with_help(f"fn '{fname}': an initializer takes only what the resource passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node, f"delete 'param N fixed …' under 'fn {fname}'")
             return
         let ret = self.sig_return_type(sig)
         let void_ret = ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_VOID

@@ -574,6 +574,7 @@ type ForeignContract {
     callbacks_none: i32,             // clause node; 0 means conservatively reentrant
     callback_consumes: List[i32],
     bare_callbacks: List[i32],          // `callback param N`: a callback with no userdata (#3178)
+    discarded_params: List[i32],        // D209: each `param N discarded` out-pointer
     field_buffer_ptrs: List[i32],       // D210: `buffer field P remaining field N` — each pointer field P (symbol) …
     field_buffer_counts: List[i32],     // … and its count field N (parallel)
     callback_userdata_cb: List[i32],    // `callback param N userdata param M`: the callback parameter N …
@@ -1431,6 +1432,7 @@ type Sema {
     // D208 (§16.2b.7): calls of a writer of a viewed process domain: the
     // node, its file, the C function, and whether it sat in `unsafe`.
     domain_writer_calls: List[DomainWriterCall],
+    facade_destroyer_at: HashMap[i32, i32, Minted],  // D209: a destroyer's function -> the parameter that receives the resource, when it is not the first
     contract_names: List[i32],                    // every contract, in source order
     contract_said: HashMap[i32, i32, Minted],     // contract name -> 2 | 1 | 0
     contract_preserves: List[ContractPreserve],
@@ -4042,6 +4044,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         global_race_access_unsafe: List.new(),
         race_accesses: [],
         domain_writer_calls: [],
+        facade_destroyer_at: sema_new_map_i32_i32(),
         contract_names: [],
         contract_said: sema_new_map_i32_i32(),
         contract_preserves: [],
