@@ -30,18 +30,16 @@
 // borrows from the process environment — the domain `environ` — and
 // `strerror` from its own buffer; `strchr`, `strrchr`, `strpbrk` and
 // `strstr` return text borrowed from the string they are lent. Each is
-// presented under its C name as `Option[CStr]`. The string functions
-// state `preserves` on both domains: they read their arguments and nothing
-// else, so a view from `getenv` survives a `strchr` over it — precision the
-// facade grants (§35); every other libc operation keeps the conservative
-// default and invalidates (§38). `getenv` does not preserve `environ`: C11
-// 7.22.4.6p4 — the string it points to "may be overwritten by a subsequent
-// call to the getenv function" — so a second getenv invalidates the view
-// an earlier one returned, and a program that needs both copies the first
-// out (`to_owned()`) before the second call. A `preserves` here would grant
-// a capability the standard does not back (ruling: never state what can
-// create unsafety); the runtime's own getenv row (rt/*.w, ruling §52)
-// says the same.
+// presented under its C name as `Option[CStr]`. Each domain names the
+// functions that rewrite it (D208, §16.2b.7), and every other function
+// preserves it: a view from `getenv` survives a `strchr` over it. `getenv`
+// is no writer of `environ` (Eric, 2026-11-18): C11 7.22.4.6 lets the
+// string be overwritten by a later getenv, but POSIX.1-2024 requires the
+// pointer to point into the environment data itself, and on a list where
+// getenv is a writer the call is refused beside every contract that is
+// silent on its threads. A view from getenv dies at a call that modifies
+// the environment. A writer the program did not import is left off the
+// list it is given: it cannot be called.
 
 use Ast
 use InternPool
@@ -77,46 +75,46 @@ fn libc_facade_source() -> str:
     fn rewinddir
         lend
         of CDir
-    domain environ process
-    domain strerror_text process
+    // The C library runs no threads of its own: C11 7.26.5.1 thrd_create
+    // runs the function the program gives it, and the implementation
+    // behaves as if no library function calls getenv (7.22.4.6) or strerror
+    // (7.24.6.2).
+    runs no threads
+    // POSIX.1-2024 getenv: the pointer returned by getenv points to a string
+    // within the environment data pointed to by environ. setenv(3),
+    // unsetenv(3), putenv(3) and clearenv(3) modify that data, as the C
+    // runtime's _putenv and _putenv_s do on Windows.
+    domain environ process written by setenv, unsetenv, putenv, clearenv, _putenv, _putenv_s
+    // C11 7.24.6.2p4: the array strerror returns may be overwritten by a
+    // subsequent call of strerror.
+    domain strerror_text process written by strerror
     // C11 7.22.4.6 getenv: returns a pointer to the value in the environment
-    // list, which the program shall not modify. It does not touch the buffer
-    // strerror returns.
+    // list, which the program shall not modify.
     fn getenv
         returns borrow CStr from domain environ
-        preserves domain strerror_text
     // C11 7.24.6.2 strerror: returns a pointer to a message string the
     // program shall not modify, which a later call of strerror may
-    // overwrite. It does not modify the environment.
+    // overwrite.
     fn strerror
         returns borrow CStr from domain strerror_text
-        preserves domain environ
     // C11 7.24.5.2 strchr: returns a pointer to the located character in
     // the string it is given, or null. It reads its arguments and nothing
     // else.
     fn strchr
         returns borrow CStr from param 0
-        preserves domain environ
-        preserves domain strerror_text
     // C11 7.24.5.5 strrchr: returns a pointer to the last occurrence of the
     // character in the string it is given, or null. It reads its arguments
     // and nothing else.
     fn strrchr
         returns borrow CStr from param 0
-        preserves domain environ
-        preserves domain strerror_text
     // C11 7.24.5.4 strpbrk: returns a pointer to a character of the first
     // string, or null. It reads its arguments and nothing else.
     fn strpbrk
         returns borrow CStr from param 0
-        preserves domain environ
-        preserves domain strerror_text
     // C11 7.24.5.7 strstr: returns a pointer to the located sequence in the
     // first string, or null. It reads its arguments and nothing else.
     fn strstr
         returns borrow CStr from param 0
-        preserves domain environ
-        preserves domain strerror_text
 "
 
 fn libc_facade_has(names: &List[str], name: &str) -> bool:
@@ -148,6 +146,7 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
     let domain_lines: List[str] = []
     let domain_names: List[str] = []
     var body = ""
+    var threads = ""
     // The citation above an item (§31.9 rule 2) goes with it: kept when the
     // item is, dropped when it is not.
     var pending_citation = ""
@@ -169,8 +168,13 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
         let name = libc_facade_operand(header)
         if libc_facade_has(claimed, name):
             continue
+        if header.trim() == "runs no threads":
+            threads = citation ++ header ++ "\n"
+            continue
         if header.trim().starts_with("domain "):
-            domain_lines.push(header)
+            // D208: the line names every writer the C library has; Sema
+            // leaves out the ones the program did not import.
+            domain_lines.push(citation ++ header)
             domain_names.push(name)
             continue
         if header.trim().starts_with("resource "):
@@ -221,4 +225,4 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
     for di in 0..domain_lines.len():
         if body.contains(" domain " ++ domain_names[di] ++ "\n"):
             domains = domains ++ domain_lines[di] ++ "\n"
-    lines[0] ++ "\n" ++ domains ++ body
+    lines[0] ++ "\n" ++ threads ++ domains ++ body

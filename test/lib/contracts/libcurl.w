@@ -43,7 +43,8 @@ c contract curl:
     // curl_global_init"), and nothing here states `preserves` on
     // curl_global_init or curl_global_cleanup, so a view taken before
     // either dies at it (§16.2b.7: unknown effect means invalidate).
-    domain version_info process
+    preserves domain version_info
+    domain version_info process written by curl_global_init, curl_global_cleanup
     // curl_easy_init(3): "This function returns a CURL easy handle that you
     // must use as input to other functions in the easy interface. This call
     // must have a corresponding call to curl_easy_cleanup when the

@@ -6090,8 +6090,8 @@ pub fn with_thread_scope_destroy(scope: i64):
 // facade presents a safe view whose validity it decides.
 c contract libc:
     domain errno thread
-    domain environ process
-    domain locale process
+    domain environ process written by any
+    domain locale process written by any
     // C malloc (C11 7.22.3.4): allocates a block of memory; does not modify
     // the process environment or locale.
     fn rt_libc_malloc

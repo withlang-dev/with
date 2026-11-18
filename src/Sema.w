@@ -677,6 +677,14 @@ type RaceEvidence {
 // global, each with the function it is in (0: top level) and its site.
 type RaceEdge { from: i32, to: i32, node: i32 }
 type RaceAccess { sym: i32, node: i32, fn_sym: i32 }
+// D208 (§16.2b.7): a call of a writer of a process domain some function
+// returns a view of.
+type DomainWriterCall { node: i32, file: i32, fn_sym: i32, domain: i32, in_unsafe: i32 }
+// D208: what a contract says of its library's threads (2 `runs no
+// threads`, 1 `runs threads`, 0 neither) and the domains it states
+// `preserves domain D` of at its own level, by contract name: blocks of one
+// name are one contract.
+type ContractPreserve { facade: i32, domain: i32 }
 
 // D66 retained variadic pairs (#1652, §16.2b.9): what one operation of a
 // resource that has a callback pair does to that pair, keyed by the concrete
@@ -719,7 +727,10 @@ type FacadeDomain {
     node: i32,
     origin_sym: i32,
     files: List[i32],
+    writers: List[str],  // D208: the functions `written by` names
+    any_writer: bool,    // D208: `written by any`, or a domain that is not a process domain and names none: every function of the library that does not state `preserves`
 }
+
 
 // What a call to signature `sig` does to foreign views (ruling §38): the
 // parameters whose received resource's views it invalidates (a bit per
@@ -1415,6 +1426,12 @@ type Sema {
     global_race_access_kinds: List[i32],
     global_race_access_unsafe: List[i32],
     race_accesses: List[RaceAccess],                       // every recorded access, with the function it is in
+    // D208 (§16.2b.7): calls of a writer of a viewed process domain: the
+    // node, its file, the C function, and whether it sat in `unsafe`.
+    domain_writer_calls: List[DomainWriterCall],
+    contract_names: List[i32],                    // every contract, in source order
+    contract_said: HashMap[i32, i32, Minted],     // contract name -> 2 | 1 | 0
+    contract_preserves: List[ContractPreserve],
     global_race_mutated_syms: HashMap[i32, i32, Minted],
     global_race_mutation_nodes: HashMap[i32, i32, Minted],
     // #2369: a mutable global some body rebinds whole (`G = value`), with
@@ -4022,6 +4039,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         global_race_access_kinds: List.new(),
         global_race_access_unsafe: List.new(),
         race_accesses: [],
+        domain_writer_calls: [],
+        contract_names: [],
+        contract_said: sema_new_map_i32_i32(),
+        contract_preserves: [],
         global_race_mutated_syms,
         global_race_mutation_nodes,
         global_rebind_sites: sema_new_map_i32_str(),

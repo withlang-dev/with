@@ -1,12 +1,11 @@
 //! expect-stdout: two values: true true
 //! expect-stdout: ok
 
-// C11 7.22.4.6p4: a second `getenv` may overwrite the text the first
-// returned, so the toolchain libc contract does not state `preserves domain
-// environ` on it, and holding the first view across the second call is
-// refused (err_c_facade_getenv_view_invalidated). An application copies the
-// first out — `to_owned()` — and then reads the second: the way the
-// standard says the program must be written, spelled once.
+// An application that wants a value of its own copies it out with
+// `to_owned()`: the copy outlives every later change to the environment.
+// Holding two views at once is also accepted since D208
+// (behav_3127_two_getenv_views); a view dies at a call that rewrites the
+// environment (err_c_facade_getenv_view_invalidated).
 
 use c_import("char *getenv(const char *name);\n")
 

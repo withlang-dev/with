@@ -6,14 +6,14 @@ resource Engine wraps *mut engine; representation: pointer; contract:engine@test
     dependency: none via engine_new; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
     thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
     invalidation: views invalidated by: engine_free; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
-resource CHeapStr wraps *mut c_char; representation: pointer; contract:libc@<toolchain facade libc>; clause:resource@<toolchain facade libc>:4
-    producer: strdup -> CHeapStr.strdup; production: direct return; NULL is None  [claim: stated@<toolchain facade libc>:5]
+resource CHeapStr wraps *mut c_char; representation: pointer; contract:libc@<toolchain facade libc>; clause:resource@<toolchain facade libc>:9
+    producer: strdup -> CHeapStr.strdup; production: direct return; NULL is None  [claim: stated@<toolchain facade libc>:10]
     status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
-    destroyer: free; automatic: Drop calls it while the value is live  [claim: stated@<toolchain facade libc>:6]
+    destroyer: free; automatic: Drop calls it while the value is live  [claim: stated@<toolchain facade libc>:11]
     dependency: none via strdup; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
     thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
     invalidation: views invalidated by: no operation; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
-note: contract-audit: clauses=6 proven=0 claimed=6 overrides=0 stale-overrides=0
-note: contract-audit: claims: stated=6 registry=0 profile=0 annotation=0 uncited=0
+note: contract-audit: clauses=7 proven=0 claimed=7 overrides=0 stale-overrides=0
+note: contract-audit: claims: stated=7 registry=0 profile=0 annotation=0 uncited=0
 note: contract-audit: resources=2 items=0 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 contract-audit: violations=0 ok

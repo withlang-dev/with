@@ -1305,8 +1305,8 @@ pub fn with_fiber_cross_thread_cancels() -> i64:
 // facade presents a safe view whose validity it decides.
 c contract libc:
     domain errno thread
-    domain environ process
-    domain locale process
+    domain environ process written by any
+    domain locale process written by any
     // POSIX mmap(2): maps pages into the address space; does not modify the
     // process environment or locale.
     fn rt_libc_mmap

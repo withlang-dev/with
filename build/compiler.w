@@ -1753,7 +1753,11 @@ fn comp_runtime_domain_violations(path: &str, text: &str, viewed: &str) -> List[
                 if trimmed.starts_with("fn "):
                     row = comp_ident_prefix(trimmed.slice(3, trimmed.len()))
                     rows = rows ++ row ++ "|"
-                else if trimmed.starts_with("domain "): domains = domains ++ comp_trim(trimmed.slice(7, trimmed.len())) ++ "|"
+                else if trimmed.starts_with("domain "):
+                    // D208: the name and scope; the writers follow them.
+                    let said = comp_trim(trimmed.slice(7, trimmed.len()))
+                    let writers = said.find(" written by ")
+                    domains = domains ++ (if writers >= 0: said.slice(0, writers) else: said) ++ "|"
                 else if trimmed.starts_with("preserves domain ") and row.len() > 0: row_preserves = row_preserves ++ row ++ ":" ++ comp_trim(trimmed.slice(17, trimmed.len())) ++ "|"
                 continue
             in_facade = false

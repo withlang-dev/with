@@ -3,8 +3,10 @@
 // call of a package function that returns static text, presents as
 // `returns static CStr` from the proof (curl_easy_strerror, sqlite3_errstr,
 // zError). It read "raw: returns *const c_char, a pointer to no record".
-// A static buffer the function writes, and a parameter handed back, stay
-// raw: neither is immutable static text.
+// A static buffer the function writes is a view of the library's domain
+// (`returns borrow CStr from domain <library>`), never `static`: each call
+// rewrites it. A parameter handed back stays raw.
+//
 use compiler.ConanClient
 use std.fs
 use std.process
@@ -42,7 +44,7 @@ fn main:
         if line.starts_with("  err_name:"): name_line = line.to_owned()
         if line.starts_with("  lib_version:"): version_line = line.to_owned()
         if line.starts_with("  pick:"): pick_line = line.to_owned()
-    let ok = not text_line.contains("raw") and not name_line.contains("raw") and version_line.contains("raw") and pick_line.contains("raw") and facade.contains("fn err_text\n        returns static CStr") and facade.contains("fn err_name\n        returns static CStr") and not facade.contains("fn lib_version") and not facade.contains("fn pick")
+    let ok = not text_line.contains("raw") and not name_line.contains("raw") and not version_line.contains("raw") and pick_line.contains("raw") and facade.contains("fn err_text\n        returns static CStr") and facade.contains("fn err_name\n        returns static CStr") and facade.contains("    domain lib_version process written by lib_version") and facade.contains("fn lib_version\n        returns borrow CStr from domain lib_version") and not facade.contains("fn lib_version\n        returns static") and not facade.contains("fn pick")
     if not ok:
         print(report)
         print(facade)

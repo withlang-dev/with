@@ -311,6 +311,7 @@ pub const FACADE_CLAUSE_DETACHES: i32 = 38         // [param_ref]  (`detaches pa
 // that is not a resource's representation, by what the callee does with it.
 pub const FACADE_CLAUSE_RUNS_THREADS: i32 = 40  // []  a facade-level item, `runs threads`: the library runs threads of its own, so its globals are never provably on one thread (§16.3)
 pub const FACADE_CLAUSE_RUNS_NO_THREADS: i32 = 42  // []  a facade-level item, `runs no threads`: the library's code and state are touched only on a thread the program called it on (§31.8.1, a grant)
+pub const FACADE_CLAUSE_CONTRACT_PRESERVES: i32 = 43  // [domain_sym]  a facade-level item, `preserves domain D`: the library's own threads do not rewrite D (D208, §16.2b.7, a grant)
 pub const FACADE_CLAUSE_PRODUCED_FIELD: i32 = 41   // [producer_sym, word_sym, field_sym…]  (`from F, nullable field a.b` / `nonnull field a.b`: the field whose NULL means a by-value producer produced nothing, §16.2b.4; the word, `nullable` or `nonnull`, is the clause)
 pub const FACADE_CLAUSE_VALUE_RECORD: i32 = 39     // [param_ref, word_sym]  (`reads` / `fills` / `updates param N`: the word is the clause, §16.2b.5)
 pub const FACADE_CLAUSE_MESSAGE: i32 = 33          // [fn_sym] resource-only: `message <fn>`, the operation that describes the resource's most recent failure (ruling Amendment 3, §16.2b.4)

@@ -565,6 +565,8 @@ impl CiProject:
         var out = self.fd_value_record_lines(si)
         if self.fd_registry_text_return(si).len() == 0 and self.fd_returns_literal_text(si, 0):
             out = out ++ "        returns static CStr    // proof: every return is a string literal\n"
+        else if self.fd_registry_text_return(si).len() == 0 and self.fd_returns_own_static_buffer(si, 0):
+            out = out ++ "        returns borrow CStr from domain " ++ self.symbols[si].name ++ "    // proof: every return is the function's own static array, which each call rewrites\n"
         for line in self.symbols[si].registry_more.split("\n"):
             if line.len() == 0: continue
             let kind = facts_kind(line)
@@ -857,6 +859,26 @@ impl CiProject:
             if callee < 0 or callee == si or not self.fd_returns_literal_text(callee, depth + 1): return false
         returns > 0
 
+    // #3127 (§16.2b.7): a function returns its own static buffer when every
+    // `return` of its body is one of its `static` arrays, or a call of a
+    // function of the package that does. The storage lives as long as the
+    // program and each call rewrites it: the text is a view of the
+    // library's domain, never `static` (which is immutable, §16.2b.6).
+    fn fd_returns_own_static_buffer(si: i32, depth: i32) -> bool:
+        if depth > 8 or not fd_is_char_pointer(self.symbols[si].ret_ty) or not self.fd_subject(si): return false
+        var returns = 0
+        var own = 0
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if not line.starts_with("ret:"): continue
+            returns = returns + 1
+            let src = line.slice(4, line.len())
+            // Its own array only: a function that returns another's buffer
+            // is not that buffer's writer, and stays raw.
+            if not (src.starts_with("local:") and self.symbols[si].own_evidence.contains("localstatic:" ++ src.slice(6, src.len()) ++ "\n")): return false
+            own = own + 1
+
+        returns > 0 and own == returns
+
     // How a function with no record-pointer return is presented: a
     // destroyer, a value-only call, a lend (every pointer parameter is a
     // modeled resource it reads and keeps), or `raw:` with the reason.
@@ -872,7 +894,7 @@ impl CiProject:
         // function stays raw for the parameter, and the draft states no item
         // whose return it cannot describe; with none, the call is safe as
         // imported and what it returns is a raw pointer.
-        let raw_return = self.symbols[si].ret_ty.starts_with("*") and not (fd_is_char_pointer(self.symbols[si].ret_ty) and self.fd_registry_text_return(si).len() > 0) and not self.fd_returns_literal_text(si, 0)
+        let raw_return = self.symbols[si].ret_ty.starts_with("*") and not (fd_is_char_pointer(self.symbols[si].ret_ty) and self.fd_registry_text_return(si).len() > 0) and not self.fd_returns_literal_text(si, 0) and not self.fd_returns_own_static_buffer(si, 0)
         if raw_return:
             for p in self.symbols[si].param_ty:
                 if p.starts_with("*"): return "raw: returns " ++ self.symbols[si].ret_ty ++ ", a pointer to no record"
@@ -1381,6 +1403,7 @@ impl CiProject:
         text = text ++ "c contract " ++ name ++ ":\n"
         if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
         if self.registry_threads.len() > 0: text = text ++ "    runs threads    // registry: " ++ self.registry_threads ++ "\n"
+        self.draft_name = name
         for record in modeled:
             text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
             let producers = self.fd_presentable_producers_of(record, modeled)
@@ -1438,7 +1461,7 @@ impl CiProject:
                 blocks.push(si as i32)
                 let consumed = self.fd_consumed_param(si as i32, modeled)
                 text = text ++ "    fn " ++ self.symbols[si].name ++ f"\n        consumes param {consumed}    // " ++ self.fd_consumed_reason(si as i32, consumed) ++ "\n" ++ self.fd_registry_presentation_lines(si as i32)
-            else if self.symbols[si].header_declared != 0 and self.fd_returns_literal_text(si as i32, 0) and self.fd_lend_verdict(si as i32, modeled) == "value-only call":
+            else if self.symbols[si].header_declared != 0 and (self.fd_returns_literal_text(si as i32, 0) or self.fd_returns_own_static_buffer(si as i32, 0)) and self.fd_lend_verdict(si as i32, modeled) == "value-only call":
                 // #3127: a value-only call that returns static text has one
                 // fact to state, its return's.
                 self.presented.push(si as i32)
@@ -1451,6 +1474,19 @@ impl CiProject:
             if blocks.contains(si) or self.symbols[si].registry_more.len() == 0: continue
             blocks.push(si)
             text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_registry_presentation_lines(si)
+        // #3127: a function presented as a view of the library's own static
+        // buffer needs the domain that view borrows from declared.
+        // Each is a domain of its own, written only by its function: a
+        // static array of a body is named nowhere else.
+        let header = "c contract " ++ name ++ ":\n"
+        var domains = ""
+        for line in text.split("\n"):
+            let at = line.find("returns borrow CStr from domain ")
+            if at < 0 or not line.contains("own static array"): continue
+            let rest = line.slice(at + 32, line.len())
+            let writer = rest.slice(0, rest.find(" "))
+            domains = domains ++ "    domain " ++ writer ++ " process written by " ++ writer ++ "    // proof: a static array of " ++ writer ++ "'s body, rewritten by each call of it\n"
+        if domains.len() > 0: text = text.replace(header, header ++ domains)
         text ++ self.registry_value_text
 
     // One line per function: how the draft presents it, or why it stays

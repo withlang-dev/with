@@ -19290,6 +19290,10 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
     if kind == CXK_RETURN_STMT and nc >= 1:
         out = out ++ "ret:" ++ ci_own_source(session, with_ci_child(session, cursor, 0), params, locals) ++ "\n"
     if kind == CXK_VAR_DECL:
+        // #3127: a `static` array of the body is storage the function owns
+        // for the life of the program and writes on each call.
+        if with_ci_cursor_storage_class(session, cursor) == CX_SC_STATIC and with_ci_type_kind(session, with_ci_cursor_type(session, cursor)) == CXT_ConstantArray:
+            out = out ++ "localstatic:" ++ with_ci_cursor_spelling(session, cursor) ++ "\n"
         let init = with_ci_var_initializer(session, cursor)
         if init >= 0:
             out = out ++ "localsrc:" ++ with_ci_cursor_spelling(session, cursor) ++ ":" ++ ci_own_source(session, init, params, locals) ++ "\n"

@@ -1293,8 +1293,8 @@ pub fn with_fiber_cross_thread_cancels() -> i64:
 // §16.2b.14, D76).
 c contract ucrt:
     domain errno thread
-    domain environ process
-    domain locale process
+    domain environ process written by any
+    domain locale process written by any
     // C abort (C11 7.22.4.1; the UCRT's here): ends the process abnormally
     // and does not return to its caller: nothing the process holds outlives
     // the call.

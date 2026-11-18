@@ -2287,8 +2287,8 @@ pub fn with_net_close(sock: i32) -> i32:
 // §16.2b.14, D76).
 c contract win32:
     domain errno thread
-    domain environ process
-    domain locale process
+    domain environ process written by any
+    domain locale process written by any
     fn GetLastError
     fn FormatMessageW
     fn GetStdHandle

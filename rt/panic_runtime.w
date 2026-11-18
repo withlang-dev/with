@@ -74,8 +74,8 @@ pub fn with_main_error_exit(msg: str) -> Never:
 // facade presents a safe view whose validity it decides.
 c contract libc:
     domain errno thread
-    domain environ process
-    domain locale process
+    domain environ process written by any
+    domain locale process written by any
     // _exit (POSIX _exit(2); the UCRT's _exit on Windows): ends the process
     // at once, running no atexit handler, and does not return: nothing the
     // process holds outlives the call.
