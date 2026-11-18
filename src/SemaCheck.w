@@ -31878,8 +31878,10 @@ impl Sema:
             // #2261 (Eric, 2026-11-18): where the declaration on the other
             // side was imported from C, neither fix is the programmer's to
             // make: the declaration is the header's, and `as` would remove
-            // the check. The conversion is checked all the same.
-            if node == self.narrowing_c_value or self.expr_declared_in_c(node) or (node == self.narrowing_assign_value and self.expr_declared_in_c(self.narrowing_assign_target)): return false
+            // the check. The conversion is checked all the same. A migrated
+            // module keeps its seam warning (D156): there the two widths are
+            // a data model's and the host's, which is the fact it reports.
+            if seam_note.len() == 0 and (node == self.narrowing_c_value or self.expr_declared_in_c(node) or (node == self.narrowing_assign_value and self.expr_declared_in_c(self.narrowing_assign_target))): return false
             self.emit_warning(f"`{got}` narrows to `{want}` with a range check{self.narrowing_target_note}{seam_note}: widen the `{want}` declaration it flows into, or write `as {want}` for the wrap (§4.2.6, D183)", node)
             return false
         // D181 (§4.2.6): an integer where a float is demanded converts to it,
