@@ -835,7 +835,7 @@ impl Sema:
             let item = self.ast.get_extra(extra_start + i)
             let kind = self.ast.kind(item)
             if kind == NodeKind.NK_FACADE_DOMAIN:
-                self.collect_facade_domain(item)
+                self.collect_facade_domain(item, self.source_name_for_file_id(self.decl_source_file_id_for_index(di)).starts_with("<toolchain facade "))
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
@@ -1003,7 +1003,7 @@ impl Sema:
     // D208 (§16.2b.7): the functions a domain declaration names after
     // `written by`, and whether it says `any`. A process domain that says
     // neither is an error: it would have no race check.
-    mut fn facade_domain_writers(item: i32) -> (List[str], bool):
+    mut fn facade_domain_writers(item: i32, toolchain: bool) -> (List[str], bool):
         let dn = self.pool_resolve(self.ast.get_data0(item))
         let writers = []
         let at = self.ast.get_data2(item)
@@ -1015,14 +1015,17 @@ impl Sema:
         if count < 0: return (writers, true)
         for wi in 0..count:
             let writer = self.ast.get_extra(at + wi)
+            // The toolchain's libc contract names every writer the C
+            // library has; one the program did not import cannot be called.
+            if toolchain and self.get_sig(writer) < 0: continue
             if self.facade_fn_sig(writer, item) >= 0: writers.push(with_str_clone_ref(self.safe_symbol_text(writer)))
         (writers, false)
 
-    mut fn collect_facade_domain(item: i32):
+    mut fn collect_facade_domain(item: i32, toolchain: bool):
         let name = self.ast.get_data0(item)
         if not self.current_facade_is_runtime():
             self.facade_program_domains.insert(name, 1)
-        let (writers, any_writer) = self.facade_domain_writers(item)
+        let (writers, any_writer) = self.facade_domain_writers(item, toolchain)
         if self.facade_domains.contains(name):
             let dn = self.pool_resolve(name)
             // Ruling §35: a facade "may also merge domains from distinct

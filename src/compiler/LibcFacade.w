@@ -172,16 +172,9 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
             threads = citation ++ header ++ "\n"
             continue
         if header.trim().starts_with("domain "):
-            // D208: the writers the program imported; one it did not import
-            // cannot be called, and a contract names only declarations.
-            let parts = header.split(" written by ")
-            var writers = ""
-            if parts.len() == 2:
-                for writer in parts[1].split(", "):
-                    let (found, _, _) = facade_render_import_shape(pool, intern, ci, writer)
-                    if found: writers = writers ++ (if writers.len() > 0: ", " else: "") ++ writer
-            if writers.len() == 0: continue
-            domain_lines.push(citation ++ parts[0] ++ " written by " ++ writers)
+            // D208: the line names every writer the C library has; Sema
+            // leaves out the ones the program did not import.
+            domain_lines.push(citation ++ header)
             domain_names.push(name)
             continue
         if header.trim().starts_with("resource "):
