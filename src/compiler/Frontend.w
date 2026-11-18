@@ -466,6 +466,9 @@ impl Zcu:
             let header_sym = out.get_data0(decl)
             let header_spec = with_str_clone_ref(self.pool.resolve(header_sym))
             let decl_dir = self.decl_source_dir_frontend(i)
+            // §18.8: the fetched package this header belongs to is the one linked.
+            let noted_config = move self.project_config
+            self.project_config = project_config_note_c_import(noted_config, decl_dir, header_spec)
             let resolved_header_spec = project_config_resolve_c_import_header(self.project_config, decl_dir, header_spec)
             self.record_frontend_tracked_input(c_import_absolute_quoted_path(resolved_header_spec))
             let cache_key = self.c_import_cache_key_frontend(out, decl, resolved_header_spec)

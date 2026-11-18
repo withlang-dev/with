@@ -19,6 +19,9 @@ type ProjectConfig {
     dep_link_libs: List[str],
     dep_link_args: List[str],
     dep_loaded: List[str],
+    // §18.8: the fetched packages a c_import of the compilation names a
+    // header of (`name/version`); their libraries are the ones linked.
+    dep_matched: List[str],
     dep_names: List[str],
     dep_constraints: List[str],
     c_dep_metadata_names: List[str],
@@ -55,6 +58,7 @@ fn project_config_default -> ProjectConfig:
         dep_link_libs: List.new(),
         dep_link_args: List.new(),
         dep_loaded: List.new(),
+        dep_matched: [],
         dep_names: List.new(),
         dep_constraints: List.new(),
         c_dep_metadata_names: List.new(),
@@ -102,6 +106,7 @@ fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         dep_link_libs: project_config_clone_str_list(cfg.dep_link_libs),
         dep_link_args: project_config_clone_str_list(cfg.dep_link_args),
         dep_loaded: project_config_clone_str_list(cfg.dep_loaded),
+        dep_matched: project_config_clone_str_list(cfg.dep_matched),
         dep_names: project_config_clone_str_list(cfg.dep_names),
         dep_constraints: project_config_clone_str_list(cfg.dep_constraints),
         c_dep_metadata_names: project_config_clone_str_list(cfg.c_dep_metadata_names),
@@ -420,15 +425,23 @@ fn project_config_is_quoted_string_value(value: &str) -> bool:
     text.len() >= 2 and text[0] == 34 and text[text.len() as i64 - 1] == 34
 
 fn project_config_load_dep_metadata(cfg: ProjectConfig, name: &str, version: &str) -> ProjectConfig:
-    project_config_load_dep_component(cfg, name, version, "")
+    project_config_load_dep_component(cfg, name, version, "", false)
 
-// Links `component` of a fetched package ("" for the whole package) and what
+// Reads `component` of a fetched package ("" for the whole package) and what
 // it requires, each once. A package's metadata states its components and
 // what each requires — a sibling, or `name/version:component` of another
 // package — as the recipe's `package_info` does (`with get`,
-// compiler.ConanClient); a package without components is linked whole, with
+// compiler.ConanClient); a package without components is read whole, with
 // every package it requires.
-fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &str, component: &str) -> ProjectConfig:
+//
+// §18.8: every declared package's headers are searched, and "the matching
+// package's libraries are linked". So there are two readings. Without
+// `link`: what c_import needs (include paths, defines). With `link`: what
+// the linker needs (library paths, libraries, link arguments), read only
+// for a package a c_import named a header of (project_config_link_matched).
+// A package with no include path has no header to match (a system
+// library, a framework); it is linked as declared.
+fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &str, component: &str, link: bool) -> ProjectConfig:
     var out = cfg
     // Read metadata.json from .with/deps/c/<name>/<version>/
     let dep_dir = out.root_dir ++ "/.with/deps/c/" ++ name ++ "/" ++ version
@@ -439,13 +452,14 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
             out.manifest_error = "missing metadata for dependency c." ++ name ++ "@" ++ version ++ " at " ++ meta_path ++ "; run 'with get c." ++ name ++ "@" ++ version ++ "'"
         return out
     let package_key = name ++ "/" ++ version
-    if not project_config_list_contains(out.dep_loaded, package_key):
+    if not link and not project_config_list_contains(out.dep_loaded, package_key):
         out.dep_loaded.push(package_key)
         // What c_import reads, and the framework stubs `with get` wrote for
         // this package (#1915, compiler.FrameworkStubs), relative to it.
         let includes = project_config_json_str_array(meta, "include_paths")
         for include in includes:
             out.c_import_include_paths.push(dep_dir ++ "/" ++ include)
+        if includes.len() == 0 and not project_config_list_contains(out.dep_matched, package_key): out.dep_matched.push(with_str_clone_ref(package_key))
         let defines = project_config_json_str_array(meta, "defines")
         for define in defines:
             out.c_import_defines.push(with_str_clone_ref(define))
@@ -459,35 +473,93 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
     else:
         for i in 0..components.len(): wanted.push(with_str_clone_ref(components[i]))
     for wanted_item in wanted:
-        let key = package_key ++ ":" ++ wanted_item
+        let key = (if link: "link:" else: "") ++ package_key ++ ":" ++ wanted_item
         if project_config_list_contains(out.dep_loaded, key): continue
         out.dep_loaded.push(key)
         let suffix = if wanted_item.len() == 0: "" else: ":" ++ wanted_item
-        let lib_paths = project_config_json_str_array(meta, "lib_paths" ++ suffix)
-        for lib_path in lib_paths:
-            let path = dep_dir ++ "/" ++ lib_path
-            if not project_config_list_contains(out.link_search_paths, path): out.link_search_paths.push(path)
-        let libs = project_config_json_str_array(meta, "libs" ++ suffix)
-        for lib in libs:
-            if not project_config_list_contains(out.dep_link_libs, lib): out.dep_link_libs.push(with_str_clone_ref(lib))
-        let link_args = project_config_json_str_array(meta, "link_args" ++ suffix)
-        for link_arg in link_args:
-            out.dep_link_args.push(with_str_clone_ref(link_arg))
+        if link:
+            let lib_paths = project_config_json_str_array(meta, "lib_paths" ++ suffix)
+            for lib_path in lib_paths:
+                let path = dep_dir ++ "/" ++ lib_path
+                if not project_config_list_contains(out.link_search_paths, path): out.link_search_paths.push(path)
+            let libs = project_config_json_str_array(meta, "libs" ++ suffix)
+            for lib in libs:
+                if not project_config_list_contains(out.dep_link_libs, lib): out.dep_link_libs.push(with_str_clone_ref(lib))
+            let link_args = project_config_json_str_array(meta, "link_args" ++ suffix)
+            for link_arg in link_args:
+                out.dep_link_args.push(with_str_clone_ref(link_arg))
         let requires = project_config_json_str_array(meta, "requires" ++ suffix)
         for i in 0..requires.len():
             let req = requires[i]
             let slash = project_config_find_char(req, 47)
             if slash <= 0:
                 // A sibling component.
-                out = project_config_load_dep_component(out, name, version, req)
+                out = project_config_load_dep_component(out, name, version, req, link)
                 continue
             let colon = project_config_find_char(req, 58)
             let req_name = req.slice(0, slash)
             let req_version = req.slice(slash + 1, if colon > slash: colon else: req.len())
             let req_component = if colon > slash: req.slice((colon + 1) as i64, req.len()) else: ""
-            out = project_config_load_dep_component(out, req_name, req_version, req_component)
+            out = project_config_load_dep_component(out, req_name, req_version, req_component, link)
     out
 
+// §18.8: notes the fetched packages whose headers the c_import `header_spec`
+// names: a header by name, each `#include` of inline C text, and each
+// `#include` of a header of the project's own that those name.
+fn project_config_note_c_import(cfg: ProjectConfig, decl_dir: &str, header_spec: &str) -> ProjectConfig:
+    var out = cfg
+    let spec = project_config_trim(header_spec)
+    if spec.len() == 0: return out
+    if project_config_str_contains(spec, "\n") or project_config_str_contains(spec, ";") or spec[0] == 35:
+        return project_config_note_includes(out, decl_dir, spec, 0)
+    let bracketed = spec.len() >= 2 and ((spec[0] == 60 and spec[spec.len() - 1] == 62) or (spec[0] == 34 and spec[spec.len() - 1] == 34))
+    project_config_note_header(out, decl_dir, if bracketed: spec.slice(1, spec.len() - 1) else: spec, 0)
+
+// Each `#include <name>` / `#include "name"` line of C text.
+fn project_config_note_includes(cfg: ProjectConfig, decl_dir: &str, text: &str, depth: i32) -> ProjectConfig:
+    var out = cfg
+    for raw in text.split("\n"):
+        let line = project_config_trim(raw)
+        if not line.starts_with("#"): continue
+        let rest = project_config_trim(line.slice(1, line.len()))
+        if not rest.starts_with("include"): continue
+        let named = project_config_trim(rest.slice(7, rest.len()))
+        if named.len() < 3: continue
+        let close: u8 = if named[0] == 60: 62 else: 34
+        if named[0] != 60 and named[0] != 34: continue
+        var end = 1
+        while end < named.len() and named[end] != close: end = end + 1
+        out = project_config_note_header(out, decl_dir, named.slice(1, end), depth)
+    out
+
+// One header name: the fetched package whose include path holds it is
+// matched; a header of the project's own is read for what it includes.
+fn project_config_note_header(cfg: ProjectConfig, decl_dir: &str, header_name: &str, depth: i32) -> ProjectConfig:
+    var out = cfg
+    let deps_root = out.root_dir ++ "/.with/deps/c/"
+    var in_package = false
+    for path in out.c_import_include_paths:
+        if not path.starts_with(deps_root) or not project_config_file_exists(resolve_join(path, header_name)): continue
+        in_package = true
+        let parts = path.slice(deps_root.len(), path.len()).split("/")
+        if parts.len() < 2: continue
+        let key = parts[0] ++ "/" ++ parts[1]
+        if not project_config_list_contains(out.dep_matched, key): out.dep_matched.push(key)
+    if in_package or depth >= 8: return out
+    let local = project_config_resolve_header_path(out, decl_dir, header_name)
+    if local.len() == 0: return out
+    let text = runtime_read_file(local)
+    project_config_note_includes(out, decl_dir, text, depth + 1)
+
+// §18.8: the libraries, library paths and link arguments of the matched
+// packages and of what they require.
+fn project_config_link_matched(cfg: ProjectConfig) -> ProjectConfig:
+    var out = cfg
+    let matched = project_config_clone_str_list(out.dep_matched)
+    for key in matched:
+        let parts = key.split("/")
+        if parts.len() == 2: out = project_config_load_dep_component(out, parts[0], parts[1], "", true)
+    out
 fn project_config_json_str_array(json: &str, key: &str) -> List[str]:
     // Simple JSON array extractor: find "key": [...] and extract string values.
     let result: List[str] = []
