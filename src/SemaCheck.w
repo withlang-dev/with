@@ -3413,10 +3413,11 @@ impl Sema:
     // being checked (0: top level).
     mut fn note_call_resolution(node: i32, fn_sym: i32):
         self.comp_resolved.insert(node, fn_sym)
-        self.note_call_edge(fn_sym)
+        self.note_call_edge(fn_sym, node)
 
-    mut fn note_call_edge(fn_sym: i32):
+    mut fn note_call_edge(fn_sym: i32, node: i32):
         if fn_sym == 0: return
+        self.race_edges.push(RaceEdge { from: self.current_fn_symbol, to: fn_sym, node })
         // Indexed by caller as it is recorded: `first` is the caller's
         // newest edge, `next` the one before it.
         let caller = self.current_fn_symbol
@@ -3470,6 +3471,113 @@ impl Sema:
                 self.global_race_concurrency_reason = with_str_clone_ref(e.reason)
                 return true
         false
+
+    // ── #3239 (§16.3): the per-library form of the C-global proof ──────────
+    //
+    // "Every call into its library and every access to its globals is
+    // provably on one thread." With a task or a spawned thread in the
+    // program, that thread is the one `main` runs on, and a function runs
+    // only there when every way to reach it is a direct call from `main`
+    // or from another such function. A function is off that path when it
+    // is a task body (`async fn`), is taken as a value (whoever holds the
+    // value may call it), is a root other than `main` (an exported
+    // function, a test or entry hook, a trait impl method, which dispatch
+    // and drops reach without a call Sema saw), or is called from such a
+    // function, or from inside a closure, an async block or a scope
+    // (their bodies run where and when their holder chooses). The set is
+    // the least one closed under those rules, so what is left out is
+    // reached only by direct calls from `main`.
+    fn race_site_is_deferred(node: i32) -> bool:
+        if node <= 0: return true
+        let file = self.ast.file(node as NodeId) as i32
+        let at = self.ast.get_start(node)
+        // (file, start, end) triples of every body that runs when its
+        // holder says.
+        var k = 0
+        while k + 2 < self.race_deferred_spans.len():
+            if self.race_deferred_spans[k] == file and self.race_deferred_spans[k + 1] <= at and at < self.race_deferred_spans[k + 2]: return true
+            k = k + 3
+        false
+
+    mut fn race_compute_off_main_fns():
+        if self.race_off_main_ready: return
+        self.race_off_main_ready = true
+        // The bodies that run when their holder says (race_site_is_deferred).
+        for n in 1..self.ast.node_count():
+            let kind = self.ast.kind(n)
+            if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE or kind == NodeKind.NK_SCOPE:
+                self.race_deferred_spans.push(self.ast.file(n as NodeId) as i32)
+                self.race_deferred_spans.push(self.ast.get_start(n))
+                self.race_deferred_spans.push(self.ast.get_end(n))
+        let main_sym = self.pool_lookup_symbol("main")
+        let work = []
+        for e in self.race_edges:
+            for f in [e.from, e.to]:
+                if f == 0 or f == main_sym or self.race_off_main_fns.contains(f): continue
+                if self.task_fns.contains(f) or self.race_fn_value_syms.contains(f) or self.race_root_fn(f):
+                    self.race_off_main_fns.insert(f, 1)
+                    work.push(f)
+        // Close under calls; then a call made inside a deferred body puts
+        // its callee off the path too, until nothing changes.
+        var changed = true
+        while changed:
+            while work.len() > 0:
+                let f = work.pop().unwrap()
+                var ei = self.race_call_edge_first.get(f) ?? -1
+                while ei >= 0:
+                    let callee = self.race_call_edge_to[ei]
+                    if callee != main_sym and not self.race_off_main_fns.contains(callee):
+                        self.race_off_main_fns.insert(callee, 1)
+                        work.push(callee)
+                    ei = self.race_call_edge_next[ei]
+            changed = false
+            for e in self.race_edges:
+                if e.to == main_sym or self.race_off_main_fns.contains(e.to) or self.race_off_main_fns.contains(e.from): continue
+                if self.race_site_is_deferred(e.node):
+                    self.race_off_main_fns.insert(e.to, 1)
+                    work.push(e.to)
+                    changed = true
+        // The runtime's own functions, by name: a header's translation
+        // redeclares the ones it is built on.
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_source_paths.len() or not sema_path_is_runtime_implementation(self.decl_source_paths[di]): continue
+            let decl = self.ast.get_decl(di)
+            let kind = self.ast.kind(decl)
+            if kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_FN_DECL: self.race_runtime_fn_names.insert(with_str_clone_ref(self.safe_symbol_text(self.ast.get_data0(decl))), 1)
+        for (f, _) in self.race_off_main_fns:
+            if f > 0: self.race_off_main_names.insert(with_str_clone_ref(self.safe_symbol_text(f)), 1)
+
+    // The `<c_import …>` file that declares the C global `sym`, by name, or "".
+    fn c_global_library_file(sym: i32) -> str:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_EXTERN_VAR and self.ast.get_data0(decl) == sym: return self.facade_decl_file_name(di)
+        ""
+
+    // Why the library declared in `file` is not reached only on `main`'s
+    // own path, or "" when it is: no function of it is called, and no
+    // global of it accessed, by code that may run anywhere else.
+    //
+    //
+    mut fn c_library_off_main_reason(file: &str) -> str:
+        if not file.starts_with("<c_import "): return "its declaring header is unknown"
+        self.race_compute_off_main_fns()
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() or self.decl_is_c_import[di] == 0 or self.facade_decl_file_name(di) != file: continue
+            // A translation also declares the runtime functions it is built
+            // on (`extern fn with_alloc`); those are the runtime's, not the
+            // library's (#3218).
+            let declared = self.ast.get_data0(self.ast.get_decl(di))
+            if self.race_runtime_fn_names.contains(self.safe_symbol_text(declared)): continue
+            let decl = self.ast.get_decl(di)
+            let kind = self.ast.kind(decl)
+            if (kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_FN_DECL) and self.race_off_main_names.contains(self.safe_symbol_text(self.ast.get_data0(decl))): return "`" ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "` of the same library is called from code that may run off `main`'s own path (a task, a closure, a function taken as a value, a trait method)"
+        for a in self.race_accesses:
+            if self.c_global_library_file(a.sym) != file: continue
+            if self.race_site_is_deferred(a.node): return "`" ++ self.pool_resolve(a.sym) ++ "` of the same library is accessed inside a closure, an async block or a scope"
+            let f = a.fn_sym
+            if f != 0 and f != self.pool_lookup_symbol("main") and self.race_off_main_fns.contains(f): return "`" ++ self.pool_resolve(a.sym) ++ "` of the same library is accessed in `" ++ self.pool_resolve(f) ++ "`, which may run off `main`'s own path"
+        ""
 
     fn global_symbol_is_synchronized(sym: i32) -> bool:
         let tid = self.scope_lookup(sym)
@@ -3526,6 +3634,7 @@ impl Sema:
         self.global_race_access_paths.push(with_str_clone_ref(self.current_module_path))
         self.global_race_access_kinds.push(kind)
         self.global_race_access_unsafe.push(self.in_unsafe)
+        self.race_accesses.push(RaceAccess { sym, node, fn_sym: self.current_fn_symbol })
         if kind == GLOBAL_RACE_ACCESS_WRITE:
             if not self.global_race_mutated_syms.contains(sym):
                 self.global_race_mutated_syms.insert(sym, 1)
@@ -5317,6 +5426,7 @@ impl Sema:
                 atomic = "Atomic[" ++ self.type_name(tid) ++ "]"
         if c_written:
             if self.global_race_concurrency_node == 0: diag.add_note(if self.c_global_library_threads(sym) == 1: "its library's contract says `runs threads`: the library may write the global at any time" else: "its library's contract does not say `runs no threads`: the library is not known to leave the global alone on other threads (§31.4)")
+            if self.global_race_off_main_reason.len() > 0: diag.add_note(self.global_race_off_main_reason)
             diag.add_help("read it on the one thread that calls the library, or assert with `unsafe`")
         else:
             diag.add_help("use " ++ atomic ++ ", wrap in Mutex, or assert with `unsafe`")
@@ -5345,8 +5455,14 @@ impl Sema:
             // §31.6.2: no default grant. The library runs no threads only
             // where its contract says so, by a proof or by a claim.
             let library_threads = c_global and self.c_global_library_threads(self.global_race_access_syms[i]) != 2
-            let failed = if c_global: tasks or library_threads else: proof_failed
-            self.global_race_concurrency_node = if c_global: (if tasks: tasks_node else: 0) else: any_node
+            // #3239: with tasks in the program, the library is still on one
+            // thread when everything that reaches it runs only on `main`'s
+            // own path.
+            let off_main = if c_global and tasks: self.c_library_off_main_reason(self.c_global_library_file(self.global_race_access_syms[i])) else: ""
+            let c_tasks = off_main.len() > 0
+            self.global_race_off_main_reason = off_main
+            let failed = if c_global: c_tasks or library_threads else: proof_failed
+            self.global_race_concurrency_node = if c_global: (if c_tasks: tasks_node else: 0) else: any_node
             self.global_race_concurrency_file = if c_global: tasks_file else: any_file
             self.global_race_concurrency_reason = if c_global: (if tasks: with_str_clone_ref(tasks_reason) else: "") else: with_str_clone_ref(any_reason)
             if failed:
@@ -13912,7 +14028,8 @@ impl Sema:
             // whose calls pass no variable arguments and need no `unsafe`;
             // With has no variadic function-pointer type to give it.
             self.record_name_use(node, "fn-value", self.fn_symbol_source_path(sym), sym)
-            self.note_call_edge(sym)
+            self.note_call_edge(sym, node)
+            self.race_fn_value_syms.insert(sym, 1)
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
                 return 0
