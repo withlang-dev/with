@@ -2289,6 +2289,85 @@ fn bs_check_runtime_workers(ctx: &ActionCtx, compiler_path: &str, case_dir: &str
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(workers_run.stdout), "runtimeworkers", "runtime_workers", "stdout")
     if rc != 0: return rc
     0
+// #491 (§18.8): a fetched package's metadata with something in it. `lists`
+// is the JSON arrays after the fixed header, as `"key": [...]` pairs.
+fn bs_dep_metadata(name: &str, version: &str, includes: &str, libs: &str, defines: &str, requires: &str) -> str:
+    "{\n  \"name\": \"" ++ name ++ "\",\n  \"version\": \"" ++ version ++ "\",\n  \"recipe_revision\": \"r\",\n  \"package_id\": \"p\",\n  \"package_revision\": \"0\",\n  \"include_paths\": [" ++ includes ++ "],\n  \"lib_paths\": [],\n  \"libs\": [" ++ libs ++ "],\n  \"defines\": [" ++ defines ++ "],\n  \"link_args\": [],\n  \"requires\": [" ++ requires ++ "]\n}\n"
+
+// One project under `dir` with the given `[deps]` lines and main source,
+// built and run; its output must be `want`.
+fn bs_dep_project_prints(ctx: &ActionCtx, compiler_path: &str, dir: &str, name: &str, deps: &str, source: &str, want: &str) -> i32:
+    var rc = bs_write_fixture(ctx, bs_join(dir, "with.toml"), "[package]\nname = \"" ++ name ++ "\"\nversion = \"0.1.0\"\n\n[deps]\n" ++ deps, name ++ " manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(dir, "src/main.w"), source, name ++ " source")
+    if rc != 0: return rc
+    let built = bs_project_expect_success(ctx, compiler_path, dir, name ++ "-build", bs_project_args("build"))
+    if built.rc != 0: return built.rc
+    let run = bs_run_binary_capture(ctx, bs_default_bin(dir, name), name ++ "-run", BS_HANG_GUARD_MS)
+    if run.rc != 0: return bs_fail(ctx, f"{name}: the binary failed with exit code {run.rc}: " ++ run.stderr)
+    bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run.stdout), want, name, "stdout")
+
+// #491 (§18.8): what a fetched package's metadata does to a build, with no
+// include or link flag written anywhere: its include paths find its
+// headers, its defines reach them, what it requires is read too, a
+// declared package with no metadata is refused by name, and only the
+// package a c_import names a header of has its libraries linked.
+fn bs_check_dep_metadata_cases(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    // Header search and defines.
+    let scaled = bs_join(case_dir, "scaled")
+    var rc = bs_write_fixture(ctx, bs_join(scaled, ".with/deps/c/used/1.0/metadata.json"), bs_dep_metadata("used", "1.0", "\"include\"", "", "\"USED_SCALE=3\"", ""), "used metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(scaled, ".with/deps/c/used/1.0/include/used.h"), "#define USED_ANSWER 14\n#ifdef USED_SCALE\nstatic inline int used_scaled(void) { return USED_SCALE * USED_ANSWER; }\n#endif\n", "used header")
+    if rc != 0: return rc
+    rc = bs_dep_project_prints(ctx, compiler_path, scaled, "depscaled", "c.used = \"1.0\"\n", "use c_import(\"used.h\")\n\nfn main:\n    print(used_scaled())\n", "42")
+    if rc != 0: return rc
+
+    // A required package is read with the one that requires it.
+    let chained = bs_join(case_dir, "chained")
+    rc = bs_write_fixture(ctx, bs_join(chained, ".with/deps/c/top/2.0/metadata.json"), bs_dep_metadata("top", "2.0", "\"include\"", "", "", "\"base/1.0\""), "top metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(chained, ".with/deps/c/top/2.0/include/top.h"), "#include <base.h>\nstatic inline int top_value(void) { return BASE_VALUE + 1; }\n", "top header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(chained, ".with/deps/c/base/1.0/metadata.json"), bs_dep_metadata("base", "1.0", "\"inc\"", "", "", ""), "base metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(chained, ".with/deps/c/base/1.0/inc/base.h"), "#define BASE_VALUE 6\n", "base header")
+    if rc != 0: return rc
+    rc = bs_dep_project_prints(ctx, compiler_path, chained, "depchained", "c.top = \"2.0\"\n", "use c_import(\"top.h\")\n\nfn main:\n    print(top_value())\n", "7")
+    if rc != 0: return rc
+
+    // A declared package with no metadata.
+    let ghost = bs_join(case_dir, "ghost")
+    rc = bs_write_fixture(ctx, bs_join(ghost, "with.toml"), "[package]\nname = \"depghost\"\nversion = \"0.1.0\"\n\n[deps]\nc.ghost = \"9.9\"\n", "ghost manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(ghost, "src/main.w"), "fn main:\n    print(\"unreachable\")\n", "ghost source")
+    if rc != 0: return rc
+    let ghost_build = bs_run_cli_capture_cwd(ctx, compiler_path, "depghost-build", bs_project_args("build"), BS_HANG_GUARD_MS, ghost)
+    if ghost_build.rc == 0: return bs_fail(ctx, "a declared dependency with no metadata built")
+    rc = bs_assert_contains(ctx, ghost_build.stderr, "missing metadata for dependency c.ghost@9.9", "dep_metadata_missing")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, ghost_build.stderr, "with get c.ghost@9.9", "dep_metadata_missing_hint")
+    if rc != 0: return rc
+
+    // Link scope: a declared package the program imports no header of
+    // carries a library that does not exist, and the build never asks for
+    // it. Importing its header asks for it.
+    let scope = bs_join(case_dir, "scope")
+    rc = bs_write_fixture(ctx, bs_join(scope, ".with/deps/c/used/1.0/metadata.json"), bs_dep_metadata("used", "1.0", "\"include\"", "", "", ""), "scope used metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(scope, ".with/deps/c/used/1.0/include/used.h"), "static inline int used_value(void) { return 5; }\n", "scope used header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(scope, ".with/deps/c/unused/1.0/metadata.json"), bs_dep_metadata("unused", "1.0", "\"include\"", "\"with_no_such_library_491\"", "", ""), "scope unused metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(scope, ".with/deps/c/unused/1.0/include/unused.h"), "static inline int unused_value(void) { return 9; }\n", "scope unused header")
+    if rc != 0: return rc
+    rc = bs_dep_project_prints(ctx, compiler_path, scope, "depscope", "c.used = \"1.0\"\nc.unused = \"1.0\"\n", "use c_import(\"used.h\")\n\nfn main:\n    print(used_value())\n", "5")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(scope, "src/main.w"), "use c_import(\"used.h\")\nuse c_import(\"unused.h\")\n\nfn main:\n    print(used_value() + unused_value())\n", "scope source importing both")
+    if rc != 0: return rc
+    let both = bs_run_cli_capture_cwd(ctx, compiler_path, "depscope-both-build", bs_project_args("build"), BS_HANG_GUARD_MS, scope)
+    if both.rc == 0: return bs_fail(ctx, "a program importing a package's header linked without that package's library")
+    bs_assert_contains(ctx, both.stderr, "with_no_such_library_491", "dep_metadata_link_scope")
+
 fn bs_check_copy_warning_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let default_dir = bs_join(case_dir, "default_warn")
     var rc = bs_write_project_manifest(ctx, default_dir, "copydefault")
@@ -3035,6 +3114,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_declarative_manifest_config(ctx, compiler_path, bs_join(output_dir, "declarative_manifest_config_case"))
     if rc != 0: return rc
     rc = bs_check_runtime_manifest_config(ctx, compiler_path, bs_join(output_dir, "runtime_manifest_config_case"))
+    if rc != 0: return rc
+    rc = bs_check_dep_metadata_cases(ctx, compiler_path, bs_join(output_dir, "dep_metadata_case"))
     if rc != 0: return rc
     rc = bs_check_copy_warning_manifest_config(ctx, compiler_path, bs_join(output_dir, "copy_warning_manifest_case"))
     if rc != 0: return rc

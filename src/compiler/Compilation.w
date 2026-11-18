@@ -1311,6 +1311,10 @@ impl Compilation:
             compilation_cleanup_build_products(obj_path, bin_path)
             return compilation_binary_link_plan_fail()
         compilation_debug_init("build_binary_to_path:linking")
+        // §18.8: the libraries of the fetched packages the compilation's
+        // c_imports matched, and of what they require.
+        let matched_config = move self.zcu.project_config
+        self.zcu.project_config = project_config_link_matched(matched_config)
         // Merge direct and dependency link libraries from project config.
         let all_link_libs = move self.zcu.last_link_lib_names
         for lli in 0..self.zcu.project_config.link_libs.len():
