@@ -16,13 +16,17 @@
 //     completion wakes the agent. Refusing here made a filler turn of
 //     every battery start (2026-11-18); or
 //   - no open issue is left that the agent may work: every open issue
-//     carries `human attn needed`.
+//     carries `human attn needed` or `blocked`.
 // Otherwise the stop is refused and the open issues are named, so the next
 // action is one of them. An issue the agent cannot move is labelled
 // `human attn needed`, with the reason in a comment: that is the only way
 // to take it out of the queue, and it is visible to the maintainer.
 // An issue an open pull request closes is already being landed and is not
-// listed.
+// listed. An issue that waits on another open issue (a ruling on its
+// grammar, a decision upstream of it) is labelled `blocked`, with the
+// blocker named in a comment: it is not the maintainer's to answer and not
+// the agent's to move, and naming it every turn made filler work
+// (2026-11-18). Whoever closes the blocker removes the label.
 //
 // The queue is `gh issue list`; its last good answer is kept, and is used
 // when GitHub cannot be reached (a failed lookup never opens the door).
@@ -68,7 +72,7 @@ fn queue() -> str:
     let given = env("WITH_STOP_GUARD_QUEUE")
     if given.len() > 0: return read_file(given) ?? ""
     let out = env("HOME") ++ "/.local/with-green/stop-guard-queue.new"
-    let listed = run_to_files(&["gh", "issue", "list", "--state", "open", "--limit", "500", "--json", "number,title,labels", "--jq", ".[] | select([.labels[].name] | index(\"human attn needed\") | not) | \"\\(.number)\\t\\(.title)\""], out, "/dev/null", 30000)
+    let listed = run_to_files(&["gh", "issue", "list", "--state", "open", "--limit", "500", "--json", "number,title,labels", "--jq", ".[] | select([.labels[].name] | (index(\"human attn needed\") or index(\"blocked\")) | not) | \"\\(.number)\\t\\(.title)\""], out, "/dev/null", 30000)
     if listed.code != 0: return read_file(cache_path()) ?? ""
     let text = read_file(out) ?? ""
     write_file(cache_path(), text)
@@ -88,5 +92,5 @@ if open.len() == 0: exit_code(0)
 
 eprint(f"stop guard: the goal is active and {open.len()} open issue(s) are yours to work. A wait on CI or on a ruling does not end a turn. Start one now:")
 for i in 0..(if open.len() < 8: open.len() else: 8): eprint("  #" ++ open[i].replace("\t", "  "))
-eprint("An issue you cannot move takes the label `human attn needed`, with the reason in a comment; nothing else removes it from this list.")
+eprint("An issue you cannot move takes the label `human attn needed`, with the reason in a comment. One that waits on another open issue takes `blocked`, with the blocker named in a comment, and comes back when that label is removed.")
 exit_code(2)
