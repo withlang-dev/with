@@ -2,7 +2,7 @@
 // #3178 (§16.2b.9, §16.2b.15): a function kept raw by a callback parameter
 // is reported with the parameter's position and the clause that would
 // describe it: the userdata pairing when a `void *` carries the userdata,
-// and "no clause yet" when none does.
+// and the bare 'callback param N' when none does.
 use compiler.ConanClient
 use std.fs
 use std.process
@@ -33,7 +33,7 @@ fn main:
     for line in report.split("\n"):
         if line.starts_with("  each:"): each_line = line.to_owned()
         if line.starts_with("  each_bare:"): bare_line = line.to_owned()
-    let ok = each_line.contains("parameter of a callback or array type the facade does not describe") and each_line.contains("(param 0)") and each_line.contains("'callback param 0 userdata param 1'") and bare_line.contains("(param 1)") and bare_line.contains("no `void *` userdata parameter")
+    let ok = each_line.contains("parameter of a callback or array type the facade does not describe") and each_line.contains("(param 0)") and each_line.contains("'callback param 0 userdata param 1'") and bare_line.contains("(param 1)") and bare_line.contains("no `void *` userdata parameter") and bare_line.contains("'callback param 1', which takes a function or a closure that captures nothing")
     if not ok: print(report)
     assert(ok)
     print("ok")
