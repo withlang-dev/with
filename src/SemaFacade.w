@@ -207,7 +207,7 @@ impl Sema:
                     let dn = self.pool_resolve(drop_fn)
                     let n = self.sig_get_param_count(dsig)
                     let shown = self.facade_param_display(drop_fn, dsig, pi)
-                    self.emit_error_with_help(f"resource '{rname}': 'drop {dn}' takes {n} parameters, and Drop has only the representation to pass: {shown} is neither fixed nor discarded (§16.2b.3, §31)", node, f"under 'fn {dn}' write 'param {pi} fixed <literal>' or 'param {pi} discarded', or write 'destroys {dn}' and name another function as 'drop'")
+                    self.emit_error_with_help(f"resource '{rname}': 'drop {dn}' takes {n} parameters, and Drop has only the representation to pass: {shown} is neither fixed nor discarded (§16.2b.3, §31)", node, f"under 'fn {dn}' write " ++ (if self.get_type_kind(self.resolve_alias(self.sig_param_type(dsig, pi) as TypeId)) == TypeKind.TY_PTR: f"'param {pi} discarded' for an out-pointer or 'param {pi} fixed null'" else: f"'param {pi} fixed <literal>'") ++ f", or write 'destroys {dn}' and name another function as 'drop'")
                     return false
             if not self.verify_facade_destroyer(ri, drop_fn):
                 return false

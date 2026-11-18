@@ -6,8 +6,8 @@
 // an error out-pointer first and the stream second, so the contract names
 // the parameter that receives the resource: 'drop f(param 1)' with the
 // error discarded for 'Drop', and 'destroys g(param 1)' as the explicit
-// close for a caller who wants the status. A value read through the same
-// first out-pointer on an ordinary operation is discarded too.
+// close for a caller who wants the status. An out-pointer of an ordinary
+// function is discarded the same way.
 use c_import("typedef struct bz { int open; } bz;
 static bz the_bz;
 static int closes;
