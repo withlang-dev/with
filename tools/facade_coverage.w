@@ -133,6 +133,10 @@ fn value_record_class(why: &str) -> str:
     w.to_owned()
 
 fn retention_class(why: &str) -> str:
+    // #3175: the report names the place a store assigned (", `strm->next_in`");
+    // the class is the kind of store.
+    let place = why.rfind(", `")
+    if place >= 0 and why.ends_with("`"): return retention_class(why.slice(0, place))
     let decided = why.find(", which no unit decides: ")
     if decided >= 0 and why.contains("the function pointer field "):
         return "passed through a function pointer field no unit decides: " ++ fnptr_field_class(why.slice(decided + ", which no unit decides: ".len(), why.len()))

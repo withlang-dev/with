@@ -599,8 +599,6 @@ impl CiProject:
         if sinks.contains("global;"): return "stored in a global" ++ place
         for line in self.symbols[si].own_evidence.split("\n"):
             if line == f"paramstore:{pi}": return if place.len() > 0: "stored in" ++ place.slice(1, place.len()) else: "stored"
-
-
         for sink in sinks.split(";"):
             if not sink.contains(":"): continue
             let kv = sink.split(":")
@@ -1460,7 +1458,6 @@ impl CiProject:
                     for pi in 0..self.symbols[si].param_stores.len():
                         if self.symbols[si].param_stores[pi] != 0:
                             verdict = verdict ++ f"; the proofs could not clear param {pi} (" ++ self.fd_retain_reason(si as i32, pi as i32, 0, true) ++ ")"
-
                             break
             else if self.symbols[si].owns_return != 0:
                 // #3176: with a drop proven, the gap is elsewhere: a

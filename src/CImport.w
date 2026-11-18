@@ -19120,7 +19120,6 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
 //   `paramstoreat:<i>:<place>`       the place such a store assigned, as the
 //                                    source spells it (the report names it)
 //   `paramstore:<i>`                 parameter i stored through a pointer or
-
 //                                    into an element, or passed indirectly
 //   `localaddr:<local>:<callee>:<i>` `callee(&local)` at argument i: what
 //                                    the callee does through that slot decides
