@@ -162,7 +162,8 @@ text_clause     = "text" param_ref
                 | "text" "return" "," "owned" "," "freed" "by" c_name
                 | "text" "return" "bytes"
 buffer_clause   = "buffer" param_ref ( "len" param_ref | "capacity" param_ref "inout" ) [ "elements" ]
-callback_clause = "callback" "consumes" param_ref
+callback_clause = "callback" param_ref
+                | "callback" "consumes" param_ref
                 | "callback" param_ref "userdata" param_ref
                 | "callback" param_ref "argv" param_ref "paired" "with" "argc" param_ref "as" type
                 | "callbacks" "none" | "callback_thread" ( "any" | "registering" )
@@ -499,6 +500,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `text return, owned, freed by f` | the result is new text the caller owns, released with `f`. | G | the call is safe and the result is a raw pointer | §16.2b.8 |
 | `text return bytes` | under `text utf8`, this result stays bytes. | R | | §16.2b.8 |
 | `buffer param b len param n` | `b` and `n` are one input slice C only reads. `capacity param n inout`: one writable slice whose length C writes back. `elements`: the count is in elements, not bytes. Never inferred from the C types. | G | two unrelated parameters; the pointer is raw | §16.2b.8 |
+| `callback param c` | `c` has no userdata parameter: a function or a closure that captures nothing is passed. A retained one states `callback_thread`. | G | raw | §16.2b.9 |
 | `callback param c userdata param u` | `c` is called with `u`; a With closure is passed as the pair. | G | raw | §16.2b.9 |
 | `callback consumes param p` | the callback takes ownership of `p`. | G | | §16.2b.9 |
 | `callback param c argv param a paired with argc param n as &[H]` | the callback's vector is a slice of handles. | G | | §16.2b.9 |
