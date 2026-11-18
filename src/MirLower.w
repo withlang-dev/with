@@ -278,6 +278,10 @@ type MirBuilder ephemeral {
     // The leaf arm of a copy-out join being lowered: its operand is the
     // view the adjustment copies out of (the audit's record says so).
     copy_out_arm_node: i32,
+    // D142: the piped expression of a pipeline that iterates a sequence,
+    // and the iterator type the stage receives in its place.
+    pipeline_iter_source_node: i32,
+    pipeline_iter_source_type: i32,
     copy_out_adjustment_node: i32,
     // §4.3d: the node whose own value a vector splat or lane conversion is
     // being built from (MirVector.lower_vector_node).
@@ -429,6 +433,8 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         contextual_copy_raw_node: 0,
         copy_out_join_node: 0,
         copy_out_arm_node: 0,
+        pipeline_iter_source_node: 0,
+        pipeline_iter_source_type: 0,
         copy_out_adjustment_node: 0,
         vector_raw_node: 0,
         contextual_fact_sig_idx: -1,
@@ -16951,7 +16957,13 @@ impl MirBuilder:
         let saved_override_place = self.pipeline_receiver_override_place
         self.pipeline_receiver_override_node = lhs_expr
         self.pipeline_receiver_override_place = iter_place
+        let saved_source_node = self.pipeline_iter_source_node
+        let saved_source_type = self.pipeline_iter_source_type
+        self.pipeline_iter_source_node = lhs_expr
+        self.pipeline_iter_source_type = self.concrete_type(self.sema.pipeline_implicit_iter.get(node).unwrap())
         let result = self.lower_pipeline_stage(lhs_expr, fn_expr, args_start, args_count, node, call_node)
+        self.pipeline_iter_source_node = saved_source_node
+        self.pipeline_iter_source_type = saved_source_type
         self.pipeline_receiver_override_node = saved_override_node
         self.pipeline_receiver_override_place = saved_override_place
         result
@@ -17416,6 +17428,10 @@ impl MirBuilder:
                 // adjustment applied above; the operand has the narrow type.
                 // D179: a leaf arm of a copy-out join is lowered at the view
                 // type; the join's recorded adjustment copies out of it.
+                // D142: the stage reads the iterator Sema's inserted
+                // `.iter()` builds where it names the piped sequence.
+                else if node == self.pipeline_iter_source_node:
+                    sema_ty = self.pipeline_iter_source_type
                 else if node == self.copy_out_arm_node:
                     sema_ty = self.contextual_copy_adjustment(self.copy_out_adjustment_node).exact_source_type
                 else if self.sema.checked_narrowings.contains(node):
