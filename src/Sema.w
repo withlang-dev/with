@@ -2036,6 +2036,9 @@ type Sema {
     // §4.2.6: where a narrowed integer is going (" (argument 2 of `get_tag`)"),
     // appended to the narrowing diagnostic; "" when not known.
     narrowing_target_note: str,
+    narrowing_assign_target: i32,  // #2261: the target of the assignment being checked, and …
+    narrowing_assign_value: i32,   // … its right side
+    narrowing_c_value: i32,   // #2261: the value node that flows into a declaration imported from C (an argument of a C function, the right side of an assignment to a C record field or global)
     // D115 (§9.7): slice pattern nodes that take an owned subject apart by
     // value; every other slice pattern observes its subject. The rest
     // binding's type, keyed by the same node.
@@ -4395,6 +4398,9 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         range_bound_fields: sema_new_map_i32_i32(),
         binding_observes_mutable_place: sema_new_map_i32_i32(),
         narrowing_target_note: "",
+        narrowing_assign_target: 0,
+        narrowing_assign_value: 0,
+        narrowing_c_value: 0,
         owned_slice_patterns: sema_new_map_i32_i32(),
         slice_rest_types: sema_new_map_i32_i32(),
         pattern_list_removal: 0,

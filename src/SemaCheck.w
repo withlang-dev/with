@@ -1626,6 +1626,29 @@ impl Sema:
             return self.aggregate_repr_differs(er, self.get_type_d0(ar) as TypeId, 0) != 0
         false
 
+    // #2261: whether the expression names something a C header declared: a
+    // call of an imported function, a field of an imported record, or an
+    // imported global.
+    fn expr_declared_in_c(node: i32) -> bool:
+        if node <= 0: return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_GROUPED: return self.expr_declared_in_c(self.ast.get_data0(node))
+        if kind == NodeKind.NK_CALL:
+            let callee = self.ast.get_data0(node)
+            if self.ast.kind(callee) != NodeKind.NK_IDENT: return false
+            let sym = self.ast.get_data0(callee)
+            return self.extern_fn_names.contains(sym) or self.ci_syms.contains(sym)
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(node)
+            return self.extern_var_texts.contains(self.pool_resolve(sym)) or (self.ci_syms.contains(sym) and self.mutable_global_syms.contains(sym))
+        if kind == NodeKind.NK_FIELD_ACCESS:
+            let object = self.ast.get_data0(node)
+            if not self.typed_expr_types.contains(object): return false
+            var record = self.resolve_alias(self.typed_expr_types.get(object).unwrap() as TypeId)
+            if self.get_type_kind(record) == TypeKind.TY_PTR or self.get_type_kind(record) == TypeKind.TY_REF: record = self.resolve_alias(self.get_type_d0(record as i32) as TypeId)
+            return self.get_type_kind(record) == TypeKind.TY_STRUCT and self.ci_syms.contains(self.pool_lookup_symbol(self.type_name(record as i32)))
+        false
+
     // §4.2.6: which argument of which call `arg` is, for the narrowing
     // diagnostic (" (argument 2 of `get_tag`)"); "" when `call` is not the
     // call that holds it.
@@ -1679,6 +1702,7 @@ impl Sema:
                 let retyped = self.check_expr_with_expected(arg_node, expected as TypeId)
                 if retyped != 0: arg_ty = retyped as i32
             self.narrowing_target_note = self.call_arg_target_note(err_node, arg_node)
+            if self.expr_declared_in_c(err_node): self.narrowing_c_value = arg_node
             self.reject_implicit_numeric_narrowing(arg_node, expected, arg_ty)
             self.narrowing_target_note = ""
             self.record_contextual_copy_adjustment(arg_node, expected, arg_ty)
@@ -20952,6 +20976,8 @@ impl Sema:
 
     mut fn check_assign(node: i32) -> i32:
         let target = self.ast.get_data0(node)
+        self.narrowing_assign_target = target
+        self.narrowing_assign_value = self.ast.get_data1(node)
         // #3061: a binding assigned again (`x = …`, `x += …`) needs its `var`.
         if self.ast.kind(target) == NodeKind.NK_IDENT:
             let rebound = self.binding_decl_node(self.ast.get_data0(target))
@@ -31847,6 +31873,11 @@ impl Sema:
             // out-of-range index panics (D71); MIR emits the check. The lint
             // names the declaration whose width is wrong, never the use.
             self.checked_narrowings.insert(node, expected)
+            // #2261 (Eric, 2026-11-18): where the declaration on the other
+            // side was imported from C, neither fix is the programmer's to
+            // make: the declaration is the header's, and `as` would remove
+            // the check. The conversion is checked all the same.
+            if node == self.narrowing_c_value or self.expr_declared_in_c(node) or (node == self.narrowing_assign_value and self.expr_declared_in_c(self.narrowing_assign_target)): return false
             self.emit_warning(f"`{got}` narrows to `{want}` with a range check{self.narrowing_target_note}{seam_note}: widen the `{want}` declaration it flows into, or write `as {want}` for the wrap (§4.2.6, D183)", node)
             return false
         // D181 (§4.2.6): an integer where a float is demanded converts to it,
