@@ -1437,7 +1437,17 @@ impl MirDropStateMap:
         // its own key, which the vacated-sub-place rule reads.
         if body.place_proj_counts[place_id] == 0:
             self.mark_local(keys, base, state)
-        else if state != MirDropState.Moved and state != MirDropState.Uninit:
+            return
+        // What happens to a place happens to the places inside it: a field
+        // assigned whole holds every sub-field again. Left as they were, a
+        // sub-field dropped just before its parent was assigned
+        // (`r.cmd.files` moved out, the rest of `r.cmd` dropped, `r.cmd =
+        // new`) still read as dropped, and the whole value's drop was
+        // reported as freeing it again.
+        for i in keys.child_starts[base]..keys.child_starts[base + 1]:
+            let child: i32 = keys.children[i]
+            if child != id and mir_drop_state_key_is_descendant(keys.names[child], keys.names[id]): self.set(keys, child, state)
+        if state != MirDropState.Moved and state != MirDropState.Uninit:
             self.set(keys, base, mir_drop_state_join(self.get(keys, base), state))
 
     mut fn note_operand(keys: &MirDropStateKeys, body: &MirBody, operand_id: i32):

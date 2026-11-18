@@ -1396,8 +1396,43 @@ fn field_redrop_verdict(rewrite: bool) -> str:
     body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
     validate_ownership_body(mir_mod, body)
 
+// A sub-field dropped, then its parent field assigned whole: the parent
+// holds every sub-field again, and the whole value's drop frees each once.
+fn nested_field_rewrite_verdict(rewrite_parent: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_STRUCT, TypeKind.TY_STRUCT, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let whole_ty = 1
+    let outer_ty = 2
+    let inner_ty = 3
+    for ty in [whole_ty, outer_ty, inner_ty]:
+        mir_mod.sema_moved_drop_types.insert(ty, 1)
+        mir_mod.sema_dropped_types.insert(ty, 1)
+    var body = MirBody.init_for_fn(1)
+    let whole_local = body.new_temp(whole_ty)
+    let whole = body.new_place(whole_local)
+    let outer = body.new_field_place(whole, 0, outer_ty)
+    let inner = body.new_field_place(outer, 0, inner_ty)
+    let entry = body.new_block()
+    let no_fields = []
+    let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, whole_local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, whole, init, 0)
+    body.push_stmt(entry, StmtKind.Drop, inner, 0, 0)
+    if rewrite_parent:
+        body.push_stmt(entry, StmtKind.Assign, outer, init, 0)
+    body.push_stmt(entry, StmtKind.Drop, whole, 0, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
 pub fn mir_test_field_redrop:
     assert(field_redrop_verdict(true) == "")
+    assert(nested_field_rewrite_verdict(true) == "")
+    assert(nested_field_rewrite_verdict(false).contains("frees _1.f0.f0 again"))
     assert(field_redrop_verdict(false).contains("drop of _1 frees _1.f0 again: a path reaching it dropped that part and nothing wrote it since (Uninit)"))
 
 pub fn mir_test_reset_of_init:

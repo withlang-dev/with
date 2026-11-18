@@ -1357,7 +1357,19 @@ fn analysis_audit_frozen_calls(mut report: AnalysisReport, sema: &Sema, mir_mod:
             report.add(fact)
             report.fail("frozen phase " ++ sema.pool_resolve(body.fn_sym) ++ " -> " ++ callee ++ ": mutable Sema re-entry")
 
-fn analysis_audit_mir(mut report: AnalysisReport, mir_mod: &MirModule, pool: &InternPool):
+// #692: a MIR local's type is a type of the table. An error type (0) that
+// reaches a lowered body, or a slot read as a type id that is none, is a
+// type Sema never gave: the garbage class, which shows as a range.
+fn analysis_mir_local_type_violations(label: &str, local_types: &List[i32], types: isize) -> List[str]:
+    let found = []
+    var li = 0
+    for tid in local_types:
+        if tid == 0: found.push(f"{label}: local _{li} has the error type; no error type reaches MIR")
+        else if tid < 0 or tid >= types: found.push(f"{label}: local _{li} has type {tid}, not a type id (types={types})")
+        li += 1
+    found
+
+fn analysis_audit_mir(mut report: AnalysisReport, mir_mod: &MirModule, pool: &InternPool, types: isize):
     let err = validate_all_mir_module(mir_mod)
     if err.len() > 0:
         report.fail(mir_name_fn_syms(err, pool))
@@ -1368,6 +1380,9 @@ fn analysis_audit_mir(mut report: AnalysisReport, mir_mod: &MirModule, pool: &In
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0:
             continue
+        let local_types = []
+        for li in 0..body.local_count(): local_types.push(body.get_local(li).type_id)
+        for violation in analysis_mir_local_type_violations(mir_debug_body_label(body, pool), local_types, types): report.fail(violation)
         let uak = validate_use_after_kill(body, pool)
         if uak.len() > 0:
             report.fail("use-after-kill: " ++ uak)
@@ -2754,7 +2769,7 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
     else if request == "audit:phase":
         analysis_audit_phase(report, sema, mir_mod)
     else if request == "audit:mir":
-        analysis_audit_mir(report, mir_mod, pool)
+        analysis_audit_mir(report, mir_mod, pool, sema.type_kinds.len())
     else if request == "audit:returns":
         analysis_audit_return_consistency(report, sema, mir_mod)
     else if request == "audit:receivers":
@@ -2779,7 +2794,7 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
         analysis_audit_storage(report, sema)
         analysis_audit_pool(report, sema)
         analysis_audit_method_registrations(report, sema)
-        analysis_audit_mir(report, mir_mod, pool)
+        analysis_audit_mir(report, mir_mod, pool, sema.type_kinds.len())
         analysis_audit_return_consistency(report, sema, mir_mod)
         analysis_audit_receivers(report, sema)
         analysis_audit_phase(report, sema, mir_mod)
