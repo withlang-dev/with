@@ -34,7 +34,7 @@ c contract dbl:
         retains param 2 by param 0
         callback param 1 userdata param 2
     domain errno thread
-    domain environ process
+    domain environ process written by any
     use convention gobject.v1
 
 fn main:

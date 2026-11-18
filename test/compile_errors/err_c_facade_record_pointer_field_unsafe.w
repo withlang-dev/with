@@ -7,7 +7,8 @@
 use c_import("../behavior/c_facade_record.h")
 
 c contract records:
-    domain locale process
+    runs no threads
+    domain locale process written by localeconv, setlocale
     fn localeconv
         returns borrow lconv from domain locale
 

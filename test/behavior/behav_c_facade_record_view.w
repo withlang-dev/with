@@ -22,7 +22,8 @@
 use c_import("c_facade_record.h")
 
 c contract records:
-    domain locale process
+    runs no threads
+    domain locale process written by localeconv, setlocale
     resource Hold wraps *mut hold
         from hold_new
         drop hold_free
