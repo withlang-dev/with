@@ -223,6 +223,7 @@ impl Clone for str:
 // spells materialization uniformly as .clone(); for Copy primitives the
 // clone IS the copy.
 impl Clone for i8:   fn clone(): *self
+impl Clone for c_char: fn clone(): *self
 impl Clone for i16:  fn clone(): *self
 impl Clone for i32:  fn clone(): *self
 impl Clone for i64:  fn clone(): *self
@@ -346,6 +347,7 @@ impl Debug for str:
 // #1288: §11.8 derives Debug unconditionally, so every primitive a field can
 // hold formats. The f-string is the one formatter for every width.
 impl Debug for i8:   fn debug_str() -> str: f"{*self}"
+impl Debug for c_char: fn debug_str() -> str: f"{*self}"
 impl Debug for i16:  fn debug_str() -> str: f"{*self}"
 impl Debug for u16:  fn debug_str() -> str: f"{*self}"
 impl Debug for u32:  fn debug_str() -> str: f"{*self}"
@@ -362,6 +364,8 @@ impl Debug for f64:  fn debug_str() -> str: f"{*self}"
 // every tier that can call `print` sees them. Each renders exactly as the
 // f-string does, so `print(v)` and `print(f"{v}")` agree byte for byte.
 impl Display for i8:   fn to_str(): f"{*self}"
+impl Display for c_char: fn to_str(): f"{*self}"
+
 impl Display for i16:  fn to_str(): f"{*self}"
 impl Display for i32:  fn to_str(): f"{*self}"
 impl Display for i64:  fn to_str(): f"{*self}"

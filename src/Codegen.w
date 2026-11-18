@@ -1687,7 +1687,7 @@ impl Codegen:
             let width = self.sema.get_type_d0(sema_tid)
             let is_signed = self.sema.get_type_d1(sema_tid)
             let is_ptr_width = self.sema.get_type_d2(sema_tid)
-            if is_ptr_width != 0:
+            if is_ptr_width == 1:
                 let name = if is_signed == 1: "isize" else: "usize"
                 let encoding = if is_signed == 1: wl_dwarf_ate_signed() else: wl_dwarf_ate_unsigned()
                 return wl_di_create_basic_type(self.di_builder, name, width as u64, encoding)

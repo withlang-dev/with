@@ -319,7 +319,8 @@ impl BundleEmitter:
         if tk == TypeKind.TY_INT:
             let bits = sema.get_type_d0(resolved)
             let signed = sema.get_type_d1(resolved) != 0
-            if sema.get_type_d2(resolved) != 0:
+            if sema.get_type_d2(resolved) == 2: return "c_char"
+            if sema.get_type_d2(resolved) == 1:
                 return if signed: "isize" else: "usize"
             if bits <= 0 or bits > 128:
                 self.refuse(f"integer type of width {bits} has no spelling")

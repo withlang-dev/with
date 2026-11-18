@@ -328,7 +328,7 @@ pub fn _exit(code: i32) -> Never:
     proc_exit(code)
 
 pub fn abort() -> Unit:
-    wasm_write_cstr(2, c"abort()\n".ptr)
+    wasm_write_cstr(2, c"abort()\n".ptr as *const u8)
     proc_exit(134)
 
 pub fn rt_exit(code: i32) -> Never:
@@ -369,7 +369,7 @@ pub fn rt_thread_id() -> i64: 1
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32:
     if len < 5:
         return wasm_fail(WASI_EINVAL)
-    with_memcpy(name, c"wasm".ptr, 5)
+    with_memcpy(name, c"wasm".ptr as *const u8, 5)
     0
 
 // ── stdio handles ─────────────────────────────────────────────────────
@@ -528,12 +528,12 @@ fn wasm_init_cwd():
     if pwd as i64 != 0 and wasm_load_u8(pwd as i64, 0) == 47:
         var norm: [4096]u8 = [0 as u8; 4096]
         let nb = (&raw mut norm) as *mut [4096]u8 as *mut u8
-        let n = wasm_normalize_into(pwd, wasm_cstr_len(pwd), nb, WASM_PATH_MAX)
+        let n = wasm_normalize_into(pwd as *const u8, wasm_cstr_len(pwd as *const u8), nb, WASM_PATH_MAX)
         if n > 0:
             wasm_cwd = wasm_dup_bytes(nb as *const u8, n)
             wasm_cwd_len = n
             return
-    wasm_cwd = wasm_dup_bytes(c"/".ptr, 1)
+    wasm_cwd = wasm_dup_bytes(c"/".ptr as *const u8, 1)
     wasm_cwd_len = 1
 
 fn wasm_init_preopens():
@@ -632,8 +632,8 @@ pub fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
 
 pub fn rt_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char:
     wasm_init_cwd()
-    if wasm_absolute_into(path, resolved_path, WASM_PATH_MAX) < 0:
-        return 0 as *mut u8
+    if wasm_absolute_into(path as *const u8, resolved_path as *mut u8, WASM_PATH_MAX) < 0:
+        return 0 as *mut c_char
     resolved_path
 
 // ── files and directories ─────────────────────────────────────────────
@@ -670,7 +670,7 @@ pub fn rt_open(path: *const c_char, flags: i32, mode: i32) -> i32:
     if (flags & RT_O_TRUNC) != 0: oflags = oflags | WASI_O_TRUNC
     if (flags & 0x1000) != 0: oflags = oflags | WASI_O_EXCL
     if (flags & RT_O_APPEND) != 0: fdflags = fdflags | WASI_FDFLAG_APPEND
-    wasm_open_wasi(path, oflags, fdflags, wasm_open_rights(flags & 3))
+    wasm_open_wasi(path as *const u8, oflags, fdflags, wasm_open_rights(flags & 3))
 
 // The cimport_stubs spelling of open(2): its flag bits are
 // O_APPEND=0x0008, O_CREAT=0x0200, O_TRUNC=0x0400, O_EXCL=0x0800.
@@ -681,7 +681,7 @@ pub fn __open(path: *const c_char, flags: i32, mode: i32) -> i32:
     if (flags & 0x0400) != 0: oflags = oflags | WASI_O_TRUNC
     if (flags & 0x0800) != 0: oflags = oflags | WASI_O_EXCL
     if (flags & 0x0008) != 0: fdflags = fdflags | WASI_FDFLAG_APPEND
-    wasm_open_wasi(path, oflags, fdflags, wasm_open_rights(flags & 3))
+    wasm_open_wasi(path as *const u8, oflags, fdflags, wasm_open_rights(flags & 3))
 
 // filestat: filetype u8 @16, size u64 @32, mtim u64 @48 (64 bytes).
 fn wasm_path_stat(path: *const u8, follow: i32, out_base: i64) -> i32:
@@ -700,7 +700,7 @@ pub fn rt_stat(path: *const c_char, out_raw: *mut u8) -> i32:
     let out = out_raw as *mut RtStatBuf
     var st: [64]u8 = [0 as u8; 64]
     let base = (&raw mut st) as *mut [64]u8 as i64
-    let rc = wasm_path_stat(path, 1, base)
+    let rc = wasm_path_stat(path as *const u8, 1, base)
     if rc != 0:
         return rc
     let ft = wasm_load_u8(base, 16)
@@ -715,7 +715,7 @@ pub fn rt_stat(path: *const c_char, out_raw: *mut u8) -> i32:
 pub fn rt_file_mode(path: *const c_char) -> i32:
     var st: [64]u8 = [0 as u8; 64]
     let base = (&raw mut st) as *mut [64]u8 as i64
-    if wasm_path_stat(path, 0, base) != 0:
+    if wasm_path_stat(path as *const u8, 0, base) != 0:
         return -1
     let ft = wasm_load_u8(base, 16)
     if ft == WASI_FILETYPE_DIRECTORY:
@@ -725,13 +725,13 @@ pub fn rt_file_mode(path: *const c_char) -> i32:
     RT_S_IFREG | 0o644
 
 fn wasm_lstat_is_dir(path: *const u8) -> bool:
-    let mode = rt_file_mode(path)
+    let mode = rt_file_mode(path as *const c_char)
     mode >= 0 and (mode & RT_S_IFMT) == RT_S_IFDIR
 
 pub fn rt_access(path: *const c_char, mode: i32) -> i32:
     var st: [64]u8 = [0 as u8; 64]
     let base = (&raw mut st) as *mut [64]u8 as i64
-    wasm_path_stat(path, 1, base)
+    wasm_path_stat(path as *const u8, 1, base)
 
 pub fn rt_chmod(path: *const c_char, mode: i32) -> i32:
     // WASI preview1 has no permission bits to set; the file keeps the
@@ -759,13 +759,13 @@ fn wasm_path_call(path: *const u8, op: i32) -> i32:
     0
 
 pub fn rt_mkdir(path: *const c_char, mode: i32) -> i32:
-    wasm_path_call(path, 0)
+    wasm_path_call(path as *const u8, 0)
 
 pub fn rt_unlink(path: *const c_char) -> i32:
-    wasm_path_call(path, 1)
+    wasm_path_call(path as *const u8, 1)
 
 pub fn rt_rmdir(path: *const c_char) -> i32:
-    wasm_path_call(path, 2)
+    wasm_path_call(path as *const u8, 2)
 
 pub fn rt_rename(old_path: *const c_char, new_path: *const c_char) -> i32:
     var old_rel: [4096]u8 = [0 as u8; 4096]
@@ -774,10 +774,10 @@ pub fn rt_rename(old_path: *const c_char, new_path: *const c_char) -> i32:
     let nb = (&raw mut new_rel) as *mut [4096]u8 as *mut u8
     var old_fd: i32 = -1
     var new_fd: i32 = -1
-    let on = wasm_resolve(old_path, ob, WASM_PATH_MAX, &raw mut old_fd)
+    let on = wasm_resolve(old_path as *const u8, ob, WASM_PATH_MAX, &raw mut old_fd)
     if on < 0:
         return on as i32
-    let nn = wasm_resolve(new_path, nb, WASM_PATH_MAX, &raw mut new_fd)
+    let nn = wasm_resolve(new_path as *const u8, nb, WASM_PATH_MAX, &raw mut new_fd)
     if nn < 0:
         return nn as i32
     let rc = path_rename(old_fd, ob as *const u8, on as i32, new_fd, nb as *const u8, nn as i32)
@@ -789,16 +789,16 @@ pub fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32:
     var rel: [4096]u8 = [0 as u8; 4096]
     let rb = (&raw mut rel) as *mut [4096]u8 as *mut u8
     var dirfd: i32 = -1
-    let n = wasm_resolve(link_path, rb, WASM_PATH_MAX, &raw mut dirfd)
+    let n = wasm_resolve(link_path as *const u8, rb, WASM_PATH_MAX, &raw mut dirfd)
     if n < 0:
         return n as i32
-    let rc = path_symlink(target, wasm_cstr_len(target) as i32, dirfd, rb as *const u8, n as i32)
+    let rc = path_symlink(target as *const u8, wasm_cstr_len(target as *const u8) as i32, dirfd, rb as *const u8, n as i32)
     if rc != 0:
         return wasm_fail(rc)
     0
 
 fn rt_empty_str() -> str:
-    with_str_from_bytes(c" ".ptr, 0)
+    with_str_from_bytes(c" ".ptr as *const u8, 0)
 
 // #2773: WASI has no message table; the code itself follows the text.
 pub fn rt_os_error_text(code: i32) -> str: with_str_from_cstr(c"WASI error".ptr)
@@ -812,7 +812,7 @@ pub fn rt_readlink(path: *const c_char) -> str:
     var rel: [4096]u8 = [0 as u8; 4096]
     let rb = (&raw mut rel) as *mut [4096]u8 as *mut u8
     var dirfd: i32 = -1
-    let n = wasm_resolve(path, rb, WASM_PATH_MAX, &raw mut dirfd)
+    let n = wasm_resolve(path as *const u8, rb, WASM_PATH_MAX, &raw mut dirfd)
     if n < 0:
         return rt_empty_str()
     var buf: [4096]u8 = [0 as u8; 4096]
@@ -924,7 +924,7 @@ fn rt_list_finish(acc: *mut i64) -> str:
 
 fn rt_list_files_walk(path: *const u8, acc: *mut i64):
     if not wasm_lstat_is_dir(path):
-        if rt_file_mode(path) < 0:
+        if rt_file_mode(path as *const c_char) < 0:
             return
         rt_list_push(acc, path, wasm_cstr_len(path))
         return
@@ -945,17 +945,17 @@ fn rt_list_files_walk(path: *const u8, acc: *mut i64):
 
 pub fn rt_list_files(path: *const c_char) -> str:
     var acc: [3]i64 = [0 as i64; 3]
-    rt_list_files_walk(path, &acc as *mut [3]i64 as *mut i64)
+    rt_list_files_walk(path as *const u8, &acc as *mut [3]i64 as *mut i64)
     rt_list_finish(&acc as *mut [3]i64 as *mut i64)
 
 // The names in a directory, one per line, no path and no descent; "" for
 // anything that is not a directory.
 pub fn rt_list_dir(path: *const c_char) -> str:
     var acc: [3]i64 = [0 as i64; 3]
-    if not wasm_lstat_is_dir(path):
+    if not wasm_lstat_is_dir(path as *const u8):
         return rt_empty_str()
     var names_len: i64 = 0
-    let names = wasm_read_dir_names(path, &raw mut names_len)
+    let names = wasm_read_dir_names(path as *const u8, &raw mut names_len)
     if names as i64 == 0:
         return rt_empty_str()
     var at: i64 = 0
@@ -968,10 +968,10 @@ pub fn rt_list_dir(path: *const c_char) -> str:
     rt_list_finish(&acc as *mut [3]i64 as *mut i64)
 
 pub fn rt_remove_tree(path: *const c_char) -> i32:
-    if not wasm_lstat_is_dir(path):
+    if not wasm_lstat_is_dir(path as *const u8):
         return rt_unlink(path)
     var names_len: i64 = 0
-    let names = wasm_read_dir_names(path, &raw mut names_len)
+    let names = wasm_read_dir_names(path as *const u8, &raw mut names_len)
     if names as i64 == 0:
         return -wasm_errno
     var at: i64 = 0
@@ -981,8 +981,8 @@ pub fn rt_remove_tree(path: *const c_char) -> i32:
         let nlen = wasm_cstr_len(name)
         var child: [4096]u8 = [0 as u8; 4096]
         let cb = (&raw mut child) as *mut [4096]u8 as *mut u8
-        if wasm_path_join(path, name, cb, WASM_PATH_MAX) == 0:
-            let child_rc = rt_remove_tree(cb as *const u8)
+        if wasm_path_join(path as *const u8, name, cb, WASM_PATH_MAX) == 0:
+            let child_rc = rt_remove_tree(cb as *const u8 as *const c_char)
             if child_rc != 0 and rc == 0:
                 rc = child_rc
         at = at + nlen + 1
@@ -1019,13 +1019,13 @@ fn rt_copy_file(src: *const u8, dst: *const u8) -> i32:
     rc
 
 pub fn rt_copy_tree(src: *const c_char, dst: *const c_char) -> i32:
-    if not wasm_lstat_is_dir(src):
-        return rt_copy_file(src, dst)
+    if not wasm_lstat_is_dir(src as *const u8):
+        return rt_copy_file(src as *const u8, dst as *const u8)
     let mk = rt_mkdir(dst, 0o755)
     if mk != 0 and mk != -17:
         return mk
     var names_len: i64 = 0
-    let names = wasm_read_dir_names(src, &raw mut names_len)
+    let names = wasm_read_dir_names(src as *const u8, &raw mut names_len)
     if names as i64 == 0:
         return -wasm_errno
     var at: i64 = 0
@@ -1037,8 +1037,8 @@ pub fn rt_copy_tree(src: *const c_char, dst: *const c_char) -> i32:
         var child_dst: [4096]u8 = [0 as u8; 4096]
         let sb = (&raw mut child_src) as *mut [4096]u8 as *mut u8
         let db = (&raw mut child_dst) as *mut [4096]u8 as *mut u8
-        if wasm_path_join(src, name, sb, WASM_PATH_MAX) == 0 and wasm_path_join(dst, name, db, WASM_PATH_MAX) == 0:
-            let child_rc = rt_copy_tree(sb as *const u8, db as *const u8)
+        if wasm_path_join(src as *const u8, name, sb, WASM_PATH_MAX) == 0 and wasm_path_join(dst as *const u8, name, db, WASM_PATH_MAX) == 0:
+            let child_rc = rt_copy_tree(sb as *const u8 as *const c_char, db as *const u8 as *const c_char)
             if child_rc != 0 and rc == 0:
                 rc = child_rc
         at = at + nlen + 1
@@ -1108,7 +1108,7 @@ fn wasm_init_env():
 
 pub fn rt_getenv(name: *const c_char) -> *const c_char:
     wasm_init_env()
-    let nlen = wasm_cstr_len(name)
+    let nlen = wasm_cstr_len(name as *const u8)
     var i: i64 = 0
     while i < wasm_env_count:
         let entry = wasm_load_ptr(wasm_env, i * WASM_PTR) as i64
@@ -1116,9 +1116,9 @@ pub fn rt_getenv(name: *const c_char) -> *const c_char:
         while k < nlen and wasm_load_u8(entry, k) == wasm_load_u8(name as i64, k):
             k = k + 1
         if k == nlen and wasm_load_u8(entry, nlen) == 61:
-            return (entry + nlen + 1) as *const u8
+            return (entry + nlen + 1) as *const c_char
         i = i + 1
-    0 as *const u8
+    0 as *const c_char
 
 fn wasm_str_data(s: &str) -> *const u8:
     unsafe *(s as *const str as *const *const u8)
@@ -1233,7 +1233,7 @@ pub fn rt_nanosleep(ns: i64) -> i32:
 
 pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
     if random_get(buf, len as i32) != 0:
-        wasm_write_cstr(2, c"fatal: could not read host randomness\n".ptr)
+        wasm_write_cstr(2, c"fatal: could not read host randomness\n".ptr as *const u8)
         proc_exit(1)
 
 // ── system information ────────────────────────────────────────────────

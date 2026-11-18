@@ -3504,7 +3504,7 @@ impl Sema:
 
     fn facade_type_is_byte(tid: i32) -> bool:
         let r = self.resolve_alias(tid as TypeId)
-        r == self.ty_u8 or r == self.ty_i8 or self.is_c_void_like_type(r as i32)
+        r == self.ty_u8 or r == self.ty_i8 or r == self.ty_c_char or self.is_c_void_like_type(r as i32)
 
     mut fn verify_facade_buffer_item(ci: i32):
         self.update_decl_source_context(self.foreign_contracts[ci].decl)
@@ -5136,7 +5136,7 @@ impl Sema:
         if self.get_type_kind(r) != TypeKind.TY_PTR:
             return false
         let pointee = self.resolve_alias(self.get_type_d0(r) as TypeId)
-        pointee == self.ty_i8 or pointee == self.ty_u8
+        pointee == self.ty_i8 or pointee == self.ty_u8 or pointee == self.ty_c_char
 
     fn facade_sig_returns_option_cstr(sig: i32) -> bool:
         let r = self.resolve_alias(self.sig_return_type(sig) as TypeId)
@@ -6264,7 +6264,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_PTR:
             return false
         let pointee = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
-        pointee == self.ty_i8 or pointee == self.ty_u8
+        pointee == self.ty_i8 or pointee == self.ty_u8 or pointee == self.ty_c_char
 
     // The symbol of the imported or declared function named `name`, or 0:
     // a facade clause's name and the translation's may be two symbols for
