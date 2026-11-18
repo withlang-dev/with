@@ -12,6 +12,10 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D216 — A polled tagged message is a contract item: a tag, its cases, an open sum with `Other(tag)`, a payload that borrows the message, and a release that is its guard's drop (ruled)](2026-11-18-D216-a-polled-tagged-message.md)
+- [D215 — A described function's C name means the modeled operation, for every representation; the raw declaration has a spelling of its own that requires `unsafe` (ruled)](2026-11-18-D215-a-described-functions-c-name-means-the-modeled-operation.md)
+- [D214 — A producer has one home, chosen by `of`; an absent parent is a second constructor, stated with `param N fixed null` (ruled)](2026-11-18-D214-a-producer-has-one-home-and-an-absent-parent-is-a-second-constructor.md)
+- [D213 — `field F of R is callback`: a function-pointer field that holds only callbacks the program registered through a presented setter; a call through it lends its arguments and keeps none (ruled)](2026-11-18-D213-a-field-that-holds-the-programs-callback.md)
 - [D212 — `with get` builds a C package from source by default: cached per user, proofs drawn from the patched tree that is compiled, a non-CMake requirement taken as a binary, and one line per package saying which it was (ruled)](2026-11-18-D212-with-get-builds-from-source-by-default.md)
 - [D211 — A call through a function-pointer field the package fills: several writers join, and a record passed to such a call has not left the proofs; `field F of R holds f, g` is the cited fallback (ruled; extends D198)](2026-11-18-D211-function-pointer-fields-the-package-fills.md)
 - [D210 — A buffer paired with fields of a resource's record: `buffer field P remaining field N`, fields cleared after the call, a generated result record (ruled)](2026-11-18-D210-a-buffer-paired-with-fields-of-the-record.md)
