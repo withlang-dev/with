@@ -550,7 +550,9 @@ Implicit widening is only allowed for these numeric conversions:
   Positions are `isize` (D108, D114): a loop index from `0..xs.len()` is
   `isize` by inference and indexes with no conversion, so a conversion
   that remains marks the declaration whose width is wrong (an `i32` field
-  or parameter), and the lint names that declaration, not the use.
+  or parameter), and the lint names that declaration, not the use. The
+  lint is not issued when the declaration on the other side of the
+  conversion was imported from C; the range check stays in every case.
 
 No other implicit numeric conversion is allowed: a float never becomes an
 integer without `as` (truncate or round is a choice, so it is spelled).

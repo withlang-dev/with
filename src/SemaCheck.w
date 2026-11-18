@@ -1632,7 +1632,9 @@ impl Sema:
     fn expr_declared_in_c(node: i32) -> bool:
         if node <= 0: return false
         let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_GROUPED: return self.expr_declared_in_c(self.ast.get_data0(node))
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_UNSAFE_BLOCK: return self.expr_declared_in_c(self.ast.get_data0(node))
+        // `unsafe { c_global }`: a block that is only its value.
+        if kind == NodeKind.NK_BLOCK: return self.ast.get_data1(node) == 0 and self.expr_declared_in_c(self.ast.get_data2(node))
         if kind == NodeKind.NK_CALL:
             let callee = self.ast.get_data0(node)
             if self.ast.kind(callee) != NodeKind.NK_IDENT: return false
