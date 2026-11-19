@@ -1864,6 +1864,13 @@ type Sema {
     // For-comprehension resolved variants: node → resolved variant sym.
     // Maps _Payload/_Empty marker nodes to Some/None or Ok/Err.
     comp_resolved: HashMap[i32, i32, Minted],
+    // §9.7 (#823): the or-patterns whose alternatives bind names, and while
+    // a later alternative is checked, the first alternative's bindings
+    // [start, end) and those this alternative has bound so far.
+    or_binding_patterns: HashMap[i32, i32, Minted],
+    or_shared_start: isize,
+    or_shared_end: isize,
+    or_shared_seen: List[isize],
     // #3441: a `T.max`-style access on a numeric type named through an
     // alias → the std.numeric function that states it. Lowered as a call.
     numeric_member_fns: HashMap[i32, i32, Minted],
@@ -4281,6 +4288,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         no_await_guard_scope_depth: 0,
         no_suspend_scope_depth: 0,
         comp_resolved: sema_new_map_i32_i32(),
+        or_binding_patterns: sema_new_map_i32_i32(),
+        or_shared_start: -1,
+        or_shared_end: -1,
+        or_shared_seen: [],
         numeric_member_fns: sema_new_map_i32_i32(),
         name_use_nodes: sema_new_list_i32(),
         name_use_kinds: sema_new_list_str(),
@@ -8514,6 +8525,15 @@ impl Sema:
             let idx: i32 = existing.unwrap()
             if self.binding_is_unseen_global(idx, sym):
                 self.shadow_unseen_global(sym, idx, tid, is_mut)
+                return
+            // §9.7 (#823): the name a later alternative of an or-pattern
+            // binds is the first alternative's binding.
+            if self.or_shared_start >= 0 and idx >= self.or_shared_start and idx < self.or_shared_end:
+                if self.or_shared_seen.contains(idx):
+                    self.emit_error(f"`{self.pool_resolve(sym)}` is bound twice in one alternative", node)
+                else if self.resolve_alias(self.bind_types[idx] as TypeId) != self.resolve_alias(tid as TypeId):
+                    self.emit_error(f"`{self.pool_resolve(sym)}` is `{self.type_name(self.bind_types[idx])}` in the first alternative and `{self.type_name(tid)}` in this one; a name bound by an or-pattern has one type (§9.7)", node)
+                self.or_shared_seen.push(idx)
                 return
             let name = with_str_clone_ref(self.pool_resolve(sym))
             self.emit_error("shadowing is not allowed for '" ++ name ++ "'" ++ self.shadowed_binding_origin_note(sym, idx), node)

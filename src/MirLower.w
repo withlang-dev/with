@@ -19,6 +19,10 @@ use std.collections.Minted
 
 // ── Builder state ────────────────────────────────────────────────
 
+// One alternative of an or-pattern (#823): the local that says which
+// alternative matched, this one's index, and its span of the move log.
+type OrAltLog { alt_local: i32, alt: i32, start: isize, end: isize }
+
 type ScopeEntry {
     local_id: i32,
     drop_kind: i32,
@@ -200,6 +204,14 @@ type MirBuilder ephemeral {
     // Pairs (binding local, subject place) of every value a pattern binding
     // moved out of its subject, in order (bind_pattern_value).
     pattern_move_log: List[i32],
+    // #823: the local that records which alternative of an or-pattern
+    // matched (by pattern node), and each alternative's span of the move log.
+    or_alt_nodes: List[i32],
+    or_alt_locals: List[i32],
+    or_alt_logs: List[OrAltLog],
+    // The reference locals of the or-pattern being bound, one per place
+    // binding of its first alternative.
+    or_alias_refs: List[i32],
     // #2289: the elements a slice pattern took out of an owned List, newest
     // last: (binding place, List place, 1 for a head, 0 for a tail). A failed
     // guard puts a head back through the prefix (restore_front) and a tail
@@ -389,6 +401,10 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         never_call_node: 0,
         pattern_bind_mut: 0,
         pattern_move_log: List.new(),
+        or_alt_nodes: [],
+        or_alt_locals: [],
+        or_alt_logs: [],
+        or_alias_refs: [],
         pattern_take_log: List.new(),
         take_log_marks: List.new(),
         with_cleanup_guard_locals: List.new(),
@@ -11356,6 +11372,21 @@ impl MirBuilder:
             if p_count <= 0:
                 self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
                 return
+            // #823: alternatives that bind. Which one matched is recorded,
+            // and the bindings are made from it (lower_or_pattern_bindings).
+            if self.sema.or_binding_patterns.contains(pat_node):
+                let alt_place = self.place_for_local(self.or_alt_local(pat_node))
+                var test_bb = self.cur_bb
+                for pi in 0..p_count:
+                    let hit_bb = self.new_block()
+                    let alt_fail: BlockId = if pi + 1 < p_count: self.new_block() else: fail_bb as BlockId
+                    self.switch_to(test_bb)
+                    self.lower_pattern_match(scrutinee_place, self.ast.get_extra(p_start + pi), hit_bb, alt_fail)
+                    self.switch_to(hit_bb)
+                    self.assign_operand_to_place(alt_place, self.int_const_operand(pi as i64, self.sema.ty_i32 as i32), self.ast.get_start(pat_node))
+                    self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
+                    test_bb = alt_fail
+                return
             var next_test_bb = self.cur_bb
             for pi in 0..p_count:
                 let alt_pat = self.ast.get_extra(p_start + pi)
@@ -11707,7 +11738,57 @@ impl MirBuilder:
     // blanked, so the binding's scheduled drop frees nothing. A binding place
     // is a whole local, or one element of a tuple rest binding (#1366).
     mut fn restore_pattern_moves(start: isize):
-        var i = self.pattern_move_log.len() - 2
+        self.restore_pattern_move_span(start, self.pattern_move_log.len(), self.or_alt_logs.len())
+        // The remainder is back in the subject (a `..rest` moved it out);
+        // now the elements taken out of the subject go back into it.
+        self.restore_pattern_takes(start)
+
+    // The log's [from, to), newest first. Where an or-pattern's
+    // alternatives logged their moves inside it (#823), only the one that
+    // matched moved anything: its entries are restored on a switch over the
+    // matched alternative. `row_limit` keeps an alternative's own row out
+    // of the search inside it (a nested or-pattern's rows come first).
+    mut fn restore_pattern_move_span(from: isize, to: isize, row_limit: isize):
+        var pick = -1
+        var at = 0
+        for row in self.or_alt_logs:
+            // An alternative that moved nothing has nothing to put back
+            // (and an empty span would never shrink the search).
+            if at < row_limit and row.end > row.start and row.start >= from and row.end <= to: pick = row.alt_local
+            at += 1
+        if pick < 0:
+            self.restore_pattern_move_entries(from, to)
+            return
+        var lo = to
+        var hi = from
+        let rows = []
+        at = 0
+        for row in self.or_alt_logs:
+            if at < row_limit and row.alt_local == pick and row.end > row.start and row.start >= from and row.end <= to:
+                rows.push(at)
+                if row.start < lo: lo = row.start
+                if row.end > hi: hi = row.end
+            at += 1
+        self.restore_pattern_move_entries(hi, to)
+        let join_bb = self.new_block()
+        let vals = []
+        let targets = []
+        for ri in rows:
+            vals.push(self.or_alt_logs[ri].alt as i64)
+            targets.push(self.new_block() as i32)
+        let table = self.body.new_switch_table(vals, targets)
+        self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, self.place_for_local(pick)), table, join_bb, 0)
+        var ti = 0
+        for ri in rows:
+            self.switch_to(targets[ti] as BlockId)
+            self.restore_pattern_move_span(self.or_alt_logs[ri].start, self.or_alt_logs[ri].end, ri)
+            self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+            ti += 1
+        self.switch_to(join_bb)
+        self.restore_pattern_move_span(from, lo, row_limit)
+
+    mut fn restore_pattern_move_entries(start: isize, end: isize):
+        var i = end - 2
         while i >= start:
             let bind_place: i32 = self.pattern_move_log[i]
             let src_place: i32 = self.pattern_move_log[i + 1]
@@ -11719,9 +11800,6 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, bind_place, blank_rv, 0)
             self.body.mark_local_ever_moved(self.body.place_locals[bind_place])
             i = i - 2
-        // The remainder is back in the subject (a `..rest` moved it out);
-        // now the elements taken out of the subject go back into it.
-        self.restore_pattern_takes(start)
 
     // #2289 (D115 Amendment 1): the List elements taken since the move log
     // was at `start` go back, newest first: a head through the prefix the
@@ -12168,6 +12246,174 @@ impl MirBuilder:
         out.push(scrutinee_place)
         out
 
+    // The local that records which alternative of an or-pattern matched.
+    mut fn or_alt_local(node: i32) -> i32:
+        for (n, l) in self.or_alt_nodes.iter().zip(self.or_alt_locals.iter()):
+            if n == node: return l
+        let local = self.new_temp(self.sema.ty_i32 as i32)
+        self.or_alt_nodes.push(node)
+        self.or_alt_locals.push(local)
+        local
+
+    // A local with no value on this path, made safe for the drop its scope
+    // scheduled: live and blank, so the drop frees nothing.
+    mut fn blank_local(local: i32, span: i32):
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local, 0, span)
+        let place = self.place_for_local(local)
+        let zop = self.body.gen_zero_operand(self.local_type(local))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, self.body.new_rvalue(RvalueKind.RK_USE, zop, 0, 0), 0)
+        self.body.mark_local_ever_moved(local)
+
+    // #823 (§9.7): the bindings of an or-pattern whose alternatives bind
+    // the same names. The arm sees the first alternative's locals. Each
+    // alternative is lowered in its own block, chosen by which one matched;
+    // a later alternative's bindings are moved into the first's locals.
+    // Only one alternative ran, so each path blanks what the others
+    // scheduled for drop, and a failed guard restores only that
+    // alternative's moves (or_alt_logs).
+    mut fn lower_or_pattern_bindings(pat_node: i32, scrutinee_place: i32) -> List[i32]:
+        let p_start = self.ast.get_data0(pat_node)
+        let p_count = self.ast.get_data1(pat_node)
+        let span = self.ast.get_start(pat_node)
+        let alt_local = self.or_alt_local(pat_node)
+        let join_bb = self.new_block()
+        let alt_bbs = []
+        let vals = []
+        let targets = []
+        for pi in 0..p_count:
+            let bb = self.new_block() as i32
+            alt_bbs.push(bb)
+            if pi > 0:
+                vals.push(pi as i64)
+                targets.push(bb)
+        let table = self.body.new_switch_table(vals, targets)
+        self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, self.place_for_local(alt_local)), table, alt_bbs[0] as BlockId, 0)
+        let bind_base = self.bind_syms.len()
+        var bind_end = bind_base
+        let alias_base = self.alias_syms.len()
+        var alias_end = alias_base
+        let ref_base = self.or_alias_refs.len()
+        let take_base = self.pattern_take_log.len()
+        let first = []
+        let drop_marks = []
+        let tail_bbs = []
+        for pi in 0..p_count:
+            drop_marks.push(self.drop_local_ids.len())
+            let log_start = self.pattern_move_log.len()
+            self.switch_to(alt_bbs[pi] as BlockId)
+            let bound = self.lower_pattern(self.ast.get_extra(p_start + pi), scrutinee_place)
+            // A place binding names a different place in each alternative:
+            // the arm reaches it through a reference this path sets.
+            var ai = if pi == 0: alias_base else: alias_end
+            while ai < self.alias_syms.len():
+                self.share_or_alias(alias_base, alias_end, pi, ai, span)
+                ai += 1
+            if pi == 0:
+                alias_end = self.alias_syms.len()
+            else:
+                while self.alias_syms.len() > alias_end:
+                    self.alias_syms.pop()
+                    self.alias_places.pop()
+                    self.alias_types.pop()
+            if pi == 0:
+                for b in bound: first.push(b)
+                bind_end = self.bind_syms.len()
+            else:
+                var bi = bind_end
+                while bi < self.bind_syms.len():
+                    self.merge_or_binding(bind_base, bind_end, self.bind_syms[bi], self.bind_local_ids[bi], log_start, span)
+                    bi += 1
+                while self.bind_syms.len() > bind_end:
+                    self.bind_syms.pop()
+                    self.bind_local_ids.pop()
+            self.or_alt_logs.push(OrAltLog { alt_local, alt: pi, start: log_start, end: self.pattern_move_log.len() })
+            // A block's statements are written in one go, and what this path
+            // must blank is known only once every alternative is lowered:
+            // the blanking gets a block of its own.
+            let tail_bb = self.new_block()
+            self.terminate(TermKind.TK_GOTO, tail_bb, 0, 0, 0)
+            tail_bbs.push(tail_bb as i32)
+        drop_marks.push(self.drop_local_ids.len())
+        // A list take has its own log, which is not split by alternative
+        // yet: refused here, never lowered wrongly.
+        if self.pattern_take_log.len() > take_base: self.mark_unsupported()
+        for pi in 0..p_count:
+            self.switch_to(tail_bbs[pi] as BlockId)
+            var di = drop_marks[0]
+            while di < drop_marks[p_count]:
+                let local = self.drop_local_ids[di]
+                let own = di >= drop_marks[pi] and di < drop_marks[pi + 1]
+                // The first alternative's named locals hold this path's
+                // values after the merge.
+                let merged = pi > 0 and self.or_first_binding_index(bind_base, bind_end, local) >= 0
+                if not own and not merged: self.blank_local(local, span)
+                di += 1
+            self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        self.switch_to(join_bb)
+        // From here the names are the places the references hold.
+        var k = alias_base
+        while k < alias_end:
+            self.alias_places[k] = self.new_deref_place(self.place_for_local(self.or_alias_refs[ref_base + (k - alias_base)]))
+            k += 1
+        while self.or_alias_refs.len() > ref_base: self.or_alias_refs.pop()
+        first
+
+    // Alias entry `ai` of alternative `pi`: its place goes into the
+    // reference local of that name, created with the first alternative.
+    mut fn share_or_alias(base: isize, end: isize, pi: i32, ai: isize, span: i32):
+        let sym = self.alias_syms[ai]
+        var slot = if pi == 0: ai - base else: -1
+        if pi > 0:
+            var i = base
+            while i < end:
+                if self.symbols_match(self.alias_syms[i], sym): slot = i - base
+                i += 1
+        let ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, self.alias_types[ai] as TypeId, 0, 0) as i32
+        if slot < 0 or ref_ty <= 0:
+            self.mark_unsupported()
+            return
+        let ref_base = self.or_alias_refs.len() - (if pi == 0: ai - base else: end - base)
+        if pi == 0: self.or_alias_refs.push(self.new_temp(ref_ty))
+        let ref_local = self.or_alias_refs[ref_base + slot]
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, ref_local, 0, span)
+        let kind = if self.sema.binding_observes_mutable_place.contains(sym): BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, self.place_for_local(ref_local), self.body.new_rvalue(RvalueKind.RK_REF, kind, self.alias_places[ai], 0), span)
+
+    // The index in the first alternative's bindings [base, end) of `local`, or -1.
+    fn or_first_binding_index(base: isize, end: isize, local: i32) -> isize:
+        var i = base
+        while i < end:
+            if self.bind_local_ids[i] == local: return i
+            i += 1
+        -1
+
+    // A later alternative bound `sym` to `local`: the value goes to the
+    // first alternative's local for that name, and the move-log entries
+    // that named `local` name the shared one, so a failed guard puts the
+    // value back from where the arm holds it.
+    mut fn merge_or_binding(base: isize, end: isize, sym: i32, local: i32, log_start: isize, span: i32):
+        var shared = -1
+        var i = base
+        while i < end:
+            if self.symbols_match(self.bind_syms[i], sym): shared = self.bind_local_ids[i]
+            i += 1
+        if shared < 0:
+            self.mark_unsupported()
+            return
+        let ty = self.local_type(local)
+        let shared_place = self.place_for_local(shared)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, shared, 0, span)
+        let op = self.body.new_operand(if self.copy_is_bits(ty): OperandKind.OK_COPY else: OperandKind.OK_MOVE, self.place_for_local(local))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, shared_place, self.body.new_rvalue(RvalueKind.RK_USE, op, 0, 0), span)
+        var li = log_start
+        while li < self.pattern_move_log.len():
+            if self.body.place_locals[self.pattern_move_log[li]] == local: self.pattern_move_log[li] = shared_place
+            li += 2
+        if not self.copy_is_bits(ty):
+            let zop = self.body.gen_zero_operand(ty)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, self.place_for_local(local), self.body.new_rvalue(RvalueKind.RK_USE, zop, 0, 0), 0)
+            self.body.mark_local_ever_moved(local)
+
     mut fn lower_pattern(pat_node: i32, scrutinee_place: i32) -> List[i32]:
         let out: List[i32] = []
         if pat_node == 0:
@@ -12412,6 +12658,7 @@ impl MirBuilder:
 
         if pk == NodeKind.NK_PAT_OR:
             let p_start = self.ast.get_data0(pat_node)
+            if self.sema.or_binding_patterns.contains(pat_node): return self.lower_or_pattern_bindings(pat_node, scrutinee_place)
             if self.ast.get_data1(pat_node) > 0:
                 return self.lower_pattern(self.ast.get_extra(p_start), scrutinee_place)
             return out
@@ -12657,6 +12904,7 @@ impl MirBuilder:
             self.restore_move_state(branch_move_state)
             while self.pattern_move_log.len() > move_log_start:
                 self.pattern_move_log.pop()
+            while self.or_alt_logs.len() > 0 and self.or_alt_logs[self.or_alt_logs.len() - 1].start >= move_log_start: self.or_alt_logs.pop()
 
             dispatch_bb = fail_bb
 

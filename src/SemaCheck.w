@@ -26601,6 +26601,48 @@ impl Sema:
         let type_text = self.pool_resolve(owner)
         self.emit_error_with_help("partial pattern on `" ++ type_text ++ "` inside its own `move fn` leaves " ++ unbound ++ " unbound", node, "a pattern that disarms `" ++ type_text ++ "`'s Drop must account for every field; add `" ++ add ++ "`")
 
+    // §9.7 (#823, D221): every alternative of an or-pattern binds the same
+    // names, each with one type, and the arm sees one binding per name. The
+    // first alternative introduces them; in a later one the same name is
+    // that binding again (scope_put_at), never a shadow.
+    mut fn check_or_pattern(node: i32, subject_type: i32):
+        let p_extra = self.ast.get_data0(node)
+        let p_count = self.ast.get_data1(node)
+        if p_count <= 0: return
+        // Nested in a later alternative of another or-pattern: each of its
+        // alternatives binds into the outer one's names, starting from what
+        // the outer alternative had bound so far.
+        if self.or_shared_start >= 0:
+            let before = []
+            for idx in self.or_shared_seen: before.push(idx)
+            self.check_pattern(self.ast.get_extra(p_extra), subject_type)
+            let after = []
+            for idx in self.or_shared_seen: after.push(idx)
+            for pi in 1..p_count:
+                self.or_shared_seen = []
+                for idx in before: self.or_shared_seen.push(idx)
+                self.check_pattern(self.ast.get_extra(p_extra + pi), subject_type)
+            self.or_shared_seen = after
+            return
+        let first = self.bind_names.len()
+        self.check_pattern(self.ast.get_extra(p_extra), subject_type)
+        let last = self.bind_names.len()
+        if last > first: self.or_binding_patterns.insert(node, 1)
+        for pi in 1..p_count:
+            let alt = self.ast.get_extra(p_extra + pi)
+            self.or_shared_start = first
+            self.or_shared_end = last
+            self.or_shared_seen = []
+            self.check_pattern(alt, subject_type)
+            for idx in first..last:
+                if not self.or_shared_seen.contains(idx):
+                    self.emit_error_with_help(f"alternative {pi + 1} of this pattern does not bind `{self.pool_resolve(self.bind_names[idx])}`, which the first alternative binds (§9.7)", alt, "every alternative binds the same names; write `_` in the first alternative if the arm does not use it")
+            if self.bind_names.len() > last:
+                self.emit_error_with_help(f"alternative {pi + 1} of this pattern binds `{self.pool_resolve(self.bind_names[last])}`, which the first alternative does not bind (§9.7)", alt, "every alternative binds the same names")
+            self.or_shared_start = -1
+            self.or_shared_end = -1
+        self.or_shared_seen = []
+
     mut fn check_pattern(node: i32, subject_type: i32):
         if node == 0:
             return
@@ -26626,6 +26668,9 @@ impl Sema:
             // = pair` observes `pair`; taking it apart is spelled `move pair`.
             if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not self.type_is_plain_bits(subject_type):
                 self.pattern_place_bindings.insert(node, 1)
+                // #823: in an or-pattern the place differs by alternative,
+                // so lowering holds it by reference; the type exists for it.
+                self.ensure_exact_type(TypeKind.TY_REF, subject_type as TypeId, 0, 0)
                 self.scope_set_is_view_bound(sym)
                 self.record_view_binding_from_expr(sym, self.pattern_subject_node)
                 if self.place_root_is_mutable(self.pattern_subject_node):
@@ -26825,10 +26870,7 @@ impl Sema:
             return
 
         if kind == NodeKind.NK_PAT_OR:
-            let p_extra = self.ast.get_data0(node)
-            let p_count = self.ast.get_data1(node)
-            for pi in 0..p_count:
-                self.check_pattern(self.ast.get_extra(p_extra + pi), subject_type)
+            self.check_or_pattern(node, subject_type)
             return
 
         if kind == NodeKind.NK_PAT_AT_BINDING:
