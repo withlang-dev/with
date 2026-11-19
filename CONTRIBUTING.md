@@ -193,7 +193,7 @@ tools/bump_seed_pins.w`, `with build :seed`.
 
 Only Eric writes or blesses normative spec text. A question that needs a
 ruling goes to him as a brief: what the reference languages do, what the spec
-says, the mission fit, and a committed prediction (CLAUDE.md, "Do the thing").
+says, the mission fit, and a committed prediction (spec-and-decisions.md, "Do the thing").
 A reversible question outside C interop, ownership and safety with a
 prediction of 75% or more is delegated (D98): implement it, spec words
 included, and record it in [docs/meetings/README.md](docs/meetings/README.md).

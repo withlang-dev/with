@@ -114,8 +114,9 @@ Eric vetoes by revert.
 
 - **The spec leads.** A spec change makes the implementation non-compliant
   until it conforms; the spec is never edited to match the code.
-- **Only Eric authors or blesses normative words**, the exact words.
-  Agreement on a direction is not approval of wording. Status notes
+- **Only Eric authors or blesses normative words**, the exact words,
+  except a delegated decision (D98). Agreement on a direction is not
+  approval of wording. Status notes
   ("implemented", "not yet") are the agent's to keep true.
 - A disagreement between spec and compiler is a compiler bug or a question
   for Eric, never a quiet workaround.
@@ -153,14 +154,15 @@ Eric vetoes by revert.
   release: `:release-checks`.
 - **Changes land by pull request**; dependent ones are a `gh stack`. A PR
   is a draft until its battery is green. CI is not a merge signal (D56).
-- **Other hosts are for platform-specific issues only.** No routine build
-  runs on eric-5090 or the Windows VM; leave nothing running there.
+- **Other hosts are for platform-specific work only;** when you build
+  there, the same rules apply, and leave nothing running.
 - **Commits are authored by the human who drove the work.** Never an AI
   author, co-author or trailer.
 - One logical change at a time. Re-read a file before editing it after a
   long session.
-- **When the path is clear, proceed and report.** A green battery is the
-  authority to push, open the PR and merge; do not ask first.
+- **When the path is clear, proceed and report.** A green battery, posted
+  on the PR, is the authority to mark it ready and merge; do not ask
+  first. It does not replace a ruling.
 
 ## The commands every task uses
 
