@@ -1351,6 +1351,13 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         var native_flags = ""
         for i in 0..gnu.items.len():
             native_flags = native_flags ++ (if i > 0: ";" else: "") ++ gnu.items[i].replace(";", "\\;")
+        // #2473: the NATIVE sub-build receives CMAKE_SYSTEM_NAME too, so it
+        // calls itself crosscompiling and configures a NATIVE of its own,
+        // which gets none of these flags and cannot find -lunwind (SDK run
+        // 39211095782). It is the host building tools for the host: say so.
+        // CMake sets CMAKE_CROSSCOMPILING from CMAKE_SYSTEM_NAME only when
+        // it is not already defined (CMakeDetermineSystem.cmake).
+        native_flags = native_flags ++ ";-DCMAKE_CROSSCOMPILING=FALSE"
         configure.push("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=" ++ native_flags)
         configure.push("-DLLVM_HOST_TRIPLE=" ++ sdk_windows_triple(sdk_windows_host_arch()))
         configure.push("-DCLANG_DEFAULT_RTLIB=compiler-rt")
