@@ -17660,6 +17660,8 @@ impl MirBuilder:
             self.implicit_iter_arg_active = saved_active
             return self.body.new_operand(OperandKind.OK_MOVE, iter_place)
         if node > 0 and self.sema.numeric_member_fns.contains(node): return self.lower_numeric_member(node, self.sema.numeric_member_fns.get(node).unwrap())
+        // D223: `Type.method` as a value is the method's function constant.
+        if node > 0 and self.sema.method_value_fns.contains(node): return self.fn_const_operand(self.sema.method_value_fns.get(node).unwrap(), self.sema.typed_expr_types.get(node) ?? 0, node)
         var op = self.lower_expr_node(node)
         // D183 (§4.2.6): a checked narrowing Sema recorded on this node.
         if node > 0 and op >= 0 and self.sema.checked_narrowings.contains(node):

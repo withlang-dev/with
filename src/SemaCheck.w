@@ -23134,6 +23134,8 @@ impl Sema:
             //     let f = (xs, value) => xs.push(value)
             let static_owner_sym = self.method_owner_symbol_for_type(obj_type as i32)
             if static_owner_sym != 0:
+                let method_value_ty = self.method_as_value(node, obj_type as i32, static_owner_sym, field)
+                if method_value_ty != 0: return method_value_ty
                 let mutating = self.method_has_mut_self_flag(static_owner_sym, field) or self.builtin_method_requires_mutable_receiver(static_owner_sym, field)
                 if mutating:
                     let owner_name = with_str_clone_ref(self.pool_resolve(static_type_sym))
@@ -30763,6 +30765,14 @@ impl Sema:
                 if ucm_meta >= 0 and ai < self.ast.fn_meta_param_count(ucm_meta):
                     let ucm_ptype = self.ast.fn_param_type(self.ast.fn_meta_param_start(ucm_meta), ai)
                     if ucm_ptype != 0 and self.ast.kind(ucm_ptype) == NodeKind.NK_TYPE_REF:
+                        continue
+                // A function value's type states each parameter's mode
+                // (§3.8, §3.8a): `&T` observes its argument and `mut T`
+                // writes the caller's place; neither takes it. Marked moved
+                // here, `let f = peek; f(b); f(b)` was a use of a moved value.
+                if callable_value_tid != 0 and ai + param_offset < self.get_type_d1(callable_value_tid as TypeId):
+                    let cv_param_kind = self.get_type_kind(self.resolve_alias(self.fn_type_param_type(callable_value_tid, ai + param_offset) as TypeId))
+                    if cv_param_kind == TypeKind.TY_REF or cv_param_kind == TypeKind.TY_PTR or self.fn_type_param_is_mut(callable_value_tid, ai + param_offset):
                         continue
                 let arg_node = if has_resolved: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 if ai < variant_payload_tys.len() and self.payload_arg_auto_refs(variant_payload_tys[ai], arg_types[ai], arg_node, node):
@@ -44235,6 +44245,37 @@ impl Sema:
             if not captures_root or self.closure_capture_writes(closure_node, root): continue
             if first_field == 0 or not self.closure_names_only_other_fields(closure_node, root, first_field):
                 self.emit_error_with_help(f"`{self.pool_resolve(root)}` is held as a `mut` place for this call, and a closure passed in the same call captures it (§3.2)", closure_node, "a callee that brackets work on its `mut` place passes it to the closure: `x.scope((s) => …)`; or read what the closure needs into a `let` before the call")
+    // D223 (§9.3a): `Type.method` names the method as a function value. Its
+    // first parameter is the receiver, in the mode the method declares:
+    // `&T` for `fn`, `mut T` for `mut fn`, `T` for `move fn`; a method with
+    // no receiver has none. The method is found, and its visibility
+    // checked, as for a call. 0 when `field` names no method with a body
+    // of its own.
+    mut fn method_as_value(node: i32, owner_ty: i32, owner_sym: i32, field: i32) -> i32:
+        let method_fn = self.lookup_method_fn(owner_sym, field)
+        let sig = self.lookup_method_sig(owner_sym, field)
+        if method_fn == 0 or sig < 0: return 0
+        self.check_method_visible(method_fn, node)
+        self.ensure_body_typed(method_fn, sig)
+        let mode = self.sig_receiver_mode(sig)
+        let param_count = self.sig_get_param_count(sig)
+        let params: List[i32] = []
+        for pi in 0..param_count:
+            var p_ty = self.sig_param_type(sig, pi)
+            if pi == 0 and mode != ReceiverMode.None:
+                let bare = self.resolve_alias(p_ty as TypeId)
+                if self.get_type_kind(bare) == TypeKind.TY_REF: p_ty = self.get_type_d0(bare)
+                if mode == ReceiverMode.Read: p_ty = self.ensure_exact_type(TypeKind.TY_REF, p_ty, 0, 0) as i32
+            params.push(p_ty)
+        let mask = self.sig_mut_param_mask(sig) | (if mode == ReceiverMode.Mut: 1 else: 0)
+        let fn_tid = self.moded_callable_type(self.ensure_fn_type(params, param_count, self.sig_return_type(sig) as TypeId) as i32, mask)
+        self.note_call_edge(method_fn, node)
+        self.fn_callable_values.insert(node, 1)
+        self.fn_value_ident_sigs.insert(node, sig)
+        self.method_value_fns.insert(node, method_fn)
+        self.note_callable_value(sig, fn_tid)
+        self.typed_expr_types.insert(node, fn_tid)
+        fn_tid
 
     mut fn check_closure_capture_conflicts(extra_start: i32, arg_count: i32, has_resolved: bool, node: i32, recv: i32):
         // Collect closure args that mutably capture a place.

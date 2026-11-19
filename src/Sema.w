@@ -1879,6 +1879,7 @@ type Sema {
     // #3441: a `T.max`-style access on a numeric type named through an
     // alias → the std.numeric function that states it. Lowered as a call.
     numeric_member_fns: HashMap[i32, i32, Minted],
+    method_value_fns: HashMap[i32, i32, Minted],        // `Type.method` node used as a value → the method's function (D223)
     // #2211: resolved name uses (node, kind, declaring module path, name) for
     // the analyzer's `reference` facts: a global read, a function taken as a
     // value, a type name — calls and methods have their own facts.
@@ -4301,6 +4302,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         or_shared_end: -1,
         or_shared_seen: [],
         numeric_member_fns: sema_new_map_i32_i32(),
+        method_value_fns: sema_new_map_i32_i32(),
         name_use_nodes: sema_new_list_i32(),
         name_use_kinds: sema_new_list_str(),
         name_use_paths: sema_new_list_str(),
