@@ -23017,6 +23017,15 @@ impl Sema:
         for i in 0..self.union_tracked_syms.len():
             self.union_last_written.insert(self.union_tracked_syms[i], 0)
 
+    // The std.numeric function that states `member` of the numeric type
+    // `tid` names (`__u32_max`), or 0. The parser writes that call itself
+    // for a builtin's own name; this is the same answer through an alias.
+    mut fn numeric_member_fn(tid: i32, member: i32) -> i32:
+        let name = self.pool_resolve(member)
+        if name != "min" and name != "max" and name != "inf" and name != "nan": return 0
+        let sym = self.pool_intern(f"__{self.type_name(self.resolve_alias(tid as TypeId) as i32)}_{name}")
+        if self.get_sig(sym) >= 0: sym else: 0
+
     mut fn check_field_access(node: i32) -> i32:
         let expr = self.ast.get_data0(node)
         let field = self.ast.get_data1(node)
@@ -23062,6 +23071,17 @@ impl Sema:
                 let static_named = self.static_receiver_named_type(expr, static_type_sym)
                 if static_named != 0:
                     obj_type = static_named as TypeId
+            // #3441 (§4.1a): a numeric type's `min` and `max` are the type's,
+            // however it is named (`c_uint.max`, an alias's `.max`).
+            let member_fn = self.numeric_member_fn(obj_type as i32, field)
+            if member_fn != 0:
+                let member_sig = self.get_sig(member_fn)
+                self.ensure_body_typed(member_fn, member_sig)
+                self.note_call_edge(member_fn, node)
+                self.numeric_member_fns.insert(node, member_fn)
+                let member_ty = self.sig_return_type(member_sig)
+                self.typed_expr_types.insert(node, member_ty)
+                return member_ty
             // mut.md Rev 8 §5.3 / §15.4 — `List.push` (etc.) parsed as a
             // first-class value expression. Method calls dispatch through
             // check_method_call, which never invokes check_field_access on the

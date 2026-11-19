@@ -6910,6 +6910,9 @@ impl ComptimeEvaluator:
             // #2248: the enum must be visible from here, as a type name is.
             let base_tid: i32 = if base_sema_sym != 0: self.sema.lookup_named_type_visible(base_sema_sym) else: 0
             if base_tid != 0:
+                // #3441: `uInt.max` in a constant, as in a function body.
+                let member_fn = if field_sema_sym != 0: self.sema.numeric_member_fn(base_tid, field_sema_sym) else: 0
+                if member_fn != 0: return self.eval_fn_symbol_call(member_fn, 0, 0, node)
                 let base_resolved = self.sema.resolve_alias(base_tid as TypeId)
                 if self.sema.get_type_kind(base_resolved) == TypeKind.TY_ENUM and field_sema_sym != 0 and self.sema.enum_has_variant(base_resolved as i32, field_sema_sym) != 0:
                     let qual_name = self.pool.resolve(base_sym) ++ "." ++ self.pool.resolve(field)
