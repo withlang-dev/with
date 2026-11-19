@@ -21,7 +21,8 @@ run in order, and it may not also declare `fn main`. An imported module may
 not hold executable statements. Every command that takes an entry file
 (`run`, `build`, `check`, `test`) applies the same rule (D74).
 
-Exactly one one-liner mode may be used in a single invocation:
+An invocation uses one of `-e`, `-n` and `-p` as its mode; `-n` and `-p`
+are never combined:
 
 | Mode | Meaning |
 |------|---------|
@@ -35,5 +36,9 @@ generated lines:
 ```
 with -e 'var total = 0' -e 'total = total + 1' -e 'print(total)'
 ```
+
+Beside `-n` or `-p`, `-e` code runs once: before the loop when it comes
+before the first `-n` or `-p`, after the loop when it comes after the last
+(§18.5b.3). `-e` between two `-n` or `-p` parts is an error.
 
 One-liner code cannot be combined with a source file argument.

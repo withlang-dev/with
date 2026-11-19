@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.64
+# The With Programming Language — Specification v7.65
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.65:** #957 (delegated, D217). §18.5b: beside `-n` or `-p`, `-e` code before the first loop part runs once before the loop and `-e` code after the last runs once after it; `-e` between two loop parts is an error; `last` is bound to whether the current line is the final one. A `var` in `-n` code stays per line. Implemented.
+
 **Changelog v7.64:** #2261 (Eric, 2026-11-18). §4.2.6: the D183 lint is not issued when the declaration on the other side of the conversion was imported from C; the range check stays in every case. D108's `length param N` follow-on is recorded as not needed. Implemented.
 
 **Changelog v7.63:** D210 (Eric, 2026-11-18; #3173). §16.2b.8, §31: `buffer field P remaining field N` pairs two fields of the record a lent resource wraps; the slice is stored before the call, the count read back and both fields cleared after it, and the operation returns a record of how much moved. The implementation lands with #3173's change.
