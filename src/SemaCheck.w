@@ -4851,6 +4851,17 @@ impl Sema:
 
     // A callable value this compilation makes (a closure, or a function
     // named as a value), for callable_type_body's dispatcher.
+    // #3453 (§3.8a): a `mut` parameter is a mode, and a function type has
+    // no place for one. As a `fn(T) -> R` value the function was called
+    // with its argument by value while its prologue expected the caller's
+    // place: a segfault in safe code.
+    mut fn refuse_mut_param_fn_value(sig: i32, sym: i32, node: i32) -> bool:
+        for pi in 0..self.sig_get_param_count(sig):
+            if self.sig_param_is_mut(sig, pi):
+                self.emit_error_with_help(f"`{self.pool_resolve(sym)}` takes a `mut` parameter: it is called directly, never used as a value (§3.8a)", node, "a function type cannot say `mut`, so a call through the value could not pass the caller's place")
+                return true
+        false
+
     mut fn note_callable_value(body: i32, tid: i32):
         if tid <= 0 or self.callable_any_fn_type(tid as TypeId) == 0:
             return
@@ -14031,6 +14042,7 @@ impl Sema:
                     if self.fn_types_assignable(expected_callable as i32, mono_tid) == false:
                         self.emit_error("`" ++ self.pool_resolve(sym) ++ "` instantiated at the expected parameters is `" ++ self.type_name(mono_tid) ++ "`, not `" ++ self.type_name(expected_callable as i32) ++ "`", node)
                         return 0
+                    if self.refuse_mut_param_fn_value(mono_sig, ident_sym, node): return 0
                     self.fn_callable_values.insert(node, 1)
                     self.typed_expr_types.insert(node, mono_tid)
                     self.fn_value_ident_sigs.insert(node, mono_sig)
@@ -14060,6 +14072,7 @@ impl Sema:
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
                 return 0
+            if self.refuse_mut_param_fn_value(sig_idx, sym, node): return 0
             // D86 (§18.2): a function value would evaluate the message
             // before the call; these forms evaluate it only on failure.
             if self.fn_symbol_is_precondition_form(sym):
