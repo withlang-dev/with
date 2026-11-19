@@ -353,7 +353,7 @@ pub const GLOBAL_VALUE_DECL_INTERFACE: i32 = 3
 // mutability.md §5 — per-parameter effect bits.
 // One fact about a `str` binding in a loop (D219): `sym` was copied into
 // `other`, or `sym` was appended to (`other` is 0).
-pub type LoopTextNote { loop_node: i32, sym: i32, other: i32 }
+type LoopTextNote { loop_node: i32, sym: i32, other: i32 }
 
 pub const EFF_READ: i32         = 1   // parameter is read
 pub const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
