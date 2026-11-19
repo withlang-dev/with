@@ -17449,7 +17449,14 @@ impl Codegen:
                 sema_phase_bug(f"BUG: anonymous parameter lacks LLVM type: node={node} parameter={i}")
             param_types.push(p_llvm_ty)
             let reference = self.sema.get_type_kind(self.sema.resolve_alias(p_sema_ty as TypeId)) == TypeKind.TY_REF
-            closure_places.push(self.sema.type_uses_c_va_list_place(p_sema_ty) | (if reference: 2 else: 0))
+            // The closure's own type says how each parameter is passed, as it
+            // does at a call through it (callable_fn_abi): one answer for the
+            // body and its callers. A `mut` parameter (D218) is the caller's
+            // place; read here from the parameter's type alone, the body took
+            // a value where its caller passed a place.
+            let closure_tid: i32 = self.sema.typed_expr_types.get(node) ?? 0
+            let by_place = if closure_tid != 0: self.sema.callable_param_uses_value_ref_abi(closure_tid, i) else: self.sema.type_uses_c_va_list_place(p_sema_ty)
+            closure_places.push(by_place | (if reference: 2 else: 0))
         let ret_ty = self.sema_type_to_llvm(closure_fn_ret_tid)
         if ret_ty == 0: sema_phase_bug(f"BUG: closure result lacks LLVM type: node={node}")
         let closure_abi_index = self.compute_fn_abi(ret_ty, param_types, closure_places, if is_extern_closure: FN_ABI_C else: FN_ABI_CLOSURE, 0)

@@ -27556,6 +27556,7 @@ impl Sema:
         // a list started before the loop would read that argument as a
         // parameter type (#1402).
         let param_tys: List[i32] = []
+        var closure_mut_mask: i32 = 0
         let inferred_param_syms: List[i32] = []
         let inferred_param_prev: List[i32] = []
         // Partial application: if body is NK_CALL, resolve callee param types for placeholders
@@ -27601,7 +27602,12 @@ impl Sema:
                 inferred_param_prev.push(self.int_local_closure_params.get(p_sym) ?? 0)
                 self.int_local_closure_params.insert(p_sym, key)
                 self.int_local_closure_keys.insert(key, 1)
-            self.scope_put_at(p_sym, p_ty, 0, if p_type_node > 0: p_type_node else: node)
+            // D218 (§9.3): a closure checked against a function type with a
+            // `mut` parameter receives that parameter as `mut`; the literal
+            // need not repeat it.
+            let p_is_mut = (expected_fn_tid != 0 and self.fn_type_param_is_mut(expected_fn_tid, pi)) or ((self.ast.fn_type_mut_mask(node as NodeId) >> (pi as u32)) & 1) != 0
+            if p_is_mut: closure_mut_mask = closure_mut_mask | (1 << (pi as u32))
+            self.scope_put_at(p_sym, p_ty, p_is_mut as i32, if p_type_node > 0: p_type_node else: node)
             param_tys.push(p_ty)
         let te_start = self.type_extra.len() as i32
         for param_ty in param_tys:
@@ -27912,6 +27918,7 @@ impl Sema:
             closure_ret_ty = self.sig_return_type(partial_sig)
         let closure_kind = if expected_extern_fn != 0: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
         let closure_ty = self.add_type(closure_kind, te_start, param_count, closure_ret_ty) as i32
+        if closure_mut_mask != 0 and closure_kind == TypeKind.TY_FN: self.mut_param_fn_type_masks.insert(closure_ty, closure_mut_mask)
         self.typed_expr_types.insert(node, closure_ty)
         // #1827: a callable value a call through its type may run.
         self.note_callable_value(-2 - node, closure_ty)

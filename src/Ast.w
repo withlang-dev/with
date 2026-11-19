@@ -806,7 +806,7 @@ type AstPoolState {
     fn_target_arch: HashMap[i32, i32, Minted],   // fn_node → @[target("arch")] arch name sym
     unsafe_fn_type_nodes: HashMap[i32, i32, Minted],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
     variadic_fn_type_nodes: HashMap[i32, i32, Minted],  // NK_TYPE_EXTERN_FN node → 1 if `extern "C" fn(A, ...)` (#1832)
-    fn_type_mut_masks: HashMap[i32, i32, Minted],       // NK_TYPE_FN node → bit i set when parameter i is `mut` (D218, §3.8a)
+    fn_type_mut_masks: HashMap[i32, i32, Minted],       // NK_TYPE_FN or closure node → bit i set when parameter i is `mut` (D218, §3.8a, §9.3)
     fn_effect_pin_starts: HashMap[i32, i32, Minted],   // fn_node → first entry in fn_effect_pin_*
     fn_effect_pin_counts: HashMap[i32, i32, Minted],   // fn_node → entry count
     fn_effect_pin_params: List[i32],            // param_name_sym
