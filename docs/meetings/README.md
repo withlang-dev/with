@@ -12,6 +12,9 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D220 — A parameter is an immutable binding, and §29.8's consuming rebind applies to it: `var x = x` is the local copy (ruled)](2026-11-18-D220-a-parameter-is-an-immutable-binding-and-the-consuming-rebind-applies-to-it.md)
+- [D219 — `++` append is the builder: D34-C stands, `StringBuilder` leaves the prelude, and the lint covers non-append and shared accumulation (ruled)](2026-11-18-D219-append-is-the-builder-and-the-lint-covers-what-is-still-slow.md)
+- [D218 — A closure may not capture the receiver of the `mut` call it is passed to; a bracket passes the receiver to its body (ruled)](2026-11-18-D218-a-closure-may-not-capture-the-receiver-of-the-mut-call-it-is-passed-to.md)
 - [D217 — One-liners keep state by position: `-e` before and after the `-n`/`-p` loop, and `last`; a `var` in loop code is not hoisted (delegated)](2026-11-18-D217-one-liners-keep-state-by-position.md)
 - [D216 — A polled tagged message is a contract item: a tag, its cases, an open sum with `Other(tag)`, a payload that borrows the message, and a release that is its guard's drop (ruled)](2026-11-18-D216-a-polled-tagged-message.md)
 - [D215 — A described function's C name means the modeled operation, for every representation; the raw declaration has a spelling of its own that requires `unsafe` (ruled)](2026-11-18-D215-a-described-functions-c-name-means-the-modeled-operation.md)
