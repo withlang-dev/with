@@ -130,6 +130,35 @@ impl Sema:
         let expected_name = if pointee == self.ty_c_char: (if self.get_type_d1(expected) != 0: "*mut c_char" else: "*const c_char") else: self.type_name(expected_ty)
         "a pointer to one integer type is not a pointer to another; spell the conversion `" ++ expression ++ " as " ++ expected_name ++ "` (D155)"
 
+    // How a function type takes parameter `pi`, in the words of §3.8.
+    fn fn_param_mode_words(fn_tid: i32, pi: i32) -> str:
+        let p_ty = self.fn_type_param_type(fn_tid, pi)
+        if self.fn_type_param_is_mut(fn_tid, pi): return f"`mut {self.type_name(p_ty)}` (writes the caller's place)"
+        if self.get_type_kind(self.resolve_alias(p_ty as TypeId)) == TypeKind.TY_REF: return f"`{self.type_name(p_ty)}` (observes)"
+        f"`{self.type_name(p_ty)}` (takes)"
+
+    // D223 (§3.8a, §9.3a): two function types that differ only in how a
+    // parameter is taken do not convert. Names the two modes and the
+    // closure that states the wanted one; "" when the types differ otherwise.
+    fn fn_mode_mismatch_note(expected_ty: i32, actual_ty: i32, arg_node: i32, expr_text: &str) -> str:
+        let want = self.resolve_alias(expected_ty as TypeId) as i32
+        let have = self.resolve_alias(actual_ty as TypeId) as i32
+        if self.get_type_kind(want as TypeId) != TypeKind.TY_FN or self.get_type_kind(have as TypeId) != TypeKind.TY_FN: return ""
+        let param_count = self.get_type_d1(want as TypeId)
+        if param_count != self.get_type_d1(have as TypeId) or self.get_type_d2(want as TypeId) != self.get_type_d2(have as TypeId): return ""
+        var differs = -1
+        for pi in 0..param_count:
+            var want_p = self.resolve_alias(self.fn_type_param_type(want, pi) as TypeId)
+            var have_p = self.resolve_alias(self.fn_type_param_type(have, pi) as TypeId)
+            let same_mode = want_p == have_p and self.fn_type_param_is_mut(want, pi) == self.fn_type_param_is_mut(have, pi)
+            if self.get_type_kind(want_p) == TypeKind.TY_REF: want_p = self.resolve_alias(self.get_type_d0(want_p) as TypeId)
+            if self.get_type_kind(have_p) == TypeKind.TY_REF: have_p = self.resolve_alias(self.get_type_d0(have_p) as TypeId)
+            if want_p != have_p: return ""
+            if not same_mode and differs < 0: differs = pi
+        if differs < 0: return ""
+        let call = if self.method_value_fns.contains(arg_node) and differs == 0 and param_count == 1: f"(x) => x.{self.pool_resolve(self.ast.get_data1(arg_node))}()" else: f"(…) => {expr_text}(…)"
+        f"parameter {differs + 1} is taken as {self.fn_param_mode_words(have, differs)} by the function and as {self.fn_param_mode_words(want, differs)} by the type wanted; the two modes do not convert (§3.8a). Write the closure: `{call}`"
+
     mut fn emit_argument_type_mismatch(call_name: &str, fn_sym: i32, arg_index: isize, param_i: isize, expected_ty: i32, actual_ty: i32, arg_node: i32):
         // D93: a parameter demands its collection of a literal's binding.
         self.note_literal_demand(arg_node, expected_ty, arg_node)
@@ -162,6 +191,8 @@ impl Sema:
         else:
             diag.add_note("expected type: " ++ expected_name)
         diag.add_note("actual type: " ++ actual_name)
+        let mode_note = self.fn_mode_mismatch_note(expected_ty, actual_ty, arg_node, expr_text)
+        if mode_note.len() > 0: diag.add_note(mode_note)
 
         // §4.3c: `&[]T` is a reference to a slice, which no argument can
         // satisfy (a slice is already a view); the person wrote Rust's `&[T]`.

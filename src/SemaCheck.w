@@ -23111,7 +23111,7 @@ impl Sema:
             let inst_owner = if inst_ty != 0: self.method_owner_symbol_for_type(inst_ty) else: 0
             if inst_owner != 0:
                 let inst_method_ty = self.method_as_value(node, inst_ty, inst_owner, field)
-                if inst_method_ty != 0: return inst_method_ty
+                if inst_method_ty != 0: return if inst_method_ty < 0: 0 else: inst_method_ty
         if static_type_sym != 0 and self.static_receiver_type_is_known(expr) and (static_expr_kind == NodeKind.NK_IDENT or static_expr_kind == NodeKind.NK_TYPE_NAMED):
             let static_prim = self.primitive_type_by_sym(static_type_sym)
             if static_prim != 0:
@@ -23131,23 +23131,11 @@ impl Sema:
                 let member_ty = self.sig_return_type(member_sig)
                 self.typed_expr_types.insert(node, member_ty)
                 return member_ty
-            // mut.md Rev 8 §5.3 / §15.4 — `List.push` (etc.) parsed as a
-            // first-class value expression. Method calls dispatch through
-            // check_method_call, which never invokes check_field_access on the
-            // callee node. Reaching this point with a static-type base means
-            // the field-access is being USED AS A VALUE — i.e., as a method
-            // reference. Reject when the resolved method is mutating.
-            // Helper: closure-wrap the call:
-            //     let f = (xs, value) => xs.push(value)
+            // D223 (§9.3a): a method named through its type, used as a value.
             let static_owner_sym = self.method_owner_symbol_for_type(obj_type as i32)
             if static_owner_sym != 0:
                 let method_value_ty = self.method_as_value(node, obj_type as i32, static_owner_sym, field)
-                if method_value_ty != 0: return method_value_ty
-                let mutating = self.method_has_mut_self_flag(static_owner_sym, field) or self.builtin_method_requires_mutable_receiver(static_owner_sym, field)
-                if mutating:
-                    let owner_name = with_str_clone_ref(self.pool_resolve(static_type_sym))
-                    let method_name = with_str_clone_ref(self.pool_resolve(field))
-                    self.emit_error("cannot reference mutating method `" ++ owner_name ++ "." ++ method_name ++ "` as a first-class function value (§15.4); wrap in a closure: `(x, ...) => x." ++ method_name ++ "(...)`", node)
+                if method_value_ty != 0: return if method_value_ty < 0: 0 else: method_value_ty
 
         if obj_type == 0:
             return 0
@@ -23158,6 +23146,13 @@ impl Sema:
         // The fields of a type a facade generates belong to its generated
         // code (its liveness flag, the views of its parents, what it keeps
         // for C): outside it the only one a program names is `.repr`.
+        // D223 (§9.3a): `x.method` without a call is not a value.
+        if field_base != 0 and self.struct_field_type(field_base as i32, field) == 0:
+            let bound_owner = self.method_owner_symbol_for_type(field_base as i32)
+            if bound_owner != 0 and (self.lookup_method_fn(bound_owner, field) != 0 or self.lookup_generic_method_fn(bound_owner, field) != 0):
+                let recv_text = render_expr(self.ast, self.pool, expr as NodeId, 0)
+                self.emit_error_with_help(f"`{recv_text}.{self.pool_resolve(field)}` without a call is not a value (§9.3a)", node, f"write the closure: `() => {recv_text}.{self.pool_resolve(field)}()`; the method itself is `{self.type_name(field_base as i32)}.{self.pool_resolve(field)}`")
+                return 0
         let rendering = self.facade_rendered_file_of(field_base as i32)
         // A record an operation returns (D210's step result) is plain data
         // for the program: it wraps nothing, so it has no `repr`.
@@ -44275,15 +44270,20 @@ impl Sema:
             let generic_fn = self.lookup_generic_method_fn(owner_sym, field)
             let generic_node = if generic_fn != 0: self.generic_fn_node_for_symbol(generic_fn) else: 0
             let meta = if generic_node != 0: self.ast.find_fn_meta(generic_node) else: -1
-            if meta < 0: return 0
+            if meta < 0:
+                // A method the compiler implements itself (`List[i32].len`)
+                // has no function to name yet.
+                if self.builtin_method_intrinsic(owner_ty, self.pool_resolve(field)) == MirIntrinsic.NONE and self.builtin_sig_row_lookup(owner_ty, field) < 0: return 0
+                self.emit_error_with_help(f"`{self.type_name(owner_ty)}.{self.pool_resolve(field)}` is built into the compiler and is not yet a function value (§9.3a)", node, "write the closure: `(x) => x." ++ self.pool_resolve(field) ++ "(…)`")
+                return -1
             self.check_method_visible(generic_fn, node)
             let method_name = f"{self.type_name(owner_ty)}.{self.pool_resolve(field)}"
             if self.ast.fn_meta_tp_count(meta) > 0:
                 self.emit_error_with_help(f"`{method_name}` has type parameters of its own, so it names no one function (§9.3a)", node, "write the closure, which fixes them by its use: `(x) => x." ++ self.pool_resolve(field) ++ "(…)`")
-                return 0
+                return -1
             if self.get_type_kind(self.resolve_alias(owner_ty as TypeId)) != TypeKind.TY_GENERIC_INST:
                 self.emit_error_with_help(f"`{method_name}` is a method of a generic type and the type's arguments are missing (§9.3a)", node, "name the instance: `" ++ self.pool_resolve(owner_sym) ++ "[…]." ++ self.pool_resolve(field) ++ "`")
-                return 0
+                return -1
             let is_static = self.receiver_mode_from_param(self.ast.fn_meta_param_start(meta), self.ast.fn_meta_param_count(meta)) == ReceiverMode.None
             let no_args: List[i32] = []
             self.check_generic_method_call(owner_sym, owner_ty, generic_fn, is_static as i32, 0, no_args, -1, -1, node)
