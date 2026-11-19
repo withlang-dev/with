@@ -36,10 +36,9 @@ by reference, since the place differs by alternative), blanks what the
 other alternatives scheduled for drop, and on a failed guard restores only
 the matched alternative's moves.
 
-**Not yet.** A list pattern that takes elements inside an alternative has
-its own log, which is not split by alternative: it is refused at lowering,
-never lowered wrongly. Alternatives nested inside a payload, and `if let`
-with `|`, are not in the grammar.
+**Not in the grammar.** Alternatives nested inside a payload, and `if let`
+with `|`. (A list pattern that takes elements inside an alternative was
+refused at first; #3459 logs the takes by alternative as well.)
 
 **Reopen if** the one-type rule proves too strict where the types differ
 only by a view of the same value.
