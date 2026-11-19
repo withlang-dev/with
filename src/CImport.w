@@ -19444,6 +19444,21 @@ fn ci_fp_named_function(session: i64, value: i32) -> str:
     let kind = if ty >= 0: with_ci_type_kind(session, ty) else: 0
     if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: with_ci_cursor_spelling(session, c) else: "?"
 
+// D211: whether a whole-record value is one the proofs follow. A variable
+// of the package that is not a parameter holds only what its own writes
+// gave it, and those are evidence (a field's set is drawn over every
+// instance of the record); so does a choice between two such, and an
+// initializer list is read field by field. A record reached through a
+// pointer, returned by a call, or received as a parameter may hold what a
+// caller wrote.
+fn ci_fp_record_value_followed(session: i64, value: i32) -> bool:
+    let c = ci_peel_transparent(session, value)
+    let kind = with_ci_cursor_kind(session, c)
+    if kind == CXK_INIT_LIST or kind == CXK_COMPOUND_LITERAL: return true
+    if kind == CXK_CONDITIONAL_OP and with_ci_num_children(session, c) == 3:
+        return ci_fp_record_value_followed(session, with_ci_child(session, c, 1)) and ci_fp_record_value_followed(session, with_ci_child(session, c, 2))
+    kind == CXK_DECL_REF and not with_ci_cursor_references_parameter(session, c)
+
 fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
     if cursor < 0 or ci_unevaluated(session, cursor): return ""
     var out = ""
@@ -19459,8 +19474,12 @@ fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
     // compound literal on the right is read field by field below.
     if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
         let whole = ci_fp_record_of(session, with_ci_cursor_type(session, with_ci_child(session, cursor, 0)))
-        let value_kind = with_ci_cursor_kind(session, ci_peel_transparent(session, with_ci_child(session, cursor, 1)))
-        if whole.len() > 0 and value_kind != CXK_INIT_LIST and value_kind != CXK_COMPOUND_LITERAL: out = out ++ "fw\t" ++ whole ++ "\t=\t?\t" ++ loc ++ "\n"
+        if whole.len() > 0 and not ci_fp_record_value_followed(session, with_ci_child(session, cursor, 1)): out = out ++ "fw\t" ++ whole ++ "\t=\t?\t" ++ loc ++ "\n"
+    // The same for a record variable initialized from a value.
+    if kind == CXK_VAR_DECL and nc >= 1:
+        let whole = ci_fp_record_of(session, with_ci_cursor_type(session, cursor))
+        let init = with_ci_child(session, cursor, nc - 1)
+        if whole.len() > 0 and with_ci_cursor_kind(session, init) >= 100 and not ci_fp_record_value_followed(session, init): out = out ++ "fw\t" ++ whole ++ "\t=\t?\t" ++ loc ++ "\n"
     if kind == CXK_INIT_LIST:
         let record = ci_fp_record_of(session, with_ci_cursor_type(session, cursor))
         if record.len() > 0: out = out ++ ci_fp_init_list_writes(session, cursor, record, loc)
