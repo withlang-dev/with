@@ -30745,6 +30745,10 @@ impl Sema:
         // When a mutating closure captures a place, sibling arguments may not
         // retain access to the same place (owned move, view, or iterator).
         self.check_closure_capture_conflicts(resolved_extra_start, resolved_arg_count, has_resolved, node, 0)
+        for ai in 0..resolved_arg_count:
+            let takes_place = if sig_idx >= 0: ai + param_offset < self.sig_get_param_count(sig_idx) and self.sig_param_is_mut(sig_idx, ai + param_offset) else: callable_value_tid != 0 and self.fn_type_param_is_mut(callable_value_tid, ai)
+            if takes_place:
+                self.refuse_captures_overlapping(if has_resolved: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai), resolved_extra_start, resolved_arg_count, has_resolved, node)
 
         // For unknown functions (no signature), conservatively mark all non-Copy args as moved.
         // For known functions, consuming-effect args are marked moved in the per-param loop below.
@@ -38683,6 +38687,12 @@ impl Sema:
 
         // mut.md Rev 8 §9.2 — closure capture conflict detection.
         self.check_closure_capture_conflicts(extra_start, mc_resolved_arg_count, mc_has_resolved_args, node, expr)
+        if mc_param_offset_for_resolution != 0 and mc_owner_sym_for_effect != 0 and (self.method_has_mut_self_flag(mc_owner_sym_for_effect, field) or self.builtin_method_requires_mutable_receiver(mc_owner_sym_for_effect, field)):
+            self.refuse_captures_overlapping(expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args, node)
+        if mc_sig_idx_for_effect >= 0:
+            for ai in 0..mc_resolved_arg_count:
+                if ai + mc_param_offset_for_resolution < self.sig_get_param_count(mc_sig_idx_for_effect) and self.sig_param_is_mut(mc_sig_idx_for_effect, ai + mc_param_offset_for_resolution):
+                    self.refuse_captures_overlapping(if mc_has_resolved_args: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai), extra_start, mc_resolved_arg_count, mc_has_resolved_args, node)
 
         let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, mc_resolved_arg_count, node)
         if inferred_pending_receiver != 0:
@@ -44172,6 +44182,42 @@ impl Sema:
 
     // §3.2: `recv` is the receiver of a method call (0 for a free call). It
     // holds its place for the call exactly as an argument does.
+    // D218 (§3.2): a closure passed in the same call may not capture a view
+    // of any place that overlaps a `mut` receiver or `mut` argument, for
+    // reading or writing. `mut_place` is that receiver or argument.
+    mut fn refuse_captures_overlapping(mut_place: i32, extra_start: i32, arg_count: i32, has_resolved: bool, node: i32):
+        let root = self.place_root_sym(mut_place)
+        if root == 0: return
+        // The first field of the place under its root, 0 when the place is
+        // the root itself: `x.items.each_mut(…)` holds `x.items`.
+        var first_field = 0
+        var walk = mut_place
+        while walk != 0:
+            let kind = self.ast.kind(walk)
+            if kind == NodeKind.NK_IDENT: break
+            if kind == NodeKind.NK_FIELD_ACCESS and self.ast.kind(self.ast.get_data0(walk)) == NodeKind.NK_IDENT: first_field = self.ast.get_data1(walk)
+            walk = self.ast.get_data0(walk)
+        for ci in 0..arg_count:
+            var closure_node = if has_resolved: self.get_resolved_call_arg(node, ci) else: self.ast.get_extra(extra_start + ci)
+            while closure_node > 0 and self.ast.kind(closure_node) == NodeKind.NK_GROUPED: closure_node = self.ast.get_data0(closure_node)
+            if closure_node <= 0 or closure_node == mut_place or self.ast.kind(closure_node) != NodeKind.NK_CLOSURE or self.ast.is_move_closure(closure_node): continue
+            var captures_root = false
+            for si in 0..self.closure_capture_summary_count(closure_node):
+                if self.closure_capture_summary_sym(closure_node, si) == root: captures_root = true
+            if not captures_root: continue
+            let closure_body = self.ast.get_data0(closure_node)
+            var overlaps = true
+            if first_field != 0 and self.capture_is_field_only(closure_body, root) != 0:
+                while self.capture_field_syms.len() > 0:
+                    self.capture_field_syms.pop()
+                    self.capture_field_kinds.pop()
+                self.collect_capture_fields(closure_body, root)
+                overlaps = false
+                for field_sym in self.capture_field_syms:
+                    if field_sym == first_field: overlaps = true
+            if overlaps:
+                self.emit_error_with_help(f"`{self.pool_resolve(root)}` is held as a `mut` place for this call, and a closure passed in the same call captures it (§3.2)", closure_node, "a callee that brackets work on its `mut` place passes it to the closure: `x.scope((s) => …)`; or read what the closure needs into a `let` before the call")
+
     mut fn check_closure_capture_conflicts(extra_start: i32, arg_count: i32, has_resolved: bool, node: i32, recv: i32):
         // Collect closure args that mutably capture a place.
         var ci: i32 = 0
