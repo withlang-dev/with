@@ -17806,16 +17806,23 @@ impl Sema:
         self.pattern_subject_node = subject
         self.pattern_subject_owned = subject != 0 and self.subject_is_owned(subject)
 
-    // §9.7 (D115, D144): an owned subject — a temporary, a place moved with
-    // `move`, a by-value parameter (dies with the frame) — is taken apart
-    // by value. A `self` receiver that borrows the caller's place (`fn`,
-    // `mut fn`), a `mut` parameter, a local and a field are places.
+    // §9.7 (D115, D144): an owned subject — one that is itself a temporary,
+    // a by-value parameter (dies with the frame) or a `move fn` receiver,
+    // or a place moved with `move` — is taken apart by value. A `self`
+    // receiver that borrows the caller's place (`fn`, `mut fn`), a `mut`
+    // parameter, a local, and a field or an element of anything are places.
     fn subject_is_owned(subject: i32) -> bool:
         var expr = subject
         while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
             expr = self.ast.get_data0(expr)
         if expr == 0 or self.ast.kind(expr) == NodeKind.NK_MOVE_ARG:
             return true
+        // A field or an element is a place whatever it is under (Eric,
+        // 2026-11-19): `match p.e:` on a by-value `p` observes the field as
+        // it does on a local. Only the whole owned subject is taken apart.
+        let subject_kind = self.ast.kind(expr)
+        if subject_kind == NodeKind.NK_FIELD_ACCESS or subject_kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or subject_kind == NodeKind.NK_INDEX or subject_kind == NodeKind.NK_MULTI_INDEX:
+            return false
         let root = self.place_root_sym(expr)
         if root == 0:
             return true
