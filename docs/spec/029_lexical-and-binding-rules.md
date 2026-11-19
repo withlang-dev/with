@@ -134,6 +134,12 @@ This removes the naming ceremony of pure narrowing chains (`s`,
 old binding would still be live after the new declaration, the rebind
 is still an error.
 
+A parameter is a local binding of its function, so the exception applies
+to it (D220). When the initializer reads a value that has no destructor,
+the read ends the old binding as a move would: it is unusable from that
+point on, in every scope and on every later loop iteration. The rebind is
+refused while a view of the old binding is live.
+
 **A local shadows a module-scope function, without fallback (D173).** A
 local binding may take the name of a module-scope function; within its scope
 the name resolves to the local, for every use. Name resolution first, type

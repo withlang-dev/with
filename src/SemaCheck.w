@@ -18578,7 +18578,10 @@ impl Sema:
             self.emit_error("`let _ = ...` is not the detach spelling for Task values; use statement position to detach, or bind and cancel(task)", node)
 
         let had_binding = self.scope_has(name)
+        let copy_consumed = self.note_copy_consuming_rebind(name, value)
         if self.scope_put_consuming_rebind_at(name, bind_type as i32, is_mut, node) == 0:
+            // A refused rebind consumed nothing.
+            if copy_consumed >= 0: self.bind_states[copy_consumed] = VarState.LIVE
             return self.ty_void as i32
         self.binding_decl_nodes.insert(name, node)
         self.binding_value_nodes.insert(name, value)
@@ -21118,6 +21121,11 @@ impl Sema:
                     if self.is_stable_global(target_sym):
                         let gn = with_str_clone_ref(self.pool_resolve(target_sym))
                         self.emit_error("cannot rebind global `" ++ gn ++ "`; declared as `global` (stable). Use `global var " ++ gn ++ " = ...` to allow rebinding, or mutate the existing value (§15.12)", node)
+                    else if self.binding_is_parameter(target_sym):
+                        // D220 (§9): a parameter is an immutable binding.
+                        // The two real intents each have a spelling.
+                        let pn = self.pool_resolve(target_sym)
+                        self.emit_error_with_help(f"cannot assign to the parameter `{pn}`: a parameter is an immutable binding (§9)", node, f"for a local copy write `var {pn} = {pn}` before this line; to change the caller's variable declare the parameter `mut {pn}`")
                     else:
                         self.emit_error("cannot assign to immutable variable", node)
         else:
@@ -41402,6 +41410,42 @@ impl Sema:
         self.borrow_path_counts.pop()
         self.borrow_scope_depths.pop()
         self.borrow_creation_nodes.pop()
+
+    // Whether the name is bound as a parameter of the function being
+    // checked: its binding sits in the parameters' scope, the one the
+    // function's bindings start at.
+    fn binding_is_parameter(sym: i32) -> bool:
+        let found = self.scope_name_map.get(sym)
+        if not found.is_some(): return false
+        let idx: i32 = found.unwrap()
+        var body_start = self.bind_names.len()
+        var in_params = false
+        for start in self.scope_starts:
+            if in_params:
+                body_start = start
+                in_params = false
+            if start == self.current_fn_bind_start: in_params = true
+        idx >= self.current_fn_bind_start and idx < body_start
+
+    // D220 (§29.8): the consuming rebind for a value with no destructor.
+    // `var x = x` reads the old binding in its own initializer, and the name
+    // then means the new one, so that read is the old binding's last use.
+    // A Copy value is not moved by a read, so the exception (which looks for
+    // a moved binding) never saw it. A binding something still views stays
+    // live after the declaration and is not consumed.
+    // Returns the binding it marked consumed, or -1.
+    mut fn note_copy_consuming_rebind(sym: i32, value: i32) -> i32:
+        let found = self.scope_name_map.get(sym)
+        if not found.is_some() or value == 0: return -1
+        let idx: i32 = found.unwrap()
+        if self.bind_states[idx] != VarState.LIVE or self.expr_uses_symbol(value, sym) == 0: return -1
+        if self.is_copy(self.bind_types[idx] as TypeId) == 0: return -1
+        for other in self.bind_names:
+            if other == sym: continue
+            for k in 0..self.binding_view_dep_count(other):
+                if self.binding_view_dep_at(other, k) == sym: return -1
+        self.bind_states[idx] = VarState.MOVED
+        idx
 
     fn expr_uses_symbol(node: i32, sym: i32) -> i32:
         if node == 0:
