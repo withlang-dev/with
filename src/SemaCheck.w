@@ -27406,6 +27406,8 @@ impl Sema:
 
         // Save borrow state — closure body borrows are local to the closure.
         let saved_borrow_len = self.borrow_kinds.len()
+        let saved_borrow_floor = self.closure_body_borrow_floor
+        self.closure_body_borrow_floor = saved_borrow_len
 
         self.push_scope()
         // #1827: a `return` in the closure drops the closure's bindings.
@@ -27650,6 +27652,7 @@ impl Sema:
         // Restore borrow state — discard borrows created inside closure body.
         while self.borrow_kinds.len() > saved_borrow_len:
             self.remove_borrow_at(self.borrow_refs.len() - 1)
+        self.closure_body_borrow_floor = saved_borrow_floor
 
         // Provisional for direct arguments; finalize_closure_arg_checks
         // revokes this marker if the complete receiving contract escapes.
@@ -27669,6 +27672,7 @@ impl Sema:
             while ci < outer_count:
                 let cap_sym: i32 = self.bind_names[ci]
                 if not self.binding_index_is_global(ci, cap_sym) and self.expr_uses_symbol(body, cap_sym) != 0:
+                    if sema_debug_borrows_enabled(): with_eprint(f"[borrow] closure {node} captures {self.pool_resolve(cap_sym)} writes={self.closure_capture_writes(node, cap_sym)}")
                     if self.capture_is_field_only(body, cap_sym) != 0:
                         // Field-level capture: register borrow per field path
                         // Clear transient capture field storage
@@ -27676,17 +27680,26 @@ impl Sema:
                             self.capture_field_syms.pop()
                             self.capture_field_kinds.pop()
                         self.collect_capture_fields(body, cap_sym)
+                        // The field scan sees an assignment to a field; when
+                        // the summary says the capture is written and the
+                        // scan found no written field (a mutating call
+                        // through one), every captured field is held
+                        // exclusively.
+                        let unseen_write = self.closure_capture_writes(node, cap_sym) and not self.capture_field_kinds.contains(BorrowKind.EXCLUSIVE)
+                        if self.closure_capture_writes(node, cap_sym): self.check_capture_write_against_views(cap_sym, node, not unseen_write)
                         var fi = 0
                         while fi < self.capture_field_syms.len():
                             let field_sym: i32 = self.capture_field_syms[fi]
-                            let bk: i32 = self.capture_field_kinds[fi]
+                            let bk: i32 = if unseen_write: BorrowKind.EXCLUSIVE else: self.capture_field_kinds[fi]
                             let path_start = self.borrow_path_mark()
                             self.borrow_path_data.push(field_sym)
                             self.check_borrow_create_direct(cap_sym, bk, field_sym, path_start, 1, node)
                             fi = fi + 1
                     else:
                         // Whole-variable capture
-                        let bk = if self.expr_mutates_place(body, cap_sym) != 0: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+                        let writes = self.closure_capture_writes(node, cap_sym)
+                        if writes: self.check_capture_write_against_views(cap_sym, node, false)
+                        let bk = if writes: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
                         let path_start = self.borrow_path_mark()
                         self.check_borrow_create_direct(cap_sym, bk, 0, path_start, 0, node)
                 ci = ci + 1
@@ -30576,7 +30589,7 @@ impl Sema:
         // mut.md Rev 8 §9.2 — closure capture conflict detection.
         // When a mutating closure captures a place, sibling arguments may not
         // retain access to the same place (owned move, view, or iterator).
-        self.check_closure_capture_conflicts(resolved_extra_start, resolved_arg_count, has_resolved, node)
+        self.check_closure_capture_conflicts(resolved_extra_start, resolved_arg_count, has_resolved, node, 0)
 
         // For unknown functions (no signature), conservatively mark all non-Copy args as moved.
         // For known functions, consuming-effect args are marked moved in the per-param loop below.
@@ -38514,7 +38527,7 @@ impl Sema:
             mc_ibi = mc_ibi - 1
 
         // mut.md Rev 8 §9.2 — closure capture conflict detection.
-        self.check_closure_capture_conflicts(extra_start, mc_resolved_arg_count, mc_has_resolved_args, node)
+        self.check_closure_capture_conflicts(extra_start, mc_resolved_arg_count, mc_has_resolved_args, node, expr)
 
         let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, mc_resolved_arg_count, node)
         if inferred_pending_receiver != 0:
@@ -41125,7 +41138,7 @@ impl Sema:
                 continue
             let live = self.borrow_liveness_at(i, err_node)
             if live.state == BORROW_DEAD:
-                self.remove_borrow_at(i)
+                if self.borrow_outlives_closure_body(i): i = i + 1 else: self.remove_borrow_at(i)
                 continue
             if live.state == BORROW_DEAD_HERE:
                 i = i + 1
@@ -41215,6 +41228,15 @@ impl Sema:
         while kept.len() > 0:
             self.diags.emit(kept.pop().unwrap())
 
+    // A borrow made before the closure whose body is being checked. Inside
+    // that body its view has no later use, because the use is in the
+    // enclosing function; that is not the view's death, and the entry must
+    // survive the body (#615: it was removed here, so the write the closure
+    // makes during its call was never judged against the view). The capture
+    // is judged where the closure is created (check_capture_write_against_views,
+    // register_view_binding_borrows).
+    fn borrow_outlives_closure_body(i: isize) -> bool: i < self.closure_body_borrow_floor
+
     mut fn check_mutation_against_views(place_node: i32, err_node: i32):
         // #3061: a write to an index loop's list inside its body (`xs.push`,
         // `xs[j] = …`) keeps the loop indexed: an element loop could not mutate it.
@@ -41262,7 +41284,7 @@ impl Sema:
                 continue
             let live = self.borrow_liveness_at(i, err_node)
             if live.state == BORROW_DEAD:
-                self.remove_borrow_at(i)
+                if self.borrow_outlives_closure_body(i): i = i + 1 else: self.remove_borrow_at(i)
                 continue
             if live.state == BORROW_DEAD_HERE:
                 i = i + 1
@@ -43968,7 +43990,34 @@ impl Sema:
             return self.arg_accessed_field_of(self.ast.get_data0(arg_node), sym)
         -1
 
-    mut fn check_closure_capture_conflicts(extra_start: i32, arg_count: i32, has_resolved: bool, node: i32):
+    // A closure passed to a call writes its capture during that call, so a
+    // view of the place that is live at the call is invalidated exactly as
+    // by a direct write (#615). The writes inside the body are judged with
+    // the body as the span, where the outer view has no later use; this is
+    // the same check at the call, in the enclosing function. `fields_known`:
+    // the field scan saw every write (capture_field_kinds marks the written
+    // fields), so a view of another field is disjoint. The scan also lists
+    // a method's name as a field (`xs.push`), which is why an unseen write
+    // is judged against the whole place.
+    mut fn check_capture_write_against_views(sym: i32, closure_node: i32, fields_known: bool):
+        if sema_debug_borrows_enabled(): with_eprint(f"[borrow] closure {closure_node} writes its capture {self.pool_resolve(sym)} fields_known={fields_known} entries={self.borrow_kinds.len()}")
+        for i in 0..self.borrow_kinds.len():
+            if sema_debug_borrows_enabled(): with_eprint(f"[borrow]   entry{i} place={self.pool_resolve(self.borrow_places[i])} ref={self.borrow_refs[i]} state={self.borrow_liveness_at(i, closure_node).state}")
+            if self.borrow_places[i] != sym or self.borrow_refs[i] <= 0: continue
+            if fields_known and self.borrow_path_counts[i] > 0:
+                let viewed = self.borrow_path_data[self.borrow_path_starts[i]]
+                var written = false
+                for fi in 0..self.capture_field_syms.len():
+                    if self.capture_field_syms[fi] == viewed and self.capture_field_kinds[fi] == BorrowKind.EXCLUSIVE: written = true
+                if not written: continue
+            let live = self.borrow_liveness_at(i, closure_node)
+            if live.state != BORROW_LIVE: continue
+            self.diags.emit(self.mutation_under_view_diag(sym, i, live, closure_node))
+            return
+
+    // §3.2: `recv` is the receiver of a method call (0 for a free call). It
+    // holds its place for the call exactly as an argument does.
+    mut fn check_closure_capture_conflicts(extra_start: i32, arg_count: i32, has_resolved: bool, node: i32, recv: i32):
         // Collect closure args that mutably capture a place.
         var ci: i32 = 0
         while ci < arg_count:
@@ -43982,7 +44031,9 @@ impl Sema:
             var bi = 0
             while bi < bind_count:
                 let cap_sym: i32 = self.bind_names[bi]
-                if self.expr_mutates_place(closure_body, cap_sym) != 0:
+                if self.closure_capture_writes(closure_node, cap_sym):
+                    if recv != 0 and self.place_root_sym(recv) == cap_sym:
+                        self.emit_error(f"the receiver `{self.pool_resolve(cap_sym)}` holds its place for the call, and a closure in the same call writes it (§3.2)", closure_node)
                     // §9.2: if the closure only accesses specific fields, use
                     // field-level disjointness to avoid false conflicts.
                     let field_only = self.capture_is_field_only(closure_body, cap_sym)
@@ -44018,7 +44069,7 @@ impl Sema:
                                         fi = fi + 1
                             if conflict != 0:
                                 let cap_name = with_str_clone_ref(self.pool_resolve(cap_sym))
-                                self.emit_error("argument retains access to `" ++ cap_name ++ "` which is mutably captured by a closure in the same call (§15.7)", node)
+                                self.emit_error("argument retains access to `" ++ cap_name ++ "` which is mutably captured by a closure in the same call (§3.2)", node)
                         si = si + 1
                 bi = bi + 1
             ci = ci + 1

@@ -1,4 +1,4 @@
-//! expect-error: argument retains access to `bag` which is mutably captured by a closure in the same call (§15.7)
+//! expect-error: argument retains access to `bag` which is mutably captured by a closure in the same call (§3.2)
 
 // §13.2 — user libraries may mark iterator constructors with
 // `@[iter_of_self]`. The returned iterator then retains shared access to the
