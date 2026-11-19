@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.69
+# The With Programming Language — Specification v7.70
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.70:** D218 (Eric, 2026-11-19). §9.3: a closure checked against a function type with a `mut` parameter receives that parameter as `mut`; the literal need not repeat it. Implemented, with the literal's own spelling `(mut b: T) => …`. Still NOT implemented from D218: an unbound `mut fn` as a value, and the §3.2 capture rule.
+
 **Changelog v7.69:** D218 (Eric, 2026-11-19). §3.8a: a function type states the mode, `fn(mut T) -> R`; it is a different type from `fn(T) -> R` and neither converts to the other; a call through such a value follows the direct call's rules; a C function pointer type has no `mut` parameter. Implemented for named functions as values; a closure checked against such a type (§9.3) and the §3.2 capture rule are NOT yet implemented.
 
 **Changelog v7.68:** #958 (delegated, D222). §18.5b.3: operands after `-n` or `-p` code are input files, read in order in place of stdin; `filename` and `fnr` are bound; `-i` with `-p` writes each file back through a sibling and a rename. Implemented.

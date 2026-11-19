@@ -397,6 +397,9 @@ The `=>` token means "produces this value" and is used in both closures
 and match arms. The `->` token is reserved exclusively for return type
 annotations (e.g., `fn foo() -> i32`).
 
+A closure checked against a function type with a `mut` parameter receives
+that parameter as `mut`; the literal need not repeat it (§3.8a, D218).
+
 Implicit `it` parameter (see §9.3.1):
 ```
 items |> filter(it.age > 21) |> map(it.name)
