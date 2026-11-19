@@ -9537,12 +9537,14 @@ impl Parser:
         // #1832: a trailing `...` makes a C variadic function-pointer type.
         var variadic = false
         // D218 (§3.8a): `fn(mut T) -> R` states the parameter's mode.
-        var mut_mask = 0
+        var mut_mask: i32 = 0
+        var mut_bit: i32 = 1
         if self.peek() == TokenKind.TK_DOT_DOT_DOT:
             variadic = true
             self.advance()
         else if self.peek() != TokenKind.TK_R_PAREN:
-            if self.fn_type_param_is_mut(): mut_mask = mut_mask | 1
+            if self.fn_type_param_is_mut(): mut_mask = mut_mask | mut_bit
+            mut_bit = mut_bit << 1
             let ty = self.parse_fn_type_param_type()
             params.push(ty as i32)
             self.skip_newlines()
@@ -9556,7 +9558,8 @@ impl Parser:
                     self.advance()
                     self.skip_newlines()
                     break
-                if self.fn_type_param_is_mut(): mut_mask = mut_mask | (1 << (params.len() as u32))
+                if self.fn_type_param_is_mut(): mut_mask = mut_mask | mut_bit
+                mut_bit = mut_bit << 1
                 let ty2 = self.parse_fn_type_param_type()
                 params.push(ty2 as i32)
                 self.skip_newlines()
