@@ -21,7 +21,7 @@ use std.collections.Minted
 
 // One alternative of an or-pattern (#823): the local that says which
 // alternative matched, this one's index, and its span of the move log.
-type OrAltLog { alt_local: i32, alt: i32, start: isize, end: isize }
+type OrAltLog { alt_local: i32, alt: i32, start: isize, end: isize, take_start: isize, take_end: isize }
 
 type ScopeEntry {
     local_id: i32,
@@ -11738,54 +11738,38 @@ impl MirBuilder:
     // blanked, so the binding's scheduled drop frees nothing. A binding place
     // is a whole local, or one element of a tuple rest binding (#1366).
     mut fn restore_pattern_moves(start: isize):
-        self.restore_pattern_move_span(start, self.pattern_move_log.len(), self.or_alt_logs.len())
-        // The remainder is back in the subject (a `..rest` moved it out);
-        // now the elements taken out of the subject go back into it.
-        self.restore_pattern_takes(start)
-
-    // The log's [from, to), newest first. Where an or-pattern's
-    // alternatives logged their moves inside it (#823), only the one that
-    // matched moved anything: its entries are restored on a switch over the
-    // matched alternative. `row_limit` keeps an alternative's own row out
-    // of the search inside it (a nested or-pattern's rows come first).
-    mut fn restore_pattern_move_span(from: isize, to: isize, row_limit: isize):
-        var pick = -1
-        var at = 0
+        // #823: an or-pattern is the whole of an arm's pattern, and only
+        // the alternative that matched moved or took anything: its entries
+        // are restored on a switch over the matched alternative.
+        var alt_local = -1
         for row in self.or_alt_logs:
-            // An alternative that moved nothing has nothing to put back
-            // (and an empty span would never shrink the search).
-            if at < row_limit and row.end > row.start and row.start >= from and row.end <= to: pick = row.alt_local
-            at += 1
-        if pick < 0:
-            self.restore_pattern_move_entries(from, to)
+            if row.start >= start: alt_local = row.alt_local
+        if alt_local < 0:
+            self.restore_pattern_move_entries(start, self.pattern_move_log.len())
+            // The remainder is back in the subject (a `..rest` moved it
+            // out); now the elements taken out of the subject go back.
+            self.restore_pattern_takes(start)
             return
-        var lo = to
-        var hi = from
-        let rows = []
-        at = 0
-        for row in self.or_alt_logs:
-            if at < row_limit and row.alt_local == pick and row.end > row.start and row.start >= from and row.end <= to:
-                rows.push(at)
-                if row.start < lo: lo = row.start
-                if row.end > hi: hi = row.end
-            at += 1
-        self.restore_pattern_move_entries(hi, to)
         let join_bb = self.new_block()
         let vals = []
         let targets = []
-        for ri in rows:
-            vals.push(self.or_alt_logs[ri].alt as i64)
-            targets.push(self.new_block() as i32)
+        for row in self.or_alt_logs:
+            if row.start >= start and row.alt_local == alt_local:
+                vals.push(row.alt as i64)
+                targets.push(self.new_block() as i32)
         let table = self.body.new_switch_table(vals, targets)
-        self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, self.place_for_local(pick)), table, join_bb, 0)
+        self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, self.place_for_local(alt_local)), table, join_bb, 0)
         var ti = 0
-        for ri in rows:
-            self.switch_to(targets[ti] as BlockId)
-            self.restore_pattern_move_span(self.or_alt_logs[ri].start, self.or_alt_logs[ri].end, ri)
-            self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
-            ti += 1
+        for row in self.or_alt_logs:
+            if row.start >= start and row.alt_local == alt_local:
+                self.switch_to(targets[ti] as BlockId)
+                self.restore_pattern_move_entries(row.start, row.end)
+                self.restore_pattern_take_entries(row.take_start, row.take_end)
+                self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+                ti += 1
         self.switch_to(join_bb)
-        self.restore_pattern_move_span(from, lo, row_limit)
+        let take_mark = self.take_log_mark_for(start)
+        while self.pattern_take_log.len() > take_mark: self.pattern_take_log.pop()
 
     mut fn restore_pattern_move_entries(start: isize, end: isize):
         var i = end - 2
@@ -11809,7 +11793,12 @@ impl MirBuilder:
         // The take log is cut at the same arm boundary as the move log: both
         // are recorded per arm and truncated together (take_log_mark).
         let start = self.take_log_mark_for(move_log_start)
-        var i = self.pattern_take_log.len() - 3
+        self.restore_pattern_take_entries(start, self.pattern_take_log.len())
+        while self.pattern_take_log.len() > start: self.pattern_take_log.pop()
+
+    // The take log's [start, end), newest first.
+    mut fn restore_pattern_take_entries(start: isize, end: isize):
+        var i = end - 3
         while i >= start:
             let bind_place: i32 = self.pattern_take_log[i]
             let list_place: i32 = self.pattern_take_log[i + 1]
@@ -11828,7 +11817,6 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, bind_place, blank_rv, 0)
             self.body.mark_local_ever_moved(self.body.place_locals[bind_place])
             i = i - 3
-        while self.pattern_take_log.len() > start: self.pattern_take_log.pop()
 
     // The take log's length when the move log had `move_log_start` entries:
     // each arm records its move-log mark; the take log is marked alongside.
@@ -12293,13 +12281,13 @@ impl MirBuilder:
         let alias_base = self.alias_syms.len()
         var alias_end = alias_base
         let ref_base = self.or_alias_refs.len()
-        let take_base = self.pattern_take_log.len()
         let first = []
         let drop_marks = []
         let tail_bbs = []
         for pi in 0..p_count:
             drop_marks.push(self.drop_local_ids.len())
             let log_start = self.pattern_move_log.len()
+            let take_start = self.pattern_take_log.len()
             self.switch_to(alt_bbs[pi] as BlockId)
             let bound = self.lower_pattern(self.ast.get_extra(p_start + pi), scrutinee_place)
             // A place binding names a different place in each alternative:
@@ -12321,12 +12309,12 @@ impl MirBuilder:
             else:
                 var bi = bind_end
                 while bi < self.bind_syms.len():
-                    self.merge_or_binding(bind_base, bind_end, self.bind_syms[bi], self.bind_local_ids[bi], log_start, span)
+                    self.merge_or_binding(bind_base, bind_end, self.bind_syms[bi], self.bind_local_ids[bi], log_start, take_start, span)
                     bi += 1
                 while self.bind_syms.len() > bind_end:
                     self.bind_syms.pop()
                     self.bind_local_ids.pop()
-            self.or_alt_logs.push(OrAltLog { alt_local, alt: pi, start: log_start, end: self.pattern_move_log.len() })
+            self.or_alt_logs.push(OrAltLog { alt_local, alt: pi, start: log_start, end: self.pattern_move_log.len(), take_start, take_end: self.pattern_take_log.len() })
             // A block's statements are written in one go, and what this path
             // must blank is known only once every alternative is lowered:
             // the blanking gets a block of its own.
@@ -12334,9 +12322,7 @@ impl MirBuilder:
             self.terminate(TermKind.TK_GOTO, tail_bb, 0, 0, 0)
             tail_bbs.push(tail_bb as i32)
         drop_marks.push(self.drop_local_ids.len())
-        // A list take has its own log, which is not split by alternative
-        // yet: refused here, never lowered wrongly.
-        if self.pattern_take_log.len() > take_base: self.mark_unsupported()
+        // A list take is logged by alternative too (take_start, take_end).
         for pi in 0..p_count:
             self.switch_to(tail_bbs[pi] as BlockId)
             var di = drop_marks[0]
@@ -12391,7 +12377,7 @@ impl MirBuilder:
     // first alternative's local for that name, and the move-log entries
     // that named `local` name the shared one, so a failed guard puts the
     // value back from where the arm holds it.
-    mut fn merge_or_binding(base: isize, end: isize, sym: i32, local: i32, log_start: isize, span: i32):
+    mut fn merge_or_binding(base: isize, end: isize, sym: i32, local: i32, log_start: isize, take_start: isize, span: i32):
         var shared = -1
         var i = base
         while i < end:
@@ -12409,6 +12395,11 @@ impl MirBuilder:
         while li < self.pattern_move_log.len():
             if self.body.place_locals[self.pattern_move_log[li]] == local: self.pattern_move_log[li] = shared_place
             li += 2
+        // An element taken out of a list goes back from the shared local too.
+        var ki = take_start
+        while ki < self.pattern_take_log.len():
+            if self.body.place_locals[self.pattern_take_log[ki]] == local: self.pattern_take_log[ki] = shared_place
+            ki += 3
         if not self.copy_is_bits(ty):
             let zop = self.body.gen_zero_operand(ty)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, self.place_for_local(local), self.body.new_rvalue(RvalueKind.RK_USE, zop, 0, 0), 0)
