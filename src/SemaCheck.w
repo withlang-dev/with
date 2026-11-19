@@ -23105,6 +23105,13 @@ impl Sema:
                     self.require_unsafe_operation("reading a union field other than the last-written field requires unsafe", node)
         let static_type_sym = self.static_receiver_base_sym(expr)
         let static_expr_kind = self.ast.kind(expr)
+        // D223: `Box[i32].count`, a method of the instance the type names.
+        if (static_expr_kind == NodeKind.NK_INDEX or static_expr_kind == NodeKind.NK_MULTI_INDEX) and self.receiver_names_type(expr):
+            let inst_ty = self.static_type_receiver_type(expr)
+            let inst_owner = if inst_ty != 0: self.method_owner_symbol_for_type(inst_ty) else: 0
+            if inst_owner != 0:
+                let inst_method_ty = self.method_as_value(node, inst_ty, inst_owner, field)
+                if inst_method_ty != 0: return inst_method_ty
         if static_type_sym != 0 and self.static_receiver_type_is_known(expr) and (static_expr_kind == NodeKind.NK_IDENT or static_expr_kind == NodeKind.NK_TYPE_NAMED):
             let static_prim = self.primitive_type_by_sym(static_type_sym)
             if static_prim != 0:
@@ -43052,6 +43059,8 @@ impl Sema:
     // D32 (§2.2): a `Type.Member` path (enum variant constructor, static
     // member) is not a field read — nothing moves out of a type name.
     fn d32_base_is_type_name(fa_node: i32) -> bool:
+        // `Box[i32].count` as a value (D223): the base is the instance's name.
+        if self.method_value_fns.contains(fa_node): return true
         var b = self.ast.get_data0(fa_node)
         while b != 0 and self.ast.kind(b) == NodeKind.NK_GROUPED:
             b = self.ast.get_data0(b)
@@ -43092,7 +43101,8 @@ impl Sema:
         var n = node
         while n != 0 and self.ast.kind(n) == NodeKind.NK_GROUPED:
             n = self.ast.get_data0(n)
-        if n != 0 and self.ast.kind(n) == NodeKind.NK_FIELD_ACCESS: true else: false
+        // `Type.method` as a value (D223) names a function, not a field.
+        n != 0 and self.ast.kind(n) == NodeKind.NK_FIELD_ACCESS and not self.method_value_fns.contains(n)
 
     mut fn d32_base_is_temporary(fa_node: i32) -> bool:
         if self.place_root_sym(fa_node) != 0:
@@ -43222,7 +43232,7 @@ impl Sema:
                 leaf = self.ast.get_data2(leaf)
             else:
                 break
-        if leaf == 0 or self.ast.kind(leaf) != NodeKind.NK_FIELD_ACCESS:
+        if leaf == 0 or not self.d32_is_field_access(leaf):
             return
         let fty_opt = self.typed_expr_types.get(leaf)
         let fty = if fty_opt.is_some(): fty_opt.unwrap() else: 0
@@ -44252,11 +44262,34 @@ impl Sema:
     // checked, as for a call. 0 when `field` names no method with a body
     // of its own.
     mut fn method_as_value(node: i32, owner_ty: i32, owner_sym: i32, field: i32) -> i32:
-        let method_fn = self.lookup_method_fn(owner_sym, field)
-        let sig = self.lookup_method_sig(owner_sym, field)
-        if method_fn == 0 or sig < 0: return 0
-        self.check_method_visible(method_fn, node)
-        self.ensure_body_typed(method_fn, sig)
+        var method_fn = self.lookup_method_fn(owner_sym, field)
+        var sig = self.lookup_method_sig(owner_sym, field)
+        if method_fn != 0 and sig >= 0:
+            self.check_method_visible(method_fn, node)
+            self.ensure_body_typed(method_fn, sig)
+        else:
+            // A method of a generic type: the type's arguments fix the
+            // instance (`Box[i32].count`), as the receiver's type does at a
+            // call. A method with type parameters of its own has no one
+            // instance to name.
+            let generic_fn = self.lookup_generic_method_fn(owner_sym, field)
+            let generic_node = if generic_fn != 0: self.generic_fn_node_for_symbol(generic_fn) else: 0
+            let meta = if generic_node != 0: self.ast.find_fn_meta(generic_node) else: -1
+            if meta < 0: return 0
+            self.check_method_visible(generic_fn, node)
+            let method_name = f"{self.type_name(owner_ty)}.{self.pool_resolve(field)}"
+            if self.ast.fn_meta_tp_count(meta) > 0:
+                self.emit_error_with_help(f"`{method_name}` has type parameters of its own, so it names no one function (§9.3a)", node, "write the closure, which fixes them by its use: `(x) => x." ++ self.pool_resolve(field) ++ "(…)`")
+                return 0
+            if self.get_type_kind(self.resolve_alias(owner_ty as TypeId)) != TypeKind.TY_GENERIC_INST:
+                self.emit_error_with_help(f"`{method_name}` is a method of a generic type and the type's arguments are missing (§9.3a)", node, "name the instance: `" ++ self.pool_resolve(owner_sym) ++ "[…]." ++ self.pool_resolve(field) ++ "`")
+                return 0
+            let is_static = self.receiver_mode_from_param(self.ast.fn_meta_param_start(meta), self.ast.fn_meta_param_count(meta)) == ReceiverMode.None
+            let no_args: List[i32] = []
+            self.check_generic_method_call(owner_sym, owner_ty, generic_fn, is_static as i32, 0, no_args, -1, -1, node)
+            sig = self.resolved_call_sigs.get(node) ?? -1
+            if sig < 0: return 0
+            method_fn = self.sig_names[sig]
         let mode = self.sig_receiver_mode(sig)
         let param_count = self.sig_get_param_count(sig)
         let params: List[i32] = []
