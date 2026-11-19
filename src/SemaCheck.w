@@ -26479,15 +26479,12 @@ impl Sema:
     // temporary or a place moved with `move`, and observed when it names a
     // place. A pattern with no subject expression (a parameter, a loop
     // item) owns the value it is given.
+    // Whether a slice pattern takes its subject apart. One test with every
+    // other binding (pattern_subject_root_owned): this had its own, which
+    // left out a parameter, so in a match that consumed its parameter the
+    // list was only viewed and never dropped (#3461).
     fn slice_pattern_subject_owned(subject_type: i32) -> bool:
-        if self.get_type_kind(self.resolve_alias(subject_type as TypeId)) == TypeKind.TY_REF:
-            return false
-        var expr = self.pattern_subject_node
-        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
-            expr = self.ast.get_data0(expr)
-        if expr == 0 or self.ast.kind(expr) == NodeKind.NK_MOVE_ARG:
-            return true
-        self.place_root_sym(expr) == 0
+        self.get_type_kind(self.resolve_alias(subject_type as TypeId)) != TypeKind.TY_REF and self.pattern_subject_root_owned(self.pattern_subject_node)
 
     fn pattern_subject_ref_mutability(subject_type: i32) -> i32:
         if subject_type == 0:
