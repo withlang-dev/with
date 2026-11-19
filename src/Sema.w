@@ -8573,7 +8573,17 @@ impl Sema:
         // body's own scope may consume-rebind it (`var state = move state`).
         // The parameters sit one scope below the body's, which kept the
         // exception from ever reaching them.
-        let rebinds_param = depth >= 2 and self.scope_starts[(depth - 2)] == self.current_fn_bind_start and idx >= self.current_fn_bind_start
+        // The parameters' scope is the first that starts where the
+        // function's bindings start. A function with no parameters has an
+        // empty one, and its body's scope starts at the same index: only
+        // the first is the parameters', so a nested block of the body is
+        // not mistaken for the body (D220).
+        var params_depth = -1
+        var at = 0
+        for start in self.scope_starts:
+            if params_depth < 0 and start == self.current_fn_bind_start: params_depth = at
+            at += 1
+        let rebinds_param = depth >= 2 and params_depth == depth - 2 and idx >= self.current_fn_bind_start and idx < current_start
         if (idx < current_start and not rebinds_param) or self.bind_states[idx] != VarState.MOVED:
             let name = with_str_clone_ref(self.pool_resolve(sym))
             self.emit_error("shadowing is not allowed for '" ++ name ++ "'" ++ self.shadowed_binding_origin_note(sym, if existing.is_some(): existing.unwrap() else: -1), node)
