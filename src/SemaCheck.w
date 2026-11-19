@@ -44007,8 +44007,8 @@ impl Sema:
             if fields_known and self.borrow_path_counts[i] > 0:
                 let viewed = self.borrow_path_data[self.borrow_path_starts[i]]
                 var written = false
-                for fi in 0..self.capture_field_syms.len():
-                    if self.capture_field_syms[fi] == viewed and self.capture_field_kinds[fi] == BorrowKind.EXCLUSIVE: written = true
+                for (field, kind) in self.capture_field_syms.iter().zip(self.capture_field_kinds.iter()):
+                    if field == viewed and kind == BorrowKind.EXCLUSIVE: written = true
                 if not written: continue
             let live = self.borrow_liveness_at(i, closure_node)
             if live.state != BORROW_LIVE: continue
