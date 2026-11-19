@@ -854,6 +854,7 @@ type AstPoolState {
     module_header_files: List[i32],
     module_header_names: List[i32],
     frozen: i32,
+    adapter_node_count: i32,                             // nodes Sema wrote for built-in method values (D223, add_adapter_node)
 }
 
 // A counted handle over the node tables (#2449), as InternPool is: `clone()`
@@ -1011,6 +1012,7 @@ fn AstPool.new -> AstPool:
             default_body_clone_index: HashMap.new(),
             generated_debug_type_syms: List.new(),
             frozen: 0,
+            adapter_node_count: 0,
         }
     let st = ptr
     st.kinds.push(0)
@@ -1047,6 +1049,34 @@ impl AstPool:
         self.state.int_literal_radices.push(0)
         self.state.files.push(self.state.current_file_id)
         idx as NodeId
+
+    // D223: the one door through the freeze. A built-in method named as a
+    // value (`List[i32].len`) is the closure a person would write for it,
+    // and Sema is the first phase that knows the method: it writes that
+    // closure's nodes here, at the span and in the file of `like`, the
+    // expression they stand for. Nothing else adds to a frozen pool; the
+    // nodes are counted (`adapter_node_count`) so an audit can tell them
+    // from what the parser read.
+    mut fn add_adapter_node(like: NodeId, kind: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
+        let idx = self.state.kinds.len() as i32
+        self.state.kinds.push(kind)
+        self.state.starts.push(self.state.starts[like as i32])
+        self.state.ends.push(self.state.ends[like as i32])
+        self.state.data0.push(d0)
+        self.state.data1.push(d1)
+        self.state.data2.push(d2)
+        self.state.literal_suffixes.push(LiteralSuffix.None)
+        self.state.int_literal_digit_idxs.push(-1)
+        self.state.int_literal_radices.push(0)
+        self.state.files.push(self.state.files[like as i32])
+        self.state.adapter_node_count += 1
+        idx as NodeId
+
+    mut fn add_adapter_extra(value: i32) -> i32:
+        self.state.extra.push(value)
+        self.state.extra.len() as i32 - 1
+
+    fn adapter_node_count() -> i32: self.state.adapter_node_count
 
     // Add extra data, returns the index in the extra array.
     mut fn add_extra(value: i32) -> i32:

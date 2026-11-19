@@ -27581,7 +27581,12 @@ impl Sema:
             let p_sym = self.ast.get_extra(extra_start + pi * 2)
             let p_type_node = self.ast.get_extra(extra_start + pi * 2 + 1)
             var p_ty = self.ty_i32 as i32
-            if p_type_node > 0:
+            let adapter_ty: i32 = self.method_adapter_param_types.get(node * 64 + pi) ?? 0
+            if adapter_ty != 0:
+                // D223: the closure the compiler writes for a built-in
+                // method named as a value states its parameters' types here.
+                p_ty = adapter_ty
+            else if p_type_node > 0:
                 let explicit_ty = self.resolve_type_expr(p_type_node)
                 if explicit_ty != 0:
                     p_ty = explicit_ty as i32
@@ -44250,6 +44255,64 @@ impl Sema:
             if not captures_root or self.closure_capture_writes(closure_node, root): continue
             if first_field == 0 or not self.closure_names_only_other_fields(closure_node, root, first_field):
                 self.emit_error_with_help(f"`{self.pool_resolve(root)}` is held as a `mut` place for this call, and a closure passed in the same call captures it (§3.2)", closure_node, "a callee that brackets work on its `mut` place passes it to the closure: `x.scope((s) => …)`; or read what the closure needs into a `let` before the call")
+    // D223: a method the compiler implements itself (`List[i32].len`) has no
+    // function to name, so its value is the closure a person would write,
+    // `(x, a) => x.method(a)`, written here and checked like any other: the
+    // receiver in the method's mode (builtin_method_receiver_mode), each
+    // argument at its declared type (the BuiltinSigs row). -1 after an error.
+    mut fn builtin_method_as_value(node: i32, owner_ty: i32, owner_sym: i32, field: i32) -> i32:
+        // A second check of the same expression (a D93 round) reuses the
+        // closure the first one wrote.
+        if self.method_value_closures.contains(node):
+            let written = self.check_expr(self.method_value_closures.get(node).unwrap())
+            if written != 0: self.typed_expr_types.insert(node, written)
+            return if written == 0: -1 else: written
+        let row = self.builtin_sig_row_for(owner_ty, field)
+        let arg_count = if row < 0: 0 else if self.builtin_sig_required[row] >= 0: self.builtin_sig_required[row] else: self.builtin_sig_modes[row].len() as i32
+        let mode = self.builtin_method_receiver_mode(owner_sym, field)
+        let has_receiver = mode != ReceiverMode.None
+        let like = node as NodeId
+        let arg_types = []
+        for ai in 0..arg_count:
+            let arg_ty = self.method_expected_arg_type(owner_ty, field, ai)
+            if arg_ty == 0:
+                self.emit_error_with_help(f"`{self.type_name(owner_ty)}.{self.pool_resolve(field)}` has type parameters of its own, so it names no one function (§9.3a)", node, "write the closure, which fixes them by its use: `(x) => x." ++ self.pool_resolve(field) ++ "(…)`")
+                return -1
+            arg_types.push(arg_ty)
+        // The call `recv.method(args…)`, or `Type.method(args…)` for a
+        // method with no receiver.
+        let recv_sym = self.pool_intern("__method_value_receiver")
+        let callee_base = if has_receiver: self.ast.add_adapter_node(like, NodeKind.NK_IDENT, recv_sym, 0, 0) as i32 else: self.ast.get_data0(node)
+        let callee = self.ast.add_adapter_node(like, NodeKind.NK_FIELD_ACCESS, callee_base, field, 0) as i32
+        let arg_nodes = []
+        let arg_syms = []
+        for ai in 0..arg_count:
+            let arg_sym = self.pool_intern(f"__method_value_arg{ai}")
+            arg_syms.push(arg_sym)
+            arg_nodes.push(self.ast.add_adapter_node(like, NodeKind.NK_IDENT, arg_sym, 0, 0) as i32)
+        let call_extra = self.ast.extra_len()
+        for arg_node in arg_nodes: self.ast.add_adapter_extra(arg_node)
+        let call = self.ast.add_adapter_node(like, NodeKind.NK_CALL, callee, call_extra, arg_count) as i32
+        let params_extra = self.ast.extra_len()
+        if has_receiver:
+            self.ast.add_adapter_extra(recv_sym)
+            self.ast.add_adapter_extra(0)
+        for arg_sym in arg_syms:
+            self.ast.add_adapter_extra(arg_sym)
+            self.ast.add_adapter_extra(0)
+        let param_count = arg_count + (has_receiver as i32)
+        let closure = self.ast.add_adapter_node(like, NodeKind.NK_CLOSURE, call, params_extra, param_count) as i32
+        if has_receiver:
+            self.method_adapter_param_types.insert(closure * 64, if mode == ReceiverMode.Read: self.ensure_exact_type(TypeKind.TY_REF, owner_ty, 0, 0) as i32 else: owner_ty)
+            if mode == ReceiverMode.Mut: self.ast.set_fn_type_mut_mask(closure as NodeId, 1)
+        for ai in 0..arg_count:
+            self.method_adapter_param_types.insert(closure * 64 + ai + (has_receiver as i32), arg_types[ai])
+        let closure_ty = self.check_expr(closure)
+        if closure_ty == 0: return -1
+        self.method_value_closures.insert(node, closure)
+        self.typed_expr_types.insert(node, closure_ty)
+        closure_ty
+
     // D223 (§9.3a): `Type.method` names the method as a function value. Its
     // first parameter is the receiver, in the mode the method declares:
     // `&T` for `fn`, `mut T` for `mut fn`, `T` for `move fn`; a method with
@@ -44274,11 +44337,8 @@ impl Sema:
             let generic_node = if generic_fn != 0: self.generic_fn_node_for_symbol(generic_fn) else: 0
             let meta = if generic_node != 0: self.ast.find_fn_meta(generic_node) else: -1
             if meta < 0:
-                // A method the compiler implements itself (`List[i32].len`)
-                // has no function to name yet.
                 if self.builtin_method_intrinsic(owner_ty, self.pool_resolve(field)) == MirIntrinsic.NONE and self.builtin_sig_row_lookup(owner_ty, field) < 0: return 0
-                self.emit_error_with_help(f"`{self.type_name(owner_ty)}.{self.pool_resolve(field)}` is built into the compiler and is not yet a function value (§9.3a)", node, "write the closure: `(x) => x." ++ self.pool_resolve(field) ++ "(…)`")
-                return -1
+                return self.builtin_method_as_value(node, owner_ty, owner_sym, field)
             self.check_method_visible(generic_fn, node)
             let method_name = f"{self.type_name(owner_ty)}.{self.pool_resolve(field)}"
             if self.ast.fn_meta_tp_count(meta) > 0:

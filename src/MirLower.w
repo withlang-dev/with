@@ -17432,7 +17432,13 @@ impl MirBuilder:
             // the body owns it and drops what it did not move on (#1363: an
             // unused `(_) => ""` fallback leaked the Err payload; any unused
             // owned closure argument leaked).
-            if not self.copy_is_bits(param_ty):
+            // D218 (§3.8a): a `mut` parameter is the caller's place, which
+            // the caller still owns: the body never drops it. (Dropped
+            // here, `push(ys, 5)` through `(mut r: List[i32], a) =>
+            // r.push(a)` freed the caller's list.)
+            if self.sema.fn_type_param_is_mut(callable_ty, i):
+                child.body.mark_caller_place_local(local)
+            else if not self.copy_is_bits(param_ty):
                 child.schedule_drop(local, DropKind.DK_VALUE)
         child.body.n_params = (captures.len() + param_count) as i32
         child.expected_type = ret_ty
@@ -17660,6 +17666,8 @@ impl MirBuilder:
             self.implicit_iter_arg_active = saved_active
             return self.body.new_operand(OperandKind.OK_MOVE, iter_place)
         if node > 0 and self.sema.numeric_member_fns.contains(node): return self.lower_numeric_member(node, self.sema.numeric_member_fns.get(node).unwrap())
+        // D223: a built-in method named as a value is the closure Sema wrote.
+        if node > 0 and self.sema.method_value_closures.contains(node): return self.lower_expr(self.sema.method_value_closures.get(node).unwrap())
         // D223: `Type.method` as a value is the method's function constant.
         if node > 0 and self.sema.method_value_fns.contains(node): return self.fn_const_operand(self.sema.method_value_fns.get(node).unwrap(), self.sema.typed_expr_types.get(node) ?? 0, node)
         var op = self.lower_expr_node(node)
