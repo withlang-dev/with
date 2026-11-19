@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D223 — `Type.method` names the method as a function value: the receiver is its first parameter in the method's own mode; the bound form `x.method` is refused in every mode (ruled)](2026-11-19-D223-type-method-names-the-method-as-a-function-value.md)
 - [D222 — One-liners read files and edit them in place: operands after `-n`/`-p` code are input files, `filename` and `fnr` are bound, `-i` writes back through a sibling and a rename (delegated)](2026-11-18-D222-one-liners-read-files-and-edit-them-in-place.md)
 - [D221 — The alternatives of an or-pattern share their bindings: same names, one type each, one binding per name; sugar for the duplicated arms (delegated)](2026-11-18-D221-the-alternatives-of-an-or-pattern-share-their-bindings.md)
 - [D220 — A parameter is an immutable binding, and §29.8's consuming rebind applies to it: `var x = x` is the local copy (ruled)](2026-11-18-D220-a-parameter-is-an-immutable-binding-and-the-consuming-rebind-applies-to-it.md)

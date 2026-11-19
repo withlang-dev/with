@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.71
+# The With Programming Language — Specification v7.72
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.72:** D223 (Eric, 2026-11-19). §9.3a (new): methods as values. `Type.method` names the method as a function value whose first parameter is the receiver in the method's own mode (`&T`, `mut T`, `T`); a method with no receiver has none; found and visibility-checked as for a call; `x.method` without a call is not a value. Implemented for methods declared in With source; compiler-implemented methods (`List[i32].len`) are NOT yet values.
+
 **Changelog v7.71:** D218 (Eric, 2026-11-19). §3.2: a closure passed in the same call may not capture a view of any place that overlaps a `mut` receiver or `mut` argument, for reading or writing; a callee that brackets work on it passes it to the closure. Implemented (a writing capture was already refused; a reading one is now). Another field of the same variable than the one the call holds does not overlap. No program in the tree was affected.
 
 **Changelog v7.70:** D218 (Eric, 2026-11-19). §9.3: a closure checked against a function type with a `mut` parameter receives that parameter as `mut`; the literal need not repeat it. Implemented, with the literal's own spelling `(mut b: T) => …`. Still NOT implemented from D218: an unbound `mut fn` as a value, and the §3.2 capture rule.

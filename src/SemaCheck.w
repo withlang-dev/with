@@ -44288,14 +44288,13 @@ impl Sema:
                 self.emit_error_with_help(f"`{method_name}` is a method of a generic type and the type's arguments are missing (§9.3a)", node, "name the instance: `" ++ self.pool_resolve(owner_sym) ++ "[…]." ++ self.pool_resolve(field) ++ "`")
                 return -1
             let is_static = self.receiver_mode_from_param(self.ast.fn_meta_param_start(meta), self.ast.fn_meta_param_count(meta)) == ReceiverMode.None
-            let no_args: List[i32] = []
-            self.check_generic_method_call(owner_sym, owner_ty, generic_fn, is_static as i32, 0, no_args, -1, -1, node)
+            self.check_generic_method_call(owner_sym, owner_ty, generic_fn, is_static as i32, 0, [], -1, -1, node)
             sig = self.resolved_call_sigs.get(node) ?? -1
             if sig < 0: return 0
             method_fn = self.sig_names[sig]
         let mode = self.sig_receiver_mode(sig)
         let param_count = self.sig_get_param_count(sig)
-        let params: List[i32] = []
+        let params = []
         for pi in 0..param_count:
             var p_ty = self.sig_param_type(sig, pi)
             if pi == 0 and mode != ReceiverMode.None:
@@ -44303,7 +44302,7 @@ impl Sema:
                 if self.get_type_kind(bare) == TypeKind.TY_REF: p_ty = self.get_type_d0(bare)
                 if mode == ReceiverMode.Read: p_ty = self.ensure_exact_type(TypeKind.TY_REF, p_ty, 0, 0) as i32
             params.push(p_ty)
-        let mask = self.sig_mut_param_mask(sig) | (if mode == ReceiverMode.Mut: 1 else: 0)
+        let mask = self.sig_mut_param_mask(sig) | ((mode == ReceiverMode.Mut) as i32)
         let fn_tid = self.moded_callable_type(self.ensure_fn_type(params, param_count, self.sig_return_type(sig) as TypeId) as i32, mask)
         self.note_call_edge(method_fn, node)
         self.fn_callable_values.insert(node, 1)
