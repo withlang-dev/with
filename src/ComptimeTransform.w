@@ -239,6 +239,8 @@ fn astpool_clone_deep(src: &AstPool) -> AstPool:
             out.state.unsafe_fn_type_nodes.insert(ni, 1)
         if src.state.variadic_fn_type_nodes.contains(ni):
             out.state.variadic_fn_type_nodes.insert(ni, 1)
+        if src.state.fn_type_mut_masks.contains(ni):
+            out.state.fn_type_mut_masks.insert(ni, src.state.fn_type_mut_masks.get(ni).unwrap())
         let effect_pin_count = src.fn_effect_pin_count(node)
         for pi in 0..effect_pin_count:
             out.add_fn_effect_pin(node, src.fn_effect_pin_param(node, pi), src.fn_effect_pin_bits(node, pi))

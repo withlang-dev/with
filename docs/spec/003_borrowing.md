@@ -474,6 +474,11 @@ let id = add_node(pool, leaf)      // pool is mutated in place
   passed on to another `mut` parameter or used as a `mut` receiver.
 - Exclusivity and activation follow §3.2 and §3.2a.
 - A receiver `mut fn` is the same mode on the first parameter.
+- A function type states the mode: `fn(mut T) -> R` is the type of a
+  function whose parameter is `mut`. It is a different type from
+  `fn(T) -> R`, and neither converts to the other. A call through a value
+  of this type follows the same rules as a direct call. A C function
+  pointer type has no `mut` parameter (D218).
 
 ### 3.9 Implicit Trait Object Coercion
 

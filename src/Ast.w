@@ -806,6 +806,7 @@ type AstPoolState {
     fn_target_arch: HashMap[i32, i32, Minted],   // fn_node → @[target("arch")] arch name sym
     unsafe_fn_type_nodes: HashMap[i32, i32, Minted],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
     variadic_fn_type_nodes: HashMap[i32, i32, Minted],  // NK_TYPE_EXTERN_FN node → 1 if `extern "C" fn(A, ...)` (#1832)
+    fn_type_mut_masks: HashMap[i32, i32, Minted],       // NK_TYPE_FN node → bit i set when parameter i is `mut` (D218, §3.8a)
     fn_effect_pin_starts: HashMap[i32, i32, Minted],   // fn_node → first entry in fn_effect_pin_*
     fn_effect_pin_counts: HashMap[i32, i32, Minted],   // fn_node → entry count
     fn_effect_pin_params: List[i32],            // param_name_sym
@@ -990,6 +991,7 @@ fn AstPool.new -> AstPool:
             module_header_names: List.new(),
             unsafe_fn_type_nodes: HashMap.new(),
             variadic_fn_type_nodes: HashMap.new(),
+            fn_type_mut_masks: HashMap.new(),
             fn_effect_pin_starts: HashMap.new(),
             fn_effect_pin_counts: HashMap.new(),
             fn_effect_pin_params: List.new(),
@@ -2254,6 +2256,12 @@ impl AstPool:
         self.state.variadic_fn_type_nodes.insert(node as i32, 1)
 
     fn is_variadic_fn_type_node(node: NodeId) -> bool: self.state.variadic_fn_type_nodes.contains(node as i32)
+
+    mut fn set_fn_type_mut_mask(node: NodeId, mask: i32):
+        self.state.fn_type_mut_masks.insert(node as i32, mask)
+
+    // Which parameters of a function type are `mut` (D218): bit i for parameter i.
+    fn fn_type_mut_mask(node: NodeId) -> i32: self.state.fn_type_mut_masks.get(node as i32) ?? 0
 
     fn is_unsafe_fn_type_node(node: NodeId) -> bool:
         if self.state.unsafe_fn_type_nodes.contains(node as i32): return true
