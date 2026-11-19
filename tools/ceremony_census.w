@@ -41,6 +41,15 @@
 // line `pattern<TAB>area<TAB>bar<TAB>ceiling<TAB>why` (the PR says why too).
 // A grant names the bar it was made against and lapses once the bar moves.
 //
+// The bar file holds the counts (`pattern<TAB>area<TAB>n`) and, for the
+// typed patterns, each site (`site<TAB>pattern<TAB>area<TAB>path<TAB>line
+// text`), so a typed rise names the lines the bar did not have (#3452).
+// The typed patterns come from one compilation, and a generic body is typed
+// only where some instance of it exists: a call added in one place can make
+// an old line elsewhere count for the first time. The report says so for a
+// site in a file the tree did not change; the fix is the same (remove the
+// ceremony there, or grant it).
+//
 //   with run tools/ceremony_census.w                   # check against the bar
 //   with run tools/ceremony_census.w --record-bar FILE # write this tree's counts as a bar
 //   with run tools/ceremony_census.w --sites PATTERN   # list one typed pattern's sites
@@ -231,6 +240,40 @@ fn typed_sites(compiler: &str) -> str:
         exit_code(2)
     read_file("out/ceremony-typed.txt") ?? ""
 
+// One typed site: its count's key (`pattern<TAB>area`), where it is, and
+// the text of its line.
+type Site { key: str, path: str, line: i64, text: str }
+
+fn source_line(path: &str, line: i64) -> str:
+    let lines = (read_file(path) ?? "").split("\n")
+    if line >= 1 and line <= lines.len(): lines[line - 1].trim().to_owned() else: ""
+
+// The sites of `key` the bar did not record, by file and line text. A site
+// in a file this tree did not change is an existing line, measured now
+// because the tree instantiates the generic body it is in.
+fn report_new_sites(key: &str, sites: &List[Site], bar_file: &str):
+    var known: HashMap[str, i64] = HashMap.new()
+    // A bar recorded before sites were kept has none: nothing to compare.
+    var bar_has_sites = false
+    for line in (read_file(bar_file) ?? "").split("\n"):
+        let cols = line.split("\t")
+        if cols.len() != 5 or cols[0] != "site": continue
+        bar_has_sites = true
+        if f"{cols[1]}\t{cols[2]}" == key:
+            let id = f"{cols[3]}\t{cols[4]}"
+            known.insert(id, (known.get(id) ?? 0) + 1)
+    if not bar_has_sites: return
+    let changed = changed_counted_files("origin/main")
+    for site in sites:
+        if site.key != key: continue
+        let id = f"{site.path}\t{site.text}"
+        let left = known.get(id) ?? 0
+        if left > 0:
+            known.insert(id, left - 1)
+            continue
+        let why = if changed.contains(site.path): "" else: " (this file is unchanged: the line is measured for the first time, because the tree now instantiates the generic body it is in)"
+        eprint(f"ceremony-census:   {site.path}:{site.line}: {site.text}{why}")
+
 fn read_counts(path: &str) -> HashMap[str, i64]:
     var counts: HashMap[str, i64] = HashMap.new()
     for line in (read_file(path) ?? "").split("\n"):
@@ -307,16 +350,25 @@ fn main:
     // a :dev stage1 checks it and counted 40 corpus sites of
     // some-at-option-demand under lib.
     let generated = corpus_dirs(&git_listing(&["git", "ls-files"], "ls"))
+    // #3452: a typed site is recorded with its line's text, so a rise names
+    // the lines the bar did not have. A generic body is typed only where
+    // some instance exists, so a count can rise through a call elsewhere:
+    // the line was there all along and is measured for the first time.
+    let sites = []
     for line in typed.split("\n"):
         let cols = line.split("\t")
         if cols.len() < 3: continue
         let path = if cols[1].starts_with("<embedded-std>/"): "lib/" ++ cols[1].slice("<embedded-std>/".len(), cols[1].len()) else: cols[1]
         // Build-generated modules (out/gen) are not source anyone writes.
-        if not path.starts_with("out/") and not under_any(path, &generated): census.bump(f"{cols[0]}\t{area_of(cols[1])}")
+        if not path.starts_with("out/") and not under_any(path, &generated):
+            census.bump(f"{cols[0]}\t{area_of(cols[1])}")
+            sites.push(Site { key: f"{cols[0]}\t{area_of(cols[1])}", path, line: string_to_int(cols[2]), text: source_line(path, string_to_int(cols[2])) })
     let bar_file = green_dir() ++ "/ceremony-bar.tsv"
     if record_bar_to.len() > 0:
         var text = ""
         for (key, n) in census.counts: text = text ++ f"{key}\t{n}\n"
+        // The sites follow the counts, five columns to the counts' three.
+        for site in sites: text = text ++ f"site\t{site.key}\t{site.path}\t{site.text}\n"
         if write_file(record_bar_to, text) != 0:
             eprint(f"ceremony-census: could not write {record_bar_to}")
             exit_code(2)
@@ -334,6 +386,7 @@ fn main:
         if now > ceiling:
             rose = rose + 1
             eprint(f"ceremony-census: {key.replace("\t", " in ")} rose {was} -> {now}; remove the new ceremony, or grant it in {ALLOWANCES} (`{key}\t{was}\t{now}\t<why>`) and say why in the PR")
+            report_new_sites(key, &sites, bar_file)
         else if now < was:
             print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> {now}; the bar follows at the next reseed")
     if rose > 0: exit_code(1)
