@@ -1725,20 +1725,10 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
 
     // §18.5b (#957): `-e` before the first `-n` runs once before the loop,
     // `-e` after the last once after it, and `last` is the final line.
-    args = List.new()
-    args |> push("-e")
-    args |> push("var m = \"\"")
-    args |> push("-n")
-    args |> push("if line.len() > m.len(): m = line")
-    args |> push("-e")
-    args |> push("print(m)")
+    args = ["-e", "var m = \"\"", "-n", "if line.len() > m.len(): m = line", "-e", "print(m)"]
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-before-and-after", args, "ab\nabcd\nabc\n", "abcd")
     if rc != 0: return rc
-    args = List.new()
-    args |> push("-n")
-    args |> push("")
-    args |> push("-e")
-    args |> push("print(nr)")
+    args = ["-n", "", "-e", "print(nr)"]
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-count-lines", args, "a\nb\nc\n", "3")
     if rc != 0: return rc
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-count-no-lines", args, "", "0")
@@ -1748,13 +1738,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     // A one-liner's own `last` is its own: nothing is bound over it.
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-own-last", bs_one_liner_args("-n", "let last = line.len(); print(last)"), "ab\n", "2")
     if rc != 0: return rc
-    args = List.new()
-    args |> push("-n")
-    args |> push("print(1)")
-    args |> push("-e")
-    args |> push("print(2)")
-    args |> push("-n")
-    args |> push("print(3)")
+    args = ["-n", "print(1)", "-e", "print(2)", "-n", "print(3)"]
     let between = bs_run_cli_capture(ctx, compiler_path, "one-liner-e-between-n", args, BS_HANG_GUARD_MS)
     if between.rc == 0:
         return bs_fail(ctx, "one-liner -e between two -n parts unexpectedly succeeded")

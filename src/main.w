@@ -588,7 +588,7 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
             if not looping:
                 // The `-e` parts seen so far run before the loop.
                 for part in result.code_parts: result.pre_parts.push(with_str_clone_ref(part))
-                result.code_parts = List.new()
+                result.code_parts = []
             result.mode = mode
             result.code_parts.push(with_arg_at(i + 1))
             i = i + 2
@@ -796,9 +796,17 @@ fn cli_synthetic_add_mapping(syn: CliSyntheticSource, start: i32, text: &str, so
     syn.source_texts.push(with_str_clone_ref(text))
     syn
 
+// One code part on a line of its own, mapped back to the argument it came
+// from so a diagnostic points at the user's text (§18.5b.7).
+fn cli_append_mapped(syn: CliSyntheticSource, mut source: StringBuilder, text: &str, name: &str) -> CliSyntheticSource:
+    let start = source.len() as i32
+    source.push_str(text)
+    source.push_str("\n")
+    cli_synthetic_add_mapping(syn, start, text, name)
+
 fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     var syn = cli_synthetic_source_new()
-    let source = StringBuilder.new()
+    var source = StringBuilder.new()
     source.push_str("use std.io\n")
     source.push_str("use std.str\n")
     source.push_str("use std.regex\n")
@@ -818,12 +826,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     source.push_str("use std.builtins\n\n")
     source.push_str(cli_build_args_binding(one.args))
     if one.mode == CliOneLinerMode.Eval:
-        for i in 0..one.code_parts.len():
-            let rewritten = cli_rewrite_semicolons(one.code_parts[i])
-            let start = source.len() as i32
-            source.push_str(rewritten)
-            source.push_str("\n")
-            syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -e #" ++ f"{i + 1}" ++ ">")
+        for i in 0..one.code_parts.len(): syn = cli_append_mapped(syn, source, cli_rewrite_semicolons(one.code_parts[i]), f"<cli -e #{i + 1}>")
         syn.source = source.to_str()
         return syn
     // The per-line loop takes a brace body (§29.13, the same AST as the
@@ -851,12 +854,10 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
         rewritten_parts.push(rewritten)
         use_lens.push(use_len)
     // §18.5b (#957): code that runs once before the loop.
-    for i in 0..one.pre_parts.len():
-        let before = cli_rewrite_semicolons(one.pre_parts[i])
-        let start = source.len() as i32
-        source.push_str(before)
-        source.push_str("\n")
-        syn = cli_synthetic_add_mapping(syn, start, before, f"<cli -e #{i + 1}>")
+    var eval_part = 0
+    for part in one.pre_parts:
+        eval_part += 1
+        syn = cli_append_mapped(syn, source, cli_rewrite_semicolons(part), f"<cli -e #{eval_part}>")
     // `last` is bound when the code names it and does not declare its own:
     // the loop holds every line, so "this is the final one" is known.
     var wants_last = false
@@ -876,12 +877,9 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     if not lines_mode: source.push_str("print(line)\n")
     source.push_str("}\n")
     // §18.5b (#957): code that runs once after the loop.
-    for i in 0..one.post_parts.len():
-        let after = cli_rewrite_semicolons(one.post_parts[i])
-        let start = source.len() as i32
-        source.push_str(after)
-        source.push_str("\n")
-        syn = cli_synthetic_add_mapping(syn, start, after, f"<cli -e #{one.pre_parts.len() + i + 1}>")
+    for part in one.post_parts:
+        eval_part += 1
+        syn = cli_append_mapped(syn, source, cli_rewrite_semicolons(part), f"<cli -e #{eval_part}>")
     syn.source = source.to_str()
     syn
 
