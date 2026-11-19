@@ -23147,7 +23147,7 @@ impl Sema:
         // code (its liveness flag, the views of its parents, what it keeps
         // for C): outside it the only one a program names is `.repr`.
         // D223 (§9.3a): `x.method` without a call is not a value.
-        if field_base != 0 and self.struct_field_type(field_base as i32, field) == 0:
+        if field_base != 0 and self.struct_field_type(field_base as i32, field) == 0 and self.enum_has_variant(field_base as i32, field) == 0:
             let bound_owner = self.method_owner_symbol_for_type(field_base as i32)
             if bound_owner != 0 and (self.lookup_method_fn(bound_owner, field) != 0 or self.lookup_generic_method_fn(bound_owner, field) != 0):
                 let recv_text = render_expr(self.ast, self.pool, expr as NodeId, 0)
@@ -44257,6 +44257,9 @@ impl Sema:
     // checked, as for a call. 0 when `field` names no method with a body
     // of its own.
     mut fn method_as_value(node: i32, owner_ty: i32, owner_sym: i32, field: i32) -> i32:
+        // `Type.name` is a variant before it is a method, as at a call
+        // (`Shape.Circle(2)` constructs).
+        if self.enum_has_variant(owner_ty, field) != 0: return 0
         var method_fn = self.lookup_method_fn(owner_sym, field)
         var sig = self.lookup_method_sig(owner_sym, field)
         if method_fn != 0 and sig >= 0:
