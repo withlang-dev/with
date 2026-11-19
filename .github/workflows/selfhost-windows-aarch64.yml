@@ -59,6 +59,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The unit-return review diffs against origin/main; a checkout of a
+      # dispatched branch has no such ref (#3471).
+      - name: Fetch main for the review base
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+
       - name: Fetch windows-aarch64 LLVM SDK
         run: |
           set -euo pipefail
