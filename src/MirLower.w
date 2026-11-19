@@ -209,6 +209,9 @@ type MirBuilder ephemeral {
     or_alt_nodes: List[i32],
     or_alt_locals: List[i32],
     or_alt_logs: List[OrAltLog],
+    // The reference locals of the or-pattern being bound, one per place
+    // binding of its first alternative.
+    or_alias_refs: List[i32],
     // #2289: the elements a slice pattern took out of an owned List, newest
     // last: (binding place, List place, 1 for a head, 0 for a tail). A failed
     // guard puts a head back through the prefix (restore_front) and a tail
@@ -401,6 +404,7 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         or_alt_nodes: [],
         or_alt_locals: [],
         or_alt_logs: [],
+        or_alias_refs: [],
         pattern_take_log: List.new(),
         take_log_marks: List.new(),
         with_cleanup_guard_locals: List.new(),
@@ -12285,6 +12289,8 @@ impl MirBuilder:
         let bind_base = self.bind_syms.len()
         var bind_end = bind_base
         let alias_base = self.alias_syms.len()
+        var alias_end = alias_base
+        let ref_base = self.or_alias_refs.len()
         let take_base = self.pattern_take_log.len()
         var first: List[i32] = []
         let drop_marks: List[i32] = []
@@ -12294,6 +12300,19 @@ impl MirBuilder:
             let log_start = self.pattern_move_log.len() as i32
             self.switch_to(alt_bbs[pi] as BlockId)
             let bound = self.lower_pattern(self.ast.get_extra(p_start + pi), scrutinee_place)
+            // A place binding names a different place in each alternative:
+            // the arm reaches it through a reference this path sets.
+            var ai = if pi == 0: alias_base else: alias_end
+            while ai < self.alias_syms.len():
+                self.share_or_alias(alias_base, alias_end, pi, ai, span)
+                ai += 1
+            if pi == 0:
+                alias_end = self.alias_syms.len()
+            else:
+                while self.alias_syms.len() > alias_end:
+                    self.alias_syms.pop()
+                    self.alias_places.pop()
+                    self.alias_types.pop()
             if pi == 0:
                 first = bound
                 bind_end = self.bind_syms.len()
@@ -12313,9 +12332,9 @@ impl MirBuilder:
             self.terminate(TermKind.TK_GOTO, tail_bb, 0, 0, 0)
             tail_bbs.push(tail_bb as i32)
         drop_marks.push(self.drop_local_ids.len() as i32)
-        // A place alias differs by alternative, and a list take has its own
-        // log: neither is merged yet, and neither is lowered wrongly.
-        if self.alias_syms.len() > alias_base or self.pattern_take_log.len() > take_base: self.mark_unsupported()
+        // A list take has its own log, which is not split by alternative
+        // yet: refused here, never lowered wrongly.
+        if self.pattern_take_log.len() > take_base: self.mark_unsupported()
         for pi in 0..p_count:
             self.switch_to(tail_bbs[pi] as BlockId)
             var di = drop_marks[0]
@@ -12329,7 +12348,34 @@ impl MirBuilder:
                 di += 1
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
         self.switch_to(join_bb)
+        // From here the names are the places the references hold.
+        var k = alias_base
+        while k < alias_end:
+            self.alias_places[k] = self.new_deref_place(self.place_for_local(self.or_alias_refs[ref_base + (k - alias_base)]))
+            k += 1
+        while self.or_alias_refs.len() > ref_base: self.or_alias_refs.pop()
         first
+
+    // Alias entry `ai` of alternative `pi`: its place goes into the
+    // reference local of that name, created with the first alternative.
+    mut fn share_or_alias(base: isize, end: isize, pi: i32, ai: isize, span: i32):
+        let sym = self.alias_syms[ai]
+        var slot = if pi == 0: ai - base else: -1
+        if pi > 0:
+            var i = base
+            while i < end:
+                if self.symbols_match(self.alias_syms[i], sym): slot = i - base
+                i += 1
+        let ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, self.alias_types[ai] as TypeId, 0, 0) as i32
+        if slot < 0 or ref_ty <= 0:
+            self.mark_unsupported()
+            return
+        let ref_base = self.or_alias_refs.len() - (if pi == 0: ai - base else: end - base)
+        if pi == 0: self.or_alias_refs.push(self.new_temp(ref_ty))
+        let ref_local = self.or_alias_refs[ref_base + slot]
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, ref_local, 0, span)
+        let kind = if self.sema.binding_observes_mutable_place.contains(sym): BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, self.place_for_local(ref_local), self.body.new_rvalue(RvalueKind.RK_REF, kind, self.alias_places[ai], 0), span)
 
     // The index in the first alternative's bindings [base, end) of `local`, or -1.
     fn or_first_binding_index(base: isize, end: isize, local: i32) -> isize:

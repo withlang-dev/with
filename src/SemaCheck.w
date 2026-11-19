@@ -26668,6 +26668,9 @@ impl Sema:
             // = pair` observes `pair`; taking it apart is spelled `move pair`.
             if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not self.type_is_plain_bits(subject_type):
                 self.pattern_place_bindings.insert(node, 1)
+                // #823: in an or-pattern the place differs by alternative,
+                // so lowering holds it by reference; the type exists for it.
+                self.ensure_exact_type(TypeKind.TY_REF, subject_type as TypeId, 0, 0)
                 self.scope_set_is_view_bound(sym)
                 self.record_view_binding_from_expr(sym, self.pattern_subject_node)
                 if self.place_root_is_mutable(self.pattern_subject_node):
