@@ -148,9 +148,12 @@ impl CiProject:
         if self.fnptr_verdicts_drawn: return
         self.fnptr_verdicts_drawn = true
         let seen: HashMap[str, i32] = HashMap.new()
-        let count: HashMap[str, i32] = HashMap.new()
-        let named: HashMap[str, str] = HashMap.new()
+        // Every writer of a field, in order, without repeats; `?` for a
+        // write that names no function.
+        let writers: HashMap[str, str] = HashMap.new()
         let fields = []
+        // A record handed to a call: (record, callee, where).
+        let handed = []
         for line in self.fnptr_evidence.split("\n"):
             if line.len() == 0 or seen.contains(line): continue
             seen.insert(line.to_owned(), 1)
@@ -158,27 +161,62 @@ impl CiProject:
             let record_key = if f.len() > 1: f[1] ++ ".*" else: ""
             if f[0] == "fw" and f.len() == 5 and f[2] == "*":
                 if not self.fnptr_verdicts.contains(record_key): self.fnptr_verdicts.insert(record_key, "why:an initializer of the record maps to no field, or a field's address is taken (" ++ f[4] ++ ")")
+            else if f[0] == "fw" and f.len() == 5 and f[2] == "=":
+                // D211: a whole-record assignment writes every function-pointer
+                // field from a source no field write names.
+                if not self.fnptr_verdicts.contains(record_key): self.fnptr_verdicts.insert(record_key, "why:the record is assigned whole, which writes every field from a source the proofs do not follow (" ++ f[4] ++ ")")
             else if f[0] == "fw" and f.len() == 5:
                 let key = f[1] ++ "." ++ f[2]
-                let so_far = count.get(key).copied() ?? 0
-                if so_far == 0:
+                if not writers.contains(key):
                     fields.push(key.to_owned())
-                    named.insert(key.to_owned(), f[3].to_owned())
-                else if so_far == 1:
-                    named.insert(key.to_owned(), with_str_clone_ref(named.get(key).unwrap()) ++ ", " ++ f[3])
-                count.insert(key, so_far + 1)
+                    writers.insert(key.to_owned(), f[3].to_owned())
+                else if not fd_name_list_has(writers.get(key).unwrap(), f[3]):
+                    writers.insert(key.to_owned(), with_str_clone_ref(writers.get(key).unwrap()) ++ ", " ++ f[3])
             else if f[0] == "ra" and f.len() == 4:
-                if not self.fnptr_verdicts.contains(record_key) and not self.fd_reads_callee(f[2]):
-                    self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is passed to " ++ (if f[2] == "?": "a function pointer" else: f[2]) ++ ", which the proofs cannot read (" ++ f[3] ++ ")")
+                handed.push(HandedRecord { record: f[1].to_owned(), callee: f[2].to_owned(), place: f[3].to_owned() })
             else if f[0] == "rc" and f.len() == 3:
                 if not self.fnptr_verdicts.contains(record_key): self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is converted to another pointer type (" ++ f[2] ++ ")")
+        // D211: a record handed to a call through a field has not left what
+        // the proofs read once that field's set is closed. The verdicts are
+        // a fixed point: a record that leaves closes none of its fields,
+        // which can make another record leave. The set of closed fields
+        // only shrinks, so this ends.
+        var changed = true
+        while changed:
+            changed = false
+            for h in handed:
+                let record_key = h.record ++ ".*"
+                if self.fnptr_verdicts.contains(record_key): continue
+                if h.callee.starts_with("*"):
+                    let field = h.callee.slice(1, h.callee.len())
+                    if self.fd_field_closed(&writers, field): continue
+                    self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is passed to a call through the function pointer field " ++ field ++ ", which the proofs do not close (" ++ h.place ++ ")")
+                else:
+                    if self.fd_reads_callee(h.callee): continue
+                    self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is passed to " ++ (if h.callee == "?": "a function pointer" else: h.callee) ++ ", which the proofs cannot read (" ++ h.place ++ ")")
+                changed = true
         for key in fields:
-            let writes = count.get(key).copied() ?? 0
-            let value = with_str_clone_ref(named.get(key).unwrap())
-            if writes > 1: self.fnptr_verdicts.insert(key, f"why:it is written in {writes} places (" ++ value ++ (if writes > 2: ", …)" else: ")"))
-            else if value == "?": self.fnptr_verdicts.insert(key, "why:its one write is not a named function")
-            else if not self.fd_reads_callee(value): self.fnptr_verdicts.insert(key, "why:its one write names " ++ value ++ ", which the proofs cannot read")
-            else: self.fnptr_verdicts.insert(key, "fn:" ++ value)
+            let names = with_str_clone_ref(writers.get(key).unwrap())
+            let unread = self.fd_first_unread_writer(names)
+            if unread == "?": self.fnptr_verdicts.insert(key, "why:a write of it is not a named function")
+            else if unread.len() > 0: self.fnptr_verdicts.insert(key, "why:a write of it names " ++ unread ++ ", which the proofs cannot read")
+            // D211: several writers, each a named function of the package, are
+            // the set the field holds.
+            else: self.fnptr_verdicts.insert(key, (if names.contains(", "): "fns:" else: "fn:") ++ names)
+
+    // The first writer in `names` the proofs cannot read (`?` for a write
+    // that names no function), or "" when every one is read.
+    fn fd_first_unread_writer(names: &str) -> str:
+        for name in names.split(", "):
+            if name == "?" or not self.fd_reads_callee(name): return name.to_owned()
+        ""
+
+    // Whether `Record.field`'s set is closed: its record has not left the
+    // proofs, and every write of it names a function they read.
+    fn fd_field_closed(writers: &HashMap[str, str], field: &str) -> bool:
+        let dot = field.rfind(".")
+        if dot <= 0 or self.unread.len() > 0 or self.fnptr_verdicts.contains(field.slice(0, dot) ++ ".*"): return false
+        writers.contains(field) and self.fd_first_unread_writer(writers.get(field).unwrap()).len() == 0
 
     // A function whose body the proofs read (or `free`, which writes no
     // field): a record passed to it has not left what the drafter sees.
@@ -198,11 +236,19 @@ impl CiProject:
         if self.fnptr_verdicts.contains(record_field): return with_str_clone_ref(self.fnptr_verdicts.get(record_field).unwrap())
         "why:the package never writes it (its value is the caller's)"
 
-    // The package function a `*Record.field` callee is proven to be, or "".
+    // The package functions a `*Record.field` callee is proven to hold
+    // (D198: one writer; D211: several), `, `-separated; "" when unproven.
     fn fd_fnptr_proven_callee(callee: &str) -> str:
         if not callee.starts_with("*"): return ""
         let verdict = self.fd_fnptr_field_verdict(callee.slice(1, callee.len()))
-        if verdict.starts_with("fn:"): verdict.slice(3, verdict.len()) else: ""
+        if verdict.starts_with("fn:"): verdict.slice(3, verdict.len()) else if verdict.starts_with("fns:"): verdict.slice(4, verdict.len()) else: ""
+
+    // D211, the join: the member of the proven set that retains what is
+    // passed at `index`, or "" when none does.
+    fn fd_fnptr_retaining_member(callee: &str, index: i32) -> str:
+        for member in self.fd_fnptr_proven_callee(callee).split(", "):
+            if member.len() > 0 and self.fd_callee_retains(member, index): return member.to_owned()
+        ""
 
     // What the report says of an unproven `*Record.field` callee.
     fn fd_fnptr_why(callee: &str) -> str:
@@ -218,8 +264,8 @@ impl CiProject:
         // proven to hold decides; an unproven field retains.
         if callee.starts_with("*"):
             if self.fd_field_role(callee).len() > 0: return false
-            let proven = self.fd_fnptr_proven_callee(callee)
-            return proven.len() == 0 or self.fd_callee_retains(proven, index)
+            // D211: retained if any member of the set retains it.
+            return self.fd_fnptr_proven_callee(callee).len() == 0 or self.fd_fnptr_retaining_member(callee, index).len() > 0
         if self.fd_is_free_call(callee) or self.fd_is_alloc_call(callee) or ci_own_is_libc_observer(callee): return false
         let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
         if si < 0: return true
@@ -233,22 +279,28 @@ impl CiProject:
         index < self.symbols[si].param_stores.len() and self.symbols[si].param_stores[index] != 0
 
     // A sink's callee by name: the function a `*Record.field` is proven to hold (D198).
-    fn fd_sink_callee(callee: &str) -> str:
-        let proven = self.fd_fnptr_proven_callee(callee)
-        if proven.len() > 0: proven else: callee.to_owned()
+    fn fd_sink_callee(callee: &str, index: i32) -> str:
+        if not callee.starts_with("*"): return callee.to_owned()
+        let member = self.fd_fnptr_retaining_member(callee, index)
+        if member.len() > 0: member else: callee.to_owned()
 
     // `to f`, or for a proven `*Record.field`: `through the function
     // pointer field F (only ever f) to f`.
-    fn fd_sink_text(callee: &str) -> str:
+    fn fd_sink_text(callee: &str, index: i32) -> str:
         let proven = self.fd_fnptr_proven_callee(callee)
         if proven.len() == 0: return "to " ++ callee
-        "through the function pointer field " ++ fd_field_of(callee) ++ " (only ever " ++ proven ++ ") to " ++ proven
+        let member = self.fd_fnptr_retaining_member(callee, index)
+        "through the function pointer field " ++ fd_field_of(callee) ++ " (only ever " ++ proven.replace(", ", " or ") ++ ") to " ++ (if member.len() > 0: member else: proven)
 
     fn fd_callee_destroys(callee: &str, index: i32) -> bool:
         if callee.starts_with("*"):
             if self.fd_is_free_call(callee): return true
+            // D211: destroyed only if every member of the set destroys it.
             let proven = self.fd_fnptr_proven_callee(callee)
-            return proven.len() > 0 and self.fd_callee_destroys(proven, index)
+            if proven.len() == 0: return false
+            for member in proven.split(", "):
+                if not self.fd_callee_destroys(member, index): return false
+            return true
         if self.fd_is_free_call(callee): return true
         let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
         if si < 0 or not self.fd_subject(si): return false
@@ -347,8 +399,16 @@ impl CiProject:
             // D198: the one function the field is proven to hold decides.
             if self.fd_is_alloc_call("*" ++ src.slice(9, src.len())): return "owned"
             let proven = self.fd_fnptr_proven_callee("*" ++ src.slice(9, src.len()))
-            if proven.len() > 0: return self.fd_source_verdict(si, "call:" ++ proven ++ ":", depth + 1, out_ctx)
-            return "unknown:returns what " ++ self.fd_fnptr_why("*" ++ src.slice(9, src.len()))
+            if proven.len() == 0: return "unknown:returns what " ++ self.fd_fnptr_why("*" ++ src.slice(9, src.len()))
+            // D211: a return is owned only if every member returns owned;
+            // members that answer differently decide nothing.
+            var joined = ""
+            for member in proven.split(", "):
+                let verdict = self.fd_source_verdict(si, "call:" ++ member ++ ":", depth + 1, out_ctx)
+                if verdict.starts_with("unknown:"): return verdict
+                if joined.len() > 0 and joined != verdict: return "unknown:returns what the function pointer field " ++ fd_field_of(src.slice(9, src.len())) ++ " holds (" ++ proven.replace(", ", " or ") ++ "), which do not return alike"
+                joined = verdict
+            return joined
         if src.starts_with("call:"):
             let rest = src.slice(5, src.len())
             let colon = rest.find(":")
@@ -609,9 +669,9 @@ impl CiProject:
             // dispatch) is said as such; which function the field holds is
             // a registry fact, not a missing unit.
             if kv[0].starts_with("*") and self.fd_fnptr_proven_callee(kv[0]).len() == 0: return "passed through " ++ self.fd_fnptr_why(kv[0])
-            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(kv[0]))
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(kv[0], fd_i32(kv[1])))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ kv[0] ++ ", which no unit defines"
-            return self.fd_retain_hop(self.fd_sink_text(kv[0]), kv[1], self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1, places), depth)
+            return self.fd_retain_hop(self.fd_sink_text(kv[0], fd_i32(kv[1])), kv[1], self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1, places), depth)
         for line in self.symbols[si].own_evidence.split("\n"):
             if line.starts_with("localstore:") and self.fd_local_alias_param(si, line.slice(11, line.len())) == pi: return "stored through local " ++ line.slice(11, line.len())
             if line.starts_with("localaddr:"):
@@ -621,9 +681,9 @@ impl CiProject:
             let parts = line.split(":")
             if parts.len() != 4 or self.fd_local_alias_param(si, parts[1]) != pi or not self.fd_callee_retains(parts[2], fd_i32(parts[3])): continue
             if parts[2].starts_with("*") and self.fd_fnptr_proven_callee(parts[2]).len() == 0: return "passed through " ++ self.fd_fnptr_why(parts[2])
-            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(parts[2]))
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(parts[2], fd_i32(parts[3])))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ parts[2] ++ ", which no unit defines"
-            return self.fd_retain_hop(self.fd_sink_text(parts[2]), parts[3], self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1, places), depth)
+            return self.fd_retain_hop(self.fd_sink_text(parts[2], fd_i32(parts[3])), parts[3], self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1, places), depth)
         // #3374: last, so a store the bodies do show is the one reported.
         // Whether the frame's record outlives the call is not followed:
         // weaker than a grant, and it contradicts nothing (§31.7).
@@ -961,7 +1021,7 @@ impl CiProject:
             return (if colon >= 0: rest.slice(0, colon).to_owned() else: rest.to_owned()) ++ "(…)"
         if src.starts_with("indirect:"):
             let proven = self.fd_fnptr_proven_callee("*" ++ src.slice(9, src.len()))
-            return if proven.len() > 0: proven ++ "(…) through the function pointer field " ++ fd_field_of(src.slice(9, src.len())) else: "(*" ++ fd_field_of(src.slice(9, src.len())) ++ ")(…)"
+            return if proven.len() > 0: proven.replace(", ", " or ") ++ "(…) through the function pointer field " ++ fd_field_of(src.slice(9, src.len())) else: "(*" ++ fd_field_of(src.slice(9, src.len())) ++ ")(…)"
         if src.starts_with("field:param:"): return "a part of param " ++ src.slice(12, src.len())
         if src.starts_with("param:"): return "param " ++ src.slice(6, src.len())
         if src.starts_with("local:"): return src.slice(6, src.len()).to_owned()
@@ -1607,6 +1667,16 @@ impl CiProject:
         head ++ lines
 
 // The field of a `Record.field` (or `*Record.field`) callee.
+// A pointer to `record` handed to `callee` (`*Record.field` for a call
+// through a function-pointer field, `?` for another indirect call).
+type HandedRecord { record: str, callee: str, place: str }
+
+// Whether the `, `-separated list has `name`.
+fn fd_name_list_has(names: &str, name: &str) -> bool:
+    for one in names.split(", "):
+        if one == name: return true
+    false
+
 fn fd_field_of(record_field: &str) -> str:
     let dot = record_field.rfind(".")
     if dot >= 0: record_field.slice(dot + 1, record_field.len()) else: record_field.to_owned()

@@ -19454,6 +19454,13 @@ fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
         let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
         if with_ci_cursor_kind(session, lhs) == CXK_MEMBER_REF and with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, lhs)):
             out = out ++ "fw\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ ci_fp_named_function(session, with_ci_child(session, cursor, 1)) ++ "\t" ++ loc ++ "\n"
+    // D211: a record assigned whole takes every function-pointer field from
+    // its source, which no field write names. An initializer list or a
+    // compound literal on the right is read field by field below.
+    if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
+        let whole = ci_fp_record_of(session, with_ci_cursor_type(session, with_ci_child(session, cursor, 0)))
+        let value_kind = with_ci_cursor_kind(session, ci_peel_transparent(session, with_ci_child(session, cursor, 1)))
+        if whole.len() > 0 and value_kind != CXK_INIT_LIST and value_kind != CXK_COMPOUND_LITERAL: out = out ++ "fw\t" ++ whole ++ "\t=\t?\t" ++ loc ++ "\n"
     if kind == CXK_INIT_LIST:
         let record = ci_fp_record_of(session, with_ci_cursor_type(session, cursor))
         if record.len() > 0: out = out ++ ci_fp_init_list_writes(session, cursor, record, loc)
@@ -19466,7 +19473,10 @@ fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
         call_args_from = 1
         let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
         let direct = if field.len() > 0: "" else: ci_call_callee_name(session, with_ci_child(session, cursor, 0))
-        let callee = if direct.len() > 0: direct else: "?"
+        // D211: a call through a function-pointer field is named with its
+        // field, so the record it is handed is judged by what that field
+        // is proven to hold.
+        let callee = if direct.len() > 0: direct else if field.len() > 0: "*" ++ field else: "?"
         var ai = 1
         while ai < nc:
             let record = ci_fp_pointee_record(session, with_ci_cursor_type(session, ci_peel_transparent_and_cstyle(session, with_ci_child(session, cursor, ai))))
