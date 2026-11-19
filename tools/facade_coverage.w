@@ -109,9 +109,10 @@ fn pointer_class(ty: &str) -> str:
 // and locations folded away; each kind is what a registry fact must state.
 fn fnptr_field_class(why: &str) -> str:
     let w = why.trim()
-    if w.starts_with("it is written in "): return "written in several places"
-    if w.starts_with("its one write is not a named function"): return "its one write is not a named function"
-    if w.starts_with("its one write names "): return "its one write names a function the proofs cannot read"
+    if w.starts_with("a write of it is not a named function"): return "a write of it is not a named function"
+    if w.starts_with("a write of it names "): return "a write of it names a function the proofs cannot read"
+    if w.starts_with("the record is assigned whole"): return "the record is assigned whole"
+    if w.contains("passed to a call through the function pointer field"): return "the record is passed to a call through a field the proofs do not close"
     // #3174: a call through another function-pointer field is the case a
     // closed set of callees would decide; an outside function is not.
     if w.starts_with("a pointer to the record is passed to a function pointer"): return "the record is passed to a call through a function pointer"
