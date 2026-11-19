@@ -1311,6 +1311,35 @@ pub fn rt_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens:
         let _freed = CertFreeCertificateContext(leaf)
         if ok != 0 and built != null: 0 else: -1
 
+// rt_getenv's values (#3364): per variable, its name, the UTF-16 value last
+// read, that value's length in units, and the UTF-8 buffer handed out.
+// Static storage and a lock of its own: rt_getenv runs under the allocator
+// lock, so it can take neither the allocator nor its lock.
+let WIN_ENV_MAX: i64 = 512
+var win_env_slots: [2048]i64 = [0 as i64; 2048]
+var win_env_count: i64 = 0
+var win_env_lock: Atomic[i32]
+
+fn win_env_lock_take():
+    while win_env_lock.swap(1, .Acquire) != 0:
+        Sleep(0 as u32)
+
+fn win_env_name_is(entry_name: i64, name: *const c_char) -> bool:
+    var i: i64 = 0
+    while true:
+        let a = unsafe *((entry_name + i) as *const u8)
+        if a != unsafe *((name as i64 + i) as *const u8): return false
+        if a == 0: return true
+        i = i + 1
+    false
+
+fn win_env_wide_is(entry_wide: i64, value: *const u16, units: i64) -> bool:
+    var i: i64 = 0
+    while i < units:
+        if unsafe *((entry_wide + i * 2) as *const u16) != unsafe *((value as i64 + i * 2) as *const u16): return false
+        i = i + 1
+    true
+
 pub fn rt_getenv(name: *const c_char) -> *const c_char:
     var wname: [1024]u16 = [0; 1024]
     var wvalue: [16384]u16 = [0; 16384]
@@ -1339,28 +1368,61 @@ pub fn rt_getenv(name: *const c_char) -> *const c_char:
         if big as i64 != 0:
             rt_munmap(big, big_bytes)
         return 0 as *const c_char
-    // Each returned value gets its own allocation so retained `env()`/
-    // `with_getenv_str` results never alias. Linux/darwin satisfy this for
-    // free because libc `getenv` hands out stable per-variable `environ`
-    // pointers; Windows `GetEnvironmentVariableW` copies into a caller buffer,
-    // so a single shared static buffer would make every retained result alias
-    // the last read. The buffer holds the value's UTF-8 and its NUL.
-    //
-    // The buffer MUST come from rt_mmap, not with_alloc: rt_getenv is called
-    // from inside the allocator lock. The allocator's own config checks
-    // (dbg_on/alloc_system_on/rt_alloc_effective_limit_unlocked reading
-    // WITH_MEMORY_LIMIT_BYTES) run in rt_alloc_unlocked while rt_alloc_lock_word
-    // is held; a with_alloc here would re-enter rt_allocator_lock() on the same
-    // thread and deadlock on the non-recursive spinlock. Linux/darwin never hit
-    // this because their rt_getenv returns environ pointers and allocates
-    // nothing. rt_mmap (VirtualAlloc) is thread-safe and takes no allocator
-    // lock, mirroring dbg_ledger_init's raw-page pattern. This is an owned,
-    // non-aliasing, process-lifetime region — the same lifetime model as
-    // `environ` — so "non-allocating rt_getenv" (rt_core.w) holds on Windows too.
+    // #3364: one buffer per variable and value. A value read before is
+    // returned again from its own buffer, so a variable read a million times
+    // (the compiler reads WITH_FILE_PREFIX_MAP on every source path) costs
+    // one buffer, not a page per read: mapping a fresh region each time and
+    // never freeing it made a 1.7 GB compile commit 8.5 GB on Windows.
+    // Compared in UTF-16 against the copy kept beside the value, so a hit
+    // converts and maps nothing.
+    win_env_lock_take()
+    var slot: i64 = -1
+    var k: i64 = 0
+    while k < win_env_count:
+        if win_env_name_is(win_env_slots[k * 4], name):
+            slot = k
+            if win_env_slots[k * 4 + 2] == n as i64 and win_env_wide_is(win_env_slots[k * 4 + 1], value as *const u16, n as i64):
+                let cached = win_env_slots[k * 4 + 3]
+                win_env_lock.store(0, .Release)
+                if big as i64 != 0:
+                    rt_munmap(big, big_bytes)
+                return cached as *const c_char
+        k = k + 1
+    // A new variable, or a new value of a known one: one region holds the
+    // UTF-16 copy (first, so it is aligned), the UTF-8 value and, for a new
+    // variable, its name. A replaced value's region stays mapped: a result
+    // read earlier may still be held.
     let len = win_utf16_utf8_len(value as *const u16)
-    let buf = rt_mmap(len + 1)
-    if buf as i64 != 0:
-        win_utf16_to_utf8_buf(value as *const u16, buf, len + 1)
+    let name_len = win_cstr_len(name as *const u8)
+    let wide_bytes = n as i64 * 2
+    let region = rt_mmap(wide_bytes + len + 1 + name_len + 1)
+    if region as i64 == 0:
+        win_env_lock.store(0, .Release)
+        if big as i64 != 0:
+            rt_munmap(big, big_bytes)
+        return 0 as *const c_char
+    var i: i64 = 0
+    while i < wide_bytes:
+        unsafe *((region as i64 + i) as *mut u8) = unsafe *((value as i64 + i) as *const u8)
+        i = i + 1
+    let buf = (region as i64 + wide_bytes) as *mut u8
+    win_utf16_to_utf8_buf(value as *const u16, buf, len + 1)
+    if slot < 0 and win_env_count < WIN_ENV_MAX:
+        let name_copy = region as i64 + wide_bytes + len + 1
+        i = 0
+        while i <= name_len:
+            unsafe *((name_copy + i) as *mut u8) = unsafe *((name as i64 + i) as *const u8)
+            i = i + 1
+        slot = win_env_count
+        win_env_count = win_env_count + 1
+        win_env_slots[slot * 4] = name_copy
+    // A full table leaves the value uncached: it is still correct, and
+    // costs its region on each read as every value did before.
+    if slot >= 0:
+        win_env_slots[slot * 4 + 1] = region as i64
+        win_env_slots[slot * 4 + 2] = n as i64
+        win_env_slots[slot * 4 + 3] = buf as i64
+    win_env_lock.store(0, .Release)
     if big as i64 != 0:
         rt_munmap(big, big_bytes)
     buf as *const c_char
