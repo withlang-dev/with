@@ -44182,6 +44182,32 @@ impl Sema:
 
     // §3.2: `recv` is the receiver of a method call (0 for a free call). It
     // holds its place for the call exactly as an argument does.
+    // Whether every mention of `root` in the closure is `root.f` with `f`
+    // another field than `held`. The closure's nodes are the ones the
+    // parser made while reading it: the ids below its own whose text lies
+    // inside its span. Every expression form is covered by reading the
+    // nodes themselves; a walker by node kind (capture_is_field_only)
+    // answers "field only" for a kind it does not know, a cast among them.
+    fn closure_names_only_other_fields(closure_node: i32, root: i32, held: i32) -> bool:
+        let from = self.ast.get_start(closure_node as NodeId)
+        let to = self.ast.get_end(closure_node as NodeId)
+        let body_start = self.ast.get_start(self.ast.get_data0(closure_node) as NodeId)
+        var mentions = 0
+        var other_fields = 0
+        var reached = to
+        var n = closure_node - 1
+        while n > 0 and self.ast.get_start(n as NodeId) >= from and self.ast.get_end(n as NodeId) <= to:
+            let kind = self.ast.kind(n)
+            if kind == NodeKind.NK_IDENT and self.ast.get_data0(n) == root: mentions += 1
+            if kind == NodeKind.NK_FIELD_ACCESS and self.ast.get_data1(n) != held:
+                let base = self.ast.get_data0(n)
+                if self.ast.kind(base) == NodeKind.NK_IDENT and self.ast.get_data0(base) == root: other_fields += 1
+            if self.ast.get_start(n as NodeId) < reached: reached = self.ast.get_start(n as NodeId)
+            n -= 1
+        // Not every node of the body was read, or the place is named some
+        // other way: the capture overlaps.
+        reached <= body_start and mentions > 0 and mentions == other_fields
+
     // D218 (§3.2): a closure passed in the same call may not capture a view
     // of any place that overlaps a `mut` receiver or `mut` argument, for
     // reading or writing. `mut_place` is that receiver or argument.
@@ -44204,18 +44230,10 @@ impl Sema:
             var captures_root = false
             for si in 0..self.closure_capture_summary_count(closure_node):
                 if self.closure_capture_summary_sym(closure_node, si) == root: captures_root = true
-            if not captures_root: continue
-            let closure_body = self.ast.get_data0(closure_node)
-            var overlaps = true
-            if first_field != 0 and self.capture_is_field_only(closure_body, root) != 0:
-                while self.capture_field_syms.len() > 0:
-                    self.capture_field_syms.pop()
-                    self.capture_field_kinds.pop()
-                self.collect_capture_fields(closure_body, root)
-                overlaps = false
-                for field_sym in self.capture_field_syms:
-                    if field_sym == first_field: overlaps = true
-            if overlaps:
+            // A capture that writes the place is refused by the capture
+            // conflict check, with its own message.
+            if not captures_root or self.closure_capture_writes(closure_node, root): continue
+            if first_field == 0 or not self.closure_names_only_other_fields(closure_node, root, first_field):
                 self.emit_error_with_help(f"`{self.pool_resolve(root)}` is held as a `mut` place for this call, and a closure passed in the same call captures it (§3.2)", closure_node, "a callee that brackets work on its `mut` place passes it to the closure: `x.scope((s) => …)`; or read what the closure needs into a `let` before the call")
 
     mut fn check_closure_capture_conflicts(extra_start: i32, arg_count: i32, has_resolved: bool, node: i32, recv: i32):
