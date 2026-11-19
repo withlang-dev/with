@@ -11761,7 +11761,7 @@ impl MirBuilder:
             return
         var lo = to
         var hi = from
-        let rows: List[i32] = []
+        let rows = []
         at = 0
         for row in self.or_alt_logs:
             if at < row_limit and row.alt_local == pick and row.end > row.start and row.start >= from and row.end <= to:
@@ -11771,8 +11771,8 @@ impl MirBuilder:
             at += 1
         self.restore_pattern_move_entries(hi, to)
         let join_bb = self.new_block()
-        let vals: List[i64] = []
-        let targets: List[i32] = []
+        let vals = []
+        let targets = []
         for ri in rows:
             vals.push(self.or_alt_logs[ri].alt as i64)
             targets.push(self.new_block() as i32)
@@ -12277,9 +12277,9 @@ impl MirBuilder:
         let span = self.ast.get_start(pat_node)
         let alt_local = self.or_alt_local(pat_node)
         let join_bb = self.new_block()
-        let alt_bbs: List[i32] = []
-        let vals: List[i64] = []
-        let targets: List[i32] = []
+        let alt_bbs = []
+        let vals = []
+        let targets = []
         for pi in 0..p_count:
             let bb = self.new_block() as i32
             alt_bbs.push(bb)
@@ -12294,9 +12294,9 @@ impl MirBuilder:
         var alias_end = alias_base
         let ref_base = self.or_alias_refs.len()
         let take_base = self.pattern_take_log.len()
-        var first: List[i32] = []
-        let drop_marks: List[i32] = []
-        let tail_bbs: List[i32] = []
+        let first = []
+        let drop_marks = []
+        let tail_bbs = []
         for pi in 0..p_count:
             drop_marks.push(self.drop_local_ids.len() as i32)
             let log_start = self.pattern_move_log.len() as i32
@@ -12316,7 +12316,7 @@ impl MirBuilder:
                     self.alias_places.pop()
                     self.alias_types.pop()
             if pi == 0:
-                first = bound
+                for b in bound: first.push(b)
                 bind_end = self.bind_syms.len()
             else:
                 var bi = bind_end

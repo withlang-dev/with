@@ -26613,10 +26613,10 @@ impl Sema:
         // alternatives binds into the outer one's names, starting from what
         // the outer alternative had bound so far.
         if self.or_shared_start >= 0:
-            let before: List[i32] = []
+            let before = []
             for idx in self.or_shared_seen: before.push(idx)
             self.check_pattern(self.ast.get_extra(p_extra), subject_type)
-            let after: List[i32] = []
+            let after = []
             for idx in self.or_shared_seen: after.push(idx)
             for pi in 1..p_count:
                 self.or_shared_seen = []
