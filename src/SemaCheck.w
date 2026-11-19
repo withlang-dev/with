@@ -13993,6 +13993,12 @@ impl Sema:
                     // the clone's cost.
                     let collection = if tid != 0: self.engine_collection_base_name(tid) else: ""
                     let moved_name = self.pool_resolve(sym)
+                    // #3461 (§9.7): a list pattern on an owned subject takes
+                    // it apart. Say that, and the spelling that keeps it.
+                    if self.list_pattern_took.contains(sym):
+                        let pat_line = self.node_line(self.list_pattern_took.get(sym).unwrap())
+                        self.emit_error_with_help(f"use of moved value: the list pattern at line {pat_line} took `{moved_name}` apart", node, f"`{moved_name}` is a by-value parameter, an owned subject, so the pattern takes its elements; declare it `{moved_name}: &{self.type_name(tid)}` and the pattern views it (§9.7)")
+                        return 0
                     let help = if collection.len() > 0: f"`{moved_name}` is a {collection}, an engine-backed collection and a resource (§2.3, D152): the earlier use moved it; a copy is `{moved_name}.clone()`, O(n), every element cloned" else: "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move".to_owned()
                     self.emit_error_with_help(moved_msg, node, help)
             if sym != self.assign_target_revive_sym:
@@ -19919,7 +19925,29 @@ impl Sema:
         if self.pattern_binds_owned_value(pat) == false and self.pattern_disarms_drop_subject(pat, subject_type) == 0:
             return
         self.consuming_pattern_subjects.insert(node, 1)
+        // A parameter taken apart by a list pattern: remembered for the
+        // error a later use of it gets (#3461).
+        let root = self.place_root_sym(subject)
+        let took = self.owned_slice_pattern_in(pat)
+        if root != 0 and took != 0 and self.param_index_for_sym(root) >= 0 and not self.list_pattern_took.contains(root): self.list_pattern_took.insert(root, took)
         self.mark_moved_if_consumed(subject)
+
+    // The first slice pattern in `pat` that takes an owned subject apart, or 0.
+    fn owned_slice_pattern_in(pat: i32) -> i32:
+        if pat == 0: return 0
+        let kind = self.ast.kind(pat)
+        if kind == NodeKind.NK_PAT_SLICE: return if self.owned_slice_patterns.contains(pat): pat else: 0
+        if kind == NodeKind.NK_PAT_AT_BINDING: return self.owned_slice_pattern_in(self.ast.get_data1(pat))
+        let children_at_0 = kind == NodeKind.NK_PAT_OR or kind == NodeKind.NK_PAT_TUPLE
+        // A struct pattern keeps field names beside its sub-patterns; it is
+        // not walked here (the message is then the general one).
+        if not children_at_0 and kind != NodeKind.NK_PAT_VARIANT and kind != NodeKind.NK_PAT_ENUM_SHORTHAND: return 0
+        let start = if children_at_0: self.ast.get_data0(pat) else: self.ast.get_data1(pat)
+        let count = if children_at_0: self.ast.get_data1(pat) else: self.ast.get_data2(pat)
+        for pi in 0..count:
+            let found = self.owned_slice_pattern_in(self.ast.get_extra(start + pi))
+            if found != 0: return found
+        0
 
     mut fn record_pattern_view_bindings(node: i32, subject_node: i32):
         if subject_node == 0:
