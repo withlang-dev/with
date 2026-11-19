@@ -1750,6 +1750,10 @@ type Sema {
     fn_label_order_counter: i32,
 
     // Borrow tracking
+    // The number of borrows that existed when the closure body now being
+    // checked began (0 outside one): entries below it belong to the
+    // enclosing function.
+    closure_body_borrow_floor: isize,
     borrow_kinds: List[i32],
     borrow_places: List[i32],
     borrow_fields: List[i32],
@@ -4206,6 +4210,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         fn_label_scope_stack: List.new(),
         fn_label_next_scope_id: 0,
         fn_label_order_counter: 0,
+        closure_body_borrow_floor: 0,
         borrow_kinds: List.new(),
         borrow_places: List.new(),
         borrow_fields: List.new(),

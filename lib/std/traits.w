@@ -445,7 +445,7 @@ impl[A, B, L: Iter[A], R: Iter[B]] Iter[(A, B)] for Zipped[A, B, L, R]:
             Some(x) =>
                 match self.r.next():
                     None => None
-                    Some(y) => Some((x, y))
+                    Some(y) => (x, y)
 
 pub fn iter_zip[A, B, L: Iter[A], R: Iter[B]](l: L, r: R) -> Zipped[A, B, L, R]: Zipped { l, r }
 

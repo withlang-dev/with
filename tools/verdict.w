@@ -12,6 +12,10 @@ fn failed_target(line: &str) -> str:
     if line.starts_with("error: build.w test target failed: "): return line.slice(35, line.len()).trim().to_owned()
     if line.starts_with("  failed: "): return line.slice(10, line.len()).trim().to_owned()
     if line.starts_with("RED: "): return line.slice(5, line.len()).trim().to_owned()
+    // The battery's stage reds: `RED (census): …`, `RED (gate): …`,
+    // `RED (uat): …`. Reading only `RED: ` printed green over a battery the
+    // census had stopped (2026-11-18).
+    if line.starts_with("RED ("): return line.slice(4, line.len()).trim().to_owned()
     if line.starts_with("error:   failed: "): return line.slice(17, line.len()).trim().to_owned()
     if line.contains(" failed in '"): return line.split(" failed in '")[1].split("'")[0].to_owned()
     let quoted = (line.starts_with("error: ") and line.contains(" target '") and line.contains("' failed")) or line.starts_with("survey: skipping '")
