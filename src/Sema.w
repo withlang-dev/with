@@ -351,6 +351,10 @@ pub const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
 pub const GLOBAL_VALUE_DECL_INTERFACE: i32 = 3
 
 // mutability.md §5 — per-parameter effect bits.
+// One fact about a `str` binding in a loop (D219): `sym` was copied into
+// `other`, or `sym` was appended to (`other` is 0).
+pub type LoopTextNote { loop_node: i32, sym: i32, other: i32 }
+
 pub const EFF_READ: i32         = 1   // parameter is read
 pub const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
 pub const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
@@ -1784,6 +1788,10 @@ type Sema {
     // declared outside a loop and used anywhere in it is used again after
     // a mutation in it, on the next iteration.
     live_loop_nodes: List[i32],
+    // D219, the shared-accumulator lint, for the loops of user code: the
+    // copies of a `str` binding into another (`other`), and the appends.
+    loop_text_copies: List[LoopTextNote],
+    loop_text_appends: List[LoopTextNote],
     live_loop_depths: List[i32],
     live_loop_body_depths: List[i32],
     // The first block and loop frame of the body being checked: a function,
@@ -4230,6 +4238,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         live_block_tails: List.new(),
         live_block_depths: List.new(),
         live_loop_nodes: List.new(),
+        loop_text_copies: [],
+        loop_text_appends: [],
         live_loop_depths: List.new(),
         live_loop_body_depths: List.new(),
         live_block_floor: 0,

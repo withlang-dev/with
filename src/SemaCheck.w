@@ -20974,8 +20974,45 @@ impl Sema:
         if self.concat_expr_includes_symbol_value(value, target_sym) == 0:
             return
         if self.concat_expr_starts_with_symbol_value(value, target_sym) != 0:
+            // D219: `s = s ++ piece` appends in place while `s` is the only
+            // holder of its text. A binding that takes a copy of `s` on
+            // every pass shares it at the append, which then copies it all.
+            self.loop_text_appends.push(LoopTextNote { loop_node: self.innermost_live_loop(), sym: target_sym, other: 0 })
+            let sharer = self.loop_text_sharer(target_sym)
+            if sharer != 0: self.warn_shared_accumulator(target_sym, sharer, node)
             return
-        self.emit_warning("string concatenation with ++ inside a loop repeatedly copies the accumulator; use StringBuilder or collect pieces and concatenate once", node)
+        self.emit_warning("string concatenation with ++ inside a loop repeatedly copies the accumulator; append to it instead (`s = s ++ piece`, building in the other direction), or collect the pieces and join them once", node)
+
+    fn innermost_live_loop() -> i32: if self.live_loop_nodes.len() > 0: self.live_loop_nodes[self.live_loop_nodes.len() - 1] else: 0
+
+    // The binding that takes a copy of `sym`'s text in the innermost loop
+    // being checked, or 0.
+    fn loop_text_sharer(sym: i32) -> i32:
+        let here = self.innermost_live_loop()
+        for row in self.loop_text_copies:
+            if row.loop_node == here and row.sym == sym: return row.other
+        0
+
+    mut fn warn_shared_accumulator(sym: i32, sharer: i32, node: i32):
+        let name = self.pool_resolve(sym)
+        self.emit_warning(f"`{name}` is appended to in this loop while `{self.pool_resolve(sharer)}` holds a copy of it, so every append copies the whole text; keep what the loop needs from the old value (its length, a piece) instead of the value", node)
+
+    // D219: `prev = s` inside a loop, for a `str`: an assignment, so `prev`
+    // holds the copy into the next pass. (A `let` in the body is not noted:
+    // its copy can die before the next append, and the lint claims only
+    // what is certain.) Noted for the append check; when the append came
+    // first in the loop body, the warning is given here.
+    mut fn note_loop_text_copy(target_sym: i32, value: i32, node: i32):
+        if self.loop_depth <= 0 or value == 0 or self.ast.kind(value) != NodeKind.NK_IDENT: return
+        let copied = self.ast.get_data0(value)
+        if copied == target_sym or not sema_path_is_user_lint_source(self.current_module_path): return
+        if self.scope_lookup(copied) < 0 or self.resolve_alias(self.scope_lookup(copied) as TypeId) != self.ty_str: return
+        let here = self.innermost_live_loop()
+        self.loop_text_copies.push(LoopTextNote { loop_node: here, sym: copied, other: target_sym })
+        for row in self.loop_text_appends:
+            if row.loop_node == here and row.sym == copied:
+                self.warn_shared_accumulator(copied, target_sym, node)
+                return
 
     mut fn assignment_target_value_type(node: i32, exact_type: i32) -> TypeId:
         if node == 0 or exact_type == 0:
@@ -21200,6 +21237,7 @@ impl Sema:
                     self.emit_error("type mismatch in assignment", node)
 
         self.warn_loop_string_concat_accumulation(node, target, value, target_type)
+        if self.ast.kind(target) == NodeKind.NK_IDENT: self.note_loop_text_copy(self.ast.get_data0(target), value, node)
 
         // Move semantics
         self.mark_moved_if_consumed(value)
