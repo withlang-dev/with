@@ -4712,6 +4712,12 @@ fn with_ci_type_declaration(session: i64, type_idx: i32) -> i32:
         let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
         let decl = clang_getTypeDeclaration(ty)
         if decl.kind == 0: return -1
+        // A record named before it is defined (`typedef struct T T;` and the
+        // struct later, glfw's `_GLFWplatform`) answers with that first
+        // declaration, which has no fields. Its definition is the
+        // declaration to read (invalid kinds are 70..73).
+        let definition = clang_getCursorDefinition(decl)
+        if definition.kind != 0 and (definition.kind < 70 or definition.kind > 73): return store_cursor(s, definition)
         store_cursor(s, decl)
 
 // 1 when the C spelling is a With builtin type name (CImport.ci_is_builtin_type_name).

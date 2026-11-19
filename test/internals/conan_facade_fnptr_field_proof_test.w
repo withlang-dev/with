@@ -34,7 +34,7 @@ fn main:
     assert(mkdir_p(build) == 0)
     var header = "typedef struct Thing Thing;\nThing *thing_new(void);\nvoid thing_free(Thing *t);\n"
     header = header ++ "struct UserOps { void (*show)(Thing *); };\n"
-    for name in ["one", "two", "zeroed", "cast", "keep", "chain", "copied"]: header = header ++ "void " ++ name ++ "_show(Thing *t);\n"
+    for name in ["one", "two", "zeroed", "cast", "keep", "chain", "copied", "fwd"]: header = header ++ "void " ++ name ++ "_show(Thing *t);\n"
     header = header ++ "struct CopyOps { void (*show)(Thing *); };\nvoid copy_set(const struct CopyOps *user);\n"
     header = header ++ "void user_show(struct UserOps *ops, Thing *t);\n"
     assert(write_file(dep ++ "/include/thing.h", header) == 0)
@@ -59,6 +59,12 @@ fn main:
     unit = unit ++ "void chain_show(Thing *t) { disp.run(&chain_ops, t); }\n"
     unit = unit ++ "static struct CopyOps copy_ops = { show_a };\nvoid copy_set(const struct CopyOps *user) { copy_ops = *user; }\n"
     unit = unit ++ "void copied_show(Thing *t) { copy_ops.show(t); }\n"
+    // A table type named by a typedef before its struct is defined, and a
+    // local table with designated initializers handed to a pointer (glfw's
+    // `const _GLFWplatform null = { .init = … }; *platform = null;`).
+    unit = unit ++ "typedef struct FwdOps FwdOps;\nstruct FwdOps { int id; void (*show)(Thing *); };\nstatic FwdOps fwd_ops;\n"
+    unit = unit ++ "static void fwd_connect(FwdOps *into) { const FwdOps table = { .id = 1, .show = show_a }; *into = table; }\n"
+    unit = unit ++ "void fwd_show(Thing *t) { fwd_connect(&fwd_ops); fwd_ops.show(t); }\n"
     assert(write_file(src ++ "/thing.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c thing.c\",\n  \"file\": \"thing.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
@@ -71,6 +77,7 @@ fn main:
         "  two_show: lend",
         "  keep_show: raw: retains param 0 (passed through the function pointer field show (only ever show_a or show_keep) to show_keep",
         "  chain_show: lend",
+        "  fwd_show: lend",
         "  copied_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: the record is assigned whole",
         "  zeroed_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: a pointer to the record is passed to memset, which the proofs cannot read",
         "  cast_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: a pointer to the record is converted to another pointer type",
