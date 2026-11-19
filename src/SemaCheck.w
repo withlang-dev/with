@@ -17811,6 +17811,8 @@ impl Sema:
         let pi = self.param_index_for_sym(root)
         if pi < 0 or self.current_fn_sig_idx < 0:
             return false
+        // A `mut` parameter is the caller's place (§3.8a), never owned here.
+        if self.sig_param_is_mut(self.current_fn_sig_idx, pi): return false
         if pi == 0:
             let rmode = self.sig_receiver_mode(self.current_fn_sig_idx)
             if rmode == ReceiverMode.Read or rmode == ReceiverMode.Mut:

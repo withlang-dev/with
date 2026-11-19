@@ -13,7 +13,7 @@ tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
 **Changelog v7.68:** #958 (delegated, D222). §18.5b.3: operands after `-n` or `-p` code are input files, read in order in place of stdin; `filename` and `fnr` are bound; `-i` with `-p` writes each file back through a sibling and a rename. Implemented.
 
-**Changelog v7.67:** #823 (delegated, D221). §9.7: the alternatives of an or-pattern may bind names: every alternative binds the same names with one type, and the arm sees one binding per name, made by the alternative that matched; the arm means what it means written once per alternative. Implemented (a list pattern that takes elements inside an alternative is not yet lowered and is refused).
+**Changelog v7.67:** #823 (delegated, D221). §9.7: the alternatives of an or-pattern may bind names: every alternative binds the same names with one type, and the arm sees one binding per name, made by the alternative that matched; the arm means what it means written once per alternative. Implemented, a list pattern that takes elements inside an alternative included (#3459).
 
 **Changelog v7.66:** #690 (D220, Eric's words). §9.1: a parameter is an immutable binding; assigning to it is an error, `var x = x` is the working copy and `mut x: T` changes the caller's variable. §29.8: the consuming rebind applies to a parameter, and a read of a value with no destructor in the initializer ends the old binding as a move would; the rebind is refused while a view of the old binding is live. Implemented.
 
