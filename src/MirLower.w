@@ -11752,7 +11752,9 @@ impl MirBuilder:
         var pick = -1
         var at = 0
         for row in self.or_alt_logs:
-            if at < row_limit and row.start >= from and row.end <= to: pick = row.alt_local
+            // An alternative that moved nothing has nothing to put back
+            // (and an empty span would never shrink the search).
+            if at < row_limit and row.end > row.start and row.start >= from and row.end <= to: pick = row.alt_local
             at += 1
         if pick < 0:
             self.restore_pattern_move_entries(from, to)
@@ -11762,7 +11764,7 @@ impl MirBuilder:
         let rows: List[i32] = []
         at = 0
         for row in self.or_alt_logs:
-            if at < row_limit and row.alt_local == pick and row.start >= from and row.end <= to:
+            if at < row_limit and row.alt_local == pick and row.end > row.start and row.start >= from and row.end <= to:
                 rows.push(at)
                 if row.start < lo: lo = row.start
                 if row.end > hi: hi = row.end
