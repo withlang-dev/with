@@ -888,6 +888,22 @@ match day:
     Saturday | Sunday => "weekend"
 ```
 
+The alternatives of an or-pattern may bind names (delegated, D221). Every
+alternative binds the same names, each with one type, and the guard and
+the body see one binding per name, made by the alternative that matched:
+
+```
+match err:
+    .WebModelCall(webc_error, ..) | .WebAdapterCall(webc_error, ..) =>
+        webc_error.status()
+    _ => 0
+```
+
+It means what the same arm written once per alternative means: a value is
+moved once and dropped once, and when a guard fails it goes back to the
+subject for the next arm. A name one alternative binds and another does
+not, or binds with another type, is an error that names the alternative.
+
 **`@` binding:**
 ```
 match event:

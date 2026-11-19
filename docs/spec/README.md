@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.66
+# The With Programming Language — Specification v7.67
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.67:** #823 (delegated, D221). §9.7: the alternatives of an or-pattern may bind names: every alternative binds the same names with one type, and the arm sees one binding per name, made by the alternative that matched; the arm means what it means written once per alternative. Implemented (a list pattern that takes elements inside an alternative is not yet lowered and is refused).
+
 **Changelog v7.66:** #690 (D220, Eric's words). §9.1: a parameter is an immutable binding; assigning to it is an error, `var x = x` is the working copy and `mut x: T` changes the caller's variable. §29.8: the consuming rebind applies to a parameter, and a read of a value with no destructor in the initializer ends the old binding as a move would; the rebind is refused while a view of the old binding is live. Implemented.
 
 **Changelog v7.65:** #957 (delegated, D217). §18.5b: beside `-n` or `-p`, `-e` code before the first loop part runs once before the loop and `-e` code after the last runs once after it; `-e` between two loop parts is an error; `last` is bound to whether the current line is the final one. A `var` in `-n` code stays per line. Implemented.
