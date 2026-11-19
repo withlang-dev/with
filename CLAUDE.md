@@ -532,7 +532,9 @@ never Python, bash, perl or awk. With IS a scripting language.
     before the first `-n` and read in `-e` after the last (D217):
     `with -e 'var m = ""' -n 'if line.len() > m.len(): m = line' -e 'print(m)'`
   - `jq -r .a.b` → `with -e 'use std.json` ⏎ `print(JsonDocument.parse(read_all()).root().field("a").field("b").raw())'`
-  - `sed -i`, `awk … file` → not yet (#958): `< file` and `with run`
+  - `sed -i 's/a/b/' f` → `with -p -i 'line = line.replace("a", "b")' f`;
+    `awk '…' f1 f2` → `with -n '…' f1 f2`, with `filename` and `fnr` bound
+    (FILENAME, FNR) beside `nr` (D222)
   - Full matrix and open gaps: `docs/spec/toolchain/improve_oneliners.md`.
 - **Implicit main** — a `.w` file needs no `fn main`; top-level statements are
   the program, beside helper `fn`s:

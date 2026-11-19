@@ -115,6 +115,8 @@ type CliOneLiner {
     code_parts: List[str],
     pre_parts: List[str],    // §18.5b (#957): `-e` code that runs once before the `-n`/`-p` loop
     post_parts: List[str],   // … and once after it
+    files: List[str],        // §18.5b (#958): the input files of a `-n`/`-p` loop, in order; stdin when none
+    in_place: bool,          // `-i`: `-p` writes each file back
     args: List[str],
     opt_level: i32,
 }
@@ -513,6 +515,8 @@ fn cli_one_liner_default(argc: i32) -> CliOneLiner:
         code_parts: List.new(),
         pre_parts: [],
         post_parts: [],
+        files: [],
+        in_place: false,
         args: List.new(),
         opt_level: cli_default_opt_level(argc),
     }
@@ -562,6 +566,10 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
         let mode = cli_one_liner_mode_for_flag(arg)
         if mode != CliOneLinerMode.None:
             result.seen = true
+            // `-p -i CODE`: sed's spelling. `-i` is never code.
+            if i + 1 < argc and with_arg_at(i + 1) == "-i":
+                result.in_place = true
+                i = i + 1
             if i + 1 >= argc:
                 result.ok = false
                 result.error_msg = "error: " ++ arg ++ " requires a code argument"
@@ -593,6 +601,10 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
             result.code_parts.push(with_arg_at(i + 1))
             i = i + 2
             continue
+        if arg == "-i":
+            result.in_place = true
+            i = i + 1
+            continue
         if arg == "-O0":
             result.opt_level = 0
             i = i + 1
@@ -621,11 +633,17 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
             i = i + 1
             continue
         if with_str_len(arg) > 0 and with_str_byte_at_ref(arg, 0) != 45:
-            if result.seen:
+            // §18.5b (#958): an operand after `-n`/`-p` code is an input
+            // file; the source is the flag's value, so it is never one.
+            if result.mode == CliOneLinerMode.Lines or result.mode == CliOneLinerMode.Print: result.files.push(arg)
+            else if result.seen:
                 result.ok = false
                 result.error_msg = "error: cannot combine one-liner code with a source file"
                 return result
         i = i + 1
+    if result.seen and result.in_place and (result.mode != CliOneLinerMode.Print or result.files.len() == 0):
+        result.ok = false
+        result.error_msg = "error: -i writes each input file back: it takes -p and at least one file"
     result
 
 fn cli_escape_with_string(value: &str) -> str:
@@ -823,7 +841,11 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     source.push_str("use std.rc\n")
     source.push_str("use std.task\n")
     source.push_str("use std.thread\n")
-    source.push_str("use std.builtins\n\n")
+    source.push_str("use std.builtins\n")
+    // §18.5b (#958): a loop over input files reads them, and stops on one
+    // it cannot read.
+    if one.files.len() > 0: source.push_str("use std.fs\nuse std.process\n")
+    source.push_str("\n")
     source.push_str(cli_build_args_binding(one.args))
     if one.mode == CliOneLinerMode.Eval:
         for i in 0..one.code_parts.len(): syn = cli_append_mapped(syn, source, cli_rewrite_semicolons(one.code_parts[i]), f"<cli -e #{i + 1}>")
@@ -860,28 +882,62 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
         syn = cli_append_mapped(syn, source, cli_rewrite_semicolons(part), f"<cli -e #{eval_part}>")
     // `last` is bound when the code names it and does not declare its own:
     // the loop holds every line, so "this is the final one" is known.
-    var wants_last = false
-    for part in rewritten_parts:
-        if cli_code_names(part, "last") and not part.contains("let last") and not part.contains("var last"): wants_last = true
+    let wants_last = cli_parts_name(rewritten_parts, "last")
+    // §18.5b (#958): `filename` and `fnr` (the line's number within its
+    // file) are bound when the code names them, as `last` is.
+    let wants_fnr = cli_parts_name(rewritten_parts, "fnr")
+    let wants_filename = cli_parts_name(rewritten_parts, "filename")
+    let from_files = one.files.len() > 0
     source.push_str("var nr: i64 = 0\n")
-    source.push_str("let __lines = stdin.lines()\n")
+    if from_files:
+        let quoted = []
+        for file in one.files: quoted.push("\"" ++ cli_escape_with_string(file) ++ "\"")
+        source.push_str("let __files = [" ++ quoted.join(", ") ++ "]\n")
+        source.push_str("var __file_index = 0\n")
+        source.push_str("for __file in __files {\n")
+        source.push_str("__file_index = __file_index + 1\n")
+        source.push_str("let __read = read_file(__file)\n")
+        source.push_str("if __read.is_err() {\neprint(\"with: cannot read \" ++ __file)\nexit_code(2)\n}\n")
+        source.push_str("let __text = __read.unwrap()\n")
+        source.push_str("let __lines = lines(__text)\n")
+        source.push_str("var __fnr: i64 = 0\n")
+        if one.in_place: source.push_str("let __out = []\n")
+    else:
+        source.push_str("let __lines = stdin.lines()\n")
     source.push_str(if lines_mode: "for line in __lines {\n" else: "for __line in __lines {\n")
     source.push_str("nr = nr + 1\n")
-    if wants_last: source.push_str("let last = nr == __lines.len()\n")
+    if from_files: source.push_str("__fnr = __fnr + 1\n")
+    if wants_fnr: source.push_str(if from_files: "let fnr = __fnr\n" else: "let fnr = nr\n")
+    if wants_filename: source.push_str(if from_files: "let filename = __file\n" else: "let filename = \"\"\n")
+    if wants_last: source.push_str(if from_files: "let last = __file_index == __files.len() and __fnr == __lines.len()\n" else: "let last = nr == __lines.len()\n")
     if not lines_mode: source.push_str("var line = __line.clone()\n")
     for i in 0..rewritten_parts.len():
         let start = source.len() as i32
         source.push_str(cli_blank_prefix(rewritten_parts[i], use_lens[i]))
         source.push_str("\n")
         syn = cli_synthetic_add_mapping(syn, start, rewritten_parts[i], f"<cli {flag} #{i + 1}>")
-    if not lines_mode: source.push_str("print(line)\n")
+    if not lines_mode: source.push_str(if one.in_place: "__out.push(line)\n" else: "print(line)\n")
     source.push_str("}\n")
+    if from_files:
+        // `-i`: the new text goes to a sibling and is renamed over the
+        // file, so a failure never leaves it half written. A file that
+        // ended without a newline still does.
+        if one.in_place:
+            source.push_str("let __tmp = __file ++ \".with-tmp\"\n")
+            source.push_str("if write_file(__tmp, __out.join(\"\\n\") ++ (if __text.ends_with(\"\\n\"): \"\\n\" else: \"\")) != 0 or rename_file(__tmp, __file) != 0 {\neprint(\"with: cannot write \" ++ __file)\nexit_code(2)\n}\n")
+        source.push_str("}\n")
     // §18.5b (#957): code that runs once after the loop.
     for part in one.post_parts:
         eval_part += 1
         syn = cli_append_mapped(syn, source, cli_rewrite_semicolons(part), f"<cli -e #{eval_part}>")
     syn.source = source.to_str()
     syn
+
+// Whether some part names `word` and does not declare its own.
+fn cli_parts_name(parts: &List[str], word: &str) -> bool:
+    for part in parts:
+        if cli_code_names(part, word) and not part.contains("let " ++ word) and not part.contains("var " ++ word): return true
+    false
 
 // Whether `code` names the identifier `word`: the word with no identifier
 // character on either side.

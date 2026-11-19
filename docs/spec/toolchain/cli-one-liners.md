@@ -29,6 +29,7 @@ are never combined:
 | `-e CODE` | Compile and run `CODE` as top-level executable statements |
 | `-n CODE` | Loop over stdin lines and run `CODE` for each line |
 | `-p CODE` | Like `-n`, then print the current `line` after `CODE` |
+| `-i` | With `-p` and input files: write each file back in place of printing |
 
 Multiple flags of the same mode are allowed and concatenate as separate
 generated lines:
@@ -41,4 +42,7 @@ Beside `-n` or `-p`, `-e` code runs once: before the loop when it comes
 before the first `-n` or `-p`, after the loop when it comes after the last
 (§18.5b.3). `-e` between two `-n` or `-p` parts is an error.
 
-One-liner code cannot be combined with a source file argument.
+`-e` code cannot be combined with a source file argument. Operands after
+`-n` or `-p` code are input files, read in order in place of stdin, with
+`filename` and `fnr` bound; `-i` with `-p` writes each file back
+(§18.5b.3).

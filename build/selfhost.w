@@ -1745,6 +1745,42 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_assert_contains(ctx, between.stderr, "-e between two -n parts", "one_liners")
     if rc != 0: return rc
 
+    // §18.5b (#958): operands after `-n`/`-p` code are input files, read in
+    // order; `filename` and `fnr` are bound; `-i` writes each file back.
+    let ol_a = bs_join(output_dir, "one_liner_a.txt")
+    let ol_b = bs_join(output_dir, "one_liner_b.txt")
+    rc = bs_write_fixture(ctx, ol_a, "alpha\nbeta\n", "one-liner input a")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, ol_b, "gamma\ndelta", "one-liner input b")
+    if rc != 0: return rc
+    args = ["-n", "print(f\"{fnr}:{nr}:{last}:{line}\")", ol_a, ol_b]
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-files", args, "", "1:1:false:alpha\n2:2:false:beta\n1:3:false:gamma\n2:4:true:delta")
+    if rc != 0: return rc
+    args = ["-n", "if fnr == 2: print(filename.ends_with(\"one_liner_b.txt\"))", ol_a, ol_b]
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-filename", args, "", "false\ntrue")
+    if rc != 0: return rc
+    args = ["-e", "var n = 0", "-n", "n += 1", "-e", "print(n)", ol_a, ol_b]
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-files-count", args, "", "4")
+    if rc != 0: return rc
+    args = ["-p", "-i", "line = line.replace(\"a\", \"A\")", ol_a, ol_b]
+    let in_place = bs_run_cli_capture(ctx, compiler_path, "one-liner-in-place", args, BS_HANG_GUARD_MS)
+    if in_place.rc != 0: return bs_fail(ctx, "one-liner -i failed: " ++ in_place.stderr)
+    // A file that ended without a newline still does, and no sibling is left.
+    if ctx.fs().read_text(ol_a) != "AlphA\nbetA\n" or ctx.fs().read_text(ol_b) != "gAmmA\ndeltA":
+        return bs_fail(ctx, "one-liner -i did not write the files back as edited")
+    if ctx.fs().exists(ol_a ++ ".with-tmp") or ctx.fs().exists(ol_b ++ ".with-tmp"):
+        return bs_fail(ctx, "one-liner -i left its temporary file")
+    args = ["-p", "-i", "line = line"]
+    let no_file = bs_run_cli_capture(ctx, compiler_path, "one-liner-in-place-no-file", args, BS_HANG_GUARD_MS)
+    if no_file.rc == 0: return bs_fail(ctx, "one-liner -i without a file unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, no_file.stderr, "-i writes each input file back", "one_liners")
+    if rc != 0: return rc
+    args = ["-n", "print(line)", bs_join(output_dir, "one_liner_missing.txt")]
+    let missing = bs_run_cli_capture(ctx, compiler_path, "one-liner-missing-file", args, BS_HANG_GUARD_MS)
+    if missing.rc == 0: return bs_fail(ctx, "one-liner over a missing file unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, missing.stderr, "cannot read", "one_liners")
+    if rc != 0: return rc
+
     let diag_e = bs_run_cli_capture(ctx, compiler_path, "one-liner-diag-e", bs_one_liner_args("-e", "let x = "), BS_HANG_GUARD_MS)
     if diag_e.rc == 0:
         return bs_fail(ctx, "one-liner malformed -e unexpectedly succeeded")

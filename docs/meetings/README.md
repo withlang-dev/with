@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D222 — One-liners read files and edit them in place: operands after `-n`/`-p` code are input files, `filename` and `fnr` are bound, `-i` writes back through a sibling and a rename (delegated)](2026-11-18-D222-one-liners-read-files-and-edit-them-in-place.md)
 - [D221 — The alternatives of an or-pattern share their bindings: same names, one type each, one binding per name; sugar for the duplicated arms (delegated)](2026-11-18-D221-the-alternatives-of-an-or-pattern-share-their-bindings.md)
 - [D220 — A parameter is an immutable binding, and §29.8's consuming rebind applies to it: `var x = x` is the local copy (ruled)](2026-11-18-D220-a-parameter-is-an-immutable-binding-and-the-consuming-rebind-applies-to-it.md)
 - [D219 — `++` append is the builder: D34-C stands, `StringBuilder` leaves the prelude, and the lint covers non-append and shared accumulation (ruled)](2026-11-18-D219-append-is-the-builder-and-the-lint-covers-what-is-still-slow.md)
