@@ -44,6 +44,11 @@ Arguments to `mut` parameters naming structurally disjoint fields
 callee's body writes (§3.6, D178); across packages it mutates the whole
 place.
 
+A closure passed in the same call may not capture a view of any place
+that overlaps a `mut` receiver or `mut` argument, for reading or writing;
+a callee that brackets work on it passes it to the closure
+(`x.scope((s) => …)`) (D218).
+
 ### 3.2a Access Activation
 
 A call proceeds in four steps:
