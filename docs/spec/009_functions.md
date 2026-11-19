@@ -147,6 +147,10 @@ nesting an `if` inside the else body. The forms may be mixed freely
 within a single chain. `else` is required in expression position
 unless the if-branch is `Never`-typed.
 
+**A parameter is an immutable binding (D220):** assigning to it is an
+error. A working copy is a consuming rebind (§29.8), `var x = x`. To
+change the caller's variable, declare the parameter `mut x: T` (§3.8a).
+
 ### 9.1a Named Arguments, Default Parameters, and Implicit Parameters
 
 Function parameters may be passed positionally or by name. Parameters
