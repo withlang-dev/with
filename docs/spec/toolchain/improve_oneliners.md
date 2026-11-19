@@ -89,11 +89,10 @@ materializes the input as `List[str]`, so `last`/END cost nothing. Proposal:
 hoist a snippet's top-level `var` declarations out of the loop and bind
 `last: bool`.
 
-**2. No file operands and no `-i` (#958).** `with -n CODE file` and
-`with -p -i CODE file` are refused with "cannot combine one-liner code with a
-source file" — §18.5b's own sentence, so the fix is a spec edit (trailing
-operands are inputs; `filename`/`fnr` bindings; `-i` through a temp sibling
-and rename).
+**2. File operands and `-i` (#958): done (D222).** `with -n CODE file…` and
+`with -p -i CODE file…` work: operands after `-n`/`-p` code are input files,
+`filename` and `fnr` are bound, and `-i` writes each file back through a
+sibling and a rename.
 
 **3. No integer parse on `str` (#959); whitespace-run fields have landed.**
 `line.split(" ")` yields an empty field for a double space (awk's `$N`

@@ -245,6 +245,29 @@ any loop. On empty input the loop body never runs, so `if last:` prints
 nothing, while code after the loop still runs and `print(nr)` prints `0`.
 The same holds for `-p`.
 
+**Input files (delegated, D222).** Operands after `-n` or `-p` code are
+input files, read in order in place of stdin; the source of a one-liner is
+the flag's value, so an operand is never the source. `filename` is bound to
+the current file's path as given (the empty string when the input is
+stdin) and `fnr` to the line's number within its file; `nr` counts across
+all files, and `last` is the final line of the last file. A file that
+cannot be read stops the program with an error and a non-zero exit.
+
+```
+with -n 'if fnr == 1: print(filename)' a.txt b.txt
+with -e 'var n = 0' -n 'n += 1' -e 'print(n)' *.log
+```
+
+**`-i` (delegated, D222).** With `-p` and at least one file, `-i` writes
+each file's lines back in place of printing them: `sed -i`. The new text is
+written beside the file and renamed over it, so a failure never leaves it
+half written; a file that ended without a newline still does. `-i` with
+`-n`, with `-e` alone, or with no file is an error.
+
+```
+with -p -i 'line = line.replace("old", "new")' notes.txt
+```
+
 #### 18.5b.4 `-p`
 
 `-p CODE` is like `-n`, but prints `line` after `CODE` runs. `line` is a
