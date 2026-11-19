@@ -27605,7 +27605,7 @@ impl Sema:
             // D218 (§9.3): a closure checked against a function type with a
             // `mut` parameter receives that parameter as `mut`; the literal
             // need not repeat it.
-            let p_is_mut = expected_fn_tid != 0 and self.fn_type_param_is_mut(expected_fn_tid, pi)
+            let p_is_mut = (expected_fn_tid != 0 and self.fn_type_param_is_mut(expected_fn_tid, pi)) or ((self.ast.fn_type_mut_mask(node as NodeId) >> (pi as u32)) & 1) != 0
             if p_is_mut: closure_mut_mask = closure_mut_mask | (1 << (pi as u32))
             self.scope_put_at(p_sym, p_ty, p_is_mut as i32, if p_type_node > 0: p_type_node else: node)
             param_tys.push(p_ty)

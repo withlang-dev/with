@@ -9280,7 +9280,14 @@ impl Parser:
         self.advance()  // consume (
         self.skip_newlines()
         let params: List[i32] = []
+        // D218 (§9.3): `(mut b: T) => …` states the parameter's mode.
+        var mut_mask: i32 = 0
+        var mut_bit: i32 = 1
         while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+            if self.peek() == TokenKind.TK_KW_MUT:
+                self.advance()
+                mut_mask = mut_mask | mut_bit
+            mut_bit = mut_bit << 1
             if self.peek() == TokenKind.TK_KW_IT:
                 self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
                 self.advance()
@@ -9306,7 +9313,9 @@ impl Parser:
         let ret_type = self.parse_closure_ret_type()
         self.expect(TokenKind.TK_FAT_ARROW)
         let body = self.parse_block_or_expr()
-        self.add_closure_node(start, body, extra_start, param_count, ret_type)
+        let closure = self.add_closure_node(start, body, extra_start, param_count, ret_type)
+        if mut_mask != 0: self.pool.set_fn_type_mut_mask(closure, mut_mask)
+        closure
 
     // A closure's optional `-> T` (§12, #1508): the result type Sema checks
     // like a declared return type. It was parsed and discarded.
