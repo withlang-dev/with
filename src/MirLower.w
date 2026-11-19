@@ -12070,6 +12070,12 @@ impl MirBuilder:
     mut fn lower_slice_pattern_take_list(pat_node: i32, scrutinee_place: i32) -> List[i32]:
         let out: List[i32] = []
         let span = self.ast.get_start(pat_node)
+        // #3461: the elements leave this buffer. A subject that was a counted
+        // copy of a list still in use shares it (D120), and taking an element
+        // out of a shared buffer gave it two owners (a double free); the
+        // subject gets its own buffer first, which costs nothing when it is
+        // already the only holder.
+        self.make_unique_before_mutation(scrutinee_place)
         let list_ty = self.sema.resolve_alias(self.place_local_type(scrutinee_place) as TypeId) as i32
         let elem_ty = self.sema.get_generic_inst_arg(list_ty, 0)
         let sp_extra = self.ast.get_data0(pat_node)
@@ -12747,6 +12753,9 @@ impl MirBuilder:
         let pending_reset_field_start = self.pending_reset_field_places.len()
         let pending_move_temp_start = self.pending_move_temp_locals.len()
         var scrutinee_place = observed_place
+        // The subject was read as a copy (a value that is used again takes a
+        // count, D111/D120): its source keeps what it holds, and its own drop.
+        var subject_copied = false
         if observed_place < 0:
             let saved_scrutinee_expected = self.expected_type
             if scrutinee_ty != 0 and scrutinee_ty != self.sema.ty_void as i32:
@@ -12755,6 +12764,7 @@ impl MirBuilder:
                 self.expected_type = 0
             let scrutinee_op = self.lower_expr(scrutinee_expr)
             self.expected_type = saved_scrutinee_expected
+            subject_copied = scrutinee_op >= 0 and scrutinee_op < self.body.operand_kinds.len() and self.body.operand_kinds[scrutinee_op] == OperandKind.OK_COPY
             scrutinee_place = self.materialize_operand(scrutinee_op, scrutinee_ty, self.ast.get_start(scrutinee_expr))
             // #2561: the subject's move happened here, on every path, before
             // any arm. Blank what it vacated now: flushed at the end of the
@@ -12790,7 +12800,11 @@ impl MirBuilder:
                 self.cancel_stmt_temp_for_local(match_scrut_local)
                 self.cancel_scheduled_value_drop_for_local(match_scrut_local)
                 self.mark_carrier_consumed(match_scrut_local)
-            self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
+            // #3461: only a subject that moved out of its place gave the arms
+            // its payloads. After a counted copy the place still holds its
+            // own count, and cancelling its drop leaked it (a `List[str]`
+            // parameter taken apart by a list pattern and used again).
+            if not subject_copied: self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
 
         let match_entry_bb = self.cur_bb as i32
         let branch_drop_depth = self.drop_local_ids.len()

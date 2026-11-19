@@ -13993,6 +13993,12 @@ impl Sema:
                     // the clone's cost.
                     let collection = if tid != 0: self.engine_collection_base_name(tid) else: ""
                     let moved_name = self.pool_resolve(sym)
+                    // #3461 (§9.7): a list pattern on an owned subject takes
+                    // it apart. Say that, and the spelling that keeps it.
+                    if self.list_pattern_took.contains(sym):
+                        let pat_line = self.node_line(self.list_pattern_took.get(sym).unwrap())
+                        self.emit_error_with_help(f"use of moved value: the list pattern at line {pat_line} took `{moved_name}` apart", node, f"`{moved_name}` is a by-value parameter, an owned subject, so the pattern takes its elements; declare it `{moved_name}: &{self.type_name(tid)}` and the pattern views it (§9.7)")
+                        return 0
                     let help = if collection.len() > 0: f"`{moved_name}` is a {collection}, an engine-backed collection and a resource (§2.3, D152): the earlier use moved it; a copy is `{moved_name}.clone()`, O(n), every element cloned" else: "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move".to_owned()
                     self.emit_error_with_help(moved_msg, node, help)
             if sym != self.assign_target_revive_sym:
@@ -17795,11 +17801,20 @@ impl Sema:
         let root = self.place_root_sym(expr)
         root != 0 and self.scope_lookup_mut(root) != 0
 
-    // §9.7 (D115): a pattern subject that is owned — a temporary, a place
-    // moved with `move`, a by-value parameter (dies with the frame) — is
-    // taken apart by value. A `self` receiver that borrows the caller's
-    // place (`fn`, `mut fn`) is a place, as a local or a field is.
-    fn pattern_subject_root_owned(subject: i32) -> bool:
+    // The subject of the pattern about to be checked, and whether it is an
+    // owned subject. That is a fact about the subject, decided here once;
+    // every pattern form reads it (#3461: the slice pattern had its own
+    // test, which left out a parameter, so in one match a variant binding
+    // took the parameter apart and a list pattern only viewed it).
+    mut fn set_pattern_subject(subject: i32):
+        self.pattern_subject_node = subject
+        self.pattern_subject_owned = subject != 0 and self.subject_is_owned(subject)
+
+    // §9.7 (D115, D144): an owned subject — a temporary, a place moved with
+    // `move`, a by-value parameter (dies with the frame) — is taken apart
+    // by value. A `self` receiver that borrows the caller's place (`fn`,
+    // `mut fn`), a `mut` parameter, a local and a field are places.
+    fn subject_is_owned(subject: i32) -> bool:
         var expr = subject
         while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
             expr = self.ast.get_data0(expr)
@@ -19910,7 +19925,29 @@ impl Sema:
         if self.pattern_binds_owned_value(pat) == false and self.pattern_disarms_drop_subject(pat, subject_type) == 0:
             return
         self.consuming_pattern_subjects.insert(node, 1)
+        // A parameter taken apart by a list pattern: remembered for the
+        // error a later use of it gets (#3461).
+        let root = self.place_root_sym(subject)
+        let took = self.owned_slice_pattern_in(pat)
+        if root != 0 and took != 0 and self.param_index_for_sym(root) >= 0 and not self.list_pattern_took.contains(root): self.list_pattern_took.insert(root, took)
         self.mark_moved_if_consumed(subject)
+
+    // The first slice pattern in `pat` that takes an owned subject apart, or 0.
+    fn owned_slice_pattern_in(pat: i32) -> i32:
+        if pat == 0: return 0
+        let kind = self.ast.kind(pat)
+        if kind == NodeKind.NK_PAT_SLICE: return if self.owned_slice_patterns.contains(pat): pat else: 0
+        if kind == NodeKind.NK_PAT_AT_BINDING: return self.owned_slice_pattern_in(self.ast.get_data1(pat))
+        let children_at_0 = kind == NodeKind.NK_PAT_OR or kind == NodeKind.NK_PAT_TUPLE
+        // A struct pattern keeps field names beside its sub-patterns; it is
+        // not walked here (the message is then the general one).
+        if not children_at_0 and kind != NodeKind.NK_PAT_VARIANT and kind != NodeKind.NK_PAT_ENUM_SHORTHAND: return 0
+        let start = if children_at_0: self.ast.get_data0(pat) else: self.ast.get_data1(pat)
+        let count = if children_at_0: self.ast.get_data1(pat) else: self.ast.get_data2(pat)
+        for pi in 0..count:
+            let found = self.owned_slice_pattern_in(self.ast.get_extra(start + pi))
+            if found != 0: return found
+        0
 
     mut fn record_pattern_view_bindings(node: i32, subject_node: i32):
         if subject_node == 0:
@@ -24588,10 +24625,10 @@ impl Sema:
             // Conditional *field* moves remain rejected via drop_control_flow_depth.
             self.push_move_control_flow_context(1)
             self.push_scope()
-            self.pattern_subject_node = subject
+            self.set_pattern_subject(subject)
             self.pattern_list_removal = 0
             self.check_pattern(pat, subject_type as i32)
-            self.pattern_subject_node = 0
+            self.set_pattern_subject(0)
             // A failed guard puts the arm's bindings back into the subject, an
             // element taken out of an owned List included (#2289: MIR's
             // restore_pattern_takes; D115 Amendment 1 gives a head its way back).
@@ -26481,16 +26518,6 @@ impl Sema:
     // temporary or a place moved with `move`, and observed when it names a
     // place. A pattern with no subject expression (a parameter, a loop
     // item) owns the value it is given.
-    fn slice_pattern_subject_owned(subject_type: i32) -> bool:
-        if self.get_type_kind(self.resolve_alias(subject_type as TypeId)) == TypeKind.TY_REF:
-            return false
-        var expr = self.pattern_subject_node
-        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
-            expr = self.ast.get_data0(expr)
-        if expr == 0 or self.ast.kind(expr) == NodeKind.NK_MOVE_ARG:
-            return true
-        self.place_root_sym(expr) == 0
-
     fn pattern_subject_ref_mutability(subject_type: i32) -> i32:
         if subject_type == 0:
             return -1
@@ -26668,7 +26695,7 @@ impl Sema:
             // bits take the value.
             // A bare local is a place too (Eric, 2026-10-22): `let (tx, rx)
             // = pair` observes `pair`; taking it apart is spelled `move pair`.
-            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not self.type_is_plain_bits(subject_type):
+            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_owned and not self.type_is_plain_bits(subject_type):
                 self.pattern_place_bindings.insert(node, 1)
                 // #823: in an or-pattern the place differs by alternative,
                 // so lowering holds it by reference; the type exists for it.
@@ -26956,7 +26983,7 @@ impl Sema:
             let shape_kind = self.get_type_kind(shape)
             let seq_elem = self.slice_pattern_seq_elem(subject_type)
             if seq_elem != 0:
-                if shape_kind != TypeKind.TY_SLICE and self.slice_pattern_subject_owned(subject_type):
+                if shape_kind != TypeKind.TY_SLICE and self.pattern_subject_owned and self.get_type_kind(self.resolve_alias(subject_type as TypeId)) != TypeKind.TY_REF:
                     self.owned_slice_patterns.insert(node, 1)
                     elem_type = seq_elem
                     if shape_kind == TypeKind.TY_ARRAY:
@@ -29044,13 +29071,13 @@ impl Sema:
             let else_kind = self.get_type_kind(self.resolve_alias(else_ty as TypeId))
             if else_kind != TypeKind.TY_NEVER:
                 self.emit_error("let ... else requires a diverging else branch", else_body)
-        self.pattern_subject_node = value
+        self.set_pattern_subject(value)
         // §9.7: `var PATTERN = ...` binds every name it introduces mutably (#1354).
         let saved_bind_mut = self.pattern_bind_mut
         self.pattern_bind_mut = self.ast.let_pattern_is_mut(node)
         self.check_pattern(pattern, val_type as i32)
         self.pattern_bind_mut = saved_bind_mut
-        self.pattern_subject_node = 0
+        self.set_pattern_subject(0)
         self.record_pattern_view_bindings(pattern, value)
         // #782 arm 2: a pattern let over an owned subject EXTRACTS by value —
         // MIR moves the bound elements out, so a later use of the subject
