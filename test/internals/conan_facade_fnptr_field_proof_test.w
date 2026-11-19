@@ -7,7 +7,15 @@
 //   one_show     one constant initializer naming a package function that
 //                only reads: proven, and the wrapper presents as a lend
 //   two_show     the same field written by two tables (glfw's cocoa and
-//                null platforms): "written in 2 places"
+//                null platforms), and the table assigned whole from one of
+//                them: D211, the field holds either, and both only read
+//   keep_show    two writers, one of which keeps its argument: retained,
+//                and the report names the member that keeps it
+//   chain_show   a table handed to a call through another table's field,
+//                whose set is closed: the first table has not left the
+//                proofs (the fixed point)
+//   copied_show  the table assigned whole from a caller's pointer: "the
+//                record is assigned whole"
 //   zeroed_show  the table handed to memset: "passed to memset, which the
 //                proofs cannot read"
 //   cast_show    a pointer to the table converted to `char *`
@@ -26,7 +34,8 @@ fn main:
     assert(mkdir_p(build) == 0)
     var header = "typedef struct Thing Thing;\nThing *thing_new(void);\nvoid thing_free(Thing *t);\n"
     header = header ++ "struct UserOps { void (*show)(Thing *); };\n"
-    for name in ["one", "two", "zeroed", "cast"]: header = header ++ "void " ++ name ++ "_show(Thing *t);\n"
+    for name in ["one", "two", "zeroed", "cast", "keep", "chain", "copied"]: header = header ++ "void " ++ name ++ "_show(Thing *t);\n"
+    header = header ++ "struct CopyOps { void (*show)(Thing *); };\nvoid copy_set(const struct CopyOps *user);\n"
     header = header ++ "void user_show(struct UserOps *ops, Thing *t);\n"
     assert(write_file(dep ++ "/include/thing.h", header) == 0)
     assert(write_file(src ++ "/thing.h", header) == 0)
@@ -42,6 +51,14 @@ fn main:
     unit = unit ++ "struct CastOps { void (*show)(Thing *); };\nstatic struct CastOps cast_ops = { show_a };\nstatic char *cast_bytes;\n"
     unit = unit ++ "void cast_show(Thing *t) { cast_bytes = (char *)&cast_ops; cast_ops.show(t); }\n"
     unit = unit ++ "void user_show(struct UserOps *ops, Thing *t) { ops->show(t); }\n"
+    unit = unit ++ "static Thing *kept;\nstatic void show_keep(Thing *t) { kept = t; }\n"
+    unit = unit ++ "struct KeepOps { void (*show)(Thing *); };\nstatic const struct KeepOps quiet = { show_a };\nstatic const struct KeepOps keeper = { show_keep };\n"
+    unit = unit ++ "void keep_show(Thing *t) { (t->n ? &quiet : &keeper)->show(t); }\n"
+    unit = unit ++ "struct ChainOps { void (*show)(Thing *); };\nstatic struct ChainOps chain_ops = { show_a };\n"
+    unit = unit ++ "struct Disp { void (*run)(struct ChainOps *, Thing *); };\nstatic void run_impl(struct ChainOps *o, Thing *t) { o->show(t); }\nstatic const struct Disp disp = { run_impl };\n"
+    unit = unit ++ "void chain_show(Thing *t) { disp.run(&chain_ops, t); }\n"
+    unit = unit ++ "static struct CopyOps copy_ops = { show_a };\nvoid copy_set(const struct CopyOps *user) { copy_ops = *user; }\n"
+    unit = unit ++ "void copied_show(Thing *t) { copy_ops.show(t); }\n"
     assert(write_file(src ++ "/thing.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c thing.c\",\n  \"file\": \"thing.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
@@ -51,7 +68,10 @@ fn main:
     let report = read_file(dep ++ "/contract-report.txt") ?? ""
     let wanted = [
         "  one_show: lend",
-        "  two_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: it is written in 2 places (show_a, show_b))",
+        "  two_show: lend",
+        "  keep_show: raw: retains param 0 (passed through the function pointer field show (only ever show_a or show_keep) to show_keep",
+        "  chain_show: lend",
+        "  copied_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: the record is assigned whole",
         "  zeroed_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: a pointer to the record is passed to memset, which the proofs cannot read",
         "  cast_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: a pointer to the record is converted to another pointer type",
         "  user_show: raw: retains param 1 (passed through the function pointer field show, which no unit decides: the package never writes it (its value is the caller's))",
