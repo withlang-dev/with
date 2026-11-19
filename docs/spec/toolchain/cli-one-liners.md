@@ -29,6 +29,7 @@ are never combined:
 | `-e CODE` | Compile and run `CODE` as top-level executable statements |
 | `-n CODE` | Loop over stdin lines and run `CODE` for each line |
 | `-p CODE` | Like `-n`, then print the current `line` after `CODE` |
+| `-i` | With `-p` and input files: write each file back in place of printing |
 
 Multiple flags of the same mode are allowed and concatenate as separate
 generated lines:
