@@ -189,7 +189,7 @@ impl CiProject:
                 if self.fnptr_verdicts.contains(record_key): continue
                 if h.callee.starts_with("*"):
                     let field = h.callee.slice(1, h.callee.len())
-                    if self.fd_field_closed(&writers, field): continue
+                    if self.fd_field_closed(writers, field): continue
                     self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is passed to a call through the function pointer field " ++ field ++ ", which the proofs do not close (" ++ h.place ++ ")")
                 else:
                     if self.fd_reads_callee(h.callee): continue
