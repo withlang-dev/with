@@ -13507,7 +13507,7 @@ impl MirBuilder:
         // D172 (§3.8a): a `mut` parameter's argument is the caller's place,
         // passed in place: never moved and never copied, and made unique
         // first, since the callee writes it (D120).
-        if sig_idx >= 0 and arg_i >= 0 and self.sema.sig_param_is_mut(sig_idx, arg_i):
+        if arg_i >= 0 and ((sig_idx >= 0 and self.sema.sig_param_is_mut(sig_idx, arg_i)) or (sig_idx < 0 and callable_fn_tid != 0 and self.sema.fn_type_param_is_mut(callable_fn_tid, arg_i))):
             let mut_place = self.lower_expr_place(arg_node)
             self.make_unique_before_mutation(mut_place)
             self.expected_type = saved_expected

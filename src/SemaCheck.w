@@ -1872,6 +1872,12 @@ impl Sema:
             if arg_node > 0 and self.ast.is_mut_arg(arg_node as NodeId):
                 self.emit_error(f"`mut` at a call site is valid only where the parameter is `mut`; `{callee}` does not declare it (§3.8)", arg_node)
             return false
+        self.check_mut_place_arg(arg_node, call_node, sig_idx, param_i)
+        true
+
+    // The argument of a `mut` parameter, of a named function (`sig_idx`) or
+    // of a function value (`sig_idx` -1, D218): a mutable place.
+    mut fn check_mut_place_arg(arg_node: i32, call_node: i32, sig_idx: i32, param_i: i32) -> bool:
         if arg_node <= 0:
             return true
         let packed = self.classify_place(arg_node)
@@ -4851,17 +4857,6 @@ impl Sema:
 
     // A callable value this compilation makes (a closure, or a function
     // named as a value), for callable_type_body's dispatcher.
-    // #3453 (§3.8a): a `mut` parameter is a mode, and a function type has
-    // no place for one. As a `fn(T) -> R` value the function was called
-    // with its argument by value while its prologue expected the caller's
-    // place: a segfault in safe code.
-    mut fn refuse_mut_param_fn_value(sig: i32, sym: i32, node: i32) -> bool:
-        for pi in 0..self.sig_get_param_count(sig):
-            if self.sig_param_is_mut(sig, pi):
-                self.emit_error_with_help(f"`{self.pool_resolve(sym)}` takes a `mut` parameter: it is called directly, never used as a value (§3.8a)", node, "a function type cannot say `mut`, so a call through the value could not pass the caller's place")
-                return true
-        false
-
     mut fn note_callable_value(body: i32, tid: i32):
         if tid <= 0 or self.callable_any_fn_type(tid as TypeId) == 0:
             return
@@ -14045,11 +14040,10 @@ impl Sema:
                     let mono_params: List[i32] = []
                     for mpi in 0..mono_param_count:
                         mono_params.push(self.sig_param_type(mono_sig, mpi))
-                    let mono_tid = self.ensure_fn_type(mono_params, mono_param_count, self.sig_return_type(mono_sig) as TypeId) as i32
+                    let mono_tid = self.moded_callable_type(self.ensure_fn_type(mono_params, mono_param_count, self.sig_return_type(mono_sig) as TypeId) as i32, self.sig_mut_param_mask(mono_sig))
                     if self.fn_types_assignable(expected_callable as i32, mono_tid) == false:
                         self.emit_error("`" ++ self.pool_resolve(sym) ++ "` instantiated at the expected parameters is `" ++ self.type_name(mono_tid) ++ "`, not `" ++ self.type_name(expected_callable as i32) ++ "`", node)
                         return 0
-                    if self.refuse_mut_param_fn_value(mono_sig, ident_sym, node): return 0
                     self.fn_callable_values.insert(node, 1)
                     self.typed_expr_types.insert(node, mono_tid)
                     self.fn_value_ident_sigs.insert(node, mono_sig)
@@ -14065,7 +14059,9 @@ impl Sema:
         let sig_idx = self.get_visible_sig(sym)
         if sig_idx >= 0 and self.is_ci_visible(sym) and self.symbol_visible_from_current(sym):
             self.ensure_body_typed(sym, sig_idx)
-            let fn_tid: i32 = self.sig_type_ids[sig_idx]
+            // D218 (§3.8a): a function with a `mut` parameter is a value of
+            // the type that says so, `fn(mut T) -> R`.
+            let fn_tid: i32 = self.moded_callable_type(self.sig_type_ids[sig_idx], self.sig_mut_param_mask(sig_idx))
             // An async fn referenced as a value can be called through the value
             // later; the call site no longer knows it spawns — record here.
             if self.task_fns.contains(sym):
@@ -14079,7 +14075,6 @@ impl Sema:
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
                 return 0
-            if self.refuse_mut_param_fn_value(sig_idx, sym, node): return 0
             // D86 (§18.2): a function value would evaluate the message
             // before the call; these forms evaluate it only on failure.
             if self.fn_symbol_is_precondition_form(sym):
@@ -29575,6 +29570,9 @@ impl Sema:
                     else:
                         self.note_call_arg_coercion(expected_ty, arg_ty, err_arg_node, node)
             let eph_arg_node = if has_resolved: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+            // D218 (§3.8a): a `mut` parameter of the function value's type
+            // takes a mutable place, as in a direct call.
+            if self.fn_type_param_is_mut(fn_tid, param_i): self.check_mut_place_arg(eph_arg_node, node, -1, param_i)
             self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, 0, 0, param_i)
 
         // #1819: a call of a closure binding runs that closure's body, and a

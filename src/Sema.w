@@ -7083,7 +7083,26 @@ impl Sema:
         let params: List[i32] = []
         for pi in 0..param_count:
             params.push(self.type_extra[(start + pi)])
-        self.ensure_callable_type(kind, params, param_count, self.get_type_d2(resolved) as TypeId, CALLABLE_UNSAFE) as i32
+        self.ensure_callable_type(kind, params, param_count, self.get_type_d2(resolved) as TypeId, CALLABLE_UNSAFE | (self.callable_type_flags(resolved) & ~3)) as i32
+
+    // D218 (§3.8a): the type of a function whose parameters `mask` names are
+    // `mut`: `fn(mut T) -> R`. The other identity bits are kept.
+    mut fn moded_callable_type(tid: i32, mask: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if mask == 0 or self.get_type_kind(resolved) != TypeKind.TY_FN: return resolved
+        let param_count = self.get_type_d1(resolved)
+        let start = self.get_type_d0(resolved)
+        let params = []
+        for pi in 0..param_count:
+            params.push(self.type_extra[(start + pi)])
+        self.ensure_callable_type(TypeKind.TY_FN, params, param_count, self.get_type_d2(resolved) as TypeId, (self.callable_type_flags(resolved) & 3) | (mask << CALLABLE_MUT_SHIFT)) as i32
+
+    // Which of a signature's parameters are `mut`, as a function type's mask.
+    fn sig_mut_param_mask(sig: i32) -> i32:
+        var mask = 0
+        for pi in 0..self.sig_get_param_count(sig):
+            if pi < 24 and self.sig_param_is_mut(sig, pi): mask = mask | (1 << (pi as u32))
+        mask
 
     // #1832: the C variadic function-pointer type of a variadic function's
     // signature: its fixed parameters, then `...`.
@@ -7110,6 +7129,11 @@ impl Sema:
     // An unresolved side (type 0) is not yet known and does not decide.
     fn fn_types_assignable(expected: i32, actual: i32) -> bool:
         if self.callable_unsafe_coercion_ok(expected, actual) == false:
+            return false
+        // D218 (§3.8a): `fn(mut T) -> R` and `fn(T) -> R` are different
+        // types and neither converts to the other: one writes the caller's
+        // place, the other takes its argument.
+        if (self.callable_type_flags(self.resolve_alias(expected as TypeId) as i32) >> CALLABLE_MUT_SHIFT) != (self.callable_type_flags(self.resolve_alias(actual as TypeId) as i32) >> CALLABLE_MUT_SHIFT):
             return false
         let param_count = self.get_type_d1(expected)
         if param_count != self.get_type_d1(actual):
@@ -8350,6 +8374,11 @@ impl Sema:
     fn callable_param_uses_value_ref_abi(tid: i32, pi: i32) -> i32:
         let resolved = self.callable_type_resolved(tid)
         if resolved == 0 or pi < 0 or pi >= self.get_type_d1(resolved): return 0
+        // D218 (§3.8a): a `mut` parameter is the caller's place, through a
+        // function value as in a direct call. The callee and its thunk
+        // already take it so; the call through the value passed a value
+        // (#3453's segfault).
+        if self.fn_type_param_is_mut(resolved, pi): return 1
         self.type_uses_c_va_list_place(self.type_extra[self.get_type_d0(resolved) + pi])
 
     fn sig_param_is_c_va_list_by_place(sig_idx: isize, pi: i32) -> i32:
