@@ -984,8 +984,6 @@ fn cc_is_public_abi_name(name: &str) -> bool:
         return true
     if name.starts_with("migrate_") or name.starts_with("ci_"):
         return true
-    if name == "pthread_self":
-        return true
     if name == "i32_to_str" or name == "i64_to_string" or name == "str_from_byte":
         return true
     false

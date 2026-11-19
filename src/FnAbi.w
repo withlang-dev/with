@@ -214,7 +214,7 @@ fn codegen_is_runtime_source_file(source_path: &str) -> bool:
 fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
     if base_name.starts_with("with_") or base_name.starts_with("rt_") or base_name.starts_with("wl_"):
         return true
-    base_name == "__open" or base_name == "pthread_self" or
+    base_name == "__open" or
         base_name == "i32_to_str" or base_name == "i64_to_string" or
         base_name == "str_from_byte"
 
