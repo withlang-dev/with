@@ -6270,6 +6270,9 @@ impl MirBuilder:
         var_tid == resolved
 
     mut fn lower_field_access(node: i32) -> i32:
+        // #3441: `c_uint.max` has no base place; it is the call's result.
+        if self.sema.numeric_member_fns.contains(node):
+            return self.body.operand_d0[self.lower_numeric_member(node, self.sema.numeric_member_fns.get(node).unwrap())]
         let base_expr = self.ast.get_data0(node)
         let field_idx = self.ast.get_data1(node)
         let field_ty = self.expr_type(node)
@@ -13032,6 +13035,22 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
+    // #3441: `c_uint.max`. Sema named the std.numeric function that states
+    // the member; it is called with no arguments.
+    mut fn lower_numeric_member(node: i32, fn_sym: i32) -> i32:
+        let sig_idx = self.call_sig_for_sym(fn_sym)
+        let ret = self.sema.sig_return_type(sig_idx)
+        let args_id = self.body.new_call_args([])
+        self.body.set_call_ast_node(args_id, node)
+        self.record_call_contract(args_id, node, sig_idx)
+        let result_local = self.new_temp(ret)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.const_operand(ConstKind.CK_FN, fn_sym, ret), args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+        self.register_stmt_temp(result_local, ret)
+        self.body.new_operand(OperandKind.OK_COPY, result_place)
+
     mut fn lower_std_drop_call(node: i32) -> i32:
         let args_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
@@ -17387,6 +17406,7 @@ impl MirBuilder:
             let iter_place = self.lower_for_implicit_iter_call(node, node)
             self.implicit_iter_arg_active = saved_active
             return self.body.new_operand(OperandKind.OK_MOVE, iter_place)
+        if node > 0 and self.sema.numeric_member_fns.contains(node): return self.lower_numeric_member(node, self.sema.numeric_member_fns.get(node).unwrap())
         var op = self.lower_expr_node(node)
         // D183 (§4.2.6): a checked narrowing Sema recorded on this node.
         if node > 0 and op >= 0 and self.sema.checked_narrowings.contains(node):

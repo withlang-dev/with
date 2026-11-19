@@ -1864,6 +1864,9 @@ type Sema {
     // For-comprehension resolved variants: node → resolved variant sym.
     // Maps _Payload/_Empty marker nodes to Some/None or Ok/Err.
     comp_resolved: HashMap[i32, i32, Minted],
+    // #3441: a `T.max`-style access on a numeric type named through an
+    // alias → the std.numeric function that states it. Lowered as a call.
+    numeric_member_fns: HashMap[i32, i32, Minted],
     // #2211: resolved name uses (node, kind, declaring module path, name) for
     // the analyzer's `reference` facts: a global read, a function taken as a
     // value, a type name — calls and methods have their own facts.
@@ -4278,6 +4281,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         no_await_guard_scope_depth: 0,
         no_suspend_scope_depth: 0,
         comp_resolved: sema_new_map_i32_i32(),
+        numeric_member_fns: sema_new_map_i32_i32(),
         name_use_nodes: sema_new_list_i32(),
         name_use_kinds: sema_new_list_str(),
         name_use_paths: sema_new_list_str(),
