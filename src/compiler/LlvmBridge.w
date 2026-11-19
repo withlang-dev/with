@@ -10,7 +10,6 @@
 use rt.rt_core
 use rt.platform
 use std.libc.abort
-extern fn pthread_self() -> i64
 extern fn rt_sysinfo_os() -> str
 extern fn rt_sysinfo_arch() -> str
 
@@ -458,7 +457,7 @@ fn cstr_unlock():
     cstr_slot_lock.store(0, .Release)
 
 fn cstr_thread_id() -> i64:
-    let tid = unsafe { pthread_self() }
+    let tid = rt_thread_id()
     if tid != 0:
         return tid
     1

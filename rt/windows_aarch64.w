@@ -1375,12 +1375,6 @@ pub fn rt_gethostname(name: *mut u8, len: u64) -> i32:
         return -1
     if win_utf16_to_utf8_buf(&wname as *const [256]u16 as *const u16, name, len as i64) < 0: -1 else: 0
 
-// Seed-bound (#3311): src/ is linked with the pinned seed's runtime and
-// calls this name until a seed carries rt_thread_id; deleted in that pin's
-// stack.
-pub fn pthread_self() -> i64:
-    GetCurrentThreadId() as i64
-
 // The name comes from GetTempFileNameW, not the template, and is written back
 // as UTF-8 into a buffer assumed to hold 1024 bytes (see windows_x86_64.w).
 fn win_mkstemp(template_path: *mut c_char) -> i32:
