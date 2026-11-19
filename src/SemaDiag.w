@@ -1577,6 +1577,7 @@ impl Sema:
             for pi in 0..param_count:
                 if pi > 0:
                     out = out ++ ", "
+                if self.fn_type_param_is_mut(resolved as i32, pi): out = out ++ "mut "
                 out = out ++ self.type_name(self.type_extra[(te_start + pi)])
             return out ++ ") -> " ++ self.type_name(self.get_type_d2(resolved))
         if tk == TypeKind.TY_EXTERN_FN:

@@ -9536,10 +9536,13 @@ impl Parser:
         let params: List[i32] = []
         // #1832: a trailing `...` makes a C variadic function-pointer type.
         var variadic = false
+        // D218 (§3.8a): `fn(mut T) -> R` states the parameter's mode.
+        var mut_mask = 0
         if self.peek() == TokenKind.TK_DOT_DOT_DOT:
             variadic = true
             self.advance()
         else if self.peek() != TokenKind.TK_R_PAREN:
+            if self.fn_type_param_is_mut(): mut_mask = mut_mask | 1
             let ty = self.parse_fn_type_param_type()
             params.push(ty as i32)
             self.skip_newlines()
@@ -9553,6 +9556,7 @@ impl Parser:
                     self.advance()
                     self.skip_newlines()
                     break
+                if self.fn_type_param_is_mut(): mut_mask = mut_mask | (1 << (params.len() as u32))
                 let ty2 = self.parse_fn_type_param_type()
                 params.push(ty2 as i32)
                 self.skip_newlines()
@@ -9569,7 +9573,18 @@ impl Parser:
         let node = self.pool.add_node(kind, start, self.prev_end(), extra_start, count, ret)
         if variadic and kind == NodeKind.NK_TYPE_EXTERN_FN:
             self.pool.mark_variadic_fn_type(node)
+        if mut_mask != 0 and kind == NodeKind.NK_TYPE_EXTERN_FN:
+            self.emit_error("a C function pointer type has no `mut` parameter: C has no modes, and a C callback that writes through its argument takes `*mut T` (§3.8a)")
+        else if mut_mask != 0:
+            self.pool.set_fn_type_mut_mask(node, mut_mask)
         node
+
+    // `mut` before a function type's parameter (D218). At most 24 parameters
+    // can carry the mode; the mask shares the type's identity bits.
+    mut fn fn_type_param_is_mut() -> bool:
+        if self.peek() != TokenKind.TK_KW_MUT: return false
+        self.advance()
+        true
 
     mut fn parse_type_expr() -> NodeId:
         let t = self.peek()

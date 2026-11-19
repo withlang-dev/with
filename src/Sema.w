@@ -344,6 +344,8 @@ fn sema_trait_method_key(owner: i32, trait_idx: i32, method: i32) -> i64:
 // Identity bits of a callable type beyond its signature (§16.11, #1832).
 pub const CALLABLE_UNSAFE: i32 = 1
 pub const CALLABLE_VARIADIC: i32 = 2
+// D218 (§3.8a): above the two bits, one bit per `mut` parameter.
+pub const CALLABLE_MUT_SHIFT: u32 = 8
 
 pub const GLOBAL_VALUE_DECL_DEF: i32 = 1
 pub const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
@@ -1127,6 +1129,7 @@ type Sema {
     // Variadic-ness is part of the type's identity, and a variadic type is
     // always unsafe to call (§16.3c: a variadic call is raw).
     variadic_fn_type_set: HashMap[i32, i32, Minted],
+    mut_param_fn_type_masks: HashMap[i32, i32, Minted],   // fn type → bit i set when parameter i is `mut` (D218)
     // §16.4 union last-written tracking. Maps a local union variable's name
     // sym → the last-written field sym (0 = tracked-but-unknown after control
     // flow). Absent = untracked (never literal-initialized/assigned) and never
@@ -3912,6 +3915,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         repr_c_types: sema_new_map_i32_i32(),
         unsafe_fn_type_set: sema_new_map_i32_i32(),
         variadic_fn_type_set: sema_new_map_i32_i32(),
+        mut_param_fn_type_masks: sema_new_map_i32_i32(),
         union_last_written: sema_new_map_i32_i32(),
         union_tracked_syms: List.new(),
         union_in_assign_target: 0,
@@ -7004,11 +7008,18 @@ impl Sema:
             self.unsafe_fn_type_set.insert(tid as i32, 1)
         if (flags & CALLABLE_VARIADIC) != 0:
             self.variadic_fn_type_set.insert(tid as i32, 1)
+        if (flags >> CALLABLE_MUT_SHIFT) != 0:
+            self.mut_param_fn_type_masks.insert(tid as i32, flags >> CALLABLE_MUT_SHIFT)
         tid
 
     // The identity bits of a callable type beyond its signature.
     fn callable_type_flags(tid: i32) -> i32:
-        (if self.unsafe_fn_type_set.contains(tid): CALLABLE_UNSAFE else: 0) | (if self.variadic_fn_type_set.contains(tid): CALLABLE_VARIADIC else: 0)
+        (if self.unsafe_fn_type_set.contains(tid): CALLABLE_UNSAFE else: 0) | (if self.variadic_fn_type_set.contains(tid): CALLABLE_VARIADIC else: 0) | ((self.mut_param_fn_type_masks.get(tid) ?? 0) << CALLABLE_MUT_SHIFT)
+
+    // D218 (§3.8a): whether parameter `pi` of a function type is `mut`.
+    fn fn_type_param_is_mut(tid: i32, pi: isize) -> bool:
+        if tid == 0 or pi < 0 or pi >= 24: return false
+        (((self.mut_param_fn_type_masks.get(self.resolve_alias(tid as TypeId) as i32) ?? 0) >> (pi as u32)) & 1) != 0
 
     // #1832: whether a callable type is a C variadic function pointer.
     fn fn_type_is_variadic(tid: i32) -> bool:

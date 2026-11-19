@@ -12334,7 +12334,8 @@ impl Sema:
     fn fn_type_node_flags(node: i32) -> i32:
         if self.ast.is_variadic_fn_type_node(node):
             return CALLABLE_UNSAFE | CALLABLE_VARIADIC
-        if self.ast.is_unsafe_fn_type_node(node): CALLABLE_UNSAFE else: 0
+        // D218 (§3.8a): which parameters are `mut` is part of the type.
+        (if self.ast.is_unsafe_fn_type_node(node): CALLABLE_UNSAFE else: 0) | (self.ast.fn_type_mut_mask(node as NodeId) << CALLABLE_MUT_SHIFT)
 
     // §16.11: why a direct call to `fn_sym` from the module being checked
     // needs an unsafe context — an `unsafe fn`, a raw c_import function, or
