@@ -26624,9 +26624,9 @@ impl Sema:
                 self.check_pattern(self.ast.get_extra(p_extra + pi), subject_type)
             self.or_shared_seen = after
             return
-        let first = self.bind_names.len() as i32
+        let first = self.bind_names.len()
         self.check_pattern(self.ast.get_extra(p_extra), subject_type)
-        let last = self.bind_names.len() as i32
+        let last = self.bind_names.len()
         if last > first: self.or_binding_patterns.insert(node, 1)
         for pi in 1..p_count:
             let alt = self.ast.get_extra(p_extra + pi)
@@ -26637,7 +26637,7 @@ impl Sema:
             for idx in first..last:
                 if not self.or_shared_seen.contains(idx):
                     self.emit_error_with_help(f"alternative {pi + 1} of this pattern does not bind `{self.pool_resolve(self.bind_names[idx])}`, which the first alternative binds (§9.7)", alt, "every alternative binds the same names; write `_` in the first alternative if the arm does not use it")
-            if self.bind_names.len() as i32 > last:
+            if self.bind_names.len() > last:
                 self.emit_error_with_help(f"alternative {pi + 1} of this pattern binds `{self.pool_resolve(self.bind_names[last])}`, which the first alternative does not bind (§9.7)", alt, "every alternative binds the same names")
             self.or_shared_start = -1
             self.or_shared_end = -1

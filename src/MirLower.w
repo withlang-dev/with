@@ -21,7 +21,7 @@ use std.collections.Minted
 
 // One alternative of an or-pattern (#823): the local that says which
 // alternative matched, this one's index, and its span of the move log.
-type OrAltLog { alt_local: i32, alt: i32, start: i32, end: i32 }
+type OrAltLog { alt_local: i32, alt: i32, start: isize, end: isize }
 
 type ScopeEntry {
     local_id: i32,
@@ -11738,7 +11738,7 @@ impl MirBuilder:
     // blanked, so the binding's scheduled drop frees nothing. A binding place
     // is a whole local, or one element of a tuple rest binding (#1366).
     mut fn restore_pattern_moves(start: isize):
-        self.restore_pattern_move_span(start as i32, self.pattern_move_log.len() as i32, self.or_alt_logs.len() as i32)
+        self.restore_pattern_move_span(start, self.pattern_move_log.len(), self.or_alt_logs.len())
         // The remainder is back in the subject (a `..rest` moved it out);
         // now the elements taken out of the subject go back into it.
         self.restore_pattern_takes(start)
@@ -11748,7 +11748,7 @@ impl MirBuilder:
     // matched moved anything: its entries are restored on a switch over the
     // matched alternative. `row_limit` keeps an alternative's own row out
     // of the search inside it (a nested or-pattern's rows come first).
-    mut fn restore_pattern_move_span(from: i32, to: i32, row_limit: i32):
+    mut fn restore_pattern_move_span(from: isize, to: isize, row_limit: isize):
         var pick = -1
         var at = 0
         for row in self.or_alt_logs:
@@ -11787,7 +11787,7 @@ impl MirBuilder:
         self.switch_to(join_bb)
         self.restore_pattern_move_span(from, lo, row_limit)
 
-    mut fn restore_pattern_move_entries(start: i32, end: i32):
+    mut fn restore_pattern_move_entries(start: isize, end: isize):
         var i = end - 2
         while i >= start:
             let bind_place: i32 = self.pattern_move_log[i]
@@ -12298,8 +12298,8 @@ impl MirBuilder:
         let drop_marks = []
         let tail_bbs = []
         for pi in 0..p_count:
-            drop_marks.push(self.drop_local_ids.len() as i32)
-            let log_start = self.pattern_move_log.len() as i32
+            drop_marks.push(self.drop_local_ids.len())
+            let log_start = self.pattern_move_log.len()
             self.switch_to(alt_bbs[pi] as BlockId)
             let bound = self.lower_pattern(self.ast.get_extra(p_start + pi), scrutinee_place)
             // A place binding names a different place in each alternative:
@@ -12326,14 +12326,14 @@ impl MirBuilder:
                 while self.bind_syms.len() > bind_end:
                     self.bind_syms.pop()
                     self.bind_local_ids.pop()
-            self.or_alt_logs.push(OrAltLog { alt_local, alt: pi, start: log_start, end: self.pattern_move_log.len() as i32 })
+            self.or_alt_logs.push(OrAltLog { alt_local, alt: pi, start: log_start, end: self.pattern_move_log.len() })
             // A block's statements are written in one go, and what this path
             // must blank is known only once every alternative is lowered:
             // the blanking gets a block of its own.
             let tail_bb = self.new_block()
             self.terminate(TermKind.TK_GOTO, tail_bb, 0, 0, 0)
             tail_bbs.push(tail_bb as i32)
-        drop_marks.push(self.drop_local_ids.len() as i32)
+        drop_marks.push(self.drop_local_ids.len())
         // A list take has its own log, which is not split by alternative
         // yet: refused here, never lowered wrongly.
         if self.pattern_take_log.len() > take_base: self.mark_unsupported()
@@ -12391,7 +12391,7 @@ impl MirBuilder:
     // first alternative's local for that name, and the move-log entries
     // that named `local` name the shared one, so a failed guard puts the
     // value back from where the arm holds it.
-    mut fn merge_or_binding(base: isize, end: isize, sym: i32, local: i32, log_start: i32, span: i32):
+    mut fn merge_or_binding(base: isize, end: isize, sym: i32, local: i32, log_start: isize, span: i32):
         var shared = -1
         var i = base
         while i < end:

@@ -1868,9 +1868,9 @@ type Sema {
     // a later alternative is checked, the first alternative's bindings
     // [start, end) and those this alternative has bound so far.
     or_binding_patterns: HashMap[i32, i32, Minted],
-    or_shared_start: i32,
-    or_shared_end: i32,
-    or_shared_seen: List[i32],
+    or_shared_start: isize,
+    or_shared_end: isize,
+    or_shared_seen: List[isize],
     // #3441: a `T.max`-style access on a numeric type named through an
     // alias → the std.numeric function that states it. Lowered as a call.
     numeric_member_fns: HashMap[i32, i32, Minted],
