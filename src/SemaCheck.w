@@ -13435,7 +13435,7 @@ impl Sema:
                 let move_resolved = self.resolve_alias(ty as TypeId)
                 let move_kind = self.get_type_kind(move_resolved)
                 if self.scope_is_view_bound(sym) != 0 and move_kind != TypeKind.TY_REF and move_kind != TypeKind.TY_PTR:
-                    self.emit_error("cannot consume read-only view binding `" ++ self.pool_resolve(sym) ++ "`; clone it or transfer from the owner", node)
+                    self.emit_error("cannot consume read-only view binding `" ++ self.pool_resolve(sym) ++ "`; clone it or transfer from the owner (a pattern observes a place: `match move x` takes `x` apart, §9.7)", node)
                     self.typed_expr_types.insert(node, ty as i32)
                     return ty
                 if self.type_needs_drop(ty as i32) != 0 and self.outer_binding_has_unsupported_move_context(sym):
@@ -13997,7 +13997,7 @@ impl Sema:
                     // it apart. Say that, and the spelling that keeps it.
                     if self.list_pattern_took.contains(sym):
                         let pat_line = self.node_line(self.list_pattern_took.get(sym).unwrap())
-                        self.emit_error_with_help(f"use of moved value: the list pattern at line {pat_line} took `{moved_name}` apart", node, f"`{moved_name}` is a by-value parameter, an owned subject, so the pattern takes its elements; declare it `{moved_name}: &{self.type_name(tid)}` and the pattern views it (§9.7)")
+                        self.emit_error_with_help(f"use of moved value: the list pattern at line {pat_line} took `{moved_name}` apart", node, f"`{moved_name}` was moved into the pattern (`move {moved_name}`), which takes its elements; without `move` the pattern observes it (§9.7)")
                         return 0
                     let help = if collection.len() > 0: f"`{moved_name}` is a {collection}, an engine-backed collection and a resource (§2.3, D152): the earlier use moved it; a copy is `{moved_name}.clone()`, O(n), every element cloned" else: "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move".to_owned()
                     self.emit_error_with_help(moved_msg, node, help)
@@ -17810,41 +17810,23 @@ impl Sema:
         self.pattern_subject_node = subject
         self.pattern_subject_owned = subject != 0 and self.subject_is_owned(subject)
 
-    // §9.7 (D115, D144): an owned subject — one that is itself a temporary,
-    // a by-value parameter (dies with the frame) or a `move fn` receiver,
-    // or a place moved with `move` — is taken apart by value. A `self`
-    // receiver that borrows the caller's place (`fn`, `mut fn`), a `mut`
-    // parameter, a local, and a field or an element of anything are places.
+    // §9.7 (D115): an owned subject is a temporary or a place moved with
+    // `move`; a pattern takes it apart by value. Every other subject is a
+    // place and is observed: a local, a parameter of any mode, a receiver,
+    // a field or an element. `match move x` takes a place apart. (A
+    // by-value parameter used to be owned here, which no ruling said: the
+    // same `match x` consumed a parameter and observed a `let`. Eric,
+    // 2026-11-20.)
     fn subject_is_owned(subject: i32) -> bool:
         var expr = subject
         while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
             expr = self.ast.get_data0(expr)
         if expr == 0 or self.ast.kind(expr) == NodeKind.NK_MOVE_ARG:
             return true
-        // A field or an element is a place whatever it is under (Eric,
-        // 2026-11-19): `match p.e:` on a by-value `p` observes the field as
-        // it does on a local. Only the whole owned subject is taken apart.
         let subject_kind = self.ast.kind(expr)
         if subject_kind == NodeKind.NK_FIELD_ACCESS or subject_kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or subject_kind == NodeKind.NK_INDEX or subject_kind == NodeKind.NK_MULTI_INDEX:
             return false
-        let root = self.place_root_sym(expr)
-        if root == 0:
-            return true
-        let pi = self.param_index_for_sym(root)
-        if pi < 0 or self.current_fn_sig_idx < 0:
-            return false
-        // A `mut` parameter is the caller's place (§3.8a), never owned here.
-        if self.sig_param_is_mut(self.current_fn_sig_idx, pi): return false
-        if pi == 0:
-            let rmode = self.sig_receiver_mode(self.current_fn_sig_idx)
-            if rmode == ReceiverMode.Read or rmode == ReceiverMode.Mut:
-                return false
-        let p_ty = self.sig_param_type(self.current_fn_sig_idx, pi)
-        if p_ty != 0:
-            let p_tk = self.get_type_kind(self.resolve_alias(p_ty as TypeId))
-            if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
-                return false
-        true
+        self.place_root_sym(expr) == 0
 
     mut fn field_let_binds_as_view(value: i32, is_mut: i32, ann_type: TypeId) -> bool:
         if ann_type != 0:
@@ -43484,7 +43466,7 @@ impl Sema:
                     let view_resolved = self.resolve_alias(tid as TypeId)
                     let view_kind = self.get_type_kind(view_resolved)
                     if self.scope_is_view_bound(sym) != 0 and view_kind != TypeKind.TY_REF and view_kind != TypeKind.TY_PTR:
-                        self.emit_error("cannot consume read-only view binding `" ++ self.pool_resolve(sym) ++ "`; clone it or transfer from the owner", node)
+                        self.emit_error("cannot consume read-only view binding `" ++ self.pool_resolve(sym) ++ "`; clone it or transfer from the owner (a pattern observes a place: `match move x` takes `x` apart, §9.7)", node)
                         return
                     if self.type_needs_drop(tid) != 0 and self.outer_binding_has_unsupported_move_context(sym):
                         self.emit_error("conditional move of Drop value requires drop-state tracking", node)
