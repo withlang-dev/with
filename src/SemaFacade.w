@@ -59,9 +59,11 @@ impl Sema:
     // produced type is the rendering's own. Maps that constructor's
     // signature to the surviving spelling's method name.
     mut fn facade_index_parented_constructors():
-        for ri in 0..self.facade_resources.len():
-            let rname = self.pool_resolve(self.facade_resources[ri].name)
-            for p in self.facade_resources[ri].producers:
+        var ri: isize = -1
+        for r in self.facade_resources:
+            ri += 1
+            let rname = self.pool_resolve(r.name)
+            for p in r.producers:
                 let host = self.facade_receiver_of(p)
                 if host < 0 or host == ri: continue
                 let ci = self.facade_contract_for(p)
