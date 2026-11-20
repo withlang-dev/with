@@ -11697,18 +11697,6 @@ impl Codegen:
             args.push(end64)
             result = self.call_internal_runtime_fn("with_str_slice_ref", param_types, args, 3, str_ty)
 
-        else if intrinsic == MirIntrinsic.STR_CONTAINS:
-            let recv = self.mir_intrinsic_recv_str_value(body, args_id)
-            let needle = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let param_types: List[i64] = []
-            param_types.push(self.str_llvm_type())
-            param_types.push(self.str_llvm_type())
-            let args: List[i64] = []
-            args.push(self.str_view_arg(recv))
-            args.push(self.str_view_arg(needle))
-            let raw = self.call_internal_runtime_fn("with_str_contains_ref", param_types, args, 2, i32_ty)
-            result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
-
         else if intrinsic == MirIntrinsic.STR_CONTAINS_CHAR:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let ch = self.mir_intrinsic_arg(body, args_id, 1)
@@ -11719,30 +11707,6 @@ impl Codegen:
             args.push(self.str_view_arg(recv))
             args.push(ch)
             let raw = self.call_internal_runtime_fn("with_str_contains_char_ref", param_types, args, 2, i32_ty)
-            result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
-
-        else if intrinsic == MirIntrinsic.STR_STARTS_WITH:
-            let recv = self.mir_intrinsic_recv_str_value(body, args_id)
-            let prefix = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let param_types: List[i64] = []
-            param_types.push(self.str_llvm_type())
-            param_types.push(self.str_llvm_type())
-            let args: List[i64] = []
-            args.push(self.str_view_arg(recv))
-            args.push(self.str_view_arg(prefix))
-            let raw = self.call_internal_runtime_fn("with_str_starts_with_ref", param_types, args, 2, i32_ty)
-            result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
-
-        else if intrinsic == MirIntrinsic.STR_ENDS_WITH:
-            let recv = self.mir_intrinsic_recv_str_value(body, args_id)
-            let suffix = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let param_types: List[i64] = []
-            param_types.push(self.str_llvm_type())
-            param_types.push(self.str_llvm_type())
-            let args: List[i64] = []
-            args.push(self.str_view_arg(recv))
-            args.push(self.str_view_arg(suffix))
-            let raw = self.call_internal_runtime_fn("with_str_ends_with_ref", param_types, args, 2, i32_ty)
             result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
         else if intrinsic == MirIntrinsic.STR_FIND:

@@ -90,10 +90,7 @@ enum CcBuiltin: i32:
     STR_LEN
     STR_BYTE_AT
     STR_SLICE
-    STR_CONTAINS
     STR_CONTAINS_CHAR
-    STR_STARTS_WITH
-    STR_ENDS_WITH
     STR_FIND
     MAP_CLEAR
     OPT_IS_NONE
@@ -6181,8 +6178,6 @@ impl CCodegen:
             return self.sema.ty_i32 as i32
         if kind == CcBuiltin.STR_SLICE:
             return self.sema.ty_str as i32
-        if kind == CcBuiltin.STR_CONTAINS or kind == CcBuiltin.STR_STARTS_WITH or kind == CcBuiltin.STR_ENDS_WITH:
-            return self.sema.ty_bool as i32
         if kind == CcBuiltin.STR_FIND or kind == CcBuiltin.STR_INDEX_OF:
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.STR_SPLIT:
@@ -6942,10 +6937,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.STR_ULEN32: return CcBuiltin.STR_ULEN32
     if intrinsic == MirIntrinsic.STR_BYTE_AT: return CcBuiltin.STR_BYTE_AT
     if intrinsic == MirIntrinsic.STR_SLICE: return CcBuiltin.STR_SLICE
-    if intrinsic == MirIntrinsic.STR_CONTAINS: return CcBuiltin.STR_CONTAINS
     if intrinsic == MirIntrinsic.STR_CONTAINS_CHAR: return CcBuiltin.STR_CONTAINS_CHAR
-    if intrinsic == MirIntrinsic.STR_STARTS_WITH: return CcBuiltin.STR_STARTS_WITH
-    if intrinsic == MirIntrinsic.STR_ENDS_WITH: return CcBuiltin.STR_ENDS_WITH
     if intrinsic == MirIntrinsic.STR_FIND: return CcBuiltin.STR_FIND
     if intrinsic == MirIntrinsic.MAP_CLEAR: return CcBuiltin.MAP_CLEAR
     if intrinsic == MirIntrinsic.OPT_IS_NONE: return CcBuiltin.OPT_IS_NONE
@@ -7726,20 +7718,6 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.STR_CONTAINS:
-            if argc < 2:
-                self.fail("str.contains expects two arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let needle = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
-            else:
-                out = out ++ "    (void)with_str_contains_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
         if kind == CcBuiltin.STR_CONTAINS_CHAR:
             if argc < 2:
                 self.fail("char-in-str membership expects two arguments")
@@ -7751,34 +7729,6 @@ impl CCodegen:
                 out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains_char_ref(" ++ recv ++ ", (int32_t)(" ++ ch ++ "));\n"
             else:
                 out = out ++ "    (void)with_str_contains_char_ref(" ++ recv ++ ", (int32_t)(" ++ ch ++ "));\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_STARTS_WITH:
-            if argc < 2:
-                self.fail("str.starts_with expects two arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let prefix = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_starts_with_ref(" ++ recv ++ ", " ++ prefix ++ ");\n"
-            else:
-                out = out ++ "    (void)with_str_starts_with_ref(" ++ recv ++ ", " ++ prefix ++ ");\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_ENDS_WITH:
-            if argc < 2:
-                self.fail("str.ends_with expects two arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let suffix = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_ends_with_ref(" ++ recv ++ ", " ++ suffix ++ ");\n"
-            else:
-                out = out ++ "    (void)with_str_ends_with_ref(" ++ recv ++ ", " ++ suffix ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

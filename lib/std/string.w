@@ -207,6 +207,16 @@ impl str:
     pub fn as_view() -> StrView:
         self
 
+    /// Whether `needle` occurs in the text. Bytes are compared. Declared
+    /// here, as D110 asks of every built-in method (#3483).
+    pub fn contains(needle: &str) -> bool: with_str_contains_ref(self, needle) != 0
+
+    /// Whether the text begins with `prefix`.
+    pub fn starts_with(prefix: &str) -> bool: with_str_starts_with_ref(self, prefix) != 0
+
+    /// Whether the text ends with `suffix`.
+    pub fn ends_with(suffix: &str) -> bool: with_str_ends_with_ref(self, suffix) != 0
+
     /// The bytes as a view (§16.5): `s as []u8`, spelled as a method.
     pub fn as_bytes() -> []u8:
         (*self) as []u8

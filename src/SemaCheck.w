@@ -10012,9 +10012,6 @@ impl Sema:
             if str_len_intrinsic != MirIntrinsic.NONE: return str_len_intrinsic
             if method_name == "byte_at": return MirIntrinsic.STR_BYTE_AT
             if method_name == "slice": return MirIntrinsic.STR_SLICE
-            if method_name == "contains": return MirIntrinsic.STR_CONTAINS
-            if method_name == "starts_with": return MirIntrinsic.STR_STARTS_WITH
-            if method_name == "ends_with": return MirIntrinsic.STR_ENDS_WITH
             // `find` is std.string's `find(needle, from = 0)` (#2377, D129);
             // STR_FIND serves only the pinned seed's lowering of the
             // compiler's own calls and retires with the next seed bump.
