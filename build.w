@@ -1107,7 +1107,7 @@ fn gate_fixed_targets() -> List[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: List[str] = List.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check doc-path-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check corpus-promote-guard-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check doc-path-check freeze-door-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check corpus-promote-guard-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -3593,6 +3593,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     for dir in ["build.w", "src", "build", "lib", "tools", "rt", "test"]: doc_path_check = doc_path_check.input(dir)
     out = out.add_target(doc_path_check)
 
+    // The tree's freeze has one door for one caller (build/compiler.w run_freeze_door_check_action).
+    var freeze_door_check = target_new(.Action, "freeze-door-check", "").output("out/.build-state/freeze-door-check.txt")
+    freeze_door_check.action = run_freeze_door_check_action
+    freeze_door_check = freeze_door_check.write_scope("out/.build-state")
+    for dir in ["src", "lib", "tools", "rt"]: freeze_door_check = freeze_door_check.input(dir)
+    out = out.add_target(freeze_door_check)
+
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
     spec_inventory = spec_inventory.write_scope("out/.build-state")
@@ -4531,6 +4538,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var gate_fast = target_new(.Group, "gate-fast", "")
     gate_fast = gate_fast.dep("ceremony-census-lexical")
     gate_fast = gate_fast.dep("doc-path-check")
+    gate_fast = gate_fast.dep("freeze-door-check")
     gate_fast = gate_fast.dep("spec-inventory-check")
     out = out.add_target(gate_fast)
     var rt_decl_audit = test_lane(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
