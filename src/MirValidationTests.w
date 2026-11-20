@@ -1775,16 +1775,21 @@ pub fn mir_test_moved_owned_read:
 
 // #984, #989: malformed MIR for the structural validator (validate_mir_body).
 // `shape`: 0 a well-formed body, 1 no basic block, 2 a goto to a block that
-// does not exist, 3 a switch whose default is the entry block.
+// does not exist, 3 a switch whose default is the entry block, 4 a local
+// that is the caller's place with a value drop scheduled in this body
+// (#3467: a closure dropped its `mut` parameter).
 fn structural_verdict(shape: i32) -> str:
     var body = MirBody.init_for_fn(1)
     if shape == 1: return validate_mir_body(body)
     let local = body.new_temp(1)
+    if shape == 4:
+        body.mark_caller_place_local(local)
+        body.owned_cleanup_locals.push(local)
     let place = body.new_place(local)
     let entry = body.new_block()
     let exit = body.new_block()
     body.set_terminator(exit, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
-    if shape == 0: body.set_terminator(entry, TermKind.TK_GOTO, exit, 0, 0, 0, 0)
+    if shape == 0 or shape == 4: body.set_terminator(entry, TermKind.TK_GOTO, exit, 0, 0, 0, 0)
     else if shape == 2: body.set_terminator(entry, TermKind.TK_GOTO, 9, 0, 0, 0, 0)
     else:
         let table = body.new_switch_table([0i64], [exit])
@@ -1853,3 +1858,4 @@ pub fn mir_test_structural_validator():
     assert(structural_verdict(1) == "missing basic blocks")
     assert(structural_verdict(2).contains("goto target out of range"))
     assert(structural_verdict(3).contains("switch default is not a block after the entry"))
+    assert(structural_verdict(4).contains("is the caller's place and has a value drop scheduled in this body"))
