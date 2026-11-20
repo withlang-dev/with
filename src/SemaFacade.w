@@ -67,7 +67,8 @@ impl Sema:
                 let host = self.facade_receiver_of(p)
                 if host < 0 or host == ri: continue
                 let ci = self.facade_contract_for(p)
-                if ci >= 0 and self.foreign_contracts[ci].of_resource != 0: continue
+                // `of` the produced type keeps the constructor its home.
+                if ci >= 0 and self.foreign_contracts[ci].of_resource == r.name: continue
                 let pn = self.pool_resolve(p)
                 let sig = self.facade_constructor_sig(rname ++ "." ++ self.facade_presented(ri, pn))
                 if sig >= 0: self.facade_parented_ctor_methods.insert(sig, self.pool_intern(self.facade_presented(host, pn)))
