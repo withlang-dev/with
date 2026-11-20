@@ -16,12 +16,12 @@ enum Expr:
     Neg(e: Box[Expr2])
 
 fn eval(e: Expr) -> i64:
-    match e:
+    match move e:
         Expr.Num(n) => n
         Expr.Neg(inner) => 0 - eval2(inner.into_inner())
 
 fn eval2(e: Expr2) -> i64:
-    match e:
+    match move e:
         Expr2.Lit(v, w) => v + w
         Expr2.Wrap(inner) => eval(inner.into_inner()) * 2
 

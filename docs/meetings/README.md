@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D224 — A by-value parameter is a place for a pattern; only a temporary and `move` are owned subjects (ruled)](2026-11-20-D224-a-by-value-parameter-is-a-place-for-a-pattern.md)
 - [D223 — `Type.method` names the method as a function value: the receiver is its first parameter in the method's own mode; the bound form `x.method` is refused in every mode (ruled)](2026-11-19-D223-type-method-names-the-method-as-a-function-value.md)
 - [D222 — One-liners read files and edit them in place: operands after `-n`/`-p` code are input files, `filename` and `fnr` are bound, `-i` writes back through a sibling and a rename (delegated)](2026-11-18-D222-one-liners-read-files-and-edit-them-in-place.md)
 - [D221 — The alternatives of an or-pattern share their bindings: same names, one type each, one binding per name; sugar for the duplicated arms (delegated)](2026-11-18-D221-the-alternatives-of-an-or-pattern-share-their-bindings.md)

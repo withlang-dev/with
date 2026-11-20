@@ -58,9 +58,8 @@ the resource side of the line.
 lists a temporary, a `move` place and a parameter as owned subjects". That
 was a report of what the compiler did, not a ruling, and §9.7 never listed
 a parameter: D115's blessed words name a temporary and a place moved with
-`move`. Whether a by-value parameter is an owned subject is open (the §9.7
-question of 2026-11-19: a parameter observed like a local, taken apart
-with `move`, pending a count of the sites it changes).
+`move`. D224 (2026-11-20) ruled the question: a by-value parameter is a
+place, observed like a local and taken apart with `move`.
 
 **Consequence.** Sema: `type_is_plain_bits` (Copy with no drop glue);
 `field_let_binds_as_view` returns no view for plain bits; a pattern

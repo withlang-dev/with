@@ -15,9 +15,9 @@
 //! expect-stdout: drop f2
 //! expect-stdout: whole 2
 
-// #3461 (§9.7): a by-value parameter is an owned subject for every
-// pattern form. `leak` never dropped its list: the variant bindings of the
-// other arms took the parameter and the list pattern only viewed it.
+// #3461 (§9.7): a subject moved with `move` is owned for every pattern
+// form. `leak` never dropped its list: the variant bindings of the other
+// arms took the subject and the list pattern only viewed it.
 // What a list pattern does not bind is dropped once (`[h, ..]`,
 // `[_, ..rest]`); `[]` on a consumed subject frees the buffer; and when a
 // guard fails nothing has been taken apart for the next arm.
@@ -30,28 +30,28 @@ enum E:
     B(xs: List[Tag])
 
 fn leak(e: E) -> i32:
-    match e:
+    match move e:
         .A([h, ..rest]) => h.name.len() as i32 + rest.len() as i32
         .A(xs) => 0
         .B(xs) => xs.len() as i32
 
 fn head_only(xs: List[Tag]) -> str:
-    match xs:
+    match move xs:
         [h, ..] => h.name
         [] => "empty"
 
 fn rest_only(xs: List[Tag]) -> i32:
-    match xs:
+    match move xs:
         [_, ..rest] => rest.len() as i32
         [] => -1
 
 fn empty_arm(xs: List[Tag]) -> i32:
-    match xs:
+    match move xs:
         [] => 0
         _ => 1
 
 fn guarded(e: E, ok: bool) -> str:
-    match e:
+    match move e:
         .A([h, ..rest]) if ok => f"{h.name}+{rest.len()}"
         .A(xs) => f"whole {xs.len()}"
         .B(xs) => f"b {xs.len()}"
