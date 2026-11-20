@@ -3381,6 +3381,13 @@ fn validate_mir_body(body: &MirBody) -> str:
         return "locals/local_is_caller_place length mismatch"
     if body.n_params < 0 or body.n_params > local_count:
         return "invalid n_params"
+    // #3467: a local that is the caller's place is the caller's to drop.
+    // A body that also schedules its own value drop of it frees what the
+    // caller still holds (a closure dropped its `mut` parameter, #3479,
+    // and every validator said ok).
+    for owned in body.owned_cleanup_locals:
+        if owned >= 0 and owned < local_count and body.local_is_caller_place[owned] != 0:
+            return f"local _{owned} is the caller's place and has a value drop scheduled in this body"
 
     let bb_count = body.bb_stmt_starts.len()
     if bb_count <= 0:
