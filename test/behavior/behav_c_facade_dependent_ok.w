@@ -25,6 +25,8 @@ c contract dbf:
         from st_prepare(out param out)
         drop st_finalize
         ok ST_OK
+    fn st_prepare
+        of Statement
     fn st_step
         lend
 

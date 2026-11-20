@@ -20,6 +20,8 @@ c contract dbf:
     resource Backup wraps *mut bk
         from backup_init
         drop backup_finish
+    fn backup_init
+        of Backup
     resource Cursor wraps *mut cur
         from cur_open
         from cur_blank

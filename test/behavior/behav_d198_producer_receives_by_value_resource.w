@@ -29,6 +29,8 @@ c contract dbl:
     resource Database wraps *mut db
         from db_new
         drop db_close
+    fn db_new
+        of Database
 
 fn main:
     let c = counter_new()

@@ -23,6 +23,10 @@ c contract dbf:
         from cur_open
         from cur_blank
         drop cur_close
+    fn cur_open
+        of Cursor
+    fn cur_blank
+        of Cursor
     resource Iter wraps iter_state
         init it_init(self)
         drop it_end

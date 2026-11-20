@@ -34,17 +34,27 @@ c contract dbf:
         from snap_take
         drop snap_free
         independent
+    fn snap_take
+        of Snapshot
     resource Link wraps *mut lk
         from link_new
         drop link_free
         borrows param 0
+    fn link_new
+        of Link
     resource Backup wraps *mut bk
         from backup_init
         drop backup_finish
+    fn backup_init
+        of Backup
     resource Cursor wraps *mut cur
         from cur_open
         from cur_blank
         drop cur_close
+    fn cur_open
+        of Cursor
+    fn cur_blank
+        of Cursor
     resource Iter wraps iter_state
         init it_init(self)
         drop it_end

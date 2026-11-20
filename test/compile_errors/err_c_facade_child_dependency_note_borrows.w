@@ -16,6 +16,8 @@ c contract dbf:
         from link_new
         drop link_free
         borrows param 0
+    fn link_new
+        of Link
     resource Backup wraps *mut bk
         from backup_init
         drop backup_finish

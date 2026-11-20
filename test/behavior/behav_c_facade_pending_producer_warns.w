@@ -45,11 +45,11 @@ c contract dep:
 
 fn main:
     let d = Database.new(0).unwrap()
-    let s = Statement.new(d, 1)
-    let (status, t) = Statement.open(d)
-    let row: Result[Row, RowError] = Row.open(d)
+    let s = d.st_new(1)
+    let (status, t) = d.st_open()
+    let row: Result[Row, RowError] = d.rw_open()
     let back: Option[BorrowedDatabase[Statement]] = s.unwrap().db()
-    match Row.open(d):
+    match d.rw_open():
         Err(RowError.Failed(st)) => print(\"failed\")
         Err(RowError.NothingProduced(st)) => print(\"none\")
         Ok(_) => print(\"ok\")
