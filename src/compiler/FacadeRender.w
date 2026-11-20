@@ -684,6 +684,10 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
         let li = facade_render_lend_item(pool, intern, ci, item)
         if not facade_render_lend_hosted(pool, intern, li, resource, repr): continue
         if li.detaches != 0 or li.text_view or li.variadic != 0 or li.record_view or li.borrow_res != 0 or li.text_free != 0: continue
+        // A buffer-field operation (D210) takes the buffers and returns
+        // the step's record: its method is not the C function's shape, so
+        // no forwarder is rendered and the name keeps its raw meaning.
+        if facade_render_has_clause(pool, item, FACADE_CLAUSE_BUFFER_FIELD): continue
         let decl = li.decl
         let fname = intern.resolve(pool.get_data0(decl as NodeId))
         let mname = facade_render_present(pool, intern, ci, resource, fname)
