@@ -10396,11 +10396,6 @@ impl Codegen:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             result = self.mir_list_len_inline(recv_ptr)
 
-        else if intrinsic == MirIntrinsic.LIST_IS_EMPTY:
-            let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let raw_len = self.mir_list_len_inline(recv_ptr)
-            result = wl_build_icmp(self.builder, wl_int_eq(), raw_len, wl_const_int(i64_ty, 0, 0))
-
         else if intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.LIST_ULEN32:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let raw_len = self.mir_list_len_inline(recv_ptr)

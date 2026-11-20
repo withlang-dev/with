@@ -124,7 +124,6 @@ enum MirIntrinsic: i32:
     LIST_PUSH
     LIST_GET
     LIST_LEN
-    LIST_IS_EMPTY
     LIST_SET
     LIST_REMOVE
     LIST_CLEAR

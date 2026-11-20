@@ -68,7 +68,6 @@ enum CcBuiltin: i32:
     LIST_PUSH
     LIST_GET
     LIST_LEN
-    LIST_IS_EMPTY
 
     LIST_REMOVE
     LIST_CLEAR
@@ -186,7 +185,6 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_PUSH: return true
     if kind == CcBuiltin.LIST_GET: return true
     if kind == CcBuiltin.LIST_LEN: return true
-    if kind == CcBuiltin.LIST_IS_EMPTY: return true
     if kind == CcBuiltin.LIST_LEN32: return true
     if kind == CcBuiltin.LIST_LEN64: return true
     if kind == CcBuiltin.LIST_ULEN32: return true
@@ -6068,8 +6066,6 @@ impl CCodegen:
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.LIST_LEN:
             return self.sema.ty_usize as i32
-        if kind == CcBuiltin.LIST_IS_EMPTY:
-            return self.sema.ty_bool as i32
         if kind == CcBuiltin.LIST_LEN32:
             return self.sema.ty_i32 as i32
         if kind == CcBuiltin.LIST_LEN64:
@@ -6905,7 +6901,6 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.LIST_GET: return CcBuiltin.LIST_GET
     if intrinsic == MirIntrinsic.LIST_GET_REF: return CcBuiltin.LIST_GET
     if intrinsic == MirIntrinsic.LIST_LEN: return CcBuiltin.LIST_LEN
-    if intrinsic == MirIntrinsic.LIST_IS_EMPTY: return CcBuiltin.LIST_IS_EMPTY
     if intrinsic == MirIntrinsic.LIST_LEN32: return CcBuiltin.LIST_LEN32
     if intrinsic == MirIntrinsic.LIST_LEN64: return CcBuiltin.LIST_LEN64
     if intrinsic == MirIntrinsic.LIST_ULEN32: return CcBuiltin.LIST_ULEN32
@@ -7172,17 +7167,6 @@ impl CCodegen:
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
             var out = self.emit_len_result(body, dest_place, "with_vec_len(" ++ recv_ptr ++ ")", kind, has_ret)
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.LIST_IS_EMPTY:
-            if argc < 1:
-                self.fail("vec.is_empty expects one argument")
-                return "    abort();"
-            let recv_ptr = self.list_recv_ptr_text(body, args_id)
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_vec_len(" ++ recv_ptr ++ ") == 0;\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
