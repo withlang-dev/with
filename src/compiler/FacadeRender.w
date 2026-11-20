@@ -637,7 +637,9 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
     // record holds a pointer, and a token that holds none (`Fd wraps
     // c_int`) keeps its C functions as they are
     // (SemaFacade.facade_index_imported_name_ops).
-    if repr.starts_with("*") or facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT): return ""
+    // D215: a described function's C name is its modeled operation for
+    // every representation, a pointer resource included.
+    if facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT): return ""
     var out = ""
     for k in 0..pool.get_data2(resource as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -650,7 +652,11 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             if not bridge.ok: continue
             let cname = intern.resolve(pool.get_data0(producer as NodeId))
             let made = if facade_render_produced_field(pool, intern, resource, cname).0 == "nullable": "Option[" ++ name ++ "]" else: with_str_clone_ref(name)
-            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ bridge.params ++ ") -> " ++ made ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
+            // A pointer resource's constructor states its own result (an
+            // Option for a nullable producer, a Result for a failing one):
+            // the forwarder's result is the constructor's, inferred (§9.1).
+            let result = if repr.starts_with("*"): "" else: " -> " ++ made
+            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
         else if kind == FACADE_CLAUSE_DROP:
             let dropper = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
             if dropper != 0:
