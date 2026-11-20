@@ -39,6 +39,7 @@
 // raw signature. A corpus call to a method is printed as one (CImport.w
 // lower_method_call_ir).
 
+use compiler.ClangBridge.ci_escape_reserved
 use CiIR
 use CImport
 use CiFacadeDraft
