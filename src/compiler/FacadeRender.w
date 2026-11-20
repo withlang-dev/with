@@ -675,6 +675,14 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             // the forwarder's result is the constructor's, inferred (§9.1).
             let result = if repr.starts_with("*"): "" else: " -> " ++ made
             out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
+        else if kind == FACADE_CLAUSE_INIT and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_PREINIT):
+            // D215: an in-place producer by its C name takes the modeled
+            // argument list; the storage slot is what the contract removes.
+            let init_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            if init_fn == 0: continue
+            let cname = intern.resolve(pool.get_data0(init_fn as NodeId))
+            let (iparams, _) = facade_render_params(pool, intern, init_fn, 1)
+            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ iparams ++ "):\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(iparams) ++ ")\n"
         else if kind == FACADE_CLAUSE_DROP:
             let dropper = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
             if dropper != 0:

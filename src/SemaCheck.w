@@ -31329,6 +31329,17 @@ impl Sema:
         let shown_max = expected - receiver
         let shown_min = min_expected - receiver
         let shown_actual = supplied
+        // D215: a producer called by its C name with C's argument list
+        // (`sqlite3_open(path, &db)`): the slot is what the contract removes.
+        let bridge_prefix = self.facade_bridge_prefix()
+        if callee_name.starts_with(bridge_prefix):
+            let cname = callee_name.slice(bridge_prefix.len(), callee_name.len())
+            let produced = self.facade_resource_produced_by(self.pool_lookup_symbol(cname))
+            if produced.len() > 0 and shown_actual > shown_max:
+                self.emit_error_with_help(f"`{cname}` takes {shown_max} argument(s) here, found {shown_actual}: the contract produces the `{produced}`, so the parameter C fills is not passed", node, f"write `let value = {cname}(…)` with the remaining arguments; the raw C call is `unsafe {{ c.{cname}(…) }}`")
+                return false
+            self.emit_error(f"{what} '{cname}' expects {shown_max} argument(s), found {shown_actual}", node)
+            return false
         if shown_min == shown_max:
             self.emit_error(f"{what} '{callee_name}' expects {shown_max} argument(s), found {shown_actual}", node)
         else:
