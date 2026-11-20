@@ -451,6 +451,24 @@ the one way.
 - E0952: `it` used in context expecting N != 1 parameters
 - E0953: `it` is a reserved keyword and cannot be used as an identifier
 
+### 9.3a Methods as Values
+
+**Methods as values.** `Type.method` names the method as a function value.
+Its first parameter is the receiver, in the mode the method declares: `&T`
+for `fn`, `mut T` for `mut fn`, `T` for `move fn`; a method with no
+receiver has none. The method is found, and its visibility checked, as for
+a call. `x.method` without a call is not a value; write the closure
+(`() => x.method()`).
+
+*Status (D223): implemented, for methods declared in With source and for
+the ones the compiler implements itself (`List[i32].len`,
+`HashMap[str, i32].get`, `List[i32].new`), those of a generic type's
+instance included. A method with type parameters of its own, and a generic
+type named without its arguments, are refused. Two rules the compiler
+applies await their words here: a method may not be named like a variant
+of its own enum, and where a name has an observing and a taking form
+(`first`) the wanted function type selects the taking one.*
+
 ### 9.4 Partial Application
 
 Functions can be partially applied with `_` placeholders inside a call

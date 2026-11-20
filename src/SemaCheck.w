@@ -6363,6 +6363,13 @@ impl Sema:
         let saved_receiver_field_shadowed = move self.receiver_field_shadowed
         self.receiver_field_owner = self.ast.receiver_field_owner(node)
         self.receiver_field_shadowed = sema_new_map_i32_i32()
+        // D223 (§9.3a): `Type.name` names one thing. A method named like a
+        // variant of its own enum would make `Shape.Square` either.
+        if self.sig_receiver_mode(sig_idx) != ReceiverMode.None and self.sig_get_param_count(sig_idx) > 0:
+            let recv_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(self.sig_param_type(sig_idx, 0) as TypeId)) as i32
+            let method_sym = self.method_decl_name_symbol(self.ast.get_data0(node))
+            if method_sym != 0 and self.enum_has_variant(recv_ty, method_sym) != 0:
+                self.emit_error_with_help(f"`{self.pool_resolve(method_sym)}` is a variant of `{self.type_name(recv_ty)}` and cannot also be a method of it: `{self.type_name(recv_ty)}.{self.pool_resolve(method_sym)}` would name either (§9.3a)", node, "rename the method")
 
         // Add parameters to scope
         let meta = self.ast.find_fn_meta(node)
@@ -23105,6 +23112,17 @@ impl Sema:
                     self.require_unsafe_operation("reading a union field other than the last-written field requires unsafe", node)
         let static_type_sym = self.static_receiver_base_sym(expr)
         let static_expr_kind = self.ast.kind(expr)
+        // D223: `Box[i32].count`, a method of the instance the type names.
+        if (static_expr_kind == NodeKind.NK_INDEX or static_expr_kind == NodeKind.NK_MULTI_INDEX) and self.receiver_names_type(expr):
+            let inst_ty = self.static_type_receiver_type(expr)
+            let inst_owner = if inst_ty != 0: self.method_owner_symbol_for_type(inst_ty) else: 0
+            if inst_owner != 0:
+                let inst_method_ty = self.method_as_value(node, inst_ty, inst_owner, field)
+                if inst_method_ty != 0: return if inst_method_ty < 0: 0 else: inst_method_ty
+                // A type has no fields to read: what is left names nothing.
+                if self.enum_has_variant(inst_ty, field) == 0:
+                    self.emit_error(f"`{self.type_name(inst_ty)}` has no method `{self.pool_resolve(field)}` (§9.3a)", node)
+                    return 0
         if static_type_sym != 0 and self.static_receiver_type_is_known(expr) and (static_expr_kind == NodeKind.NK_IDENT or static_expr_kind == NodeKind.NK_TYPE_NAMED):
             let static_prim = self.primitive_type_by_sym(static_type_sym)
             if static_prim != 0:
@@ -23124,21 +23142,11 @@ impl Sema:
                 let member_ty = self.sig_return_type(member_sig)
                 self.typed_expr_types.insert(node, member_ty)
                 return member_ty
-            // mut.md Rev 8 §5.3 / §15.4 — `List.push` (etc.) parsed as a
-            // first-class value expression. Method calls dispatch through
-            // check_method_call, which never invokes check_field_access on the
-            // callee node. Reaching this point with a static-type base means
-            // the field-access is being USED AS A VALUE — i.e., as a method
-            // reference. Reject when the resolved method is mutating.
-            // Helper: closure-wrap the call:
-            //     let f = (xs, value) => xs.push(value)
+            // D223 (§9.3a): a method named through its type, used as a value.
             let static_owner_sym = self.method_owner_symbol_for_type(obj_type as i32)
             if static_owner_sym != 0:
-                let mutating = self.method_has_mut_self_flag(static_owner_sym, field) or self.builtin_method_requires_mutable_receiver(static_owner_sym, field)
-                if mutating:
-                    let owner_name = with_str_clone_ref(self.pool_resolve(static_type_sym))
-                    let method_name = with_str_clone_ref(self.pool_resolve(field))
-                    self.emit_error("cannot reference mutating method `" ++ owner_name ++ "." ++ method_name ++ "` as a first-class function value (§15.4); wrap in a closure: `(x, ...) => x." ++ method_name ++ "(...)`", node)
+                let method_value_ty = self.method_as_value(node, obj_type as i32, static_owner_sym, field)
+                if method_value_ty != 0: return if method_value_ty < 0: 0 else: method_value_ty
 
         if obj_type == 0:
             return 0
@@ -23149,6 +23157,13 @@ impl Sema:
         // The fields of a type a facade generates belong to its generated
         // code (its liveness flag, the views of its parents, what it keeps
         // for C): outside it the only one a program names is `.repr`.
+        // D223 (§9.3a): `x.method` without a call is not a value.
+        if field_base != 0 and self.struct_field_type(field_base as i32, field) == 0 and self.enum_has_variant(field_base as i32, field) == 0:
+            let bound_owner = self.method_owner_symbol_for_type(field_base as i32)
+            if bound_owner != 0 and (self.lookup_method_fn(bound_owner, field) != 0 or self.lookup_generic_method_fn(bound_owner, field) != 0):
+                let recv_text = render_expr(self.ast, self.pool, expr as NodeId, 0)
+                self.emit_error_with_help(f"`{recv_text}.{self.pool_resolve(field)}` without a call is not a value (§9.3a)", node, f"write the closure: `() => {recv_text}.{self.pool_resolve(field)}()`; the method itself is `{self.type_name(field_base as i32)}.{self.pool_resolve(field)}`")
+                return 0
         let rendering = self.facade_rendered_file_of(field_base as i32)
         // A record an operation returns (D210's step result) is plain data
         // for the program: it wraps nothing, so it has no `repr`.
@@ -27577,7 +27592,12 @@ impl Sema:
             let p_sym = self.ast.get_extra(extra_start + pi * 2)
             let p_type_node = self.ast.get_extra(extra_start + pi * 2 + 1)
             var p_ty = self.ty_i32 as i32
-            if p_type_node > 0:
+            let adapter_ty: i32 = self.method_adapter_param_types.get(node * 64 + pi) ?? 0
+            if adapter_ty != 0:
+                // D223: the closure the compiler writes for a built-in
+                // method named as a value states its parameters' types here.
+                p_ty = adapter_ty
+            else if p_type_node > 0:
                 let explicit_ty = self.resolve_type_expr(p_type_node)
                 if explicit_ty != 0:
                     p_ty = explicit_ty as i32
@@ -30763,6 +30783,14 @@ impl Sema:
                 if ucm_meta >= 0 and ai < self.ast.fn_meta_param_count(ucm_meta):
                     let ucm_ptype = self.ast.fn_param_type(self.ast.fn_meta_param_start(ucm_meta), ai)
                     if ucm_ptype != 0 and self.ast.kind(ucm_ptype) == NodeKind.NK_TYPE_REF:
+                        continue
+                // A function value's type states each parameter's mode
+                // (§3.8, §3.8a): `&T` observes its argument and `mut T`
+                // writes the caller's place; neither takes it. Marked moved
+                // here, `let f = peek; f(b); f(b)` was a use of a moved value.
+                if callable_value_tid != 0 and ai + param_offset < self.get_type_d1(callable_value_tid as TypeId):
+                    let cv_param_kind = self.get_type_kind(self.resolve_alias(self.fn_type_param_type(callable_value_tid, ai + param_offset) as TypeId))
+                    if cv_param_kind == TypeKind.TY_REF or cv_param_kind == TypeKind.TY_PTR or self.fn_type_param_is_mut(callable_value_tid, ai + param_offset):
                         continue
                 let arg_node = if has_resolved: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 if ai < variant_payload_tys.len() and self.payload_arg_auto_refs(variant_payload_tys[ai], arg_types[ai], arg_node, node):
@@ -36514,8 +36542,11 @@ impl Sema:
     // its receiver; the call's expected type completes a bare generic base
     // (`let xs: List[i32] = List.new()`), an answer of the call, not of the
     // method.
+    // The built-in methods with no receiver: the constructors.
+    fn builtin_method_is_constructor(field: i32) -> bool: field == self.syms.new or self.pool_resolve(field) == "with_capacity"
+
     fn builtin_constructor_in_context(recv_type: i32, owner_sym: i32, field: i32, ret: i32) -> i32:
-        if ret != recv_type or (field != self.syms.new and self.pool_resolve(field) != "with_capacity"):
+        if ret != recv_type or not self.builtin_method_is_constructor(field):
             return ret
         self.generic_constructor_return_type(owner_sym, recv_type)
 
@@ -43042,6 +43073,8 @@ impl Sema:
     // D32 (§2.2): a `Type.Member` path (enum variant constructor, static
     // member) is not a field read — nothing moves out of a type name.
     fn d32_base_is_type_name(fa_node: i32) -> bool:
+        // `Box[i32].count` as a value (D223): the base is the instance's name.
+        if self.method_value_fns.contains(fa_node) or self.method_value_closures.contains(fa_node): return true
         var b = self.ast.get_data0(fa_node)
         while b != 0 and self.ast.kind(b) == NodeKind.NK_GROUPED:
             b = self.ast.get_data0(b)
@@ -43082,7 +43115,8 @@ impl Sema:
         var n = node
         while n != 0 and self.ast.kind(n) == NodeKind.NK_GROUPED:
             n = self.ast.get_data0(n)
-        if n != 0 and self.ast.kind(n) == NodeKind.NK_FIELD_ACCESS: true else: false
+        // `Type.method` as a value (D223) names a function, not a field.
+        n != 0 and self.ast.kind(n) == NodeKind.NK_FIELD_ACCESS and not self.method_value_fns.contains(n) and not self.method_value_closures.contains(n)
 
     mut fn d32_base_is_temporary(fa_node: i32) -> bool:
         if self.place_root_sym(fa_node) != 0:
@@ -43212,7 +43246,7 @@ impl Sema:
                 leaf = self.ast.get_data2(leaf)
             else:
                 break
-        if leaf == 0 or self.ast.kind(leaf) != NodeKind.NK_FIELD_ACCESS:
+        if leaf == 0 or not self.d32_is_field_access(leaf):
             return
         let fty_opt = self.typed_expr_types.get(leaf)
         let fty = if fty_opt.is_some(): fty_opt.unwrap() else: 0
@@ -44235,6 +44269,139 @@ impl Sema:
             if not captures_root or self.closure_capture_writes(closure_node, root): continue
             if first_field == 0 or not self.closure_names_only_other_fields(closure_node, root, first_field):
                 self.emit_error_with_help(f"`{self.pool_resolve(root)}` is held as a `mut` place for this call, and a closure passed in the same call captures it (§3.2)", closure_node, "a callee that brackets work on its `mut` place passes it to the closure: `x.scope((s) => …)`; or read what the closure needs into a `let` before the call")
+    // D223: a method the compiler implements itself (`List[i32].len`) has no
+    // function to name, so its value is the closure a person would write,
+    // `(x, a) => x.method(a)`, written here and checked like any other: the
+    // receiver in the method's mode (builtin_method_receiver_mode), each
+    // argument at its declared type (the BuiltinSigs row). -1 after an error.
+    mut fn builtin_method_as_value(node: i32, owner_ty: i32, owner_sym: i32, field: i32) -> i32:
+        // A second check of the same expression (a D93 round) reuses the
+        // closure the first one wrote.
+        if self.method_value_closures.contains(node):
+            let written = self.check_expr(self.method_value_closures.get(node).unwrap())
+            if written != 0: self.typed_expr_types.insert(node, written)
+            return if written == 0: -1 else: written
+        let row = self.builtin_sig_row_for(owner_ty, field)
+        // The arguments a call must write (a trailing one that may be
+        // omitted is omitted); a method with no row takes none.
+        // A float math method's receiver is its first operand.
+        let math_id = math_fn_lookup(self.pool_resolve(field))
+        let is_math = math_id >= 0 and self.get_type_kind(self.resolve_alias(owner_ty as TypeId)) == TypeKind.TY_FLOAT
+        let arg_count = if is_math: math_fn_arity(math_id) - 1 else if row < 0 or self.builtin_sig_required[row] < 0: 0 else: self.builtin_sig_required[row]
+        let mode = if self.builtin_method_is_constructor(field): ReceiverMode.None else: self.builtin_method_receiver_mode(owner_sym, field)
+        let has_receiver = mode != ReceiverMode.None
+        let like = node as NodeId
+        let arg_types = []
+        for ai in 0..arg_count:
+            let arg_ty = self.method_expected_arg_type(owner_ty, field, ai)
+            if arg_ty == 0:
+                self.emit_error_with_help(f"`{self.type_name(owner_ty)}.{self.pool_resolve(field)}` has type parameters of its own, so it names no one function (§9.3a)", node, "write the closure, which fixes them by its use: `(x) => x." ++ self.pool_resolve(field) ++ "(…)`")
+                return -1
+            // A parameter the row declares `&T` observes its argument.
+            let observed = self.builtin_row_observed(row, ai) == 1 and self.get_type_kind(self.resolve_alias(arg_ty as TypeId)) != TypeKind.TY_REF
+            arg_types.push(if observed: self.ensure_exact_type(TypeKind.TY_REF, arg_ty, 0, 0) as i32 else: arg_ty)
+        // The call `recv.method(args…)`, or `Type.method(args…)` for a
+        // method with no receiver.
+        let recv_sym = self.pool_intern("__method_value_receiver")
+        let callee_base = if has_receiver: self.ast.add_adapter_node(like, NodeKind.NK_IDENT, recv_sym, 0, 0) as i32 else: self.ast.get_data0(node)
+        let callee = self.ast.add_adapter_node(like, NodeKind.NK_FIELD_ACCESS, callee_base, field, 0) as i32
+        let arg_nodes = []
+        let arg_syms = []
+        for ai in 0..arg_count:
+            let arg_sym = self.pool_intern(f"__method_value_arg{ai}")
+            arg_syms.push(arg_sym)
+            arg_nodes.push(self.ast.add_adapter_node(like, NodeKind.NK_IDENT, arg_sym, 0, 0) as i32)
+        let call_extra = self.ast.extra_len()
+        for arg_node in arg_nodes: self.ast.add_adapter_extra(arg_node)
+        let call = self.ast.add_adapter_node(like, NodeKind.NK_CALL, callee, call_extra, arg_count) as i32
+        let params_extra = self.ast.extra_len()
+        if has_receiver:
+            self.ast.add_adapter_extra(recv_sym)
+            self.ast.add_adapter_extra(0)
+        for arg_sym in arg_syms:
+            self.ast.add_adapter_extra(arg_sym)
+            self.ast.add_adapter_extra(0)
+        let param_count = arg_count + (has_receiver as i32)
+        let closure = self.ast.add_adapter_node(like, NodeKind.NK_CLOSURE, call, params_extra, param_count) as i32
+        if has_receiver:
+            self.method_adapter_param_types.insert(closure * 64, if mode == ReceiverMode.Read: self.ensure_exact_type(TypeKind.TY_REF, owner_ty, 0, 0) as i32 else: owner_ty)
+            if mode == ReceiverMode.Mut: self.ast.set_fn_type_mut_mask(closure as NodeId, 1)
+        for ai in 0..arg_count:
+            self.method_adapter_param_types.insert(closure * 64 + ai + (has_receiver as i32), arg_types[ai])
+        let closure_ty = self.check_expr(closure)
+        if closure_ty == 0: return -1
+        self.method_value_closures.insert(node, closure)
+        self.typed_expr_types.insert(node, closure_ty)
+        closure_ty
+
+    // D223 (§9.3a): `Type.method` names the method as a function value. Its
+    // first parameter is the receiver, in the mode the method declares:
+    // `&T` for `fn`, `mut T` for `mut fn`, `T` for `move fn`; a method with
+    // no receiver has none. The method is found, and its visibility
+    // checked, as for a call. 0 when `field` names no method with a body
+    // of its own.
+    mut fn method_as_value(node: i32, owner_ty: i32, owner_sym: i32, field: i32) -> i32:
+        // `Type.name` is a variant before it is a method, as at a call
+        // (`Shape.Circle(2)` constructs).
+        if self.enum_has_variant(owner_ty, field) != 0: return 0
+        // D117: where a name has an observing and a taking form
+        // (`first`), the type wanted selects, as the receiver's ownership
+        // does at a call: a first parameter taken by value names the
+        // taking form. With no type wanted, the name is the observing one.
+        let taking: i32 = self.method_twin_names.get(field) ?? 0
+        if taking != 0 and self.has_expected_type != 0 and self.expected_expr_type != 0 and self.type_has_method_named(owner_ty, taking):
+            let wanted = self.resolve_alias(self.expected_expr_type as TypeId) as i32
+            if self.get_type_kind(wanted as TypeId) == TypeKind.TY_FN and self.get_type_d1(wanted as TypeId) >= 1 and not self.fn_type_param_is_mut(wanted, 0):
+                if self.get_type_kind(self.resolve_alias(self.fn_type_param_type(wanted, 0) as TypeId)) != TypeKind.TY_REF:
+                    return self.method_as_value(node, owner_ty, owner_sym, taking)
+        var method_fn = self.lookup_method_fn(owner_sym, field)
+        var sig = self.lookup_method_sig(owner_sym, field)
+        if method_fn != 0 and sig >= 0:
+            self.check_method_visible(method_fn, node)
+            self.ensure_body_typed(method_fn, sig)
+        else:
+            // A method of a generic type: the type's arguments fix the
+            // instance (`Box[i32].count`), as the receiver's type does at a
+            // call. A method with type parameters of its own has no one
+            // instance to name.
+            let generic_fn = self.lookup_generic_method_fn(owner_sym, field)
+            let generic_node = if generic_fn != 0: self.generic_fn_node_for_symbol(generic_fn) else: 0
+            let meta = if generic_node != 0: self.ast.find_fn_meta(generic_node) else: -1
+            if meta < 0:
+                if self.builtin_method_intrinsic(owner_ty, self.pool_resolve(field)) == MirIntrinsic.NONE and self.builtin_sig_row_lookup(owner_ty, field) < 0: return 0
+                return self.builtin_method_as_value(node, owner_ty, owner_sym, field)
+            self.check_method_visible(generic_fn, node)
+            let method_name = f"{self.type_name(owner_ty)}.{self.pool_resolve(field)}"
+            if self.ast.fn_meta_tp_count(meta) > 0:
+                self.emit_error_with_help(f"`{method_name}` has type parameters of its own, so it names no one function (§9.3a)", node, "write the closure, which fixes them by its use: `(x) => x." ++ self.pool_resolve(field) ++ "(…)`")
+                return -1
+            if self.get_type_kind(self.resolve_alias(owner_ty as TypeId)) != TypeKind.TY_GENERIC_INST:
+                self.emit_error_with_help(f"`{method_name}` is a method of a generic type and the type's arguments are missing (§9.3a)", node, "name the instance: `" ++ self.pool_resolve(owner_sym) ++ "[…]." ++ self.pool_resolve(field) ++ "`")
+                return -1
+            let is_static = self.receiver_mode_from_param(self.ast.fn_meta_param_start(meta), self.ast.fn_meta_param_count(meta)) == ReceiverMode.None
+            self.check_generic_method_call(owner_sym, owner_ty, generic_fn, is_static as i32, 0, [], -1, -1, node)
+            sig = self.resolved_call_sigs.get(node) ?? -1
+            if sig < 0: return 0
+            method_fn = self.sig_names[sig]
+        let mode = self.sig_receiver_mode(sig)
+        let param_count = self.sig_get_param_count(sig)
+        let params = []
+        for pi in 0..param_count:
+            var p_ty = self.sig_param_type(sig, pi)
+            if pi == 0 and mode != ReceiverMode.None:
+                let bare = self.resolve_alias(p_ty as TypeId)
+                if self.get_type_kind(bare) == TypeKind.TY_REF: p_ty = self.get_type_d0(bare)
+                if mode == ReceiverMode.Read: p_ty = self.ensure_exact_type(TypeKind.TY_REF, p_ty, 0, 0) as i32
+            params.push(p_ty)
+        let mask = self.sig_mut_param_mask(sig) | ((mode == ReceiverMode.Mut) as i32)
+        let fn_tid = self.moded_callable_type(self.ensure_fn_type(params, param_count, self.sig_return_type(sig) as TypeId) as i32, mask)
+        self.note_call_edge(method_fn, node)
+        self.fn_callable_values.insert(node, 1)
+        self.fn_value_ident_sigs.insert(node, sig)
+        self.method_value_fns.insert(node, method_fn)
+        self.note_callable_value(sig, fn_tid)
+        self.typed_expr_types.insert(node, fn_tid)
+        fn_tid
 
     mut fn check_closure_capture_conflicts(extra_start: i32, arg_count: i32, has_resolved: bool, node: i32, recv: i32):
         // Collect closure args that mutably capture a place.
