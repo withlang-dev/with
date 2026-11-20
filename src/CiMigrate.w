@@ -7,6 +7,7 @@
 // ci_translate_macros, the C expression parser, the statement translator,
 // goto elimination, etc.) remain in CImport.w and are called from here.
 
+use compiler.ClangBridge.ci_escape_reserved
 use CiIR
 use CiPrint
 use CImport
