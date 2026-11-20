@@ -646,6 +646,14 @@ fn facade_render_unshared_name_ops(ops: &str) -> str:
         if keep and line.len() > 0: out = out ++ line ++ "\n"
     out
 
+// Whether an fn item states a clause of `kind` (an item's clauses start at
+// its first extra; a resource's follow its representation).
+fn facade_render_item_has_clause(pool: &AstPool, item: i32, kind: i32) -> bool:
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        if pool.get_data0(pool.get_extra(cstart + k) as NodeId) == kind: return true
+    false
+
 fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> str:
     let name = intern.resolve(pool.get_data0(resource as NodeId))
     let extra_start = pool.get_data1(resource as NodeId)
@@ -695,7 +703,7 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
         // A buffer-field operation (D210) takes the buffers and returns
         // the step's record: its method is not the C function's shape, so
         // no forwarder is rendered and the name keeps its raw meaning.
-        if facade_render_has_clause(pool, item, FACADE_CLAUSE_BUFFER_FIELD): continue
+        if facade_render_item_has_clause(pool, item, FACADE_CLAUSE_BUFFER_FIELD): continue
         let decl = li.decl
         let fname = intern.resolve(pool.get_data0(decl as NodeId))
         let mname = facade_render_present(pool, intern, ci, resource, fname)
