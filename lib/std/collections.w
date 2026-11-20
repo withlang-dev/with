@@ -34,6 +34,9 @@ impl[T] List[T]:
     /// and lowering read this one signature (#3483, the first of them).
     pub fn len() -> isize: self.len as isize
 
+    /// Whether the list has no elements.
+    pub fn is_empty() -> bool: self.len == 0
+
     /// §9.7: a small remainder keeps the whole original buffer alive;
     /// `shrink_to_fit` releases the prefix and the spare capacity.
     pub mut fn shrink_to_fit(): with_vec_shrink_to_fit_es((&raw mut self) as *mut u8, sizeof[T]())

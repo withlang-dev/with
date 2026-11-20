@@ -10075,7 +10075,6 @@ impl Sema:
             if method_name == "with_capacity": return MirIntrinsic.LIST_WITH_CAPACITY
             if method_name == "push": return MirIntrinsic.LIST_PUSH
             if method_name == "get": return MirIntrinsic.LIST_GET
-            if method_name == "is_empty": return MirIntrinsic.LIST_IS_EMPTY
             let list_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.LIST_LEN, method_name)
             if list_len_intrinsic != MirIntrinsic.NONE: return list_len_intrinsic
             if method_name == "remove": return MirIntrinsic.LIST_REMOVE
