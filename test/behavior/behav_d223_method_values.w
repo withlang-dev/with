@@ -40,7 +40,6 @@ enum Shape:
     Circle(r: i32)
     Square
 impl Shape:
-    fn Square() -> i32: 4
     fn area() -> i32: 1
 
 fn observe(f: fn(&Bag) -> i32, b: &Bag) -> i32: f(b)

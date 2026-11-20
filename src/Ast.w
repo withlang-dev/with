@@ -1058,7 +1058,7 @@ impl AstPool:
     // nodes are counted (`adapter_node_count`) so an audit can tell them
     // from what the parser read.
     mut fn add_adapter_node(like: NodeId, kind: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
-        let idx = self.state.kinds.len() as i32
+        let idx = self.node_count()
         self.state.kinds.push(kind)
         self.state.starts.push(self.state.starts[like as i32])
         self.state.ends.push(self.state.ends[like as i32])
@@ -1074,7 +1074,7 @@ impl AstPool:
 
     mut fn add_adapter_extra(value: i32) -> i32:
         self.state.extra.push(value)
-        self.state.extra.len() as i32 - 1
+        self.extra_len() - 1
 
     fn adapter_node_count() -> i32: self.state.adapter_node_count
 

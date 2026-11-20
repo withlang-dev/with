@@ -23119,6 +23119,10 @@ impl Sema:
             if inst_owner != 0:
                 let inst_method_ty = self.method_as_value(node, inst_ty, inst_owner, field)
                 if inst_method_ty != 0: return if inst_method_ty < 0: 0 else: inst_method_ty
+                // A type has no fields to read: what is left names nothing.
+                if self.enum_has_variant(inst_ty, field) == 0:
+                    self.emit_error(f"`{self.type_name(inst_ty)}` has no method `{self.pool_resolve(field)}` (§9.3a)", node)
+                    return 0
         if static_type_sym != 0 and self.static_receiver_type_is_known(expr) and (static_expr_kind == NodeKind.NK_IDENT or static_expr_kind == NodeKind.NK_TYPE_NAMED):
             let static_prim = self.primitive_type_by_sym(static_type_sym)
             if static_prim != 0:
@@ -36538,8 +36542,11 @@ impl Sema:
     // its receiver; the call's expected type completes a bare generic base
     // (`let xs: List[i32] = List.new()`), an answer of the call, not of the
     // method.
+    // The built-in methods with no receiver: the constructors.
+    fn builtin_method_is_constructor(field: i32) -> bool: field == self.syms.new or self.pool_resolve(field) == "with_capacity"
+
     fn builtin_constructor_in_context(recv_type: i32, owner_sym: i32, field: i32, ret: i32) -> i32:
-        if ret != recv_type or (field != self.syms.new and self.pool_resolve(field) != "with_capacity"):
+        if ret != recv_type or not self.builtin_method_is_constructor(field):
             return ret
         self.generic_constructor_return_type(owner_sym, recv_type)
 
@@ -43067,7 +43074,7 @@ impl Sema:
     // member) is not a field read — nothing moves out of a type name.
     fn d32_base_is_type_name(fa_node: i32) -> bool:
         // `Box[i32].count` as a value (D223): the base is the instance's name.
-        if self.method_value_fns.contains(fa_node): return true
+        if self.method_value_fns.contains(fa_node) or self.method_value_closures.contains(fa_node): return true
         var b = self.ast.get_data0(fa_node)
         while b != 0 and self.ast.kind(b) == NodeKind.NK_GROUPED:
             b = self.ast.get_data0(b)
@@ -43109,7 +43116,7 @@ impl Sema:
         while n != 0 and self.ast.kind(n) == NodeKind.NK_GROUPED:
             n = self.ast.get_data0(n)
         // `Type.method` as a value (D223) names a function, not a field.
-        n != 0 and self.ast.kind(n) == NodeKind.NK_FIELD_ACCESS and not self.method_value_fns.contains(n)
+        n != 0 and self.ast.kind(n) == NodeKind.NK_FIELD_ACCESS and not self.method_value_fns.contains(n) and not self.method_value_closures.contains(n)
 
     mut fn d32_base_is_temporary(fa_node: i32) -> bool:
         if self.place_root_sym(fa_node) != 0:
@@ -44275,8 +44282,13 @@ impl Sema:
             if written != 0: self.typed_expr_types.insert(node, written)
             return if written == 0: -1 else: written
         let row = self.builtin_sig_row_for(owner_ty, field)
-        let arg_count = if row < 0: 0 else if self.builtin_sig_required[row] >= 0: self.builtin_sig_required[row] else: self.builtin_sig_modes[row].len() as i32
-        let mode = self.builtin_method_receiver_mode(owner_sym, field)
+        // The arguments a call must write (a trailing one that may be
+        // omitted is omitted); a method with no row takes none.
+        // A float math method's receiver is its first operand.
+        let math_id = math_fn_lookup(self.pool_resolve(field))
+        let is_math = math_id >= 0 and self.get_type_kind(self.resolve_alias(owner_ty as TypeId)) == TypeKind.TY_FLOAT
+        let arg_count = if is_math: math_fn_arity(math_id) - 1 else if row < 0 or self.builtin_sig_required[row] < 0: 0 else: self.builtin_sig_required[row]
+        let mode = if self.builtin_method_is_constructor(field): ReceiverMode.None else: self.builtin_method_receiver_mode(owner_sym, field)
         let has_receiver = mode != ReceiverMode.None
         let like = node as NodeId
         let arg_types = []
