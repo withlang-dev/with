@@ -1770,6 +1770,13 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "one-liner -i did not write the files back as edited")
     if ctx.fs().exists(ol_a ++ ".with-tmp") or ctx.fs().exists(ol_b ++ ".with-tmp"):
         return bs_fail(ctx, "one-liner -i left its temporary file")
+    // #3478: under `-p`, `continue` skips the line's print, so the line is
+    // dropped: the in-place `sed -i '1d'`.
+    args = ["-p", "-i", "if fnr == 1: continue", ol_a, ol_b]
+    let dropped = bs_run_cli_capture(ctx, compiler_path, "one-liner-in-place-drop", args, BS_HANG_GUARD_MS)
+    if dropped.rc != 0: return bs_fail(ctx, "one-liner -i with continue failed: " ++ dropped.stderr)
+    if ctx.fs().read_text(ol_a) != "betA\n" or ctx.fs().read_text(ol_b) != "deltA":
+        return bs_fail(ctx, "one-liner -i with continue did not drop the first line of each file")
     args = ["-p", "-i", "line = line"]
     let no_file = bs_run_cli_capture(ctx, compiler_path, "one-liner-in-place-no-file", args, BS_HANG_GUARD_MS)
     if no_file.rc == 0: return bs_fail(ctx, "one-liner -i without a file unexpectedly succeeded")

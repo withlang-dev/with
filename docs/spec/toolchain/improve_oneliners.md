@@ -48,6 +48,7 @@ spec.
 |---|---|
 | `sed -n 'A,Bp' file` | `with -n 'if nr >= A and nr <= B: print(line)' < file` |
 | `sed '/pat/d'` | `with -n 'if not line.contains("pat"): print(line)'` |
+| `sed -i '/pat/d' f`, `sed -i '10,16d' f` | `with -p -i 'if line.contains("pat"): continue' f`, `with -p -i 'if nr >= 10 and nr <= 16: continue' f` (under `-p`, `continue` skips the line's print: the line is dropped) |
 | `sed 's/old/new/g'` | `with -p 'line = line.replace("old", "new")'` (all occurrences) |
 | `sed -E 's/^(\w+) +(\d+)/\2 \1/'` | `with -p 'line = /^(\w+)\s+(\d+)/.replace(line, "$2 $1")'` |
 | `sed -E 's/\bit\b/x/g'` | `with -p 'line = /\bit\b/g.replace(line, "x")'` (the `g` flag replaces every match, as in sed; without it, the first) |

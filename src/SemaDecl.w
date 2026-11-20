@@ -2332,12 +2332,16 @@ impl Sema:
             self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
             self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
             self.register_generic_method_fn(node, fn_name, parsed_fn_name)
+            // A method's own type parameters join its impl's: `impl[T]
+            // Box[T]: fn conv[U](f: fn(&T) -> U)` names both. Validated
+            // against its own alone, the impl's `T` was "unknown type".
+            let generic_impl_node = self.impl_node_for_method_decl(node)
             for pi in 0..param_count:
                 let p_type_node = self.ast.fn_param_type(param_start, pi)
                 self.refuse_dyn_by_value_params(p_type_node, true)
-                self.validate_type_expr_with_type_params(p_type_node, self.ast.fn_meta_tp_start(meta), tp_count)
+                self.validate_type_expr_with_impl_type_params(p_type_node, self.ast.fn_meta_tp_start(meta), tp_count, generic_impl_node)
             self.refuse_dyn_by_value_params(ret_node, false)
-            self.validate_type_expr_with_type_params(ret_node, self.ast.fn_meta_tp_start(meta), tp_count)
+            self.validate_type_expr_with_impl_type_params(ret_node, self.ast.fn_meta_tp_start(meta), tp_count, generic_impl_node)
             // Validate where clause references
             self.validate_where_clause(node, self.ast.fn_meta_tp_start(meta), tp_count)
             if self_type_id != 0:
