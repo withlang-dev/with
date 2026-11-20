@@ -100,6 +100,7 @@ fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci: &Li
     let count = pool.get_data2(facade as NodeId)
     let names: List[str] = []
     let uses: List[FacadeErrorUse] = []
+    var name_ops = ""
     for i in 0..count:
         let item = pool.get_extra(extra_start + i)
         if facade_item_is_handle(pool, item):
@@ -113,10 +114,11 @@ fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci: &Li
             // through a borrow is one `Borrowed<R>[_]` viewing that borrow.
             let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, true, false, true) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
             out = out ++ text
-            if text.len() > 0: out = out ++ facade_render_imported_name_ops(pool, intern, ci, item)
+            if text.len() > 0: name_ops = name_ops ++ facade_render_imported_name_ops(pool, intern, ci, item)
             let rname = intern.resolve(pool.get_data0(item as NodeId))
             names.push(rname)
             uses.push(use_of_error)
+    out = out ++ facade_render_unshared_name_ops(name_ops)
     out = out ++ facade_render_shared_error_type(pool, intern, ci, facade, names, uses)
     // Record-view hosts (D122, §16.2b.6): `impl T:` for each record this
     // block's items borrow and no resource wraps, carrying its operations.
@@ -626,6 +628,23 @@ fn facade_render_produced_field(pool: &AstPool, intern: &InternPool, resource: i
             path = path ++ (if s > 2: "." else: "") ++ intern.resolve(pool.get_extra(ops + s))
         return (intern.resolve(pool.get_extra(ops + 1)), path)
     ("", "")
+
+// D215: a C name means one modeled operation. A function two resources
+// describe (`db_close` the drop of `Database` and of `Shared`) has two, so
+// its name is rendered for neither and a call by it stays the raw call the
+// error explains. `ops` is every resource's forwarders: each begins at a
+// line `fn <name>(` and runs to the next.
+fn facade_render_unshared_name_ops(ops: &str) -> str:
+    let lines = ops.split("\n")
+    let seen: HashMap[str, i32] = HashMap.new()
+    for line in lines:
+        if line.starts_with("fn "): seen.increment(line.slice(3, line.find("(")).to_owned())
+    var out = ""
+    var keep = true
+    for line in lines:
+        if line.starts_with("fn "): keep = (seen.get(line.slice(3, line.find("("))) ?? &0) == 1
+        if keep and line.len() > 0: out = out ++ line ++ "\n"
+    out
 
 fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> str:
     let name = intern.resolve(pool.get_data0(resource as NodeId))
