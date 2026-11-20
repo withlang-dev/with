@@ -657,8 +657,7 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
     // c_int`) keeps its C functions as they are
     // (SemaFacade.facade_index_imported_name_ops).
     // D215: a described function's C name is its modeled operation for
-    // every representation, a pointer resource included.
-    if facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT): return ""
+    // every representation: by value, a pointer, initialized in place.
     var out = ""
     for k in 0..pool.get_data2(resource as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
