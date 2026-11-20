@@ -6366,10 +6366,7 @@ impl Sema:
         // D223 (§9.3a): `Type.name` names one thing. A method named like a
         // variant of its own enum would make `Shape.Square` either.
         if self.sig_receiver_mode(sig_idx) != ReceiverMode.None and self.sig_get_param_count(sig_idx) > 0:
-            let recv_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(self.sig_param_type(sig_idx, 0) as TypeId)) as i32
-            let method_sym = self.method_decl_name_symbol(self.ast.get_data0(node))
-            if method_sym != 0 and self.enum_has_variant(recv_ty, method_sym) != 0:
-                self.emit_error_with_help(f"`{self.pool_resolve(method_sym)}` is a variant of `{self.type_name(recv_ty)}` and cannot also be a method of it: `{self.type_name(recv_ty)}.{self.pool_resolve(method_sym)}` would name either (§9.3a)", node, "rename the method")
+            self.refuse_method_named_like_variant(node, self.auto_deref_ref_ptr_type(self.resolve_alias(self.sig_param_type(sig_idx, 0) as TypeId)) as i32)
 
         // Add parameters to scope
         let meta = self.ast.find_fn_meta(node)
@@ -18012,7 +18009,9 @@ impl Sema:
             if vector_help.len() > 0:
                 self.emit_error("type mismatch in binding: " ++ vector_help, node)
             else if self.arithmetic_result_type(ann_type, val_type) == 0:
-                self.emit_error("type mismatch in binding", node)
+                // D223: two function types that differ only in a mode.
+                let mode_note = self.fn_mode_mismatch_note(ann_type as i32, val_type as i32, value, render_expr(self.ast, self.pool, value as NodeId, 0))
+                self.emit_error(if mode_note.len() > 0: "type mismatch in binding: " ++ mode_note else: "type mismatch in binding", node)
         else if self.aggregate_repr_differs(ann_type, val_type, 0) != 0:
             self.emit_error("type mismatch in binding: the annotation is `" ++ self.type_name(ann_type as i32) ++ "` but the value is `" ++ self.type_name(val_type as i32) ++ "`; an aggregate's elements do not convert", node)
 
@@ -34524,7 +34523,19 @@ impl Sema:
             return
         self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node, 0)
 
+    // D223 (§9.3a): `Type.name` names one thing. A method named like a
+    // variant of its own enum would make `Shape.Square` either. Said once
+    // per method, however many instances of a generic enum check it.
+    mut fn refuse_method_named_like_variant(fn_node: i32, recv_ty: i32):
+        let method_sym = self.method_decl_name_symbol(self.ast.get_data0(fn_node))
+        if method_sym == 0 or self.enum_has_variant(recv_ty, method_sym) == 0 or self.variant_named_methods.contains(fn_node): return
+        self.variant_named_methods.insert(fn_node, 1)
+        let owner_sym = self.method_owner_symbol_for_type(recv_ty)
+        let owner = if owner_sym != 0: self.pool_resolve(owner_sym) else: self.type_name(recv_ty)
+        self.emit_error_with_help(f"`{self.pool_resolve(method_sym)}` is a variant of `{owner}` and cannot also be a method of it: `{owner}.{self.pool_resolve(method_sym)}` would name either (§9.3a)", fn_node, "rename the method")
+
     mut fn check_generic_method_body_concrete(fn_node: i32, method_fn_sym: i32, concrete_owner: i32, owner_tp_start: i32, owner_tp_count: i32, fn_tp_start: i32, fn_tp_count: i32) -> i32:
+        self.refuse_method_named_like_variant(fn_node, concrete_owner)
         let tp_syms: List[i32] = []
         let tp_types: List[i32] = []
         var key = f"{self.pool_resolve(method_fn_sym)}__receiver__{concrete_owner}"

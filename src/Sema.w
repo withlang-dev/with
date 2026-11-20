@@ -1880,6 +1880,7 @@ type Sema {
     // alias → the std.numeric function that states it. Lowered as a call.
     numeric_member_fns: HashMap[i32, i32, Minted],
     method_value_fns: HashMap[i32, i32, Minted],        // `Type.method` node used as a value → the method's function (D223)
+    variant_named_methods: HashMap[i32, i32, Minted],   // method declarations already refused for a variant's name (D223)
     method_value_closures: HashMap[i32, i32, Minted],   // `Type.method` node naming a built-in method → the closure written for it
     method_adapter_param_types: HashMap[i32, i32, Minted], // that closure's node * 64 + parameter index → the parameter's type
     // #2211: resolved name uses (node, kind, declaring module path, name) for
@@ -4305,6 +4306,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         or_shared_seen: [],
         numeric_member_fns: sema_new_map_i32_i32(),
         method_value_fns: sema_new_map_i32_i32(),
+        variant_named_methods: sema_new_map_i32_i32(),
         method_value_closures: sema_new_map_i32_i32(),
         method_adapter_param_types: sema_new_map_i32_i32(),
         name_use_nodes: sema_new_list_i32(),

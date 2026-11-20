@@ -643,7 +643,7 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
         i = i + 1
     if result.seen and result.in_place and (result.mode != CliOneLinerMode.Print or result.files.len() == 0):
         result.ok = false
-        result.error_msg = "error: -i writes each input file back: it takes -p and at least one file"
+        result.error_msg = "error: -i writes each input file back: it takes -p and at least one file (to drop a line under -p, `continue`)"
     result
 
 fn cli_escape_with_string(value: &str) -> str:
