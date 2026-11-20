@@ -29,6 +29,11 @@ pub type List[T]  {
 
 
 impl[T] List[T]:
+    /// The number of elements (D108). Declared here, as D110 asks of every
+    /// built-in method: calls, method values (`List[T].len`), move checking
+    /// and lowering read this one signature (#3483, the first of them).
+    pub fn len() -> isize: self.len as isize
+
     /// §9.7: a small remainder keeps the whole original buffer alive;
     /// `shrink_to_fit` releases the prefix and the spare capacity.
     pub mut fn shrink_to_fit(): with_vec_shrink_to_fit_es((&raw mut self) as *mut u8, sizeof[T]())
