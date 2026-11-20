@@ -646,6 +646,13 @@ fn facade_render_unshared_name_ops(ops: &str) -> str:
         if keep and line.len() > 0: out = out ++ line ++ "\n"
     out
 
+// Whether a C function's first parameter is `void *` (of either constness).
+fn facade_render_first_param_is_void_ptr(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
+    let meta = pool.find_fn_meta(decl as NodeId)
+    if meta < 0 or pool.fn_meta_param_count(meta) == 0: return false
+    let text = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId)
+    text == "*mut c_void" or text == "*const c_void"
+
 // Whether an fn item states a clause of `kind` (an item's clauses start at
 // its first extra; a resource's follow its representation).
 fn facade_render_item_has_clause(pool: &AstPool, item: i32, kind: i32) -> bool:
@@ -693,7 +700,10 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ iparams ++ "):\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(iparams) ++ ")\n"
         else if kind == FACADE_CLAUSE_DROP:
             let dropper = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
-            if dropper != 0:
+            // OPTION B (awaiting Eric): a drop whose C parameter is `void *`
+            // takes any pointer (`free`), so it is not one resource's
+            // operation and its name keeps its raw meaning.
+            if dropper != 0 and not facade_render_first_param_is_void_ptr(pool, intern, dropper):
                 out = out ++ "fn " ++ facade_render_bridge_name(intern.resolve(pool.get_data0(dropper as NodeId))) ++ "(facade_self: " ++ name ++ "):\n    let facade_ended = facade_self\n"
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for item in items:
