@@ -6363,6 +6363,13 @@ impl Sema:
         let saved_receiver_field_shadowed = move self.receiver_field_shadowed
         self.receiver_field_owner = self.ast.receiver_field_owner(node)
         self.receiver_field_shadowed = sema_new_map_i32_i32()
+        // D223 (§9.3a): `Type.name` names one thing. A method named like a
+        // variant of its own enum would make `Shape.Square` either.
+        if self.sig_receiver_mode(sig_idx) != ReceiverMode.None and self.sig_get_param_count(sig_idx) > 0:
+            let recv_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(self.sig_param_type(sig_idx, 0) as TypeId)) as i32
+            let method_sym = self.method_decl_name_symbol(self.ast.get_data0(node))
+            if method_sym != 0 and self.enum_has_variant(recv_ty, method_sym) != 0:
+                self.emit_error_with_help(f"`{self.pool_resolve(method_sym)}` is a variant of `{self.type_name(recv_ty)}` and cannot also be a method of it: `{self.type_name(recv_ty)}.{self.pool_resolve(method_sym)}` would name either (§9.3a)", node, "rename the method")
 
         // Add parameters to scope
         let meta = self.ast.find_fn_meta(node)
@@ -44325,6 +44332,16 @@ impl Sema:
         // `Type.name` is a variant before it is a method, as at a call
         // (`Shape.Circle(2)` constructs).
         if self.enum_has_variant(owner_ty, field) != 0: return 0
+        // D117: where a name has an observing and a taking form
+        // (`first`), the type wanted selects, as the receiver's ownership
+        // does at a call: a first parameter taken by value names the
+        // taking form. With no type wanted, the name is the observing one.
+        let taking: i32 = self.method_twin_names.get(field) ?? 0
+        if taking != 0 and self.has_expected_type != 0 and self.expected_expr_type != 0 and self.type_has_method_named(owner_ty, taking):
+            let wanted = self.resolve_alias(self.expected_expr_type as TypeId) as i32
+            if self.get_type_kind(wanted as TypeId) == TypeKind.TY_FN and self.get_type_d1(wanted as TypeId) >= 1 and not self.fn_type_param_is_mut(wanted, 0):
+                if self.get_type_kind(self.resolve_alias(self.fn_type_param_type(wanted, 0) as TypeId)) != TypeKind.TY_REF:
+                    return self.method_as_value(node, owner_ty, owner_sym, taking)
         var method_fn = self.lookup_method_fn(owner_sym, field)
         var sig = self.lookup_method_sig(owner_sym, field)
         if method_fn != 0 and sig >= 0:
