@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.73
+# The With Programming Language — Specification v7.74
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.74:** D214 (Eric, 2026-11-18; words blessed 2026-11-20). §16.2b.11: a producer has one home, chosen by `of`; one that receives a resource is that resource's method unless its fn item states `of` the produced type, and then no method is generated on the resource it receives. Implemented. The second half of D214 (`param N fixed null` on a resource parameter as a second constructor) is NOT yet implemented.
+
 **Changelog v7.73:** D223 (Eric, 2026-11-19). §9.3a: a method may not have the name of a variant of its own enum; where a name has an observing and a taking form, `Type.name` is the observing one unless a function type is expected whose first parameter is taken by value. Both implemented.
 
 **Changelog v7.72:** D223 (Eric, 2026-11-19). §9.3a (new): methods as values. `Type.method` names the method as a function value whose first parameter is the receiver in the method's own mode (`&T`, `mut T`, `T`); a method with no receiver has none; found and visibility-checked as for a call; `x.method` without a call is not a value. Implemented, compiler-implemented methods (`List[i32].len`) included.
