@@ -1974,6 +1974,38 @@ pub fn run_doc_path_check_action(ctx: ActionCtx) -> i32:
     print(f"doc-path-check: {scanned} source files name no document path")
     comp_write_ok_output(ctx)
 
+// D223 (#3483): the syntax tree is frozen before Sema, and one function
+// writes to it afterwards, for one caller. A second call site, or a second
+// place that clears the freeze, fails here.
+pub fn run_freeze_door_check_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let calls = []
+    let writers = []
+    // The compiler's sources and what is compiled with them; this file
+    // names the door in its own text.
+    for dir in ["src", "lib", "tools", "rt"]:
+        for path in fs.list_files(dir):
+            if not path.ends_with(".w"): continue
+            var line_no = 0
+            for line in fs.read_text(path).split("\n"):
+                line_no = line_no + 1
+                if line.trim().starts_with("//"): continue
+                if line.contains(".add_method_value_closure("): calls.push(f"{path}:{line_no}")
+                if line.contains(".add_after_freeze(") and path != "src/Ast.w": writers.push(f"{path}:{line_no}")
+    var errors = 0
+    var one_caller = false
+    if calls.len() == 1: one_caller = calls[0].starts_with("src/SemaCheck.w:")
+    if not one_caller:
+        eprint("freeze-door-check: AstPool.add_method_value_closure has exactly one caller, Sema.builtin_method_as_value in src/SemaCheck.w; found:")
+        for site in calls: eprint("  " ++ site)
+        errors = errors + 1
+    for site in writers:
+        eprint(f"{site}: add_after_freeze is add_method_value_closure's own writer; nothing else adds to the tree after the freeze")
+        errors = errors + 1
+    if errors > 0: return comp_fail(ctx, "the tree's freeze has one door for one caller (D223); a new need is a brief, not a second caller")
+    print("freeze-door-check: one caller")
+    comp_write_ok_output(ctx)
+
 pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     // The specification is one file per chapter under docs/spec/, with the

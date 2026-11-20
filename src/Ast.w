@@ -1050,14 +1050,40 @@ impl AstPool:
         self.state.files.push(self.state.current_file_id)
         idx as NodeId
 
-    // D223: the one door through the freeze. A built-in method named as a
-    // value (`List[i32].len`) is the closure a person would write for it,
-    // and Sema is the first phase that knows the method: it writes that
-    // closure's nodes here, at the span and in the file of `like`, the
-    // expression they stand for. Nothing else adds to a frozen pool; the
-    // nodes are counted (`adapter_node_count`) so an audit can tell them
-    // from what the parser read.
-    mut fn add_adapter_node(like: NodeId, kind: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
+    // D223: the one door through the freeze, and it builds one thing. A
+    // built-in method named as a value (`List[i32].len`) is the closure a
+    // person would write for it, `(recv, a…) => recv.method(a…)` (or
+    // `(a…) => Type.method(a…)` when `recv_sym` is 0), and Sema is the
+    // first phase that knows the method. `like` is the `Type.method`
+    // expression the closure stands for: its span and file are the
+    // closure's. Any other use is refused here, and `freeze-door-check`
+    // (in the gate) fails when a second call site appears. The door and its
+    // caller go when built-in methods have bodies in the standard library
+    // (#3483).
+    mut fn add_method_value_closure(like: NodeId, recv_sym: i32, method_sym: i32, arg_syms: &List[i32]) -> NodeId:
+        if self.state.kinds[like as i32] != NodeKind.NK_FIELD_ACCESS or self.state.data1[like as i32] != method_sym:
+            ast_pool_phase_bug("BUG: AstPool.add_method_value_closure is only for a `Type.method` expression naming a built-in method (D223)")
+        let callee_base = if recv_sym != 0: self.add_after_freeze(like, NodeKind.NK_IDENT, recv_sym, 0, 0) else: self.state.data0[like as i32]
+        let callee = self.add_after_freeze(like, NodeKind.NK_FIELD_ACCESS, callee_base, method_sym, 0)
+        let arg_nodes = []
+        var arg_count: i32 = 0
+        for arg_sym in arg_syms:
+            arg_nodes.push(self.add_after_freeze(like, NodeKind.NK_IDENT, arg_sym, 0, 0))
+            arg_count += 1
+        let call_extra = self.extra_len()
+        for arg_node in arg_nodes: self.state.extra.push(arg_node)
+        let call = self.add_after_freeze(like, NodeKind.NK_CALL, callee, call_extra, arg_count)
+        let params_extra = self.extra_len()
+        if recv_sym != 0:
+            self.state.extra.push(recv_sym)
+            self.state.extra.push(0)
+        for arg_sym in arg_syms:
+            self.state.extra.push(arg_sym)
+            self.state.extra.push(0)
+        self.add_after_freeze(like, NodeKind.NK_CLOSURE, call, params_extra, arg_count + (recv_sym != 0) as i32) as NodeId
+
+    // add_method_value_closure's node writer; nothing else calls it.
+    mut fn add_after_freeze(like: NodeId, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
         let idx = self.node_count()
         self.state.kinds.push(kind)
         self.state.starts.push(self.state.starts[like as i32])
@@ -1070,11 +1096,7 @@ impl AstPool:
         self.state.int_literal_radices.push(0)
         self.state.files.push(self.state.files[like as i32])
         self.state.adapter_node_count += 1
-        idx as NodeId
-
-    mut fn add_adapter_extra(value: i32) -> i32:
-        self.state.extra.push(value)
-        self.extra_len() - 1
+        idx
 
     fn adapter_node_count() -> i32: self.state.adapter_node_count
 

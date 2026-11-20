@@ -44311,29 +44311,12 @@ impl Sema:
             // A parameter the row declares `&T` observes its argument.
             let observed = self.builtin_row_observed(row, ai) == 1 and self.get_type_kind(self.resolve_alias(arg_ty as TypeId)) != TypeKind.TY_REF
             arg_types.push(if observed: self.ensure_exact_type(TypeKind.TY_REF, arg_ty, 0, 0) as i32 else: arg_ty)
-        // The call `recv.method(args…)`, or `Type.method(args…)` for a
-        // method with no receiver.
-        let recv_sym = self.pool_intern("__method_value_receiver")
-        let callee_base = if has_receiver: self.ast.add_adapter_node(like, NodeKind.NK_IDENT, recv_sym, 0, 0) as i32 else: self.ast.get_data0(node)
-        let callee = self.ast.add_adapter_node(like, NodeKind.NK_FIELD_ACCESS, callee_base, field, 0) as i32
-        let arg_nodes = []
+        // The closure `(recv, a…) => recv.method(a…)`, or `(a…) =>
+        // Type.method(a…)` for a method with no receiver.
+        let recv_sym = if has_receiver: self.pool_intern("__method_value_receiver") else: 0
         let arg_syms = []
-        for ai in 0..arg_count:
-            let arg_sym = self.pool_intern(f"__method_value_arg{ai}")
-            arg_syms.push(arg_sym)
-            arg_nodes.push(self.ast.add_adapter_node(like, NodeKind.NK_IDENT, arg_sym, 0, 0) as i32)
-        let call_extra = self.ast.extra_len()
-        for arg_node in arg_nodes: self.ast.add_adapter_extra(arg_node)
-        let call = self.ast.add_adapter_node(like, NodeKind.NK_CALL, callee, call_extra, arg_count) as i32
-        let params_extra = self.ast.extra_len()
-        if has_receiver:
-            self.ast.add_adapter_extra(recv_sym)
-            self.ast.add_adapter_extra(0)
-        for arg_sym in arg_syms:
-            self.ast.add_adapter_extra(arg_sym)
-            self.ast.add_adapter_extra(0)
-        let param_count = arg_count + (has_receiver as i32)
-        let closure = self.ast.add_adapter_node(like, NodeKind.NK_CLOSURE, call, params_extra, param_count) as i32
+        for ai in 0..arg_count: arg_syms.push(self.pool_intern(f"__method_value_arg{ai}"))
+        let closure = self.ast.add_method_value_closure(like, recv_sym, field, arg_syms) as i32
         if has_receiver:
             self.method_adapter_param_types.insert(closure * 64, if mode == ReceiverMode.Read: self.ensure_exact_type(TypeKind.TY_REF, owner_ty, 0, 0) as i32 else: owner_ty)
             if mode == ReceiverMode.Mut: self.ast.set_fn_type_mut_mask(closure as NodeId, 1)
