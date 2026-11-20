@@ -38682,6 +38682,10 @@ impl Sema:
 
         // mut.md Rev 8 §9.2 — closure capture conflict detection.
         self.check_closure_capture_conflicts(extra_start, mc_resolved_arg_count, mc_has_resolved_args, node, expr)
+        // D214 COUNT (not yet an error): a parent-received producer called
+        // as the produced type's constructor, outside the rendering.
+        if mc_param_offset_for_resolution == 0 and mc_sig_idx_for_effect >= 0 and self.facade_parented_ctor_methods.contains(mc_sig_idx_for_effect) and not self.current_file_is_generated("<facade ") and with_getenv_str("WITH_TRACE_D214").len() > 0:
+            with_eprint(f"D214SITE\t{self.current_module_path}\t{self.node_line(node)}\t{self.type_name(obj_type as i32)}.{self.pool_resolve(field)}\t-> .{self.pool_resolve(self.facade_parented_ctor_methods.get(mc_sig_idx_for_effect).unwrap())}")
         if mc_param_offset_for_resolution != 0 and mc_owner_sym_for_effect != 0 and (self.method_has_mut_self_flag(mc_owner_sym_for_effect, field) or self.builtin_method_requires_mutable_receiver(mc_owner_sym_for_effect, field)):
             self.refuse_captures_overlapping(expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args, node)
         if mc_sig_idx_for_effect >= 0:
