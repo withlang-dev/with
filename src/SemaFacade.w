@@ -3675,6 +3675,9 @@ impl Sema:
             si += 1
         false
 
+    // The prefix of a rendered operation's name (`__with_facade_<name>`).
+    fn facade_bridge_prefix() -> str: facade_render_bridge_name("")
+
     fn facade_bridge_redirect(fn_sym: i32) -> i32:
         if self.facade_bridge_of.len() == 0:
             return fn_sym

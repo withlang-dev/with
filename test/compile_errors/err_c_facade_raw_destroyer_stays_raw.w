@@ -1,4 +1,5 @@
-//! expect-check-fail: raw c_import function call requires unsafe context
+//! expect-check-fail: wrong argument type in call to 'db_close'
+//! expect-check-fail: parameter 'facade_self' expects Database
 
 // D51 §16.2b.5: "destroy through C, then Drop destroys again" is not
 // expressible in safe code. A resource is the safe surface of its

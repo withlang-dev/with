@@ -176,7 +176,9 @@ impl Sema:
         let expr_text = render_expr(self.ast, self.pool, arg_node as NodeId, 0)
         var msg = "wrong argument type"
         if call_name.len() > 0:
-            msg = msg ++ " in call to '" ++ call_name ++ "'"
+            // A rendered operation is known by the C name it presents (D215).
+            let bridge_prefix = self.facade_bridge_prefix()
+            msg = msg ++ " in call to '" ++ (if call_name.starts_with(bridge_prefix): call_name.slice(bridge_prefix.len(), call_name.len()) else: call_name) ++ "'"
         let diag = Diagnostic.err(msg, primary)
         if expr_text.len() > 0 and sema_str_contains_char(expr_text, 10) == false:
             diag.add_label(primary, "argument expression '" ++ expr_text ++ "' has type " ++ actual_name)
