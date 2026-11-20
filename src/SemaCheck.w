@@ -44278,7 +44278,9 @@ impl Sema:
             if arg_ty == 0:
                 self.emit_error_with_help(f"`{self.type_name(owner_ty)}.{self.pool_resolve(field)}` has type parameters of its own, so it names no one function (§9.3a)", node, "write the closure, which fixes them by its use: `(x) => x." ++ self.pool_resolve(field) ++ "(…)`")
                 return -1
-            arg_types.push(arg_ty)
+            // A parameter the row declares `&T` observes its argument.
+            let observed = self.builtin_row_observed(row, ai) == 1 and self.get_type_kind(self.resolve_alias(arg_ty as TypeId)) != TypeKind.TY_REF
+            arg_types.push(if observed: self.ensure_exact_type(TypeKind.TY_REF, arg_ty, 0, 0) as i32 else: arg_ty)
         // The call `recv.method(args…)`, or `Type.method(args…)` for a
         // method with no receiver.
         let recv_sym = self.pool_intern("__method_value_receiver")
