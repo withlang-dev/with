@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.72
+# The With Programming Language — Specification v7.73
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.73:** D223 (Eric, 2026-11-19). §9.3a: a method may not have the name of a variant of its own enum; where a name has an observing and a taking form, `Type.name` is the observing one unless a function type is expected whose first parameter is taken by value. Both implemented.
+
 **Changelog v7.72:** D223 (Eric, 2026-11-19). §9.3a (new): methods as values. `Type.method` names the method as a function value whose first parameter is the receiver in the method's own mode (`&T`, `mut T`, `T`); a method with no receiver has none; found and visibility-checked as for a call; `x.method` without a call is not a value. Implemented, compiler-implemented methods (`List[i32].len`) included.
 
 **Changelog v7.71:** D218 (Eric, 2026-11-19). §3.2: a closure passed in the same call may not capture a view of any place that overlaps a `mut` receiver or `mut` argument, for reading or writing; a callee that brackets work on it passes it to the closure. Implemented (a writing capture was already refused; a reading one is now). Another field of the same variable than the one the call holds does not overlap. No program in the tree was affected.

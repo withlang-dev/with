@@ -60,6 +60,10 @@ implement it, spec words included, and record it in the decision log as
 delegated. That is the one case in which an agent lands normative words;
 Eric vetoes by revert.
 
+The stop list wins: a question on it is never delegated, even when a law
+seems to decide it. Delegated words state a rule the laws already decide;
+writing them is not editing the spec to match the code.
+
 ## Bugs
 
 - **We own every bug.** Nothing is "pre-existing". Fix it; never defer or
