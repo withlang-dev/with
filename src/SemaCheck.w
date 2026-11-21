@@ -30780,6 +30780,14 @@ impl Sema:
         // (`unsafe fn danger` beside `let danger = ...`) is not called.
         // D215: the raw declaration, spelled `c.name`, always needs unsafe.
         let raw_c_call = self.ast.kind(self.ast.get_data0(node)) == NodeKind.NK_IDENT and self.raw_c_name_nodes.contains(self.ast.get_data0(node))
+        // D215: a bare C name several resources share has no one meaning,
+        // in safe code or inside `unsafe`; the raw function is `c.name`.
+        if not raw_c_call and callable_value_tid == 0 and fn_sym != 0 and self.facade_resources.len() > 0 and not self.current_file_is_generated("<facade ") and not self.current_file_is_generated("<c_import "):
+            let shared = self.facade_shared_name_spellings(fn_sym)
+            if shared.len() > 0:
+                let shared_name = self.pool_resolve(fn_sym)
+                self.emit_error_with_help(f"`{shared_name}` is named by more than one resource, so the C name has no one modeled meaning (§16.2b.11)", node, f"write {shared}; the raw function is `unsafe {{ c.{shared_name}(…) }}`")
+                return 0
         let unsafe_call_reason = if callable_value_tid != 0: "" else if raw_c_call: f"`c.{self.pool_resolve(fn_sym)}` is the raw C function and requires unsafe context (§31)" else: self.fn_symbol_unsafe_call_reason(fn_sym, self.facade_call_is_presented(fn_sym))
         if unsafe_call_reason.len() > 0:
             if self.require_unsafe_operation(unsafe_call_reason, node) == false:
