@@ -160,7 +160,6 @@ enum MirIntrinsic: i32:
     LIST_CONTAINS
     ARR_LEN
     GENERIC_CALL
-    LIST_JOIN
     DYN_VTABLE_CMP
     DYN_DOWNCAST
     OPT_FILTER

@@ -1851,3 +1851,9 @@ pub type FromFnIter[T] { f: fn() -> Option[T] }
 impl[T] Iter[T] for FromFnIter[T]:
     mut fn next() -> Option[T]: (self.f)()
 pub fn iter_ctor_from_fn[T](f: fn() -> Option[T]) -> FromFnIter[T]: FromFnIter { f }
+
+impl List[str]:
+    /// The texts joined into one, with `sep` between each pair. Declared
+    /// here over the runtime's join (D110, #3483); a list of anything but
+    /// text has no `join`.
+    pub fn join(sep: &str) -> str: with_vec_str_join(self as *const List[str] as *mut u8, sep)

@@ -99,7 +99,6 @@ enum CcBuiltin: i32:
     LIST_CONTAINS
     ARR_LEN
     GENERIC_CALL
-    LIST_JOIN
     DYN_VTABLE_CMP
     DYN_DOWNCAST
     OPT_FILTER
@@ -186,7 +185,6 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_TAKE_FRONT: return true
     if kind == CcBuiltin.LIST_RESTORE_FRONT: return true
     if kind == CcBuiltin.LIST_CONTAINS: return true
-    if kind == CcBuiltin.LIST_JOIN: return true
     if kind == CcBuiltin.LIST_SLOT: return true
     if kind == CcBuiltin.LIST_GET_DISJOINT: return true
     false
@@ -6063,8 +6061,6 @@ impl CCodegen:
             return self.sema.ty_u32 as i32
         if kind == CcBuiltin.LIST_CONTAINS:
             return self.sema.ty_bool as i32
-        if kind == CcBuiltin.LIST_JOIN:
-            return self.sema.ty_str as i32
         if kind == CcBuiltin.LIST_WITH_CAPACITY:
             return CC_PSEUDO_TID_LIST
         if kind == CcBuiltin.MAP_NEW:
@@ -6927,7 +6923,6 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.ARR_LEN64: return CcBuiltin.ARR_LEN64
     if intrinsic == MirIntrinsic.ARR_ULEN32: return CcBuiltin.ARR_ULEN32
     if intrinsic == MirIntrinsic.GENERIC_CALL: return CcBuiltin.GENERIC_CALL
-    if intrinsic == MirIntrinsic.LIST_JOIN: return CcBuiltin.LIST_JOIN
     if intrinsic == MirIntrinsic.DYN_VTABLE_CMP: return CcBuiltin.DYN_VTABLE_CMP
     if intrinsic == MirIntrinsic.DYN_DOWNCAST: return CcBuiltin.DYN_DOWNCAST
     if intrinsic == MirIntrinsic.DYN_CALL: return CcBuiltin.DYN_CALL
@@ -7856,23 +7851,6 @@ impl CCodegen:
             if has_ret != 0:
                 out = out ++ " " ++ dst ++ " = __with_found;"
             out = out ++ " " ++ cc_rbrace() ++ "\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.LIST_JOIN:
-            if argc < 2:
-                self.fail("vec.join expects two arguments")
-                return "    abort();"
-            let recv_ptr = self.list_recv_ptr_text(body, args_id)
-            let sep_op = self.call_arg_operand(body, args_id, 1)
-            // The separator is a `&str` view: the `{ptr, len}` value itself
-            // (#1810; with_runtime.h `with_str sep`), never its address.
-            let sep = self.operand_text(body, sep_op)
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_vec_str_join(" ++ recv_ptr ++ ", " ++ sep ++ ");\n"
-            else:
-                out = out ++ "    (void)with_vec_str_join(" ++ recv_ptr ++ ", " ++ sep ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
