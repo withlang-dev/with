@@ -38453,6 +38453,7 @@ impl Sema:
             self.emit_ambiguous_trait_method_error(mc_owner_sym_for_effect, field, node)
             return 0
         if mc_method_fn_for_resolution != 0: self.check_method_visible(mc_method_fn_for_resolution, node)
+        if mc_method_fn_for_resolution != 0 and not self.check_method_declared_for(mc_method_fn_for_resolution, obj_type as i32, field, node): return 0
         let arg_types: List[i32] = []
         // mut.md Rev 8 §15.8 — see check_call.
         let mc_iter_borrow_idxs: List[i32] = []
@@ -43785,6 +43786,28 @@ impl Sema:
     // function. A trait impl's method is reached through the trait, whose
     // visibility governs it. Returns whether the call may reach `method_fn`,
     // reporting it when not.
+    // #3508: a method declared for one instantiation (`impl Box[str]`) is
+    // a method of that instantiation alone. Methods are found by the type's
+    // name, so it was accepted on every other one (`Box[isize]`), and its
+    // body read the receiver at the wrong type: an integer as text, in safe
+    // code. Returns whether the receiver is the instantiation the method
+    // was declared for, reporting it when not.
+    mut fn check_method_declared_for(method_fn: i32, recv_ty: i32, method_sym: i32, node: i32) -> bool:
+        let impl_node: i32 = self.method_impl_nodes.get(method_fn) ?? 0
+        if impl_node == 0 or self.ast.find_impl_type_params(impl_node) >= 0 or self.impl_target_has_bare_type_params(impl_node): return true
+        let target = self.ast.find_impl_target_type_node(impl_node as NodeId)
+        if target == 0: return true
+        let target_kind = self.ast.kind(target)
+        if target_kind != NodeKind.NK_INDEX and target_kind != NodeKind.NK_TYPE_GENERIC: return true
+        let declared = self.resolve_alias(self.resolve_type_expr(target as i32))
+        let recv = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(recv_ty as TypeId)) as TypeId)
+        if declared == 0 or recv == 0 or declared == recv: return true
+        if self.get_type_kind(recv) != TypeKind.TY_GENERIC_INST or self.type_has_unresolved_parts(recv as i32) != 0: return true
+        if self.suppress_errors != 0: return false
+        let name = self.pool_resolve(method_sym)
+        self.emit_error_with_help(f"method '{name}' is declared for `{self.type_name(declared as i32)}`, and this is a `{self.type_name(recv as i32)}`", node, f"`{name}` exists for that one instantiation; declare it in an `impl[T]` block to have it for every one")
+        false
+
     mut fn check_method_visible(method_fn: i32, node: i32) -> bool:
         let decl: i32 = self.fn_decl_nodes.get(method_fn) ?? 0
         if decl == 0: return true
