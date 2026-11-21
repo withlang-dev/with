@@ -5756,10 +5756,10 @@ pub fn with_codegen_loop_get_result(idx: i32) -> i64:
 extern fn rt_sysinfo_os() -> str
 extern fn rt_sysinfo_arch() -> str
 
-pub fn with_sysinfo_os() -> str:
+pub comptime fn with_sysinfo_os() -> str:
     rt_sysinfo_os()
 
-pub fn with_sysinfo_arch() -> str:
+pub comptime fn with_sysinfo_arch() -> str:
     rt_sysinfo_arch()
 
 // ── TLS trust store (Windows) ──────────────────────────────────────

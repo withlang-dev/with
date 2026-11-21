@@ -8475,13 +8475,22 @@ impl ComptimeEvaluator:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
             return comptime_control_value(self.empty_string_builder_value(result_type, comptime_value_intlike(arg_values[0])))
         let fn_node = self.find_fn_decl_node(fn_sym)
+        // A compile-time call that crosses a package boundary reaches only a
+        // `comptime fn`: the marker is the author's promise to importers
+        // that the function stays evaluable, and it is what tells a bundle
+        // which bodies to carry. Inside a package no marker is needed.
+        if fn_node != 0 and (self.ast.get_data2(fn_node) / FnFlags.COMPTIME) % 2 == 0:
+            let callee_package = self.sema.package_of(self.decl_path(fn_node))
+            let caller_package = self.sema.package_of(self.current_source_path())
+            if callee_package != caller_package:
+                return self.fail(node, "cannot evaluate '" ++ fn_name ++ "' at compile time: it belongs to another package (" ++ callee_package ++ ") and is not declared `comptime fn`")
         // D91 (§17.1a): the target's OS and architecture are a declared
         // build input, readable by any compile-time code. Whether the
         // runtime symbol is an extern, an interface declaration (the runtime
         // bundle's, D30 R3) or, with the runtime in-unit (D30), its body:
         // that body reads the host (rt_sysinfo_os), never the target, and
         // its c"..." literal is not comptime-evaluable.
-        let reads_target = fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch"
+        let reads_target = self.sema.fn_comptime_answer_is_compilers(fn_sym)
         // D39: an interface declaration has no body to evaluate. A runtime ABI
         // function's (the runtime bundle's interface, D30 step 3) is judged
         // below as the extern it is to compile time, by D104's wording.
