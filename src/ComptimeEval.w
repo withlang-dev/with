@@ -2655,6 +2655,7 @@ fn comptime_string_builder_constructor_method(name: &str) -> str:
 
 impl ComptimeEvaluator:
     mut fn eval_string_builder_method_call(recv_node: i32, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tstring_builder\t" ++ self.sema.pool_resolve(field))
         let method = with_str_clone_ref(self.pool.resolve(field))
         let builder = self.string_builder_from_value(recv_value, node)
         if builder.kind != ComptimeValueKind.CV_STRING_BUILDER:
@@ -2884,6 +2885,7 @@ fn comptime_reverse_bits(value: i64, width: i32) -> i64:
 
 impl ComptimeEvaluator:
     mut fn eval_int_method_call(recv_value: &ComptimeValue, recv_type_raw: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tint\t" ++ self.sema.pool_resolve(field))
         let method = with_str_clone_ref(self.pool.resolve(field))
         var recv_type = recv_type_raw
         if recv_type == 0:
@@ -3077,6 +3079,7 @@ impl ComptimeEvaluator:
         self.fail(node, "static method is not comptime-evaluable yet")
 
     mut fn eval_bytes_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tbytes\t" ++ self.sema.pool_resolve(field))
         let method = self.pool.resolve(field)
         if method == "len":
             if arg_count != 0:
@@ -3158,6 +3161,7 @@ impl ComptimeEvaluator:
         self.fail(node, "List[u8] method '" ++ method ++ "' is not comptime-evaluable yet")
 
     mut fn eval_list_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tlist\t" ++ self.sema.pool_resolve(field))
         let method = self.pool.resolve(field)
 
         if method == "push":
@@ -3267,6 +3271,7 @@ impl ComptimeEvaluator:
     // are std bodies). The arena is immutable, so `Some` names the element's
     // own slot and `rest` is a view of the tail, as `pop` keeps a prefix.
     mut fn eval_array_view_method_call(recv_value: &ComptimeValue, field: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tarray_view\t" ++ self.sema.pool_resolve(field))
         let method = self.pool.resolve(field)
         if arg_count != 0 or (method != "first" and method != "last" and method != "rest"):
             return self.fail(node, "method '" ++ method ++ "' is not comptime-evaluable yet")
@@ -3304,6 +3309,7 @@ impl ComptimeEvaluator:
         comptime_control_value(comptime_value_enum(result_tid, self.sema.syms.some, slot, 1))
 
     mut fn eval_map_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tmap\t" ++ self.sema.pool_resolve(field))
         let method = self.pool.resolve(field)
 
         if method == "insert":
@@ -3453,6 +3459,7 @@ impl ComptimeEvaluator:
         self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.option
 
     mut fn eval_option_method_call(recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\toption\t" ++ self.sema.pool_resolve(field))
         // §10.5's non-closure combinators. The closure-taking ones (map,
         // and_then, filter) wait on comptime closure evaluation (#665.3).
         let method = self.pool.resolve(field)
@@ -3512,6 +3519,7 @@ fn comptime_str_find(haystack: &str, needle: &str) -> i32:
 
 impl ComptimeEvaluator:
     mut fn eval_str_method_call(recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tstr\t" ++ self.sema.pool_resolve(field))
         let method = self.pool.resolve(field)
         let text = recv_value.text
         if method == "len":
@@ -3898,6 +3906,7 @@ impl ComptimeEvaluator:
         self.eval_fn_symbol_call_values(fn_sym, args, node)
 
     mut fn eval_static_type_method_call(recv_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tstatic_type\t" ++ self.sema.pool_resolve(field))
         let method = self.pool.resolve(field)
         let resolved_recv = self.sema.resolve_alias(recv_type)
         if self.sema.enum_has_variant(resolved_recv as i32, field) != 0:
@@ -6498,6 +6507,7 @@ impl ComptimeEvaluator:
         self.fail(node, "Workspace capability method '" ++ method ++ "' is not implemented yet")
 
     mut fn eval_capability_method_call(recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0: with_eprint("CTNATIVE\tcapability\t" ++ self.sema.pool_resolve(field))
         let method = with_str_clone_ref(self.pool.resolve(field))
         let kind = recv_value.data0 as i32
         if kind == CapabilityKind.CK_BUILD_CTX:
@@ -8467,6 +8477,16 @@ impl ComptimeEvaluator:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
             return comptime_control_value(self.empty_string_builder_value(result_type, comptime_value_intlike(arg_values[0])))
         let fn_node = self.find_fn_decl_node(fn_sym)
+        // COUNT ONLY (not for merge): every call the evaluator makes into a
+        // function of another package, and whether that function is `comptime`.
+        if fn_node != 0 and with_getenv_str("WITH_TRACE_CT_CALLS").len() > 0:
+            let callee_path = self.decl_path(fn_node)
+            let caller_path_ct = self.current_source_path()
+            let callee_pkg = self.sema.package_of(callee_path)
+            let caller_pkg = self.sema.package_of(caller_path_ct)
+            if callee_pkg != caller_pkg:
+                let is_ct = if (self.ast.get_data2(fn_node) / FnFlags.COMPTIME) % 2 == 1: "comptime" else: "ordinary"
+                with_eprint("CTCALL\t" ++ caller_pkg ++ "\t" ++ callee_pkg ++ "\t" ++ fn_name ++ "\t" ++ is_ct ++ "\t" ++ callee_path)
         // D91 (§17.1a): the target's OS and architecture are a declared
         // build input, readable by any compile-time code. Whether the
         // runtime symbol is an extern, an interface declaration (the runtime
