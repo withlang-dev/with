@@ -234,6 +234,13 @@ impl str:
     /// The text repeated `count` times.
     pub fn repeat(count: i64) -> str: with_str_repeat_ref(self, count)
 
+    /// The pieces of the text between occurrences of `sep`. An empty text
+    /// has no pieces; an empty `sep` gives the whole text as one piece.
+    pub fn split(sep: &str) -> List[str]:
+        var pieces: List[str] = []
+        with_str_split_vec_ref(&raw mut pieces as *mut u8, self, sep)
+        pieces
+
     /// The bytes as a view (§16.5): `s as []u8`, spelled as a method.
     pub fn as_bytes() -> []u8:
         (*self) as []u8

@@ -156,7 +156,6 @@ enum MirIntrinsic: i32:
     STR_FIND
     MAP_CLEAR
     OPT_IS_NONE
-    STR_SPLIT
     MAP_INCREMENT
     MAP_DECREMENT
     MAP_UPDATE

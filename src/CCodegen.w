@@ -94,7 +94,6 @@ enum CcBuiltin: i32:
     STR_FIND
     MAP_CLEAR
     OPT_IS_NONE
-    STR_SPLIT
     MAP_INCREMENT
     MAP_DECREMENT
     MAP_UPDATE
@@ -6175,14 +6174,6 @@ impl CCodegen:
             return self.sema.ty_str as i32
         if kind == CcBuiltin.STR_FIND:
             return self.sema.ty_i64 as i32
-        if kind == CcBuiltin.STR_SPLIT:
-            let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == false:
-                return hinted
-            let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == false:
-                return dst
-            return CC_PSEUDO_TID_LIST
         if kind == CcBuiltin.ARR_LEN:
             return self.sema.ty_usize as i32
         if kind == CcBuiltin.ARR_LEN32:
@@ -6934,7 +6925,6 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.STR_FIND: return CcBuiltin.STR_FIND
     if intrinsic == MirIntrinsic.MAP_CLEAR: return CcBuiltin.MAP_CLEAR
     if intrinsic == MirIntrinsic.OPT_IS_NONE: return CcBuiltin.OPT_IS_NONE
-    if intrinsic == MirIntrinsic.STR_SPLIT: return CcBuiltin.STR_SPLIT
     if intrinsic == MirIntrinsic.MAP_INCREMENT: return CcBuiltin.MAP_INCREMENT
     if intrinsic == MirIntrinsic.MAP_DECREMENT: return CcBuiltin.MAP_DECREMENT
     if intrinsic == MirIntrinsic.MAP_UPDATE: return CcBuiltin.MAP_UPDATE
@@ -7734,19 +7724,6 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.STR_SPLIT:
-            if argc < 2:
-                self.fail("str.split expects two arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let delim = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    with_str_split_vec_ref(&(" ++ self.place_text(body, dest_place) ++ "), " ++ recv ++ ", " ++ delim ++ ");\n"
-            else:
-                out = out ++ "    " ++ cc_lbrace() ++ " with_vec __with_tmp_split; with_str_split_vec_ref(&__with_tmp_split, " ++ recv ++ ", " ++ delim ++ "); " ++ cc_rbrace() ++ "\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
 
         ""
 
