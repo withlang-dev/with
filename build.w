@@ -4690,6 +4690,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     // link it instead of compiling the compiler into every test.
     out = out.add_target(compiler_bundle_target())
 
+    // #3401: a package's interface gives an importer the answers its source does.
+    var package_interface_check = target_new(.Action, "package-interface-check", "").output("out/package-interface-check/bundle/shapes.wi")
+    package_interface_check.action = run_package_interface_check_action
+    package_interface_check = package_interface_check.compiler(release_compiler_bin("with"))
+    package_interface_check = package_interface_check.input(release_compiler_bin("with"))
+    package_interface_check = package_interface_check.arg("compiler=" ++ release_compiler_bin("with"))
+    package_interface_check = package_interface_check.arg("dir=out/package-interface-check")
+    package_interface_check = package_interface_check.input("test/package_bundle")
+    package_interface_check = package_interface_check.input("build/compiler_bundle.w")
+    package_interface_check = package_interface_check.write_scope("out/package-interface-check")
+    package_interface_check = package_interface_check.write_scope("out/command/package-interface-check")
+    package_interface_check = package_interface_check.dep("build")
+    out = out.add_target(package_interface_check)
+
     var internals_tests = test_lane(.Test, "internals-tests", "test/internals/*.w")
     internals_tests = internals_tests.allow_parallel()
     internals_tests = internals_tests.arg("compiler=" ++ release_compiler_bin("with"))
@@ -5026,6 +5040,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // #2011: the async/cancel/defer corpus under `check --validate-all`.
     tests = tests.dep("validate-all-async")
     tests = tests.dep("internals-tests")
+    tests = tests.dep("package-interface-check")
     tests = tests.dep("internals-compiler-tests")
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")
