@@ -409,6 +409,9 @@ jobs:
 
   sdk-windows-aarch64:
     name: SDK windows-aarch64
+    # D225 (Eric, 2026-11-20): windows-aarch64 is not a supported platform
+    # until someone asks to use With there. The job is kept, disabled.
+    if: false
     # GitHub's ARM64 Windows runner (public preview / GA). If unavailable to
     # this repo the job stays queued rather than failing — the seed and nightly
     # jobs do not depend on it.
