@@ -328,8 +328,10 @@ impl Parser:
             return self.parse_body()
         if tp_count > 0:
             self.emit_error("interface declarations cannot be generic (D39: a bundle boundary is Level 0, abi_roadmap.md)")
-        if is_async != 0 or is_gen != 0 or is_comptime != 0:
-            self.emit_error("interface declarations cannot be async, gen, or comptime functions (D39)")
+        // A `comptime fn` with no body is one whose compile-time answer the
+        // compiler supplies; Sema refuses any other.
+        if is_async != 0 or is_gen != 0:
+            self.emit_error("interface declarations cannot be async or gen functions (D39)")
         if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_L_BRACE:
             self.emit_error("interface declarations carry no bodies (D39: a .wi holds signatures; the object holds the code)")
             return self.parse_body()

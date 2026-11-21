@@ -646,7 +646,11 @@ impl BundleEmitter:
             let text = self.source_slice(sema, node) ++ "\n"
             self.push_export(BX_FN, mod_path, full, text, "comptime\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n")
             return ""
-        if (flags / FnFlags.ASYNC) % 2 != 0 or (flags / FnFlags.GEN) % 2 != 0 or (flags / FnFlags.COMPTIME) % 2 != 0:
+        // A `comptime fn` whose compile-time answer the compiler supplies
+        // has no body an importer evaluates: its interface line states
+        // `comptime fn`, and the object holds what runs at run time.
+        let answered = (flags / FnFlags.COMPTIME) % 2 != 0 and sema.fn_comptime_answer_is_compilers(fn_sym)
+        if (flags / FnFlags.ASYNC) % 2 != 0 or (flags / FnFlags.GEN) % 2 != 0 or ((flags / FnFlags.COMPTIME) % 2 != 0 and not answered):
             self.refuse("is async, gen or comptime; a bundle boundary is Level 0 (abi_roadmap.md)")
             return ""
         // A variadic function crosses the boundary spelled as in source
@@ -902,7 +906,7 @@ impl BundleEmitter:
         let written_pins = bx_effect_pins_text(sema, node)
         let pins_text = if inferred_pins.len() == 0: written_pins else if written_pins.len() == 0: "@[effect(" ++ inferred_pins ++ ")]\n" else: written_pins.slice(0, written_pins.len() - 3) ++ ", " ++ inferred_pins ++ ")]\n"
         var head = cc_attr ++ pins_text ++ (if must_use: "@[must_use]\n" else: "")
-        head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ from_text ++ writes_text ++ "\n"
+        head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ (if answered: "comptime " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ from_text ++ writes_text ++ "\n"
         let vis = if is_pub: "pub" else: "priv"
         let unsafe_text = if is_unsafe: "1" else: "0"
         let must_use_text = if must_use: "must_use" else: "-"

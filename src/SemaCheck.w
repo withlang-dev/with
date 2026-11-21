@@ -3317,6 +3317,11 @@ impl Sema:
                     // effects come from the signature and there is no body.
                     if self.ast.fn_decl_body_is_interface(decl):
                         self.update_module_context(di)
+                        // A `comptime fn` crosses a bundle boundary with its
+                        // body, which the importer evaluates. One without a
+                        // body is one whose answer the compiler supplies.
+                        if (self.ast.get_data2(decl) / FnFlags.COMPTIME) % 2 == 1 and not self.fn_comptime_answer_is_compilers(fn_name):
+                            self.emit_error(f"interface declaration of comptime fn '{self.pool_resolve(fn_name)}' has no body to evaluate (D39)", decl)
                         self.apply_interface_declared_effects(decl, fn_name)
                         self.resolve_declared_global_writes(decl, true)
                         let interface_sig = self.get_sig(fn_name)
