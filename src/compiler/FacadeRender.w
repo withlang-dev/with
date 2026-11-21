@@ -1736,9 +1736,9 @@ pub const FACADE_DEP_INIT: i32 = -1
 // A resource may state several `init` clauses, each a constructor (Eric,
 // 2026-11-21). The first is FACADE_DEP_INIT; the k-th after it is -10 - k,
 // clear of every `from` index and of the "none yet" marker -2.
-pub fn facade_dep_init(k: isize) -> i32: if k == 0: FACADE_DEP_INIT else: -10 - (k as i32)
-pub fn facade_dep_is_init(owner: i32) -> bool: owner == FACADE_DEP_INIT or owner <= -11
-pub fn facade_dep_init_index(owner: i32) -> i32: if owner == FACADE_DEP_INIT: 0 else: -10 - owner
+fn facade_dep_init(k: isize) -> i32: if k == 0: FACADE_DEP_INIT else: -10 - (k as i32)
+fn facade_dep_is_init(owner: i32) -> bool: owner == FACADE_DEP_INIT or owner <= -11
+fn facade_dep_init_index(owner: i32) -> i32: if owner == FACADE_DEP_INIT: 0 else: -10 - owner
 
 // The success statuses an `init` clause is compared with: the ones it
 // states for itself (`init f(self), ok K`, the operands after the
