@@ -88,7 +88,7 @@ pub fn run_compiler_bundle_action(ctx: ActionCtx) -> i32:
         return cb_fail(ctx, "fingerprint of the compiler bundle's interface (" ++ wi_fp ++ ") differs from the source fingerprint (" ++ source_fp ++ "); diff " ++ fp_source ++ ".tsv against " ++ fp_wi ++ ".tsv")
     0
 
-// #3401 (docs/proposals/package-bundles.md): an importer reads a package's
+// #3401 (package-bundles.md): an importer reads a package's
 // interface, never its bodies, and the interface records what was inferred.
 // The fixture package test/package_bundle/lib leaves a return type, a
 // view's origins, a stored parameter and a callable's single invocation to
