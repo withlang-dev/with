@@ -3108,6 +3108,32 @@ impl Sema:
     // How a program reaches the operation a resource's contract names
     // `fn_sym` as, for the diagnostic of a call by its C name: "" when no
     // resource names it.
+    // D215 (§16.2b.11): a function that more than one resource names, and
+    // that has no one modeled meaning (a producer: nothing at the call says
+    // which resource; a destroyer with further arguments, until its shared
+    // form is rendered), has no meaning under its bare C name. The modeled
+    // spellings, joined; "" for any other function. A function whose
+    // resource parameter is `void *` keeps its raw meaning and is not one.
+    fn facade_shared_name_spellings(fn_sym: i32) -> str:
+        let cname = self.pool_resolve(fn_sym)
+        if fn_sym == 0 or self.facade_bridge_of.contains(cname): return ""
+        let sig = self.get_sig(fn_sym)
+        var spellings = ""
+        var count = 0
+        var ri: isize = -1
+        for r in self.facade_resources:
+            ri += 1
+            let rname = self.pool_resolve(r.name)
+            var spelling = ""
+            if r.producers.contains(fn_sym) or self.facade_same_fn(r.init, fn_sym): spelling = f"`{rname}.{self.facade_presented(ri, cname)}(…)`"
+            else if r.destroyers.contains(fn_sym): spelling = f"`value.{self.facade_presented(ri, cname)}(…)` on a `{rname}`"
+            else if self.facade_same_fn(r.drop, fn_sym): spelling = f"the end of a `{rname}`'s scope"
+            if spelling.len() == 0: continue
+            if sig >= 0 and self.sig_get_param_count(sig) > 0 and not (r.producers.contains(fn_sym) or self.facade_same_fn(r.init, fn_sym)) and self.facade_type_is_void_ptr(self.sig_param_type(sig, self.facade_destroyer_at.get(fn_sym).copied() ?? 0)): return ""
+            spellings = if count == 0: spelling else: spellings ++ ", or " ++ spelling
+            count += 1
+        if count < 2: "" else: spellings
+
     fn facade_described_op_note(fn_sym: i32) -> str:
         let cname = self.pool_resolve(fn_sym)
         var ri: isize = 0
