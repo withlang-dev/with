@@ -246,8 +246,17 @@ fn cli_help_topic(argc: i32) -> str:
 fn cli_is_implicit_run(argc: i32) -> bool:
     if argc < 2:
         return false
-    let arg = with_arg_at(1)
-    arg.ends_with(".w")
+    cli_names_a_file(with_arg_at(1))
+
+// A first argument that contains a dot or a slash is a file, whatever it is
+// called: no subcommand has either (`with hello.potato`, `with ./notes`). A
+// bare word with neither is a subcommand lookup. The extension governs what
+// the toolchain discovers, never what a user names.
+fn cli_names_a_file(arg: &str) -> bool:
+    if arg.len() == 0 or arg[0] == '-' or arg[0] == ':': return false
+    for i in 0..arg.len():
+        if arg[i] == '.' or arg[i] == '/' or arg[i] == '\\': return true
+    false
 
 fn cli_has_flag(argc: i32, flag: &str):
     // One-liners can begin with a flag before -e/-n/-p.
@@ -323,7 +332,7 @@ fn cli_default_opt_level(argc: i32) -> i32:
         let command = with_arg_at(1)
         if command == "build" or command == "run" or command == "test":
             return CLI_DEFAULT_BUILD_OPT_LEVEL
-        if command.ends_with(".w"):
+        if cli_names_a_file(command):
             return CLI_DEFAULT_BUILD_OPT_LEVEL
     CLI_DEFAULT_DEBUG_OPT_LEVEL
 
@@ -1427,6 +1436,10 @@ fn run_cli(full_argc: i32) -> i32:
         return run_fmt_command(argc)
     let command = cli_command(argc)
     with_eprint("error: unknown command '" ++ command ++ "'")
+    // A bare word is a subcommand lookup, never a file: a file named so
+    // would change meaning the day a subcommand took that name.
+    if with_fs_file_exists(command) != 0:
+        with_eprint("  = help: `" ++ command ++ "` is a file here; run it as `with ./" ++ command ++ "` or `with run " ++ command ++ "`")
     print_usage()
     1
 
@@ -4670,8 +4683,6 @@ fn synthesize_test_main_source(text: &str, test_names: &List[str]) -> str:
     out.to_str()
 
 fn discover_tests_for_target(target: &str) -> TestDiscovery:
-    if not target.ends_with(".w"):
-        return empty_test_discovery()
     let text = with_fs_read_file(target)
     if text.len() == 0:
         return empty_test_discovery()
@@ -4969,7 +4980,7 @@ fn test_append_extra_args(argv: &str, extra_args: &str) -> str:
 
 fn test_capture_dir(target: &str, suffix: &str) -> str:
     let base = build_graph_path_basename(target)
-    let stem = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
+    let stem = link_stage_source_stem(base)
     "out/test-native/" ++ stem ++ "." ++ suffix ++ "." ++ f"{with_getpid()}.{with_clock_nanos()}"
 
 fn run_test_compiler_command(target: &str, command_name: &str, directives: &TestDirectives) -> TestRunResult:
