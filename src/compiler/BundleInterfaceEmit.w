@@ -667,6 +667,7 @@ impl BundleEmitter:
         var receiver_row = "-"
         var params = ""
         var params_row = ""
+        var inferred_pins = ""
         var printed = 0
         let origin = sema.declared_view_origin(sig)
         // §21.1 rule 6 (#1903): a `from` clause states the origins, in place
@@ -688,7 +689,17 @@ impl BundleEmitter:
             // A declared `@[effect]` pin is the parameter's contract (D30
             // step 2): the interface prints it and the row carries it.
             let pinned = bx_effect_pin_bits_of(ast, node, name_sym)
-            let eff = if pinned >= 0: pinned else: sema.declared_param_effect(pi, ptid, receiver_mode, sema.is_copy_frozen(ptid))
+            let declared_eff = if pinned >= 0: pinned else: sema.declared_param_effect(pi, ptid, receiver_mode, sema.is_copy_frozen(ptid))
+            // #3401: a package's interface records what was inferred. A body
+            // that stores or returns its parameter gives it an effect the
+            // declaration does not state, and a caller reads it (§12.4: a
+            // closure holding a local by place may not reach such a callee);
+            // it is printed as the pin a person would write.
+            let escapes_unstated = self.tree and pinned < 0 and (declared_eff & EFF_ESCAPE_VALUE) == 0 and (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VALUE) != 0 and not ast.fn_decl_body_is_interface(node)
+            let eff = if escapes_unstated: declared_eff | EFF_ESCAPE_VALUE else: declared_eff
+            if escapes_unstated:
+                let names = sema_effect_bits_text(eff)
+                inferred_pins = inferred_pins ++ (if inferred_pins.len() > 0: ", " else: "") ++ pname ++ ": " ++ (if names.contains(","): "[" ++ names ++ "]" else: names)
             let vra = sema.sig_param_uses_value_ref_abi(sig, pi)
             if pname == "self":
                 if pi != 0 or fn_param_is_synth_receiver(pflags) == 0:
@@ -753,6 +764,12 @@ impl BundleEmitter:
         // A returned view of a global crosses the boundary only as a stated
         // origin: the interface carries no body-inferred fact (D39), and
         // elision names a parameter, never a global (§21.1 rule 6).
+        // #3401: a package's interface records what was inferred. A result
+        // whose origins are not the elided one, and no `from` clause, is
+        // printed with the origins its body gave it, as the clause a person
+        // would write.
+        var inferred_from = ""
+        var inferred_from_row = ""
         if not has_from and not ast.fn_decl_body_is_interface(node):
             let derived_globals = sema.sig_derived_global_origins(sig)
             if derived_globals.len() > 0:
@@ -770,27 +787,23 @@ impl BundleEmitter:
             // to the wrong argument.
             if origin != DECLARED_ORIGIN_AMBIGUOUS:
                 var clause = ""
+                var clause_row = ""
                 var stray = ""
                 for pi in 0..param_count:
                     if (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) == 0:
                         continue
                     let pname = with_str_clone_ref(sema.pool_resolve(ast.fn_param_name(param_start, pi)))
                     clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ pname
+                    clause_row = clause_row ++ "param:" ++ pname ++ ";"
                     if pi != origin and stray.len() == 0:
                         stray = pname
                 if stray.len() > 0 and self.tree:
-                    self.omitted.push(mod_path ++ "\t" ++ full ++ "\tundeclared-origin")
-                    self.push_export(BX_NOTE, mod_path, full, "// not exported (its returned view's origin is not the elided one): fn " ++ full ++ "\n", "")
-                    return ""
-                if stray.len() > 0:
+                    inferred_from = " " ++ clause
+                    inferred_from_row = clause_row
+                else if stray.len() > 0:
                     let elided = if origin >= 0: "`" ++ sema.pool_resolve(ast.fn_param_name(param_start, origin)) ++ "`" else: "none"
                     self.refuse("returns a view derived from `" ++ stray ++ "`, but with no `from` clause its origin at a bundle boundary is the §21.1 elision (" ++ elided ++ ": the receiver, else the single borrowed parameter); write `" ++ clause ++ "` after the return type")
                     return ""
-        // #3401: the interface records what was inferred. A returned view
-        // with more than one origin and no `from` clause is printed with
-        // the origins its body gave it, as the clause a person would write.
-        var inferred_from = ""
-        var inferred_from_row = ""
         if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from and self.tree:
             for pi in 0..param_count:
                 if (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) == 0: continue
@@ -835,7 +848,9 @@ impl BundleEmitter:
                 printed_name = full.slice(dot + 1, full.len())
         // The `writes` clause is the declaration's last clause (§21.1 rule 1).
         let writes_text = if written_clause.len() > 0: " " ++ written_clause else: ""
-        var head = cc_attr ++ bx_effect_pins_text(sema, node) ++ (if must_use: "@[must_use]\n" else: "")
+        let written_pins = bx_effect_pins_text(sema, node)
+        let pins_text = if inferred_pins.len() == 0: written_pins else if written_pins.len() == 0: "@[effect(" ++ inferred_pins ++ ")]\n" else: written_pins.slice(0, written_pins.len() - 3) ++ ", " ++ inferred_pins ++ ")]\n"
+        var head = cc_attr ++ pins_text ++ (if must_use: "@[must_use]\n" else: "")
         head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ from_text ++ writes_text ++ "\n"
         let vis = if is_pub: "pub" else: "priv"
         let unsafe_text = if is_unsafe: "1" else: "0"
