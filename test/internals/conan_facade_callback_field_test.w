@@ -33,7 +33,8 @@ fn draft(root: &str, facts: &str, extra_source: &str) -> str:
     (read_file(dep ++ "/contract.w") ?? "") ++ "\n====\n" ++ (read_file(dep ++ "/contract-report.txt") ?? "")
 
 fn main:
-    let role = "    field trace of handle is callback    // traced.h: the trace function is the program's, set with handle_set_trace\n"
+    let role_alone = "    field trace of handle is callback    // traced.h: the trace function is the program's, set with handle_set_trace\n"
+    let role = role_alone ++ "    fn handle_set_trace\n        callback param 1    // traced.h: called with the handle and a message\n        retains param 1 by param 0    // traced.c: stored in the handle\n        callback_thread registering    // traced.h: called from handle_run, on the caller's thread\n"
     let bare = draft("out/tmp/conan_facade_callback_field_test/bare", "", "")
     let stated = draft("out/tmp/conan_facade_callback_field_test/stated", role, "")
     // Without the role the handle is retained by a call nothing decides.
@@ -52,6 +53,19 @@ fn main:
         print(stated)
         print(filled)
         print(refusal)
+    // The drafter finds the setter from source: with the role stated and
+    // the setter not described, the role is refused naming it.
+    let before = conan_facts_contradicted().len()
+    let undescribed = draft("out/tmp/conan_facade_callback_field_test/undescribed", role_alone, "")
+    let setter_refusal = conan_facts_contradicted().slice(before, conan_facts_contradicted().len())
+    let setter_ok = not undescribed.contains("c contract traced:") and setter_refusal.contains("`handle_set_trace` stores into it and the facts describe it with no `callback param N`")
+    // Described, the setter is presented with the clauses the facts state.
+    let setter_presented = stated.contains("    fn handle_set_trace\n") and stated.contains("        callback param 1    // registry: ") and stated.contains("        retains param 1 by param 0    // registry: ") and stated.contains("        callback_thread registering    // registry: ")
+    if not (setter_ok and setter_presented):
+        print(stated)
+        print(setter_refusal)
+    assert(setter_ok)
+    assert(setter_presented)
     assert(bare_ok)
     assert(stated_ok)
     assert(filled_ok)

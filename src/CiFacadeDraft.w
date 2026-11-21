@@ -640,7 +640,7 @@ impl CiProject:
         for line in self.symbols[si].registry_more.split("\n"):
             if line.len() == 0: continue
             let kind = facts_kind(line)
-            let clause = if kind.starts_with("nullable:"): "nullable param " ++ kind.slice(9, kind.len()) else if kind.starts_with("text_param:"): "text param " ++ kind.slice(11, kind.len()) else: "text return, owned, freed by " ++ kind.slice(12, kind.len())
+            let clause = if kind.starts_with("nullable:"): "nullable param " ++ kind.slice(9, kind.len()) else if kind.starts_with("text_param:"): "text param " ++ kind.slice(11, kind.len()) else if kind.starts_with("callback:"): "callback param " ++ kind.slice(9, kind.len()) else if kind.starts_with("retains_by:"): "retains param " ++ kind.slice(11, kind.len()).replace(":", " by param ") else if kind.starts_with("callback_thread:"): "callback_thread " ++ kind.slice(16, kind.len()) else: "text return, owned, freed by " ++ kind.slice(12, kind.len())
             out = out ++ "        " ++ clause ++ "    // registry: " ++ facts_cite(line) ++ "\n"
         out
 
@@ -844,9 +844,15 @@ impl CiProject:
             pi += 1
         out
 
+    // D213: the registry's `callback param N` for parameter `pi` of `si`.
+    fn fd_registry_callback(si: i32, pi: i32) -> bool:
+        for line in self.symbols[si].registry_more.split("\n"):
+            if facts_kind(line) == f"callback:{pi}": return true
+        false
+
     fn fd_param_presentable(si: i32, pi: i32, modeled: &List[str]) -> bool:
         let p = with_str_clone_ref(self.symbols[si].param_ty[pi])
-        if self.fd_called_only_callback(si, pi): return true
+        if self.fd_called_only_callback(si, pi) or self.fd_registry_callback(si, pi): return true
         // D198: a record passed by value that holds a pointer is raw until
         // a contract models it. A clause on such a function is refused by
         // the compiler (raylib's DrawMeshInstanced: `Mesh` by value beside

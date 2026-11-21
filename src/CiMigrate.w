@@ -1840,9 +1840,16 @@ impl CiProject:
         self.symbols[symbol_id].ret_ty = ci_ir_owned_text(self.signature_type(with_cimport_fn_return_type_translated(session, decl_idx), with_cimport_fn_return_type_written(session, decl_idx)))
         self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
         // D198: with how the body uses each pointer parameter's record (`vw`/`vr`/`va`/`vx`).
-        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names) ++ ci_value_record_evidence(session, cursor, names))
         // D198: its writes of function-pointer fields and the records it lets escape.
-        self.fnptr_evidence = self.fnptr_evidence ++ ci_fnptr_field_evidence(session, cursor)
+        let field_evidence = ci_fnptr_field_evidence(session, cursor)
+        self.fnptr_evidence = self.fnptr_evidence ++ field_evidence
+        // D213: `fieldstore:<Record.field>` for each function-pointer field
+        // the body stores a value it was handed into: it is a setter of it.
+        var setter_evidence = ""
+        for line in field_evidence.split("\n"):
+            let f = line.split("\t")
+            if f.len() == 5 and f[0] == "fs" and f[3] == "value" and not setter_evidence.contains("fieldstore:" ++ f[1] ++ "." ++ f[2] ++ "\n"): setter_evidence = setter_evidence ++ "fieldstore:" ++ f[1] ++ "." ++ f[2] ++ "\n"
+        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names) ++ ci_value_record_evidence(session, cursor, names) ++ setter_evidence)
         // D159: what the body proves about the pointers it is handed.
         self.symbols[symbol_id].contract_evidence = ci_ir_owned_text(ci_body_contract_evidence(session, cursor, names))
         for pi in 0..count:
@@ -2158,6 +2165,17 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
             if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
             project.symbols[si].registry = registry.of(project.symbols[si].name)
             project.symbols[si].registry_more = registry.presentation(project.symbols[si].name)
+        // D213: the drafter finds a `callback` field's setters from source:
+        // each function that stores a value it was handed into the field.
+        // The facts describe each one with a callback clause, or the role
+        // is refused naming it.
+        for (field, role) in registry.field_roles:
+            if facts_kind(role) != "callback": continue
+            let dot = field.find(".")
+            for si in 0..project.symbols.len():
+                if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not project.symbols[si].own_evidence.contains("fieldstore:" ++ field ++ "\n"): continue
+                if not project.symbols[si].registry_more.contains("callback:"):
+                    return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered through a presented operation; DISAGREES: `" ++ project.symbols[si].name ++ "` stores into it and the facts describe it with no `callback param N`")
     project.resolve_ownership()
     Ok(project)
 

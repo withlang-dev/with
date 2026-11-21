@@ -63,7 +63,7 @@ type Facts {
 /// Whether `kind` is a presentation fact (a parameter's or a return's
 /// shape) rather than an ownership fact.
 fn facts_is_presentation(kind: &str) -> bool:
-    kind.starts_with("nullable:") or kind.starts_with("text_param:") or kind.starts_with("text_return:")
+    kind.starts_with("nullable:") or kind.starts_with("text_param:") or kind.starts_with("text_return:") or kind.starts_with("callback:") or kind.starts_with("retains_by:") or kind.starts_with("callback_thread:")
 
 impl Facts:
     /// The ownership fact for the C function `name` as `kind|record|cite`,
@@ -251,6 +251,18 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             let words = clause.replace(",", " ").fields()
             if words.len() != 6 or words[2] != "owned" or words[3] != "freed" or words[4] != "by": return Err(facts_error(path, line_no, "a text return is `text return, owned, freed by F`"))
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_return:" ++ words[5], record: "", cite: cite })
-        else: return Err(facts_error(path, line_no, "an item fact is `consumes param N`, `returns borrow R from param N`, `lend`, `nullable param N`, `text param N` or `text return, owned, freed by F`"))
+        else if clause.starts_with("callback param "):
+            // D213: a setter of a `callback` field is described here, since
+            // which thread runs the callback is a claim no proof reaches.
+            let n = clause.slice(15, clause.len()).trim()
+            if n.len() == 0 or not is_digit(n[0]) or n.contains(" "): return Err(facts_error(path, line_no, "`callback param N` takes a parameter index (a callback with a userdata parameter is paired in a contract, not here)"))
+            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback:" ++ n, record: "", cite: cite })
+        else if clause.starts_with("retains param ") and clause.contains(" by param "):
+            let words = clause.fields()
+            if words.len() != 6 or not is_digit(words[2][0]) or not is_digit(words[5][0]): return Err(facts_error(path, line_no, "`retains param N by param M` takes two parameter indexes"))
+            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "retains_by:" ++ words[2] ++ ":" ++ words[5], record: "", cite: cite })
+        else if clause == "callback_thread any" or clause == "callback_thread registering":
+            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback_thread:" ++ clause.slice(16, clause.len()), record: "", cite: cite })
+        else: return Err(facts_error(path, line_no, "an item fact is `consumes param N`, `returns borrow R from param N`, `lend`, `nullable param N`, `text param N`, `text return, owned, freed by F`, `callback param N`, `retains param N by param M` or `callback_thread any|registering`"))
     if facts.package.len() == 0: return Err(path ++ ": no `c facts NAME:` header")
     Ok(facts)
