@@ -1125,7 +1125,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: List.new(), out_params: List.new(), init: 0, inits: List.new(), init_ok: List.new(), preinit: 0, drop: 0, destroyers: List.new(), ok_consts: List.new(), ok_node: 0, borrows: List.new(), borrows_owner: List.new(), borrows_nodes: List.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: List.new(), out_params: List.new(), init: 0, inits: [], init_ok: [], preinit: 0, drop: 0, destroyers: List.new(), ok_consts: List.new(), ok_node: 0, borrows: List.new(), borrows_owner: List.new(), borrows_nodes: List.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, r, clause)
