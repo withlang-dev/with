@@ -324,7 +324,7 @@ impl Parser:
     mut fn parse_interface_body(tp_count: i32, is_async: i32, is_gen: i32, is_comptime: i32) -> NodeId:
         // #3401: a generic function travels as source: the importer
         // instantiates it, so its interface declaration keeps its body.
-        if tp_count > 0 and (self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_L_BRACE):
+        if (tp_count > 0 or (is_comptime != 0 and is_async == 0 and is_gen == 0)) and (self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_L_BRACE):
             return self.parse_body()
         if tp_count > 0:
             self.emit_error("interface declarations cannot be generic (D39: a bundle boundary is Level 0, abi_roadmap.md)")

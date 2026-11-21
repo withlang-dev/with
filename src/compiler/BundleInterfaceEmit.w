@@ -639,6 +639,13 @@ impl BundleEmitter:
         if full.contains("$ext$") or sema.method_decl_is_extension(node) != 0:
             self.refuse("is an extension method; extensions do not cross a bundle boundary")
             return ""
+        // #3401: a `comptime` function is evaluated by whoever calls it, so
+        // a package's interface carries it as the source wrote it, as it
+        // carries a generic function.
+        if self.tree and not in_impl and (flags / FnFlags.COMPTIME) % 2 != 0 and (flags / FnFlags.ASYNC) % 2 == 0 and (flags / FnFlags.GEN) % 2 == 0:
+            let text = self.source_slice(sema, node) ++ "\n"
+            self.push_export(BX_FN, mod_path, full, text, "comptime\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n")
+            return ""
         if (flags / FnFlags.ASYNC) % 2 != 0 or (flags / FnFlags.GEN) % 2 != 0 or (flags / FnFlags.COMPTIME) % 2 != 0:
             self.refuse("is async, gen or comptime; a bundle boundary is Level 0 (abi_roadmap.md)")
             return ""
