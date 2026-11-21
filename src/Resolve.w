@@ -3,6 +3,7 @@
 // This pass builds deterministic module/import/def/binding/use tables from AST.
 // It does not replace Sema yet; it provides a stable resolved artifact for Wave 4.
 
+use compiler.SourceExt
 use Ast
 use Lexer
 use Parser
@@ -1433,7 +1434,7 @@ fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
     var last_dot = -1
     for i in 0..dotted.len():
         if dotted[i] == '.': last_dot = i as i32
-    if last_dot <= 0 or resolved_path.len() == 0 or resolved_path.replace("\\", "/").ends_with(dotted.replace(".", "/") ++ ".w"):
+    if last_dot <= 0 or resolved_path.len() == 0 or source_ext_stem(resolved_path.replace("\\", "/")).ends_with(dotted.replace(".", "/")):
         return ""
     let last = dotted.slice(last_dot + 1, dotted.len())
     let path = resolved_path.replace("\\", "/")
