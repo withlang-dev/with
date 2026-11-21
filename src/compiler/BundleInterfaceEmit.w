@@ -786,17 +786,28 @@ impl BundleEmitter:
                     let elided = if origin >= 0: "`" ++ sema.pool_resolve(ast.fn_param_name(param_start, origin)) ++ "`" else: "none"
                     self.refuse("returns a view derived from `" ++ stray ++ "`, but with no `from` clause its origin at a bundle boundary is the §21.1 elision (" ++ elided ++ ": the receiver, else the single borrowed parameter); write `" ++ clause ++ "` after the return type")
                     return ""
+        // #3401: the interface records what was inferred. A returned view
+        // with more than one origin and no `from` clause is printed with
+        // the origins its body gave it, as the clause a person would write.
+        var inferred_from = ""
+        var inferred_from_row = ""
         if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from and self.tree:
+            for pi in 0..param_count:
+                if (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) == 0: continue
+                let pname = with_str_clone_ref(sema.pool_resolve(ast.fn_param_name(param_start, pi)))
+                inferred_from = inferred_from ++ (if inferred_from.len() == 0: " from " else: ", ") ++ pname
+                inferred_from_row = inferred_from_row ++ "param:" ++ pname ++ ";"
+        if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from and self.tree and inferred_from.len() == 0:
             // Left to the bundle: its callers are the bundle's own modules,
             // which read its body. An importer that names it is told so.
             self.omitted.push(mod_path ++ "\t" ++ full ++ "\tambiguous-origin")
             self.push_export(BX_NOTE, mod_path, full, "// not exported (its returned view names no one origin): fn " ++ full ++ "\n", "")
             return ""
-        if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from:
+        if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from and inferred_from.len() == 0:
             self.refuse("returns a reference with no unambiguous origin: name the origin in the source signature (D39 elision: receiver, else the single borrowed parameter), or write `from static` for a view of static data (§21.1 rule 6)")
             return ""
-        var from_text = ""
-        var from_row = ""
+        var from_text = inferred_from
+        var from_row = inferred_from_row
         if has_from:
             from_text = " " ++ self.written_from_clause(sema, node)
             for from_entrie in from_entries:
@@ -829,7 +840,7 @@ impl BundleEmitter:
         let vis = if is_pub: "pub" else: "priv"
         let unsafe_text = if is_unsafe: "1" else: "0"
         let must_use_text = if must_use: "must_use" else: "-"
-        let row = "fn\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ unsafe_text ++ "\t" ++ receiver_row ++ "\t" ++ must_use_text ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ (if has_from: "\torigin:from:" ++ from_row else: f"\torigin:{origin}") ++ "\tvis:" ++ vis ++ "\twrites:" ++ writes_row ++ "\n"
+        let row = "fn\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ unsafe_text ++ "\t" ++ receiver_row ++ "\t" ++ must_use_text ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ (if has_from or inferred_from.len() > 0: "\torigin:from:" ++ from_row else: f"\torigin:{origin}") ++ "\tvis:" ++ vis ++ "\twrites:" ++ writes_row ++ "\n"
         if in_impl:
             self.last_fn_row = row
         else:
