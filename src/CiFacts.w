@@ -187,6 +187,20 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
                 facts.value_fns.push(words[1].slice(0, words[1].len() - 1))
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
                 continue
+            // §31.8.1 (Eric, 2026-11-21, #3173 D): an in-place resource is
+            // stated as a contract states it: `init F(self)`, with its own
+            // success status when it has one (`init F(self), ok K`), and a
+            // resource-level `ok K` for the initializers that state none.
+            if in_value and words.len() >= 2 and words[0] == "init":
+                let named = if words[1].ends_with(","): words[1].slice(0, words[1].len() - 1) else: words[1]
+                if not named.ends_with("(self)") or named.len() <= 6: return Err(facts_error(path, line_no, "an in-place initializer is `init F(self)`, or `init F(self), ok K` with its own success status"))
+                if words.len() > 2 and (not words[1].ends_with(",") or words[2] != "ok" or words.len() < 4): return Err(facts_error(path, line_no, "after `init F(self),` state the initializer's own success status: `ok K`"))
+                facts.value_fns.push(named.slice(0, named.len() - 6))
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+                continue
+            if in_value and words.len() >= 2 and words[0] == "ok":
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+                continue
             if words.len() != 2 or not (words[0] == "from" or words[0] == "drop" or words[0] == "destroys"): return Err(facts_error(path, line_no, "a resource fact is `from F`, `drop F` or `destroys F`; a by-value producer may add `, nullable field F` or `, nonnull field F`"))
             if in_value:
                 facts.value_fns.push(words[1])
