@@ -1418,6 +1418,30 @@ impl CiProject:
         let inits = self.fd_inplace_candidates(record, true)
         if inits.len() != 1: "" else: inits[0].split(":")[2].to_owned()
 
+    // The records proven in-place resources, in the order the functions
+    // that take them are declared.
+    fn fd_inplace_records() -> List[str]:
+        let out = []
+        let seen = []
+        for si in 0..self.symbols.len():
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].header_declared == 0: continue
+            for ty in self.symbols[si].param_ty:
+                if not ty.starts_with("*mut "): continue
+                let record = ty.slice(5, ty.len())
+                if seen.contains(record) or not self.installed_pointer_records.contains(record): continue
+                seen.push(record.to_owned())
+                if self.fd_inplace_pair(record).len() == 4: out.push(record.to_owned())
+        out
+
+    // `init:<record>` or `end:<record>` when `si` is the proven init or
+    // end function of an in-place record; "" otherwise.
+    fn fd_inplace_role(si: i32, inplace: &List[str]) -> str:
+        for record in inplace:
+            let pair = self.fd_inplace_pair(record)
+            if pair.len() == 4 and pair[0] == si: return "init:" ++ record
+            if pair.len() == 4 and pair[2] == si: return "end:" ++ record
+        ""
+
     fn fd_representations() -> List[str]:
         let out: List[str] = []
         for si in 0..self.symbols.len():
@@ -1543,6 +1567,10 @@ impl CiProject:
                 if self.fd_presentable_producers_of(record, out).len() > 0 or self.fd_borrow_candidates_from(record, out).len() > 0:
                     out.push(record)
                     changed = true
+        // #3173: an in-place resource's record is modeled too: an operation
+        // that takes a pointer to it lends that resource.
+        for record in self.fd_inplace_records():
+            if not out.contains(record): out.push(record)
         out
 
     // #3123: every typedef of `void` is one representation to the checker
@@ -1572,7 +1600,17 @@ impl CiProject:
         if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
         if self.registry_threads.len() > 0: text = text ++ "    runs threads    // registry: " ++ self.registry_threads ++ "\n"
         self.draft_name = name
+        let inplace = self.fd_inplace_records()
         for record in modeled:
+            // #3173: the record itself, in storage With provides, between
+            // its proven init and end.
+            if inplace.contains(record):
+                let pair = self.fd_inplace_pair(record)
+                let field = self.fd_inplace_field(record)
+                self.presented.push(pair[0])
+                self.presented.push(pair[2])
+                text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps " ++ record ++ "\n        init " ++ self.symbols[pair[0]].name ++ "(self)    // proof: gives the record's " ++ field ++ " field a fresh allocation nothing else keeps\n        drop " ++ self.symbols[pair[2]].name ++ "    // proof: frees the " ++ field ++ " field " ++ self.symbols[pair[0]].name ++ " filled\n"
+                continue
             text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
             let producers = self.fd_presentable_producers_of(record, modeled)
             for si in producers:
@@ -1605,6 +1643,8 @@ impl CiProject:
         // and presents the operation on its resource.
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
+            // #3173: an in-place resource's init and end are its clauses.
+            if self.fd_inplace_role(si as i32, inplace).len() > 0: continue
             // D198: an operation the registry states on a by-value resource
             // is that resource's; its block is the registry's.
             if self.registry_value_fns.contains(self.symbols[si].name):
@@ -1661,6 +1701,7 @@ impl CiProject:
     // raw; a summary first.
     fn facade_report(name: &str) -> str:
         let modeled = self.fd_modeled_records()
+        let inplace = self.fd_inplace_records()
         var lines = ""
         var safe = 0
         var raw = 0
@@ -1676,10 +1717,15 @@ impl CiProject:
             let ret = fd_record_pointee(self.symbols[si].ret_ty)
             var verdict = ""
             let unpresentable = if self.symbols[si].owns_return != 0 and modeled.contains(ret): self.fd_unpresentable_param(si as i32, -1, modeled) else: -1
+            let inplace_role = self.fd_inplace_role(si as i32, inplace)
             if self.registry_value_fns.contains(self.symbols[si].name):
                 // The registry's by-value resource names this function: its
                 // stanza presents it, whatever the draft's own proof found.
                 verdict = "stated by the registry's resource"
+            else if inplace_role.starts_with("init:"):
+                verdict = "in-place initializer of " ++ fd_resource_name(inplace_role.slice(5, inplace_role.len())) ++ " (proof: gives the record's " ++ self.fd_inplace_field(inplace_role.slice(5, inplace_role.len())) ++ " field a fresh allocation nothing else keeps)"
+            else if inplace_role.starts_with("end:"):
+                verdict = "destroyer of the in-place " ++ fd_resource_name(inplace_role.slice(4, inplace_role.len())) ++ " (proof: frees the " ++ self.fd_inplace_field(inplace_role.slice(4, inplace_role.len())) ++ " field its initializer filled)"
             else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.fd_copy_source_param(si as i32) >= 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ f", but param {self.fd_copy_source_param(si as i32)} is another " ++ fd_resource_name(ret) ++ ": that the copy shares nothing with its source is not proven; a contract states 'independent' on the resource (§16.2b.6)"
             else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.symbols[si].variadic != 0:
