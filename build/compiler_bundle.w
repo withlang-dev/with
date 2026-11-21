@@ -154,6 +154,22 @@ pub fn run_package_interface_check_action(ctx: ActionCtx) -> i32:
         if not interface_right:
             wrong = wrong + 1
             eprint("package-interface-check: " ++ rel ++ " against the package's interface: expected " ++ (if wants_ok: "ok" else: "an error containing `" ++ fragment ++ "`") ++ "\n" ++ from_interface.stderr)
+    // The importer reads the interface, never the body: a function added to
+    // the package's source after its bundle was built is not there, for
+    // `check` and for `run` alike. (`run` once dropped `--link-bundle` and
+    // compiled the package from its source without a word.)
+    let late_source = fs.read_text(dir ++ "/lib/shapes.w") ++ "\npub fn added_after_the_bundle() -> i32: 9\n"
+    let late_program = dir ++ "/app/names_what_only_the_source_has.w"
+    if fs.write_text(dir ++ "/lib/shapes.w", late_source) != 0 or fs.write_text(late_program, "use shapes\nfn main: print(added_after_the_bundle())\n") != 0:
+        return cb_fail(ctx, "could not write the late-source probe under " ++ dir)
+    let late_check = cb_run(ctx, "late.check", &[cb_abs(root, compiler), "check", cb_abs(root, late_program), "--link-bundle", cb_abs(root, prefix)])
+    let late_run = cb_run(ctx, "late.run", &[cb_abs(root, compiler), "run", "--link-bundle", cb_abs(root, prefix), cb_abs(root, late_program)])
+    if late_check.rc == 0 or not late_check.stderr.contains("undefined variable"):
+        wrong = wrong + 1
+        eprint("package-interface-check: `check --link-bundle` saw a function that exists only in the package's source\n" ++ late_check.stderr)
+    if late_run.rc == 0 or not late_run.stderr.contains("undefined variable"):
+        wrong = wrong + 1
+        eprint("package-interface-check: `run --link-bundle` saw a function that exists only in the package's source\n" ++ late_run.stderr ++ late_run.stdout)
     if wrong > 0:
         return cb_fail(ctx, f"{wrong} outcome(s) differ from what the programs state")
     print(f"package-interface-check: {programs.len()} programs agree against source and interface")

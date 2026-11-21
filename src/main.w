@@ -4221,6 +4221,12 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
     comp.set_debug_info(debug_info)
     comp.set_release(cli_release_flag())
     comp.set_target_kind(cli_platform_target_kind)
+    // `with run --link-bundle <prefix> app.w` reads the bundle's interface
+    // and links its object, as `check` and `build` do. The option was
+    // dropped here and the program compiled from the package's source
+    // without a word. Only the driver's own arguments count: what follows
+    // the source is the program's.
+    comp.set_link_bundles(driver_link_bundle_args(cli_driver_argc(with_arg_count())))
     // The binary, its object and the object's nm report live in a directory
     // of this invocation's own (#1374). Named by the source alone
     // (out/<stem>, out/<stem>.o, out/<stem>.o.undef), two `with run`s of one
