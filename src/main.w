@@ -254,8 +254,8 @@ fn cli_is_implicit_run(argc: i32) -> bool:
 // the toolchain discovers, never what a user names.
 fn cli_names_a_file(arg: &str) -> bool:
     if arg.len() == 0 or arg[0] == '-' or arg[0] == ':': return false
-    for i in 0..arg.len():
-        if arg[i] == '.' or arg[i] == '/' or arg[i] == '\\': return true
+    for b in arg.bytes():
+        if b == '.' or b == '/' or b == '\\': return true
     false
 
 fn cli_has_flag(argc: i32, flag: &str):
