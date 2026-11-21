@@ -695,7 +695,9 @@ impl BundleEmitter:
             // declaration does not state, and a caller reads it (§12.4: a
             // closure holding a local by place may not reach such a callee);
             // it is printed as the pin a person would write.
-            let escapes_unstated = self.tree and pinned < 0 and (declared_eff & EFF_ESCAPE_VALUE) == 0 and (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VALUE) != 0 and not ast.fn_decl_body_is_interface(node)
+            // Only a callable parameter has a reader of it: a value handed
+            // over by value is the callee's whatever it does with it.
+            let escapes_unstated = self.tree and pinned < 0 and sema.get_type_kind(sema.resolve_alias(ptid)) == TypeKind.TY_FN and (declared_eff & EFF_ESCAPE_VALUE) == 0 and (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VALUE) != 0 and not ast.fn_decl_body_is_interface(node)
             let eff = if escapes_unstated: declared_eff | EFF_ESCAPE_VALUE else: declared_eff
             if escapes_unstated:
                 let names = sema_effect_bits_text(eff)

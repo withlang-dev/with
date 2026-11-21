@@ -31,3 +31,7 @@ pub fn keep(mut k: Keeper, f: fn() -> i32):
 pub fn run_now(f: fn() -> i32) -> i32: f()
 
 pub fn later(f: fn() -> i32) -> fn() -> i32: move () => f() + 1
+
+impl Keeper:
+    /// A method that returns a closure holding its callable parameter.
+    pub fn wrapped(f: fn() -> i32) -> fn() -> i32: move () => f() + 1
