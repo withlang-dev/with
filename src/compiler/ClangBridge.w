@@ -7,9 +7,25 @@
 use rt.rt_core
 use rt.platform
 use std.libc.strtod
-// `str` methods are declared in std.string (#3483); this unit is compiled
-// without the prelude, so it names the module.
-use std.string
+// This unit is compiled apart from the standard library, into an object
+// every stage links (clang_bridge.o), so it depends on the runtime alone.
+// `str` methods are declared in std.string (#3483): calling them from here
+// left the object with references to that module's functions, which the
+// Windows stage2 link does not define (#3511). The text operations it needs
+// are the runtime's, called directly.
+fn bridge_starts_with(s: &str, prefix: &str) -> bool: with_str_starts_with_ref(s, prefix) != 0
+fn bridge_ends_with(s: &str, suffix: &str) -> bool: with_str_ends_with_ref(s, suffix) != 0
+fn bridge_contains(s: &str, needle: &str) -> bool: with_str_contains_ref(s, needle) != 0
+fn bridge_replace(s: &str, from: &str, to: &str) -> str: with_str_replace_ref(s, from, to)
+fn bridge_byte_at(s: &str, index: i64) -> i32: with_str_byte_at_ref(s, index)
+fn bridge_slice(s: &str, start: i64, end: i64) -> str: with_str_slice_ref(s, start, end)
+// Where the piece of `s` that starts at `start` ends: at the next `sep`
+// byte, or at the end of the text. The pieces of a text are walked with
+// this, since a list of them is a library type.
+fn bridge_piece_end(s: &str, sep: i32, start: i64) -> i64:
+    var end = start
+    while end < s.len() and with_str_byte_at_ref(s, end) != sep: end += 1
+    end
 
 // ── libSystem extern fns ────────────────────────────────────────
 // mkstemp and realpath are the runtime's with_libc_* seams (one body per
@@ -999,7 +1015,11 @@ unsafe fn type_is_unaligned_qualified(ty: CXType) -> bool:
     let words = make_str(clang_getCString(spelling))
     clang_disposeString(spelling)
     var found = false
-    for word in words.split(" "):
+    var word_at: i64 = 0
+    while words.len() > 0 and word_at <= words.len():
+        let word_end = bridge_piece_end(words, 32, word_at)
+        let word = bridge_slice(words, word_at, word_end)
+        word_at = word_end + 1
         if word == "__unaligned":
             found = true
             break
@@ -1435,7 +1455,7 @@ unsafe fn cimport_linkage_is_c(s: *mut CImportSession, cursor: CXCursor):
         var language = ""
         for i in 0..count as i32:
             let token = clang_str_to_with(s, clang_getTokenSpelling((*s).tu, tokens[i]))
-            if token.starts_with("/*") or token.starts_with("//"): continue
+            if bridge_starts_with(token, "/*") or bridge_starts_with(token, "//"): continue
             if not seen_extern:
                 if token != "extern": break
                 seen_extern = true
@@ -2511,7 +2531,7 @@ unsafe fn cimport_record_parse_error(s: *mut CImportSession):
                 // per-run name (collect_inclusion skips it too): a c_import
                 // snippet's own error stays located by the snippet, as
                 // before. A migrated unit's `#line` names its real path.
-                if not at_file.starts_with("/tmp/with_cimport_") and not at_file.starts_with("/private/tmp/with_cimport_"):
+                if not bridge_starts_with(at_file, "/tmp/with_cimport_") and not bridge_starts_with(at_file, "/private/tmp/with_cimport_"):
                     text = at_file ++ f":{presumed_line}:{presumed_col}: " ++ text
             clang_disposeString(presumed_file)
             (*s).err_msg = cimport_path_to_cstr(text)
@@ -2690,7 +2710,7 @@ unsafe fn collect_inclusion(included_file: *mut u8, inclusion_stack: *mut u8, in
     if path.len() == 0:
         return
     // The synthetic main file is a throwaway temp; it is not a dependency.
-    if path.starts_with("/tmp/with_cimport_") or path.starts_with("/private/tmp/with_cimport_"):
+    if bridge_starts_with(path, "/tmp/with_cimport_") or bridge_starts_with(path, "/private/tmp/with_cimport_"):
         return
     g_bridge_inclusion_files = g_bridge_inclusion_files ++ path ++ "\n"
 
@@ -3036,7 +3056,7 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
                 else if text == ")":
                     depth = depth - 1
                     if depth > 1: out = out ++ text
-                    if depth == 0 and out.len() > 0 and not out.ends_with(";"): out = out ++ ";"
+                    if depth == 0 and out.len() > 0 and not bridge_ends_with(out, ";"): out = out ++ ";"
                 else if text == ",":
                     out = out ++ (if depth == 2: ";" else: ",")
                 else: out = out ++ text
@@ -3050,8 +3070,12 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
         // above read nothing.
         g_attr_children_out = ""
         clang_visitChildren(cursor, collect_attr_child as *const u8, s as *mut u8)
-        for entry in g_attr_children_out.split(";"):
-            if entry.len() > 0 and not (";" ++ out).contains(";" ++ entry ++ ";"): out = out ++ entry ++ ";"
+        var entry_at: i64 = 0
+        while g_attr_children_out.len() > 0 and entry_at <= g_attr_children_out.len():
+            let entry_end = bridge_piece_end(g_attr_children_out, 59, entry_at)
+            let entry = bridge_slice(g_attr_children_out, entry_at, entry_end)
+            entry_at = entry_end + 1
+            if entry.len() > 0 and not bridge_contains(";" ++ out, ";" ++ entry ++ ";"): out = out ++ entry ++ ";"
         g_attr_children_out = ""
         out
 
@@ -3664,24 +3688,25 @@ unsafe fn cimport_location_path_is_system(path: *const u8) -> bool:
     // require a path boundary so a neighboring project directory stays public.
     let resource_dir = get_clang_resource_dir()
     if resource_dir as i64 != 0:
-        let resource_root = make_str(resource_dir).replace("\\", "/")
-        let prefix = if resource_root.ends_with("/"): resource_root else: resource_root ++ "/"
-        if normalized.starts_with(prefix): return true
+        let resource_root = bridge_replace(make_str(resource_dir), "\\", "/")
+        let prefix = if bridge_ends_with(resource_root, "/"): resource_root else: resource_root ++ "/"
+        if bridge_starts_with(normalized, prefix): return true
     // The Windows C runtime this parse names as its sysroot (#1915): its
     // headers are the system's, wherever the SDK or the compiler's own
     // toolchain cache puts them.
     if g_cimport_sysroot_arg_buf[0] != 0:
-        let sysroot = make_str((&raw const g_cimport_sysroot_arg_buf as *const [1100]u8 as i64 + 10) as *const u8).replace("\\", "/")
-        let root_prefix = if sysroot.ends_with("/"): sysroot else: sysroot ++ "/"
-        if normalized.starts_with(root_prefix): return true
-    if normalized.starts_with("/usr/"): return true
-    if normalized.starts_with("/Library/"): return true
-    if normalized.starts_with("/Applications/Xcode"): return true
-    if normalized.contains("/usr/include/"): return true
-    if normalized.contains("/SDKs/"): return true
-    if normalized.contains("/clang/"): return true
-    if normalized.contains("/Windows Kits/"): return true
-    if normalized.contains("/VC/Tools/MSVC/"): return true
+        let sysroot_raw = make_str((&raw const g_cimport_sysroot_arg_buf as *const [1100]u8 as i64 + 10) as *const u8)
+        let sysroot = bridge_replace(sysroot_raw, "\\", "/")
+        let root_prefix = if bridge_ends_with(sysroot, "/"): sysroot else: sysroot ++ "/"
+        if bridge_starts_with(normalized, root_prefix): return true
+    if bridge_starts_with(normalized, "/usr/"): return true
+    if bridge_starts_with(normalized, "/Library/"): return true
+    if bridge_starts_with(normalized, "/Applications/Xcode"): return true
+    if bridge_contains(normalized, "/usr/include/"): return true
+    if bridge_contains(normalized, "/SDKs/"): return true
+    if bridge_contains(normalized, "/clang/"): return true
+    if bridge_contains(normalized, "/Windows Kits/"): return true
+    if bridge_contains(normalized, "/VC/Tools/MSVC/"): return true
     false
 
 // Declaration locations and macro cursors use one path classification.
@@ -3825,12 +3850,12 @@ fn macro_source_is_define_line(source: &str) -> bool:
     var i = 0
     while i < source.len() and (source[i] == 32 or source[i] == 9):
         i = i + 1
-    if i >= source.len() or source.byte_at(i as i64) != 35:
+    if i >= source.len() or bridge_byte_at(source, i as i64) != 35:
         return false
     i = i + 1
-    while i < source.len() and (source.byte_at(i as i64) == 32 or source.byte_at(i as i64) == 9):
+    while i < source.len() and (bridge_byte_at(source, i as i64) == 32 or bridge_byte_at(source, i as i64) == 9):
         i = i + 1
-    i + 6 <= source.len() and source.slice(i as i64, (i + 6) as i64) == "define"
+    i + 6 <= source.len() and bridge_slice(source, i as i64, (i + 6) as i64) == "define"
 
 unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, origin_flags: i32):
     if line_ptr as i64 == 0:
@@ -4025,7 +4050,7 @@ fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str,
             while pos < macro_names.len() and macro_names[pos] != 124:
                 pos = pos + 1
             if pos > start:
-                let name = macro_names.slice(start as i64, pos as i64)
+                let name = bridge_slice(macro_names, start as i64, pos as i64)
                 let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ ";\n"
                 let probe_ptr = *(&probe_line as *const *const u8)
                 rt_write(fd, probe_ptr, probe_line.len())
@@ -4051,8 +4076,8 @@ fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str,
             // but its recovery type is not evidence of a usable C expression.
             if clang_getCursorKind(cursor) == CXCursor_VarDecl and clang_isInvalidDeclaration(cursor) == 0:
                 let spelling = clang_str_to_with(s, clang_getCursorSpelling(cursor))
-                if spelling.len() > prefix.len() and spelling.slice(0, prefix.len()) == prefix:
-                    let macro_name = spelling.slice(prefix.len(), spelling.len())
+                if spelling.len() > prefix.len() and bridge_slice(spelling, 0, prefix.len()) == prefix:
+                    let macro_name = bridge_slice(spelling, prefix.len(), spelling.len())
                     let translated = translate_type_recursive(s, clang_getCursorType(cursor), 0, 0)
                     if translated as i64 != 0 and c_strncmp(translated as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) != 0:
                         let macro_ty = session_make_str(s, translated as *const u8)
@@ -4094,7 +4119,11 @@ fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx: boo
         let src_ptr = *(header_code as *const str as *const *const u8)
         rt_write(fd, src_ptr, header_code.len())
         rt_write(fd, "\n\0" as *const u8, 1)
-        for name in macro_names.split("|"):
+        var name_at: i64 = 0
+        while macro_names.len() > 0 and name_at <= macro_names.len():
+            let name_end = bridge_piece_end(macro_names, 124, name_at)
+            let name = bridge_slice(macro_names, name_at, name_end)
+            name_at = name_end + 1
             if name.len() == 0: continue
             let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ " = " ++ name ++ ";\n"
             let probe_ptr = *(&probe_line as *const *const u8)
