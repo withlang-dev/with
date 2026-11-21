@@ -168,9 +168,9 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         if cite.len() == 0: return Err(facts_error(path, line_no, "a fact needs its citation after `//`: the source line or document that proves it"))
         if cite.contains("|"): return Err(facts_error(path, line_no, "a citation cannot hold `|`"))
         if clause.starts_with("field "):
-            // `field F of R is allocator|reallocator|deallocator|context`
+            // `field F of R is allocator|reallocator|deallocator|context|callback`
             let words = clause.fields()
-            if words.len() != 6 or words[2] != "of" or words[4] != "is" or not (words[5] == "allocator" or words[5] == "reallocator" or words[5] == "deallocator" or words[5] == "context"): return Err(facts_error(path, line_no, "a field's role is `field F of R is allocator`, `reallocator`, `deallocator` or `context`"))
+            if words.len() != 6 or words[2] != "of" or words[4] != "is" or not (words[5] == "allocator" or words[5] == "reallocator" or words[5] == "deallocator" or words[5] == "context" or words[5] == "callback"): return Err(facts_error(path, line_no, "a field's role is `field F of R is allocator`, `reallocator`, `deallocator`, `context` or `callback`"))
             in_resource = false
             current_fn = ""
             facts.field_roles.push((words[3] ++ "." ++ words[1], words[5] ++ "|" ++ words[3] ++ "|" ++ cite))

@@ -2144,6 +2144,15 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
         for (field, role) in registry.field_roles:
             let dot = field.find(".")
             project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is " ++ facts_kind(role) ++ "    // registry: " ++ facts_cite(role) ++ "\n"
+            // D213 (§31.7): the package does not fill a `callback` field. A
+            // store of a named package function into it contradicts the
+            // role; a null store, a store of a caller's value and a
+            // whole-record copy do not.
+            if facts_kind(role) == "callback":
+                for line in project.fnptr_evidence.split("\n"):
+                    let f = line.split("\t")
+                    if f.len() == 5 and f[0] == "fw" and f[1] ++ "." ++ f[2] == field and f[3] != "?":
+                        return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered; DISAGREES: the package stores its own function `" ++ f[3] ++ "` into it (" ++ f[4] ++ ")")
             project.field_roles.insert(field, role)
         for si in 0..project.symbols.len():
             if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
@@ -2229,6 +2238,10 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     let project = match ci_facade_project(files, facade_name, gir_files, facts_path, true):
         Ok(p) => p
         Err(message) =>
+            // D213 (§31.7): a registry line the source contradicts is
+            // handed back, so the caller refuses the package as it does for
+            // a line a proof contradicts.
+            if message.starts_with("contradicted: "): return message
             if message.len() > 0: eprint("with get: facade of " ++ facade_name ++ ": " ++ message)
             return ""
     // A prototype in a header the package does not install cannot be

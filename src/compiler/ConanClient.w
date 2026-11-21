@@ -2137,6 +2137,9 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     migrate_parse_c_as_c_import()
     let summary = migrate_c_facade_for_package(corpus.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/contract.w", report_path)
     if summary.len() == 0: return
+    if summary.starts_with("contradicted: "):
+        g_conan_facts_contradicted = g_conan_facts_contradicted ++ "\n  " ++ name ++ ": " ++ summary.slice(14, summary.len())
+        return
     let q = "\x22"
     let pin = "{\n  " ++ q ++ "registry_commit" ++ q ++ ": " ++ q ++ conan_json_escape(registry.commit) ++ q ++ ",\n  " ++ q ++ "facts_sha256" ++ q ++ ": " ++ q ++ registry.sha256 ++ q ++ "\n}\n"
     let _pin = runtime_write_file(dep_dir ++ "/contract.json", pin)

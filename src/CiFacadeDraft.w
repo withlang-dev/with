@@ -190,6 +190,9 @@ impl CiProject:
                 if h.callee.starts_with("*"):
                     let field = h.callee.slice(1, h.callee.len())
                     if self.fd_field_closed(writers, field): continue
+                    // D213: a call through a `callback` field lends the
+                    // record to the program's code, which writes no field.
+                    if self.fd_field_role(h.callee) == "callback" and self.unread.len() == 0: continue
                     self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is passed to a call through the function pointer field " ++ field ++ ", which the proofs do not close (" ++ h.place ++ ")")
                 else:
                     if self.fd_reads_callee(h.callee): continue
@@ -263,7 +266,13 @@ impl CiProject:
         // D198: through a function-pointer field, the one function it is
         // proven to hold decides; an unproven field retains.
         if callee.starts_with("*"):
-            if self.fd_field_role(callee).len() > 0: return false
+            // D213: a `callback` field holds only what the program registered,
+            // and a call through it lends its arguments. That is checked
+            // against every unit, so one that could not be read leaves the
+            // field undecided.
+            let role = self.fd_field_role(callee)
+            if role == "callback" and self.unread.len() > 0: return true
+            if role.len() > 0: return false
             // D211: retained if any member of the set retains it.
             return self.fd_fnptr_proven_callee(callee).len() == 0 or self.fd_fnptr_retaining_member(callee, index).len() > 0
         if self.fd_is_free_call(callee) or self.fd_is_alloc_call(callee) or ci_own_is_libc_observer(callee): return false
