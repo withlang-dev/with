@@ -826,6 +826,13 @@ fn render_expr(pool: &AstPool, intern: &InternPool, node: NodeId, indent: i32) -
 
     if kind == NodeKind.NK_GROUPED:
         let inner = pool.get_data0(node)
+        // A binary expression prints its own parentheses, so a group
+        // around one adds a second pair each time rendered text is read
+        // back and rendered again (#3401: a generic function travels as
+        // rendered source, and its fingerprint must be stable).
+        let inner_kind = pool.kind(inner as NodeId)
+        if inner_kind == NodeKind.NK_BINARY or inner_kind == NodeKind.NK_MATCH_OP or inner_kind == NodeKind.NK_NEG_MATCH_OP or inner_kind == NodeKind.NK_GROUPED:
+            return prefix ++ render_expr(pool, intern, (inner) as NodeId, 0)
         return prefix ++ "(" ++ render_expr(pool, intern, (inner) as NodeId, 0) ++ ")"
 
     if kind == NodeKind.NK_MATCH:

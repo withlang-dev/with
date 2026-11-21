@@ -631,6 +631,14 @@ impl BundleEmitter:
             self.refuse("has no function metadata")
             return ""
         if ast.fn_meta_tp_count(meta) > 0 or sema.fn_node_is_generic_template(node, fn_sym):
+            // #3401: a generic function is the importer's to instantiate,
+            // so a package's interface carries its declaration as source.
+            // Its row is the text: any edit to it is an interface change.
+            if self.tree and not in_impl and ast.fn_meta_tp_count(meta) > 0:
+                let source = render_decl(sema.ast, sema.pool, node as NodeId, 0)
+                let text = if source.ends_with("\n"): source else: source ++ "\n"
+                self.push_export(BX_FN, mod_path, full, text, "generic\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n")
+                return ""
             self.omit_generic_fn(mod_path, full)
             return ""
         let cc_sym = ast.fn_meta_tp_start(meta)

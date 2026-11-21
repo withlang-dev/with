@@ -35,3 +35,15 @@ pub fn later(f: fn() -> i32) -> fn() -> i32: move () => f() + 1
 impl Keeper:
     /// A method that returns a closure holding its callable parameter.
     pub fn wrapped(f: fn() -> i32) -> fn() -> i32: move () => f() + 1
+
+/// A generic function is the importer's to instantiate: the interface
+/// carries it as source. Its body calls a private function of the package,
+/// which the bundle's object provides.
+pub fn widest[T](xs: &List[T], width: fn(&T) -> i32) -> i32:
+    var best = 0
+    for x in xs:
+        let w = clamp_width(width(x))
+        if w > best: best = w
+    best
+
+fn clamp_width(w: i32) -> i32: if w < 0: 0 else: w
