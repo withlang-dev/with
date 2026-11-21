@@ -5253,6 +5253,24 @@ impl Parser:
                     return 0
                 self.advance()
                 if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+            // `init f(self), ok K`: an initializer states its own success
+            // status on its own line, as `from f, nonnull` states a fact of
+            // one producer (Eric, 2026-11-21). The statuses follow the
+            // function in the clause's operands.
+            if word == "init" and self.peek() == TokenKind.TK_COMMA:
+                self.advance()
+                if not self.current_ident_is("ok"):
+                    self.emit_error("after 'init <fn>(self),' write the initializer's own success status: 'ok <CONST>' (§16.2b.4)")
+                    return 0
+                self.advance()
+                let first = self.parse_facade_status()
+                if first == 0: return 0
+                ops.push(first)
+                while self.peek() == TokenKind.TK_COMMA:
+                    self.advance()
+                    let more = self.parse_facade_status()
+                    if more == 0: return 0
+                    ops.push(more)
         else if word == "drop":
             kind = FACADE_CLAUSE_DROP
             let f = self.expect_ident()

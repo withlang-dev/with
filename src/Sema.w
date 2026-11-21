@@ -534,7 +534,9 @@ type FacadeResource {
     repr_tid: i32,
     producers: List[i32],  // one per `from` clause (fopen, fdopen, tmpfile → one FILE)
     out_params: List[i32], // parallel to producers; -1 for a direct return
-    init: i32,
+    init: i32,            // the first `init`, for what is true of the resource (it is in place)
+    inits: List[i32],     // every `init`, each a constructor
+    init_ok: List[i32],   // parallel: how many success statuses that `init` states for itself (`init f(self), ok K`)
     preinit: i32,
     drop: i32,
     destroyers: List[i32],

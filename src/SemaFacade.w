@@ -94,7 +94,7 @@ impl Sema:
             var token: isize = -1
             var ri: isize = 0
             for r in self.facade_resources:
-                if self.facade_same_fn(r.drop, csym) or r.producers.contains(csym) or self.facade_same_fn(r.init, csym) or r.destroyers.contains(csym): token = ri
+                if self.facade_same_fn(r.drop, csym) or r.producers.contains(csym) or self.facade_any_same_fn(r.inits, csym) or r.destroyers.contains(csym): token = ri
                 ri += 1
             let hosts = self.facade_method_host(csym)
             if token < 0 and hosts.len() == 1: token = hosts[0]
@@ -250,8 +250,8 @@ impl Sema:
                 return false
         if self.facade_resources[ri].ok_consts.len() > 0 and init_fn == 0 and not self.verify_facade_ok_producers(ri):
             return false
-        if init_fn != 0 and not self.verify_facade_init(ri):
-            return false
+        for k in 0..self.facade_resources[ri].inits.len():
+            if not self.verify_facade_init(ri, k): return false
         true
 
     // `ok CONST` interprets a producer's status (§16.2b.4): an out-parameter
@@ -285,7 +285,7 @@ impl Sema:
                     continue
                 for pi in 0..self.facade_resources[ri].producers.len():
                     if self.facade_resources[ri].out_params[pi] >= 0: readers.push(self.facade_resources[ri].producers[pi])
-                if self.facade_resources[ri].init != 0: readers.push(self.facade_resources[ri].init)
+                for each_init in self.facade_resources[ri].inits: readers.push(each_init)
             for ci in 0..self.foreign_contracts.len():
                 if self.foreign_contracts[ci].decl == di and self.foreign_contracts[ci].ok_const != 0: readers.push(self.foreign_contracts[ci].fn_sym)
             for reader in readers:
@@ -352,12 +352,14 @@ impl Sema:
     // and whether that error can hold a failed-state resource `Failed<R>` (an
     // out-parameter producer: failure may still produce, ruling §18).
     fn facade_projects_status(ri: isize) -> bool:
-        if self.facade_resources[ri].ok_consts.len() == 0:
+        // An initializer under `ok`, the resource's or its own, that
+        // returns a status.
+        for k in 0..self.facade_resources[ri].inits.len():
+            if self.facade_resources[ri].ok_consts.len() == 0 and self.facade_resources[ri].init_ok[k] == 0: continue
+            let isig = self.get_sig(self.facade_resources[ri].inits[k])
+            if isig >= 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) != TypeKind.TY_VOID: return true
+        if self.facade_resources[ri].ok_consts.len() == 0 or self.facade_resources[ri].inits.len() > 0:
             return false
-        let init_fn = self.facade_resources[ri].init
-        if init_fn != 0:
-            let isig = self.get_sig(init_fn)
-            return isig >= 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) != TypeKind.TY_VOID
         self.facade_has_failed_state(ri)
 
     // A dependent resource has no failed state to own: its error is
@@ -593,7 +595,7 @@ impl Sema:
         let sig = self.facade_constructor_sig(rname ++ "." ++ self.facade_presented(ri, pn))
         if sig >= 0:
             out.push(sig)
-        if owner == FACADE_DEP_INIT:
+        if facade_dep_is_init(owner):
             return out
         let host = self.facade_receiver_of(f)
         if host < 0:
@@ -626,11 +628,14 @@ impl Sema:
     // and `preinit` returns the storage it constructs (it stands where
     // `Representation.zeroed()` would). `ok` reads the init's status, so a
     // void init has none to read. Either call must be safe once covered.
-    mut fn verify_facade_init(ri: isize) -> bool:
+    mut fn verify_facade_init(ri: isize, k: isize) -> bool:
         let rname = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
-        let init_fn = self.facade_resources[ri].init
+        let init_fn = self.facade_resources[ri].inits[k]
         let iname = self.pool_resolve(init_fn)
+        // The statuses this initializer is compared with: its own
+        // (`init f(self), ok K`), else the resource's.
+        let states_ok = self.facade_resources[ri].init_ok[k] > 0 or self.facade_resources[ri].ok_consts.len() > 0
         let isig = self.get_sig(init_fn)
         if isig < 0:
             return false
@@ -638,11 +643,15 @@ impl Sema:
         if self.facade_same_type(self.sig_param_type(isig, 0), repr as i32):
             self.emit_error_with_help(f"resource '{rname}': 'init {iname}' takes the representation by value, so it would initialize a copy; an in-place initializer takes a pointer to the storage (§16.2b.4)", node, "name the initializer that takes a pointer to the record; a function that returns the record by value is 'from <fn>'")
             return false
-        if self.facade_resources[ri].ok_consts.len() > 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) == TypeKind.TY_VOID:
+        // A void initializer beside others that return a status takes no
+        // part in the resource's `ok`; one that states its own, or is the
+        // resource's only initializer, has nothing to compare.
+        let alone = self.facade_resources[ri].inits.len() == 1
+        if states_ok and (alone or self.facade_resources[ri].init_ok[k] > 0) and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) == TypeKind.TY_VOID:
             let cn = self.facade_ok_text(ri)
             self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' names a status but 'init {iname}' returns nothing to compare it with (§16.2b.4)", node, "delete 'ok'")
             return false
-        if self.facade_resources[ri].ok_consts.len() > 0 and self.get_type_kind(self.numeric_operand_type(self.sig_return_type(isig))) != TypeKind.TY_INT:
+        if states_ok and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) != TypeKind.TY_VOID and self.get_type_kind(self.numeric_operand_type(self.sig_return_type(isig))) != TypeKind.TY_INT:
             let cn = self.facade_ok_text(ri)
             let rt = self.type_name(self.sig_return_type(isig))
             self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' compares an integer status, but 'init {iname}' returns {rt} (§16.2b.4)", node, "delete 'ok': it compares the integer an initializer returns")
@@ -1116,7 +1125,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: List.new(), out_params: List.new(), init: 0, preinit: 0, drop: 0, destroyers: List.new(), ok_consts: List.new(), ok_node: 0, borrows: List.new(), borrows_owner: List.new(), borrows_nodes: List.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: List.new(), out_params: List.new(), init: 0, inits: List.new(), init_ok: List.new(), preinit: 0, drop: 0, destroyers: List.new(), ok_consts: List.new(), ok_node: 0, borrows: List.new(), borrows_owner: List.new(), borrows_nodes: List.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, r, clause)
@@ -1255,16 +1264,25 @@ impl Sema:
                 self.emit_error_with_help(f"resource '{rname}': '{fnm}' does not take the representation as its first parameter (§16.2b.13)", clause, f"an operation of '{rname}' takes what it wraps first; describe '{fnm}' with an fn item when the resource is a later parameter (no destroyer form exists for that: #3177)")
                 return r
             if kind == FACADE_CLAUSE_INIT:
-                // One in-place initializer is modeled. A second was taken
-                // and the first dropped: its constructor did not exist and
-                // nothing said so.
-                if r.init != 0 and r.init != f:
-                    let first = self.pool_resolve(r.init)
-                    let second = self.pool_resolve(f)
-                    self.emit_error_with_help(f"resource '{rname}' states two initializers, 'init {first}' and 'init {second}'; one in-place initializer is modeled (§16.2b.4)", clause, f"state '{second}' on a resource of its own, or leave it raw")
+                // Several initializers are several constructors of the one
+                // resource (Eric, 2026-11-21); the same function twice is
+                // one clause too many.
+                if r.inits.contains(f):
+                    let twice = self.pool_resolve(f)
+                    self.emit_error_with_help(f"resource '{rname}' states 'init {twice}' twice (§16.2b.4)", clause, f"delete one 'init {twice}(self)'")
                     return r
-                r.init = f
-                r.last_producer = FACADE_DEP_INIT
+                if r.init == 0: r.init = f
+                r.last_producer = facade_dep_init(r.inits.len() as i32)
+                r.inits.push(f)
+                // `init f(self), ok K`: its own success statuses, verified
+                // as the resource's are.
+                for k in 1..self.ast.get_data2(clause):
+                    let c = self.ast.get_extra(ops + k)
+                    if not self.facade_status_constant_ok(c):
+                        let cn = self.pool_resolve(c)
+                        self.emit_error_with_help(f"resource '{rname}': '{cn}' is not an imported compile-time constant (§16.2b.4, §16.2b.13)", clause, "after 'ok' write the status constant as the header names it: 'ok SQLITE_OK'")
+                        return r
+                r.init_ok.push(self.ast.get_data2(clause) - 1)
             else if kind == FACADE_CLAUSE_DROP: r.drop = f
             else: r.destroyers.push(f)
             return r
@@ -1297,7 +1315,7 @@ impl Sema:
             if r.last_producer == -2:
                 self.emit_error_with_help(f"resource '{rname}': 'borrows' names a parameter of the producer; state 'from <producer>' first, or 'init <fn>(self)' (§16.2b.6)", clause, "put the 'from <fn>' line (or 'init <fn>(self)') above 'borrows'")
                 return r
-            let producer = if r.last_producer == FACADE_DEP_INIT: r.init else: r.producers[r.last_producer]
+            let producer = if facade_dep_is_init(r.last_producer): r.inits[facade_dep_init_index(r.last_producer)] else: r.producers[r.last_producer]
             let sig = self.get_sig(producer)
             if sig < 0:
                 return r
@@ -1306,9 +1324,9 @@ impl Sema:
                 return r
             let shown = self.facade_param_display(producer, sig, pi)
             let pn = self.pool_resolve(producer)
-            let slot = if r.last_producer == FACADE_DEP_INIT: 0 else: r.out_params[r.last_producer]
+            let slot = if facade_dep_is_init(r.last_producer): 0 else: r.out_params[r.last_producer]
             if pi == slot:
-                let what = if r.last_producer == FACADE_DEP_INIT: "the storage 'init' initializes" else: "the out parameter the resource is produced through"
+                let what = if facade_dep_is_init(r.last_producer): "the storage 'init' initializes" else: "the out parameter the resource is produced through"
                 self.emit_error_with_help(f"resource '{rname}': 'borrows' names {shown} of '{pn}', {what}; 'borrows' names a parent resource the producer receives (§16.2b.6)", clause, "after 'borrows' name the producer's parameter that receives the parent resource: 'borrows param 0'")
                 return r
             // That the parameter receives a modeled resource is verified once
@@ -3092,6 +3110,11 @@ impl Sema:
                 return i as i32
         -1
 
+    fn facade_any_same_fn(list: &List[i32], b: i32) -> bool:
+        for a in list:
+            if self.facade_same_fn(a, b): return true
+        false
+
     fn facade_same_fn(a: i32, b: i32) -> bool:
         if a == 0 or b == 0:
             return false
@@ -3112,7 +3135,7 @@ impl Sema:
     fn facade_describes_fn(fn_sym: i32) -> bool:
         if self.facade_contract_for(fn_sym) >= 0: return true
         for r in self.facade_resources:
-            if r.init == fn_sym or r.preinit == fn_sym or r.drop == fn_sym or r.abandon == fn_sym or r.producers.contains(fn_sym) or r.destroyers.contains(fn_sym): return true
+            if r.inits.contains(fn_sym) or r.preinit == fn_sym or r.drop == fn_sym or r.abandon == fn_sym or r.producers.contains(fn_sym) or r.destroyers.contains(fn_sym): return true
         false
 
     // How a program reaches the operation a resource's contract names
@@ -3135,11 +3158,11 @@ impl Sema:
             ri += 1
             let rname = self.pool_resolve(r.name)
             var spelling = ""
-            if r.producers.contains(fn_sym) or self.facade_same_fn(r.init, fn_sym): spelling = f"`{rname}.{self.facade_presented(ri, cname)}(…)`"
+            if r.producers.contains(fn_sym) or self.facade_any_same_fn(r.inits, fn_sym): spelling = f"`{rname}.{self.facade_presented(ri, cname)}(…)`"
             else if r.destroyers.contains(fn_sym): spelling = f"`value.{self.facade_presented(ri, cname)}(…)` on a `{rname}`"
             else if self.facade_same_fn(r.drop, fn_sym): spelling = f"the end of a `{rname}`'s scope"
             if spelling.len() == 0: continue
-            if sig >= 0 and self.sig_get_param_count(sig) > 0 and not (r.producers.contains(fn_sym) or self.facade_same_fn(r.init, fn_sym)) and self.facade_type_is_void_ptr(self.sig_param_type(sig, self.facade_destroyer_at.get(fn_sym).copied() ?? 0)): return ""
+            if sig >= 0 and self.sig_get_param_count(sig) > 0 and not (r.producers.contains(fn_sym) or self.facade_any_same_fn(r.inits, fn_sym)) and self.facade_type_is_void_ptr(self.sig_param_type(sig, self.facade_destroyer_at.get(fn_sym).copied() ?? 0)): return ""
             spellings = if count == 0: spelling else: spellings ++ ", or " ++ spelling
             count += 1
         if count < 2: "" else: spellings
@@ -3149,7 +3172,7 @@ impl Sema:
         var ri: isize = 0
         for r in self.facade_resources:
             let rname = self.pool_resolve(r.name)
-            if r.producers.contains(fn_sym) or r.init == fn_sym:
+            if r.producers.contains(fn_sym) or r.inits.contains(fn_sym):
                 return f": `{cname}` is the producer of `{rname}`; write `{rname}.{self.facade_presented(ri, cname)}(…)`"
             if r.drop == fn_sym:
                 return f": `{cname}` is the drop of `{rname}`; it runs when the value's scope ends"
@@ -3463,14 +3486,14 @@ impl Sema:
     fn facade_fn_is_init(fn_sym: i32) -> bool:
         for ri in 0..self.facade_resources.len():
             let r = &self.facade_resources[ri]
-            if self.facade_same_fn(r.init, fn_sym) or self.facade_same_fn(r.preinit, fn_sym):
+            if self.facade_any_same_fn(r.inits, fn_sym) or self.facade_same_fn(r.preinit, fn_sym):
                 return true
         false
 
     fn facade_fn_is_resource_op(fn_sym: i32) -> bool:
         for ri in 0..self.facade_resources.len():
             let r = &self.facade_resources[ri]
-            if self.facade_same_fn(r.init, fn_sym) or self.facade_same_fn(r.preinit, fn_sym) or self.facade_same_fn(r.drop, fn_sym):
+            if self.facade_any_same_fn(r.inits, fn_sym) or self.facade_same_fn(r.preinit, fn_sym) or self.facade_same_fn(r.drop, fn_sym):
                 return true
             for k in 0..r.producers.len():
                 if self.facade_same_fn(r.producers[k], fn_sym): return true
@@ -3699,7 +3722,7 @@ impl Sema:
     fn facade_fn_is_destroyer_or_init(fn_sym: i32) -> bool:
         for ri in 0..self.facade_resources.len():
             let r = &self.facade_resources[ri]
-            if self.facade_same_fn(r.init, fn_sym) or self.facade_same_fn(r.preinit, fn_sym) or self.facade_same_fn(r.drop, fn_sym):
+            if self.facade_any_same_fn(r.inits, fn_sym) or self.facade_same_fn(r.preinit, fn_sym) or self.facade_same_fn(r.drop, fn_sym):
                 return true
             for k in 0..r.destroyers.len():
                 if self.facade_same_fn(r.destroyers[k], fn_sym): return true
@@ -3730,7 +3753,7 @@ impl Sema:
     fn facade_resource_produced_by(fn_sym: i32) -> str:
         if fn_sym == 0: return ""
         for r in self.facade_resources:
-            if r.producers.contains(fn_sym) or self.facade_same_fn(r.init, fn_sym): return self.pool_resolve(r.name)
+            if r.producers.contains(fn_sym) or self.facade_any_same_fn(r.inits, fn_sym): return self.pool_resolve(r.name)
         ""
 
     // The prefix of a rendered operation's name (`__with_facade_<name>`).
@@ -3795,7 +3818,7 @@ impl Sema:
         // parameters; an initializer takes only what the resource passes it.
         var is_init = false
         for r in self.facade_resources:
-            if r.init == fn_sym or r.preinit == fn_sym: is_init = true
+            if r.inits.contains(fn_sym) or r.preinit == fn_sym: is_init = true
         if has_fixed and is_init:
             self.emit_error_with_help(f"fn '{fname}': an initializer takes only what the resource passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node, f"delete 'param N fixed …' under 'fn {fname}'")
             return
@@ -3892,15 +3915,15 @@ impl Sema:
         let out: List[i32] = []
         for pi in 0..self.facade_resources[ri].producers.len():
             out.push(pi as i32)
-        if self.facade_resources[ri].init != 0:
-            out.push(FACADE_DEP_INIT)
+        for k in 0..self.facade_resources[ri].inits.len():
+            out.push(facade_dep_init(k as i32))
         out
 
-    fn facade_owner_fn(ri: isize, owner: i32) -> i32: if owner == FACADE_DEP_INIT: self.facade_resources[ri].init else: self.facade_resources[ri].producers[owner]
+    fn facade_owner_fn(ri: isize, owner: i32) -> i32: if facade_dep_is_init(owner): self.facade_resources[ri].inits[facade_dep_init_index(owner)] else: self.facade_resources[ri].producers[owner]
 
     // The parameter an owner never receives a parent through: the out slot,
     // or the storage `init` initializes.
-    fn facade_owner_skip(ri: isize, owner: i32) -> i32: if owner == FACADE_DEP_INIT: 0 else: self.facade_resources[ri].out_params[owner]
+    fn facade_owner_skip(ri: isize, owner: i32) -> i32: if facade_dep_is_init(owner): 0 else: self.facade_resources[ri].out_params[owner]
 
     // The parameters producer `owner`'s result depends on (spec §16.2b.6):
     // none under `independent`, the ones its `borrows` clauses name, and
@@ -4034,7 +4057,7 @@ impl Sema:
             // The receiver method on a parent (`db.prepare(sql)`) has the
             // same indices: its `self` is C's first parameter.
             var shift: i32 = 0
-            if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
+            if facade_dep_is_init(owner) and self.facade_resources[ri].preinit != 0:
                 shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
             let slot = self.facade_owner_skip(ri, owner)
             let sigs = self.facade_producer_sigs(ri, owner, f)
@@ -4043,7 +4066,7 @@ impl Sema:
                 for parent in parents:
                     let c_pi = parent
                     var pi = c_pi
-                    if owner == FACADE_DEP_INIT:
+                    if facade_dep_is_init(owner):
                         pi = shift + c_pi - 1
                     else if slot >= 0 and c_pi > slot:
                         pi = c_pi - 1
@@ -4743,7 +4766,7 @@ impl Sema:
             for pi in 0..self.facade_resources[ri].producers.len():
                 self.facade_domain_note_file(facade, self.facade_fn_file(self.facade_resources[ri].producers[pi]))
             let ops: List[i32] = []
-            ops.push(self.facade_resources[ri].init)
+            for each_init in self.facade_resources[ri].inits: ops.push(each_init)
             ops.push(self.facade_resources[ri].preinit)
             ops.push(self.facade_resources[ri].drop)
             for op in ops:
@@ -4775,10 +4798,10 @@ impl Sema:
                 let ci = self.facade_contract_for(f)
                 let domains = self.facade_domains_touched(self.facade_fn_file(f), ci, f)
                 var shift: i32 = 0
-                if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
+                if facade_dep_is_init(owner) and self.facade_resources[ri].preinit != 0:
                     shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
                 let slot = self.facade_owner_skip(ri, owner)
-                let raw_mask = self.facade_touch_params_mask(f, ci, (owner == FACADE_DEP_INIT) as i32)
+                let raw_mask = self.facade_touch_params_mask(f, ci, (facade_dep_is_init(owner)) as i32)
                 var mask: i32 = 0
                 // #1977: the C parameter each presented one came from — the
                 // projection below, kept so a presented bit names its source
@@ -4786,10 +4809,10 @@ impl Sema:
                 // parameter at the presented index.
                 let sources: List[i32] = []
                 for c_pi in 0..self.sig_get_param_count(self.get_sig(f)):
-                    if c_pi == slot or (owner == FACADE_DEP_INIT and c_pi == 0):
+                    if c_pi == slot or (facade_dep_is_init(owner) and c_pi == 0):
                         continue
                     var pi = c_pi
-                    if owner == FACADE_DEP_INIT:
+                    if facade_dep_is_init(owner):
                         pi = shift + c_pi - 1
                     else if slot >= 0 and c_pi > slot:
                         pi = c_pi - 1
@@ -5659,7 +5682,7 @@ impl Sema:
         for r in self.facade_resources:
             for p in r.producers: described.push((p, r.node))
             for d in r.destroyers: described.push((d, r.node))
-            described.push((r.init, r.node))
+            for each_init in r.inits: described.push((each_init, r.node))
             described.push((r.preinit, r.node))
             described.push((r.drop, r.node))
             described.push((r.abandon, r.node))
