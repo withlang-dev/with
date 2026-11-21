@@ -1453,6 +1453,8 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // §31.8.6: `drop g` where `g` is a function-pointer global, not a function.
     var drop_global: i32 = 0
     var init_fn: i32 = 0
+    let init_fns = []
+    let init_clauses = []
     var preinit_fn: i32 = 0
     // `ok C1, C2, …` (§16.2b.4): every listed status is success.
     let ok_syms: List[i32] = []
@@ -1469,7 +1471,12 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             producers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
             out_refs.push(pool.get_extra(ops + 1))
         else if kind == FACADE_CLAUSE_INIT:
-            init_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            // Several initializers are several constructors; `init_fn` is
+            // the first, for what is true of the resource (it is in place).
+            let found = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            if init_fn == 0: init_fn = found
+            init_fns.push(found)
+            init_clauses.push(clause)
         else if kind == FACADE_CLAUSE_PREINIT:
             preinit_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_OK:
@@ -1605,11 +1612,16 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
                 if facade_render_producer_message_call(pool, intern, ci, producers[pi]).len() == 0: with_message = false
                 if status_type.len() == 0:
                     status_type = ret.slice(4, ret.len())
-        if init_fn != 0:
-            let ret = facade_render_return(pool, intern, init_fn)
-            if ret.len() > 0:
-                status_type = ret.slice(4, ret.len())
-                with_message = false
+    // An initializer under `ok`, the resource's or its own, projects onto
+    // the same error type.
+    var status_k = -1
+    for status_init in init_fns:
+        status_k += 1
+        if status_init == 0 or (ok_syms.len() == 0 and pool.get_data2(init_clauses[status_k] as NodeId) < 2): continue
+        let ret = facade_render_return(pool, intern, status_init)
+        if ret.len() > 0:
+            status_type = ret.slice(4, ret.len())
+            with_message = false
     if not failed_state: with_message = false
     // The generated error never owns a dependent child (ruling §18: the
     // error "may" own the failure-state resource "where required" — an
@@ -1685,9 +1697,15 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
                 if field_mode == "nullable": out = out ++ produced ++ "    if " ++ repr ++ "." ++ field_path ++ " == null: None else: Some(" ++ value ++ ")\n"
                 else: out = out ++ produced ++ "    if " ++ repr ++ "." ++ field_path ++ " == null: panic(\"" ++ cname ++ ": the facade states 'nonnull field " ++ field_path ++ "', and C returned it NULL (§16.2b.4)\")\n    " ++ value ++ "\n"
         out = out ++ facade_render_receiver_method(pool, intern, ci, item, producer, -1, pname, result)
-    if init_fn != 0:
-        let iname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(init_fn as NodeId)))
-        let ctor = facade_render_init(pool, intern, name, repr_text, init_fn, iname, preinit_fn, ok_syms, pinned, facade_render_dep_values(pool, intern, deps, FACADE_DEP_INIT, init_fn) ++ keep_init, shared, shared_message)
+    var k = -1
+    for each_init in init_fns:
+        k += 1
+        if each_init == 0: continue
+        let iname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(each_init as NodeId)))
+        // The initializer's own `ok` when it states one; the resource's
+        // otherwise.
+        let init_oks = facade_render_init_oks(pool, init_clauses[k], ok_syms)
+        let ctor = facade_render_init(pool, intern, name, repr_text, each_init, iname, preinit_fn, init_oks, pinned, facade_render_dep_values(pool, intern, deps, facade_dep_init(k), each_init) ++ keep_init, shared, shared_message)
         if ctor.len() == 0:
             return ("", facade_render_no_error_use())
         out = out ++ ctor
@@ -1715,6 +1733,24 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
 // `from` is its index).
 pub const FACADE_DEP_INIT: i32 = -1
 
+// A resource may state several `init` clauses, each a constructor (Eric,
+// 2026-11-21). The first is FACADE_DEP_INIT; the k-th after it is -10 - k,
+// clear of every `from` index and of the "none yet" marker -2.
+fn facade_dep_init(k: isize) -> i32: if k == 0: FACADE_DEP_INIT else: -10 - (k as i32)
+fn facade_dep_is_init(owner: i32) -> bool: owner == FACADE_DEP_INIT or owner <= -11
+fn facade_dep_init_index(owner: i32) -> i32: if owner == FACADE_DEP_INIT: 0 else: -10 - owner
+
+// The success statuses an `init` clause is compared with: the ones it
+// states for itself (`init f(self), ok K`, the operands after the
+// function), else the resource's.
+fn facade_render_init_oks(pool: &AstPool, clause: i32, resource_oks: &List[i32]) -> List[i32]:
+    let out = []
+    let ops = pool.get_data1(clause as NodeId)
+    for k in 1..pool.get_data2(clause as NodeId): out.push(pool.get_extra(ops + k))
+    if out.len() == 0:
+        for status in resource_oks: out.push(status)
+    out
+
 // A resource's parents: one entry per (owner, parameter) the owner's result
 // depends on, with the resource item wrapping that parameter's
 // representation and the parent slot it fills; the slots are the view
@@ -1741,7 +1777,7 @@ fn facade_render_item_deps(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
     let borrow_owners: List[i32] = []
     var last_producer: i32 = -2
     var independent = false
-    var init_fn: i32 = 0
+    let inits = []
     var preinit_fn: i32 = 0
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -1757,11 +1793,11 @@ fn facade_render_item_deps(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
         else if kind == FACADE_CLAUSE_INDEPENDENT:
             independent = true
         else if kind == FACADE_CLAUSE_INIT:
-            init_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
-            last_producer = FACADE_DEP_INIT
+            last_producer = facade_dep_init(inits.len())
+            inits.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
         else if kind == FACADE_CLAUSE_PREINIT:
             preinit_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
-    facade_render_deps(pool, intern, producers, out_refs, init_fn, preinit_fn, borrow_refs, borrow_owners, independent)
+    facade_render_deps(pool, intern, producers, out_refs, inits, preinit_fn, borrow_refs, borrow_owners, independent)
 
 // D85 (§16.2b.6): the field of resource `item` that holds its parent named
 // `parent` — the one view a parent borrow is read from. "" unless exactly
@@ -1781,7 +1817,7 @@ fn facade_render_parent_field(pool: &AstPool, intern: &InternPool, ci: &List[i32
         return ""
     facade_render_slot_field(deps, found)
 
-fn facade_render_deps(pool: &AstPool, intern: &InternPool, producers: &List[i32], out_refs: &List[i32], init_fn: i32, preinit_fn: i32, borrow_refs: &List[i32], borrow_owners: &List[i32], independent: bool) -> FacadeDeps:
+fn facade_render_deps(pool: &AstPool, intern: &InternPool, producers: &List[i32], out_refs: &List[i32], inits: &List[i32], preinit_fn: i32, borrow_refs: &List[i32], borrow_owners: &List[i32], independent: bool) -> FacadeDeps:
     let deps = FacadeDeps { ok: true, owners: List.new(), params: List.new(), resources: List.new(), slots: List.new(), slot_res: List.new(), slot_optional: List.new() }
     // Every owner: each `from`, then the `init`.
     let owners: List[i32] = []
@@ -1795,9 +1831,12 @@ fn facade_render_deps(pool: &AstPool, intern: &InternPool, producers: &List[i32]
         decls.push(producers[pi])
         firsts.push(0)
         skips.push(if out_refs[pi] != 0: facade_render_param_ref(pool, intern, producers[pi], out_refs[pi]) else: -1)
-    if init_fn != 0:
-        owners.push(FACADE_DEP_INIT)
-        decls.push(init_fn)
+    var init_k = -1
+    for each_init in inits:
+        init_k += 1
+        if each_init == 0: continue
+        owners.push(facade_dep_init(init_k))
+        decls.push(each_init)
         firsts.push(1)
         skips.push(-1)
         // A resource the in-place resource depends on is received by its
