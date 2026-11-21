@@ -1147,7 +1147,9 @@ impl CiProject:
                 // D198 (§16.2b.5): where a record is complete and flat; a value record
                 // must be complete in a header the package installs.
                 if rname.len() > 0 and rloc.len() > 0 and ci_decl_is_complete_record(session, i, decl_kind, rcursor): self.complete_records.insert(ci_escape_reserved(rname), ci_migrate_location_file(rloc))
-                else if rname.len() > 0 and ci_decl_is_defined_record(session, i, decl_kind, rcursor): self.pointer_records.insert(ci_escape_reserved(rname), true)
+                else if rname.len() > 0 and ci_decl_is_defined_record(session, i, decl_kind, rcursor):
+                    self.pointer_records.insert(ci_escape_reserved(rname), true)
+                    if rloc.len() > 0: self.pointer_record_files.insert(ci_escape_reserved(rname), ci_migrate_location_file(rloc))
             if decl_kind == CK_VAR:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
@@ -2283,6 +2285,11 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         if not file_installed.contains(file): file_installed.insert(file.to_owned(), ci_facade_import_spelling(file, import_dirs).len() > 0)
         if file_installed.get(file).copied() ?? false: installed.push(record.to_owned())
     for record in installed: project.installed_records.insert(record, true)
+    let installed_pointer = []
+    for (record, file) in project.pointer_record_files:
+        if not file_installed.contains(file): file_installed.insert(file.to_owned(), ci_facade_import_spelling(file, import_dirs).len() > 0)
+        if file_installed.get(file).copied() ?? false: installed_pointer.push(record.to_owned())
+    for record in installed_pointer: project.installed_pointer_records.insert(record, true)
     let draft = project.facade_draft(facade_name)
     var spellings: List[str] = []
     for si in project.presented:

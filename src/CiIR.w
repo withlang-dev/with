@@ -1215,6 +1215,11 @@ type CiProject {
     // models the record (D198).
     pointer_records: HashMap[str, bool],
     installed_records: HashMap[str, bool],
+    // #3173: a record that holds a pointer, with the file that defines it,
+    // and those of them a header the package installs defines: an in-place
+    // resource wraps such a record by value, so the import must have it.
+    pointer_record_files: HashMap[str, str],
+    installed_pointer_records: HashMap[str, bool],
     identity_records: HashMap[str, bool],
     // D121 step 5: the symbols the last facade draft presented (every
     // producer, destroyer, borrow, lend and consumer it named), so the
@@ -1260,6 +1265,8 @@ fn CiProject.new -> CiProject:
         complete_records: HashMap.new(),
         pointer_records: HashMap.new(),
         installed_records: HashMap.new(),
+        pointer_record_files: HashMap.new(),
+        installed_pointer_records: HashMap.new(),
         identity_records: HashMap.new(),
         free_aliases: List.new(),
         presented: List.new(),

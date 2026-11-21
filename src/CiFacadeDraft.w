@@ -1326,6 +1326,98 @@ impl CiProject:
 
     // The pointer-to-record representations the corpus produces or
     // destroys, in first-seen order of the symbol table.
+    // #3173 (§16.2b.3, D198): an in-place resource is proposed only from a
+    // proof over the source, never from a name. The record is one the
+    // caller allocates: a header the package installs defines it, and no
+    // function produces or destroys a pointer to it. Its init function is
+    // handed the record and gives one of its fields a fresh allocation
+    // nothing else keeps; its end function hands that same field to a
+    // destroyer. Exactly one of each, over one field: two init functions
+    // or two end functions are two resources over one record
+    // (inflateInit/inflateEnd and deflateInit/deflateEnd over a z_stream),
+    // which a contract states.
+    //
+    // Whether local `local` of `si` is a fresh allocation whose only store
+    // is into field `field` of the record parameter `pi` names.
+    fn fd_local_fresh_for_field(si: i32, local: &str, pi: i32, field: &str) -> bool:
+        var stores = 0
+        var field_stores = 0
+        var fresh = false
+        for line in self.symbols[si].own_evidence.split("\n"):
+            let parts = line.split(":")
+            if parts.len() < 2 or parts[1] != local: continue
+            if parts[0] == "localstore": stores += 1
+            else if parts[0] == "localfield" and parts.len() == 4 and fd_i32(parts[2]) == pi and parts[3] == field: field_stores += 1
+            else if parts[0] == "localout" or parts[0] == "localaddr" or parts[0] == "localfield": return false
+            else if parts[0] == "localsink" and parts.len() == 4:
+                if self.fd_callee_retains(parts[2], fd_i32(parts[3])): return false
+            else if parts[0] == "localsrc" and parts.len() >= 3:
+                let src = line.slice(("localsrc:" ++ local ++ ":").len(), line.len())
+                if src == "null": continue
+                if not src.starts_with("call:") and not src.starts_with("indirect:"): return false
+                if self.fd_source_verdict(si, src, 1, -1) != "owned": return false
+                fresh = true
+        fresh and stores == field_stores and field_stores > 0
+
+    // The fields of the record parameter `pi` of `si` names that the body
+    // gives a fresh allocation (`want_init`), or hands to a destroyer.
+    fn fd_inplace_fields(si: i32, pi: i32, want_init: bool) -> List[str]:
+        let out = []
+        let head = if want_init: f"fieldset:{pi}:" else: f"fieldsink:{pi}:"
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if not line.starts_with(head): continue
+            let parts = line.slice(head.len(), line.len()).split(":")
+            if parts.len() < 2 or out.contains(parts[0]): continue
+            if not want_init:
+                if parts.len() == 3 and self.fd_callee_destroys(parts[1], fd_i32(parts[2])): out.push(parts[0].to_owned())
+                continue
+            // Every value the field is given here is NULL or the one fresh
+            // local; at least one is the local.
+            var fresh = false
+            var other = false
+            let field_head = head ++ parts[0] ++ ":"
+            for given in self.symbols[si].own_evidence.split("\n"):
+                if not given.starts_with(field_head): continue
+                let src = given.slice(field_head.len(), given.len())
+                if src == "null": continue
+                if src.starts_with("local:") and self.fd_local_fresh_for_field(si, src.slice(6, src.len()), pi, parts[0]): fresh = true
+                else: other = true
+            if fresh and not other: out.push(parts[0].to_owned())
+        out
+
+    // `si:pi:field` for every function that is an init (`want_init`) or an
+    // end of an in-place `record`.
+    fn fd_inplace_candidates(record: &str, want_init: bool) -> List[str]:
+        let out = []
+        for si in 0..self.symbols.len():
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.symbols[si].has_definition == 0 or self.symbols[si].variadic != 0 or self.symbols[si].unanalyzable != 0: continue
+            var pi = 0
+            for ty in self.symbols[si].param_ty:
+                if ty == "*mut " ++ record:
+                    for field in self.fd_inplace_fields(si as i32, pi, want_init): out.push(f"{si}:{pi}:" ++ field)
+                pi += 1
+        out
+
+    // The proven pair for `record` as `[init si, init pi, end si, end pi]`
+    // with the field in `fd_inplace_field`, or an empty list.
+    fn fd_inplace_pair(record: &str) -> List[i32]:
+        let none: List[i32] = []
+        if self.unread.len() > 0 or not self.installed_pointer_records.contains(record) or self.fd_representations().contains(record): return none
+        let inits = self.fd_inplace_candidates(record, true)
+        let ends = self.fd_inplace_candidates(record, false)
+        if inits.len() != 1 or ends.len() != 1: return none
+        let i = inits[0].split(":")
+        let e = ends[0].split(":")
+        // The init is handed the record first (`init f(self)`), the end
+        // takes it alone, and both name the one field.
+        if i[2] != e[2] or fd_i32(i[1]) != 0 or fd_i32(e[1]) != 0 or self.symbols[fd_i32(e[0])].param_ty.len() != 1: return none
+        [fd_i32(i[0]), fd_i32(i[1]), fd_i32(e[0]), fd_i32(e[1])]
+
+    // The field an in-place `record`'s proven pair shares.
+    fn fd_inplace_field(record: &str) -> str:
+        let inits = self.fd_inplace_candidates(record, true)
+        if inits.len() != 1: "" else: inits[0].split(":")[2].to_owned()
+
     fn fd_representations() -> List[str]:
         let out: List[str] = []
         for si in 0..self.symbols.len():

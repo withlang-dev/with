@@ -19265,6 +19265,9 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             // body's own frame is the call evidence's `frame:` record, not
             // a store. A local stored there stays the store it was.
             let recorded = ci_own_record_store(session, rhs, params, locals)
+            // #3173: `localfield:<local>:<i>:<field>` beside the store: the
+            // place is that field of the record parameter i names.
+            if set_field.len() > 0 and recorded.starts_with("localstore:"): out = out ++ "localfield:" ++ recorded.slice(11, recorded.len() - 1) ++ ":" ++ set_field ++ "\n"
             let store = if recorded.starts_with("paramstore:") and ci_place_in_frame_record(session, lhs, frame): "" else: recorded
             // #3175: where the parameter was stored, for the report: the
             // place as the source spells it and its location. The verdict
