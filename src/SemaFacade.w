@@ -1255,6 +1255,14 @@ impl Sema:
                 self.emit_error_with_help(f"resource '{rname}': '{fnm}' does not take the representation as its first parameter (§16.2b.13)", clause, f"an operation of '{rname}' takes what it wraps first; describe '{fnm}' with an fn item when the resource is a later parameter (no destroyer form exists for that: #3177)")
                 return r
             if kind == FACADE_CLAUSE_INIT:
+                // One in-place initializer is modeled. A second was taken
+                // and the first dropped: its constructor did not exist and
+                // nothing said so.
+                if r.init != 0 and r.init != f:
+                    let first = self.pool_resolve(r.init)
+                    let second = self.pool_resolve(f)
+                    self.emit_error_with_help(f"resource '{rname}' states two initializers, 'init {first}' and 'init {second}'; one in-place initializer is modeled (§16.2b.4)", clause, f"state '{second}' on a resource of its own, or leave it raw")
+                    return r
                 r.init = f
                 r.last_producer = FACADE_DEP_INIT
             else if kind == FACADE_CLAUSE_DROP: r.drop = f
