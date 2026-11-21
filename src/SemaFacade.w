@@ -250,7 +250,9 @@ impl Sema:
                 return false
         if self.facade_resources[ri].ok_consts.len() > 0 and init_fn == 0 and not self.verify_facade_ok_producers(ri):
             return false
-        for k in 0..self.facade_resources[ri].inits.len():
+        var k = -1
+        for _ in self.facade_resources[ri].inits:
+            k += 1
             if not self.verify_facade_init(ri, k): return false
         true
 
@@ -354,9 +356,11 @@ impl Sema:
     fn facade_projects_status(ri: isize) -> bool:
         // An initializer under `ok`, the resource's or its own, that
         // returns a status.
-        for k in 0..self.facade_resources[ri].inits.len():
+        var k = -1
+        for each_init in self.facade_resources[ri].inits:
+            k += 1
             if self.facade_resources[ri].ok_consts.len() == 0 and self.facade_resources[ri].init_ok[k] == 0: continue
-            let isig = self.get_sig(self.facade_resources[ri].inits[k])
+            let isig = self.get_sig(each_init)
             if isig >= 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) != TypeKind.TY_VOID: return true
         if self.facade_resources[ri].ok_consts.len() == 0 or self.facade_resources[ri].inits.len() > 0:
             return false
@@ -1272,7 +1276,7 @@ impl Sema:
                     self.emit_error_with_help(f"resource '{rname}' states 'init {twice}' twice (§16.2b.4)", clause, f"delete one 'init {twice}(self)'")
                     return r
                 if r.init == 0: r.init = f
-                r.last_producer = facade_dep_init(r.inits.len() as i32)
+                r.last_producer = facade_dep_init(r.inits.len())
                 r.inits.push(f)
                 // `init f(self), ok K`: its own success statuses, verified
                 // as the resource's are.
@@ -3915,8 +3919,10 @@ impl Sema:
         let out: List[i32] = []
         for pi in 0..self.facade_resources[ri].producers.len():
             out.push(pi as i32)
-        for k in 0..self.facade_resources[ri].inits.len():
-            out.push(facade_dep_init(k as i32))
+        var k = -1
+        for _ in self.facade_resources[ri].inits:
+            k += 1
+            out.push(facade_dep_init(k))
         out
 
     fn facade_owner_fn(ri: isize, owner: i32) -> i32: if facade_dep_is_init(owner): self.facade_resources[ri].inits[facade_dep_init_index(owner)] else: self.facade_resources[ri].producers[owner]
