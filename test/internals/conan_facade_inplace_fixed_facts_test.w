@@ -31,6 +31,9 @@ fn main:
     assert(set_env("WITH_REGISTRY", "file://" ++ current_dir() ++ "/" ++ registry) == 0)
     conan_write_facade("zs", "1.0", dep, src, build)
     let facade = read_file(dep ++ "/contract.w") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    // The report agrees with the contract: neither function is raw.
+    assert(report.contains("strm_init_: stated by the registry's resource") and report.contains("strm_end: stated by the registry's resource") and not report.contains(": raw: "))
     let ok = facade.contains("    resource Stream wraps strm\n        init strm_init_(self), ok ZS_OK    // registry: ") and facade.contains("    fn strm_init_\n        param version fixed ZS_VERSION    // registry: zs.h: the version the caller was compiled against\n        param size fixed sizeof(strm)    // registry: zs.h: the size of the caller's strm\n")
     if not ok:
         print(facade)

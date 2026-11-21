@@ -1583,7 +1583,11 @@ impl CiProject:
             let ret = fd_record_pointee(self.symbols[si].ret_ty)
             var verdict = ""
             let unpresentable = if self.symbols[si].owns_return != 0 and modeled.contains(ret): self.fd_unpresentable_param(si as i32, -1, modeled) else: -1
-            if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.fd_copy_source_param(si as i32) >= 0:
+            if self.registry_value_fns.contains(self.symbols[si].name):
+                // The registry's by-value resource names this function: its
+                // stanza presents it, whatever the draft's own proof found.
+                verdict = "stated by the registry's resource"
+            else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.fd_copy_source_param(si as i32) >= 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ f", but param {self.fd_copy_source_param(si as i32)} is another " ++ fd_resource_name(ret) ++ ": that the copy shares nothing with its source is not proven; a contract states 'independent' on the resource (§16.2b.6)"
             else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.symbols[si].variadic != 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ ", but variadic, which the facade does not describe"
