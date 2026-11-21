@@ -3268,6 +3268,13 @@ impl ComptimeEvaluator:
     // own slot and `rest` is a view of the tail, as `pop` keeps a prefix.
     mut fn eval_array_view_method_call(recv_value: &ComptimeValue, field: i32, arg_count: i32, node: i32) -> ComptimeControl:
         let method = self.pool.resolve(field)
+        // An array's length is its arena count, as a List's is: `[1, 2,
+        // 3].len()` in a `comptime` expression was refused as "not
+        // comptime-evaluable yet" while the same call on a List worked.
+        if arg_count == 0 and method == "len":
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_isize as i32), recv_value.extra_count as i64))
+        if arg_count == 0 and method == "is_empty":
+            return comptime_control_value(comptime_value_bool(recv_value.extra_count == 0))
         if arg_count != 0 or (method != "first" and method != "last" and method != "rest"):
             return self.fail(node, "method '" ++ method ++ "' is not comptime-evaluable yet")
         let count = recv_value.extra_count
