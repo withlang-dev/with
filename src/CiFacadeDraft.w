@@ -1389,12 +1389,14 @@ impl CiProject:
     // end of an in-place `record`.
     fn fd_inplace_candidates(record: &str, want_init: bool) -> List[str]:
         let out = []
-        for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.symbols[si].has_definition == 0 or self.symbols[si].variadic != 0 or self.symbols[si].unanalyzable != 0: continue
+        var si = -1
+        for symbol in self.symbols:
+            si += 1
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si) or symbol.header_declared == 0 or symbol.has_definition == 0 or symbol.variadic != 0 or symbol.unanalyzable != 0: continue
             var pi = 0
-            for ty in self.symbols[si].param_ty:
+            for ty in symbol.param_ty:
                 if ty == "*mut " ++ record:
-                    for field in self.fd_inplace_fields(si as i32, pi, want_init): out.push(f"{si}:{pi}:" ++ field)
+                    for field in self.fd_inplace_fields(si, pi, want_init): out.push(f"{si}:{pi}:" ++ field)
                 pi += 1
         out
 
@@ -1402,16 +1404,15 @@ impl CiProject:
     // proven over one field, as `[init si, init pi, end si, end pi]`; an
     // empty list otherwise.
     fn fd_inplace_functions(record: &str) -> List[i32]:
-        let none: List[i32] = []
-        if self.unread.len() > 0 or not self.installed_pointer_records.contains(record) or self.fd_representations().contains(record): return none
+        if self.unread.len() > 0 or not self.installed_pointer_records.contains(record) or self.fd_representations().contains(record): return []
         let inits = self.fd_inplace_candidates(record, true)
         let ends = self.fd_inplace_candidates(record, false)
-        if inits.len() != 1 or ends.len() != 1: return none
+        if inits.len() != 1 or ends.len() != 1: return []
         let i = inits[0].split(":")
         let e = ends[0].split(":")
         // The init is handed the record first (`init f(self)`), the end
         // takes it alone, and both name the one field.
-        if i[2] != e[2] or fd_i32(i[1]) != 0 or fd_i32(e[1]) != 0 or self.symbols[fd_i32(e[0])].param_ty.len() != 1: return none
+        if i[2] != e[2] or fd_i32(i[1]) != 0 or fd_i32(e[1]) != 0 or self.symbols[fd_i32(e[0])].param_ty.len() != 1: return []
         [fd_i32(i[0]), fd_i32(i[1]), fd_i32(e[0]), fd_i32(e[1])]
 
     // What the init function `si` returns once it has filled `field`:
@@ -1448,9 +1449,7 @@ impl CiProject:
         let pair = self.fd_inplace_functions(record)
         if pair.len() != 4: return pair
         let status = self.fd_inplace_status(pair[0], self.fd_inplace_field(record))
-        if status.len() == 0 or status.starts_with("literal:"):
-            let none: List[i32] = []
-            return none
+        if status.len() == 0 or status.starts_with("literal:"): return []
         pair
 
     // The field an in-place `record`'s proven pair shares.
@@ -1477,9 +1476,9 @@ impl CiProject:
     fn fd_inplace_records() -> List[str]:
         let out = []
         let seen = []
-        for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].header_declared == 0: continue
-            for ty in self.symbols[si].param_ty:
+        for symbol in self.symbols:
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.header_declared == 0: continue
+            for ty in symbol.param_ty:
                 if not ty.starts_with("*mut "): continue
                 let record = ty.slice(5, ty.len())
                 if seen.contains(record) or not self.installed_pointer_records.contains(record): continue

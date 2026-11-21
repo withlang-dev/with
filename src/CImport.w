@@ -19209,8 +19209,10 @@ fn ci_own_param_field(session: i64, expr: i32, params: &List[str]) -> str:
     let base = ci_own_peel(session, with_ci_child(session, e, 0))
     if with_ci_cursor_kind(session, base) != CXK_DECL_REF: return ""
     let spelled = with_ci_cursor_spelling(session, base)
-    for pi in 0..params.len():
-        if spelled == params[pi] or ci_escape_reserved(spelled) == params[pi]: return f"{pi}:" ++ with_ci_cursor_spelling(session, e)
+    var pi = 0
+    for param in params:
+        if spelled == param or ci_escape_reserved(spelled) == param: return f"{pi}:" ++ with_ci_cursor_spelling(session, e)
+        pi += 1
     ""
 
 fn ci_own_record_store(session: i64, value: i32, params: &List[str], locals: &List[str]) -> str:
