@@ -8482,7 +8482,9 @@ impl ComptimeEvaluator:
         if fn_node != 0 and (self.ast.get_data2(fn_node) / FnFlags.COMPTIME) % 2 == 0:
             let callee_package = self.sema.package_of(self.decl_path(fn_node))
             let caller_package = self.sema.package_of(self.current_source_path())
-            if callee_package != caller_package:
+            // The build and compiler APIs are the capability-bearing mode
+            // (§17.1b): the capability registry is where they are stated.
+            if callee_package != caller_package and not self.sema.fn_symbol_is_tool_comptime_allowed(fn_sym):
                 return self.fail(node, "cannot evaluate '" ++ fn_name ++ "' at compile time: it belongs to another package (" ++ callee_package ++ ") and is not declared `comptime fn`")
         // D91 (§17.1a): the target's OS and architecture are a declared
         // build input, readable by any compile-time code. Whether the
