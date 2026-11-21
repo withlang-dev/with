@@ -1219,6 +1219,9 @@ type CiProject {
     // and those of them a header the package installs defines: an in-place
     // resource wraps such a record by value, so the import must have it.
     pointer_record_files: HashMap[str, str],
+    // The field names of each, `,`-separated: an operation presented under
+    // a field's name is refused (§16.2b.3), so the draft leaves it raw.
+    pointer_record_fields: HashMap[str, str],
     installed_pointer_records: HashMap[str, bool],
     identity_records: HashMap[str, bool],
     // D121 step 5: the symbols the last facade draft presented (every
@@ -1266,6 +1269,7 @@ fn CiProject.new -> CiProject:
         pointer_records: HashMap.new(),
         installed_records: HashMap.new(),
         pointer_record_files: HashMap.new(),
+        pointer_record_fields: HashMap.new(),
         installed_pointer_records: HashMap.new(),
         identity_records: HashMap.new(),
         free_aliases: List.new(),

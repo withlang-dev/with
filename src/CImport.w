@@ -19603,7 +19603,61 @@ fn ci_value_record_walk(session: i64, cursor: i32, params: &List[str], mode: i32
 
 fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
     let locals = ci_own_collect_locals(session, cursor)
-    ci_own_walk(session, cursor, params, locals, ci_frame_records(session, cursor, params))
+    ci_own_walk(session, cursor, params, locals, ci_frame_records(session, cursor, params)) ++ ci_init_shape_evidence(session, cursor, params)
+
+// The integer a constant expression evaluates to, as text; "" when it is
+// not one.
+fn ci_const_int_text(session: i64, cursor: i32) -> str:
+    let c = ci_peel_transparent_and_cstyle(session, cursor)
+    if with_ci_eval_int_valid(session, c): ci_eval_int_text(session, c) else: ""
+
+// Whether every `return` under `cursor` returns an integer constant other
+// than `k`.
+fn ci_returns_only_other_constants(session: i64, cursor: i32, k: &str) -> bool:
+    let nc = with_ci_num_children(session, cursor)
+    if with_ci_cursor_kind(session, cursor) == CXK_RETURN_STMT:
+        if nc < 1: return false
+        let v = ci_const_int_text(session, with_ci_child(session, cursor, 0))
+        return v.len() > 0 and v != k
+    for i in 0..nc:
+        if not ci_returns_only_other_constants(session, with_ci_child(session, cursor, i), k): return false
+    true
+
+// #3173: `initshape:<i>:<field>:<K>:<name>`: the status an init function returns
+// once it has filled a field of the record parameter i names. The proof is
+// structural, so it is enumerable: the body has no `goto` and no label; its
+// last statement is `return K`, K an integer constant; the store into the
+// field is a statement of the body itself, not nested in a branch or a
+// loop; and every `return` written before that store returns an integer
+// constant other than K. So a call that returns K ran the store, and one
+// that did not run it returned something else.
+fn ci_init_shape_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+    let fn_children = with_ci_num_children(session, cursor)
+    if fn_children < 1: return ""
+    let body = with_ci_child(session, cursor, fn_children - 1)
+    let n = with_ci_num_children(session, body)
+    if with_ci_cursor_kind(session, body) != CXK_COMPOUND_STMT or n < 2: return ""
+    if ci_subtree_has_kind(session, body, CXK_GOTO_STMT) or ci_subtree_has_kind(session, body, CXK_LABEL_STMT): return ""
+    let last = with_ci_child(session, body, n - 1)
+    if with_ci_cursor_kind(session, last) != CXK_RETURN_STMT or with_ci_num_children(session, last) < 1: return ""
+    let k = ci_const_int_text(session, with_ci_child(session, last, 0))
+    if k.len() == 0: return ""
+    var out = ""
+    let seen = []
+    for t in 0..n - 1:
+        let stmt = ci_peel_transparent(session, with_ci_child(session, body, t))
+        if with_ci_cursor_kind(session, stmt) != CXK_BINARY_OP or with_ci_num_children(session, stmt) != 2 or with_ci_binary_op(session, stmt) != BO_ASSIGN: continue
+        let field = ci_own_param_field(session, with_ci_child(session, stmt, 0), params)
+        if field.len() == 0 or seen.contains(field) or ci_cursor_is_null_like(session, with_ci_child(session, stmt, 1)): continue
+        seen.push(field.to_owned())
+        var before_ok = true
+        for b in 0..t:
+            if not ci_returns_only_other_constants(session, with_ci_child(session, body, b), k): before_ok = false
+        // The constant as the source names it (`CODEC_OK`), which is what
+        // an `ok` clause states; empty for a literal.
+        let spelled = with_ci_cursor_source_text(session, with_ci_child(session, last, 0)).trim()
+        if before_ok: out = out ++ "initshape:" ++ field ++ ":" ++ k ++ ":" ++ (if ci_is_c_ident(spelled): spelled else: "") ++ "\n"
+    out
 
 // ── D159: contract evidence for a migrated function's own signature ──────
 //
