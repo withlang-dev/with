@@ -5283,6 +5283,10 @@ impl Parser:
             let f = self.expect_ident()
             if f == 0: return 0
             ops.push(f)
+            // `abandon f(param N)`: the resource is parameter N (§31).
+            let at = self.parse_facade_destroyer_position("abandon")
+            if at < 0: return 0
+            ops.push(at)
         else if word == "message":
             // `message <fn>` (ruling Amendment 3, §16.2b.4): the operation
             // that describes the resource's most recent failure. Sema

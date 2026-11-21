@@ -268,6 +268,15 @@ fn facade_render_hosted_fn_errors(pool: &AstPool, intern: &InternPool, ci: &List
     let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
     let repr = facade_render_unalias(pool, intern, repr_text)
     var out = facade_render_drop_helper(pool, intern, ci, resource)
+    // The abandonment path's helper, when `abandon f(param N)` or fixed
+    // parameters need one.
+    let cstart = pool.get_data1(resource as NodeId)
+    for k in 1..pool.get_data2(resource as NodeId) + 1:
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_ABANDON: continue
+        let abandon_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(pool.get_data1(clause as NodeId)))
+        if abandon_fn != 0 and (facade_render_destroyer_at(pool, intern, resource, abandon_fn) != 0 or facade_render_param_count(pool, abandon_fn) > 1):
+            out = out ++ facade_render_abandon_helper(pool, intern, resource, abandon_fn)
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for item in items:
         let li = facade_render_lend_item(pool, intern, ci, item)
@@ -1533,7 +1542,14 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
         // missed one is unsafe, so the rendering runs it on every drop;
         // MIR proves the pair state at every other callback-capable
         // operation (MirForeignPairs.w).
-        if abandon_fn != 0 and facade_render_param_count(pool, abandon_fn) == 1 and facade_render_repr_arg(pool, intern, abandon_fn, repr_text, "self.repr", pinned).len() > 0:
+        // `abandon f(param N)`, or one whose other parameters are fixed or
+        // discarded: the call is the helper's (facade_render_abandon_helper).
+        let abandon_at = if abandon_fn != 0: facade_render_destroyer_at(pool, intern, item, abandon_fn) else: 0
+        let abandon_placed = abandon_fn != 0 and (abandon_at != 0 or facade_render_param_count(pool, abandon_fn) > 1)
+        if abandon_placed and facade_render_abandon_helper(pool, intern, item, abandon_fn).len() > 0:
+            let abandon_call = "unsafe { " ++ facade_render_abandon_helper_name(name) ++ "(" ++ facade_render_repr_arg_at(pool, intern, abandon_fn, abandon_at, repr_text, "self.repr", pinned) ++ ") }"
+            out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live:\n            " ++ abandon_call ++ "\n            " ++ drop_call ++ "\n"
+        else if abandon_fn != 0 and facade_render_param_count(pool, abandon_fn) == 1 and facade_render_repr_arg(pool, intern, abandon_fn, repr_text, "self.repr", pinned).len() > 0:
             let abandon_call = facade_render_call(pool, intern, abandon_fn, facade_render_repr_arg(pool, intern, abandon_fn, repr_text, "self.repr", pinned))
             out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live:\n            " ++ abandon_call ++ "\n            " ++ drop_call ++ "\n"
         else:
@@ -2537,7 +2553,7 @@ fn facade_render_destroyer_at(pool: &AstPool, intern: &InternPool, resource: i32
     for k in 1..pool.get_data2(resource as NodeId) + 1:
         let clause = pool.get_extra(cstart + k)
         let kind = pool.get_data0(clause as NodeId)
-        if kind != FACADE_CLAUSE_DROP and kind != FACADE_CLAUSE_DESTROYS: continue
+        if kind != FACADE_CLAUSE_DROP and kind != FACADE_CLAUSE_DESTROYS and kind != FACADE_CLAUSE_ABANDON: continue
         let ops = pool.get_data1(clause as NodeId)
         if pool.get_data2(clause as NodeId) < 2 or pool.get_extra(ops + 1) == 0 or intern.resolve(pool.get_extra(ops)) != fname: continue
         let at = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
@@ -2558,6 +2574,19 @@ fn facade_render_drop_needs_helper(pool: &AstPool, intern: &InternPool, name: &s
     resource != 0 and drop_fn != 0 and (facade_render_destroyer_at(pool, intern, resource, drop_fn) != 0 or facade_render_param_count(pool, drop_fn) > 1)
 
 fn facade_render_drop_helper_name(name: &str) -> str: "__with_facade_drop_" ++ name
+
+fn facade_render_abandon_helper_name(name: &str) -> str: "__with_facade_abandon_" ++ name
+
+// `fn __with_facade_abandon_<R>(facade_repr: <the parameter's type>)`: the
+// call the abandonment path makes when `abandon f(param N)` passes the
+// resource at N and the contract fixes or discards every other parameter.
+// "" when the shape is one Sema names.
+fn facade_render_abandon_helper(pool: &AstPool, intern: &InternPool, resource: i32, abandon_fn: i32) -> str:
+    let name = intern.resolve(pool.get_data0(resource as NodeId))
+    let at = facade_render_destroyer_at(pool, intern, resource, abandon_fn)
+    let bridge = facade_render_bridge(pool, intern, abandon_fn, 0, at, "facade_repr")
+    if not bridge.ok or bridge.params.len() > 0: return ""
+    "unsafe fn " ++ facade_render_abandon_helper_name(name) ++ "(facade_repr: " ++ facade_render_param_type(pool, intern, abandon_fn, at) ++ "):\n" ++ facade_render_indent(bridge.prologue, "    ") ++ "    " ++ facade_render_call(pool, intern, abandon_fn, bridge.args) ++ "\n"
 
 // `fn __with_facade_drop_<R>(facade_repr: <the parameter's type>)`: the
 // call `Drop` makes when `drop f(param N)` passes the resource at N and the
