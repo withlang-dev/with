@@ -1743,7 +1743,7 @@ impl Codegen:
             self.module_runtime_init_types.push(init_ty)
 
     fn is_collection_runtime_intrinsic(intrinsic: MirIntrinsic) -> bool:
-        if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE or intrinsic == MirIntrinsic.MAP_MAKE_UNIQUE or intrinsic == MirIntrinsic.LIST_NEW or intrinsic == MirIntrinsic.LIST_WITH_CAPACITY or intrinsic == MirIntrinsic.LIST_PUSH or intrinsic == MirIntrinsic.LIST_GET or intrinsic == MirIntrinsic.LIST_LEN or intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.LIST_ULEN32 or intrinsic == MirIntrinsic.LIST_SET or intrinsic == MirIntrinsic.LIST_REMOVE or intrinsic == MirIntrinsic.LIST_CLEAR or intrinsic == MirIntrinsic.LIST_POP or intrinsic == MirIntrinsic.LIST_CONTAINS or intrinsic == MirIntrinsic.LIST_JOIN:
+        if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE or intrinsic == MirIntrinsic.MAP_MAKE_UNIQUE or intrinsic == MirIntrinsic.LIST_NEW or intrinsic == MirIntrinsic.LIST_WITH_CAPACITY or intrinsic == MirIntrinsic.LIST_PUSH or intrinsic == MirIntrinsic.LIST_GET or intrinsic == MirIntrinsic.LIST_LEN or intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.LIST_ULEN32 or intrinsic == MirIntrinsic.LIST_SET or intrinsic == MirIntrinsic.LIST_REMOVE or intrinsic == MirIntrinsic.LIST_CLEAR or intrinsic == MirIntrinsic.LIST_POP or intrinsic == MirIntrinsic.LIST_CONTAINS:
             return true
         if intrinsic == MirIntrinsic.MAP_CAPACITY or intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT or intrinsic == MirIntrinsic.MAP_TAKE_AT:
             return true

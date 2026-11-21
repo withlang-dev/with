@@ -38452,6 +38452,10 @@ impl Sema:
             self.emit_ambiguous_trait_method_error(mc_owner_sym_for_effect, field, node)
             return 0
         if mc_method_fn_for_resolution != 0: self.check_method_visible(mc_method_fn_for_resolution, node)
+        // `List.join` is declared for `List[str]` (#3483). A list of
+        // anything else gets the sentence that says what to do about it,
+        // before the general refusal.
+        if field == self.syms.join and self.list_join_refused_for_elements(obj_type as i32, node): return 0
         if mc_method_fn_for_resolution != 0 and not self.check_method_declared_for(mc_method_fn_for_resolution, obj_type as i32, field, node): return 0
         let arg_types: List[i32] = []
         // mut.md Rev 8 §15.8 — see check_call.
@@ -39278,15 +39282,6 @@ impl Sema:
                     let range_arg_ty = arg_types[0]
                     if range_arg_ty != 0 and self.get_type_kind(self.resolve_alias(range_arg_ty as TypeId)) != TypeKind.TY_RANGE:
                         self.emit_error("range() expects a range argument, `v.range(start..end)`, found " ++ self.type_name(range_arg_ty), self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.list and field == self.syms.join:
-                // List.join(sep: &str) concatenates str elements. Any other
-                // element was read as a str's {ptr, len} at run time: a
-                // List[i32] printed nothing or crashed in memcpy.
-                let join_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                if join_elem_ty != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(join_elem_ty as TypeId))) != TypeKind.TY_STR and self.type_has_unresolved_parts(join_elem_ty) == 0:
-                    self.emit_error(f"List.join joins str elements, and this List holds `{self.type_name(join_elem_ty)}`; turn each element into text first: `v.iter() |> map(f\"\{it\}\") |> collect[List]()`", node)
-                if arg_count >= 1:
-                    self.check_builtin_method_call_arg(mc_call_name, 0, self.ty_str_view as i32, arg_types[0], self.ast.get_extra(extra_start))
             else if type_name_sym == self.syms.list and field == self.syms.contains:
                 // D22: List.contains(value: &T) observes — arg[0] is &T; an
                 // owned argument auto-refs at the call site.
@@ -43789,6 +43784,16 @@ impl Sema:
     // body read the receiver at the wrong type: an integer as text, in safe
     // code. Returns whether the receiver is the instantiation the method
     // was declared for, reporting it when not.
+    // Whether `recv_ty` is a List whose elements are not text, reporting
+    // that `join` joins text and how to make each element text.
+    mut fn list_join_refused_for_elements(recv_ty: i32, node: i32) -> bool:
+        let recv = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(recv_ty as TypeId)) as TypeId)
+        if self.get_type_kind(recv) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(recv as i32) != self.syms.list: return false
+        let elem = self.get_generic_inst_arg(recv as i32, 0)
+        if elem == 0 or self.type_has_unresolved_parts(elem) != 0 or self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(elem as TypeId))) == TypeKind.TY_STR: return false
+        self.emit_error(f"List.join joins str elements, and this List holds `{self.type_name(elem)}`; turn each element into text first: `v.iter() |> map(f\"\{it\}\") |> collect[List]()`", node)
+        true
+
     mut fn check_method_declared_for(method_fn: i32, recv_ty: i32, method_sym: i32, node: i32) -> bool:
         let impl_node: i32 = self.method_impl_nodes.get(method_fn) ?? 0
         if impl_node == 0 or self.ast.find_impl_type_params(impl_node) >= 0 or self.impl_target_has_bare_type_params(impl_node): return true

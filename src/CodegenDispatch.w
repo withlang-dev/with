@@ -13092,23 +13092,6 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.LIST_CONTAINS:
             result = self.mir_emit_list_contains(body, args_id)
 
-        else if intrinsic == MirIntrinsic.LIST_JOIN:
-            let vj_recv = self.mir_intrinsic_recv_list_value(body, args_id)
-            let vj_sep = self.mir_intrinsic_arg(body, args_id, 1)
-            let vj_str_ty = self.str_llvm_type()
-            let vj_alloca = self.create_entry_alloca(wl_type_of(vj_recv))
-            wl_build_store(self.builder, vj_recv, vj_alloca)
-            // `with_vec_str_join(parts: *mut u8, sep: &str) -> str`: the
-            // separator is a `&str` view (#1810) and both it and the str
-            // result cross as the FnAbi descriptor says for this target.
-            let vj_params: List[i64] = []
-            vj_params.push(wl_ptr_type(self.context))
-            vj_params.push(vj_str_ty)
-            let vj_args: List[i64] = []
-            vj_args.push(vj_alloca)
-            vj_args.push(self.str_view_arg(vj_sep))
-            result = self.call_internal_runtime_fn("with_vec_str_join", vj_params, vj_args, 2, vj_str_ty)
-
         else:
             return false
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
