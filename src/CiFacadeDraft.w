@@ -1341,8 +1341,21 @@ impl CiProject:
     fn fd_producers_of(record: &str) -> List[i32]:
         let out: List[i32] = []
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and self.fd_subject(si as i32) and self.symbols[si].header_declared != 0 and self.symbols[si].owns_return != 0 and fd_record_pointee(self.symbols[si].ret_ty) == record: out.push(si as i32)
+            if self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and self.fd_subject(si as i32) and self.symbols[si].header_declared != 0 and self.symbols[si].owns_return != 0 and fd_record_pointee(self.symbols[si].ret_ty) == record and self.fd_copy_source_param(si as i32) < 0: out.push(si as i32)
         out
+
+    // The parameter through which a producer is handed another of the
+    // record it returns (a copy: `dup`), or -1. A fresh allocation is
+    // proven; that the copy shares nothing with its source is not, and a
+    // resource that depends on one of its own type is not modeled
+    // (§16.2b.6), so the draft leaves it raw for a contract to state
+    // `independent`.
+    fn fd_copy_source_param(si: i32) -> i32:
+        let record = fd_record_pointee(self.symbols[si].ret_ty)
+        if record.len() == 0: return -1
+        for pi in 0..self.symbols[si].param_ty.len():
+            if fd_record_pointee(self.symbols[si].param_ty[pi]) == record: return pi as i32
+        -1
 
     // The functions destroying a parameter of `record`; `unary` keeps those
     // whose only parameter it is.
@@ -1568,7 +1581,9 @@ impl CiProject:
             let ret = fd_record_pointee(self.symbols[si].ret_ty)
             var verdict = ""
             let unpresentable = if self.symbols[si].owns_return != 0 and modeled.contains(ret): self.fd_unpresentable_param(si as i32, -1, modeled) else: -1
-            if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.symbols[si].variadic != 0:
+            if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.fd_copy_source_param(si as i32) >= 0:
+                verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ f", but param {self.fd_copy_source_param(si as i32)} is another " ++ fd_resource_name(ret) ++ ": that the copy shares nothing with its source is not proven; a contract states 'independent' on the resource (§16.2b.6)"
+            else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.symbols[si].variadic != 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ ", but variadic, which the facade does not describe"
             else if unpresentable >= 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ f", but param {unpresentable} is " ++ self.symbols[si].param_ty[unpresentable] ++ ", which the facade does not describe"

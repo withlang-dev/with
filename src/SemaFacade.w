@@ -3975,6 +3975,13 @@ impl Sema:
                         names = names ++ (if k > 0: ", " else: "") ++ f"'{cn}'"
                     self.emit_error_with_help(f"resource '{rname}': producer '{pn}' receives {shown}, a representation several resources wrap ({names}); the constructor cannot tell which resource it borrows (§16.2b.3)", node, f"state which one under 'fn {pn}': 'of <Resource>' for that parameter")
                     return false
+                // A producer handed one of its own resource (a copy: `dup`)
+                // would make the resource depend on its own type, a layout
+                // the renderer has no struct for; the checker reported the
+                // two disagreeing as a compiler defect.
+                if recv[0] == ri and self.facade_resources[ri].independent == 0:
+                    self.emit_error_with_help(f"resource '{rname}': producer '{pn}' receives {shown}, another '{rname}'; a resource that depends on one of its own type is not modeled (§16.2b.6)", node, f"state 'independent' when what '{pn}' returns shares nothing with the one it is given; otherwise leave '{pn}' raw")
+                    return false
                 if not self.facade_received_presentable(recv[0], f, pi):
                     let why = self.facade_received_unpresentable_reason(recv[0], f, pi)
                     let cn = self.pool_resolve(self.facade_resources[recv[0]].name)
