@@ -721,7 +721,10 @@ impl BundleEmitter:
             let noalias = fn_param_is_noalias(pflags) != 0
             // §12.4 (D75): the bundle interface records `once` — a consumer
             // may pass a consuming closure only to such a parameter.
-            let once = fn_param_is_once(pflags)
+            // #3401: a package's interface records what was inferred: a
+            // callable parameter its body invokes at most once is printed
+            // `once`, as a person would declare it.
+            let once = fn_param_is_once(pflags) or (self.tree and not ast.fn_decl_body_is_interface(node) and sema.get_type_kind(sema.resolve_alias(ptid)) == TypeKind.TY_FN and sema.sig_param_invoke_many_at(sig, pi) == 0)
             // A tree bundle prints a default as the source wrote it.
             let default_text = if pdefault != 0: " = " ++ render_expr(sema.ast, sema.pool, pdefault as NodeId, 0) else: ""
             // A `mut` parameter (D172, §3.8a) is the caller's place: its
