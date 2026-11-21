@@ -1,11 +1,5 @@
 # std.math — Design Specification
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
-> removal of `&mut T` from safe With (specification §15.1). Its `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
-
 
 **The standard numerical computing library for With.**
 
@@ -642,21 +636,21 @@ use std.math.random
 type Rng = opaque
 
 fn rng(seed: u64) -> Rng
-fn rng_fork(r: &mut Rng) -> Rng
+fn rng_fork(mut r: Rng) -> Rng
 
 // Explicit RNG (reproducible):
-fn uniform(r: &mut Rng, shape: Shape, low: f64 = 0.0, high: f64 = 1.0,
+fn uniform(mut r: Rng, shape: Shape, low: f64 = 0.0, high: f64 = 1.0,
            dtype: DType = Float32) -> Array
-fn normal(r: &mut Rng, shape: Shape, mean: f64 = 0.0, std: f64 = 1.0,
+fn normal(mut r: Rng, shape: Shape, mean: f64 = 0.0, std: f64 = 1.0,
           dtype: DType = Float32) -> Array
-fn randint(r: &mut Rng, shape: Shape, low: i64, high: i64,
+fn randint(mut r: Rng, shape: Shape, low: i64, high: i64,
            dtype: DType = Int32) -> Array
-fn bernoulli(r: &mut Rng, shape: Shape, p: f64 = 0.5) -> Array
-fn exponential(r: &mut Rng, shape: Shape, rate: f64 = 1.0) -> Array
-fn poisson(r: &mut Rng, shape: Shape, lam: f64 = 1.0) -> Array
-fn permutation(r: &mut Rng, n: i32) -> Array
-fn shuffle(r: &mut Rng, a: &mut Array)
-fn choice(r: &mut Rng, a: &Array, n: i32, replace: bool = true) -> Array
+fn bernoulli(mut r: Rng, shape: Shape, p: f64 = 0.5) -> Array
+fn exponential(mut r: Rng, shape: Shape, rate: f64 = 1.0) -> Array
+fn poisson(mut r: Rng, shape: Shape, lam: f64 = 1.0) -> Array
+fn permutation(mut r: Rng, n: i32) -> Array
+fn shuffle(mut r: Rng, mut a: Array)
+fn choice(mut r: Rng, a: &Array, n: i32, replace: bool = true) -> Array
 
 // Convenience (thread-local default RNG):
 fn rand(shape: Shape, dtype: DType = Float32) -> Array

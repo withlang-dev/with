@@ -1,11 +1,5 @@
 ## Critical (Weld cannot function without these)
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
-> removal of `&mut T` from safe With (specification §15.1). Its `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
-
 *These form the core memory and data models. Cannot start Crux/Weld without these.*
 
 ### C1. `@[drop]` — Automatic resource cleanup (RAII)
@@ -24,7 +18,7 @@ type Tensor = {
 }
 
 impl Drop for Tensor:
-    fn drop(self: &mut Self):
+    move fn drop():
         if self.storage != null:
             storage_release(self.storage)
         if self.grad_meta != null:
@@ -32,7 +26,7 @@ impl Drop for Tensor:
 ```
 
 **Semantics:**
-- `Drop` is a built-in trait: `fn drop(self: &mut Self)`
+- `Drop` is a built-in trait: `move fn drop()`
 - Compiler inserts drop calls at scope exit on ALL paths: normal return, early return, `?` propagation, break, continue.
 - Drop order is reverse declaration order (LIFO).
 - A moved value is NOT dropped (new owner is responsible).
@@ -614,7 +608,7 @@ let d = a + b + c  // desugars to Add.add(&Add.add(&a, &b), &c)
 
 ### 5. Drop + defer
 ```with
-fn inference(ctx: &mut Context):
+fn inference(mut ctx: Context):
     no_grad(ctx)
     defer: restore_grad(ctx)
     let t = zeros(...)

@@ -1,10 +1,9 @@
 # The With Programming Language — Implementation Notes
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
+> **Historical notebook (D27, 2026-07-30):** this document predates the
 > removal of `&mut T` from safe With (specification §15.1). Its `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
+> signatures record the design as it was and are not respelled; the
+> specification is the authority.
 
 
 **Companion to:** Specification v7.2
