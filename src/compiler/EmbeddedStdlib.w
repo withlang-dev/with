@@ -22,6 +22,11 @@ fn embedded_std_display_path(rel_path: &str) -> str:
 fn embedded_std_resolve_path(rel_path: &str) -> str:
     if not embedded_std_is_module_rel(rel_path):
         return ""
+    // A module is found as `name.with`, and as `name.w` while the
+    // extension changes; `name.with` wins.
+    if rel_path.ends_with(".w"):
+        let found = embedded_std_resolve_path(rel_path ++ "ith")
+        if found.len() > 0: return found
     let display = embedded_std_display_path(rel_path)
     if bundle_interface_text(display).len() > 0:
         return display

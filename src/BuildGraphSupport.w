@@ -1,5 +1,6 @@
 // BuildGraphSupport -- path and argv helpers shared by build graph execution.
 
+use compiler.SourceExt
 use Resolve
 use BuildGraphModel
 use BuildGraphRuntime
@@ -409,7 +410,7 @@ fn collect_test_files(target_dir: &str) -> List[str]:
     let w_files: List[str] = []
     for all_file in all_files:
         let path = all_file
-        if path.ends_with(".w"):
+        if source_ext_is_source(path):
             w_files.push(with_str_clone_ref(path))
     build_graph_sorted_strings(w_files)
 

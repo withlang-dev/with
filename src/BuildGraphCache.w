@@ -1,5 +1,6 @@
 // BuildGraphCache -- build state tracking and incrementality.
 
+use compiler.SourceExt
 use BuildGraphModel
 use BuildGraphRuntime
 use BuildGraphSupport
@@ -344,7 +345,7 @@ fn build_cache_list_w_files(root: &str, dir: &str) -> List[str]:
     let w_files: List[str] = []
     for all_file in all_files:
         let path = all_file
-        if path.ends_with(".w"):
+        if source_ext_is_source(path):
             w_files.push(with_str_clone_ref(path))
     build_cache_sorted_strings(w_files)
 
@@ -638,7 +639,7 @@ fn build_cache_tree_fingerprint(root: &str, dir: &str, w_only: bool) -> str:
     var combined = ""
     for i in 0..files.len():
         let file = files[i]
-        if w_only and not file.ends_with(".w"): continue
+        if w_only and not source_ext_is_source(file): continue
         combined = combined ++ build_cache_project_relative(root, file) ++ ":" ++ build_cache_fingerprint_file(file) ++ "\n"
     let fp = build_cache_sha256_text(combined)
     build_cache_tree_fp_memo.insert(memo_key, with_str_clone_ref(fp))

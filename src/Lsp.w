@@ -3,6 +3,7 @@
 // Speaks JSON-RPC 2.0 over stdio using Content-Length framing.
 // Reuses the compiler frontend for diagnostics.
 
+use compiler.SourceExt
 use Ast
 use Lexer
 use Token
@@ -1445,9 +1446,10 @@ fn lsp_list_embedded_modules(prefix: &str) -> List[str]:
         let ch = if at_end: 10 else: listing[i]
         if ch == 10:
             let entry = listing.slice(start as i64, i as i64)
-            if entry.starts_with(prefix) and entry.ends_with(".w"):
-                // Extract module name: strip prefix and .w
-                let name = entry.slice(prefix.len(), entry.len() - 2)
+            if entry.starts_with(prefix) and source_ext_is_source(entry):
+                // The module's name: the entry without the prefix and the
+                // source extension.
+                let name = entry.slice(prefix.len(), entry.len() - source_ext_len(entry))
                 // Skip subdir modules (contain /) for top-level completion
                 if lsp_find_substr(name, "/") < 0:
                     result.push(name)

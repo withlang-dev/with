@@ -83,6 +83,11 @@ fn embedded_rt_unit_files() -> List[str]:
 fn embedded_rt_resolve_path(rel_path: &str) -> str:
     if not embedded_rt_is_module_rel(rel_path):
         return ""
+    // A module is found as `name.with`, and as `name.w` while the
+    // extension changes; `name.with` wins.
+    if rel_path.ends_with(".w"):
+        let found = embedded_rt_resolve_path(rel_path ++ "ith")
+        if found.len() > 0: return found
     let real = embedded_rt_real_path(rel_path)
     if real.len() == 0:
         return ""
