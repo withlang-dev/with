@@ -1441,6 +1441,23 @@ impl CiProject:
         if status.starts_with("literal:"): return proven ++ ", and it returns " ++ status.slice(8, status.len()) ++ " on success, but 'ok' names a constant and the header gives that value no name"
         ""
 
+    // What the proofs found of an in-place resource in `si` when no pair
+    // was drafted: it fills or frees a field of a caller-allocated record,
+    // and how many functions do each. "" when it does neither.
+    fn fd_inplace_partial(si: i32) -> str:
+        if self.symbols[si].header_declared == 0 or self.symbols[si].has_definition == 0: return ""
+        var pi = 0
+        for ty in self.symbols[si].param_ty:
+            if ty.starts_with("*mut ") and self.installed_pointer_records.contains(ty.slice(5, ty.len())):
+                let record = ty.slice(5, ty.len())
+                let filled = self.fd_inplace_fields(si, pi, true)
+                let freed = self.fd_inplace_fields(si, pi, false)
+                if (filled.len() > 0 or freed.len() > 0) and self.fd_inplace_functions(record).len() != 4:
+                    let what = if filled.len() > 0: "gives the " ++ filled[0] ++ " field of " ++ record ++ " a fresh allocation" else: "frees the " ++ freed[0] ++ " field of " ++ record
+                    return what ++ f"; {self.fd_inplace_candidates(record, true).len()} function(s) fill a field of {record} and {self.fd_inplace_candidates(record, false).len()} free one, so no one init and end pair is proven: a contract states each pair as a resource"
+            pi += 1
+        ""
+
     // The proven pair for `record`, or an empty list. A status-returning
     // init is one only with its success status proven and named: without
     // `ok` the resource would be live after a failed init, and its end
@@ -1852,7 +1869,9 @@ impl CiProject:
             let attrs = self.symbols[si].attrs
             if attrs.len() > 0: verdict = verdict ++ " [attributes: " ++ attrs.replace(";", " ").trim() ++ "]"
             verdict = verdict ++ self.fd_gir_summary(si as i32) ++ self.fd_registry_summary(si as i32)
-            lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ "\n"
+            // #3173: what was found of an in-place resource when none is drafted.
+            let partial = if verdict.starts_with("raw:"): self.fd_inplace_partial(si as i32) else: ""
+            lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ (if partial.len() > 0: " [in place: " ++ partial ++ "]" else: "") ++ "\n"
         var head = "facade " ++ name ++ f": {total} functions, {safe} presented safely, {raw} raw" ++ (if internal > 0: f"; {internal} internal (no prototype declares them)" else: "") ++ "\n"
         // A registry line is never dropped without a word: a presentation
         // fact (`text param`, `nullable param`, `text return`) is written
