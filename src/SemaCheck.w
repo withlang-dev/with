@@ -10016,11 +10016,6 @@ impl Sema:
             // STR_FIND serves only the pinned seed's lowering of the
             // compiler's own calls and retires with the next seed bump.
             if method_name == "split": return MirIntrinsic.STR_SPLIT
-            if method_name == "to_upper" or method_name == "upper": return MirIntrinsic.STR_TO_UPPER
-            if method_name == "to_lower" or method_name == "lower": return MirIntrinsic.STR_TO_LOWER
-            if method_name == "replace": return MirIntrinsic.STR_REPLACE
-            if method_name == "index_of": return MirIntrinsic.STR_INDEX_OF
-            if method_name == "repeat": return MirIntrinsic.STR_REPEAT
             return MirIntrinsic.NONE
         if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
             let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
@@ -36708,9 +36703,7 @@ impl Sema:
                 return len_method_ret
             if method_name == "byte_at":
                 return self.ty_i32 as i32
-            if method_name == "index_of":
-                return self.ty_isize as i32
-            if field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.lower or field == self.syms.upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
+            if field == self.syms.slice:
                 return self.ty_str as i32
             if method_name == "split":
                 return self.ensure_list_str_type()
