@@ -534,6 +534,20 @@ impl Parser:
         self.emit_error("expected identifier")
         0
 
+    // A success status after `ok` (§16.2b.4, §31): a constant's name, or an
+    // integer literal (`ok 0`, `ok -1`). The literal is the contract saying
+    // which value is success; nothing assumes it. Interned as written.
+    mut fn parse_facade_status() -> i32:
+        let negative = self.peek() == TokenKind.TK_MINUS
+        if not negative and self.peek() != TokenKind.TK_INT_LIT: return self.expect_ident()
+        if negative: self.advance()
+        if self.peek() != TokenKind.TK_INT_LIT:
+            self.emit_error("after 'ok' write a status constant's name or an integer literal")
+            return 0
+        let digits = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+        self.advance()
+        self.intern.intern((if negative: "-" else: "") ++ digits)
+
     fn intern_current() -> i32:
         let s = self.current_start()
         let e = self.current_end()
@@ -5266,12 +5280,12 @@ impl Parser:
             // listed constant is success. Sema verifies each and where a
             // list is allowed.
             kind = FACADE_CLAUSE_OK
-            let c = self.expect_ident()
+            let c = self.parse_facade_status()
             if c == 0: return 0
             ops.push(c)
             while self.peek() == TokenKind.TK_COMMA:
                 self.advance()
-                let more = self.expect_ident()
+                let more = self.parse_facade_status()
                 if more == 0: return 0
                 ops.push(more)
         else if word == "borrows":

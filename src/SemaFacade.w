@@ -2568,6 +2568,8 @@ impl Sema:
     // A status constant is a c_import `let` (or a `const`) with a literal
     // initializer: a materialized compile-time value, never a runtime read.
     fn facade_status_constant_ok(sym: i32) -> bool:
+        // An integer literal is its own value (§16.2b.4: `ok 0`).
+        if facade_status_is_literal(self.pool_resolve(sym)): return true
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_LET_DECL or self.ast.get_data0(decl) != sym:
@@ -6571,3 +6573,12 @@ impl Sema:
             if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR and not defined: continue
             if facade_render_global_type_node(self.ast, decl) != 0 and self.safe_symbol_text(self.ast.get_data0(decl)) == name: return decl
         0
+
+// Whether a status after `ok` is an integer literal, as the parser interned
+// it: digits, with an optional leading minus.
+fn facade_status_is_literal(text: &str) -> bool:
+    let digits = if text.starts_with("-"): text.slice(1, text.len()) else: text
+    if digits.len() == 0: return false
+    for b in digits.bytes():
+        if b < '0' or b > '9': return false
+    true
