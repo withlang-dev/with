@@ -4690,6 +4690,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     // link it instead of compiling the compiler into every test.
     out = out.add_target(compiler_bundle_target())
 
+    // #3511: the objects every stage links apart from the standard library
+    // reference the runtime alone.
+    var standalone_objects_check = target_new(.Action, "standalone-objects-check", "").output("out/.build-state/standalone-objects-check.txt")
+    standalone_objects_check.action = run_standalone_objects_check_action
+    standalone_objects_check = standalone_objects_check.arg("obj=out/lib/clang_bridge.o")
+    standalone_objects_check = standalone_objects_check.input("out/lib/clang_bridge.o")
+    standalone_objects_check = standalone_objects_check.input("build/package.w")
+    standalone_objects_check = standalone_objects_check.write_scope("out/.build-state")
+    standalone_objects_check = standalone_objects_check.write_scope("out/command/standalone-objects-check")
+    standalone_objects_check = standalone_objects_check.dep("clang-bridge-object")
+    out = out.add_target(standalone_objects_check)
+
     // #3401: a package's interface gives an importer the answers its source does.
     var package_interface_check = target_new(.Action, "package-interface-check", "").output("out/package-interface-check/bundle/shapes.wi")
     package_interface_check.action = run_package_interface_check_action
@@ -5041,6 +5053,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("validate-all-async")
     tests = tests.dep("internals-tests")
     tests = tests.dep("package-interface-check")
+    tests = tests.dep("standalone-objects-check")
     tests = tests.dep("internals-compiler-tests")
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")

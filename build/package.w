@@ -639,3 +639,37 @@ pub fn run_package_platform_release_action(ctx: ActionCtx) -> i32:
     if output.len() > 0:
         return pkg_write_text(ctx, output, "ok\n")
     0
+
+// #3511: an object compiled apart from the standard library (the Clang
+// bridge, `--emit-obj --no-prelude`) is linked into every stage, so it may
+// reference the runtime and nothing else of With. A reference to another
+// module's function (`__with_mod_<hash>__…`) is dead code to a Mach-O or
+// ELF link, which says nothing, and an undefined symbol to a COFF link,
+// which fails the Windows build. Each `obj=<path>` argument is checked with
+// the SDK's own llvm-nm.
+pub fn run_standalone_objects_check_action(ctx: ActionCtx) -> i32:
+    let root = ctx.project_info().project_root()
+    let nm = comp_llvm_prefix_for_root(root) ++ "/bin/llvm-nm" ++ pkg_host_exe_suffix()
+    if not pkg_path_exists(ctx, nm):
+        return pkg_fail(ctx, "missing With-owned llvm-nm: " ++ nm)
+    var checked = 0
+    for arg in ctx.args():
+        if not arg.starts_with("obj="): continue
+        let obj = arg.slice(4, arg.len())
+        let args: List[str] = List.new()
+        args.push(pkg_process_path(root, nm))
+        args.push("-u")
+        args.push(pkg_abs(root, obj))
+        let result = pkg_run_capture(ctx, "undefined-symbols", args, 120000)
+        if result.rc != 0:
+            return pkg_fail(ctx, "could not list the undefined symbols of " ++ obj ++ f" (exit code {result.rc}): " ++ result.stdout ++ result.stderr)
+        var found = ""
+        for line in result.stdout.split("\n"):
+            if line.contains("__with_mod_"): found = found ++ "\n  " ++ line.trim()
+        if found.len() > 0:
+            return pkg_fail(ctx, obj ++ " references functions of other With modules; it is compiled apart from the standard library and may call the runtime alone (a COFF link fails on these):" ++ found)
+        checked = checked + 1
+    if checked == 0:
+        return pkg_fail(ctx, "requires at least one obj=<path> argument")
+    print(f"standalone-objects-check: {checked} object(s) reference the runtime alone")
+    0
