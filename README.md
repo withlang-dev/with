@@ -7,17 +7,15 @@
 [![linux-x86_64](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/withlang-dev/with/badges/release-linux-x86_64.json)](https://github.com/withlang-dev/with/releases/latest)
 [![linux-aarch64](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/withlang-dev/with/badges/release-linux-aarch64.json)](https://github.com/withlang-dev/with/releases/latest)
 [![windows-x86_64](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/withlang-dev/with/badges/release-windows-x86_64.json)](https://github.com/withlang-dev/with/releases/latest)
-[![windows-aarch64](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/withlang-dev/with/badges/release-windows-aarch64.json)](https://github.com/withlang-dev/with/releases/latest)
 
 **Nightly self-host** on GitHub's runners (post-hoc evidence for last night's
-`main`, never a merge gate, D56; a red files an issue; windows-aarch64 is
-non-gating, D137):
+`main`, never a merge gate, D56; a red files an issue; windows-aarch64 is not
+a supported platform and is not built, D225):
 
 [![linux x86_64](https://github.com/withlang-dev/with/actions/workflows/selfhost-linux.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-linux.yml)
 [![linux aarch64](https://github.com/withlang-dev/with/actions/workflows/selfhost-linux-aarch64.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-linux-aarch64.yml)
 [![macOS arm64](https://github.com/withlang-dev/with/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/ci.yml)
 [![windows x86_64](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows.yml)
-[![windows aarch64](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows-aarch64.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows-aarch64.yml)
 
 With is a systems language that compiles to native code. It has no garbage
 collector and no lifetime annotations, it is designed to be at least as

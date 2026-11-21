@@ -1420,7 +1420,9 @@ jobs:
 
   build-windows-aarch64:
     name: Verify and package windows-aarch64
-    if: inputs.diagnostic_run == ''
+    # D225 (Eric, 2026-11-20): windows-aarch64 is not a supported platform
+    # until someone asks to use With there. The job is kept, disabled.
+    if: false
     runs-on: windows-11-arm
     timeout-minutes: 360
     defaults:

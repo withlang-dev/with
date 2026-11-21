@@ -49,7 +49,7 @@ jobs:
           has() { printf '%s\n' "$assets" | grep -qx -- "$1"; }
           sdk_name="$(printf '%s\n' "$assets" | grep '^with-llvm-sdk-.*\.tar\.gz$' | head -1)"
           sdk_ver="${sdk_name#with-llvm-sdk-}"; sdk_ver="${sdk_ver%%-*}"
-          for platform in darwin-aarch64 linux-x86_64 linux-aarch64 windows-x86_64 windows-aarch64; do
+          for platform in darwin-aarch64 linux-x86_64 linux-aarch64 windows-x86_64; do
             exe="with-$platform"
             case "$platform" in windows-*) exe="$exe.exe" ;; esac
             sdk="with-llvm-sdk-$sdk_ver-$platform.tar.gz"

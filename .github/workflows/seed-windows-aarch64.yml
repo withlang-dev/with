@@ -32,8 +32,6 @@ on:
           pattern and its shallow fetch then matches nothing.
         required: false
         default: ""
-  push:
-    branches: [winarm/pr3-seed-ci]
 
 concurrency:
   group: seed-windows-aarch64-${{ github.ref }}
