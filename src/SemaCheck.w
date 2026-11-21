@@ -1,5 +1,6 @@
 // SemaCheck — type expression resolution, expression type checking, generic/trait resolution.
 
+use compiler.SourceExt
 use Sema
 use Token
 use Ast
@@ -190,8 +191,9 @@ fn sema_path_is_std_implementation(path: &str) -> bool:
 // The source path of std module `name` (lib/std/<name>.w), in the tree or
 // embedded.
 fn sema_path_is_std_module(path: &str, name: &str) -> bool:
-    let file = name ++ ".w"
-    path == "lib/std/" ++ file or path == "<embedded-std>/std/" ++ file or path.ends_with("/lib/std/" ++ file) or path.ends_with("\\lib\\std\\" ++ file)
+    if not source_ext_is_source(path): return false
+    let stem = source_ext_stem(path)
+    stem == "lib/std/" ++ name or stem == "<embedded-std>/std/" ++ name or stem.ends_with("/lib/std/" ++ name) or stem.ends_with("\\lib\\std\\" ++ name)
 
 // The resolver owns the judgment (Resolve.resolve_path_is_runtime): the same
 // paths it lets import the runtime are the ones Sema treats as its own.
@@ -43859,8 +43861,8 @@ fn sema_module_display_name(path: &str) -> str:
         if ch == 47 or ch == 92:
             start = (i + 1) as i32
     var end = path.len()
-    if end - start > 2 and path.slice(end - 2, end) == ".w":
-        end = end - 2
+    if end - start > source_ext_len(path):
+        end = end - source_ext_len(path)
     path.slice(start, end)
 
 fn sema_import_alias_matches(import_text: &str, alias: &str) -> bool:

@@ -1,3 +1,4 @@
+use compiler.SourceExt
 use ComptimeValue
 use Sema
 use Ast
@@ -4310,8 +4311,8 @@ fn comptime_module_name_for_path(root: &str, path: &str) -> str:
     let prefix = if root.ends_with("/"): with_str_clone_ref(root) else: root ++ "/"
     if root.len() > 0 and path.starts_with(prefix):
         rel = path.slice(prefix.len(), path.len())
-    if rel.ends_with(".w"):
-        rel = rel.slice(0, rel.len() - 2)
+    if source_ext_is_source(rel):
+        rel = rel.slice(0, rel.len() - source_ext_len(rel))
     var out = ""
     for i in 0..rel.len():
         let ch = rel[i]

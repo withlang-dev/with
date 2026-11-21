@@ -192,6 +192,11 @@ impl Zcu:
             let dotted = self.use_path_name_frontend(pool, ps, pc)
             let target = self.resolve_module_path_frontend(dotted, self.decl_source_dir_frontend(di))
             if target.len() == 0: continue
+            // One module, one file: a directory holding both spellings of a
+            // module would let an edit to one of them go unread.
+            let other = source_file_other_extension(target)
+            if other.len() > 0 and with_fs_file_exists(other) != 0 and with_fs_file_exists(target) != 0:
+                self.diagnostics.emit(Diagnostic.err("module '" ++ dotted.replace("/", ".") ++ "' is both '" ++ target ++ "' and '" ++ other ++ "'; keep one (With source files are named `.with`)", Span { file: self.decl_source_file_id_frontend(di), start: pool.get_start(decl), end: pool.get_end(decl) }))
             let refusal = resolve_internal_import_refusal(self.decl_source_path_frontend(di), target, dotted.replace("/", "."))
             if refusal.len() == 0: continue
             let span = Span { file: self.decl_source_file_id_frontend(di), start: pool.get_start(decl), end: pool.get_end(decl) }
@@ -3461,6 +3466,10 @@ fn frontend_path_is_fetched_facade(path: &str) -> bool:
     ("/" ++ p).contains("/.with/deps/c/") and p.ends_with("/contract.w")
 
 fn frontend_resolve_module_rel(module_dir: &str, rel_path: &str) -> str:
+    // `name.with` first, then `name.w`, as Resolve finds a module.
+    if rel_path.ends_with(".w"):
+        let found = frontend_resolve_module_rel(module_dir, rel_path ++ "ith")
+        if found.len() > 0: return found
     let cand1 = resolve_join(module_dir, rel_path)
     if resolve_file_exists(cand1):
         return cand1

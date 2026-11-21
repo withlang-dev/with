@@ -13,6 +13,7 @@
 // Without `--apply` it lists what it would change. A directory is walked
 // for `.w` files.
 
+use compiler.SourceExt
 use std.process
 use std.builtins.eprint
 use Lexer
@@ -56,14 +57,15 @@ fn cr_line_of(source: &str, at: i32) -> i32:
         if byte == '\n': line += 1
     line
 
-/// The `.w` files `path` names: itself, or every one beneath a directory.
+/// The source files `path` names: itself when it is a file, whatever it is
+/// called, or every source file beneath a directory.
 fn cr_sources(path: &str) -> List[str]:
     let files = []
-    if path.ends_with(".w"):
+    if with_fs_is_dir(path) == 0:
         files.push(path.to_owned())
         return files
     for entry in with_fs_list_files(path).split("\n"):
-        if entry.ends_with(".w"): files.push(entry.to_owned())
+        if source_ext_is_source(entry): files.push(entry.to_owned())
     files
 
 fn run_fix_contracts() -> i32:

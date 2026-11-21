@@ -11,6 +11,7 @@
 // (EmbeddedStdlib.embedded_std_resolve_path, ModuleSource.module_source_read),
 // so a bundle-provided module keeps its canonical
 // `<embedded-std>/std/<corpus>/<name>.w` path and only its text changes.
+use compiler.SourceExt
 use std.collections.HashMap
 use std.crypto.sha256
 use rt.rt_core
@@ -33,7 +34,7 @@ fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
         return false
     // A tree bundle may name several directories, comma-separated.
     for base in bundle_corpus_base(corpus).split(","):
-        if canonical_path == base ++ ".w" or canonical_path.starts_with(base ++ "/"): return true
+        if source_ext_is_source(canonical_path) and source_ext_stem(canonical_path) == base or canonical_path.starts_with(base ++ "/"): return true
     false
 
 // The tree a corpus lives in: the runtime's (D30 R3, `rt`) is
@@ -77,9 +78,9 @@ fn bundle_init_symbol(corpus: &str) -> str: fn_abi_module_link_prefix(bundle_cor
 // → `rt.rt_core`; "" for any other path.
 fn bundle_module_dotted_name(canonical_path: &str) -> str:
     let prefix = if canonical_path.starts_with("<embedded-rt>/"): "<embedded-rt>/" else: "<embedded-std>/"
-    if not canonical_path.starts_with(prefix) or not canonical_path.ends_with(".w"):
+    if not canonical_path.starts_with(prefix) or not source_ext_is_source(canonical_path):
         return ""
-    let rel = canonical_path.slice(prefix.len(), canonical_path.len() - 2)
+    let rel = canonical_path.slice(prefix.len(), canonical_path.len() - source_ext_len(canonical_path))
     var out = ""
     for i in 0..rel.len():
         out = out ++ (if rel[i] == '/': "." else: rel.slice(i, i + 1))
@@ -88,9 +89,9 @@ fn bundle_module_dotted_name(canonical_path: &str) -> str:
 // A tree bundle's module as its tree imports it: `<dir>/compiler/Link.w` of
 // corpus directory `<dir>` is `compiler.Link`; "" outside the corpus.
 fn bundle_tree_module_dotted_name(corpus: &str, canonical_path: &str) -> str:
-    if not canonical_path.ends_with(".w"): return ""
+    if not source_ext_is_source(canonical_path): return ""
     for base in bundle_corpus_base(corpus).split(","):
-        if canonical_path.starts_with(base ++ "/"): return canonical_path.slice(base.len() + 1, canonical_path.len() - 2).replace("/", ".")
+        if canonical_path.starts_with(base ++ "/"): return canonical_path.slice(base.len() + 1, canonical_path.len() - source_ext_len(canonical_path)).replace("/", ".")
     ""
 
 // The `module <path>` section paths of an interface file, in file order.

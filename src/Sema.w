@@ -5,6 +5,7 @@
 // reports type errors with source spans. Codegen continues to work as
 // before — Sema is purely additive validation.
 
+use compiler.SourceExt
 use Ast
 use SemaTypes
 use BorrowCfg
@@ -3078,8 +3079,8 @@ fn sema_std_module_dotted(path: &str) -> str:
             i = i + 1
     if rel.len() == 0:
         return ""
-    if rel.ends_with(".w"):
-        rel = rel.slice(0, rel.len() - 2)
+    if source_ext_is_source(rel):
+        rel = rel.slice(0, rel.len() - source_ext_len(rel))
     rel.replace("/", ".")
 
 // D29 scaffolding (#750): the §18.2 prelude, exactly as enumerated. These
@@ -11759,7 +11760,7 @@ fn sema_module_stem_self_name(path: &str) -> str:
         if path[i] == '/': start = (i + 1) as i32
     var end = path.len()
     if path.ends_with(".wi"): end = end - 3
-    else if path.ends_with(".w"): end = end - 2
+    else: end = end - source_ext_len(path)
     if end <= start:
         return ""
     var out = ""

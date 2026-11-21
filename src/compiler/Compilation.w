@@ -1,3 +1,4 @@
+use compiler.SourceExt
 use Ast
 use Diagnostic
 use Resolve
@@ -292,8 +293,8 @@ fn compilation_relative_source_path(root: &str, path: &str) -> str:
 
 fn compilation_module_import_name(root: &str, path: &str) -> str:
     var rel = compilation_relative_source_path(root, path)
-    if rel.ends_with(".w"):
-        rel = rel.slice(0, rel.len() - 2)
+    if source_ext_is_source(rel):
+        rel = rel.slice(0, rel.len() - source_ext_len(rel))
     var out = ""
     for i in 0..rel.len():
         let ch = rel[i]

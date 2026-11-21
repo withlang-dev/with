@@ -3,6 +3,7 @@
 // This pass builds deterministic module/import/def/binding/use tables from AST.
 // It does not replace Sema yet; it provides a stable resolved artifact for Wave 4.
 
+use compiler.SourceExt
 use Ast
 use Lexer
 use Parser
@@ -1367,6 +1368,11 @@ impl ResolveState:
         ""
 
     fn resolve_module_rel(module_dir: &str, rel_path: &str) -> str:
+        // The toolchain finds a module as `name.with`. During the change of
+        // extension it also finds `name.w`, and `name.with` wins.
+        if rel_path.ends_with(".w"):
+            let found = self.resolve_module_rel(module_dir, rel_path ++ "ith")
+            if found.len() > 0: return found
         // Strategy 1: relative to current module's directory.
         let cand1 = resolve_join(module_dir, rel_path)
         if resolve_file_exists(cand1):
@@ -1428,7 +1434,7 @@ fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
     var last_dot = -1
     for i in 0..dotted.len():
         if dotted[i] == '.': last_dot = i as i32
-    if last_dot <= 0 or resolved_path.len() == 0 or resolved_path.replace("\\", "/").ends_with(dotted.replace(".", "/") ++ ".w"):
+    if last_dot <= 0 or resolved_path.len() == 0 or source_ext_stem(resolved_path.replace("\\", "/")).ends_with(dotted.replace(".", "/")):
         return ""
     let last = dotted.slice(last_dot + 1, dotted.len())
     let path = resolved_path.replace("\\", "/")
@@ -1534,6 +1540,13 @@ fn resolve_path_is_under_checkout_dir(path: &str, dir: &str) -> bool:
         if (at == 0 or normal[at - 1] == '/') and resolve_dir_is_compiler_checkout(path.slice(0, at)): return true
         from = at + 1
     false
+
+// The same path under the other source extension: `x.with` for `x.w` and
+// `x.w` for `x.with`; "" for any other name.
+fn source_file_other_extension(path: &str) -> str:
+    if path.ends_with(".with"): return path.slice(0, path.len() - 3)
+    if path.ends_with(".w"): return path ++ "ith"
+    ""
 
 fn import_not_found_message(dotted: &str) -> str:
     // A bundled corpus is in the compiler as an object and an interface,
