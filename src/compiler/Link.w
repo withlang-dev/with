@@ -2423,9 +2423,13 @@ fn link_stage_source_stem(source_path: &str) -> str:
         source_path.slice((last_slash + 1) as i64, source_path.len() as i64)
     else:
         with_str_clone_ref(source_path)
-    if base.len() > 2 and base.ends_with(".w"):
-        return base.slice(0, (base.len() - 2) as i64)
-    base
+    // The name up to its last dot: `hello.potato` is `hello`, `a.b.with` is
+    // `a.b`. A name with no dot is the whole name, and a leading dot is not
+    // an extension separator (`.hidden` stays `.hidden`).
+    var last_dot = -1
+    for i in 1..base.len():
+        if base[i] == '.': last_dot = i as i32
+    if last_dot > 0: base.slice(0, last_dot as i64) else: base
 
 fn link_stage_sanitize_relative_dir(path: &str) -> str:
     var out = ""

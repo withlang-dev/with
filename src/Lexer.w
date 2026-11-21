@@ -85,8 +85,17 @@ type Lexer {
     bracket_depth: i32,
 }
 
+// A file run as a script begins `#!/usr/bin/env with`. That first line is
+// the operating system's, not the program's: lexing starts after it, at
+// the newline that ends it, so every line number is the file's own.
+fn lexer_shebang_len(source: &str) -> i32:
+    if source.len() < 2 or source[0] != '#' or source[1] != '!': return 0
+    var end = 2
+    while end < source.len() and source[end] != '\n': end += 1
+    end as i32
+
 fn Lexer.init(source: &str, file_id: i32) -> Lexer:
-    Lexer { source: with_str_clone_ref(source), pos: 0, file_id, token_start: 0, emit_comments: 0, last_sig_tag: -1, line_start: 1, bracket_depth: 0 }
+    Lexer { source: with_str_clone_ref(source), pos: lexer_shebang_len(source), file_id, token_start: 0, emit_comments: 0, last_sig_tag: -1, line_start: 1, bracket_depth: 0 }
 
 // Tokenize the entire source, returning a token list ending with EOF.
 impl Lexer:
