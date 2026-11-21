@@ -656,11 +656,7 @@ pub fn run_standalone_objects_check_action(ctx: ActionCtx) -> i32:
     for arg in ctx.args():
         if not arg.starts_with("obj="): continue
         let obj = arg.slice(4, arg.len())
-        let args: List[str] = List.new()
-        args.push(pkg_process_path(root, nm))
-        args.push("-u")
-        args.push(pkg_abs(root, obj))
-        let result = pkg_run_capture(ctx, "undefined-symbols", args, 120000)
+        let result = pkg_run_capture(ctx, "undefined-symbols", [pkg_process_path(root, nm), "-u", pkg_abs(root, obj)], 120000)
         if result.rc != 0:
             return pkg_fail(ctx, "could not list the undefined symbols of " ++ obj ++ f" (exit code {result.rc}): " ++ result.stdout ++ result.stderr)
         var found = ""
