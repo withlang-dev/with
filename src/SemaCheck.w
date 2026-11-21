@@ -43790,6 +43790,10 @@ impl Sema:
         let recv = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(recv_ty as TypeId)) as TypeId)
         if self.get_type_kind(recv) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(recv as i32) != self.syms.list: return false
         let elem = self.get_generic_inst_arg(recv as i32, 0)
+        // D143: in the open pass over a self-calling body a call of the
+        // function itself reads `Never`; the pass that follows checks the
+        // elements it then has.
+        if self.resolve_alias(elem as TypeId) == self.ty_never: return false
         if elem == 0 or self.type_has_unresolved_parts(elem) != 0 or self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(elem as TypeId))) == TypeKind.TY_STR: return false
         self.emit_error(f"List.join joins str elements, and this List holds `{self.type_name(elem)}`; turn each element into text first: `v.iter() |> map(f\"\{it\}\") |> collect[List]()`", node)
         true
@@ -43805,6 +43809,10 @@ impl Sema:
         let recv = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(recv_ty as TypeId)) as TypeId)
         if declared == 0 or recv == 0 or declared == recv: return true
         if self.get_type_kind(recv) != TypeKind.TY_GENERIC_INST or self.type_has_unresolved_parts(recv as i32) != 0: return true
+        // D143: a type argument that is `Never` is a self-call the open
+        // pass has not typed yet; the pass that follows checks the real one.
+        for ai in 0..self.get_generic_inst_arg_count(recv as i32):
+            if self.resolve_alias(self.get_generic_inst_arg(recv as i32, ai) as TypeId) == self.ty_never: return true
         if self.suppress_errors != 0: return false
         let name = self.pool_resolve(method_sym)
         self.emit_error_with_help(f"method '{name}' is declared for `{self.type_name(declared as i32)}`, and this is a `{self.type_name(recv as i32)}`", node, f"`{name}` exists for that one instantiation; declare it in an `impl[T]` block to have it for every one")
