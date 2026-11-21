@@ -5215,7 +5215,27 @@ impl Parser:
         let t = self.peek()
         if t == TokenKind.TK_MINUS: return self.parse_unary_negate() as i32
         if t == TokenKind.TK_INT_LIT or t == TokenKind.TK_KW_NULL or t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE: return self.parse_primary() as i32
-        self.emit_error("a fixed argument is an integer literal, 'null', 'true' or 'false' (§16.2b.11)")
+        if t == TokenKind.TK_IDENT:
+            // `fixed sizeof(T)`: the size of an imported type, as C's own
+            // spelling. A grouped type name is that form's node; a bare name
+            // is a constant the header defines (`fixed ZLIB_VERSION`).
+            if not self.current_ident_is("sizeof"): return self.parse_primary() as i32
+            let start = self.current_start()
+            self.advance()
+            if self.peek() != TokenKind.TK_L_PAREN:
+                self.emit_error("'fixed sizeof' names its type in parentheses: 'fixed sizeof(T)' (§16.2b.11)")
+                return 0
+            self.advance()
+            if self.peek() != TokenKind.TK_IDENT:
+                self.emit_error("'fixed sizeof(T)' names an imported type (§16.2b.11)")
+                return 0
+            let named = self.parse_primary()
+            if self.peek() != TokenKind.TK_R_PAREN:
+                self.emit_error("expected ')' after the type of 'fixed sizeof(T)' (§16.2b.11)")
+                return 0
+            self.advance()
+            return self.pool.add_node(NodeKind.NK_GROUPED, start, self.prev_end(), named, 0, 0) as i32
+        self.emit_error("a fixed argument is an integer literal, 'null', 'true', 'false', a constant the header defines, or 'sizeof(T)' (§16.2b.11)")
         0
 
     mut fn parse_facade_clause(in_resource: bool) -> i32:

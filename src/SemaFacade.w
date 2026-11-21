@@ -504,6 +504,32 @@ impl Sema:
         let file = self.facade_decl_file_name(self.find_decl_index(self.type_decl_nodes_by_tid.get(resolved as i32).unwrap()))
         if file.starts_with("<facade "): file else: ""
 
+    // The constant a c_import declares under the name of `sym`, or 0.
+    // Matched by name, as an imported record is.
+    fn facade_imported_constant(sym: i32) -> i32:
+        let want = self.pool_resolve(sym)
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() or self.decl_is_c_import[di] == 0: continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_LET_DECL and self.ast.get_data2(decl) % 2 == 0 and self.safe_symbol_text(self.ast.get_data0(decl)) == want: return decl
+        0
+
+    // The type a c_import declares under the name of `sym`, or 0.
+    fn facade_imported_type(sym: i32) -> i32:
+        let want = self.pool_resolve(sym)
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() or self.decl_is_c_import[di] == 0: continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == want: return self.lookup_named_type_ambient(self.ast.get_data0(decl))
+        0
+
+    // Whether `tid` is the C type of a text argument: a pointer to a byte.
+    fn facade_type_is_c_text(tid: i32) -> bool:
+        let resolved = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_PTR: return false
+        let pointee = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        pointee == self.ty_c_char or pointee == self.ty_i8 or pointee == self.ty_u8
+
     // The display name of the file being checked.
     fn facade_current_file_name() -> str: self.source_text_name_of(self.local_file_id)
 
@@ -2190,8 +2216,47 @@ impl Sema:
                 if negative and self.is_unsigned_int_type(self.numeric_operand_type(ptype as i32)):
                     self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds a negative literal to {shown}, an unsigned integer (§16.2b.11)", clause, "write the value the parameter receives as a literal of its own range, zero or above")
                     return c
+            else if lk == NodeKind.NK_IDENT:
+                // `fixed NAME`: a constant the header defines, a value of
+                // the parameter's type. The wrapper passes the constant, so
+                // a new release of the library is a new value with no edit.
+                let cname = self.pool_resolve(self.ast.get_data0(lit))
+                let cdecl = self.facade_imported_constant(self.ast.get_data0(lit))
+                if cdecl == 0:
+                    self.emit_error_with_help(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true', 'false', a constant the header defines or 'sizeof(T)'; '{cname}' is not a constant the header defines (§16.2b.11)", clause, "name a constant of the imported header, or write the literal")
+                    return c
+                // A header's constant is a literal. Text goes to a C text
+                // parameter and an integer to an integer one that holds it;
+                // any other constant is checked by the rendered call.
+                let cvalue = self.ast.get_data1(cdecl)
+                let ck = self.ast.kind(cvalue)
+                if ck == NodeKind.NK_STRING_LIT and not self.facade_type_is_c_text(ptype as i32):
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed {cname}' binds text to {shown}, which is not a C string (§16.2b.11)", clause, "fix the parameter with a constant of its own type")
+                    return c
+                if ck == NodeKind.NK_INT_LIT and (self.get_type_kind(self.numeric_operand_type(ptype as i32)) != TypeKind.TY_INT or not self.int_literal_fits_type(cvalue, self.numeric_operand_type(ptype as i32))):
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed {cname}' binds an integer to {shown}, which does not hold it (§16.2b.11)", clause, "fix the parameter with a constant of its own type")
+                    return c
+            else if lk == NodeKind.NK_GROUPED:
+                // `fixed sizeof(T)`: the size of an imported type, which
+                // must fit the integer parameter that receives it.
+                let tsym = self.ast.get_data0(self.ast.get_data0(lit))
+                let tname = self.pool_resolve(tsym)
+                let sized = self.facade_imported_type(tsym)
+                if sized == 0:
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed sizeof({tname})' names no imported type (§16.2b.11)", clause, "name a type the header declares")
+                    return c
+                let itype = self.resolve_alias(self.numeric_operand_type(ptype as i32) as TypeId)
+                if self.get_type_kind(itype) != TypeKind.TY_INT:
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed sizeof({tname})' binds a size to {shown}, which is not an integer (§16.2b.11)", clause, "a size is fixed on an integer parameter")
+                    return c
+                let size = self.type_layout_size_of(sized)
+                let bits = self.get_type_d0(itype)
+                let value_bits = if self.get_type_d1(itype) != 0: bits - 1 else: bits
+                if size <= 0 or (value_bits < 63 and size >= (1 as i64) << (value_bits as i64)):
+                    self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed sizeof({tname})' is {size}, which {shown} cannot hold (§16.2b.11)", clause, "the raw operation stays available")
+                    return c
             else:
-                self.emit_error_with_help(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true' or 'false' (§16.2b.11)", clause, "'param N fixed 0', 'param N fixed null' or 'param N fixed true'; a value the caller chooses stays a parameter")
+                self.emit_error_with_help(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true', 'false', a constant the header defines or 'sizeof(T)' (§16.2b.11)", clause, "'param N fixed 0', 'param N fixed null' or 'param N fixed true'; a value the caller chooses stays a parameter")
                 return c
             if self.facade_param_receives(fn_sym, pi).len() > 0:
                 self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds {shown}, which receives a modeled resource; a resource is passed by the value that owns it, never fixed (§16.2b.11)", clause, f"delete 'param {pi} fixed …': the presented operation takes the resource itself, as its receiver when it is the first parameter")
