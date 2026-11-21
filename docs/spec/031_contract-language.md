@@ -138,7 +138,7 @@ production      = "from" c_name [ "(" "out" param_ref ")" ] [ "," ( field_check 
                 | "init" c_name [ "(" "self" ")" ]
                 | "preinit" c_name [ "(" "self" ")" ]
 field_check     = ( "nullable" | "nonnull" ) "field" field_path
-destruction     = ( "drop" | "destroys" ) c_name [ "(" param_ref ")" ] | "abandon" c_name
+destruction     = ( "drop" | "destroys" | "abandon" ) c_name [ "(" param_ref ")" ]
 status          = "ok" CONST { "," CONST } | "message" c_name
 dependency      = "borrows" param_ref | "independent"
 capability      = "movable" | "thread" thread_cap { thread_cap }
@@ -440,7 +440,7 @@ produced. (§16.2b.15.)
 | `preinit f` | `f` constructs the storage `init` fills. Without it the storage begins as the zeroed representation. | G | | §16.2b.4 |
 | `drop f` | `f`, taking only the representation, destroys it; `Drop` calls it. `drop f(param N)`: the representation is parameter N, and every other parameter is fixed on `fn f`. | G | a resource with a producer and no destruction path is refused | §16.2b.3 |
 | `destroys f` | `f` destroys the resource and takes further arguments; `destroys f(param N)`: the resource is parameter N, the first when the parentheses are absent; called explicitly, consuming. A resource with `destroys` and no `drop` is refused. The resource owns this fact, with `from`, `init`, `drop` and `abandon`. | G | | §16.2b.3 |
-| `abandon f` | `f`, which invokes no callbacks, runs before the destroyer on a drop path that abandons a half-configured callback pair. | G | | §16.2b.9 |
+| `abandon f` | `f`, which invokes no callbacks, runs before the destroyer on a drop path that abandons a half-configured callback pair. `abandon f(param N)`: the representation is parameter N, the first when the parentheses are absent, and every other parameter is fixed or discarded on `fn f`. | G | | §16.2b.9 |
 | `ok C1, C2` | the producers' status is success when it is one of these constants; with several, the `Ok` side carries the one that matched. A success status with nothing produced is `NothingProduced`, an error. | G | the status is uninterpreted: the constructor's result is `(status, Option[N])`. There is no rule that 0 means success | §16.2b.4 |
 | `message f` | `f` describes the resource's most recent failure; an error from an operation on the resource carries `message: str`, an owned copy read before any other operation on it. | G | | §16.2b.4 |
 | `borrows param p` | the product depends on the resource received at `p` and cannot outlive it. | R | every resource parameter of a producer is a dependency | §16.2b.6 |
@@ -872,7 +872,9 @@ independent of provenance (§16.2b.13):
 2. **Shapes.** A producer returns the representation, or stores it through
    the stated out parameter; `drop` takes only the representation, or with
    `(param N)` takes it at N and every other parameter is fixed;
-   `destroys` takes it first, or at the stated parameter; an `ok` status is an integer; a `buffer`'s
+   `destroys` takes it first, or at the stated parameter; `abandon` takes
+   only the representation, or with `(param N)` takes it at N and every
+   other parameter is fixed or discarded; an `ok` status is an integer; a `buffer`'s
    count is an integer; a `callback`'s parameter is callable; `consumes`
    names a compatible value. A destroyer parameter of type `void *` accepts
    every object-pointer representation and no function-pointer or by-value

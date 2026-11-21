@@ -2905,18 +2905,31 @@ impl Sema:
             if self.facade_fn_is_resource_op(f):
                 self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' names the resource's producer, initializer, drop or destroyer; the abandonment path is an operation that leaves the resource live with its callback setup undone (§16.2b.9)", node, "after 'abandon' name the operation that undoes the callback setup and leaves the resource usable")
                 continue
+            // `abandon f(param N)` (§31): the resource is parameter N, the
+            // first when the parentheses are absent; the collection checked
+            // that N takes the representation.
+            let aat = self.facade_destroyer_at.get(f).copied() ?? 0
             let hosts = self.facade_method_host(f)
-            if hosts.len() != 1 or hosts[0] != ri:
-                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' is not an operation of '{rname}' (its first parameter does not receive this resource) (§16.2b.9)", node, f"after 'abandon' name a function whose first parameter is what '{rname}' wraps")
-                continue
-            let asig = self.get_sig(f)
-            if asig >= 0 and self.sig_get_param_count(asig) != 1:
-                let n = self.sig_get_param_count(asig)
-                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' takes {n} parameters; the abandonment path takes only the representation, since generated cleanup has nothing else to pass it (§16.2b.9)", node, "after 'abandon' name a function that takes the wrapped pointer and nothing else")
+            if aat == 0 and (hosts.len() != 1 or hosts[0] != ri):
+                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' is not an operation of '{rname}' (its first parameter does not receive this resource) (§16.2b.9)", node, f"after 'abandon' name a function whose first parameter is what '{rname}' wraps, or the parameter that is: 'abandon {fnm}(param N)'")
                 continue
             var ci = -1
             for k in 0..self.foreign_contracts.len():
                 if self.facade_same_fn(self.foreign_contracts[k].fn_sym, f): ci = k as i32
+            // The abandonment path has only the representation to pass:
+            // every other parameter is fixed or discarded on the function's
+            // own item, as for `drop` (D209).
+            let asig = self.get_sig(f)
+            var unfilled = -1
+            if asig >= 0:
+                for pi in 0..self.sig_get_param_count(asig):
+                    if pi == aat or (ci >= 0 and (self.foreign_contracts[ci].fixed_params.contains(pi) or self.foreign_contracts[ci].discarded_params.contains(pi))): continue
+                    if unfilled < 0: unfilled = pi
+            if unfilled >= 0:
+                let n = self.sig_get_param_count(asig)
+                let shown = self.facade_param_display(f, asig, unfilled)
+                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' takes {n} parameters, and the abandonment path has only the representation to pass: {shown} is neither fixed nor discarded (§16.2b.9, §31)", node, f"fix or discard it on the function's own item ('fn {fnm}' with 'param … fixed <value>' or 'param … discarded'), or name a function that takes only the representation")
+                continue
             if ci < 0 or self.foreign_contracts[ci].callbacks_none == 0:
                 self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' names an operation that may invoke callbacks, so it cannot safely abandon an incomplete callback pair (§16.2b.9)", node, f"describe '{fnm}' with an fn item stating 'callbacks none' when verified foreign-library evidence guarantees it invokes none")
                 continue
