@@ -10076,7 +10076,6 @@ impl Sema:
             if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
             if method_name == "iter_place": return MirIntrinsic.LIST_ITER_PLACE
             if method_name == "contains": return MirIntrinsic.LIST_CONTAINS
-            if method_name == "join": return MirIntrinsic.LIST_JOIN
             return MirIntrinsic.NONE
         if type_name == "FixedString" or type_name.starts_with("FixedString__"):
             if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
@@ -39416,8 +39415,6 @@ impl Sema:
                     return generic_len_ret
                 if field == self.syms.contains:
                     return self.ty_bool as i32
-                if field == self.syms.join:
-                    return self.ty_str as i32
                 if field == self.syms.slot:
                     let slot_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                     let slot_tid = self.find_generic_inst(self.syms.listslot, slot_elem_ty)

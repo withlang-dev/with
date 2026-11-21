@@ -44,7 +44,6 @@ fn builtin_sig_table() -> List[BuiltinSigRow]:
     t.push(sig("List", "split_at", "mid: i64"))
     t.push(sig("List", "split_at_mut", "mid: i64"))
     t.push(sig("List", "contains", "value: &T"))
-    t.push(sig("List", "join", "sep: &str"))
     t.push(sig("FixedString", "push_byte", "b: u8"))
     t.push(sig("FixedString", "push_str", "s: &str"))
     t.push(sig("FixedString", "equals", "other: &str"))
