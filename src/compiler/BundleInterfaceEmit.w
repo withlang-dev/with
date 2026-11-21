@@ -191,6 +191,17 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
 
 fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
 
+// `text` with the indentation of its first line removed from every line.
+fn bx_dedent(text: &str) -> str:
+    var indent = 0
+    while indent < text.len() and (text[indent] == ' ' or text[indent] == '\t'): indent += 1
+    var out = ""
+    for line in text.split("\n"):
+        var cut = 0
+        while cut < indent and cut < line.len() and (line[cut] == ' ' or line[cut] == '\t'): cut += 1
+        out = out ++ (if out.len() > 0: "\n" else: "") ++ line.slice(cut, line.len())
+    out
+
 // The declared bits of the `@[effect]` pin naming parameter `name_sym`, or
 // -1 when no pin names it.
 fn bx_effect_pin_bits_of(ast: &AstPool, node: i32, name_sym: i32) -> i32:
@@ -247,6 +258,20 @@ fn bx_string_escape_byte(b: i32) -> str:
 fn bx_node_kind_name(kind: i32) -> str: f"node kind {kind}"
 
 impl BundleEmitter:
+    // The text of a declaration as its source wrote it, from the first
+    // column of its first line (a `pub` before it is part of it).
+    fn source_slice(sema: &Sema, node: i32) -> str:
+        let text = sema.source_text_for_decl_node(node)
+        var start = sema.ast.get_start(node as NodeId) as i64
+        let end = sema.ast.get_end(node as NodeId) as i64
+        if start < 0 or end > text.len() or start >= end: return ""
+        while start > 0 and text[start - 1] != '\n': start -= 1
+        // A block's span runs to the next declaration; the blank lines
+        // between are not part of it.
+        var stop = end
+        while stop > start and (text[stop - 1] == '\n' or text[stop - 1] == ' ' or text[stop - 1] == '\t' or text[stop - 1] == '\r'): stop -= 1
+        text.slice(start, stop).to_owned()
+
     mut fn refuse(message: &str):
         self.errors.push(self.context ++ ": " ++ message)
         self.failed = true
@@ -639,6 +664,12 @@ impl BundleEmitter:
                 let text = if source.ends_with("\n"): source else: source ++ "\n"
                 self.push_export(BX_FN, mod_path, full, text, "generic\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n")
                 return ""
+            // A generic method of a type that is not generic: its source,
+            // set at the first column, for the impl block to indent.
+            if self.tree and in_impl and ast.fn_meta_tp_count(meta) > 0:
+                let text = bx_dedent(self.source_slice(sema, node)) ++ "\n"
+                self.last_fn_row = "generic\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n"
+                return text
             self.omit_generic_fn(mod_path, full)
             return ""
         let cc_sym = ast.fn_meta_tp_start(meta)
@@ -1104,6 +1135,11 @@ impl BundleEmitter:
                 self.refuse("binds associated types; no interface spelling (Level 0)")
                 continue
             let tp_meta = ast.find_impl_type_params(impl_node)
+            if tp_meta >= 0 and ast.state.impl_type_params[(tp_meta + 2)] > 0 and self.tree:
+                // #3401: a generic type's methods travel with it, as source.
+                let text = self.source_slice(sema, impl_node) ++ "\n"
+                self.push_export(BX_IMPL, mod_path, type_name ++ "#generic-impl", text, "generic-impl\t" ++ mod_path ++ "\t" ++ type_name ++ "\t" ++ bundle_text_sha256(text) ++ "\n")
+                continue
             if tp_meta >= 0 and ast.state.impl_type_params[(tp_meta + 2)] > 0:
                 self.refuse("is generic; a bundle boundary is Level 0 (abi_roadmap.md)")
                 continue
@@ -1172,11 +1208,13 @@ impl BundleEmitter:
             self.refuse("is ephemeral; not a bundle interface surface")
             return
         if sema.type_decl_tp_count(node) > 0 and self.tree:
-            // Left to the bundle, as a generic function is: a declaration
-            // that names it fails to spell, and says so.
+            // #3401: a generic type is the importer's to instantiate, so a
+            // package's interface carries its declaration as the source
+            // wrote it. Its row is that text.
             let in_module: str = self.current_module
-            self.omitted.push(in_module ++ "\t" ++ name ++ "\tgeneric-type")
-            self.push_export(BX_NOTE, in_module, name, "// not exported (generic): type " ++ name ++ "\n", "")
+            let text = self.source_slice(sema, node) ++ "\n"
+            self.push_export(BX_TYPE, in_module, name, text, "generic-type\t" ++ in_module ++ "\t" ++ name ++ "\t" ++ bundle_text_sha256(text) ++ "\n")
+            self.emit_impls_of(sema, name_sym, name)
             return
         if sema.type_decl_tp_count(node) > 0:
             self.refuse("is generic; a bundle boundary is Level 0 (abi_roadmap.md)")

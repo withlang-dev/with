@@ -47,3 +47,17 @@ pub fn widest[T](xs: &List[T], width: fn(&T) -> i32) -> i32:
     best
 
 fn clamp_width(w: i32) -> i32: if w < 0: 0 else: w
+
+/// A generic type and its methods are the importer's to instantiate: the
+/// interface carries both as the source wrote them.
+pub type Pair[T] { a: T, b: T }
+
+impl[T] Pair[T]:
+    pub fn first() -> &T: self.a
+    pub fn swapped() -> Pair[T]: Pair { a: self.b, b: self.a }
+
+pub type Tally { n: i32 }
+
+impl Tally:
+    /// A generic method of a type that is not generic.
+    pub fn plus_count[T](xs: &List[T]) -> i32: self.n + xs.len32()
