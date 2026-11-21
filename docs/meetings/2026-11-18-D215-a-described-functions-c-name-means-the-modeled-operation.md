@@ -47,3 +47,22 @@ frequency.
 
 **Reopen if** the raw spelling's namespace collides with a program's own
 names in a way a rename cannot settle.
+
+**Amendments at implementation (Eric, 2026-11-20).**
+
+- **A general deallocator keeps its raw name.** The built-in libc contract
+  names `free` as the drop of `CHeapStr`, so under the uniform rule a raw
+  `free(p)` became a type error wherever `string.h` was imported. Ruled: a
+  function whose resource parameter is `void *` is not one resource's
+  operation, and its name keeps its raw meaning, whether a contract names
+  it with `drop`, `destroys` or `freed by`. The test is the C signature,
+  and it errs toward raw, which can only ask for `unsafe`.
+- **A function more than one resource names** as its drop or destroyer
+  consumes whichever of those resources it is given: the argument's type
+  says which. Falling back to raw would make adding a second resource to a
+  contract change what an existing call means. Built as one function over
+  the resources that name it (a marker trait, rendered).
+- **Not built yet:** a shared destroyer that takes further arguments, and a
+  shared producer (it has no resource argument to choose by); each keeps
+  its raw meaning. A buffer-field operation (D210) keeps its raw name: its
+  method is not the C function's shape.
