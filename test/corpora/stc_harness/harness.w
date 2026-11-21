@@ -11,6 +11,7 @@ module std.engines.stc_testing.harness
 
 use rt.rt_core
 use std.collections
+use std.string
 
 // Exported functions may be entered from any thread, so the count is atomic.
 var ctest_failures: Atomic[i64] = Atomic.new(0)
