@@ -217,6 +217,23 @@ impl str:
     /// Whether the text ends with `suffix`.
     pub fn ends_with(suffix: &str) -> bool: with_str_ends_with_ref(self, suffix) != 0
 
+    /// The byte index of the first occurrence of `needle`, or -1.
+    pub fn index_of(needle: &str) -> isize: with_str_index_of_ref(self, needle) as isize
+
+    /// The text with its ASCII letters in upper case.
+    pub fn to_upper() -> str: with_str_to_upper_ref(self)
+    pub fn upper() -> str: with_str_to_upper_ref(self)
+
+    /// The text with its ASCII letters in lower case.
+    pub fn to_lower() -> str: with_str_to_lower_ref(self)
+    pub fn lower() -> str: with_str_to_lower_ref(self)
+
+    /// The text with every occurrence of `from` replaced by `to`.
+    pub fn replace(from: &str, to: &str) -> str: with_str_replace_ref(self, from, to)
+
+    /// The text repeated `count` times.
+    pub fn repeat(count: i64) -> str: with_str_repeat_ref(self, count)
+
     /// The bytes as a view (§16.5): `s as []u8`, spelled as a method.
     pub fn as_bytes() -> []u8:
         (*self) as []u8

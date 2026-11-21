@@ -12702,39 +12702,6 @@ impl Codegen:
             else:
                 result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
-        else if intrinsic == MirIntrinsic.STR_TO_UPPER:
-            let r2 = self.mir_intrinsic_recv_str_value(body, args_id)
-            let t2 = wl_type_of(r2)
-            let p2: List[i64] = []
-            p2.push(self.str_llvm_type())
-            let a2: List[i64] = []
-            a2.push(self.str_view_arg(r2))
-            result = self.call_internal_runtime_fn("with_str_to_upper_ref", p2, a2, 1, t2)
-
-        else if intrinsic == MirIntrinsic.STR_TO_LOWER:
-            let r3 = self.mir_intrinsic_recv_str_value(body, args_id)
-            let t3 = wl_type_of(r3)
-            let p3: List[i64] = []
-            p3.push(self.str_llvm_type())
-            let a3: List[i64] = []
-            a3.push(self.str_view_arg(r3))
-            result = self.call_internal_runtime_fn("with_str_to_lower_ref", p3, a3, 1, t3)
-
-        else if intrinsic == MirIntrinsic.STR_REPLACE:
-            let r4 = self.mir_intrinsic_recv_str_value(body, args_id)
-            let t4 = wl_type_of(r4)
-            let s4a = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let s4b = self.mir_intrinsic_arg_str_value(body, args_id, 2)
-            let p4: List[i64] = []
-            p4.push(self.str_llvm_type())
-            p4.push(self.str_llvm_type())
-            p4.push(self.str_llvm_type())
-            let a4: List[i64] = []
-            a4.push(self.str_view_arg(r4))
-            a4.push(self.str_view_arg(s4a))
-            a4.push(self.str_view_arg(s4b))
-            result = self.call_internal_runtime_fn("with_str_replace_ref", p4, a4, 3, t4)
-
         else if intrinsic == MirIntrinsic.STR_SPLIT:
             let r6 = self.mir_intrinsic_recv_str_value(body, args_id)
             let t6 = wl_type_of(r6)
@@ -12751,17 +12718,6 @@ impl Codegen:
             a6.push(self.str_view_arg(d6))
             self.call_internal_runtime_fn("with_str_split_vec_ref", p6, a6, 3, wl_void_type(self.context))
             result = wl_build_load(self.builder, vt6, out6)
-
-        else if intrinsic == MirIntrinsic.STR_INDEX_OF:
-            let r5 = self.mir_intrinsic_recv_str_value(body, args_id)
-            let n5 = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let p5: List[i64] = []
-            p5.push(self.str_llvm_type())
-            p5.push(self.str_llvm_type())
-            let a5: List[i64] = []
-            a5.push(self.str_view_arg(r5))
-            a5.push(self.str_view_arg(n5))
-            result = self.call_internal_runtime_fn("with_str_index_of_ref", p5, a5, 2, i64_ty)
 
         else if intrinsic == MirIntrinsic.MAP_INCREMENT or intrinsic == MirIntrinsic.MAP_DECREMENT:
             let r7 = self.mir_intrinsic_arg(body, args_id, 0)
@@ -12861,19 +12817,6 @@ impl Codegen:
             upd_insert_args.push(upd_is_str)
             wl_build_call(self.builder, upd_insert_ty, upd_insert_fn, list_data_i64(upd_insert_args), 4)
             result = 0
-
-        else if intrinsic == MirIntrinsic.STR_REPEAT:
-            let sr_recv = self.mir_intrinsic_recv_str_value(body, args_id)
-            let sr_n = self.mir_intrinsic_arg(body, args_id, 1)
-            let sr_n64 = self.coerce_int(sr_n, i64_ty)
-            let sr_ty = wl_type_of(sr_recv)
-            let sr_params: List[i64] = []
-            sr_params.push(self.str_llvm_type())
-            sr_params.push(i64_ty)
-            let sr_args: List[i64] = []
-            sr_args.push(self.str_view_arg(sr_recv))
-            sr_args.push(sr_n64)
-            result = self.call_internal_runtime_fn("with_str_repeat_ref", sr_params, sr_args, 2, sr_ty)
 
         else:
             return false

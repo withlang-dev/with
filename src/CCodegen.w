@@ -95,16 +95,11 @@ enum CcBuiltin: i32:
     MAP_CLEAR
     OPT_IS_NONE
     STR_SPLIT
-    STR_TO_UPPER
-    STR_TO_LOWER
-    STR_REPLACE
-    STR_INDEX_OF
     MAP_INCREMENT
     MAP_DECREMENT
     MAP_UPDATE
     MAP_SLOT_WALK
     LIST_CONTAINS
-    STR_REPEAT
     ARR_LEN
     GENERIC_CALL
     LIST_JOIN
@@ -6178,7 +6173,7 @@ impl CCodegen:
             return self.sema.ty_i32 as i32
         if kind == CcBuiltin.STR_SLICE:
             return self.sema.ty_str as i32
-        if kind == CcBuiltin.STR_FIND or kind == CcBuiltin.STR_INDEX_OF:
+        if kind == CcBuiltin.STR_FIND:
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.STR_SPLIT:
             let hinted = self.call_dest_expected_tid(body, dest_place)
@@ -6188,8 +6183,6 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return CC_PSEUDO_TID_LIST
-        if kind == CcBuiltin.STR_TO_UPPER or kind == CcBuiltin.STR_TO_LOWER or kind == CcBuiltin.STR_REPLACE or kind == CcBuiltin.STR_REPEAT:
-            return self.sema.ty_str as i32
         if kind == CcBuiltin.ARR_LEN:
             return self.sema.ty_usize as i32
         if kind == CcBuiltin.ARR_LEN32:
@@ -6942,16 +6935,11 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.MAP_CLEAR: return CcBuiltin.MAP_CLEAR
     if intrinsic == MirIntrinsic.OPT_IS_NONE: return CcBuiltin.OPT_IS_NONE
     if intrinsic == MirIntrinsic.STR_SPLIT: return CcBuiltin.STR_SPLIT
-    if intrinsic == MirIntrinsic.STR_TO_UPPER: return CcBuiltin.STR_TO_UPPER
-    if intrinsic == MirIntrinsic.STR_TO_LOWER: return CcBuiltin.STR_TO_LOWER
-    if intrinsic == MirIntrinsic.STR_REPLACE: return CcBuiltin.STR_REPLACE
-    if intrinsic == MirIntrinsic.STR_INDEX_OF: return CcBuiltin.STR_INDEX_OF
     if intrinsic == MirIntrinsic.MAP_INCREMENT: return CcBuiltin.MAP_INCREMENT
     if intrinsic == MirIntrinsic.MAP_DECREMENT: return CcBuiltin.MAP_DECREMENT
     if intrinsic == MirIntrinsic.MAP_UPDATE: return CcBuiltin.MAP_UPDATE
     if intrinsic == MirIntrinsic.MAP_CAPACITY or intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT or intrinsic == MirIntrinsic.MAP_TAKE_AT: return CcBuiltin.MAP_SLOT_WALK
     if intrinsic == MirIntrinsic.LIST_CONTAINS: return CcBuiltin.LIST_CONTAINS
-    if intrinsic == MirIntrinsic.STR_REPEAT: return CcBuiltin.STR_REPEAT
     if intrinsic == MirIntrinsic.ARR_LEN: return CcBuiltin.ARR_LEN
     if intrinsic == MirIntrinsic.ARR_LEN32: return CcBuiltin.ARR_LEN32
     if intrinsic == MirIntrinsic.ARR_LEN64: return CcBuiltin.ARR_LEN64
@@ -7746,20 +7734,6 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.STR_INDEX_OF:
-            if argc < 2:
-                self.fail("str.index_of expects two arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let needle = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_index_of_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
-            else:
-                out = out ++ "    (void)with_str_index_of_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
         if kind == CcBuiltin.STR_SPLIT:
             if argc < 2:
                 self.fail("str.split expects two arguments")
@@ -7771,61 +7745,6 @@ impl CCodegen:
                 out = out ++ "    with_str_split_vec_ref(&(" ++ self.place_text(body, dest_place) ++ "), " ++ recv ++ ", " ++ delim ++ ");\n"
             else:
                 out = out ++ "    " ++ cc_lbrace() ++ " with_vec __with_tmp_split; with_str_split_vec_ref(&__with_tmp_split, " ++ recv ++ ", " ++ delim ++ "); " ++ cc_rbrace() ++ "\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_TO_UPPER:
-            if argc < 1:
-                self.fail("str.to_upper expects one argument")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_to_upper_ref(" ++ recv ++ ");\n"
-            else:
-                out = out ++ "    (void)with_str_to_upper_ref(" ++ recv ++ ");\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_TO_LOWER:
-            if argc < 1:
-                self.fail("str.to_lower expects one argument")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_to_lower_ref(" ++ recv ++ ");\n"
-            else:
-                out = out ++ "    (void)with_str_to_lower_ref(" ++ recv ++ ");\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_REPLACE:
-            if argc < 3:
-                self.fail("str.replace expects three arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let old_s = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            let new_s = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_replace_ref(" ++ recv ++ ", " ++ old_s ++ ", " ++ new_s ++ ");\n"
-            else:
-                out = out ++ "    (void)with_str_replace_ref(" ++ recv ++ ", " ++ old_s ++ ", " ++ new_s ++ ");\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_REPEAT:
-            if argc < 2:
-                self.fail("str.repeat expects two arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let n = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_repeat_ref(" ++ recv ++ ", (int64_t)(" ++ n ++ "));\n"
-            else:
-                out = out ++ "    (void)with_str_repeat_ref(" ++ recv ++ ", (int64_t)(" ++ n ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
