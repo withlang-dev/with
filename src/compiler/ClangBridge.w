@@ -7,6 +7,9 @@
 use rt.rt_core
 use rt.platform
 use std.libc.strtod
+// `str` methods are declared in std.string (#3483); this unit is compiled
+// without the prelude, so it names the module.
+use std.string
 
 // ── libSystem extern fns ────────────────────────────────────────
 // mkstemp and realpath are the runtime's with_libc_* seams (one body per

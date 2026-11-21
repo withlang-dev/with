@@ -10012,9 +10012,6 @@ impl Sema:
             if str_len_intrinsic != MirIntrinsic.NONE: return str_len_intrinsic
             if method_name == "byte_at": return MirIntrinsic.STR_BYTE_AT
             if method_name == "slice": return MirIntrinsic.STR_SLICE
-            if method_name == "contains": return MirIntrinsic.STR_CONTAINS
-            if method_name == "starts_with": return MirIntrinsic.STR_STARTS_WITH
-            if method_name == "ends_with": return MirIntrinsic.STR_ENDS_WITH
             // `find` is std.string's `find(needle, from = 0)` (#2377, D129);
             // STR_FIND serves only the pinned seed's lowering of the
             // compiler's own calls and retires with the next seed bump.
@@ -36711,8 +36708,6 @@ impl Sema:
                 return len_method_ret
             if method_name == "byte_at":
                 return self.ty_i32 as i32
-            if field == self.syms.contains or field == self.syms.starts_with or field == self.syms.ends_with:
-                return self.ty_bool as i32
             if method_name == "index_of":
                 return self.ty_isize as i32
             if field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.lower or field == self.syms.upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
@@ -39835,6 +39830,14 @@ impl Sema:
         let seq_resolved = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type)))
         if sema_iter_adapter_name(method_name) and self.get_type_kind(seq_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(seq_resolved as i32) == self.syms.list:
             self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "': a List's adapters are its iterator's, and a pipeline iterates it — `xs |> " ++ method_name ++ "(…)` (§13.5, D142)", node)
+            return 0
+        // A `str` method is declared in std.string (#3483). The prelude
+        // imports it; a unit compiled without the prelude names it.
+        var string_module_loaded = false
+        for path in self.module_paths:
+            if path.ends_with("std/string.w"): string_module_loaded = true
+        if self.get_type_kind(self.auto_deref_ref_ptr_type(seq_resolved)) == TypeKind.TY_STR and not string_module_loaded:
+            self.emit_error_with_help("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node, "`str` methods are declared in std.string, which this unit does not import (it is compiled without the prelude): add `use std.string`")
             return 0
         self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node)
         0
