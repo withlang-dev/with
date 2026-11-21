@@ -94,11 +94,13 @@ impl Sema:
             var token: isize = -1
             var ri: isize = 0
             for r in self.facade_resources:
-                if self.facade_same_fn(r.drop, csym) or r.producers.contains(csym): token = ri
+                if self.facade_same_fn(r.drop, csym) or r.producers.contains(csym) or self.facade_same_fn(r.init, csym) or r.destroyers.contains(csym): token = ri
                 ri += 1
             let hosts = self.facade_method_host(csym)
             if token < 0 and hosts.len() == 1: token = hosts[0]
-            if token >= 0 and self.pointer_holding_part(self.facade_resources[token].repr_tid, "").len() > 0:
+            // D215: an in-place resource's functions take a pointer to its
+            // record, so they are pointer functions whatever the record holds.
+            if token >= 0 and (self.facade_resources[token].init != 0 or self.pointer_holding_part(self.facade_resources[token].repr_tid, "").len() > 0):
                 self.facade_bridge_of.insert(cname.to_owned(), rendered)
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an
@@ -3674,6 +3676,16 @@ impl Sema:
             if id == self.local_file_id and si < self.source_text_names.len() and self.source_text_names[si].starts_with(prefix): return true
             si += 1
         false
+
+    // The name of the resource `fn_sym` produces (a `from` or the `init`), or "".
+    fn facade_resource_produced_by(fn_sym: i32) -> str:
+        if fn_sym == 0: return ""
+        for r in self.facade_resources:
+            if r.producers.contains(fn_sym) or self.facade_same_fn(r.init, fn_sym): return self.pool_resolve(r.name)
+        ""
+
+    // The prefix of a rendered operation's name (`__with_facade_<name>`).
+    fn facade_bridge_prefix() -> str: facade_render_bridge_name("")
 
     fn facade_bridge_redirect(fn_sym: i32) -> i32:
         if self.facade_bridge_of.len() == 0:

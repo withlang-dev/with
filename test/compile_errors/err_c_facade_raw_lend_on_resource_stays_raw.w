@@ -1,4 +1,4 @@
-//! expect-check-fail: raw c_import function call requires unsafe context
+//! expect-check-fail: wrong argument type in call to 'db_count'
 
 // D51 §16.2b.5: a lend of a resource is safe because With proves the
 // resource live, unmoved and undestroyed — which it cannot prove of a raw

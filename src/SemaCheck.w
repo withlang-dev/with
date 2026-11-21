@@ -29688,7 +29688,10 @@ impl Sema:
         // `builtins` for the prelude's functions and the intrinsics.
         let self_qualifier = not is_path and text == self.module_self_name()
         let builtins_qualifier = not is_path and text == "builtins"
-        if not self_qualifier and not builtins_qualifier and (self.get_visible_sig(root) >= 0 or self.generic_fn_node_for_symbol(root) != 0):
+        // D215 (§31): `c` qualifies the raw declaration of an imported C
+        // function, whatever a contract makes of its bare name.
+        let c_qualifier = not is_path and text == "c"
+        if not self_qualifier and not builtins_qualifier and not c_qualifier and (self.get_visible_sig(root) >= 0 or self.generic_fn_node_for_symbol(root) != 0):
             return 0
         let cur_opt = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
         let cur: i32 = cur_opt ?? -1
@@ -29710,6 +29713,10 @@ impl Sema:
                 return self.bind_qualified_module_member(node, with_str_clone_ref(self.current_module_path), member, text)
             if builtins_qualifier:
                 return self.bind_builtins_member(node, member)
+            if c_qualifier and self.ci_syms.contains(member) and self.current_module_uses_c_import():
+                self.ast.bind_namespace_ident(node as NodeId, member, 0)
+                self.raw_c_name_nodes.insert(node, 1)
+                return 1
             return 0
         if clash >= 0:
             let a = self.namespace_import_text(found)
@@ -30323,10 +30330,11 @@ impl Sema:
             fn_sym = self.resolve_displaced_fn_ident(self.ast.get_data0(callee), callee)
             // D64 (§16.2b.8, §16.2b.11): a free operation a facade presents
             // under the C name is its rendered bridge wherever that is visible.
-            fn_sym = self.facade_bridge_redirect(fn_sym)
+            // D215: `c.name(…)` is the raw declaration, never the rendering.
+            if not self.raw_c_name_nodes.contains(callee): fn_sym = self.facade_bridge_redirect(fn_sym)
             // D66 (§16.2b.5): a variadic free operation's presented call is
             // the case function its compile-time selector picks.
-            fn_sym = self.facade_variadic_redirect_free(fn_sym, extra_start, arg_count, node)
+            if not self.raw_c_name_nodes.contains(callee): fn_sym = self.facade_variadic_redirect_free(fn_sym, extra_start, arg_count, node)
             if fn_sym == 0:
                 return 0
             // Resolve for-comprehension _Payload marker to Some or Ok
@@ -30770,7 +30778,9 @@ impl Sema:
         // A call through a callable local is that value's call (its own
         // unsafety is checked above); the free function its name shares
         // (`unsafe fn danger` beside `let danger = ...`) is not called.
-        let unsafe_call_reason = if callable_value_tid != 0: "" else: self.fn_symbol_unsafe_call_reason(fn_sym, self.facade_call_is_presented(fn_sym))
+        // D215: the raw declaration, spelled `c.name`, always needs unsafe.
+        let raw_c_call = self.ast.kind(self.ast.get_data0(node)) == NodeKind.NK_IDENT and self.raw_c_name_nodes.contains(self.ast.get_data0(node))
+        let unsafe_call_reason = if callable_value_tid != 0: "" else if raw_c_call: f"`c.{self.pool_resolve(fn_sym)}` is the raw C function and requires unsafe context (§31)" else: self.fn_symbol_unsafe_call_reason(fn_sym, self.facade_call_is_presented(fn_sym))
         if unsafe_call_reason.len() > 0:
             if self.require_unsafe_operation(unsafe_call_reason, node) == false:
                 return 0
@@ -31319,6 +31329,17 @@ impl Sema:
         let shown_max = expected - receiver
         let shown_min = min_expected - receiver
         let shown_actual = supplied
+        // D215: a producer called by its C name with C's argument list
+        // (`sqlite3_open(path, &db)`): the slot is what the contract removes.
+        let bridge_prefix = self.facade_bridge_prefix()
+        if callee_name.starts_with(bridge_prefix):
+            let cname = callee_name.slice(bridge_prefix.len(), callee_name.len())
+            let produced = self.facade_resource_produced_by(self.pool_lookup_symbol(cname))
+            if produced.len() > 0 and shown_actual > shown_max:
+                self.emit_error_with_help(f"`{cname}` takes {shown_max} argument(s) here, found {shown_actual}: the contract produces the `{produced}`, so the parameter C fills is not passed", node, f"write `let value = {cname}(…)` with the remaining arguments; the raw C call is `unsafe {{ c.{cname}(…) }}`")
+                return false
+            self.emit_error(f"{what} '{cname}' expects {shown_max} argument(s), found {shown_actual}", node)
+            return false
         if shown_min == shown_max:
             self.emit_error(f"{what} '{callee_name}' expects {shown_max} argument(s), found {shown_actual}", node)
         else:

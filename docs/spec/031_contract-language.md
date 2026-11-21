@@ -85,6 +85,8 @@ The language is defined against what an undescribed imported function is.
 A function a contract names, in an `fn` item or in a resource's `from`,
 `init`, `drop`, `destroys`, `abandon` or `freed by`, is described. The base
 rule does not apply to it: it has the meaning the contract gives it.
+The raw declaration of an imported function is spelled `c.name`; a call of
+it requires `unsafe`.
 A call of it is **raw**, needing `unsafe`, when any of these holds, and safe
 otherwise:
 
