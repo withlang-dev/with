@@ -237,7 +237,7 @@ impl str:
     /// The pieces of the text between occurrences of `sep`. An empty text
     /// has no pieces; an empty `sep` gives the whole text as one piece.
     pub fn split(sep: &str) -> List[str]:
-        var pieces: List[str] = []
+        var pieces = List[str].new()
         with_str_split_vec_ref(&raw mut pieces as *mut u8, self, sep)
         pieces
 
