@@ -94,7 +94,7 @@ impl Sema:
             var token: isize = -1
             var ri: isize = 0
             for r in self.facade_resources:
-                if self.facade_same_fn(r.drop, csym) or r.producers.contains(csym) or self.facade_same_fn(r.init, csym): token = ri
+                if self.facade_same_fn(r.drop, csym) or r.producers.contains(csym) or self.facade_same_fn(r.init, csym) or r.destroyers.contains(csym): token = ri
                 ri += 1
             let hosts = self.facade_method_host(csym)
             if token < 0 and hosts.len() == 1: token = hosts[0]

@@ -641,8 +641,36 @@ fn facade_render_unshared_name_ops(ops: &str) -> str:
         if line.starts_with("fn "): seen.increment(line.slice(3, line.find("(")).to_owned())
     var out = ""
     var keep = true
+    // D215: a function more than one resource names as its drop consumes
+    // whichever of those resources it is given. Its forwarders (each `fn
+    // NAME(facade_self: R):` over one line that ends the value) become one
+    // function over the resources that name it.
+    let enders: HashMap[str, str] = HashMap.new()
+    let mixed: HashMap[str, i32] = HashMap.new()
+    var li = 0
+    while li < lines.len():
+        let line = lines[li]
+        if line.starts_with("fn ") and (seen.get(line.slice(3, line.find("("))) ?? &0) > 1:
+            let name = line.slice(3, line.find("(")).to_owned()
+            let head = "fn " ++ name ++ "(facade_self: "
+            let is_end = line.starts_with(head) and line.ends_with("):") and li + 1 < lines.len() and lines[li + 1] == "    let facade_ended = facade_self"
+            if is_end:
+                let resource = line.slice(head.len(), line.len() - 2)
+                enders.insert(name, (enders.get(name) ?? &"") ++ resource ++ "\n")
+            else: mixed.insert(name, 1)
+        li += 1
+    let emitted: HashMap[str, i32] = HashMap.new()
     for line in lines:
-        if line.starts_with("fn "): keep = (seen.get(line.slice(3, line.find("("))) ?? &0) == 1
+        if line.starts_with("fn "):
+            let name = line.slice(3, line.find("(")).to_owned()
+            keep = (seen.get(name) ?? &0) == 1
+            if not keep and enders.contains(name) and not mixed.contains(name) and not emitted.contains(name):
+                emitted.insert(name, 1)
+                let marker = "EndedBy_" ++ name.slice(facade_render_bridge_name("").len(), name.len())
+                out = out ++ "trait " ++ marker ++ " {}\n"
+                for resource in enders.get(name).unwrap().split("\n"):
+                    if resource.len() > 0: out = out ++ "impl " ++ marker ++ " for " ++ resource ++ "\n"
+                out = out ++ "fn " ++ name ++ "[T: " ++ marker ++ "](facade_self: T):\n    let facade_ended = facade_self\n"
         if keep and line.len() > 0: out = out ++ line ++ "\n"
     out
 
@@ -700,11 +728,20 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ iparams ++ "):\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(iparams) ++ ")\n"
         else if kind == FACADE_CLAUSE_DROP:
             let dropper = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
-            // OPTION B (awaiting Eric): a drop whose C parameter is `void *`
-            // takes any pointer (`free`), so it is not one resource's
-            // operation and its name keeps its raw meaning.
+            // D215 (§16.2b.11): a function whose resource parameter is
+            // `void *` takes any pointer (`free`), so it is not one
+            // resource's operation and its name keeps its raw meaning.
             if dropper != 0 and not facade_render_first_param_is_void_ptr(pool, intern, dropper):
                 out = out ++ "fn " ++ facade_render_bridge_name(intern.resolve(pool.get_data0(dropper as NodeId))) ++ "(facade_self: " ++ name ++ "):\n    let facade_ended = facade_self\n"
+        else if kind == FACADE_CLAUSE_DESTROYS:
+            // A destroyer's name consumes the resource too, with the
+            // destroyer's other arguments: the consuming method, by C name.
+            let destroyer = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            if destroyer != 0 and not facade_render_first_param_is_void_ptr(pool, intern, destroyer):
+                let dname = intern.resolve(pool.get_data0(destroyer as NodeId))
+                let (dparams, _) = facade_render_params_but(pool, intern, destroyer, 1, -1, "")
+                let head = if dparams.len() > 0: "facade_self: " ++ name ++ ", " ++ dparams else: "facade_self: " ++ name
+                out = out ++ "fn " ++ facade_render_bridge_name(dname) ++ "(" ++ head ++ "):\n    facade_self." ++ facade_render_present(pool, intern, ci, resource, dname) ++ "(" ++ facade_render_forward_names(dparams) ++ ")\n"
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for item in items:
         let li = facade_render_lend_item(pool, intern, ci, item)
