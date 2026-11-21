@@ -1353,8 +1353,10 @@ impl CiProject:
     fn fd_copy_source_param(si: i32) -> i32:
         let record = fd_record_pointee(self.symbols[si].ret_ty)
         if record.len() == 0: return -1
-        for pi in 0..self.symbols[si].param_ty.len():
-            if fd_record_pointee(self.symbols[si].param_ty[pi]) == record: return pi as i32
+        var pi = 0
+        for ty in self.symbols[si].param_ty:
+            if fd_record_pointee(ty) == record: return pi
+            pi += 1
         -1
 
     // The functions destroying a parameter of `record`; `unary` keeps those
