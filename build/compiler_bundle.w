@@ -87,3 +87,74 @@ pub fn run_compiler_bundle_action(ctx: ActionCtx) -> i32:
     if source_fp.len() != 64 or source_fp != wi_fp:
         return cb_fail(ctx, "fingerprint of the compiler bundle's interface (" ++ wi_fp ++ ") differs from the source fingerprint (" ++ source_fp ++ "); diff " ++ fp_source ++ ".tsv against " ++ fp_wi ++ ".tsv")
     0
+
+// #3401 (package-bundles.md): an importer reads a package's
+// interface, never its bodies, and the interface records what was inferred.
+// The fixture package test/package_bundle/lib leaves a return type, a
+// view's origins, a stored parameter and a callable's single invocation to
+// inference; each program under test/package_bundle/app is checked against
+// the package's source and against its interface alone. Both must give the
+// outcome the program's first line states, and the interface must reproduce
+// the source's declaration fingerprint.
+//
+// The fixture is copied under <dir> so a program's `use shapes` finds the
+// package's `lib/` from there, as it does in a project.
+// args: compiler=<path> dir=<dir>.
+pub fn run_package_interface_check_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    let compiler = wo_arg_value(args, "compiler=")
+    let dir = wo_arg_value(args, "dir=")
+    if compiler.len() == 0 or dir.len() == 0:
+        return cb_fail(ctx, "requires compiler= and dir= arguments")
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let fixture = "test/package_bundle"
+    if fs.mkdir_all(dir ++ "/lib") != 0 or fs.mkdir_all(dir ++ "/app") != 0 or fs.mkdir_all(dir ++ "/bundle") != 0 or fs.mkdir_all("out/command/" ++ ctx.target_name()) != 0:
+        return cb_fail(ctx, "could not create " ++ dir)
+    let programs = []
+    for path in fs.list_files(fixture):
+        if not path.ends_with(".w"): continue
+        let rel = path.slice(fixture.len() + 1, path.len())
+        if fs.write_text(dir ++ "/" ++ rel, fs.read_text(path)) != 0:
+            return cb_fail(ctx, "could not write " ++ dir ++ "/" ++ rel)
+        if rel.starts_with("app/"): programs.push(rel)
+    if programs.len() == 0:
+        return cb_fail(ctx, "no program under " ++ fixture ++ "/app")
+    let root_path = dir ++ "/bundle/root.w"
+    if fs.write_text(root_path, "use shapes\n") != 0:
+        return cb_fail(ctx, "could not write " ++ root_path)
+    let corpus = "tree:" ++ cb_abs(root, dir ++ "/lib")
+    let prefix = dir ++ "/bundle/shapes"
+    let built = cb_run(ctx, "build", &[cb_abs(root, compiler), "build", cb_abs(root, root_path), "--emit-obj", "--bundle-corpus", corpus, "--emit-bundle-interface", cb_abs(root, prefix ++ ".wi"), "--emit-bundle-manifest", cb_abs(root, prefix ++ ".manifest"), "--bundle-fingerprint", cb_abs(root, prefix ++ ".fp"), "-O1", "-o", cb_abs(root, prefix ++ ".o")])
+    if built.rc != 0:
+        return cb_fail(ctx, f"the package's bundle build failed with exit code {built.rc}\n" ++ built.stderr)
+    let checked = cb_run(ctx, "check-wi", &[cb_abs(root, compiler), "check", cb_abs(root, prefix ++ ".wi"), "--bundle-corpus", corpus, "--bundle-fingerprint", cb_abs(root, prefix ++ ".wi.fp")])
+    if checked.rc != 0:
+        return cb_fail(ctx, f"check of the package's interface failed with exit code {checked.rc}\n" ++ checked.stderr)
+    let source_fp = cb_first_line(fs.read_text(prefix ++ ".fp"))
+    let wi_fp = cb_first_line(fs.read_text(prefix ++ ".wi.fp"))
+    if source_fp.len() != 64 or source_fp != wi_fp:
+        return cb_fail(ctx, "the interface's fingerprint (" ++ wi_fp ++ ") differs from the source's (" ++ source_fp ++ "); diff " ++ prefix ++ ".fp.tsv against " ++ prefix ++ ".wi.fp.tsv")
+    var wrong = 0
+    for rel in programs:
+        let path = dir ++ "/" ++ rel
+        let first = cb_first_line(fs.read_text(path))
+        let wants_ok = first == "//! expect: ok"
+        let fragment = if first.starts_with("//! expect-error: "): first.slice(18, first.len()) else: ""
+        if not wants_ok and fragment.len() == 0:
+            return cb_fail(ctx, rel ++ ": its first line is neither `//! expect: ok` nor `//! expect-error: <text>`")
+        let label = rel.slice(4, rel.len() - 2)
+        let from_source = cb_run(ctx, label ++ ".source", &[cb_abs(root, compiler), "check", cb_abs(root, path)])
+        let from_interface = cb_run(ctx, label ++ ".interface", &[cb_abs(root, compiler), "check", cb_abs(root, path), "--link-bundle", cb_abs(root, prefix)])
+        let source_right = if wants_ok: from_source.rc == 0 else: from_source.rc != 0 and from_source.stderr.contains(fragment)
+        let interface_right = if wants_ok: from_interface.rc == 0 else: from_interface.rc != 0 and from_interface.stderr.contains(fragment)
+        if not source_right:
+            wrong = wrong + 1
+            eprint("package-interface-check: " ++ rel ++ " against the package's source: expected " ++ (if wants_ok: "ok" else: "an error containing `" ++ fragment ++ "`") ++ "\n" ++ from_source.stderr)
+        if not interface_right:
+            wrong = wrong + 1
+            eprint("package-interface-check: " ++ rel ++ " against the package's interface: expected " ++ (if wants_ok: "ok" else: "an error containing `" ++ fragment ++ "`") ++ "\n" ++ from_interface.stderr)
+    if wrong > 0:
+        return cb_fail(ctx, f"{wrong} outcome(s) differ from what the programs state")
+    print(f"package-interface-check: {programs.len()} programs agree against source and interface")
+    0

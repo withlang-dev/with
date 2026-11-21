@@ -667,6 +667,7 @@ impl BundleEmitter:
         var receiver_row = "-"
         var params = ""
         var params_row = ""
+        var inferred_pins = ""
         var printed = 0
         let origin = sema.declared_view_origin(sig)
         // §21.1 rule 6 (#1903): a `from` clause states the origins, in place
@@ -688,7 +689,19 @@ impl BundleEmitter:
             // A declared `@[effect]` pin is the parameter's contract (D30
             // step 2): the interface prints it and the row carries it.
             let pinned = bx_effect_pin_bits_of(ast, node, name_sym)
-            let eff = if pinned >= 0: pinned else: sema.declared_param_effect(pi, ptid, receiver_mode, sema.is_copy_frozen(ptid))
+            let declared_eff = if pinned >= 0: pinned else: sema.declared_param_effect(pi, ptid, receiver_mode, sema.is_copy_frozen(ptid))
+            // #3401: a package's interface records what was inferred. A body
+            // that stores or returns its parameter gives it an effect the
+            // declaration does not state, and a caller reads it (§12.4: a
+            // closure holding a local by place may not reach such a callee);
+            // it is printed as the pin a person would write.
+            // Only a callable parameter has a reader of it: a value handed
+            // over by value is the callee's whatever it does with it.
+            let escapes_unstated = self.tree and pinned < 0 and sema.get_type_kind(sema.resolve_alias(ptid)) == TypeKind.TY_FN and (declared_eff & EFF_ESCAPE_VALUE) == 0 and (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VALUE) != 0 and not ast.fn_decl_body_is_interface(node)
+            let eff = if escapes_unstated: declared_eff | EFF_ESCAPE_VALUE else: declared_eff
+            if escapes_unstated:
+                let names = sema_effect_bits_text(eff)
+                inferred_pins = inferred_pins ++ (if inferred_pins.len() > 0: ", " else: "") ++ pname ++ ": " ++ (if names.contains(","): "[" ++ names ++ "]" else: names)
             let vra = sema.sig_param_uses_value_ref_abi(sig, pi)
             if pname == "self":
                 if pi != 0 or fn_param_is_synth_receiver(pflags) == 0:
@@ -710,7 +723,10 @@ impl BundleEmitter:
             let noalias = fn_param_is_noalias(pflags) != 0
             // §12.4 (D75): the bundle interface records `once` — a consumer
             // may pass a consuming closure only to such a parameter.
-            let once = fn_param_is_once(pflags)
+            // #3401: a package's interface records what was inferred: a
+            // callable parameter its body invokes at most once is printed
+            // `once`, as a person would declare it.
+            let once = fn_param_is_once(pflags) or (self.tree and not ast.fn_decl_body_is_interface(node) and sema.get_type_kind(sema.resolve_alias(ptid)) == TypeKind.TY_FN and sema.sig_param_invoke_many_at(sig, pi) == 0)
             // A tree bundle prints a default as the source wrote it.
             let default_text = if pdefault != 0: " = " ++ render_expr(sema.ast, sema.pool, pdefault as NodeId, 0) else: ""
             // A `mut` parameter (D172, §3.8a) is the caller's place: its
@@ -753,6 +769,12 @@ impl BundleEmitter:
         // A returned view of a global crosses the boundary only as a stated
         // origin: the interface carries no body-inferred fact (D39), and
         // elision names a parameter, never a global (§21.1 rule 6).
+        // #3401: a package's interface records what was inferred. A result
+        // whose origins are not the elided one, and no `from` clause, is
+        // printed with the origins its body gave it, as the clause a person
+        // would write.
+        var inferred_from = ""
+        var inferred_from_row = ""
         if not has_from and not ast.fn_decl_body_is_interface(node):
             let derived_globals = sema.sig_derived_global_origins(sig)
             if derived_globals.len() > 0:
@@ -770,33 +792,40 @@ impl BundleEmitter:
             // to the wrong argument.
             if origin != DECLARED_ORIGIN_AMBIGUOUS:
                 var clause = ""
+                var clause_row = ""
                 var stray = ""
                 for pi in 0..param_count:
                     if (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) == 0:
                         continue
                     let pname = with_str_clone_ref(sema.pool_resolve(ast.fn_param_name(param_start, pi)))
                     clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ pname
+                    clause_row = clause_row ++ "param:" ++ pname ++ ";"
                     if pi != origin and stray.len() == 0:
                         stray = pname
                 if stray.len() > 0 and self.tree:
-                    self.omitted.push(mod_path ++ "\t" ++ full ++ "\tundeclared-origin")
-                    self.push_export(BX_NOTE, mod_path, full, "// not exported (its returned view's origin is not the elided one): fn " ++ full ++ "\n", "")
-                    return ""
-                if stray.len() > 0:
+                    inferred_from = " " ++ clause
+                    inferred_from_row = clause_row
+                else if stray.len() > 0:
                     let elided = if origin >= 0: "`" ++ sema.pool_resolve(ast.fn_param_name(param_start, origin)) ++ "`" else: "none"
                     self.refuse("returns a view derived from `" ++ stray ++ "`, but with no `from` clause its origin at a bundle boundary is the §21.1 elision (" ++ elided ++ ": the receiver, else the single borrowed parameter); write `" ++ clause ++ "` after the return type")
                     return ""
         if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from and self.tree:
+            for pi in 0..param_count:
+                if (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) == 0: continue
+                let pname = with_str_clone_ref(sema.pool_resolve(ast.fn_param_name(param_start, pi)))
+                inferred_from = inferred_from ++ (if inferred_from.len() == 0: " from " else: ", ") ++ pname
+                inferred_from_row = inferred_from_row ++ "param:" ++ pname ++ ";"
+        if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from and self.tree and inferred_from.len() == 0:
             // Left to the bundle: its callers are the bundle's own modules,
             // which read its body. An importer that names it is told so.
             self.omitted.push(mod_path ++ "\t" ++ full ++ "\tambiguous-origin")
             self.push_export(BX_NOTE, mod_path, full, "// not exported (its returned view names no one origin): fn " ++ full ++ "\n", "")
             return ""
-        if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from:
+        if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from and inferred_from.len() == 0:
             self.refuse("returns a reference with no unambiguous origin: name the origin in the source signature (D39 elision: receiver, else the single borrowed parameter), or write `from static` for a view of static data (§21.1 rule 6)")
             return ""
-        var from_text = ""
-        var from_row = ""
+        var from_text = inferred_from
+        var from_row = inferred_from_row
         if has_from:
             from_text = " " ++ self.written_from_clause(sema, node)
             for from_entrie in from_entries:
@@ -824,12 +853,14 @@ impl BundleEmitter:
                 printed_name = full.slice(dot + 1, full.len())
         // The `writes` clause is the declaration's last clause (§21.1 rule 1).
         let writes_text = if written_clause.len() > 0: " " ++ written_clause else: ""
-        var head = cc_attr ++ bx_effect_pins_text(sema, node) ++ (if must_use: "@[must_use]\n" else: "")
+        let written_pins = bx_effect_pins_text(sema, node)
+        let pins_text = if inferred_pins.len() == 0: written_pins else if written_pins.len() == 0: "@[effect(" ++ inferred_pins ++ ")]\n" else: written_pins.slice(0, written_pins.len() - 3) ++ ", " ++ inferred_pins ++ ")]\n"
+        var head = cc_attr ++ pins_text ++ (if must_use: "@[must_use]\n" else: "")
         head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ from_text ++ writes_text ++ "\n"
         let vis = if is_pub: "pub" else: "priv"
         let unsafe_text = if is_unsafe: "1" else: "0"
         let must_use_text = if must_use: "must_use" else: "-"
-        let row = "fn\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ unsafe_text ++ "\t" ++ receiver_row ++ "\t" ++ must_use_text ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ (if has_from: "\torigin:from:" ++ from_row else: f"\torigin:{origin}") ++ "\tvis:" ++ vis ++ "\twrites:" ++ writes_row ++ "\n"
+        let row = "fn\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ unsafe_text ++ "\t" ++ receiver_row ++ "\t" ++ must_use_text ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ (if has_from or inferred_from.len() > 0: "\torigin:from:" ++ from_row else: f"\torigin:{origin}") ++ "\tvis:" ++ vis ++ "\twrites:" ++ writes_row ++ "\n"
         if in_impl:
             self.last_fn_row = row
         else:

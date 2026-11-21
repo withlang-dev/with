@@ -4078,6 +4078,10 @@ impl Parser:
             let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
             let final_m_tp_start = if m_tp_count > 0: m_tp_start else: 0
             self.pool.add_fn_meta(fn_node, meta_flags, ret_type, m_params_start, param_count, final_m_tp_start, m_tp_count)
+            // An `@[effect]` pin above a method is that method's. It was
+            // left pending and attached to the next function declared
+            // outside the block.
+            self.attach_pending_effect_pins(fn_node)
             self.attach_global_writes(fn_node, method_global_writes)
             self.attach_view_origins(fn_node, method_view_origins)
             if self.pending_iter_of_self != 0:
