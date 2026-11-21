@@ -668,4 +668,6 @@ pub fn run_standalone_objects_check_action(ctx: ActionCtx) -> i32:
     if checked == 0:
         return pkg_fail(ctx, "requires at least one obj=<path> argument")
     print(f"standalone-objects-check: {checked} object(s) reference the runtime alone")
+    if ctx.fs().mkdir_all("out/.build-state") != 0 or ctx.fs().write_text(ctx.output(), "ok\n") != 0:
+        return pkg_fail(ctx, "could not write " ++ ctx.output())
     0
