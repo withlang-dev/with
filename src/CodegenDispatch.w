@@ -11661,42 +11661,6 @@ impl Codegen:
             let raw_len = wl_build_extract_value(self.builder, recv, 1)
             result = self.mir_convert_len_method_result(raw_len, intrinsic)
 
-        else if intrinsic == MirIntrinsic.STR_BYTE_AT:
-            let recv = self.mir_intrinsic_recv_str_value(body, args_id)
-            let index = self.mir_intrinsic_arg(body, args_id, 1)
-            let index64 = self.coerce_int(index, i64_ty)
-            let param_types: List[i64] = []
-            param_types.push(self.str_llvm_type())
-            param_types.push(i64_ty)
-            let args: List[i64] = []
-            args.push(self.str_view_arg(recv))
-            args.push(index64)
-            result = self.call_internal_runtime_fn("with_str_byte_at_ref", param_types, args, 2, i32_ty)
-
-        else if intrinsic == MirIntrinsic.STR_SLICE:
-            // #747: slice returns an OWNED str, and MIR schedules a drop for
-            // it. The old zero-copy view (gep + len) was a Copy-world relic:
-            // dropping the view freed a pointer INTO the receiver's live
-            // buffer (for start=0, the receiver's own block — the stage2
-            // lexer freed its source out from under itself and the allocator
-            // recycled it into the token vecs). Call the copying runtime
-            // slice instead; #748 view tokens can recover the zero-copy form.
-            let recv = self.mir_intrinsic_recv_str_value(body, args_id)
-            let start = self.mir_intrinsic_arg(body, args_id, 1)
-            let end = self.mir_intrinsic_arg(body, args_id, 2)
-            let start64 = self.coerce_int(start, i64_ty)
-            let end64 = self.coerce_int(end, i64_ty)
-            let str_ty = self.resolve_named_type(self.intern.intern("str"))
-            let param_types: List[i64] = []
-            param_types.push(self.str_llvm_type())
-            param_types.push(i64_ty)
-            param_types.push(i64_ty)
-            let args: List[i64] = []
-            args.push(self.str_view_arg(recv))
-            args.push(start64)
-            args.push(end64)
-            result = self.call_internal_runtime_fn("with_str_slice_ref", param_types, args, 3, str_ty)
-
         else if intrinsic == MirIntrinsic.STR_CONTAINS_CHAR:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let ch = self.mir_intrinsic_arg(body, args_id, 1)
