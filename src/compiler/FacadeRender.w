@@ -1103,6 +1103,26 @@ fn facade_render_receiver(pool: &AstPool, intern: &InternPool, decl: i32) -> i32
 // `slot` is the out parameter withheld from the constructor (-1 for a direct
 // return). Sema puts the constructor's declared dependency summary on this
 // method too (apply_facade_dependency_effects).
+// Whether an fn item describes `decl` and states `of <resource>` for the
+// resource named `name`.
+fn facade_render_item_states_of(pool: &AstPool, intern: &InternPool, decl: i32, name: &str) -> bool:
+    let cname = intern.resolve(pool.get_data0(decl as NodeId))
+    for item in facade_render_all_items(pool, NodeKind.NK_FACADE_FN):
+        if intern.resolve(pool.get_data0(item as NodeId)) != cname: continue
+        let cstart = pool.get_data1(item as NodeId)
+        for k in 0..pool.get_data2(item as NodeId):
+            let clause = pool.get_extra(cstart + k)
+            if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_OF and intern.resolve(pool.get_extra(pool.get_data1(clause as NodeId))) == name: return true
+    false
+
+// Whether an fn item states a clause of `kind` (an item's clauses start at
+// its first extra; a resource's follow its representation).
+fn facade_render_item_has_clause(pool: &AstPool, item: i32, kind: i32) -> bool:
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        if pool.get_data0(pool.get_extra(cstart + k) as NodeId) == kind: return true
+    false
+
 fn facade_render_receiver_method(pool: &AstPool, intern: &InternPool, ci: &List[i32], child: i32, producer: i32, slot: i32, ctor: &str, result: &str) -> str:
     let parent = facade_render_receiver(pool, intern, producer)
     // A producer made from its own resource (libxml2's `xmlDictCreateSub(xmlDict *)`)
@@ -1110,6 +1130,10 @@ fn facade_render_receiver_method(pool: &AstPool, intern: &InternPool, ci: &List[
     // definition of the same name on the same type.
     if parent <= 0 or parent == child:
         return ""
+    // D214: a producer has one home, chosen by `of`. An fn item that states
+    // `of` the produced type makes it that type's constructor, and no parent
+    // method is generated; `of` the parent, or none, leaves it the parent's.
+    if facade_render_item_states_of(pool, intern, producer, intern.resolve(pool.get_data0(child as NodeId))): return ""
     let pname = intern.resolve(pool.get_data0(parent as NodeId))
     let cname = intern.resolve(pool.get_data0(producer as NodeId))
     let mname = facade_render_present(pool, intern, ci, parent, cname)

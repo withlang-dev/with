@@ -30,6 +30,10 @@ c contract dbf:
         from db_prepare(out param out)
         from st_new
         drop st_finalize
+    fn db_prepare
+        of Statement
+    fn st_new
+        of Statement
     fn st_step
         lend
     fn db_id

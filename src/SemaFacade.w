@@ -52,6 +52,26 @@ impl Sema:
         self.facade_index_call_effects()
         self.facade_index_pair_ops()
         self.facade_index_imported_name_ops()
+        self.facade_index_parented_constructors()
+
+    // D214: a producer has one home. Without `of`, it is a method of the
+    // resource its first parameter receives, and its constructor on the
+    // produced type is the rendering's own. Maps that constructor's
+    // signature to the surviving spelling's method name.
+    mut fn facade_index_parented_constructors():
+        var ri: isize = -1
+        for r in self.facade_resources:
+            ri += 1
+            let rname = self.pool_resolve(r.name)
+            for p in r.producers:
+                let host = self.facade_receiver_of(p)
+                if host < 0 or host == ri: continue
+                let ci = self.facade_contract_for(p)
+                // `of` the produced type keeps the constructor its home.
+                if ci >= 0 and self.foreign_contracts[ci].of_resource == r.name: continue
+                let pn = self.pool_resolve(p)
+                let sig = self.facade_constructor_sig(rname ++ "." ++ self.facade_presented(ri, pn))
+                if sig >= 0: self.facade_parented_ctor_methods.insert(sig, self.pool_intern(self.facade_presented(host, pn)))
 
     // D198 (§16.2b.11): an operation a facade renders under its imported
     // name (`__with_facade_<name>`, FacadeRender.w

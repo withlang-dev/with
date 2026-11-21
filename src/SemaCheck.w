@@ -38682,6 +38682,13 @@ impl Sema:
 
         // mut.md Rev 8 §9.2 — closure capture conflict detection.
         self.check_closure_capture_conflicts(extra_start, mc_resolved_arg_count, mc_has_resolved_args, node, expr)
+        // D214: a producer has one home. One that receives a resource and
+        // states no `of` is that resource's method; its constructor on the
+        // produced type is the rendering's own.
+        if mc_param_offset_for_resolution == 0 and mc_sig_idx_for_effect >= 0 and self.facade_parented_ctor_methods.contains(mc_sig_idx_for_effect) and not self.current_file_is_generated("<facade "):
+            let home = self.pool_resolve(self.facade_parented_ctor_methods.get(mc_sig_idx_for_effect).unwrap())
+            let made = self.type_name(obj_type as i32)
+            self.emit_error_with_help(f"`{made}.{self.pool_resolve(field)}` is a producer that receives a resource, so it is that resource's method (D214)", node, f"write `parent.{home}(…)` with the remaining arguments; to keep it a constructor of `{made}`, state `of {made}` on its fn item in the contract")
         if mc_param_offset_for_resolution != 0 and mc_owner_sym_for_effect != 0 and (self.method_has_mut_self_flag(mc_owner_sym_for_effect, field) or self.builtin_method_requires_mutable_receiver(mc_owner_sym_for_effect, field)):
             self.refuse_captures_overlapping(expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args, node)
         if mc_sig_idx_for_effect >= 0:

@@ -45,7 +45,7 @@ c contract dbf:
 fn main:
     let d = Database.new(1).unwrap()
     let a = d.prepare(5).unwrap()
-    let b = Statement.prepare(d, 5).unwrap()
+    let b = d.prepare(5).unwrap()
     let d2 = Database.new(2).unwrap()
     let c = d2.prepare(5).unwrap()
     print(f"prepared {a.step()} {c.step()}")

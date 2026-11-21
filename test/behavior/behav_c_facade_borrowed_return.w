@@ -24,6 +24,8 @@ c contract dbf:
     resource Statement wraps *mut st
         from st_new
         drop st_finalize
+    fn st_new
+        of Statement
     fn db_id
         lend
         preserves param 0

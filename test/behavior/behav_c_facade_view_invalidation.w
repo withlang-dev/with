@@ -20,6 +20,8 @@ c contract notes:
     resource Twin wraps *mut twin
         from twin_new
         drop twin_free
+    fn twin_new
+        of Twin
     fn twin_id
         lend
     fn note_text
