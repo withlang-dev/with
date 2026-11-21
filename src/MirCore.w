@@ -4209,12 +4209,6 @@ fn mir_validate_call_unmaterialized_view(mir_mod: &MirModule, body: &MirBody, ca
     let arg_start = body.call_arg_starts[call_id]
     let arg_count = body.call_arg_counts[call_id]
     let intrinsic = body.call_intrinsic(call_id)
-    let str_index_args: i32 = if intrinsic == MirIntrinsic.STR_SLICE: 2 else if intrinsic == MirIntrinsic.STR_BYTE_AT: 1 else: 0
-    if str_index_args > 0:
-        for ai in 1..(str_index_args + 1):
-            if ai >= arg_count: break
-            if mir_validate_is_scalar_view(mir_mod, mir_validate_operand_type(mir_mod, body, body.call_arg_operands[arg_start + ai])): return ai
-        return -1
     if intrinsic != MirIntrinsic.NONE: return -1
     if callee_operand < 0 or callee_operand >= body.operand_kinds.len() or body.operand_kinds[callee_operand] != OperandKind.OK_CONSTANT: return -1
     let callee_const = body.operand_d0[callee_operand]

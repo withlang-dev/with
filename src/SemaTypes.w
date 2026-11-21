@@ -150,8 +150,6 @@ enum MirIntrinsic: i32:
     OPT_UNWRAP
     OPT_EXPECT
     STR_LEN
-    STR_BYTE_AT
-    STR_SLICE
     STR_CONTAINS_CHAR
     STR_FIND
     MAP_CLEAR

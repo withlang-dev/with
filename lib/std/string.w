@@ -234,6 +234,13 @@ impl str:
     /// The text repeated `count` times.
     pub fn repeat(count: i64) -> str: with_str_repeat_ref(self, count)
 
+    /// The byte at `index`, counted from 0.
+    pub fn byte_at(index: i64) -> i32: with_str_byte_at_ref(self, index)
+
+    /// A copy of the bytes from `start` up to, not including, `end`. Both
+    /// are clamped to the text; an empty range gives the empty text.
+    pub fn slice(start: i64, end: i64) -> str: with_str_slice_ref(self, start, end)
+
     /// The pieces of the text between occurrences of `sep`. An empty text
     /// has no pieces; an empty `sep` gives the whole text as one piece.
     pub fn split(sep: &str) -> List[str]:

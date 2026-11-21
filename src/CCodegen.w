@@ -88,8 +88,6 @@ enum CcBuiltin: i32:
     LIST_TAKE_FRONT
     LIST_RESTORE_FRONT
     STR_LEN
-    STR_BYTE_AT
-    STR_SLICE
     STR_CONTAINS_CHAR
     STR_FIND
     MAP_CLEAR
@@ -6168,10 +6166,6 @@ impl CCodegen:
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.STR_ULEN32:
             return self.sema.ty_u32 as i32
-        if kind == CcBuiltin.STR_BYTE_AT:
-            return self.sema.ty_i32 as i32
-        if kind == CcBuiltin.STR_SLICE:
-            return self.sema.ty_str as i32
         if kind == CcBuiltin.STR_FIND:
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.ARR_LEN:
@@ -6919,8 +6913,6 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.STR_LEN32: return CcBuiltin.STR_LEN32
     if intrinsic == MirIntrinsic.STR_LEN64: return CcBuiltin.STR_LEN64
     if intrinsic == MirIntrinsic.STR_ULEN32: return CcBuiltin.STR_ULEN32
-    if intrinsic == MirIntrinsic.STR_BYTE_AT: return CcBuiltin.STR_BYTE_AT
-    if intrinsic == MirIntrinsic.STR_SLICE: return CcBuiltin.STR_SLICE
     if intrinsic == MirIntrinsic.STR_CONTAINS_CHAR: return CcBuiltin.STR_CONTAINS_CHAR
     if intrinsic == MirIntrinsic.STR_FIND: return CcBuiltin.STR_FIND
     if intrinsic == MirIntrinsic.MAP_CLEAR: return CcBuiltin.MAP_CLEAR
@@ -7664,35 +7656,6 @@ impl CCodegen:
                 return "    abort();"
             let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             var out = self.emit_len_result(body, dest_place, "((" ++ recv ++ ").len)", kind, has_ret)
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_BYTE_AT:
-            if argc < 2:
-                self.fail("str.byte_at expects two arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_byte_at_ref(" ++ recv ++ ", (int64_t)(" ++ idx ++ "));\n"
-            else:
-                out = out ++ "    (void)with_str_byte_at_ref(" ++ recv ++ ", (int64_t)(" ++ idx ++ "));\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_SLICE:
-            if argc < 3:
-                self.fail("str.slice expects three arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let start = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            let end_ = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_slice_ref(" ++ recv ++ ", (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "));\n"
-            else:
-                out = out ++ "    (void)with_str_slice_ref(" ++ recv ++ ", (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

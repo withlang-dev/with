@@ -10010,8 +10010,6 @@ impl Sema:
         if tk == TypeKind.TY_STR:
             let str_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.STR_LEN, method_name)
             if str_len_intrinsic != MirIntrinsic.NONE: return str_len_intrinsic
-            if method_name == "byte_at": return MirIntrinsic.STR_BYTE_AT
-            if method_name == "slice": return MirIntrinsic.STR_SLICE
             // `find` is std.string's `find(needle, from = 0)` (#2377, D129);
             // STR_FIND serves only the pinned seed's lowering of the
             // compiler's own calls and retires with the next seed bump.
@@ -36490,7 +36488,7 @@ impl Sema:
     // slice/byte_at/repeat (#2023), `&str` for contains/starts_with/ends_with/
     // index_of/split/replace (#2434).
     fn str_intrinsic_param_type(method_name: &str) -> i32:
-        if method_name == "slice" or method_name == "byte_at" or method_name == "repeat": return self.ty_i64 as i32
+        if method_name == "repeat": return self.ty_i64 as i32
         if method_name == "contains" or method_name == "starts_with" or method_name == "ends_with" or method_name == "index_of" or method_name == "split" or method_name == "replace": return self.ty_str_view as i32
         0
 
@@ -36700,10 +36698,6 @@ impl Sema:
         if tk == TypeKind.TY_STR:
             if len_method_ret != 0:
                 return len_method_ret
-            if method_name == "byte_at":
-                return self.ty_i32 as i32
-            if field == self.syms.slice:
-                return self.ty_str as i32
         if tk == TypeKind.TY_ARRAY:
             if len_method_ret != 0:
                 return len_method_ret
