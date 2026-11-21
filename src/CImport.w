@@ -19201,6 +19201,18 @@ fn ci_own_addr_of_local(session: i64, cursor: i32, params: &List[str], locals: &
     let root = ci_own_place_root(session, a, params, locals)
     if root.starts_with("local:"): root.slice(6, root.len()) else: ""
 
+// #3173: `<i>:<field>` when `expr` is a field of the record parameter i
+// points at or holds (`p->state`, `p.state`), one level deep; "" otherwise.
+fn ci_own_param_field(session: i64, expr: i32, params: &List[str]) -> str:
+    let e = ci_own_peel(session, expr)
+    if with_ci_cursor_kind(session, e) != CXK_MEMBER_REF or with_ci_num_children(session, e) < 1: return ""
+    let base = ci_own_peel(session, with_ci_child(session, e, 0))
+    if with_ci_cursor_kind(session, base) != CXK_DECL_REF: return ""
+    let spelled = with_ci_cursor_spelling(session, base)
+    for pi in 0..params.len():
+        if spelled == params[pi] or ci_escape_reserved(spelled) == params[pi]: return f"{pi}:" ++ with_ci_cursor_spelling(session, e)
+    ""
+
 fn ci_own_record_store(session: i64, value: i32, params: &List[str], locals: &List[str]) -> str:
     let root = ci_own_place_root(session, value, params, locals)
     let v = ci_own_peel(session, value)
@@ -19244,6 +19256,11 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             // proof's to say (fd_out_fresh); the local is recorded as
             // stored there, not as stored anywhere.
             let slot = ci_own_deref_param(session, lhs, params)
+            // #3173: `fieldset:<i>:<field>:<src>`: what a field of the
+            // record parameter i names is given. An init function gives one
+            // a fresh allocation; that is half of an in-place resource's proof.
+            let set_field = ci_own_param_field(session, lhs, params)
+            if set_field.len() > 0: out = out ++ "fieldset:" ++ set_field ++ ":" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
             // #3374: a parameter stored into a field of a record in the
             // body's own frame is the call evidence's `frame:` record, not
             // a store. A local stored there stays the store it was.
@@ -19266,6 +19283,11 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             let arg = with_ci_child(session, cursor, ai)
             let root = ci_own_place_root(session, arg, params, locals)
             let a = ci_own_peel(session, arg)
+            // #3173: `fieldsink:<i>:<field>:<callee>:<pos>`: a field of the
+            // record parameter i names, handed to a call. An end function
+            // hands one to `free`; that is the other half of the proof.
+            let sunk_field = ci_own_param_field(session, arg, params)
+            if sunk_field.len() > 0 and callee.len() > 0: out = out ++ "fieldsink:" ++ sunk_field ++ ":" ++ callee ++ f":{ai - 1}\n"
             if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("local:"):
                 if callee.len() > 0: out = out ++ "localsink:" ++ root.slice(6, root.len()) ++ ":" ++ callee ++ f":{ai - 1}\n"
                 else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
