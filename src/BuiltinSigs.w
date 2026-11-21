@@ -26,7 +26,6 @@ fn builtin_sig_table() -> List[BuiltinSigRow]:
     t.push(sig("str", "byte_at", "index: i64"))
     t.push(sig("str", "slice", "start: i64, end: i64"))
     // str.contains, starts_with and ends_with are declared in std (#3483).
-    t.push(sig("str", "split", "sep: &str"))
     t.push(sig("array", "split_at", "mid: i64"))
     t.push(sig("array", "split_at_mut", "mid: i64"))
     t.push(sig("int", "rotate_left", "n: u32"))

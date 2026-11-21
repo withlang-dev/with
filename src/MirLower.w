@@ -19188,7 +19188,7 @@ fn cow_collection_of_sema(sema: &Sema, ty: i32) -> StdGeneric:
     g
 
 fn cow_intrinsic_creates_unique(kind: MirIntrinsic) -> bool:
-    kind == MirIntrinsic.LIST_NEW or kind == MirIntrinsic.LIST_WITH_CAPACITY or kind == MirIntrinsic.MAP_NEW or kind == MirIntrinsic.COLLECTION_LITERAL or kind == MirIntrinsic.MAP_LITERAL or kind == MirIntrinsic.LIST_CONCAT or kind == MirIntrinsic.STR_SPLIT
+    kind == MirIntrinsic.LIST_NEW or kind == MirIntrinsic.LIST_WITH_CAPACITY or kind == MirIntrinsic.MAP_NEW or kind == MirIntrinsic.COLLECTION_LITERAL or kind == MirIntrinsic.MAP_LITERAL or kind == MirIntrinsic.LIST_CONCAT
 
 fn cow_local_of_operand(body: &MirBody, ref_root: &List[i32], op: i32) -> i32:
     if op < 0 or op >= body.operand_kinds.len():

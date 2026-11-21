@@ -16,7 +16,8 @@
 //     completion wakes the agent. Refusing here made a filler turn of
 //     every battery start (2026-11-18); or
 //   - no open issue is left that the agent may work: every open issue
-//     carries `human attn needed` or `blocked`.
+//     carries `human attn needed`, `blocked` or `held` (D225: not worked
+//     until someone asks for it).
 // Otherwise the stop is refused and the open issues are named, so the next
 // action is one of them. An issue the agent cannot move is labelled
 // `human attn needed`, with the reason in a comment: that is the only way
@@ -72,7 +73,7 @@ fn queue() -> str:
     let given = env("WITH_STOP_GUARD_QUEUE")
     if given.len() > 0: return read_file(given) ?? ""
     let out = env("HOME") ++ "/.local/with-green/stop-guard-queue.new"
-    let listed = run_to_files(&["gh", "issue", "list", "--state", "open", "--limit", "500", "--json", "number,title,labels", "--jq", ".[] | select([.labels[].name] | (index(\"human attn needed\") or index(\"blocked\")) | not) | \"\\(.number)\\t\\(.title)\""], out, "/dev/null", 30000)
+    let listed = run_to_files(&["gh", "issue", "list", "--state", "open", "--limit", "500", "--json", "number,title,labels", "--jq", ".[] | select([.labels[].name] | (index(\"human attn needed\") or index(\"blocked\") or index(\"held\")) | not) | \"\\(.number)\\t\\(.title)\""], out, "/dev/null", 30000)
     if listed.code != 0: return read_file(cache_path()) ?? ""
     let text = read_file(out) ?? ""
     write_file(cache_path(), text)

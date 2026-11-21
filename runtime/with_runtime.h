@@ -70,7 +70,7 @@ typedef struct {
 } with_vec;
 
 with_vec with_vec_new(int64_t elem_size);
-void with_str_split_vec_ref(with_vec *out, with_str s, with_str delim);
+void with_str_split_vec_ref(uint8_t *out, with_str s, with_str delim);
 void with_vec_new_out(uint8_t *out, int64_t elem_size);
 void with_vec_new_with_capacity_out(with_vec *out, int64_t elem_size, int64_t cap);
 void with_vec_append_bytes(uint8_t *v, with_str s);

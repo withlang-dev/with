@@ -12702,23 +12702,6 @@ impl Codegen:
             else:
                 result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
-        else if intrinsic == MirIntrinsic.STR_SPLIT:
-            let r6 = self.mir_intrinsic_recv_str_value(body, args_id)
-            let t6 = wl_type_of(r6)
-            let d6 = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let vt6 = self.get_or_create_list_type(0, t6)
-            let out6 = self.create_entry_alloca(vt6)
-            let p6: List[i64] = []
-            p6.push(wl_ptr_type(self.context))
-            p6.push(self.str_llvm_type())
-            p6.push(self.str_llvm_type())
-            let a6: List[i64] = []
-            a6.push(out6)
-            a6.push(self.str_view_arg(r6))
-            a6.push(self.str_view_arg(d6))
-            self.call_internal_runtime_fn("with_str_split_vec_ref", p6, a6, 3, wl_void_type(self.context))
-            result = wl_build_load(self.builder, vt6, out6)
-
         else if intrinsic == MirIntrinsic.MAP_INCREMENT or intrinsic == MirIntrinsic.MAP_DECREMENT:
             let r7 = self.mir_intrinsic_arg(body, args_id, 0)
             let mp7 = self.mir_extract_map_ptr(r7)

@@ -10015,7 +10015,6 @@ impl Sema:
             // `find` is std.string's `find(needle, from = 0)` (#2377, D129);
             // STR_FIND serves only the pinned seed's lowering of the
             // compiler's own calls and retires with the next seed bump.
-            if method_name == "split": return MirIntrinsic.STR_SPLIT
             return MirIntrinsic.NONE
         if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
             let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
@@ -36705,8 +36704,6 @@ impl Sema:
                 return self.ty_i32 as i32
             if field == self.syms.slice:
                 return self.ty_str as i32
-            if method_name == "split":
-                return self.ensure_list_str_type()
         if tk == TypeKind.TY_ARRAY:
             if len_method_ret != 0:
                 return len_method_ret
