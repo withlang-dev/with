@@ -8479,9 +8479,13 @@ impl ComptimeEvaluator:
         // `comptime fn`: the marker is the author's promise to importers
         // that the function stays evaluable, and it is what tells a bundle
         // which bodies to carry. Inside a package no marker is needed.
+        // The callee's file is Sema's record of where the function is
+        // declared; the caller is the function this call is evaluated in,
+        // or, outside any, the module whose expression is being evaluated.
         if fn_node != 0 and (self.ast.get_data2(fn_node) / FnFlags.COMPTIME) % 2 == 0:
-            let callee_package = self.sema.package_of(self.decl_path(fn_node))
-            let caller_package = self.sema.package_of(self.current_source_path())
+            let callee_package = self.sema.package_of(self.sema.fn_symbol_source_path(fn_sym))
+            let caller_path = if self.active_fn_syms.len() > 0: self.sema.fn_symbol_source_path(self.active_fn_syms[self.active_fn_syms.len() - 1]) else: self.current_source_path()
+            let caller_package = self.sema.package_of(caller_path)
             // The build and compiler APIs are the capability-bearing mode
             // (§17.1b): the capability registry is where they are stated.
             if callee_package != caller_package and not self.sema.fn_symbol_is_tool_comptime_allowed(fn_sym):
