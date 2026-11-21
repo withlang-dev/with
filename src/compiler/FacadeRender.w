@@ -737,9 +737,21 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             // A destroyer's name consumes the resource too, with the
             // destroyer's other arguments: the consuming method, by C name.
             let destroyer = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
-            if destroyer != 0 and not facade_render_first_param_is_void_ptr(pool, intern, destroyer):
+            // D209: `destroys f(param N)` hands the resource at N, and the
+            // other parameters are the method's, fixed or discarded; the
+            // forwarder takes what the method takes.
+            let at = if destroyer != 0: facade_render_destroyer_at(pool, intern, resource, destroyer) else: 0
+            let placed_form = destroyer != 0 and (at != 0 or facade_render_fixes_or_discards(pool, intern, destroyer))
+            if destroyer != 0 and (placed_form or not facade_render_first_param_is_void_ptr(pool, intern, destroyer)):
                 let dname = intern.resolve(pool.get_data0(destroyer as NodeId))
-                let (dparams, _) = facade_render_params_but(pool, intern, destroyer, 1, -1, "")
+                var dparams = ""
+                if placed_form:
+                    let placed = facade_render_bridge(pool, intern, destroyer, 0, at, "facade_self.repr")
+                    if not placed.ok: continue
+                    dparams = placed.params
+                else:
+                    let (plain, _) = facade_render_params_but(pool, intern, destroyer, 1, -1, "")
+                    dparams = plain
                 let head = if dparams.len() > 0: "facade_self: " ++ name ++ ", " ++ dparams else: "facade_self: " ++ name
                 out = out ++ "fn " ++ facade_render_bridge_name(dname) ++ "(" ++ head ++ "):\n    facade_self." ++ facade_render_present(pool, intern, ci, resource, dname) ++ "(" ++ facade_render_forward_names(dparams) ++ ")\n"
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
