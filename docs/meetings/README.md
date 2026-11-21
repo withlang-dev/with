@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D226 — In-place resources: several `init` clauses each with its own `ok`, an integer literal after `ok`, an in-place resource stated in a facts file, and what the proof of a drafted one is (ruled; spec v7.77)](2026-11-21-D226-in-place-resources-several-initializers-a-literal-status-and-the-drafts-proof.md)
 - [D225 — windows-aarch64 is not a supported platform until someone asks for it: its builds are disabled and its issues are held (ruled; supersedes D137)](2026-11-20-D225-windows-aarch64-is-not-supported-until-someone-asks.md)
 - [D224 — A by-value parameter is a place for a pattern; only a temporary and `move` are owned subjects (ruled)](2026-11-20-D224-a-by-value-parameter-is-a-place-for-a-pattern.md)
 - [D223 — `Type.method` names the method as a function value: the receiver is its first parameter in the method's own mode; the bound form `x.method` is refused in every mode (ruled)](2026-11-19-D223-type-method-names-the-method-as-a-function-value.md)

@@ -135,11 +135,12 @@ role            = "allocator" | "reallocator" | "deallocator" | "context"
 resource_clause = [ "override" ] ( production | destruction | status | dependency
                 | capability | domain_use | presentation )
 production      = "from" c_name [ "(" "out" param_ref ")" ] [ "," ( field_check | "nonnull" ) ]
-                | "init" c_name [ "(" "self" ")" ]
+                | "init" c_name [ "(" "self" ")" ] [ "," "ok" status_value { "," status_value } ]
                 | "preinit" c_name [ "(" "self" ")" ]
 field_check     = ( "nullable" | "nonnull" ) "field" field_path
 destruction     = ( "drop" | "destroys" | "abandon" ) c_name [ "(" param_ref ")" ]
-status          = "ok" CONST { "," CONST } | "message" c_name
+status          = "ok" status_value { "," status_value } | "message" c_name
+status_value    = CONST | [ "-" ] INT
 dependency      = "borrows" param_ref | "independent"
 capability      = "movable" | "thread" thread_cap { thread_cap }
 thread_cap      = "creator" | "send" | "share" | "drop_any_thread"
@@ -436,12 +437,12 @@ produced. (§16.2b.15.)
 | `from f(out param p)` | `f` stores a new `N` through `p`. The compiler sets the slot to NULL, calls `f`, and inspects it: non-null is a produced resource, owned at once, whatever the status says. | G | | §16.2b.4 |
 | `from f, nullable field a.b` | a by-value producer: a NULL in field `a.b` of the result means nothing was produced; presents `Option[N]`. Checked when the call returns. | G | | §16.2b.4 |
 | `from f, nonnull field a.b` | as above, and a NULL there is a contract failure naming `f`; presents `N`. | G | | §16.2b.4 |
-| `init f(self)` | `f` initializes caller-provided storage in place; `N` is pinned: its representation has one address until destruction completes. | G | | §16.2b.4 |
+| `init f(self)` | `f` initializes caller-provided storage in place; `N` is pinned: its representation has one address until destruction completes. A resource may state several `init` clauses; each is a constructor. `init f(self), ok K` states that initializer's own success status; an initializer that states none takes the resource's `ok`. | G | | §16.2b.4 |
 | `preinit f` | `f` constructs the storage `init` fills. Without it the storage begins as the zeroed representation. | G | | §16.2b.4 |
 | `drop f` | `f`, taking only the representation, destroys it; `Drop` calls it. `drop f(param N)`: the representation is parameter N, and every other parameter is fixed on `fn f`. | G | a resource with a producer and no destruction path is refused | §16.2b.3 |
 | `destroys f` | `f` destroys the resource and takes further arguments; `destroys f(param N)`: the resource is parameter N, the first when the parentheses are absent; called explicitly, consuming. A resource with `destroys` and no `drop` is refused. The resource owns this fact, with `from`, `init`, `drop` and `abandon`. | G | | §16.2b.3 |
 | `abandon f` | `f`, which invokes no callbacks, runs before the destroyer on a drop path that abandons a half-configured callback pair. `abandon f(param N)`: the representation is parameter N, the first when the parentheses are absent, and every other parameter is fixed or discarded on `fn f`. | G | | §16.2b.9 |
-| `ok C1, C2` | the producers' status is success when it is one of these constants; with several, the `Ok` side carries the one that matched. A success status with nothing produced is `NothingProduced`, an error. | G | the status is uninterpreted: the constructor's result is `(status, Option[N])`. There is no rule that 0 means success | §16.2b.4 |
+| `ok C1, C2` | the producers' status is success when it is one of these constants; with several, the `Ok` side carries the one that matched. A status is a constant's name or an integer literal. A success status with nothing produced is `NothingProduced`, an error. | G | the status is uninterpreted: the constructor's result is `(status, Option[N])`. There is no rule that 0 means success | §16.2b.4 |
 | `message f` | `f` describes the resource's most recent failure; an error from an operation on the resource carries `message: str`, an owned copy read before any other operation on it. | G | | §16.2b.4 |
 | `borrows param p` | the product depends on the resource received at `p` and cannot outlive it. | R | every resource parameter of a producer is a dependency | §16.2b.6 |
 | `independent` | the product depends on no parameter. | G | dependent | §16.2b.6 |

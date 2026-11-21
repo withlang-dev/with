@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.76
+# The With Programming Language — Specification v7.77
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.77:** #3173 (Eric, 2026-11-21; rulings A to E, words blessed the same day). §31: a status after `ok` is a constant's name or an integer literal (`status_value`); a resource may state several `init` clauses, each a constructor, and `init f(self), ok K` states that initializer's own success status. §16.2b.3: what the proof of a drafted in-place resource is, including a failed allocation and the init's `ok`. §16.2b.15: a facts file may state an in-place resource. Implemented: the grammar, several initializers, and the facts-file form. Not yet: the draft's proof, and checking a stated pair against it.
+
 **Changelog v7.76:** #3177 (Eric, 2026-11-20). §31: `abandon f(param N)` names the parameter that receives the resource, as `drop` and `destroys` do (D209); the grammar's `destruction` production, the `abandon f` row and verification rule 2 say so. Implemented.
 
 **Changelog v7.75:** D215 (Eric, 2026-11-18; words blessed 2026-11-20). §16.2b.11: a described function's imported name means its modeled operation for every representation; a function more than one resource names as its drop or destroyer consumes whichever of those resources it is given; a function whose resource parameter is `void *` keeps its raw meaning. §31: the raw declaration of an imported function is spelled `c.name` and a call of it requires `unsafe`. Implemented, with the limits the §16.2b.11 status note lists.
