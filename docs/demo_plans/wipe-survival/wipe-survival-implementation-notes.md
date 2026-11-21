@@ -1,11 +1,5 @@
 # 🎮 WIPE: SURVIVAL — Implementation Notes
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
-> removal of `&mut T` from safe With (specification §15.1). Its `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
-
 
 ---
 
@@ -190,7 +184,7 @@ fn read_input() -> Input:
 ## Player
 
 ```with id="8xw9wz"
-fn update_player(world: &mut World, input: &Input, dt: f32):
+fn update_player(mut world: World, input: &Input, dt: f32):
     world.player.pos += input.move * SPEED * dt
 
     if input.aim.length() > 0.1:
@@ -202,7 +196,7 @@ fn update_player(world: &mut World, input: &Input, dt: f32):
 ## Enemies
 
 ```with id="tq3x3k"
-fn update_enemies(world: &mut World, dt: f32):
+fn update_enemies(mut world: World, dt: f32):
     for e in world.enemies:
         let dir = (world.player.pos - e.pos).normalize()
         e.pos += dir * e.speed * dt

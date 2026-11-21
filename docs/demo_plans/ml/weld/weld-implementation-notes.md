@@ -1,11 +1,5 @@
 # Weld — Implementation Notes (v3)
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
-> removal of `&mut T` from safe With (specification §15.1). Its `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
-
 
 **Companion to:** weld-design.md (v5)
 **Audience:** The agent implementing Weld in With.
@@ -184,7 +178,7 @@ type Tensor = {
 }
 
 impl Drop for Tensor:
-    fn drop(self: &mut Self):
+    move fn drop():
         if self.storage != null:
             storage_release(self.storage)
         if self.grad_meta != null:
@@ -369,13 +363,13 @@ fn grad_enabled(ctx: &Context) -> bool:
     if ctx.grad_stack.len() == 0: return true
     ctx.grad_stack.get(ctx.grad_stack.len() - 1) != 0
 
-fn no_grad(ctx: &mut Context):
+fn no_grad(mut ctx: Context):
     ctx.grad_stack.push(0)
 
-fn enable_grad(ctx: &mut Context):
+fn enable_grad(mut ctx: Context):
     ctx.grad_stack.push(1)
 
-fn restore_grad(ctx: &mut Context):
+fn restore_grad(mut ctx: Context):
     if ctx.grad_stack.len() > 0:
         ctx.grad_stack.pop()
 ```
@@ -692,7 +686,7 @@ fn attach_grad_node(out: Tensor, backward_fn: i32,
     node.output_meta = out.grad_meta
 ```
 
-Note: `out` is `&mut Tensor` — we borrow it mutably to set its
+Note: `out` is a `mut` parameter, the caller's own tensor, so we set its
 grad_meta. The caller still owns the tensor.
 
 ### backward

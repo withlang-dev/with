@@ -1,11 +1,5 @@
 # State Machine Async — Specification & Implementation Notes
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
-> removal of `&mut T` from safe With (specification §15.1). Its `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
-
 
 *`std.async.sm` — Opt-in high-density async without fiber stacks*
 
@@ -324,7 +318,7 @@ instead of blocking.
 
 ```
 // Provided by std.io for use with state machines
-fn TcpStream.poll_read(mut self, buf: &mut Buffer, cx: &Context) -> Poll[Result[usize, IoError]]
+fn TcpStream.poll_read(mut self, mut buf: Buffer, cx: &Context) -> Poll[Result[usize, IoError]]
 fn TcpStream.poll_write(mut self, data: &[u8], cx: &Context) -> Poll[Result[usize, IoError]]
 fn TcpStream.poll_ready(&self, cx: &Context) -> bool
 fn TcpListener.poll_accept(mut self, cx: &Context) -> Poll[Result[TcpStream, IoError]]
@@ -572,7 +566,7 @@ fn SmReactor.run(mut self):
 
         // 2. Wait for I/O events
         let timeout = self.next_timer_deadline()
-        let n = platform_poll(self.poll_fd, &mut self.events, timeout)
+        let n = platform_poll(self.poll_fd, self.events, timeout)
 
         // 3. Fire expired timers
         self.fire_timers()

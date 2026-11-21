@@ -9,11 +9,7 @@
 > `docs/spec/stdlib/std-encoding-rfc4648.md`, `docs/completed/stdlib_sourcing_plan.md`) is
 > authoritative for it.
 >
-> **Conformance note (D27, 2026-07-30):** the API sketches below predate the
-> removal of `&mut T` from safe With (specification §3.1). Their `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739. Since 2026-09-22 (D55) `print` is `print[T: Display](v: &T)`
+> **Note:** Since 2026-09-22 (D55) `print` is `print[T: Display](v: &T)`
 > and `Sender[T]` is `Clone`; sketches that assume the old shapes are read
 > accordingly.
 
@@ -285,46 +281,46 @@ fn Buf.remaining(self: &Self) -> usize
 fn Buf.is_empty(self: &Self) -> bool
 
 // Write (appends at write_pos, advances write_pos)
-fn Buf.put_u8(self: &mut Self, v: u8)
-fn Buf.put_u16_be(self: &mut Self, v: u16)
-fn Buf.put_u16_le(self: &mut Self, v: u16)
-fn Buf.put_u32_be(self: &mut Self, v: u32)
-fn Buf.put_u32_le(self: &mut Self, v: u32)
-fn Buf.put_u64_be(self: &mut Self, v: u64)
-fn Buf.put_u64_le(self: &mut Self, v: u64)
-fn Buf.put_i16_be(self: &mut Self, v: i16)
-fn Buf.put_i16_le(self: &mut Self, v: i16)
-fn Buf.put_i32_be(self: &mut Self, v: i32)
-fn Buf.put_i32_le(self: &mut Self, v: i32)
-fn Buf.put_i64_be(self: &mut Self, v: i64)
-fn Buf.put_i64_le(self: &mut Self, v: i64)
-fn Buf.put_f32_be(self: &mut Self, v: f32)
-fn Buf.put_f32_le(self: &mut Self, v: f32)
-fn Buf.put_f64_be(self: &mut Self, v: f64)
-fn Buf.put_f64_le(self: &mut Self, v: f64)
-fn Buf.put_bytes(self: &mut Self, data: &[u8])
-fn Buf.put_str(self: &mut Self, s: &str)
+mut fn Buf.put_u8(v: u8)
+mut fn Buf.put_u16_be(v: u16)
+mut fn Buf.put_u16_le(v: u16)
+mut fn Buf.put_u32_be(v: u32)
+mut fn Buf.put_u32_le(v: u32)
+mut fn Buf.put_u64_be(v: u64)
+mut fn Buf.put_u64_le(v: u64)
+mut fn Buf.put_i16_be(v: i16)
+mut fn Buf.put_i16_le(v: i16)
+mut fn Buf.put_i32_be(v: i32)
+mut fn Buf.put_i32_le(v: i32)
+mut fn Buf.put_i64_be(v: i64)
+mut fn Buf.put_i64_le(v: i64)
+mut fn Buf.put_f32_be(v: f32)
+mut fn Buf.put_f32_le(v: f32)
+mut fn Buf.put_f64_be(v: f64)
+mut fn Buf.put_f64_le(v: f64)
+mut fn Buf.put_bytes(data: &[u8])
+mut fn Buf.put_str(s: &str)
 
 // Read (reads at read_pos, advances read_pos)
-fn Buf.get_u8(self: &mut Self) -> Result[u8, BufError]
-fn Buf.get_u16_be(self: &mut Self) -> Result[u16, BufError]
-fn Buf.get_u16_le(self: &mut Self) -> Result[u16, BufError]
-fn Buf.get_u32_be(self: &mut Self) -> Result[u32, BufError]
-fn Buf.get_u32_le(self: &mut Self) -> Result[u32, BufError]
-fn Buf.get_u64_be(self: &mut Self) -> Result[u64, BufError]
-fn Buf.get_u64_le(self: &mut Self) -> Result[u64, BufError]
-fn Buf.get_i16_be(self: &mut Self) -> Result[i16, BufError]
-fn Buf.get_i16_le(self: &mut Self) -> Result[i16, BufError]
-fn Buf.get_i32_be(self: &mut Self) -> Result[i32, BufError]
-fn Buf.get_i32_le(self: &mut Self) -> Result[i32, BufError]
-fn Buf.get_i64_be(self: &mut Self) -> Result[i64, BufError]
-fn Buf.get_i64_le(self: &mut Self) -> Result[i64, BufError]
-fn Buf.get_f32_be(self: &mut Self) -> Result[f32, BufError]
-fn Buf.get_f32_le(self: &mut Self) -> Result[f32, BufError]
-fn Buf.get_f64_be(self: &mut Self) -> Result[f64, BufError]
-fn Buf.get_f64_le(self: &mut Self) -> Result[f64, BufError]
-fn Buf.get_bytes(self: &mut Self, n: usize) -> Result[List[u8], BufError]
-fn Buf.get_str(self: &mut Self, n: usize) -> Result[str, BufError]
+mut fn Buf.get_u8() -> Result[u8, BufError]
+mut fn Buf.get_u16_be() -> Result[u16, BufError]
+mut fn Buf.get_u16_le() -> Result[u16, BufError]
+mut fn Buf.get_u32_be() -> Result[u32, BufError]
+mut fn Buf.get_u32_le() -> Result[u32, BufError]
+mut fn Buf.get_u64_be() -> Result[u64, BufError]
+mut fn Buf.get_u64_le() -> Result[u64, BufError]
+mut fn Buf.get_i16_be() -> Result[i16, BufError]
+mut fn Buf.get_i16_le() -> Result[i16, BufError]
+mut fn Buf.get_i32_be() -> Result[i32, BufError]
+mut fn Buf.get_i32_le() -> Result[i32, BufError]
+mut fn Buf.get_i64_be() -> Result[i64, BufError]
+mut fn Buf.get_i64_le() -> Result[i64, BufError]
+mut fn Buf.get_f32_be() -> Result[f32, BufError]
+mut fn Buf.get_f32_le() -> Result[f32, BufError]
+mut fn Buf.get_f64_be() -> Result[f64, BufError]
+mut fn Buf.get_f64_le() -> Result[f64, BufError]
+mut fn Buf.get_bytes(n: usize) -> Result[List[u8], BufError]
+mut fn Buf.get_str(n: usize) -> Result[str, BufError]
 
 // Zero-copy views
 fn Buf.peek_u8(self: &Self) -> Result[u8, BufError]
@@ -333,10 +329,10 @@ fn Buf.as_slice(self: &Self) -> &[u8]
 fn Buf.unread_slice(self: &Self) -> &[u8]
 
 // Cursor control
-fn Buf.advance(self: &mut Self, n: usize)
-fn Buf.reset_read(self: &mut Self)
-fn Buf.compact(self: &mut Self)
-fn Buf.clear(self: &mut Self)
+mut fn Buf.advance(n: usize)
+mut fn Buf.reset_read()
+mut fn Buf.compact()
+mut fn Buf.clear()
 
 enum BufError:
     | Underflow
@@ -486,15 +482,15 @@ type FlagSet {
 
 fn FlagSet.new(name: str, description: str) -> FlagSet
 
-fn FlagSet.string(self: &mut Self, name: str, default: str, help: str) -> &str
-fn FlagSet.int(self: &mut Self, name: str, default: i32, help: str) -> &i32
-fn FlagSet.bool(self: &mut Self, name: str, default: bool, help: str) -> &bool
-fn FlagSet.float(self: &mut Self, name: str, default: f64, help: str) -> &f64
+mut fn FlagSet.string(name: str, default: str, help: str) -> &str
+mut fn FlagSet.int(name: str, default: i32, help: str) -> &i32
+mut fn FlagSet.bool(name: str, default: bool, help: str) -> &bool
+mut fn FlagSet.float(name: str, default: f64, help: str) -> &f64
 
-fn FlagSet.parse(self: &mut Self, args: &[str]) -> Result[List[str], FlagError]
+mut fn FlagSet.parse(args: &[str]) -> Result[List[str], FlagError]
 fn FlagSet.usage(self: &Self) -> str
 
-fn FlagSet.add_subcommand(self: &mut Self, name: str, description: str) -> &mut FlagSet
+mut fn FlagSet.add_subcommand(name: str, description: str, configure: fn(mut FlagSet))
 fn FlagSet.subcommand(self: &Self) -> Option[&str]
 ```
 
@@ -606,14 +602,14 @@ type TarEntry {
 
 fn TarReader.open(path: &str) -> Result[TarReader, TarError]
 fn TarReader.from_bytes(data: &[u8]) -> Result[TarReader, TarError]
-fn TarReader.next(self: &mut Self) -> Option[Result[TarEntry, TarError]]
-fn TarReader.read_data(self: &mut Self) -> Result[List[u8], TarError]
-fn TarReader.extract_all(self: &mut Self, dest: &str) -> Result[(), TarError]
+mut fn TarReader.next() -> Option[Result[TarEntry, TarError]]
+mut fn TarReader.read_data() -> Result[List[u8], TarError]
+mut fn TarReader.extract_all(dest: &str) -> Result[(), TarError]
 
 fn TarWriter.create(path: &str) -> Result[TarWriter, TarError]
-fn TarWriter.add_file(self: &mut Self, path: &str, data: &[u8]) -> Result[(), TarError]
-fn TarWriter.add_dir(self: &mut Self, path: &str) -> Result[(), TarError]
-fn TarWriter.finish(self: &mut Self) -> Result[(), TarError]
+mut fn TarWriter.add_file(path: &str, data: &[u8]) -> Result[(), TarError]
+mut fn TarWriter.add_dir(path: &str) -> Result[(), TarError]
+mut fn TarWriter.finish() -> Result[(), TarError]
 
 // tar.gz support (composes with std.compress.gzip)
 fn TarReader.open_gz(path: &str) -> Result[TarReader, TarError]
@@ -677,13 +673,13 @@ fn CsvReader.from_file(path: &str) -> Result[CsvReader, CsvError]
 fn CsvReader.delimiter(self: Self, d: u8) -> Self
 fn CsvReader.has_header(self: Self, h: bool) -> Self
 
-gen fn CsvReader.records(self: &mut Self) -> Result[List[str], CsvError]
+gen mut fn CsvReader.records() -> Result[List[str], CsvError]
 fn CsvReader.header(self: &Self) -> Option[&List[str]]
 
 fn CsvWriter.to_file(path: &str) -> Result[CsvWriter, CsvError]
 fn CsvWriter.delimiter(self: Self, d: u8) -> Self
-fn CsvWriter.write_record(self: &mut Self, fields: &[str]) -> Result[(), CsvError]
-fn CsvWriter.flush(self: &mut Self) -> Result[(), CsvError]
+mut fn CsvWriter.write_record(fields: &[str]) -> Result[(), CsvError]
+mut fn CsvWriter.flush() -> Result[(), CsvError]
 ```
 
 RFC 4180 compliant. Handles quoted fields, embedded newlines,
@@ -720,7 +716,7 @@ type XmlAttr {
 type XmlTokenizer { ... }
 
 fn XmlTokenizer.from_str(data: &str) -> XmlTokenizer
-gen fn XmlTokenizer.tokens(self: &mut Self) -> Result[XmlToken, XmlError]
+gen mut fn XmlTokenizer.tokens() -> Result[XmlToken, XmlError]
 ```
 
 Tokenizer only. No DOM, no XPath, no schema validation.
@@ -763,7 +759,7 @@ a Buf.
 fn random_bytes(n: usize) -> List[u8]
 fn random_u32() -> u32
 fn random_u64() -> u64
-fn random_fill(buf: &mut [u8])
+fn random_fill(buf: []mut u8)
 ```
 
 macOS: `SecRandomCopyBytes` via Security framework.
@@ -845,17 +841,17 @@ type BufWriter { ... }
 
 fn BufReader.new(fd: i32) -> BufReader
 fn BufReader.new_sized(fd: i32, capacity: usize) -> BufReader
-fn BufReader.read_line(self: &mut Self) -> Option[str]
-fn BufReader.read_bytes(self: &mut Self, n: usize) -> List[u8]
-fn BufReader.read_until(self: &mut Self, delim: u8) -> List[u8]
+mut fn BufReader.read_line() -> Option[str]
+mut fn BufReader.read_bytes(n: usize) -> List[u8]
+mut fn BufReader.read_until(delim: u8) -> List[u8]
 fn BufReader.peek(self: &Self, n: usize) -> &[u8]
-gen fn BufReader.lines(self: &mut Self) -> str
+gen mut fn BufReader.lines() -> str
 
 fn BufWriter.new(fd: i32) -> BufWriter
 fn BufWriter.new_sized(fd: i32, capacity: usize) -> BufWriter
-fn BufWriter.write(self: &mut Self, data: &[u8])
-fn BufWriter.write_str(self: &mut Self, s: &str)
-fn BufWriter.flush(self: &mut Self)
+mut fn BufWriter.write(data: &[u8])
+mut fn BufWriter.write_str(s: &str)
+mut fn BufWriter.flush()
 ```
 
 Default buffer size: 8KB. Reduces syscall overhead for

@@ -1,11 +1,5 @@
 # Weld: The ML Library for With (v5)
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
-> removal of `&mut T` from safe With (specification §15.1). Its `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
-
 
 **Built on:** Crux (compute substrate)
 **Goal:** PyTorch-level productivity, tinygrad-level simplicity,
@@ -154,7 +148,7 @@ type Tensor = {
 }
 
 impl Drop for Tensor:
-    fn drop(self: &mut Self):
+    move fn drop():
         if self.storage != null:
             storage_release(self.storage)
         if self.grad_meta != null:
@@ -274,13 +268,13 @@ fn context_destroy(ctx: *mut Context)
 ### Gradient mode (push/pop stack)
 
 ```
-fn no_grad(ctx: &mut Context):
+fn no_grad(mut ctx: Context):
     ctx.grad_stack.push(false)
 
-fn enable_grad(ctx: &mut Context):
+fn enable_grad(mut ctx: Context):
     ctx.grad_stack.push(true)
 
-fn restore_grad(ctx: &mut Context):
+fn restore_grad(mut ctx: Context):
     ctx.grad_stack.pop()
 
 fn grad_enabled(ctx: &Context) -> bool:
@@ -291,7 +285,7 @@ fn grad_enabled(ctx: &Context) -> bool:
 Usage with defer:
 
 ```
-fn run_inference(ctx: &mut Context):
+fn run_inference(mut ctx: Context):
     no_grad(ctx)
     defer: restore_grad(ctx)
     // all code runs without grad, restored on any exit path
@@ -646,9 +640,9 @@ trait Module =
     fn forward(self: &Self, ctx: &Context, input: &Tensor) -> Tensor
     fn parameters(self: &Self) -> Vec[*mut Tensor]
     fn named_parameters(self: &Self) -> Vec[(str, *mut Tensor)]
-    fn to_device(self: &mut Self, device: *mut Device)
-    fn train(self: &mut Self)
-    fn eval(self: &mut Self)
+    mut fn to_device(device: *mut Device)
+    mut fn train()
+    mut fn eval()
 ```
 
 `forward` borrows `self` and `input`, returns owned Tensor.
@@ -897,8 +891,8 @@ fn data_parallel(model: &Transformer, world: *mut World) -> DataParallel:
 Training step:
 
 ```
-fn dp_train_step(dp: &mut DataParallel, batches: &[Tensor],
-                 targets: &[Tensor], opt: &mut Adam):
+fn dp_train_step(mut dp: DataParallel, batches: &[Tensor],
+                 targets: &[Tensor], mut opt: Adam):
     var losses = Vec.new()
 
     // Forward on each device
@@ -1225,7 +1219,7 @@ fn sharded_adam(fsdp: &FSDP, world: *mut World, lr: f64) -> ShardedAdam:
     ...
 
 impl Optimizer for ShardedAdam:
-    fn step(self: &mut Self, rank: i32):
+    mut fn step(rank: i32):
         self.t = self.t + 1
         let ctx = &self.world.contexts[rank]
         for layer in 0..self.fsdp.num_layers:
@@ -1347,8 +1341,8 @@ fn distributed_generate(tp: &TensorParallel, tokenizer: &Tokenizer,
 
 ```
 trait Optimizer =
-    fn step(self: &mut Self, ctx: &Context)
-    fn zero_grad(self: &mut Self)
+    mut fn step(ctx: &Context)
+    mut fn zero_grad()
 
 type Adam = {
     params: Vec[*mut Tensor],
@@ -1372,7 +1366,7 @@ fn adam(params: Vec[*mut Tensor], lr: f64) -> Adam:
     }
 
 impl Optimizer for Adam:
-    fn step(self: &mut Self, ctx: &Context):
+    mut fn step(ctx: &Context):
         self.t = self.t + 1
         for i in 0..self.params.len():
             let p = self.params[i]
@@ -1396,7 +1390,7 @@ impl Optimizer for Adam:
             // Update params
             *p = sub(ctx, *p, mul_scalar(ctx, div(ctx, m_hat, add_scalar(ctx, sqrt(ctx, v_hat), self.eps)), self.lr))
 
-    fn zero_grad(self: &mut Self):
+    mut fn zero_grad():
         for p in self.params:
             p.grad_meta.grad = null
 ```
@@ -1453,13 +1447,13 @@ type TensorInfo = {
 
 fn load_safetensors(path: &str) -> SafetensorsFile
 fn load_tensor(file: &SafetensorsFile, name: &str, device: *mut Device) -> Tensor
-fn load_weights(model: &mut Transformer, file: &SafetensorsFile, device: *mut Device)
+fn load_weights(mut model: Transformer, file: &SafetensorsFile, device: *mut Device)
 ```
 
 ### Sharded weight loading (for distributed)
 
 ```
-fn load_weights_sharded(fsdp: &mut FSDP, file: &SafetensorsFile):
+fn load_weights_sharded(mut fsdp: FSDP, file: &SafetensorsFile):
     for layer_idx in 0..fsdp.num_layers:
         for sp_group in &fsdp.sharded_params[layer_idx]:
             let name = sp_group[0].name
@@ -1471,7 +1465,7 @@ fn load_weights_sharded(fsdp: &mut FSDP, file: &SafetensorsFile):
                 let shard_data = slice(flat, 0, start, end)
                 sp_group[rank].shard = to(shard_data, fsdp.world.devices[rank])
 
-fn load_weights_tp(tp: &mut TensorParallel, file: &SafetensorsFile):
+fn load_weights_tp(mut tp: TensorParallel, file: &SafetensorsFile):
     // Load full weights, shard per tensor parallel config
     for i in 0..tp.world.size:
         for block_idx in 0..tp.shards[i].blocks.len():

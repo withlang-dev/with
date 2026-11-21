@@ -1,11 +1,5 @@
 # withkmod — A Linux Kernel Module in With
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
-> removal of `&mut T` from safe With (specification §15.1). Its `&mut`
-> signatures are non-conforming and must be respelled (mut receivers,
-> `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
-
 
 ## 1. What to Build
 
@@ -61,7 +55,7 @@ spin_unlock(&ring->lock);
 In With, this is impossible:
 
 ```with
-fn read_byte(ring: &mut RingBuf) -> Result[u8, KernelError] =
+fn read_byte(mut ring: RingBuf) -> Result[u8, KernelError] =
     with ring.lock:        // acquires spinlock
         if ring.count == 0:
             return Err(.Again)  // lock released by `with` block
@@ -296,7 +290,7 @@ fn ringbuf_write(
     let to_write = min(count, local_buf.len())
 
     // Copy from userspace (outside the lock)
-    let not_copied = copy_from_user(&mut local_buf, user_buf, to_write)
+    let not_copied = copy_from_user(local_buf, user_buf, to_write)
     if not_copied != 0:
         return -EFAULT
 
@@ -557,11 +551,11 @@ extend Locked[T]
     fn new(value: T) -> Locked[T] =
         .{ inner: value, lock: SpinLock.new() }
 
-    // The `with` block yields a &mut T while holding the lock
-    fn with[R](self: &mut Self, body: fn(&mut T) -> R) -> R =
+    // The `with` block hands the body the value as a `mut` parameter while holding the lock
+    mut fn with[R](body: fn(mut T) -> R) -> R =
         self.lock.acquire()
         defer self.lock.release()
-        body(&mut self.inner)
+        body(self.inner)
 ```
 
 Usage:
