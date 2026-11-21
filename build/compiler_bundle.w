@@ -111,7 +111,7 @@ pub fn run_package_interface_check_action(ctx: ActionCtx) -> i32:
     let fixture = "test/package_bundle"
     if fs.mkdir_all(dir ++ "/lib") != 0 or fs.mkdir_all(dir ++ "/app") != 0 or fs.mkdir_all(dir ++ "/bundle") != 0 or fs.mkdir_all("out/command/" ++ ctx.target_name()) != 0:
         return cb_fail(ctx, "could not create " ++ dir)
-    var programs: List[str] = List.new()
+    let programs = []
     for path in fs.list_files(fixture):
         if not path.ends_with(".w"): continue
         let rel = path.slice(fixture.len() + 1, path.len())
