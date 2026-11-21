@@ -145,12 +145,23 @@ pub fn run_package_interface_check_action(ctx: ActionCtx) -> i32:
             return cb_fail(ctx, rel ++ ": its first line is neither `//! expect: ok` nor `//! expect-error: <text>`")
         let label = rel.slice(4, rel.len() - 2)
         let from_source = cb_run(ctx, label ++ ".source", &[cb_abs(root, compiler), "check", cb_abs(root, path)])
-        let from_interface = cb_run(ctx, label ++ ".interface", &[cb_abs(root, compiler), "check", cb_abs(root, path), "--link-bundle", cb_abs(root, prefix)])
         let source_right = if wants_ok: from_source.rc == 0 else: from_source.rc != 0 and from_source.stderr.contains(fragment)
-        let interface_right = if wants_ok: from_interface.rc == 0 else: from_interface.rc != 0 and from_interface.stderr.contains(fragment)
         if not source_right:
             wrong = wrong + 1
             eprint("package-interface-check: " ++ rel ++ " against the package's source: expected " ++ (if wants_ok: "ok" else: "an error containing `" ++ fragment ++ "`") ++ "\n" ++ from_source.stderr)
+    // The package's source is removed before anything is checked against
+    // the bundle: a bundled module resolves from its interface, so the
+    // source need not exist, and nothing can be read from it.
+    let package_source = fs.read_text(dir ++ "/lib/shapes.w")
+    if fs.remove_tree(dir ++ "/lib") != 0: return cb_fail(ctx, "could not remove " ++ dir ++ "/lib")
+    for rel in programs:
+        let path = dir ++ "/" ++ rel
+        let first = cb_first_line(fs.read_text(path))
+        let wants_ok = first == "//! expect: ok"
+        let fragment = if first.starts_with("//! expect-error: "): first.slice(18, first.len()) else: ""
+        let label = rel.slice(4, rel.len() - 2)
+        let from_interface = cb_run(ctx, label ++ ".interface", &[cb_abs(root, compiler), "check", cb_abs(root, path), "--link-bundle", cb_abs(root, prefix)])
+        let interface_right = if wants_ok: from_interface.rc == 0 else: from_interface.rc != 0 and from_interface.stderr.contains(fragment)
         if not interface_right:
             wrong = wrong + 1
             eprint("package-interface-check: " ++ rel ++ " against the package's interface: expected " ++ (if wants_ok: "ok" else: "an error containing `" ++ fragment ++ "`") ++ "\n" ++ from_interface.stderr)
@@ -158,9 +169,9 @@ pub fn run_package_interface_check_action(ctx: ActionCtx) -> i32:
     // the package's source after its bundle was built is not there, for
     // `check` and for `run` alike. (`run` once dropped `--link-bundle` and
     // compiled the package from its source without a word.)
-    let late_source = fs.read_text(dir ++ "/lib/shapes.w") ++ "\npub fn added_after_the_bundle() -> i32: 9\n"
+    let late_source = package_source ++ "\npub fn added_after_the_bundle() -> i32: 9\n"
     let late_program = dir ++ "/app/names_what_only_the_source_has.w"
-    if fs.write_text(dir ++ "/lib/shapes.w", late_source) != 0 or fs.write_text(late_program, "use shapes\nfn main: print(added_after_the_bundle())\n") != 0:
+    if fs.mkdir_all(dir ++ "/lib") != 0 or fs.write_text(dir ++ "/lib/shapes.w", late_source) != 0 or fs.write_text(late_program, "use shapes\nfn main: print(added_after_the_bundle())\n") != 0:
         return cb_fail(ctx, "could not write the late-source probe under " ++ dir)
     let late_check = cb_run(ctx, "late.check", &[cb_abs(root, compiler), "check", cb_abs(root, late_program), "--link-bundle", cb_abs(root, prefix)])
     let late_run = cb_run(ctx, "late.run", &[cb_abs(root, compiler), "run", "--link-bundle", cb_abs(root, prefix), cb_abs(root, late_program)])

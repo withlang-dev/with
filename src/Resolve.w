@@ -1547,8 +1547,11 @@ fn import_not_found_message(dotted: &str) -> str:
         msg = msg ++ " (build-generated modules live under out/gen; run `with build` once in a fresh checkout)"
     msg
 
+// A module a linked bundle provides exists by its interface section: the
+// importer reads the interface, never the body, so the package's source
+// need not be there (#3401).
 fn resolve_file_exists(path: &str) -> bool:
-    with_fs_read_file(path).len() > 0
+    bundle_interface_registered(path) or with_fs_read_file(path).len() > 0
 
 fn resolve_parent_lib_candidate(module_dir: &str, rel_path: &str) -> str:
     var cur = with_str_clone_ref(module_dir)
