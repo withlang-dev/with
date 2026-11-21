@@ -1381,6 +1381,8 @@ impl CiProject:
                 let src = given.slice(field_head.len(), given.len())
                 if src == "null": continue
                 if src.starts_with("local:") and self.fd_local_fresh_for_field(si, src.slice(6, src.len()), pi, parts[0]): fresh = true
+                // `p->state = alloc(...)`: the call's result goes nowhere else.
+                else if (src.starts_with("call:") or src.starts_with("indirect:")) and self.fd_source_verdict(si, src, 1, -1) == "owned": fresh = true
                 else: other = true
             if fresh and not other: out.push(parts[0].to_owned())
         out
