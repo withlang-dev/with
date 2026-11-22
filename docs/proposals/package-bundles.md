@@ -99,6 +99,28 @@ so those symbols are not a lasting ABI.
 The saving is the non-generic bodies. A package that is mostly generic
 saves little; that is this design's limit.
 
+**What "a `comptime` function the importer may call" means (Eric,
+2026-11-21).** A compile-time call that crosses a package boundary reaches
+only a `comptime fn` (§17.1). So the bodies a bundle carries for the
+evaluator are exactly those of its `pub comptime fn`s and of every function
+of the package they reach. A `comptime fn` whose compile-time answer the
+compiler supplies (the runtime's target queries) crosses as a declaration
+without a body.
+
+**The build and compiler APIs.** They need no marker: they run under
+driver-minted capabilities (§17.1b) and the capability registry states
+which functions they are. A user's `build.w` is evaluated at compile time
+and calls them, so once the standard library is a bundle their bodies must
+still reach the evaluator. This design's answer: **they cross the boundary
+with their bodies**, exactly as a `comptime fn` does, and the registry is
+the list of them. The alternative, the driver supplying them natively,
+would need a native twin of every registry function kept in step with its
+source, and a build file would then run different code when evaluated
+against a bundle than against source. One mechanism keeps "a program built
+with bundles and one built from source accept and reject the same
+programs" true for build files too. This is to be confirmed before
+standard-library bundling (step 6) starts.
+
 ### 5. Globals and initialization
 
 - A package's globals are storage in its bundle, initialized by the
