@@ -220,6 +220,15 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
             value_item = current_fn
             facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+        else if clause.starts_with("buffer field ") and clause.contains(" remaining field ") and facts.value_fns.contains(current_fn):
+            // D210: a step function of a by-value resource reads and writes
+            // through fields of the record (zlib's `deflate` through
+            // `next_in`/`avail_in` and `next_out`/`avail_out`). Carried as
+            // written, after the `of R` that makes the function the
+            // resource's.
+            if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+            value_item = current_fn
+            facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
         else if clause.starts_with("param ") and clause.contains(" fixed ") and facts.value_fns.contains(current_fn):
             // §16.2b.11: a parameter of a by-value resource's function that
             // the presented call always passes (zlib's `inflateInit_` takes

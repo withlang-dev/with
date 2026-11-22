@@ -1,0 +1,39 @@
+//! expect-stdout: ok
+// D210, #3173: a facts file states the buffer fields of a by-value
+// resource's step function, after the `of R` that makes the function the
+// resource's. zlib's `deflate` reads through `next_in`/`avail_in` and
+// writes through `next_out`/`avail_out`; with these lines a program
+// compresses and decompresses with no `unsafe`. The draft carries the
+// clauses as written, on one `fn` item, with `registry:` provenance.
+use compiler.ConanClient
+use std.fs
+use std.process
+use std.os
+
+fn main:
+    let root = "out/tmp/conan_facade_buffer_field_facts_test"
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    let registry = root ++ "/registry"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    assert(mkdir_p(registry ++ "/registry/c/zs") == 0)
+    let header = "typedef struct strm { unsigned char *next_in; unsigned avail_in; unsigned char *next_out; unsigned avail_out; void *state; } strm;\nint strm_init(strm *s);\nint strm_step(strm *s, int flush);\nint strm_end(strm *s);\n"
+    assert(write_file(dep ++ "/include/zs.h", header) == 0)
+    assert(write_file(src ++ "/zs.h", header) == 0)
+    assert(write_file(src ++ "/zs.c", "#include <stdlib.h>\n#include \"zs.h\"\nint strm_init(strm *s) { s->state = malloc(8); return s->state ? 0 : -4; }\nint strm_step(strm *s, int flush) { while (s->avail_in > 0 && s->avail_out > 0) { *s->next_out++ = *s->next_in++; s->avail_in--; s->avail_out--; } return flush; }\nint strm_end(strm *s) { free(s->state); s->state = 0; return 0; }\n") == 0)
+    let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c zs.c\",\n  \"file\": \"zs.c\"\n}\n]\n"
+    assert(write_file(build ++ "/compile_commands.json", commands) == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"zs\"]}\n") == 0)
+    assert(write_file(registry ++ "/registry/c/zs/facts.w", "c facts zs:\n    resource Stream wraps strm\n        init strm_init(self), ok 0    // zs.h: returns 0 once the state is allocated\n        drop strm_end    // zs.h: frees the state\n    fn strm_step\n        of Stream    // zs.h: steps the stream strm_init set up\n        buffer field next_in remaining field avail_in    // zs.h: reads avail_in bytes at next_in and updates both\n        buffer field next_out remaining field avail_out    // zs.h: writes at next_out and updates both\n") == 0)
+    assert(set_env("WITH_REGISTRY", "file://" ++ current_dir() ++ "/" ++ registry) == 0)
+    conan_write_facade("zs", "1.0", dep, src, build)
+    let facade = read_file(dep ++ "/contract.w") ?? ""
+    let ok = facade.contains("    fn strm_step\n        of Stream    // registry: zs.h: steps the stream strm_init set up\n        buffer field next_in remaining field avail_in    // registry: zs.h: reads avail_in bytes at next_in and updates both\n        buffer field next_out remaining field avail_out    // registry: zs.h: writes at next_out and updates both\n")
+    if not ok:
+        print(facade)
+        print(read_file(dep ++ "/contract-report.txt") ?? "")
+    assert(ok)
+    print("ok")
