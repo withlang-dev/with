@@ -3884,12 +3884,14 @@ impl Sema:
                 self.emit_error_with_help(f"fn '{fname}': {shown} is both a buffer or fixed parameter and a callback, userdata, retention or consumption parameter; each parameter has one presented contract (§16.2b.8, §16.2b.9)", node, "keep one of the two clauses that name this parameter")
                 return
         // D209: a drop or a destroyer may fix or discard its other
-        // parameters; an initializer takes only what the resource passes it.
-        var is_init = false
+        // parameters, and so may an initializer (zlib's `inflateInit_`
+        // takes the header's version text and the stream's size). A
+        // `preinit` constructs the storage and takes only its own arguments.
+        var is_preinit = false
         for r in self.facade_resources:
-            if r.inits.contains(fn_sym) or r.preinit == fn_sym: is_init = true
-        if has_fixed and is_init:
-            self.emit_error_with_help(f"fn '{fname}': an initializer takes only what the resource passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node, f"delete 'param N fixed …' under 'fn {fname}'")
+            if r.preinit == fn_sym: is_preinit = true
+        if has_fixed and is_preinit:
+            self.emit_error_with_help(f"fn '{fname}': a preinit takes only what the constructor passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node, f"delete 'param N fixed …' under 'fn {fname}'")
             return
         let ret = self.sig_return_type(sig)
         let void_ret = ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_VOID
