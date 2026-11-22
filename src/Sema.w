@@ -5534,7 +5534,7 @@ impl Sema:
 
     fn package_of(path: &str) -> str:
         if self.package_keys.contains(path): return self.package_keys.get(path).unwrap()
-        if sema_tier_path_is_std_implementation(path): "<std>" else if sema_path_is_runtime_implementation(path): "<runtime>" else: "<program>"
+        if sema_tier_path_is_std_implementation(path): "<std>" else if path.starts_with("<embedded-rt>/"): "<runtime>" else: "<program>"
 
     fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:
