@@ -662,11 +662,13 @@ impl BundleEmitter:
         // A carried method: its source, set at the first column, for the
         // impl block to indent (as a generic method is carried).
         if self.tree and in_impl and carried and (flags / FnFlags.ASYNC) % 2 == 0 and (flags / FnFlags.GEN) % 2 == 0:
-            let text = bx_dedent(self.source_slice(sema, node)) ++ "\n"
+            let marker = if (flags / FnFlags.COMPTIME) % 2 != 0: "" else: "@[evaluated]\n"
+            let text = marker ++ bx_dedent(self.source_slice(sema, node)) ++ "\n"
             self.last_fn_row = "comptime\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n"
             return text
         if self.tree and not in_impl and carried and (flags / FnFlags.ASYNC) % 2 == 0 and (flags / FnFlags.GEN) % 2 == 0:
-            let text = self.source_slice(sema, node) ++ "\n"
+            let marker = if (flags / FnFlags.COMPTIME) % 2 != 0: "" else: "@[evaluated]\n"
+            let text = marker ++ self.source_slice(sema, node) ++ "\n"
             self.push_export(BX_FN, mod_path, full, text, "comptime\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n")
             return ""
         // A `comptime fn` whose compile-time answer the compiler supplies

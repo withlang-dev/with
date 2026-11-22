@@ -607,7 +607,8 @@ impl Compilation:
             if loaded_wi_sha != manifest_wi_sha:
                 with_eprint("error: --link-bundle: " ++ wi_path ++ " (sha256 " ++ loaded_wi_sha ++ ") is not the interface " ++ manifest_path ++ " was built with (" ++ manifest_wi_sha ++ "); rebuild the bundle")
                 return false
-            if bundle_interfaces_register_package_wi(sema_path_last_segment(prefix_path), wi_text) == 0:
+            let bundled_package = link_stage_bundle_manifest_field(manifest, "package")
+            if (if bundled_package.len() > 0: bundle_interfaces_register_package_wi(bundled_package, wi_text) else: bundle_interfaces_register_wi(wi_text)) == 0:
                 with_eprint("error: --link-bundle: no `module <path>` sections in " ++ wi_path)
                 return false
             if not self.link_objects.contains(obj_path):
@@ -1504,6 +1505,13 @@ impl Compilation:
         if compiler_generation_is_stamped():
             text = text ++ "generation " ++ compiler_generation() ++ "\n"
         text = text ++ "object " ++ link_stage_basename(obj_path) ++ "\n"
+        // A bundle of a directory that is a package of its own (it has a
+        // `with.toml`) says which package: its modules are that package's
+        // wherever the source is. A tree bundle of the checkout's own
+        // directories says nothing and stays in the checkout's package.
+        if bundle_corpus_is_tree(self.bundle_corpus):
+            let first_dir = bundle_corpus_base(self.bundle_corpus).split(",")[0]
+            if runtime_read_file(first_dir ++ "/with.toml").len() > 0: text = text ++ "package " ++ sema_package_display(first_dir) ++ "\n"
         if fingerprint.len() > 0:
             text = text ++ "fingerprint " ++ fingerprint ++ "\n"
         if interface_sha.len() > 0:
