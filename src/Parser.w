@@ -86,9 +86,6 @@ type Parser {
     pending_weak: i32,
     pending_callconv: i32,
     pending_stack_size: i32,
-    // `@[evaluated]`, in an interface: the declaration that follows carries
-    // a body for the importer's evaluator (D39 as amended by D227).
-    pending_evaluated: bool,
     pending_target: i32,
     pending_effect_params: List[i32],
     pending_effect_bits: List[i32],
@@ -214,7 +211,6 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_weak: 0,
         pending_callconv: 0,
         pending_stack_size: 0,
-        pending_evaluated: false,
         pending_target: 0,
         pending_effect_params: List.new(),
         pending_effect_bits: List.new(),
@@ -340,14 +336,10 @@ impl Parser:
         // `comptime fn`s reaches crosses with its body, for the importer's
         // evaluator. It is still an interface declaration: the object holds
         // its code, and the body here is read at compile time only.
-        // The interface marks such a declaration `@[evaluated]`; any other
-        // body in a `.wi` is an error (the object holds the code).
-        let carried = self.pending_evaluated
-        self.pending_evaluated = false
+        // Sema accepts the body only on a function one of the interface's
+        // `comptime fn`s reaches; any other body in a `.wi` is an error
+        // (the object holds the code).
         if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_L_BRACE:
-            if not carried:
-                self.emit_error("interface declarations carry no bodies (D39: a .wi holds signatures; the object holds the code)")
-                return self.parse_body()
             let start = self.current_start()
             let evaluated = self.parse_body()
             return self.pool.add_node(NodeKind.NK_INTERFACE_BODY, start, self.prev_end(), evaluated as i32, 0, 0)
@@ -778,7 +770,6 @@ impl Parser:
         self.pending_weak = 0
         self.pending_callconv = 0
         self.pending_stack_size = 0
-        self.pending_evaluated = false
         self.pending_target = 0
         self.pending_effect_params = List.new()
         self.pending_effect_bits = List.new()
@@ -1010,9 +1001,6 @@ impl Parser:
                         self.advance()
                     if self.peek() == TokenKind.TK_R_PAREN:
                         self.advance()
-            else if self.is_ident_named("evaluated"):
-                self.advance()
-                self.pending_evaluated = true
             else if self.is_ident_named("stack_size"):
                 self.advance()
                 if self.peek() == TokenKind.TK_L_PAREN:

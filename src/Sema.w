@@ -11747,6 +11747,7 @@ impl Sema:
         let sigs_before = self.sig_names.len()
         let diags_start = self.diags.items.len()
         self.check_bodies()
+        self.check_interface_carried_bodies()
         if profile:
             sema_profile_report("bodies", t)
             // What body checking adds to the module-wide tables: every entry
