@@ -2172,10 +2172,10 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
         for (field, role) in registry.field_roles:
             if facts_kind(role) != "callback": continue
             let dot = field.find(".")
-            for si in 0..project.symbols.len():
-                if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not project.symbols[si].own_evidence.contains("fieldstore:" ++ field ++ "\n"): continue
-                if not project.symbols[si].registry_more.contains("callback:"):
-                    return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered through a presented operation; DISAGREES: `" ++ project.symbols[si].name ++ "` stores into it and the facts describe it with no `callback param N`")
+            for symbol in project.symbols:
+                if symbol.kind != CiProjectSymbolKind.CIPS_FN or not symbol.own_evidence.contains("fieldstore:" ++ field ++ "\n"): continue
+                if not symbol.registry_more.contains("callback:"):
+                    return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered through a presented operation; DISAGREES: `" ++ symbol.name ++ "` stores into it and the facts describe it with no `callback param N`")
     project.resolve_ownership()
     Ok(project)
 
