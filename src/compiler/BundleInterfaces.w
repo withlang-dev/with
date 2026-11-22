@@ -18,6 +18,8 @@ use rt.rt_core
 use FnAbi
 
 var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
+var g_bundle_interface_packages: HashMap[str, str] = HashMap.new()
+var g_bundle_registering_package = ""
 
 // sha256 hex of a text — the manifest's `interface-sha` (the .wi bytes) and
 // the fingerprint (the canonical declaration rows).
@@ -141,6 +143,20 @@ fn bundle_interface_trim(s: &str) -> str:
 fn bundle_interfaces_register_section(path: &str, text: &str):
     if not path.starts_with("<"): g_bundle_tree_sections = true
     g_bundle_interface_texts.insert(with_str_clone_ref(path), with_str_clone_ref(text))
+    if g_bundle_registering_package.len() > 0: g_bundle_interface_packages.insert(with_str_clone_ref(path), with_str_clone_ref(g_bundle_registering_package))
+
+// A package bundle's modules are one package: the bundle's. The source of
+// a bundled package need not exist, so its `with.toml` cannot say so.
+fn bundle_interfaces_register_package_wi(package: &str, wi_text: &str) -> isize:
+    g_bundle_registering_package = with_str_clone_ref(package)
+    let count = bundle_interfaces_register_wi(wi_text)
+    g_bundle_registering_package = ""
+    count
+
+/// The package of the bundle that provides the module at `path`, or "".
+fn bundle_interface_package(path: &str) -> str:
+    let found = g_bundle_interface_packages.get(bundle_interface_key(path))
+    if found.is_some(): found.unwrap() else: ""
 
 // Register every `module <path>` section of an interface file. Returns the
 // section count so a file with none is a loud error at the caller.

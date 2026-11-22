@@ -3,7 +3,7 @@
 // program in ../app against the interface alone and against this source:
 // the two must accept and refuse the same programs.
 
-pub type Shape { w: i32, h: i32, name: str }
+pub type Shape { pub w: i32, pub h: i32, pub name: str }
 
 pub fn area(s: &Shape): s.w * s.h
 
@@ -23,7 +23,7 @@ pub fn first_of[T](xs: &List[T]) -> &T: xs[0]
 
 pub fn apply(s: &Shape, body: fn(&Shape) -> i32) -> i32: body(s)
 
-pub type Keeper { held: List[fn() -> i32] }
+pub type Keeper { pub held: List[fn() -> i32] }
 
 pub fn keep(mut k: Keeper, f: fn() -> i32):
     k.held.push(f)
@@ -50,18 +50,35 @@ fn clamp_width(w: i32) -> i32: if w < 0: 0 else: w
 
 /// A generic type and its methods are the importer's to instantiate: the
 /// interface carries both as the source wrote them.
-pub type Pair[T] { a: T, b: T }
+pub type Pair[T] { pub a: T, pub b: T }
 
 impl[T] Pair[T]:
     pub fn first() -> &T: self.a
     pub fn swapped() -> Pair[T]: Pair { a: self.b, b: self.a }
 
-pub type Tally { n: i32 }
+pub type Tally { pub n: i32 }
 
 impl Tally:
     /// A generic method of a type that is not generic.
     pub fn plus_count[T](xs: &List[T]) -> i32: self.n + xs.len32()
 
+    /// A `comptime` method, and a private method it reaches: the interface
+    /// carries both bodies (D39 as amended by D227).
+    pub comptime fn doubled() -> i32: self.twice_privately()
+
+    fn twice_privately() -> i32: self.n * 2
+
 /// A `comptime` function is evaluated by whoever calls it: the interface
 /// carries it as the source wrote it.
 pub comptime fn squared(n: i32) -> i32: n * n
+
+/// A `comptime` function reaches a private function of its own package:
+/// the interface carries both bodies, because the importer evaluates them
+/// (D39 as amended by D227). `squared_privately` has no `pub` and no marker.
+pub comptime fn cubed(n: i32) -> i32: n * squared_privately(n)
+
+fn squared_privately(n: i32) -> i32: n * n
+
+/// Not marked: an importer's compile-time call of it is refused, by the
+/// same words whether the package is read from source or from its bundle.
+pub fn tripled(n: i32) -> i32: n * 3

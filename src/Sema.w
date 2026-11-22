@@ -3041,6 +3041,29 @@ fn sema_tier_path_is_std_implementation(path: &str) -> bool:
         return true
     false
 
+// The last segment of a path, by either separator.
+fn sema_path_last_segment(path: &str) -> str:
+    var cut = -1
+    var i = 0
+    for b in path.bytes():
+        if b == '/' or b == '\\': cut = i
+        i += 1
+    path.slice(cut + 1, path.len())
+
+// How a package is named to the programmer: the name its `with.toml`
+// states, else its directory's name; a bundled package by its bundle's
+// name. The same package reads the same from source and from a bundle.
+fn sema_package_display(key: &str) -> str:
+    if key.starts_with("package:"): return key.slice(8, key.len())
+    if key.starts_with("<"): return key.to_owned()
+    if key == ".": return "<program>"
+    for line in with_fs_read_file(key ++ "/with.toml").split("\n"):
+        let t = line.trim()
+        if t.starts_with("name") and t.contains("="):
+            let value = t.slice(t.find("=") + 1, t.len()).trim()
+            if value.len() >= 2 and value.starts_with("\"") and value.ends_with("\""): return value.slice(1, value.len() - 1)
+    sema_path_last_segment(key)
+
 // Separator-agnostic: a native Windows source path is backslash-separated.
 fn sema_dirname(path: &str) -> str:
     var last_slash = -1
@@ -5511,7 +5534,7 @@ impl Sema:
 
     fn package_of(path: &str) -> str:
         if self.package_keys.contains(path): return self.package_keys.get(path).unwrap()
-        if sema_tier_path_is_std_implementation(path): "<std>" else: "<program>"
+        if sema_tier_path_is_std_implementation(path): "<std>" else if path.starts_with("<embedded-rt>/"): "<runtime>" else: "<program>"
 
     fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:
@@ -11724,6 +11747,7 @@ impl Sema:
         let sigs_before = self.sig_names.len()
         let diags_start = self.diags.items.len()
         self.check_bodies()
+        self.check_interface_carried_bodies()
         if profile:
             sema_profile_report("bodies", t)
             // What body checking adds to the module-wide tables: every entry

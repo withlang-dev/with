@@ -652,6 +652,11 @@ impl Zcu:
 // imports from its own tree.
 fn zcu_package_key(path: &str) -> str:
     if sema_tier_path_is_std_implementation(path): return "<std>"
+    if path.starts_with("<embedded-rt>/"): return "<runtime>"
+    // A module a package bundle provides belongs to that bundle's package,
+    // whether or not the package's source is on disk.
+    let bundled = bundle_interface_package(path)
+    if bundled.len() > 0: return "package:" ++ bundled
     var dir = zcu_parent_dir(path)
     while true:
         let manifest = if dir.len() == 0: "with.toml" else: dir ++ "/with.toml"

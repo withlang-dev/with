@@ -124,6 +124,12 @@ type BundleEmitter {
     failed: bool,
     // the fingerprint row of the method fn_text last printed for an impl
     last_fn_row: str,
+    // D39 as amended (D227): the functions a `pub comptime fn` of the
+    // package reaches in its own package. The interface carries their
+    // bodies, because the importer's evaluator runs them. Filled on the
+    // first function emitted.
+    comptime_reached: List[i32],
+    comptime_reached_ready: bool,
     omitted: List[str],
     // Sema's call graph by caller, for each function's global effects
     // (fn_global_effects; D39 / §21.1 rule 1)
@@ -183,6 +189,8 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
         context: "",
         failed: false,
         last_fn_row: "",
+        comptime_reached: [],
+        comptime_reached_ready: false,
         omitted: List.new(),
         call_index: SemaGlobalCallIndex { head: HashMap.new(), next: List.new() },
         corpus_global_names: HashMap.new(),
@@ -642,7 +650,22 @@ impl BundleEmitter:
         // #3401: a `comptime` function is evaluated by whoever calls it, so
         // a package's interface carries it as the source wrote it, as it
         // carries a generic function.
-        if self.tree and not in_impl and (flags / FnFlags.COMPTIME) % 2 != 0 and (flags / FnFlags.ASYNC) % 2 == 0 and (flags / FnFlags.GEN) % 2 == 0:
+        if self.tree and not self.comptime_reached_ready:
+            self.comptime_reached_ready = true
+            for other in 0..sema.ast.decl_count():
+                let other_node = sema.ast.get_decl(other)
+                if sema.ast.kind(other_node) != NodeKind.NK_FN_DECL or (sema.ast.get_data2(other_node) / FnFlags.COMPTIME) % 2 == 0 or sema.ast.get_data2(other_node) % 2 == 0: continue
+                if not bundle_corpus_contains(self.corpus, sema.decl_source_path_for_index(other)): continue
+                for reached in sema.comptime_reached_in_package(sema.ast.get_data0(other_node)):
+                    if not self.comptime_reached.contains(reached): self.comptime_reached.push(reached)
+        let carried = (flags / FnFlags.COMPTIME) % 2 != 0 or self.comptime_reached.contains(fn_sym)
+        // A carried method: its source, set at the first column, for the
+        // impl block to indent (as a generic method is carried).
+        if self.tree and in_impl and carried and (flags / FnFlags.ASYNC) % 2 == 0 and (flags / FnFlags.GEN) % 2 == 0:
+            let text = bx_dedent(self.source_slice(sema, node)) ++ "\n"
+            self.last_fn_row = "comptime\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n"
+            return text
+        if self.tree and not in_impl and carried and (flags / FnFlags.ASYNC) % 2 == 0 and (flags / FnFlags.GEN) % 2 == 0:
             let text = self.source_slice(sema, node) ++ "\n"
             self.push_export(BX_FN, mod_path, full, text, "comptime\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ bundle_text_sha256(text) ++ "\n")
             return ""

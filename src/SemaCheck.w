@@ -19003,6 +19003,61 @@ impl Sema:
     fn fn_comptime_answer_is_compilers(fn_sym: i32) -> bool:
         self.fn_symbol_is_comptime(fn_sym) and sema_comptime_answer_is_compilers(self.pool_resolve(fn_sym), self.fn_symbol_source_path(fn_sym))
 
+    // D39 as amended (D227): the functions of `fn_sym`'s own package that a
+    // compile-time evaluation of it reaches, transitively; `fn_sym` itself
+    // is not listed. A bundle carries their bodies beside the `comptime
+    // fn`'s, because the importer's evaluator runs them. The callee of each
+    // call is the one the body's check resolved (comptime_callable_chain
+    // reads the same records).
+    fn comptime_reached_in_package(fn_sym: i32) -> List[i32]:
+        let package = self.package_of(self.fn_symbol_source_path(fn_sym))
+        let reached = []
+        let work = [fn_sym]
+        var at = 0
+        while at < work.len():
+            let current = work[at]
+            at += 1
+            let fn_node = self.fn_symbol_decl_node(current)
+            if fn_node == 0: continue
+            let body_start = self.ast.get_start(fn_node)
+            let body_end = self.ast.get_end(fn_node)
+            let body_file = self.ast.file(fn_node as NodeId)
+            for n in 1..self.ast.node_count():
+                if self.ast.kind(n) != NodeKind.NK_CALL or self.ast.file(n as NodeId) != body_file: continue
+                if self.ast.get_start(n) < body_start or self.ast.get_end(n) > body_end: continue
+                var callee: i32 = 0
+                if self.resolved_generic_call_nodes.contains(n):
+                    let decl = self.resolved_generic_call_nodes.get(n).unwrap()
+                    if decl != 0: callee = self.ast.get_data0(decl)
+                if callee == 0 and self.resolved_call_sigs.contains(n):
+                    let sig = self.resolved_call_sigs.get(n).unwrap()
+                    if sig >= 0 and sig < self.sig_names.len(): callee = self.sig_names[sig]
+                if callee == 0 or callee == fn_sym or work.contains(callee): continue
+                if self.fn_symbol_decl_node(callee) == 0 or self.package_of(self.fn_symbol_source_path(callee)) != package: continue
+                work.push(callee)
+                reached.push(callee)
+        reached
+
+    // D39 as amended (D227): in an interface, a function may carry a body
+    // only for the evaluator, and only when one of the interface's
+    // `comptime fn`s reaches it. Any other body in a `.wi` is an error: the
+    // object holds the code. Run once every body is checked, because the
+    // reach is read from the calls those checks resolved.
+    mut fn check_interface_carried_bodies():
+        let carried = []
+        let roots = []
+        for (sym, node) in self.fn_decl_nodes:
+            if not self.ast.fn_decl_body_is_interface(node) and (self.ast.get_data2(node) / FnFlags.COMPTIME) % 2 == 1: roots.push(sym)
+            if self.ast.fn_decl_body_is_interface(node) and self.ast.fn_decl_evaluation_body(node) != 0: carried.push(sym)
+        if carried.len() == 0: return
+        let reached = []
+        for root in roots:
+            for fn_sym in self.comptime_reached_in_package(root):
+                if not reached.contains(fn_sym): reached.push(fn_sym)
+        for fn_sym in carried:
+            if not reached.contains(fn_sym):
+                self.emit_error("interface declarations carry no bodies (D39: a .wi holds signatures; the object holds the code)", self.fn_symbol_decl_node(fn_sym))
+
     fn fn_symbol_is_comptime(fn_sym: i32) -> bool:
         let fn_node = self.fn_symbol_decl_node(fn_sym)
         if fn_node == 0:

@@ -113,7 +113,9 @@ pub fn run_package_interface_check_action(ctx: ActionCtx) -> i32:
         return cb_fail(ctx, "could not create " ++ dir)
     let programs = []
     for path in fs.list_files(fixture):
-        if not path.ends_with(".w"): continue
+        // The fixture library is a package of its own: its `with.toml` goes
+        // with it, so a call from a program crosses a package boundary.
+        if not path.ends_with(".w") and not path.ends_with("/with.toml"): continue
         let rel = path.slice(fixture.len() + 1, path.len())
         if fs.write_text(dir ++ "/" ++ rel, fs.read_text(path)) != 0:
             return cb_fail(ctx, "could not write " ++ dir ++ "/" ++ rel)

@@ -1,4 +1,4 @@
-//! expect-check-fail: cannot evaluate 'second_of' at compile time: it belongs to another package (test/compile_errors/lib/ctlib) and is not declared `comptime fn`
+//! expect-check-fail: cannot evaluate 'second_of' at compile time: it belongs to another package (ctlib) and is not declared `comptime fn`
 // A generic function is a function: unmarked in the other package.
 use ctlib.math
 
