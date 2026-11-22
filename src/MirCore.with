@@ -169,6 +169,11 @@ type MirBody {
     // later cancelled. The validator must not infer ownership from surviving
     // Drop statements: that misses a compiler that omits all of them (#1944).
     owned_cleanup_locals: List[i32],
+    // A local a match consumed. Its arms own its payloads (the enclosing
+    // cleanup is retired), so every arm leaves the payloads of the variant
+    // it matched moved or dropped; the validator holds each arm to that
+    // (#3467).
+    consumed_match_subjects: List[i32],
     n_params: i32,
     // Blocks ending in mutual tail calls (marked by mutual TCO pass).
     mutual_tail_bbs: List[i32],
@@ -537,6 +542,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         local_is_global: List.new(),
         local_is_caller_place: List.new(),
         owned_cleanup_locals: List.new(),
+        consumed_match_subjects: [],
         n_params: 0,
         mutual_tail_bbs: List.new(),
         bb_stmt_starts: List.new(),
@@ -1212,8 +1218,17 @@ impl MirDropStateKeys:
         for c in 0..self.chunk_count():
             refs.push((-(c + 1)) as i32)
         for id in 0..self.chunk_count() * self.chunk:
-            if id >= self.len() or id >= body.local_count():
+            if id >= self.len():
                 own.push(MirDropState.Absent)
+            else if id >= body.local_count():
+                // A place inside a parameter or a global holds a value at
+                // entry, as the whole does. Left Absent, every such place
+                // read as vacated: a parameter with one field named in the
+                // body was "partially moved" to the leak rule, and a
+                // parameter a match consumed had no payload to be held to
+                // (#3467).
+                let base: i32 = self.base_local[id]
+                own.push(if (base > 0 and base <= body.n_params) or body.local_is_global[base] != 0: MirDropState.Init else: MirDropState.Absent)
             else if id > 0 and id <= body.n_params:
                 own.push(MirDropState.Init)
             else if body.local_is_global[id] != 0:
@@ -1657,6 +1672,10 @@ fn mir_drop_state_constant_switch_target(body: &MirBody, bb: i32) -> i32:
     if kind != ConstKind.CK_BOOL and kind != ConstKind.CK_INT:
         return -1
     let value = if kind == ConstKind.CK_BOOL: body.const_d0[cid] as i64 else: mir_const_int_value(body, cid)
+    mir_switch_target(body, bb, value)
+
+// The block the switch ending `bb` goes to for `value`.
+fn mir_switch_target(body: &MirBody, bb: i32, value: i64) -> i32:
     let table = body.term_data1(bb)
     if table >= 0 and table < body.switch_table_starts.len():
         let start: i32 = body.switch_table_starts[table]
@@ -1665,6 +1684,44 @@ fn mir_drop_state_constant_switch_target(body: &MirBody, bb: i32) -> i32:
             if body.switch_table_vals[start + i] == value:
                 return body.switch_table_targets[start + i]
     body.term_data2(bb)
+
+// #3467: the place whose discriminant the switch ending `bb` tests, when it
+// is a consumed match subject or a place inside one (a nested pattern tests
+// a payload's own variant), or -1.
+fn mir_consumed_subject_switched(body: &MirBody, bb: i32) -> i32:
+    if body.consumed_match_subjects.len() == 0 or body.term_kind(bb) != TermKind.TK_SWITCH_INT:
+        return -1
+    let operand = body.term_data0(bb)
+    if operand < 0 or operand >= body.operand_kinds.len() or body.operand_kinds[operand] != OperandKind.OK_COPY:
+        return -1
+    let tested = body.operand_d0[operand]
+    let stmt_start = body.bb_stmt_starts[bb]
+    var subject = -1
+    for si in 0..body.bb_stmt_counts[bb]:
+        let stmt_id = stmt_start + si
+        if body.stmt_kind(stmt_id) != StmtKind.Assign or body.stmt_data0(stmt_id) != tested:
+            continue
+        subject = -1
+        let rv = body.stmt_data1(stmt_id)
+        if body.rval_kinds[rv] == RvalueKind.RK_DISCRIMINANT:
+            let of = body.rval_d0[rv]
+            if body.consumed_match_subjects.contains(body.place_locals[of]): subject = of
+    subject
+
+// The variant of `tested` that `place` lies in: `place` is `tested`, then a
+// downcast, then anything. -1 when it is not inside `tested`.
+fn mir_place_variant_under(body: &MirBody, place: i32, tested: i32) -> i32:
+    let depth = body.place_proj_counts[tested]
+    if place < 0 or body.place_locals[place] != body.place_locals[tested] or body.place_proj_counts[place] <= depth:
+        return -1
+    let from = body.place_proj_starts[place]
+    let under = body.place_proj_starts[tested]
+    for i in 0..depth:
+        if body.proj_kinds[from + i] != body.proj_kinds[under + i] or body.proj_d0[from + i] != body.proj_d0[under + i]:
+            return -1
+    if body.proj_kinds[from + depth] != ProjKind.PK_DOWNCAST:
+        return -1
+    body.proj_d0[from + depth]
 
 fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32) -> bool:
     let kind = body.term_kind(pred)
@@ -1703,7 +1760,49 @@ fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> List[i32]:
             let out: List[i32] = []
             out.push(chosen)
             return out
+    let threaded = mir_drop_state_threaded_target(body, bb)
+    if threaded >= 0:
+        return [threaded]
     mir_term_successors(body, bb)
+
+// The alternatives of an or-pattern each store their number in a selector
+// and meet in an empty block that switches on it. The edge out of an
+// alternative has one executable continuation, as a literal switch has:
+// follow it, so one alternative's state is not joined into another's (#3467:
+// the variant an alternative matched was lost at the meeting block). The
+// block reached through the empty one, or -1.
+fn mir_drop_state_threaded_target(body: &MirBody, bb: i32) -> i32:
+    if body.term_kind(bb) != TermKind.TK_GOTO:
+        return -1
+    let meet = body.term_data0(bb)
+    if meet < 0 or meet >= body.block_count() or body.bb_stmt_counts[meet] != 0 or body.term_kind(meet) != TermKind.TK_SWITCH_INT:
+        return -1
+    let operand = body.term_data0(meet)
+    if operand < 0 or operand >= body.operand_kinds.len() or body.operand_kinds[operand] != OperandKind.OK_COPY:
+        return -1
+    let tested = body.operand_d0[operand]
+    let count = body.bb_stmt_counts[bb]
+    if count == 0 or body.place_proj_counts[tested] != 0:
+        return -1
+    let last = body.bb_stmt_starts[bb] + count - 1
+    if body.stmt_kind(last) != StmtKind.Assign:
+        return -1
+    let dest = body.stmt_data0(last)
+    if body.place_proj_counts[dest] != 0 or body.place_locals[dest] != body.place_locals[tested]:
+        return -1
+    let rv = body.stmt_data1(last)
+    if body.rval_kinds[rv] != RvalueKind.RK_USE:
+        return -1
+    let source = body.rval_d0[rv]
+    if source < 0 or source >= body.operand_kinds.len() or body.operand_kinds[source] != OperandKind.OK_CONSTANT:
+        return -1
+    let cid = body.operand_d0[source]
+    if cid < 0 or cid >= body.const_kinds.len():
+        return -1
+    let kind = body.const_kinds[cid]
+    if kind != ConstKind.CK_BOOL and kind != ConstKind.CK_INT:
+        return -1
+    mir_switch_target(body, meet, if kind == ConstKind.CK_BOOL: body.const_d0[cid] as i64 else: mir_const_int_value(body, cid))
 
 // Every block a terminator names as a successor: which data slot holds a
 // block is the terminator kind's (a call's d2 is its destination place).
@@ -1753,6 +1852,15 @@ type MirDropStateBlocks {
     preds: List[i32],
     succ_starts: List[i32],
     succs: List[i32],
+    // #3467: for a block ending in a switch over the discriminant of a
+    // consumed match subject, the subject's variant-payload keys and the
+    // block the switch goes to for each key's variant
+    // (`switch_key_starts[bb]..switch_key_starts[bb + 1]` indexes both).
+    switch_key_starts: List[isize],
+    switch_keys: List[i32],
+    switch_key_targets: List[i32],
+    // The out-state of a predecessor as one of its edges sees it (load_edge).
+    edge: List[i32],
 }
 
 impl MirDropStateBlocks:
@@ -1799,16 +1907,32 @@ impl MirDropStateBlocks:
                 if self.computed[pred] == 0:
                     continue
                 let base = pred * width
+                let refined = self.switch_key_starts[pred] < self.switch_key_starts[pred + 1]
+                if refined: self.load_edge(pred, bb)
                 if not seen:
                     for c in 0..width:
-                        self.scratch.refs[c] = self.rows[base + c]
+                        self.scratch.refs[c] = if refined: self.edge[c] else: self.rows[base + c]
                     seen = true
                 else:
                     for c in 0..width:
-                        self.scratch.refs[c] = self.keys.join_chunks(self.scratch.refs[c], self.rows[base + c])
+                        self.scratch.refs[c] = self.keys.join_chunks(self.scratch.refs[c], if refined: self.edge[c] else: self.rows[base + c])
         if not seen:
             for c in 0..width:
                 self.scratch.refs[c] = self.entry[c]
+
+    // #3467: the out-state of `pred` as its edge to `bb` sees it. A switch
+    // over a consumed match subject's discriminant goes to `bb` only for
+    // some variants. The payloads of the others are not there on that edge:
+    // Reset, the state of a place a drop frees nothing from, so an arm is
+    // not held to the payloads of a variant it did not match.
+    mut fn load_edge(pred: i32, bb: i32):
+        var state = self.load_block(pred)
+        for i in self.switch_key_starts[pred]..self.switch_key_starts[pred + 1]:
+            if self.switch_key_targets[i] != bb and state.get(self.keys, self.switch_keys[i]) == MirDropState.Init:
+                state.set(self.keys, self.switch_keys[i], MirDropState.Reset)
+        self.edge.clear()
+        for r in state.refs:
+            self.edge.push(if r >= 0: r else: self.keys.intern_chunk(state.own, (-r - 1) * self.keys.chunk))
 
     // The input state of `bb` (see load_input), sharing the stored chunks.
     mut fn input(bb: i32) -> MirDropStateMap:
@@ -1903,7 +2027,25 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
             preds[slot] = bb
             fill[s] = slot + 1
     let scratch = MirDropStateMap { refs: entry.clone(), own: List.new() }
-    MirDropStateBlocks { keys, rows, entry, scratch, computed, pred_starts, preds, succ_starts, succs }
+    let switch_key_starts = []
+    let switch_keys = []
+    let switch_key_targets = []
+    let key_places = mir_drop_state_key_places(keys)
+    for bb in 0..bb_count:
+        switch_key_starts.push(switch_keys.len())
+        let tested = mir_consumed_subject_switched(body, bb)
+        if tested < 0:
+            continue
+        let subject = body.place_locals[tested]
+        for ci in keys.child_starts[subject]..keys.child_starts[subject + 1]:
+            let key: i32 = keys.children[ci]
+            let variant = mir_place_variant_under(body, key_places[key], tested)
+            if variant < 0:
+                continue
+            switch_keys.push(key)
+            switch_key_targets.push(mir_switch_target(body, bb, variant as i64))
+    switch_key_starts.push(switch_keys.len())
+    MirDropStateBlocks { keys, rows, entry, scratch, computed, pred_starts, preds, succ_starts, succs, switch_key_starts, switch_keys, switch_key_targets, edge: [] }
 
 // Every block's out-state at the dataflow fixpoint. One sweep in block order is
 // not enough: a block's input joins ALL its predecessors, some of which are
@@ -2593,6 +2735,38 @@ fn mir_local_partially_vacated(body: &MirBody, keys: &MirDropStateKeys, state: &
             return true
     false
 
+// #3467: the key of a payload of the consumed match subject `subject` that
+// still holds a value needing a drop on some path into this state, or -1.
+// Init and Maybe are the states of a payload some path left whole: a moved
+// one is Moved, a dropped one Uninit, a blanked one or one of a variant the
+// path did not take Reset, and none of those joins to Init or Maybe without
+// a path that left it. Only a key with no key inside it is judged: a payload
+// taken apart field by field is its fields.
+fn mir_consumed_subject_payload_left(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, key_places: &List[i32], subject: i32) -> i32:
+    if subject < 0 or subject + 1 >= keys.child_starts.len():
+        return -1
+    let start: i32 = keys.child_starts[subject]
+    let end: i32 = keys.child_starts[subject + 1]
+    for ci in start..end:
+        let key: i32 = keys.children[ci]
+        let held = state.get(keys, key)
+        if held != MirDropState.Init and held != MirDropState.Maybe:
+            continue
+        let place: i32 = key_places[key]
+        // A payload of the subject itself: not what a pointer payload points
+        // at, which another owner or the pointer's own drop frees.
+        if place < 0 or body.proj_kinds[body.place_proj_starts[place]] != ProjKind.PK_DOWNCAST or body.proj_kinds[body.place_proj_starts[place] + body.place_proj_counts[place] - 1] == ProjKind.PK_DOWNCAST:
+            continue
+        if not mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, place)):
+            continue
+        var leaf = true
+        for cj in start..end:
+            let other: i32 = keys.children[cj]
+            if other != key and mir_drop_state_key_is_descendant(keys.names[other], keys.names[key]): leaf = false
+        if leaf:
+            return key
+    -1
+
 // Every move of a statement or terminator checked by the #1415 rule.
 fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str:
     for bb in 0..body.block_count():
@@ -3027,6 +3201,14 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 if body.local_unwritten_at_return(bb, local_id):
                     continue
                 return f"fn sym{body.fn_sym} bb{bb}: owned local {mir_place_text(body, place_id)} is still Init at return — no path drops or moves it (a leak)"
+            // #3467: a match that consumed its subject owns its payloads. At
+            // a return each one is moved, dropped or blank, or belongs to a
+            // variant the path did not take (load_edge). One that still holds
+            // its value was left by an arm.
+            for subject in body.consumed_match_subjects:
+                let left = mir_consumed_subject_payload_left(mir_mod, body, blocks.keys, state, key_places, subject)
+                if left >= 0:
+                    return f"fn sym{body.fn_sym} bb{bb}: payload {blocks.keys.names[left]} of the consumed match subject _{subject} still holds its value at return: an arm neither moved nor dropped it (a leak, §2.5)"
         state.transfer_term(blocks.keys, body, bb)
     ""
 

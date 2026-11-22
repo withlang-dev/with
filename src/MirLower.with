@@ -12828,6 +12828,7 @@ impl MirBuilder:
                 self.cancel_stmt_temp_for_local(match_scrut_local)
                 self.cancel_scheduled_value_drop_for_local(match_scrut_local)
                 self.mark_carrier_consumed(match_scrut_local)
+                self.body.consumed_match_subjects.push(match_scrut_local)
             // #3461: only a subject that moved out of its place gave the arms
             // its payloads. After a counted copy the place still holds its
             // own count, and cancelling its drop leaked it (a `List[str]`

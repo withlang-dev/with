@@ -555,6 +555,83 @@ pub fn mir_test_vacated_payload_drop() -> Unit:
     // A payload with no drop glue is not freed again by the enum's drop.
     assert(vacated_payload_verdict(0, false) == "")
 
+// #3467: a match that consumes its subject owns its payloads, so each arm
+// leaves the payload of the variant it matched moved or dropped. #3461's
+// MIR: a two-variant enum, a switch on its discriminant, and an arm that
+// only read its payload (a list pattern that viewed what the other arms
+// took) — a leak validate-all passed, because the subject's cleanup is
+// retired and no rule watched it. `first` is what the first variant's arm
+// does with its payload and `second` the other arm: 0 only reads it, 1 moves
+// it out and blanks it, 2 drops it in place.
+fn consumed_subject_verdict(first: i32, second: i32, consumed: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_INT, TypeKind.TY_ENUM]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let tag_ty = 1
+    let payload_ty = 2
+    let enum_ty = 3
+    mir_mod.sema_type_d0[enum_ty] = 7
+    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len()
+    mir_mod.sema_type_d2[enum_ty] = 2
+    for _ in 0..2:
+        mir_mod.sema_type_extra.push(0)
+        mir_mod.sema_type_extra.push(1)
+        mir_mod.sema_type_extra.push(payload_ty)
+    mir_mod.sema_moved_drop_types.insert(payload_ty, 1)
+    // The subject arrives as the one parameter: it holds a value at entry.
+    var body = MirBody.init_for_fn(1)
+    body.n_params = 1
+    let subject_local = body.new_temp(enum_ty)
+    let subject = body.new_place(subject_local)
+    if consumed: body.consumed_match_subjects.push(subject_local)
+    let tag_local = body.new_temp(tag_ty)
+    let tag = body.new_place(tag_local)
+    let entry = body.new_block()
+    let arms = [body.new_block(), body.new_block()]
+    let done = body.new_block()
+    let read_tag = body.new_rvalue(RvalueKind.RK_DISCRIMINANT, subject, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, tag, read_tag, 0)
+    let table = body.new_switch_table([0i64], [arms[0]])
+    let tag_op = body.new_operand(OperandKind.OK_COPY, tag)
+    body.set_terminator(entry, TermKind.TK_SWITCH_INT, tag_op, table, arms[1], 0, 0)
+    var variant_index = 0
+    for does in [first, second]:
+        let arm = arms[variant_index]
+        let payload = body.new_field_place(body.new_downcast_place(subject, variant_index), 0, payload_ty)
+        let bound = body.new_place(body.new_temp(payload_ty))
+        if does == 0:
+            let seen = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_COPY, payload), 0, 0)
+            body.push_stmt(arm, StmtKind.Assign, bound, seen, 0)
+        if does == 1:
+            let taken = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_MOVE, payload), 0, 0)
+            body.push_stmt(arm, StmtKind.Assign, bound, taken, 0)
+            let blank = body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, payload_ty)
+            let reset = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_CONSTANT, blank), 0, 0)
+            body.push_stmt(arm, StmtKind.Assign, payload, reset, 0)
+            body.push_stmt(arm, StmtKind.Drop, bound, 0, 0)
+        if does == 2:
+            body.push_stmt(arm, StmtKind.Drop, payload, 0, 0)
+        body.set_terminator(arm, TermKind.TK_GOTO, done, 0, 0, 0, 0)
+        variant_index += 1
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_consumed_match_subject:
+    // Each arm takes or drops the payload of the variant it matched; the
+    // other variant's payload is not there on that arm.
+    assert(consumed_subject_verdict(1, 1, true) == "")
+    assert(consumed_subject_verdict(1, 2, true) == "")
+    assert(consumed_subject_verdict(2, 1, true) == "")
+    // #3461: an arm that only read its payload left it.
+    assert(consumed_subject_verdict(0, 1, true).contains("payload _1<as v0>.f0 of the consumed match subject _1 still holds its value at return"))
+    assert(consumed_subject_verdict(1, 0, true).contains("payload _1<as v1>.f0 of the consumed match subject _1 still holds its value at return"))
+    assert(consumed_subject_verdict(2, 0, true).contains("payload _1<as v1>.f0"))
+    // A subject the match observes is its owner's to drop: not this rule's.
+    assert(consumed_subject_verdict(0, 0, false) == "")
+
 // #1414: a move of a drop-bearing place a path reaching it already moved
 // out. A failed match guard's arm bound `move _3<as v0>.f0` and the next arm
 // bound it again: a double free that validate-all passed. `shape`:
