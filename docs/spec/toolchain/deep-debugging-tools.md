@@ -38,14 +38,14 @@ exit 2, #2198): a misspelled or removed flag never reads as a clean run.
   **`out/release/bin/with`**: the same, one stage on.
 
 A program you build with any of them carries debug info for its own code
-and the runtime, so lldb on the *program* resolves `rt_core.w` lines
+and the runtime, so lldb on the *program* resolves `rt_core.with` lines
 (`dbg_report_double_free`, `with_panic_core`) whichever compiler built it.
 
 ## Routes by bug class
 
 ### A drop, double free, invalid free, use-after-free, or leak
 
-1. **Native debug allocator first.** `with run --debug-alloc repro.w` (or
+1. **Native debug allocator first.** `with run --debug-alloc repro.with` (or
    `WITH_DEBUG_ALLOC=1` on any binary). It names the block, its size, and
    the drop-origin tag of the first free (`first_drop=drop#struct
    __drop_struct_551` names a type's drop glue, the number varies by
@@ -128,7 +128,7 @@ and the runtime, so lldb on the *program* resolves `rt_core.w` lines
    #1014 asks for the first free's site to be recorded by default so the
    plain report names both.
 6. **Read the function's IR or disassembly at the join block.** `with ir
-   fixture.w` prints the module as codegen built it (stdout, before the
+   fixture.with` prints the module as codegen built it (stdout, before the
    LLVM pipeline); `WITH_DUMP_LLIR_PRE=1` / `WITH_DUMP_LLIR_POST=1` on a
    `with build` print it to stdout either side of the pipeline, which is
    the only view of the attributes codegen attached (`captures(none)`,
@@ -156,18 +156,18 @@ bisect by neutralizing code: the #691 escalation cascade was one misattributed
 seed, a one-query answer with provenance.
 
 For a wrong view-origin verdict (a use-after-free accepted, a valid view
-refused), start with `with analyze repro.w 'explain:origin:<fn>[:<binding>]'`
+refused), start with `with analyze repro.with 'explain:origin:<fn>[:<binding>]'`
 (below): per parameter, whether a returned view comes from its own storage
 or only through what it views, and the node that first made it so; per
 view binding, its origins, storage origins and dependencies each time
 they were set. It runs on a program that fails to compile. Then
-`WITH_DEBUG_BORROWS=1 with check repro.w` prints every view
+`WITH_DEBUG_BORROWS=1 with check repro.with` prints every view
 binding with its dependency count and the borrow table at each read and
 mutation check: a binding whose dependency is itself, or a local where a
 parameter was expected, names the lost origin in one run (#2187).
 
 For a `mut` call refused, or accepted, under a view of a *sibling* field
-(D178 footprints): `WITH_TRACE_FOOTPRINTS=1 with check repro.w` prints
+(D178 footprints): `WITH_TRACE_FOOTPRINTS=1 with check repro.with` prints
 every signature's footprint (the field paths its receiver or `mut`
 parameters are written through, or "the whole place" with the reason and
 source line), every edge a `mut` call recorded to its callee, and each
@@ -186,7 +186,7 @@ dependent ordering); never an excuse for `-O0`.
 
 ### A lowering, MIR, ABI, or codegen bug on a compilable input
 
-`with reduce` to a minimal input, `analyze repro.w audit:all` as the proof
+`with reduce` to a minimal input, `analyze repro.with audit:all` as the proof
 gate (it must pass on the reduced repro before any build), `matrix` for the
 diverging layer, `lldb:<query>` for breakpoints from real facts, then lldb
 on the compiler branch. `--dump-abi` answers "is this parameter lowered
@@ -195,10 +195,10 @@ consistently at caller and callee" — never infer that from MIR.
 When codegen picked the wrong formatter, comparison or ABI for a value (a
 `BUG: … no registered :? formatter`, floats compared where a key
 projection should be, a wrapper passed as its inner type), run
-`analyze repro.w audit:resolution` first: its operand-type check names the
+`analyze repro.with audit:resolution` first: its operand-type check names the
 exact expression whose MIR operand has a type Sema did not give it, with
 both types, before any debugger session. Then
-`analyze repro.w 'select:kind=operator,detail~fn:<fn>'` shows how codegen
+`analyze repro.with 'select:kind=operator,detail~fn:<fn>'` shows how codegen
 lowered each binary operator in that function: the route it took and the
 operand types it saw (below).
 
@@ -213,7 +213,7 @@ the representation instead of asking Sema, before reading any of it:
    differs from its normal run, or a typed-MIR ICE, is code that assumed a
    tag ("`Some` is 0", "the tag is the index"). The failing tests name the
    shapes; `--dump-mir` on one shows the switch value or downcast that
-   assumed. Its first corpus runs (2026-10-05, `test/behavior/*.w`) went
+   assumed. Its first corpus runs (2026-10-05, `test/behavior/*.with`) went
    from 402 failures to 13 to the expected ones as each assumption was
    fixed: MIR switches comparing a discriminant with an index (the success
    switch, optional chains, `ControlFlow`), codegen's own tag table, Option
@@ -241,7 +241,7 @@ stage1: the corpus check a change needs before the battery, without the
 release build `:behavior-tests` waits for. Add a debug switch in front
 (`WITH_DEBUG_PERMUTE_TAGS=1`) to run the whole corpus under it.
 
-Pass `test/behavior/*.w`, not the directory: `test/behavior/lib/` holds
+Pass `test/behavior/*.with`, not the directory: `test/behavior/lib/` holds
 helper modules, which fail as tests. Set `WITH_TEST_COMPILER` to the same
 stage1 for the fixtures that spawn a compiler. Eight fixtures fail under
 any stage1 (main's too, measured 2026-10-05) and pass under the release
@@ -262,17 +262,17 @@ sites, three rebuilds, and the failure was not in the text). The order:
 1. **What ran.** Every corpus test action prints `<target> ran <sha256>
    <path>` for each binary before it runs it and appends the same lines to
    `out/corpus/<stem>-test/provenance.txt` (`corpus_provenance`,
-   build/corpus.w). Compare the sha with a second run: a different binary
+   build/corpus.with). Compare the sha with a second run: a different binary
    from identical sources is a build defect (the native runner's partial
    attempt before a 97 fallback, a stale bundle), not a migration defect.
 2. **What the migrator changed, as MIR.** The migration differential:
 
    ```sh
-   with run tools/migrate_diff.w lib/std/engines/pcre2 out/pcre2_migrated pcre2test.w engines/pcre2
+   with run tools/migrate_diff.with lib/std/engines/pcre2 out/pcre2_migrated pcre2test.with engines/pcre2
    ```
 
    lays each side out as `lib/std/<subdir>/` under `out/tmp/migrate-diff/`,
-   checks `<main.w>` with `--dump-mir --bundle-corpus std/<subdir> --no-prelude`
+   checks `<main.with>` with `--dump-mir --bundle-corpus std/<subdir> --no-prelude`
    (the corpus on its source: the embedded interface would answer every
    `use std.<subdir>.X` and the dump would hold no corpus body; the prelude
    off, as the bundle builds, or its std.regex reaches the checkout's
@@ -329,15 +329,15 @@ and effects, concrete specializations, `MirBody` tables, diagnostic provenance,
 and the actual LLVM marshalling/prologue branches used for production codegen.
 
 ```sh
-with analyze repro.w audit:all
-with analyze repro.w audit:storage
-with analyze repro.w 'matrix:name~target_fn'
-with analyze repro.w 'path:call:main:target_fn'
-with analyze repro.w 'closure:call:main'
-with analyze repro.w 'lldb:kind=call,name~target_fn'
-with analyze repro.w contract
-with analyze repro.w audit:contract
-with analyze repro.w 'select:stage=sema,kind=global-effect'
+with analyze repro.with audit:all
+with analyze repro.with audit:storage
+with analyze repro.with 'matrix:name~target_fn'
+with analyze repro.with 'path:call:main:target_fn'
+with analyze repro.with 'closure:call:main'
+with analyze repro.with 'lldb:kind=call,name~target_fn'
+with analyze repro.with contract
+with analyze repro.with audit:contract
+with analyze repro.with 'select:stage=sema,kind=global-effect'
 ```
 
 The global-effect view reads recorded writes, calls and their expanded targets,
@@ -347,7 +347,7 @@ branch; inspecting the graph does not resolve names or expand it again.
 Signature rows include the canonical declaration and name-based declaration
 lookup, with unsafe status read by the same Sema helper as acceptance checks.
 
-`contract` (D51 stage 10, ruling §63; `src/AnalysisContract.w`) prints the
+`contract` (D51 stage 10, ruling §63; `src/AnalysisContract.with`) prints the
 effective modeled foreign contract of every `c facade` block the program
 sees: per resource its production, status, destroy paths, dependencies,
 thread capabilities, the views borrowed from it and the operations that
@@ -368,7 +368,7 @@ The profile checks (ambiguous match, shadowed fact) fire only once stage 11
 resolves a convention profile. Fixtures: `test/contract/`
 (`with build contract-view-tests`).
 
-`audit:resolution` (D65, #1647; `src/AnalysisResolution.w`, in `audit:all`)
+`audit:resolution` (D65, #1647; `src/AnalysisResolution.with`, in `audit:all`)
 checks that every MIR call agrees with Sema's resolution of the call it
 lowers — Sema decides *what* a call invokes, MIR materializes it, and a
 callee MIR re-derived from an AST spelling is the #1635 class (`let r =
@@ -397,10 +397,10 @@ Sema's own classification, snapshotted into the MIR module
 (`sema_callable_syms`) for the typed-MIR validator, which refuses a
 `const fn` callee outside the snapshot with no body and no intrinsic mark
 (`--validate-all`, #1639). Planted fixtures: `test/internals/
-analysis_resolution_test.w` (the comparison over a hand-built body and a
-hand-built Sema answer) and `test/internals/mir_unknown_callee_test.w`
+analysis_resolution_test.with` (the comparison over a hand-built body and a
+hand-built Sema answer) and `test/internals/mir_unknown_callee_test.with`
 (the validator); the clean corpus is `audit:all` on the contract, closure
-and c_facade fixtures and on `build.w`. Phases 2–5 (codegen mode
+and c_facade fixtures and on `build.with`. Phases 2–5 (codegen mode
 provenance, places and origins, effects, MirLower cleanup):
 `docs/spec/implementation/mir-sema-hardening.md`.
 
@@ -469,7 +469,7 @@ grower it reaches. Fix by owning the text at the binding
 covered: a view stored into an aggregate, a view from a builtin (`List.get`),
 and a view into a container the function itself owns (`&List[str]` parameter).
 
-Cost: instant on a repro; on the compiler itself (`analyze src/main.w
+Cost: instant on a repro; on the compiler itself (`analyze src/main.with
 audit:all`, the batch-tier step) about 170 s and 20 GB resident at 12033103.
 It is a batch-tier gate, not a per-edit one.
 
@@ -492,8 +492,8 @@ handled the matching facts (`Codegen.marshal_mir_call_arg`,
 stage1 compiling the repro:
 
 ```sh
-with analyze repro.w 'lldb:kind=call,name~take' > take.lldb
-lldb --batch -s take.lldb -o run -o "bt 6" -- out/bootstrap/bin/with-stage1 build repro.w -o /tmp/repro
+with analyze repro.with 'lldb:kind=call,name~take' > take.lldb
+lldb --batch -s take.lldb -o run -o "bt 6" -- out/bootstrap/bin/with-stage1 build repro.with -o /tmp/repro
 ```
 
 On the installed `with` the dotted names stay `pending` (see Which binary).
@@ -507,7 +507,7 @@ compiler branch that stopped it.
 Use an analysis audit directly as a reduction predicate:
 
 ```sh
-with reduce repro.w --exit-code nonzero -- \
+with reduce repro.with --exit-code nonzero -- \
   with analyze {file} audit:all
 ```
 
@@ -521,7 +521,7 @@ use (partitioning an error worklist, e.g. the #691 flip's, before deciding
 which sites get a `move` keyword and which need design work).
 
 ```sh
-with analyze src/main.w move-sites
+with analyze src/main.with move-sites
 ```
 
 One TSV row per site:
@@ -536,7 +536,7 @@ file:line:col  root  shape  spellable  liveness  loop  callee  param
 - `liveness` — `last-use` when the call is the final use of the root in the
   enclosing body (a `move` cannot introduce use-after-move), `live-after`
   when later uses exist (a DESIGN site: adding `move` blanks a value the
-  flow still reads — Backend.w's take-and-return class), or `unknown`.
+  flow still reads — Backend.with's take-and-return class), or `unknown`.
 - `loop` — `in-loop` when the call sits inside a loop body; such sites are
   conservatively design-flagged regardless of textual liveness (a
   next-iteration use is not textually "after").
@@ -556,7 +556,7 @@ gates (the gate and the query share the predicate; the gate is this report
 flipped to a diagnostic once the inventory is clean).
 
 ```sh
-with analyze src/main.w seam-sites
+with analyze src/main.with seam-sites
 ```
 
 Every row carries a **tier**, and the summary counts both:
@@ -606,7 +606,7 @@ call argument) or an effect-flow edge into a callee parameter, followed
 recursively until a direct seed is reached.
 
 ```sh
-with analyze src/main.w 'explain:effect:Zcu.clear_stage_outputs:self'
+with analyze src/main.with 'explain:effect:Zcu.clear_stage_outputs:self'
 ```
 
 A method is `Type.method`; a free function its name. A generic function's
@@ -635,7 +635,7 @@ on erroring inputs.
 ### The thing that compiled was not the thing under test
 
 Every compiler a build action spawns is named in the action log:
-`[compile] <target> ran <digest> <binary> <argv>` (lib/std/build.w
+`[compile] <target> ran <digest> <binary> <argv>` (lib/std/build.with
 `tool_compile_provenance`, hashed once per binary per driver run), and a
 Workspace compile prints `[driver-compile] <workspace> compiler=<path>
 files=…` — that compiler is `WITH_BUILD_COMPILER`, the DRIVER, the pinned
@@ -676,8 +676,8 @@ no longer does, since the toolchain runs no host command (Eric,
 ### Two compiler generations disagree
 
 ```sh
-with run tools/gen_diff.w out/bootstrap/bin/with-stage1 out/release/bin/with repro.w
-with run tools/gen_diff.w out/bootstrap/bin/with-stage1 ~/.local/bin/with repro.w explain:modules
+with run tools/gen_diff.with out/bootstrap/bin/with-stage1 out/release/bin/with repro.with
+with run tools/gen_diff.with out/bootstrap/bin/with-stage1 ~/.local/bin/with repro.with explain:modules
 ```
 
 runs `analyze <file> <query>` under both binaries (default
@@ -690,7 +690,7 @@ the declarations stage1 loads through a corpus and the release never does.
 ### A name resolves on one compiler generation and not the other, or a std helper stops resolving
 
 Visibility is three walks, a gate of rules and a fallback bridge; a 0 out
-of them says nothing. `with analyze file.w 'explain:visible:<name>'` lists
+of them says nothing. `with analyze file.with 'explain:visible:<name>'` lists
 every declaration the name could mean from the root module — values,
 types and displaced identities (#1350) — with its module, package, engine
 id, prelude-closure and corpus-private marks, then the verdict and every
@@ -715,7 +715,7 @@ was two of them: the evaluator found every module's `let` by name
 imported printed a value while `print(HIDDEN)` beside it was refused, on
 every generation. The fix routes the lookup through the gate
 (`decl_node_visible_from_current`, `lookup_named_type_visible`); the
-fixtures are `test/compile_errors/err_2248_comptime_*_not_transitive.w`.
+fixtures are `test/compile_errors/err_2248_comptime_*_not_transitive.with`.
 
 **The evaluator refuses a type Sema would give.** Top-level folding runs
 before Sema (`comptime_transform_module`), so `typed_expr_types` is empty
@@ -730,16 +730,16 @@ typed the node is a missing demand source, not a missing type.
 
 ```
 explain:visible is_alnum
-  from module test/behavior/behav_1362_std_helper_resolves_unimported.w (package <program>)
-  value declared in lib/std/engines/pcre2/defs.w (package <std>, pub=1, engine=1, prelude-closure=0, corpus-private=0)
+  from module test/behavior/behav_1362_std_helper_resolves_unimported.with (package <program>)
+  value declared in lib/std/engines/pcre2/defs.with (package <std>, pub=1, engine=1, prelude-closure=0, corpus-private=0)
     gate: … not an enumerated prelude name; engine=1 prelude-closure=0 corpus-private=0
-      no-prelude walk: skip <embedded-std>/std/prelude.w (the synthetic prelude edge)
+      no-prelude walk: skip <embedded-std>/std/prelude.with (the synthetic prelude edge)
       refused: an engine or prelude-closure module needs an explicit import path
     verdict: 0
-  displaced value (#1350) declared in <embedded-std>/std/string.w (… prelude-closure=1 …)
+  displaced value (#1350) declared in <embedded-std>/std/string.with (… prelude-closure=1 …)
     verdict: 0
-    bridge: 1 non-engine std module(s) declare it; engine twin lib/std/engines/pcre2/defs.w
-  fallback bridge: resolves the bare name to <embedded-std>/std/string.w
+    bridge: 1 non-engine std module(s) declare it; engine twin lib/std/engines/pcre2/defs.with
+  fallback bridge: resolves the bare name to <embedded-std>/std/string.with
 ```
 
 `analyze <file> 'explain:origin:<fn>[:<binding>]'` prints what Sema recorded
@@ -749,8 +749,8 @@ specialization matches), even when the check fails:
 ```
 explain:origin at_match
   at_match param[0]: a returned view may come from it, only through what it views (origins=[0] through=[0])
-    first view at repro.w:12 (node 579952)
-  binding `v` bind at repro.w:12: origins=[0] storage=[0] deps=[s]
+    first view at repro.with:12 (node 579952)
+  binding `v` bind at repro.with:12: origins=[0] storage=[0] deps=[s]
 ```
 
 Per parameter that a returned view may come from: whether from the
@@ -773,7 +773,7 @@ existed only as trace prints before (#2187's two-hour hunt).
 predicate still holds.
 
 ```sh
-with reduce repro.w \
+with reduce repro.with \
     --contains "undefined variable" \
     -- with check {file}
 ```
@@ -792,7 +792,7 @@ Options:
   `with test` on the reduced file to get one.
 
 ```sh
-with reduce fixture.w --test test_needs_two_lines
+with reduce fixture.with --test test_needs_two_lines
 ```
 
 - `--baseline <compiler>` also requires `<compiler> check {file}` to accept
@@ -802,7 +802,7 @@ with reduce fixture.w --test test_needs_two_lines
   printed, and the result carries a second, unrelated error (#1100).
 
 ```sh
-with reduce repro.w --baseline ~/.local/bin/with \
+with reduce repro.with --baseline ~/.local/bin/with \
     --contains "may outlive its origin" \
     -- out/bootstrap/bin/with-stage1 check {file}
 ```
@@ -833,12 +833,12 @@ sweep silently skipped. States: `Uninit`, `Init`, `Moved`, `Maybe`, and
 stack garbage, the #729 class).
 
 ```sh
-with check repro.w --dump-drop-state
-with check repro.w --dump-drop-plan
-with check repro.w --trace-ownership main:_1
-with check repro.w --trace-cleanup-edge 'main:bb0->bb1'
-with check repro.w --validate-ownership
-with check repro.w --validate-all
+with check repro.with --dump-drop-state
+with check repro.with --dump-drop-plan
+with check repro.with --trace-ownership main:_1
+with check repro.with --trace-cleanup-edge 'main:bb0->bb1'
+with check repro.with --validate-ownership
+with check repro.with --validate-all
 ```
 
 Each dump covers every body in the module, the standard library's
@@ -880,13 +880,13 @@ Semantic selection stays in the compiler. The remaining source tools are thin
 clients of `compiler_analyze_file`; they may use the compiler Lexer only to verify
 and apply byte splices inside compiler-proven spans:
 
-- `tools/annotate_receivers.w` applies finalized Sema receiver requirements.
-- `tools/migrate_receivers.w` removes explicit receivers only from declarations
+- `tools/annotate_receivers.with` applies finalized Sema receiver requirements.
+- `tools/migrate_receivers.with` removes explicit receivers only from declarations
   Sema identifies as valid impl methods with matching modes.
-- `with migrate-receivers` (built into the compiler, `src/ReceiverMigration.w`;
-  `--report|--list|--apply <entry.w>`) relocates only Sema-identified top-level
+- `with migrate-receivers` (built into the compiler, `src/ReceiverMigration.with`;
+  `--report|--list|--apply <entry.with>`) relocates only Sema-identified top-level
   instance methods and verifies one semantic fact per structural rewrite.
-- `tools/migrate_method_arg_moves.w` consumes structured diagnostic facts and
+- `tools/migrate_method_arg_moves.with` consumes structured diagnostic facts and
   exact spans; it never parses rendered stderr.
 
 All clients preflight the complete file/path and fail before writing on missing,
@@ -966,7 +966,7 @@ none; VS Build Tools ships none). The route still closes, because the
 runtime carries the two things the debugger was for:
 
 - **Every panic prints a backtrace** (`rt_backtrace_print`,
-  rt/windows_x86_64.w): Win64 unwind tables let
+  rt/windows_x86_64.with): Win64 unwind tables let
   `RtlCaptureStackBackTrace` walk the stack with no frame-pointer chain,
   and dbghelp symbolizes against the PDB the link wrote. So
   `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` stops ARE the call chain of the
@@ -1040,12 +1040,12 @@ earlier call). `--sema-body-order-reverse` (or
 comparing a program's output with and without it shows a dependence:
 
 ```sh
-with check file.w
-with check --sema-body-order-reverse file.w
+with check file.with
+with check --sema-body-order-reverse file.with
 ```
 
 `with build :sema-order-check` runs the comparison over every
-`test/compile_errors` fixture (tools/sema_order_check.w) and fails on a
+`test/compile_errors` fixture (tools/sema_order_check.with) and fails on a
 difference outside `test/sema_order_allowlist.txt` (#1941).
 
 ## Debug Allocator
@@ -1054,8 +1054,8 @@ The native debug allocator remains the first tool for drop, lifetime,
 double-free, use-after-free, and leak bugs:
 
 ```sh
-with run --debug-alloc repro.w
-with run --debug-alloc --debug-alloc-filter=non-root repro.w
+with run --debug-alloc repro.with
+with run --debug-alloc --debug-alloc-filter=non-root repro.with
 WITH_DEBUG_ALLOC=1 ./bin                          # any binary
 WITH_DEBUG_ALLOC=1 WITH_ALLOC_NO_REUSE=1 ./bin    # never reuse a freed address
 ```
@@ -1103,11 +1103,11 @@ view instead of raw process-lifetime noise.
 
 The tools around the allocator:
 
-- `tools/debug_drop.w` drives it: `debug_drop run <with> <repro.w>` prints
-  the verdict lines; `debug_drop check <with> <fixture.w>…` asserts each
+- `tools/debug_drop.with` drives it: `debug_drop run <with> <repro.with>` prints
+  the verdict lines; `debug_drop check <with> <fixture.with>…` asserts each
   fixture's `//! expect-debug-alloc:` and `//! expect-stdout:` lines (the
   `:debug-alloc-tests` lane). Build it with
-  `out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop`.
+  `out/release/bin/with build tools/debug_drop.with -o out/debug-alloc-tests/debug_drop`.
 - `tools/debug_drop_sites.lldb` resolves the sites: breakpoints on the trap
   checks (`dbg_trap_free_check`, `dbg_trap_alloc_check`) and on the
   double-free reporter, each with a backtrace, used with
@@ -1212,7 +1212,7 @@ The same holds for the typed MIR validator's ICE (`invalid MIR before
 codegen: … in \`CiGotoCfgContext.emit_switch_dispatch\``): the invalid
 module is kept for the dumps, so `--dump-mir` shows the refused statement
 (`_14 = copy _6.state`) and `--explain-mir-origin` its locals. A compiler
-that lowers its own source wrongly shows it as `check src/main.w` failing
+that lowers its own source wrongly shows it as `check src/main.with` failing
 under stage1 while the build succeeded: the release binary is then built
 from invalid MIR, so reproduce with stage1, not the release binary.
 

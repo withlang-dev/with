@@ -48,7 +48,7 @@ Summary of work (see 05 for full checkboxes):
 Summary of work (see 06 for full checkboxes):
 
 - [ ] Move state from Driver to Zcu
-- [ ] Route main.w through compiler.Compilation
+- [ ] Route main.with through compiler.Compilation
 - [ ] Delete Driver or reduce to thin adapter
 - [ ] Verify: no semantic or codegen logic outside `src/compiler/*`
 
@@ -69,17 +69,17 @@ Summary of work (see 06 for full checkboxes):
 
 ## Phase 5: C Backend Completion
 
-**Current state:** CCodegen.w is functional (3,749 lines). Reads
+**Current state:** CCodegen.with is functional (3,749 lines). Reads
 MIR. `--emit-c` flag works. Runtime files exist (with_runtime.h,
 with_runtime.c, helpers.c, fiber.c, fiber_asm for x86_64 and
 aarch64). Not yet capable of cross-compiling the compiler itself
 for 4 targets.
 
-**Files:** `src/CCodegen.w`, `runtime/`, `src/compiler/Link.w`
+**Files:** `src/CCodegen.with`, `runtime/`, `src/compiler/Link.with`
 
 ### 5.1 Audit CCodegen Coverage Gaps
 
-- [ ] Read src/CCodegen.w (3,749 lines) end-to-end to identify
+- [ ] Read src/CCodegen.with (3,749 lines) end-to-end to identify
       MIR constructs not yet translated to C
 - [ ] Compile a simple test program with `--emit-c`, verify output
       compiles with `cc` and produces correct results
@@ -93,7 +93,7 @@ for 4 targets.
 
 ### 5.2 Self-Compile via C Backend
 
-- [ ] Attempt: `./out/bin/with-stage2 build src/main.w --emit-c`
+- [ ] Attempt: `./out/bin/with-stage2 build src/main.with --emit-c`
       to emit the compiler as C
 - [ ] Catalog all CCodegen failures/errors during self-compile
 - [ ] Fix CCodegen gaps one at a time (each gap is a sub-task):
@@ -101,7 +101,7 @@ for 4 targets.
 - [ ] Gap fix 2: (to be determined by audit)
 - [ ] Gap fix 3: (to be determined by audit)
 - [ ] After each fix: `make build && make fixpoint`
-- [ ] Verify: `with-stage2 build src/main.w --emit-c` completes
+- [ ] Verify: `with-stage2 build src/main.with --emit-c` completes
       without errors and produces `out/main.c`
 
 ### 5.3 Compile Emitted C to Working Binary
@@ -110,8 +110,8 @@ for 4 targets.
       `clang -O2 -I runtime out/main.c runtime/with_runtime.c
       runtime/helpers.c runtime/fiber.c runtime/fiber_asm_aarch64.s
       -o out/bin/with-from-c`
-- [ ] Run `out/bin/with-from-c check src/main.w` — must succeed
-- [ ] Run `out/bin/with-from-c build src/main.w` — must produce
+- [ ] Run `out/bin/with-from-c check src/main.with` — must succeed
+- [ ] Run `out/bin/with-from-c build src/main.with` — must produce
       a working binary
 - [ ] Compare output of C-compiled compiler vs LLVM-compiled compiler:
       both must produce identical output for the same input
@@ -150,7 +150,7 @@ for 4 targets.
 
 ### 6.1 `with fmt` — Code Formatter
 
-**Current state:** Stub in main.w (prints "not yet available").
+**Current state:** Stub in main.with (prints "not yet available").
 
 - [ ] Design formatting rules:
       - Indentation: 4 spaces (match compiler source convention)
@@ -161,8 +161,8 @@ for 4 targets.
       - Import grouping: std imports first, then local
 - [ ] Implement formatter as AST round-trip:
       parse → walk AST → emit formatted source
-- [ ] Create `src/Formatter.w` (or extend render.w)
-- [ ] Wire `with fmt` command in main.w (replace stub)
+- [ ] Create `src/Formatter.with` (or extend render.with)
+- [ ] Wire `with fmt` command in main.with (replace stub)
 - [ ] Write test: format a messy file, verify output matches expected
 - [ ] Run `with fmt` on compiler source — catalog all changes
 - [ ] Fix any formatting rule conflicts found by formatting
@@ -199,19 +199,19 @@ No `@[test]` attribute discovery.
       - Reports: min, median, mean, std dev per benchmark
 - [ ] Implement `@[bench]` function collection
 - [ ] Implement benchmark runner with timing infrastructure
-- [ ] Add `with bench` command to main.w
+- [ ] Add `with bench` command to main.with
 - [ ] Write benchmark for compiler self-compile time
 - [ ] `make build && make fixpoint`
 
 ### 6.4 Error Messages with Suggestions
 
 **Current state:** Diagnostic type supports notes and helps fields
-(src/Diagnostic.w). Quality varies — some errors include
+(src/Diagnostic.with). Quality varies — some errors include
 suggestions, many don't.
 
-- [ ] Audit error messages in src/Sema.w: catalog errors missing
+- [ ] Audit error messages in src/Sema.with: catalog errors missing
       source locations, suggestions, or fix hints
-- [ ] Audit error messages in src/Parser.w: same
+- [ ] Audit error messages in src/Parser.with: same
 - [ ] For each common error, add a help suggestion:
 - [ ] "undefined variable X" → "did you mean Y?" (Levenshtein)
 - [ ] "type mismatch: expected X, got Y" → show both locations
@@ -230,16 +230,16 @@ tied to a single phase — they are cross-cutting concerns.
 
 ### P2: One Source of Truth — Eliminate i32 Fallbacks
 
-**Current state:** Codegen.w has multiple `wl_i32_type` fallbacks
-(lines 4036, 4079, 4122, 4150, 4155). Sema.w returns 0 from
+**Current state:** Codegen.with has multiple `wl_i32_type` fallbacks
+(lines 4036, 4079, 4122, 4150, 4155). Sema.with returns 0 from
 type resolution in 30+ places.
 
 **Detailed plan for codegen fallbacks:** `docs/01_Codegen_Bug_Fixes.md`
 Priority 5 (i32 Fallback Elimination)
 
-- [ ] Audit all `wl_i32_type` fallback sites in Codegen.w
+- [ ] Audit all `wl_i32_type` fallback sites in Codegen.with
 - [ ] Convert each fallback to a hard compile error
-- [ ] Audit all `return 0` in Sema.w type resolution
+- [ ] Audit all `return 0` in Sema.with type resolution
 - [ ] Replace sentinel 0 returns with proper error propagation
 - [ ] Verify: no silent i32 defaults remain (non-negotiable #3)
 - [ ] `make build && make fixpoint`
@@ -261,9 +261,9 @@ This must be verified, not assumed.
         These must be replaced with ordered structures.
       - **Unknown:** Need investigation.
 - [ ] Count unsafe (iterated) HashMaps:
-      - Codegen.w: 172 HashMap declarations
-      - Sema.w: 38 HashMap declarations
-      - CCodegen.w: 16 HashMap declarations
+      - Codegen.with: 172 HashMap declarations
+      - Sema.with: 38 HashMap declarations
+      - CCodegen.with: 16 HashMap declarations
       - Other files: 17 HashMap declarations
 - [ ] Design OrderedMap type:
       - Option A: Vec of (key, value) pairs with linear scan
@@ -271,7 +271,7 @@ This must be verified, not assumed.
       - Option B: Vec of entries + HashMap index for O(1) lookup
         with deterministic iteration order
       - Option C: BTreeMap-style sorted map
-- [ ] Implement OrderedMap in `lib/std/collections.w`
+- [ ] Implement OrderedMap in `lib/std/collections.with`
 - [ ] Replace unsafe (iterated) HashMaps with OrderedMap
 - [ ] Verify: fixpoint still holds after each replacement
 - [ ] Verify: no HashMap iteration remains in compiler source
@@ -288,47 +288,47 @@ receive invalid data from error cases.
       - Carries the original error diagnostic
       - All downstream phases must handle NK_POISONED gracefully
         (skip it, don't crash)
-- [ ] Add NK_POISONED to src/Ast.w
-- [ ] Update src/Parser.w: emit NK_POISONED on parse errors
+- [ ] Add NK_POISONED to src/Ast.with
+- [ ] Update src/Parser.with: emit NK_POISONED on parse errors
       instead of returning 0 or skipping
-- [ ] Update src/Resolve.w: propagate NK_POISONED (don't resolve
+- [ ] Update src/Resolve.with: propagate NK_POISONED (don't resolve
       names inside poisoned subtrees)
-- [ ] Update src/Sema.w: propagate NK_POISONED (return TY_ERR
+- [ ] Update src/Sema.with: propagate NK_POISONED (return TY_ERR
       for poisoned nodes without emitting duplicate errors)
-- [ ] Update src/Codegen.w: skip NK_POISONED nodes (emit nothing)
+- [ ] Update src/Codegen.with: skip NK_POISONED nodes (emit nothing)
 - [ ] Verify: a file with parse errors produces diagnostics but
       doesn't crash in later phases
 - [ ] `make build && make fixpoint`
 
 ### P11: File Complexity Budget
 
-**Current state:** Codegen.w is 10,821 lines (2x the 5,000 line
-budget). Sema.w is 5,820 lines (borderline).
+**Current state:** Codegen.with is 10,821 lines (2x the 5,000 line
+budget). Sema.with is 5,820 lines (borderline).
 
-- [ ] Audit Codegen.w for natural split boundaries:
-      - String method codegen (~200 lines) → `src/CodegenStr.w`
-      - Vec method codegen (~300 lines) → `src/CodegenVec.w`
-      - HashMap method codegen (~200 lines) → `src/CodegenHashMap.w`
-      - Option/Result codegen (~200 lines) → `src/CodegenOption.w`
-      - Closure codegen (~800 lines) → `src/CodegenClosure.w`
-      - Match codegen (~500 lines) → `src/CodegenMatch.w`
-      - Async codegen → already in AsyncLower.w
-- [ ] Split Codegen.w into main file + extracted modules
+- [ ] Audit Codegen.with for natural split boundaries:
+      - String method codegen (~200 lines) → `src/CodegenStr.with`
+      - Vec method codegen (~300 lines) → `src/CodegenVec.with`
+      - HashMap method codegen (~200 lines) → `src/CodegenHashMap.with`
+      - Option/Result codegen (~200 lines) → `src/CodegenOption.with`
+      - Closure codegen (~800 lines) → `src/CodegenClosure.with`
+      - Match codegen (~500 lines) → `src/CodegenMatch.with`
+      - Async codegen → already in AsyncLower.with
+- [ ] Split Codegen.with into main file + extracted modules
       (each split is a separate step with fixpoint verification)
-- [ ] Split 1: extract string methods to CodegenStr.w
+- [ ] Split 1: extract string methods to CodegenStr.with
 - [ ] `make build && make fixpoint`
-- [ ] Split 2: extract Vec methods to CodegenVec.w
+- [ ] Split 2: extract Vec methods to CodegenVec.with
 - [ ] `make build && make fixpoint`
-- [ ] Split 3: extract HashMap methods to CodegenHashMap.w
+- [ ] Split 3: extract HashMap methods to CodegenHashMap.with
 - [ ] `make build && make fixpoint`
-- [ ] Split 4: extract Option/Result methods to CodegenOption.w
+- [ ] Split 4: extract Option/Result methods to CodegenOption.with
 - [ ] `make build && make fixpoint`
-- [ ] Split 5: extract closure codegen to CodegenClosure.w
+- [ ] Split 5: extract closure codegen to CodegenClosure.with
 - [ ] `make build && make fixpoint`
-- [ ] Split 6: extract match codegen to CodegenMatch.w
+- [ ] Split 6: extract match codegen to CodegenMatch.with
 - [ ] `make build && make fixpoint`
-- [ ] Verify: Codegen.w is under 5,000 lines after splits
-- [ ] Audit Sema.w (5,820 lines) for potential splits if needed
+- [ ] Verify: Codegen.with is under 5,000 lines after splits
+- [ ] Audit Sema.with (5,820 lines) for potential splits if needed
 - [ ] `make build && make fixpoint`
 
 ### P12: Measure, Then Optimize — Compile Time Tracking
@@ -338,7 +338,7 @@ budget). Sema.w is 5,820 lines (borderline).
 - [ ] Add timing to Makefile: wrap stage1 and stage2 builds with
       `time` and log to `out/log/build_times.txt`
 - [ ] Create `scripts/benchmark_self_compile.sh`:
-      - Runs `time ./out/bin/with-stage2 build src/main.w` 3 times
+      - Runs `time ./out/bin/with-stage2 build src/main.with` 3 times
       - Reports min/median/mean wall-clock time
       - Appends to `out/log/compile_time_history.csv`
 - [ ] Add git hook or Makefile target to record compile time on
@@ -376,12 +376,12 @@ budget). Sema.w is 5,820 lines (borderline).
 - [ ] Write round-trip tests:
       `--emit-c` → C compiler → run vs LLVM backend → run
       must produce identical stdout
-- [ ] Create `test/cases/roundtrip_*.w` test files:
-- [ ] roundtrip_arithmetic.w — basic math
-- [ ] roundtrip_strings.w — string operations
-- [ ] roundtrip_structs.w — struct creation and field access
-- [ ] roundtrip_enums.w — enum match and variant access
-- [ ] roundtrip_closures.w — closure capture and call
+- [ ] Create `test/cases/roundtrip_*.with` test files:
+- [ ] roundtrip_arithmetic.with — basic math
+- [ ] roundtrip_strings.with — string operations
+- [ ] roundtrip_structs.with — struct creation and field access
+- [ ] roundtrip_enums.with — enum match and variant access
+- [ ] roundtrip_closures.with — closure capture and call
 - [ ] Add roundtrip test support to scripts/run_tests.sh:
       `//! roundtrip` directive compiles both ways and compares
 - [ ] `make build && make fixpoint`
@@ -429,7 +429,7 @@ These must hold at all times. Run after every change.
 - [ ] **Fixpoint holds:** `make fixpoint` (stage2 == stage3)
 - [ ] **Tests pass:** `./scripts/run_tests.sh` — zero failures
 - [ ] **No i32 fallbacks:** grep for `wl_i32_type.*fallback` in
-      Codegen.w returns zero results
+      Codegen.with returns zero results
 - [ ] **No hardcoded user-facing names:** `is_builtin_fn` and
       `is_builtin_value` deleted from sema
 - [ ] **Deterministic output:** same input → same binary

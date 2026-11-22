@@ -127,18 +127,18 @@ Violations of the static restrictions produce errors. The following are illustra
 
 ```
 error: goto target is in a different function
-  --> example.w:42:5
+  --> example.with:42:5
    |
 42 |     goto 'other_fn_label
    |     ^^^^^^^^^^^^^^^^^^^^
    |
-   = note: 'other_fn_label is declared in fn `other_fn` at example.w:30:1
+   = note: 'other_fn_label is declared in fn `other_fn` at example.with:30:1
    = help: goto can only target labels in the same function
 ```
 
 ```
 error: goto would enter a block from outside
-  --> example.w:42:9
+  --> example.with:42:9
    |
 40 |     if cond:
 41 |         do_setup()
@@ -155,7 +155,7 @@ error: goto would enter a block from outside
 
 ```
 error: goto would skip variable initialization
-  --> example.w:42:5
+  --> example.with:42:5
    |
 42 |     goto 'use_x
    |     ^^^^^^^^^^^

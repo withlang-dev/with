@@ -1,0 +1,228 @@
+// LibcFacade — the toolchain libc facade (D51 ruling §5 "bounded knowledge",
+// spec §16.2b.1 and §16.3c: "The toolchain's own knowledge is bounded to the
+// C standard library (the curated libc facade), which is a standard
+// deliverable").
+//
+// It is facade code, not compiler folklore: the text below is an ordinary
+// `c facade` block, parsed, verified (§61, SemaFacade.with) and rendered
+// (FacadeRender.with) exactly like one a program writes. The Frontend splices
+// it after every `<c_import …>` translation as the synthetic file
+// `<toolchain facade libc>` — the provenance every diagnostic about it names —
+// into the module whose c_import declared the functions it describes.
+//
+// Only what the program imported is described: a `from` line needs its
+// producer, a resource needs a kept `from` and its `drop`, and an fn item
+// needs its function and the resource its `of` names — each of libc's shape
+// (libc_facade_select). A libc function the
+// program never declared is never mentioned, so a facade clause can never
+// name an absent declaration. A program's own facade outranks this one: a
+// resource, producer or fn item the program's facades already name is left
+// to the program (§16.2b.2: an explicit facade clause is the program's).
+//
+// These are the rows the #357 owning-wrapper tables carried (strdup/strndup
+// → free, fopen/fdopen/tmpfile → fclose, opendir → closedir, readdir and
+// rewinddir borrowing the directory), now under the facade rules: each
+// constructor yields `Option[R]` (NULL produced nothing, §16.2b.8), Drop runs
+// the destroyer exactly once, and the raw C names stay raw (§16.2b.5).
+//
+// Stage 7 (ruling §33, §37, §38, §41; spec §16.2b.7-8) adds the borrowed
+// strings the #379 overlay vouched for as raw nullable pointers: `getenv`
+// borrows from the process environment — the domain `environ` — and
+// `strerror` from its own buffer; `strchr`, `strrchr`, `strpbrk` and
+// `strstr` return text borrowed from the string they are lent. Each is
+// presented under its C name as `Option[CStr]`. Each domain names the
+// functions that rewrite it (D208, §16.2b.7), and every other function
+// preserves it: a view from `getenv` survives a `strchr` over it. `getenv`
+// is no writer of `environ` (Eric, 2026-11-18): C11 7.22.4.6 lets the
+// string be overwritten by a later getenv, but POSIX.1-2024 requires the
+// pointer to point into the environment data itself, and on a list where
+// getenv is a writer the call is refused beside every contract that is
+// silent on its threads. A view from getenv dies at a call that modifies
+// the environment. A writer the program did not import is left off the
+// list it is given: it cannot be called.
+
+use Ast
+use InternPool
+use compiler.FacadeRender
+
+fn libc_facade_source() -> str:
+    "c contract libc:
+    // POSIX strdup(3) and strndup(3): each returns a new string obtained from
+    // malloc, which the caller releases with free (C11 7.22.3.3).
+    resource CHeapStr wraps *mut c_char
+        from strdup
+        from strndup
+        drop free
+    // C11 7.21.5.3 fopen, POSIX fdopen(3) and C11 7.21.4.3 tmpfile: each
+    // returns a stream the caller closes with fclose (C11 7.21.5.1).
+    resource CFile wraps *mut FILE
+        from fopen
+        from fdopen
+        from tmpfile
+        drop fclose
+    // POSIX opendir(3): returns a directory stream the caller closes with
+    // closedir(3).
+    resource CDir wraps *mut DIR
+        from opendir
+        drop closedir
+    // POSIX readdir(3): returns the stream's next entry; the stream stays
+    // open and stays the caller's.
+    fn readdir
+        lend
+        of CDir
+    // POSIX rewinddir(3): resets the stream's position; the stream stays
+    // open and stays the caller's.
+    fn rewinddir
+        lend
+        of CDir
+    // The C library runs no threads of its own: C11 7.26.5.1 thrd_create
+    // runs the function the program gives it, and the implementation
+    // behaves as if no library function calls getenv (7.22.4.6) or strerror
+    // (7.24.6.2).
+    runs no threads
+    // POSIX.1-2024 getenv: the pointer returned by getenv points to a string
+    // within the environment data pointed to by environ. setenv(3),
+    // unsetenv(3), putenv(3) and clearenv(3) modify that data, as the C
+    // runtime's _putenv and _putenv_s do on Windows.
+    domain environ process written by setenv, unsetenv, putenv, clearenv, _putenv, _putenv_s
+    // C11 7.24.6.2p4: the array strerror returns may be overwritten by a
+    // subsequent call of strerror.
+    domain strerror_text process written by strerror
+    // C11 7.22.4.6 getenv: returns a pointer to the value in the environment
+    // list, which the program shall not modify.
+    fn getenv
+        returns borrow CStr from domain environ
+    // C11 7.24.6.2 strerror: returns a pointer to a message string the
+    // program shall not modify, which a later call of strerror may
+    // overwrite.
+    fn strerror
+        returns borrow CStr from domain strerror_text
+    // C11 7.24.5.2 strchr: returns a pointer to the located character in
+    // the string it is given, or null. It reads its arguments and nothing
+    // else.
+    fn strchr
+        returns borrow CStr from param 0
+    // C11 7.24.5.5 strrchr: returns a pointer to the last occurrence of the
+    // character in the string it is given, or null. It reads its arguments
+    // and nothing else.
+    fn strrchr
+        returns borrow CStr from param 0
+    // C11 7.24.5.4 strpbrk: returns a pointer to a character of the first
+    // string, or null. It reads its arguments and nothing else.
+    fn strpbrk
+        returns borrow CStr from param 0
+    // C11 7.24.5.7 strstr: returns a pointer to the located sequence in the
+    // first string, or null. It reads its arguments and nothing else.
+    fn strstr
+        returns borrow CStr from param 0
+"
+
+fn libc_facade_has(names: &List[str], name: &str) -> bool:
+    for i in 0..names.len():
+        if names[i] == name:
+            return true
+    false
+
+// The second word of a facade line (`from fopen` → `fopen`).
+fn libc_facade_operand(line: &str) -> str:
+    let words = line.trim().split(" ")
+    if words.len() < 2: "" else: words[1]
+
+// The facade text restricted to what this compilation's c_import
+// declarations support (`ci` flags them) and `claimed` (names the program's
+// own facades state) leaves to the toolchain; "" when nothing applies. A
+// declaration is described only when it has libc's shape: a producer returns
+// the representation, the drop takes it (or `void *`, §61), a lend takes it
+// first. A declaration of another shape — a program's own `fopen` over
+// `void *` — is not described: it stays the raw surface, which removes
+// capability and never asserts a contract the declarations do not carry.
+fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claimed: &List[str]) -> str:
+    let lines = libc_facade_source().split("\n")
+    let kept_names: List[str] = []
+    let kept_reprs: List[str] = []
+    // Domain lines are kept when a kept item names the domain (a
+    // `from domain D` or `preserves domain D` clause) and the program's own
+    // facades do not declare it.
+    let domain_lines: List[str] = []
+    let domain_names: List[str] = []
+    var body = ""
+    var threads = ""
+    // The citation above an item (§31.9 rule 2) goes with it: kept when the
+    // item is, dropped when it is not.
+    var pending_citation = ""
+    var i = 1
+    while i < lines.len():
+        let header = lines[i]
+        i = i + 1
+        if header.trim().len() == 0:
+            continue
+        if header.trim().starts_with("//"):
+            pending_citation = pending_citation ++ header ++ "\n"
+            continue
+        let citation = pending_citation
+        pending_citation = ""
+        let clauses: List[str] = []
+        while i < lines.len() and lines[i].starts_with("        "):
+            clauses.push(lines[i])
+            i = i + 1
+        let name = libc_facade_operand(header)
+        if libc_facade_has(claimed, name):
+            continue
+        if header.trim() == "runs no threads":
+            threads = citation ++ header ++ "\n"
+            continue
+        if header.trim().starts_with("domain "):
+            // D208: the line names every writer the C library has; Sema
+            // leaves out the ones the program did not import.
+            domain_lines.push(citation ++ header)
+            domain_names.push(name)
+            continue
+        if header.trim().starts_with("resource "):
+            let words = header.trim().split(" wraps ")
+            if words.len() != 2:
+                continue
+            let repr = facade_render_unalias(pool, intern, words[1].trim())
+            var kept = ""
+            var producers = 0
+            var has_drop = false
+            for ci_ in 0..clauses.len():
+                let clause = clauses[ci_]
+                let op = libc_facade_operand(clause)
+                let (found, ret, p0) = facade_render_import_shape(pool, intern, ci, op)
+                if clause.trim().starts_with("from "):
+                    if found and ret == repr and not libc_facade_has(claimed, op):
+                        kept = kept ++ clause ++ "\n"
+                        producers = producers + 1
+                else:
+                    if clause.trim().starts_with("drop ") and found and (p0 == repr or ((p0 == "*mut c_void" or p0 == "*const c_void") and repr.starts_with("*"))):
+                        has_drop = true
+                    kept = kept ++ clause ++ "\n"
+            if producers > 0 and has_drop:
+                body = body ++ citation ++ header ++ "\n" ++ kept
+                kept_names.push(name)
+                kept_reprs.push(repr)
+        else:
+            let (found, _, p0) = facade_render_import_shape(pool, intern, ci, name)
+            if not found:
+                continue
+            var ok = true
+            for ci_ in 0..clauses.len():
+                if clauses[ci_].trim().starts_with("of "):
+                    let target = libc_facade_operand(clauses[ci_])
+                    var matched = false
+                    for ki in 0..kept_names.len():
+                        if kept_names[ki] == target and kept_reprs[ki] == p0:
+                            matched = true
+                    if not matched:
+                        ok = false
+            if ok:
+                body = body ++ citation ++ header ++ "\n"
+                for ci_ in 0..clauses.len():
+                    body = body ++ clauses[ci_] ++ "\n"
+    if body.len() == 0:
+        return ""
+    var domains = ""
+    for di in 0..domain_lines.len():
+        if body.contains(" domain " ++ domain_names[di] ++ "\n"):
+            domains = domains ++ domain_lines[di] ++ "\n"
+    lines[0] ++ "\n" ++ threads ++ domains ++ body

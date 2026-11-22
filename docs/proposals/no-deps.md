@@ -10,7 +10,7 @@ The only subprocess calls that remain are running the With compiler itself (stag
 
 ### Phase 1: Pure-With archive creation
 
-**What it replaces:** `ar rcs` subprocess (BuildGraphOps.w:186)
+**What it replaces:** `ar rcs` subprocess (BuildGraphOps.with:186)
 
 **Priority:** First because it's zero-risk, zero-investigation, pure With, ~100 lines.
 
@@ -22,7 +22,7 @@ The format is simple:
 
 For long filenames (>16 chars), use the BSD `#1/` extended name format: the name is prepended to the file data and the header's name field reads `#1/<name_length>`.
 
-**Add to runtime (`rt/rt_core.w`):**
+**Add to runtime (`rt/rt_core.with`):**
 
 ```with
 @[c_export("with_create_archive")]
@@ -31,9 +31,9 @@ pub fn create_archive(output: str, object_files: str) -> i32
 
 Where `object_files` is null-separated paths (same convention as the existing argv blobs).
 
-Alternatively, implement entirely in With in the build system layer (BuildGraphOps.w) using `with_fs_read_file` / `with_fs_write_file`. No runtime C code needed — just byte-level format construction.
+Alternatively, implement entirely in With in the build system layer (BuildGraphOps.with) using `with_fs_read_file` / `with_fs_write_file`. No runtime C code needed — just byte-level format construction.
 
-**Replace in BuildGraphOps.w:186.** Remove the `ar` tool from BuildGraphTools.w.
+**Replace in BuildGraphOps.with:186.** Remove the `ar` tool from BuildGraphTools.with.
 
 **Verification:** Create an archive, verify with `nm` that symbols are accessible, link the compiler against it, fixpoint passes.
 
@@ -42,8 +42,8 @@ Alternatively, implement entirely in With in the build system layer (BuildGraphO
 ### Phase 2: SDK path discovery + seed compiler probe
 
 **What it replaces:**
-- `/usr/bin/xcrun --show-sdk-path` (build_compiler.w:166)
-- `with --version` seed probe (build_compiler.w:190)
+- `/usr/bin/xcrun --show-sdk-path` (build_compiler.with:166)
+- `with --version` seed probe (build_compiler.with:190)
 
 **Priority:** Second because both are trivial filesystem probes, ~15 lines each.
 
@@ -58,7 +58,7 @@ Alternatively, implement entirely in With in the build system layer (BuildGraphO
 On Linux: no SDK path needed (system headers are in `/usr/include`).
 On Windows: probe `%WindowsSdkDir%` or known Visual Studio paths.
 
-**Replace in build_compiler.w:166.**
+**Replace in build_compiler.with:166.**
 
 **Seed compiler probe — walk PATH with filesystem checks:**
 
@@ -71,7 +71,7 @@ On Windows: probe `%WindowsSdkDir%` or known Visual Studio paths.
 
 This is what shell `which` does internally — a filesystem probe, not a subprocess. Replace the `with --version` subprocess call with a PATH walk.
 
-**Replace in build_compiler.w:190.**
+**Replace in build_compiler.with:190.**
 
 **Verification:** Compare discovered paths against `xcrun --show-sdk-path` and `which with` on a dev machine.
 
@@ -79,7 +79,7 @@ This is what shell `which` does internally — a filesystem probe, not a subproc
 
 ### Phase 3: Git-free version detection
 
-**What it replaces:** `git rev-parse --short HEAD` and `git rev-list --count HEAD` (build_compiler.w:260-274)
+**What it replaces:** `git rev-parse --short HEAD` and `git rev-list --count HEAD` (build_compiler.with:260-274)
 
 **Priority:** Third because it's straightforward file reads, no external dependencies.
 
@@ -107,7 +107,7 @@ fn read_git_head_hash(root: str) -> str:
 
 If `.git` doesn't exist (tarball build), fall back to reading `src/version` which already contains the release version.
 
-**Replace in build_compiler.w:260-274.**
+**Replace in build_compiler.with:260-274.**
 
 **Verification:** Compare output against `git rev-parse --short=9 HEAD` on a dev machine.
 
@@ -115,7 +115,7 @@ If `.git` doesn't exist (tarball build), fall back to reading `src/version` whic
 
 ### Phase 4: Git-free committed-state check
 
-**What it replaces:** `git status --porcelain` (build_compiler.w:479-483)
+**What it replaces:** `git status --porcelain` (build_compiler.with:479-483)
 
 **Priority:** Fourth because it needs design work but has no external dependencies.
 
@@ -131,7 +131,7 @@ At `with build :fixpoint` success (or a new `with build :bless` command), record
 out/.build-state/blessed-manifest
 ```
 
-Contents: sorted lines of `<path>:<content-hash>`, covering `src/*.w` (recursively), `rt/*.w`, `lib/std/*.w`, `build.w`, `build_compiler.w`.
+Contents: sorted lines of `<path>:<content-hash>`, covering `src/*.with` (recursively), `rt/*.with`, `lib/std/*.with`, `build.with`, `build_compiler.with`.
 
 At `install-user` / `update-seed` time, recompute hashes of the same files and compare against the manifest. If any file differs or the manifest doesn't exist, fail with a diagnostic listing the changed files. `--force` bypasses as before.
 
@@ -139,13 +139,13 @@ At `install-user` / `update-seed` time, recompute hashes of the same files and c
 
 **Why not Option C (skip when no git):** The check should work everywhere, not just in git repos.
 
-**Replace in build_compiler.w:479-483.**
+**Replace in build_compiler.with:479-483.**
 
 ---
 
 ### Phase 5: LLVM path discovery
 
-**What it replaces:** `llvm-config --libfiles --link-static ...` (build_compiler.w:354)
+**What it replaces:** `llvm-config --libfiles --link-static ...` (build_compiler.with:354)
 
 **Priority:** Fifth because it requires care around LLVM version portability.
 
@@ -159,7 +159,7 @@ At `install-user` / `update-seed` time, recompute hashes of the same files and c
 4. Check for unified `libLLVM.a` first — if it exists, use just that instead of component libraries.
 5. Write the result to `out/lib/llvm_link.rsp` as before.
 
-**Replace in build_compiler.w:354.**
+**Replace in build_compiler.with:354.**
 
 **Verification:** Diff the generated `llvm_link.rsp` against what `llvm-config` would produce — it should be a superset (same libraries plus possibly unused ones). The compiler must link and fixpoint.
 
@@ -167,7 +167,7 @@ At `install-user` / `update-seed` time, recompute hashes of the same files and c
 
 ### Phase 6: LLVM-based C compilation, assembly, and IR-to-object
 
-**What it replaces:** `cc -c` for C objects, `cc -c` for assembly, `clang -c` for LLVM IR (BuildGraphDispatch.w:116-120)
+**What it replaces:** `cc -c` for C objects, `cc -c` for assembly, `clang -c` for LLVM IR (BuildGraphDispatch.with:116-120)
 
 **Priority:** Last because it requires the most investigation and has the highest risk.
 
@@ -175,7 +175,7 @@ At `install-user` / `update-seed` time, recompute hashes of the same files and c
 
 The compiler dynamically links `libclang` (for `c_import` header parsing) but the full clang compilation pipeline (C source → object file) requires the static clang libraries (`libclangCodeGen.a`, `libclangFrontend.a`, etc.). These are different link dependencies. Before committing to an approach, determine:
 
-1. What clang APIs are available through the current `libclang` dynamic link? Check `rt/clang_bridge.w` for the current API surface.
+1. What clang APIs are available through the current `libclang` dynamic link? Check `rt/clang_bridge.with` for the current API surface.
 2. Does `libclang` expose any code emission / compilation function, or only parsing/indexing?
 3. Would switching from dynamic `libclang` to static clang libraries be feasible? What's the binary size impact?
 4. Can the clang frontend be driven through the LLVM C API that's already statically linked?
@@ -187,7 +187,7 @@ The build timeline says "Apr 5 — Zero C source files." If no `.c` files remain
 - **Assembly (kind 13):** Can LLVM's MC layer be driven through the existing LLVM C API? The compiler already initializes LLVM targets for codegen — the same target initialization serves assembly. Use `createMCAsmParser` → `MCStreamer` or `LLVMTargetMachineEmitToFile`.
 - **LLVM IR to object (kind 14):** The compiler already does this for With source (emit IR → compile to object via LLVM backend). Factor out the "IR text → object file" step into a standalone runtime function. This is likely the easiest of the three.
 
-**Add to the LLVM bridge (`rt/llvm_bridge.w`):**
+**Add to the LLVM bridge (`rt/llvm_bridge.with`):**
 
 ```with
 /// Assemble a .s file to an object file using LLVM's MC layer.
@@ -200,7 +200,7 @@ fn wl_compile_ir_to_object(source: str, output: str) -> i32
 fn wl_compile_c_to_object(source: str, output: str, include_paths: str, flags: str) -> i32
 ```
 
-**Replace in BuildGraphDispatch.w:116-120.** Route each target kind to the appropriate LLVM function instead of subprocess.
+**Replace in BuildGraphDispatch.with:116-120.** Route each target kind to the appropriate LLVM function instead of subprocess.
 
 **Verification:** Rebuild the compiler. Every runtime object (rt_core.o, llvm_bridge.o, clang_bridge.o, fiber_asm.o, etc.) must be produced by the LLVM bridge functions, not by subprocess. `nm` on the output objects should produce identical symbols. Fixpoint must pass.
 
@@ -227,10 +227,10 @@ After all phases:
 
 ```bash
 # Confirm no external tool subprocesses remain
-rg 'exec_argv_capture|exec_binary' src/ --include '*.w' -l
-# Should show only: BuildGraphOps.w (user Command targets),
-#                   BuildGraphTests.w (test runner),
-#                   build_compiler.w (stage chain — runs With itself)
+rg 'exec_argv_capture|exec_binary' src/ --include '*.with' -l
+# Should show only: BuildGraphOps.with (user Command targets),
+#                   BuildGraphTests.with (test runner),
+#                   build_compiler.with (stage chain — runs With itself)
 ```
 
 Every remaining subprocess call must be either running the With compiler itself or running a user-specified executable. Zero platform tool invocations.

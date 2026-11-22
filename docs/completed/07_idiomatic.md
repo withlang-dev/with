@@ -10,8 +10,8 @@ Rule: One file at a time. Verify fixpoint after each file.
 Never batch multiple files.
 
 **Codebase stats:** 47,204 total lines across 42 source files.
-Largest files: Codegen.w (10,062), Sema.w (8,683), CImport.w
-(4,628), Parser.w (4,317), CCodegen.w (3,775).
+Largest files: Codegen.with (10,062), Sema.with (8,683), CImport.with
+(4,628), Parser.with (4,317), CCodegen.with (3,775).
 
 ---
 
@@ -21,40 +21,40 @@ Convert integer constant groups to discriminant enums. Each file
 is a standalone unit of work. `make build && make fixpoint` after
 each file.
 
-### 1.1 src/Ast.w — Node Kinds (60 constants, 690 if-chain uses)
+### 1.1 src/Ast.with — Node Kinds (60 constants, 690 if-chain uses)
 
 **Current:** `const NK_FN_DECL: i32 = 1` through ~90 NK_* constants
 **Target:** `type NodeKind = disc i32 { FN_DECL = 1, TYPE_DECL = 2, ... }`
 
-- [ ] Read src/Ast.w to catalog all ~90 NK_* constants
+- [ ] Read src/Ast.with to catalog all ~90 NK_* constants
 - [ ] Define `type NodeKind` discriminant enum with all variants
       preserving existing integer values
 - [ ] Delete all 60 `const NK_*` definitions
 - [ ] Update `fn NK_*() -> i32` accessor pattern if used (check callers)
 - [ ] `make build` — fix all compilation errors from removed constants
-- [ ] Update src/Ast.w internal uses (if-chains within the file)
+- [ ] Update src/Ast.with internal uses (if-chains within the file)
 - [ ] `make build && make fixpoint`
 
-- [ ] Update src/Sema.w: replace 320 `if kind == NK_*` with `match kind`
+- [ ] Update src/Sema.with: replace 320 `if kind == NK_*` with `match kind`
       (largest consumer — do in batches of ~50 if-chains per sub-step)
 - [ ] `make build && make fixpoint`
-- [ ] Update src/Codegen.w: replace 126 `if kind == NK_*` with `match kind`
+- [ ] Update src/Codegen.with: replace 126 `if kind == NK_*` with `match kind`
 - [ ] `make build && make fixpoint`
-- [ ] Update src/render.w: replace 83 `if kind == NK_*` with `match kind`
+- [ ] Update src/render.with: replace 83 `if kind == NK_*` with `match kind`
 - [ ] `make build && make fixpoint`
-- [ ] Update src/Resolve.w: replace 64 `if kind == NK_*` with `match kind`
+- [ ] Update src/Resolve.with: replace 64 `if kind == NK_*` with `match kind`
 - [ ] `make build && make fixpoint`
-- [ ] Update src/MirLower.w: replace 43 `if kind == NK_*` with `match kind`
+- [ ] Update src/MirLower.with: replace 43 `if kind == NK_*` with `match kind`
 - [ ] `make build && make fixpoint`
-- [ ] Update src/AsyncLower.w: replace 31 `if kind == NK_*` with `match kind`
+- [ ] Update src/AsyncLower.with: replace 31 `if kind == NK_*` with `match kind`
 - [ ] `make build && make fixpoint`
-- [ ] Update src/Parser.w: replace NK_* references with enum variants
+- [ ] Update src/Parser.with: replace NK_* references with enum variants
 - [ ] `make build && make fixpoint`
-- [ ] Update src/main.w and src/main_emit_temp.w: replace 18 NK_* uses
-- [ ] Update src/BorrowCfg.w: replace 5 NK_* uses
+- [ ] Update src/main.with and src/main_emit_temp.with: replace 18 NK_* uses
+- [ ] Update src/BorrowCfg.with: replace 5 NK_* uses
 - [ ] `make build && make fixpoint`
 
-### 1.2 src/Ast.w — Operator Kinds (25 + 6 constants)
+### 1.2 src/Ast.with — Operator Kinds (25 + 6 constants)
 
 **Current:** `const OP_ADD: i32 = 0` through `const OP_NOT_IN: i32 = 24`,
 `const UOP_NEGATE: i32 = 0` through `const UOP_TRY: i32 = 5`
@@ -65,7 +65,7 @@ each file.
 - [ ] Update all consumers across src/ files
 - [ ] `make build && make fixpoint`
 
-### 1.3 src/Ast.w — Other Constant Groups
+### 1.3 src/Ast.with — Other Constant Groups
 
 **Current:** TDK_* (5 type decl sub-kinds), FN_FLAG_* (13 bit flags),
 VIS_* (2 visibility levels)
@@ -76,34 +76,34 @@ VIS_* (2 visibility levels)
 - [ ] Update all consumers
 - [ ] `make build && make fixpoint`
 
-### 1.4 src/Token.w — Token Kinds (~125 constants)
+### 1.4 src/Token.with — Token Kinds (~125 constants)
 
 **Current:** `const TK_INT_LIT: i32 = 0` through ~125 TK_* constants
 **Target:** `type TokenKind` discriminant enum
 
-- [ ] Read src/Token.w to catalog all ~125 TK_* constants
+- [ ] Read src/Token.with to catalog all ~125 TK_* constants
 - [ ] Define `type TokenKind` discriminant enum preserving integer values
 - [ ] Delete all `const TK_*` definitions
-- [ ] Update src/Token.w internal uses (114 occurrences in `tag_name`)
+- [ ] Update src/Token.with internal uses (114 occurrences in `tag_name`)
 - [ ] `make build && make fixpoint`
-- [ ] Update src/Parser.w TK_* references
-- [ ] Update src/Lexer.w TK_* references
-- [ ] Update src/main.w and src/main_emit_temp.w TK_* references
+- [ ] Update src/Parser.with TK_* references
+- [ ] Update src/Lexer.with TK_* references
+- [ ] Update src/main.with and src/main_emit_temp.with TK_* references
 - [ ] `make build && make fixpoint`
 
-### 1.5 src/Sema.w — Type Kinds (20 constants)
+### 1.5 src/Sema.with — Type Kinds (20 constants)
 
 **Current:** `const TY_ERR: i32 = 0` through 20 TY_* constants
 **Target:** `type TypeKind` discriminant enum
 
 - [ ] Define `type TypeKind` discriminant enum with 19 TY_* variants
 - [ ] Delete all `const TY_*` definitions
-- [ ] Update src/Sema.w internal uses
-- [ ] Update src/Codegen.w TY_* references
-- [ ] Update any other consumers (CCodegen.w, MirLower.w)
+- [ ] Update src/Sema.with internal uses
+- [ ] Update src/Codegen.with TY_* references
+- [ ] Update any other consumers (CCodegen.with, MirLower.with)
 - [ ] `make build && make fixpoint`
 
-### 1.6 src/Sema.w — Other Constant Groups
+### 1.6 src/Sema.with — Other Constant Groups
 
 **Current:** VS_* (2 var states), BK_* (2 borrow kinds), DR_* (3 derive reqs)
 
@@ -113,7 +113,7 @@ VIS_* (2 visibility levels)
 - [ ] Update all consumers
 - [ ] `make build && make fixpoint`
 
-### 1.7 src/Mir.w — All MIR Constant Groups (50+ constants)
+### 1.7 src/Mir.with — All MIR Constant Groups (50+ constants)
 
 **Current:** SK_* (5), TK_* (6), RK_* (9), OK_* (3), CK_* (7),
 PK_* (4), DK_* (2), MIR_INTRINSIC_* (~50)
@@ -127,16 +127,16 @@ PK_* (4), DK_* (2), MIR_INTRINSIC_* (~50)
 - [ ] Define `type DropKind` discriminant enum (2 DK_* variants)
 - [ ] Define `type MirIntrinsic` discriminant enum (17 variants)
 - [ ] Delete all original constant definitions
-- [ ] Update src/Mir.w internal uses
-- [ ] Update src/MirLower.w consumers
-- [ ] Update src/Codegen.w MIR consumers
-- [ ] Update src/MirOpt.w consumers
-- [ ] Update src/BorrowCfg.w consumers
+- [ ] Update src/Mir.with internal uses
+- [ ] Update src/MirLower.with consumers
+- [ ] Update src/Codegen.with MIR consumers
+- [ ] Update src/MirOpt.with consumers
+- [ ] Update src/BorrowCfg.with consumers
 - [ ] `make build && make fixpoint`
 
-### 1.8 src/Codegen.w — Remaining Integer Constants
+### 1.8 src/Codegen.with — Remaining Integer Constants
 
-- [ ] Audit src/Codegen.w for any integer constant groups not
+- [ ] Audit src/Codegen.with for any integer constant groups not
       covered by Ast/Token/Sema/Mir enums
 - [ ] Convert any found groups to discriminant enums
 - [ ] `make build && make fixpoint`
@@ -150,44 +150,44 @@ accidentally passing a NodeId where a TypeId is expected.
 
 ### 2.1 type NodeId = distinct i32
 
-**File:** src/Ast.w
+**File:** src/Ast.with
 
-- [ ] Add `type NodeId = distinct i32` to src/Ast.w
+- [ ] Add `type NodeId = distinct i32` to src/Ast.with
 - [ ] Update AstPool functions to accept/return NodeId instead of i32
       for node-index parameters
-- [ ] Update callers in src/Ast.w
+- [ ] Update callers in src/Ast.with
 - [ ] `make build` — catalog all type errors
-- [ ] Update src/Parser.w to use NodeId
-- [ ] Update src/Resolve.w to use NodeId
-- [ ] Update src/Sema.w to use NodeId
-- [ ] Update src/Codegen.w to use NodeId
-- [ ] Update src/MirLower.w to use NodeId
-- [ ] Update src/render.w to use NodeId
-- [ ] Update remaining files (AsyncLower.w, BorrowCfg.w, main.w, etc.)
+- [ ] Update src/Parser.with to use NodeId
+- [ ] Update src/Resolve.with to use NodeId
+- [ ] Update src/Sema.with to use NodeId
+- [ ] Update src/Codegen.with to use NodeId
+- [ ] Update src/MirLower.with to use NodeId
+- [ ] Update src/render.with to use NodeId
+- [ ] Update remaining files (AsyncLower.with, BorrowCfg.with, main.with, etc.)
 - [ ] `make build && make fixpoint`
 
 ### 2.2 type TypeId = distinct i32
 
-**File:** src/Sema.w
+**File:** src/Sema.with
 
-- [ ] Add `type TypeId = distinct i32` to src/Sema.w
+- [ ] Add `type TypeId = distinct i32` to src/Sema.with
 - [ ] Update type table functions (add_type, get_type_kind, etc.)
       to accept/return TypeId
-- [ ] Update src/Sema.w internal uses
+- [ ] Update src/Sema.with internal uses
 - [ ] `make build` — catalog all type errors
-- [ ] Update src/Codegen.w to use TypeId
+- [ ] Update src/Codegen.with to use TypeId
 - [ ] Update remaining consumer files
 - [ ] `make build && make fixpoint`
 
 ### 2.3 type BlockId = distinct i32
 
-**File:** src/Mir.w
+**File:** src/Mir.with
 
-- [ ] Add `type BlockId = distinct i32` to src/Mir.w
+- [ ] Add `type BlockId = distinct i32` to src/Mir.with
 - [ ] Update MIR basic block functions to use BlockId
-- [ ] Update src/MirLower.w to use BlockId
-- [ ] Update src/Codegen.w MIR consumers to use BlockId
-- [ ] Update src/MirOpt.w, src/BorrowCfg.w
+- [ ] Update src/MirLower.with to use BlockId
+- [ ] Update src/Codegen.with MIR consumers to use BlockId
+- [ ] Update src/MirOpt.with, src/BorrowCfg.with
 - [ ] `make build && make fixpoint`
 
 ---
@@ -202,7 +202,7 @@ mechanical transformations that preserve semantics.
 `it` implicit closures are implemented (TK_KW_IT, token 110).
 Closure syntax uses fat arrow: `x => x * 2` (not `|x| x * 2`).
 
-- [ ] Search all src/*.w files for `x =>` single-parameter closure patterns
+- [ ] Search all src/*.with files for `x =>` single-parameter closure patterns
 - [ ] Replace eligible closures with `it` shorthand
       (e.g., `v.filter(x => x > 0)` → `v.filter(it > 0)`)
 - [ ] Verify no nested `it` usage (parser rejects this)
@@ -226,7 +226,7 @@ Closure syntax uses fat arrow: `x => x * 2` (not `|x| x * 2`).
 
 ### 3.4 Replace `if x == false` with `if not x`
 
-- [ ] Search for `== false` patterns in src/*.w
+- [ ] Search for `== false` patterns in src/*.with
 - [ ] **Status:** 0 occurrences found in current codebase — verify
       and skip if confirmed
 - [ ] `make build && make fixpoint` (if any changes made)
@@ -250,7 +250,7 @@ Closure syntax uses fat arrow: `x => x * 2` (not `|x| x * 2`).
 
 ### 4.1 AstPool Metadata: Add HashMaps for O(1) Lookup
 
-**File:** src/Ast.w
+**File:** src/Ast.with
 
 **Current:** 9 functions do O(n) linear scans on metadata arrays:
 `find_fn_meta` (line ~503), `find_type_meta` (line ~543),
@@ -258,7 +258,7 @@ Closure syntax uses fat arrow: `x => x * 2` (not `|x| x * 2`).
 `find_fn_param_pattern_meta`, `find_impl_type_params`,
 `is_must_use_type_node`, `is_sealed_trait_node`, `is_move_closure`
 
-- [ ] Read src/Ast.w lines 427-570 to understand each metadata lookup
+- [ ] Read src/Ast.with lines 427-570 to understand each metadata lookup
 - [ ] Add `fn_meta_map: HashMap[i32, i32]` to AstPool struct
       (maps node → index in fn_meta vec)
 - [ ] Populate fn_meta_map when fn_meta entries are added
@@ -291,13 +291,13 @@ Closure syntax uses fat arrow: `x => x * 2` (not `|x| x * 2`).
 
 ### 4.2 Sema Scope Lookup: Add HashMap Overlay
 
-**File:** src/Sema.w
+**File:** src/Sema.with
 
 **Current:** 13 scope lookup functions do reverse linear scans of
 `bind_names` Vec. Scope uses watermark stack (`scope_starts`).
 `scope_lookup` at line ~1333.
 
-- [ ] Read src/Sema.w lines 781-921 to understand scope architecture
+- [ ] Read src/Sema.with lines 781-921 to understand scope architecture
 - [ ] Design HashMap overlay: `scope_name_map: HashMap[i32, i32]`
       mapping sym → most recent binding index
 - [ ] On `push_scope`: save current map state (snapshot or copy)
@@ -315,12 +315,12 @@ Closure syntax uses fat arrow: `x => x * 2` (not `|x| x * 2`).
 
 ### 4.3 Lexer: Replace Remaining Magic Numbers
 
-**File:** src/Lexer.w
+**File:** src/Lexer.with
 
 **Current:** ~112 numeric character comparisons despite
 36 CH_* constants already defined.
 
-- [ ] Read src/Lexer.w lines 83-234 to find remaining magic numbers
+- [ ] Read src/Lexer.with lines 83-234 to find remaining magic numbers
 - [ ] Replace `== 10` with `== CH_NEWLINE` (line 83)
 - [ ] Replace remaining numeric char comparisons (lines 88-227)
       with existing CH_* constants
@@ -329,12 +329,12 @@ Closure syntax uses fat arrow: `x => x * 2` (not `|x| x * 2`).
 
 ### 4.4 Document find_source_arg Assumptions
 
-**File:** src/main.w
+**File:** src/main.with
 
 **Current:** `find_source_arg` does linear scan of CLI args,
 called redundantly from multiple subcommand handlers.
 
-- [ ] Read src/main.w lines 275-291 and all callers
+- [ ] Read src/main.with lines 275-291 and all callers
 - [ ] Add comment documenting assumptions:
       - Skips `-o <path>` (2-arg option)
       - Skips `--output=<path>` prefix options
@@ -349,20 +349,20 @@ called redundantly from multiple subcommand handlers.
 
 ## Phase 5: Pipeline Ownership
 
-Move compilation state from Driver to Zcu. Route main.w through
+Move compilation state from Driver to Zcu. Route main.with through
 compiler.Compilation. Delete or reduce Driver.
 
 ### 5.1 Audit Current State Distribution
 
-**Files:** src/Driver.w (204 lines), src/compiler/Zcu.w (270 lines),
-src/compiler/Compilation.w (379 lines), src/main.w (1,054 lines)
+**Files:** src/Driver.with (204 lines), src/compiler/Zcu.with (270 lines),
+src/compiler/Compilation.with (379 lines), src/main.with (1,054 lines)
 
-- [ ] Read src/Driver.w in full — catalog all state fields
+- [ ] Read src/Driver.with in full — catalog all state fields
       (comp, mode, source_path, output_path, opt_level, no_std,
       alloc, last_error_count)
-- [ ] Read src/compiler/Zcu.w in full — catalog all state fields
-- [ ] Read src/compiler/Compilation.w — understand adapter role
-- [ ] Read src/main.w — understand current entry point flow
+- [ ] Read src/compiler/Zcu.with in full — catalog all state fields
+- [ ] Read src/compiler/Compilation.with — understand adapter role
+- [ ] Read src/main.with — understand current entry point flow
 - [ ] Map which Driver fields duplicate Zcu/Compilation fields
 - [ ] Map which Driver methods simply delegate to Compilation
 
@@ -377,9 +377,9 @@ src/compiler/Compilation.w (379 lines), src/main.w (1,054 lines)
 - [ ] Remove `last_error_count` — use Zcu.diagnostics.count() directly
 - [ ] `make build && make fixpoint`
 
-### 5.3 Route main.w Through compiler.Compilation
+### 5.3 Route main.with Through compiler.Compilation
 
-- [ ] Update main.w subcommand handlers to use Compilation directly
+- [ ] Update main.with subcommand handlers to use Compilation directly
       instead of creating Driver instances
 - [ ] Replace `Driver.new()` calls with `Compilation.init()` calls
 - [ ] Replace `driver.build()` with `comp.build()`
@@ -389,9 +389,9 @@ src/compiler/Compilation.w (379 lines), src/main.w (1,054 lines)
 
 ### 5.4 Delete Driver or Reduce to Thin Adapter
 
-- [ ] After main.w no longer uses Driver directly:
+- [ ] After main.with no longer uses Driver directly:
       check if any test files or other code still references Driver
-- [ ] If no remaining references: delete src/Driver.w entirely
+- [ ] If no remaining references: delete src/Driver.with entirely
 - [ ] If references remain: reduce Driver to thin adapter that
       wraps Compilation with no duplicated state
 - [ ] Remove `use Driver` imports from all files
@@ -406,10 +406,10 @@ codegen. The prelude is the sole source of ambient names.
 
 ### 6.1 Audit Hardcoded Names
 
-- [ ] Read `sema_is_builtin_trait_name()` (Sema.w lines 1457-1468)
+- [ ] Read `sema_is_builtin_trait_name()` (Sema.with lines 1457-1468)
       — lists 11 hardcoded trait names: Drop, Scoped, ScopedMut,
       Debug, Display, Default, Iter, IntoIter, Eq, Hash, Ord
-- [ ] Audit src/Codegen.w for string-based dispatch — estimated
+- [ ] Audit src/Codegen.with for string-based dispatch — estimated
       88+ string comparisons for method/type names
 - [ ] Categorize each hardcoded name:
       - **Language primitive** (must stay): primitive types (i32, bool, str, etc.),
@@ -420,7 +420,7 @@ codegen. The prelude is the sole source of ambient names.
 
 ### 6.2 Delete is_builtin_fn from Sema
 
-- [ ] Read `is_builtin_fn` in src/Sema.w (find exact location)
+- [ ] Read `is_builtin_fn` in src/Sema.with (find exact location)
 - [ ] Identify all callers of is_builtin_fn
 - [ ] Replace each call site with proper trait/impl lookup or
       prelude-based resolution
@@ -429,7 +429,7 @@ codegen. The prelude is the sole source of ambient names.
 
 ### 6.3 Delete is_builtin_value from Sema
 
-- [ ] Read `is_builtin_value` in src/Sema.w (find exact location)
+- [ ] Read `is_builtin_value` in src/Sema.with (find exact location)
 - [ ] Identify all callers
 - [ ] Replace with proper scope-based resolution (values come from
       prelude imports, not hardcoded lists)
@@ -442,7 +442,7 @@ This is the largest hardcode removal task. Codegen dispatches
 method calls by comparing string names (133+ comparisons).
 
 - [ ] Catalog all string-based dispatches in gen_method_call
-      (Codegen.w lines 7088-7276): Vec methods, HashMap methods,
+      (Codegen.with lines 7088-7276): Vec methods, HashMap methods,
       Option methods, Result methods, string methods
 - [ ] Design replacement: codegen should dispatch based on
       sema-provided TypeId + method symbol, not string names
@@ -473,14 +473,14 @@ method calls by comparing string names (133+ comparisons).
 
 ### 6.5 Verify --no-prelude Makes println Unavailable
 
-- [ ] Write test `test/cases/err_no_prelude_println.w`:
+- [ ] Write test `test/cases/err_no_prelude_println.with`:
       ```
       //! args: --no-prelude
       //! expect-check-fail: undefined
       fn main:
           println("hello")
       ```
-- [ ] Run test: `./scripts/run_tests.sh test/cases/err_no_prelude_println.w`
+- [ ] Run test: `./scripts/run_tests.sh test/cases/err_no_prelude_println.with`
 - [ ] Verify that `--no-prelude` also makes Vec, HashMap, Option,
       Result unavailable (they come from prelude)
 - [ ] `make build && make fixpoint`
@@ -504,10 +504,10 @@ across files.
 **Recommended order:**
 
 1. Phase 4 (quality improvements) — lowest risk, immediate benefit
-2. Phase 1.5 + 1.6 (Sema.w enums) — small, well-contained
-3. Phase 1.7 (Mir.w enums) — small, well-contained
-4. Phase 1.4 (Token.w enums) — medium scope
-5. Phase 1.1 (Ast.w NodeKind) — largest enum, most consumers
+2. Phase 1.5 + 1.6 (Sema.with enums) — small, well-contained
+3. Phase 1.7 (Mir.with enums) — small, well-contained
+4. Phase 1.4 (Token.with enums) — medium scope
+5. Phase 1.1 (Ast.with NodeKind) — largest enum, most consumers
 6. Phase 2 (distinct types) — depends on enum conversions
 7. Phase 3 (idiomatic patterns) — can be done incrementally
 8. Phase 5 (pipeline ownership) — structural change
@@ -532,10 +532,10 @@ across files.
 - [ ] No if-chains for node kind dispatch (all converted to match)
 - [ ] All 9 AstPool metadata lookups use O(1) HashMap
 - [ ] Sema scope lookup uses HashMap overlay
-- [ ] No magic number characters in Lexer.w
+- [ ] No magic number characters in Lexer.with
 - [ ] find_source_arg documented and deduplicated
 - [ ] Driver deleted or reduced to thin adapter
-- [ ] main.w routes through compiler.Compilation
+- [ ] main.with routes through compiler.Compilation
 - [ ] is_builtin_fn and is_builtin_value deleted from Sema
 - [ ] No string-based method dispatch in Codegen
 - [ ] `--no-prelude` makes println unavailable

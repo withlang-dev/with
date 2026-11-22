@@ -50,7 +50,7 @@ unsigned count where needed, and result inference follows the left operand,
 including typed pasted literals. The resulting helper returns i64 and
 uses `(1i64 << (n as u32))`.
 
-`behav_migrate_private_token_paste.w` covers a private wrapper chain, an
+`behav_migrate_private_token_paste.with` covers a private wrapper chain, an
 unsigned pasted literal shifted to bit 63, a project-owned callable alias,
 and execution of the generated project macros while SDK names remain absent.
 All three targeted tests passed with the updated stage2:
@@ -58,7 +58,7 @@ All three targeted tests passed with the updated stage2:
 `behav_c_import_macros_no_cc` (`/tmp/with-macro-shift-final-tests.log`).
 Both corpora were regenerated with that stage2: PCRE2 completed 33/33 files
 and zlib completed 15 files plus two harnesses. Every generated library file
-matches this branch byte for byte (the separately generated PCRE2 `bundle.w`
+matches this branch byte for byte (the separately generated PCRE2 `bundle.with`
 is outside migration output). Logs: `/tmp/with-macro-shift-pcre2-migrate.log`
 and `/tmp/with-macro-shift-zlib-migrate.log`.
 

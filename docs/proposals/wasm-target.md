@@ -8,10 +8,10 @@ runtime speaks WASI preview1 directly, and the emitted host is the
 "userspace" that serves those system calls, emscripten-style.
 
 ```
-with build --target=wasm32 prog.w -o prog.wasm    # prog.wasm + prog.js
+with build --target=wasm32 prog.with -o prog.wasm    # prog.wasm + prog.js
 node prog.js a b c                                 # run under node
-with run --target=wasm32 prog.w a b c              # build and run (node)
-with test --target=wasm32 test/wasm/hello.w        # test fixtures under node
+with run --target=wasm32 prog.with a b c              # build and run (node)
+with test --target=wasm32 test/wasm/hello.with        # test fixtures under node
 ```
 
 Any WASI preview1 host also runs the module directly (`wasmtime prog.wasm`,
@@ -21,15 +21,15 @@ node's `wasi` module), because the imports are the standard ones.
 
 | Piece | Where | What it does |
 |---|---|---|
-| target kind 7 (`wasm32`) | `src/TargetSpec.w`, `src/compiler/DriverOptions.w`, `src/BuildGraphKinds.w`, `lib/std/build.w` | triple `wasm32-unknown-unknown`, OS `Wasi`, arch `wasm32`, 4-byte pointers (`target_spec_ptr_bytes`) |
-| pointer-width-aware layout | `src/TypeLayout.w` | pointer, reference, fn and trait-object sizes read the target's pointer width; `str`/slices stay 16 bytes (i64 length keeps its 8-byte alignment) |
-| `@[import_module("ns")]` | `src/Parser.w`, `src/Codegen.w`, `src/compiler/LlvmBridge.w` | an extern fn imported from a wasm namespace (clang's `import_module`); codegen attaches `wasm-import-module` / `wasm-import-name` |
-| `_start` entry | `src/Codegen.w` `wrap_main_for_exit` | on wasm the wrapper is wasm-ld's `_start()`: `with_wasm_startup` fills argc/argv, main runs, `with_wasm_exit` leaves through `proc_exit` |
-| link stage | `src/compiler/Link.w` | `wasm-ld` beside the SDK's lld, `--stack-first -z stack-size=8MiB` (`WITH_WASM_STACK_SIZE`), no archives, output `<stem>.wasm`, emits the JS host, refuses async programs |
-| platform runtime | `rt/wasm.w` | the `rt_*` contract over WASI: files/dirs through preopens, env/args, clocks, sleep, randomness, the page allocator behind `rt_mmap` (`memory.grow`), `malloc`/`free`/`_exit`/`abort`/`memcmp` and compiler-rt's `__multi3` |
-| JS host | `src/compiler/WasmHost.w` | `<prog>.js`: WASI preview1 over node's real filesystem/stdio/argv/env, or over an in-memory filesystem + console in a browser |
-| build | `build.w` `:cross-rt-wasm` | compiles the runtime objects into `out/lib/cross/wasm32/` |
-| driver | `src/main.w` | `with run`/`with test` execute wasm programs through `node <prog>.js` (`WITH_NODE` overrides the interpreter) |
+| target kind 7 (`wasm32`) | `src/TargetSpec.with`, `src/compiler/DriverOptions.with`, `src/BuildGraphKinds.with`, `lib/std/build.with` | triple `wasm32-unknown-unknown`, OS `Wasi`, arch `wasm32`, 4-byte pointers (`target_spec_ptr_bytes`) |
+| pointer-width-aware layout | `src/TypeLayout.with` | pointer, reference, fn and trait-object sizes read the target's pointer width; `str`/slices stay 16 bytes (i64 length keeps its 8-byte alignment) |
+| `@[import_module("ns")]` | `src/Parser.with`, `src/Codegen.with`, `src/compiler/LlvmBridge.with` | an extern fn imported from a wasm namespace (clang's `import_module`); codegen attaches `wasm-import-module` / `wasm-import-name` |
+| `_start` entry | `src/Codegen.with` `wrap_main_for_exit` | on wasm the wrapper is wasm-ld's `_start()`: `with_wasm_startup` fills argc/argv, main runs, `with_wasm_exit` leaves through `proc_exit` |
+| link stage | `src/compiler/Link.with` | `wasm-ld` beside the SDK's lld, `--stack-first -z stack-size=8MiB` (`WITH_WASM_STACK_SIZE`), no archives, output `<stem>.wasm`, emits the JS host, refuses async programs |
+| platform runtime | `rt/wasm.with` | the `rt_*` contract over WASI: files/dirs through preopens, env/args, clocks, sleep, randomness, the page allocator behind `rt_mmap` (`memory.grow`), `malloc`/`free`/`_exit`/`abort`/`memcmp` and compiler-rt's `__multi3` |
+| JS host | `src/compiler/WasmHost.with` | `<prog>.js`: WASI preview1 over node's real filesystem/stdio/argv/env, or over an in-memory filesystem + console in a browser |
+| build | `build.with` `:cross-rt-wasm` | compiles the runtime objects into `out/lib/cross/wasm32/` |
+| driver | `src/main.with` | `with run`/`with test` execute wasm programs through `node <prog>.js` (`WITH_NODE` overrides the interpreter) |
 
 `wasm64` is modeled as kind 8 but refused by the driver: the runtime is the
 wasm32 flavour (32-bit WASI sizes, 8-byte iovecs) and the JS host reads
@@ -45,7 +45,7 @@ prefixes it; the remainder is what the host sees. The emitted host preopens
 the real filesystem exactly as a native binary would. In a browser the
 filesystem is in memory, seeded from `run({ files: { '/data/in.txt': '...' } })`.
 
-WASI errnos are translated to the POSIX numbers `rt_core.w` and `std.fs`
+WASI errnos are translated to the POSIX numbers `rt_core.with` and `std.fs`
 expect (`ENOENT` 44 → 2, and so on), so error paths behave as on Linux.
 
 ## What is not there
@@ -90,7 +90,7 @@ Formatting an `Option[&T]` in an f-string (`print(f"{m.get("k")}")` with a
 compiler (`LLVMTypeOf` on a null value) on every target: the enum
 formatter walked the nullable-pointer niche representation as a
 tag + payload struct. Not wasm-specific; fixed on its own in #1216.
-`test/wasm/wasm_alloc.w` predates that fix and unwraps instead.
+`test/wasm/wasm_alloc.with` predates that fix and unwraps instead.
 
 ## Spec items awaiting a ruling
 
@@ -151,7 +151,7 @@ UCRT descriptors with the Windows runtime's separate handle table.
 ```
 with build :dev                      # stage1 with the target
 with build :cross-rt-wasm            # out/lib/cross/wasm32/*.o
-with test --target=wasm32 test/wasm/*.w
+with test --target=wasm32 test/wasm/*.with
 ```
 
 The fixtures in `test/wasm/` cover stdout/stderr and exit codes, argv and

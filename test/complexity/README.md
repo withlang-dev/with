@@ -1,7 +1,7 @@
 # Stdlib complexity fixtures
 
 Run `with build :stdlib-complexity`. The lane also runs in `with build :test`.
-It builds `stdlib.w` at `-O1`, then measures work inside that executable so
+It builds `stdlib.with` at `-O1`, then measures work inside that executable so
 compiler time and process startup are excluded. The build action runs serially
 to avoid competing test processes during timing.
 
@@ -25,7 +25,7 @@ Only a failed cost bound is eligible for XFAIL. Wrong results, crashes,
 timeouts, missing trace markers, and invalid controls fail the lane. An XPASS
 also fails: update its expectation in the same change that fixes the engine.
 
-Allocation checks use `with run --trace-alloc stdlib.w allocations`. An empty
+Allocation checks use `with run --trace-alloc stdlib.with allocations`. An empty
 marked span must report zero requests; a List allocation control must report at
 least one. A marked colliding-key HashMap removal checks the no-allocation
 contract without confusing temporary allocations with leaks or reserved slabs.

@@ -16,12 +16,12 @@ deterministic repro and `--dump-abi` evidence. Verify fixes with the
 
 **RESOLVED:** the classification was correct (`--dump-abi`: OWNED); the gap was
 call-site enforcement — extern calls skipped `record_consume_call_site`. Fixed in
-SemaCheck.w:12501 (enforce for extern params whose effect includes CONSUME/
+SemaCheck.with:12501 (enforce for extern params whose effect includes CONSUME/
 ESCAPE_VALUE). Test un-skipped + migrated. The historical diagnosis below is kept
 for reference.
 
 
-**Repro:** `test/compile_errors/err_effect_extern_consume_marks_moved.w` (currently `//! skip:`).
+**Repro:** `test/compile_errors/err_effect_extern_consume_marks_moved.with` (currently `//! skip:`).
 
 ```with
 @[effect(handle: consume)]
@@ -51,7 +51,7 @@ The bug is at the **call site**, and it is extern-specific:
 So extern calls skip the OWNED-param consume enforcement that regular calls run
 (`record_consume_call_site` / `finalize_call_site_ownership`). The extern-call
 path short-circuits before that recording — see the `extern_fn_names.contains`
-branches in `SemaCheck.w` (~3552, ~4045) in the call-arg checking flow.
+branches in `SemaCheck.with` (~3552, ~4045) in the call-arg checking flow.
 
 **Fix direction:** make extern-fn calls record a consume-call-site (or mark the
 arg moved) for each OWNED (consume/escape_value) parameter, the same way regular
@@ -63,10 +63,10 @@ OWNED with `--dump-abi`.
 
 ## G2 — move-self receiver: Sema label vs MIR behavior divergence — RESOLVED
 
-**RESOLVED:** `fn_param_uses_value_ref_abi` (SemaDecl.w) classified *any*
+**RESOLVED:** `fn_param_uses_value_ref_abi` (SemaDecl.with) classified *any*
 receiver-typed param as share-place, ignoring receiver mode. Now a `move self`
 receiver returns 0 (OWNED) — `mut self` / `&self` / plain `self` stay share-place.
-The move-self param's effect is also seeded with CONSUME (SemaCheck.w). `--dump-abi`
+The move-self param's effect is also seeded with CONSUME (SemaCheck.with). `--dump-abi`
 now shows `move self` as `eff=[consume] value_ref_abi=0 -> OWNED`, matching the
 MIR's drop discipline (D6). Verified: drop-audit 0 fail, full suite green, fixpoint
 holds. History below for reference.
@@ -93,13 +93,13 @@ Task drop (FIBER_CLEANUP_AWAIT). Fixed by threading an `await_owns` flag from
 MirLower to codegen: a value-await frees the buffer only when this scope OWNS the
 task (a temporary, or an owned local whose scheduled drop the await cancels) — a
 borrowed param's owner-drop frees it instead. `await_task_owns_result` +
-`local_has_scheduled_value_drop` (MirLower.w), threaded through `lower_single_await`
+`local_has_scheduled_value_drop` (MirLower.with), threaded through `lower_single_await`
 and the tuple-await / select-await FIBER_AWAIT emitters; codegen reads the flag
-(CodegenDispatch.w). Verified with `--debug-alloc` across owned/temporary/tuple/
+(CodegenDispatch.with). Verified with `--debug-alloc` across owned/temporary/tuple/
 select/borrowed (all leak count=0). Test un-skipped. History below for reference.
 
 
-**Repro:** `test/behavior/behav_ephemeral_task_consuming_callee.w` (currently `//! skip:`).
+**Repro:** `test/behavior/behav_ephemeral_task_consuming_callee.with` (currently `//! skip:`).
 
 ```with
 fn consume_task(task: Task[i32]) -> i32:
@@ -122,11 +122,11 @@ specifically await-through-a-borrow then caller-drop.
 debug-alloc: DOUBLE FREE addr=… size=16 origin=with_alloc first_drop=<untagged> second_drop=<untagged>
 ```
 The 16-byte `with_alloc` block is the **async entry** `[fiber_id: i32, pad: i32,
-result_buf: *mut u8]` (rt/rt_core.w:3507) backing a `Task[T]`
-(`{ fiber_id, result_buf }`, lib/std/task.w:13). `await`-through-a-borrow
+result_buf: *mut u8]` (rt/rt_core.with:3507) backing a `Task[T]`
+(`{ fiber_id, result_buf }`, lib/std/task.with:13). `await`-through-a-borrow
 (`consume_task` borrows `first`, then `first.await`) drives the fiber and reaps
 the frame, and the OWNER's scope-exit Task drop — `lower_cleanup_await`
-(MirLower.w:6798), scheduled by `task_drop_kind_for_binding` (695) — reaps it a
+(MirLower.with:6798), scheduled by `task_drop_kind_for_binding` (695) — reaps it a
 SECOND time. `spec_ss14_7` (await + observe in the SAME scope, task owned there)
 is fine; the double-free is specifically await-through-a-borrow then owner-drop.
 
@@ -137,7 +137,7 @@ cleanup idempotent (a reaped/freed flag so the second `lower_cleanup_await` free
 nothing). NOT an `await`-consume workaround (reverted — violates §14.7).
 
 **Next step (tooling):** the two free sites are `<untagged>` — name them at the
-instruction level before editing runtime code. Run `tools/debug_drop.w` +
+instruction level before editing runtime code. Run `tools/debug_drop.with` +
 `tools/debug_drop_sites.lldb` on the repro (docs/spec/toolchain/debug-allocator.md) to get the
 exact allocation site and both free call sites of the async entry, then decide
 which free path to drop (the borrowed-await reap, vs the owner's Task drop).

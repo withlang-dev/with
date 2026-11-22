@@ -1,0 +1,491 @@
+// BuildGraphSupport -- path and argv helpers shared by build graph execution.
+
+use compiler.SourceExt
+use Resolve
+use BuildGraphModel
+use BuildGraphRuntime
+use compiler.Runtime
+use rt.rt_core
+
+// #2362: how long `with test` lets one test binary run before it stops it.
+// A hang guard, not a speed budget (#2371): a passing test on a slow host
+// (WIPE's 16-seed simulation took 160 s on a Steam Deck) was killed at a
+// fixed 120 s and reported as a failure. Thirty minutes, as a build
+// target's own ceiling.
+const TEST_HANG_GUARD_MS: i32 = 1800000
+
+fn build_graph_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: isize) -> str:
+    if output_path.len() > 0:
+        if target_count != 1:
+            return ""
+        return runtime_str_clone(output_path)
+    if target.output.len() > 0:
+        return build_graph_resolve_project_path(root, target.output)
+    runtime_program_path(resolve_join(resolve_join(root, "out/bin"), target.name))
+
+fn build_graph_library_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: isize) -> str:
+    if output_path.len() > 0:
+        if target_count != 1:
+            return ""
+        return runtime_str_clone(output_path)
+    if target.output.len() > 0:
+        return build_graph_resolve_project_path(root, target.output)
+    resolve_join(resolve_join(root, "out/lib"), "lib" ++ target.name ++ ".a")
+
+fn build_graph_object_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: isize) -> str:
+    if output_path.len() > 0:
+        if target_count != 1:
+            return ""
+        return runtime_str_clone(output_path)
+    if target.output.len() > 0:
+        return build_graph_resolve_project_path(root, target.output)
+    resolve_join(resolve_join(root, "out/obj"), target.name ++ ".o")
+
+/// The file a target produces: its declared output, or its kind's default
+/// (an executable's out/bin/<name>). The one answer the runner, `with run`,
+/// the output-ownership check and the cache all read.
+fn build_graph_target_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: isize) -> str:
+    if target.kind == 0: return build_graph_output_path(root, target, output_path, target_count)
+    if target.kind == 1 or target.kind == 4: return build_graph_library_output_path(root, target, output_path, target_count)
+    if target.kind == 3: return build_graph_object_output_path(root, target, output_path, target_count)
+    if target.kind == 8: return build_graph_expand_install_path(root, target.output)
+    if target.output.len() > 0: build_graph_resolve_project_path(root, target.output) else: ""
+
+fn build_graph_resolve_project_path(root: &str, path: &str) -> str:
+    if runtime_path_is_absolute(path):
+        return with_str_clone_ref(path)
+    resolve_join(root, path)
+
+fn build_graph_resolve_paths(root: &str, paths: &List[str]) -> List[str]:
+    let out: List[str] = []
+    for path in paths:
+        out.push(build_graph_resolve_project_path(root, path))
+    out
+
+fn build_graph_clone_strings(values: &List[str]) -> List[str]:
+    let out: List[str] = []
+    for value in values:
+        out.push(runtime_str_clone(value))
+    out
+
+fn build_graph_dirname(path: &str) -> str:
+    var last_slash = -1
+    for i in 0..path.len():
+        if path[i] == 47:
+            last_slash = i as i32
+    if last_slash < 0:
+        return "."
+    // The root's parent is the root (POSIX dirname): `/` and `/a` (#1021).
+    if last_slash == 0: return "/"
+    path.slice(0, last_slash as i64)
+
+fn build_graph_path_basename(path: &str) -> str:
+    // POSIX basename of the root is the root (#1021).
+    if path == "/": return "/"
+    let dir = build_graph_dirname(path)
+    if dir == ".":
+        return with_str_clone_ref(path)
+    path.slice(if dir == "/": 1 else: dir.len() + 1, path.len())
+
+fn build_graph_path_has_glob(path: &str) -> bool:
+    path.contains("*")
+
+fn build_graph_single_star_pattern_matches(pattern: &str, name: &str) -> bool:
+    var star = -1
+    for i in 0..pattern.len():
+        if pattern[i] == 42:
+            if star >= 0:
+                return false
+            star = i as i32
+    if star < 0:
+        return pattern == name
+    let prefix = pattern.slice(0, star as i64)
+    let suffix = pattern.slice((star + 1) as i64, pattern.len())
+    if name.len() < prefix.len() + suffix.len():
+        return false
+    if prefix.len() > 0 and name.slice(0, prefix.len()) != prefix:
+        return false
+    if suffix.len() > 0:
+        let suffix_start = name.len() - suffix.len()
+        if name.slice(suffix_start, name.len()) != suffix:
+            return false
+    true
+
+fn build_graph_path_for_child_process(root: &str, path: &str) -> str:
+    var normalized_root = with_str_clone_ref(root)
+    while normalized_root.len() > 1 and normalized_root.ends_with("/"):
+        normalized_root = normalized_root.slice(0, normalized_root.len() - 1)
+    if normalized_root.ends_with("/."):
+        normalized_root = normalized_root.slice(0, normalized_root.len() - 2)
+    let dot_prefix = normalized_root ++ "/./"
+    if path.starts_with(dot_prefix):
+        return path.slice(dot_prefix.len(), path.len())
+    let prefix = normalized_root ++ "/"
+    if path.starts_with(prefix):
+        return path.slice(prefix.len(), path.len())
+    with_str_clone_ref(path)
+
+fn build_graph_generated_path_valid(path: &str) -> bool:
+    if path.len() == 0:
+        return false
+    if runtime_path_is_absolute(path):
+        return false
+    if path.contains(".."):
+        return false
+    for i in 0..path.len():
+        let ch = path[i]
+        if ch == 10 or ch == 13 or ch == 9:
+            return false
+    true
+
+fn build_graph_manifest_relative_path_valid(path: &str) -> bool:
+    if path.len() == 0:
+        return false
+    if runtime_path_is_absolute(path):
+        return false
+    if path.contains(".."):
+        return false
+    for i in 0..path.len():
+        let ch = path[i]
+        if ch == 0 or ch == 10 or ch == 13 or ch == 9:
+            return false
+    true
+
+fn build_graph_define_valid(define: &str) -> bool:
+    if define.len() == 0:
+        return false
+    for i in 0..define.len():
+        let ch = define[i]
+        if ch == 10 or ch == 13:
+            return false
+    true
+
+fn build_graph_process_arg_valid(arg: &str) -> bool:
+    for i in 0..arg.len():
+        if arg[i] == 0:
+            return false
+    true
+
+// Whether `path` stays inside the project at `root`. An absolute path is
+// contained when it is the root or lies beneath it (#1885: an in-root
+// `WITH_WO_DIR`, spelled absolute with a drive letter, was refused as an
+// escape); the comparison is on `/`-normalized spellings, and on Windows
+// ignores case, as the file system does.
+fn build_graph_path_project_contained(root: &str, path: &str) -> bool:
+    if path.len() == 0:
+        return true
+    if runtime_path_is_absolute(path):
+        let rel = build_graph_path_under_root(root, path)
+        if rel.len() == 0:
+            return false
+        return build_graph_path_project_contained(root, rel)
+    if path.contains(".."):
+        return false
+    if path.starts_with("$"):
+        return false
+    for i in 0..path.len():
+        let ch = path[i]
+        if ch == 0 or ch == 10 or ch == 13 or ch == 9:
+            return false
+    true
+
+// One expansion for an install destination: the install operation writes
+// through it and the freshness check looks for the output through it (#1157:
+// the check tested the literal `$HOME/...`, so every Install target was
+// permanently stale and everything downstream of it rebuilt).
+// The home directory an install destination's `$HOME/` names: $HOME, else
+// on Windows %USERPROFILE% ('\\' as '/'), which a Windows shell other than
+// Git Bash sets instead (#1915; build/wo.with wo_home spells it the same).
+fn build_graph_home_dir() -> str:
+    let home = build_graph_rt_getenv("HOME")
+    if home.len() > 0 or runtime_sysinfo_os() != "Windows":
+        return home
+    build_graph_rt_getenv("USERPROFILE").replace("\\", "/")
+
+// #970: the install variable a destination starts with whose value is empty
+// ("$HOME", "$INSTALL_BINDIR" or "$INSTALL_LIBDIR"), else "". An install
+// refuses such a destination: expansion falls back to a project path, and
+// with HOME unset `$HOME/x` was installed into ./$HOME/x.
+fn build_graph_install_prefix_unset(path: &str) -> str:
+    if path.starts_with("$HOME/") and build_graph_home_dir().len() == 0: return "$HOME"
+    if path.starts_with("$INSTALL_BINDIR/") and build_graph_install_bindir().len() == 0: return "$INSTALL_BINDIR"
+    if path.starts_with("$INSTALL_LIBDIR/") and build_graph_install_libdir().len() == 0: return "$INSTALL_LIBDIR"
+    ""
+
+fn build_graph_expand_install_path(root: &str, path: &str) -> str:
+    if path.starts_with("$HOME/"):
+        let home = build_graph_home_dir()
+        if home.len() > 0:
+            return resolve_join(home, path.slice(6, path.len()))
+    if path.starts_with("$INSTALL_BINDIR/"):
+        let install_bindir = build_graph_install_bindir()
+        if install_bindir.len() > 0:
+            return build_graph_resolve_project_path(root, resolve_join(install_bindir, path.slice(16, path.len())))
+    if path.starts_with("$INSTALL_LIBDIR/"):
+        let install_libdir = build_graph_install_libdir()
+        if install_libdir.len() > 0:
+            return build_graph_resolve_project_path(root, resolve_join(install_libdir, path.slice(16, path.len())))
+    build_graph_resolve_project_path(root, path)
+
+fn build_graph_env_or_default(name: &str, default_value: &str) -> str:
+    let value = build_graph_rt_getenv(name)
+    if value.len() > 0:
+        return value
+    with_str_clone_ref(default_value)
+
+fn build_graph_install_bindir() -> str:
+    let prefix = build_graph_env_or_default("PREFIX", "/usr/local")
+    let bindir = build_graph_env_or_default("BINDIR", resolve_join(prefix, "bin"))
+    build_graph_rt_getenv("DESTDIR") ++ bindir
+
+fn build_graph_install_libdir() -> str:
+    resolve_join(build_graph_install_bindir(), "runtime")
+
+// `path`, absolute, relative to `root` when it lies beneath it: "." for the
+// root itself, "" when it does not. Separators compare as `/`; on Windows
+// the two spellings compare without case.
+fn build_graph_path_under_root(root: &str, path: &str) -> str:
+    if root.len() == 0 or not runtime_path_is_absolute(root):
+        return ""
+    var norm_root = resolve_normalize_path(root)
+    while norm_root.len() > 1 and norm_root.ends_with("/"):
+        norm_root = norm_root.slice(0, norm_root.len() - 1)
+    let norm_path = resolve_normalize_path(path)
+    let fold = runtime_sysinfo_os() == "Windows"
+    let cmp_root = if fold: norm_root.to_lower() else: norm_root
+    let cmp_path = if fold: norm_path.to_lower() else: norm_path
+    if cmp_path == cmp_root:
+        return "."
+    if cmp_path.starts_with(cmp_root ++ "/"):
+        return norm_path.slice(norm_root.len() + 1, norm_path.len())
+    ""
+
+fn build_graph_path_is_install_dest(path: &str) -> bool:
+    path.starts_with("$HOME/") or path.starts_with("$INSTALL_BINDIR/") or path.starts_with("$INSTALL_LIBDIR/")
+
+fn build_graph_validate_target_containment(root: &str, target: &BuildGraphTarget) -> i32:
+    let kind = target.kind
+    let is_install = kind == 8
+    let is_promote = kind == 20
+    let is_clean = kind == 21
+    if is_clean:
+        return 0
+    if target.output.len() > 0:
+        if is_install:
+            if not build_graph_path_is_install_dest(target.output) and not build_graph_path_project_contained(root, target.output):
+                build_graph_rt_eprint("error: install target '" ++ target.name ++ "' output escapes project root without install prefix: " ++ target.output)
+                return 1
+        else if is_promote:
+            if not build_graph_path_project_contained(root, target.output):
+                build_graph_rt_eprint("error: promote target '" ++ target.name ++ "' output escapes project root: " ++ target.output)
+                return 1
+        else:
+            if not build_graph_path_project_contained(root, target.output):
+                build_graph_rt_eprint("error: target '" ++ target.name ++ "' output escapes project root: " ++ target.output)
+                return 1
+    let is_command = kind == 7
+    let is_corpus = kind == 19
+    let is_action = kind == 23
+    let entry_is_executable = is_command or is_corpus
+    if target.entry.len() > 0 and not is_install and not entry_is_executable and not is_action:
+        if not build_graph_path_project_contained(root, target.entry):
+            build_graph_rt_eprint("error: target '" ++ target.name ++ "' entry escapes project root: " ++ target.entry)
+            return 1
+    for oi in 0..target.extra_outputs.len():
+        let extra = target.extra_outputs[oi]
+        if not build_graph_path_project_contained(root, extra):
+            build_graph_rt_eprint("error: target '" ++ target.name ++ "' extra_output escapes project root: " ++ extra)
+            return 1
+    0
+
+fn build_graph_argv_append(argv_blob: &str, arg: &str) -> str:
+    argv_blob ++ arg ++ "\0"
+
+fn build_graph_exec_argv(target: &BuildGraphTarget, operation_name: &str, argv_blob: &str) -> i32:
+    let rc = build_graph_rt_exec_argv(argv_blob)
+    if rc != 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ f"' failed with exit code {rc}")
+        return rc
+    0
+
+// A target's declared environment (`with_env`), set around a child it runs
+// and put back after: returns the NAME=old pairs to restore. Every target
+// kind that runs a child reads it (actions in main.with; #965: command and
+// corpus targets, which dropped it).
+fn build_graph_apply_target_env(target: &BuildGraphTarget) -> List[str]:
+    let saved: List[str] = []
+    for i in 0..target.env.len():
+        let entry = target.env[i]
+        let eq = entry.find("=")
+        if eq <= 0: continue
+        let name = entry.slice(0, eq)
+        saved.push(name ++ "=" ++ with_getenv_str(name))
+        let _set = with_setenv_str(name, entry.slice(eq + 1, entry.len()))
+    saved
+
+fn build_graph_restore_target_env(saved: &List[str]):
+    var i = saved.len() - 1
+    while i >= 0:
+        let entry = saved[i]
+        let eq = entry.find("=")
+        let _set = with_setenv_str(entry.slice(0, eq), entry.slice(eq + 1, entry.len()))
+        i = i - 1
+
+// #965: the timeout a target declares (`timeout`), else five minutes.
+fn build_graph_target_timeout_ms(target: &BuildGraphTarget) -> i32: if target.timeout_ms > 0: target.timeout_ms else: 300000
+
+fn build_graph_validate_process_args(target: &BuildGraphTarget) -> i32:
+    if not build_graph_process_arg_valid(target.entry):
+        build_graph_rt_eprint("error: target '" ++ target.name ++ "' field 'entry' contains a NUL byte: " ++ target.entry)
+        return 1
+    if not build_graph_process_arg_valid(target.output):
+        build_graph_rt_eprint("error: target '" ++ target.name ++ "' field 'output' contains a NUL byte: " ++ target.output)
+        return 1
+    for ii in 0..target.inputs.len():
+        if not build_graph_process_arg_valid(target.inputs[ii]):
+            build_graph_rt_eprint("error: target '" ++ target.name ++ f"' field 'input[{ii}]' contains a NUL byte")
+            return 1
+    for ai in 0..target.args.len():
+        if not build_graph_process_arg_valid(target.args[ai]):
+            build_graph_rt_eprint("error: target '" ++ target.name ++ f"' field 'arg[{ai}]' contains a NUL byte")
+            return 1
+    0
+
+fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = []
+    let text_len = text.len()
+    var start = 0
+    var i = 0
+    while i <= text_len:
+        var ch = 10
+        if i < text_len:
+            ch = text[i]
+        if ch == 10:
+            var line = text.slice(start as i64, i as i64)
+            if line.len() > 0 and line[line.len() as i64 - 1] == 13:
+                line = line.slice(0, line.len() - 1)
+            if line.len() > 0:
+                lines.push(line)
+            start = i + 1
+        i = i + 1
+    lines
+
+fn build_graph_str_compare(a: &str, b: &str) -> i32:
+    let min_len = if a.len() < b.len(): a.len() else: b.len()
+    var i = 0
+    while i < min_len as i32:
+        let ac = a[i] as i32
+        let bc = b[i] as i32
+        if ac != bc:
+            return ac - bc
+        i = i + 1
+    if a.len() == b.len():
+        return 0
+    if a.len() < b.len():
+        return -1
+    1
+
+fn build_graph_sorted_strings(items: &List[str]) -> List[str]:
+    var sorted: List[str] = []
+    for i in 0..items.len():
+        let item = items[i]
+        var inserted = false
+        let out: List[str] = []
+        for sorted_item in sorted:
+            let existing = sorted_item
+            if not inserted and build_graph_str_compare(item, existing) < 0:
+                out.push(with_str_clone_ref(item))
+                inserted = true
+            out.push(with_str_clone_ref(existing))
+        if not inserted:
+            out.push(with_str_clone_ref(item))
+        sorted = out
+    sorted
+
+fn collect_test_files(target_dir: &str) -> List[str]:
+    let listing = build_graph_rt_list_files(target_dir)
+    if listing.len() == 0:
+        return List.new()
+    let all_files = build_graph_split_nonempty_lines(listing)
+    let w_files: List[str] = []
+    for all_file in all_files:
+        let path = all_file
+        if source_ext_is_source(path):
+            w_files.push(with_str_clone_ref(path))
+    build_graph_sorted_strings(w_files)
+
+fn build_graph_time_fmt(ns: i64) -> str:
+    let tenths = ns / 100000000
+    f"{tenths / 10}.{tenths % 10}s"
+
+fn build_graph_time_picked(picked: &List[i64], idx: i64) -> bool:
+    for picked_item in picked:
+        if picked_item == idx:
+            return true
+    false
+
+fn build_graph_rss_fmt(bytes: i64) -> str:
+    if bytes <= 0:
+        return "0M"
+    f"{(bytes + 524288) / 1048576}M"
+
+// Per-invocation wall-time + peak-RSS record: chronological TSV beside the
+// cache state (the dir build_cache_state_dir names), plus a slowest-first
+// stderr summary with the RSS high-water target (#679/#702 — the 8 GB
+// budget needs per-target attribution, like wall time got in c3de4c0b).
+// Pooled children report exact wait4 rusage; in-process targets report the
+// orchestrator's high-water DELTA around the target (0 when it stayed under
+// the existing mark — attribution, not absolute footprint).
+// Durations and sizes must never enter hashed build inputs or artifacts.
+// Reporting is unconditional policy-wise; only an explicitly budgeted target
+// may turn a successful build into a memory-budget failure (#1665).
+fn build_graph_rss_budget_error(graph: &BuildGraph, name: &str, peak: i64) -> str:
+    for i in 0..graph.targets.len():
+        let target = &graph.targets[i]
+        if target.name != name: continue
+        let limit = target.rss_limit_bytes
+        if limit > 0 and peak > limit:
+            return "rss tripwire: target '" ++ name ++ f"' peaked at {peak} bytes (limit {limit} bytes)"
+        return ""
+    ""
+
+// #2489: whether a measured peak is the target's, so a budget can be held
+// against it. A pooled child's is (wait4). An in-process target's is the
+// driver's high-water delta, which is the compile's footprint when the
+// build runner evaluates the actions and the driver's own comptime
+// evaluator's when the runner did not compile and the driver falls back:
+// stage1 then read 4.4 GB against a 2 GB budget on a tree whose compile
+// peaks near 1.5 GB.
+fn build_graph_rss_budget_judged(in_process: bool, runner_fell_back: bool) -> bool: not (in_process and runner_fell_back)
+
+fn build_graph_rss_unjudged_note(name: &str, peak: i64) -> str:
+    "the memory budget of '" ++ name ++ f"' is not judged in this run: the build runner did not compile and the driver evaluated the build's actions itself, so the {peak} bytes measured are the driver's"
+
+fn build_graph_times_report(root: &str, names: &List[str], ns_list: &List[i64], rss_list: &List[i64], total_ns: i64):
+    if names.len() == 0:
+        return
+    var text = "target\tseconds\tpeak_rss\n"
+    for i in 0..names.len():
+        let rss = if i < rss_list.len(): rss_list[i] else: 0
+        text = text ++ names[i] ++ "\t" ++ build_graph_time_fmt(ns_list[i]) ++ "\t" ++ build_graph_rss_fmt(rss) ++ "\n"
+    text = text ++ "TOTAL\t" ++ build_graph_time_fmt(total_ns) ++ "\t" ++ build_graph_rss_fmt(build_graph_rt_self_maxrss()) ++ "\n"
+    let state_dir = resolve_join(root, "out/.build-state")
+    let _mkdir = build_graph_rt_mkdir_p(state_dir)
+    let _write = build_graph_rt_write_file(resolve_join(state_dir, "build-times.tsv"), text)
+    var summary = "[times] total " ++ build_graph_time_fmt(total_ns) ++ f" across {names.len()} executed; slowest:"
+    let picked: List[i64] = []
+    while picked.len() < 5 and picked.len() < names.len():
+        var best: i64 = -1
+        for i in 0..names.len():
+            if not build_graph_time_picked(picked, i):
+                if best < 0 or ns_list[i] > ns_list[best]:
+                    best = i
+        picked.push(best)
+        summary = summary ++ " " ++ names[best] ++ " " ++ build_graph_time_fmt(ns_list[best])
+    var rss_best: i64 = -1
+    for i in 0..rss_list.len():
+        if rss_best < 0 or rss_list[i] > rss_list[rss_best]:
+            rss_best = i
+    if rss_best >= 0 and rss_best < names.len() and rss_list[rss_best] > 0:
+        summary = summary ++ "; peak rss " ++ build_graph_rss_fmt(rss_list[rss_best]) ++ " (" ++ names[rss_best] ++ ")"
+    build_graph_rt_eprint(summary ++ " (out/.build-state/build-times.tsv)")

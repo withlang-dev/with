@@ -8,8 +8,8 @@ planning before code moves.
 
 ## Placement
 
-The target belongs in the repository-local `build_selfhost.w` module, imported
-by root `build.w`. The smoke fixtures test this compiler's CLI behavior; they
+The target belongs in the repository-local `build_selfhost.with` module, imported
+by root `build.with`. The smoke fixtures test this compiler's CLI behavior; they
 are not generic build-system APIs and do not belong in `lib/std`.
 
 ## What Moves
@@ -57,11 +57,11 @@ Old serialized graphs should fail with the standard removed-kind diagnostic:
 
 ## Dispatch Removal
 
-After extraction, `src/main.w` must not dispatch kind `1002` or branch on the
+After extraction, `src/main.with` must not dispatch kind `1002` or branch on the
 `"smoke"` suite argument. Verify with:
 
 ```sh
-rg -n "cli_selfhost_smoke_test|build_graph_run_cli_selfhost_smoke|build_graph_run_cli_selfhost_help|build_graph_run_cli_selfhost_test_directives" src/main.w src/BuildGraphKinds.w
+rg -n "cli_selfhost_smoke_test|build_graph_run_cli_selfhost_smoke|build_graph_run_cli_selfhost_help|build_graph_run_cli_selfhost_test_directives" src/main.with src/BuildGraphKinds.with
 ```
 
 Expected remaining hits are limited to the removed-kind name/diagnostic.
@@ -79,8 +79,8 @@ The extraction is correct only if the target's exit code and observable output
 remain equivalent, and the full slice verification also passes:
 
 ```sh
-out/bin/with check build_selfhost.w
-out/bin/with check build.w
+out/bin/with check build_selfhost.with
+out/bin/with check build.with
 out/bin/with build :cli-selfhost-smoke-tests
 make build
 make fixpoint

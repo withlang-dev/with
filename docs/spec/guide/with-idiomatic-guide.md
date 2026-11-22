@@ -1339,7 +1339,7 @@ With follows Rust's naming conventions:
 | Types, traits, enums | `PascalCase` | `ServerConfig`, `Display` |
 | Enum variants | `PascalCase` | `Option.Some`, `Color.Red` |
 | Constants | `SCREAMING_SNAKE` | `MAX_RETRIES` |
-| Modules, files | `snake_case` | `string_map.w` |
+| Modules, files | `snake_case` | `string_map.with` |
 
 `with fmt` enforces these.
 

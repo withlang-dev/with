@@ -14,7 +14,7 @@ write tiny.c:
         struct Pair p = { 20, 1 };
         return add_pair(p) == 42 ? 0 : 1;
     }
-run: with migrate tiny.c -o tiny.w --no-c-export --prefer-colon
-expect file tiny.w contains: fn add_pair
-run: with check tiny.w
-run: with run tiny.w
+run: with migrate tiny.c -o tiny.with --no-c-export --prefer-colon
+expect file tiny.with contains: fn add_pair
+run: with check tiny.with
+run: with run tiny.with

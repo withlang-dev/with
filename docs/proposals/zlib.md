@@ -188,13 +188,13 @@ The migrated code preserves zlib's C API. Layer a With-idiomatic API on top:
 
 ```
 lib/std/compress/zlib/     -- migrated zlib internals (private)
-lib/std/compress.w         -- public With API
+lib/std/compress.with         -- public With API
 ```
 
 The public API:
 
 ```with
-// lib/std/compress.w
+// lib/std/compress.with
 pub module zlib
 
 pub enum Level: i32:
@@ -252,10 +252,10 @@ zlib includes test vectors and a comprehensive test program. The primary correct
 # Generate test data
 dd if=/dev/urandom bs=1M count=10 of=/tmp/test_random.bin
 dd if=/dev/zero bs=1M count=10 of=/tmp/test_zeros.bin
-cp src/main.w /tmp/test_source.w
+cp src/main.with /tmp/test_source.with
 
 # Round-trip test
-with run test/behavior/behav_zlib_roundtrip.w
+with run test/behavior/behav_zlib_roundtrip.with
 ```
 
 ### 5.2 Compatibility

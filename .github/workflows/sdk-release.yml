@@ -7,8 +7,8 @@ name: SDK release
 # package, its digest sidecar and its manifest to the release named by
 # `tag`, replacing any asset of the same name. The tree built is the ref the
 # workflow is dispatched on (normally main): the package's inputs are the
-# LLVM sources and build/sdk.w, not the compiler at the tag. The asset names
-# are build/sdk.w's sdk_asset_for_platform
+# LLVM sources and build/sdk.with, not the compiler at the tag. The asset names
+# are build/sdk.with's sdk_asset_for_platform
 # (with-llvm-sdk-<llvm>-<platform>.tar.gz), the names nightly-release.yml
 # pins and republishes beside each compiler asset; after a republish here,
 # bump the sdk_version/sdk_sha256 pins there and the WITH_SDK_* pins in the
@@ -168,7 +168,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           # dev libs: the compiler link line uses -lz -lzstd -lxml2
-          # (build/compiler.w), which need the .so dev symlinks.
+          # (build/compiler.with), which need the .so dev symlinks.
           sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev libxml2-dev
 
       - name: Fetch LLVM SDK
@@ -277,8 +277,8 @@ jobs:
           chmod +x with-seed
           ./with-seed version
           # Prove the seed can actually link before spending a full build on it.
-          printf 'fn main:\n    print("seed links")\n' > /tmp/seedcheck.w
-          ./with-seed run /tmp/seedcheck.w
+          printf 'fn main:\n    print("seed links")\n' > /tmp/seedcheck.with
+          ./with-seed run /tmp/seedcheck.with
 
       - uses: ./.github/actions/source-sdk
         with:
@@ -373,7 +373,7 @@ jobs:
           # they need Windows-form paths (cygpath -m keeps forward slashes, which
           # both the file APIs and lld-link accept). Bash file ops keep msys paths.
 
-          # Seed resolution (build/compiler.w comp_resolve_seed_compiler) reads WITH
+          # Seed resolution (build/compiler.with comp_resolve_seed_compiler) reads WITH
           # and spawns it with CreateProcessW.
           echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
           echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc")" >> "$GITHUB_ENV"
@@ -478,7 +478,7 @@ jobs:
           echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
           echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc")" >> "$GITHUB_ENV"
 
-          # MSVC CRT + Windows SDK import libs, read by Link.w via
+          # MSVC CRT + Windows SDK import libs, read by Link.with via
           # WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR. Locate VS with vswhere (edition-
           # agnostic) and glob the highest MSVC + Windows SDK version dirs. This
           # is the arm64 runner, so the ARM64 lib subdirs (…/lib/arm64,
@@ -492,7 +492,7 @@ jobs:
           echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/arm64")" >> "$GITHUB_ENV"
           echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/arm64")" >> "$GITHUB_ENV"
 
-          # MSVC CRT + Windows SDK include dirs, read by ClangBridge.w via
+          # MSVC CRT + Windows SDK include dirs, read by ClangBridge.with via
           # WITH_WINDOWS_{MSVC,UCRT,SHARED,UM}_INCDIR so a system-header c_import
           # resolves on native Windows. Headers are arch-independent, so the same
           # Include dirs as the x64 job.

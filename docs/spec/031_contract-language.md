@@ -334,7 +334,7 @@ a proof, the gate on a stale override, and the counts in the census and
   the contradiction error for that one clause, and the grant then stands as
   any stated clause does.
 - The proofs a stated contract is held against are the ones `with get`
-  recorded for the package it describes: a project's `contracts/<name>.w`
+  recorded for the package it describes: a project's `contracts/<name>.with`
   against `contract-proofs.txt` of `c.<name>`. A package with none recorded
   contradicts nothing.
 - `override` is available on every grant: a resource clause, a function
@@ -379,7 +379,7 @@ The error without the marker:
 
 ```
 error: `lend` on `engine_peek` contradicts a proof: the function stores param 0
- --> src/contracts/engine.w:14:9
+ --> src/contracts/engine.with:14:9
   = proof: engine_peek passes param 0 to cache_put at param 1 (engine.c:212), which stores it in a field (cache.c:88)
   = help: if the proof is wrong about this library, the clause can be marked `override`; the program then answers for the fact
   = help: a proof believed wrong is a compiler bug: report it with this message, the function and the library's version
@@ -391,16 +391,16 @@ The report, in `with analyze … contract` (the three counts are separate;
 `clauses` is their sum with `proven`):
 
 ```
-library engine; contract:engine@src/contracts/engine.w
-    threads: runs no threads  [override@src/contracts/engine.w:2, against proof: engine_start calls pthread_create (engine.c:44)]
-fn engine_peek; contract:engine@src/contracts/engine.w; clause:fn@src/contracts/engine.w:3
-    effect: param 0: *mut engine e: lend  [override@src/contracts/engine.w:4, against proof: stores param 0 (cache.c:88)]
-fn engine_reset; contract:engine@src/contracts/engine.w; clause:fn@src/contracts/engine.w:5
-    effect: param 0: *mut engine e: lend  [stale override@src/contracts/engine.w:6: no proof contradicts it]
-fn engine_name; contract:engine@src/contracts/engine.w; clause:fn@src/contracts/engine.w:7
-    effect: param 0: *mut engine e: lend  [claim: stated@src/contracts/engine.w:7]
+library engine; contract:engine@src/contracts/engine.with
+    threads: runs no threads  [override@src/contracts/engine.with:2, against proof: engine_start calls pthread_create (engine.c:44)]
+fn engine_peek; contract:engine@src/contracts/engine.with; clause:fn@src/contracts/engine.with:3
+    effect: param 0: *mut engine e: lend  [override@src/contracts/engine.with:4, against proof: stores param 0 (cache.c:88)]
+fn engine_reset; contract:engine@src/contracts/engine.with; clause:fn@src/contracts/engine.with:5
+    effect: param 0: *mut engine e: lend  [stale override@src/contracts/engine.with:6: no proof contradicts it]
+fn engine_name; contract:engine@src/contracts/engine.with; clause:fn@src/contracts/engine.with:7
+    effect: param 0: *mut engine e: lend  [claim: stated@src/contracts/engine.with:7]
 contract-audit: clauses=41 proven=28 claimed=10 overrides=2 stale-overrides=1
-contract-audit: stale override at src/contracts/engine.w:6: `lend` on `engine_reset`; no proof contradicts it, so `override` can be deleted
+contract-audit: stale override at src/contracts/engine.with:6: `lend` on `engine_reset`; no proof contradicts it, so `override` can be deleted
 ```
 
 A clause that restates what is already effective from a lower line is
@@ -767,7 +767,7 @@ library's code, not only this one:
 | How the library reaches the program | What the drafter knows | The result |
 |---|---|---|
 | Built from source by `with get` (CMake, Ninja and `with cc`) | everything: the units and the macros are the build's own `compile_commands.json`, and the library linked is that build's output | drawn |
-| A project's own C sources, compiled by its `build.w` | everything, when the project's build compiles every C unit of the library its contract describes: the units and flags are the build's compile targets | drawn at build time. `runs no threads` is then effective with provenance `proof` without being written, and `with analyze … contract` prints it. Where it does not hold, the program states the one-line claim |
+| A project's own C sources, compiled by its `build.with` | everything, when the project's build compiles every C unit of the library its contract describes: the units and flags are the build's compile targets | drawn at build time. `runs no threads` is then effective with provenance `proof` without being written, and `with analyze … contract` prints it. Where it does not hold, the program states the one-line claim |
 | A prebuilt binary (a Conan Center package) | the package states its settings (os, arch, compiler, build type) and its options in `conaninfo.txt`. It does not state the flags its builder's environment added | evidence, not proof: printed in the report with the configuration analyzed, granting nothing. Configuring the source with the settings and options the package records does not establish that the builds are the same |
 | A system package (`c.<name> = "system"`) | nothing: there is no source | none |
 
@@ -917,7 +917,7 @@ exits with status 134. Its message names the function, the clause, and
 where the clause came from:
 
 ```
-panic: LoadImageFromScreen: `from LoadImageFromScreen, nonnull field data` (registry/c/raylib/facts.w:17): C returned it NULL
+panic: LoadImageFromScreen: `from LoadImageFromScreen, nonnull field data` (registry/c/raylib/facts.with:17): C returned it NULL
 ```
 
 For a registry line the place is the facts file and line; for a stated

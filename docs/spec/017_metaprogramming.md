@@ -18,7 +18,7 @@ With provides three built-in magic constants, evaluated at the point of use:
 | `__FN__` | `str` | Name of the current function |
 
 ```
-print(__FILE__)    // prints "src/main.w"
+print(__FILE__)    // prints "src/main.with"
 print(__LINE__)    // prints the current line number
 print(__FN__)      // prints the current function name
 ```
@@ -30,7 +30,7 @@ and logging functions:
 fn log(msg: str, file: str = __FILE__, line: u32 = __LINE__):
     print(f"[{file}:{line}] {msg}")
 
-log("hello")  // prints "[src/main.w:5] hello"
+log("hello")  // prints "[src/main.with:5] hello"
 ```
 
 ### 17.1 Compile-Time Evaluation
@@ -170,7 +170,7 @@ Capabilities are unforgeable values granting specific authority:
 filesystem access, process execution, package/network access,
 environment access, output writing, tool invocation, or similar. They
 bound what build code may touch, especially for untrusted fetched
-dependencies. A dependency's `build.w` does not receive ambient access to
+dependencies. A dependency's `build.with` does not receive ambient access to
 the user's machine merely because the package was fetched.
 
 Capabilities are not a determinism waiver. Any effect that affects the
@@ -205,7 +205,7 @@ The canonical form names both the capability type and the local binding:
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     var out = ctx.new_build()
-    var app = target_new(.Executable, "app", "src/main.w")
+    var app = target_new(.Executable, "app", "src/main.with")
     out = out.add_target(app)
     out.default("app")
 ```
@@ -263,7 +263,7 @@ Pure comptime cannot forge or construct capability values. Only the
 compiler driver and explicitly privileged test harnesses can mint
 capabilities. A function that requires capabilities can be invoked only
 from a comptime context that already has those capabilities in scope or
-from a driver-discovered entry point such as `build.w` or an action
+from a driver-discovered entry point such as `build.with` or an action
 target.
 
 ### 17.2 Compile-Time Type Introspection
@@ -501,7 +501,7 @@ in `"file:line:col"` format:
 fn log(msg: str):
     print(src() ++ ": " ++ msg)
 
-log("hello")    // prints "src/main.w:4:5: hello"
+log("hello")    // prints "src/main.with:4:5: hello"
 ```
 
 **`embed_file(path)`** reads a file at compile time and embeds its

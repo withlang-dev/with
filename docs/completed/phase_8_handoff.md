@@ -25,7 +25,7 @@ and folded into the phase. Verify states with `gh issue view <n>` before acting
 - **#357** — proven-ownership Drop wrappers. *Partial:* removal half done; the
   positive path **first increment shipped** — curated owning-wrapper generation
   for `strdup`/`strndup`→`free` (`ci_owned_return_destructor` +
-  `ci_emit_owning_wrapper` in `src/CImport.w` emit a `COwned_<fn>` type with
+  `ci_emit_owning_wrapper` in `src/CImport.with` emit a `COwned_<fn>` type with
   `impl Drop` + safe constructor + `.handle()` accessor; test
   `behav_c_import_owning_wrapper_strdup`). Remaining: broader curated coverage
   (fopen/fclose…), refcount modeling, and an annotation/metadata evidence surface.
@@ -74,7 +74,7 @@ Five whys:
 
 Ruled out:
 - Parser/sema for the focused test: `with-stage2 check
-  behav_mut_self_field_assign_vec_tail.w` passed before the failing run.
+  behav_mut_self_field_assign_vec_tail.with` passed before the failing run.
 - A single missing primitive fallback: adding text fallback for primitive names
   did not fix the focused tests.
 - A single sig lookup gap: sema signatures were present (`sema.sigs=174` in
@@ -111,9 +111,9 @@ with build :behavior-tests
 with build :native-compile-error-tests
 with build :native-spec-tests
 ```
-Fast single-file repro (no full rebuild): `./out/release/bin/with run file.w`
-or `./out/release/bin/with build file.w`. Debug drop/codegen:
-`WITH_DEBUG_MIR_CODEGEN=1 ./out/release/bin/with build file.w`.
+Fast single-file repro (no full rebuild): `./out/release/bin/with run file.with`
+or `./out/release/bin/with build file.with`. Debug drop/codegen:
+`WITH_DEBUG_MIR_CODEGEN=1 ./out/release/bin/with build file.with`.
 
 Concurrent agents push to `main`: after committing, `git fetch && git rebase
 origin/main` before `git push`. Never `git stash`. Commit author is Eric
@@ -123,15 +123,15 @@ Hartford only — no AI co-authors/trailers.
 
 ## 3. What shipped (mechanisms worth knowing)
 
-### #379 curated libc contract overlay (`src/SemaDecl.w`, `src/CImport.w`)
+### #379 curated libc contract overlay (`src/SemaDecl.with`, `src/CImport.with`)
 The blanket `const char*`→cstring rule (commit 1e53f8aa) was **removed**;
 modeling is now evidence-driven.
 - `ci_overlay_cstr_in_param_count(name)` and `ci_overlay_return_is_borrowed_ptr(name)`
-  in `src/SemaDecl.w` are the curated tables (ordered, deterministic).
+  in `src/SemaDecl.with` are the curated tables (ordered, deterministic).
 - `Sema.ci_function_requires_raw_abi(fn_sym)` decides raw-vs-modeled; populates
   `ci_raw_syms`. A c_import fn with a **slice parameter** is exempt (it's a
   generated safe wrapper — C has no slices).
-- `Sema.try_ci_coercion(fn_sym, ...)` (`src/SemaDiag.w`) gates the str→C-string
+- `Sema.try_ci_coercion(fn_sym, ...)` (`src/SemaDiag.with`) gates the str→C-string
   coercion on the function being modeled (`ci_raw_syms.contains == 0`).
 - **Shipped facts:** `cstr_in` (strlen/strcmp/atoi/…), `nullable_ptr` borrowed
   returns (strchr/getenv/… — raw C pointers are *natively nullable*: `== None` /
@@ -143,21 +143,21 @@ modeling is now evidence-driven.
 
 ### `@[link_name("symbol")]` extern-fn attribute (new, general)
 Parser stores it as a `link_name:` prefix on `pending_callconv`
-(`src/Parser.w`, mirroring `c_export:`); codegen `Codegen.declare_extern_fn`
-(`src/Codegen.w`) uses the given symbol as the LLVM name instead of
+(`src/Parser.with`, mirroring `c_export:`); codegen `Codegen.declare_extern_fn`
+(`src/Codegen.with`) uses the given symbol as the LLVM name instead of
 `canonical_extern_name`, keeping C ABI. This is the primitive buf_in's wrapper
 gen needs (public name = wrapper, raw binding renamed but linking to the real
-C symbol). Test: `test/behavior/behav_link_name_extern.w`.
+C symbol). Test: `test/behavior/behav_link_name_extern.with`.
 
-### buf_in wrapper generation (`src/CImport.w`)
+### buf_in wrapper generation (`src/CImport.with`)
 `ci_emit_buf_wrapper` emits a renamed `@[link_name]` raw extern + a safe `fn`
 wrapper taking `[]u8`, deriving length from `slice.len()`, base pointer via
 `&raw const s[0]` (empty slice → `null`). Curated by `ci_buf_count` /
 `ci_buf_ptr_idx` / `ci_buf_len_idx` / `ci_buf_is_mut`. memcmp requires equal
-lengths (panics). Tests: `behav_c_import_overlay_memchr.w`,
-`behav_c_import_overlay_memcmp.w`.
+lengths (panics). Tests: `behav_c_import_overlay_memchr.with`,
+`behav_c_import_overlay_memcmp.with`.
 
-### #601 match-arm drop corruption (`src/MirLower.w` `lower_match`)
+### #601 match-arm drop corruption (`src/MirLower.with` `lower_match`)
 Match-arm pattern bindings were dropped on every path leaving the match,
 dropping uninitialized memory for `Result[DropType, E]`. Fixed by per-arm
 push/pop drop scope. (Found via lldb backtrace.)
@@ -166,18 +166,18 @@ push/pop drop scope. (Found via lldb backtrace.)
 A non-Copy value placed in a struct-literal field was bitwise-**copied**, not
 moved → use-after-move undetected + drop flag uncleared → **double-free**.
 Fixed, gated on `type_has_drop_impl(field value type)`:
-- `Sema.check_struct_literal` (`src/SemaCheck.w`): `mark_moved_if_consumed` on a
+- `Sema.check_struct_literal` (`src/SemaCheck.with`): `mark_moved_if_consumed` on a
   whole non-Copy identifier field value (use-after-move detection).
-- struct-literal lowering in `src/MirLower.w`: `consume_moved_operand` on the
+- struct-literal lowering in `src/MirLower.with`: `consume_moved_operand` on the
   field operand (drop-once), explicit + defaulted fields.
 - One compiler site relied on the copy — `CCodegen.c_emit_module` used `mir_mod`
   after moving it into the codegen struct; migrated to read through the field.
 - Non-Drop value types are intentionally left to **copy** — the compiler/stdlib
-  rely on it to *share* a value across constructions (e.g. `lib/std/build.w`
+  rely on it to *share* a value across constructions (e.g. `lib/std/build.with`
   puts one `fs_outputs` into both `ToolFs` and `ProcessRunner`); harmless
   without a destructor. Strict-move for all non-Copy would require a clone
-  migration (out of scope). Tests: `behav_drop_move_into_struct_field.w`,
-  `err_use_after_move_into_struct_field.w`.
+  migration (out of scope). Tests: `behav_drop_move_into_struct_field.with`,
+  `err_use_after_move_into_struct_field.with`.
 
 ---
 
@@ -207,25 +207,25 @@ real code (resource handles live in structs/Option/Vec).
   into double-frees. **They must land together** per aggregate kind.
 
 ### Drop machinery (code map)
-- Drop trait: `lib/std/traits.w`; `impl Drop for X: fn drop(move self: Self)`.
-  **`lib/std/string.w` `CString` is the owning-wrapper template** (struct
+- Drop trait: `lib/std/traits.with`; `impl Drop for X: fn drop(move self: Self)`.
+  **`lib/std/string.with` `CString` is the owning-wrapper template** (struct
   holding `*mut`, `drop` calls `with_free` once).
-- `Sema.type_has_drop_impl(tid)` (`src/Sema.w`, ~3808) — **SHALLOW**: checks the
+- `Sema.type_has_drop_impl(tid)` (`src/Sema.with`, ~3808) — **SHALLOW**: checks the
   type's own Drop impl only, NOT fields/elements. A transitive needs-drop
   predicate does not exist and is needed (a struct with a Drop field but no own
   Drop impl currently still copies → inner double-free).
-- `Codegen.detect_drop_functions` (`src/Codegen.w`, ~4741) registers `drop` fns
+- `Codegen.detect_drop_functions` (`src/Codegen.with`, ~4741) registers `drop` fns
   **only from explicit `impl Drop`** — no synthesis.
-- `Codegen.mir_emit_drop_ptr_for_sema_type` (`src/CodegenDispatch.w`, ~3827) is
+- `Codegen.mir_emit_drop_ptr_for_sema_type` (`src/CodegenDispatch.with`, ~3827) is
   the drop dispatcher. `mir_emit_drop_fields_ptr` recurses **struct fields
   only** (`if ty != struct_kind: return`) and honors per-field consumption via
   `drop_consumed_field`. There is no tuple/array/enum-payload recursion.
-- MIR move tracking (`src/MirLower.w`): `consume_moved_operand` (~376) →
+- MIR move tracking (`src/MirLower.with`): `consume_moved_operand` (~376) →
   `mark_local_value_moved` (~300) + `cancel_scheduled_value_drop_for_local`
   (~317, flips a scheduled `DK_VALUE` drop to `DK_STORAGE`). `schedule_drop`
   (~209). Drop suppression for a let-bound var flows from the **sema** mark
   influencing the operand kind (OK_MOVE) which the MIR consume then acts on.
-- Sema move marking: `Sema.mark_moved_if_consumed` (`src/SemaCheck.w`, ~18242) —
+- Sema move marking: `Sema.mark_moved_if_consumed` (`src/SemaCheck.with`, ~18242) —
   `NK_IDENT` → `scope_set_state(MOVED)`; `NK_FIELD_ACCESS` → "partial move from
   Drop type". Gate calls on `NK_IDENT` + `type_has_drop_impl` to avoid
   flagging legitimate partial reads (this was a real regression — `ctx.token`
@@ -233,7 +233,7 @@ real code (resource handles live in structs/Option/Vec).
 
 ### Templates to reuse for #606
 - **Enum (variant-aware) drop:** `Codegen.gen_display_enum`
-  (`src/CodegenDispatch.w`, ~2838) is the exact discriminant-switch skeleton
+  (`src/CodegenDispatch.with`, ~2838) is the exact discriminant-switch skeleton
   (load tag → per-variant compare/branch → merge). Adapt it: per active variant,
   drop each payload **ptr** instead of formatting. Helpers:
   `mir_enum_variant_count`, `mir_enum_variant_discriminant`,
@@ -252,7 +252,7 @@ A tuple #605+#606 pilot: CodegenDispatch `TY_TUPLE` drop branch + sema
   destructure moves the elements out, but the source tuple still drops them.
 
 **Why destructure didn't converge:** the source must be fully consumed, but
-`lower_tuple_destructure` (`src/MirLower.w`) does
+`lower_tuple_destructure` (`src/MirLower.with`) does
 `rhs_place = materialize_operand(rhs_op, ...)` which yields a **copy temp**, so
 `cancel_scheduled_value_drop_for_local(mir_place_plain_local(rhs_place))`
 cancels the *temp's* drop, not the real source local's. The sema mark on the
@@ -292,7 +292,7 @@ construct one today.** Verified mechanism matrix (all run, not inferred):
 | free `mut param` (struct/Vec) | **moves** (consumes; caller loses binding) |
 | `mut self` method | in-place, usable after |
 | move-in / return `f(T)->T` | works |
-| `[]mut T` parameter | type exists (`TY_SLICE` `d1`=mut flag), but **no expression produces a `[]mut` value** — slice exprs emit `d1=0`; compat check `Sema.w` ~4427 rejects `[]`→`[]mut` |
+| `[]mut T` parameter | type exists (`TY_SLICE` `d1`=mut flag), but **no expression produces a `[]mut` value** — slice exprs emit `d1=0`; compat check `Sema.with` ~4427 rejects `[]`→`[]mut` |
 | `VecRange` parameter | **unspellable** (`unknown type: VecRange`; it's `self.syms.vecrange`, compiler-internal) |
 | `&mut Vec[u8]` parameter | rejected (no safe `&mut`) |
 
@@ -315,7 +315,7 @@ uncallable and would regress the raw `memset` surface). `owned` returns
 ## 6. #348 — c_import preprocess shell-out (partial)
 
 Macro `-dM` collection is libclang-only (done). Remaining: migrator-only
-`with_cimport_preprocess_text` (`src/CImport.w`) runs `cc -E` to reconstruct
+`with_cimport_preprocess_text` (`src/CImport.with`) runs `cc -E` to reconstruct
 macro-expanded text at source locations (via `#line` markers), feeding the
 migrator's `ci_preprocessed_*` readers. libclang has no `-E`; options are a C++
 bridge preprocessor function (over the statically-linked clang frontend) or a
@@ -327,8 +327,8 @@ Self-contained-toolchain rule: never shell to system `cc`/LLVM. Substantial.
 ## 7. #357 — proven-ownership Drop wrappers (positive path)
 
 Removal half done (heuristic auto-defer removed upstream; regression tests
-`err_c_import_destroy_heuristic_no_owning_wrapper.w`,
-`behav_c_import_destroy_heuristic_no_auto_defer.w` added). Spec: §16.2a
+`err_c_import_destroy_heuristic_no_owning_wrapper.with`,
+`behav_c_import_destroy_heuristic_no_auto_defer.with` added). Spec: §16.2a
 "Auto-Method Generation / Proven ownership cleanup"; `docs/requirements.md`
 16.2.2.11–16.2.2.27.
 
@@ -382,7 +382,7 @@ metadata).
   increments; run `with build :fixpoint` every change. A wrong drop-glue change
   silently miscompiles or breaks stage2==stage3.
 - No silent fallbacks: fail loudly with a diagnostic, never stub.
-- Never change `Link.w` + runtime in the same commit; these tasks don't touch
+- Never change `Link.with` + runtime in the same commit; these tasks don't touch
   the link path, so normal `with build` + `:fixpoint` gates apply.
 - Re-read files before editing after long sessions (concurrent agents + linters
   shift line numbers — prefer function names over line numbers).
@@ -404,10 +404,10 @@ Remaining, required order unless the maintainer redirects:
    wildcard-element drop in irrefutable destructure; precise per-element
    partial-extraction tracking to replace the conservative whole-base consume.
 3. **#348 preprocess_text** — replace the `cc -E` shell-out in
-   `with_cimport_preprocess_text` (`src/compiler/ClangBridge.w` ~2309) with
+   `with_cimport_preprocess_text` (`src/compiler/ClangBridge.with` ~2309) with
    libclang token reconstruction. The token FFI already exists and is used
    (`clang_tokenize`/`clang_getTokenSpelling`/`clang_getExpansionLocation`,
-   ClangBridge.w ~1474–1491). Independent of the drop codegen; substantial.
+   ClangBridge.with ~1474–1491). Independent of the drop codegen; substantial.
 4. **#357 expansion** — more curated owning constructors (fopen/fclose…),
    refcount modeling (+1 ctor vs borrowing accessor), and an annotation/metadata
    evidence surface. Reuses the shipped `ci_emit_owning_wrapper`.

@@ -9,8 +9,8 @@ Last updated: 2026-06-09 14:48 -0700.
   now passes through `check` and `run` with both backslash and slash paths.
 - #341: CLOSED. The two issue-specific Windows async
   cancellation tests now pass:
-  `behav_async_cancel_await_cleans_children.w` and
-  `behav_async_cancel_nested_unwind.w`.
+  `behav_async_cancel_await_cleans_children.with` and
+  `behav_async_cancel_nested_unwind.with`.
 - #369: OPEN. This is the separate Windows custom-fiber stack-overflow
   diagnostic bug. It is not a regression in #341 cancellation behavior.
 
@@ -41,10 +41,10 @@ Latest #341 root-cause facts:
 Latest #369 root-cause facts:
 
 - Reproduced on current `main` (`0030c685`) with
-  `out/bin/with.exe test test/behavior/behav_async_stack_overflow.w`:
+  `out/bin/with.exe test test/behavior/behav_async_stack_overflow.with`:
   exit `-1073741819` (`0xC0000005`), expected `134`.
 - Stable repro binary built with `-O0` and LLDB stops in `deep` at
-  `behav_async_stack_overflow.w:13` with an access violation writing
+  `behav_async_stack_overflow.with:13` with an access violation writing
   `RSP - 8`.
 - LLDB register/memory evidence: `rsp = 0x...9f40000`, page
   `[rsp, rsp+0x10000)` is `rw-`, page `[rsp-0x1000, rsp)` is `---`.
@@ -64,7 +64,7 @@ Current paper-over:
 - Until the async backend migration in `docs/feature_plans/async-proposal.md` replaces the
   current Windows custom assembly fiber stack, the test runner supports a
   narrow `//! skip-windows:` directive. Only
-  `test/behavior/behav_async_stack_overflow.w` uses it. The expected `134`
+  `test/behavior/behav_async_stack_overflow.with` uses it. The expected `134`
   diagnostic remains in the test for non-Windows platforms, and #369 remains
   open for the real Windows fix.
 
@@ -138,15 +138,15 @@ Resolved blocker history:
   after `build` and `:fixpoint` passed.
 - Current failure class: Linux regex runtime FFI subject pointer bug, fixed in
   source by extracting `str` data before calling PCRE2.
-- Latest focused check: Linux `behav_regex_language_semantics.w` and
-  `behav_regex_capture_fstring.w` PASS after rebuilding `regex-runtime-object`.
+- Latest focused check: Linux `behav_regex_language_semantics.with` and
+  `behav_regex_capture_fstring.with` PASS after rebuilding `regex-runtime-object`.
 - Linux committed-source release gate PASS: `build`, `:fixpoint`, `:test`,
   `:test-green`, and `:last-green`.
 - Windows user-program linker path: fixed in source by routing Windows
   non-LLVM links through `out/lib/llvm_ld` and the existing `lld-link` command
   builder.
 - Windows basic async runtime bootstrap: improved enough for focused
-  `test/behavior/async_basic.w` to pass by selecting the Windows fiber core and
+  `test/behavior/async_basic.with` to pass by selecting the Windows fiber core and
   Windows x64 fiber assembly.
 - Windows action process test: fixed in source by invoking With itself via
   `version`; this avoids external `echo`/shell dependencies after bootstrap.
@@ -300,12 +300,12 @@ Latest transition:
     `out/bin/with version`.
 
 - Linux regex behavior root cause:
-  - `with build :test` failed in `behav_regex_language_semantics.w` and
-    `behav_regex_capture_fstring.w`.
+  - `with build :test` failed in `behav_regex_language_semantics.with` and
+    `behav_regex_capture_fstring.with`.
   - LLDB breakpoint on `pcre2_match_8` showed the subject pointer register
     contained a pointer to a With `str` value on the stack. The bytes at that
     address were `{data_ptr, len, ...}`, not the subject bytes `"a1 b2"`.
-  - Root cause: `rt/regex_runtime.w` passed `text as *const u8` to PCRE2.
+  - Root cause: `rt/regex_runtime.with` passed `text as *const u8` to PCRE2.
     `str` is a value type, so the runtime must extract the first field rather
     than cast the whole value to a byte pointer.
   - Fix: added `regex_str_data` and used it for PCRE2 match/substitute subject
@@ -314,9 +314,9 @@ Latest transition:
   - Full committed-source Linux release gate PASS.
 
 - Windows release-test root cause:
-  - `check` and `--emit-obj` passed for `test/behavior/assoc_type_basic.w`,
+  - `check` and `--emit-obj` passed for `test/behavior/assoc_type_basic.with`,
     while binary `build` failed silently.
-  - `test/hello.w` showed the same object-pass/binary-fail pattern, so this
+  - `test/hello.with` showed the same object-pass/binary-fail pattern, so this
     was a link path failure, not an associated-type or async compiler bug.
   - Source inspection showed non-LLVM/user-program links call
     `link_stage_make_link_command("cc", ...)`. Linux passed because that path
@@ -325,25 +325,25 @@ Latest transition:
     LLVM linker command builder using `out/lib/llvm_ld`.
 
 - Windows async runtime root cause:
-  - After the linker fix, `test/hello.w` built and ran.
-  - `:test` advanced to `async_basic.w` and failed with unresolved
+  - After the linker fix, `test/hello.with` built and ran.
+  - `:test` advanced to `async_basic.with` and failed with unresolved
     `with_fiber_spawn`, `with_runtime_core_*`, and related scheduler symbols.
-  - `build.w` selected `rt/fiber_core_windows_stub.w`; that file intentionally
+  - `build.with` selected `rt/fiber_core_windows_stub.with`; that file intentionally
     exported only `with_windows_fiber_core_stub`.
   - Source fix: select the shared fiber core for Windows, add Windows system
     call shims for the POSIX-shaped hooks it imports, and replace the Windows
     assembly placeholder with `with_fiber_switch` and
     `with_fiber_prepare_initial_context`.
-  - Follow-up correction: POSIX-name shim functions in `rt/windows_x86_64.w`
+  - Follow-up correction: POSIX-name shim functions in `rt/windows_x86_64.with`
     were module-mangled and therefore did not satisfy `extern fn mmap` from a
     separate object. The final source keeps Windows fiber core separate and
     calls existing unmangled `rt_*` platform hooks.
-  - Focused `test/behavior/async_basic.w`: PASS.
+  - Focused `test/behavior/async_basic.with`: PASS.
 
 - Windows action process test root cause:
   - Full Windows `:test` later failed only in
-    `behav_action_capability_process.w`.
-  - The generated nested `build.w` pushed `"/bin/echo"` into
+    `behav_action_capability_process.with`.
+  - The generated nested `build.with` pushed `"/bin/echo"` into
     `ctx.process_runner().run_capture`.
   - Linux passed because `/bin/echo` exists; Windows failed at run stage with
     exit 134 because the nested action could not run the hardcoded POSIX path.
@@ -359,8 +359,8 @@ Latest transition:
     this unit test.
 
 - Windows async cancellation root cause:
-  - `behav_async_cancel_await_cleans_children.w` and
-    `behav_async_cancel_nested_unwind.w` crashed with `0xc0000005`.
+  - `behav_async_cancel_await_cleans_children.with` and
+    `behav_async_cancel_nested_unwind.with` crashed with `0xc0000005`.
   - LLDB crash site: `store_i32` inside
     `with_runtime_current_set_cancelled_return`, writing the cancelled-return
     flag through `current_fiber`.
@@ -385,7 +385,7 @@ Latest transition:
   - Decision for v0.15.0: do not keep layering async patches during the Windows
     compiler-bootstrap release. Track this as post-release issue #341.
 
-- Restored `build/compiler.w` compiler-child actions to use
+- Restored `build/compiler.with` compiler-child actions to use
   `run_capture_with_env` on Windows. The prior no-capture diagnostic branch
   caused `bootstrap-regex-runtime-ir` to print IR to the console instead of
   writing the expected `.ll.tmp` stdout capture file. With `WITH` set to the
@@ -410,8 +410,8 @@ Latest transition:
   `LLVM_PREFIX=$PWD/.deps/llvm-22.1.6-linux-x86_64` and
   `WITH=$PWD/out/bootstrap/bin/with-from-c`: `build` PASS, `:fixpoint` PASS,
   `:emit-c-fixpoint` PASS.
-- Removed the temporary `argv.txt` diagnostic write from `build/compiler.w`
-  and cleaned trailing whitespace in `src/CodegenDispatch.w`, then reran the
+- Removed the temporary `argv.txt` diagnostic write from `build/compiler.with`
+  and cleaned trailing whitespace in `src/CodegenDispatch.with`, then reran the
   gates from the final source:
   - Windows `with build :emit-c-fixpoint`: PASS (`EMIT-C OK`,
     `EMIT-C FIXPOINT`).
@@ -445,8 +445,8 @@ Latest transition:
   `emit-c-fixpoint` still declared `out/emit-c-test/with-from-c` instead of
   `out/emit-c-test/with-from-c.exe`. Classification: build graph input path
   bug, not compiler/codegen.
-- Source fix applied: `build.w` now declares that input with `host_bin`.
-- Rebuilt stage1/stage2 after the `build.w` input fix, refreshed
+- Source fix applied: `build.with` now declares that input with `host_bin`.
+- Rebuilt stage1/stage2 after the `build.with` input fix, refreshed
   `out/stage/bin/with-stage2-candidate.exe`, then ran clean
   `WITH=out/stage/bin/with-stage2-candidate.exe with build :emit-c-fixpoint`:
   PASS (`EMIT-C OK`, `EMIT-C FIXPOINT`).
@@ -464,7 +464,7 @@ Latest transition:
   `/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2`, and
   `/usr/lib/gcc/x86_64-linux-gnu/15/crtbegin.o` exist. Classification:
   source detection bug, not missing host dependency.
-- Source fix applied: `src/compiler/Link.w` `link_stage_file_exists` now uses
+- Source fix applied: `src/compiler/Link.with` `link_stage_file_exists` now uses
   `runtime_file_exists(path) != 0` instead of `runtime_read_file(path).len() >
   0`.
 - Running `/tmp/with-v0.14.8-seed/with-linux-x86_64` directly got past CRT
@@ -478,9 +478,9 @@ Latest transition:
 - Local non-root Linux verification setup: created `/tmp/with-link-libs`
   symlinks for `libz.so`, `libzstd.so`, and `libxml2.so`, plus
   `/tmp/with-tools/ld.lld-with-local-libs` adding `-L/tmp/with-link-libs`.
-- First wrapper attempt still failed because `build/compiler.w` child compiler
+- First wrapper attempt still failed because `build/compiler.with` child compiler
   actions passed only `WITH_OUT_DIR`, dropping `WITH_LLVM_LD`.
-- Source fix applied: `build/compiler.w` now passes through explicit LLVM
+- Source fix applied: `build/compiler.with` now passes through explicit LLVM
   toolchain override variables (`LLVM_PREFIX`, `WITH_LLVM_LD`, `LLVM_LD`,
   `WITH_LLVM_CC`, `LLVM_CC`, `WITH_LIBCLANG`, `LIBCLANG_FILE`) to child
   compiler actions.
@@ -495,9 +495,9 @@ Latest transition:
   - Both files are LF-only and NUL-free as emitted C files, but the first
     diff is inside `EMBEDDED_STD_0`: Windows embedded raw stdlib text with
     `\r\n`, Linux embedded `\n`.
-- Source fix applied: `build/runtime.w` and
-  `src/tools/generate_embedded_stdlib.w` now canonicalize embedded source text
-  to LF before writing `EmbeddedStdlibData.w`.
+- Source fix applied: `build/runtime.with` and
+  `src/tools/generate_embedded_stdlib.with` now canonicalize embedded source text
+  to LF before writing `EmbeddedStdlibData.with`.
 - Next exact command: regenerate Windows and Linux emitted C from this source,
   compare bytes, then continue Linux `:emit-c-fixpoint` and Windows isolation.
 - Bootstrap policy correction: the Linux static LLVM SDK package was incomplete
@@ -520,7 +520,7 @@ Latest transition:
 - Refreshed `out/lib` runtime/bridge objects from healthy stage1, regenerated
   `out/lib/embedded_objects.o`, and forced a stage2 relink.
 - `out/stage/bin/with-stage2.exe version`: PASS.
-- `out/stage/bin/with-stage2.exe check test\hello.w`: PASS.
+- `out/stage/bin/with-stage2.exe check test\hello.with`: PASS.
 - Stage2 stack reserve: PASS, `8388608`.
 - Direct stage3 object command: PASS.
 - `WITH=out/bootstrap-c-v0.14.8/with-bootstrap.exe with build :fixpoint`: PASS.
@@ -640,16 +640,16 @@ existing pointer/ref local.
 
 ## Source Fixes Already In This Session
 
-- `src/CCodegen.w`: tuple C lowering now uses generated `with_tuple_N` structs
+- `src/CCodegen.with`: tuple C lowering now uses generated `with_tuple_N` structs
   instead of `int64_t`.
-- `src/CCodegen.w`: tuple types are collected and emitted like other compound C
+- `src/CCodegen.with`: tuple types are collected and emitted like other compound C
   types.
-- `src/CCodegen.w`: `*c_void` lowers to real C `void*`.
-- `src/CCodegen.w`: emitted bootstrap declarations include `with_memmove`,
+- `src/CCodegen.with`: `*c_void` lowers to real C `void*`.
+- `src/CCodegen.with`: emitted bootstrap declarations include `with_memmove`,
   `with_memcmp`, `with_fiber_cleanup_await`, and `with_fiber_cancel`.
-- `src/CCodegen.w`: address-like rvalues assigned into integer-shaped storage
+- `src/CCodegen.with`: address-like rvalues assigned into integer-shaped storage
   get explicit `intptr_t`/`uintptr_t` casts.
-- `src/CCodegen.w`: locals assigned from address-of pointer/ref targets are
+- `src/CCodegen.with`: locals assigned from address-of pointer/ref targets are
   declared as `void*` storage, not as the pointee pointer type.
 - `runtime/unistd.h`: Windows bootstrap shim declares `gethostname`.
 
@@ -671,13 +671,13 @@ void* _3 __attribute__((unused)) = {0};
 Resolved prior blocker:
 
 ```text
-rt/regex_runtime.w:82: incompatible pointer types assigning to int32_t*
+rt/regex_runtime.with:82: incompatible pointer types assigning to int32_t*
 from const char* for _3 = (&_1.ptr[_2])
-rt/regex_runtime.w:41: undeclared with_println_str
-rt/regex_runtime.w:44: undeclared with_eprint
-rt/regex_runtime.w:46: undeclared with_write
-rt/regex_runtime.w:54: undeclared with_println_i32
-rt/regex_runtime.w:57: undeclared with_println_i64
+rt/regex_runtime.with:41: undeclared with_println_str
+rt/regex_runtime.with:44: undeclared with_eprint
+rt/regex_runtime.with:46: undeclared with_write
+rt/regex_runtime.with:54: undeclared with_println_i32
+rt/regex_runtime.with:57: undeclared with_println_i64
 ```
 
 The missing `with_*` declarations are source-side bootstrap declaration gaps.
@@ -743,9 +743,9 @@ The regenerated bundle then moved to C declaration conflicts caused by stale
 extra bootstrap declarations:
 
 - `with_str_from_cstr` and `with_str_from_bytes` were declared as `uint8_t*`
-  even though `rt/rt_core.w` defines them as `*const u8`.
+  even though `rt/rt_core.with` defines them as `*const u8`.
 - `with_fiber_panic_capture` was declared as `uint8_t*` even though
-  `rt/fiber_stubs.w` and `rt/panic_runtime.w` use `*const u8`.
+  `rt/fiber_stubs.with` and `rt/panic_runtime.with` use `*const u8`.
 - `with_memcpy`'s source parameter was declared as mutable `void*` even though
   runtime modules use `*const u8` for source buffers.
 - `with_cimport_set_resource_dir` had no explicit return annotation, so the
@@ -757,11 +757,11 @@ and explicitly marks `with_cimport_set_resource_dir(path: str) -> void`.
 
 The next link attempt with the correct Windows object set eliminated duplicate
 bridge/platform symbols but exposed `str_from_byte` and `i64_to_string` as
-unresolved. `git log`, then-current project-state notes, and `Link.w` show
+unresolved. `git log`, then-current project-state notes, and `Link.with` show
 these are a small non-prefixed runtime shim exception to the normal
 `with_`/`rt_`/`wl_`
 runtime ABI naming rule. Current source edit adds exact stable C names for
-the actual `rt_core.w` shims: `i32_to_str`, `i64_to_string`, and
+the actual `rt_core.with` shims: `i32_to_str`, `i64_to_string`, and
 `str_from_byte`.
 
 ## Next Steps
@@ -788,7 +788,7 @@ Completed:
 - 2026-06-05: Re-read `AGENTS.md` and the then-current project-state
   checkpoint.
 - 2026-06-05: Confirmed host source build passes after latest
-  `src/CCodegen.w` edit.
+  `src/CCodegen.with` edit.
 - 2026-06-05: Created this status document to avoid losing state or spinning in
   circles.
 - 2026-06-05: Regenerated host bootstrap bundle from rebuilt host compiler:
@@ -829,7 +829,7 @@ Completed:
   selection is `with_compiler.obj` plus Windows platform/compat/runtime objects,
   not separate `llvm_bridge.obj`, `clang_bridge.obj`, or generic
   `compat_runtime.obj`. Added exact stable names for the non-prefixed
-  `rt_core.w` string shims exposed by that link. A follow-up link proved
+  `rt_core.with` string shims exposed by that link. A follow-up link proved
   `int_to_string` is not in that set because it is a stdlib helper emitted in
   multiple modules, so it remains mangled.
 - 2026-06-05: Regenerated bundle
@@ -839,7 +839,7 @@ Completed:
   `with-bootstrap.pdb`; import table contains only `ntdll.dll`,
   `ADVAPI32.dll`, `ole32.dll`, `SHELL32.dll`, `VERSION.dll`,
   `OLEAUT32.dll`, and `KERNEL32.dll`. Smoke checks passed for `--version`,
-  `--help`, and `check test\hello.w`.
+  `--help`, and `check test\hello.with`.
 - 2026-06-05: Updated `docs/with-bootstrap-runbook.md` to document the proven
   Windows object selection and `ntdll.lib` link input.
 - 2026-06-05: First native Windows `with build` from `with-bootstrap.exe`
@@ -855,16 +855,16 @@ Completed:
   `ctx.fs().list_files` normalized every relative path to `"."`. Generated C
   for `comptime_tool_path_normalize` skipped both `else if part != "."`
   branches, so normal path segments were never pushed. Patched
-  `src/ComptimeEval.w` to route path segment handling through an early-return
+  `src/ComptimeEval.with` to route path segment handling through an early-return
   helper instead of nested `else if` control flow.
 - 2026-06-05: Regenerated and linked `with-bootstrap.exe` plus
   `with-bootstrap.pdb`. Verified `SizeOfStackReserve: 67108864` and imports
   limited to Windows system DLLs; no LLVM/Clang/MSVC runtime DLL imports.
   Scratch `ctx.fs().normalize`/`ctx.fs().list_files` probe now emits real
-  paths (`files/a.w`, `files/b.txt`) instead of `"."`.
+  paths (`files/a.with`, `files/b.txt`) instead of `"."`.
 - 2026-06-05: Native Windows `with build` reached the stage1 link. New blocker:
   `pthread_self`, `mkstemp`, and `realpath` were implemented in
-  `rt/windows_x86_64.w` but emitted as module-prefixed symbols in
+  `rt/windows_x86_64.with` but emitted as module-prefixed symbols in
   `rt_windows_x86_64.o`; LLVM support also required `ntdll.lib` for
   `RtlGetLastNtStatus`. Patched source codegen to preserve exact link names
   for the Windows POSIX shim exports and patched Windows LLVM link metadata to
@@ -874,7 +874,7 @@ Completed:
   `out/bin/with-stage1.exe`. New blocker: output validation rejected declared
   command-directory extra output `out/command/stage1` because
   `with_fs_file_exists` used `rt_open`, which accepts directories on POSIX but
-  not on Windows. Patched `rt/rt_core.w` to use `rt_access(path, 0)` so path
+  not on Windows. Patched `rt/rt_core.with` to use `rt_access(path, 0)` so path
   existence is portable across files and directories.
 - 2026-06-05: Regenerated from the `rt_access` fix. Stage1 again built and
   output validation passed, but stage2 failed to launch with exit
@@ -888,13 +888,13 @@ Completed:
   are system-only. Stage2 then failed inside stage1 with
   `failed to create output directory './out/bin'`. Root cause:
   `fs_mkdir_component` only treated POSIX `-EEXIST` (`-17`) as success for an
-  existing directory; Windows returns `-183`. Patched `rt/rt_core.w` to treat
+  existing directory; Windows returns `-183`. Patched `rt/rt_core.with` to treat
   any mkdir failure as success when the path is now a directory.
 - 2026-06-05: Rebuilt stage1 from the mkdir fix. Stage2 then crashed with
   `0xc0000005`. LLDB showed the fault at an `ntdll` prologue push with `rsp`
   on the guard boundary. PE header confirmed `with-stage1.exe` had only the
   default `SizeOfStackReserve: 1048576`. Patched the Windows lld-link command
-  builder in `src/compiler/Link.w` to pass `/stack:67108864`, matching the
+  builder in `src/compiler/Link.with` to pass `/stack:67108864`, matching the
   bootstrap runbook/manual bootstrap link.
 - 2026-06-05: Regenerated the bootstrap bundle from the `/stack` fix and
   rebuilt Windows bootstrap. Native Windows `with build` completed:
@@ -911,7 +911,7 @@ Completed:
 - 2026-06-05: `with build :emit-c-fixpoint` on Windows reached the emitted-C
   compile/link path, then failed because clang treated plain Windows `.lib`
   names as missing input files before `lld-link` could apply `/libpath`.
-  Patched `build/emit_c.w` to pass explicit SDK/MSVC import-library paths for
+  Patched `build/emit_c.with` to pass explicit SDK/MSVC import-library paths for
   Windows emit-C links while keeping the final binary dependency gate based on
   PE imports.
 - 2026-06-05: Deep-dived the `/stack:67108864` workaround. Root-cause evidence:
@@ -924,7 +924,7 @@ Completed:
   >= 256 KiB, and a largest frame of 465,704 bytes. The source root cause is
   the LLVM backend's MIR path: it lowers locals/temporaries to entry-block
   allocas, while the intended `mem2reg` cleanup is explicitly disabled in
-  `src/CodegenDispatch.w` (`DISABLED: investigating whether mem2reg causes
+  `src/CodegenDispatch.with` (`DISABLED: investigating whether mem2reg causes
   argument setup issues`, introduced by commit 261288cb). Linux and Darwin did
   not expose this because their runtime adapters already call
   `setrlimit(RLIMIT_STACK, 64 MiB)` from `with_raise_stack_limit()` at compiler
@@ -943,13 +943,13 @@ Completed:
   files it uses `llvm-readobj --unwind`; this gives a stable measurement for
   Windows without relying on crash/no-crash alone.
 - 2026-06-05: Split the LLVM MIR intrinsic dispatcher in
-  `src/CodegenDispatch.w` into vector, map, scalar/vector, atomic/fiber, and
+  `src/CodegenDispatch.with` into vector, map, scalar/vector, atomic/fiber, and
   ext helper families. Split the C backend builtin dispatcher in
-  `src/CCodegen.w` into smaller builtin-family helpers. This removed the former
+  `src/CCodegen.with` into smaller builtin-family helpers. This removed the former
   largest `CCodegen.emit_builtin_call_term` frame: stage2's largest measured
   frame is now `Compilation.run_mir_lower` at 180,104 bytes.
 - 2026-06-05: Changed compiler stack policy from 64 MiB to 8 MiB in
-  `src/compiler/Link.w`, `build/emit_c.w`, and POSIX
+  `src/compiler/Link.with`, `build/emit_c.with`, and POSIX
   `rt_compat_raise_stack_limit()`. A source-built Windows stage2 now reports
   `SizeOfStackReserve: 8388608` and imports only Windows system DLLs.
 - 2026-06-05: Reworked `ComptimeWorkspaceNativeCompileResult` so it no longer
@@ -1011,15 +1011,15 @@ Completed:
   bootstrap seed; fixpoint object targets remain `-O0`.
 - 2026-06-06: Moved the remaining ordinary compiler codegen temporaries from
   block-local `wl_build_alloca(self.builder, ...)` to `create_entry_alloca(...)`
-  in `src/Codegen.w` and `src/CodegenTraits.w`, matching the MIR-side entry
+  in `src/Codegen.with` and `src/CodegenTraits.with`, matching the MIR-side entry
   alloca rule. This removed the Windows stack-probe/register-clobber class from
   the compiler codegen files; `rg "wl_build_alloca\\(self\\.builder"`
-  returns no matches in `src/Codegen.w`, `src/CodegenDispatch.w`, or
-  `src/CodegenTraits.w`.
+  returns no matches in `src/Codegen.with`, `src/CodegenDispatch.with`, or
+  `src/CodegenTraits.with`.
 - 2026-06-06: Rebuilt Windows stage1 and stage2 after the entry-alloca cleanup.
   Both passed, and `out/stage/bin/with-stage2.exe` still has the intended
   8 MiB stack reserve. The direct stage3 object compile still crashes:
-  `out/stage/bin/with-stage2.exe build out/gen/main.w --emit-obj -O0 ...`
+  `out/stage/bin/with-stage2.exe build out/gen/main.with --emit-obj -O0 ...`
   exits `0xc0000005`.
 - 2026-06-06: LLDB now consistently identifies the remaining crash in the
   frontend helper `exact_int_expr_value(lo: i64, hi: i64, negative: i32) ->
@@ -1039,7 +1039,7 @@ Completed:
   fallback, declared function values, AST/generic direct calls, closure thunks,
   and trait wrappers. Partial sret handling is worse than none.
 - 2026-06-06: Rechecked the current tree after resuming. The bootstrap C seed
-  and `out/bootstrap/bin/with-stage1.exe` both pass `check test\hello.w`, but
+  and `out/bootstrap/bin/with-stage1.exe` both pass `check test\hello.with`, but
   the newly built `out/stage/bin/with-stage2.exe` crashes with `0xc0000005`
   on the same file. LLDB classifies this as control-flow corruption, not stack
   exhaustion: `rip=0x00007274735f746e`, which is data/string-looking bytes
@@ -1068,7 +1068,7 @@ Completed:
   Root cause: MIR `RK_CAST` treated every pointer-target cast as a
   place-address cast before considering the source type. That is correct for
   aggregate/array place reinterpretation, but wrong for integer-to-pointer and
-  pointer-to-pointer casts. Patched `src/CodegenDispatch.w` so only
+  pointer-to-pointer casts. Patched `src/CodegenDispatch.with` so only
   non-int/non-pointer source casts use `mir_try_place_ptr_for_ref`; integer and
   pointer source casts now flow to the normal value cast path.
 - 2026-06-06: Rebuilt Windows stage1 and stage2 after the cast fix. Both
@@ -1081,43 +1081,43 @@ Completed:
   frame reduction remains open, but this transition fixed the classified
   pointer-cast/register-data corruption path.
 - 2026-06-06: Short Windows gates after regenerated stage2:
-  `out/stage/bin/with-stage2.exe check test/hello.w` passes, and
-  `out/stage/bin/with-stage2.exe check test/codegen/large_aggregate_abi.w`
+  `out/stage/bin/with-stage2.exe check test/hello.with` passes, and
+  `out/stage/bin/with-stage2.exe check test/codegen/large_aggregate_abi.with`
   passes. The previous `0xc0000005` is gone. The raw direct stage3 object
   command now exits with ordinary diagnostics about manual extern calls in
-  `out/gen/main.w`; this is not a stack fault or control-flow corruption.
-  Because `out/gen/main.w` is generated, the next step is to let the build
+  `out/gen/main.with`; this is not a stack fault or control-flow corruption.
+  Because `out/gen/main.with` is generated, the next step is to let the build
   graph regenerate it through `with build :fixpoint`, not hand-edit it.
 - 2026-06-06: `with build :fixpoint` regenerated enough to reach LLVM function
   cleanup, then failed on `empty_test_discovery` with
   `unknown function pass '<garbage>' in pipeline '<garbage>'`. This is a
   normal diagnostic, not a crash. Root cause is another aggregate/string ABI
-  bug in `src/compiler/LlvmBridge.w`: `wl_run_function_passes` passed a With
+  bug in `src/compiler/LlvmBridge.with`: `wl_run_function_passes` passed a With
   `str` directly as `*const u8` to `LLVMRunPassesOnFunction`, so Windows could
   hand LLVM a pointer to the `str` value instead of a NUL-terminated C string.
   Patched the LLVM pass wrappers to call `to_cstr(...)` for pass pipelines.
 
 ## 2026-06-06 - LLVM pass pipeline C-string root cause
 
-- Evidence: LLDB showed stage1 contains two `to_cstr` copies and both include the NUL terminator store. Stage2 contains a source-compiled `main.w` copy of `to_cstr` that calls `with_memcpy` and returns the buffer without storing the terminator; the separately linked `LlvmBridge.w` copy still contains the terminator.
+- Evidence: LLDB showed stage1 contains two `to_cstr` copies and both include the NUL terminator store. Stage2 contains a source-compiled `main.with` copy of `to_cstr` that calls `with_memcpy` and returns the buffer without storing the terminator; the separately linked `LlvmBridge.with` copy still contains the terminator.
 - Classification: not stack and not ABI. This is an LLVM cleanup/codegen interaction: the source used integer pointer arithmetic for `*((dst as i64 + n) as *mut u8) = 0`, and the stage1-generated optimized copy dropped that store after the `sroa,mem2reg` cleanup.
-- Source fix: changed `src/compiler/LlvmBridge.w` so `to_cstr` writes `cstr_bufs[slot][idx][n] = 0` through the typed buffer instead of pointer-int-pointer arithmetic.
+- Source fix: changed `src/compiler/LlvmBridge.with` so `to_cstr` writes `cstr_bufs[slot][idx][n] = 0` through the typed buffer instead of pointer-int-pointer arithmetic.
 - Next check: rebuild stage1/stage2, confirm stage2's active `to_cstr` contains the terminator store, then rerun the aggregate repro and fixpoint object.
 
 
 ## 2026-06-06 - Typed C-string terminator rebuild result
 
 - Rebuilt `:stage1` and `:stage2` with the typed `cstr_bufs[slot][idx][n] = 0` terminator store.
-- LLDB confirmed the active stage2 `main.w` copy of `to_cstr` now contains `movb $0x0, (...)` after `with_memcpy`; the separate `LlvmBridge.w` copy also contains the store.
+- LLDB confirmed the active stage2 `main.with` copy of `to_cstr` now contains `movb $0x0, (...)` after `with_memcpy`; the separate `LlvmBridge.with` copy also contains the store.
 - `llvm-readobj` reports stage2 stack reserve `8388608` and commit `4096`.
-- `stage2 check test/hello.w` passed and `stage2 check test/codegen/large_aggregate_abi.w` passed.
+- `stage2 check test/hello.with` passed and `stage2 check test/codegen/large_aggregate_abi.with` passed.
 - `scripts/check-stack-budget.py` still reports max frame `223368`, so large generated frames remain tracked debt, but this was not the pass-pipeline failure.
 
 
 ## 2026-06-06 - Post-C-string object checks
 
-- `stage2 build out/tmp/abi-repros/aggregate_deref.w --emit-obj -O0` passed and produced `out/tmp/aggregate_deref_stage2.o`.
-- Raw direct `stage2 build out/gen/main.w --emit-obj -O0` no longer crashes and no longer reports LLVM pass pipeline corruption; it now returns normal unsafe-context diagnostics for generated compiler source when invoked outside the build graph's compiler-build context.
+- `stage2 build out/tmp/abi-repros/aggregate_deref.with --emit-obj -O0` passed and produced `out/tmp/aggregate_deref_stage2.o`.
+- Raw direct `stage2 build out/gen/main.with --emit-obj -O0` no longer crashes and no longer reports LLVM pass pipeline corruption; it now returns normal unsafe-context diagnostics for generated compiler source when invoked outside the build graph's compiler-build context.
 - Next check is the actual build graph target `with build :fixpoint`, which supplies the intended compiler build context.
 
 
@@ -1140,28 +1140,28 @@ Completed:
 ## 2026-06-06 - Stage2 rebuild crash after emit-C patch
 
 - Rebuilding `:stage1` succeeded, but rebuilding `:stage2` crashed with `0xc0000005`.
-- LLDB evidence: crash is in `with_arg_at` at `rt_core.w`, writing the returned `str` through `%rax`/hidden result buffer. Registers at fault included `rcx=0`, and the write target was `0x00000001`.
+- LLDB evidence: crash is in `with_arg_at` at `rt_core.with`, writing the returned `str` through `%rax`/hidden result buffer. Registers at fault included `rcx=0`, and the write target was `0x00000001`.
 - Classification: aggregate-return ABI mismatch, not stack. `with_arg_at(idx: i32) -> str` is a 16-byte aggregate return across a module/runtime boundary; the callee expects a Windows x64 hidden sret/result pointer, while the caller path did not pass one consistently.
 - Stop condition triggered: this is a broad ABI inconsistency. Do not add one-off patches around `with_arg_at`; generalize and wire the internal ABI model before editing more call sites.
 
 ## 2026-06-06 - Runtime extern ABI classification source fix
 
-- Source change: added an explicit runtime extern classifier in `src/Codegen.w`. Unannotated `with_*` and `str_from_byte` extern declarations now use the same internal With aggregate ABI as normal With definitions. Extern declarations with an explicit call convention remain foreign/C ABI.
-- Reason: `with_arg_at` is declared with `extern fn` in compiler sources but defined as ordinary With code in `rt/rt_core.w`; it is not a C FFI boundary. Treating that declaration as C ABI made callers return `str` directly while the Windows x64 callee expected hidden sret.
-- Next check: rebuild stage1/stage2 with value locals disabled and 8 MiB stack policy, then rerun `stage2 check test/hello.w` and the stage3/fixpoint path.
+- Source change: added an explicit runtime extern classifier in `src/Codegen.with`. Unannotated `with_*` and `str_from_byte` extern declarations now use the same internal With aggregate ABI as normal With definitions. Extern declarations with an explicit call convention remain foreign/C ABI.
+- Reason: `with_arg_at` is declared with `extern fn` in compiler sources but defined as ordinary With code in `rt/rt_core.with`; it is not a C FFI boundary. Treating that declaration as C ABI made callers return `str` directly while the Windows x64 callee expected hidden sret.
+- Next check: rebuild stage1/stage2 with value locals disabled and 8 MiB stack policy, then rerun `stage2 check test/hello.with` and the stage3/fixpoint path.
 
 ## 2026-06-06 - Runtime extern unsafe classification on Windows paths
 
 - After the runtime extern ABI classifier, a direct stage2 compile reported normal diagnostics for `with_arg_at`, `with_eprint`, etc.: `manual extern function call requires unsafe context`.
-- Classification: semantic classifier bug, not stack and not a crash. `Sema.fn_symbol_is_manual_extern` already exempts compiler-owned runtime externs, but the path predicates only recognized `/out/gen/`, `/src/`, `/rt/`, and `/lib/std/`. Windows generated sources use backslash absolute paths such as `C:\Users\Eric\with\out\gen\main.w`.
-- Source fix: extended the Sema path predicates in `src/SemaCheck.w` to recognize Windows backslash separators for runtime, stdlib, compiler source, and migrated regex paths.
+- Classification: semantic classifier bug, not stack and not a crash. `Sema.fn_symbol_is_manual_extern` already exempts compiler-owned runtime externs, but the path predicates only recognized `/out/gen/`, `/src/`, `/rt/`, and `/lib/std/`. Windows generated sources use backslash absolute paths such as `C:\Users\Eric\with\out\gen\main.with`.
+- Source fix: extended the Sema path predicates in `src/SemaCheck.with` to recognize Windows backslash separators for runtime, stdlib, compiler source, and migrated regex paths.
 - Next check: rebuild stage1 so the Sema fix is active, then rebuild stage2.
 
 ## 2026-06-06 - Build audit action hang
 
 - `with-bootstrap.exe build :stage1` repeatedly spun for 5 minutes before launching any child compiler. LLDB showed the bootstrap C seed executing a comptime build action, and the repo lock identified the target as `compiler-no-c-export`.
 - Classification: build-action/comptime hang, not stack and not a stage compiler crash. The audit target already receives all source files as declared inputs, but the action re-walked `src`, `rt`, and `lib/std` with `ctx.fs().list_files(...)`.
-- First source fix: changed `run_check_compiler_no_new_c_export_action` in `build/compiler.w` to scan `ctx.inputs()` instead of performing a second filesystem walk during action evaluation.
+- First source fix: changed `run_check_compiler_no_new_c_export_action` in `build/compiler.with` to scan `ctx.inputs()` instead of performing a second filesystem walk during action evaluation.
 - Follow-up evidence: the target still hung in the bootstrap C seed's comptime evaluator while scanning source text, even with a byte-level scanner. LLDB stayed in comptime binary/string evaluation, not a child compiler process.
 - Source fix: moved the audit body to `scripts/check-no-c-export.py` and made the build action invoke it through `ctx.process_runner()`. The target now declares the script input and `out/command/compiler-no-c-export` write scope.
 - Result: `with-bootstrap.exe build :compiler-no-c-export` passes and updates `out/.build-state/compiler-no-c-export.txt`.
@@ -1170,7 +1170,7 @@ Completed:
 ## 2026-06-06 - Stage2 rebuild DEP crash after Sema path fix
 
 - `with-bootstrap.exe build :stage1` passed after the Windows path predicate fix, producing `out/bootstrap/bin/with-stage1.exe`.
-- Direct stage2 rebuild with `out/bootstrap/bin/with-stage1.exe build C:\Users\Eric\with\out\gen\main.w -O0 -o out\stage\bin\with-stage2.exe.tmp` exits `0xc0000005` with no stdout/stderr.
+- Direct stage2 rebuild with `out/bootstrap/bin/with-stage1.exe build C:\Users\Eric\with\out\gen\main.with -O0 -o out\stage\bin\with-stage2.exe.tmp` exits `0xc0000005` with no stdout/stderr.
 - LLDB classification: not stack. The crash is a DEP violation at the loaded PE image base, `rip=rax=rcx=0x00007ff63d0f0000`, and `image lookup` resolves that address as `with-stage1.exe + 0` (PE header), not executable code. This is a bad indirect target/control-flow corruption.
 - The nearest plausible caller address on the stack is `MirModule.mir_resolve_alias + 66`, immediately after its call to `MirModule.mir_get_type_kind`. Disassembly shows `mir_get_type_kind` receives `MirModule` indirectly and calls `with_vec_len`/`with_vec_get_ptr` on the `sema_type_kinds` Vec. Early breakpoints on those runtime vector calls show valid Vec-looking data, so the failure is not currently classified as the old block-local alloca/register-clobber class or a simple vector runtime declaration mismatch.
 - Current hypothesis: the remaining ABI model is still too fragmented. Several direct/generic/closure/trait call paths build `wl_build_call` from `fn_fn_types` and `coerce_call_args_for_fn_value` without one canonical internal ABI call helper, while MIR and declarations consult the `extern_fn_*` ABI transform maps differently. Continue by identifying the exact bad indirect call before editing, then centralize internal ABI consumption instead of adding a one-off sret patch.
@@ -1178,8 +1178,8 @@ Completed:
 ## 2026-06-06 - Function fat-pointer and string-concat ABI fixes
 
 - Added `Codegen.build_call_fn_value(...)` so direct/generic call sites can share sret, indirect aggregate parameter, and call-attribute handling instead of pairing `coerce_call_args_for_fn_value(...)` with raw `wl_build_call(...)`.
-- Root cause found in `test/codegen/large_aggregate_abi.w`: when a function constant was passed to a `fn(...) -> T` parameter, the Windows indirect aggregate path treated the raw code pointer as if it were already a pointer to the fat `{fn, ctx}` value. The generated IR called `call_big(..., ptr @make_big)`, and the callee loaded `{fn, ctx}` from the first bytes of the function body. Fixed MIR and direct byval lowering so indirect aggregate arguments are passed through a real aggregate buffer, and function constants materialize a thunked fat value when the expected type is a fat function value.
-- Added `test/codegen/regex_literal_code_abi.w` as a focused repro for the `Regex.__literal_code` shape. The simpler pointer-store form passes; adding the panic string-concat path pointed at the full compiler crash site.
+- Root cause found in `test/codegen/large_aggregate_abi.with`: when a function constant was passed to a `fn(...) -> T` parameter, the Windows indirect aggregate path treated the raw code pointer as if it were already a pointer to the fat `{fn, ctx}` value. The generated IR called `call_big(..., ptr @make_big)`, and the callee loaded `{fn, ctx}` from the first bytes of the function body. Fixed MIR and direct byval lowering so indirect aggregate arguments are passed through a real aggregate buffer, and function constants materialize a thunked fat value when the expected type is a fat function value.
+- Added `test/codegen/regex_literal_code_abi.with` as a focused repro for the `Regex.__literal_code` shape. The simpler pointer-store form passes; adding the panic string-concat path pointed at the full compiler crash site.
 - `WITH_DEBUG_MIR_CODEGEN=1` narrowed the full stage2 crash to `Regex.__literal_code`, block 13, assignment statement 21, a `RK_BIN_OP` string concatenation. Root cause: `mir_str_concat` and `mir_str_concat_n` bypassed the ABI model and emitted raw calls to `with_str_concat*`. On Windows these return `str` via hidden sret and take `str` parameters indirectly. Patched both helpers to use `build_call_fn_value(...)` and to create fallback declarations with the internal ABI when no declaration exists yet.
 
 ## 2026-06-06 - Format runtime ABI island fixed
@@ -1187,7 +1187,7 @@ Completed:
 - After the string-concat ABI fix, the direct stage2 rebuild no longer crashed, but LLVM verification failed after MIR cleanup for `type_key_pack1`.
 - Classification: invalid IR from another raw aggregate ABI island, not stack and not control-flow corruption. The dumped function showed `call %str @with_fmt_i32(i32 ...)` and `call void @with_fmt_buf_write_str(ptr ..., %str ...)`, which are invalid for the Windows internal ABI because `str` returns use hidden sret and `str` parameters are indirect.
 - Source fix: added `ensure_internal_runtime_fn(...)` / `call_internal_runtime_fn(...)` and routed the `with_fmt_*` format-runtime helpers through `build_call_fn_value(...)`, including `with_fmt_i32`, `with_fmt_*_spec`, `with_fmt_buf_write_str`, and `with_fmt_buf_finish`.
-- Result: rebuilt stage1 successfully, then the direct command `out/bootstrap/bin/with-stage1.exe build out/gen/main.w -O0 -o out/stage/bin/with-stage2.exe.tmp` passed. The only output was lld-link warnings about DWARF section names longer than 8 characters.
+- Result: rebuilt stage1 successfully, then the direct command `out/bootstrap/bin/with-stage1.exe build out/gen/main.with -O0 -o out/stage/bin/with-stage2.exe.tmp` passed. The only output was lld-link warnings about DWARF section names longer than 8 characters.
 - Next check: run the build graph `:stage2`, then the direct stage3 object command and `:fixpoint`.
 
 ## 2026-06-06 - String equality ABI fixed
@@ -1203,17 +1203,17 @@ Completed:
 - After relinking stage2 with a refreshed `rt_core.o`, simple CLI checks exposed more internal ABI islands rather than stack faults.
 - `version` initially exited through the unknown-command path because the linked stage2 used a stale embedded runtime object. `out/lib/rt_core.o` had ABI-correct `with_arg_at`, but `out/lib/embedded_objects.o` still embedded the older raw-return runtime. Regenerated the embedded runtime bundle from current object inputs.
 - Rebuilding stage1 after that failed because the old bootstrap seed prefers `out/lib` over `out/bootstrap-lib`; with `out/lib/cimport_stubs.o` present, stage1 linked the stage2 ABI runtime even though the bootstrap compiler still emitted raw calls for its own CLI. Removed the `out/lib` probe before stage1 so the existing `prepare-bootstrap-link-root` rule made stage1 use bootstrap-compatible runtime artifacts.
-- A forced stage2 relink then failed with undefined `with_*` symbols. Root cause: `codegen_is_runtime_source_file(...)` only recognized `/` paths, so direct Windows object builds such as `rt\\rt_core.w` were treated as ordinary module objects and renamed runtime definitions to `__with_mod_*`. Source fix: recognize Windows backslash runtime and generated compat-runtime paths.
-- `check test/hello.w` then faulted in `i64_to_string`, with the caller passing `rcx=1` instead of a hidden return buffer. Root cause: `i64_to_string` is a compiler-owned runtime ABI symbol but did not start with `with_`, so extern/runtime call classification missed it. Source fix: `codegen_extern_uses_internal_abi(...)` now delegates to the full `codegen_is_runtime_abi_symbol(...)` predicate.
+- A forced stage2 relink then failed with undefined `with_*` symbols. Root cause: `codegen_is_runtime_source_file(...)` only recognized `/` paths, so direct Windows object builds such as `rt\\rt_core.with` were treated as ordinary module objects and renamed runtime definitions to `__with_mod_*`. Source fix: recognize Windows backslash runtime and generated compat-runtime paths.
+- `check test/hello.with` then faulted in `i64_to_string`, with the caller passing `rcx=1` instead of a hidden return buffer. Root cause: `i64_to_string` is a compiler-owned runtime ABI symbol but did not start with `with_`, so extern/runtime call classification missed it. Source fix: `codegen_extern_uses_internal_abi(...)` now delegates to the full `codegen_is_runtime_abi_symbol(...)` predicate.
 - Refreshed stage2 runtime objects with stage1 using the build graph object flags (`--emit-obj --no-prelude`), regenerated `out/lib/embedded_objects.s`/`.o`, and forced `:stage2` to relink.
-- Result: `out/stage/bin/with-stage2.exe version` passed, `out/stage/bin/with-stage2.exe check test\\hello.w` passed, `llvm-readobj` reports `SizeOfStackReserve: 8388608`, and the direct stage3 object command `out/stage/bin/with-stage2.exe build out/gen/main.w --emit-obj -O0 -o out/stage/bin/with-stage3-fixpoint.o.tmp` passed.
+- Result: `out/stage/bin/with-stage2.exe version` passed, `out/stage/bin/with-stage2.exe check test\\hello.with` passed, `llvm-readobj` reports `SizeOfStackReserve: 8388608`, and the direct stage3 object command `out/stage/bin/with-stage2.exe build out/gen/main.with --emit-obj -O0 -o out/stage/bin/with-stage3-fixpoint.o.tmp` passed.
 - `WITH=out/bootstrap-c-v0.14.8/with-bootstrap.exe with build :fixpoint` passed and printed `FIXPOINT`.
 - Next check: run `:emit-c-fixpoint`.
 
 ## 2026-06-07 - Emit-C intern pool root cause
 
 - Rebuilt Windows stage1/stage2 and re-ran the short gates after the C backend
-  string-literal guard. `stage2 version`, `stage2 check test\hello.w`,
+  string-literal guard. `stage2 version`, `stage2 check test\hello.with`,
   stage2 stack reserve `8388608`, direct stage3 object, and `:fixpoint` all
   passed.
 - `:emit-c-fixpoint` still failed compiling `out/emit-c-test/main.c` with raw
@@ -1223,12 +1223,12 @@ Completed:
   while the LLVM backend already switches to `self.zcu.last_sema.pool` after
   semantic analysis. In the full compiler, imported/generated module string
   literal symbols were resolved against the wrong intern pool, producing
-  pointer/length-looking binary garbage. Standalone `EmbeddedStdlibData.w`
+  pointer/length-looking binary garbage. Standalone `EmbeddedStdlibData.with`
   emit-C did not expose this because its root pool contained the needed symbols.
 - Source fix: make emit-C use `self.zcu.last_sema.pool` when populated, matching
   the LLVM backend handoff. Keep the guarded source-token literal path as a
   second protection for globals whose source text is available.
-- Follow-up evidence: direct `out/release/bin/with.exe build out/gen/main.w
+- Follow-up evidence: direct `out/release/bin/with.exe build out/gen/main.with
   --emit-c` produced valid C with zero raw NULs, but `with build
   :emit-c-fixpoint` still produced raw NULs.
 - Deeper root cause: `run_emit_c_test_action` used `Workspace.compile()` for
@@ -1245,7 +1245,7 @@ Completed:
 ## 2026-06-07 - Emit-C value-ref pointer argument classification
 
 - After the build action fix and a stage2 relink, `stage2 version`,
-  `stage2 check test\hello.w`, direct stage3 object, and `:fixpoint` passed.
+  `stage2 check test\hello.with`, direct stage3 object, and `:fixpoint` passed.
 - Clean `:emit-c-fixpoint` no longer generated raw NULs in
   `out/emit-c-test/main.c`; a byte check reported zero NUL bytes in the C file.
 - New failure classification: normal C compiler diagnostic in emitted C, not
@@ -1266,21 +1266,21 @@ Completed:
 
 ### 2026-06-07 Cross-Host Generated Source Recheck
 
-- Compared Windows `out/gen/main.w` against Linux `out/gen/main.w` after LF normalization. Initial remaining divergence was only the embedded version string: Windows used `v0.14.8`; Linux, without `WITH_VERSION`, used the Git-derived `v0.14.8-ge4aa059f6`.
-- Re-ran Linux `:compiler-sources` with `WITH_VERSION=v0.14.8`; Linux `out/gen/main.w` now matches Windows exactly: size `127403`, SHA-256 `fc3b1d204d12230d93412eb152614fb742243ce46043dd00dd4fb5c7333bcb1a`, LF-only.
-- Classification: build metadata/environment mismatch, not compiler/codegen divergence. Next frontier is byte-for-byte comparison of emitted C generated from the matching `out/gen/main.w` on both hosts.
+- Compared Windows `out/gen/main.with` against Linux `out/gen/main.with` after LF normalization. Initial remaining divergence was only the embedded version string: Windows used `v0.14.8`; Linux, without `WITH_VERSION`, used the Git-derived `v0.14.8-ge4aa059f6`.
+- Re-ran Linux `:compiler-sources` with `WITH_VERSION=v0.14.8`; Linux `out/gen/main.with` now matches Windows exactly: size `127403`, SHA-256 `fc3b1d204d12230d93412eb152614fb742243ce46043dd00dd4fb5c7333bcb1a`, LF-only.
+- Classification: build metadata/environment mismatch, not compiler/codegen divergence. Next frontier is byte-for-byte comparison of emitted C generated from the matching `out/gen/main.with` on both hosts.
 
 
 ### 2026-06-07 Windows Emitted-C Regeneration
 
-- Regenerated Windows emitted C from matching `out/gen/main.w` using `out/stage/bin/with-stage2-candidate.exe`.
+- Regenerated Windows emitted C from matching `out/gen/main.with` using `out/stage/bin/with-stage2-candidate.exe`.
 - Result: `out/emit-c-test/main.c` size `31702785`, SHA-256 `ca333406407c85a0df49bb8d545b8adfe769720f60d009723ced5baf246e8391`, LF-only, zero raw NUL bytes.
 - Next command: copy this C to Linux, rebuild `out/bootstrap/bin/with-from-c` with `.deps/llvm-22.1.6-linux-x86_64/bin/clang++`, then emit Linux C for byte comparison.
 
 
 ### 2026-06-07 Stale Windows Candidate Detected
 
-- Attempted to compile the Windows-emitted C on Linux with SDK `clang++`; compile failed at `#line "C:\Users\Eric\with\out\gen\main.w"` because backslashes in C line directives are interpreted as escapes.
+- Attempted to compile the Windows-emitted C on Linux with SDK `clang++`; compile failed at `#line "C:\Users\Eric\with\out\gen\main.with"` because backslashes in C line directives are interpreted as escapes.
 - Classification: stale Windows emitter binary was used for regeneration; source has a canonical `#line` path fix, but `out/stage/bin/with-stage2-candidate.exe` did not contain it.
 - Next command: regenerate emitted C with the rebuilt comparison compiler that contains the CCodegen `#line` canonicalization, then verify absence of `C:\` line directives before rebuilding the Linux C seed.
 
@@ -1289,7 +1289,7 @@ Completed:
 
 - Regenerated Windows emitted C with `out/tmp/with-canonical-lines.exe`, which includes the CCodegen `#line` path canonicalization.
 - Result: `out/emit-c-test/main.c` size `30671626`, SHA-256 `c3fb10097db77932aee86637f7e4c95b7e48019d4f7edd4df6bf65e5e7ab26fd`, LF-only, zero raw NUL bytes.
-- First line directive is `#line 68 "out/gen/main.w"`; no backslash `\out\gen` directives remain.
+- First line directive is `#line 68 "out/gen/main.with"`; no backslash `\out\gen` directives remain.
 - Next command: copy this C to Linux and rebuild the Linux C seed with With-owned SDK Clang.
 
 
@@ -1302,7 +1302,7 @@ Completed:
 
 ### 2026-06-07 Source Line-Ending Determinism Fix
 
-- New cross-host emitted-C diff after fixing generated `main.w`: code aligned, but `#line` numbers diverged at imported module code (`src/Span.w`). Windows workspace has CRLF in `src/Span.w`; Linux has LF. Parser spans are byte offsets, so CRLF changed imported-module span offsets and therefore emitted C line directives.
+- New cross-host emitted-C diff after fixing generated `main.with`: code aligned, but `#line` numbers diverged at imported module code (`src/Span.with`). Windows workspace has CRLF in `src/Span.with`; Linux has LF. Parser spans are byte offsets, so CRLF changed imported-module span offsets and therefore emitted C line directives.
 - Source fix applied: frontend source ingestion now normalizes CRLF and bare CR to LF before lexing/parsing root sources, extra sources, resolved imports, and import expansion. Resolve import parsing also normalizes source text before lexing/parsing.
 - Classification: source ingestion/span determinism bug, not stack/ABI/MIR-value-local. Next command: rebuild a fresh Windows comparison compiler containing this fix, regenerate Windows emitted C, sync to Linux, rebuild Linux C seed, and compare emitted C bytes again.
 
@@ -1311,14 +1311,14 @@ Completed:
 
 - Built fresh Windows comparison compiler `out/tmp/with-source-normalized.exe` from current source: PASS, `with v0.14.8`.
 - Regenerated Windows emitted C with that compiler. Result: `out/emit-c-test/main.c` size `30686907`, SHA-256 `296ebbe9a72ef6d7b711f1e1a3eb04f33b0f9cad0012c361ccf3077ee773238f`, LF-only, zero raw NUL bytes.
-- First line directive remains canonical: `#line 68 "out/gen/main.w"`.
+- First line directive remains canonical: `#line 68 "out/gen/main.with"`.
 - Next command: rebuild Linux C seed from this C and rerun the Linux emitted-C comparison.
 
 
 ### 2026-06-07 Linux Re-Emit After Source Normalization
 
 - Rebuilt Linux `out/bootstrap/bin/with-from-c` from the normalized Windows emitted C with SDK `clang++`: PASS, `with v0.14.8`.
-- Regenerated Linux `out/gen/main.w` with `WITH_VERSION=v0.14.8`: PASS.
+- Regenerated Linux `out/gen/main.with` with `WITH_VERSION=v0.14.8`: PASS.
 - Regenerated Linux `out/emit-c-test/main.c`: PASS.
 - Next command: copy Linux emitted C back to Windows and compare bytes against Windows `out/emit-c-test/main.c`.
 
@@ -1327,7 +1327,7 @@ Completed:
 
 - Copied Linux emitted C back to Windows and compared against Windows `out/emit-c-test/main.c`.
 - Result: MATCH byte-for-byte. Both files size `30686907`, SHA-256 `296ebbe9a72ef6d7b711f1e1a3eb04f33b0f9cad0012c361ccf3077ee773238f`, LF-only, zero raw NUL bytes.
-- Source fix applied: `build/emit_c.w` now defaults to the With-owned LLVM SDK `bin/clang` on Linux/macOS/Windows when no explicit `WITH_EMIT_C_CC`/`CC` is set; this matches the Clang-only bootstrap rule.
+- Source fix applied: `build/emit_c.with` now defaults to the With-owned LLVM SDK `bin/clang` on Linux/macOS/Windows when no explicit `WITH_EMIT_C_CC`/`CC` is set; this matches the Clang-only bootstrap rule.
 - Next command: run Linux `:emit-c-fixpoint` using the rebuilt C seed to prove the emitted C roundtrip on Linux.
 
 
@@ -1336,7 +1336,7 @@ Completed:
 - Linux `:emit-c-fixpoint` failed during stage1 link with `ld.lld: error: unable to find library -lzstd`.
 - Host inspection: `/usr/lib/x86_64-linux-gnu/libzstd.so.1` exists but unversioned `libzstd.so` does not; `/tmp/with-link-libs` symlink workaround existed only for manual C-seed linking.
 - Classification: generated LLVM link metadata used `-lzstd` even though the direct Linux link-stage code already has versioned-library fallback logic.
-- Source fix applied: `build/compiler.w` now emits concrete Linux system library paths for z/zstd/xml2 when unversioned linker names are unavailable.
+- Source fix applied: `build/compiler.with` now emits concrete Linux system library paths for z/zstd/xml2 when unversioned linker names are unavailable.
 - Next command: rerun Linux `:emit-c-fixpoint`.
 
 
@@ -1344,7 +1344,7 @@ Completed:
 
 - Rerunning Linux `:emit-c-fixpoint` after the zstd metadata fix built stage1, stage2, and release, then failed during emitted-C compiler link with many unresolved C++ standard-library symbols from static LLVM/Clang archives.
 - Classification: emit-C wrapper used `clang` as the C driver while linking C++ LLVM/Clang archives. The generated source still must be compiled as C, but the link driver must be Clang's C++ driver.
-- Source fix applied: `build/emit_c.w` now defaults to SDK `clang++` and wraps generated C inputs as `-x c <file.c> -x none`, including the hello C compile path.
+- Source fix applied: `build/emit_c.with` now defaults to SDK `clang++` and wraps generated C inputs as `-x c <file.c> -x none`, including the hello C compile path.
 - Next command: rerun Linux `:emit-c-fixpoint`.
 
 
@@ -1360,7 +1360,7 @@ Completed:
 
 - Reran Linux `:emit-c-fixpoint` with `WITH_VERSION=v0.14.8`, `LLVM_PREFIX=.deps/llvm-22.1.6-linux-x86_64`, and `WITH=out/bootstrap/bin/with-from-c`.
 - Result: PASS. The build wrote Linux stage1, stage2, release compiler, then reported `EMIT-C OK` and `EMIT-C FIXPOINT`.
-- Current isolation state: Windows and Linux emit identical `out/emit-c-test/main.c` bytes from matching `out/gen/main.w`; Linux emit-C fixpoint passes. Any remaining failure is now Windows-side compile/link/runtime execution, not cross-host C emission.
+- Current isolation state: Windows and Linux emit identical `out/emit-c-test/main.c` bytes from matching `out/gen/main.with`; Linux emit-C fixpoint passes. Any remaining failure is now Windows-side compile/link/runtime execution, not cross-host C emission.
 - Next command: rebuild Windows stage1/stage2 from current source, then run Windows direct stage3 object, `:fixpoint`, and `:emit-c-fixpoint`.
 
 
@@ -1386,12 +1386,12 @@ Completed:
 - Root cause: `str` is an aggregate value. Casting `str as *const u8` passes the address/representation of the aggregate, not the address of its byte payload. That already broke regex on Windows and the same bug class existed in stdlib crypto/http/tls helpers.
 - Source fix in progress: add `std.internal.str_abi` as the single stdlib bridge for converting `str` to an owned NUL-terminated byte buffer, then use it at the confirmed bad sites in SHA-256 string hashing, HMAC string hashing, HTTP request send, and TLS SNI ClientHello send. TLS receive chunk copy now reads bytes through `str.byte_at` instead of casting the chunk aggregate.
 - Verification so far: the confirmed direct bad-cast patterns are gone. Remaining `as *const u8` hits in `lib/std` are array/pointer casts or generated PCRE code, not the audited `str` aggregate pattern.
-- Windows focused verification: regenerated `out/gen/compiler/EmbeddedStdlibData.w` through `:compat-runtime-source`, rebuilt `out/bootstrap/bin/with-stage1-direct.exe` from source, then built and ran `tests/test_crypto.w` with that candidate. Result: PASS, `44/44 passed`, including the new SHA-256/HMAC string helper checks.
+- Windows focused verification: regenerated `out/gen/compiler/EmbeddedStdlibData.with` through `:compat-runtime-source`, rebuilt `out/bootstrap/bin/with-stage1-direct.exe` from source, then built and ran `tests/test_crypto.with` with that candidate. Result: PASS, `44/44 passed`, including the new SHA-256/HMAC string helper checks.
 - Windows build graph note: `:stage1` still fails through `with_exec_argv_capture` with empty stdout/stderr and rc `-2`; direct equivalent compiler invocations and an isolated `with_exec_argv_capture` repro both succeed. Classification: separate Windows build-action/process-runner issue, not evidence against the issue #368 stdlib fix.
 - Linux seed correction: v0.15.1 release binary was installed into `out/bin/with`, `src/main`, and `~/.local/bin/with`.
 - Linux gate blocker found after seed correction: v0.15.1 seed still reaches `/usr/bin/ld.bfd` on one Linux clang-driver link path, so `-Wl,--icf=all` fails with `unrecognized option '--icf=all'`. Root cause: `link_stage_make_link_command` adds Linux lld-only linker options but did not pass `-fuse-ld=lld` when using the clang driver. Source fix: add `-fuse-ld=lld` to that Linux clang-driver path. Because the seed has the old behavior baked in, the first Linux stage1 hop needs a temporary SDK-clang wrapper or equivalent until stage1 contains the source fix.
 - Second Linux blocker: after forcing SDK clang to lld for the old seed's first hop, lld rejected temp archives like `out/lib/fiber_stubs.o.<pid>.<clock>.a` as malformed. Root cause: the pure-With ELF archive writer mixed a GNU symbol-table member with BSD `#1/` long-name member encoding and 8-byte padding. GNU archive readers expect GNU member name fields/string table and even-byte padding. Source fix: the ELF/GNU archive path now emits GNU member headers, an optional GNU long-name table, and 2-byte member padding; Mach-O/BSD archive output is unchanged.
-- Linux verification: installed v0.15.1 release binary into `out/bin/with`, `src/main`, and `~/.local/bin/with`; built `out/bootstrap/bin/with-stage1` with a temporary SDK-clang lld wrapper for the old seed hop; `out/bootstrap/bin/with-stage1 version` reports `with v0.15.1`; `out/bootstrap/bin/with-stage1 build tests/test_crypto.w -o out/tmp/test_crypto && out/tmp/test_crypto` PASS, `44/44 passed`.
+- Linux verification: installed v0.15.1 release binary into `out/bin/with`, `src/main`, and `~/.local/bin/with`; built `out/bootstrap/bin/with-stage1` with a temporary SDK-clang lld wrapper for the old seed hop; `out/bootstrap/bin/with-stage1 version` reports `with v0.15.1`; `out/bootstrap/bin/with-stage1 build tests/test_crypto.with -o out/tmp/test_crypto && out/tmp/test_crypto` PASS, `44/44 passed`.
 - Linux direct fixpoint verification: built `out/stage/bin/with-stage2` with stage1, built `out/stage/bin/with-stage3` with stage2, and `cmp -s out/stage/bin/with-stage2 out/stage/bin/with-stage3` returned MATCH.
-- Windows final source sanity: after the Linux `Archive.w` and `Link.w` fixes, rebuilt `out/bootstrap/bin/with-stage1-direct.exe` directly from `out/gen/main.w`; it reports `with v0.15.1`. Rebuilt and ran `tests/test_crypto.w` with that candidate: PASS, `44/44 passed`.
+- Windows final source sanity: after the Linux `Archive.with` and `Link.with` fixes, rebuilt `out/bootstrap/bin/with-stage1-direct.exe` directly from `out/gen/main.with`; it reports `with v0.15.1`. Rebuilt and ran `tests/test_crypto.with` with that candidate: PASS, `44/44 passed`.
 - Remaining blocker: normal Linux graph targets still re-enter `stage1` and the old seed panics with `integer overflow` after writing stage1. Direct stage artifacts are valid; the graph/action tail panic remains to root-cause separately if it blocks committing/release.

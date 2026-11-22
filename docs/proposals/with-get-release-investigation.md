@@ -44,7 +44,7 @@ Actions runner registration is needed.
 
 LLDB on the OpenSSL import stops first in
 `with_cimport_mark_name_emitted("OSSL_DEPRECATED")` from
-`ci_translate_macros` (`src/CImport.w:3054`), then in
+`ci_translate_macros` (`src/CImport.with:3054`), then in
 `ci_record_untranslated_macro` for the same name. The direct-call guard
 subsequently accepts `OSSL_DEPRECATED(4.0)` because the omitted callee is
 still marked emitted. This happens on Darwin too; it is not exclusively
@@ -65,7 +65,7 @@ macro diagnostic. With ASLR disabled, address trap `4712080096` records:
 2. Free in `sema_clone_str_str_hashmap`, when its `src.keys()` Vec drops
    (`0x1004ece58`, helper +404).
 3. Reuse for a trait-selection HashMap allocation.
-4. Free through the original omitted-symbol map at `Frontend.w:1780`.
+4. Free through the original omitted-symbol map at `Frontend.with:1780`.
 5. Double free when the actual trait map is destroyed.
 
 `MAP_KEYS`, `MAP_VALUES`, and `MAP_ITEMS` produce owning Vecs through
@@ -76,7 +76,7 @@ can pass. Map iteration also lowers through `MAP_ITEMS` and belongs in
 the acceptance matrix. Do not work around this in the Sema clone helper.
 
 Evidence: `out/with-get-investigation/openssl-trap-all.log`,
-`map_snapshots.w`, and `map_keys_reduced.w`. The reducer predicate requires
+`map_snapshots.with`, and `map_keys_reduced.with`. The reducer predicate requires
 an ordinary successful run and a scribble-mode failure, preventing reduction
 to an unrelated empty-map unwrap panic.
 
@@ -138,7 +138,7 @@ declarations. Evidence: `macro-brace-error-lldb.log` and
 `macro-brace-recovery-lldb.log` in the investigation output directory.
 
 The registry fix exposed an ordering regression in CI run `35169665692`:
-the existing `behav_c_import_offsetof.w` failed on all five platforms,
+the existing `behav_c_import_offsetof.with` failed on all five platforms,
 before the jobs reached UAT. LLDB in `ci_object_macro_is_function_call`
 returned `w0 = 1` for `offsetof(with_offset_point_t, x)`, preventing its
 constant translator from running (`offsetof-guard-lldb.log`). The call
@@ -367,7 +367,7 @@ The native-cc fix removes `-fuse-ld=lld` and the lld-only `--icf=all`
 from ordinary Linux user-program links. Compiler and cross links retain
 their explicit LLVM linker plan. A seed-driven native Linux full build
 passes (880.9 s), its release compiler runs with no SDK on PATH, and
-`behav_linux_platform_linker.w` restricts the child PATH to system cc,
+`behav_linux_platform_linker.with` restricts the child PATH to system cc,
 as, ld, and nm: the baseline fails with missing ld; the fixed stage2
 prints `ok`. Evidence: `linux-platform-linker-before.log`,
 `linux-platform-linker-after.log`, `linux-platform-linker-full-build.log`.
@@ -401,11 +401,11 @@ same-sized `scalar("changed").unwrap()`, and observes the first value change.
 The native allocator with reuse disabled and the address trap proves the
 first free occurs in `source_yaml_scalar`; LLDB then stops at
 `lower_fn_with_sig+6224` while lowering the reduced function. The implicit
-`Ok` aggregate assignment at `src/MirLower.w` replaced `result` without
+`Ok` aggregate assignment at `src/MirLower.with` replaced `result` without
 calling `consume_moved_operand`. Other aggregate transfer paths already
 consume their operands. The fix consumes this payload before leaving its
 temporary frame. Evidence: `result-tail-wrap-live-lldb.log` and the reduced
-`result_branch_reduced.w` under `out/with-get-investigation/`.
+`result_branch_reduced.with` under `out/with-get-investigation/`.
 
 The regression retains returned strings, vectors, and structs across a
 second allocation, covering direct, both `if` arms, and both `match` arms.

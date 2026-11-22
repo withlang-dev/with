@@ -1,0 +1,37 @@
+//! check-only
+
+// #490 (§17.1b): the `comptime with` clause. The canonical form names the
+// capability and its local binding; the shorthand takes the capability's
+// default binding (BuildCtx and ActionCtx: ctx, ToolFs: fs, ProcessRunner:
+// proc, Diagnostics: diag, SourceEmitter: emit, ProjectInfo: project,
+// Workspace: workspace); capabilities compose with commas. The bindings are
+// the function's own, not globals.
+use std.build
+
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
+    ctx.new_build().executable("demo", "src/main.with")
+
+comptime with BuildCtx:
+pub fn build_short -> Build:
+    ctx.new_build()
+
+comptime with ToolFs as files, ProcessRunner as runner:
+fn both() -> i32:
+    if files.exists("x"): 1 else: 0
+
+comptime with ToolFs, ProcessRunner, Diagnostics, SourceEmitter, ProjectInfo, Workspace:
+fn defaults() -> i32:
+    if fs.exists("x"): 1 else: 0
+
+comptime with ActionCtx:
+fn action() -> i32:
+    ctx.args().len() as i32
+
+comptime with ToolFs, ProcessRunner, Diagnostics, SourceEmitter, ProjectInfo, Workspace:
+fn every_default() -> i32:
+    let _ = (&fs, &proc, &diag, &emit, &project, &workspace)
+    0
+
+fn main:
+    print("ok")

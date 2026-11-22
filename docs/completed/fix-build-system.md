@@ -24,13 +24,13 @@ A project build is defined by:
 
 ```text
 with.toml  declarative package metadata
-build.w    executable build behavior
+build.with    executable build behavior
 ```
 
 `with.toml` contains identity, dependencies, default target metadata, feature
 flags, toolchain defaults, and publishing information.
 
-`build.w` contains imperative build behavior: target graph construction,
+`build.with` contains imperative build behavior: target graph construction,
 generated source, test harnesses, tool discovery, promotion/install operations,
 compiler stage graphs, migration flows, and custom validation.
 
@@ -71,13 +71,13 @@ complete and verified.
 
 ### 2.1 The Standard Library Owns Capabilities, Not Project Policy
 
-`lib/std/build.w` must contain build primitives that ordinary With projects can
+`lib/std/build.with` must contain build primitives that ordinary With projects can
 reuse. It must not contain target kinds or helper APIs specific to the With
 compiler repository, PCRE2, emit-C roundtrips, self-hosting fixtures, or seed
 compiler release policy.
 
-Project-specific graph construction belongs in the repository's `build.w` or in
-project-local modules loaded by `build.w`.
+Project-specific graph construction belongs in the repository's `build.with` or in
+project-local modules loaded by `build.with`.
 
 ### 2.2 Typed Nodes Replace Shell Recipes
 
@@ -160,7 +160,7 @@ compare."
 `RunCorpusTest` is standard as a typed harness primitive: run a declared test
 program or compiler mode across a corpus with structured capture and failure
 reporting. The specific With compiler corpus lives in this repository's
-`build.w`.
+`build.with`.
 
 ### 3.4 Toolchain Targets
 
@@ -186,7 +186,7 @@ primitives.
 
 `Clean` is standard. The standard operation is "remove these declared build
 artifact paths safely." The actual paths are project-specific and belong in
-`build.w`.
+`build.with`.
 
 `CopyRuntimeTree` should not be a standard name. The standard target should be
 `CopyTree`; copying the runtime tree is just one project-specific use.
@@ -247,7 +247,7 @@ project-specific targets look like standard build-system concepts.
 
 Keep standard kinds in `std.build`.
 
-Keep project kinds in `build.w` or project-local build modules, using local
+Keep project kinds in `build.with` or project-local build modules, using local
 helpers only as a transitional bridge.
 
 ### Final Rule
@@ -307,7 +307,7 @@ Executes `std.build` nodes:
 - execute typed external commands.
 
 This layer belongs in the compiler/tool driver, not in this repository's
-`build.w`.
+`build.with`.
 
 ### 6.2 Extension Registry
 
@@ -327,7 +327,7 @@ library target kinds.
 
 ### 6.3 Project Graph
 
-The repository's `build.w` constructs the With compiler graph:
+The repository's `build.with` constructs the With compiler graph:
 
 - seed acquisition;
 - stage1/stage2/stage3;
@@ -445,20 +445,20 @@ standard build capability.
 
 ### Phase 1: Repair the Public API Boundary
 
-1. Restore `Clean` to `lib/std/build.w` as a standard target.
+1. Restore `Clean` to `lib/std/build.with` as a standard target.
 2. Add a `Build.clean(name)` or `Build.clean(name, paths)` helper.
 3. Rename standard `CopyRuntimeTree` to `CopyTree`.
 4. Keep compatibility parsing for `copy_runtime_tree` until existing graph
    tests are updated.
-5. Confirm `lib/std/build.w` contains only standard build concepts.
+5. Confirm `lib/std/build.with` contains only standard build concepts.
 6. Move remaining With-repository names out of public std APIs.
 
 Verification:
 
 ```text
-out/bin/with check lib/std/build.w
-out/bin/with check build.w
-out/bin/with run test/behavior/behav_std_build_api.w
+out/bin/with check lib/std/build.with
+out/bin/with check build.with
+out/bin/with run test/behavior/behav_std_build_api.with
 with build --graph --dry-run
 ```
 
@@ -467,27 +467,27 @@ with build --graph --dry-run
 Before implementation continues beyond Phase 1, audit `src/` for build-system
 boundary violations. Current findings:
 
-- `src/main.w` contains project-specific build graph dispatch for target kinds
+- `src/main.with` contains project-specific build graph dispatch for target kinds
   21-48. This includes selfhost fixture tests, compiler-entrypoint generation,
   With compiler stage invocation, PCRE2 build/test/promote/migrate handlers,
   seed download, clean, emit-C tests, and emit-C roundtrip.
-- `src/BuildGraphPcre2.w` contains PCRE2-specific migrated-library workflow
+- `src/BuildGraphPcre2.with` contains PCRE2-specific migrated-library workflow
   handlers. This is project-specific and should not be part of the generic
   compiler build driver.
-- `src/BuildGraphEmitC.w` contains emit-C roundtrip workflow handlers and is
+- `src/BuildGraphEmitC.with` contains emit-C roundtrip workflow handlers and is
   currently untracked in the worktree. This is project-specific verification
   logic and should be moved out of generic compiler dispatch before it becomes
   part of the permanent compiler surface.
-- `src/BuildGraphSelfhost.w` and `src/BuildGraphSelfhostHarness.w` contain a
+- `src/BuildGraphSelfhost.with` and `src/BuildGraphSelfhostHarness.with` contain a
   large fixture warehouse for repository selfhost tests. These tests are
   valuable, but the fixture data should eventually live as normal test/build
   fixture files or project-local test modules, not as bulky compiler-linked
   source.
-- `src/BuildGraphKinds.w` still names every project-specific kind as if it were
+- `src/BuildGraphKinds.with` still names every project-specific kind as if it were
   a stable global build-system kind. This is the same boundary bug as
   project-specific constructors in `std.build`, just one layer lower.
-- `src/BuildGraphOps.w`, `src/BuildGraphRuntime.w`, `src/BuildGraphSupport.w`,
-  `src/BuildGraphTools.w`, and `src/BuildGraphModel.w` are mostly generic
+- `src/BuildGraphOps.with`, `src/BuildGraphRuntime.with`, `src/BuildGraphSupport.with`,
+  `src/BuildGraphTools.with`, and `src/BuildGraphModel.with` are mostly generic
   build-driver infrastructure. They should remain compiler/tooling code, but
   their public vocabulary must be limited to standard targets and extension
   dispatch.
@@ -527,15 +527,15 @@ against the representation we already know is wrong, then rewritten again.
 Verification:
 
 ```text
-out/bin/with test test/behavior/behav_std_build_api.w
+out/bin/with test test/behavior/behav_std_build_api.with
 with build --graph --dry-run
 with build :test
 ```
 
-### Phase 3: Split Project-Specific Execution Out of `src/main.w`
+### Phase 3: Split Project-Specific Execution Out of `src/main.with`
 
 1. Create a build-driver module for standard graph dispatch.
-2. Move standard target execution out of ad hoc `main.w` branches.
+2. Move standard target execution out of ad hoc `main.with` branches.
 3. Move With-compiler project handlers into a project-specific module.
 4. Replace giant target-kind condition chains with named predicates or a
    dispatch table.
@@ -675,7 +675,7 @@ is deletion, not a permanent compatibility layer.
 #### 6.1 Script Deletion Audit
 
 1. List every file in `scripts/`.
-2. For each script, identify whether it is referenced by Make, `build.w`,
+2. For each script, identify whether it is referenced by Make, `build.with`,
    compiler code, docs, or CI.
 3. Classify scripts into:
    - already unused: delete immediately after confirming no references;
@@ -713,8 +713,8 @@ change or keep the script with a written deletion condition.
 After project-specific target execution has moved out of generic compiler
 dispatch:
 
-1. Remove hardcoded project target branches from `src/main.w`.
-2. Remove old integer project-kind decoding from `src/BuildGraphKinds.w`.
+1. Remove hardcoded project target branches from `src/main.with`.
+2. Remove old integer project-kind decoding from `src/BuildGraphKinds.with`.
 3. Remove compatibility aliases such as `copy_runtime_tree` once graph fixtures
    and docs use the standard name.
 4. Delete project-specific build executor modules from `src/` if they have
@@ -780,7 +780,7 @@ introspection, constant computation, derives, generated declarations, and
 compile-time diagnostics. It must remain reproducible and must not gain broad
 filesystem, process, network, or toolchain effects.
 
-Privileged build operations belong to tool mode. `build.w` is tool-mode
+Privileged build operations belong to tool mode. `build.with` is tool-mode
 compiler-driver code, not ordinary pure `comptime`.
 
 ### 9.2 Missing Compiler-Driver Capabilities
@@ -815,7 +815,7 @@ Full Jai-style parity requires at least these APIs and runtime semantics:
 
 6. **Default-metaprogram behavior.**
    `with build` should act as the built-in default build driver. A project
-   `build.w` should be able to replace or extend the default behavior, and a
+   `build.with` should be able to replace or extend the default behavior, and a
    future module-style metaprogram should be able to customize the default
    build path without requiring Make, CMake, Ninja, or generated project files.
 
@@ -834,7 +834,7 @@ The bridge must answer:
   clearly;
 - how this interacts with existing pure `comptime` functions.
 
-Until that boundary is designed, `build.w` should be treated as a pragmatic
+Until that boundary is designed, `build.with` should be treated as a pragmatic
 tool-mode entry point implemented by the CLI driver, not as the final
 compiler-as-library model.
 
@@ -862,7 +862,7 @@ compiler-as-library layer is the next architectural project after Make parity.
 
 Every implementation slice must keep these invariants:
 
-- No project-specific target names in `lib/std/build.w`.
+- No project-specific target names in `lib/std/build.with`.
 - No silent fallback when a target cannot execute.
 - No raw shell command strings in compiler, stdlib, runtime, or build-system
   implementation code.
@@ -880,11 +880,11 @@ Every implementation slice must keep these invariants:
 
 The next implementation slice should be deliberately small:
 
-1. Re-add standard `Clean` to `lib/std/build.w`.
-2. Replace `project_kind_clean()` in `build.w` with `.Clean`.
+1. Re-add standard `Clean` to `lib/std/build.with`.
+2. Replace `project_kind_clean()` in `build.with` with `.Clean`.
 3. Rename `CopyRuntimeTree` to `CopyTree` in the public API, keeping a temporary
    compatibility alias if needed.
-4. Update `src/BuildGraphKinds.w` names and implemented-kind checks so the
+4. Update `src/BuildGraphKinds.with` names and implemented-kind checks so the
    standard/project boundary is explicit.
 5. Add or update behavior tests for:
    - `Build.clean`;
@@ -893,10 +893,10 @@ The next implementation slice should be deliberately small:
 6. Verify:
 
 ```text
-out/bin/with check lib/std/build.w
-out/bin/with check build.w
-out/bin/with run test/behavior/behav_std_build_api.w
+out/bin/with check lib/std/build.with
+out/bin/with check build.with
+out/bin/with run test/behavior/behav_std_build_api.with
 out/bin/with build --graph --dry-run
 ```
 
-Only after that passes should the next slice move dispatch out of `src/main.w`.
+Only after that passes should the next slice move dispatch out of `src/main.with`.

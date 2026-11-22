@@ -17,7 +17,7 @@ This is a discrete backend task, not part of the general quality pass.
 - MIR terminators do NOT carry spans yet — this must be added.
 - `runtime/llvm_bridge.c` does not include `llvm-c/DebugInfo.h`
   and exports no DIBuilder helpers.
-- `src/Codegen.w` has no debug metadata.
+- `src/Codegen.with` has no debug metadata.
 
 ---
 
@@ -55,7 +55,7 @@ This is a discrete backend task, not part of the general quality pass.
 
 All of the following must be true:
 
-- `./out/bin/with-stage2 build examples/hello.w` succeeds.
+- `./out/bin/with-stage2 build examples/hello.with` succeeds.
 - LLDB shows With source, not disassembly:
   ```
   lldb -b \
@@ -71,7 +71,7 @@ All of the following must be true:
   `!DISubprogram`, and `!dbg` instruction attachments.
 - `make build` passes.
 - `make fixpoint` passes.
-- `./out/bin/with-stage2 check src/main.w` passes.
+- `./out/bin/with-stage2 check src/main.with` passes.
 - No O(n²) line lookup in hot codegen paths.
 
 ---
@@ -173,7 +173,7 @@ i32 wl_dwarf_lang_c()
 All handles use the existing `i64` opaque pattern. No new
 handle types needed.
 
-### `src/Codegen.w`
+### `src/Codegen.with`
 
 Main implementation site.
 
@@ -240,7 +240,7 @@ fn gen_module(self: Codegen):
     self.verify()
 ```
 
-### `src/Mir.w`
+### `src/Mir.with`
 
 Add terminator span storage.
 
@@ -249,7 +249,7 @@ Add terminator span storage.
 bb_term_spans: Vec[i32]    // source byte offset per BB terminator
 ```
 
-### `src/MirLower.w`
+### `src/MirLower.with`
 
 Thread spans through terminator creation.
 
@@ -281,7 +281,7 @@ fn debug_init_module(self: Codegen):
     self.di_source = Source.from_string(
         self.source_file, self.source_text)
 
-    // Split source path: "src/main.w" -> ("src", "main.w")
+    // Split source path: "src/main.with" -> ("src", "main.with")
     let (dir, file) = split_path(self.source_file)
 
     // Create DIBuilder
@@ -387,7 +387,7 @@ after each step. Do not batch.
    Test with a loop/match example.
 
 8. **Self-host validation.** `make build`, `make fixpoint`,
-   `./out/bin/with-stage2 check src/main.w`. All pass.
+   `./out/bin/with-stage2 check src/main.with`. All pass.
 
 ---
 
@@ -426,7 +426,7 @@ show disassembly. This is why step 3 must come before step 5.
 
 - [x] Add `llvm-c/DebugInfo.h` to `runtime/llvm_bridge.c`
 - [x] Add `wl_di_*` wrapper functions to bridge
-- [x] Declare bridge functions in `src/Codegen.w`
+- [x] Declare bridge functions in `src/Codegen.with`
 - [x] Add debug state fields to `Codegen`
 - [x] Add `Source` for cached offset-to-location lookup
 - [x] Implement `debug_init_module`
@@ -444,11 +444,11 @@ show disassembly. This is why step 3 must come before step 5.
 - [x] Set location from `term_spans` before each MIR terminator
 - [x] Set location for function prologue (param stores, allocas)
 - [x] Clear location for synthetic instructions
-- [x] Verify `examples/hello.w` shows source in LLDB
+- [x] Verify `examples/hello.with` shows source in LLDB
 - [x] Verify loop/match example steps through source
 - [x] `make build` passes
 - [x] `make fixpoint` passes
-- [x] `./out/bin/with-stage2 check src/main.w` passes
+- [x] `./out/bin/with-stage2 check src/main.with` passes
 
 ### Phase 2
 

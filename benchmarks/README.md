@@ -17,11 +17,11 @@ workloads, measuring what people actually ask about a native language:
 From the repository root (or from `benchmarks/`):
 
 ```sh
-with run benchmarks/run.w                    # debug and release level for every language and workload
-with run benchmarks/run.w --full             # every optimization level each compiler offers
-with run benchmarks/run.w -w nbody -w trees  # a subset of workloads
-with run benchmarks/run.w -l with -l rust    # a subset of languages
-with run benchmarks/run.w -n 5 -o results    # five runs per cell; write results.md, .csv, .json
+with run benchmarks/run.with                    # debug and release level for every language and workload
+with run benchmarks/run.with --full             # every optimization level each compiler offers
+with run benchmarks/run.with -w nbody -w trees  # a subset of workloads
+with run benchmarks/run.with -l with -l rust    # a subset of languages
+with run benchmarks/run.with -n 5 -o results    # five runs per cell; write results.md, .csv, .json
 ```
 
 `--timeout <seconds>` bounds each run (default 120) and `--keep` keeps the
@@ -78,9 +78,9 @@ checksum <result>
 Two spots in the With sources work around compiler gaps and say so in a
 comment. Both are filed upstream:
 
-- `nbody.w` expresses float constants as functions because a `const` with a
+- `nbody.with` expresses float constants as functions because a `const` with a
   float initializer is not yet comptime-evaluable
   ([withlang-dev/with#1668](https://github.com/withlang-dev/with/issues/1668)).
 - The With sources mutate through `mut self` methods on a wrapper type because
   `mut` is not a parameter modifier; that is the language design, not a gap,
-  but it is why `nbody.w` has a `System` type where C has free functions.
+  but it is why `nbody.with` has a `System` type where C has free functions.

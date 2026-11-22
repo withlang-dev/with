@@ -31,5 +31,5 @@ identity while changing the full key.
 
 The minimal repeated-key program fails before the repair and passes after it.
 The permanent regression is
-`test/behavior/behav_build_cache_compiler_identity.w`. Local LLDB evidence is
+`test/behavior/behav_build_cache_compiler_identity.with`. Local LLDB evidence is
 `out/fnabi-validation/compiler-fingerprint-reset-proof.txt`.

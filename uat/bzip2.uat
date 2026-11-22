@@ -4,8 +4,8 @@ requires: network
 new directory
 run: with init .
 run: with get c.bzip2
-write src/main.w from bzip2_main.w
-write src/contracts/bzip2.w:
+write src/main.with from bzip2_main.with
+write src/contracts/bzip2.with:
     // The bzip2 facade — D64 (spec §16.2b.8 "Buffers"): the one-shot
     // buffer-to-buffer surface of the real `bzlib.h` (the one `c_import`
     // resolves on the host), exactly what the release UAT program uses. The
@@ -14,7 +14,7 @@ write src/contracts/bzip2.w:
     //
     // Where it lives: in the acceptance scenario that uses it, which writes it
     // into the fresh project as its own contract (§16.2b.1; `c.bzip2` ships none yet):
-    // src/contracts/bzip2.w.
+    // src/contracts/bzip2.with.
     //
     // The three tuning integers (`blockSize100k`, `verbosity`, `workFactor`)
     // stay presented: they are the caller's choice, not facts of the facade,

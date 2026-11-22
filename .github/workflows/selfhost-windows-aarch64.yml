@@ -96,7 +96,7 @@ jobs:
           echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
           echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc")" >> "$GITHUB_ENV"
 
-          # MSVC CRT + Windows SDK import libs, read by Link.w via
+          # MSVC CRT + Windows SDK import libs, read by Link.with via
           # WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR. Locate VS with vswhere (edition-
           # agnostic) and glob the highest MSVC + Windows SDK version dirs. This
           # is the arm64 runner, so the ARM64 lib subdirs (…/lib/arm64,
@@ -110,7 +110,7 @@ jobs:
           echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/arm64")" >> "$GITHUB_ENV"
           echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/arm64")" >> "$GITHUB_ENV"
 
-          # MSVC CRT + Windows SDK include dirs, read by ClangBridge.w via
+          # MSVC CRT + Windows SDK include dirs, read by ClangBridge.with via
           # WITH_WINDOWS_{MSVC,UCRT,SHARED,UM}_INCDIR so a system-header c_import
           # resolves on native Windows. Headers are arch-independent, so the same
           # Include dirs as the x64 job.

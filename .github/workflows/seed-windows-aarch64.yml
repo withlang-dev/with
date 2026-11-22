@@ -55,14 +55,14 @@ jobs:
       # Native x86_64 host LLVM SDK (drives the host bootstrap link). The
       # canonical sdk.lock pin, as selfhost-linux CI fetches it: the v0.15.1
       # .tar.zst SDK predates the sysroot-carrying layout and has no
-      # bin/clang or ld.lld for build/sdk.w's linux-sysroot (run 38381940413).
+      # bin/clang or ld.lld for build/sdk.with's linux-sysroot (run 38381940413).
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: nightly-sdk-20261004-c4ddb7ddbef2
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
       # windows-aarch64 TARGET LLVM SDK — statically linked into the cross
       # compiler. Published to this repo by the `sdk-llvm windows-aarch64`
       # workflow. Extracts to src-tree/.deps/llvm-22.1.6-windows-aarch64-msvc/ (the
-      # top-level dir inside the tarball already matches build.w's expected
+      # top-level dir inside the tarball already matches build.with's expected
       # prefix — no rename).
       CROSS_SDK_TAG: sdk-windows-aarch64
       CROSS_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
@@ -117,7 +117,7 @@ jobs:
           # This tip must support the windows-aarch64 cross target (kind 6): the
           # cross_supported gate must include kind 6, and TargetSpec must map the
           # triple to it.
-          grep -q 'kind == 6' src/TargetSpec.w \
+          grep -q 'kind == 6' src/TargetSpec.with \
             || { echo "source tip does not enable the windows-aarch64 cross target (kind 6)"; exit 1; }
 
       - name: Install host packages
@@ -136,7 +136,7 @@ jobs:
           APT="sudo apt-get -o DPkg::Lock::Timeout=300"
           $APT update -qq
           # zstd: extract the host SDK. dev libs: the host bootstrap link line
-          # uses -lz -lzstd -lxml2 (build/compiler.w).
+          # uses -lz -lzstd -lxml2 (build/compiler.with).
           $APT install -y --no-install-recommends \
             zstd zlib1g-dev libzstd-dev libxml2-dev curl ca-certificates
 
@@ -163,7 +163,7 @@ jobs:
             test -d "$d" || { echo "xwin did not produce $d"; find "$GITHUB_WORKSPACE/src-tree/.deps/winsdk-arm64" -maxdepth 3 -type d | head -40; exit 1; }
           done
           # The compiler resolves the arm64 Windows libdirs from these env vars
-          # (build/emit_c.w windows-aarch64 block). Export for later steps.
+          # (build/emit_c.with windows-aarch64 block). Export for later steps.
           {
             echo "WITH_WINDOWS_MSVC_LIBDIR=$crt"
             echo "WITH_WINDOWS_UCRT_LIBDIR=$ucrt"
@@ -246,7 +246,7 @@ jobs:
         working-directory: src-tree
         env:
           # The freshly built compiler, not the downloaded seed: the embed
-          # action (EmbedObjectFiles, src/BuildGraphOps.w) runs inside whichever
+          # action (EmbedObjectFiles, src/BuildGraphOps.with) runs inside whichever
           # driver executes this target, and the seed's list of platform slots
           # is the seed's, not this tree's -- with the v0.15.2.0 seed the cross
           # link failed on with_embedded_rt_linux_aarch64_o_start even after
@@ -268,19 +268,19 @@ jobs:
           set -euo pipefail
           export PATH="$GITHUB_WORKSPACE/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/.link-shim:${LD_LIBRARY_PATH:-}"
-          # out/gen/main.w is the version-stamped CLI entry produced by `with build`;
+          # out/gen/main.with is the version-stamped CLI entry produced by `with build`;
           # it `use`s the src/ modules, so the full compiler is compiled in.
-          test -f out/gen/main.w || { echo "out/gen/main.w missing (expected after build)"; exit 1; }
+          test -f out/gen/main.with || { echo "out/gen/main.with missing (expected after build)"; exit 1; }
           # The seed is self-contained: static CRT (libcmt), as the native
-          # compiler link in build/compiler.w. Programs link the DLL runtime
-          # by default (Link.w) because prebuilt Windows libraries expect it.
+          # compiler link in build/compiler.with. Programs link the DLL runtime
+          # by default (Link.with) because prebuilt Windows libraries expect it.
           export WITH_WINDOWS_CRT_STATIC=1
           out/release/bin/with build --target "$CROSS_TRIPLE" \
             --link-bundle out/wo/windows_aarch64/pcre2 \
             --link-bundle out/wo/windows_aarch64/zlib \
             --link-bundle out/wo/windows_aarch64/c_algorithms \
             --link-bundle out/wo/windows_aarch64/tommyds \
-            out/gen/main.w -O1 \
+            out/gen/main.with -O1 \
             -o "$GITHUB_WORKSPACE/$SEED_ASSET"
 
       - name: Verify cross output is an arm64 PE/COFF image

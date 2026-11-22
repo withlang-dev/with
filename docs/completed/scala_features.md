@@ -79,7 +79,7 @@ functions into a single loop with a dispatch tag.
 
 **Detection (MIR level):**
 
-In MirLower.w, after lowering a function body, scan all `TermKind.TK_CALL`
+In MirLower.with, after lowering a function body, scan all `TermKind.TK_CALL`
 terminators. A call is in tail position if:
 
 1. The call's result place is the function's return place (`_0`)
@@ -150,7 +150,7 @@ In Sema or MirLower, when a function has the `tailrec` attribute:
 
 ```
 error: recursive call is not in tail position
-src/foo.w:5:10
+src/foo.with:5:10
 5 |     1 + sum_to(n - 1, acc)
   |         ^^^^^^^^^^^^^^^^^^
   = note: function is annotated @[tailrec]
@@ -161,10 +161,10 @@ src/foo.w:5:10
 
 | File | Change |
 |------|--------|
-| `src/Ast.w` | Add attribute recognition for `tailrec` |
-| `src/MirLower.w` | Tail call detection + self-call → loop transform |
-| `src/Sema.w` or `src/SemaCheck.w` | `@[tailrec]` enforcement |
-| `src/Codegen.w` | Emit `musttail` for mutual calls (optional) |
+| `src/Ast.with` | Add attribute recognition for `tailrec` |
+| `src/MirLower.with` | Tail call detection + self-call → loop transform |
+| `src/Sema.with` or `src/SemaCheck.with` | `@[tailrec]` enforcement |
+| `src/Codegen.with` | Emit `musttail` for mutual calls (optional) |
 
 **Estimated scope:** ~200 lines for self-tail calls. ~400 more for mutual.
 
@@ -271,10 +271,10 @@ function with all arguments filled in.
 
 | File | Change |
 |------|--------|
-| `src/Parser.w` | Detect `_` in call args, emit `NK_PARTIAL_CALL` |
-| `src/Ast.w` | Add `NK_PARTIAL_CALL` node kind (or flag on `NK_CALL`) |
-| `src/SemaCheck.w` | Type-check partial calls, synthesize closure type |
-| `src/MirLower.w` | Desugar to closure construction + synthetic function |
+| `src/Parser.with` | Detect `_` in call args, emit `NK_PARTIAL_CALL` |
+| `src/Ast.with` | Add `NK_PARTIAL_CALL` node kind (or flag on `NK_CALL`) |
+| `src/SemaCheck.with` | Type-check partial calls, synthesize closure type |
+| `src/MirLower.with` | Desugar to closure construction + synthetic function |
 
 **Estimated scope:** ~300 lines across parser, sema, and MIR lowering.
 
@@ -372,9 +372,9 @@ arguments at all — it sees a normal call with arguments in the right order.
 
 | File | Change |
 |------|--------|
-| `src/Parser.w` | Detect `ident: expr` in call args |
-| `src/Ast.w` | Sidecar storage for named arg symbols |
-| `src/SemaCheck.w` | Reorder + validate named arguments |
+| `src/Parser.with` | Detect `ident: expr` in call args |
+| `src/Ast.with` | Sidecar storage for named arg symbols |
+| `src/SemaCheck.with` | Reorder + validate named arguments |
 
 **Estimated scope:** ~200 lines. No MIR or codegen changes needed.
 
@@ -516,9 +516,9 @@ match a()
 
 | File | Change |
 |------|--------|
-| `src/Parser.w` | Multi-binding `for` + `yield` detection |
-| `src/Parser.w` or `src/Desugar.w` | Nested match desugaring |
-| `src/SemaCheck.w` | Determine Option vs Result from first binding type |
+| `src/Parser.with` | Multi-binding `for` + `yield` detection |
+| `src/Parser.with` or `src/Desugar.with` | Nested match desugaring |
+| `src/SemaCheck.with` | Determine Option vs Result from first binding type |
 
 **Estimated scope:** ~250 lines. Desugaring in the parser keeps sema
 and MIR completely unaware of comprehensions.
@@ -614,9 +614,9 @@ In `lower_for`, after evaluating the iterator's `.next()` call:
 
 | File | Change |
 |------|--------|
-| `src/Parser.w` | Accept patterns in for binding position |
-| `src/SemaCheck.w` | Check pattern against iterator element type |
-| `src/MirLower.w` | Pattern destructuring in for loop body |
+| `src/Parser.with` | Accept patterns in for binding position |
+| `src/SemaCheck.with` | Check pattern against iterator element type |
+| `src/MirLower.with` | Pattern destructuring in for loop body |
 
 **Estimated scope:** ~80 lines. Most of the machinery already exists
 for `match` and `let` destructuring.

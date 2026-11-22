@@ -193,7 +193,7 @@ to file, and each was found by trying, not by reasoning.
 
 | Need | Why | Where it stands |
 |---|---|---|
-| `c_import` under `--target` | The one blocker for building the Deck's binary on the Mac; the link stage already takes a sysroot and the bundled `ld.lld` | `src/CImport.w:754` refuses; the steamrt4 sysroot is published by Valve |
+| `c_import` under `--target` | The one blocker for building the Deck's binary on the Mac; the link stage already takes a sysroot and the bundled `ld.lld` | `src/CImport.with:754` refuses; the steamrt4 sysroot is published by Valve |
 | Target-keyed C dependencies and a fetched sysroot | Conan selection uses the host; `.with/deps/c/` has no target key; the sysroot is an environment variable | Not started |
 | Facade coverage for Steamworks | Rule 10: no `unsafe` in a game. 22 sites in WIPE's binding; all but the callback pump map onto facade clauses that exist | Pump waits on withlang-dev/with#2425; the `steam_api.json` facade generator is the toolkit plan's §3.2.1 |
 | Incremental compilation | Every edit costs a full rebuild; the Deck loop is the build and nothing else | Three measured stages in `docs/plans/incremental-compilation.md`: stop repeating work (the `c_import` disk cache for several imports, confining the D89/D93 second Sema pass, `-O0` for dev), reuse per codegen unit, re-analyze only what an edit affects |

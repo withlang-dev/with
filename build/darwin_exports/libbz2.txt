@@ -1,4 +1,4 @@
-# /usr/lib/libbz2.dylib exports, macOS 26.6.2 (tools/darwin_exports.w)
+# /usr/lib/libbz2.dylib exports, macOS 26.6.2 (tools/darwin_exports.with)
 BZ2_bzBuffToBuffCompress
 BZ2_bzBuffToBuffDecompress
 BZ2_bzCompress

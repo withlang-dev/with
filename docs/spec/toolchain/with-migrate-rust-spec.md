@@ -615,10 +615,10 @@ The tool reports a quality level per file:
 ```
 with migrate rust src/ --stats
 
-src/lib.rs     → lib.w       Grade A   0 flags
-src/parser.rs  → parser.w    Grade B   3 flags (Box removal)
-src/ast.rs     → ast.w       Grade C   7 flags (stored refs, lifetimes)
-src/macros.rs  → macros.w    Grade D  12 flags (proc macros, macro_rules)
+src/lib.rs     → lib.with       Grade A   0 flags
+src/parser.rs  → parser.with    Grade B   3 flags (Box removal)
+src/ast.rs     → ast.with       Grade C   7 flags (stored refs, lifetimes)
+src/macros.rs  → macros.with    Grade D  12 flags (proc macros, macro_rules)
 ```
 
 ---
@@ -629,11 +629,11 @@ src/macros.rs  → macros.w    Grade D  12 flags (proc macros, macro_rules)
 
 ```rust
 // Rust: src/lib.rs, src/parser.rs, src/parser/lexer.rs
-// With: lib.w, parser.w, parser/lexer.w
+// With: lib.with, parser.with, parser/lexer.with
 ```
 
 `mod parser;` → `use parser` (if in same directory).
-`mod parser { ... }` (inline module) → separate file `parser.w`.
+`mod parser { ... }` (inline module) → separate file `parser.with`.
 
 ### `use` statements
 
@@ -690,7 +690,7 @@ listing Cargo dependencies and suggesting With alternatives.
 ### Step 1: Syntax transformer (extend Migrate.zig port)
 
 The existing `transformRust` in Migrate.zig handles basic
-syntax rewrites. Port to With (in `src/MigrateRust.w`) and
+syntax rewrites. Port to With (in `src/MigrateRust.with`) and
 extend with:
 
 - Generic `<>` → `[]` (context-aware)

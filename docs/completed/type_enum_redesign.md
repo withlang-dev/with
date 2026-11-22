@@ -53,21 +53,21 @@
 
 ## Phase 3: Migrate compiler source
 
-- [x] **P3-1.** Migrate disc enums in `src/Ast.w`:
+- [x] **P3-1.** Migrate disc enums in `src/Ast.with`:
   - `NodeKind` (NK_*), `TypeDeclKind` (TDK_*), `FnFlags` (FN_FLAG_*),
     `BinaryOp` (OP_*), `UnaryOp` (UOP_*), `Visibility` (VIS_*),
     `LiteralSuffix` (LIT_SUFFIX_*), `FStringSegmentKind` (FSTR_SEG_*)
-- [x] **P3-2.** Migrate disc enums in `src/Mir.w`:
+- [x] **P3-2.** Migrate disc enums in `src/Mir.with`:
   - `MirIntrinsic` (MIR_INTRINSIC_*), `StmtKind` (SK_*),
     `TermKind` (TK_*), `RvalueKind` (RK_*)
-- [x] **P3-3.** Migrate disc enums in `src/Sema.w`: `TypeKind` (TY_*).
-- [x] **P3-4.** Migrate disc enums in `src/Token.w`: `TokenKind` (TK_*).
+- [x] **P3-3.** Migrate disc enums in `src/Sema.with`: `TypeKind` (TY_*).
+- [x] **P3-4.** Migrate disc enums in `src/Token.with`: `TokenKind` (TK_*).
 - [x] **P3-5.** Migrate struct types across all compiler sources.
 - [x] **P3-6.** Convert remaining constant groups across all compiler sources:
   - `CharCode` (CH_*), `DriverMode`/`CompileResult`, `DiagSeverity`,
     `ValidateError`, `CfgNodeKind`, `AsyncBodyKind`/`AsyncSuspendKind`,
     `CallKind`/`AllocKind`, `PreludeMode`, `MigrateLang`/`MigrateMode`,
-    plus Resolve.w scope/decl kinds
+    plus Resolve.with scope/decl kinds
 - [x] **P3-7.** Prefix removal deferred (separate follow-up).
 - [x] **P3-8.** All tests pass. Build, fixpoint.
 

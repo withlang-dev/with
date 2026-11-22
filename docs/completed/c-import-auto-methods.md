@@ -217,7 +217,7 @@ The flat C functions are always available regardless of this setting.
 
 ### Where It Lives
 
-The auto-method generation happens in `src/CImport.w`, after all
+The auto-method generation happens in `src/CImport.with`, after all
 functions and structs have been collected and translated. It is a
 post-processing pass over the already-translated declarations —
 it does not change how functions or structs are parsed or
@@ -376,13 +376,13 @@ and methods are regenerated.
 3. Constructor vs method classification (~20 lines)
 4. Destructor candidate recording for manifests/diagnostics (~15 lines)
 5. Constructor default parameter inference (~30 lines)
-6. Callable type syntax (TypeName(...) → TypeName.new(...)) (~15 lines in Parser.w)
+6. Callable type syntax (TypeName(...) → TypeName.new(...)) (~15 lines in Parser.with)
 7. With source text emission for matched methods (~60 lines)
 8. Proven ownership metadata and generated `Drop` wrapper support
 9. Integration into c_import output pipeline (~10 lines)
 10. Cache compatibility verification (~0 lines, already works)
 
-Total: ~290 lines across CImport.w, Parser.w, and Sema.w.
+Total: ~290 lines across CImport.with, Parser.with, and Sema.with.
 
 ### Test Cases
 

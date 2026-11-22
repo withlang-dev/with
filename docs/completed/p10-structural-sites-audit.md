@@ -8,31 +8,31 @@ p10.17–p10.22.
 
 | File | Sites | Category |
 |------|-------|----------|
-| src/CImport.w | 66 | multi-pool params, genuine coercions, free fns |
-| src/ComptimeEval.w | 5 | entry-point free fns (4 sigs + 1 call site) |
-| src/ComptimeTransform.w | 29 | multi-pool params + `&mut sema.diags` call sites |
-| src/compiler/Frontend.w | 6 | multi-pool params (Sema, HashMap, Vec) |
-| src/compiler/Compilation.w | 1 | `&mut sema` passed to seed function |
-| src/compiler/Link.w | 1 | `&mut out as *mut u8` (raw pointer cast) |
-| src/SemaCheck.w | 16 | strings/comments, code, borrow checker comments |
-| src/render.w | 2 | string output `"&mut "` |
-| src/SemaDiag.w | 1 | string output `"&mut "` |
-| src/CiPrint.w | 1 | string output `"&mut "` / `"&"` |
-| src/CiIR.w | 1 | comment: `d1 = is_mut (0 = &, 1 = &mut)` |
-| src/CCodegen.w | 1 | comment: separate `&mut` accumulators |
-| src/CodegenDispatch.w | 1 | comment: receiver is &mut Vec[T] |
-| src/MirLower.w | 1 | comment: indexing through &mut Vec[T] |
-| src/Sema.w | 1 | comment: &mut HashMap params |
-| src/main.w | 1 | help text string |
-| src/main_emit_temp.w | 1 | help text string |
-| src/bootstrap_main.w | 1 | help text string |
-| lib/std/traits.w | 1 | `multi_index_set(self: &mut Self, ...)` (deprecated) |
-| lib/std/cfg/stackify.w | 1 | comment |
+| src/CImport.with | 66 | multi-pool params, genuine coercions, free fns |
+| src/ComptimeEval.with | 5 | entry-point free fns (4 sigs + 1 call site) |
+| src/ComptimeTransform.with | 29 | multi-pool params + `&mut sema.diags` call sites |
+| src/compiler/Frontend.with | 6 | multi-pool params (Sema, HashMap, Vec) |
+| src/compiler/Compilation.with | 1 | `&mut sema` passed to seed function |
+| src/compiler/Link.with | 1 | `&mut out as *mut u8` (raw pointer cast) |
+| src/SemaCheck.with | 16 | strings/comments, code, borrow checker comments |
+| src/render.with | 2 | string output `"&mut "` |
+| src/SemaDiag.with | 1 | string output `"&mut "` |
+| src/CiPrint.with | 1 | string output `"&mut "` / `"&"` |
+| src/CiIR.with | 1 | comment: `d1 = is_mut (0 = &, 1 = &mut)` |
+| src/CCodegen.with | 1 | comment: separate `&mut` accumulators |
+| src/CodegenDispatch.with | 1 | comment: receiver is &mut Vec[T] |
+| src/MirLower.with | 1 | comment: indexing through &mut Vec[T] |
+| src/Sema.with | 1 | comment: &mut HashMap params |
+| src/main.with | 1 | help text string |
+| src/main_emit_temp.with | 1 | help text string |
+| src/bootstrap_main.with | 1 | help text string |
+| lib/std/traits.with | 1 | `multi_index_set(self: &mut Self, ...)` (deprecated) |
+| lib/std/cfg/stackify.with | 1 | comment |
 | **Total** | **138** | |
 
 ## Actionable Sites by Category
 
-### A. Diag-threading: ComptimeEval.w (44 sites)
+### A. Diag-threading: ComptimeEval.with (44 sites)
 
 Every method on `ComptimeEvaluator` takes `diags: &mut DiagnosticList` as a
 separate parameter. The struct (line 28) has no `diags` field.
@@ -44,12 +44,12 @@ to `mut self: ComptimeEvaluator`. Remove the `diags` parameter. Replace
 functions (lines 143, 154, 165, 168) to pass `diags` into the struct at
 construction.
 
-Caller in SemaCheck.w (line 6394) passes `&mut self.diags` — will need updating
+Caller in SemaCheck.with (line 6394) passes `&mut self.diags` — will need updating
 to pass diags into the evaluator constructor instead.
 
 **Eliminates:** 44 `&mut` sites (all of them in this file).
 
-### B. Read-only `&mut` params: ComptimeTransform.w (8 params)
+### B. Read-only `&mut` params: ComptimeTransform.with (8 params)
 
 These parameters are `&mut` but never mutated (verified leaf-only, no transitive
 mutation):
@@ -68,7 +68,7 @@ mutation):
 **Eliminates:** 7–8 `&mut` sites. Also eliminates `&mut` at call sites that
 pass these params.
 
-### C. CImport.w method params: `types: &mut CiTypePool` (leaf-only)
+### C. CImport.with method params: `types: &mut CiTypePool` (leaf-only)
 
 Many CiExprPool and CiStmtPool methods take `types: &mut CiTypePool` but only
 call read-only CiTypePool methods (`kind()`, `name()`). However, some of these
@@ -87,7 +87,7 @@ call chains eventually reach `type_from_translated_text` or `type_from_libclang`
 
 **Eliminates:** 2–3 params.
 
-### D. CImport.w call-site coercions (27 sites)
+### D. CImport.with call-site coercions (27 sites)
 
 Patterns like `&mut self`, `&mut exprs`, `&mut types` passed to free functions:
 
@@ -107,7 +107,7 @@ Some callees (`ci_print_expr`, `ci_expr_is_zero_int_lit`, etc.) never mutate
 their pool argument. Converting those free functions to methods or downgrading
 their params to `&` would eliminate these coercion sites.
 
-### E. CImport.w free function declarations (5 functions)
+### E. CImport.with free function declarations (5 functions)
 
 | Line | Function | Param |
 |------|----------|-------|
@@ -122,7 +122,7 @@ These are utility free functions, not methods on a pool. They could become
 methods on their respective types (e.g., `Vec.push_target()`) but the gain is
 minimal — they're not part of the pool method pattern.
 
-### F. CImport.w field projections (14 sites)
+### F. CImport.with field projections (14 sites)
 
 All are `ci_goto_cfg_push_target(&mut self.break_targets, ...)` and
 `ci_goto_cfg_pop_target(&mut self.continue_targets)` inside CiGotoCfgContext
@@ -134,7 +134,7 @@ calls, eliminating the `&mut self.field` pattern. But the push/pop operate on
 different fields (break_targets vs continue_targets), so they'd need separate
 methods or a discriminator.
 
-### G. compiler/Frontend.w (8 sites)
+### G. compiler/Frontend.with (8 sites)
 
 | Line | Pattern |
 |------|---------|
@@ -147,7 +147,7 @@ methods or a discriminator.
 | 1380 | `fn ... out_decls: &mut Vec[i32], out_paths: &mut Vec[str], out_file_ids: &mut Vec[i32]` |
 
 All genuinely mutating (populating Sema module graph, building output vectors).
-Line 34 (`&mut out as *mut u8`) in Link.w is a raw pointer cast — permanent
+Line 34 (`&mut out as *mut u8`) in Link.with is a raw pointer cast — permanent
 exempt pattern (becomes `&raw mut out` at P12).
 
 ### H. Strings, comments, diagnostics (22 sites)
@@ -155,11 +155,11 @@ exempt pattern (becomes `&raw mut out` at P12).
 These are string literals or comments containing `"&mut"` — not code patterns.
 They stay as-is (the text is describing syntax, not using it).
 
-### I. lib/std/traits.w:141 (1 site)
+### I. lib/std/traits.with:141 (1 site)
 
 `fn multi_index_set(self: &mut Self, ...)` — deprecated alias, removed at P12.
 
-## CImport.w 66-site Audit
+## CImport.with 66-site Audit
 
 After p10.22 coercion downgrades. 54 in function declarations, 11 in call
 sites, 1 comment.
@@ -185,7 +185,7 @@ mutations. Method extraction possible but marginal gain.
 **p10.22 eliminated 18 call-site coercions** where `&mut self` was passed to
 free functions that only needed `&Pool`. Changed to `&self` at call sites.
 
-## Diag-Threading Pilot: ComptimeEval.w
+## Diag-Threading Pilot: ComptimeEval.with
 
 ### Design Decision
 
@@ -226,11 +226,11 @@ cleanly: all 39 methods converted with zero surprises. The tight call graph
 that made partial piloting risky also made all-at-once trivial — every method
 got the same transform.
 
-## Diag-Threading: ComptimeTransform.w
+## Diag-Threading: ComptimeTransform.with
 
 ### Design Decision
 
-**No natural receiver type.** Unlike ComptimeEval.w, all 13 diags-taking
+**No natural receiver type.** Unlike ComptimeEval.with, all 13 diags-taking
 functions are free functions with signature `ct_*(source_ast, pool, sema,
 intern, diags, node)`. There is no `ComptimeTransformer` struct.
 
@@ -265,24 +265,24 @@ Net: 13 `&mut` sites eliminated.
 
 | Priority | Category | Sites | Status |
 |----------|----------|-------|--------|
-| 1 | B: ComptimeTransform.w read-only downgrades | 12 | **DONE** (p10.17) |
-| 2 | C: CImport.w read-only pool params | 55 | **DONE** (p10.18) |
-| 3 | A: ComptimeEval.w diag-threading | 39 | **DONE** (p10.19) |
-| 4 | F: CImport.w push/pop → CiGotoCfgContext methods | 16 | **DONE** (p10.20) |
-| 5 | ComptimeTransform.w diag → sema.diags | 13 params | **DONE** (p10.21) |
-| 6 | CImport.w call-site coercion downgrades | 16 lines | **DONE** (p10.22) |
+| 1 | B: ComptimeTransform.with read-only downgrades | 12 | **DONE** (p10.17) |
+| 2 | C: CImport.with read-only pool params | 55 | **DONE** (p10.18) |
+| 3 | A: ComptimeEval.with diag-threading | 39 | **DONE** (p10.19) |
+| 4 | F: CImport.with push/pop → CiGotoCfgContext methods | 16 | **DONE** (p10.20) |
+| 5 | ComptimeTransform.with diag → sema.diags | 13 params | **DONE** (p10.21) |
+| 6 | CImport.with call-site coercion downgrades | 16 lines | **DONE** (p10.22) |
 | — | E,G,H,I: exempt or deferred to P12 | ~30 | — |
 
 ## P4 Status
 
 ### P4.1 Verification (2026-04-30)
 
-**Trait definition:** `lib/std/traits.w:58-59` defines
+**Trait definition:** `lib/std/traits.with:58-59` defines
 `fn next(mut self: Self) -> Option[T]`. Correct shape. ✓
 
 **Check 1 — For-loop desugaring calling convention:**
 
-`src/MirLower.w:2582` (`lower_for`) has hardcoded paths for:
+`src/MirLower.with:2582` (`lower_for`) has hardcoded paths for:
 - Range literals (NK_RANGE) → `lower_for_range`
 - Range variables (TY_RANGE) → `lower_for_range_var`
 - Slice/Array (TY_SLICE, TY_ARRAY) → `lower_for_slice`
@@ -297,13 +297,13 @@ removed, so this function cannot be compiled."
 **`for x in custom_iter` is a compile-time error for any non-builtin type.**
 
 VecIter.next() (line 3921-3922): dispatched as `MIR_INTRINSIC_VECITER_NEXT`,
-entirely compiler-intrinsic. CodegenDispatch.w:3595 takes receiver as pointer
+entirely compiler-intrinsic. CodegenDispatch.with:3595 takes receiver as pointer
 via `mir_intrinsic_recv_ptr` and mutates `idx` field in place (line 3644:
 `wl_build_store(self.builder, next_idx, idx_ptr)`). This is ABI-compatible
 with `mut self: Self` (struct self is passed as pointer, mutations visible
 to caller).
 
-Sema check_for (`src/SemaCheck.w:2554`) delegates to `infer_for_element_type`
+Sema check_for (`src/SemaCheck.with:2554`) delegates to `infer_for_element_type`
 (line 7666), which is hardcoded for Range, Array, Slice, Vec — no trait
 dispatch. No `&mut` shape anywhere in the for-loop pipeline.
 
@@ -311,11 +311,11 @@ dispatch. No `&mut` shape anywhere in the for-loop pipeline.
 
 Types implementing `Iter[T]` in stdlib: **zero**. No `impl Iter[T] for X`
 blocks exist anywhere in `lib/std/`. `VecIter[T]` (defined in
-`lib/std/collections.w:52`) has no source-level `next()` method — its
+`lib/std/collections.with:52`) has no source-level `next()` method — its
 `next()` is a compiler intrinsic.
 
-`IntoIter[T]` (traits.w:62-63) returns `VecIter[T]`, not a generic
-iterator. Only impl is `Vec[T]` (traits.w:69-71).
+`IntoIter[T]` (traits.with:62-63) returns `VecIter[T]`, not a generic
+iterator. Only impl is `Vec[T]` (traits.with:69-71).
 
 No range iterators, string char/byte iterators, or HashMap iterators exist
 as types with `next()`. All for-loop iteration for these types goes through
@@ -323,7 +323,7 @@ hardcoded MIR lowering paths, not trait dispatch.
 
 **Check 3 — Behavioral test:**
 
-Test: `test/behavior/behav_iter_mut_self.w` — defines `CountUp` struct
+Test: `test/behavior/behav_iter_mut_self.with` — defines `CountUp` struct
 implementing `impl Iter[i32] for CountUp` with `fn next(mut self: Self)`.
 
 - **Manual while-loop** calling `iter.next()`: **passes.** Output: `10`. ✓
@@ -332,10 +332,10 @@ implementing `impl Iter[i32] for CountUp` with `fn next(mut self: Self)`.
 - **For-loop** (`for x in iter`): **compile error.** ✗
   ```
   error: MIR lowering failed for function 'main' in
-  test/behavior/behav_iter_mut_self.w; AST codegen was removed,
+  test/behavior/behav_iter_mut_self.with; AST codegen was removed,
   so this function cannot be compiled
   ```
-  MIR lowering hits the generic iterator fallback at MirLower.w:2632
+  MIR lowering hits the generic iterator fallback at MirLower.with:2632
   (`mark_unsupported()`), which used to fall back to AST codegen. AST
   codegen has been removed, so this is now a hard error.
 
@@ -349,15 +349,15 @@ P4.1 is **complete**:
 - ✓ `VecIter[T]` formally implements `Iter[T]` via trait dispatch
 
 **Fixes applied:**
-- `src/MirLower.w`: generic iterator fallback resolves `next` callee via
+- `src/MirLower.with`: generic iterator fallback resolves `next` callee via
   `resolve_method_callee_sym`, looks up return type from method signature,
   uses `success_variant_index()` for discriminant, extracts payload via
   downcast+field projection. `mark_unsupported()` only fires if method
   resolution fails.
-- `src/SemaCheck.w`: `infer_for_element_type` has trait-based fallback that
+- `src/SemaCheck.with`: `infer_for_element_type` has trait-based fallback that
   looks up `next()` method return type and extracts T from Option[T].
-- `lib/std/collections.w`: `impl[T] Iter[T] for VecIter[T]` added.
-- `src/SemaDecl.w`: overlap detection fixed to consult `blanket_target_base_syms`
+- `lib/std/collections.with`: `impl[T] Iter[T] for VecIter[T]` added.
+- `src/SemaDecl.with`: overlap detection fixed to consult `blanket_target_base_syms`
   for targeted blankets like `impl[T] Trait for SpecificType[T]`.
 
 **Remaining stdlib Iter impls — structural blockers:**
@@ -380,9 +380,9 @@ P4.1 is **complete**:
 ### MIR Generic Iterator Protocol — Design
 
 **What does `mark_unsupported()` do?** Sets `self.body.lowering_failed = 1`
-(MirLower.w:1404). This is just a flag. The MIR generation after line 2632
+(MirLower.with:1404). This is just a flag. The MIR generation after line 2632
 executes fully — blocks, terminators, operands are all created. But
-CodegenDispatch.w:49 checks `body.lowering_failed == 0` and rejects the
+CodegenDispatch.with:49 checks `body.lowering_failed == 0` and rejects the
 whole function if the flag is set. So the MIR IS generated but never consumed.
 
 **What MIR does the stub generate?** (lines 2633-2675):
@@ -409,7 +409,7 @@ whole function if the flag is set. So the MIR IS generated but never consumed.
    `next()` or construct `Option[elem_ty]`.
 
 3. **Hardcoded element type inference.** `infer_for_element_type`
-   (SemaCheck.w:7666-7681) only handles Range/Array/Slice/Vec, falling
+   (SemaCheck.with:7666-7681) only handles Range/Array/Slice/Vec, falling
    back to `ty_i32`. For custom iterators, it must look up the Iter[T]
    trait impl and extract T. **Fix:** add trait lookup fallback.
 
@@ -454,7 +454,7 @@ both `check_index` (sema) and `lower_index` (MIR). The recognition mechanism
 is existing name/type-kind matching — no attribute or whitelist needed because
 the types are compiler-built-in.
 
-Formal `impl IndexPlace` blocks are added to `lib/std/traits.w` so the type
+Formal `impl IndexPlace` blocks are added to `lib/std/traits.with` so the type
 system records the relationship. The compiler does NOT use trait lookup for
 v1 dispatch — the hardcoded type checks are the dispatch mechanism.
 
@@ -468,7 +468,7 @@ handles IndexPlace semantics for Vec/Array/Slice:
 - `xs[i].method()` with `mut self: Self` — mutates element in place ✓
 - `xs[i] += value` — reads/writes through place projection ✓
 
-Codegen (CodegenDispatch.w:615-672) resolves PK_INDEX as:
+Codegen (CodegenDispatch.with:615-672) resolves PK_INDEX as:
 - Array types → direct GEP
 - Pointer types → load ptr, GEP
 - Vec/Slice/str → load data ptr (field 0), GEP to element
@@ -485,7 +485,7 @@ Both `xs[f()]` in the ASSIGN and BINARY are the SAME AST node ID, but MIR
 lowering evaluates it twice: once via `lower_expr_place(target)` and once
 via `lower_expr(binary.d1)`.
 
-**Fix in `lower_assign` (MirLower.w:2167):** Detect compound assignment on
+**Fix in `lower_assign` (MirLower.with:2167):** Detect compound assignment on
 indexed target (rhs is NK_BINARY with d1 == place_expr, and place_expr is
 NK_INDEX). Pre-evaluate the index expression to a temp local, build the
 index place using the temp, read the current value, evaluate only the
@@ -504,7 +504,7 @@ _place = _new                       // write back
 #### Four implementation pieces
 
 1. **p10.23 — §6.3 compound assignment single-evaluation fix** ✓
-   (MirLower.w `lower_assign`): detect compound assignment (rhs is NK_BINARY
+   (MirLower.with `lower_assign`): detect compound assignment (rhs is NK_BINARY
    with d1 == place_expr), lower as single read-modify-write through the
    place. Verified: `xs[f()] += g()` evaluates f() and g() exactly once.
 
@@ -513,31 +513,31 @@ _place = _new                       // write back
    impl bodies. The compiler's hardcoded PK_INDEX place projections provide
    correct IndexPlace semantics for Vec/Array/Slice. Formal impls can be
    added when the compiler supports generic trait method bodies. Comment
-   added to `lib/std/traits.w` documenting the limitation.
+   added to `lib/std/traits.with` documenting the limitation.
 
 3. **p10.25 — §15.11 diagnostic** ✓ — already implemented in check_assign
-   (SemaCheck.w:2500-2504). When classify_place returns PK_NotPlace for an
+   (SemaCheck.with:2500-2504). When classify_place returns PK_NotPlace for an
    NK_INDEX target, emits "type does not support index assignment (no
    IndexPlace impl) (§15.11)" warning.
 
-4. **p10.26 — §18 behavioral tests** ✓ — `test/behavior/behav_index_place.w`
+4. **p10.26 — §18 behavioral tests** ✓ — `test/behavior/behav_index_place.with`
    covers: direct assignment, nested field mutation, mutating method through
    index, compound assignment, single-evaluation rule. Array coverage in
-   `test/behavior/behav_index_place_array.w`.
+   `test/behavior/behav_index_place_array.with`.
 
 ## Permanent Exemptions
 
 1. **String/comment mentions** of `&mut` — not code. (22 sites)
-2. **`&mut out as *mut u8`** (Link.w:34) — becomes `&raw mut out` at P12.
-3. **`multi_index_set(self: &mut Self)`** (traits.w:141) — removed at P12.
-4. **SemaCheck.w lockdown error messages** (lines 137-141, 2164-2167) — text
+2. **`&mut out as *mut u8`** (Link.with:34) — becomes `&raw mut out` at P12.
+3. **`multi_index_set(self: &mut Self)`** (traits.with:141) — removed at P12.
+4. **SemaCheck.with lockdown error messages** (lines 137-141, 2164-2167) — text
    of diagnostic messages about `&mut`.
-5. **SemaCheck.w borrow checker comments** (lines 6806, 7087, 7099, etc.) —
+5. **SemaCheck.with borrow checker comments** (lines 6806, 7087, 7099, etc.) —
    describing borrow semantics.
-6. **Multi-pool threading** in CImport.w method signatures where pools are
+6. **Multi-pool threading** in CImport.with method signatures where pools are
    transitively mutated — these are the genuine `&mut Pool` pattern that
    remains until the pools are consolidated or the methods restructured.
-7. **compiler/Frontend.w** `sema: &mut Sema` and output `&mut Vec` params —
+7. **compiler/Frontend.with** `sema: &mut Sema` and output `&mut Vec` params —
    top-level pipeline plumbing, genuine mutations.
 8. **Free utility functions** (`ci_collect_var_decls`, `ci_goto_cfg_push/pop_target`,
    etc.) — operate on `&mut Vec` fields, genuine mutations.

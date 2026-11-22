@@ -18,7 +18,7 @@ run: ./out/bin/tmp
 expect exit: 0
 expect stdout: hello from tmp
 expect stdout contains: from tmp
-run (fails): with check missing.w
-expect stderr contains: missing.w
+run (fails): with check missing.with
+expect stderr contains: missing.with
 run: with uat
 expect stdout contains: 1 pass

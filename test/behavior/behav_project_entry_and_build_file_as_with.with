@@ -1,0 +1,37 @@
+//! expect-stdout: ok
+// The names the toolchain finds for a project by itself, its `src/main` and
+// its `build` file, are found as `.with`, and as `.w` while the extension
+// changes (the .with ruling, step 1). The driver looked for `src/main.with`
+// and `build.with` by those exact names.
+use std.fs
+use std.process
+
+fn temp_root() -> str:
+    let tmpdir = env("TMPDIR")
+    if tmpdir.len() > 0: return tmpdir
+    let temp = env("TEMP")
+    if temp.len() > 0: return temp
+    "/tmp"
+
+fn ran(compiler: &str, base: &str, args: &List[str]) -> str:
+    let argv = [compiler.to_owned()]
+    for a in args: argv.push(a.to_owned())
+    let done = run_to_files_in(base, &argv, base ++ "/stdout", base ++ "/stderr")
+    f"{done.code}|" ++ (read_file(base ++ "/stdout") ?? "") ++ (read_file(base ++ "/stderr") ?? "")
+
+fn main:
+    let compiler = env("WITH_TEST_COMPILER")
+    assert(compiler.len() > 0)
+    let base = temp_root() ++ f"/with-behav-project-entry-{pid()}"
+    let _clean = remove_tree(base)
+    assert(mkdir_p(base ++ "/src") == 0)
+    assert(write_file(base ++ "/with.toml", "[package]\nname = \"entry\"\n") == 0)
+    assert(write_file(base ++ "/src/main.with", "fn main:\n    print(\"from src/main.with\")\n") == 0)
+    assert(write_file(base ++ "/build.with", "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build().executable(\"entry\", \"src/main.with\")\n    out.default(\"entry\")\n") == 0)
+    // `with run` with no file finds the project's build file.
+    let entry = ran(compiler, base, ["run"])
+    if not entry.starts_with("0|") or not entry.contains("from src/main.with"):
+        print("project entry: " ++ entry)
+        exit_code(1)
+    let _done = remove_tree(base)
+    print("ok")

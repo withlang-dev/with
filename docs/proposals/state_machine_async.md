@@ -460,13 +460,13 @@ to fiber-land. There is no `Executor` trait, no pluggable runtimes, no
 
 ```
 lib/std/async/sm/
-├── mod.w              // re-exports
-├── future.w           // Future trait, Poll enum
-├── waker.w            // Waker, RawWaker, RawWakerVTable, Context
-├── bridge.w           // into_task implementation
-├── reactor.w          // SmReactor
-├── combinators.w      // select, join, timeout, ready, pending
-└── io.w               // poll_read, poll_write, poll_accept adapters
+├── mod.with              // re-exports
+├── future.with           // Future trait, Poll enum
+├── waker.with            // Waker, RawWaker, RawWakerVTable, Context
+├── bridge.with           // into_task implementation
+├── reactor.with          // SmReactor
+├── combinators.with      // select, join, timeout, ready, pending
+└── io.with               // poll_read, poll_write, poll_accept adapters
 ```
 
 ### 8.2 `RawWaker` Implementation

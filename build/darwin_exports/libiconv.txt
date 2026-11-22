@@ -1,4 +1,4 @@
-# /usr/lib/libiconv.dylib exports, macOS 26.6.2 (tools/darwin_exports.w)
+# /usr/lib/libiconv.dylib exports, macOS 26.6.2 (tools/darwin_exports.with)
 __bsd___iconv
 __bsd___iconv_free_list
 __bsd___iconv_get_list

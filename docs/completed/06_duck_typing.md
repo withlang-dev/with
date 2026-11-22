@@ -70,17 +70,17 @@ for the caller:
 ```
 // Without bounds:
 error: type `str` does not support operator `*`
-  --> src/lib.w:1:28
+  --> src/lib.with:1:28
    |
 1  | fn triple[T](x: T): x * 3
    |                        ^ used here
    |
    = note: in instantiation of triple[str]
-   = note: called from src/main.w:4:5
+   = note: called from src/main.with:4:5
 
 // With bounds:
 error: type `str` does not satisfy bound `Mul`
-  --> src/main.w:4:5
+  --> src/main.with:4:5
    |
 4  | triple("hi")
    | ^^^^^^^^^^^^ `str` does not implement `Mul`
@@ -173,13 +173,13 @@ generic function body, the error message must include:
 
 ```
 error: type `str` does not support operator `*`
-  --> src/lib.w:1:28
+  --> src/lib.with:1:28
    |
 1  | fn triple[T](x: T): x * 3
    |                        ^ `*` used on type parameter `T`
    |
    = note: in instantiation triple[str]
-   = note: instantiated at src/main.w:4:5
+   = note: instantiated at src/main.with:4:5
    |
 4  | triple("hi")
    | ^^^^^^^^^^^^
@@ -189,13 +189,13 @@ For method calls:
 
 ```
 error: type `i32` has no method `len`
-  --> src/lib.w:2:12
+  --> src/lib.with:2:12
    |
 2  |     x.len()
    |       ^^^ method not found on `i32`
    |
    = note: in instantiation describe[i32]
-   = note: instantiated at src/main.w:8:5
+   = note: instantiated at src/main.with:8:5
 ```
 
 For multiple errors in one instantiation, report all of them,

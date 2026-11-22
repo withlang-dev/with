@@ -311,7 +311,7 @@ A trait marked `@[sealed]` may only be implemented within the module
 that defines it. Implementations in other modules are a compile error.
 
 ```
-// In module parser/token.w:
+// In module parser/token.with:
 
 @[sealed]
 trait Token:
@@ -483,9 +483,9 @@ Mechanism:
 
    ```
    error: connection refused
-     at src/db.w:42        (connect)
-     at src/repo.w:18      (find_user)
-     at src/handler.w:7    (get_dashboard)
+     at src/db.with:42        (connect)
+     at src/repo.with:18      (find_user)
+     at src/handler.with:7    (get_dashboard)
    ```
 
 Implementation priority: after fixpoint. This is a runtime library

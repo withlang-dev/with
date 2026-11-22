@@ -2,7 +2,7 @@
 
 Tracked in #1111, including the validator's false-green result.
 
-The seven-line reproduction in `test/phase/validate_all_defer_temporaries.w`
+The seven-line reproduction in `test/phase/validate_all_defer_temporaries.with`
 registers a deferred assertion, conditionally returns, then continues. With
 specification §2.4 requires deferred cleanup at scope exit. Its assertion-message
 temporary must be initialized before its drop on each execution path.
@@ -15,15 +15,15 @@ The native allocator route exposed this in the streaming gunzip helper after
 replacing raw allocation/manual cleanup with scoped ownership. In the actual
 test binary, LLDB stopped at `rt_munmap` with `x0=0x116e78000` and
 `x1=0x400010`: a string drop unmapped the owned output vector. The stack was
-`rt_free_unlocked_with_drop_origin` (`rt_core.w:1353`) ←
-`with_str_free_drop_origin` (`rt_core.w:2708`) ← `inflate_gzip` at
+`rt_free_unlocked_with_drop_origin` (`rt_core.with:1353`) ←
+`with_str_free_drop_origin` (`rt_core.with:2708`) ← `inflate_gzip` at
 `0x100009470`. The next `inflate` write faulted at `0x10000ae80`.
 Local evidence: `/tmp/with-gunzip-buffer-unmap-lldb.log` and
 `/tmp/with-gunzip-cases-crash-lldb.log`.
 
 LLDB on frozen compiler 519ec35f stopped at
 `MirBuilder.emit_defers_for_return+68` (`0x1007f6f54`), the `lower_expr`
-call corresponding to `MirLower.w:1132`. Its caller was `lower_return` through
+call corresponding to `MirLower.with:1132`. Its caller was `lower_return` through
 `lower_if`. Continuing to `register_stmt_temp` showed `w1=2` (the local) and
 `w2=16` (str), with the deferred expression on the stack. `lower_return`
 had already flushed its statement frame, so registration escaped into the
@@ -46,7 +46,7 @@ in the same dataflow driver: the sweep-bound product overflowed i32 on the large
 imported PCRE2 body. LLDB stopped at `mir_drop_state_compute_blocks+276`
 (`0x1004ee618`), the overflow branch after `smull`, with
 `x8=0x128f58d20`, `w9=0xa35b`, `w22=0xa35a`, and `w0=0x9b1f`.
-This is the multiplication at `Mir.w:2044`, before the first sweep. The bound
+This is the multiplication at `Mir.with:2044`, before the first sweep. The bound
 and sweep counter now use i64; a direct regression checks the 50,000-local,
 50,000-block bound without allocating a huge state table. Evidence:
 `/tmp/with-defer-validator-bound-lldb.log`.

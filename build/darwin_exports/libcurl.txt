@@ -1,4 +1,4 @@
-# /usr/lib/libcurl.dylib exports, macOS 26.6.2 (tools/darwin_exports.w)
+# /usr/lib/libcurl.dylib exports, macOS 26.6.2 (tools/darwin_exports.with)
 curl_easy_cleanup
 curl_easy_duphandle
 curl_easy_escape

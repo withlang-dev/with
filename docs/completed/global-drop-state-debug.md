@@ -10,7 +10,7 @@ validator rejects `clear` as `fn sym225 stmt0: drop of _2 ... (Uninit)`.
 LLDB stopped in MirDropStateKeys.initial at `0x10031d9b4` with `w23=2`
 (the global proxy) and `w8=0` (parameter count). The branch at `+248`
 falls through to `str wzr`, choosing Uninit without checking local_is_global.
-This is Mir.w's initial-state branch, not a missing runtime initialization.
+This is Mir.with's initial-state branch, not a missing runtime initialization.
 Evidence: `/tmp/with-global-drop-branch-lldb.log` and
 `/tmp/with-global-drop-verdict.log`.
 

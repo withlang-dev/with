@@ -7,7 +7,7 @@ Covers simple pipelines, fan-out/fan-in with multiple workers, and
 ## Files
 
 ```
-pipeline.w    Three demos: simple pipeline, fan-out, select
+pipeline.with    Three demos: simple pipeline, fan-out, select
 ```
 
 ## What It Demonstrates

@@ -23,9 +23,9 @@ src/main build :stage2
 The unchanged build reports success. Its stage2 was preserved as
 `out/cold-stage2` with its dSYM before rebuilding. It fails both:
 
-- `out/cold-stage2 check src/main.w`: the same `stderr` shadowing and
+- `out/cold-stage2 check src/main.with`: the same `stderr` shadowing and
   argument-type errors as CI, with 78,792 stderr lines.
-- Running that compiler's `test tests/one.w tests/two.w` in the existing
+- Running that compiler's `test tests/one.with tests/two.with` in the existing
   `c4r/out/tmp/pre-d-p7/cli_test_command_args` scratch project: the same ten
   missing `std.re.*` imports as CI.
 
@@ -35,7 +35,7 @@ instead has a populated manifest and interface.
 
 ## Exact branch
 
-LLDB against the preserved cold stage2, checking scratch `tests/one.w`:
+LLDB against the preserved cold stage2, checking scratch `tests/one.with`:
 
 ```
 breakpoint set -n embedded_bundle_present
@@ -55,10 +55,10 @@ w21 = 0x00000000   # slot zero
 0x100628cf8 <+136>: tbz w0, #0x0, 0x100628ce0
 ```
 
-That instruction takes the `continue` in `src/compiler/Compilation.w:574`.
+That instruction takes the `continue` in `src/compiler/Compilation.with:574`.
 The backtrace is `register_embedded_bundle_interfaces` →
 `load_link_bundles` → `compile_file` → `run_cli` → `main`.
-The generated compiler's DWARF attributes these frames to `main.w:1`;
+The generated compiler's DWARF attributes these frames to `main.with:1`;
 use function names and disassembly, not its displayed source lines.
 
 A separate LLDB stop in `link_stage_resolve_runtime_root`, while the
@@ -111,7 +111,7 @@ The focused verification passed after the repair:
 | Check | Cold baseline | Patched stage2 |
 |---|---|---|
 | Manifest/interface payloads | Both empty | Both nonempty |
-| `check src/main.w` | Exit 1, `stderr` collisions | Exit 0, `ok` |
+| `check src/main.with` | Exit 1, `stderr` collisions | Exit 0, `ok` |
 | Scratch-directory CLI test | Exit 1, missing `std.re.*` | One test passed |
 | Explicit missing embedding object | No override support | Exit 1 with the missing path |
 

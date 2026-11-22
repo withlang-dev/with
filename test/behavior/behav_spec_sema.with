@@ -1,0 +1,15 @@
+//! check-only
+
+// Spec conformance: semantics/type-system behavior
+// TODO: These tests require the spec_harness module which is an
+// internal test driver. Individual semantic features are tested
+// in their respective end-to-end test files:
+// - behav_struct.with (struct construction/methods)
+// - behav_trait.with (trait impl/dispatch)
+// - behav_generic.with (generic types)
+// - behav_for.with (for loop bindings)
+// - behav_match.with (match expressions)
+
+fn main:
+    let x = 42
+    assert(x == 42)

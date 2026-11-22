@@ -10,8 +10,8 @@ platforms: darwin, linux-x86_64
 new directory
 run: with init .
 run: with get c.libcurl
-write src/main.w from libcurl_main.w
-write src/contracts/libcurl.w:
+write src/main.with from libcurl_main.with
+write src/contracts/libcurl.with:
     // The libcurl facade — D66 (spec §16.2b.5 "Discriminated variadic
     // contracts", §16.2b.6 "Borrowed record views"): the first facade written
     // against the variadic ruling, over the real `curl/curl.h` (the one
@@ -21,7 +21,7 @@ write src/contracts/libcurl.w:
     //
     // Where it lives: in the acceptance scenario that uses it, which writes it
     // into the fresh project as its own contract (§16.2b.1; `c.libcurl` ships none yet):
-    // src/contracts/libcurl.w.
+    // src/contracts/libcurl.with.
     //
     // What the ruling asks for and where it is met (D66):
     //   CURL as an owned pointer resource ............... resource Easy

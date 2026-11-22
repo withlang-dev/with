@@ -8,7 +8,7 @@ remaining before D1.
 
 This is the design contract for Phase D. It supersedes v6 and reconciles the design with the completed pre-Phase-D implementation artifacts.
 
-The pre-Phase-D work documented in `docs/completed/pre-phase-d-plan.md` is complete through P8: audits, capability dispatch design, BuildOptions design, behavior tests, and the `src/main.w` action-runner refactor are all in place. The findings from those efforts are absorbed into this document. P9 records the verification baseline after this design revision.
+The pre-Phase-D work documented in `docs/completed/pre-phase-d-plan.md` is complete through P8: audits, capability dispatch design, BuildOptions design, behavior tests, and the `src/main.with` action-runner refactor are all in place. The findings from those efforts are absorbed into this document. P9 records the verification baseline after this design revision.
 
 ## Revision History
 
@@ -100,7 +100,7 @@ The public user model must not depend on whether the compiler executes capabilit
 These items are deliberately outside Phase D:
 
 * **`#run` directives invoked from inside an arbitrary source file.** With's general comptime mechanism is real and remains. What is not added is a top-level directive that causes a function to execute at the compile time of its own file. Build entry points are invoked by the compiler driver, not by user-placed `#run` directives.
-* **Default-metaprogram replacement for arbitrary source builds.** `with build` uses `build.w` if present. `build.w` is the metaprogram; there is no separate default to replace.
+* **Default-metaprogram replacement for arbitrary source builds.** `with build` uses `build.with` if present. `build.with` is the metaprogram; there is no separate default to replace.
 * **Direct AST or Sema mutation from user comptime code.** Code generation is performed through `Workspace.add_string`. Direct AST mutation is permanently out.
 * **Raw AST handles exposed to comptime code.** Comptime code receives `DeclSummary`, never internal AST or Sema nodes.
 * **Cross-process or RPC capability transport.** Implementation is in-process. APIs remain boundary-safe so cross-process transport is possible later if needed.
@@ -116,7 +116,7 @@ This section absorbs findings from `docs/audits/comptime-eval-audit.md`.
 
 ### Current State of ComptimeEval
 
-The existing `src/ComptimeEval.w` evaluator handles:
+The existing `src/ComptimeEval.with` evaluator handles:
 
 * Constant expression evaluation for `const X: T = expr` declarations.
 * Compile-time function invocation for functions referenced in constant contexts.
@@ -471,7 +471,7 @@ The current CLI parser for `with build` mutates `Compilation` state directly. Th
 
 This refactor is the largest single piece of D2 integration work. It touches:
 
-* Argument parsing, which lives in `src/main.w`.
+* Argument parsing, which lives in `src/main.with`.
 * Default value computation.
 * Validation: mutually exclusive flags, target-host compatibility, and related cross-field checks.
 * The main driver loop, which now calls a workspace instead of mutating `Compilation` directly.
@@ -761,11 +761,11 @@ If a future phase introduces work-stealing or a more sophisticated scheduler, th
 
 The following compiler areas need integration work. Several involve real refactors and are called out as such.
 
-* **`src/main.w`**: replace generated build/action runner execution with comptime evaluator dispatch. **The CLI argument parser for `with build` is refactored to produce a `BuildOptions` value rather than mutating `Compilation` state directly.** A direct source build (`with build src.w`) constructs an implicit workspace from the produced `BuildOptions` and drives it through the same evaluator path as explicit workspaces. This refactor is the largest single piece of integration work; it touches argument parsing, default values, validation, and the main driver loop. The pre-D refactor isolated the action-runner code into a small set of named functions; D1 replaces those functions with evaluator dispatch.
+* **`src/main.with`**: replace generated build/action runner execution with comptime evaluator dispatch. **The CLI argument parser for `with build` is refactored to produce a `BuildOptions` value rather than mutating `Compilation` state directly.** A direct source build (`with build src.with`) constructs an implicit workspace from the produced `BuildOptions` and drives it through the same evaluator path as explicit workspaces. This refactor is the largest single piece of integration work; it touches argument parsing, default values, validation, and the main driver loop. The pre-D refactor isolated the action-runner code into a small set of named functions; D1 replaces those functions with evaluator dispatch.
 
-* **`src/compiler/Compilation.w`**: owns workspace lifecycle, phase emission, per-workspace message queues, generated-source re-entry with generation tracking, hook scheduling, and `BuildResult` construction. The compilation entry point gains explicit phase emission calls at each integration point listed in §8.
+* **`src/compiler/Compilation.with`**: owns workspace lifecycle, phase emission, per-workspace message queues, generated-source re-entry with generation tracking, hook scheduling, and `BuildResult` construction. The compilation entry point gains explicit phase emission calls at each integration point listed in §8.
 
-* **`src/ComptimeEval.w`**: extended per §3. E1 (capability dispatch) and E2 (intrinsic effect dispatch) land in D1. E3 (cooperative suspension) lands in D4.
+* **`src/ComptimeEval.with`**: extended per §3. E1 (capability dispatch) and E2 (intrinsic effect dispatch) land in D1. E3 (cooperative suspension) lands in D4.
 
 * **Parser / Ast**: support named in-memory source units from `Workspace.add_string`. Source manager extended to track virtual file paths for generated sources.
 
@@ -785,7 +785,7 @@ Phase D is sliced into D1 through D8. Each slice is its own commit or short sequ
 
 ### D1: Capability-Bearing Comptime Evaluator (No Message Loop)
 
-Implement comptime evaluator dispatch for `build.w` and `Action` targets through capability-bearing comptime functions. Implement evaluator extensions E1 and E2: capability dispatch and intrinsic effect dispatch. Do not implement E3 suspension; that lives in D4.
+Implement comptime evaluator dispatch for `build.with` and `Action` targets through capability-bearing comptime functions. Implement evaluator extensions E1 and E2: capability dispatch and intrinsic effect dispatch. Do not implement E3 suspension; that lives in D4.
 
 D1 lands as one PR but may be split into two review commits for clarity:
 
@@ -806,8 +806,8 @@ Scope:
 
 Removed:
 
-* Generated `__with_build_runner.*.w` files.
-* Generated `__with_build_action_runner.*.w` files.
+* Generated `__with_build_runner.*.with` files.
+* Generated `__with_build_action_runner.*.with` files.
 * Action runner binary compilation and execution.
 * Environment variable transport for capability tokens.
 
@@ -820,7 +820,7 @@ Focused verification:
 
 ### D2: BuildOptions and CLI Unification
 
-Refactor CLI parsing for `with build` to produce `BuildOptions`. Implement `BuildOptions` and `MigrateOptions` structs. Direct source builds (`with build src.w`) construct an implicit workspace internally.
+Refactor CLI parsing for `with build` to produce `BuildOptions`. Implement `BuildOptions` and `MigrateOptions` structs. Direct source builds (`with build src.with`) construct an implicit workspace internally.
 
 Scope:
 
@@ -842,7 +842,7 @@ Focused verification:
 
 * BuildOptions compatibility fixtures from `docs/design/build-options.md` pass byte-for-byte.
 * `with build :build`, `with build :fixpoint`, and `with build :test` pass.
-* Direct `with build src.w` produces identical output to pre-D2.
+* Direct `with build src.with` produces identical output to pre-D2.
 * Other subcommands continue to work unchanged.
 
 ### D3: Sequential Workspace Skeleton
@@ -949,11 +949,11 @@ Replace action implementations that shell out to `with build` with direct worksp
 
 Scope:
 
-* `build_compiler.w` stage builders use `workspace.compile()` where they invoke the compiler only to compile With source.
-* `build_emit_c.w` emit-C flows use `workspace.compile()` with `emit_c = true`.
-* `build_pcre2.w` migration uses `workspace.compile()` with migration options where appropriate.
-* `build_seed.w` continues using ProcessRunner where a different compiler binary or process boundary is the point of the action.
-* `build_selfhost.w` test fixtures that compile With source use workspaces; fixtures that test the CLI process boundary remain as ProcessRunner calls.
+* `build_compiler.with` stage builders use `workspace.compile()` where they invoke the compiler only to compile With source.
+* `build_emit_c.with` emit-C flows use `workspace.compile()` with `emit_c = true`.
+* `build_pcre2.with` migration uses `workspace.compile()` with migration options where appropriate.
+* `build_seed.with` continues using ProcessRunner where a different compiler binary or process boundary is the point of the action.
+* `build_selfhost.with` test fixtures that compile With source use workspaces; fixtures that test the CLI process boundary remain as ProcessRunner calls.
 
 Focused verification:
 
@@ -968,7 +968,7 @@ Implement one real compiler-tooling use case on `DeclSummary` and the message lo
 
 Scope:
 
-* A migrator integration in `build.w` that:
+* A migrator integration in `build.with` that:
 
   * Creates a workspace for migrated source.
   * Intercepts compilation.
@@ -1015,7 +1015,7 @@ This document depends on the following pre-Phase-D artifacts:
 * `docs/completed/pre-phase-d-plan.md` — the pre-D work contract.
 * `docs/audits/comptime-eval-audit.md` — ComptimeEval audit findings, absorbed into §3.
 * `docs/audits/parallel-state-audit.md` — global state enumeration, absorbed into §11.
-* `docs/audits/build-script-survey.md` — current build.w inventory, referenced by D7 scope.
+* `docs/audits/build-script-survey.md` — current build.with inventory, referenced by D7 scope.
 * `docs/design/capability-dispatch.md` — capability mechanism design, absorbed into §4.
 * `docs/design/build-options.md` — BuildOptions and CLI design, absorbed into §6.
 * `docs/audits/pre-d1-baseline.md` — verification baseline captured before D1 begins.

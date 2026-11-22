@@ -5,7 +5,7 @@
 This plan is for the self-hosted compiler path only:
 
 - `src/compiler/*`
-- `src/main.w` (selfhost CLI flag plumbing)
+- `src/main.with` (selfhost CLI flag plumbing)
 
 Do not route this work through bootstrap-only orchestration paths for this task.
 
@@ -43,13 +43,13 @@ Additional policy guard (to avoid confusing shadowing):
 
 ---
 
-## File: `lib/std/prelude.w`
+## File: `lib/std/prelude.with`
 
 Use a plain module with plain `use` declarations (no re-export syntax
 dependency).
 
 ```with
-// lib/std/prelude.w
+// lib/std/prelude.with
 // Keep this list to modules/names that do not create unresolved collisions
 // in the current import model.
 
@@ -72,7 +72,7 @@ Notes:
 ### Core prelude file
 
 ```with
-// lib/std/prelude_core.w
+// lib/std/prelude_core.with
 use std.string
 use std.math
 ```
@@ -85,7 +85,7 @@ use std.math
 
 Inject the implicit prelude in the selfhost frontend import pipeline:
 
-- `src/compiler/Frontend.w`
+- `src/compiler/Frontend.with`
 - via `Zcu.compile_source_frontend(...)` / import expansion helpers
 
 Do not implement this in bootstrap `Driver` flow for this task.
@@ -108,11 +108,11 @@ if prelude_mode == PRELUDE_NONE:
 
 For this implicit path only, resolve directly to:
 
-- `lib/std/prelude.w`
-- `lib/std/prelude_core.w`
+- `lib/std/prelude.with`
+- `lib/std/prelude_core.with`
 
 Do not route implicit prelude resolution through normal source-dir-first
-module search order; that prevents local `std/prelude.w` (or similarly
+module search order; that prevents local `std/prelude.with` (or similarly
 named files) from accidentally shadowing the standard prelude.
 
 ---
@@ -145,7 +145,7 @@ behavior unchanged.
 ### Normal (default)
 
 ```bash
-with build program.w
+with build program.with
 ```
 
 Implicitly imports `std.prelude`.
@@ -153,7 +153,7 @@ Implicitly imports `std.prelude`.
 ### `--no-prelude`
 
 ```bash
-with build --no-prelude program.w
+with build --no-prelude program.with
 ```
 
 No implicit prelude import.
@@ -161,7 +161,7 @@ No implicit prelude import.
 ### `--prelude=core`
 
 ```bash
-with build --prelude=core program.w
+with build --prelude=core program.with
 ```
 
 Implicitly imports `std.prelude_core`.
@@ -169,7 +169,7 @@ Implicitly imports `std.prelude_core`.
 ### `--freestanding`
 
 ```bash
-with build --freestanding program.w
+with build --freestanding program.with
 ```
 
 Equivalent policy target:
@@ -185,13 +185,13 @@ In this tree, thread this consistently with existing `--no-std`.
 
 ### 1. Prelude source files
 
-- [x] Add `lib/std/prelude.w` (full)
-- [x] Add `lib/std/prelude_core.w` (minimal)
+- [x] Add `lib/std/prelude.with` (full)
+- [x] Add `lib/std/prelude_core.with` (minimal)
 - [x] Ensure both parse and import correctly as normal modules
 
 ### 2. Frontend implicit-use injection
 
-- [x] Add helper in `src/compiler/Frontend.w` to synthesize a `use` decl
+- [x] Add helper in `src/compiler/Frontend.with` to synthesize a `use` decl
       from module path segments.
 - [x] Inject the selected prelude use before explicit user imports are
       expanded.
@@ -205,8 +205,8 @@ In this tree, thread this consistently with existing `--no-std`.
 - [x] Parse `--prelude=core|full`
 - [x] Parse/alias `--freestanding` to "no prelude + no std/runtime policy"
 - [x] Thread through:
-      `src/main.w` -> `src/compiler/Compilation/Config.w`
-      -> `src/compiler/Compilation.w` -> frontend/ZCU state
+      `src/main.with` -> `src/compiler/Compilation/Config.with`
+      -> `src/compiler/Compilation.with` -> frontend/ZCU state
 
 ### 4. Hardcoded symbol cleanup (phased)
 
@@ -255,6 +255,6 @@ Long-term target remains: everything user-facing (`println`, `assert`,
 ## Long-Term Follow-up (When Language Support Expands)
 
 When selective re-export/import support exists (`pub use`-style and
-symbol-level conflict controls), upgrade `prelude.w` from module-level
+symbol-level conflict controls), upgrade `prelude.with` from module-level
 `use` to granular exports. That enables cleaner inclusion of modules like
 `std.option`/`std.result` without free-function name collisions.

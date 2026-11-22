@@ -1,0 +1,8 @@
+//! expect-exit: 134
+//! expect-stderr: panic: cannot parse u8 from "300": overflow
+//! expect-stderr:   at test/behavior/behav_d204_text_cast_out_of_range_says_overflow.with:7:13
+// §15.5 (D204): a value the type cannot hold fails, and the panic says so.
+// `300 as u8` is 44 (§4.2.6); text states a value, and 300 is no `u8`.
+fn main:
+    let n = "300" as u8
+    print(n)

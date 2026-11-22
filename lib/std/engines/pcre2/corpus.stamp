@@ -3,5 +3,5 @@
 # modules (the integrity check compares it) and the trigger that justified
 # the promotion (the pin moved, a migrator-pin bump, a ruling).
 migrated_by d3116973412123580f542e7c1a0dd53b402317c53719b01e5c6fd53507b15680
-modules a8ed2e70886b0615aa70a82edc133e628c9f732019ae73ca0db79e96ffbbc5c8
-promoted_for ruling:D177
+modules 9c0abab623e34a6da2194aa975ff29e2d9888ef1a40668ca706c6781ba6dff95
+promoted_for ruling:D228

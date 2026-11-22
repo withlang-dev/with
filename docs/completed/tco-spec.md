@@ -566,7 +566,7 @@ Example:
 
 ```text
 error: recursive call is not in tail position
-  --> foo.w:12:16
+  --> foo.with:12:16
    |
 12 |     1 + fact(n - 1)
    |         ^^^^^^^^^^^ call result is used by `+`
@@ -577,7 +577,7 @@ Example for mutual recursion:
 
 ```text
 error: mutual tail-recursive cycle cannot be guaranteed stack-constant
-  --> parser.w:44:20
+  --> parser.with:44:20
    |
 44 |     parse_expr(ctx)
    |     ^^^^^^^^^^^^^^^ recursive edge enters `parse_expr`
@@ -590,7 +590,7 @@ Example for unsupported ABI:
 
 ```text
 error: recursive edge requires unsupported return ABI for `@[tailrec]`
-  --> foo.w:31:12
+  --> foo.with:31:12
    |
 31 |     return bar(x)
    |            ^^^^^^ recursive edge returns through an incompatible sret slot
@@ -602,7 +602,7 @@ Example for heterogeneous SCC support not implemented:
 
 ```text
 error: mutual `@[tailrec]` cycle has differing function signatures
-  --> control.w:88:16
+  --> control.with:88:16
    |
 88 |     return next_label(state, code)
    |            ^^^^^^^^^^^^^^^^^^^^^^^ recursive edge changes active SCC frame shape

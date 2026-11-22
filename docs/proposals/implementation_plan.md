@@ -30,7 +30,7 @@ install targets.
    should close its matching test issue whenever the implementation and tests
    are naturally one change.
 4. Runtime and link-path changes follow the bootstrap sequencing rules in
-   `AGENTS.md`; do not mix runtime-object changes with `Link.w` activation in
+   `AGENTS.md`; do not mix runtime-object changes with `Link.with` activation in
    the same commit.
 
 ## Phase 0: Baseline Decisions and Drift Gates

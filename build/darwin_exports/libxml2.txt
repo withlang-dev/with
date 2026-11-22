@@ -1,4 +1,4 @@
-# /usr/lib/libxml2.dylib exports, macOS 26.6.2 (tools/darwin_exports.w)
+# /usr/lib/libxml2.dylib exports, macOS 26.6.2 (tools/darwin_exports.with)
 UTF8ToHtml
 UTF8Toisolat1
 __docbDefaultSAXHandler

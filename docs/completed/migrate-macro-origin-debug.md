@@ -94,7 +94,7 @@ whose replacement is `x + 1` must retain C's precedence when used in
 `3 * MACRO(x)`. Unsupported paste/stringification dependencies retain the
 existing untranslated-macro handling rather than emitting a missing call.
 
-`behav_migrate_macro_origins.w` covers system object/function macros,
+`behav_migrate_macro_origins.with` covers system object/function macros,
 preprocessing-driver macros, corpus and project-header macros, a project
 alias of a system constant, nested function-like dependencies, object aliases
 of callable macros, unparenthesized replacement precedence, compound integer
@@ -104,13 +104,13 @@ code, and ordinary `c_import` of the same header.
 ## Iterate verification
 
 The three targeted behavior files pass with the rebuilt stage2 compiler:
-`behav_migrate_macro_origins.w`, `behav_c_import_macros_no_cc.w`, and
-`behav_c_import_compound_literal_macro.w`. Compiler source checks pass.
+`behav_migrate_macro_origins.with`, `behav_c_import_macros_no_cc.with`, and
+`behav_c_import_compound_literal_macro.with`. Compiler source checks pass.
 
 PCRE2 and zlib were regenerated through their build actions using this
 compiler. PCRE2 translated all 33 source files; zlib translated its 15 library
 files and both harnesses. Every generated implementation file remains
-byte-identical to the committed corpus. Only `defs.w` changes: private host
+byte-identical to the committed corpus. Only `defs.with` changes: private host
 macros disappear, and project macro declarations retain or regain their
 translated bodies, including PCRE2's `S32OVERFLOW`. The complete PCRE2 bundle
 source set and the zlib facade pass source checks after promotion. Full batch

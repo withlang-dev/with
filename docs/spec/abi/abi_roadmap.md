@@ -32,11 +32,11 @@ alone (`docs/spec/toolchain/wo_bundles.md`). The `.wo` object key is
 
     corpus content sha × target × sha256(ABI-defining sources)
 
-where the ABI-defining sources are today `src/FnAbi.w` and
-`src/TypeLayout.w` (`docs/with-abi.sha256`), extended as ABI rules move
+where the ABI-defining sources are today `src/FnAbi.with` and
+`src/TypeLayout.with` (`docs/with-abi.sha256`), extended as ABI rules move
 out of the large files. This is Go's toolchain-keyed cache applied to
 exactly the ABI subset: reuse is automatic, invalidation is automatic, and
-no version number has to be remembered. `WITH_ABI_VERSION` in `FnAbi.w`
+no version number has to be remembered. `WITH_ABI_VERSION` in `FnAbi.with`
 is a human-readable label for the documentation's version history, not
 part of the key.
 

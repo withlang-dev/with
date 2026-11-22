@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "with run \"$CLAUDE_PROJECT_DIR\"/tools/hooks/battery_guard.w"
+            "command": "with run \"$CLAUDE_PROJECT_DIR\"/tools/hooks/battery_guard.with"
           }
         ]
       }
@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "with run \"$CLAUDE_PROJECT_DIR\"/tools/hooks/stop_guard.w",
+            "command": "with run \"$CLAUDE_PROJECT_DIR\"/tools/hooks/stop_guard.with",
             "timeout": 60
           }
         ]

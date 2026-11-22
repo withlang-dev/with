@@ -1,20 +1,20 @@
 foreign-contract view	v1
-resource Engine wraps *mut engine; representation: pointer; contract:engine@test/contract/ok_citation_covers.w; clause:resource@test/contract/ok_citation_covers.w:16
-    producer: engine_new -> Engine.new; production: direct return; NULL is None  [claim: stated@test/contract/ok_citation_covers.w:17]
+resource Engine wraps *mut engine; representation: pointer; contract:engine@test/contract/ok_citation_covers.with; clause:resource@test/contract/ok_citation_covers.with:16
+    producer: engine_new -> Engine.new; production: direct return; NULL is None  [claim: stated@test/contract/ok_citation_covers.with:17]
     status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
-    destroyer: engine_free; automatic: Drop calls it while the value is live  [claim: stated@test/contract/ok_citation_covers.w:18]
+    destroyer: engine_free; automatic: Drop calls it while the value is live  [claim: stated@test/contract/ok_citation_covers.with:18]
     dependency: none via engine_new; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
     thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
     invalidation: views invalidated by: engine_free, engine_peek, engine_name; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
-fn engine_peek; contract:engine@test/contract/ok_citation_covers.w; clause:fn@test/contract/ok_citation_covers.w:19
+fn engine_peek; contract:engine@test/contract/ok_citation_covers.with; clause:fn@test/contract/ok_citation_covers.with:19
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
-    effect: param 0: *mut engine e: lend, the described fn's assertion; receives Engine  [claim: stated@test/contract/ok_citation_covers.w:19]
+    effect: param 0: *mut engine e: lend, the described fn's assertion; receives Engine  [claim: stated@test/contract/ok_citation_covers.with:19]
     returns: i32  [default:as declared]
     invalidates: Engine (param 0: *mut engine e)  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Engine.peek  [default:presentation sugar from the resource prefix (§16.2b.11)]
-fn engine_name; contract:engine@test/contract/ok_citation_covers.w; clause:fn@test/contract/ok_citation_covers.w:20
+fn engine_name; contract:engine@test/contract/ok_citation_covers.with; clause:fn@test/contract/ok_citation_covers.with:20
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
-    effect: param 0: *mut engine e: lend, the described fn's assertion; receives Engine  [claim: stated@test/contract/ok_citation_covers.w:20]
+    effect: param 0: *mut engine e: lend, the described fn's assertion; receives Engine  [claim: stated@test/contract/ok_citation_covers.with:20]
     returns: i32  [default:as declared]
     invalidates: Engine (param 0: *mut engine e)  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Engine.name  [default:presentation sugar from the resource prefix (§16.2b.11)]

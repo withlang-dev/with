@@ -10,8 +10,8 @@ new directory
 env WITH_GET_CMAKE_RAYLIB=PLATFORM=Memory;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF
 run: with init .
 run: with get c.raylib
-write src/main.w from raylib_spiral_main.w
-run: with check src/main.w
+write src/main.with from raylib_spiral_main.with
+run: with check src/main.with
 expect stdout: ok
 run: with run
 expect exit: 0

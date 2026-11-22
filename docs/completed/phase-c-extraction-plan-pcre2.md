@@ -15,15 +15,15 @@ The extracted code will live in a new project-local module:
 module build_pcre2
 ```
 
-at repository root as `build_pcre2.w`.
+at repository root as `build_pcre2.with`.
 
-It does not belong in `lib/std/build.w`: PCRE2 release URLs, reference-tree
+It does not belong in `lib/std/build.with`: PCRE2 release URLs, reference-tree
 normalization, migration exclusion lists, generated stdlib promotion, and corpus
 policy are specific to this repository.
 
 ## 2. What Moves
 
-Move from `src/BuildGraphPcre2.w`:
+Move from `src/BuildGraphPcre2.with`:
 
 - PCRE2 reference preparation helpers:
   - `pcre2_split_lines`
@@ -57,13 +57,13 @@ Move from `src/BuildGraphPcre2.w`:
   - `build_graph_copy_w_files`
   - `build_graph_run_pcre2_build`
 
-Remove from `src/main.w`:
+Remove from `src/main.with`:
 
 - all dispatch branches for kinds `1005`, `1006`, `1007`, `1008`, `1021`, and
   `1022`
 - `use BuildGraphPcre2` if no remaining source uses it
 
-Move from `build.w`:
+Move from `build.with`:
 
 - `project_kind_pcre2_run_test()`
 - `project_kind_pcre2_generated_check()`
@@ -139,7 +139,7 @@ must fail with the existing regenerate-graph diagnostic.
 After extraction, generic compiler-driver code must not dispatch any PCRE2
 project kind and must not import `BuildGraphPcre2`.
 
-If `src/BuildGraphPcre2.w` becomes empty, delete it.
+If `src/BuildGraphPcre2.with` becomes empty, delete it.
 
 ## 7. Parity Standard
 
@@ -165,7 +165,7 @@ For each prerequisite capability slice:
 
 1. Implement the generic capability.
 2. Add focused build-system tests.
-3. Run `out/bin/with check lib/std/build.w`.
+3. Run `out/bin/with check lib/std/build.with`.
 4. Run the focused selfhost target.
 5. Run `make build`.
 6. Run `make fixpoint`.

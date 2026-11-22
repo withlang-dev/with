@@ -38,12 +38,12 @@ Wave 11 exit gate:
     - `bootstrap/test/run_phase6_c_import_cache_invalidation_tests.sh`
     - `bootstrap/test/run_phase6_c_import_macro_diagnostics_tests.sh`
 - Existing self-host implementation:
-  - `src/main.w`
-  - `src/Driver.w`
-  - `src/Resolve.w`
-  - `src/Parser.w`
-  - `src/CImport.w`
-  - `src/Compilation.w`
+  - `src/main.with`
+  - `src/Driver.with`
+  - `src/Resolve.with`
+  - `src/Parser.with`
+  - `src/CImport.with`
+  - `src/Compilation.with`
   - `scripts/parity_states.sh`
 - Reference architecture:
   - Zig:
@@ -156,16 +156,16 @@ Each `KNOWN_DIVERGENCE` entry must include:
 
 Implementation (expected touch points):
 
-- `src/main.w` (command surface, option parsing, command diagnostics)
-- `src/Driver.w` (pipeline orchestration boundaries, linking, artifact policy)
-- `src/Compilation.w` (driver-wrapper behavior exposed to CLI modes)
-- `src/Resolve.w` (c_import link-lib extraction and deterministic ordering)
-- `src/Parser.w` (c_import syntax/keyword diagnostics parity)
-- `src/CImport.w` (cache behavior, macro/snippet diagnostics, finalization)
+- `src/main.with` (command surface, option parsing, command diagnostics)
+- `src/Driver.with` (pipeline orchestration boundaries, linking, artifact policy)
+- `src/Compilation.with` (driver-wrapper behavior exposed to CLI modes)
+- `src/Resolve.with` (c_import link-lib extraction and deterministic ordering)
+- `src/Parser.with` (c_import syntax/keyword diagnostics parity)
+- `src/CImport.with` (cache behavior, macro/snippet diagnostics, finalization)
 
 Tests/scripts (new):
 
-- `test/wave11/cases/*.w`
+- `test/wave11/cases/*.with`
 - `test/wave11/driver_corpus.txt`
 - `test/wave11/coverage_manifest.txt`
 - `test/wave11/coverage_matrix.md`
@@ -317,8 +317,8 @@ Any uncovered behavior requires either:
 - 2026-03-04: Wave 11 unit harness passes via `scripts/run_wave11_driver_unit_tests.sh`.
 - 2026-03-04: Wave 11 parity harness passes via `scripts/run_wave11_driver_parity.sh` (`processed=30`, `failures=0`, `known_divergences=2`).
 - Accepted Wave 11 known divergences are documented in `test/wave11/driver_corpus.txt`:
-  - `check|test/wave11/cases/c_import_macro_constants_ok.w` (`correct_compiler=selfhost`)
-  - `check|test/wave11/cases/c_import_macro_function_like_ok.w` (`correct_compiler=selfhost`)
+  - `check|test/wave11/cases/c_import_macro_constants_ok.with` (`correct_compiler=selfhost`)
+  - `check|test/wave11/cases/c_import_macro_function_like_ok.with` (`correct_compiler=selfhost`)
 - Coverage gate passes via `scripts/verify_wave11_coverage.sh` (`processed=9`).
 - Wave 11 CLI parity harness now executes missing-arg/unknown-flag checks in isolated temp directories and applies CLI timeouts to avoid false hangs.
 

@@ -45,7 +45,7 @@ test infrastructure:
 
 ### Phase 1: Parser — `@[bench]` attribute
 
-**File:** `src/Parser.w`
+**File:** `src/Parser.with`
 
 Add `@[bench]` attribute parsing, mirroring `@[test]`.
 
@@ -64,7 +64,7 @@ Add `@[bench]` attribute parsing, mirroring `@[test]`.
 
 ### Phase 2: Bench type in stdlib
 
-**File:** `lib/test/bench.w` (new)
+**File:** `lib/test/bench.with` (new)
 
 Provide the `Bench` type that users interact with:
 
@@ -143,7 +143,7 @@ Uses `time.now_ns()` from Phase 6 (`with_clock_nanos` runtime function).
 
 ### Phase 3: Result formatting
 
-**File:** `lib/test/bench.w` (continued)
+**File:** `lib/test/bench.with` (continued)
 
 Add result formatting, following Go's output format:
 
@@ -161,7 +161,7 @@ fn Bench.report(self: &Bench, name: str):
 
 ### Phase 4: Discovery in the test runner
 
-**File:** `src/main.w`
+**File:** `src/main.with`
 
 Extend `discover_test_functions` to also discover benchmarks.
 
@@ -176,7 +176,7 @@ Extend `discover_test_functions` to also discover benchmarks.
 
 ### Phase 5: `with bench` command
 
-**File:** `src/main.w`
+**File:** `src/main.with`
 
 Add the `with bench` command handler, mirroring `run_test_command`.
 
@@ -229,7 +229,7 @@ int64_t with_clock_nanos(void) {
 }
 ```
 
-**File:** `lib/std/time.w` — add:
+**File:** `lib/std/time.with` — add:
 ```
 extern fn with_clock_nanos() -> i64
 
@@ -237,7 +237,7 @@ pub fn now_ns() -> i64:
     with_clock_nanos()
 ```
 
-`lib/std/time.w` currently has `with_time_now()` (seconds since epoch)
+`lib/std/time.with` currently has `with_time_now()` (seconds since epoch)
 and `clock()` (CPU ticks) but no monotonic nanosecond timer exposed.
 
 **Verify:** `make build && make fixpoint`
@@ -260,7 +260,7 @@ Execute in this order (each step: build + fixpoint):
 
 After all phases:
 
-1. Write `examples/bench_demo.w`:
+1. Write `examples/bench_demo.with`:
    ```
    fn do_work():
        let mut sum = 0
@@ -272,7 +272,7 @@ After all phases:
        b.run(do_work)
    ```
 
-2. Run: `./out/bin/with-stage2 bench examples/bench_demo.w`
+2. Run: `./out/bin/with-stage2 bench examples/bench_demo.with`
 
 3. Expected output:
    ```
@@ -282,7 +282,7 @@ After all phases:
 
 4. `make build && make fixpoint`
 
-5. Write `test/behavior/behav_bench_discovery.w` to verify both
+5. Write `test/behavior/behav_bench_discovery.with` to verify both
    `@[bench]` attribute and `bench_*` naming convention are discovered.
 
 ---

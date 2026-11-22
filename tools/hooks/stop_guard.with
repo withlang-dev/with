@@ -1,0 +1,97 @@
+// Claude Code Stop hook: a turn does not end while the goal has work the
+// agent may do.
+//
+// The rule "never end a turn while work remains" was prose three times
+// (2026-10-31, 2026-11-15, 2026-11-17) and failed three times: the agent
+// judged its own stop, at the end of a long turn, and a background wait on
+// CI satisfied the letter of it. This is the check the agent does not run.
+//
+// A goal is active while `goal-prompt.md` exists at the project root (the
+// maintainer writes it and removes it). While it is, the turn may end only
+// when:
+//   - a job of the agent's is running: a battery (its slot is live, or its
+//     process is, since the battery takes its slot only after its census
+//     and sources checks), or any process working in a staging worktree (a
+//     build, a sweep, a seed leg). The machine is taken, and the job's
+//     completion wakes the agent. Refusing here made a filler turn of
+//     every battery start (2026-11-18); or
+//   - no open issue is left that the agent may work: every open issue
+//     carries `human attn needed`, `blocked` or `held` (D225: not worked
+//     until someone asks for it).
+// Otherwise the stop is refused and the open issues are named, so the next
+// action is one of them. An issue the agent cannot move is labelled
+// `human attn needed`, with the reason in a comment: that is the only way
+// to take it out of the queue, and it is visible to the maintainer.
+// An issue an open pull request closes is already being landed and is not
+// listed. An issue that waits on another open issue (a ruling on its
+// grammar, a decision upstream of it) is labelled `blocked`, with the
+// blocker named in a comment: it is not the maintainer's to answer and not
+// the agent's to move, and naming it every turn made filler work
+// (2026-11-18). Whoever closes the blocker removes the label.
+//
+// The queue is `gh issue list`; its last good answer is kept, and is used
+// when GitHub cannot be reached (a failed lookup never opens the door).
+// WITH_STOP_GUARD_QUEUE names a file to read the queue from instead (the
+// cases file uses it).
+//
+// Exit 2 refuses the stop and shows the reason; anything else allows.
+use std.io
+use std.fs
+use std.process
+
+fn slot_dir -> str: env("HOME") ++ "/.local/with-green/battery-slots"
+
+fn alive(pid: str) -> bool: pid.len() > 0 and run_to_files(&["ps", "-p", pid, "-o", "pid="], "/dev/null", "/dev/null", 5000).code == 0
+
+fn battery_running() -> bool:
+    for i in 0..2:
+        let path = slot_dir() ++ f"/{i}"
+        if not file_exists(path): continue
+        if alive((read_file(path) ?? "").split("\n")[0].split("\t")[0]): return true
+    false
+
+// A process whose command line names the battery tool or a staging
+// worktree. WITH_STOP_GUARD_JOBS=none says there is none (the cases use it).
+fn agent_job_running() -> bool:
+    if env("WITH_STOP_GUARD_JOBS") == "none": return false
+    for pattern in ["tools/battery.with", "/.local/with-staging/"]:
+        if run_to_files(&["pgrep", "-f", pattern], "/dev/null", "/dev/null", 5000).code == 0: return true
+    false
+
+// The issues open pull requests close, one number per line; "" when GitHub
+// cannot be reached (nothing is hidden then).
+fn landing() -> str:
+    if env("WITH_STOP_GUARD_QUEUE").len() > 0: return ""
+    let out = env("HOME") ++ "/.local/with-green/stop-guard-landing.new"
+    let listed = run_to_files(&["gh", "pr", "list", "--state", "open", "--limit", "200", "--json", "closingIssuesReferences", "--jq", ".[].closingIssuesReferences[].number"], out, "/dev/null", 30000)
+    if listed.code != 0: "" else: read_file(out) ?? ""
+
+fn cache_path -> str: env("HOME") ++ "/.local/with-green/stop-guard-queue.tsv"
+
+// `number<TAB>title` for each open issue the agent may work.
+fn queue() -> str:
+    let given = env("WITH_STOP_GUARD_QUEUE")
+    if given.len() > 0: return read_file(given) ?? ""
+    let out = env("HOME") ++ "/.local/with-green/stop-guard-queue.new"
+    let listed = run_to_files(&["gh", "issue", "list", "--state", "open", "--limit", "500", "--json", "number,title,labels", "--jq", ".[] | select([.labels[].name] | (index(\"human attn needed\") or index(\"blocked\") or index(\"held\")) | not) | \"\\(.number)\\t\\(.title)\""], out, "/dev/null", 30000)
+    if listed.code != 0: return read_file(cache_path()) ?? ""
+    let text = read_file(out) ?? ""
+    write_file(cache_path(), text)
+    text
+
+let root = env("CLAUDE_PROJECT_DIR")
+if root.len() == 0 or not file_exists(root ++ "/goal-prompt.md"): exit_code(0)
+if battery_running() or agent_job_running(): exit_code(0)
+
+let in_flight = landing().split("\n")
+let open = []
+for line in queue().split("\n"):
+    if line.len() > 0 and not in_flight.contains(line.split("\t")[0]): open.push(line)
+
+
+if open.len() == 0: exit_code(0)
+
+eprint(f"stop guard: the goal is active and {open.len()} open issue(s) are yours to work. A wait on CI or on a ruling does not end a turn. Start one now:")
+for i in 0..(if open.len() < 8: open.len() else: 8): eprint("  #" ++ open[i].replace("\t", "  "))
+eprint("An issue you cannot move takes the label `human attn needed`, with the reason in a comment. One that waits on another open issue takes `blocked`, with the blocker named in a comment, and comes back when that label is removed.")
+exit_code(2)

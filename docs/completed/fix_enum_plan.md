@@ -9,7 +9,7 @@ Status:
 Validation gate:
 - [x] `make build`
 - [x] `make smoke`
-- [x] `./out/bin/with-stage2 check src/main.w`
+- [x] `./out/bin/with-stage2 check src/main.with`
 - [x] `make fixpoint`
 
 ## Completed Work
@@ -97,19 +97,19 @@ Current migration diagnostics:
 
 ### Phase 7: deferred enumification follow-ups started
 
-- [x] `MIR_INTRINSIC_*` was converted from a flat constant block to `enum MirIntrinsic: i32:` in `src/Mir.w`.
+- [x] `MIR_INTRINSIC_*` was converted from a flat constant block to `enum MirIntrinsic: i32:` in `src/Mir.with`.
 - [x] MIR lowering and both backends now reference intrinsic tags through `MirIntrinsic.MIR_INTRINSIC_*`.
 - [x] The `MirIntrinsic` enumification slice passes `make build`, `make smoke`, and `make fixpoint`.
-- [x] `OP_*` was converted from a flat constant block to `enum BinaryOp: i32:` in `src/Ast.w`.
+- [x] `OP_*` was converted from a flat constant block to `enum BinaryOp: i32:` in `src/Ast.with`.
 - [x] Parser, sema, MIR lowering, renderer, and both backends now reference binary operators through `BinaryOp.OP_*`.
 - [x] The `BinaryOp` enumification slice passes `make build`, `make smoke`, and `make fixpoint`.
-- [x] `UOP_*` was converted from a flat constant block to `enum UnaryOp: i32:` in `src/Ast.w`.
+- [x] `UOP_*` was converted from a flat constant block to `enum UnaryOp: i32:` in `src/Ast.with`.
 - [x] Parser, sema, MIR lowering, renderer, and both backends now reference unary operators through `UnaryOp.UOP_*`.
 - [x] The `UnaryOp` enumification slice passes `make build`, `make smoke`, and `make fixpoint`.
-- [x] `VIS_*` was converted from a flat constant block to `enum Visibility: i32:` in `src/Ast.w`.
+- [x] `VIS_*` was converted from a flat constant block to `enum Visibility: i32:` in `src/Ast.with`.
 - [x] Parser and renderer helpers now reference declaration visibility through `Visibility.VIS_*`.
 - [x] The `Visibility` enumification slice passes `make build`, `make smoke`, and `make fixpoint`.
-- [x] `LIT_SUFFIX_*` was converted from a flat constant block to `enum LiteralSuffix: i32:` in `src/Ast.w`.
+- [x] `LIT_SUFFIX_*` was converted from a flat constant block to `enum LiteralSuffix: i32:` in `src/Ast.with`.
 - [x] AST storage, parser suffix decoding, and sema suffix typing now reference literal suffix tags through `LiteralSuffix.LIT_SUFFIX_*`.
 - [x] The `LiteralSuffix` enumification slice passes `make build`, `make smoke`, and `make fixpoint`.
 
@@ -134,7 +134,7 @@ These are separate refactors, not remaining blockers for the enum/type syntax re
   - `CharCode` (CH_*), `DriverMode`/`CompileResult`, `DiagSeverity`, `ValidateError`
   - `CfgNodeKind`, `AsyncBodyKind`/`AsyncSuspendKind`, `CallKind`/`AllocKind`
   - `PreludeMode`, `MigrateLang`/`MigrateMode`
-- [x] Root-cause the imported-enum regression exposed by additional `src/Ast.w` enumification slices.
+- [x] Root-cause the imported-enum regression exposed by additional `src/Ast.with` enumification slices.
   Root cause was a HashMap tombstone reuse bug in `runtime/helpers.c` (`with_hashmap_insert`).
   After enough insert/remove churn, the function could fail to insert because it only checked
   state==0 slots and ignored tombstone slots (state==2). Fixed and all previously-failing

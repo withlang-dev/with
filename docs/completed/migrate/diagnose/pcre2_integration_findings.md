@@ -16,12 +16,12 @@ use std.re.pcre2_ucd
 use std.re.pcre2_context
 fn main: print("ok\n")
 ```
-`with build bug.w -o /tmp/bug` → exit 139 silently.
+`with build bug.with -o /tmp/bug` → exit 139 silently.
 
 With 9 or fewer imports, the compiler prints 500+ shadowing errors
 and exits 1 cleanly. At 10 imports it crashes instead.
 
-**LLDB crash site:** `diagnostic_error at main.w:33` (but frame #0
+**LLDB crash site:** `diagnostic_error at main.with:33` (but frame #0
 is inside a trivial struct constructor; deeper stack is not printed
 by lldb, consistent with deep recursion in diagnostic rendering).
 
@@ -33,7 +33,7 @@ survive many shadowing errors.
 ## Bug #2 (#135): Enum members from C headers emitted as `let` in every module
 
 **Symptom:** 636 distinct `let` names duplicated across 2+ modules;
-NONE are in defs.w. C3's shared-defs redirection handles only
+NONE are in defs.with. C3's shared-defs redirection handles only
 #define-derived lets (ci_translate_macros), not enum-derived ones
 (ci_translate_enum).
 
@@ -47,7 +47,7 @@ fn main: print("ok\n")
 Produces 500+ errors like:
 ```
 error: shadowing is not allowed for 'ucp_C'
- --> lib/std/re/pcre2_tables.w:100:1
+ --> lib/std/re/pcre2_tables.with:100:1
 100 | let ucp_C: c_uint = 0
 ```
 
@@ -78,7 +78,7 @@ Same shadowing errors as Bug #2, but for types like `BOOL`,
 `pcre2_callout_block_8`.
 
 **Classification:** (b) duplicate declaration / migrator gap — no
-type-dedup into defs.w.
+type-dedup into defs.with.
 
 ---
 
@@ -102,7 +102,7 @@ pcre2_jit_compile_8, pcre2_jit_match_8, every pcre2_* public fn).
 With's linker refuses duplicate extern declarations across modules.
 
 **Classification:** (b) duplicate declaration — header-sourced
-extern fn declarations should go to defs.w once.
+extern fn declarations should go to defs.with once.
 
 ---
 
@@ -121,18 +121,18 @@ consumer modules.
 
 ## Bug #7 (#143): Missing pcre2_init_op_lengths_8()
 
-**Symptom:** test/pcre2_smoke.w calls `pcre2_init_op_lengths_8()` on
+**Symptom:** test/pcre2_smoke.with calls `pcre2_init_op_lengths_8()` on
 line 50 to set up the PRIV(OP_lengths) table. This function doesn't
 exist in the fresh migration output. It was a hand-added helper
 in the pre-C1 lib/std/re/ snapshot.
 
 **Repro:**
 ```
-grep pcre2_init_op_lengths_8 out/pcre2_generated/*.w  # no matches
+grep pcre2_init_op_lengths_8 out/pcre2_generated/*.with  # no matches
 ```
 
 **Classification:** (d) missing migrated code — the OP_lengths array
-IS migrated (pcre2_tables.w:712), so this helper may no longer be
+IS migrated (pcre2_tables.with:712), so this helper may no longer be
 needed, OR the smoke test needs to be updated to not call it. But
 regardless, the harness fails to compile against fresh migration.
 
@@ -157,7 +157,7 @@ are declared `extern fn` everywhere but no module defines them
 (we excluded pcre2_jit_compile.c during migration).
 
 **Classification:** (d) missing migrated code / (a) missing
-declaration handling — these need stubs in defs.w that return
+declaration handling — these need stubs in defs.with that return
 "JIT not supported" error codes, or the extern declarations need
 to be elided.
 
@@ -165,7 +165,7 @@ to be elided.
 
 ## Bug #10 (#142): Context struct field default initializers not translated
 
-**Symptom:** test/pcre2_smoke.w lines 64-70 manually set context
+**Symptom:** test/pcre2_smoke.with lines 64-70 manually set context
 defaults (max_pattern_length, parens_nest_limit, etc.) because
 `pcre2_compile_context_create_8` doesn't initialize them. The C
 source constructs these in `pcre2_set_compile_context_defaults`

@@ -243,7 +243,7 @@ holder's drop is inert.
 use-after-free detection (spec §6 / §2.5.5) uses a generation the **`SlotMap`
 maintains per slot**, in its own metadata — not the allocator. Each slot has a
 generation, bumped when that slot's value is removed; `with_slotmap_*`
-(`rt/rt_core.w`) compares the handle's snapshot against the slot's generation on
+(`rt/rt_core.with`) compares the handle's snapshot against the slot's generation on
 every access (mismatch → the slot was reclaimed → a checked `None`). The
 owner's drop does **not** consult any generation — reset-on-move is its whole
 mechanism.
@@ -256,7 +256,7 @@ mechanism.
 > never changes when a slot is removed and reused *inside* the live allocation,
 > and therefore cannot distinguish a stale handle from a live one. The header
 > generation also had no reader (`alloc_generation` was never called) — pure
-> per-allocation cost. It has been **deleted** (`rt/rt_core.w`); the per-slot
+> per-allocation cost. It has been **deleted** (`rt/rt_core.with`); the per-slot
 > `SlotMap` generation is the canonical and only handle mechanism. This was a
 > spec bug describing an impossible mechanism, not an implementation divergence.
 
@@ -1124,7 +1124,7 @@ Error messages are a primary UX concern. Every compile error should:
 **Ephemeral escape:**
 ```
 error[E0301]: ephemeral value cannot be stored in struct
-  --> src/main.w:15:5
+  --> src/main.with:15:5
    |
 15 |     type Bad { view: StrView }
    |                  ^^^^^^^^^^^^^ StrView is ephemeral
@@ -1137,7 +1137,7 @@ error[E0301]: ephemeral value cannot be stored in struct
 **Borrow conflict:**
 ```
 error[E0101]: conflicting borrows of `data`
-  --> src/main.w:8:9
+  --> src/main.with:8:9
    |
  6 |     let r = &mut data
    |             --------- exclusive borrow created here
@@ -1153,7 +1153,7 @@ error[E0101]: conflicting borrows of `data`
 **Async without runtime:**
 ```
 error[E0501]: `async` requires the fiber runtime
-  --> src/main.w:3:1
+  --> src/main.with:3:1
    |
  3 | async fn fetch(url: str) -> String:
    | ^^^^^^^^ not available in no_runtime builds
@@ -1165,7 +1165,7 @@ error[E0501]: `async` requires the fiber runtime
 **`.await` inside `@[no_await_guard]` guard:**
 ```
 error[E0701]: `.await` inside `@[no_await_guard]` with block
-  --> src/service.w:15:20
+  --> src/service.with:15:20
    |
 14 |     with self.cache.lock() as data:
    |          ------------------- MutexGuard is @[no_await_guard]
@@ -1185,7 +1185,7 @@ error[E0701]: `.await` inside `@[no_await_guard]` with block
 **`may_suspend` call while `@[no_await_guard]` is live:**
 ```
 error[E0701]: may_suspend call while `@[no_await_guard]` guard is live
-  --> src/service.w:15:9
+  --> src/service.with:15:9
    |
 14 |     with self.cache.lock() as data:
    |          ------------------- MutexGuard is @[no_await_guard]
@@ -1198,7 +1198,7 @@ error[E0701]: may_suspend call while `@[no_await_guard]` guard is live
 **Unused Task:**
 ```
 error[E0801]: unused `Task` will be cancelled on drop
-  --> src/service.w:42:9
+  --> src/service.with:42:9
    |
 42 |     send_analytics("page_view")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Task created but not used
@@ -1213,7 +1213,7 @@ error[E0801]: unused `Task` will be cancelled on drop
 **Unnecessary unsafe block:**
 ```
 error[E0901]: unnecessary `unsafe` block
-  --> src/main.w:5:5
+  --> src/main.with:5:5
    |
  5 |     unsafe { let x = 1 + 2 }
    |     ^^^^^^ no unsafe operations in this block
@@ -1224,7 +1224,7 @@ error[E0901]: unnecessary `unsafe` block
 **Implicit numeric narrowing:**
 ```
 error[E0201]: implicit narrowing conversion from `i64` to `i32`
-  --> src/main.w:3:22
+  --> src/main.with:3:22
    |
  3 |     let small: i32 = big
    |                       ^^^ `i64` cannot be implicitly narrowed
@@ -1235,7 +1235,7 @@ error[E0201]: implicit narrowing conversion from `i64` to `i32`
 **Unreachable code:**
 ```
 error[E0601]: unreachable code
-  --> src/main.w:4:5
+  --> src/main.with:4:5
    |
  3 |     return 42
    |     --------- any code after this is unreachable
@@ -1246,7 +1246,7 @@ error[E0601]: unreachable code
 **Closure treated as escaping:**
 ```
 error[E0401]: closure captures ephemeral value but may escape
-  --> src/main.w:12:13
+  --> src/main.with:12:13
    |
 10 |     with store.read() as data:
    |                          ---- ephemeral borrow starts here
@@ -1491,7 +1491,7 @@ error must be clear:
 
 ```
 error[E1001]: c_import failed for "nonexistent.h"
-  --> src/main.w:1:5
+  --> src/main.with:1:5
    |
  1 | use c_import("nonexistent.h")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ header not found
@@ -1559,7 +1559,7 @@ Each `std.*` module has a single public API. Internally, it
 dispatches to platform-specific implementations:
 
 ```
-// std/fs/file.w (simplified)
+// std/fs/file.with (simplified)
 module std.fs
 
 comptime if cfg.target_os == "linux" or cfg.target_os == "darwin":
@@ -1577,7 +1577,7 @@ pub fn open(path: &str, mode: OpenMode) -> Result[File, IoError]:
 The platform modules themselves use `c_import`:
 
 ```
-// std/os/posix/fs.w (simplified)
+// std/os/posix/fs.with (simplified)
 module std.os.posix
 
 use c_import("fcntl.h", link: "c")
@@ -1769,7 +1769,7 @@ Every public function in the standard library must have:
 4. **Platform test** — runs on Linux, macOS, Windows
 
 The test runner from Phase 2 is used. Tests are in companion
-`*_test.w` files next to the module source.
+`*_test.with` files next to the module source.
 
 Cross-platform CI is essential from Phase 3a onward. Every PR must
 pass on all three platforms.
@@ -3209,7 +3209,7 @@ to app developers — `mut self` methods simply work on Drop types.
 
 A method merely NAMED `drop` outside `impl Drop` is an ordinary method —
 the compiler never calls it (destructor recognition is
-`select_trait_impl(type, drop)` only). lib/std/alloc.w relied on naked
+`select_trait_impl(type, drop)` only). lib/std/alloc.with relied on naked
 `fn Type.drop(mut self)` for all six allocator types, so no allocator
 destructor ever ran (#641). They are now `impl Drop for T:
 fn drop(move self: Self)`; the composite owners (ArenaScope,
@@ -3245,14 +3245,14 @@ view-origin* — exactly what borrow-origin tracking already computes.
 
 **How implemented (origin tracking, not a type ban).**
 - **Stores propagate origins.** At the `method_arg_stores_value` site
-  (SemaCheck.w), `v.push(elem)` / `m.insert(k, elem)` on a local unions
+  (SemaCheck.with), `v.push(elem)` / `m.insert(k, elem)` on a local unions
   the element's view-origins onto the container binding via
-  `add_binding_view_deps` (Sema.w). `List.new()` receivers that are
+  `add_binding_view_deps` (Sema.with). `List.new()` receivers that are
   element-erased (not a full `GENERIC_INST`) are recognized by extending
   the base-symbol extraction in `method_arg_stores_value` to bare
   container structs.
 - **Container literals carry element origins.** `collect_expr_view_deps`
-  (SemaCheck.w) recurses `NK_ARRAY_LIT` elements and `NK_MAP_LIT`
+  (SemaCheck.with) recurses `NK_ARRAY_LIT` elements and `NK_MAP_LIT`
   key/value pairs (it already recursed struct-literal fields).
 - **Tail-position escape check runs in-scope.** The body-level ephemeral
   escape check (after `check_expr(body)`) runs *after* the block scope is
@@ -3335,7 +3335,7 @@ newtype slot, not the wrapped pointer).
 
 ## 58. Implicit Default of Heap Containers = `.new()` (spec §4.10; #633)
 
-`lower_implicit_default_value` (MirLower.w) emits real values for void /
+`lower_implicit_default_value` (MirLower.with) emits real values for void /
 Option (`.None`) / Result (`.Ok(default)`) and fell to `CK_UNIT` (a zeroed
 struct) for everything else. For `HashMap`/`HashSet` that zeroed struct has
 null buckets and SEGFAULTs on the first use of the defaulted value (§4.10
@@ -3349,7 +3349,7 @@ emit `VEC_NEW` (`emit_vec_new_into`). The implicit default now equals `.new()`.
 `str`/`int`/`float`/`bool`/`ptr` keep the zeroed default — it is their
 canonical value (empty `str` is `{null, 0}`, verified usable; there is no
 `str.new()` to match). Audited against `type_has_default_value`
-(SemaCheck.w): every generic-inst it blesses (Option/Result/List/HashMap/
+(SemaCheck.with): every generic-inst it blesses (Option/Result/List/HashMap/
 HashSet) now produces a valid value.
 
 References: Go zero values (spirit adopted — a default must be fully usable;
@@ -3386,7 +3386,7 @@ label (`finish_labeled_block`), and `parse_block_or_expr` makes that `NK_LABEL`
 the enclosing block's tail. The tail typed correctly (`check_expr(NK_LABEL)`
 descends into the body) but `lower_block_mode` discarded the value: a block with
 a block-meta label unconditionally `return self.unit_operand()` at its exit
-(MirLower.w ~5158), so `lower_label` returned unit, the fn-level implicit-default
+(MirLower.with ~5158), so `lower_label` returned unit, the fn-level implicit-default
 condition (`body_can_fall_through and operand_type(body_result) == void`) fired,
 and the function returned the type default (0 / "").
 
@@ -3438,7 +3438,7 @@ keeps the passed C-string pointer past the call. Implementation:
 - **Store.** `Sema.retained_extern_params` maps a fn name sym to a bitmask of
   retained param indices (`mark_param_retained` / `param_is_retained`).
 - **Parser.** `retains:` is a c_import option parallel to `owns:`/`borrows:`
-  (Parser.w), serialized after the #357 ownership record in the NK_C_IMPORT
+  (Parser.with), serialized after the #357 ownership record in the NK_C_IMPORT
   extra.
 - **Reader.** `read_c_import_retentions` (run in the decl-collect loop) walks the
   extra past the packed counts + strict/only + owns/borrows records to the
@@ -3453,7 +3453,7 @@ keeps the passed C-string pointer past the call. Implementation:
   directing the caller to `to_cstring()?.as_cstr().ptr()`. An owned pointer
   (`CStr.ptr()` → `*const i8`) is not a str value/view and passes.
 
-Debug teeth: `WITH_DEBUG_ALLOC_SCRIBBLE` / `dbg_scribble` (rt_core.w) poisons
+Debug teeth: `WITH_DEBUG_ALLOC_SCRIBBLE` / `dbg_scribble` (rt_core.with) poisons
 freed allocations with `0xDE`, so a retained-then-freed pointer reads poison at
 runtime — a dynamic backstop for any retention the static check cannot see.
 

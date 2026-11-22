@@ -264,7 +264,7 @@ with migrate .reference/pcre2/src/ \
     -D HAVE_CONFIG_H=1
 ```
 
-Produces 32 `.w` files + `defs.w` shared definitions from 32 `.c`
+Produces 32 `.w` files + `defs.with` shared definitions from 32 `.c`
 files. 9 files are excluded (test harnesses, JIT compiler, fuzzer,
 POSIX wrapper, dftables).
 
@@ -280,7 +280,7 @@ Gotos in the C source are translated as native `goto 'label`
 builder handles goto-into-switch-case patterns, predecessorless
 blocks, and cross-block expression temporaries.
 
-All errors were fixed in the migrator (`src/CImport.w`), not
+All errors were fixed in the migrator (`src/CImport.with`), not
 by patching generated code. Key migrator improvements:
 
 | Fix | Errors resolved |
@@ -299,12 +299,12 @@ Key migrated files:
 
 | File | Lines | Gotos | Unsafe | Role |
 |---|---|---|---|---|
-| `pcre2_compile.w` | ~27,000 | 275 | 1,619 | Pattern compiler |
-| `pcre2_match.w` | ~54,000 | 48 | 2,148 | Interpretive match engine |
-| `pcre2_dfa_match.w` | ~17,000 | 26 | 394 | DFA match engine |
-| `pcre2_substitute.w` | ~5,400 | 63 | 144 | Search-and-replace |
-| `pcre2_tables.w` | 2 | 0 | 0 | Character property tables |
-| `pcre2_ucd.w` | 2 | 0 | 0 | Unicode character data |
+| `pcre2_compile.with` | ~27,000 | 275 | 1,619 | Pattern compiler |
+| `pcre2_match.with` | ~54,000 | 48 | 2,148 | Interpretive match engine |
+| `pcre2_dfa_match.with` | ~17,000 | 26 | 394 | DFA match engine |
+| `pcre2_substitute.with` | ~5,400 | 63 | 144 | Search-and-replace |
+| `pcre2_tables.with` | 2 | 0 | 0 | Character property tables |
+| `pcre2_ucd.with` | 2 | 0 | 0 | Unicode character data |
 
 ### JIT compiler
 
@@ -457,7 +457,7 @@ Everything PCRE2 supports, which is everything Perl supports:
 | Verify against system pcre2test | DONE — full migrated `pcre2test` corpus runs through `make regex-test` |
 | Run full PCRE2 test suite | DONE — all tests run, no skipped corpus |
 
-### Phase 2: With wrapper API (`lib/std/regex.w`)
+### Phase 2: With wrapper API (`lib/std/regex.with`)
 
 | Step | Status |
 |---|---|

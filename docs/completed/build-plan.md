@@ -18,7 +18,7 @@ compiler driver.
 
 Already implemented:
 
-- `build.w` discovery and tool-mode execution.
+- `build.with` discovery and tool-mode execution.
 - Canonical capability-bearing comptime entry syntax:
   `comptime with BuildCtx as ctx:`, with standard default-binding shorthand
   such as `comptime with BuildCtx:`.
@@ -113,7 +113,7 @@ hash).
 
 Tasks:
 
-1. Audit every `BuildKind` in `lib/std/build.w`. Done.
+1. Audit every `BuildKind` in `lib/std/build.with`. Done.
 2. For each kind, record:
    - validation rules;
    - graph parser support;
@@ -271,7 +271,7 @@ Commit after this phase.
 
 ## 6. Phase C: Move Project-Specific Build Logic Out of Generic Driver
 
-Goal: `src/main.w` and generic build graph executor code no longer know about
+Goal: `src/main.with` and generic build graph executor code no longer know about
 PCRE2, emit-C roundtrip policy, seed policy, or With-repository selfhost
 fixtures.
 
@@ -297,50 +297,50 @@ been replaced by standard targets or project-local `Action` targets, and stale
 Completed slices:
 
 - Moved `issue61-regression` from a compiler-hardcoded project kind to a
-  `build.w` Action target and removed the old compiler dispatch path for that
+  `build.with` Action target and removed the old compiler dispatch path for that
   target.
 - Moved `compat-runtime-source` generation from a compiler-hardcoded project
-  kind to the repository-local `build_runtime.w` module. The target is now an
+  kind to the repository-local `build_runtime.with` module. The target is now an
   `Action` with declared primary and extra outputs, and project kind 1012 is
   reserved as removed legacy graph data.
 - Moved `cli-selfhost-smoke-tests` from hardcoded `cli_selfhost_smoke_test`
-  dispatch to the repository-local `build_selfhost.w` module. The target is now
+  dispatch to the repository-local `build_selfhost.with` module. The target is now
   an `Action`, and project kind 1002 is reserved as removed legacy graph data.
 - Moved `cli-selfhost-one-liner-tests` from hardcoded
   `cli_selfhost_one_liner_test` dispatch to the repository-local
-  `build_selfhost.w` module. The target is now an `Action`, and project kind
+  `build_selfhost.with` module. The target is now an `Action`, and project kind
   1009 is reserved as removed legacy graph data.
 - Moved `cli-selfhost-object-symbol-tests` from hardcoded
   `cli_selfhost_object_symbol_test` dispatch to the repository-local
-  `build_selfhost.w` module. The target is now an `Action`, and project kind
+  `build_selfhost.with` module. The target is now an `Action`, and project kind
   1010 is reserved as removed legacy graph data.
 - Moved `cli-selfhost-project-tests` from hardcoded
   `cli_selfhost_project_test` dispatch to the repository-local
-  `build_selfhost.w` module. The target is now an `Action`, and project kind
+  `build_selfhost.with` module. The target is now an `Action`, and project kind
   1014 is reserved as removed legacy graph data.
 - Moved `cli-selfhost-edge-tests` from hardcoded
   `cli_selfhost_edge_test` dispatch to the repository-local
-  `build_selfhost.w` module. The target is now an `Action`, and project kind
+  `build_selfhost.with` module. The target is now an `Action`, and project kind
   1015 is reserved as removed legacy graph data.
 - Moved `cli-selfhost-parallel-tests` from the generic `selfhost_suite_test`
-  dispatcher to the repository-local `build_selfhost.w` module. The target is
+  dispatcher to the repository-local `build_selfhost.with` module. The target is
   now an `Action` using `ProcessRunner.spawn_capture` and `ProcessRunner.wait`.
 - Moved `c-migrator-pcre2-prep-tests` from the generic `selfhost_suite_test`
-  dispatcher to the repository-local `build_selfhost.w` module. The target is
+  dispatcher to the repository-local `build_selfhost.with` module. The target is
   now an `Action`, project kind 1016 is reserved as removed legacy graph data,
   and `ProcessRunner` clears driver-private action capability environment while
   launching child processes so nested `with build` invocations are isolated.
 - Moved the remaining selfhost fixture suites, including migrate-basic,
   migrate-core, build-w, embedded-runtime, and the old selfhost suite
   dispatcher, into repository-local actions.
-- Moved all PCRE2 targets into `build_pcre2.w` actions or standard graph nodes:
+- Moved all PCRE2 targets into `build_pcre2.with` actions or standard graph nodes:
   reference, migrate, build, test, generated check, and promote.
-- Moved seed download/update policy into `build_seed.w`.
-- Moved emit-C test, fixpoint, and roundtrip policy into `build_emit_c.w`.
+- Moved seed download/update policy into `build_seed.with`.
+- Moved emit-C test, fixpoint, and roundtrip policy into `build_emit_c.with`.
 - Moved compiler source generation and LLVM link metadata generation into
-  `build_compiler.w`.
+  `build_compiler.with`.
 - Moved compiler build and compiler IR invocation targets into
-  `build_compiler.w` actions, and removed the old `BuildGraphCompiler.w`
+  `build_compiler.with` actions, and removed the old `BuildGraphCompiler.with`
   project-kind dispatch module.
 - Reserved every old 1000-series project kind as removed graph data. No live
   project-specific build kind remains.
@@ -451,7 +451,7 @@ with build
 with build :fixpoint
 ```
 
-Completed D8 also replaced a real external diagnostic scan in `build_pcre2.w`
+Completed D8 also replaced a real external diagnostic scan in `build_pcre2.with`
 with a workspace message-loop integration that consumes stable
 `DeclSummary` values.
 
@@ -466,7 +466,7 @@ and process work through typed APIs, not shell strings.
 
 Audit and replace shell-string use in:
 
-- `src/main.w`
+- `src/main.with`
 - `src/compiler/*`
 - `src/BuildGraph*`
 - migrator code
@@ -492,7 +492,7 @@ Required replacements:
 Verification:
 
 ```sh
-rg -n "with_system|\\|>|<| rm |mkdir -p|\\| awk|\\| grep" src lib rt build.w
+rg -n "with_system|\\|>|<| rm |mkdir -p|\\| awk|\\| grep" src lib rt build.with
 with build :test
 with build
 with build :fixpoint
@@ -503,25 +503,25 @@ explicitly documented exception.
 
 Completed slices:
 
-- `src/compiler/Compilation.w`, `src/compiler/Link.w`, and compiler module
+- `src/compiler/Compilation.with`, `src/compiler/Link.with`, and compiler module
   runtime access now use typed runtime process/filesystem wrappers.
-- `src/main.w` cleanup, CLI run, test capture, and benchmark execution no
+- `src/main.with` cleanup, CLI run, test capture, and benchmark execution no
   longer use shell command strings.
-- `src/compiler/ConanClient.w` extracts Conan archives through typed argv.
-- `lib/std/process.w` is argv-first; shell-string execution was removed from
+- `src/compiler/ConanClient.with` extracts Conan archives through typed argv.
+- `lib/std/process.with` is argv-first; shell-string execution was removed from
   the public process API.
-- `rt/clang_bridge.w` no longer uses `popen`; SDK discovery and preprocessing
+- `rt/clang_bridge.with` no longer uses `popen`; SDK discovery and preprocessing
   use typed argv capture and resource-directory discovery uses direct
   directory enumeration.
-- `rt/compat_runtime.w` no longer exports `with_system` or
+- `rt/compat_runtime.with` no longer exports `with_system` or
   `with_extract_tgz`.
-- The unused tracked legacy entry snapshot `src/main_emit_temp.w` was removed
+- The unused tracked legacy entry snapshot `src/main_emit_temp.with` was removed
   from source generation.
 
 Final source scan hits are documented in
 `docs/audits/phase-e-shell-audit.md`: PCRE2's upstream `RunTest` bash runner
 is an isolated migrated-library test boundary, and `shorthand` in
-`build_selfhost.w` is a filename false positive. Makefile shell usage remains
+`build_selfhost.with` is a filename false positive. Makefile shell usage remains
 outside Phase E by design while Make still exists.
 
 ---
@@ -554,7 +554,7 @@ Completed work:
 
 - Added `build_graph_path_project_contained` and
   `build_graph_path_is_install_dest` validators in
-  `src/BuildGraphSupport.w`.
+  `src/BuildGraphSupport.with`.
 - Added `build_graph_validate_target_containment` that gates every
   target dispatch: non-install targets reject absolute, `..`, `$`-prefix,
   and control-char paths; install targets accept only recognized install
@@ -563,7 +563,7 @@ Completed work:
   staleness detection: skips fresh files, reports stale count.
 - Improved `build_graph_validate_process_args` diagnostics to name the
   target, field index, and rejected value.
-- Removed stale `main_emit_temp` clean artifacts from `build.w`.
+- Removed stale `main_emit_temp` clean artifacts from `build.with`.
 - Full audit recorded in `docs/audits/phase-f-path-audit.md`.
 
 ---
@@ -652,7 +652,7 @@ Deletion sequence:
 1. Replace Make target bodies with one-line delegations to `with build :...`.
 2. Verify every delegated target.
 3. Delete shell scripts no longer referenced by:
-   - `build.w`;
+   - `build.with`;
    - tests;
    - docs;
    - release automation.
@@ -734,4 +734,4 @@ all pass without Make or required repository shell scripts, and:
 
 Note: Phase H implemented the Makefile as a thin delegation layer rather than
 deleting it outright. Full removal is gated on CI migration to `with build`
-and cross-compilation (`make cross`) moving into `build.w`.
+and cross-compilation (`make cross`) moving into `build.with`.

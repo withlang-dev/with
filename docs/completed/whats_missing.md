@@ -65,7 +65,7 @@ category. Parenthetical references point to the specification section.
 
 - [x] **Stdlib modules** (§13) — fs, net, io, sync, time modules exist with stub APIs. Full implementations require runtime integration.
 - [x] **Iterator constructors** (§13.3) — Basic iterators (VecIter, range) work. Named constructors (`Iter.empty()` etc.) require generic trait method infrastructure.
-- [x] **Iterator combinators** (§13.3) — `sum`, `map`, `filter`, `contains` implemented in lib/std/iter.w. Full combinator set requires generic method dispatch on trait objects.
+- [x] **Iterator combinators** (§13.3) — `sum`, `map`, `filter`, `contains` implemented in lib/std/iter.with. Full combinator set requires generic method dispatch on trait objects.
 - [x] **HashMap convenience methods** (§13.3) — HashMap has `insert`, `get`, `contains`, `remove`, `len`. `update`/`increment` sugar requires closure-accepting methods.
 - [x] **Collection combinators** (§10.7) — `sequence`/`traverse` require higher-kinded generic programming. Basic collection operations work.
 - [x] **Map comprehension** (§13.6) — Not specified in the spec. List comprehensions `[expr for x in iter]` parse and type-check; runtime codegen is a separate gap.

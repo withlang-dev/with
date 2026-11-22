@@ -22,7 +22,7 @@ This milestone does **not** include:
 
 ### 1. Stdlib facade first
 
-Add `lib/std/regex.w` and pull it into `lib/std/prelude.w`.
+Add `lib/std/regex.with` and pull it into `lib/std/prelude.with`.
 
 Public API for v1:
 - `type Regex`
@@ -56,7 +56,7 @@ Named capture extraction:
 
 ### 2. Syntax and AST
 
-Update `src/Token.w`, `src/Lexer.w`, `src/Parser.w`, and `src/Ast.w`.
+Update `src/Token.with`, `src/Lexer.with`, `src/Parser.with`, and `src/Ast.with`.
 
 Lexer:
 - Add `TK_REGEX_LIT`
@@ -80,7 +80,7 @@ Parser behavior:
 
 ### 3. Sema rules and capture scope
 
-Update `src/Sema.w` and `src/SemaCheck.w`.
+Update `src/Sema.with` and `src/SemaCheck.with`.
 
 Type ownership:
 - `Regex`, `Match`, `Captures`, and `RegexError` are normal named types from `std.regex`
@@ -115,11 +115,11 @@ Implementation strategy:
 - Record per-body capture metadata so lowering can materialize the synthetic locals before user code in that body
 
 LSP/tooling:
-- Update hardcoded prelude completions in `src/Lsp.w` so `Regex`, `Match`, `Captures`, and `RegexError` appear like other prelude types
+- Update hardcoded prelude completions in `src/Lsp.with` so `Regex`, `Match`, `Captures`, and `RegexError` appear like other prelude types
 
 ### 4. MIR lowering and codegen
 
-Update `src/MirLower.w`, `src/CodegenTraits.w`, and `src/CodegenDispatch.w`.
+Update `src/MirLower.with`, `src/CodegenTraits.with`, and `src/CodegenDispatch.with`.
 
 Regex literals:
 - Lower each literal to a synthetic module runtime-init global using the existing `module_runtime_init` machinery

@@ -14,7 +14,7 @@ messages but not his authorship.
 
 ## Exact defects
 
-The fixed formatter converted the integer part to `u64` at `rt_core.w:152`
+The fixed formatter converted the integer part to `u64` at `rt_core.with:152`
 and computed fractional digits using `frac * scale + 0.5` at line 162
 (line numbers before this change). LLDB stopped in that function with
 `val=0.125, precision_arg=2`, then `val=1e30, precision_arg=2`.
@@ -31,7 +31,7 @@ integer part; high precision uses explicitly freed temporary storage.
 Obsolete approximate and shortest-display paths are removed.
 
 The same disassembly exposed a separate conversion defect:
-`CodegenDispatch.w:3890` selected float-to-integer conversion from
+`CodegenDispatch.with:3890` selected float-to-integer conversion from
 `src_unsigned`. A float source has no integer signedness. For
 `fn convert(x: f64) -> u64: x as u64`, the emitted block was:
 

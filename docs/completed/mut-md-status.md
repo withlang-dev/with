@@ -31,10 +31,10 @@ casts, and direct `var` mutation for local state.
 
 ## Slice A (P8-P10 mechanical removal) — `b7bf86b`
 
-Converted ~180 `&mut` sites in CImport.w free functions, ComptimeEval.w
+Converted ~180 `&mut` sites in CImport.with free functions, ComptimeEval.with
 redundant params, and InternPool to handle types. Straightforward
 find-and-replace after auditing read-only vs. mutating usage. The main
-insight: ~55 CImport.w params marked `&mut` were actually read-only and
+insight: ~55 CImport.with params marked `&mut` were actually read-only and
 could be downgraded to `&` without behavioral change.
 
 ## Slice B (handle-type conversion) — `3099ec4`..`8331841`
@@ -42,7 +42,7 @@ could be downgraded to `&` without behavioral change.
 Converted CiTypePool, CiExprPool, CiStmtPool, CiDeclPool, and AstPool from
 free-function-with-pool-pointer to method-on-handle-type pattern. This
 eliminated the remaining ~70 `&mut Pool` params by making the pool the
-receiver. ComptimeTransform.w and Frontend.w followed the same pattern.
+receiver. ComptimeTransform.with and Frontend.with followed the same pattern.
 The handle-type approach proved cleaner than the Sema-bundle alternative
 because it preserved per-pool encapsulation.
 

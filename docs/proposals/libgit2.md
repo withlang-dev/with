@@ -69,7 +69,7 @@ if repo.is_dirty():
 
 ```bash
 # Migrate a C library directly from its repository
-with migrate git://github.com/edubart/minicoro -o rt/minicoro.w
+with migrate git://github.com/edubart/minicoro -o rt/minicoro.with
 
 # Migrate a specific tag
 with migrate git://github.com/PCRE2Project/pcre2@pcre2-10.44 -o lib/std/re/
@@ -94,7 +94,7 @@ let tags = repo.tags()
 // Read objects
 let commit = repo.lookup_commit(head.target())
 let tree = commit.tree()
-let blob = tree.entry_by_path("src/main.w").to_blob()
+let blob = tree.entry_by_path("src/main.with").to_blob()
 let content = blob.content()
 
 // Status
@@ -215,7 +215,7 @@ The migrated code preserves libgit2's C API shape. Layer a With-idiomatic API on
 
 ```
 lib/std/git/          -- migrated libgit2 internals (private)
-lib/std/git.w         -- public With API (Repository, Commit, Tree, etc.)
+lib/std/git.with         -- public With API (Repository, Commit, Tree, etc.)
 ```
 
 The public API uses With types (str, Vec, Option, Result), handles, and the ownership model. The internals remain close to libgit2's original structure for maintainability and future upstream sync.
@@ -226,7 +226,7 @@ The public API uses With types (str, Vec, Option, Result), handles, and the owne
 
 ### 5.1 Wire into the build system
 
-After Phase A, replace the git subprocess calls in `build_compiler.w`:
+After Phase A, replace the git subprocess calls in `build_compiler.with`:
 
 | Current | Replacement |
 |---|---|

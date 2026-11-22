@@ -7,7 +7,7 @@ and pipeline operators for composition.
 ## Files
 
 ```
-json.w    Tokenizer, parser, accessors, tree walker, demo
+json.with    Tokenizer, parser, accessors, tree walker, demo
 ```
 
 ## What It Demonstrates

@@ -23,7 +23,7 @@ returned or stored.
 ## Owners of facts (D65)
 
 - **Parser** records the case's callback type, paired selector and retaining
-  parameter, and the `abandon` clause (Ast.w FACADE_CLAUSE_VARIADIC_CASE,
+  parameter, and the `abandon` clause (Ast.with FACADE_CLAUSE_VARIADIC_CASE,
   FACADE_CLAUSE_ABANDON).
 - **Sema** resolves a case into a `ForeignVariadicSlot` (resource, retaining
   parameter, C callable, its one `void *` position, the paired selector and
@@ -37,9 +37,9 @@ returned or stored.
   own signature (`facade_bind_pair_callback_u`).
 - **Renderer** emits `mut fn <base>__<CB>[U](…, value: <typed callback>)`
   and `mut fn <base>__<UD>[U](…, value: &U)`, and a Drop that runs the
-  abandonment path before the destroyer (compiler/FacadeRender.w).
-- **MIR** (`MirForeignPairs.w`, after lowering, before codegen) runs the
-  `ForeignPairState.w` place flow over each body: `APPLY` at the receiver of
+  abandonment path before the destroyer (compiler/FacadeRender.with).
+- **MIR** (`MirForeignPairs.with`, after lowering, before codegen) runs the
+  `ForeignPairState.with` place flow over each body: `APPLY` at the receiver of
   every pair operation, `BORROW`/`MOVE` for references and moves of the
   resource, `EXPIRE` where a retained origin dies or moves, `ESCAPE` where a
   resource moves into the return place, a projection or an aggregate,
@@ -63,7 +63,7 @@ returned or stored.
 - Reading a chunk's bytes inside a write callback: the `char *` parameter
   stays raw until a callback buffer clause is ruled; counts are safe today.
 
-## Foreign evidence recorded in lib/facades/libcurl.w
+## Foreign evidence recorded in lib/facades/libcurl.with
 
 `curl_easy_setopt` is `callbacks none` (no listed option's page describes a
 callback, and a transfer starts only at `curl_easy_perform`), `ok CURLE_OK`.
@@ -76,15 +76,15 @@ header callbacks while closing connections).
 
 ## Tests
 
-- `test/behavior/behav_libcurl_facade_callback_pair.w`: the pair over the real
+- `test/behavior/behav_libcurl_facade_callback_pair.with`: the pair over the real
   library, a `file://` transfer driving the callback (no network).
-- `test/behavior/behav_libcurl_facade_callback_pair_failure.w`: the required
+- `test/behavior/behav_libcurl_facade_callback_pair_failure.with`: the required
   acceptance case with the real variadic ABI — first setter succeeds, the
   second fails (a test facade pairs the callback with `CURLOPT_LASTENTRY`),
   the function returns an error, Drop resets then cleans up.
-- `test/behavior/behav_c_facade_variadic_callback_pair_check.w`: accepted
+- `test/behavior/behav_c_facade_variadic_callback_pair_check.with`: accepted
   shapes over a declared setter (either order, reset between runs, a helper
   handed a proven pair, a sink read between the setter and the run).
-- `test/compile_errors/err_c_facade_variadic_callback_*.w`,
-  `err_c_facade_abandon_invokes.w`: the refusals.
-- `test/internals/foreign_pair_*_test.w`: the abstract domain.
+- `test/compile_errors/err_c_facade_variadic_callback_*.with`,
+  `err_c_facade_abandon_invokes.with`: the refusals.
+- `test/internals/foreign_pair_*_test.with`: the abstract domain.

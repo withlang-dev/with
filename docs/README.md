@@ -62,7 +62,7 @@ document with the ones the compiler implements.
 
 ## Maintenance
 
-The tree was given this shape by `tools/docs_restructure.w`, which moves
+The tree was given this shape by `tools/docs_restructure.with`, which moves
 text and never rewords it; the same tool reassembles the split documents
 and proves them byte-identical to their sources (`verify-spec`,
 `verify-decisions`).

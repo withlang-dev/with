@@ -38,12 +38,12 @@ Derived from principle, not feasibility:
   every batched commit is bisection debt. Near gate: 10 min via #680 +
   fixpoint parallelization.
 - **Compiler self-build RSS: 1 GiB per-target tripwire, enforced** —
-  `build.w` explicitly budgets the compiler stage/fixpoint/release compilation
+  `build.with` explicitly budgets the compiler stage/fixpoint/release compilation
   targets through `target_with_compiler_source_inputs`. Crossing the budget
   fails the build naming the target. Changing it is a visible repository
   policy edit, never a global limit increase.
 - Ordinary application targets report RSS without a default memory budget.
-  A project can opt a target into `target.rss_limit(bytes)` in `build.w`;
+  A project can opt a target into `target.rss_limit(bytes)` in `build.with`;
   the limit is a positive i64 byte count, and only a measured peak strictly
   greater than it fails. Budgets belong to their graph and do not propagate
   through the environment to nested application builds (#1665).

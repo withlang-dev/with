@@ -1,0 +1,2897 @@
+// Ast — AST node types for the With language.
+//
+// The AST is produced by the parser and consumed by later passes
+// (type checking, lowering, codegen). Nodes are stored in an AstPool
+// using index-based references (i32 handles) instead of pointers.
+// This follows a SoA (Struct of Arrays) approach for cache-friendly
+// access and avoids the need for heap-allocated pointer trees.
+
+use Span
+use Token
+use InternPool
+use std.collections.HashMap
+use rt.rt_core
+use std.libc.abort
+use std.collections.Minted
+
+
+fn ast_pool_phase_bug(message: &str):
+    with_eprint(message)
+    abort()
+
+// ── Node kinds ───────────────────────────────────────────────────
+
+pub type NodeId = i32
+
+// Enforced-distinct file id: the pilot for migrating the compiler's id
+// spaces (NodeId/Symbol/TypeId) off transparent i32 aliases. A distinct id
+// cannot be mixed with another id space without an explicit cast, making
+// the #660 collision class unrepresentable where adopted.
+type AstFileId = distinct i32
+impl Copy for AstFileId
+
+enum NodeKind: i32:
+    // Declarations
+    NK_FN_DECL = 1
+    NK_TYPE_DECL = 2
+    NK_USE_DECL = 3
+    NK_LET_DECL = 4
+    NK_EXTERN_FN = 5
+    NK_C_IMPORT = 6
+    NK_TRAIT_DECL = 7
+    NK_IMPL_DECL = 8
+    NK_POISONED_DECL = 9
+    NK_EXTERN_VAR = 10
+    // Expressions
+    NK_INT_LIT = 20
+    NK_FLOAT_LIT = 21
+    NK_STRING_LIT = 22
+    NK_BOOL_LIT = 23
+    NK_IDENT = 24
+    NK_BINARY = 25
+    NK_UNARY = 26
+    NK_CALL = 27
+    NK_FIELD_ACCESS = 28
+    NK_INDEX = 29
+    NK_BLOCK = 30
+    NK_IF_EXPR = 31
+    NK_RETURN = 32
+    NK_LET_BINDING = 33
+    NK_ASSIGN = 34
+    NK_WHILE = 35
+    NK_LOOP = 36
+    NK_FOR = 37
+    NK_BREAK = 38
+    NK_CONTINUE = 39
+    NK_MATCH = 40
+    NK_TUPLE = 41
+    NK_ARRAY_LIT = 42
+    NK_STRUCT_LIT = 43
+    NK_CLOSURE = 44
+    NK_CAST = 45
+    NK_DEFER = 46
+    NK_PIPELINE = 47
+    NK_RANGE = 48
+    NK_GROUPED = 49
+    NK_C_STRING_LIT = 50
+    NK_VARIANT_SHORTHAND = 51
+    NK_WITH_EXPR = 52
+    NK_RECORD_UPDATE = 53
+    NK_ENUM_VARIANT = 54
+    NK_SLICE = 55
+    NK_OPTIONAL_CHAIN = 56
+    NK_AWAIT = 57
+    NK_ASYNC_BLOCK = 58
+    NK_YIELD = 60
+    NK_COMPTIME = 61
+    NK_LET_ELSE = 62
+    NK_TUPLE_DESTRUCTURE = 63
+    NK_ARRAY_COMPREHENSION = 64
+    NK_ASYNC_SCOPE = 65
+    NK_SELECT_AWAIT = 66
+    NK_ERRDEFER = 67
+    NK_NULL_LIT = 68
+    NK_POISONED_EXPR = 69
+    NK_UNSAFE_BLOCK = 70
+    NK_COMPTIME_ERROR = 71
+    NK_FSTRING = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
+    NK_FSTRING_SPEC = 73  // d0=packed_flags, d1=width, d2=precision
+    // NK_WITH_IMPLICIT: d0=source_expr, d1=body, d2=binding_name_sym
+    NK_WITH_IMPLICIT = 76
+    NK_COMPUTED_FIELD_ACCESS = 74  // d0=expr(node), d1=field_expr(node), d2=0
+    NK_ASM_EXPR = 75  // d0=template(string_sym), d1=constraints(string_sym), d2=flags (bit0=volatile, bit1=has_output)
+    // NK_MULTI_INDEX: d0=base_expr, d1=specs_extra_start, d2=specs_count
+    NK_MULTI_INDEX = 77
+    // NK_INDEX_SPEC: d0=start_or_expr, d1=stop, d2=step_and_kind (kind * INDEX_KIND_SHIFT + step_node)
+    NK_INDEX_SPEC = 78
+    // NK_SCOPE: d0=name(sym), d1=body(node), d2=0
+    NK_SCOPE = 79
+    // Labels and unstructured jumps. Values are appended after existing
+    // expression/pattern nodes to avoid renumbering bootstrap-visible kinds.
+    // NK_LABEL: d0=label_sym, d1=statement, d2=0
+    // NK_GOTO:  d0=label_sym, d1=0, d2=0
+    NK_LABEL = 115
+    NK_GOTO = 116
+    // NK_WITH_TUPLE: d0=source_expr, d1=body_expr, d2=extra_start
+    // Extra: [name_count, is_mut, sym0, sym1, ...]
+    NK_WITH_TUPLE = 117
+    // mutability.md — call-site passing mode wrappers.
+    // NK_COPY_ARG: d0=inner(node), d1=0, d2=0  (explicit copy at call site)
+    // NK_MOVE_ARG: d0=inner(node), d1=0, d2=0  (explicit move at call site)
+    NK_COPY_ARG = 118
+    NK_MOVE_ARG = 119
+    // NK_REGEX_LIT: d0=pattern_sym, d1=flags_sym, d2=0
+    NK_REGEX_LIT = 120
+    // NK_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
+    // NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
+    NK_MATCH_OP = 123
+    NK_NEG_MATCH_OP = 124
+    // NK_NO_SUSPEND: d0=body(node), d1=0, d2=0
+    NK_NO_SUSPEND = 126
+    // NK_MAP_LIT: d0=extra_start, d1=pair_count, d2=0
+    // Extra stores key/value node pairs in source order.
+    NK_MAP_LIT = 128
+    // NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0
+    // Extra: [key_expr, value_expr, then per clause: binding, iterable, filter]
+    NK_MAP_COMPREHENSION = 129
+    // D39 typed body state (2026-09-02-D39-bundle-interfaces-a-bundle-provided-module-is-its-wi-and.md): a `.wi` interface declaration
+    // carries these in place of a source body / initializer. They are real
+    // nodes, never a 0 slot — `d1 == 0` on NK_LET_DECL already means a
+    // zero-initialized `var x: T` and DEFINES storage; an interface global is
+    // storage the bundle object supplies.
+    // NK_INTERFACE_BODY: d0=0, d1=0, d2=0  (NK_FN_DECL.d1; wrapped in
+    //   NK_UNSAFE_BLOCK/UNSAFE_ORIGIN_FN_BODY for `unsafe fn`, like a source body)
+    // NK_INTERFACE_PROVIDED: d0=0, d1=0, d2=0  (NK_LET_DECL.d1)
+    NK_INTERFACE_BODY = 130
+    NK_INTERFACE_PROVIDED = 131
+    // D51 modeled C, stage 1 (§16.2b): a `c facade name:` block and its items.
+    // NK_C_FACADE:          d0=name(sym), d1=extra_start, d2=item_count; extra=[item(node)...]
+    // NK_FACADE_RESOURCE:   d0=name(sym), d1=extra_start, d2=clause_count; extra=[wraps_type(node), clause(node)...]
+    //                       (a `handle Name wraps T` item is one whose only clause is FACADE_CLAUSE_HANDLE, §16.2b.9)
+    // NK_FACADE_FN:         d0=name(sym), d1=extra_start, d2=clause_count; extra=[clause(node)...]
+    // NK_FACADE_DOMAIN:     d0=name(sym), d1=kind(sym: process|thread|resource|static), d2=0
+    // NK_FACADE_CONVENTION: d0=extra_start, d1=path_count, d2=match_count; extra=[path_sym..., match(node)...]
+    //                       (the matches are written by the frontend's profile pass, stage 11)
+    // NK_FACADE_CLAUSE:     d0=FACADE_CLAUSE_*, d1=extra_start, d2=operand_count; extra=[operand...]
+    // NK_FACADE_PARAM_REF:  d0=FACADE_PARAM_REF_*, d1=name(sym)|digits(sym)|type(node), d2=0
+    NK_C_FACADE = 132
+    NK_FACADE_RESOURCE = 133
+    NK_FACADE_FN = 134
+    NK_FACADE_DOMAIN = 135
+    NK_FACADE_CONVENTION = 136
+    NK_FACADE_CLAUSE = 137
+    NK_FACADE_PARAM_REF = 138
+    // The head of a pattern let (§9.7, §30.4): the pattern, whether the
+    // statement is `var`, and the optional `: TYPE` of the whole subject.
+    NK_LET_PATTERN = 139
+    // D51 stage 11 (ruling §7, §59; spec §16.2b.12): a convention profile,
+    // `c convention pkg.vN:`, a package-shipped block of rules another facade
+    // adopts with `use convention pkg.vN`.
+    // NK_C_CONVENTION:        d0=name(sym: the dotted path), d1=extra_start, d2=rule_count; extra=[rule(node)...]
+    // NK_FACADE_RULE:         d0=rule name(sym), d1=extra_start, d2=3; extra=[pattern(sym), template(NK_FACADE_CLAUSE), is_fn_rule]
+    //                         a resource rule's template is from/init/drop/destroys with the
+    //                         pattern in the fn-sym operand; an fn rule's is the clause the
+    //                         matched fn item states (`fn *_get lend`)
+    // NK_FACADE_PROFILE_MATCH: d0=rule(node), d1=FACADE_PROFILE_*, d2=extra_start;
+    //                         extra=[subject(node: resource item, or the fn's declaring node), candidate_count, candidate_sym...]
+    NK_C_CONVENTION = 140
+    NK_FACADE_RULE = 141
+    NK_FACADE_PROFILE_MATCH = 142
+    // The one error type a facade's header states (`c facade sqlite error
+    // SqliteError:`, §16.2b.4, D97), kept as an item so every rewrite of the
+    // item list carries it.
+    // NK_FACADE_ERROR:        d0=error name(sym), d1=0, d2=0
+    NK_FACADE_ERROR = 143
+    // Type expressions
+    NK_TYPE_NAMED = 80
+    NK_TYPE_GENERIC = 81
+    NK_TYPE_REF = 82
+    NK_TYPE_PTR = 83
+    NK_TYPE_FN = 84
+    NK_TYPE_TUPLE = 85
+    NK_TYPE_OPTIONAL = 86
+    NK_TYPE_ARRAY = 87
+    NK_TYPE_SLICE = 88
+    NK_TYPE_TRAIT_OBJ = 89
+    NK_TYPE_INFERRED = 90
+    NK_TYPE_ASSOC = 91  // d0=base_sym (e.g. Self), d1=assoc_sym (e.g. Output), d2=0
+    NK_TYPE_TYPEOF = 92 // d0=expr(node), d1=0, d2=0
+    NK_TYPE_EXTERN_FN = 127
+    // Patterns (for match arms)
+    NK_PAT_WILDCARD = 100
+    NK_PAT_IDENT = 101
+    NK_PAT_INT = 102
+    NK_PAT_BOOL = 103
+    NK_PAT_STRING = 104
+    NK_PAT_VARIANT = 105
+    NK_PAT_TUPLE = 106
+    NK_PAT_STRUCT = 107
+    NK_PAT_RANGE = 108
+    NK_PAT_OR = 109
+    NK_MATCH_ARM = 110
+    NK_PAT_ENUM_SHORTHAND = 111
+    NK_PAT_AT_BINDING = 112
+    NK_PAT_SLICE = 113
+    NK_PAT_TYPED_BIND = 114
+    NK_PAT_REST = 125
+    NK_PAT_REGEX = 121
+    NK_DO_WHILE = 122
+
+// With-expression binding encoding in d2:
+// - positive value: immutable binding symbol id
+// - negative value: mutable binding symbol id
+fn encode_with_binding(sym: i32, is_mut: i32) -> i32:
+    if is_mut != 0 and sym > 0:
+        return 0 - sym
+    sym
+
+fn decode_with_binding_sym(encoded: i32) -> i32:
+    if encoded < 0:
+        return 0 - encoded
+    encoded
+
+fn decode_with_binding_is_mut(encoded: i32) -> i32:
+    if encoded < 0:
+        return 1
+    0
+
+// Type decl sub-kinds (stored in data2 field)
+enum TypeDeclKind: i32:
+    Alias = 0
+    Struct = 1
+    Enum = 2
+    Distinct = 3
+    DiscEnum = 4
+    Opaque = 5
+    Union = 6
+
+// Type decl flag bits (combined with TypeDeclKind via arithmetic)
+const TDK_FLAG_EPHEMERAL: i32 = 8
+pub const TDK_FLAG_PACKED: i32 = 16
+pub const TDK_FLAG_BITPACKED: i32 = 32
+pub const TDK_FLAG_SPECIFIED: i32 = 64
+pub const TDK_FLAG_ERROR: i32 = 128
+// D120 (§4.3): `resource type T`, a struct whose meaning forbids
+// duplication; `resource` is a keyword only before `type`. Above the
+// @[repr(packed(N))] cap field (TDK_PACK_UNIT × 1..31).
+pub const TDK_FLAG_RESOURCE: i32 = 32768
+
+// D51 §16.2b stage 1: NK_FACADE_CLAUSE.d0 and the operands each kind writes
+// to extra (a 0 operand is "absent"; refs are NK_FACADE_PARAM_REF nodes).
+pub const FACADE_CLAUSE_FROM: i32 = 1              // [producer_sym, out_param_ref|0]
+pub const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym]
+pub const FACADE_CLAUSE_PREINIT: i32 = 3           // [fn_sym]
+pub const FACADE_CLAUSE_DROP: i32 = 4              // [fn_sym, param_ref|0]  (`drop f(param N)`: N receives the resource, the first when 0, D209)
+pub const FACADE_CLAUSE_DESTROYS: i32 = 5          // [fn_sym|0, param_ref|0]   (a resource names one; an fn item is one)
+pub const FACADE_CLAUSE_OK: i32 = 6                // [const_sym...]  (several: any is success, §16.2b.4)
+pub const FACADE_CLAUSE_BORROWS: i32 = 7           // [param_ref]
+pub const FACADE_CLAUSE_INDEPENDENT: i32 = 8       // []
+pub const FACADE_CLAUSE_LEND: i32 = 9              // []
+pub const FACADE_CLAUSE_CONSUMES: i32 = 10         // [param_ref, destroyed_by_ref|0]
+pub const FACADE_CLAUSE_RETAINS: i32 = 11          // [param_ref, by_ref]
+pub const FACADE_CLAUSE_RETURNS_BORROW: i32 = 12   // [resource_sym|CStr, from_ref|0, domain_sym|0, parent_sym|0, from_ref2] — parent: `from parent P of param N` (D85); from_ref2 (present only for `from params N, M`, D187): the second origin
+pub const FACADE_CLAUSE_RETURNS_STATIC: i32 = 13   // [type(node)]
+pub const FACADE_CLAUSE_PRESERVES: i32 = 14        // [param_ref|0, domain_sym|0]
+pub const FACADE_CLAUSE_OF: i32 = 15               // [resource_sym]
+pub const FACADE_CLAUSE_RENAME: i32 = 16           // [new_sym]
+pub const FACADE_CLAUSE_THREAD: i32 = 17           // [capability_sym...]
+pub const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any` | `registering`)
+pub const FACADE_CLAUSE_CALLBACK_CONSUMES: i32 = 19 // [param_ref]
+pub const FACADE_CLAUSE_MOVABLE: i32 = 20          // []  (in-place resource: not pinned, D54)
+pub const FACADE_CLAUSE_CALLBACK: i32 = 44          // [callback_ref]  (`callback param N`: a callback with no userdata, §16.2b.9)
+pub const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
+pub const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
+pub const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param N`: the facade establishes nullability, §16.2b.8)
+pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, capacity(0|1), elements(0|1)] (D64 §16.2b.8)
+pub const FACADE_CLAUSE_FIXED: i32 = 25            // [param_ref, literal(node)]  (`param N fixed <literal>`, D64 §16.2b.11)
+pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref, case(node)...]  (`variadic param N selected by param P:`, D66 §16.2b.5)
+pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0, length_ref|0, length_type(node)|0, until_sym...] (D194: the last three; d2 is the count, so the `until` names are extras 7..d2)
+pub const FACADE_CLAUSE_CALLBACKS_NONE: i32 = 28  // [] trusted no-invocation guarantee (§16.2b.9)
+pub const FACADE_CLAUSE_ABANDON: i32 = 29          // [fn_sym] resource-only: the `callbacks none` operation run before the destroyer on a drop path not proven callback-free (§16.2b.9)
+
+// #2223 (Law 3, one owner): whether a clause makes its free function render
+// through a bridge — a presented call the facade redirects to. A buffer
+// pairing, a fixed argument, an `ok` status contract (D64) and `nullable
+// param N` (D102) do; the one list Sema's contract (`bridged`) and the
+// renderer's lend item read, so neither recomputes it from the clauses.
+fn facade_clause_bridges(kind: i32) -> bool:
+    // A `text return` on a free operation renders its bridge too (the copy
+    // and the release): unlisted, the bridge was rendered and a call by the
+    // C name never reached it.
+    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_BUFFER_FIELD or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_DISCARDED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD or kind == FACADE_CLAUSE_TEXT_RETURN
+pub const FACADE_CLAUSE_BUFFER_FIELD: i32 = 46     // [pointer_field_sym, count_field_sym]  (`buffer field P remaining field N`: a slice carried by two fields of the resource's record, D210 §16.2b.8)
+pub const FACADE_CLAUSE_DISCARDED: i32 = 48        // [param_ref]  (`param N discarded`: an out-pointer the wrapper hands scratch storage, D209 §16.2b.11)
+pub const FACADE_CLAUSE_HANDLE: i32 = 30           // [] the parser's marker on the NK_FACADE_RESOURCE a `handle Name wraps *mut T` item makes: a callback-scope handle (§16.2b.9), never written as a clause
+pub const FACADE_CLAUSE_CALLBACK_ARGV: i32 = 31    // [callback_ref, argv_ref, argc_ref, type(node)]  (`callback param N argv param A paired with argc param C as &[H]`: A and C index the callback's own parameters, §16.2b.9, D76)
+pub const FACADE_CLAUSE_USER_DATA: i32 = 32        // [accessor_sym, type(node)]  (`user_data from <fn> as &U`: the registered userdata the facade boxed, read back through <fn>, §16.2b.9, D76)
+pub const FACADE_CLAUSE_TEXT_PARAM: i32 = 34       // [param_ref]  (`text param N`: input text of any C character type, read to its NUL and not kept; takes a str, D122 §16.2b.8)
+pub const FACADE_CLAUSE_TEXT_RETURN: i32 = 35      // [free_fn_sym]  (`text return, owned, freed by F`: new text the caller owns, released with F, D122 §16.2b.8)
+pub const FACADE_CLAUSE_TEXT_UTF8: i32 = 36        // []  a facade-level item, `text utf8`: every text return presents as Option[str], validated at the boundary (D134 §16.2b.8)
+pub const FACADE_CLAUSE_TEXT_BYTES: i32 = 37       // []  (`text return bytes`: this item's text return stays owned bytes under a `text utf8` facade, D134 §16.2b.8)
+pub const FACADE_CLAUSE_DETACHES: i32 = 38         // [param_ref]  (`detaches param N`: removes the value param N borrows from its origin and yields it owned, dependent on that origin, D134 §16.2b.6)
+// D198 (§16.2b.5 "Value records"): a pointer parameter to one complete record
+// that is not a resource's representation, by what the callee does with it.
+pub const FACADE_CLAUSE_RUNS_THREADS: i32 = 40  // []  a facade-level item, `runs threads`: the library runs threads of its own, so its globals are never provably on one thread (§16.3)
+pub const FACADE_CLAUSE_RUNS_NO_THREADS: i32 = 42  // []  a facade-level item, `runs no threads`: the library's code and state are touched only on a thread the program called it on (§31.8.1, a grant)
+pub const FACADE_CLAUSE_CONTRACT_PRESERVES: i32 = 43  // [domain_sym]  a facade-level item, `preserves domain D`: the library's own threads do not rewrite D (D208, §16.2b.7, a grant)
+pub const FACADE_CLAUSE_PRODUCED_FIELD: i32 = 41   // [producer_sym, word_sym, field_sym…]  (`from F, nullable field a.b` / `nonnull field a.b`: the field whose NULL means a by-value producer produced nothing, §16.2b.4; the word, `nullable` or `nonnull`, is the clause)
+pub const FACADE_CLAUSE_VALUE_RECORD: i32 = 39     // [param_ref, word_sym]  (`reads` / `fills` / `updates param N`: the word is the clause, §16.2b.5)
+pub const FACADE_CLAUSE_MESSAGE: i32 = 33          // [fn_sym] resource-only: `message <fn>`, the operation that describes the resource's most recent failure (ruling Amendment 3, §16.2b.4)
+pub const FACADE_PARAM_REF_NAME: i32 = 0
+pub const FACADE_PARAM_REF_INDEX: i32 = 1
+pub const FACADE_PARAM_REF_TYPE: i32 = 2
+
+// D51 stage 11: a clause a convention profile supplied carries the rule
+// that supplied it as one trailing operand beyond the kind's own (a
+// resource `drop` is [fn_sym, param_ref|0]; a profile's adds rule_node). That
+// operand is the fact's provenance (§16.2b.2): Sema and the contract view
+// read it here, the renderer reads the leading operands as it reads any
+// clause. Only the kinds a profile rule can state have a row.
+fn facade_clause_operand_count(kind: i32) -> i32:
+    if kind == FACADE_CLAUSE_FROM or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 2
+    if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT: return 1
+    if kind == FACADE_CLAUSE_LEND: return 0
+    -1
+
+// Whether an NK_FACADE_RESOURCE item is a callback-scope handle (§16.2b.9).
+// The one error type a facade states for all of its fallible operations
+// (§16.2b.4, D97), or 0 when each resource and operation has its own.
+fn facade_error_sym(pool: &AstPool, facade: i32) -> i32:
+    let extra_start = pool.get_data1(facade as NodeId)
+    for k in 0..pool.get_data2(facade as NodeId):
+        let item = pool.get_extra(extra_start + k)
+        if pool.kind(item as NodeId) == NodeKind.NK_FACADE_ERROR: return pool.get_data0(item as NodeId)
+    0
+
+// The `c facade` block an item belongs to, or 0.
+fn facade_of_item(pool: &AstPool, item: i32) -> i32:
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_C_FACADE: continue
+        let extra_start = pool.get_data1(decl)
+        for k in 0..pool.get_data2(decl):
+            if pool.get_extra(extra_start + k) == item: return decl as i32
+    0
+
+// The shared error type of the facade an item belongs to, or 0.
+fn facade_item_error_sym(pool: &AstPool, item: i32) -> i32:
+    let facade = facade_of_item(pool, item)
+    if facade == 0: 0 else: facade_error_sym(pool, facade)
+
+fn facade_item_is_handle(pool: &AstPool, item: i32) -> bool:
+    if item <= 0 or pool.kind(item as NodeId) != NodeKind.NK_FACADE_RESOURCE: return false
+    let extra_start = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        if pool.get_data0(pool.get_extra(extra_start + 1 + k) as NodeId) == FACADE_CLAUSE_HANDLE: return true
+    false
+
+fn facade_clause_profile_rule(pool: &AstPool, clause: i32) -> i32:
+    if clause <= 0 or pool.kind(clause as NodeId) != NodeKind.NK_FACADE_CLAUSE: return 0
+    // An `init` states its own success statuses after its function
+    // (`init f(self), ok K`, D226): every operand is the clause's own, and
+    // no profile states an `init`.
+    if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_INIT: return 0
+    let own = facade_clause_operand_count(pool.get_data0(clause as NodeId))
+    if own < 0 or pool.get_data2(clause as NodeId) <= own: return 0
+    pool.get_extra(pool.get_data1(clause as NodeId) + own)
+
+// NK_FACADE_PROFILE_MATCH.d1: what a rule's match did for one subject.
+pub const FACADE_PROFILE_APPLIED: i32 = 0     // one valid candidate; the clause was stated
+pub const FACADE_PROFILE_AMBIGUOUS: i32 = 1   // several candidates; nothing contributed (ruling §7.1)
+pub const FACADE_PROFILE_SHADOWED: i32 = 2    // an explicit clause states the fact; the profile's is not (ruling §7.2)
+pub const FACADE_PROFILE_NONE: i32 = 3        // no candidate
+pub const TDK_FLAG_REPR_C: i32 = 256
+// D100 (§18.3): a struct field's alignment slot carries this bit when the
+// field is `pub` (alignments are 0 or a power of two up to 65536). Sema
+// strips it when it copies the alignments (field_align_value).
+pub const FIELD_PUB_ALIGN_FLAG: i32 = 1048576
+fn field_align_value(slot: i32) -> i32: slot % FIELD_PUB_ALIGN_FLAG
+fn field_slot_is_pub(slot: i32) -> bool: slot >= FIELD_PUB_ALIGN_FLAG
+// @[flags] on a discriminant enum (§4.4a): auto-increment doubles.
+pub const TDK_FLAG_FLAGS: i32 = 512
+
+fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
+    if is_ephemeral != 0:
+        return sub_kind + TDK_FLAG_EPHEMERAL
+    sub_kind
+
+fn type_decl_sub_kind(packed: i32) -> i32:
+    packed % TDK_FLAG_EPHEMERAL
+
+// An enum declaration's variants in its extras (§4.4a): a plain enum's are
+// `[count, (name, pcount, payloads...)*]`, a discriminant enum's
+// `[repr, count, (name, disc, pcount, payloads...)*]`; both end with
+// `vis, tp_start, tp_count`. One walk serves both: a walker that knew only
+// the plain layout left a generic discriminant enum's payloads unresolved
+// (#1768).
+fn type_decl_is_enum(sub_kind: i32) -> bool:
+    sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum
+
+// The extras index of the variant count.
+fn enum_decl_count_index(sub_kind: i32, extra_start: i32) -> i32:
+    if sub_kind == TypeDeclKind.DiscEnum: extra_start + 1 else: extra_start
+
+// The slots before a variant's payload count: its name, plus its
+// discriminant node in a discriminant enum.
+fn enum_decl_variant_head(sub_kind: i32) -> i32:
+    if sub_kind == TypeDeclKind.DiscEnum: 2 else: 1
+
+fn type_decl_is_ephemeral(packed: i32) -> i32:
+    (packed / TDK_FLAG_EPHEMERAL) % 2
+
+fn type_decl_is_packed(packed: i32) -> i32:
+    (packed / TDK_FLAG_PACKED) % 2
+
+fn type_decl_is_resource(packed: i32) -> i32:
+    (packed / TDK_FLAG_RESOURCE) % 2
+
+fn type_decl_is_bitpacked(packed: i32) -> i32:
+    (packed / TDK_FLAG_BITPACKED) % 2
+
+// @[repr(packed(N))] (§16.4): every field's alignment capped at N, a power
+// of two up to 65536, kept as log2(N) + 1 in the five bits above
+// TDK_FLAG_FLAGS (0: no cap).
+pub const TDK_PACK_UNIT: i32 = 1024
+
+fn type_decl_pack_bits(n: i32) -> i32:
+    var e: i32 = 1
+    var v = n
+    while v > 1:
+        v = v / 2
+        e = e + 1
+    e * TDK_PACK_UNIT
+
+// The N of @[repr(packed(N))], or 0.
+fn type_decl_pack_cap(packed: i32) -> i32:
+    let e = (packed / TDK_PACK_UNIT) % 32
+    (not (e == 0)) as i32 << ((e - 1) as u32)
+
+// @[repr(C)] layout. @[repr(packed)] and @[repr(packed(N))] imply repr(C)
+// per §16.4.
+fn type_decl_is_repr_c(packed: i32) -> i32:
+    if (packed / TDK_FLAG_REPR_C) % 2 != 0 or type_decl_pack_cap(packed) != 0:
+        return 1
+    type_decl_is_packed(packed)
+
+fn type_decl_is_specified(packed: i32) -> i32:
+    (packed / TDK_FLAG_SPECIFIED) % 2
+
+fn type_decl_is_error(packed: i32) -> i32:
+    (packed / TDK_FLAG_ERROR) % 2
+
+fn type_decl_is_flags(packed: i32) -> i32:
+    (packed / TDK_FLAG_FLAGS) % 2
+
+// Fn decl flag bits (stored in data2 field)
+@[flags]
+enum FnFlags: i32:
+    PUB = 1
+    ASYNC = 2
+    GEN = 4
+    COMPTIME = 8
+    TAILREC = 16
+    MUST_USE = 32
+    VARIADIC = 64
+    INLINE = 128
+    NOINLINE = 256
+    PANIC_HANDLER = 512
+    ENTRY = 1024
+    NO_MAIN = 2048
+    TEST = 4096
+    BEFORE = 8192
+    AFTER = 16384
+    BENCH = 32768
+    SUSPENDS = 65536  // @[suspends]: calling it may suspend the current fiber (#3052; a std lock, wait or receive)
+
+// Metadata packing unit used to encode required-parameter count into
+// fn_meta flags without affecting existing FnFlags.* parity checks.
+pub const FN_META_REQUIRED_UNIT: i32 = 131072
+pub const FN_PARAM_STRIDE: i32 = 3
+pub const TRAIT_METHOD_STRIDE: i32 = 8
+pub const TRAIT_METHOD_NAME: i32 = 0
+pub const TRAIT_METHOD_FLAGS: i32 = 1
+pub const TRAIT_METHOD_PARAM_START: i32 = 2
+pub const TRAIT_METHOD_PARAM_COUNT: i32 = 3
+pub const TRAIT_METHOD_RETURN_TYPE: i32 = 4
+pub const TRAIT_METHOD_DEFAULT_BODY: i32 = 5
+pub const TRAIT_METHOD_SOURCE_START: i32 = 6
+pub const TRAIT_METHOD_SOURCE_END: i32 = 7
+pub const FN_PARAM_FLAG_NOALIAS: i32 = 1
+pub const FN_PARAM_FLAG_IMPLICIT: i32 = 2
+// mut.md Rev 8 §5.1 — receiver-place mode `mut self: Self`.
+// Set by the parser on a parameter declared `mut`: a `mut self` receiver or,
+// D172 (§3.8a), any `mut p: T` parameter: the same in-place mode.
+// Stored as a flag bit so callers can detect a mutating parameter without
+// reparsing; Sema requires a mutable place at the call site.
+pub const FN_PARAM_FLAG_MUT_SELF: i32 = 4
+// mutability.md — receiver-mode `self: &Self` (read-only view).
+// Set when param name is `self` and the declared type is a reference (&Self).
+pub const FN_PARAM_FLAG_REF_SELF: i32 = 8
+// mutability.md — receiver-mode `move self: Self` (consuming).
+// Set when param name is `self` and was preceded by `move`.
+pub const FN_PARAM_FLAG_MOVE_SELF: i32 = 16
+// D7: the parser synthesized this receiver from `fn` / `mut fn` / `move fn`.
+// This is distinct from its access mode so analysis and migrations can prove
+// that no source-level `self` parameter remains.
+pub const FN_PARAM_FLAG_SYNTH_RECEIVER: i32 = 32
+// §12.4 (D75): `f: once fn(A) -> R` — the body invokes `f` at most once, so
+// a consuming closure may cross a bundle boundary to it.
+pub const FN_PARAM_FLAG_ONCE: i32 = 64
+
+// Multi-index spec kind constants (stored in NK_INDEX_SPEC.d2 high bits)
+pub const INDEX_SCALAR: i32 = 0
+pub const INDEX_SLICE: i32 = 1
+pub const INDEX_ELLIPSIS: i32 = 2
+pub const INDEX_NEWAXIS: i32 = 3
+pub const INDEX_KIND_SHIFT: i32 = 268435456  // 1 << 28
+
+pub const TYPE_TRAIT_OBJECT_DYN: i32 = 1
+pub const TYPE_TRAIT_OBJECT_IMPL: i32 = 2
+
+// NK_UNSAFE_BLOCK.d1 distinguishes a true unsafe block from the narrow
+// `unsafe *p` / `unsafe p[i]` raw-access prefix form. d2 marks parser-inserted
+// unsafe-function body wrappers, which are not subject to the unnecessary-block
+// diagnostic.
+pub const UNSAFE_KIND_BLOCK: i32 = 0
+pub const UNSAFE_KIND_PREFIX: i32 = 1
+pub const UNSAFE_ORIGIN_EXPR: i32 = 0
+pub const UNSAFE_ORIGIN_FN_BODY: i32 = 1
+
+fn fn_param_is_noalias(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_NOALIAS) % 2
+
+fn fn_param_is_implicit(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_IMPLICIT) % 2
+
+fn fn_param_is_mut_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_MUT_SELF) % 2
+
+fn fn_param_is_ref_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_REF_SELF) % 2
+
+fn fn_param_is_move_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_MOVE_SELF) % 2
+
+fn fn_param_is_synth_receiver(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_SYNTH_RECEIVER) % 2
+
+fn fn_param_is_once(flags: i32) -> bool: (flags / FN_PARAM_FLAG_ONCE) % 2 != 0
+
+// mut.md Rev 8 §12 — module-level place declarations.
+// NK_LET_DECL flags layout:
+//   bit 0 (mask 1):  is_mut (var vs let)
+//   bit 1 (mask 2):  is_pub
+//   bit 2 (mask 4):  LET_FLAG_GLOBAL     — declared via `global`
+//   bit 3 (mask 8):  LET_FLAG_GLOBAL_VAR — declared via `global var`
+//   bits 4+       :  (type_extra index + 1) * 16   (0 means no type)
+// Plain top-level `let`/`var` (without `global`) leave bits 2/3 clear.
+pub const LET_FLAG_GLOBAL: i32 = 4
+pub const LET_FLAG_GLOBAL_VAR: i32 = 8
+
+fn let_decl_is_global(flags: i32) -> i32:
+    (flags / LET_FLAG_GLOBAL) % 2
+
+fn let_decl_is_global_var(flags: i32) -> i32:
+    (flags / LET_FLAG_GLOBAL_VAR) % 2
+
+const C_IMPORT_ALLOW_COUNT_UNIT: i32 = 1024
+const C_IMPORT_NO_METHODS_COUNT_UNIT: i32 = 1048576       // 1024 * 1024
+const C_IMPORT_NO_METHODS_ALL_UNIT: i32 = 1073741824      // 1 << 30
+
+fn c_import_link_count(packed: i32) -> i32:
+    packed % C_IMPORT_ALLOW_COUNT_UNIT
+
+fn c_import_allow_count(packed: i32) -> i32:
+    (packed / C_IMPORT_ALLOW_COUNT_UNIT) % C_IMPORT_ALLOW_COUNT_UNIT
+
+// Count of per-type `no_methods: "Type"` names stored after the allow group.
+fn c_import_no_methods_count(packed: i32) -> i32:
+    (packed / C_IMPORT_NO_METHODS_COUNT_UNIT) % C_IMPORT_ALLOW_COUNT_UNIT
+
+// 1 when `no_methods: true` disabled auto-methods for the whole import.
+fn c_import_no_methods_all(packed: i32) -> i32:
+    (packed / C_IMPORT_NO_METHODS_ALL_UNIT) % 2
+
+fn pack_c_import_counts(link_count: i32, allow_count: i32) -> i32:
+    pack_c_import_counts_ex(link_count, allow_count, 0, 0)
+
+fn pack_c_import_counts_ex(link_count: i32, allow_count: i32, no_methods_count: i32, no_methods_all: i32) -> i32:
+    link_count + allow_count * C_IMPORT_ALLOW_COUNT_UNIT + no_methods_count * C_IMPORT_NO_METHODS_COUNT_UNIT + no_methods_all * C_IMPORT_NO_METHODS_ALL_UNIT
+
+// Visibility flags
+enum Visibility: i32:
+    Private = 0
+    Public = 1
+
+// Binary operators
+enum BinaryOp: i32:
+    OP_ADD = 0
+    OP_SUB = 1
+    OP_MUL = 2
+    OP_DIV = 3
+    OP_MOD = 4
+    OP_EQ = 5
+    OP_NEQ = 6
+    OP_LT = 7
+    OP_GT = 8
+    OP_LTE = 9
+    OP_GTE = 10
+    OP_AND = 11
+    OP_OR = 12
+    OP_BIT_AND = 13
+    OP_BIT_OR = 14
+    OP_BIT_XOR = 15
+    OP_SHL = 16
+    OP_SHR = 17
+    OP_DEFAULT = 18
+    OP_CONCAT = 19
+    OP_ADD_WRAP = 20
+    OP_SUB_WRAP = 21
+    OP_MUL_WRAP = 22
+    OP_IN = 23
+    OP_NOT_IN = 24
+    OP_ADD_SAT = 25
+    OP_SUB_SAT = 26
+    OP_MUL_SAT = 27
+    OP_MATMUL = 28
+
+// Unary operators
+enum UnaryOp: i32:
+    UOP_NEGATE = 0
+    UOP_NOT = 1
+    UOP_REF = 2
+    UOP_MUT_REF = 3  // dead after P12 lockdown — parser rejects &mut
+    UOP_DEREF = 4
+    UOP_TRY = 5
+    UOP_BIT_NOT = 6
+    // mut.md Rev 8 §13.2 — explicit raw-address-of forms.
+    UOP_RAW_REF_CONST = 7
+    UOP_RAW_REF_MUT = 8
+
+// Literal suffix metadata (stored out-of-line in AstPool.literal_suffixes)
+enum LiteralSuffix: i32:
+    None = 0
+    I8 = 1
+    I16 = 2
+    I32 = 3
+    I64 = 4
+    I128 = 5
+    Isize = 6
+    U8 = 7
+    U16 = 8
+    U32 = 9
+    U64 = 10
+    U128 = 11
+    Usize = 12
+    F32 = 13
+    F64 = 14
+
+// F-string segment kinds (stored in extra_data)
+enum FStringSegmentKind: i32:
+    LITERAL = 0  // +1 word: string token index (interned symbol)
+    EXPR = 1     // +1 word: expression node, +1 word: spec node (0 if none)
+
+// ── AST Pool ──────────────────────────────────────────────────────
+
+// The AstPool stores all AST nodes in parallel arrays (SoA layout).
+// Each node has:
+// - A kind tag (NodeKind.NK_*)
+// - Start/end span positions (byte offsets into source)
+// - Up to 3 integer data fields (meaning depends on kind)
+// - An optional extra data range for variable-length data
+//
+// Node 0 is reserved as a null sentinel.
+
+type AstPoolState {
+    holders: i64,
+    kinds: List[i32],
+    starts: List[i32],
+    ends: List[i32],
+    data0: List[i32],
+    data1: List[i32],
+    data2: List[i32],
+    literal_suffixes: List[i32],
+    int_literal_digit_idxs: List[i32],
+    int_literal_radices: List[i32],
+    // Tenth SoA column: the file each node was parsed from. Spans store
+    // (start,end) byte offsets only; without this, file identity is
+    // reconstructed positionally from decl tables (#661 class). Stamped
+    // from current_file_id, which each Parser sets for its file.
+    files: List[i32],
+    current_file_id: i32,
+    extra: List[i32],
+    decls: List[i32],
+    local_decl_count: i32,
+    prelude_decl_count: i32,
+    strings: List[str],
+    fn_meta: List[i32],
+    type_meta: List[i32],
+    pattern_qualifiers: List[i32],
+    // §31.7: the contract clauses written after `override`.
+    facade_overrides: List[i32],
+    fn_param_patterns: List[i32],
+    fn_param_pattern_meta: List[i32],
+    for_meta: List[i32],
+    // §13.6a: (for node, one-clause comprehension match) pairs; see
+    // add_for_carrier_alt.
+    for_carrier_alts: List[i32],
+    block_meta: List[i32],
+    must_use_type_nodes: List[i32],
+    no_await_guard_type_nodes: List[i32],
+    no_alloc_fn_nodes: List[i32],
+    iter_of_self_fn_nodes: List[i32],
+    sealed_trait_nodes: List[i32],
+    extend_impl_nodes: List[i32],
+    comptime_decl_nodes: List[i32],
+    // D39: NK_LET_DECL nodes the parser produced from `const` — the wrapper
+    // it desugars to (NK_COMPTIME) is folded away by the comptime transform,
+    // so the bundle-interface emitter reads const-ness from this mark, which
+    // is identical for `.w` and `.wi` input.
+    const_decl_nodes: List[i32],
+    move_closure_nodes: List[i32],
+    // D172 (§3.8): call arguments spelled `mut x`, a spelling of intent only.
+    mut_arg_nodes: List[i32],
+    non_escaping_closure_nodes: List[i32],
+    by_place_closure_nodes: List[i32],
+    // (closure node, `-> T` type node) pairs: a closure's declared result
+    // (§12, #1508), kept in order for a pool copy.
+    closure_ret_type_nodes: List[i32],
+    compiler_hook_fn_nodes: List[i32],
+    compiler_hook_phase_syms: List[i32],
+    global_allocator_decl_nodes: List[i32],
+    where_meta: List[i32],
+    impl_type_params: List[i32],
+    impl_target_type_nodes: List[i32],
+    impl_trait_type_args: List[i32],
+    // A parameterized type-parameter bound's arguments (`G: Gen[T]`):
+    // (extra index of the bound's trait symbol, start in
+    // type_bound_arg_nodes, count) triples.
+    type_bound_args: List[i32],
+    type_bound_arg_nodes: List[i32],
+    fn_meta_map: HashMap[i32, i32, Minted],
+    // For `x in collection` / `x not in collection` binary nodes: the extra-array
+    // index of the pre-reserved `collection.contains(x)` argument. Allocated at
+    // parse time because the pool freezes before MIR lowering (#234, §9.9).
+    membership_arg_map: HashMap[i32, i32, Minted],
+    // (parent for/comprehension node, binding value) pairs the parser built
+    // as PATTERN bindings; absent = plain symbol binding. See
+    // for_binding_is_pattern. The List mirrors the map in insertion order so
+    // pool clones (ComptimeTransform) can copy it deterministically.
+    pattern_binding_keys: HashMap[i64, i32, Minted],
+    pattern_binding_pairs: List[i64],
+    type_meta_map: HashMap[i32, i32, Minted],
+    pattern_qualifier_map: HashMap[i32, i32, Minted],
+    where_meta_map: HashMap[i32, i32, Minted],
+    impl_type_params_map: HashMap[i32, i32, Minted],
+    impl_target_type_nodes_map: HashMap[i32, i32, Minted],
+    impl_trait_type_args_map: HashMap[i32, i32, Minted],
+    type_bound_args_map: HashMap[i32, i32, Minted],
+    fn_param_pattern_meta_map: HashMap[i32, i32, Minted],
+    for_meta_map: HashMap[i32, i32, Minted],
+    for_carrier_alt_map: HashMap[i32, i32, Minted],
+    block_meta_map: HashMap[i32, i32, Minted],
+    fn_param_defaults: HashMap[i64, i32, Minted],
+    must_use_type_set: HashMap[i32, i32, Minted],
+    no_await_guard_type_set: HashMap[i32, i32, Minted],
+    no_alloc_fn_set: HashMap[i32, i32, Minted],
+    iter_of_self_fn_set: HashMap[i32, i32, Minted],
+    sealed_trait_set: HashMap[i32, i32, Minted],
+    extend_impl_set: HashMap[i32, i32, Minted],
+    comptime_decl_set: HashMap[i32, i32, Minted],
+    const_decl_set: HashMap[i32, i32, Minted],
+    // D88: an unannotated `const` -> the initializer it was written with,
+    // kept when the comptime transform folds the declaration to its value.
+    untyped_const_inits: HashMap[i32, i32, Minted],
+    move_closure_set: HashMap[i32, i32, Minted],
+    mut_arg_set: HashMap[i32, i32, Minted],
+    non_escaping_closure_set: HashMap[i32, i32, Minted],
+    by_place_closure_set: HashMap[i32, i32, Minted],
+    closure_ret_type_map: HashMap[i32, i32, Minted],
+    compiler_hook_fn_set: HashMap[i32, i32, Minted],
+    compiler_hook_phase_map: HashMap[i32, i32, Minted],
+    global_allocator_decl_set: HashMap[i32, i32, Minted],
+    // D184 (§29.15): a script's top-level bindings (sym -> NK_LET_BINDING) and
+    // the file's top-level fns, which capture them.
+    script_binding_syms: List[i32],
+    script_binding_nodes: List[i32],
+    script_binding_by_sym: HashMap[i32, i32, Minted],
+    script_helper_decls: List[i32],
+    script_helper_set: HashMap[i32, i32, Minted],
+    call_named_args: HashMap[i32, i32, Minted],
+    // §9.3.1 (#2326): a call argument that is or holds an implicit `it`
+    // closure → its extra slot, and → the enclosing call argument holding
+    // it. Sema walks them to give the closure to the nearest argument whose
+    // parameter takes a one-parameter function.
+    implicit_it_slots: HashMap[i32, i32, Minted],
+    implicit_it_parents: HashMap[i32, i32, Minted],
+    fn_stack_sizes: HashMap[i32, i32, Minted],
+    fn_weak_flags: HashMap[i32, i32, Minted],
+    extern_var_link_names: HashMap[i32, i32, Minted],  // NK_EXTERN_VAR node → @[link_name("sym")] symbol (#858)
+    fn_target_arch: HashMap[i32, i32, Minted],   // fn_node → @[target("arch")] arch name sym
+    unsafe_fn_type_nodes: HashMap[i32, i32, Minted],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
+    variadic_fn_type_nodes: HashMap[i32, i32, Minted],  // NK_TYPE_EXTERN_FN node → 1 if `extern "C" fn(A, ...)` (#1832)
+    fn_type_mut_masks: HashMap[i32, i32, Minted],       // NK_TYPE_FN or closure node → bit i set when parameter i is `mut` (D218, §3.8a, §9.3)
+    fn_effect_pin_starts: HashMap[i32, i32, Minted],   // fn_node → first entry in fn_effect_pin_*
+    fn_effect_pin_counts: HashMap[i32, i32, Minted],   // fn_node → entry count
+    fn_effect_pin_params: List[i32],            // param_name_sym
+    fn_effect_pin_bits: List[i32],              // effect bitmask
+    // §21.1 rule 1 (D39): a function's declared global write set, its
+    // checked contract — (module path sym, 0 when the clause names the
+    // global in scope; name sym) pairs (Parser.attach_pending_global_writes).
+    fn_global_write_starts: HashMap[i32, i32, Minted],  // fn_node → first entry in fn_global_write_*
+    fn_global_write_counts: HashMap[i32, i32, Minted],  // fn_node → entry count
+    fn_global_write_paths: List[i32],            // module path sym
+    fn_global_write_names: List[i32],            // global name sym
+    // §21.1 rule 6 (#1903): a function's declared returned-view origins,
+    // `-> &T from p, other.G` — (module path sym or 0; name sym) pairs, a
+    // parameter (`self` included) or a global (Parser.parse_optional_from_clause).
+    fn_view_origin_starts: HashMap[i32, i32, Minted],   // fn_node → first entry in fn_view_origin_*
+    fn_view_origin_counts: HashMap[i32, i32, Minted],   // fn_node → entry count
+    fn_view_origin_paths: List[i32],             // module path sym
+    fn_view_origin_names: List[i32],             // parameter or global name sym
+    // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
+    copy_arg_needs_clone: HashMap[i32, i32, Minted],   // node → 1
+    // A trait's default method body as one impl's own nodes
+    // (clone_default_method_bodies): the impl, the trait's body, the copy.
+    default_body_clone_impls: List[i32],
+    default_body_clone_origins: List[i32],
+    default_body_clones: List[i32],
+    default_body_clone_index: HashMap[i64, i32, Minted],   // (impl, trait body) → index
+    // D61: type symbols whose Debug impl the compiler generated (a derive,
+    // an `error` declaration). `:?` formats them with the generated form.
+    generated_debug_type_syms: List[i32],
+    // D70 (§18.2): `use m as n` / `use c_import(...) as n` — import decl → n.
+    use_alias_map: HashMap[i32, i32, Minted],
+    // D70: field-access nodes Sema resolved through an import namespace and
+    // rewrote into the declaration's ident (Sema.rewrite_namespace_access),
+    // mapped to the module's type when the member is a type (#1757), else 0.
+    namespace_bound_set: HashMap[i32, i32, Minted],
+    // §9.5 (#1930): resolve_receiver_field_names' record. An instance method
+    // declared in its type's own module → the type's declaration; each
+    // NK_FIELD_ACCESS it made of a bare field name → that declaration; and
+    // (declaration, field name) keys of those types' fields.
+    receiver_field_methods: HashMap[i32, i32, Minted],
+    receiver_field_accesses: HashMap[i32, i32, Minted],
+    receiver_field_keys: HashMap[i64, i32, Minted],
+    // §18.1: (file, last segment of its `module` header) pairs, in parse
+    // order — a module's self-name when it has a header.
+    module_header_files: List[i32],
+    module_header_names: List[i32],
+    frozen: i32,
+    adapter_node_count: i32,                             // nodes Sema wrote for built-in method values (D223, add_adapter_node)
+}
+
+// A counted handle over the node tables (#2449), as InternPool is: `clone()`
+// is another holder, dropping the last frees every table. A function that
+// reads or appends takes `&AstPool`; a type that keeps a handle stores a
+// clone.
+type AstPool {
+    state: *mut AstPoolState,
+}
+
+impl Drop for AstPool:
+    move fn drop():
+        let st = self.state
+        if st as i64 == 0:
+            return
+        if st.holders > 1:
+            st.holders = st.holders - 1
+            return
+        let block = unsafe *st
+        drop(block)
+        with_free(st as *mut u8)
+
+impl AstPool:
+    fn clone() -> AstPool:
+        let st = self.state
+        st.holders = st.holders + 1
+        AstPool { state: self.state }
+
+    fn holders() -> i64:
+        self.state.holders
+
+fn AstPool.new -> AstPool:
+    let ptr = with_alloc(sizeof[AstPoolState]()) as *mut AstPoolState
+    unsafe:
+        *ptr = AstPoolState {
+            holders: 1,
+            kinds: List.new(),
+            starts: List.new(),
+            ends: List.new(),
+            data0: List.new(),
+            data1: List.new(),
+            data2: List.new(),
+            literal_suffixes: List.new(),
+            int_literal_digit_idxs: List.new(),
+            int_literal_radices: List.new(),
+            files: List.new(),
+            current_file_id: 0,
+            extra: List.new(),
+            decls: List.new(),
+            local_decl_count: -1,
+            prelude_decl_count: -1,
+            strings: List.new(),
+            fn_meta: List.new(),
+            type_meta: List.new(),
+            pattern_qualifiers: List.new(),
+            facade_overrides: [],
+            fn_param_patterns: List.new(),
+            fn_param_pattern_meta: List.new(),
+            for_meta: List.new(),
+            for_carrier_alts: List.new(),
+            block_meta: List.new(),
+            must_use_type_nodes: List.new(),
+            no_await_guard_type_nodes: List.new(),
+            no_alloc_fn_nodes: List.new(),
+            iter_of_self_fn_nodes: List.new(),
+            sealed_trait_nodes: List.new(),
+            extend_impl_nodes: List.new(),
+            comptime_decl_nodes: List.new(),
+            const_decl_nodes: List.new(),
+            move_closure_nodes: List.new(),
+            mut_arg_nodes: List.new(),
+            non_escaping_closure_nodes: List.new(),
+            by_place_closure_nodes: List.new(),
+            closure_ret_type_nodes: List.new(),
+            compiler_hook_fn_nodes: List.new(),
+            compiler_hook_phase_syms: List.new(),
+            global_allocator_decl_nodes: List.new(),
+            where_meta: List.new(),
+            impl_type_params: List.new(),
+            impl_target_type_nodes: List.new(),
+            impl_trait_type_args: List.new(),
+            type_bound_args: List.new(),
+            type_bound_arg_nodes: List.new(),
+            fn_meta_map: HashMap.new(),
+            membership_arg_map: HashMap.new(),
+            pattern_binding_keys: HashMap.new(),
+            pattern_binding_pairs: List.new(),
+            type_meta_map: HashMap.new(),
+            pattern_qualifier_map: HashMap.new(),
+            where_meta_map: HashMap.new(),
+            impl_type_params_map: HashMap.new(),
+            impl_target_type_nodes_map: HashMap.new(),
+            impl_trait_type_args_map: HashMap.new(),
+            type_bound_args_map: HashMap.new(),
+            fn_param_pattern_meta_map: HashMap.new(),
+            for_meta_map: HashMap.new(),
+            for_carrier_alt_map: HashMap.new(),
+            block_meta_map: HashMap.new(),
+            fn_param_defaults: HashMap.new(),
+            must_use_type_set: HashMap.new(),
+            no_await_guard_type_set: HashMap.new(),
+            no_alloc_fn_set: HashMap.new(),
+            iter_of_self_fn_set: HashMap.new(),
+            sealed_trait_set: HashMap.new(),
+            extend_impl_set: HashMap.new(),
+            comptime_decl_set: HashMap.new(),
+            const_decl_set: HashMap.new(),
+            untyped_const_inits: HashMap.new(),
+            move_closure_set: HashMap.new(),
+            mut_arg_set: HashMap.new(),
+            non_escaping_closure_set: HashMap.new(),
+            by_place_closure_set: HashMap.new(),
+            closure_ret_type_map: HashMap.new(),
+            compiler_hook_fn_set: HashMap.new(),
+            compiler_hook_phase_map: HashMap.new(),
+            global_allocator_decl_set: HashMap.new(),
+            script_binding_syms: List.new(),
+            script_binding_nodes: List.new(),
+            script_binding_by_sym: HashMap.new(),
+            script_helper_decls: List.new(),
+            script_helper_set: HashMap.new(),
+            call_named_args: HashMap.new(),
+            implicit_it_slots: [:],
+            implicit_it_parents: [:],
+            fn_stack_sizes: HashMap.new(),
+            fn_weak_flags: HashMap.new(),
+            extern_var_link_names: HashMap.new(),
+            fn_target_arch: HashMap.new(),
+            use_alias_map: HashMap.new(),
+            namespace_bound_set: HashMap.new(),
+            receiver_field_methods: HashMap.new(),
+            receiver_field_accesses: HashMap.new(),
+            receiver_field_keys: HashMap.new(),
+            module_header_files: List.new(),
+            module_header_names: List.new(),
+            unsafe_fn_type_nodes: HashMap.new(),
+            variadic_fn_type_nodes: HashMap.new(),
+            fn_type_mut_masks: HashMap.new(),
+            fn_effect_pin_starts: HashMap.new(),
+            fn_effect_pin_counts: HashMap.new(),
+            fn_effect_pin_params: List.new(),
+            fn_effect_pin_bits: List.new(),
+            fn_global_write_starts: HashMap.new(),
+            fn_global_write_counts: HashMap.new(),
+            fn_global_write_paths: List.new(),
+            fn_global_write_names: List.new(),
+            fn_view_origin_starts: HashMap.new(),
+            fn_view_origin_counts: HashMap.new(),
+            fn_view_origin_paths: List.new(),
+            fn_view_origin_names: List.new(),
+            copy_arg_needs_clone: HashMap.new(),
+            default_body_clone_impls: List.new(),
+            default_body_clone_origins: List.new(),
+            default_body_clones: List.new(),
+            default_body_clone_index: HashMap.new(),
+            generated_debug_type_syms: List.new(),
+            frozen: 0,
+            adapter_node_count: 0,
+        }
+    let st = ptr
+    st.kinds.push(0)
+    st.starts.push(0)
+    st.ends.push(0)
+    st.data0.push(0)
+    st.data1.push(0)
+    st.data2.push(0)
+    st.literal_suffixes.push(LiteralSuffix.None)
+    st.int_literal_digit_idxs.push(-1)
+    st.int_literal_radices.push(0)
+    st.files.push(0)
+    AstPool { state: ptr }
+
+// Mark the pool as immutable. Any subsequent mutation will print an error.
+impl AstPool:
+    fn freeze():
+        let st = self.state
+        st.frozen = 1
+
+    // Add a node to the pool, returns the node index.
+    mut fn add_node(kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: AstPool.add_node called after freeze")
+        let idx = self.state.kinds.len() as i32
+        self.state.kinds.push(kind)
+        self.state.starts.push(start)
+        self.state.ends.push(end)
+        self.state.data0.push(d0)
+        self.state.data1.push(d1)
+        self.state.data2.push(d2)
+        self.state.literal_suffixes.push(LiteralSuffix.None)
+        self.state.int_literal_digit_idxs.push(-1)
+        self.state.int_literal_radices.push(0)
+        self.state.files.push(self.state.current_file_id)
+        idx as NodeId
+
+    // D223: the one door through the freeze, and it builds one thing. A
+    // built-in method named as a value (`List[i32].len`) is the closure a
+    // person would write for it, `(recv, a…) => recv.method(a…)` (or
+    // `(a…) => Type.method(a…)` when `recv_sym` is 0), and Sema is the
+    // first phase that knows the method. `like` is the `Type.method`
+    // expression the closure stands for: its span and file are the
+    // closure's. Any other use is refused here, and `freeze-door-check`
+    // (in the gate) fails when a second call site appears. The door and its
+    // caller go when built-in methods have bodies in the standard library
+    // (#3483).
+    mut fn add_method_value_closure(like: NodeId, recv_sym: i32, method_sym: i32, arg_syms: &List[i32]) -> NodeId:
+        if self.state.kinds[like as i32] != NodeKind.NK_FIELD_ACCESS or self.state.data1[like as i32] != method_sym:
+            ast_pool_phase_bug("BUG: AstPool.add_method_value_closure is only for a `Type.method` expression naming a built-in method (D223)")
+        let callee_base = if recv_sym != 0: self.add_after_freeze(like, NodeKind.NK_IDENT, recv_sym, 0, 0) else: self.state.data0[like as i32]
+        let callee = self.add_after_freeze(like, NodeKind.NK_FIELD_ACCESS, callee_base, method_sym, 0)
+        let arg_nodes = []
+        var arg_count: i32 = 0
+        for arg_sym in arg_syms:
+            arg_nodes.push(self.add_after_freeze(like, NodeKind.NK_IDENT, arg_sym, 0, 0))
+            arg_count += 1
+        let call_extra = self.extra_len()
+        for arg_node in arg_nodes: self.state.extra.push(arg_node)
+        let call = self.add_after_freeze(like, NodeKind.NK_CALL, callee, call_extra, arg_count)
+        let params_extra = self.extra_len()
+        if recv_sym != 0:
+            self.state.extra.push(recv_sym)
+            self.state.extra.push(0)
+        for arg_sym in arg_syms:
+            self.state.extra.push(arg_sym)
+            self.state.extra.push(0)
+        self.add_after_freeze(like, NodeKind.NK_CLOSURE, call, params_extra, arg_count + (recv_sym != 0) as i32) as NodeId
+
+    // add_method_value_closure's node writer; nothing else calls it.
+    mut fn add_after_freeze(like: NodeId, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
+        let idx = self.node_count()
+        self.state.kinds.push(kind)
+        self.state.starts.push(self.state.starts[like as i32])
+        self.state.ends.push(self.state.ends[like as i32])
+        self.state.data0.push(d0)
+        self.state.data1.push(d1)
+        self.state.data2.push(d2)
+        self.state.literal_suffixes.push(LiteralSuffix.None)
+        self.state.int_literal_digit_idxs.push(-1)
+        self.state.int_literal_radices.push(0)
+        self.state.files.push(self.state.files[like as i32])
+        self.state.adapter_node_count += 1
+        idx
+
+    fn adapter_node_count() -> i32: self.state.adapter_node_count
+
+    // Add extra data, returns the index in the extra array.
+    mut fn add_extra(value: i32) -> i32:
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: AstPool.add_extra called after freeze")
+        let idx = self.state.extra.len() as i32
+        self.state.extra.push(value)
+        idx
+
+    // Add a string to the string table, returns the string index.
+    mut fn add_string(s: &str) -> i32:
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: AstPool.add_string called after freeze")
+        let idx = self.state.strings.len() as i32
+        self.state.strings.push(with_str_clone_ref(s))
+        idx
+
+    // The file a node was parsed from (0 = root/unknown). See the `files`
+    // column note; synthesized nodes inherit the active parse's file.
+    // FileId is the compiler's first enforced-distinct id (D-candidate:
+    // "record at the producer; ids are distinct types") — mixing it with
+    // node/symbol/type ids is a compile error, which is the entire point
+    // (#660 was a symbol id read as a node id).
+    fn file(idx: NodeId) -> AstFileId:
+        let i = idx as i32
+        if i < 0 or i as i64 >= self.state.files.len():
+            return AstFileId(0)
+        AstFileId(self.state.files[i])
+
+    fn set_current_file_id(file_id: AstFileId):
+        let st = self.state
+        st.current_file_id = file_id as i32
+
+    // Get node kind at index
+    fn kind(idx: NodeId) -> i32:
+        self.state.kinds[(idx as i32)]
+
+    // Get node data fields
+    fn get_data0(idx: NodeId) -> i32:
+        self.state.data0[(idx as i32)]
+
+    fn get_data1(idx: NodeId) -> i32:
+        self.state.data1[(idx as i32)]
+
+    fn get_data2(idx: NodeId) -> i32:
+        self.state.data2[(idx as i32)]
+
+    // D39: the fn's body slot holds an interface body (looking through the
+    // `unsafe fn` wrapper the parser inserts around every fn body).
+    // The body compile-time evaluation runs for `node`: its own body, or,
+    // for an interface declaration that crossed a bundle boundary with one
+    // (D39 as amended), the body it carries; 0 when it has none.
+    fn fn_decl_evaluation_body(node: NodeId) -> i32:
+        var body = self.get_data1(node)
+        if body != 0 and self.kind(body) == NodeKind.NK_UNSAFE_BLOCK and self.get_data2(body) == UNSAFE_ORIGIN_FN_BODY: body = self.get_data0(body)
+        if body != 0 and self.kind(body) == NodeKind.NK_INTERFACE_BODY: return self.get_data0(body)
+        self.get_data1(node)
+
+    fn fn_decl_body_is_interface(node: NodeId) -> bool:
+        if self.kind(node) != NodeKind.NK_FN_DECL:
+            return false
+        var body = self.get_data1(node)
+        if body != 0 and self.kind(body) == NodeKind.NK_UNSAFE_BLOCK and self.get_data2(body) == UNSAFE_ORIGIN_FN_BODY:
+            body = self.get_data0(body)
+        body != 0 and self.kind(body) == NodeKind.NK_INTERFACE_BODY
+
+    // D39: the global's initializer slot says the bundle object supplies it.
+    fn let_decl_is_interface_provided(node: NodeId) -> bool:
+        if self.kind(node) != NodeKind.NK_LET_DECL:
+            return false
+        let value = self.get_data1(node)
+        value != 0 and self.kind(value) == NodeKind.NK_INTERFACE_PROVIDED
+
+    fn literal_suffix(idx: NodeId) -> i32:
+        self.state.literal_suffixes[(idx as i32)]
+
+    fn set_literal_suffix(idx: NodeId, suffix: i32):
+        let st = self.state
+        st.literal_suffixes[(idx as i32)] = suffix
+
+    fn int_literal_digit_idx(idx: NodeId) -> i32:
+        self.state.int_literal_digit_idxs[(idx as i32)]
+
+    fn int_literal_radix(idx: NodeId) -> i32:
+        self.state.int_literal_radices[(idx as i32)]
+
+    fn set_int_literal_exact(idx: NodeId, digit_idx: i32, radix: i32):
+        let st = self.state
+        st.int_literal_digit_idxs[(idx as i32)] = digit_idx
+        st.int_literal_radices[(idx as i32)] = radix
+
+    fn has_int_literal_exact(idx: NodeId) -> bool:
+        self.int_literal_digit_idx(idx) >= 0 and self.int_literal_radix(idx) >= 2
+
+    fn int_literal_digits(idx: NodeId) -> str:
+        let digit_idx = self.int_literal_digit_idx(idx)
+        if digit_idx < 0:
+            return ""
+        with_str_clone_ref(self.get_string(digit_idx))
+
+// A float literal's text with digit separators removed, ready to be turned into a
+// value. §29.1: "Separators are ignored for numeric value parsing", and a float may
+// carry them (`3.141_592_653`). The parser keeps the separators in the stored text,
+// so each consumer that converts text to a value drops them here; integer literals
+// have their own normalized digits (`int_literal_digits`).
+fn float_literal_value_text(text: &str) -> str:
+    let len = text.len()
+    var i = 0
+    while i < len:
+        if text[i] == 95:
+            break
+        i = i + 1
+    if i >= len:
+        return with_str_clone_ref(text)
+    var out = ""
+    var j = 0
+    while j < len:
+        let ch = text[j]
+        if ch != 95:
+            out = out ++ str_from_byte(ch)
+        j = j + 1
+    out
+
+const AST_INT_PART_BASE: i64 = 2097152
+const AST_INT_PART_BASE2: i64 = 4398046511104
+
+fn ast_int_part0(value: i64) -> i32:
+    (value % AST_INT_PART_BASE) as i32
+
+fn ast_int_part1(value: i64) -> i32:
+    ((value / AST_INT_PART_BASE) % AST_INT_PART_BASE) as i32
+
+fn ast_int_part2(value: i64) -> i32:
+    (value / AST_INT_PART_BASE2) as i32
+
+fn ast_int_from_parts(d0: i32, d1: i32, d2: i32) -> i64:
+    (d0 as i64) + (d1 as i64) * AST_INT_PART_BASE + (d2 as i64) * AST_INT_PART_BASE2
+
+impl AstPool:
+    fn int_lit_value(idx: NodeId) -> i64:
+        ast_int_from_parts(self.get_data0(idx), self.get_data1(idx), self.get_data2(idx))
+
+type ExactIntValue {
+    ok: i32,
+    overflow: i32,
+    lo: i64,
+    hi: i64,
+}
+impl Copy for ExactIntValue
+
+type ExactIntExpr {
+    ok: i32,
+    overflow: i32,
+    negative: i32,
+    lo: i64,
+    hi: i64,
+}
+impl Copy for ExactIntExpr
+
+type ExactIntI64 {
+    ok: i32,
+    value: i64,
+}
+impl Copy for ExactIntI64
+
+fn exact_int_invalid() -> ExactIntValue:
+    ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+
+fn exact_int_overflow() -> ExactIntValue:
+    ExactIntValue { ok: 1, overflow: 1, lo: 0, hi: 0 }
+
+fn exact_int_value(lo: i64, hi: i64) -> ExactIntValue:
+    ExactIntValue { ok: 1, overflow: 0, lo, hi }
+
+fn exact_int_expr_invalid() -> ExactIntExpr:
+    ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
+
+fn exact_int_expr_value(lo: i64, hi: i64, negative: i32) -> ExactIntExpr:
+    ExactIntExpr { ok: 1, overflow: 0, negative, lo, hi }
+
+fn exact_int_expr_magnitude(expr: ExactIntExpr) -> ExactIntValue:
+    ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
+
+fn exact_int_sign_bit() -> i64:
+    -9223372036854775807 - 1
+
+fn exact_int_uword_lt(lhs: i64, rhs: i64) -> bool:
+    let sign_bit = exact_int_sign_bit()
+    (lhs ^ sign_bit) < (rhs ^ sign_bit)
+
+fn exact_int_uword_lte(lhs: i64, rhs: i64) -> bool:
+    let sign_bit = exact_int_sign_bit()
+    (lhs ^ sign_bit) <= (rhs ^ sign_bit)
+
+fn exact_int_low_mask(bits: i32) -> i64:
+    if bits <= 0:
+        return 0
+    if bits >= 64:
+        return -1
+    if bits == 63:
+        return 9223372036854775807
+    ((1 as i64) << bits) - 1
+
+fn exact_int_pow2_word(bit: i32) -> i64:
+    if bit < 0 or bit >= 64:
+        return 0
+    if bit == 63:
+        return exact_int_sign_bit()
+    (1 as i64) << bit
+
+fn exact_int_logical_shr_word(value: i64, shift: i32) -> i64:
+    if shift <= 0:
+        return value
+    if shift >= 64:
+        return 0
+    (value >> shift) & exact_int_low_mask(64 - shift)
+
+fn exact_int_shl_word(value: i64, shift: i32) -> i64:
+    if shift <= 0:
+        return value
+    if shift >= 64:
+        return 0
+    var out = value
+    for i in 0..shift:
+        out = out +% out
+    out
+
+fn exact_int_word_to_f64(value: i64) -> f64:
+    if value >= 0:
+        return value as f64
+    9223372036854775808.0 + ((value ^ exact_int_sign_bit()) as f64)
+
+fn exact_int_is_zero(value: ExactIntValue) -> bool:
+    value.ok != 0 and value.overflow == 0 and value.lo == 0 and value.hi == 0
+
+fn exact_int_cmp(lhs: ExactIntValue, rhs: ExactIntValue) -> i32:
+    if exact_int_uword_lt(lhs.hi, rhs.hi):
+        return -1
+    if exact_int_uword_lt(rhs.hi, lhs.hi):
+        return 1
+    if exact_int_uword_lt(lhs.lo, rhs.lo):
+        return -1
+    if exact_int_uword_lt(rhs.lo, lhs.lo):
+        return 1
+    0
+
+fn exact_int_add_values(lhs: ExactIntValue, rhs: ExactIntValue) -> ExactIntValue:
+    if lhs.ok == 0 or rhs.ok == 0:
+        return exact_int_invalid()
+    if lhs.overflow != 0 or rhs.overflow != 0:
+        return exact_int_overflow()
+    let lo = lhs.lo +% rhs.lo
+    let carry = if exact_int_uword_lt(lo, lhs.lo): 1 as i64 else: 0 as i64
+    let hi = lhs.hi +% rhs.hi
+    if exact_int_uword_lt(hi, lhs.hi):
+        return exact_int_overflow()
+    let hi2 = hi +% carry
+    if exact_int_uword_lt(hi2, hi):
+        return exact_int_overflow()
+    exact_int_value(lo, hi2)
+
+fn exact_int_add_small(value: ExactIntValue, digit: i64) -> ExactIntValue:
+    exact_int_add_values(value, exact_int_value(digit, 0))
+
+fn exact_int_shl_small(value: ExactIntValue, shift: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if shift < 0 or shift >= 64:
+        return exact_int_invalid()
+    if shift == 0:
+        return value
+    if exact_int_logical_shr_word(value.hi, 64 - shift) != 0:
+        return exact_int_overflow()
+    let hi = exact_int_shl_word(value.hi, shift) | exact_int_logical_shr_word(value.lo, 64 - shift)
+    let lo = exact_int_shl_word(value.lo, shift)
+    exact_int_value(lo, hi)
+
+fn exact_int_mul_small(value: ExactIntValue, factor: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if factor < 0:
+        return exact_int_invalid()
+    var result = exact_int_value(0, 0)
+    var addend = value
+    var mul = factor
+    while mul > 0:
+        if (mul & 1) != 0:
+            result = exact_int_add_values(result, addend)
+            if result.overflow != 0:
+                return result
+        mul = mul >> 1
+        if mul > 0:
+            addend = exact_int_shl_small(addend, 1)
+            if addend.overflow != 0:
+                return addend
+    result
+
+fn exact_int_mask_bits(value: ExactIntValue, bits: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if bits <= 0:
+        return exact_int_value(0, 0)
+    if bits >= 128:
+        return value
+    if bits < 64:
+        let mask = exact_int_low_mask(bits)
+        return exact_int_value(value.lo & mask, 0)
+    if bits == 64:
+        return exact_int_value(value.lo, 0)
+    let hi_bits = bits - 64
+    let hi_mask = exact_int_low_mask(hi_bits)
+    exact_int_value(value.lo, value.hi & hi_mask)
+
+fn exact_int_digit_value(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    -1
+
+fn exact_int_parse_digits(digits: &str, radix: i32) -> ExactIntValue:
+    if radix < 2 or radix > 16:
+        return exact_int_invalid()
+    var acc = exact_int_value(0, 0)
+    for i in 0..digits.len():
+        let digit = exact_int_digit_value(digits[i])
+        if digit < 0 or digit >= radix:
+            return exact_int_invalid()
+        acc = exact_int_mul_small(acc, radix)
+        if acc.overflow != 0:
+            return acc
+        acc = exact_int_add_small(acc, digit)
+        if acc.overflow != 0:
+            return acc
+    acc
+
+fn exact_int_fits_unsigned_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    if bits >= 128:
+        return true
+    if bits < 64:
+        if value.hi != 0:
+            return false
+        let max_lo = exact_int_low_mask(bits)
+        return exact_int_uword_lte(value.lo, max_lo)
+    if bits == 64:
+        return value.hi == 0
+    let hi_bits = bits - 64
+    let max_hi = exact_int_low_mask(hi_bits)
+    exact_int_uword_lte(value.hi, max_hi)
+
+fn exact_int_fits_signed_magnitude_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    if bits == 1:
+        return exact_int_is_zero(value)
+    exact_int_fits_unsigned_bits(value, bits - 1)
+
+fn exact_int_fits_signed_negative_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    let mag_bits = bits - 1
+    if mag_bits < 64:
+        if value.hi != 0:
+            return false
+        return exact_int_uword_lte(value.lo, exact_int_pow2_word(mag_bits))
+    if mag_bits == 64:
+        if value.hi == 0:
+            return true
+        return value.hi == 1 and value.lo == 0
+    let limit_hi = exact_int_pow2_word(mag_bits - 64)
+    if exact_int_uword_lt(value.hi, limit_hi):
+        return true
+    value.hi == limit_hi and value.lo == 0
+
+fn exact_int_try_i64(value: ExactIntValue) -> ExactIntI64:
+    if value.ok == 0 or value.overflow != 0:
+        return ExactIntI64 { ok: 0, value: 0 }
+    if value.hi != 0 or value.lo < 0:
+        return ExactIntI64 { ok: 0, value: 0 }
+    ExactIntI64 { ok: 1, value: value.lo }
+
+fn exact_int_twos_complement_bits(value: ExactIntValue, bits: i32) -> ExactIntValue:
+    if value.ok == 0 or value.overflow != 0:
+        return exact_int_invalid()
+    let lo = (~value.lo) +% 1
+    let carry = if lo == 0: 1 as i64 else: 0 as i64
+    let hi = (~value.hi) +% carry
+    let neg = exact_int_value(lo, hi)
+    if bits >= 128:
+        return neg
+    exact_int_mask_bits(neg, bits)
+
+impl AstPool:
+    fn int_literal_exact_value(idx: NodeId) -> ExactIntValue:
+        if not self.has_int_literal_exact(idx):
+            return exact_int_invalid()
+        exact_int_parse_digits(self.int_literal_digits(idx), self.int_literal_radix(idx))
+
+    fn int_literal_fast_i64(idx: NodeId) -> ExactIntI64:
+        if self.has_int_literal_exact(idx):
+            return exact_int_try_i64(self.int_literal_exact_value(idx))
+        ExactIntI64 { ok: 1, value: self.int_lit_value(idx) }
+
+    fn int_literal_expr_i64(node: i32) -> ExactIntI64:
+        if node == 0:
+            return ExactIntI64 { ok: 0, value: 0 }
+        let kind = self.kind(node)
+        if kind == NodeKind.NK_INT_LIT and not self.has_int_literal_exact(node as NodeId):
+            return ExactIntI64 { ok: 1, value: self.int_lit_value(node as NodeId) }
+        let expr = self.int_literal_exact_expr(node)
+        if expr.ok == 0 or expr.overflow != 0:
+            return ExactIntI64 { ok: 0, value: 0 }
+        let mag = exact_int_expr_magnitude(expr)
+        if expr.negative == 0:
+            return exact_int_try_i64(mag)
+        if not exact_int_fits_signed_negative_bits(mag, 64):
+            return ExactIntI64 { ok: 0, value: 0 }
+        if mag.hi == 0 and mag.lo == exact_int_sign_bit():
+            return ExactIntI64 { ok: 1, value: -9223372036854775807 - 1 }
+        ExactIntI64 { ok: 1, value: 0 - mag.lo }
+
+    fn int_literal_exact_expr(node: i32) -> ExactIntExpr:
+        if node == 0:
+            return ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
+        let kind = self.kind(node)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_CAST:
+            return self.int_literal_exact_expr(self.get_data0(node))
+        if kind == NodeKind.NK_UNARY and self.get_data0(node) == UnaryOp.UOP_NEGATE:
+            let inner = self.int_literal_exact_expr(self.get_data1(node))
+            if inner.ok == 0 or inner.overflow != 0:
+                return inner
+            return ExactIntExpr { ok: 1, overflow: 0, negative: (not (inner.negative != 0)) as i32, lo: inner.lo, hi: inner.hi }
+        if kind != NodeKind.NK_INT_LIT:
+            return ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
+        if self.has_int_literal_exact(node):
+            let parsed = self.int_literal_exact_value(node)
+            return ExactIntExpr { ok: parsed.ok, overflow: parsed.overflow, negative: 0, lo: parsed.lo, hi: parsed.hi }
+        let raw = self.int_lit_value(node)
+        if raw < 0:
+            // Parser-folded negative literal: report magnitude + sign. For
+            // i64.min the magnitude 2^63 is raw's own bit pattern read as an
+            // unsigned word, which is what the exact-int helpers compare.
+            if raw == (-9223372036854775807 - 1):
+                return ExactIntExpr { ok: 1, overflow: 0, negative: 1, lo: raw, hi: 0 }
+            return ExactIntExpr { ok: 1, overflow: 0, negative: 1, lo: 0 - raw, hi: 0 }
+        ExactIntExpr { ok: 1, overflow: 0, negative: 0, lo: raw, hi: 0 }
+
+    fn int_literal_expr_bits(node: i32, bits: i32, signed: i32) -> ExactIntValue:
+        let expr = self.int_literal_exact_expr(node)
+        if expr.ok == 0 or expr.overflow != 0:
+            return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+        let mag = ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
+        if expr.negative == 0:
+            if signed != 0:
+                if not exact_int_fits_signed_magnitude_bits(mag, bits):
+                    return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+            else:
+                if not exact_int_fits_unsigned_bits(mag, bits):
+                    return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+            return mag
+        if signed == 0 or not exact_int_fits_signed_negative_bits(mag, bits):
+            return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+        exact_int_twos_complement_bits(mag, bits)
+
+    fn has_comptime_nodes() -> bool:
+        for ni in 1..self.node_count():
+            let nid = ni as NodeId
+            if self.kind(nid) == NodeKind.NK_COMPTIME:
+                return true
+        false
+
+    fn has_comptime_branch_nodes() -> bool:
+        for ni in 1..self.node_count():
+            let nid = ni as NodeId
+            if self.kind(nid) == NodeKind.NK_COMPTIME:
+                let inner_i32 = self.get_data0(nid)
+                if inner_i32 > 0 and inner_i32 < self.node_count():
+                    let inner = inner_i32 as NodeId
+                    let ik = self.kind(inner)
+                    if ik == NodeKind.NK_IF_EXPR or ik == NodeKind.NK_FOR:
+                        return true
+        false
+
+    fn has_type_derives() -> bool:
+        var meta: i32 = 0
+        while meta < self.state.type_meta.len():
+            if self.type_meta_derive_count(meta) > 0:
+                return true
+            meta = meta + 3
+        false
+
+    mut fn mark_compiler_hook_fn(node: NodeId, phase_sym: i32):
+        self.state.compiler_hook_fn_nodes.push(node as i32)
+        self.state.compiler_hook_phase_syms.push(phase_sym)
+        self.state.compiler_hook_fn_set.insert(node as i32, 1)
+        self.state.compiler_hook_phase_map.insert(node as i32, phase_sym)
+
+    fn is_compiler_hook_fn(node: NodeId) -> bool:
+        if self.state.compiler_hook_fn_set.contains(node as i32): true else: false
+
+    fn compiler_hook_phase(node: NodeId) -> i32:
+        if self.state.compiler_hook_phase_map.contains(node as i32):
+            return self.state.compiler_hook_phase_map.get(node as i32).unwrap()
+        0
+
+    fn compiler_hook_count() -> i32:
+        self.state.compiler_hook_fn_nodes.len() as i32
+
+    fn compiler_hook_node(idx: isize) -> NodeId:
+        self.state.compiler_hook_fn_nodes[idx] as NodeId
+
+    fn compiler_hook_phase_at(idx: isize) -> i32:
+        self.state.compiler_hook_phase_syms[idx]
+
+    // D184 (§29.15): a script's top-level `let`/`var` is a local of the
+    // implicit main that the file's helper fns may capture.
+    mut fn mark_script_binding(sym: i32, node: NodeId):
+        self.state.script_binding_syms.push(sym)
+        self.state.script_binding_nodes.push(node as i32)
+        self.state.script_binding_by_sym.insert(sym, node as i32)
+
+    fn script_binding_node(sym: i32) -> i32:
+        self.state.script_binding_by_sym.get(sym) ?? 0
+
+    fn script_binding_count() -> isize: self.state.script_binding_syms.len()
+
+    mut fn mark_script_helper(decl: NodeId):
+        self.state.script_helper_decls.push(decl as i32)
+        self.state.script_helper_set.insert(decl as i32, 1)
+
+    fn is_script_helper(decl: NodeId) -> bool:
+        self.state.script_helper_set.contains(decl as i32)
+
+    mut fn mark_global_allocator_decl(node: NodeId):
+        self.state.global_allocator_decl_nodes.push(node as i32)
+        self.state.global_allocator_decl_set.insert(node as i32, 1)
+
+    fn is_global_allocator_decl(node: NodeId) -> bool:
+        if self.state.global_allocator_decl_set.contains(node as i32): return true
+        false
+
+    fn get_extra(idx: isize) -> i32:
+        self.state.extra[idx]
+
+    fn set_extra(idx: isize, val: i32):
+        let st = self.state
+        st.extra[idx] = val
+
+    fn optional_chain_is_call(extra_start: i32) -> i32:
+        if extra_start < 0 or extra_start >= self.extra_len():
+            return 0
+        self.get_extra(extra_start)
+
+    fn optional_chain_arg_count(extra_start: i32) -> i32:
+        if self.optional_chain_is_call(extra_start) == 0:
+            return 0
+        if extra_start + 1 >= self.extra_len():
+            return 0
+        self.get_extra(extra_start + 1)
+
+    fn optional_chain_arg_start(extra_start: i32) -> i32:
+        extra_start + 2
+
+    fn get_string(idx: i32) -> &str:
+        self.state.strings[idx]
+
+    fn get_start(idx: NodeId) -> i32:
+        self.state.starts[(idx as i32)]
+
+    fn get_end(idx: NodeId) -> i32:
+        self.state.ends[(idx as i32)]
+
+    fn node_count() -> i32:
+        self.state.kinds.len() as i32
+
+    fn require_same_storage(other: &AstPool, context: &str):
+        if self.state != other.state:
+            ast_pool_phase_bug("BUG: mismatched AstPool storage at " ++ context)
+
+    mut fn add_decl(node_idx: NodeId) -> Unit:
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: AstPool.add_decl called after freeze")
+        self.state.decls.push(node_idx as i32)
+
+    // Drops the declarations added after the first `count` (§17.5: an arm
+    // of a module-level target selection that is not taken).
+    fn truncate_decls(count: i32):
+        let st = self.state
+        while st.decls.len() > count: st.decls.pop()
+
+    fn decl_count() -> i32:
+        self.state.decls.len() as i32
+
+    // The pool's identity for a cache keyed on it (the renderer's alias
+    // and declaration indexes): two handles to one pool agree, and a pool
+    // rebuilt by the comptime transform differs.
+    fn identity() -> i64:
+        self.state as i64
+
+    // The pool's shape for the same caches: its identity with its node
+    // and declaration counts, which any addition to it changes (a
+    // declaration, or a clause a convention profile synthesizes into an
+    // existing facade block).
+    fn shape() -> i64:
+        self.identity() ^ ((self.node_count() as i64) << 24) ^ ((self.decl_count() as i64) << 48)
+
+    fn get_decl(idx: isize) -> NodeId:
+        (self.state.decls[idx]) as NodeId
+
+    fn set_local_decl_count(n: i32):
+        let st = self.state
+        st.local_decl_count = n
+
+    fn local_decl_count() -> i32:
+        self.state.local_decl_count
+
+    fn set_prelude_decl_count(n: i32):
+        let st = self.state
+        st.prelude_decl_count = n
+
+    fn prelude_decl_count() -> i32:
+        self.state.prelude_decl_count
+
+    fn extra_len() -> i32:
+        self.state.extra.len() as i32
+
+    fn trait_assoc_count(node: NodeId): self.get_extra(self.get_data1(node) + 2)
+
+    fn trait_assoc_start(node: NodeId): self.get_data1(node) + 3
+
+    fn trait_method_count_index(node: NodeId) -> i32:
+        var pos = self.trait_assoc_start(node)
+        for _ in 0..self.trait_assoc_count(node):
+            let bound_count = self.get_extra(pos + 1)
+            pos = pos + 3 + bound_count
+        pos
+
+    fn trait_method_count(node: NodeId): self.get_extra(self.trait_method_count_index(node))
+
+    fn trait_method_start(node: NodeId): self.trait_method_count_index(node) + 1
+
+    fn trait_method_field(node: NodeId, method: i32, field: i32):
+        self.get_extra(self.trait_method_start(node) + method * TRAIT_METHOD_STRIDE + field)
+
+    // The body of a trait's default method as `impl_node`'s own nodes; the
+    // trait's body itself when the impl has no copy.
+    fn impl_default_body(impl_node: i32, body: i32) -> i32:
+        let index = self.state.default_body_clone_index.get((impl_node as i64) * 4294967296 + body as i64)
+        if index.is_some(): self.state.default_body_clones[index.unwrap()] else: body
+
+    fn default_body_clone_count(): self.state.default_body_clones.len()
+    fn default_body_clone_origin(index: i32) -> i32: self.state.default_body_clone_origins[index]
+    fn default_body_clone(index: i32) -> i32: self.state.default_body_clones[index]
+
+    mut fn set_use_alias(node: NodeId, alias: i32):
+        self.state.use_alias_map.insert(node as i32, alias)
+
+    // The `as` name of an import decl, 0 when it has none.
+    fn use_alias(node: NodeId) -> i32:
+        let opt = self.state.use_alias_map.get(node as i32)
+        if opt.is_some(): opt.unwrap() else: 0
+
+    // D70: Sema resolved `ns.member` to the declaration `sym`; the node
+    // becomes that ident, marked so no later check re-resolves its short
+    // name by import precedence. A type member carries its identity `tid`
+    // (#1757): types keep their short names, so the ident alone could name
+    // another module's type of that name.
+    fn bind_namespace_ident(idx: NodeId, sym: i32, tid: i32):
+        let st = self.state
+        st.kinds[(idx as i32)] = NodeKind.NK_IDENT
+        st.data0[(idx as i32)] = sym
+        st.data1[(idx as i32)] = 0
+        st.data2[(idx as i32)] = 0
+        st.namespace_bound_set.insert(idx as i32, tid)
+
+    fn is_namespace_bound(idx: NodeId) -> bool: self.state.namespace_bound_set.contains(idx as i32)
+
+    // The type a namespace-bound ident names (#1757), 0 when it names a
+    // value or fn, or is no namespace access.
+    fn namespace_bound_type(idx: NodeId) -> i32: self.state.namespace_bound_set.get(idx as i32) ?? 0
+
+    fn set_data0(idx: NodeId, val: i32):
+        let st = self.state
+        st.data0[(idx as i32)] = val
+
+    fn set_data1(idx: NodeId, val: i32):
+        let st = self.state
+        st.data1[(idx as i32)] = val
+
+    fn set_data2(idx: NodeId, val: i32):
+        let st = self.state
+        st.data2[(idx as i32)] = val
+
+    fn set_start(idx: NodeId, val: i32):
+        let st = self.state
+        st.starts[(idx as i32)] = val
+
+    fn set_end(idx: NodeId, val: i32):
+        let st = self.state
+        st.ends[(idx as i32)] = val
+
+    mut fn set_implicit_it_slot(node: i32, slot: i32): self.state.implicit_it_slots.insert(node, slot)
+    mut fn set_implicit_it_parent(node: i32, parent: i32): self.state.implicit_it_parents.insert(node, parent)
+    // -1 when `node` is no call argument holding an implicit `it` closure.
+    fn implicit_it_slot(node: i32): self.state.implicit_it_slots.get(node) ?? -1
+    fn implicit_it_parent(node: i32): self.state.implicit_it_parents.get(node) ?? 0
+
+    // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
+    mut fn add_fn_meta(node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
+        let idx = self.state.fn_meta.len() as i32
+        self.state.fn_meta.push(node as i32)
+        self.state.fn_meta.push(flags)
+        self.state.fn_meta.push(ret)
+        self.state.fn_meta.push(ps)
+        self.state.fn_meta.push(pc)
+        self.state.fn_meta.push(ts)
+        self.state.fn_meta.push(tc)
+        self.state.fn_meta_map.insert(node as i32, idx)
+
+    mut fn add_fn_effect_pin(node: NodeId, param_sym: i32, bits: i32):
+        let n = node as i32
+        if not self.state.fn_effect_pin_starts.contains(n):
+            self.state.fn_effect_pin_starts.insert(n, self.state.fn_effect_pin_params.len() as i32)
+            self.state.fn_effect_pin_counts.insert(n, 0)
+        self.state.fn_effect_pin_params.push(param_sym)
+        self.state.fn_effect_pin_bits.push(bits)
+        let count: i32 = self.state.fn_effect_pin_counts.get(n).unwrap()
+        self.state.fn_effect_pin_counts.insert(n, count + 1)
+
+    fn fn_effect_pin_count(node: NodeId) -> i32:
+        let n = node as i32
+        if self.state.fn_effect_pin_counts.contains(n):
+            return self.state.fn_effect_pin_counts.get(n).unwrap()
+        0
+
+    fn fn_effect_pin_param(node: NodeId, idx: i32) -> i32:
+        let n = node as i32
+        if not self.state.fn_effect_pin_starts.contains(n):
+            return 0
+        let start = self.state.fn_effect_pin_starts.get(n).unwrap()
+        self.state.fn_effect_pin_params[(start + idx)]
+
+    fn fn_effect_pin_bits(node: NodeId, idx: i32) -> i32:
+        let n = node as i32
+        if not self.state.fn_effect_pin_starts.contains(n):
+            return 0
+        let start = self.state.fn_effect_pin_starts.get(n).unwrap()
+        self.state.fn_effect_pin_bits[(start + idx)]
+
+    // §21.1 rule 1: one global a function's write clause declares.
+    mut fn add_fn_global_write(node: NodeId, path_sym: i32, name_sym: i32):
+        let n = node as i32
+        if not self.state.fn_global_write_starts.contains(n):
+            self.state.fn_global_write_starts.insert(n, self.state.fn_global_write_paths.len() as i32)
+            self.state.fn_global_write_counts.insert(n, 0)
+        self.state.fn_global_write_paths.push(path_sym)
+        self.state.fn_global_write_names.push(name_sym)
+        let count: i32 = self.state.fn_global_write_counts.get(n).unwrap()
+        self.state.fn_global_write_counts.insert(n, count + 1)
+
+    fn fn_global_write_count(node: NodeId) -> i32: self.state.fn_global_write_counts.get(node as i32) ?? 0
+
+    fn fn_global_write_path(node: NodeId, idx: i32) -> i32:
+        self.state.fn_global_write_paths[self.state.fn_global_write_starts.get(node as i32).unwrap() + idx]
+
+    fn fn_global_write_name(node: NodeId, idx: i32) -> i32:
+        self.state.fn_global_write_names[self.state.fn_global_write_starts.get(node as i32).unwrap() + idx]
+
+    // §21.1 rule 6 (#1903): one origin a function's `from` clause declares.
+    mut fn add_fn_view_origin(node: NodeId, path_sym: i32, name_sym: i32):
+        let n = node as i32
+        if not self.state.fn_view_origin_starts.contains(n):
+            self.state.fn_view_origin_starts.insert(n, self.state.fn_view_origin_paths.len() as i32)
+            self.state.fn_view_origin_counts.insert(n, 0)
+        self.state.fn_view_origin_paths.push(path_sym)
+        self.state.fn_view_origin_names.push(name_sym)
+        let count: i32 = self.state.fn_view_origin_counts.get(n).unwrap()
+        self.state.fn_view_origin_counts.insert(n, count + 1)
+
+    fn fn_view_origin_count(node: NodeId) -> i32: self.state.fn_view_origin_counts.get(node as i32) ?? 0
+
+    fn fn_view_origin_path(node: NodeId, idx: i32) -> i32:
+        self.state.fn_view_origin_paths[self.state.fn_view_origin_starts.get(node as i32).unwrap() + idx]
+
+    fn fn_view_origin_name(node: NodeId, idx: i32) -> i32:
+        self.state.fn_view_origin_names[self.state.fn_view_origin_starts.get(node as i32).unwrap() + idx]
+
+    // Record the extra-array slot holding the `contains` argument for an `in` node.
+    mut fn set_membership_arg(node: NodeId, slot: i32):
+        self.state.membership_arg_map.insert(node as i32, slot)
+
+    // Get the pre-reserved `contains` argument slot for an `in` node, or -1.
+    fn find_membership_arg(node: NodeId) -> i32:
+        let opt = self.state.membership_arg_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    // Get fn metadata for a given fn decl node. Returns 7-int record start or -1.
+    fn find_fn_meta(node: NodeId) -> i32:
+        let opt = self.state.fn_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn fn_meta_flags(meta: i32) -> i32:
+        self.state.fn_meta[(meta + 1)]
+
+    fn fn_meta_ret(meta: i32) -> i32:
+        self.state.fn_meta[(meta + 2)]
+
+    fn fn_meta_param_start(meta: i32) -> i32:
+        self.state.fn_meta[(meta + 3)]
+
+    fn fn_meta_param_count(meta: i32) -> i32:
+        self.state.fn_meta[(meta + 4)]
+
+    fn fn_meta_tp_start(meta: i32) -> i32:
+        self.state.fn_meta[(meta + 5)]
+
+    fn fn_meta_tp_count(meta: i32) -> i32:
+        self.state.fn_meta[(meta + 6)]
+
+    // D7: trait declarations must retain an explicit receiver to distinguish
+    // instance methods from associated methods, but app-facing impl blocks keep
+    // the ordinary implicit-receiver spelling. That distinction is known only
+    // after the full imported AST is assembled, so inherit the trait receiver
+    // here, before freeze, rather than guessing while an individual file parses.
+    // Associated trait methods have no receiver and remain unchanged.
+    mut fn inherit_trait_impl_receivers(intern: &InternPool):
+        let st = self.state
+        if st.frozen != 0:
+            ast_pool_phase_bug("BUG: trait impl receiver inheritance ran after AstPool.freeze")
+        for impl_di in 0..self.decl_count():
+            let impl_node = self.get_decl(impl_di)
+            if self.kind(impl_node) != NodeKind.NK_IMPL_DECL:
+                continue
+            let trait_sym = self.get_data2(impl_node)
+            if trait_sym == 0:
+                continue
+
+            // #2520: trait identity is (module, name) — the trait declared
+            // in the impl's own file is the one the impl names; only a
+            // trait declared elsewhere falls back to first match. Taking
+            // the first same-named trait made a user's `trait One` impl
+            // inherit std One's (absent) receiver.
+            var trait_node = 0 as NodeId
+            var fallback_node = 0 as NodeId
+            for trait_di in 0..self.decl_count():
+                let candidate = self.get_decl(trait_di)
+                if self.kind(candidate) == NodeKind.NK_TRAIT_DECL and self.get_data0(candidate) == trait_sym:
+                    if fallback_node == 0:
+                        fallback_node = candidate
+                    if self.file(candidate) == self.file(impl_node):
+                        trait_node = candidate
+                        break
+            if trait_node == 0:
+                trait_node = fallback_node
+            if trait_node == 0:
+                continue
+
+            let impl_extra = self.get_data1(impl_node)
+            let assoc_count = self.get_extra(impl_extra)
+            let method_count = self.get_extra(impl_extra + 1 + assoc_count * 2)
+            let first_method_di = impl_di - method_count
+            if first_method_di < 0:
+                ast_pool_phase_bug("BUG: trait impl method range precedes the AST declaration table")
+
+            for method_offset in 0..method_count:
+                let method_node = self.get_decl(first_method_di + method_offset)
+                if self.kind(method_node) != NodeKind.NK_FN_DECL:
+                    ast_pool_phase_bug("BUG: trait impl method range contains a non-function declaration")
+                let method_name = intern.resolve(self.get_data0(method_node))
+
+                var trait_method: i32 = -1
+                for trait_mi in 0..self.trait_method_count(trait_node):
+                    let bare_sym = self.trait_method_field(trait_node, trait_mi, TRAIT_METHOD_NAME)
+                    let expected = intern.resolve(self.get_data0(impl_node)) ++ "." ++ intern.resolve(bare_sym)
+                    if method_name == expected:
+                        trait_method = trait_mi
+                        break
+                if trait_method < 0:
+                    continue
+
+                let trait_param_count = self.trait_method_field(trait_node, trait_method, TRAIT_METHOD_PARAM_COUNT)
+                if trait_param_count <= 0:
+                    continue
+                let trait_param_start = self.trait_method_field(trait_node, trait_method, TRAIT_METHOD_PARAM_START)
+                if intern.resolve(self.fn_param_name(trait_param_start, 0)) != "self":
+                    continue
+                let receiver_flags = self.fn_param_flags(trait_param_start, 0)
+                if fn_param_is_ref_self(receiver_flags) == 0 and fn_param_is_mut_self(receiver_flags) == 0 and fn_param_is_move_self(receiver_flags) == 0:
+                    continue
+
+                let meta = self.find_fn_meta(method_node)
+                if meta < 0:
+                    ast_pool_phase_bug("BUG: trait impl method has no function metadata")
+                let old_param_start = self.fn_meta_param_start(meta)
+                let old_param_count = self.fn_meta_param_count(meta)
+                if old_param_count > 0 and intern.resolve(self.fn_param_name(old_param_start, 0)) == "self":
+                    continue
+
+                let new_param_start = self.extra_len()
+                self.add_extra(self.fn_param_name(trait_param_start, 0))
+                self.add_extra(self.fn_param_type(trait_param_start, 0))
+                self.add_extra(receiver_flags | FN_PARAM_FLAG_SYNTH_RECEIVER)
+                for pi in 0..old_param_count:
+                    self.add_extra(self.fn_param_name(old_param_start, pi))
+                    self.add_extra(self.fn_param_type(old_param_start, pi))
+                    self.add_extra(self.fn_param_flags(old_param_start, pi))
+                    let default_node = self.get_fn_param_default(old_param_start, pi)
+                    if default_node != 0:
+                        self.set_fn_param_default(new_param_start, pi + 1, default_node)
+
+                st.fn_meta[(meta + 1)] = self.fn_meta_flags(meta) + FN_META_REQUIRED_UNIT
+                st.fn_meta[(meta + 3)] = new_param_start
+                st.fn_meta[(meta + 4)] = old_param_count + 1
+
+                let pattern_meta = self.find_fn_param_pattern_meta(method_node)
+                if pattern_meta >= 0:
+                    let old_pattern_start = self.fn_param_pattern_meta_start(pattern_meta)
+                    let old_pattern_count = self.fn_param_pattern_meta_count(pattern_meta)
+                    let new_pattern_start = self.fn_param_patterns_len()
+                    self.add_fn_param_pattern_value(0 as NodeId)
+                    for pi in 0..old_pattern_count:
+                        self.add_fn_param_pattern_value(self.fn_param_pattern_value(old_pattern_start + pi))
+                    st.fn_param_pattern_meta[(pattern_meta + 1)] = new_pattern_start
+                    st.fn_param_pattern_meta[(pattern_meta + 2)] = old_pattern_count + 1
+
+    // §9.5 (#1930): in an instance method declared in its type's own module
+    // (§18.1: the file that declares the type), a field of the receiver is in
+    // scope by its bare name. Each such NK_IDENT in the method's body becomes
+    // `self.<field>` in place — `(self.<field>)` as a callee, so the call
+    // calls the field's value and never finds a method — before freeze,
+    // after every import and the comptime transform. A parameter of a
+    // field's name keeps its uses. Sema owns the verdict on every rewrite:
+    // a parameter or local binding of a field's name and a bare name that
+    // also names a global or a module-level function are its shadowing
+    // errors (receiver_field_owner, receiver_field_access_owner). A
+    // c_import's declarations and the types and methods a `c facade`
+    // renders (`generated_files`) are the compiler's text, not a module
+    // anyone wrote: their C parameter names stand.
+    mut fn resolve_receiver_field_names(intern: &InternPool, decl_is_c_import: &List[i32], generated_files: &List[i32]):
+        let st = self.state
+        if st.frozen != 0:
+            ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
+        let self_sym = intern.intern("self")
+        let generated: HashMap[i32, i32, Minted] = [:]
+        for generated_file in generated_files:
+            generated.insert(generated_file, 1)
+        let struct_decls: HashMap[i64, i32, Minted] = [:]
+        let decl_nodes: HashMap[i32, i32, Minted] = [:]
+        for di in 0..self.decl_count():
+            let decl = self.get_decl(di)
+            decl_nodes.insert(decl as i32, 1)
+            let from_c = (di < decl_is_c_import.len() and decl_is_c_import[di] != 0) or generated.contains(self.file(decl) as i32)
+            if self.kind(decl) == NodeKind.NK_TYPE_DECL and not from_c:
+                let sub = type_decl_sub_kind(self.get_data2(decl))
+                if sub == TypeDeclKind.Struct or sub == TypeDeclKind.Union:
+                    struct_decls.insert(ast_pair_key(self.file(decl) as i32, self.get_data0(decl)), decl as i32)
+        for di in 0..self.decl_count():
+            let fn_node = self.get_decl(di)
+            if (di < decl_is_c_import.len() and decl_is_c_import[di] != 0) or generated.contains(self.file(fn_node) as i32):
+                continue
+            let owner = self.own_module_receiver_type(fn_node, self_sym, intern, struct_decls)
+            if owner != 0:
+                self.resolve_method_receiver_field_names(fn_node, owner, self_sym, decl_nodes)
+
+    // The struct or union `fn_node` is an instance method of when the file
+    // declaring the method declares the type, else 0. A derive the compiler
+    // generates carries its type's span: it is not a method anyone wrote.
+    fn own_module_receiver_type(fn_node: NodeId, self_sym: i32, intern: &InternPool, struct_decls: &HashMap[i64, i32, Minted]) -> i32:
+        if self.kind(fn_node) != NodeKind.NK_FN_DECL or self.get_data1(fn_node) == 0 or self.fn_decl_body_is_interface(fn_node):
+            return 0
+        let meta = self.find_fn_meta(fn_node)
+        if meta < 0 or self.fn_meta_param_count(meta) == 0 or self.fn_param_name(self.fn_meta_param_start(meta), 0) != self_sym:
+            return 0
+        let name = intern.resolve(self.get_data0(fn_node))
+        var dot = -1
+        for ci in 0..name.len():
+            if name[ci] == '.':
+                dot = ci as i32
+                break
+        if dot <= 0:
+            return 0
+        let owner_sym = intern.lookup_symbol(name.slice(0, dot as i64))
+        let decl = struct_decls.get(ast_pair_key(self.file(fn_node) as i32, owner_sym)) ?? 0
+        if decl == 0:
+            return 0
+        if self.get_start(fn_node) >= self.get_start(decl as NodeId) and self.get_end(fn_node) <= self.get_end(decl as NodeId):
+            return 0
+        decl
+
+    mut fn resolve_method_receiver_field_names(fn_node: NodeId, owner: i32, self_sym: i32, decl_nodes: &HashMap[i32, i32, Minted]):
+        let st = self.state
+        st.receiver_field_methods.insert(fn_node as i32, owner)
+        let fields_ex = self.get_data1(owner as NodeId)
+        for fi in 0..self.get_extra(fields_ex):
+            st.receiver_field_keys.insert(ast_pair_key(owner, self.get_extra(fields_ex + 1 + fi * 3)), 1)
+        let file = self.file(fn_node) as i32
+        let body = self.get_data1(fn_node) as NodeId
+        let body_start = self.get_start(body)
+        let body_end = self.get_end(body)
+        let meta = self.find_fn_meta(fn_node)
+        let param_start = self.fn_meta_param_start(meta)
+        let param_count = self.fn_meta_param_count(meta)
+        // Nodes are appended children first: the method's subtree is the ids
+        // between the nearest declaration below it and its own (as Sema's
+        // prepare_body_order reads it); the body's span bounds it within.
+        var below = fn_node as i32 - 1
+        while below > 0 and not decl_nodes.contains(below): below = below - 1
+        // A nested fn is its own scope, with no receiver.
+        let nested_starts: List[i32] = []
+        let nested_ends: List[i32] = []
+        let callees: HashMap[i32, i32, Minted] = [:]
+        // Names a binding in the body takes. Sema refuses that binding
+        // (§29.8); its uses stay the binding's, so the refusal is the one
+        // diagnostic rather than the head of a cascade through `self.<name>`.
+        let bound: HashMap[i32, i32, Minted] = [:]
+        for n in below + 1..fn_node as i32:
+            let node = n as NodeId
+            let kind = self.kind(node)
+            if kind == NodeKind.NK_FN_DECL:
+                nested_starts.push(self.get_start(node))
+                nested_ends.push(self.get_end(node))
+            else if kind == NodeKind.NK_CALL:
+                callees.insert(self.get_data0(node), 1)
+            if self.file(node) as i32 != file or self.get_start(node) < body_start or self.get_end(node) > body_end:
+                continue
+            if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_AT_BINDING or kind == NodeKind.NK_PAT_TYPED_BIND or kind == NodeKind.NK_PAT_REST:
+                bound.insert(self.get_data0(node), 1)
+            else if kind == NodeKind.NK_FOR and not self.for_binding_is_pattern(node):
+                bound.insert(self.get_data0(node), 1)
+            else if kind == NodeKind.NK_CLOSURE:
+                for pi in 0..self.get_data2(node):
+                    bound.insert(self.get_extra(self.get_data1(node) + pi * 2), 1)
+            else if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
+                for ti in 0..self.get_data1(node):
+                    bound.insert(self.get_extra(self.get_data0(node) + ti), 1)
+            else if kind == NodeKind.NK_PAT_STRUCT:
+                for si in 0..self.get_data2(node):
+                    if self.get_extra(self.get_data1(node) + 1 + si * 2 + 1) == 0:
+                        bound.insert(self.get_extra(self.get_data1(node) + 1 + si * 2), 1)
+        for n in below + 1..fn_node as i32:
+            let node = n as NodeId
+            if self.kind(node) != NodeKind.NK_IDENT or self.file(node) as i32 != file:
+                continue
+            let sym = self.get_data0(node)
+            let start = self.get_start(node)
+            let end = self.get_end(node)
+            if start < body_start or end > body_end or not self.receiver_type_has_field(owner, sym) or bound.contains(sym):
+                continue
+            var is_param = false
+            for pi in 0..param_count:
+                if self.fn_param_name(param_start, pi) == sym: is_param = true
+            var nested = false
+            for ni in 0..nested_starts.len():
+                if start >= nested_starts[ni] and end <= nested_ends[ni]: nested = true
+            if is_param or nested:
+                continue
+            let receiver = self.add_node(NodeKind.NK_IDENT, start, end, self_sym, 0, 0)
+            st.files[(receiver as i32)] = file
+            if callees.contains(n):
+                let access = self.add_node(NodeKind.NK_FIELD_ACCESS, start, end, receiver as i32, sym, 0)
+                st.files[(access as i32)] = file
+                st.receiver_field_accesses.insert(access as i32, owner)
+                st.kinds[n] = NodeKind.NK_GROUPED
+                st.data0[n] = access as i32
+            else:
+                st.kinds[n] = NodeKind.NK_FIELD_ACCESS
+                st.data0[n] = receiver as i32
+                st.data1[n] = sym
+                st.receiver_field_accesses.insert(n, owner)
+
+    fn receiver_type_has_field(owner: i32, sym: i32) -> bool: self.state.receiver_field_keys.contains(ast_pair_key(owner, sym))
+
+    // §18.1: `module a.b.c` in file `file` names the module `c`.
+    mut fn record_module_header(file: i32, name_sym: i32):
+        self.state.module_header_files.push(file)
+        self.state.module_header_names.push(name_sym)
+
+    // The last segment of `file`'s `module` header, 0 when it has none.
+    fn module_header_name(file: i32) -> i32:
+        for i in 0..self.state.module_header_files.len():
+            if self.state.module_header_files[i] == file: return self.state.module_header_names[i]
+        0
+
+
+    // The type whose fields are in scope by bare name in `fn_node`'s body
+    // (§9.5), 0 when the method is not one of its own module's.
+    fn receiver_field_owner(fn_node: i32) -> i32: self.state.receiver_field_methods.get(fn_node) ?? 0
+
+    // The type a bare field name `node` was resolved through, 0 when `node`
+    // is no such access.
+    fn receiver_field_access_owner(node: i32) -> i32: self.state.receiver_field_accesses.get(node) ?? 0
+
+    fn fn_param_name(param_start: i32, param_idx: isize) -> i32:
+        self.get_extra(param_start + param_idx * FN_PARAM_STRIDE)
+
+    fn fn_param_type(param_start: i32, param_idx: isize) -> i32:
+        self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 1)
+
+    fn fn_param_flags(param_start: i32, param_idx: isize) -> i32:
+        self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
+
+    mut fn set_fn_param_default(param_start: i32, param_idx: i32, default_node: i32):
+        let key = (param_start as i64) * 1000 + (param_idx as i64)
+        self.state.fn_param_defaults.insert(key, default_node)
+
+    fn get_fn_param_default(param_start: i32, param_idx: i32) -> i32:
+        let key = (param_start as i64) * 1000 + (param_idx as i64)
+        if self.state.fn_param_defaults.contains(key):
+            return self.state.fn_param_defaults.get(key).unwrap()
+        0
+
+    mut fn set_call_named_args(call_node: NodeId, names_extra_start: i32):
+        self.state.call_named_args.insert(call_node as i32, names_extra_start)
+
+    fn get_call_named_arg(call_node: NodeId, arg_idx: i32) -> i32:
+        if self.state.call_named_args.contains(call_node as i32):
+            let start = self.state.call_named_args.get(call_node as i32).unwrap()
+            return self.get_extra(start + arg_idx)
+        0
+
+    fn has_call_named_args(call_node: NodeId) -> bool:
+        if self.state.call_named_args.contains(call_node as i32): true else: false
+
+    mut fn add_type_meta(node: NodeId, derive_start: i32, derive_count: i32):
+        let idx = self.state.type_meta.len() as i32
+        self.state.type_meta.push(node as i32)
+        self.state.type_meta.push(derive_start)
+        self.state.type_meta.push(derive_count)
+        self.state.type_meta_map.insert(node as i32, idx)
+
+    fn find_type_meta(node: NodeId) -> i32:
+        let opt = self.state.type_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn type_meta_derive_start(meta: i32) -> i32:
+        self.state.type_meta[(meta + 1)]
+
+    fn type_meta_derive_count(meta: i32) -> i32:
+        self.state.type_meta[(meta + 2)]
+
+    mut fn add_facade_override(clause: NodeId): self.state.facade_overrides.push(clause as i32)
+
+    fn facade_overridden(clause: i32): self.state.facade_overrides.contains(clause)
+
+    mut fn add_pattern_qualifier(node: NodeId, type_sym: i32):
+        let idx = self.state.pattern_qualifiers.len() as i32
+        self.state.pattern_qualifiers.push(node as i32)
+        self.state.pattern_qualifiers.push(type_sym)
+        self.state.pattern_qualifier_map.insert(node as i32, idx)
+
+    fn pattern_qualifier(node: NodeId) -> i32:
+        let opt = self.state.pattern_qualifier_map.get(node as i32)
+        if opt.is_some():
+            return self.state.pattern_qualifiers[(opt.unwrap() + 1)]
+        0
+
+    mut fn mark_must_use_type(node: NodeId):
+        self.state.must_use_type_nodes.push(node as i32)
+        self.state.must_use_type_set.insert(node as i32, 1)
+
+    fn is_must_use_type_node(node: NodeId) -> bool:
+        if self.state.must_use_type_set.contains(node as i32): return true
+        false
+
+    mut fn mark_no_await_guard_type(node: NodeId):
+        self.state.no_await_guard_type_nodes.push(node as i32)
+        self.state.no_await_guard_type_set.insert(node as i32, 1)
+
+    fn is_no_await_guard_type_node(node: NodeId) -> bool:
+        if self.state.no_await_guard_type_set.contains(node as i32): return true
+        false
+
+    mut fn mark_no_alloc_fn(node: NodeId):
+        self.state.no_alloc_fn_nodes.push(node as i32)
+        self.state.no_alloc_fn_set.insert(node as i32, 1)
+
+    fn is_no_alloc_fn_node(node: NodeId) -> bool:
+        if self.state.no_alloc_fn_set.contains(node as i32): return true
+        false
+
+    mut fn mark_fn_target_arch(node: NodeId, arch_sym: i32):
+        self.state.fn_target_arch.insert(node as i32, arch_sym)
+
+    // Returns the @[target("arch")] arch name sym for a fn node, or 0 if none.
+    fn fn_target_arch_of(node: NodeId) -> i32:
+        let v = self.state.fn_target_arch.get(node as i32)
+        if v.is_some(): v.unwrap() else: 0
+
+    // §16.11: mark an NK_TYPE_FN/NK_TYPE_EXTERN_FN node as `unsafe fn(...)`.
+    mut fn mark_unsafe_fn_type(node: NodeId):
+        self.state.unsafe_fn_type_nodes.insert(node as i32, 1)
+
+    mut fn mark_variadic_fn_type(node: NodeId):
+        self.state.variadic_fn_type_nodes.insert(node as i32, 1)
+
+    fn is_variadic_fn_type_node(node: NodeId) -> bool: self.state.variadic_fn_type_nodes.contains(node as i32)
+
+    mut fn set_fn_type_mut_mask(node: NodeId, mask: i32):
+        self.state.fn_type_mut_masks.insert(node as i32, mask)
+
+    // Which parameters of a function type are `mut` (D218): bit i for parameter i.
+    fn fn_type_mut_mask(node: NodeId) -> i32: self.state.fn_type_mut_masks.get(node as i32) ?? 0
+
+    fn is_unsafe_fn_type_node(node: NodeId) -> bool:
+        if self.state.unsafe_fn_type_nodes.contains(node as i32): return true
+        false
+
+    mut fn mark_iter_of_self_fn(node: NodeId):
+        self.state.iter_of_self_fn_nodes.push(node as i32)
+        self.state.iter_of_self_fn_set.insert(node as i32, 1)
+
+    fn is_iter_of_self_fn_node(node: NodeId) -> bool:
+        if self.state.iter_of_self_fn_set.contains(node as i32): return true
+        false
+
+    mut fn mark_sealed_trait(node: NodeId):
+        self.state.sealed_trait_nodes.push(node as i32)
+        self.state.sealed_trait_set.insert(node as i32, 1)
+
+    fn is_sealed_trait_node(node: NodeId) -> bool:
+        if self.state.sealed_trait_set.contains(node as i32): return true
+        false
+
+    mut fn mark_generated_debug_type(type_sym: i32):
+        if not self.is_generated_debug_type(type_sym):
+            self.state.generated_debug_type_syms.push(type_sym)
+
+    fn is_generated_debug_type(type_sym: i32) -> bool:
+        for i in 0..self.state.generated_debug_type_syms.len():
+            if self.state.generated_debug_type_syms[i] == type_sym:
+                return true
+        false
+
+    mut fn mark_extend_impl(node: NodeId):
+        self.state.extend_impl_nodes.push(node as i32)
+        self.state.extend_impl_set.insert(node as i32, 1)
+
+    fn is_extend_impl_node(node: NodeId) -> bool:
+        if self.state.extend_impl_set.contains(node as i32): return true
+        false
+
+    mut fn mark_comptime_decl(node: NodeId):
+        self.state.comptime_decl_nodes.push(node as i32)
+        self.state.comptime_decl_set.insert(node as i32, 1)
+
+    fn is_comptime_decl_node(node: NodeId) -> bool:
+        if self.state.comptime_decl_set.contains(node as i32): return true
+        false
+
+    mut fn mark_const_decl(node: NodeId):
+        self.state.const_decl_nodes.push(node as i32)
+        self.state.const_decl_set.insert(node as i32, 1)
+
+    mut fn set_untyped_const_init(decl: NodeId, init: NodeId):
+        self.state.untyped_const_inits.insert(decl as i32, init as i32)
+
+    fn untyped_const_init_of(decl: NodeId) -> i32:
+        if self.state.untyped_const_inits.contains(decl as i32): return self.state.untyped_const_inits.get(decl as i32).unwrap()
+        0
+
+    fn is_const_decl_node(node: NodeId) -> bool:
+        if self.state.const_decl_set.contains(node as i32): return true
+        false
+
+    mut fn mark_move_closure(node: NodeId):
+        self.state.move_closure_nodes.push(node as i32)
+        self.state.move_closure_set.insert(node as i32, 1)
+
+    fn is_move_closure(node: NodeId) -> bool:
+        if self.state.move_closure_set.contains(node as i32): return true
+        false
+
+    mut fn mark_mut_arg(node: NodeId):
+        self.state.mut_arg_nodes.push(node as i32)
+        self.state.mut_arg_set.insert(node as i32, 1)
+
+    fn is_mut_arg(node: NodeId) -> bool: self.state.mut_arg_set.contains(node as i32)
+
+    mut fn mark_non_escaping_closure(node: NodeId):
+        if self.state.non_escaping_closure_set.contains(node as i32): return
+        self.state.non_escaping_closure_nodes.push(node as i32)
+        self.state.non_escaping_closure_set.insert(node as i32, 1)
+
+    mut fn unmark_non_escaping_closure(node: NodeId):
+        self.state.non_escaping_closure_set.remove(node as i32)
+        for i in 0..self.state.non_escaping_closure_nodes.len():
+            if self.state.non_escaping_closure_nodes[i] == node as i32:
+                self.state.non_escaping_closure_nodes.remove(i)
+                return
+
+    fn is_non_escaping_closure(node: NodeId) -> bool:
+        if self.state.non_escaping_closure_set.contains(node as i32): return true
+        false
+
+    mut fn mark_by_place_closure(node: NodeId):
+        self.state.by_place_closure_nodes.push(node as i32)
+        self.state.by_place_closure_set.insert(node as i32, 1)
+
+    fn is_by_place_closure(node: NodeId) -> bool:
+        if self.state.by_place_closure_set.contains(node as i32): return true
+        false
+
+    // §12 (#1508): the type node of a closure's `-> T`, which Sema checks
+    // like a declared return type; 0 when the closure states none.
+    mut fn set_closure_ret_type(node: NodeId, type_node: i32):
+        self.state.closure_ret_type_nodes.push(node as i32)
+        self.state.closure_ret_type_nodes.push(type_node)
+        self.state.closure_ret_type_map.insert(node as i32, type_node)
+
+    fn closure_ret_type(node: NodeId) -> i32: self.state.closure_ret_type_map.get(node as i32) ?? 0
+
+    mut fn add_where_meta(fn_node: NodeId, extra_start: i32, clause_count: i32):
+        let idx = self.state.where_meta.len() as i32
+        self.state.where_meta.push(fn_node as i32)
+        self.state.where_meta.push(extra_start)
+        self.state.where_meta.push(clause_count)
+        self.state.where_meta_map.insert(fn_node as i32, idx)
+
+    fn find_where_meta(fn_node: NodeId) -> i32:
+        let opt = self.state.where_meta_map.get(fn_node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    mut fn add_impl_type_params(impl_node: NodeId, tp_start: i32, tp_count: i32):
+        let idx = self.state.impl_type_params.len() as i32
+        self.state.impl_type_params.push(impl_node as i32)
+        self.state.impl_type_params.push(tp_start)
+        self.state.impl_type_params.push(tp_count)
+        self.state.impl_type_params_map.insert(impl_node as i32, idx)
+
+    fn find_impl_type_params(impl_node: NodeId) -> i32:
+        let opt = self.state.impl_type_params_map.get(impl_node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn impl_type_params_start(meta: i32) -> i32: self.state.impl_type_params[(meta + 1)]
+    fn impl_type_params_count(meta: i32) -> i32: self.state.impl_type_params[(meta + 2)]
+
+    mut fn add_impl_target_type_node(impl_node: NodeId, type_node: NodeId):
+        self.state.impl_target_type_nodes.push(impl_node as i32)
+        self.state.impl_target_type_nodes.push(type_node as i32)
+        self.state.impl_target_type_nodes_map.insert(impl_node as i32, type_node as i32)
+
+    fn find_impl_target_type_node(impl_node: NodeId) -> NodeId:
+        let opt = self.state.impl_target_type_nodes_map.get(impl_node as i32)
+        if opt.is_some():
+            return (opt.unwrap()) as NodeId
+        var i = 0
+        while i < self.state.impl_target_type_nodes.len():
+            if self.state.impl_target_type_nodes[i] == (impl_node as i32):
+                return (self.state.impl_target_type_nodes[(i + 1)]) as NodeId
+            i = i + 2
+        0 as NodeId
+
+    mut fn add_impl_trait_type_args(impl_node: NodeId, args_start: i32, args_count: i32):
+        let idx = self.state.impl_trait_type_args.len() as i32
+        self.state.impl_trait_type_args.push(impl_node as i32)
+        self.state.impl_trait_type_args.push(args_start)
+        self.state.impl_trait_type_args.push(args_count)
+        self.state.impl_trait_type_args_map.insert(impl_node as i32, idx)
+
+    fn find_impl_trait_type_args(impl_node: NodeId) -> i32:
+        let opt = self.state.impl_trait_type_args_map.get(impl_node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    // A type-parameter bound's trait arguments, keyed by the extra index
+    // that holds the bound's trait symbol: `G: Gen[T]` records `[T]`, so a
+    // call can infer T from the type G is bound to (#1732).
+    mut fn add_type_bound_args(bound_extra_idx: i32, arg_nodes: List[i32]):
+        let idx = self.state.type_bound_args.len() as i32
+        self.state.type_bound_args.push(bound_extra_idx)
+        self.state.type_bound_args.push(self.state.type_bound_arg_nodes.len() as i32)
+        self.state.type_bound_args.push(arg_nodes.len() as i32)
+        for n in arg_nodes:
+            self.state.type_bound_arg_nodes.push(n)
+        self.state.type_bound_args_map.insert(bound_extra_idx, idx)
+
+    fn find_type_bound_args(bound_extra_idx: i32) -> i32: self.state.type_bound_args_map.get(bound_extra_idx) ?? -1
+
+    // The argument type nodes of the bound record `meta`.
+    fn type_bound_arg_nodes(meta: i32) -> List[i32]:
+        let out: List[i32] = []
+        let start: i32 = self.state.type_bound_args[(meta + 1)]
+        for i in 0..self.state.type_bound_args[(meta + 2)]:
+            out.push(self.state.type_bound_arg_nodes[(start + i)])
+        out
+
+    fn impl_trait_type_args_start(meta: i32) -> i32: self.state.impl_trait_type_args[(meta + 1)]
+    fn impl_trait_type_args_count(meta: i32) -> i32: self.state.impl_trait_type_args[(meta + 2)]
+
+    fn fn_param_patterns_len() -> i32:
+        self.state.fn_param_patterns.len() as i32
+
+    mut fn add_fn_param_pattern_value(node: NodeId) -> Unit:
+        self.state.fn_param_patterns.push(node as i32)
+
+    fn fn_param_pattern_value(idx: i32) -> NodeId:
+        (self.state.fn_param_patterns[idx]) as NodeId
+
+    mut fn add_fn_param_pattern_meta(node: NodeId, start: i32, count: i32):
+        let idx = self.state.fn_param_pattern_meta.len() as i32
+        self.state.fn_param_pattern_meta.push(node as i32)
+        self.state.fn_param_pattern_meta.push(start)
+        self.state.fn_param_pattern_meta.push(count)
+        self.state.fn_param_pattern_meta_map.insert(node as i32, idx)
+
+    fn find_fn_param_pattern_meta(node: NodeId) -> i32:
+        let opt = self.state.fn_param_pattern_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn fn_param_pattern_meta_start(meta: i32) -> i32:
+        self.state.fn_param_pattern_meta[(meta + 1)]
+
+    fn fn_param_pattern_meta_count(meta: i32) -> i32:
+        self.state.fn_param_pattern_meta[(meta + 2)]
+
+    mut fn add_for_meta(node: NodeId, index_binding: i32, label: i32):
+        let idx = self.state.for_meta.len() as i32
+        self.state.for_meta.push(node as i32)
+        self.state.for_meta.push(index_binding)
+        self.state.for_meta.push(label)
+        self.state.for_meta_map.insert(node as i32, idx)
+
+    fn find_for_meta(node: NodeId) -> i32:
+        let opt = self.state.for_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn for_meta_index_binding(meta: i32) -> i32:
+        self.state.for_meta[(meta + 1)]
+
+    fn for_meta_label(meta: i32) -> i32:
+        self.state.for_meta[(meta + 2)]
+
+    // §13.6a: a one-clause `for` over an Option or Result is a comprehension,
+    // not a loop, and only Sema knows the iterable's type. The parser records
+    // the comprehension reading beside the loop; Sema adopts it for a carrier.
+    mut fn add_for_carrier_alt(node: NodeId, alt: NodeId):
+        self.state.for_carrier_alts.push(node)
+        self.state.for_carrier_alts.push(alt)
+        self.state.for_carrier_alt_map.insert(node, alt)
+
+    fn for_carrier_alt(node: i32): self.state.for_carrier_alt_map.get(node) ?? 0
+
+    // The one-clause reading of `for PAT in EXPR: BODY` (build_comprehension_match
+    // over one clause, the yield form when BODY is exactly `yield E`), built
+    // over this for node's own children.
+    mut fn build_for_carrier_alt(for_node: i32, binding_is_pat: bool, payload_sym: i32, fail_sym: i32) -> NodeId:
+        let start = self.get_start(for_node)
+        let binding = self.get_data0(for_node)
+        let pats: List[i32] = []
+        pats.push(if binding_is_pat: binding else: self.add_node(NodeKind.NK_PAT_IDENT, start, start, binding, 0, 0))
+        let exprs: List[i32] = []
+        exprs.push(self.get_data1(for_node))
+        let kinds: List[i32] = []
+        kinds.push(0)
+        let fail_syms: List[i32] = []
+        fail_syms.push(fail_sym)
+        let body = self.get_data2(for_node)
+        let yielded = ast_for_body_yield_value(self, body)
+        self.build_comprehension_match(start, self.get_end(for_node), payload_sym, 0, fail_syms, pats, exprs, kinds, if yielded != 0: yielded else: body, yielded != 0)
+
+    // The placeholder symbols of an alternative build_for_carrier_alt made:
+    // its payload pattern's variant and its failure arm's binding.
+    fn carrier_alt_payload_sym(alt: i32): self.get_data0(self.get_data0(self.get_extra(self.get_data1(alt))))
+
+    fn carrier_alt_fail_sym(alt: i32): self.get_data0(self.get_data0(self.get_extra(self.get_data1(alt) + 1)))
+
+    // §13.6a: a for-comprehension is one nested match per clause. Clause i
+    // binds `pats[i]` from `exprs[i]` (`kinds[i]` 1: an `if` guard):
+    // `match exprs[i]: _Payload(pats[i]) => inner, ___fail_i @ _ => ___fail_i`,
+    // the failure arm `{}` in the statement form. The innermost value is
+    // `body`, wrapped in `_Payload(...)` in the yield form. Sema resolves the
+    // placeholders against each clause's carrier.
+    mut fn build_comprehension_match(start: i32, end: i32, payload_sym: i32, empty_sym: i32, fail_syms: &List[i32], pats: &List[i32], exprs: &List[i32], kinds: &List[i32], body: i32, has_yield: bool) -> NodeId:
+        var inner = body
+        if has_yield:
+            let some_callee = self.add_node(NodeKind.NK_IDENT, start, start, payload_sym, 0, 0)
+            let some_extra = self.extra_len()
+            self.add_extra(body)
+            inner = self.add_node(NodeKind.NK_CALL, start, end, some_callee, some_extra, 1)
+        var bi = exprs.len() - 1
+        while bi >= 0:
+            if kinds[bi] == 1:
+                let guard_else = if has_yield: self.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, empty_sym, 0, 0) else: self.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
+                inner = self.add_node(NodeKind.NK_IF_EXPR, start, end, exprs[bi], inner, guard_else)
+            else:
+                let pat_extra = self.extra_len()
+                self.add_extra(pats[bi])
+                // Spans the comprehension: a payload pattern counts as one only
+                // inside its owner's span (MirBuilder.pattern_payload_node), and
+                // a one-clause `for` passes the user's own binding pattern.
+                let some_pat = self.add_node(NodeKind.NK_PAT_VARIANT, start, end, payload_sym, pat_extra, 1)
+                let some_arm = self.add_node(NodeKind.NK_MATCH_ARM, start, end, some_pat, inner, 0)
+                let wild = self.add_node(NodeKind.NK_PAT_WILDCARD, start, start, 0, 0, 0)
+                let fail_pat = self.add_node(NodeKind.NK_PAT_AT_BINDING, start, start, fail_syms[bi], wild, 0)
+                let fail_body = if has_yield: self.add_node(NodeKind.NK_IDENT, start, start, fail_syms[bi], 0, 0) else: self.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
+                let fail_arm = self.add_node(NodeKind.NK_MATCH_ARM, start, end, fail_pat, fail_body, 0)
+                let arms_extra = self.extra_len()
+                self.add_extra(some_arm)
+                self.add_extra(fail_arm)
+                inner = self.add_node(NodeKind.NK_MATCH, start, end, exprs[bi], arms_extra, 2)
+            bi = bi - 1
+        inner
+
+    mut fn add_block_meta(node: NodeId, label: i32):
+        let idx = self.state.block_meta.len() as i32
+        self.state.block_meta.push(node as i32)
+        self.state.block_meta.push(label)
+        self.state.block_meta_map.insert(node as i32, idx)
+
+    fn find_block_meta(node: NodeId) -> i32:
+        let opt = self.state.block_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn block_meta_label(meta: i32) -> i32:
+        self.state.block_meta[(meta + 1)]
+
+fn ast_pattern_binding_key(parent: i32, binding: i32): (parent as i64) * 4294967296 + (binding as i64)
+
+fn ast_pair_key(a: i32, b: i32): (a as i64) * 4294967296 + (b as i64)
+
+// The value of a `for` body that is exactly `yield E` — inline, or the only
+// line of its block — else 0. §13.6a: that body is the yield form.
+fn ast_for_body_yield_value(pool: &AstPool, body: i32) -> i32:
+    var node = body
+    if node != 0 and pool.kind(node) == NodeKind.NK_BLOCK:
+        let count = pool.get_data1(node)
+        let tail = pool.get_data2(node)
+        node = if count == 0: tail else if count == 1 and tail == 0: pool.get_extra(pool.get_data0(node)) else: 0
+    if node != 0 and pool.kind(node) == NodeKind.NK_YIELD: pool.get_data0(node) else: 0
+
+fn ast_is_pattern_kind(kind: i32) -> bool:
+    kind == NodeKind.NK_PAT_WILDCARD or
+    kind == NodeKind.NK_PAT_IDENT or
+    kind == NodeKind.NK_PAT_INT or
+    kind == NodeKind.NK_PAT_BOOL or
+    kind == NodeKind.NK_PAT_STRING or
+    kind == NodeKind.NK_PAT_VARIANT or
+    kind == NodeKind.NK_PAT_TUPLE or
+    kind == NodeKind.NK_PAT_STRUCT or
+    kind == NodeKind.NK_PAT_RANGE or
+    kind == NodeKind.NK_PAT_OR or
+    kind == NodeKind.NK_PAT_ENUM_SHORTHAND or
+    kind == NodeKind.NK_PAT_AT_BINDING or
+    kind == NodeKind.NK_PAT_SLICE or
+    kind == NodeKind.NK_PAT_TYPED_BIND or
+    kind == NodeKind.NK_PAT_REST or
+    kind == NodeKind.NK_PAT_REGEX
+
+impl AstPool:
+    // NK_LET_ELSE's head (#1354): every pattern let carries one.
+    fn let_pattern(let_node: i32): self.get_data0(self.get_data0(let_node))
+    fn let_pattern_is_mut(let_node: i32): self.get_data1(self.get_data0(let_node)) % 2
+    fn let_pattern_type_ann(let_node: i32): self.get_data2(self.get_data0(let_node))
+
+    fn is_pattern_node(node: i32) -> bool:
+        if node <= 0 or node >= self.node_count():
+            return false
+        ast_is_pattern_kind(self.kind(node as NodeId))
+
+    // Tuple rest patterns (§9.7 `let (head, ..tail)`, #1366): the position
+    // of the first `..` in an NK_PAT_TUPLE, -1 when it has none.
+    fn tuple_pattern_rest_index(pat: i32) -> i32:
+        let start = self.get_data0(pat)
+        for i in 0..self.get_data1(pat):
+            let elem = self.get_extra(start + i)
+            if elem > 0 and self.kind(elem as NodeId) == NodeKind.NK_PAT_REST:
+                return i
+        -1
+
+    // The subject element that element `i` of a tuple pattern matches: the
+    // same position before the rest, counted from the end after it.
+    fn tuple_pattern_subject_index(pat: i32, i: i32, subject_count: i32) -> i32:
+        let rest = self.tuple_pattern_rest_index(pat)
+        if rest < 0 or i < rest: i else: subject_count - (self.get_data1(pat) - i)
+
+    // NK_FOR / comprehension binding slots hold an untagged union: a plain
+    // binding stores the SYMBOL id, a pattern binding stores the pattern
+    // NODE id. The parser records which case it built (key = parent,binding).
+    // Probing the pool to guess — the old heuristic — broke whenever a
+    // symbol id collided with a pattern-kinded node id whose span happened
+    // to overlap numerically (#660: interning one new symbol in Sema.with
+    // flipped a plain for-binding in CodegenTraits.with into a pattern match,
+    // unbinding the loop variable).
+    mut fn mark_pattern_binding(parent: NodeId, binding: i32):
+        self.mark_pattern_binding_pair(ast_pattern_binding_key(parent as i32, binding))
+
+    mut fn mark_pattern_binding_pair(pair: i64):
+        if self.state.pattern_binding_keys.contains(pair):
+            return
+        self.state.pattern_binding_keys.insert(pair, 1)
+        self.state.pattern_binding_pairs.push(pair)
+
+    fn has_pattern_binding(parent: NodeId, binding: i32) -> bool:
+        self.state.pattern_binding_keys.contains(ast_pattern_binding_key(parent as i32, binding))
+
+    fn for_binding_is_pattern(node: NodeId) -> bool:
+        if node <= 0 or node >= self.node_count():
+            return false
+        if self.kind(node) != NodeKind.NK_FOR:
+            return false
+        self.has_pattern_binding(node, self.get_data0(node))
+
+    fn comprehension_binding_is_pattern(node: NodeId, binding: i32) -> bool:
+        if node <= 0 or node >= self.node_count():
+            return false
+        if self.kind(node) != NodeKind.NK_ARRAY_COMPREHENSION and self.kind(node) != NodeKind.NK_MAP_COMPREHENSION:
+            return false
+        self.has_pattern_binding(node, binding)
+
+// ── Node Data Layout Reference ───────────────────────────────────
+//
+// NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
+//                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*, type_param_count, [type_param_name, bound_count, bounds...]*]
+//                   body is a source expression, or NK_INTERFACE_BODY for a `.wi` declaration (D39)
+//
+// NodeKind.NK_INTERFACE_BODY:     d0=0, d1=0, d2=0  (fn body of an interface declaration)
+// NodeKind.NK_INTERFACE_PROVIDED: d0=0, d1=0, d2=0  (initializer of an interface global)
+//
+// NodeKind.NK_C_FACADE (D51 §16.2b, stage 1: parsed, facts not yet collected):
+//                   d0=name(sym), d1=extra_start, d2=item_count; extra=[item(node)...]
+//                   items: NK_FACADE_ERROR (the header's `error E`, d0=E sym), NK_FACADE_RESOURCE (extra=[wraps_type, clause...]),
+//                   NK_FACADE_FN (extra=[clause...]), NK_FACADE_DOMAIN (d1=kind sym),
+//                   NK_FACADE_CONVENTION (extra=[path_sym..., match...]). A clause is
+//                   NK_FACADE_CLAUSE d0=FACADE_CLAUSE_* with its operands in extra
+//                   (see the FACADE_CLAUSE_* table); a parameter reference is
+//                   NK_FACADE_PARAM_REF d0=FACADE_PARAM_REF_* (name sym, digits
+//                   sym, or a type node), resolved in stage 2.
+//
+// NodeKind.NK_C_CONVENTION (D51 stage 11, §16.2b.12): `c convention pkg.vN:`,
+//                   d0=name(sym, dotted), d1=extra_start, d2=rule_count; extra=[NK_FACADE_RULE...].
+//                   The frontend's profile pass (Frontend.with apply_convention_profiles_frontend)
+//                   states each uniquely matched rule as a clause on the adopting facade's
+//                   item, with the rule as a trailing operand (facade_clause_profile_rule),
+//                   and records every outcome as an NK_FACADE_PROFILE_MATCH on the
+//                   `use convention` item.
+//
+// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.* + TDK_FLAG_*)
+//                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
+//                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
+//                   For alias/distinct: extra=[aliased_or_inner_type, vis, tp_start, tp_count]
+//
+// NodeKind.NK_USE_DECL:      d0=extra_start, d1=path_count, d2=selector_count
+//                   extra: [path_sym..., selector_sym...]
+//
+// NodeKind.NK_LET_DECL:      d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
+//                   extra: [type_expr(node)] if type annotation present
+//                   value: initializer expression, 0 for zero-initialized `var x: T`,
+//                   or NK_INTERFACE_PROVIDED for a `.wi` storage declaration (D39)
+//
+// NodeKind.NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic, bit1=c_import unprototyped)
+//                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*]
+//
+// NodeKind.NK_C_IMPORT:      d0=header_str_idx, d1=extra_start, d2=pack_c_import_counts(link_count, allow_untranslated_count)
+//                   extra: [link_lib_sym..., allow_untranslated_sym...]
+//
+// NodeKind.NK_TRAIT_DECL:    d0=name(sym), d1=extra_start, d2=vis
+//
+// NodeKind.NK_IMPL_DECL:     d0=type_name(sym), d1=extra_start, d2=trait_name(sym, 0=none)
+//
+// NodeKind.NK_INT_LIT:       d0=value_low, d1=value_high, d2=0
+// NodeKind.NK_FLOAT_LIT:     d0=string_idx, d1=0, d2=0
+// NodeKind.NK_STRING_LIT:    d0=sym, d1=0, d2=0
+// NodeKind.NK_C_STRING_LIT:  d0=sym, d1=0, d2=0
+// NodeKind.NK_BOOL_LIT:      d0=value(0/1), d1=0, d2=0
+// NodeKind.NK_IDENT:         d0=sym, d1=0, d2=0
+// NodeKind.NK_BINARY:        d0=op(OP_*), d1=lhs(node), d2=rhs(node)
+// NodeKind.NK_UNARY:         d0=op(UOP_*), d1=operand(node), d2=0
+// NodeKind.NK_CALL:          d0=callee(node), d1=extra_start, d2=arg_count
+// NodeKind.NK_FIELD_ACCESS:  d0=expr(node), d1=field(sym), d2=0
+// NodeKind.NK_COMPUTED_FIELD_ACCESS: d0=expr(node), d1=field_expr(node), d2=0
+// NodeKind.NK_INDEX:         d0=expr(node), d1=index(node), d2=0
+// NodeKind.NK_SLICE:         d0=expr(node), d1=start(node,0=none), d2=end(node,0=none)
+// NodeKind.NK_BLOCK:         d0=extra_start, d1=stmt_count, d2=tail(node,0=none)
+// NodeKind.NK_IF_EXPR:       d0=cond(node), d1=then(node), d2=else(node,0=none)
+// NodeKind.NK_RETURN:        d0=value(node,0=none), d1=0, d2=0
+// NodeKind.NK_LET_BINDING:   d0=name(sym), d1=value(node), d2=flags (bit0=mut)
+//                   If has type: extra=[type_node]
+// NodeKind.NK_LET_ELSE:      d0=head(NK_LET_PATTERN node), d1=value(node), d2=else_body(node,0=none)
+//                   Read the head through let_pattern/let_pattern_is_mut/let_pattern_type_ann.
+// NodeKind.NK_LET_PATTERN:   d0=pattern(node), d1=flags (bit0=mut: `var`), d2=type_ann(node,0=none)
+// NodeKind.NK_TUPLE_DESTRUCTURE: d0=extra_start, d1=name_count, d2=value(node)
+// NodeKind.NK_ASSIGN:        d0=target(node), d1=value(node), d2=0
+// NodeKind.NK_WHILE:         d0=cond(node), d1=body(node), d2=label(sym,0=none)
+// NodeKind.NK_DO_WHILE:      d0=body(node), d1=cond(node), d2=label(sym,0=none)
+// NodeKind.NK_LOOP:          d0=body(node), d1=label(sym,0=none), d2=0
+// NodeKind.NK_FOR:           d0=binding(sym) or pattern(node), d1=iterable(node), d2=body(node)
+//                   extra: [index_binding(sym,0=none), label(sym,0=none)]
+// NodeKind.NK_BREAK:         d0=value(node,0=none), d1=label(sym,0=none), d2=0
+// NodeKind.NK_CONTINUE:      d0=label(sym,0=none), d1=0, d2=0
+// NodeKind.NK_LABEL:         d0=label_sym, d1=statement(node), d2=0
+// NodeKind.NK_GOTO:          d0=label_sym, d1=0, d2=0
+// NodeKind.NK_MATCH:         d0=subject(node), d1=extra_start, d2=arm_count
+// NodeKind.NK_MATCH_ARM:     d0=pattern(node), d1=body(node), d2=guard(node,0=none)
+// NodeKind.NK_TUPLE:         d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_ARRAY_LIT:     d0=extra_start, d1=elem_count, d2=fill count expr (0=written elements; §4.3a `[v; N]` with a non-literal N holds v once, #1478)
+// NodeKind.NK_ARRAY_COMPREHENSION: d0=expr(node), d1=extra_start, d2=clause_count
+//                   extra per clause: [binding(pattern or sym), iterable(node), filter(node,0=none)]
+// NodeKind.NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0
+//                   extra: [key_expr, value_expr, then per clause: binding(pattern or sym), iterable(node), filter(node,0=none)]
+// NodeKind.NK_STRUCT_LIT:    d0=name(sym), d1=extra_start, d2=field_count
+// NodeKind.NK_CLOSURE:       d0=body(node), d1=extra_start, d2=param_count
+// NodeKind.NK_CAST:          d0=expr(node), d1=target_type(node), d2=0
+// NodeKind.NK_DEFER:         d0=body(node), d1=0, d2=0
+// NodeKind.NK_ERRDEFER:      d0=body(node), d1=0, d2=0
+// NodeKind.NK_PIPELINE:      d0=lhs(node), d1=rhs(node), d2=0
+// NodeKind.NK_RANGE:         d0=start(node,0=none), d1=end(node,0=none), d2=inclusive(0/1)
+// NodeKind.NK_GROUPED:       d0=inner(node), d1=0, d2=0
+// NodeKind.NK_VARIANT_SHORTHAND: d0=name(sym), d1=extra_start, d2=arg_count
+// NodeKind.NK_WITH_EXPR:     d0=source(node), d1=body(node), d2=encoded_binding(sym+mut)
+// NodeKind.NK_RECORD_UPDATE: d0=source(node), d1=extra_start, d2=field_count
+// NodeKind.NK_ENUM_VARIANT:  d0=type_name(sym), d1=variant_name(sym), d2=extra_start
+//                   extra: [arg_count, args...]
+// NodeKind.NK_OPTIONAL_CHAIN: d0=expr(node), d1=member(sym), d2=extra_start
+//                    extra: [has_call(0/1), arg_count, args...]
+// NodeKind.NK_AWAIT:         d0=expr(node), d1=0, d2=0
+// NodeKind.NK_ASYNC_BLOCK:   d0=body(node), d1=0, d2=0
+// NodeKind.NK_YIELD:         d0=expr(node), d1=0, d2=0
+// NodeKind.NK_COMPTIME:      d0=expr(node), d1=0, d2=0
+// NodeKind.NK_NO_SUSPEND:    d0=body(node), d1=0, d2=0
+// NodeKind.NK_ASYNC_SCOPE:   d0=name(sym), d1=body(node), d2=0
+// NodeKind.NK_SCOPE:         d0=name(sym), d1=body(node), d2=0
+// NodeKind.NK_SELECT_AWAIT:  d0=extra_start, d1=arm_count, d2=biased(0/1)
+//
+// Type expression nodes:
+// NodeKind.NK_TYPE_NAMED:    d0=sym, d1=0, d2=0
+// NodeKind.NK_TYPE_GENERIC:  d0=name(sym), d1=extra_start, d2=arg_count
+// NodeKind.NK_TYPE_REF:      d0=pointee(node), d1=is_mut(0/1), d2=0
+// NodeKind.NK_TYPE_PTR:      d0=pointee(node), d1=is_mut(0/1), d2=0
+// NodeKind.NK_TYPE_FN:       d0=extra_start, d1=param_count, d2=return_type(node)
+// NodeKind.NK_TYPE_EXTERN_FN: d0=extra_start, d1=param_count, d2=return_type(node)
+// NodeKind.NK_TYPE_TUPLE:    d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_TYPE_OPTIONAL: d0=inner(node), d1=0, d2=0
+// NodeKind.NK_TYPE_ARRAY:    d0=element(node), d1=length, d2=length expr (0=d1 is the length; §4.3a `[T; N]` with a non-literal N, until Sema evaluates it into d1)
+// NodeKind.NK_TYPE_SLICE:    d0=element(node), d1=is_mut(0/1), d2=0
+// NodeKind.NK_TYPE_TRAIT_OBJ: d0=sym, d1=TYPE_TRAIT_OBJECT_*, d2=0
+// NodeKind.NK_TYPE_INFERRED: d0=0, d1=0, d2=0
+//
+// Pattern nodes:
+// NodeKind.NK_PAT_WILDCARD:  d0=0, d1=0, d2=0
+// NodeKind.NK_PAT_IDENT:     d0=sym, d1=0, d2=0
+// NodeKind.NK_PAT_INT:       d0/d1/d2 = i64 value, encoded with ast_int_part0/1/2 (same as NK_INT_LIT)
+// NodeKind.NK_PAT_BOOL:      d0=value(0/1), d1=0, d2=0
+// NodeKind.NK_PAT_STRING:    d0=sym, d1=0, d2=0
+// NodeKind.NK_PAT_VARIANT:   d0=name(sym), d1=extra_start, d2=binding_count
+// NodeKind.NK_PAT_TUPLE:     d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_PAT_STRUCT:    d0=type_name(sym,0=none), d1=extra_start, d2=field_count
+//                   extra: [has_rest(0/1), [field_name, field_pattern(node,0=shorthand)]...]
+// NodeKind.NK_PAT_RANGE:     d0=start_low, d1=end_low, d2=inclusive(0/1)
+// NodeKind.NK_PAT_OR:        d0=extra_start, d1=pattern_count, d2=0
+// NodeKind.NK_PAT_AT_BINDING: d0=name(sym), d1=pattern(node), d2=0
+// NodeKind.NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
+//                   extra: [has_rest(0/1), head_syms..., tail_count, tail_syms...]
+// NodeKind.NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
+// NodeKind.NK_PAT_REST:      d0=name (0 for a bare `..`), d1=0, d2=0
+// NodeKind.NK_MATCH_OP:     d0=lhs(str expr), d1=regex expr, d2=0
+// NodeKind.NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
+// NodeKind.NK_PAT_REGEX:    d0=pattern_sym, d1=flags_sym, d2=0
+// NodeKind.NK_PAT_ENUM_SHORTHAND: d0=name(sym), d1=extra_start, d2=binding_count
+

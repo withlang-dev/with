@@ -15,10 +15,10 @@ A With project uses up to two configuration files:
 
 ```text
 with.toml  declarative package metadata, dependencies, and settings
-build.w    executable build behavior (optional)
+build.with    executable build behavior (optional)
 ```
 
-Most projects need only `with.toml`. Reach for `build.w` when you need
+Most projects need only `with.toml`. Reach for `build.with` when you need
 custom build targets, C library integration, code generation, asset
 pipelines, or multi-binary builds.
 
@@ -32,22 +32,22 @@ pipelines, or multi-binary builds.
 with init my_app
 cd my_app
 with build
-with run main.w
+with run main.with
 ```
 
 This produces:
 
 ```
 my_app/
-  main.w
+  main.with
   with.toml
-  build.w
+  build.with
   README.md
   AGENTS.md
   CLAUDE.md
   .gitignore
   test/
-    test_main.w
+    test_main.with
 ```
 
 `with init` also runs `git init` if git is available (fails silently if not).
@@ -57,7 +57,7 @@ Options:
 ```sh
 with init              # init in current directory, name from dirname
 with init my_app       # create my_app/ directory
-with init --lib        # library project (lib.w, no main)
+with init --lib        # library project (lib.with, no main)
 with init --name foo   # override project name
 ```
 
@@ -281,7 +281,7 @@ Not allowed:
 - Target graph construction
 - Platform-specific branching logic
 
-Those belong in `build.w`.
+Those belong in `build.with`.
 
 ---
 
@@ -298,26 +298,26 @@ with build :action --no-deps  # run one action without deps (debugging)
 with build :prune        # report stale build artifacts
 ```
 
-`with build` searches upward for `build.w` or `with.toml`. If `build.w`
+`with build` searches upward for `build.with` or `with.toml`. If `build.with`
 exists, the driver evaluates it and executes the returned graph. If no
-`build.w` exists, the driver synthesizes a default build of `src/main.w`.
+`build.with` exists, the driver synthesizes a default build of `src/main.with`.
 
 ### Direct Source Builds
 
-Direct source builds bypass `build.w`:
+Direct source builds bypass `build.with`:
 
 ```sh
-with build src/main.w
-with build src/main.w -o out/bin/app
-with build src/main.w --emit-obj -o out/main.o
-with build src/main.w --emit-c -o out/main.c
+with build src/main.with
+with build src/main.with -o out/bin/app
+with build src/main.with --emit-obj -o out/main.o
+with build src/main.with --emit-c -o out/main.c
 ```
 
 ### Test and Run
 
 ```sh
 with test                # run the test target
-with run src/main.w      # compile and run
+with run src/main.with      # compile and run
 with clean               # clean build artifacts
 ```
 
@@ -347,9 +347,9 @@ Set `WITH_BUILD_TEST_JOBS=N` to control batch size (default 4, max 32).
 
 ---
 
-## build.w
+## build.with
 
-`build.w` is executable build behavior written in With. It runs as
+`build.with` is executable build behavior written in With. It runs as
 capability-bearing comptime code — the driver passes unforgeable capability
 handles that grant filesystem, process, and compiler access.
 
@@ -360,8 +360,8 @@ use std.build
 
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
-    var out = ctx.new_build().executable("my_app", "main.w")
-    out = out.test("test", "test/*.w")
+    var out = ctx.new_build().executable("my_app", "main.with")
+    out = out.test("test", "test/*.with")
     out.default("my_app")
 ```
 
@@ -370,7 +370,7 @@ selects the requested target closure, and executes it.
 
 ### Default Recipe
 
-If no `build.w` exists but `main.w` (or `src/main.w`) does, the driver
+If no `build.with` exists but `main.with` (or `src/main.with`) does, the driver
 synthesizes:
 
 ```with
@@ -379,7 +379,7 @@ use std.build
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     let info = ctx.project_info()
-    ctx.new_build().executable(info.package_name(), "main.w")
+    ctx.new_build().executable(info.package_name(), "main.with")
 ```
 
 ---
@@ -418,9 +418,9 @@ paths are accepted; absolute paths and `..` escapes fail loudly.
 ```with
 let fs = ctx.fs()
 fs.mkdir_all("out/gen")
-fs.write_text("out/gen/config.w", "pub let version = \"0.1.0\"\n")
-let text = fs.read_text("out/gen/config.w")
-let exists = fs.exists("src/main.w")
+fs.write_text("out/gen/config.with", "pub let version = \"0.1.0\"\n")
+let text = fs.read_text("out/gen/config.with")
+let exists = fs.exists("src/main.with")
 ```
 
 Available operations: `read_text`, `write_text`, `exists`, `is_dir`,
@@ -455,7 +455,7 @@ Creates generated-source graph entries:
 
 ```with
 let emitter = ctx.source_emitter()
-let source = emitter.generated_source("out/gen/config.w", "pub let answer = 42\n")
+let source = emitter.generated_source("out/gen/config.with", "pub let answer = 42\n")
 var build = ctx.new_build()
 build = build.add_generated_source(source)
 ```
@@ -466,7 +466,7 @@ Compiles, checks, or inspects With source without spawning a subprocess:
 
 ```with
 let ws = ctx.create_workspace("check")
-ws.add_string("generated.w", "fn f -> i32: 7\n")
+ws.add_string("generated.with", "fn f -> i32: 7\n")
 var options = ws.options()
 options.output_kind = BuildOutputKind.Check
 ws.set_options(options)
@@ -495,16 +495,16 @@ ws.end_intercept()
 
 ```with
 var out = ctx.new_build()
-out = out.executable("app", "src/main.w")
-out = out.library("mylib", "src/lib.w")
-out = out.test("test", "tests/*.w")
+out = out.executable("app", "src/main.with")
+out = out.library("mylib", "src/lib.with")
+out = out.test("test", "tests/*.with")
 out.default("app")
 ```
 
 ### Full Control
 
 ```with
-var target = target_new(.Executable, "app", "src/main.w")
+var target = target_new(.Executable, "app", "src/main.with")
 target = target.optimize(.release)
 target = target.include_path("include")
 target = target.define("WITH_FEATURE=1")
@@ -558,7 +558,7 @@ target's cached execution. It does not limit the operating-system allocator.
 
 | Kind | Description |
 |------|-------------|
-| `Test` | Compile and run With tests (single file or `*.w` glob) |
+| `Test` | Compile and run With tests (single file or `*.with` glob) |
 | `BinaryCompare` | Compare two files byte-for-byte |
 | `FixpointCompare` | Compare two files as a codegen fixpoint |
 | `RunCorpusTest` | Run a tool with captured stdout/stderr |
@@ -612,10 +612,10 @@ fn generate(ctx: ActionCtx) -> i32:
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     var out = ctx.new_build()
-    var gen = target_new(.Action, "generate", "").output("out/gen/generated.w")
+    var gen = target_new(.Action, "generate", "").output("out/gen/generated.with")
     gen.action = generate
     out = out.add_target(gen)
-    out = out.executable("app", "src/main.w").dep("generate")
+    out = out.executable("app", "src/main.with").dep("generate")
     out.default("app")
 ```
 
@@ -636,8 +636,8 @@ use std.build
 
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
-    var out = ctx.new_build().executable("app", "src/main.w")
-    out = out.test("test", "tests/*.w")
+    var out = ctx.new_build().executable("app", "src/main.with")
+    out = out.test("test", "tests/*.with")
     out.default("app")
 ```
 
@@ -649,8 +649,8 @@ use std.build
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     var out = ctx.new_build()
-    out = out.library("mylib", "src/lib.w")
-    out = out.test("test", "tests/*.w")
+    out = out.library("mylib", "src/lib.with")
+    out = out.test("test", "tests/*.with")
     out.default("mylib")
 ```
 
@@ -661,7 +661,7 @@ use std.build
 
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
-    var app = target_new(.Executable, "app", "src/main.w")
+    var app = target_new(.Executable, "app", "src/main.with")
     app = app.include_path("include")
     app = app.define("WITH_FEATURE=1")
     app = app.link_system_lib("m")
@@ -677,12 +677,12 @@ comptime with BuildCtx as ctx:
 pub fn build -> Build:
     let fs = ctx.fs()
     let emitter = ctx.source_emitter()
-    let text = fs.read_text("templates/generated.w")
-    let generated = emitter.generated_source("out/gen/generated.w", text)
+    let text = fs.read_text("templates/generated.with")
+    let generated = emitter.generated_source("out/gen/generated.with", text)
 
     var out = ctx.new_build()
     out = out.add_generated_source(generated)
-    out.executable("generated-app", "out/gen/generated.w")
+    out.executable("generated-app", "out/gen/generated.with")
 ```
 
 ### Aggregate Target
@@ -693,8 +693,8 @@ use std.build
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     var out = ctx.new_build()
-    out = out.executable("app", "src/main.w")
-    out = out.test("test", "tests/*.w")
+    out = out.executable("app", "src/main.with")
+    out = out.test("test", "tests/*.with")
 
     var check = target_new(.Group, "check", "")
     check = check.dep("app")
@@ -719,7 +719,7 @@ BuildTarget.windows_x86_64
 Unsupported targets fail loudly. The language design does not privilege one
 operating system over another.
 
-`--target wasm32` needs no sysroot: `rt/wasm.w` is the target's libc, and a
+`--target wasm32` needs no sysroot: `rt/wasm.with` is the target's libc, and a
 wasm32 link joins the runtime bundle and the wasm fiber stubs.
 
 ---
@@ -731,4 +731,4 @@ wasm32 link joins the runtime bundle and the wasm fiber stubs.
 - Declare dependencies with `Target.dep`.
 - Fail loudly with `Diagnostics.error` or a nonzero return.
 - Do not emit placeholder generated code to hide unsupported behavior.
-- Keep project-specific policy in project `build.w`, not in `std.build`.
+- Keep project-specific policy in project `build.with`, not in `std.build`.

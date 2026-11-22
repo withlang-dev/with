@@ -1,16 +1,16 @@
 # §31.9 rule 2: the uncited claims of each contract file of the runtime,
 # as `with analyze <file> contract` counts them. Every file is at zero (D205: one citation per
 # function, of the actual function's documented behavior): contract-view-tests refuses
-# a file with an uncited claim. Not listed, with why: rt/wasm.w (25 fn items, no
+# a file with an uncited claim. Not listed, with why: rt/wasm.with (25 fn items, no
 # clauses; the view cannot compile it for the host).
-rt/fiber_core_windows.w	0
-rt/fiber_stubs.w	0
-rt/panic_runtime.w	0
-rt/fiber_runtime.w	0
-rt/rt_core.w	0
-rt/windows_aarch64.w	0
-rt/windows_x86_64.w	0
-rt/fiber_core_darwin.w	0
-rt/linux_aarch64.w	0
-rt/linux_x86_64.w	0
-rt/darwin_aarch64.w	0
+rt/fiber_core_windows.with	0
+rt/fiber_stubs.with	0
+rt/panic_runtime.with	0
+rt/fiber_runtime.with	0
+rt/rt_core.with	0
+rt/windows_aarch64.with	0
+rt/windows_x86_64.with	0
+rt/fiber_core_darwin.with	0
+rt/linux_aarch64.with	0
+rt/linux_x86_64.with	0
+rt/darwin_aarch64.with	0

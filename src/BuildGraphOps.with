@@ -1,0 +1,869 @@
+// BuildGraphOps -- generic executable build graph node operations.
+
+use Archive
+use Resolve
+use compiler.Runtime
+use BuildGraphKinds
+use BuildGraphModel
+use BuildGraphSupport
+use BuildGraphRuntime
+use std.string.StringBuilder
+use rt.rt_core
+
+
+fn build_graph_target_input_path(root: &str, target: &BuildGraphTarget, index: i32) -> str:
+    if index == 0:
+        if target.entry.len() == 0:
+            return ""
+        return build_graph_resolve_project_path(root, target.entry)
+    let input_index = index - 1
+    if input_index < 0 or input_index >= target.inputs.len():
+        return ""
+    build_graph_resolve_project_path(root, target.inputs[input_index])
+
+// One checked read for the file-content operations (compare, copy, promote,
+// install): a read failure is the operation's error, never mistaken for an
+// empty file (#953). `what` names the operation for the diagnostic.
+fn build_graph_read_input(what: &str, path: &str) -> Option[str]:
+    let status: i32 = 0
+    let text = build_graph_rt_read_file_status(path, &raw mut status as *mut i32)
+    if status != 0:
+        build_graph_rt_eprint("error: " ++ what ++ " could not read " ++ path ++ f" (os error {0 - status})")
+        return None
+    text
+
+fn build_graph_compare_files(root: &str, target: &BuildGraphTarget, operation_name: &str) -> i32:
+    let left_path = build_graph_target_input_path(root, target, 0)
+    let right_path = if target.args.len() > 0:
+        build_graph_resolve_project_path(root, target.args[0])
+    else:
+        build_graph_target_input_path(root, target, 1)
+    if left_path.len() == 0 or right_path.len() == 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires two input paths")
+        return 1
+    if build_graph_rt_file_exists(left_path) == 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing left input: " ++ left_path)
+        return 1
+    if build_graph_rt_file_exists(right_path) == 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing right input: " ++ right_path)
+        return 1
+    let left = build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", left_path) ?? return 1
+    let right = build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", right_path) ?? return 1
+    let min_len = if left.len() < right.len(): left.len() else: right.len()
+    var diff_at: i64 = -1
+    var i = 0
+    while i < min_len:
+        if left[i] != right[i]:
+            diff_at = i
+            break
+        i = i + 1
+    if diff_at < 0 and left.len() != right.len():
+        diff_at = min_len
+    if diff_at >= 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' failed: " ++ left_path ++ " and " ++ right_path ++ f" differ at byte {diff_at}")
+        return 1
+    0
+
+// #964: a path clean may remove is a strict descendant of the project root:
+// relative, and every segment a name (not empty, `.` or `..`). `.` passed
+// the old filter (empty, absolute, `..`), resolved to the root itself, and
+// clean removed the whole project before failing on the root.
+fn build_graph_clean_path_is_descendant(rel: &str) -> bool:
+    if rel.len() == 0 or runtime_path_is_absolute(rel):
+        return false
+    for segment in rel.replace("\\", "/").split("/"):
+        if segment.len() == 0 or segment == "." or segment == "..":
+            return false
+    true
+
+fn build_graph_run_clean(root: &str, target: &BuildGraphTarget) -> i32:
+    var removed = 0
+    // Every path is checked before the first removal.
+    for rel in target.args:
+        if not build_graph_clean_path_is_descendant(rel):
+            build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' has unsafe path: " ++ rel ++ " (clean removes paths inside the project, named segment by segment)")
+            return 1
+    for ai in 0..target.args.len():
+        let rel = target.args[ai]
+        let path = build_graph_resolve_project_path(root, rel)
+        if build_graph_rt_is_dir(path) != 0:
+            let rc = build_graph_rt_remove_tree(path)
+            if rc != 0:
+                build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' could not remove directory tree: " ++ path)
+                return 1
+            removed = removed + 1
+        else if build_graph_rt_file_exists(path) != 0:
+            let rc = build_graph_rt_remove_file(path)
+            if rc != 0:
+                build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' could not remove file: " ++ path)
+                return 1
+            removed = removed + 1
+    build_graph_rt_write(f"cleaned {removed} build artifact paths\n")
+    0
+
+fn build_graph_response_arg_valid(arg: &str) -> bool:
+    for i in 0..arg.len():
+        let ch = arg[i]
+        if ch == 10 or ch == 13:
+            return false
+    true
+
+fn build_graph_quote_response_arg(arg: &str) -> str:
+    var out = "\""
+    for i in 0..arg.len():
+        let ch = arg[i]
+        if ch == 92 or ch == 34:
+            out = out ++ "\\"
+        out = out ++ arg.slice(i as i64, (i + 1) as i64)
+    out ++ "\""
+
+fn build_graph_write_response_file(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.output.len() == 0:
+        build_graph_rt_eprint("error: generate_response_file target '" ++ target.name ++ "' requires an output path")
+        return 1
+    // #966: every argument is one process argument, so the shared rule
+    // refuses a NUL as it does for every other target, and a newline would
+    // split the line; both before anything is created. A NUL went into the
+    // file, where a consumer truncated the argument at it.
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    for ai in 0..target.args.len():
+        if not build_graph_response_arg_valid(target.args[ai]):
+            build_graph_rt_eprint("error: generate_response_file target '" ++ target.name ++ "' contains an argument with a newline")
+            return 1
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create response file directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    var text = ""
+    for ai in 0..target.args.len():
+        text = text ++ build_graph_quote_response_arg(target.args[ai]) ++ "\n"
+    if build_graph_rt_write_file(output_path, text) != 0:
+        build_graph_rt_eprint("error: could not write response file for target '" ++ target.name ++ "': " ++ output_path)
+        return 1
+    0
+
+fn build_graph_append_common_compile_args(root: &str, target: &BuildGraphTarget, argv_blob: &str) -> str:
+    var out = with_str_clone_ref(argv_blob)
+    for ii in 0..target.include_paths.len():
+        out = build_graph_argv_append(out, "-I" ++ build_graph_resolve_project_path(root, target.include_paths[ii]))
+    for di in 0..target.defines.len():
+        out = build_graph_argv_append(out, "-D" ++ target.defines[di])
+    for ai in 0..target.args.len():
+        out = build_graph_argv_append(out, target.args[ai])
+    out
+
+fn build_graph_compile_object(root: &str, target: &BuildGraphTarget, operation_name: &str, compiler: &str) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires source and output paths")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if build_graph_rt_file_exists(source_path) == 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create object output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    var argv = ""
+    if compiler.len() > 0:
+        argv = build_graph_argv_append(argv, compiler)
+    else:
+        argv = build_graph_argv_append(argv, with_self_exe())
+        argv = build_graph_argv_append(argv, "cc")
+    argv = build_graph_append_common_compile_args(root, target, argv)
+    argv = build_graph_argv_append(argv, "-c")
+    argv = build_graph_argv_append(argv, source_path)
+    argv = build_graph_argv_append(argv, "-o")
+    argv = build_graph_argv_append(argv, output_path)
+    build_graph_exec_argv(target, operation_name, argv)
+
+fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' requires source and output paths")
+        return 1
+    // #969: no argument assembles for the host; one `triple=<llvm-triple>`
+    // for that target. Anything else was ignored and assembled for the host:
+    // an unknown option, an empty `triple=`, a second argument.
+    if target.args.len() > 1 or (target.args.len() == 1 and (not target.args[0].starts_with("triple=") or target.args[0].len() == 7)):
+        build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' takes no argument (the host) or one `triple=<llvm-triple>`; it has " ++ f"{target.args.len()}, the first `{target.args[0]}`")
+        return 1
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if build_graph_rt_file_exists(source_path) == 0:
+        build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create object output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    // An optional `triple=<llvm-triple>` arg assembles for that target
+    // instead of the host (cross-target runtime objects).
+    var asm_triple = ""
+    if target.args.len() > 0:
+        let arg0 = target.args[0]
+        if arg0.starts_with("triple="):
+            asm_triple = arg0.slice(7, arg0.len())
+    // #1899: a relative `.incbin`/`.include` operand names a file from the
+    // project root (an embed target's assembly is the same text in every
+    // worktree). The assembler opens operands against the process's working
+    // directory, which need not be the root, so it reads a copy whose
+    // operands are resolved; the object holds the bytes, not the names.
+    let source_text = build_graph_rt_read_file(source_path)
+    let resolved_text = build_graph_asm_resolve_operands(root, source_text)
+    var assembled_path = source_path
+    if resolved_text != source_text:
+        assembled_path = output_path ++ ".resolved.s"
+        if build_graph_rt_write_file(assembled_path, resolved_text) != 0:
+            build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' could not write " ++ assembled_path)
+            return 1
+    let rc = if asm_triple.len() > 0:
+        build_graph_rt_assemble_to_object_for_triple(assembled_path, output_path, asm_triple)
+    else:
+        build_graph_rt_assemble_to_object(assembled_path, output_path)
+    if assembled_path != source_path:
+        let _rm = build_graph_rt_remove_file(assembled_path)
+    if rc != 0:
+        build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' failed")
+    rc
+
+// `text` with every relative `.incbin`/`.include` operand resolved against
+// the project root.
+fn build_graph_asm_resolve_operands(root: &str, text: &str) -> str:
+    let out = StringBuilder.new()
+    var start: i64 = 0
+    while start < text.len():
+        var end = start
+        while end < text.len() and text[end] != '\n': end = end + 1
+        let line = text.slice(start, end)
+        let path = build_graph_asm_directive_path(line)
+        let quoted = build_graph_asm_quote_path(path)
+        let at = line.find(quoted)
+        if path.len() > 0 and not runtime_path_is_absolute(path) and at >= 0:
+            out.push_str(line.slice(0, at as i64) ++ build_graph_asm_quote_path(build_graph_resolve_project_path(root, path)) ++ line.slice(at as i64 + quoted.len(), line.len()))
+        else:
+            out.push_str(line)
+        if end < text.len(): out.push_str("\n")
+        start = end + 1
+    out.to_str()
+
+// The files a standard target read that it does not declare, recorded as its
+// discovered dependencies. An assembled object is made from its source and
+// from every file the source pulls in by `.incbin`/`.include` (#1423, #1435):
+// an embed target's assembly names its blobs by path only, so a blob whose
+// bytes changed leaves the source identical, and without these the object
+// stayed fresh over the old bytes.
+fn build_graph_discovered_inputs(root: &str, target: &BuildGraphTarget) -> List[str]:
+    let paths: List[str] = []
+    if target.kind != 13 or target.entry.len() == 0: return paths
+    let text = build_graph_rt_read_file(build_graph_resolve_project_path(root, target.entry))
+    var start: i64 = 0
+    while start < text.len():
+        var end = start
+        while end < text.len() and text[end] != '\n': end = end + 1
+        let path = build_graph_asm_directive_path(text.slice(start, end))
+        // A relative operand is opened against the working directory, which
+        // is the project root during a build.
+        if path.len() > 0: paths.push(build_graph_resolve_project_path(root, path))
+        start = end + 1
+    paths
+
+// The unescaped quoted operand of an `.incbin`/`.include` line, "" for any
+// other line (the inverse of build_graph_asm_quote_path).
+fn build_graph_asm_directive_path(line: &str) -> str:
+    var i: i64 = 0
+    while i < line.len() and (line[i] == ' ' or line[i] == '\t'): i = i + 1
+    let rest = line.slice(i, line.len())
+    let directive_len = if rest.starts_with(".incbin"): 7 else if rest.starts_with(".include"): 8 else: 0
+    if directive_len == 0: return ""
+    var j: i64 = directive_len
+    while j < rest.len() and (rest[j] == ' ' or rest[j] == '\t'): j = j + 1
+    if j >= rest.len() or rest[j] != '"': return ""
+    var path = ""
+    j = j + 1
+    while j < rest.len() and rest[j] != '"':
+        if rest[j] == '\\' and j + 1 < rest.len(): j = j + 1
+        path = path ++ rest.slice(j, j + 1)
+        j = j + 1
+    path
+
+fn build_graph_compile_ir_to_object(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' requires source and output paths")
+        return 1
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if build_graph_rt_file_exists(source_path) == 0:
+        build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create object output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    let rc = build_graph_rt_compile_ir_to_object(source_path, output_path)
+    if rc != 0:
+        build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' failed")
+    rc
+
+fn build_graph_archive_member_seen(inputs: &List[str], count: isize, basename: &str) -> bool:
+    for i in 0..count:
+        if build_graph_path_basename(inputs[i]) == basename:
+            return true
+    false
+
+fn build_graph_create_archive(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.output.len() == 0:
+        build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' requires an output path")
+        return 1
+    if target.inputs.len() == 0:
+        build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' requires at least one input object")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create archive output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    let resolved_inputs: List[str] = []
+    for ii in 0..target.inputs.len():
+        let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
+        if build_graph_rt_file_exists(input_path) == 0:
+            build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' missing input: " ++ input_path)
+            return 1
+        let member = build_graph_path_basename(input_path)
+        if build_graph_archive_member_seen(resolved_inputs, resolved_inputs.len(), member):
+            build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' has duplicate archive member name: " ++ member)
+            return 1
+        resolved_inputs.push(input_path)
+    // #968: the archive is built beside its destination and renamed over it
+    // only once complete, so a failure (a member that cannot be read, a
+    // write that fails) leaves the last good archive. It was removed first.
+    let tmp_path = output_path ++ f".tmp.{build_graph_rt_pid()}"
+    let _stale_tmp = build_graph_rt_remove_file(tmp_path)
+    let ar_rc = create_static_archive(tmp_path, resolved_inputs)
+    if ar_rc != 0:
+        let _failed_tmp = build_graph_rt_remove_file(tmp_path)
+        build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' failed")
+        return ar_rc
+    if build_graph_rt_rename_file(tmp_path, output_path) != 0:
+        let _unplaced_tmp = build_graph_rt_remove_file(tmp_path)
+        build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' could not replace " ++ output_path)
+        return 1
+    0
+
+fn build_graph_asm_quote_path(path: &str) -> str:
+    var out = "\""
+    for i in 0..path.len():
+        let ch = path[i]
+        if ch == 92 or ch == 34:
+            out = out ++ "\\"
+        out = out ++ path.slice(i as i64, (i + 1) as i64)
+    out ++ "\""
+
+fn build_graph_symbol_char_ok(ch: i32) -> bool:
+    (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or (ch >= 48 and ch <= 57) or ch == 95
+
+fn build_graph_symbol_name_valid(sym: &str) -> bool:
+    if sym.len() == 0:
+        return false
+    let first = sym[0]
+    if first >= 48 and first <= 57:
+        return false
+    for i in 0..sym.len():
+        if not build_graph_symbol_char_ok(sym[i]):
+            return false
+    true
+
+fn build_graph_emit_embedded_blob(sym: &str, input_path: &str) -> str:
+    ".globl _with_embedded_" ++ sym ++ "_start\n" ++
+    ".globl with_embedded_" ++ sym ++ "_start\n" ++
+    ".globl _with_embedded_" ++ sym ++ "_end\n" ++
+    ".globl with_embedded_" ++ sym ++ "_end\n" ++
+    ".p2align 4\n" ++
+    "_with_embedded_" ++ sym ++ "_start:\n" ++
+    "with_embedded_" ++ sym ++ "_start:\n" ++
+    "    .incbin " ++ build_graph_asm_quote_path(input_path) ++ "\n" ++
+    "_with_embedded_" ++ sym ++ "_end:\n" ++
+    "with_embedded_" ++ sym ++ "_end:\n\n"
+
+fn build_graph_emit_empty_embedded_blob(sym: &str) -> str:
+    ".globl _with_embedded_" ++ sym ++ "_start\n" ++
+    ".globl with_embedded_" ++ sym ++ "_start\n" ++
+    ".globl _with_embedded_" ++ sym ++ "_end\n" ++
+    ".globl with_embedded_" ++ sym ++ "_end\n" ++
+    ".p2align 4\n" ++
+    "_with_embedded_" ++ sym ++ "_start:\n" ++
+    "with_embedded_" ++ sym ++ "_start:\n" ++
+    "_with_embedded_" ++ sym ++ "_end:\n" ++
+    "with_embedded_" ++ sym ++ "_end:\n\n"
+
+fn build_graph_embed_object_files(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.output.len() == 0:
+        build_graph_rt_eprint("error: embed_object_files target '" ++ target.name ++ "' requires an output path")
+        return 1
+    if target.inputs.len() == 0:
+        build_graph_rt_eprint("error: embed_object_files target '" ++ target.name ++ "' requires at least one input object")
+        return 1
+    if target.args.len() != target.inputs.len():
+        build_graph_rt_eprint("error: embed_object_files target '" ++ target.name ++ "' requires one stable symbol name per input")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create embedded-object output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    var asm_text = "// Auto-generated by with build embed_object_files - do not edit.\n\n"
+    var has_darwin_runtime = false
+    var has_linux_runtime = false
+    var has_linux_aarch64_runtime = false
+    var has_windows_runtime = false
+    var has_windows_aarch64_runtime = false
+    // The embed target's entry names the PLATFORM the assembly is for
+    // (e.g. "linux_x86_64" for a cross-built compiler); empty = host.
+    var macho_sections = build_graph_host_target_kind() == 3 or build_graph_host_target_kind() == 4
+    var coff_sections = build_graph_host_target_kind() == 5 or build_graph_host_target_kind() == 6
+    if target.entry.len() > 0:
+        macho_sections = target.entry.starts_with("darwin")
+        coff_sections = target.entry.starts_with("windows")
+    if macho_sections:
+        asm_text = asm_text ++ ".section __TEXT,__const\n.subsections_via_symbols\n\n"
+    else if coff_sections:
+        asm_text = asm_text ++ ".section .rdata,\"dr\"\n\n"
+    else:
+        asm_text = asm_text ++ ".section .rodata\n\n"
+    for ii in 0..target.inputs.len():
+        let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
+        if build_graph_rt_file_exists(input_path) == 0:
+            build_graph_rt_eprint("error: embed_object_files target '" ++ target.name ++ "' missing input: " ++ input_path)
+            return 1
+        let sym = target.args[ii]
+        if not build_graph_symbol_name_valid(sym):
+            build_graph_rt_eprint("error: embed_object_files target '" ++ target.name ++ "' has invalid symbol name: " ++ sym)
+            return 1
+        if sym == "rt_darwin_aarch64_o":
+            has_darwin_runtime = true
+        if sym == "rt_linux_x86_64_o":
+            has_linux_runtime = true
+        if sym == "rt_linux_aarch64_o":
+            has_linux_aarch64_runtime = true
+        if sym == "rt_windows_x86_64_o":
+            has_windows_runtime = true
+        if sym == "rt_windows_aarch64_o":
+            has_windows_aarch64_runtime = true
+        // #1899: named as declared (from the project root), so the assembly
+        // is the same text in every worktree; build_graph_assemble_to_object
+        // resolves the operand against the root, as the discovered inputs do.
+        asm_text = asm_text ++ build_graph_emit_embedded_blob(sym, target.inputs[ii])
+    // Every platform slot src/compiler/Link.with declares must exist in every
+    // embedded-objects blob, real or zero-length: a cross-compiled compiler
+    // (build.with's cross-rt-windows-* targets) carries only its own platform
+    // object as an input and relies on this zero-fill for the rest. This list
+    // is the same list as build.with's embedded_platform_symbols() and Link.with's
+    // externs; a platform missing here surfaces far away as
+    // `undefined symbol: with_embedded_rt_<platform>_o_start` at the cross
+    // link (the windows-aarch64 seed, missing linux_aarch64).
+    if not has_darwin_runtime:
+        asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_darwin_aarch64_o")
+    if not has_linux_runtime:
+        asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_linux_x86_64_o")
+    if not has_linux_aarch64_runtime:
+        asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_linux_aarch64_o")
+    if not has_windows_runtime:
+        asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_windows_x86_64_o")
+    if not has_windows_aarch64_runtime:
+        asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_windows_aarch64_o")
+    if build_graph_rt_write_file(output_path, asm_text) != 0:
+        build_graph_rt_eprint("error: could not write embedded-object assembly for target '" ++ target.name ++ "': " ++ output_path)
+        return 1
+    0
+
+fn build_graph_copy_manifest_files(root: &str, target: &BuildGraphTarget, operation_name: &str) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires source and output directories")
+        return 1
+    if target.inputs.len() == 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires explicit relative input paths")
+        return 1
+    let source_dir = build_graph_resolve_project_path(root, target.entry)
+    let output_dir = build_graph_resolve_project_path(root, target.output)
+    // #967: every input is checked and read before the first write, so a
+    // missing or unreadable one leaves the destination as it was; one at a
+    // time, a failure left part of the tree new and part old.
+    let contents_of: List[str] = []
+    for ii in 0..target.inputs.len():
+        let rel = target.inputs[ii]
+        if not build_graph_manifest_relative_path_valid(rel):
+            build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' has invalid relative input path: " ++ rel)
+            return 1
+        let source_path = resolve_join(source_dir, rel)
+        if build_graph_rt_file_exists(source_path) == 0:
+            build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing input: " ++ source_path)
+            return 1
+        contents_of.push(build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", source_path) ?? return 1)
+    for ii in 0..target.inputs.len():
+        let dest_path = resolve_join(output_dir, target.inputs[ii])
+        let dest_dir = build_graph_dirname(dest_path)
+        if build_graph_rt_mkdir_p(dest_dir) != 0:
+            build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir)
+            return 1
+        if build_graph_rt_write_file(dest_path, contents_of[ii]) != 0:
+            build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' could not write destination: " ++ dest_path)
+            return 1
+    0
+
+fn build_graph_promote_tree_if_verified(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' requires source and output directories")
+        return 1
+    if target.inputs.len() == 0:
+        build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' requires explicit relative input paths")
+        return 1
+    let source_dir = build_graph_resolve_project_path(root, target.entry)
+    let output_dir = build_graph_resolve_project_path(root, target.output)
+    // #967: every entry is checked, read and compared before the first
+    // write; a missing input after a stale one left a mixed tree that a
+    // later run consumed.
+    var stale_count = 0
+    var fresh_count = 0
+    let stale_dest: List[str] = []
+    let stale_contents: List[str] = []
+    for ii in 0..target.inputs.len():
+        let rel = target.inputs[ii]
+        if not build_graph_manifest_relative_path_valid(rel):
+            build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' has invalid relative input path: " ++ rel)
+            return 1
+        let source_path = resolve_join(source_dir, rel)
+        let dest_path = resolve_join(output_dir, rel)
+        if build_graph_rt_file_exists(source_path) == 0:
+            build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' missing input: " ++ source_path)
+            return 1
+        let source_contents = build_graph_read_input("promote_tree_if_verified target '" ++ target.name ++ "'", source_path) ?? return 1
+        if build_graph_rt_file_exists(dest_path) != 0:
+            let dest_contents = build_graph_read_input("promote_tree_if_verified target '" ++ target.name ++ "'", dest_path) ?? return 1
+            if source_contents.len() == dest_contents.len():
+                var same = true
+                var ci = 0
+                while ci < source_contents.len():
+                    if source_contents[ci] != dest_contents[ci]:
+                        same = false
+                        break
+                    ci = ci + 1
+                if same:
+                    fresh_count = fresh_count + 1
+                    continue
+        stale_count = stale_count + 1
+        stale_dest.push(dest_path)
+        stale_contents.push(source_contents)
+    for si in 0..stale_dest.len():
+        let dest_path = stale_dest[si]
+        let dest_dir_path = build_graph_dirname(dest_path)
+        if build_graph_rt_mkdir_p(dest_dir_path) != 0:
+            build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir_path)
+            return 1
+        if build_graph_rt_write_file(dest_path, stale_contents[si]) != 0:
+            build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' could not write destination: " ++ dest_path)
+            return 1
+    if stale_count > 0:
+        build_graph_rt_eprint(f"promote: updated {stale_count} stale files in " ++ target.output)
+    else:
+        build_graph_rt_eprint("promote: all " ++ f"{fresh_count}" ++ " files in " ++ target.output ++ " are up to date")
+    0
+
+fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ "' requires a runner")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    for ii in 0..target.inputs.len():
+        let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
+        if build_graph_rt_file_exists(input_path) == 0:
+            build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ "' missing declared input: " ++ input_path)
+            return 1
+    let output_dir = if target.output.len() > 0:
+        build_graph_resolve_project_path(root, target.output)
+    else:
+        resolve_join(resolve_join(root, "out/corpus"), target.name)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create corpus output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    let stdout_path = resolve_join(output_dir, "stdout.txt")
+    let stderr_path = resolve_join(output_dir, "stderr.txt")
+    var argv = ""
+    let runner_path = if runtime_path_is_absolute(target.entry) or target.entry.contains("/"):
+        build_graph_resolve_project_path(root, target.entry)
+    else:
+        target.entry
+    argv = build_graph_argv_append(argv, runner_path)
+    for ai in 0..target.args.len():
+        argv = build_graph_argv_append(argv, target.args[ai])
+    // Compile provenance (#2249): the binary a corpus test ran, in the log.
+    var prov_args = ""
+    for pai in 0..target.args.len(): prov_args = prov_args ++ " " ++ target.args[pai]
+    build_graph_rt_eprint("[compile] " ++ target.name ++ " ran " ++ runner_path ++ prov_args)
+    let rc = build_graph_exec_target_capture(root, target, argv, stdout_path, stderr_path)
+    if rc == 124:
+        build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ f"' timed out after {build_graph_target_timeout_ms(target)}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return rc
+    for extra in target.extra_outputs:
+        if build_graph_rt_file_exists(build_graph_resolve_project_path(root, extra)) == 0:
+            build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ "' did not produce declared extra output: " ++ extra)
+            return 1
+    0
+
+// #965: a command or corpus target runs its child as the target declares
+// it: its timeout, its working directory (`working_dir`) and its
+// environment (`with_env`); all three were dropped (a 300 s timeout, the
+// project root, the parent's environment).
+fn build_graph_exec_target_capture(root: &str, target: &BuildGraphTarget, argv: &str, stdout_path: &str, stderr_path: &str) -> i32:
+    let timeout_ms = build_graph_target_timeout_ms(target)
+    let saved_env = build_graph_apply_target_env(target)
+    let rc = if target.cwd.len() > 0: build_graph_rt_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, build_graph_resolve_project_path(root, target.cwd)) else: build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    build_graph_restore_target_env(saved_env)
+    rc
+
+// #965: every output a target declares exists once it succeeds: its output
+// and each extra output. A command target checked only the first.
+fn build_graph_check_declared_outputs(root: &str, target: &BuildGraphTarget, kind_name: &str) -> i32:
+    if target.output.len() > 0:
+        let output_path = build_graph_resolve_project_path(root, target.output)
+        if build_graph_rt_file_exists(output_path) == 0:
+            build_graph_rt_eprint("error: " ++ kind_name ++ " target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
+            return 1
+    for extra in target.extra_outputs:
+        let extra_path = build_graph_resolve_project_path(root, extra)
+        if build_graph_rt_file_exists(extra_path) == 0:
+            build_graph_rt_eprint("error: " ++ kind_name ++ " target '" ++ target.name ++ "' did not produce declared extra output: " ++ extra_path)
+            return 1
+    0
+
+fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        build_graph_rt_eprint("error: command target '" ++ target.name ++ "' requires an executable")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    for ii in 0..target.inputs.len():
+        let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
+        if build_graph_rt_file_exists(input_path) == 0:
+            build_graph_rt_eprint("error: command target '" ++ target.name ++ "' missing declared input: " ++ input_path)
+            return 1
+    if target.output.len() > 0:
+        let output_path = build_graph_resolve_project_path(root, target.output)
+        let output_dir = build_graph_dirname(output_path)
+        if build_graph_rt_mkdir_p(output_dir) != 0:
+            build_graph_rt_eprint("error: command target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
+            return 1
+    let capture_dir = resolve_join(resolve_join(root, "out/command"), target.name)
+    if build_graph_rt_mkdir_p(capture_dir) != 0:
+        build_graph_rt_eprint("error: could not create command output directory for target '" ++ target.name ++ "': " ++ capture_dir)
+        return 1
+    let stdout_path = resolve_join(capture_dir, "stdout.txt")
+    let stderr_path = resolve_join(capture_dir, "stderr.txt")
+    var argv = ""
+    let runner_path = if runtime_path_is_absolute(target.entry) or target.entry.contains("/"):
+        build_graph_resolve_project_path(root, target.entry)
+    else:
+        target.entry
+    argv = build_graph_argv_append(argv, runner_path)
+    for ai in 0..target.args.len():
+        argv = build_graph_argv_append(argv, target.args[ai])
+    // Compile provenance (#2249): the binary a corpus test ran, in the log.
+    var prov_args = ""
+    for pai in 0..target.args.len(): prov_args = prov_args ++ " " ++ target.args[pai]
+    build_graph_rt_eprint("[compile] " ++ target.name ++ " ran " ++ runner_path ++ prov_args)
+    let rc = build_graph_exec_target_capture(root, target, argv, stdout_path, stderr_path)
+    if rc == 124:
+        build_graph_rt_eprint("error: command target '" ++ target.name ++ f"' timed out after {build_graph_target_timeout_ms(target)}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        build_graph_rt_eprint("error: command target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return rc
+    build_graph_check_declared_outputs(root, target, "command")
+
+fn build_graph_copy_file_to_path(source_path: &str, dest_path: &str, mode: i32) -> i32:
+    if build_graph_rt_file_exists(source_path) == 0:
+        build_graph_rt_eprint("error: missing file to copy: " ++ source_path)
+        return 1
+    let dest_dir = build_graph_dirname(dest_path)
+    if build_graph_rt_mkdir_p(dest_dir) != 0:
+        build_graph_rt_eprint("error: could not create copy destination directory: " ++ dest_dir)
+        return 1
+    let contents = build_graph_read_input("copy_file", source_path) ?? return 1
+    if build_graph_rt_write_file(dest_path, contents) != 0:
+        build_graph_rt_eprint("error: could not write copied file: " ++ dest_path)
+        return 1
+    if mode >= 0 and build_graph_rt_chmod(dest_path, mode) != 0:
+        build_graph_rt_eprint("error: could not chmod copied file: " ++ dest_path)
+        return 1
+    0
+
+fn build_graph_copy_file(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' requires source and destination paths")
+        return 1
+    if target.args.len() > 1:
+        build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' accepts at most one mode argument")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let mode = if target.args.len() == 0: -1 else: build_graph_parse_octal_mode(target.args[0])
+    if target.args.len() > 0 and mode < 0:
+        build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args[0])
+        return 1
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    let dest_path = build_graph_resolve_project_path(root, target.output)
+    build_graph_copy_file_to_path(source_path, dest_path, mode)
+
+// A file mode in octal: permission bits and setuid/setgid/sticky, at most
+// 0o7777; -1 for anything else. #971: `10000` parsed to 0o10000, which the
+// host masked to 0000 and installed an unreadable file; a long run of digits
+// overflowed.
+fn build_graph_parse_octal_mode(text: &str) -> i32:
+    if text.len() == 0:
+        return -1
+    var mode: i32 = 0
+    for i in 0..text.len():
+        let ch = text[i]
+        if ch < 48 or ch > 55:
+            return -1
+        mode = mode * 8 + (ch - 48)
+        if mode > 0o7777:
+            return -1
+    mode
+
+fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' requires source and destination paths")
+        return 1
+    // args: [mode] [verify=<subcommand>] — the second runs `<dest> <subcommand>`
+    // after the rename and proves the installed executable starts.
+    if target.args.len() > 2 or (target.args.len() == 2 and not target.args[1].starts_with("verify=")):
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' accepts a mode and an optional verify=<subcommand>")
+        return 1
+    let verify_subcommand = if target.args.len() == 2: target.args[1].slice("verify=".len(), target.args[1].len()) else: ""
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    if build_graph_rt_file_exists(source_path) == 0:
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    let unset = build_graph_install_prefix_unset(target.output)
+    if unset.len() > 0:
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' installs under " ++ unset ++ ", which is not set: " ++ target.output)
+        return 1
+    let dest_path = build_graph_expand_install_path(root, target.output)
+    if dest_path.len() == 0:
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not resolve destination: " ++ target.output)
+        return 1
+    let mode = if target.args.len() == 0: 0o644 else: build_graph_parse_octal_mode(target.args[0])
+    if mode < 0:
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args[0])
+        return 1
+    let what = "install target '" ++ target.name ++ "'"
+    let contents = build_graph_read_input(what, source_path) ?? return 1
+    build_graph_install_path(what, source_path, contents, dest_path, mode, verify_subcommand)
+
+// The one way a file is installed — the .Install kind and the driver's
+// `:install-user` fast path both come here, so neither can write in place.
+// Temp sibling + rename, never an in-place overwrite: on arm64 macOS,
+// truncating a previously-executed signed binary's inode leaves the kernel's
+// per-vnode code-signature cache stale, and the next exec dies with SIGKILL
+// (137) even though codesign reads the file as valid. Rename gives the
+// destination path a fresh inode atomically. The temp name carries this
+// process id so no earlier temp's inode is reused.
+// A non-empty `verify_subcommand` proves the installed executable starts AND
+// is the source: `<source> <subcommand>` runs first (a source that cannot
+// run is not installed), and `<dest> <subcommand>` after the rename must
+// exit 0 with the identical stdout.
+fn build_graph_install_path(what: &str, source_path: &str, contents: &str, dest_path: &str, mode: i32, verify_subcommand: &str) -> i32:
+    let dest_dir = build_graph_dirname(dest_path)
+    if build_graph_rt_mkdir_p(dest_dir) != 0:
+        build_graph_rt_eprint("error: " ++ what ++ " could not create destination directory: " ++ dest_dir)
+        return 1
+    var expected = ""
+    if verify_subcommand.len() > 0:
+        var source_probe = build_graph_install_probe(source_path, verify_subcommand, dest_path ++ f".install-src.{build_graph_rt_pid()}")
+        if source_probe.rc != 0:
+            build_graph_rt_eprint("error: " ++ what ++ f": the source executable does not start (`{source_path} {verify_subcommand}` exited {source_probe.rc}); nothing was installed")
+            return 1
+        expected = move source_probe.stdout
+    var attempt = 0
+    while attempt < 2:
+        attempt = attempt + 1
+        let rc = build_graph_install_place(what, contents, dest_path ++ f".install-tmp.{build_graph_rt_pid()}.{attempt}", dest_path, mode)
+        if rc != 0:
+            return rc
+        if verify_subcommand.len() == 0:
+            return 0
+        // Prove the installed executable starts. 2026-09-03: an install
+        // produced a file macOS killed with "Code Signature Invalid" while
+        // the byte-identical source ran; a second copy through a fresh inode
+        // was valid. One retry, loudly; a second failure is the error.
+        let why = build_graph_install_verify_failure(dest_path, verify_subcommand, expected)
+        if why.len() == 0:
+            return 0
+        if attempt == 1:
+            build_graph_rt_eprint("warning: " ++ what ++ ": the installed executable failed verification (`" ++ dest_path ++ " " ++ verify_subcommand ++ "` " ++ why ++ "); reinstalling through a fresh inode")
+        else:
+            build_graph_rt_eprint("error: " ++ what ++ ": the installed executable failed verification: `" ++ dest_path ++ " " ++ verify_subcommand ++ "` " ++ why)
+    1
+
+// Write `contents` to a temp sibling, chmod, rename into place.
+fn build_graph_install_place(what: &str, contents: &str, temp_path: &str, dest_path: &str, mode: i32) -> i32:
+    build_graph_rt_remove_file(temp_path)
+    if build_graph_rt_write_file(temp_path, contents) != 0:
+        build_graph_rt_eprint("error: " ++ what ++ " could not write destination: " ++ temp_path)
+        return 1
+    if build_graph_rt_chmod(temp_path, mode) != 0:
+        build_graph_rt_remove_file(temp_path)
+        build_graph_rt_eprint("error: " ++ what ++ " could not chmod destination: " ++ temp_path)
+        return 1
+    if build_graph_rt_rename_file(temp_path, dest_path) != 0:
+        build_graph_rt_remove_file(temp_path)
+        build_graph_rt_eprint("error: " ++ what ++ " could not move into place: " ++ dest_path)
+        return 1
+    0
+
+// Why `<dest> <subcommand>` fails verification — it must exit 0 and print
+// exactly `expected` — or "" when it passes.
+fn build_graph_install_verify_failure(dest_path: &str, subcommand: &str, expected: &str) -> str:
+    let probe = build_graph_install_probe(dest_path, subcommand, dest_path ++ f".install-verify.{build_graph_rt_pid()}")
+    if probe.rc != 0:
+        return f"exited {probe.rc}"
+    if probe.stdout != expected:
+        return "printed `" ++ probe.stdout ++ "`, the source printed `" ++ expected ++ "`"
+    ""
+
+type InstallProbe { rc: i32, stdout: str }
+
+// `<exe> <subcommand>`: its exit status (a code-signature kill is 137) and
+// stdout. The captures live beside `capture_base` and are removed.
+fn build_graph_install_probe(exe: &str, subcommand: &str, capture_base: &str) -> InstallProbe:
+    var argv = build_graph_argv_append("", exe)
+    argv = build_graph_argv_append(argv, subcommand)
+    let stdout_path = capture_base ++ ".stdout"
+    let stderr_path = capture_base ++ ".stderr"
+    let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, 60000)
+    let stdout = build_graph_rt_read_file(stdout_path)
+    build_graph_rt_remove_file(stdout_path)
+    build_graph_rt_remove_file(stderr_path)
+    InstallProbe { rc: rc, stdout: stdout }

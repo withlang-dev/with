@@ -7,14 +7,14 @@ compiler-driver dispatch and into a repository-local build action.
 
 ## Placement
 
-The target will live in the repository-local `build_selfhost.w` module,
-imported by root `build.w`. These fixtures test this repository's C migrator;
+The target will live in the repository-local `build_selfhost.with` module,
+imported by root `build.with`. These fixtures test this repository's C migrator;
 they are not standard build-system APIs and do not belong in `lib/std`.
 
 ## What Moves
 
 Move the migrate-basic selfhost implementation out of
-`src/BuildGraphSelfhost.w` and generic dispatch:
+`src/BuildGraphSelfhost.with` and generic dispatch:
 
 - `BuildKind 1017`, currently `cli_selfhost_migrate_basic_test`
 - `run_cli_selfhost_migrate_basic_test`
@@ -33,7 +33,7 @@ generic selfhost code no longer owns them.
 
 ## Target Shape
 
-`build.w` will declare `c-migrator-basic-tests` as a standard `.Action` target:
+`build.with` will declare `c-migrator-basic-tests` as a standard `.Action` target:
 
 ```with
 var c_migrator_basic_tests = target_new(.Action, "c-migrator-basic-tests", "").output("out/test-graph/c-migrator-basic-tests")
@@ -74,11 +74,11 @@ Old serialized graphs should fail with the standard removed-kind diagnostic:
 
 ## Dispatch Removal
 
-After extraction, `src/main.w` must not dispatch kind `1017` or branch on the
+After extraction, `src/main.with` must not dispatch kind `1017` or branch on the
 `"migrate-basic"` suite argument. Verify with:
 
 ```sh
-rg -n "cli_selfhost_migrate_basic|run_cli_selfhost_migrate_basic|migrate-basic" src/main.w src/BuildGraphKinds.w src/BuildGraphSelfhost.w
+rg -n "cli_selfhost_migrate_basic|run_cli_selfhost_migrate_basic|migrate-basic" src/main.with src/BuildGraphKinds.with src/BuildGraphSelfhost.with
 ```
 
 Expected remaining hits are limited to the removed-kind name/diagnostic and any
@@ -103,8 +103,8 @@ not transient path names.
 The implementation slice must run:
 
 ```sh
-out/bin/with check build_selfhost.w
-out/bin/with check build.w
+out/bin/with check build_selfhost.with
+out/bin/with check build.with
 out/bin/with build :c-migrator-basic-tests
 make build
 make fixpoint

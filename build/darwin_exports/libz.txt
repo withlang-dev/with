@@ -1,4 +1,4 @@
-# /usr/lib/libz.dylib exports, macOS 26.6.2 (tools/darwin_exports.w)
+# /usr/lib/libz.dylib exports, macOS 26.6.2 (tools/darwin_exports.with)
 adler32
 adler32_combine
 adler32_z

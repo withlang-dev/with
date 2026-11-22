@@ -403,7 +403,7 @@ Returns the call site's source location as `"file:line:col"`:
 fn log(msg: str):
     print(src() ++ ": " ++ msg)
 
-log("hello")    // src/main.w:4:5: hello
+log("hello")    // src/main.with:4:5: hello
 ```
 
 ### 11.2 `embed_file(path)`
@@ -519,7 +519,7 @@ fn allocate_page() -> *mut u8:
 ### 13.6 A Comptime Math Library
 
 ```
-// std/math/divide.w — Three signed integer division modes.
+// std/math/divide.with — Three signed integer division modes.
 // All functions are comptime — evaluated at compile time with
 // constant arguments, inlined at runtime otherwise.
 

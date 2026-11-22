@@ -6,7 +6,7 @@ description: Operate a With compiler stack end to end — worktree, iterate tier
 # With Battery And Stack Work
 
 Use this skill when working on a stack in this repository: creating a
-worktree, running promotes, the gate, or `tools/battery.w`, triaging red
+worktree, running promotes, the gate, or `tools/battery.with`, triaging red
 targets, merging a PR, or reseeding. `AGENTS.md` is the canonical rule
 set; this skill is the operational checklist distilled from it and from
 the d119-step3 stack (PR #2364), where each item below cost a battery
@@ -32,11 +32,11 @@ round or an hour when missed.
   head-truncated grep — and runs the migrator selfhost checks
   (`src/main build :c-migrator-basic-tests --no-deps`).
 - New code in `src/` gets a ceremony sanity pass before the battery
-  (`with run tools/ceremony_census.w`); a redundant `move`/cast copied
+  (`with run tools/ceremony_census.with`); a redundant `move`/cast copied
   from neighboring code is a census rise. Do not copy an idiom because
   it is local precedent.
 - Read battery/gate logs only through
-  `with run ~/.claude/hooks/verdict.w [--progress|--detail <target>] <log>`.
+  `with run ~/.claude/hooks/verdict.with [--progress|--detail <target>] <log>`.
 
 ## Corpus promotes
 
@@ -51,7 +51,7 @@ round or an hour when missed.
 
 ## Running the battery
 
-- Clean committed tree; `with run tools/battery.w > out/battery-runN.log
+- Clean committed tree; `with run tools/battery.with > out/battery-runN.log
   2>&1` with an `rc=$?` line appended. Every phase already runs under
   its own caffeinate hold and the battery takes a machine-wide slot —
   do not wrap the invocation in caffeinate or a keep-awake lease.

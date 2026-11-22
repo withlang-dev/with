@@ -1,4 +1,4 @@
-# /usr/lib/libsqlite3.dylib exports, macOS 26.6.2 (tools/darwin_exports.w)
+# /usr/lib/libsqlite3.dylib exports, macOS 26.6.2 (tools/darwin_exports.with)
 _sqlite3_apple_archive
 _sqlite3_apple_archive_type
 _sqlite3_apple_unarchive

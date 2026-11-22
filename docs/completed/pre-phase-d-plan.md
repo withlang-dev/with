@@ -35,15 +35,15 @@ Before D1 implementation begins, the following must exist:
   questions with source-level evidence.
 - `docs/audits/parallel-state-audit.md`, enumerating current global
   compiler state with parallel-safety strategies.
-- `docs/audits/build-script-survey.md`, inventorying current build.w and
+- `docs/audits/build-script-survey.md`, inventorying current build.with and
   action call sites for compatibility planning.
 - `docs/design/capability-dispatch.md`, specifying the mechanism by which
   user-level capability method calls reach compiler-internal implementations.
 - `docs/design/build-options.md`, the concrete design of the unified
   BuildOptions struct and CLI integration plan.
-- Behavior regression tests covering the current build.w and action runner
+- Behavior regression tests covering the current build.with and action runner
   semantics (committed to `test/behavior/`).
-- An isolated refactor of `src/main.w` that separates the action-runner
+- An isolated refactor of `src/main.with` that separates the action-runner
   dispatch code from surrounding driver logic, producing a clean cut point
   for D1.
 - A documented verification baseline (commit hash, suite passing state)
@@ -72,7 +72,7 @@ Revise `docs/completed/phase-d-design.md` from v2 to v3 incorporating the v2 rev
 
 2. **Re-slice D1-D5 to D1-D6.** Replace v2's §13 with:
 
-   - D1: Capability-bearing comptime evaluator (build.w + actions
+   - D1: Capability-bearing comptime evaluator (build.with + actions
      in-process; no message loop required).
    - D2: BuildOptions / CLI unification only.
    - D3: Sequential Workspace skeleton.
@@ -144,13 +144,13 @@ Audit the existing comptime evaluation infrastructure and produce
 
 ### Files to read
 
-- `src/ComptimeEval.w` — the evaluator
-- `src/ComptimeTransform.w` — comptime-driven transforms
-- `src/Sema.w` — comptime type rules and the `is_ci_visible` mechanism
-- `src/MirLower.w` — comptime MIR construction
-- `lib/std/compiler.w` — existing capability types and `__driver_new`
+- `src/ComptimeEval.with` — the evaluator
+- `src/ComptimeTransform.with` — comptime-driven transforms
+- `src/Sema.with` — comptime type rules and the `is_ci_visible` mechanism
+- `src/MirLower.with` — comptime MIR construction
+- `lib/std/compiler.with` — existing capability types and `__driver_new`
   constructors
-- `src/main.w` — current driver dispatch to build.w and action runners
+- `src/main.with` — current driver dispatch to build.with and action runners
 
 ### Questions to answer
 
@@ -270,7 +270,7 @@ When evaluation reaches `workspace.compile()`, what happens?
   a compiler intrinsic?
 - How is the dispatch table populated?
 
-The answer affects what `lib/std/build.w` looks like. Capability methods
+The answer affects what `lib/std/build.with` looks like. Capability methods
 might be:
 - Ordinary With functions whose body calls a compiler builtin (similar
   to how `print` calls `with_print_str`).
@@ -293,7 +293,7 @@ re-architecture. Specify the extension path.
 ### Done criteria
 
 - Each question answered with a concrete design.
-- The design specifies the public surface (what `lib/std/build.w`
+- The design specifies the public surface (what `lib/std/build.with`
   declarations look like) and the compiler-internal surface (where the
   dispatch table lives, how it's populated).
 - The design is consistent with the audit findings from P2.
@@ -345,19 +345,19 @@ validates byte-for-byte CLI compatibility through the refactor.
 
 ## 8. P6: Build Script Compatibility Survey
 
-Inventory every current use of build.w, action functions, and capability
+Inventory every current use of build.with, action functions, and capability
 APIs across the repository. Produce `docs/audits/build-script-survey.md`.
 
 ### Files to survey
 
-- `build.w` (top-level)
-- `build_compiler.w`
-- `build_emit_c.w`
-- `build_pcre2.w`
-- `build_runtime.w`
-- `build_seed.w`
-- `build_selfhost.w`
-- Any other `build_*.w` files
+- `build.with` (top-level)
+- `build_compiler.with`
+- `build_emit_c.with`
+- `build_pcre2.with`
+- `build_runtime.with`
+- `build_seed.with`
+- `build_selfhost.with`
+- Any other `build_*.with` files
 
 ### Required inventory
 
@@ -386,35 +386,35 @@ For each capability method or external process call:
 
 ## 9. P7: Behavior Regression Tests
 
-Lock in current build.w and action runner semantics with behavior tests
+Lock in current build.with and action runner semantics with behavior tests
 that will catch regressions during D1. Tests land before D1 starts.
 
 ### Tests required
 
-**`test/behavior/behav_build_w_basic_invocation.w`**: a minimal build.w
+**`test/behavior/behav_build_w_basic_invocation.with`**: a minimal build.with
 fixture that exercises BuildCtx.diagnostics(), Target construction, and
 Build return. The driver invokes this and the test asserts the build
 graph shape matches expectations.
 
-**`test/behavior/behav_action_capability_filesystem.w`**: an action
+**`test/behavior/behav_action_capability_filesystem.with`**: an action
 fixture that uses ToolFs to read, write, and probe paths. Asserts
 results match expected behavior under the current generated-runner
 model. After D1, the same test must pass with the in-process evaluator.
 
-**`test/behavior/behav_action_capability_process.w`**: an action
+**`test/behavior/behav_action_capability_process.with`**: an action
 fixture that uses ProcessRunner with capture and timeout. Asserts
 captured stdout/stderr/rc match expectations.
 
-**`test/behavior/behav_capability_token_mismatch.w`**: a test that
+**`test/behavior/behav_capability_token_mismatch.with`**: a test that
 constructs a capability with a wrong token (via test-only driver entry)
 and confirms the call aborts with a structured tool-capability-violation
 error rather than silently succeeding or producing undefined behavior.
 
-**`test/behavior/behav_action_crash_diagnostic.w`**: an action fixture
+**`test/behavior/behav_action_crash_diagnostic.with`**: an action fixture
 that intentionally panics. Asserts the driver produces a diagnostic
 including target name and source location.
 
-**`test/behavior/behav_action_no_deps_isolation.w`**: an action target
+**`test/behavior/behav_action_no_deps_isolation.with`**: an action target
 invoked via `--no-deps`. Asserts that only the target's declared
 inputs/outputs are touched.
 
@@ -427,13 +427,13 @@ inputs/outputs are touched.
   no assertions on transient diagnostic text).
 - Tests are added to `make test` / `with build :test`.
 
-## 10. P8: Pre-D1 Refactor of src/main.w
+## 10. P8: Pre-D1 Refactor of src/main.with
 
-The current action-runner generation code in `src/main.w` is a single
+The current action-runner generation code in `src/main.with` is a single
 large block that mixes runner generation, environment setup, subprocess
 execution, output capture, and cleanup. D1 will replace this block.
 
-Pre-D1, refactor `src/main.w` to isolate the action-runner code into
+Pre-D1, refactor `src/main.with` to isolate the action-runner code into
 its own function or function group, so D1's diff is a clean
 replacement of a few well-defined functions rather than a sprawling
 multi-section change.
@@ -443,7 +443,7 @@ multi-section change.
 Extract from the current `run_build_action_from_build_w` and surrounding
 code:
 - `generate_action_runner_source(target, ...)` — produces the
-  `__with_build_action_runner.*.w` content. Returns a string.
+  `__with_build_action_runner.*.with` content. Returns a string.
 - `compile_action_runner(source, ...)` — compiles the runner source to
   a binary. Returns the binary path.
 - `execute_action_runner(binary, target, ...)` — sets env vars, invokes
@@ -510,7 +510,7 @@ Pre-D work can partially parallelize. Suggested order:
 **Wave 2 (depends on Wave 1 findings):**
 - P4: Capability dispatch design (depends on P2)
 - P5: BuildOptions concrete design (depends on P6 inventory)
-- P8: Pre-D1 refactor of src/main.w (depends on P7 tests existing)
+- P8: Pre-D1 refactor of src/main.with (depends on P7 tests existing)
 
 **Wave 3 (depends on Wave 2):**
 - P1: Design doc v3 (depends on P2, P3, P4, P5)

@@ -221,7 +221,7 @@ That's it. All intelligence lives in the LSP binary.
     "languages": [{
       "id": "with",
       "aliases": ["With"],
-      "extensions": [".w"],
+      "extensions": [".with"],
       "configuration": "./language-configuration.json"
     }],
     "grammars": [{

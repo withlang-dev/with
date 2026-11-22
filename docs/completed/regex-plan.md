@@ -4,8 +4,8 @@ PCRE2 auto-migrated from C via `with migrate`. 4 phases.
 
 **Spec:** `docs/regex-spec.md`
 **Engine source:** `.reference/pcre2/src/` (73K lines, 39 .c files)
-**Migration tool:** `with migrate` (src/CImport.w)
-**Generated output:** `lib/std/re/` (~160K lines, 32 .w files + defs.w)
+**Migration tool:** `with migrate` (src/CImport.with)
+**Generated output:** `lib/std/re/` (~160K lines, 32 .w files + defs.with)
 **Workflow:** `make test-pcre2` (migrate, prepare, check, verify)
 
 ---
@@ -30,7 +30,7 @@ with migrate .reference/pcre2/src/ -o out/pcre2_migrate_raw/ \
     -D HAVE_CONFIG_H=1
 ```
 
-Produces 32 `.w` files + `defs.w` shared definitions. 9 files
+Produces 32 `.w` files + `defs.with` shared definitions. 9 files
 are excluded (test harnesses, JIT compiler, fuzzer, POSIX wrapper,
 dftables).
 
@@ -94,9 +94,9 @@ small byte-for-byte comparisons against system PCRE2.
 
 ## Phase 2: With Wrapper API -- COMPLETE
 
-### Step 6: Create `lib/std/regex.w` -- DONE
+### Step 6: Create `lib/std/regex.with` -- DONE
 
-`lib/std/regex.w` wraps the migrated PCRE2 internals:
+`lib/std/regex.with` wraps the migrated PCRE2 internals:
 
 ```
 use std.re

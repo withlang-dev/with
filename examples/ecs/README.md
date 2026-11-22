@@ -8,13 +8,13 @@ via disjoint field borrowing, and comptime component registration.
 
 ```
 src/
-├── main.w          Demo: spawn entities, simulate 5 frames
-├── math.w          Vec2 and AABB types with operator overloading
-├── components.w    Game components: Transform, Velocity, Collider, Sprite, InputState
-├── storage.w       DenseStorage[T] — sparse-dense array with generational handles
-├── query.w         Query generators: query1, query2, query3, query_without
-├── world.w         World struct: entity pool + component storages + spawn/despawn
-└── systems.w       Game systems: input, movement, collision, rendering, frame orchestration
+├── main.with          Demo: spawn entities, simulate 5 frames
+├── math.with          Vec2 and AABB types with operator overloading
+├── components.with    Game components: Transform, Velocity, Collider, Sprite, InputState
+├── storage.with       DenseStorage[T] — sparse-dense array with generational handles
+├── query.with         Query generators: query1, query2, query3, query_without
+├── world.with         World struct: entity pool + component storages + spawn/despawn
+└── systems.with       Game systems: input, movement, collision, rendering, frame orchestration
 ```
 
 ## What It Demonstrates
@@ -45,20 +45,20 @@ compose with pipeline operators for filtering and transformation.
 
 | Feature | Location |
 |---------|----------|
-| Generational handles (`Handle[T]`) | world.w — entity identity |
-| `SlotMap` | world.w — entity pool |
-| Generics | storage.w — `DenseStorage[T]` |
-| Generators (`gen fn`) | storage.w — `iter()`; query.w — `query1`, `query2`, `query3` |
-| `@[component]` comptime annotation | components.w — component registration |
-| `comptime` blocks | components.w — ID generation |
-| Disjoint field borrowing | systems.w — parallel system execution |
-| `scope` (OS threads) | systems.w — `run_frame()` |
-| Record update `{ x with field: val }` | main.w — wall spawning from base template |
-| `with` blocks (mutation) | main.w — `spawn_enemies`, `spawn_walls` |
-| `with` blocks (binding) | main.w — `entity_name` |
-| Operator overloading (`Add`, `Sub`, `Neg`) | math.w — `Vec2` arithmetic |
-| Copy types | math.w, components.w — all components are `Copy` |
-| Default field values | components.w — `InputState` fields default to `false` |
-| `.Variant` shorthand | main.w — `.KeyDown(.Right)`, `.KeyUp(.Up)` |
-| Pipeline operators `\|>` | main.w — query + `for_each` |
-| Implicit `for` iteration | systems.w, world.w — iterating component storages, queues |
+| Generational handles (`Handle[T]`) | world.with — entity identity |
+| `SlotMap` | world.with — entity pool |
+| Generics | storage.with — `DenseStorage[T]` |
+| Generators (`gen fn`) | storage.with — `iter()`; query.with — `query1`, `query2`, `query3` |
+| `@[component]` comptime annotation | components.with — component registration |
+| `comptime` blocks | components.with — ID generation |
+| Disjoint field borrowing | systems.with — parallel system execution |
+| `scope` (OS threads) | systems.with — `run_frame()` |
+| Record update `{ x with field: val }` | main.with — wall spawning from base template |
+| `with` blocks (mutation) | main.with — `spawn_enemies`, `spawn_walls` |
+| `with` blocks (binding) | main.with — `entity_name` |
+| Operator overloading (`Add`, `Sub`, `Neg`) | math.with — `Vec2` arithmetic |
+| Copy types | math.with, components.with — all components are `Copy` |
+| Default field values | components.with — `InputState` fields default to `false` |
+| `.Variant` shorthand | main.with — `.KeyDown(.Right)`, `.KeyUp(.Up)` |
+| Pipeline operators `\|>` | main.with — query + `for_each` |
+| Implicit `for` iteration | systems.with, world.with — iterating component storages, queues |

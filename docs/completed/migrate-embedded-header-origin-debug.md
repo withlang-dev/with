@@ -23,7 +23,7 @@ No cache-root or version spelling is guessed, and no external LLVM resource
 lookup is introduced. Macro expansion data and ordinary c_import behavior
 remain available through their existing paths.
 
-`behav_migrate_embedded_header_origins.w` forces the builtin NULL definition,
+`behav_migrate_embedded_header_origins.with` forces the builtin NULL definition,
 requires its SDK declaration to be absent, and executes a project-owned
 alias and a migrated pointer comparison. The old compiler fails the absence
 assertion at line 13; the test does not merely depend on a duplicate-name
@@ -37,7 +37,7 @@ so that bootstrap error alone does not establish the old CI failure's cause.
 Source check, development stage1/stage2, the new regression and all four
 existing macro regressions pass. PCRE2 and zlib regeneration changes only
 their shared defs: NULL, the builtin integer-limit macros, and max_align_t
-disappear. Every generated implementation file is byte-identical; bundle.w
+disappear. Every generated implementation file is byte-identical; bundle.with
 is maintained separately and retained. Logs:
 `/tmp/with-resource-origin-{source-check,stage2,fixed-test,windows-test,macro-test,import-test,paste-test,pcre2,zlib}.log`.
 

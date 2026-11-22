@@ -332,21 +332,21 @@ Do not promise perfect round-trip compatibility in v1.
 Suggested With module layout:
 
 ```text
-demo/crayon/app.w
-demo/crayon/game.w
-demo/crayon/editor.w
-demo/crayon/render.w
-demo/crayon/input.w
-demo/crayon/physics/box2d.w
-demo/crayon/physics/world.w
-demo/crayon/geometry/path.w
-demo/crayon/geometry/simplify.w
-demo/crayon/geometry/joints.w
-demo/crayon/level/format.w
-demo/crayon/level/load.w
-demo/crayon/level/save.w
-demo/crayon/ui/toolbar.w
-demo/crayon/ui/level_select.w
+demo/crayon/app.with
+demo/crayon/game.with
+demo/crayon/editor.with
+demo/crayon/render.with
+demo/crayon/input.with
+demo/crayon/physics/box2d.with
+demo/crayon/physics/world.with
+demo/crayon/geometry/path.with
+demo/crayon/geometry/simplify.with
+demo/crayon/geometry/joints.with
+demo/crayon/level/format.with
+demo/crayon/level/load.with
+demo/crayon/level/save.with
+demo/crayon/ui/toolbar.with
+demo/crayon/ui/level_select.with
 ```
 
 Logical ownership:

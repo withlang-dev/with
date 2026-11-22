@@ -109,12 +109,12 @@ Wave 3 must match this contract exactly (including spacing/newlines/order).
 
 Primary implementation files:
 
-- `src/Ast.w`
-- `src/Parser.w`
-- `src/Parse.w`
-- `src/render.w`
-- `src/main.w` (`check --dump-ast` plumbing)
-- optional: `src/compiler/Frontend.w` if AST dump path needs frontend coordination
+- `src/Ast.with`
+- `src/Parser.with`
+- `src/Parse.with`
+- `src/render.with`
+- `src/main.with` (`check --dump-ast` plumbing)
+- optional: `src/compiler/Frontend.with` if AST dump path needs frontend coordination
 
 New Wave 3 tests/scripts:
 
@@ -147,11 +147,11 @@ If helper modules are introduced, keep one canonical parser/render path (no dupl
   - type syntax
   - pattern syntax
   - recovery points
-- Generate explicit gap list against `src/Parser.w`.
+- Generate explicit gap list against `src/Parser.with`.
 
 ## 2. AST Shape and Span Parity
 
-- Align AST node encoding/fields in `src/Ast.w` with Stage0 semantics as needed for dump parity.
+- Align AST node encoding/fields in `src/Ast.with` with Stage0 semantics as needed for dump parity.
 - Ensure span start/end rules match Stage0 for module and declarations.
 - Ensure declaration ordering and stored kinds match Stage0 dump expectations.
 
@@ -184,7 +184,7 @@ If helper modules are introduced, keep one canonical parser/render path (no dupl
 
 ## 6. AST Renderer + Dump Formatting Parity
 
-- Align `src/render.w` text output to Stage0 canonical AST rendering.
+- Align `src/render.with` text output to Stage0 canonical AST rendering.
 - Implement deterministic AST dump wrapper in self-host:
   - header
   - decl table
@@ -196,7 +196,7 @@ If helper modules are introduced, keep one canonical parser/render path (no dupl
 
 - Add `--dump-ast` handling to self-host `check` command.
 - Ensure dump path uses the same frontend import/c_import expansion semantics expected by Stage0 AST dump behavior.
-- Keep `ast <file.w>` command as compatibility alias/wrapper to shared AST dump path where possible.
+- Keep `ast <file.with>` command as compatibility alias/wrapper to shared AST dump path where possible.
 
 ## 8. Wave 3 Tests
 
@@ -269,7 +269,7 @@ Corpus policy:
 - [x] Freeze Wave 3 AST oracle contract against Stage0 current output.
 - [x] Define Wave 3 AST parity corpus file.
 - [x] Inventory Stage0 parser feature buckets from `bootstrap/src/Parser.zig` + `bootstrap/src/Parse.zig` tests.
-- [x] Align `src/Ast.w` node coverage/flags/spans needed for Stage0 dump parity.
+- [x] Align `src/Ast.with` node coverage/flags/spans needed for Stage0 dump parity.
 - [x] Align module span + decl span computation with Stage0 behavior.
 - [x] Align top-level declaration parsing parity (`fn/type/use/let/extern/trait/impl/extend/c_import`).
 - [x] Align attribute parsing parity (`@[...]` forms used in Stage0).
@@ -278,8 +278,8 @@ Corpus policy:
 - [x] Align type-expression parsing parity.
 - [x] Align pattern parsing parity.
 - [x] Align parser recovery behavior for deterministic outputs.
-- [x] Align `src/render.w` with Stage0 AST render format.
-- [x] Add self-host `check --dump-ast` support in `src/main.w`.
+- [x] Align `src/render.with` with Stage0 AST render format.
+- [x] Add self-host `check --dump-ast` support in `src/main.with`.
 - [x] Route `ast` command through shared dump formatting path where practical.
 - [x] Add `test/wave3/` parser and render unit tests.
 - [x] Add deterministic AST dump format checks.

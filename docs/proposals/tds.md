@@ -41,15 +41,15 @@ option again to weigh against the code this proposal builds.
 ```
 std.mssql                 the user's API: Connection, query, Rows, Transaction, MssqlError
 std/mssql/internal/
-    transport.w           byte streams: TCP, TLS on TCP, TLS inside PRELOGIN
-    packet.w              the 8-byte header, messages split and joined
-    prelogin.w            PRELOGIN options and the encryption decision
-    login.w               LOGIN7, FeatureExt, password obfuscation
-    tokens.w              the token stream, pulled one token at a time
-    types.w               TYPE_INFO and value decoding and encoding
-    request.w             SQL batch, RPC (sp_executesql), ALL_HEADERS, attention
-    session.w             the client state machine, ENVCHANGE state, routing
-    ntlm.w                MS-NLMP (phase 5)
+    transport.with           byte streams: TCP, TLS on TCP, TLS inside PRELOGIN
+    packet.with              the 8-byte header, messages split and joined
+    prelogin.with            PRELOGIN options and the encryption decision
+    login.with               LOGIN7, FeatureExt, password obfuscation
+    tokens.with              the token stream, pulled one token at a time
+    types.with               TYPE_INFO and value decoding and encoding
+    request.with             SQL batch, RPC (sp_executesql), ALL_HEADERS, attention
+    session.with             the client state machine, ENVCHANGE state, routing
+    ntlm.with                MS-NLMP (phase 5)
 ```
 
 `internal` modules are reachable only from `std.mssql` (D100). The user
@@ -157,7 +157,7 @@ DONE.
 
 ## The token stream (MS-TDS §2.2.7)
 
-`tokens.w` is a pull reader: `next()` returns the next token as an enum
+`tokens.with` is a pull reader: `next()` returns the next token as an enum
 value over views into the current message. Nothing is decoded until it is
 asked for.
 

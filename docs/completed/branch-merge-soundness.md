@@ -40,15 +40,15 @@ fire for #579's fallthrough.
 
 1. **Why does Test B compile?** After the `if`, Sema's state for `r` is LIVE.
 2. **Why is `r` LIVE?** The `else` branch's `r = make()` set `r`'s state LIVE
-   (`SemaCheck.w:8072`) and that was the last in-place write; the `then` branch's
+   (`SemaCheck.with:8072`) and that was the last in-place write; the `then` branch's
    `take(r) → MOVED` (`:18645`) was overwritten.
-3. **Why was it overwritten?** `check_if_expr` (`SemaCheck.w:7333+`) evaluates the
+3. **Why was it overwritten?** `check_if_expr` (`SemaCheck.with:7333+`) evaluates the
    branches **linearly into one shared `bind_states` vector**: it checks `then`
    (mutating `bind_states`), then checks `else` **from `then`'s residual state**,
    and only `restore_scope_states` when a branch *diverges* (`TY_NEVER`,
    `:7351`,`:7370`). It never computes the **union** of the two branch-exit states.
 4. **Why no union?** `VarState` is a **binary in-place flag** (LIVE=0/MOVED=1,
-   `Sema.w:52`) mutated during a single AST walk. There is no per-branch state
+   `Sema.with:52`) mutated during a single AST walk. There is no per-branch state
    vector and no join operator. Conditional moves were retrofitted with the
    `push_move_control_flow_context(0/1)` legality hack plus the divergence-restore
    patch — not a real flow-sensitive merge.
@@ -158,10 +158,10 @@ soundness:
 
 ## 5. Source map
 
-- `src/Sema.w`: `VarState` LIVE/MOVED (`:52`); `bind_states`/`bind_names`
+- `src/Sema.with`: `VarState` LIVE/MOVED (`:52`); `bind_states`/`bind_names`
   (`:575`/`:572`); `scope_binding_index`; `save_scope_states`/`restore_scope_states`
   (`:3765`/`:3772`); `push/pop_move_control_flow_context` (`:3736`+).
-- `src/SemaCheck.w`:
+- `src/SemaCheck.with`:
   - move sets MOVED: `:18645` (ident), receiver/capture consumes (`:10773`,
     `:11588`, `:15383`, `:16007`), match scrutinee.
   - reinit sets LIVE: `:8072` (assignment target).
@@ -260,7 +260,7 @@ the checker. The use-after-move diagnostic should:
 
 Provenance (which node moved a place) is not available at the use site today; track a
 `bind_idx → move-site node` map updated when a place is marked MOVED, consulted by
-the `use of moved value` sites (`SemaCheck.w:5527`,`:8613`). This is a focused
+the `use of moved value` sites (`SemaCheck.with:5527`,`:8613`). This is a focused
 follow-up to the soundness fix, but it is part of the design, not optional polish.
 
 ### 6.5 Verification

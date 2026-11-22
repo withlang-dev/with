@@ -1,0 +1,855 @@
+module build.emit_c
+
+use std.build
+use std.process
+use std.sysinfo
+use build.compiler
+fn emit_c_owned_text(s: &str): s ++ ""
+
+type EmitCParam {
+    name: str,
+    c_type: str,
+}
+
+type EmitCFunction {
+    symbol: str,
+    return_type: str,
+    params: List[EmitCParam],
+    ok: i32,
+}
+
+fn emitc_fail(ctx: &ActionCtx, message: &str) -> i32:
+    ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
+
+fn emitc_join(left: &str, right: &str) -> str:
+    if left.len() == 0:
+        return emit_c_owned_text(right)
+    if right.len() == 0:
+        return emit_c_owned_text(left)
+    if left.ends_with("/"):
+        return left ++ right
+    left ++ "/" ++ right
+
+fn emitc_abs(root: &str, path: &str) -> str:
+    if path.len() > 0 and path[0] == 47:
+        return emit_c_owned_text(path)
+    emitc_join(root, path)
+
+fn emitc_dirname(path: &str) -> str:
+    var last_slash = -1
+    for i in 0..path.len():
+        if path[i] == 47:
+            last_slash = i as i32
+    if last_slash < 0:
+        return "."
+    if last_slash == 0:
+        return "/"
+    path.slice(0, last_slash as i64)
+
+fn emitc_basename(path: &str) -> str:
+    var last_slash = -1
+    for i in 0..path.len():
+        if path[i] == 47:
+            last_slash = i as i32
+    path.slice((last_slash + 1) as i64, path.len())
+
+fn emitc_exe_name(name: &str) -> str:
+    if os() == "Windows" and not name.ends_with(".exe"):
+        return name ++ ".exe"
+    emit_c_owned_text(name)
+
+fn emitc_trim(text: &str) -> str:
+    var start = 0
+    var end = text.len()
+    while start < end:
+        let ch = text[start]
+        if ch != 9 and ch != 10 and ch != 13 and ch != 32:
+            break
+        start = start + 1
+    while end > start:
+        let ch = text[(end - 1)]
+        if ch != 9 and ch != 10 and ch != 13 and ch != 32:
+            break
+        end = end - 1
+    text.slice(start as i64, end as i64)
+
+// #2782 (Law 8, Eric 2026-10-28: the build runs no host command): the C
+// compiler is the compiler under test's own `cc` — its embedded clang
+// driver, sysroot and lld — as the emit-c smoke's (bs_c_compiler_argv).
+// WITH_EMIT_C_CC or CC is the user's explicit choice and wins.
+fn emitc_c_compiler_argv(compiler_path: &str) -> List[str]:
+    var argv: List[str] = List.new()
+    let explicit = env("WITH_EMIT_C_CC")
+    let cc = env("CC")
+    if explicit.len() > 0:
+        argv.push(explicit)
+    else if cc.len() > 0:
+        argv.push(cc)
+    else:
+        argv.push(emit_c_owned_text(compiler_path))
+        argv.push("cc")
+    argv
+
+fn emitc_push_c_compiler(argv: List[str], root: &str, compiler_path: &str) -> List[str]:
+    for part in emitc_c_compiler_argv(emitc_abs(root, compiler_path)): argv.push(part)
+    argv
+
+// The emitted C states its types exactly: a qualifier written twice or one
+// a call discards is a wrong type in the backend's output (`const const
+// int8_t**` for `*const *const i8`), refused rather than warned past.
+fn emitc_push_c_source(argv: List[str], path: &str) -> List[str]:
+    argv |> push("-Werror=duplicate-decl-specifier")
+    argv |> push("-Werror=incompatible-pointer-types-discards-qualifiers")
+    argv |> push("-x")
+    argv |> push("c")
+    argv |> push(emit_c_owned_text(path))
+    argv |> push("-x")
+    argv |> push("none")
+    argv
+
+// The target is the one the real link uses: on Windows the windows-gnu
+// triple `cc` defaults to (#1915), whose import libraries come with the
+// compiler; no Visual Studio or Windows Kits path is read.
+fn emitc_push_host_c_flags(argv: List[str]) -> List[str]:
+    if os() == "Linux":
+        argv |> push("-no-pie")
+    if os() == "Windows":
+        argv |> push("-Wl,--stack,8388608")
+    argv
+
+fn emitc_push_system_libs(argv: List[str]) -> List[str]:
+    if os() == "Windows":
+        // rt.o's platform surface: winsock, dbghelp (backtraces), crypt32
+        // (trust store), as bs_emit_c_cc_args links it.
+        argv |> push("-lws2_32")
+        argv |> push("-ldbghelp")
+        argv |> push("-lcrypt32")
+    else if os() == "Linux":
+        argv |> push("-lm")
+    argv
+
+fn emitc_index_of(text: &str, needle: &str) -> isize:
+    if needle.len() == 0:
+        return 0
+    if text.len() < needle.len():
+        return -1
+    var i = 0
+    while i <= text.len() - needle.len():
+        var j = 0
+        var matched = true
+        while j < needle.len():
+            if text[(i + j)] != needle[j]:
+                matched = false
+                break
+            j = j + 1
+        if matched:
+            return i
+        i = i + 1
+    -1
+
+fn emitc_split_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
+    var start = 0
+    var i = 0
+    while i <= text.len():
+        let at_end = i == text.len()
+        if at_end or text[i] == 10:
+            var line = text.slice(start as i64, i as i64)
+            if line.len() > 0 and line[line.len() - 1] == 13:
+                line = line.slice(0, line.len() - 1)
+            lines.push(line)
+            start = i + 1
+        i = i + 1
+    lines
+
+fn emitc_c_export_symbol(line: &str) -> str:
+    let prefix = "@[c_export(\""
+    let start = emitc_index_of(line, prefix)
+    if start < 0:
+        return ""
+    let symbol_start = start + prefix.len()
+    var i = symbol_start
+    while i < line.len():
+        if line[i] == 34:
+            return line.slice(symbol_start as i64, i as i64)
+        i = i + 1
+    ""
+
+fn emitc_find_matching_paren(text: &str, open_at: isize) -> isize:
+    var depth = 0
+    var i = open_at
+    while i < text.len():
+        let ch = text[i]
+        if ch == 40:
+            depth = depth + 1
+        else if ch == 41:
+            depth = depth - 1
+            if depth == 0:
+                return i
+        i = i + 1
+    -1
+
+fn emitc_c_type(with_type: &str) -> str:
+    if with_type == "bool": return "bool"
+    if with_type == "u8": return "uint8_t"
+    if with_type == "i32": return "int32_t"
+    if with_type == "i64": return "int64_t"
+    if with_type == "u32": return "uint32_t"
+    if with_type == "u64": return "uint64_t"
+    if with_type == "f64": return "double"
+    if with_type == "str": return "with_str"
+    // A shared &str is a view value with str's own layout (with-abi.md §1,
+    // #1810), as the emitted definitions declare it; #785's header pointer
+    // predates that and made every call conflict with this prototype.
+    if with_type == "&str": return "with_str"
+    if with_type == "WithList": return "with_vec"
+    if with_type == "*const WithList": return "const with_vec *"
+    if with_type == "*mut WithList": return "with_vec *"
+    if with_type == "*const u8": return "const uint8_t *"
+    if with_type == "*mut u8": return "uint8_t *"
+    if with_type == "*const i8": return "const int8_t *"
+    if with_type == "*const i32": return "const int32_t *"
+    if with_type == "*mut i32": return "int32_t *"
+    if with_type == "*mut i64": return "int64_t *"
+    if with_type == "*mut f64": return "double *"
+    if with_type == "Unit": return "void"
+    if with_type == "void": return "void"
+    ""
+
+fn emitc_stub_return(c_type: &str) -> str:
+    if c_type == "void":
+        return ""
+    if c_type == "with_str":
+        return "    return (with_str){0};\n"
+    if c_type == "with_vec":
+        return "    return (with_vec){0};\n"
+    "    return 0;\n"
+
+fn emitc_parse_param(param_text: &str) -> EmitCParam:
+    let trimmed = emitc_trim(param_text)
+    var colon = -1
+    for i in 0..trimmed.len():
+        if trimmed[i] == 58:
+            colon = i as i32
+            break
+    if colon < 0:
+        return EmitCParam { name: "", c_type: "" }
+    let name = emitc_trim(trimmed.slice(0, colon as i64))
+    // A default (`packed: bool = false`) is not part of the C prototype.
+    let default_at = emitc_index_of(trimmed, "=")
+    let type_end = if default_at > colon: default_at else: trimmed.len()
+    let with_type = emitc_trim(trimmed.slice((colon + 1) as i64, type_end as i64))
+    EmitCParam { name, c_type: emitc_c_type(with_type) }
+
+fn emitc_parse_params(text: &str) -> List[EmitCParam]:
+    let params: List[EmitCParam] = List.new()
+    var start = 0
+    var i = 0
+    while i <= text.len():
+        let at_end = i == text.len()
+        if at_end or text[i] == 44:
+            let piece = emitc_trim(text.slice(start as i64, i as i64))
+            if piece.len() > 0:
+                params.push(emitc_parse_param(piece))
+            start = i + 1
+        i = i + 1
+    params
+
+fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
+    let params: List[EmitCParam] = List.new()
+    let fn_at = emitc_index_of(line, "fn ")
+    if fn_at < 0:
+        return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params, ok: 0 }
+    var open_at: isize = -1
+    var i = fn_at
+    while i < line.len():
+        if line[i] == 40:
+            open_at = i
+            break
+        i = i + 1
+    if open_at < 0:
+        return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params, ok: 0 }
+    let close_at = emitc_find_matching_paren(line, open_at)
+    if close_at < 0:
+        return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params, ok: 0 }
+    let parsed_params = emitc_parse_params(line.slice((open_at + 1) as i64, close_at as i64))
+    // D27: `get` observes through a view; end the view's scope before any
+    // return moves parsed_params into the result.
+    var params_ok = 1
+    for pi in 0..parsed_params.len():
+        let param = parsed_params[pi]
+        if param.name.len() == 0 or param.c_type.len() == 0:
+            params_ok = 0
+            break
+    if params_ok == 0:
+        return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params: parsed_params, ok: 0 }
+    var return_type = "void"
+    let rest = line.slice((close_at + 1) as i64, line.len())
+    let arrow = emitc_index_of(rest, "->")
+    if arrow >= 0:
+        let after_arrow = rest.slice((arrow + 2) as i64, rest.len())
+        var colon = -1
+        for ci in 0..after_arrow.len():
+            if after_arrow[ci] == 58:
+                colon = ci as i32
+                break
+        if colon < 0:
+            return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params: parsed_params, ok: 0 }
+        return_type = emitc_c_type(emitc_trim(after_arrow.slice(0, colon as i64)))
+        if return_type.len() == 0:
+            return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params: parsed_params, ok: 0 }
+    EmitCFunction { symbol: emit_c_owned_text(symbol), return_type, params: parsed_params, ok: 1 }
+
+fn emitc_collect_exports_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> List[EmitCFunction]:
+    let exports: List[EmitCFunction] = List.new()
+    let lines = emitc_split_lines(text)
+    var pending_symbol = ""
+    for li in 0..lines.len():
+        let line = emitc_trim(lines[li])
+        let symbol = emitc_c_export_symbol(line)
+        if symbol.len() > 0:
+            pending_symbol = symbol
+            continue
+        if pending_symbol.len() > 0:
+            if line.starts_with("pub fn ") or line.starts_with("pub unsafe fn "):
+                let fn_sig = emitc_parse_export_function(pending_symbol, line)
+                if fn_sig.ok == 0:
+                    emitc_fail(ctx, "could not parse c_export signature for " ++ pending_symbol ++ " in " ++ source_path)
+                    return List.new()
+                exports.push(fn_sig)
+                pending_symbol = ""
+                continue
+            if line.len() > 0 and not line.starts_with("//"):
+                emitc_fail(ctx, "c_export is not followed by a function in " ++ source_path ++ ": " ++ pending_symbol)
+                return List.new()
+    if pending_symbol.len() > 0:
+        emitc_fail(ctx, "unterminated c_export in " ++ source_path ++ ": " ++ pending_symbol)
+        return List.new()
+    exports
+
+fn emitc_public_function_name(line: &str) -> str:
+    var start = -1
+    if line.starts_with("pub fn "):
+        start = 7
+    else if line.starts_with("pub unsafe fn "):
+        start = 14
+    if start < 0:
+        return ""
+    var i = start
+    while i < line.len():
+        let ch = line[i]
+        if ch == 40 or ch == 32 or ch == 58:
+            break
+        i = i + 1
+    if i <= start:
+        return ""
+    line.slice(start as i64, i as i64)
+
+fn emitc_is_bridge_abi_symbol(name: &str) -> bool:
+    name.starts_with("wl_") or name.starts_with("with_cimport_") or name.starts_with("with_ci_")
+
+fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> (bool, List[EmitCFunction]):
+    let exports: List[EmitCFunction] = List.new()
+    let lines = emitc_split_lines(text)
+    for li in 0..lines.len():
+        let line = emitc_trim(lines[li])
+        let name = emitc_public_function_name(line)
+        if name.len() == 0 or not emitc_is_bridge_abi_symbol(name):
+            continue
+        let fn_sig = emitc_parse_export_function(name, line)
+        if fn_sig.ok == 0:
+            emitc_fail(ctx, "could not parse public ABI signature for " ++ name ++ " in " ++ source_path)
+            return (false, List.new())
+        exports.push(fn_sig)
+    (true, exports)
+
+// The public C ABI the sources declare, and whether every source was read
+// and every declaration parsed (an empty list is a valid answer).
+fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> (bool, List[EmitCFunction]):
+    let all: List[EmitCFunction] = List.new()
+    let fs = ctx.fs()
+    for si in 0..sources.len():
+        let source_path = sources[si]
+        let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
+        if text.len() == 0:
+            emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
+            return (false, List.new())
+        let (ok, found) = emitc_collect_public_abi_from_text(ctx, text, source_path)
+        if not ok:
+            return (false, List.new())
+        var exports = found
+        while exports.len() > 0:
+            all.push(exports.remove(0))
+    (true, all)
+
+fn emitc_collect_exports(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunction]:
+    let all: List[EmitCFunction] = List.new()
+    let fs = ctx.fs()
+    for si in 0..sources.len():
+        let source_path = sources[si]
+        let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
+        if text.len() == 0:
+            emitc_fail(ctx, "could not read source for export scan: " ++ source_path)
+            return List.new()
+        var exports = emitc_collect_exports_from_text(ctx, text, source_path)
+        if exports.len() == 0:
+            return List.new()
+        while exports.len() > 0:
+            all.push(exports.remove(0))
+    all
+
+fn emitc_function_proto(fn_sig: &EmitCFunction) -> str:
+    var out = fn_sig.return_type ++ " " ++ fn_sig.symbol ++ "("
+    if fn_sig.params.len() == 0:
+        out = out ++ "void"
+    else:
+        for pi in 0..fn_sig.params.len():
+            if pi > 0:
+                out = out ++ ", "
+            let param = fn_sig.params[pi]
+            out = out ++ param.c_type ++ " " ++ param.name
+    out ++ ")"
+
+// The bridge declarations the emitted C at `main_c` is compiled with.
+fn emitc_decls_beside(main_c: &str): emitc_join(emitc_dirname(main_c), "wl_decls.h")
+
+// wl_decls.h and wl_stubs.c in `dir`, beside the emitted C that includes
+// them: each emit-c target owns its own (#2014: bootstrap-c-emit-sources,
+// emit-c-test and emit-c-roundtrip all once wrote out/gen/wl_decls.h).
+fn emitc_generate_stub_files(ctx: &ActionCtx, dir: &str) -> i32:
+    let bridge_sources: List[str] = List.new()
+    bridge_sources |> push("src/compiler/LlvmBridge.with")
+    bridge_sources |> push("src/compiler/ClangBridge.with")
+    // The bridges declare their public C ABI here, if any. Since D100 made
+    // them package-internal (#2463) they have none: the emitted unit
+    // defines every wl_* function itself, so the header and the stubs
+    // declare nothing (a parse failure still fails, inside the scan).
+    let (scanned, stub_exports) = emitc_collect_public_abi(ctx, bridge_sources)
+    if not scanned:
+        return 1
+    let fs = ctx.fs()
+    if fs.mkdir_all(dir) != 0:
+        return emitc_fail(ctx, "could not create " ++ dir)
+    var decls = "// Auto-generated by with build emit-c.\n"
+    decls = decls ++ "#ifndef WITH_EMIT_C_BRIDGE_DECLS_H\n"
+    decls = decls ++ "#define WITH_EMIT_C_BRIDGE_DECLS_H\n\n"
+    decls = decls ++ "#include \"with_runtime.h\"\n\n"
+    var stubs = "// Auto-generated by with build emit-c.\n"
+    stubs = stubs ++ "#include \"wl_decls.h\"\n\n"
+    for ei in 0..stub_exports.len():
+        let fn_sig = stub_exports[ei]
+        let proto = emitc_function_proto(fn_sig)
+        decls = decls ++ proto ++ ";\n"
+        stubs = stubs ++ proto ++ " {\n"
+        for pi in 0..fn_sig.params.len():
+            let param = fn_sig.params[pi]
+            stubs = stubs ++ "    (void)" ++ param.name ++ ";\n"
+        stubs = stubs ++ emitc_stub_return(fn_sig.return_type)
+        stubs = stubs ++ "}\n\n"
+    decls = decls ++ "\n#endif\n"
+    let decls_path = emitc_join(dir, "wl_decls.h")
+    if fs.write_text(decls_path, decls) != 0:
+        return emitc_fail(ctx, "could not write " ++ decls_path)
+    let stubs_path = emitc_join(dir, "wl_stubs.c")
+    if fs.write_text(stubs_path, stubs) != 0:
+        return emitc_fail(ctx, "could not write " ++ stubs_path)
+    0
+
+fn emitc_capture_rel(ctx: &ActionCtx, label: &str, suffix: &str) -> str:
+    emitc_join(emitc_join("out/command", ctx.target_name()), label ++ "." ++ suffix)
+
+fn emitc_run_capture(ctx: &ActionCtx, label: &str, argv: List[str], timeout_ms: i32) -> i32:
+    emitc_run_capture_env(ctx, label, argv, timeout_ms, "", "")
+
+fn emitc_run_capture_env(ctx: &ActionCtx, label: &str, argv: List[str], timeout_ms: i32, extra_key: &str, extra_val: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let fs = ctx.fs()
+    let capture_dir = emitc_join("out/command", ctx.target_name())
+    if fs.mkdir_all(capture_dir) != 0:
+        return emitc_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    let stdout_rel = emitc_capture_rel(ctx, label, "stdout")
+    let stderr_rel = emitc_capture_rel(ctx, label, "stderr")
+    var env = process_env()
+    env = env.set("WITH_OUT_DIR", emitc_abs(root, "out"))
+    if extra_key.len() > 0:
+        env = env.set(emit_c_owned_text(extra_key), emit_c_owned_text(extra_val))
+    // In the root: the link records (out/lib/llvm_link.rsp) name the SDK
+    // relative to it (#2016), and the C driver resolves them from here.
+    let result = ctx.process_runner().run_capture_cwd_with_env(argv, emitc_abs(root, stdout_rel), emitc_abs(root, stderr_rel), timeout_ms, root, env)
+    if result.rc == 0:
+        let _remove_stdout = fs.remove_file(stdout_rel)
+        let _remove_stderr = fs.remove_file(stderr_rel)
+        return 0
+    if result.stderr.len() > 0:
+        ctx.diagnostics().error(result.stderr.clone())
+    emitc_fail(ctx, "step '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_rel ++ " stderr=" ++ stderr_rel)
+
+fn emitc_expect_same_version(ctx: &ActionCtx, expected_compiler: &str, actual_compiler: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let fs = ctx.fs()
+    let capture_dir = emitc_join("out/command", ctx.target_name())
+    if fs.mkdir_all(capture_dir) != 0:
+        return emitc_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    let expected_stdout = emitc_capture_rel(ctx, "native-version", "stdout")
+    let expected_stderr = emitc_capture_rel(ctx, "native-version", "stderr")
+    var expected_args: List[str] = List.new()
+    expected_args.push(emitc_abs(root, expected_compiler))
+    expected_args.push("--version")
+    let expected = ctx.process_runner().run_capture(expected_args, emitc_abs(root, expected_stdout), emitc_abs(root, expected_stderr), 120000)
+    if expected.rc != 0:
+        return emitc_fail(ctx, f"native compiler version failed with exit code {expected.rc}; stderr=" ++ expected_stderr)
+
+    let actual_stdout = emitc_capture_rel(ctx, "with-from-c-version", "stdout")
+    let actual_stderr = emitc_capture_rel(ctx, "with-from-c-version", "stderr")
+    var actual_args: List[str] = List.new()
+    actual_args.push(emitc_abs(root, actual_compiler))
+    actual_args.push("--version")
+    let actual = ctx.process_runner().run_capture(actual_args, emitc_abs(root, actual_stdout), emitc_abs(root, actual_stderr), 120000)
+    if actual.rc != 0:
+        return emitc_fail(ctx, f"emitted compiler version failed with exit code {actual.rc}; stderr=" ++ actual_stderr)
+    if actual.stdout != expected.stdout:
+        return emitc_fail(ctx, "emitted compiler version mismatch: expected '" ++ expected.stdout ++ "' got '" ++ actual.stdout ++ "'")
+    fs.remove_file(expected_stdout)
+    fs.remove_file(expected_stderr)
+    fs.remove_file(actual_stdout)
+    fs.remove_file(actual_stderr)
+    0
+
+fn emitc_compile_runtime_args(root: &str, argv: List[str]) -> List[str]:
+    argv |> push(emitc_abs(root, "out/lib/rt.o"))
+    argv |> push(emitc_abs(root, "out/lib/fiber_asm.o"))
+    argv |> push(emitc_abs(root, "out/lib/cimport_stubs.o"))
+    argv
+
+// The compiler emitted to one C unit by `compiler_path` as a subprocess —
+// the binary under test emits, never the build driver's seed (the #761
+// mixed-world class). `--bundle-corpus std/engines/pcre2` compiles the pcre2 corpus
+// in-unit from its source: the emit-C lane links no .wo bundle, so the
+// prelude's std.regex reaches the engine as C in the same file
+// (wo_bundles.md "Retiring the shim", #955).
+fn emitc_build_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var argv: List[str] = List.new()
+    argv |> push(emitc_abs(root, compiler_path))
+    argv |> push("build")
+    argv |> push(emitc_abs(root, "out/gen/versioned_main.with"))
+    argv |> push("--emit-c")
+    argv |> push("--bundle-corpus")
+    argv |> push("std/engines/pcre2")
+    argv |> push("-o")
+    argv |> push(emitc_abs(root, main_c))
+    emitc_run_capture(ctx, "emit-compiler-c", argv, 900000)
+
+pub fn run_bootstrap_c_emit_sources_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    if args.len() == 0:
+        return emitc_fail(ctx, "requires the release compiler argument")
+    let fs = ctx.fs()
+    let main_c = ctx.output()
+    let out_dir = emitc_dirname(main_c)
+    if fs.mkdir_all(out_dir) != 0:
+        return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
+    var rc = emitc_build_compiler_c(ctx, args[0], main_c)
+    if rc != 0: return rc
+    emitc_generate_stub_files(ctx, out_dir)
+
+fn emitc_compile_c_compiler(ctx: &ActionCtx, compiler_path: &str, main_c: &str, output_path: &str) -> i32:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let llvm_rsp = "out/lib/llvm_link.rsp"
+    if not fs.exists(llvm_rsp) or fs.read_text(llvm_rsp).len() == 0:
+        return emitc_fail(ctx, "missing LLVM link metadata: " ++ llvm_rsp)
+    var argv: List[str] = List.new()
+    argv = emitc_push_c_compiler(argv, root, compiler_path)
+    argv |> push("-O1")
+    argv = emitc_push_host_c_flags(argv)
+    argv |> push("-o")
+    argv |> push(emitc_abs(root, output_path))
+    argv = emitc_push_c_source(argv, emitc_abs(root, main_c))
+    argv = emitc_compile_runtime_args(root, argv)
+    argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
+    argv |> push("-I")
+    argv |> push(emitc_abs(root, "runtime"))
+    argv |> push("-include")
+    argv |> push(emitc_abs(root, emitc_decls_beside(main_c)))
+    argv |> push("@" ++ emitc_abs(root, llvm_rsp))
+    emitc_run_capture(ctx, "compile-with-from-c", argv, 600000)
+
+fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_path: &str) -> i32:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let cc_raw = if fs.exists("out/lib/llvm_cc"): fs.read_text("out/lib/llvm_cc") else: ""
+    let cc_path = emitc_trim(cc_raw)
+    if cc_path.len() == 0:
+        return emitc_fail(ctx, "missing LLVM compiler metadata: out/lib/llvm_cc")
+    var argv: List[str] = List.new()
+    argv |> push(emitc_abs(root, cc_path))
+    argv |> push("-O1")
+    argv = emitc_push_host_c_flags(argv)
+    argv |> push("-fuse-ld=lld")
+    argv |> push("-o")
+    argv |> push(emitc_abs(root, output_path))
+    argv = emitc_push_c_source(argv, emitc_abs(root, main_c))
+    argv = emitc_compile_runtime_args(root, argv)
+    argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
+    argv |> push("-I")
+    argv |> push(emitc_abs(root, "runtime"))
+    argv |> push("-include")
+    argv |> push(emitc_abs(root, emitc_decls_beside(main_c)))
+    argv |> push("@" ++ emitc_abs(root, "out/lib/llvm_link.rsp"))
+    emitc_run_capture(ctx, "compile-with-from-c-full", argv, 900000)
+
+fn emitc_migrate_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str, output_w: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var argv: List[str] = List.new()
+    argv |> push(emitc_abs(root, compiler_path))
+    argv |> push("migrate")
+    argv |> push(emitc_abs(root, main_c))
+    argv |> push("-o")
+    argv |> push(emitc_abs(root, output_w))
+    argv |> push("-I")
+    argv |> push(emitc_abs(root, "runtime"))
+    argv |> push("-include")
+    argv |> push(emitc_abs(root, emitc_decls_beside(main_c)))
+    argv |> push("--no-c-export")
+    emitc_run_capture(ctx, "migrate-compiler-c", argv, 900000)
+
+fn emitc_build_with_compiler(ctx: &ActionCtx, compiler_path: &str, source_w: &str, output_path: &str, label: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var argv: List[str] = List.new()
+    argv |> push(emitc_abs(root, compiler_path))
+    argv |> push("build")
+    argv |> push(emitc_abs(root, source_w))
+    argv |> push("-O1")
+    argv |> push("-o")
+    argv |> push(emitc_abs(root, output_path))
+    emitc_run_capture(ctx, label, argv, 900000)
+
+fn emitc_run_single_test(ctx: &ActionCtx, compiler_path: &str, test_path: &str, label: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var argv: List[str] = List.new()
+    argv |> push(emitc_abs(root, compiler_path))
+    argv |> push("test")
+    argv |> push("--quiet")
+    argv |> push(emitc_abs(root, test_path))
+    emitc_run_capture(ctx, label, argv, 300000)
+
+fn emitc_test_target_files(ctx: &ActionCtx, entry: &str) -> List[str]:
+    let files: List[str] = List.new()
+    let star = emitc_index_of(entry, "*")
+    if star < 0:
+        files.push(emit_c_owned_text(entry))
+        return files
+    let dir = emitc_dirname(entry)
+    let suffix = entry.slice((star + 1) as i64, entry.len())
+    let all = ctx.fs().list_files(dir)
+    for i in 0..all.len():
+        let path = all[i]
+        if suffix.len() == 0 or path.ends_with(suffix):
+            files.push(emit_c_owned_text(path))
+    files
+
+fn emitc_run_test_group(ctx: &ActionCtx, compiler_path: &str, entry: &str, label: &str) -> i32:
+    let files = emitc_test_target_files(ctx, entry)
+    if files.len() == 0:
+        return emitc_fail(ctx, "matched no tests: " ++ entry)
+    for fi in 0..files.len():
+        let test_path = files[fi]
+        let base = emitc_basename(test_path)
+        let rc = emitc_run_single_test(ctx, compiler_path, test_path, label ++ "-" ++ base)
+        if rc != 0:
+            return rc
+    0
+
+fn emitc_run_compiler_test_suite(ctx: &ActionCtx, compiler_path: &str, label: &str) -> i32:
+    let groups: [5]str = [
+        "test/behavior/*.with",
+        "test/compile_errors/*.with",
+        "test/codegen/*.with",
+        "test/spec/*.with",
+        "test/phase/*.with",
+    ]
+    for gi in 0..5:
+        let rc = emitc_run_test_group(ctx, compiler_path, groups[gi], label)
+        if rc != 0:
+            return rc
+    0
+
+fn emitc_build_hello_c(ctx: &ActionCtx, compiler_path: &str, hello_c: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var argv: List[str] = List.new()
+    argv |> push(emitc_abs(root, compiler_path))
+    argv |> push("build")
+    argv |> push(emitc_abs(root, "test/hello.with"))
+    argv |> push("--emit-c")
+    argv |> push("--no-prelude")
+    argv |> push("-o")
+    argv |> push(emitc_abs(root, hello_c))
+    emitc_run_capture(ctx, "emit-hello-c", argv, 600000)
+
+fn emitc_compile_hello(ctx: &ActionCtx, compiler_path: &str, hello_c: &str, output_path: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var argv: List[str] = List.new()
+    argv = emitc_push_c_compiler(argv, root, compiler_path)
+    argv |> push("-O1")
+    argv = emitc_push_host_c_flags(argv)
+    argv |> push("-o")
+    argv |> push(emitc_abs(root, output_path))
+    argv = emitc_push_c_source(argv, emitc_abs(root, hello_c))
+    argv = emitc_compile_runtime_args(root, argv)
+    argv |> push("-I")
+    argv |> push(emitc_abs(root, "runtime"))
+    argv = emitc_push_system_libs(argv)
+    emitc_run_capture(ctx, "compile-hello", argv, 600000)
+
+fn emitc_run_hello(ctx: &ActionCtx, hello_path: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let fs = ctx.fs()
+    let stdout_rel = emitc_capture_rel(ctx, "hello", "stdout")
+    let stderr_rel = emitc_capture_rel(ctx, "hello", "stderr")
+    var argv: List[str] = List.new()
+    argv |> push(emitc_abs(root, hello_path))
+    let result = ctx.process_runner().run_capture(argv, emitc_abs(root, stdout_rel), emitc_abs(root, stderr_rel), 120000)
+    if result.rc != 0:
+        if result.stderr.len() > 0:
+            ctx.diagnostics().error(result.stderr.clone())
+        return emitc_fail(ctx, f"hello binary failed with exit code {result.rc}")
+    let _remove_stdout = fs.remove_file(stdout_rel)
+    let _remove_stderr = fs.remove_file(stderr_rel)
+    if emitc_trim(result.stdout) != "hello":
+        return emitc_fail(ctx, "hello output mismatch: " ++ result.stdout)
+    0
+
+fn emitc_compare_files(ctx: &ActionCtx, left_path: &str, right_path: &str) -> i32:
+    let fs = ctx.fs()
+    let left = fs.read_text(left_path)
+    let right = fs.read_text(right_path)
+    let min_len = if left.len() < right.len(): left.len() else: right.len()
+    var diff_at: i64 = -1
+    var i = 0
+    while i < min_len:
+        if left[i] != right[i]:
+            diff_at = i
+            break
+        i = i + 1
+    if diff_at < 0 and left.len() != right.len():
+        diff_at = min_len
+    if diff_at >= 0:
+        return emitc_fail(ctx, f"files differ at byte {diff_at}: " ++ left_path ++ " vs " ++ right_path)
+    0
+
+pub fn run_emit_c_test_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return emitc_fail(ctx, "requires compiler input")
+    let fs = ctx.fs()
+    let out_dir = "out/emit-c-test"
+    let stamp_path = ctx.output()
+    let compiler_path = inputs[0]
+    if not fs.exists(compiler_path):
+        return emitc_fail(ctx, "missing compiler: " ++ compiler_path)
+    let _clean = fs.remove_tree(out_dir)
+    if fs.mkdir_all(out_dir) != 0:
+        return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
+    let main_c = emitc_join(out_dir, "main.c")
+    let with_from_c = emitc_join(out_dir, emitc_exe_name("with-from-c"))
+    let hello_c = emitc_join(out_dir, "hello_test.c")
+    let hello_bin = emitc_join(out_dir, emitc_exe_name("hello_test"))
+    var rc = emitc_build_compiler_c(ctx, compiler_path, main_c)
+    if rc != 0: return rc
+    rc = emitc_generate_stub_files(ctx, emitc_dirname(main_c))
+    if rc != 0: return rc
+    rc = emitc_compile_c_compiler(ctx, compiler_path, main_c, with_from_c)
+    if rc != 0: return rc
+    rc = emitc_expect_same_version(ctx, compiler_path, with_from_c)
+    if rc != 0: return rc
+    rc = emitc_build_hello_c(ctx, with_from_c, hello_c)
+    if rc != 0: return rc
+    rc = emitc_compile_hello(ctx, compiler_path, hello_c, hello_bin)
+    if rc != 0: return rc
+    rc = emitc_run_hello(ctx, hello_bin)
+    if rc != 0: return rc
+    if fs.mkdir_all(emitc_dirname(stamp_path)) != 0:
+        return emitc_fail(ctx, "could not create stamp directory")
+    if fs.write_text(stamp_path, "ok\n") != 0:
+        return emitc_fail(ctx, "could not write stamp: " ++ stamp_path)
+    print("EMIT-C OK")
+    0
+
+pub fn run_emit_c_fixpoint_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() < 2:
+        return emitc_fail(ctx, "requires emitted C and compiler inputs")
+    let fs = ctx.fs()
+    let stamp_path = ctx.output()
+    let main_c = inputs[0]
+    let compiler_path = inputs[1]
+    let main2_c = "out/emit-c-test/main2.c"
+    if not fs.exists(compiler_path):
+        return emitc_fail(ctx, "missing emitted compiler: " ++ compiler_path)
+    if not fs.exists(main_c):
+        return emitc_fail(ctx, "missing first emitted C file: " ++ main_c)
+    var rc = emitc_build_compiler_c(ctx, compiler_path, main2_c)
+    if rc != 0: return rc
+    rc = emitc_compare_files(ctx, main_c, main2_c)
+    if rc != 0:
+        ctx.diagnostics().error("EMIT-C DIVERGED")
+    if fs.mkdir_all(emitc_dirname(stamp_path)) != 0:
+        return emitc_fail(ctx, "could not create stamp directory")
+    if fs.write_text(stamp_path, "ok\n") != 0:
+        return emitc_fail(ctx, "could not write stamp: " ++ stamp_path)
+    print("EMIT-C FIXPOINT")
+    0
+
+pub fn run_emit_c_roundtrip_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return emitc_fail(ctx, "requires compiler input")
+    let fs = ctx.fs()
+    let out_dir = "out/emit-c-roundtrip"
+    let stamp_path = ctx.output()
+    let compiler_path = inputs[0]
+    if not fs.exists(compiler_path):
+        return emitc_fail(ctx, "missing compiler: " ++ compiler_path)
+    let _clean = fs.remove_tree(out_dir)
+    if fs.mkdir_all(out_dir) != 0:
+        return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
+    let main_c = emitc_join(out_dir, "main.c")
+    let with_from_c = emitc_join(out_dir, emitc_exe_name("with-from-c"))
+    let migrated_w = emitc_join(out_dir, "main_roundtrip.with")
+    let with_roundtrip = emitc_join(out_dir, emitc_exe_name("with-roundtrip"))
+    let with_rebuilt_by_roundtrip = emitc_join(out_dir, emitc_exe_name("with-rebuilt-by-roundtrip"))
+    var rc = emitc_build_compiler_c(ctx, compiler_path, main_c)
+    if rc != 0: return rc
+    rc = emitc_generate_stub_files(ctx, emitc_dirname(main_c))
+    if rc != 0: return rc
+    rc = emitc_compile_c_compiler_with_bridges(ctx, main_c, with_from_c)
+    if rc != 0: return rc
+    rc = emitc_migrate_compiler_c(ctx, compiler_path, main_c, migrated_w)
+    if rc != 0: return rc
+    rc = emitc_build_with_compiler(ctx, compiler_path, migrated_w, with_roundtrip, "build-migrated-compiler")
+    if rc != 0: return rc
+    rc = emitc_run_compiler_test_suite(ctx, with_from_c, "with-from-c")
+    if rc != 0: return rc
+    rc = emitc_run_compiler_test_suite(ctx, with_roundtrip, "with-roundtrip")
+    if rc != 0: return rc
+    rc = emitc_build_with_compiler(ctx, with_roundtrip, "out/gen/main.with", with_rebuilt_by_roundtrip, "build-compiler-with-roundtrip")
+    if rc != 0: return rc
+    let version = emitc_trim(fs.read_text("out/gen/version.txt"))
+    if version.len() == 0:
+        return emitc_fail(ctx, "missing generated compiler version")
+    // Stamped as the release compiler is (#1815): the rebuild embeds out/lib's
+    // runtime, whose .producer the release's stamp carries.
+    let runtime_generation = comp_read_runtime_producer(ctx, "out/lib/.producer")
+    if runtime_generation.len() == 0: return 1
+    rc = comp_patch_version_binary(ctx, with_rebuilt_by_roundtrip, with_rebuilt_by_roundtrip, version, runtime_generation)
+    if rc != 0: return rc
+    rc = emitc_compare_files(ctx, compiler_path, with_rebuilt_by_roundtrip)
+    if rc != 0:
+        ctx.diagnostics().error("EMIT-C ROUNDTRIP SELFHOST DIVERGED")
+    if fs.mkdir_all(emitc_dirname(stamp_path)) != 0:
+        return emitc_fail(ctx, "could not create stamp directory")
+    if fs.write_text(stamp_path, "ok\n") != 0:
+        return emitc_fail(ctx, "could not write stamp: " ++ stamp_path)
+    print("EMIT-C ROUNDTRIP OK")
+    0

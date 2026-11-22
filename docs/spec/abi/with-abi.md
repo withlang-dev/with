@@ -72,7 +72,7 @@ a With value type, not as a contract With makes with another language.
 ## 3. The built-in value types (the runtime's headers)
 
 These are With value types with fixed layouts shared between the compiler's
-generated code and `rt/rt_core.w`:
+generated code and `rt/rt_core.with`:
 
 | Type | Layout | Size |
 |---|---|---|
@@ -185,35 +185,35 @@ executable.
 
 ## 7. ABI-defining sources (what `WITH_ABI_VERSION` stamps)
 
-- `src/TypeLayout.w` — §2 layouts.
-- the cached descriptor and function declaration in `src/Codegen.w`
+- `src/TypeLayout.with` — §2 layouts.
+- the cached descriptor and function declaration in `src/Codegen.with`
   (`compute_fn_abi`, `abi_param_source_type`, `declare_function_from_sig`,
   `push_call_arg`) and
   Sema's `sig_param_uses_value_ref_abi` — §4.
-- symbol naming in `src/Codegen.w` (`module_link_name_for_path`,
+- symbol naming in `src/Codegen.with` (`module_link_name_for_path`,
   `function_symbol_name`, `codegen_canonical_module_path`) and
   `with_str_hash` — §5.
-- the header layouts in `rt/rt_core.w` (`str`, List, HashMap, SlotMap,
+- the header layouts in `rt/rt_core.with` (`str`, List, HashMap, SlotMap,
   FmtBuffer sections) and the allocator header — §3, §6.
-- drop glue in `src/CodegenDispatch.w` (`mir_emit_drop_*`) — §6.
+- drop glue in `src/CodegenDispatch.with` (`mir_emit_drop_*`) — §6.
 - the LLVM version and target triple the object is built for (part of
   the `.wo` key, not of the version number).
 
-**Enforcement** (implemented): the §4–5 rules live in `src/FnAbi.w`
+**Enforcement** (implemented): the §4–5 rules live in `src/FnAbi.with`
 (`WITH_ABI_VERSION`, the `PM_*` modes, `fn_abi_pass_mode`,
 `fn_abi_argument_pass`, `fn_abi_return_pass`, `fn_abi_owned_place`,
 `fn_abi_platform_aggregate_indirect`, the symbol-naming rules), with
-one-line adapters left on `Codegen`; §2 lives in `src/TypeLayout.w`.
+one-line adapters left on `Codegen`; §2 lives in `src/TypeLayout.with`.
 `docs/with-abi.sha256` records both files' sha256 (`shasum -a 256`
-format), and the `abi-hash-check` action in `build.w` (`build/abi.w`,
+format), and the `abi-hash-check` action in `build.with` (`build/abi.with`,
 part of `:test`) fails when a recorded hash no longer matches. To change
 the convention: edit the rule, bump `WITH_ABI_VERSION`, add a
 version-history entry, re-record the hashes. A comment-only or refactor
-edit re-records without a bump. Non-ABI edits to `Codegen.w` never trip
+edit re-records without a bump. Non-ABI edits to `Codegen.with` never trip
 it.
 
 Not yet under the hash: the runtime header layouts (§3) and drop glue
-(§6) still sit inside `rt/rt_core.w` and `CodegenDispatch.w`, which
+(§6) still sit inside `rt/rt_core.with` and `CodegenDispatch.with`, which
 change for non-ABI reasons too often to hash whole. They move under an
 ABI-owned file when D30's in-unit runtime retirement lands; until then a
 layout change there is caught by the `wo-drift` lane, not by this check.

@@ -1,10 +1,10 @@
 # The package registry (§16.2b.15 item 3, D121 step 4)
 
-One reviewed facts file per C package, `registry/c/<package>/facts.w`,
+One reviewed facts file per C package, `registry/c/<package>/facts.with`,
 shared by every With user: the ownership facts that neither a proof from
 the package's source nor an annotation the package ships settles. Nobody
 writes one per project. The file is read by the facade proof engine
-(`with migrate --facade NAME <dir> --facts registry/c/<package>/facts.w`)
+(`with migrate --facade NAME <dir> --facts registry/c/<package>/facts.with`)
 and, through it, by `with get` (step 5), which fetches the file for the
 package's version from this repository and pins the commit it read in the
 project's `lock.json`.

@@ -13,7 +13,7 @@ Use this file as the master test inventory for compiler, runtime, stdlib, and to
 
 - [x] Project scaffolding modules (`ast`, `types`, `parse`, `check`, `mir`, `codegen`, `driver`, `diag`)
 - [x] CI on Linux/macOS/Windows (`zig build test`)
-- [x] Test harness (`tests/*.w` compile/run/exit/output validation)
+- [x] Test harness (`tests/*.with` compile/run/exit/output validation)
 - [x] Snapshot harness with update mode
 - [x] Lexer coverage: keywords
 - [x] Lexer coverage: operators (`|>`, `<|`, `>>`, `<<`, `?`, `?.`, `??`, `->`, `=>`, `..`, `..=`, wrapping ops)

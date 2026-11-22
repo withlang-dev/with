@@ -5,8 +5,8 @@ new directory
 run: with init .
 run: with get c.zlib
 expect stderr contains: facade zlib:
-write src/main.w from zlib_main.w
-write src/contracts/zlib.w:
+write src/main.with from zlib_main.with
+write src/contracts/zlib.with:
     // The zlib facade — D64 (spec §16.2b.8 "Buffers", §16.2b.11 "Fixed
     // arguments"): the first facade written against the buffer-pairing ruling,
     // over the real `zlib.h` (the one `c_import` resolves on the host), and
@@ -16,7 +16,7 @@ write src/contracts/zlib.w:
     //
     // Where it lives: in the acceptance scenario that uses it, which writes it
     // into the fresh project as its own contract (§16.2b.1; `c.zlib` ships none yet):
-    // src/contracts/zlib.w.
+    // src/contracts/zlib.with.
     //
     // A pairing is stated, never inferred from the C types (§16.2b.8): the
     // header alone does not prove that `destLen` is `dest`'s capacity, and a

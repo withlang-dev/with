@@ -77,9 +77,9 @@ handle types. No behavioral difference.
 
 ## 2. Per-Pool Plans
 
-### 2a. CiTypePool (25 `&mut` sites in CImport.w)
+### 2a. CiTypePool (25 `&mut` sites in CImport.with)
 
-**State struct fields** (7 fields, from CiIR.w:53-61):
+**State struct fields** (7 fields, from CiIR.with:53-61):
 ```
 type CiTypePoolState {
     kinds: Vec[i32],
@@ -99,7 +99,7 @@ type CiTypePool {
 }
 ```
 
-**Method dispatch:** CiTypePool has 21 methods (CiIR.w). All use either
+**Method dispatch:** CiTypePool has 21 methods (CiIR.with). All use either
 `mut self: CiTypePool` or `self: &CiTypePool`. After conversion:
 
 - `mut self: CiTypePool` methods: access fields via `self.state.kinds.push(...)`.
@@ -108,10 +108,10 @@ type CiTypePool {
 - `self: &CiTypePool` reader methods: change to `self: CiTypePool`. Read through
   `self.state.kinds.get(...)`. Callers passing `&types` change to `types`.
 
-One method defined outside CiIR.w: `CiTypePool.named_type_from_text` in
-CImport.w:5928, takes `mut self: CiTypePool`. Same conversion.
+One method defined outside CiIR.with: `CiTypePool.named_type_from_text` in
+CImport.with:5928, takes `mut self: CiTypePool`. Same conversion.
 
-**Direct field access:** Only in `CiTypePool.new` constructor (CiIR.w:74-77).
+**Direct field access:** Only in `CiTypePool.new` constructor (CiIR.with:74-77).
 Moves into `CiTypePoolState` initialization inside the new constructor.
 
 **Allocation:** `CiTypePool.new` allocates the state:
@@ -140,22 +140,22 @@ short-lived process). No change.
 **Allocation size:** CiTypePoolState has 7 fields. Vec is 4×i64 = 32 bytes.
 6 Vecs × 32 + 1 i32 = 196 bytes. Allocate 256 (same as InternPool, round up).
 
-**Construction sites** (9 total): CiIR.w (2, inside CiModule.new), CiPrint.w (3,
-test helpers), CImport.w (4, IR lowering helpers). All change transparently
+**Construction sites** (9 total): CiIR.with (2, inside CiModule.new), CiPrint.with (3,
+test helpers), CImport.with (4, IR lowering helpers). All change transparently
 because `CiTypePool.new` returns the same type name.
 
 **CiModule impact:** CiModule holds `types: CiTypePool`. After conversion,
 CiModule stores the handle (8 bytes instead of the full struct). CiModule.new
 calls `CiTypePool.new()` — no change needed at the call site.
 
-**Conversion within CImport.w:** After CiTypePool is a handle, all 25
+**Conversion within CImport.with:** After CiTypePool is a handle, all 25
 `types: &mut CiTypePool` parameters become `types: CiTypePool`. The 8
 `types: &CiTypePool` read-only parameters also become `types: CiTypePool`.
 All call-site `&mut types` expressions become `types`. One commit.
 
-### 2b. CiExprPool (20 `&mut` sites in CImport.w)
+### 2b. CiExprPool (20 `&mut` sites in CImport.with)
 
-**State struct fields** (8 fields, from CiIR.w:248-257):
+**State struct fields** (8 fields, from CiIR.with:248-257):
 ```
 type CiExprPoolState {
     kinds: Vec[i32],
@@ -181,13 +181,13 @@ type CiExprPool {
 
 **Allocation size:** 7 Vecs × 32 + 1 i32 = 228 bytes. Allocate 256.
 
-**Construction sites:** CiIR.w (1, CiModule.new), CImport.w (4), CiPrint.w (2).
+**Construction sites:** CiIR.with (1, CiModule.new), CImport.with (4), CiPrint.with (2).
 
 **CiModule impact:** Same as CiTypePool — stores handle instead of full struct.
 
-### 2c. CiStmtPool (16 `&mut` sites in CImport.w)
+### 2c. CiStmtPool (16 `&mut` sites in CImport.with)
 
-**State struct fields** (9 fields, from CiIR.w:399-409):
+**State struct fields** (9 fields, from CiIR.with:399-409):
 ```
 type CiStmtPoolState {
     kinds: Vec[i32],
@@ -212,29 +212,29 @@ type CiStmtPool {
 
 **Allocation size:** 7 Vecs × 32 + 1 i32 = 228 bytes. Allocate 256.
 
-**Construction sites:** CiIR.w (1), CImport.w (4), CiPrint.w (1).
+**Construction sites:** CiIR.with (1), CImport.with (4), CiPrint.with (1).
 
 **Method distribution:** 57 total methods across 2 files:
-- CiIR.w: 27 methods (core: new, add, freeze, accessors, statement constructors)
-- CImport.w: 30 methods (IR lowering: lower_stmt_ir, lower_switch_stmt_ir,
+- CiIR.with: 27 methods (core: new, add, freeze, accessors, statement constructors)
+- CImport.with: 30 methods (IR lowering: lower_stmt_ir, lower_switch_stmt_ir,
   stack_emit_tree, native_goto_emit_cfg, lower_goto_body_stackify, etc.)
 
-All 57 methods are in CiIR.w or CImport.w. No other files define CiStmtPool
+All 57 methods are in CiIR.with or CImport.with. No other files define CiStmtPool
 methods. After conversion, each method's `self.field` → `self.state.field`.
 
 **Reference site distribution:**
-- `&mut CiStmtPool`: 16 sites, all in CImport.w (secondary params on
+- `&mut CiStmtPool`: 16 sites, all in CImport.with (secondary params on
   CiGotoCfgContext and CiStackEmitContext methods)
-- `&CiStmtPool` (read-only): 14 sites — CiIR.w (7), CImport.w (4), CiPrint.w (3)
+- `&CiStmtPool` (read-only): 14 sites — CiIR.with (7), CImport.with (4), CiPrint.with (3)
 
 **Risk is contained:** All method definitions and all `&mut` sites are in 2
-files (CiIR.w, CImport.w) that are already well-understood from Slice A work.
-The 30 CImport.w method definitions are large in count but mechanical — each
+files (CiIR.with, CImport.with) that are already well-understood from Slice A work.
+The 30 CImport.with method definitions are large in count but mechanical — each
 needs `self.field` → `self.state.field` for field accesses within the body.
 
-### 2d. AstPool (18 `&mut` sites in ComptimeTransform.w)
+### 2d. AstPool (18 `&mut` sites in ComptimeTransform.with)
 
-**State struct fields** (45 fields, from Ast.w:332-449):
+**State struct fields** (45 fields, from Ast.with:332-449):
 
 AstPool is substantially larger than the CI pools. Fields include:
 - 9 parallel node arrays (kinds, starts, ends, data0-2, literal_suffixes, etc.)
@@ -248,7 +248,7 @@ type AstPoolState {
     // All 45 fields from current AstPool definition
     kinds: Vec[i32],
     starts: Vec[i32],
-    // ... (full list in Ast.w:332-449)
+    // ... (full list in Ast.with:332-449)
     frozen: i32,
 }
 
@@ -258,8 +258,8 @@ type AstPool {
 ```
 
 **Method distribution:** 107 total methods across 2 files:
-- Ast.w: 101 methods (core pool implementation)
-- ComptimeTransform.w: 6 methods (ct_new_node_copy, ct_clone_leaf,
+- Ast.with: 101 methods (core pool implementation)
+- ComptimeTransform.with: 6 methods (ct_new_node_copy, ct_clone_leaf,
   ct_empty_block, ct_build_call, ct_struct_lit_field_value,
   ct_clone_tree_with_subst)
 
@@ -268,39 +268,39 @@ All method definitions are in 2 files. No other files define AstPool methods.
 **Allocation size:** ~45 fields. ~30 Vecs × 32 + ~20 HashMaps × 48 +
 ~3 scalars = ~1920 bytes. Allocate 4096 to be safe.
 
-**Construction sites:** 25+ (Ast.w, Parser.w, Codegen.w, Frontend.w,
-ComptimeTransform.w, Lsp.w, Zcu.w). All call `AstPool.new()` — the return
+**Construction sites:** 25+ (Ast.with, Parser.with, Codegen.with, Frontend.with,
+ComptimeTransform.with, Lsp.with, Zcu.with). All call `AstPool.new()` — the return
 type stays the same, so call sites don't change.
 
-**`&mut AstPool` sites:** All 18 are in ComptimeTransform.w. After AstPool is
+**`&mut AstPool` sites:** All 18 are in ComptimeTransform.with. After AstPool is
 a handle type, these become `pool: AstPool`. The `unsafe: *pool` dereference
-pattern (4 sites in ComptimeTransform.w: lines 511, 526, 872, 948) currently
+pattern (4 sites in ComptimeTransform.with: lines 511, 526, 872, 948) currently
 dereferences `&mut AstPool` → `AstPool`. After conversion, `pool` is already
 an `AstPool` handle — the dereference becomes unnecessary; replace with
 `let eval_ast = pool` (copy the handle).
 
 **`&AstPool` reference distribution** (67 sites across 2 files):
-- Ast.w: 67 sites (reader method `self: &AstPool` parameters)
-- ComptimeTransform.w: 1 site (`ct_sync_sema_ast(sema, pool: &AstPool)`)
+- Ast.with: 67 sites (reader method `self: &AstPool` parameters)
+- ComptimeTransform.with: 1 site (`ct_sync_sema_ast(sema, pool: &AstPool)`)
 
-The 67 Ast.w sites are all method `self` parameters — mechanical conversion
-to `self: AstPool`. The 1 ComptimeTransform.w site resolves alongside `&mut`.
+The 67 Ast.with sites are all method `self` parameters — mechanical conversion
+to `self: AstPool`. The 1 ComptimeTransform.with site resolves alongside `&mut`.
 
 **Files that USE AstPool** (21 files, by parameter-site count):
-- Ast.w: 104, Frontend.w: 19, Compilation.w: 18, ComptimeTransform.w: 22,
-  Lsp.w: 16, Resolve.w: 13, render.w: 12, AsyncLower.w: 12, Zcu.w: 7,
-  ComptimeEval.w: 6, Parser.w: 6, BorrowCfg.w: 6, Sema.w: 5, Codegen.w: 5,
-  MirLower.w: 4, Backend.w: 3, SemaCheck.w: 2, CCodegen.w: 2, Parse.w: 2,
-  Mir.w: 1, CodegenDispatch.w: 1
+- Ast.with: 104, Frontend.with: 19, Compilation.with: 18, ComptimeTransform.with: 22,
+  Lsp.with: 16, Resolve.with: 13, render.with: 12, AsyncLower.with: 12, Zcu.with: 7,
+  ComptimeEval.with: 6, Parser.with: 6, BorrowCfg.with: 6, Sema.with: 5, Codegen.with: 5,
+  MirLower.with: 4, Backend.with: 3, SemaCheck.with: 2, CCodegen.with: 2, Parse.with: 2,
+  Mir.with: 1, CodegenDispatch.with: 1
 
 These files pass AstPool by value or `&AstPool`. After conversion, `&AstPool`
 parameters and call-site `&pool` expressions become by-value `AstPool`. The
-bulk of the work is in Ast.w (67 `self: &AstPool` → `self: AstPool`); the
+bulk of the work is in Ast.with (67 `self: &AstPool` → `self: AstPool`); the
 remaining files have scattered `&AstPool` parameters that convert mechanically.
 
 **Risk reassessment:** Medium, but concentrated. 94% of method definitions are
-in one file (Ast.w). The `self: &AstPool` → `self: AstPool` conversion is
-pure search-and-replace within Ast.w. The cross-file `&AstPool` parameter
+in one file (Ast.with). The `self: &AstPool` → `self: AstPool` conversion is
+pure search-and-replace within Ast.with. The cross-file `&AstPool` parameter
 sites are lower count and spread across 21 files, but each is a one-line
 edit. The main risk is the sheer count (67 + 18 = 85 parameter changes plus
 corresponding call-site `&pool` → `pool` edits), not complexity.
@@ -314,8 +314,8 @@ corresponding call-site `&pool` → `pool` edits), not complexity.
 **Completed:** CiTypePool → CiExprPool → CiStmtPool → CiDeclPool → AstPool → Sema §16.2
 
 **Rationale:** Descending by secondary-param count (25, 20, 16, 18). CI pools
-first because they're self-contained in CImport.w/CiIR.w. AstPool next because
-it's self-contained in ComptimeTransform.w for `&mut` sites.
+first because they're self-contained in CImport.with/CiIR.with. AstPool next because
+it's self-contained in ComptimeTransform.with for `&mut` sites.
 
 **Call-graph verification:** No cross-dependencies between pool conversions.
 CiTypePool methods are called from CiExprPool and CiStmtPool methods (as
@@ -399,7 +399,7 @@ unnecessary — `mut self: Self` provides mutation visibility natively.
 
 ### 5a. The 16 Conversions
 
-**ComptimeTransform.w — 15 functions:**
+**ComptimeTransform.with — 15 functions:**
 
 | # | Current signature | New signature | Body changes |
 |---|---|---|---|
@@ -419,7 +419,7 @@ unnecessary — `mut self: Self` provides mutation visibility natively.
 | 14 | `ct_transform_decl(source_ast, pool, sema: &mut Sema, intern, node)` | `Sema.ct_transform_decl(mut self: Self, source_ast, pool, intern, node)` | 6 internal calls |
 | 15 | `comptime_transform_module(source_ast, sema: &mut Sema, intern)` | `Sema.comptime_transform_module(mut self: Self, source_ast, intern)` | 34 `sema.field` refs, 4 internal calls |
 
-**Frontend.w — 1 function:**
+**Frontend.with — 1 function:**
 
 | 16 | `Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema)` | `Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult)` | 13 `sema.field` → `self.field`, `self.last_resolved` → `resolved`; pass `&ResolveResult` to avoid seed large-struct ABI bug |
 
@@ -442,12 +442,12 @@ self.ct_sync_sema_ast(pool)
 
 **External call sites.** The 16 functions are called from outside:
 
-- `comptime_transform_module` is called from Frontend.w (2 sites):
+- `comptime_transform_module` is called from Frontend.with (2 sites):
   `comptime_transform_module(source_ast, &mut sema, intern)`
   → `sema.comptime_transform_module(source_ast, intern)`
 
-- `seed_sema_module_graph_frontend` is called from Frontend.w (2 sites) +
-  Compilation.w (1 site):
+- `seed_sema_module_graph_frontend` is called from Frontend.with (2 sites) +
+  Compilation.with (1 site):
   `self.seed_sema_module_graph_frontend(&mut sema)`
   → `sema.init_module_graph(&self.last_resolved)`
   Note: takes `&ResolveResult` instead of `Zcu` by value to avoid seed
@@ -457,7 +457,7 @@ self.ct_sync_sema_ast(pool)
 taking `sema: &Sema` (ct_build_type_expr, ct_build_value_tree,
 ct_decl_source_path, etc.) were also converted to `self: Sema` methods to
 avoid the seed's `&self` → `**Sema` double-indirection bug on large structs.
-All 25 functions in ComptimeTransform.w are now Sema methods.
+All 25 functions in ComptimeTransform.with are now Sema methods.
 
 ### 5c. The `*mut Sema` Raw Pointer Paths
 
@@ -469,7 +469,7 @@ All 25 functions in ComptimeTransform.w are now Sema methods.
 let value = comptime_force_eval_expr(sema as *mut Sema, source_ast, sema.pool, node)
 ```
 
-ComptimeEval.w has 4 functions taking `sema_ptr: *mut Sema`:
+ComptimeEval.with has 4 functions taking `sema_ptr: *mut Sema`:
 ```
 fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = unsafe: *sema_ptr     // creates a local copy with different ast
@@ -503,7 +503,7 @@ returning diagnostics or using DiagnosticList as a handle. Requires
 DiagnosticList investigation.
 
 **Decision:** investigate during implementation. The 5 cast sites are localized
-in ComptimeTransform.w; any of the 3 options works mechanically. Document
+in ComptimeTransform.with; any of the 3 options works mechanically. Document
 what's left after the 16 method conversions.
 
 ### 5d. Work Summary
@@ -520,8 +520,8 @@ what's left after the 16 method conversions.
 
 Sema stays as a value type. Existing 384 methods are unaffected — no
 `self.field` → `self.state.field` rewrite. The work is confined to
-ComptimeTransform.w (15 functions + their internal call sites) and
-Frontend.w (1 function + 2 call sites)
+ComptimeTransform.with (15 functions + their internal call sites) and
+Frontend.with (1 function + 2 call sites)
 
 ---
 
@@ -547,8 +547,8 @@ Each pool conversion is one commit with this internal order:
 
 6. **Build + fixpoint.**
 
-Steps 1-3 happen in the type definition file (CiIR.w for CI pools, Ast.w for
-AstPool). Steps 4-5 happen across CImport.w / ComptimeTransform.w / etc.
+Steps 1-3 happen in the type definition file (CiIR.with for CI pools, Ast.with for
+AstPool). Steps 4-5 happen across CImport.with / ComptimeTransform.with / etc.
 All in one commit per pool.
 
 ---
@@ -600,9 +600,9 @@ After Slice B, 34 `&mut` lines remain (from 120 total). Breakdown of remaining:
 
 - 19 comment lines (bridge docs, legacy semantics refs — update at P12)
 - 9 string literals (render output, diagnostic text, help text — delete at P12)
-- 1 Link.w FFI (`&mut out as *mut u8` — unsafe, keep)
+- 1 Link.with FFI (`&mut out as *mut u8` — unsafe, keep)
 - 3 CiGotoSwitchCase (`lower_switch_body` param + 2 call sites — §16.2 candidate)
-- 2 Frontend.w out-param functions (`collect_module_dependency_order_frontend`,
+- 2 Frontend.with out-param functions (`collect_module_dependency_order_frontend`,
   `reorder_import_tier_frontend` — §16.1 candidates, 5 `&mut` params total)
 
 All resolve at P12 lockdown or in minor follow-up commits.
@@ -617,7 +617,7 @@ All resolve at P12 lockdown or in minor follow-up commits.
 
 Build + fixpoint after each. Push individually.
 
-Sema is ordered last because some ComptimeTransform.w functions have both
+Sema is ordered last because some ComptimeTransform.with functions have both
 `pool: &mut AstPool` and `sema: &mut Sema` parameters. Converting AstPool to
 handle-type first means those signatures already have `pool: AstPool` when
 the Sema method conversion replaces the function with a `mut self: Self`
@@ -641,14 +641,14 @@ method.
 
 | Commit | Scope | Sites removed |
 |---|---|---|
-| CiTypePool + CiExprPool handle | CImport.w, CiIR.w | ~45 `&mut CiTypePool/CiExprPool` |
-| CiStmtPool handle | CImport.w, CiIR.w | ~16 `&mut CiStmtPool` |
-| CiDeclPool handle | CImport.w, CiIR.w | ~8 `&mut CiDeclPool` |
-| AstPool handle | Ast.w, ComptimeTransform.w, 21 files | ~85 (`&mut AstPool` + `&AstPool`) |
-| Sema §16.2 methods | ComptimeTransform.w, Frontend.w, Compilation.w | 25 functions, ~400 internal refs |
-| CiGotoSwitchCase handle | CImport.w | 5 `&mut CiGotoSwitchCase` |
-| Frontend out-param restructure | Frontend.w | 7 `&mut Vec`/`&mut HashMap` params |
-| rt/ and lib/std/ prior passes | rt/*.w, lib/std/*.w | 157 + 46 |
+| CiTypePool + CiExprPool handle | CImport.with, CiIR.with | ~45 `&mut CiTypePool/CiExprPool` |
+| CiStmtPool handle | CImport.with, CiIR.with | ~16 `&mut CiStmtPool` |
+| CiDeclPool handle | CImport.with, CiIR.with | ~8 `&mut CiDeclPool` |
+| AstPool handle | Ast.with, ComptimeTransform.with, 21 files | ~85 (`&mut AstPool` + `&AstPool`) |
+| Sema §16.2 methods | ComptimeTransform.with, Frontend.with, Compilation.with | 25 functions, ~400 internal refs |
+| CiGotoSwitchCase handle | CImport.with | 5 `&mut CiGotoSwitchCase` |
+| Frontend out-param restructure | Frontend.with | 7 `&mut Vec`/`&mut HashMap` params |
+| rt/ and lib/std/ prior passes | rt/*.with, lib/std/*.with | 157 + 46 |
 
 ### Current state (post-Slice-B)
 
@@ -660,15 +660,15 @@ All 30 are P12 lockdown items:
 
 | Bucket | Count | Examples |
 |---|---|---|
-| Comments describing `&mut` behavior | 21 | SemaCheck.w borrow checker comments, CiIR.w enum doc |
+| Comments describing `&mut` behavior | 21 | SemaCheck.with borrow checker comments, CiIR.with enum doc |
 | String literals (diagnostics, help text) | 7 | `"&mut T is not part of safe With"`, `"unary: not - & &mut"` |
-| Render/display code emitting `"&mut "` | 2 | render.w:911, render.w:1079 |
-| Unsafe raw pointer cast | 1 | Link.w:34 `&mut out as *mut u8` → `&raw mut` at P1 |
-| Deprecated trait method | 1 | traits.w:141 `multi_index_set(self: &mut Self, ...)` → deleted at P12 |
+| Render/display code emitting `"&mut "` | 2 | render.with:911, render.with:1079 |
+| Unsafe raw pointer cast | 1 | Link.with:34 `&mut out as *mut u8` → `&raw mut` at P1 |
+| Deprecated trait method | 1 | traits.with:141 `multi_index_set(self: &mut Self, ...)` → deleted at P12 |
 
 ### Resolution timeline
 
-- **P1:** Link.w:34 converts to `&raw mut out as *mut u8` when `&raw mut` is parsed.
+- **P1:** Link.with:34 converts to `&raw mut out as *mut u8` when `&raw mut` is parsed.
 - **P12:** All remaining sites resolve:
   - Comments referencing `&mut`: update to use new terminology.
   - String literals: update diagnostic text (or delete if UOP_MUT_REF is removed).

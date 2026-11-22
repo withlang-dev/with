@@ -62,7 +62,7 @@ A 67-task plan delivers Python-style f-strings with format specs for width, padd
 Every major constant group in the compiler — `NK_*`, `TK_*`, `TY_*`, and dozens more — converts from raw integers to discriminant enums. The compiler eats its own type system.
 
 **Mar 27 — Type-safe IDs and compiler refactor**
-`NodeId` and `TypeId` become distinct types instead of raw `i32`s. `Codegen.w` splits from 10,559 to 3,993 lines. `Sema.w` splits from 9,112 to 1,847 lines. `with fmt` and `with test --filter` ship.
+`NodeId` and `TypeId` become distinct types instead of raw `i32`s. `Codegen.with` splits from 10,559 to 3,993 lines. `Sema.with` splits from 9,112 to 1,847 lines. `with fmt` and `with test --filter` ship.
 
 **Mar 28-29 — Comptime evaluation**
 A dedicated compile-time evaluator replaces ad-hoc constant folding, enabling dead branch pruning, derive lowering, collection freezing, and comptime intrinsics.
@@ -127,7 +127,7 @@ Regex literals, such as `/pattern/flags`, become first-class syntax with `=~` an
 Seven compiler and migrator bugs are found and fixed through PCRE2 test suite failures: integer sign-extension in codegen, comma-expression side-effect loss, C integer promotion for small types, `sizeof` for pointer types, function address-of lowering, `sizeof` with macro type aliases, and AST session lifetime during macro translation.
 
 **May 9-10 — Build system**
-`build.w` replaces Makefile-driven builds with declarative target graphs, include path propagation, and generated source support.
+`build.with` replaces Makefile-driven builds with declarative target graphs, include path propagation, and generated source support.
 
 **May 10 — Do-while loops**
 `do: body while condition` is added to the language. `continue` jumps to the condition check, matching C semantics. The construct reduces `goto` usage in migrated code by providing a structured form for the do-while pattern.

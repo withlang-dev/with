@@ -2,7 +2,7 @@
 
 The direct malformed-MIR regression initially imported `Mir` and
 `Compilation`. Windows x86 run 34552488715 reached all 995 behavior passes,
-then failed linking `mir_uninitialized_drop_test.w`:
+then failed linking `mir_uninitialized_drop_test.with`:
 
 ```
 lld-link: error: duplicate symbol: _invalid_parameter_noinfo

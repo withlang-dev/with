@@ -1,0 +1,72 @@
+//! expect-stdout: ok
+// D213 (#3124): `field F of R is callback` says the only values a
+// function-pointer field holds are callbacks the program registered through
+// a presented setter. A call through it lends its arguments for the call
+// and keeps none, so an operation that reaches such a call (libcurl's
+// `curl_easy_perform` calling the debug callback) is no longer raw as
+// "retains param 0". The package itself must not fill the field: a unit
+// that stores a named package function into it contradicts the role.
+use compiler.ConanClient
+use std.fs
+use std.os
+use std.process
+
+fn draft(root: &str, facts: &str, extra_source: &str) -> str:
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    let registry = root ++ "/registry"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    assert(mkdir_p(registry ++ "/registry/c/traced") == 0)
+    let header = "typedef struct handle handle;\ntypedef void (*trace_fn)(handle *h, const char *text);\nhandle *handle_new(void);\nvoid handle_free(handle *h);\nvoid handle_set_trace(handle *h, trace_fn f);\nint handle_run(handle *h);\nvoid handle_reset(handle *h);\nhandle *handle_dup(const handle *h);\n"
+    assert(write_file(dep ++ "/include/traced.h", header) == 0)
+    assert(write_file(src ++ "/traced.h", header) == 0)
+    assert(write_file(src ++ "/traced.c", "#include <stdlib.h>\n#include \"traced.h\"\nstruct handle { trace_fn trace; int n; };\nhandle *handle_new(void) { handle *h = malloc(sizeof(handle)); if (!h) return 0; h->trace = 0; h->n = 0; return h; }\nvoid handle_free(handle *h) { free(h); }\nvoid handle_set_trace(handle *h, trace_fn f) { h->trace = f; }\nint handle_run(handle *h) { if (h->trace) h->trace(h, \"run\"); h->n = h->n + 1; return h->n; }\nvoid handle_reset(handle *h) { h->trace = 0; h->n = 0; }\nhandle *handle_dup(const handle *h) { handle *d = malloc(sizeof(handle)); if (!d) return 0; *d = *h; return d; }\n" ++ extra_source) == 0)
+    let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c traced.c\",\n  \"file\": \"traced.c\"\n}\n]\n"
+    assert(write_file(build ++ "/compile_commands.json", commands) == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"traced\"]}\n") == 0)
+    assert(write_file(registry ++ "/registry/c/traced/facts.with", "c facts traced:\n" ++ facts) == 0)
+    assert(set_env("WITH_REGISTRY", if facts.len() > 0: "file://" ++ current_dir() ++ "/" ++ registry else: "file:///nonexistent-registry") == 0)
+    conan_write_facade("traced", "1.0", dep, src, build)
+    (read_file(dep ++ "/contract.with") ?? "") ++ "\n====\n" ++ (read_file(dep ++ "/contract-report.txt") ?? "")
+
+fn main:
+    let role_alone = "    field trace of handle is callback    // traced.h: the trace function is the program's, set with handle_set_trace\n"
+    let role = role_alone ++ "    fn handle_set_trace\n        callback param 1    // traced.h: called with the handle and a message\n        retains param 1 by param 0    // traced.c: stored in the handle\n        callback_thread registering    // traced.h: called from handle_run, on the caller's thread\n"
+    let bare = draft("out/tmp/conan_facade_callback_field_test/bare", "", "")
+    let stated = draft("out/tmp/conan_facade_callback_field_test/stated", role, "")
+    // Without the role the handle is retained by a call nothing decides.
+    let bare_ok = bare.contains("handle_run: raw: retains param 0 (passed through the function pointer field trace")
+    // With it the operation lends its handle. The null store in
+    // `handle_reset` and the whole-record copy in `handle_dup` are no
+    // contradiction.
+    let stated_ok = stated.contains("    fn handle_run\n        lend") and stated.contains("//   field trace of handle is callback") and conan_facts_contradicted().len() == 0
+    // A package that stores its own function into the field contradicts
+    // the role: no contract is written, and the refusal names the store.
+    let filled = draft("out/tmp/conan_facade_callback_field_test/filled", role, "static void quiet(handle *h, const char *text) { (void)h; (void)text; }\nvoid handle_quiet(handle *h) { h->trace = quiet; }\n")
+    let refusal = conan_facts_contradicted()
+    let filled_ok = not filled.contains("c contract traced:") and refusal.contains("field trace of handle is callback") and refusal.contains("DISAGREES: the package stores its own function `quiet` into it")
+    if not (bare_ok and stated_ok and filled_ok):
+        print(bare)
+        print(stated)
+        print(filled)
+        print(refusal)
+    // The drafter finds the setter from source: with the role stated and
+    // the setter not described, the role is refused naming it.
+    let before = conan_facts_contradicted().len()
+    let undescribed = draft("out/tmp/conan_facade_callback_field_test/undescribed", role_alone, "")
+    let setter_refusal = conan_facts_contradicted().slice(before, conan_facts_contradicted().len())
+    let setter_ok = not undescribed.contains("c contract traced:") and setter_refusal.contains("`handle_set_trace` stores into it and the facts describe it with no `callback param N`")
+    // Described, the setter is presented with the clauses the facts state.
+    let setter_presented = stated.contains("    fn handle_set_trace\n") and stated.contains("        callback param 1    // registry: ") and stated.contains("        retains param 1 by param 0    // registry: ") and stated.contains("        callback_thread registering    // registry: ")
+    if not (setter_ok and setter_presented):
+        print(stated)
+        print(setter_refusal)
+    assert(setter_ok)
+    assert(setter_presented)
+    assert(bare_ok)
+    assert(stated_ok)
+    assert(filled_ok)
+    print("ok")

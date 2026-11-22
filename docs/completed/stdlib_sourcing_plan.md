@@ -162,7 +162,7 @@ map; there is no `Vec` in `lib/std`), and the sorted array is
 The public surface is grouped as follows (D146):
 
 - `std.collections`: `List`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`,
-  `SlotMap` in `lib/std/collections.w`; `Deque`, `Stack`, `Queue`,
+  `SlotMap` in `lib/std/collections.with`; `Deque`, `Stack`, `Queue`,
   `LinkedList`, `PriorityQueue`, `OrderedMap`, `OrderedSet`, `UnorderedMap`,
   `UnorderedSet`, `BitSet`, `Trie`, `SortedList`, `BinaryHeap`, `HashIndex`
   as `std.collections.<name>` under `lib/std/collections/`, with the slot
@@ -171,7 +171,7 @@ The public surface is grouped as follows (D146):
   `stc_word` (the word shape's conversions) and `mlib_slot`.
 - `std.algorithms`: `List.sort`, `sort_by`, `stable_sort`, `stable_sort_by`,
   `binary_search`, `lower_bound`, `upper_bound`, `reverse`, `shuffle`
-  (`lib/std/algorithms.w`).
+  (`lib/std/algorithms.with`).
 - There is no `std.slice`/`std.span` (D158): `[]T` and D119's arrays are
   the views, and multi-dimensional slicing is a language feature.
 
@@ -202,9 +202,9 @@ it. That gives:
 
 ## The pipeline (pcre2's, reused)
 
-Per corpus (since 2026-09-14 the generic pipeline in `build/corpora.w`
+Per corpus (since 2026-09-14 the generic pipeline in `build/corpora.with`
 driven by the registry, `docs/spec/toolchain/wo_bundles.md` "The corpus registry"; a
-corpus is a `Corpus` declaration in `build/<corpus>.w` plus its hooks):
+corpus is a `Corpus` declaration in `build/<corpus>.with` plus its hooks):
 
 1. **Pin.** Upstream release tag, tarball URL, sha256 constant. Re-migration
    happens only when the pin changes (the SDLC rule: we re-migrate, never
@@ -237,7 +237,7 @@ bump it needs, or a ruling that breaks its output), and under the stdlib tree
 because a bundle's symbols hash the module's canonical `<embedded-std>/…`
 path, which that location names whether or not the source is embedded
 (`docs/spec/toolchain/wo_bundles.md`, "Object build"); facades in
-`lib/std/collections.w`, `lib/std/collections/*.w` and `lib/std/algorithms.w`;
+`lib/std/collections.with`, `lib/std/collections/*.with` and `lib/std/algorithms.with`;
 the corpora lanes (`<corpus>-test`, `:test`) run every bundle's upstream
 tests, the fresh migrations (`<corpus>-test-fresh`, `corpus-migrator-gate`)
 and `wo-drift` run at the seed-cut and release tier (D131,
@@ -269,8 +269,8 @@ compiles on every seed platform.
 ## What the facade looks like
 
 We already ship two facades over migrated corpora, and they are the
-template: `lib/std/zlib.w` over the migrated zlib modules and
-`lib/std/regex.w` over migrated pcre2. Everything below generalizes what
+template: `lib/std/zlib.with` over the migrated zlib modules and
+`lib/std/regex.with` over migrated pcre2. Everything below generalizes what
 those two do; nothing is a new mechanism.
 
 **The pattern, as zlib and regex do it today**
@@ -394,8 +394,8 @@ pub mut fn Vec[T].sort_by(cmp: fn(&T, &T) -> i32) -> Unit:
 is declared in one place next to the facade, benchmarked, and extended by
 adding an instantiation to the corpus's build inputs — never by editing
 migrated code. **Settled by D148 (2026-10-22):** arbitrary `T` goes through
-the *slot shape* — the shapes unit (`facade_shapes.c` in `build/stc.w`,
-likewise in `build/mlib.w`) instantiates the engine over pointers to
+the *slot shape* — the shapes unit (`facade_shapes.c` in `build/stc.with`,
+likewise in `build/mlib.with`) instantiates the engine over pointers to
 facade-owned slots whose head carries the C-ABI comparator and hasher that
 dispatch to the With closures (`std.collections.stc_slot`, `mlib_slot`);
 integer scalars take a *word shape* instantiation where measured (`Deque`,
@@ -455,17 +455,17 @@ green; drop audit green; comparison measurements recorded. #937 is retired
 by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
 
 **Phase 1 status (2026-09-13, branch `c-algorithms-phase1`).**
-- Corpus: pinned (`build/c_algorithms.w`, revision `23d45379`), migrated
-  raw with `with migrate` (19 engine modules + `defs.w`), promoted to
+- Corpus: pinned (`build/c_algorithms.with`, revision `23d45379`), migrated
+  raw with `with migrate` (19 engine modules + `defs.with`), promoted to
   `lib/std/engines/c_algorithms/` as the third `.wo` bundle (`c_algorithms.wo`;
-  `bundle.w` root, `c-algorithms-bundle-root-check`, drift lane with
+  `bundle.with` root, `c-algorithms-bundle-root-check`, drift lane with
   upstream's `test-cpp` as the harness). The build wires it exactly as
   zlib's bundle at every site (since 2026-09-14 through the corpus registry).
 - Upstream tests: all 17 test programs pass under With with
   `ALLOC_TESTING`. Each test is its own whole migration (engine + framework +
   test) because the programs' globals are independent; the migration is
   promoted into `test/corpora/c_algorithms/` (one shared `engine/`, a
-  `programs/<name>/` with each program's `defs.w` and test module), and the
+  `programs/<name>/` with each program's `defs.with` and test module), and the
   corpora lane `c-algorithms-test` (in `:test`) compiles those checked-in
   programs with the release binary and runs them. A migrate workspace runs
   in the build driver's own compiler, so re-migrating (pin change, migrator
@@ -483,7 +483,7 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   slot the engine indexes by pointer; `get`/`peek` observe (`&T`),
   `remove`/`pop` transfer, `move fn drop` releases every held value, then
   the engine. Behavior tests, complexity fixtures (`test/complexity`) and
-  drop-audit cells (`tools/drop_audit.w`) cover each. The RB/AVL trees,
+  drop-audit cells (`tools/drop_audit.with`) cover each. The RB/AVL trees,
   hash table, lists, queue, bloom filter and binomial heap remain internal
   comparison engines (migrated, tested, not facaded).
 - Comparators: the engines' C callbacks receive one non-generic
@@ -512,11 +512,11 @@ Gate: `check.c` passes under With; benchmark table recorded; specialized
 adapters have complexity and drop evidence. #939 remains a Phase 3 gate.
 
 **Phase 2 status (2026-09-14, branch `tommyds-phase2`).**
-- Corpus: pinned (`build/tommyds.w`, amadvance/tommyds `1f3727fc`),
-  migrated raw with `with migrate` (the 13 units as modules + `defs.w`;
+- Corpus: pinned (`build/tommyds.with`, amadvance/tommyds `1f3727fc`),
+  migrated raw with `with migrate` (the 13 units as modules + `defs.with`;
   `tommy.c`, upstream's amalgamation of those units, is excluded),
   promoted to `lib/std/engines/tommyds/` as the fourth `.wo` bundle (`tommyds.wo`;
-  `bundle.w` root, `tommyds-bundle-root-check`, drift lane with upstream's
+  `bundle.with` root, `tommyds-bundle-root-check`, drift lane with upstream's
   `check.c` as the harness — module `check_`, since `check` is a prelude
   name). Wired as c-algorithms is at every site (through the corpus registry).
 - Upstream test: `check.c` runs to `OK` under With (37 timed sections,
@@ -543,12 +543,12 @@ adapters have complexity and drop evidence. #939 remains a Phase 3 gate.
   `hash_slot_compare`), the key and the value. `get` observes, `remove`
   and a replacing `insert` transfer, `clear`/`drop` walk the buckets and
   release every slot exactly once. Behavior test `behav_hash_index`,
-  complexity row `hash-index` (`test/complexity/stdlib.w`), drop-audit
-  cells `hash_index_*` (`tools/drop_audit.w`). `hashlin` (incremental
+  complexity row `hash-index` (`test/complexity/stdlib.with`), drop-audit
+  cells `hash_index_*` (`tools/drop_audit.with`). `hashlin` (incremental
   resize) and `hashtable` (fixed) stay internal engines: same node
   protocol, so the facade would be the same file with three `init`
   calls; not a public surface until a facade needs it.
-- Benchmark (`test/benchmark/hash_engines.w`, `with run`; i32 keys,
+- Benchmark (`test/benchmark/hash_engines.with`, `with run`; i32 keys,
   n = 200000, ns per operation, median of three, Eric's laptop, `-O1`):
 
   | engine | insert | lookup | remove |
@@ -602,7 +602,7 @@ code; facade complexity fixtures and drop audit green; #938, #939, and
 contract before exposing it.
 
 **Phase 3 status (2026-10-22, branch `stc-migrator`): the pipeline half.**
-- Corpus: pinned (`build/stc.w`, stclib/STC `fc5c0587`), the `src/` library
+- Corpus: pinned (`build/stc.with`, stclib/STC `fc5c0587`), the `src/` library
   units migrated whole in STC_HEADER linkage against the header tree
   (`Corpus.include_dirs`), plus a staged `ucd` unit for the Unicode tables
   upstream compiles only into cregex; promoted to `lib/std/engines/stc/` as the
@@ -648,7 +648,7 @@ contract before exposing it.
 - The facade half (D148, 2026-10-22, branch `stc-facades`): the
   generic-over-templates design item is settled by the slot shape —
   one hand-written C unit in the corpus's build inputs (`facade_shapes.c`,
-  build/stc.w) instantiates STC's templates per shape: `hset`, `sset`,
+  build/stc.with) instantiates STC's templates per shape: `hset`, `sset`,
   `pqueue`, `deque` over pointers to facade-owned slots whose head holds the
   C-ABI callbacks that dispatch to the With comparator and hasher
   (`std.collections.stc_slot`), `deque` of words, `sort` over slot
@@ -660,8 +660,8 @@ contract before exposing it.
   advances the buffer's start (D115), so consuming iteration is O(1) per
   element (#938; the native `BTreeMap`'s descending rebuild became linear
   with it, its ascending scan and `BTreeSet` stay #937). Each has a behavior fixture, complexity rows
-  (`test/complexity/stdlib.w`) and drop-audit cells. Benchmark
-  (`test/benchmark/stc_engines.w`, n = 100000 i32, ns per operation,
+  (`test/complexity/stdlib.with`) and drop-audit cells. Benchmark
+  (`test/benchmark/stc_engines.with`, n = 100000 i32, ns per operation,
   insert/lookup/remove): PriorityQueue 18/0/109 against the c-algorithms
   BinaryHeap 17/0/111; OrderedSet 197/103/237 against the native BTreeSet
   4371/481/4525 (n = 4000, #937) and the c-algorithms SortedList
@@ -675,7 +675,7 @@ contract before exposing it.
   names. D148 blessed with two conditions, both met: `Deque` stores the
   integer scalars inline (the word shape) and says so in its doc; the
   sole-includer publication rule is its own ruling, D150, with a fixture.
-  Measured (`test/benchmark/stc_engines.w`, n = 100000 i32, ns per
+  Measured (`test/benchmark/stc_engines.with`, n = 100000 i32, ns per
   operation insert/lookup/remove): `Deque[i32]` 2/0/0 (word shape) against
   `Deque[Pair]` 12/0/10 (slot shape) and `List` 2/0/1; `UnorderedSet`
   69/53/105 against `HashSet` 75/26/25 — the facade allocates a probe slot
@@ -699,7 +699,7 @@ Gate: M*LIB's bptree tests pass under With; facade complexity fixtures and
 drop audit green; comparison measurements recorded; #937 closed.
 
 Status (2026-10-22, D151):
-- The corpus: `build/mlib.w`, `lib/std/engines/mlib` (`m-core.h`, `m-bptree.h`,
+- The corpus: `build/mlib.with`, `lib/std/engines/mlib` (`m-core.h`, `m-bptree.h`,
   the facade shapes unit `BPTREE_DEF(mlib_slot_tree, 16, mlib_slot, …)` over
   slot pointers, D148; upstream's multimap example as the drift harness and
   the `mlib-test`/`mlib-test-fresh` lanes). M*LIB pinned at
@@ -716,8 +716,8 @@ Status (2026-10-22, D151):
   knowledge of their List layout is retired (traversal by `iter()` under
   §13.5, literals and comprehensions from the recorded `new()` contract).
   Complexity rows `btree-map-*`/`btree-set-*` PASS (XFAIL #937 before);
-  drop-audit cells `btree_map_*`, `btree_set_*`; `behav_btree_engine.w`.
-- Measured (`test/benchmark/stc_engines.w`, n = 100000 i32, ns/op median of
+  drop-audit cells `btree_map_*`, `btree_set_*`; `behav_btree_engine.with`.
+- Measured (`test/benchmark/stc_engines.with`, n = 100000 i32, ns/op median of
   3, insert/lookup/remove): BTreeSet 945/444/617 and BTreeMap 936/438/611 over
   the slot shape, beside OrderedSet (STC sset, AA-tree) 195/107/223 and the
   retired sorted-List BTreeSet (n = 4000: 4371/481/4525). The B+tree pays a

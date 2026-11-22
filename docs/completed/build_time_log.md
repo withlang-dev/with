@@ -28,7 +28,7 @@ from the executor's own instrumentation (`[times]` lines /
 | #680 stage B: allow_parallel worker pool (a2413f2e, 44ab0d26) | full chain 757.8 s → 684.2 s (~10%); object/IR tail now runs as cores/2-width waves; fixpoint stayed byte-identical |
 | #681 dead strip pipeline deleted (60dc5ec9) | −221 lines; codegen_units_plan/strip/emit_one/codegen_units_emit gone (superseded by per-unit generation) |
 | #681 windowed emit concurrency (0a14b07c) | memory K-cap removed — peaks are K-INDEPENDENT under full concurrency (15.3 GB @ K=5 / 13.2 @ K=8 / 14.4–15.5 @ K=16); emit threads join-oldest windowed, W = (mem − 5 GiB) / (plan_cost × 36 KB / K), calibrated plan_cost=289004 / frontend 4.9 GB; W=16 big-host baseline unchanged (149.1 s); forced W=2 footprint 10.03 → 7.76 GB at +47 % wall; 21-cell matrix pinned vs compiler.CodegenUnitsPolicy |
-| #683 serial actions in-process (c81e8173) | per-action worker child (re-eval of build.w, ~0.85–1.6 s each) eliminated for serial actions: compiler-main-source 1.6 → 0.0 s, prepare-bootstrap-link-root 1.6 → 0.0 s, bootstrap-llvm-link-metadata 2.0 → 0.8 s; commit-shape rebuild 13.9 → 10.4 s (−25 %); cold build via new executor passed end-to-end (worktree). Pool children unchanged (their processes buy parallelism) |
+| #683 serial actions in-process (c81e8173) | per-action worker child (re-eval of build.with, ~0.85–1.6 s each) eliminated for serial actions: compiler-main-source 1.6 → 0.0 s, prepare-bootstrap-link-root 1.6 → 0.0 s, bootstrap-llvm-link-metadata 2.0 → 0.8 s; commit-shape rebuild 13.9 → 10.4 s (−25 %); cold build via new executor passed end-to-end (worktree). Pool children unchanged (their processes buy parallelism) |
 
 Current state: compiler-change battery ≈ 25 min (build 684 s + fixpoint 312 s
 + max(audit, test) ≈ 8 min + evidence tails). Non-compiler commit ≈ 16 s
@@ -46,7 +46,7 @@ build + cached-verdict sweep. Iterate tier ≈ 92 s / 3.7 min.
 
 ## 2026-07-18 — Experiment: WITH_PROFILE decomposition of the 190 s stage compile
 
-Command: `WITH_PROFILE=1 with build out/gen/main.w -O1 -o <probe>` (seed
+Command: `WITH_PROFILE=1 with build out/gen/main.with -O1 -o <probe>` (seed
 compiler, identical to a stage1 compile). Result (wall ≈ 180 s):
 
 - Frontend, single-threaded, ~97 s: resolve 1.86 + imports 0.39 + comptime
@@ -69,9 +69,9 @@ parallelizing it is deep work (park until the cheap levers are spent).
 
 ## 2026-07-18 — Experiment: codegen-unit packing by instruction count (KEPT)
 
-Change: `wl_fn_instruction_count` in LlvmBridge.w (block/instr walk);
+Change: `wl_fn_instruction_count` in LlvmBridge.with (block/instr walk);
 `codegen_units_plan` bins by instruction count instead of block count
-(src/compiler/CodegenUnits.w:106). Deterministic (counts from the parsed
+(src/compiler/CodegenUnits.with:106). Deterministic (counts from the parsed
 module).
 
 Probe (stage1 carrying the change, profiled self-compile):
@@ -91,7 +91,7 @@ objects barely moved (140s — frontend-dominated, less backend to balance).
 
 Instrumentation surfaced `invariance-check` as the single longest battery
 item: 468.2s — five meaning-preserving perturbation variants, each a full
-~93s `check src/main.w`, run SERIALLY against one repo copy inside one
+~93s `check src/main.with`, run SERIALLY against one repo copy inside one
 action. The variants are independent by construction (each applies to a
 pristine copy), so: one target per variant (`invariance-<label>`), each
 with its own repo copy under its own output dir, marked `.allow_parallel()`;
@@ -104,7 +104,7 @@ wall, 4.5x, ~6 min off every compiler-change battery. Five concurrent
 whole-compiler checks fit comfortably in host memory.
 
 Side observation, logged for #686: the measurement run itself paid a
-~10-min stage-chain rebuild because editing build.w invalidates the chain
+~10-min stage-chain rebuild because editing build.with invalidates the chain
 (action signatures hash the build source). Every build-layer experiment
 pays this tax; #686 is now the highest-leverage remaining build-graph fix.
 
@@ -133,9 +133,9 @@ forced by measurement:
    use closure; cache hashes exactly those) — worked on first probe, zero
    closure misses across the graph.
 2. First failure: root-defined stage-ancestor actions (empty-file writer,
-   prepare-bootstrap-link-root) carried build.w's whole-build/ closure →
-   relocated to build/runtime.w (closure = std.build only).
-3. Second failure + the actual root cause: build/ and build.w were declared
+   prepare-bootstrap-link-root) carried build.with's whole-build/ closure →
+   relocated to build/runtime.with (closure = std.build only).
+3. Second failure + the actual root cause: build/ and build.with were declared
    INPUTS of every stage target (target_with_compiler_source_inputs) —
    belt-and-braces from before scoped signatures existed. Removed; the
    stage compile never reads them.
@@ -146,7 +146,7 @@ component — stale-reason lines ("[stale-debug]") settled in one run what
 three theories could not. Reason-printing is worth keeping in mind as a
 permanent debugging surface.
 
-Verdict, measured: benign build/emit_c.w edit = 19.7 s no-op sweep with
+Verdict, measured: benign build/emit_c.with edit = 19.7 s no-op sweep with
 zero stale targets (was ~10 min stage-chain rebuild). No-edit sweep also
 19.9 s and byte-stable. Every future build-layer experiment in this log
 just got ~10 min cheaper — the fix that accelerates the loop itself.
@@ -239,17 +239,17 @@ tuning on small hosts).
 1. #686 signature scoping — the ~10-min tax on every build-layer edit; now
    the single highest-leverage remaining item. Design (verified feasible,
    implement next): today every kind-23 signature includes
-   build_cache_hash_build_graph_sources = hash(build.w + build/* +
-   lib/std/build.w) (BuildGraphCache.w:286-290, used at :435-436). Replace
+   build_cache_hash_build_graph_sources = hash(build.with + build/* +
+   lib/std/build.with) (BuildGraphCache.with:286-290, used at :435-436). Replace
    with a per-target `action_code_hash` computed at materialize time: the
    materializer has the action fn's decl id (Materialize:155) and Sema maps
-   decl -> source path (Sema.w:978 decl_source_paths); hash the defining
-   file plus its `use` closure among {build.w, build/*, lib/std/build.w}
+   decl -> source path (Sema.with:978 decl_source_paths); hash the defining
+   file plus its `use` closure among {build.with, build/*, lib/std/build.with}
    (file-granular over-approximation of the call closure — safe, never
    under-invalidates). Probes after implementing: (a) comment-only edit to
-   build/emit_c.w must leave stage1/stage2/link FRESH; (b) edit to
-   build/compiler.w must invalidate stage actions; (c) build.w edit must
-   invalidate only build.w-defined actions plus changed target defs.
+   build/emit_c.with must leave stage1/stage2/link FRESH; (b) edit to
+   build/compiler.with must invalidate stage actions; (c) build.with edit must
+   invalidate only build.with-defined actions plus changed target defs.
 2. Sema 73.8 s serial block (from the profile) — deep compiler work.
 3. #681 codegen-unit memory (enables >8 units → further backend wall cuts).
 4. #682 prelude snapshot; #683 compiled build graph; #684 separate
@@ -258,10 +258,10 @@ tuning on small hosts).
 ## Idea queue (from .reference study; ranked by expected value)
 
 1. Decompose the 190 s stage compile with WITH_PROFILE (per-phase lines
-   exist in Compilation.w/Backend.w) — decides whether the next lever is
+   exist in Compilation.with/Backend.with) — decides whether the next lever is
    frontend (parse/sema/MIR, single-threaded) or LLVM backend. → THIS LOG,
    next entry.
-2. #686: build.w-only edits rebuild the stage chain (action signature hashes
+2. #686: build.with-only edits rebuild the stage chain (action signature hashes
    the whole build source). Fix = scope the hash to the action's comptime
    call closure (`with analyze closure:call` can compute it). Saves ~12 min
    per build-layer iteration.
@@ -269,7 +269,7 @@ tuning on small hosts).
    ~3 GB/unit bitcode re-parse also costs time).
 4. #682: serialized prelude snapshot — O(100ms) × ~2000 child processes per
    battery.
-5. #683: stop re-interpreting build.w per worker (~1.1 s minimum per action,
+5. #683: stop re-interpreting build.with per worker (~1.1 s minimum per action,
    measured on a trivial two-action project).
 6. #680 stage C: delegate remaining in-process kinds (regex-runtime-object
    3.7 s, bridges) through the pool (~8 s bound).

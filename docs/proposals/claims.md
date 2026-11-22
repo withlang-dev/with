@@ -62,9 +62,9 @@ guardrail half.
 
 ### Tier 1: declaration-site claims about a migrated engine
 
-**Where.** The package's facts file (`CiFacts.w`, §16.2b.15 item 3), the
+**Where.** The package's facts file (`CiFacts.with`, §16.2b.15 item 3), the
 file a facade registry already uses, in the facade language's own spelling.
-A corpus's facts file lives beside the corpus's build record (`build/stc.w`
+A corpus's facts file lives beside the corpus's build record (`build/stc.with`
 names it), never inside the generated modules (D112: a corpus is never
 edited by hand; the facts file is the human's input to the migrator).
 
@@ -252,7 +252,7 @@ package's facts file for a migrated corpus and applies `returns borrow R
 from param N, nonnull` at emission under D121's precedence; the artifact's
 `:registry` provenance; `bs_check_migrate_contracts` rows for a claimed
 return, a claim contradicting a proof, an uncited claim refused;
-`build/stc.w` names the facts file; the STC lines; re-promotion under
+`build/stc.with` names the facts file; the STC lines; re-promotion under
 `migrator-pin`; the facades call `at`/`top`/`front`/`back` as methods and
 drop `unsafe fn place`.
 

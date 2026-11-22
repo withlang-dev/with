@@ -67,64 +67,64 @@ let c = add(&ctx, &a, &b)
 
 ```
 lib/weld/
-├── tensor.w                # Tensor, Storage, refcount, Drop impl
-├── grad.w                  # GradMeta, GradNode, SavedTensor, SavedState
-├── context.w               # Context, ProgramRegistry, grad stack
+├── tensor.with                # Tensor, Storage, refcount, Drop impl
+├── grad.with                  # GradMeta, GradNode, SavedTensor, SavedState
+├── context.with               # Context, ProgramRegistry, grad stack
 ├── ops/
-│   ├── elementwise.w       # add, sub, mul, neg, exp, relu, etc.
-│   ├── reduce.w            # sum, mean, max, min, argmax
-│   ├── matmul.w            # matmul, bmm, linear (fused)
-│   ├── view_ops.w          # reshape, transpose, permute, slice
-│   ├── data_ops.w          # cat, stack, gather, scatter, pad
-│   ├── cast.w              # to_dtype, float, half, bfloat16
-│   ├── fused.w             # softmax, layer_norm, rms_norm, etc.
-│   └── broadcast.w         # broadcast_shapes, unbroadcast
+│   ├── elementwise.with       # add, sub, mul, neg, exp, relu, etc.
+│   ├── reduce.with            # sum, mean, max, min, argmax
+│   ├── matmul.with            # matmul, bmm, linear (fused)
+│   ├── view_ops.with          # reshape, transpose, permute, slice
+│   ├── data_ops.with          # cat, stack, gather, scatter, pad
+│   ├── cast.with              # to_dtype, float, half, bfloat16
+│   ├── fused.with             # softmax, layer_norm, rms_norm, etc.
+│   └── broadcast.with         # broadcast_shapes, unbroadcast
 ├── backward/
-│   ├── engine.w            # backward(), topo_sort, free_graph, hooks
-│   ├── grad_add.w          # AddBackward
-│   ├── grad_mul.w          # MulBackward
-│   ├── grad_matmul.w       # MatmulBackward
-│   ├── grad_relu.w         # ReluBackward
-│   ├── grad_softmax.w      # SoftmaxBackward
-│   ├── grad_ce.w           # CrossEntropyBackward
-│   ├── grad_layernorm.w    # LayerNormBackward
-│   ├── grad_embedding.w    # EmbeddingBackward
-│   └── grad_linear.w       # LinearBackward
+│   ├── engine.with            # backward(), topo_sort, free_graph, hooks
+│   ├── grad_add.with          # AddBackward
+│   ├── grad_mul.with          # MulBackward
+│   ├── grad_matmul.with       # MatmulBackward
+│   ├── grad_relu.with         # ReluBackward
+│   ├── grad_softmax.with      # SoftmaxBackward
+│   ├── grad_ce.with           # CrossEntropyBackward
+│   ├── grad_layernorm.with    # LayerNormBackward
+│   ├── grad_embedding.with    # EmbeddingBackward
+│   └── grad_linear.with       # LinearBackward
 ├── nn/
-│   ├── module.w            # Module trait
-│   ├── linear.w
-│   ├── norm.w
-│   ├── embedding.w
-│   ├── attention.w
-│   ├── ffn.w
-│   ├── transformer.w
-│   └── init.w
+│   ├── module.with            # Module trait
+│   ├── linear.with
+│   ├── norm.with
+│   ├── embedding.with
+│   ├── attention.with
+│   ├── ffn.with
+│   ├── transformer.with
+│   └── init.with
 ├── optim/
-│   ├── optimizer.w
-│   ├── sgd.w
-│   ├── adam.w
+│   ├── optimizer.with
+│   ├── sgd.with
+│   ├── adam.with
 │   └── fused_adam.ir
 ├── distributed/
-│   ├── world.w
-│   ├── data_parallel.w
-│   ├── tensor_parallel.w
-│   ├── fsdp.w
-│   ├── pipeline.w
-│   └── hybrid.w
+│   ├── world.with
+│   ├── data_parallel.with
+│   ├── tensor_parallel.with
+│   ├── fsdp.with
+│   ├── pipeline.with
+│   └── hybrid.with
 ├── data/
-│   ├── safetensors.w
-│   ├── gguf.w
-│   ├── tokenizer.w
-│   └── sharded_loader.w
-├── error.w
+│   ├── safetensors.with
+│   ├── gguf.with
+│   ├── tokenizer.with
+│   └── sharded_loader.with
+├── error.with
 └── test/
-    ├── test_tensor.w
-    ├── test_ownership.w    # NEW: borrow/drop/refcount verification
-    ├── test_ops.w
-    ├── test_broadcast.w
-    ├── test_autograd.w
-    ├── test_nn.w
-    ├── test_distributed.w
+    ├── test_tensor.with
+    ├── test_ownership.with    # NEW: borrow/drop/refcount verification
+    ├── test_ops.with
+    ├── test_broadcast.with
+    ├── test_autograd.with
+    ├── test_nn.with
+    ├── test_distributed.with
     └── bench/
 ```
 

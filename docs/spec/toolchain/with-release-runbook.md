@@ -127,7 +127,7 @@ the seed (issue #313):
   `with-llvm-sdk-<COMPILER_LLVM_VERSION>-<host>.tar.gz` from the matching
   release and extracts it into `.deps/llvm-<ver>-<host>`. `WITH_LLVM_SDK_VERSION`
   pins the release tag; otherwise the newest release carrying the asset is used.
-- The SDK bytes change only when `COMPILER_LLVM_VERSION` (`build/compiler.w`)
+- The SDK bytes change only when `COMPILER_LLVM_VERSION` (`build/compiler.with`)
   bumps; publishing it on every release keeps each release self-describing.
 
 Seed and SDK download paths must use the host-specific asset names:
@@ -195,7 +195,7 @@ on the promoted corpora, and wo-drift. It migrates nothing (D206).
 Before `build`, confirm `src/main` is the lock's seed: `shasum -a 256
 src/main` against the asset's digest in `seed.lock`. A host whose `src/main`
 fell behind the lock fails stage1 on current syntax, and `:seed` cannot
-always repair it (an old seed may not compile `build/https_fetch.w`); fetch
+always repair it (an old seed may not compile `build/https_fetch.with`); fetch
 the pinned asset by hand and verify its digest. On macOS, export
 `SDKROOT=$(xcrun --show-sdk-path)` for `:test`: the facade tests `c_import`
 `sqlite3.h`, `bzlib.h` and `curl/curl.h`, which the embedded darwin sysroot
@@ -282,7 +282,7 @@ lists. The scenarios:
 
 - `artifact_smoke`: the platform-named release binary asset
   (`out/release/with-darwin-aarch64`, `with-linux-x86_64`, or
-  `with-windows-x86_64.exe`) through `version`, `-e`, and `run file.w`.
+  `with-windows-x86_64.exe`) through `version`, `-e`, and `run file.with`.
 - `fresh_project`: a clean `with init` project runs with the release asset.
 - `migrate_c`: a small C source migrates, checks, and runs.
 - `zlib`: the universal non-GUI C package path: `with init`, `with get
@@ -292,7 +292,7 @@ lists. The scenarios:
   `BZ2_bzBuffToBuffCompress`/`BZ2_bzBuffToBuffDecompress` round trip.
 - `sqlite3`: `with get c.sqlite3`, `use c_import("sqlite3.h")` behind the
   SQLite contract (written by the scenario into the project as
-  `src/contracts/sqlite3.w`; D51 ruling §66), and an in-memory `:memory:`
+  `src/contracts/sqlite3.with`; D51 ruling §66), and an in-memory `:memory:`
   database `CREATE TABLE`/`INSERT`/`SELECT` round trip through
   `Database.open`, `db.exec`, `db.prepare`, `stmt.step` and
   `stmt.column_int` — no `unsafe`.
@@ -307,7 +307,7 @@ lists. The scenarios:
   the Windows scenario copies `WITH_UAT_OPENGL32_DLL` beside the program
   `with run` builds). They validate the user-facing C interop path
   end to end: `with init`, `with get c.raylib`, writing the spiral program
-  to the initialized project's `src/main.w`, and `with run`. The generated
+  to the initialized project's `src/main.with`, and `with run`. The generated
   raylib app renders a deterministic spiral, reads back the rendered
   framebuffer, counts bright non-background samples in the spiral annulus,
   and exits non-zero if the visual check fails, or loudly if no window could
@@ -538,7 +538,7 @@ second manual `gh release create` for a tag handled by this workflow.
 
 When the release is meant to become the seed, bump `seed.lock` on main to the
 new version with every platform's published digest (the `.sha256` sidecars),
-move every workflow seed pin with it (`with run tools/bump_seed_pins.w`;
+move every workflow seed pin with it (`with run tools/bump_seed_pins.with`;
 `with build :seed-driver` refuses while any pin disagrees with the lock), then
 `with build :seed` refetches `src/main`. Land the first change that needs the
 new seed after that bump, never in the same PR.
@@ -559,7 +559,7 @@ after `src/version` is bumped and the tag is pushed:
 ```sh
 export GH_TOKEN=$(gh auth token)
 export RELEASE_SOURCE_SHA=$(git rev-parse v0.14.3)
-with run tools/release_local.w v0.14.3            # --channel test to rehearse
+with run tools/release_local.with v0.14.3            # --channel test to rehearse
 ```
 
 It runs, in order: the darwin gates (`build`, `:fixpoint`, `:test`,
@@ -588,7 +588,7 @@ is rerun.
 Nobody waits for the slowest runner. The release is created by whichever
 platform finishes first and every other platform adds its own asset when it
 is done, through one action, `with build :publish-release-asset`
-(build/release_publish.w): it creates the release for the tag if absent
+(build/release_publish.with): it creates the release for the tag if absent
 (stable for the `release` channel, prerelease otherwise), refuses any asset
 name already on the release (assets are add-only; a different build needs a
 different tag), uploads the asset with its `.sha256` and a `.provenance`
@@ -747,5 +747,5 @@ git rev-parse --short v0.14.3^{}
 Confirm the seed downloader still points at the published asset name:
 
 ```sh
-rg -n 'with-darwin-aarch64|with-linux-x86_64|releases/download/.*/main|seed\.arg\("main"\)' build.w scripts docs/spec/toolchain/with-release-runbook.md
+rg -n 'with-darwin-aarch64|with-linux-x86_64|releases/download/.*/main|seed\.arg\("main"\)' build.with scripts docs/spec/toolchain/with-release-runbook.md
 ```

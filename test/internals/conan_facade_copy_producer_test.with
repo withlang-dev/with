@@ -1,0 +1,36 @@
+//! expect-stdout: ok
+// A producer handed one of the record it returns (a copy, `dup`) is proven
+// to return a fresh allocation, but not that the copy shares nothing with
+// its source, and a resource that depends on one of its own type is not
+// modeled (§16.2b.6). The draft wrote `from box_dup`, a contract the
+// checker then refused as a compiler defect; it now leaves the function raw
+// and says which clause a contract states.
+use compiler.ConanClient
+use std.fs
+use std.os
+use std.process
+
+fn main:
+    let root = "out/tmp/conan_facade_copy_producer_test"
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    let header = "typedef struct box box;\nbox *box_new(void);\nbox *box_dup(const box *b);\nvoid box_free(box *b);\n"
+    assert(write_file(dep ++ "/include/boxed.h", header) == 0)
+    assert(write_file(src ++ "/boxed.h", header) == 0)
+    assert(write_file(src ++ "/boxed.c", "#include <stdlib.h>\n#include \"boxed.h\"\nstruct box { int n; };\nbox *box_new(void) { box *b = malloc(sizeof(box)); if (!b) return 0; b->n = 0; return b; }\nbox *box_dup(const box *b) { box *d = malloc(sizeof(box)); if (!d) return 0; d->n = b->n; return d; }\nvoid box_free(box *b) { free(b); }\n") == 0)
+    assert(write_file(build ++ "/compile_commands.json", "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c boxed.c\",\n  \"file\": \"boxed.c\"\n}\n]\n") == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"boxed\"]}\n") == 0)
+    assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
+    conan_write_facade("boxed", "1.0", dep, src, build)
+    let contract = read_file(dep ++ "/contract.with") ?? ""
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    let ok = contract.contains("        from box_new") and not contract.contains("from box_dup") and report.contains("box_dup: raw: owned producer of Box, but param 0 is another Box: that the copy shares nothing with its source is not proven; a contract states 'independent' on the resource")
+    if not ok:
+        print(contract)
+        print(report)
+    assert(ok)
+    print("ok")

@@ -9,8 +9,8 @@ platforms: darwin, windows, linux-x86_64
 new directory
 run: with init .
 run: with get c.sdl
-write src/main.w from sdl_main.w
-write src/contracts/sdl.w:
+write src/main.with from sdl_main.with
+write src/contracts/sdl.with:
     // An SDL facade a game writes for itself: the window and its renderer are
     // owned resources that SDL's own destroy calls release, the renderer before
     // the window it draws into.
@@ -59,7 +59,7 @@ write src/contracts/sdl.w:
         domain errors thread
         fn SDL_GetError
             returns borrow CStr from domain errors
-run: with check src/main.w
+run: with check src/main.with
 expect stdout: ok
 # SDL's own off-screen video driver (built into SDL on every platform): the
 # window and its ten frames need no monitor, so the scenario runs on a host

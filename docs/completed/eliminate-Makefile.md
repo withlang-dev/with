@@ -10,7 +10,7 @@ spec are archived under `docs/completed/`.
 Goal: after a platform has its first working With seed, the With repository can
 build, test, verify, fetch/update SDK dependencies, cross-build supported
 targets, package releases, update/install seeds from a checkout, and run CI through the
-self-hosted `build.w` framework. No normal post-seed workflow may depend on a
+self-hosted `build.with` framework. No normal post-seed workflow may depend on a
 repository shell, PowerShell, CMD, Python, or host utility script.
 
 Bootstrap exception: bringing up the first seed on a new platform may use any
@@ -143,7 +143,7 @@ Implemented:
   `Vec[u8]`. Symlink validation allows relative links that normalize inside the
   extraction root and rejects escaping targets. `ToolFs.write_tar_gz()` provides
   deterministic gzip-wrapped tar output. The migrated `std.zlib` facade
-  supports zlib/gzip decompression and gzip compression; `build/zlib.w` uses a
+  supports zlib/gzip decompression and gzip compression; `build/zlib.with` uses a
   With HTTP helper plus migrated zlib gunzip helper plus `ToolFs.extract_tar()`
   for `:zlib-reference`. Bootstrap-C, platform compiler, and SDK packaging are
   graph-owned.
@@ -210,7 +210,7 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
 ## Progress
 
 - 2026-06-14: Fixed `ToolFs.write_binary` so it writes the provided byte
-  payload and added a build.w selfhost regression that round-trips non-text
+  payload and added a build.with selfhost regression that round-trips non-text
   bytes through `write_binary` and `read_binary`.
 - 2026-06-14: Replaced `scripts/check-no-c-export.py` with a pure With build
   action and deleted the script.
@@ -222,7 +222,7 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
 - 2026-06-14: Replaced `scripts/check-spec-inventory.py` with a pure With
   build action and deleted the script.
 - 2026-06-14: Removed `sh -c`/`find`/`sed`/`wc` shell fragments from
-  `build/retention.w` prune reporting/deletion and switched test `.w`
+  `build/retention.with` prune reporting/deletion and switched test `.w`
   manifest discovery to typed `ToolFs.list_files` traversal. Checksums still
   used host `shasum`/`sha256sum` pending the native hashing capability.
 - 2026-06-14: Converted `install-user` and `update-seed` to graph `Install`
@@ -235,16 +235,16 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
   API is installed.
 - 2026-06-14: Hardened `ProcessRunner.run_spec` so unsupported capture/stdin
   combinations fail loudly, added small `ProcessSpec` builder methods, and
-  covered the path in build.w selfhost tests.
+  covered the path in build.with selfhost tests.
 - 2026-06-15: Added `with build :print-version` as the Make replacement for
   repository version printing. It uses the compiler version rule
   (`WITH_VERSION`, then `src/version-g<short_hash>`, then `src/version`) and is
   deliberately always-run so it prints every invocation.
 - 2026-06-15: Added the self-hosted `with-sha256` utility, built by the graph
-  from `tools/with-sha256.w`, and replaced repository build evidence,
+  from `tools/with-sha256.with`, and replaced repository build evidence,
   test-green/last-green, and compiler seed-input hashing with that tool.
 - 2026-06-15: Added `ToolFs.host_read_text` for future external file hashing
-  and added build.w selfhost coverage for action timeout/cwd/env/network
+  and added build.with selfhost coverage for action timeout/cwd/env/network
   metadata plus `ProcessSpec` cwd and timeout behavior.
 - 2026-06-15: Added `ToolFs.sha256_file()` backed by the BearSSL-derived
   `std.crypto.sha256` implementation, wired the tool-mode evaluator to hash
@@ -262,21 +262,21 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
   paths, writes `out/test-graph/stack-budget-check/report.txt`, and enforces
   the previous 64 KiB default budget when run.
 - 2026-06-15: Added native uncompressed USTAR creation/extraction to
-  `ToolFs.write_tar()` / `ToolFs.extract_tar()` with build.w selfhost coverage
+  `ToolFs.write_tar()` / `ToolFs.extract_tar()` with build.with selfhost coverage
   for directory entries, text files, and binary payloads.
 - 2026-06-15: Removed installer scripts from the required release asset and
   upload lists in the release runbook, and clarified in the bootstrap runbook
   that `scripts/install.*` is not the post-seed handoff path; post-seed updates
   use `with build :install-user` / `with build :update-seed`.
 - 2026-06-15: Triaged `scripts/generate-requirements.py`. It is not wired into
-  `build.w` or current runbooks, but it remains the only known generator for
+  `build.with` or current runbooks, but it remains the only known generator for
   `docs/requirements.md` and does not reproduce the committed matrix as a
   no-op. Filed #593 to replace it with a With docs-generation target or
   explicitly retire the generated requirements matrix.
 - 2026-06-15: Finished capability denial coverage for action writes and process
   execution. `ActionCtx.process_runner()` now inherits action network/write
   declarations, `ProcessRunner` capture paths must stay within declared action
-  outputs/write scopes, and build.w selfhost covers undeclared process capture
+  outputs/write scopes, and build.with selfhost covers undeclared process capture
   output denial plus an allowed-network process case.
 - 2026-06-16: Deleted the unused top-level `memlimit.sh` historical script.
 - 2026-06-16: Cleaned the release runbook away from normal post-seed package
@@ -301,7 +301,7 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
 - 2026-06-19: Added zlib graph pipeline targets through
   `:zlib-reference`, `:zlib-migrate`, `:zlib-build`, `:zlib-test`,
   `:zlib-check-generated`, and `:zlib-promote`; added a `std.zlib` facade; and
-  removed host `curl`, `shasum`, and `tar -xzf` from `build/zlib.w`.
+  removed host `curl`, `shasum`, and `tar -xzf` from `build/zlib.with`.
   `:zlib-reference` now fetches through a With HTTP helper, verifies with
   `ToolFs.sha256_file()`, gunzips through migrated zlib, and extracts with
   native `ToolFs.extract_tar()`.
@@ -319,7 +319,7 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
 - 2026-06-19: Replaced generic `std.build` host `curl` and `tar xzf` actions.
   `Build.download()` now compiles and runs a With HTTPS helper, and
   `Build.extract_tar_gz()` compiles and runs a With zlib gunzip helper before
-  extracting with native `ToolFs.extract_tar()`. Added build.w selfhost coverage
+  extracting with native `ToolFs.extract_tar()`. Added build.with selfhost coverage
   for `Build.extract_tar_gz()`.
 - 2026-06-19: Added platform compiler package targets:
   `:package-current-host`, `:package-darwin-aarch64`,
@@ -356,7 +356,7 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
   files, CI does not invoke Make or repository scripts, and remaining
   PowerShell references are bootstrap-runbook examples or installer internals.
 - 2026-06-29: Retired the generated-matrix path too: deleted
-  `build/requirements.w` and the `:requirements` / `:requirements-check`
+  `build/requirements.with` and the `:requirements` / `:requirements-check`
   targets, made `docs/requirements.md` explicitly hand-maintained, and retained
   only `:requirements-informative-check` in `:test`.
 
@@ -365,7 +365,7 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
 ### 1. Fix public build capability correctness
 
 Implement before deleting Make or scripts, because build actions must be
-trustworthy once `build.w` owns every workflow.
+trustworthy once `build.with` owns every workflow.
 
 - [x] Fix `ToolFs.write_binary(path, bytes)` so it writes the provided bytes
   instead of an empty file. Add a build-w/selfhost regression that writes
@@ -434,7 +434,7 @@ rebuild.
 The Makefile can disappear only after the repository build graph is not quietly
 depending on scripts or shell fragments for normal maintenance.
 
-- [x] Replace `build/retention.w` shell snippets used for prune counts, samples,
+- [x] Replace `build/retention.with` shell snippets used for prune counts, samples,
   and `.w` manifest hashing with typed filesystem traversal and With-native
   hashing.
 - [x] Move `scripts/check-no-c-export.py` into a With build action that reads source
@@ -446,7 +446,7 @@ depending on scripts or shell fragments for normal maintenance.
 - [x] Move `scripts/check-stack-budget.py` into an explicit With build action
   that uses declared SDK-owned LLVM tools instead of Python and host tool
   discovery.
-- [x] Audit `build/`, `src/`, `lib/`, `rt/`, `build.w`, `scripts/`, and `tools/`
+- [x] Audit `build/`, `src/`, `lib/`, `rt/`, `build.with`, `scripts/`, and `tools/`
   for `sh -c`, `bash -c`, `powershell`, `.py`, `.sh`, `.ps1`, `.cmd`, pipes,
   redirects, and shell utility names. Every post-seed hit must be eliminated or
   moved behind the explicit bootstrap-only boundary.
@@ -463,7 +463,7 @@ The goal is not cosmetic deletion; it is a With-owned build graph.
 - [x] Define the intended cross-build command surface. Preferred shape:
   `with build :cross --target <target>` or explicit graph targets named
   `cross-<target>`.
-- [x] Move emitted-C cross generation into `build.w` / project-local modules.
+- [x] Move emitted-C cross generation into `build.with` / project-local modules.
   Cross is currently unsupported, so the old emitted-C/Zig workflow was removed
   rather than preserved.
 - [x] Replace `scripts/generate_wl_stubs.sh` with With code or remove the need for
@@ -515,7 +515,7 @@ Defense: deleting Make without defining the bootstrap boundary breaks clean CI
 and new contributor checkout flows. Using installer scripts in the normal
 post-seed path would preserve the external dependency under another name.
 
-### 6. Move SDK build and SDK packaging into `build.w`
+### 6. Move SDK build and SDK packaging into `build.with`
 
 The static LLVM/Clang/lld SDK is a With-owned toolchain artifact. Its post-seed
 construction and packaging must be graph targets, not shell or PowerShell
@@ -554,7 +554,7 @@ Defense: after bootstrap, the SDK is part of the self-hosted toolchain supply
 chain. If rebuilding or packaging it needs scripts, release production still
 depends on host functionality outside the seed.
 
-### 7. Move release packaging into `build.w`
+### 7. Move release packaging into `build.with`
 
 Release assets are compiler outputs. They need the same graph ownership as
 build, fixpoint, and tests.
@@ -570,7 +570,7 @@ build, fixpoint, and tests.
   `scripts/package-linux-x86_64.sh`, and
   `scripts/package-windows-x86_64.ps1` in With build modules.
 - [x] Reimplement the behavior of `scripts/package-bootstrap-c.sh` in
-  `build/package.w` and delete the script.
+  `build/package.with` and delete the script.
 - [x] Implement release staging in With: copy binaries and resources, preserve
   executable bits, write manifests, write checksums, and produce deterministic
   archives. Platform compiler packages copy the release binary and write

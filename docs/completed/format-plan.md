@@ -19,15 +19,15 @@ profiling demands it.
 
 ## Phase 0 — Prep
 
-- [x] 1. Audit f-string and string-coercion code paths in `src/Parser.w` (lines
+- [x] 1. Audit f-string and string-coercion code paths in `src/Parser.with` (lines
       1913–2006: `desugar_interpolated_string`, `interp_concat`, `interp_to_string`,
-      `parse_interpolated_expr`), `src/Sema.w` (line 4225: `OP_CONCAT` → `ty_str`),
-      `src/Codegen.w` (lines 5833–5896: `mir_str_concat`, `coerce_val_to_str`), and
+      `parse_interpolated_expr`), `src/Sema.with` (line 4225: `OP_CONCAT` → `ty_str`),
+      `src/Codegen.with` (lines 5833–5896: `mir_str_concat`, `coerce_val_to_str`), and
       `runtime/helpers.c` (lines 352–406: `int_to_string`, `i64_to_string`,
       `with_f64_to_string`; lines 661–673: `with_str_concat`).
       Results: `docs/format-audit.md`.
 - [x] 2. Identify every AST enum, node-name table, debug printer, and dump path that
-      must learn about `NK_FSTRING` and `NK_FSTRING_SPEC` (check `src/Ast.w` node
+      must learn about `NK_FSTRING` and `NK_FSTRING_SPEC` (check `src/Ast.with` node
       kind list and name arrays). Results: `docs/format-audit.md` §7.
 - [x] 3. Inventory all `str ++ non-str` usages in the repo (437 in `src/`, 104 in
       `test/`+`lib/`, 541 total). Results: `docs/format-audit.md` §8.
@@ -39,16 +39,16 @@ profiling demands it.
       codegen fallback. Step 2 adds new codegen with runtime helpers. Step 3
       migrates compiler source to f-strings and removes coercion hack. Each step
       builds, installs seed, fixpoints. Details: `docs/format-audit.md` §10.
-- [x] 6. Confirm tree is green: `make build` ✓, `check src/main.w` ✓, `make fixpoint` ✓.
+- [x] 6. Confirm tree is green: `make build` ✓, `check src/main.with` ✓, `make fixpoint` ✓.
 
 ## Phase 1 — AST and Parser
 
 - [x] 7. Add `NK_FSTRING` (72) and `NK_FSTRING_SPEC` (73) node kind constants to
-      `src/Ast.w`. Add `FSTR_SEG_LITERAL = 0` and `FSTR_SEG_EXPR = 1`.
+      `src/Ast.with`. Add `FSTR_SEG_LITERAL = 0` and `FSTR_SEG_EXPR = 1`.
 - [x] 8. Update AST name tables: added NK_FSTRING/NK_FSTRING_SPEC to
-      `typed_expr_kind_name` in Sema.w. No dump/debug utilities switch on
+      `typed_expr_kind_name` in Sema.with. No dump/debug utilities switch on
       expression node kinds — only the Sema name table needed updating.
-- [x] 9. In `src/Parser.w`, replace `desugar_interpolated_string` / `interp_concat`
+- [x] 9. In `src/Parser.with`, replace `desugar_interpolated_string` / `interp_concat`
       with structured `NK_FSTRING` emission. Emit `FSTR_SEG_LITERAL` for text
       segments and `FSTR_SEG_EXPR` for interpolation holes. Preserve source spans.
 - [x] 10. Parse interpolation holes as `expr` plus optional `:spec`. Split on
@@ -59,14 +59,14 @@ profiling demands it.
 - [x] 12. Add interim fallback: `check_fstring` in Sema returns `ty_str`,
       `lower_fstring` in MirLower desugars NK_FSTRING to OP_CONCAT chain,
       Codegen type-inference returns `ty_str` for NK_FSTRING.
-- [x] 13. Verify: `make build` ✓, `check src/main.w` ✓, 307/307 tests pass.
-- [x] 14. Add `test/behavior/behav_fstring_parser.w` (12 tests): bare holes,
+- [x] 13. Verify: `make build` ✓, `check src/main.with` ✓, 307/307 tests pass.
+- [x] 14. Add `test/behavior/behav_fstring_parser.with` (12 tests): bare holes,
       str holes, text+hole, multi-hole, expressions, array indexing, empty,
       literal-only, adjacent holes, negative values, bools. 308/308 pass.
 
 ## Phase 2 — Semantic Analysis
 
-- [x] 15. Add `check_fstring` in `src/Sema.w`: type-check each `FSTR_SEG_EXPR`
+- [x] 15. Add `check_fstring` in `src/Sema.with`: type-check each `FSTR_SEG_EXPR`
       segment, set result type of `NK_FSTRING` to `ty_str`. (Done in task 12.)
 - [x] 16. Implement mode/type compatibility matrix in `validate_fstring_spec`:
       `d/x/X/b/o` → integers, `f/e/g` → floats, `s` → strings, `?` → any.
@@ -75,9 +75,9 @@ profiling demands it.
       allowed for all types.
 - [x] 18. Enforce bare-display rules: `{struct_expr}` without `:?` is a
       compile-time error with hint "use :? for debug". Test:
-      `err_fstring_struct_bare.w`. 317/317 pass.
-- [x] 19. Verify: `make build` ✓, `check src/main.w` ✓, 314/314 tests pass.
-- [x] 20. Add 6 sema error tests in `test/compile_errors/err_fstring_spec_*.w`:
+      `err_fstring_struct_bare.with`. 317/317 pass.
+- [x] 19. Verify: `make build` ✓, `check src/main.with` ✓, 314/314 tests pass.
+- [x] 20. Add 6 sema error tests in `test/compile_errors/err_fstring_spec_*.with`:
       int mode on float, float mode on int, str mode on int, precision on int,
       sign on str, `#` on float.
 
@@ -86,7 +86,7 @@ profiling demands it.
 - [x] 21. Interim codegen fallback works for all compiler f-strings. `make build` ✓,
       `make smoke` ✓, 308/308 tests pass.
 - [x] 22. Fresh stage2 installed as seed via `make install-user`.
-- [x] 23. Verify after seed install: `make build` ✓, `make smoke` ✓, `check src/main.w` ✓.
+- [x] 23. Verify after seed install: `make build` ✓, `make smoke` ✓, `check src/main.with` ✓.
 
 ## Phase 4 — Runtime Formatting Helpers
 
@@ -119,8 +119,8 @@ profiling demands it.
       display. String quoting and struct/enum debug formatting deferred to task 44+.
       Fixed intern pool mismatch: lower_fstring now uses self.pool.intern instead
       of self.sema.pool_intern for string constants.
-- [x] 36. Verify: `make build` ✓, `make smoke` ✓, `check src/main.w` ✓.
-- [x] 37. Add `test/behavior/behav_fstring_codegen.w` (11 tests): let binding,
+- [x] 36. Verify: `make build` ✓, `make smoke` ✓, `check src/main.with` ✓.
+- [x] 37. Add `test/behavior/behav_fstring_codegen.with` (11 tests): let binding,
       conditionals, loops, multi-hole, int/i64/bool/str coercion, expressions,
       array indexing, fn call (via variable), str concat. 315/315 pass.
       Known bugs: float→str coercion segfaults (pre-existing MIR bug),
@@ -129,61 +129,61 @@ profiling demands it.
 ## Phase 6 — Remove Concat Coercion Hack
 
 - [x] 38. Remove `coerce_val_to_str` auto-coercion from `mir_str_concat` / `++`
-      in `src/Codegen.w`. Make `++` str-only. Added MIR_INTRINSIC_FMT_TO_STR
+      in `src/Codegen.with`. Make `++` str-only. Added MIR_INTRINSIC_FMT_TO_STR
       intrinsic so lower_fstring explicitly formats non-str expressions before
       concatenation. Fixpoint verified.
 - [x] 39. Add sema error for `str ++ non-str` operands. Both operands validated
       in `check_binary`. Two compile error tests added. Fixpoint verified.
 - [x] 40. Convert compiler-source `int_to_string(x) ++ str` sites to f-strings.
       ~374 of ~403 sites migrated across all .w files. Remaining 13 sites are
-      cache key construction in Sema.w — cannot convert without seed update due
+      cache key construction in Sema.with — cannot convert without seed update due
       to bootstrap cache key format interaction. Also relaxed ++ sema check to
       allow unresolved generic types. Fixpoint verified.
 - [x] 41. Update tests that assert string concat coercion behavior. No existing
       tests used raw non-str ++ str coercion — all used int_to_string explicitly.
       Compile error tests for non-str ++ added in task 39.
-- [x] 42. Verify: `make build` ✓, `check src/main.w` ✓, `make smoke` ✓,
+- [x] 42. Verify: `make build` ✓, `check src/main.with` ✓, `make smoke` ✓,
       `make fixpoint` ✓. All f-string tests pass.
-- [x] 43. Migration regression tests: `behav_str_concat_only.w` (10 tests for
-      str-only ++ and f-string formatting), `err_concat_non_str.w` and
-      `err_concat_non_str_lhs.w` (compile errors for non-str ++). All pass.
+- [x] 43. Migration regression tests: `behav_str_concat_only.with` (10 tests for
+      str-only ++ and f-string formatting), `err_concat_non_str.with` and
+      `err_concat_non_str_lhs.with` (compile errors for non-str ++). All pass.
 
 ## Phase 7 — Debug Formatting Completion
 
 - [x] 44. Ensure `:?` works for all built-in primitives (int, float, str, bool).
       Added MIR_INTRINSIC_FMT_DEBUG_STR for str quoting. Int/bool pass through
-      as default display. 8 tests in behav_fstring_debug.w. Fixpoint verified.
+      as default display. 8 tests in behav_fstring_debug.with. Fixpoint verified.
 - [x] 45. Ensure `:?` works for user-defined structs. Codegen generates inline
       field extraction and formatting: "TypeName { field: val, ... }". Enum
       debug falls back to default display (variant name formatting deferred).
-      3 tests in behav_fstring_debug_struct.w. Fixpoint verified.
-- [x] 46. Audit: Debug trait exists in lib/std/traits.w with impls for i32,
+      3 tests in behav_fstring_debug_struct.with. Fixpoint verified.
+- [x] 46. Audit: Debug trait exists in lib/std/traits.with with impls for i32,
       bool, str. Vec/HashMap/Option have no Debug impls — these need specialized
       codegen (element iteration for Vec, key-value for HashMap, Some/None for
       Option). Container debug deferred to post-launch; :? falls back to
       default display for unrecognized types.
 - [x] 47. Structs with primitive fields work correctly with :?. Truly nested
       structs (struct containing struct) need recursive gen_debug_format calls
-      — deferred to post-launch. Tests in behav_fstring_debug_nested.w.
+      — deferred to post-launch. Tests in behav_fstring_debug_nested.with.
 - [x] 48. Format spec wiring complete: MIR_INTRINSIC_FMT_SPEC connects parsed
       specs to with_fmt_int_spec/with_fmt_f64_spec/with_fmt_str_spec. Supports
       hex, binary, octal, width, zero-pad, sign, alt prefix. 8 tests in
-      behav_fstring_spec.w. Fixpoint verified.
-- [x] 49. `:?` tests: behav_fstring_debug.w (8 tests: int, bool, str quoted),
-      behav_fstring_debug_struct.w (3 tests: struct fields), and
-      behav_fstring_debug_nested.w (2 tests: multi-field structs).
+      behav_fstring_spec.with. Fixpoint verified.
+- [x] 49. `:?` tests: behav_fstring_debug.with (8 tests: int, bool, str quoted),
+      behav_fstring_debug_struct.with (3 tests: struct fields), and
+      behav_fstring_debug_nested.with (2 tests: multi-field structs).
       Width/alignment combos deferred until spec wiring (task 48).
 
 ## Phase 8 — Test Coverage
 
-- [x] 50. Add `test/behavior/behav_fstring_format.w` (17 tests): integer decimal,
+- [x] 50. Add `test/behavior/behav_fstring_format.with` (17 tests): integer decimal,
       i64, bool display, string passthrough, multi-hole, adjacent holes, three
       holes, arithmetic expressions, array indexing, concat, loop, condition,
       empty, literal-only. Format spec tests (hex/bin/width/pad) deferred until
       spec wiring is in codegen. 316/316 pass.
-- [x] 51. Benchmark format regression: behav_fstring_float_spec.w (5 tests:
+- [x] 51. Benchmark format regression: behav_fstring_float_spec.with (5 tests:
       `:.2`, `:.3`, `:.0`, `:.6`, `+.2`). All pass with spec wiring.
-- [x] 52. Locale-sensitivity regression: behav_fstring_locale.w (4 tests).
+- [x] 52. Locale-sensitivity regression: behav_fstring_locale.with (4 tests).
       Integer, negative, bool, str formatting all locale-independent.
 - [x] 53. No tests assert old `%g` concat coercion behavior — nothing to update.
 - [x] 54. Verify: test_operators 23/23 ✓, test_types 77/77 ✓, formatting suite
@@ -192,21 +192,21 @@ profiling demands it.
 
 ## Phase 9 — Migrate Demos and Docs
 
-- [x] 55. Updated `.demo/ecs_bench.w` to use f-strings for all integer output.
+- [x] 55. Updated `.demo/ecs_bench.with` to use f-strings for all integer output.
       `:.3`/`:.2` format specs deferred until spec wiring in codegen.
 - [x] 56. No other demos or examples use `int_to_string` — nothing to migrate.
 - [x] 57. User-facing docs and examples already use f-strings consistently.
       No examples reference int_to_string.
 - [x] 58. docs/format-design.md describes the full spec. v1 limitations:
       container Debug (Vec/HashMap/Option), nested struct recursion, and
-      13 Sema.w cache key sites still use int_to_string. All documented.
-- [x] 59. Benchmark verified: `./out/bin/with run .demo/ecs_bench.w` produces
+      13 Sema.with cache key sites still use int_to_string. All documented.
+- [x] 59. Benchmark verified: `./out/bin/with run .demo/ecs_bench.with` produces
       correct f-string-formatted output (Entities, timing, checksum).
 
 ## Phase 10 — Final Verification
 
 - [x] 60. `make build` ✓
-- [x] 61. `./out/bin/with-stage2 check src/main.w` ✓
+- [x] 61. `./out/bin/with-stage2 check src/main.with` ✓
 - [x] 62. `make smoke` ✓
 - [x] 63. `make fixpoint` ✓ — achieved after Phase 6 migration.
 - [x] 64. Confirm all formatting test suites pass. 317/317 ✓

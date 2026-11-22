@@ -10,21 +10,21 @@ disagree, the ruling wins and this file is wrong.
 
 ## Where the facts are (verified 2026-09-22 on main f5198991)
 
-- `Sema.w:405-420` `FacadeResource { name, facade, node, repr_tid, producer,
+- `Sema.with:405-420` `FacadeResource { name, facade, node, repr_tid, producer,
   out_param, init, preinit, drop, destroyers, ok_const, borrows, independent,
-  thread_caps }`; `Sema.w:422-440` `ForeignContract`; stored on `Sema` at
-  `:1039-1041`, filled by `SemaFacade.w:58-75 collect_facade_resource`
-  (called from `SemaDecl.w:287`, after pass 3).
+  thread_caps }`; `Sema.with:422-440` `ForeignContract`; stored on `Sema` at
+  `:1039-1041`, filled by `SemaFacade.with:58-75 collect_facade_resource`
+  (called from `SemaDecl.with:287`, after pass 3).
 - The only consumers today: `facade_covers_return/param`
-  (`SemaFacade.w:465-487`) read by `ci_function_requires_raw_abi`
-  (`SemaDecl.w:754, 767`). Stage 4 is the first consumer of `repr_tid`,
+  (`SemaFacade.with:465-487`) read by `ci_function_requires_raw_abi`
+  (`SemaDecl.with:754, 767`). Stage 4 is the first consumer of `repr_tid`,
   `drop`, `destroyers`, `init`, `preinit`, `producer`.
-- No drop-flag / liveness facility exists in MIR (`MirLower.w:940` "M7 drop
+- No drop-flag / liveness facility exists in MIR (`MirLower.with:940` "M7 drop
   flags are retired"); a local of a Drop type is scheduled at binding and
   disarmed only by move. Arming must be expressed in ordinary With.
-- Mechanism A (`CImport.w:1433-1460` eight libc rows, `:1602-1692` COwned
+- Mechanism A (`CImport.with:1433-1460` eight libc rows, `:1602-1692` COwned
   wrappers) and its `owns:`/`borrows:` plumbing retire in 4c, not before.
-- c_import synthetic file registration: `Frontend.w:480-536` (text →
+- c_import synthetic file registration: `Frontend.with:480-536` (text →
   `<c_import HEADER>` → parse → splice with `decl_is_c_import = 1`).
 
 ## Design (execution detail)
@@ -56,15 +56,15 @@ A `move fn` destroyer must disarm the type's Drop after the raw call: render
 it as `let repr = self.repr` then forget/`move` semantics — use whatever
 existing With spelling makes the field's Drop not run (check how
 `ci_emit_owning_wrapper`'s consumers and `drop_consumed_field`
-`Sema.w:7640-7656` treat a field consumed inside `drop`; a destroyer method
+`Sema.with:7640-7656` treat a field consumed inside `drop`; a destroyer method
 that reads `self.repr` and then lets `self` drop would double-destroy — write
 the test for it first).
 
 In-place resource (repr is a by-value struct with `init`): stage 4b, landed
-(`FacadeRender.w facade_render_init`, `SemaFacade.w verify_facade_init`) —
+(`FacadeRender.with facade_render_init`, `SemaFacade.with verify_facade_init`) —
 `type R { repr: Repr, live: bool }`; storage is `Repr {}` — the ordinary
 zeroed construction of an imported struct, whose every field c_import gives
-its zero default (`CImport.w ci_default_for_type`; `T.zeroed()` of the
+its zero default (`CImport.with ci_default_for_type`; `T.zeroed()` of the
 storage-types campaign is not implemented and is not needed) — or the
 `preinit` operation's result (it returns the representation); `init` arms
 `live` by `status == OK` under `ok CONST`, else unconditionally with the
@@ -75,15 +75,15 @@ result), `init(repr.as_mut_ptr(), …)`, every drop/destroyer pointer is
 `self.repr.as_mut_ptr()` / `.as_ptr()`, and R's own Drop runs the
 destroyer before the Box field's Drop frees the cell. Resolve makes a
 facade block with a pinned resource its module's import of std.box
-(`Resolve.w facade_declares_pinned_resource`), because the rendering is
+(`Resolve.with facade_declares_pinned_resource`), because the rendering is
 spliced after resolution and the D29 gate would otherwise refuse `Box`.
 A `movable` resource (the facade's claim, never inferred; an error on a
 non-in-place resource) renders over a by-value field with `&raw mut
 self.repr`; a pinned resource's drop/destroyer taking the representation
 by value is an error. Pinning covers the representation's own storage
-only. Tests: `behav_c_facade_resource_in_place_pinned.w` (address kept
+only. Tests: `behav_c_facade_resource_in_place_pinned.with` (address kept
 by init, checked after rebinding, Vec, fn argument; raw pointer across a
-move), `da_c_facade_pinned_cell_destroy_then_free.w` (destroy-then-free
+move), `da_c_facade_pinned_cell_destroy_then_free.with` (destroy-then-free
 under the debug allocator).
 
 Facade-level errors (§9 / spec "never half-model unsafely"), reported at the
@@ -116,13 +116,13 @@ iterate tier before handing off, and the batch battery adds them.
 
 ## Traps
 
-- The facade parser writes `init <fn>(self)` (Parser.w:4069-4080); `param`
+- The facade parser writes `init <fn>(self)` (Parser.with:4069-4080); `param`
   names in c_import are `__param_<name>` (strip when re-spelling).
 - c_import and user files are separate InternPools; symbol text comparison
-  is `safe_symbol_text` (see `SemaFacade.w:460-463 facade_same_fn`).
-- Every imported struct is `impl Copy` (`CImport.w:2310`); the resource
+  is `safe_symbol_text` (see `SemaFacade.with:460-463 facade_same_fn`).
+- Every imported struct is `impl Copy` (`CImport.with:2310`); the resource
   wrapper must be a distinct non-Copy struct, never the repr itself.
-- Guard tests that must keep failing: `err_c_import_destroy_heuristic_no_owning_wrapper.w`,
-  `err_c_import_uncurated_ptr_return_raw.w`, `err_c_import_raw_call_requires_unsafe.w`.
+- Guard tests that must keep failing: `err_c_import_destroy_heuristic_no_owning_wrapper.with`,
+  `err_c_import_uncurated_ptr_return_raw.with`, `err_c_import_raw_call_requires_unsafe.with`.
 - Never emit a placeholder body or an `extern fn` to paper over a resource
   the renderer cannot express: fail with a diagnostic naming the resource.

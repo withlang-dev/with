@@ -39,7 +39,7 @@ Two conditions attached to the ruling shape the design:
 
 The evidence is already computed, for `with get`'s facades-by-evidence
 (D121): `CiMigrate.record_fn_evidence` runs `ci_body_ownership_evidence`
-(`src/CImport.w`) over each definition's C AST and records per function
+(`src/CImport.with`) over each definition's C AST and records per function
 `ret:<source>`, `localsrc:`, `localstore:`, `localsink:<local>:<callee>:<i>`,
 `paramstore:<i>` lines plus `param_sinks` (`field;`, `global;`,
 `<callee>:<i>;`); `CiFacadeDraft.resolve_ownership` turns them into retain
@@ -48,7 +48,7 @@ and destroy verdicts with reasons (`fd_retain_reason`, `fd_destroy_reason`,
 shows the shape of a whole-corpus post-print pass: `ci_migrate_writes_mark`
 places a marker in each emitted signature and `ci_migrate_apply_writes_clauses`
 replaces it once every unit is printed, with a transitive fixpoint over
-corpus callees. The libclang bridge (`src/compiler/ClangBridge.w`) gives the
+corpus callees. The libclang bridge (`src/compiler/ClangBridge.with`) gives the
 walk `with_ci_child`, `with_ci_cursor_kind`, `with_ci_cursor_references_parameter`,
 `with_ci_cursor_type`, `with_ci_binary_op`, `with_ci_unary_op`.
 
@@ -85,7 +85,7 @@ definition) computes one verdict per function parameter and return:
 function, sorted: `name<TAB>verdict[,verdict…]`, verdicts with their reasons.
 The corpus pipeline writes it as `<corpus>/contracts.tsv` beside
 `corpus.stamp` at promotion, and `wo-drift` diffs it: any changed line is
-red with the diff printed. Basic tests (`build/selfhost.w`,
+red with the diff printed. Basic tests (`build/selfhost.with`,
 `bs_check_migrate_contracts_*`) cover each verdict and each refusal with a
 small C fixture: a handle mutated directly, mutated only through a callee,
 read-only; an out-parameter written on every path, written under a status
@@ -171,7 +171,7 @@ generation (`--generation`, D112) moves; the promote guard's trigger is
 D112 no promoted corpus is touched for the bump itself. The STC corpus is
 the first to re-promote (the facades it feeds are the hot path the ruling
 named): `lib/std/collections/{stack,queue,linked_list,deque,priority_queue,
-ordered_set,ordered_map,unordered_set,unordered_map,bit_set}.w` and
+ordered_set,ordered_map,unordered_set,unordered_map,bit_set}.with` and
 `std.algorithms` call the proved methods without `unsafe`; the ceremony
 census records the fall. The `unsafe` left in a facade is the slot-lifetime
 step that crosses an ownership boundary the engine never sees.

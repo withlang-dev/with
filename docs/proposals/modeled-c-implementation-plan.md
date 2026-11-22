@@ -34,30 +34,30 @@ allowed only where being wrong removes capability. Never half-model unsafely.
 Verified at be767c0b; line numbers are of that tree.
 
 **The import record.** `use c_import(...)` parses into one `NK_C_IMPORT` node
-(`src/Parser.w:2489-2693`): `link`, `allow_untranslated`, `no_methods` packed
+(`src/Parser.with:2489-2693`): `link`, `allow_untranslated`, `no_methods` packed
 into `d2`, then `strict`, `only`, `owns`, `borrows`, `retains` appended to the
 extra pool in a fixed record. `retains:` is read by Sema
-(`Sema.w:2483-2516 read_c_import_retentions`, called from
-`SemaDecl.w:281-282`) into `retained_extern_params` and consulted per
-parameter at `SemaCheck.w:15788`. `owns:`/`borrows:` are read by the Frontend
+(`Sema.with:2483-2516 read_c_import_retentions`, called from
+`SemaDecl.with:281-282`) into `retained_extern_params` and consulted per
+parameter at `SemaCheck.with:15788`. `owns:`/`borrows:` are read by the Frontend
 and handed to CImport as process globals for the duration of translation
-(`Frontend.w:440-450`, `CImport.w:56-65`). Two threading paths; the facade
+(`Frontend.with:440-450`, `CImport.with:56-65`). Two threading paths; the facade
 takes the Sema-side one, because facts need spans and provenance.
 
 **The generated-text path.** CImport turns C declarations into With source
-text (`CImport.w:773-825`), which the Frontend registers as a synthetic file
+text (`CImport.with:773-825`), which the Frontend registers as a synthetic file
 `<c_import HEADER>`, parses into the same pool and splices with
-`decl_is_c_import = 1` (`Frontend.w:480-536`). Sema's `build_ci_scoping`
-(`SemaDecl.w:563-606`) puts every c_import symbol in `ci_syms` and, for
-functions, calls `ci_function_requires_raw_abi` (`SemaDecl.w:726-765`): raw
+`decl_is_c_import = 1` (`Frontend.with:480-536`). Sema's `build_ci_scoping`
+(`SemaDecl.with:563-606`) puts every c_import symbol in `ci_syms` and, for
+functions, calls `ci_function_requires_raw_abi` (`SemaDecl.with:726-765`): raw
 if variadic, if the return is a pointer not vouched by
 `ci_overlay_return_is_borrowed_ptr` (five libc names, `:692-698`), or if any
 parameter is a pointer other than a `const char *` input (D47). A hit lands
 the symbol in `ci_raw_syms`, read at the call site by
-`fn_symbol_is_raw_c_import` (`SemaCheck.w:6150`) → "raw c_import function
-call requires unsafe context" (`SemaCheck.w:15848-15856`).
+`fn_symbol_is_raw_c_import` (`SemaCheck.with:6150`) → "raw c_import function
+call requires unsafe context" (`SemaCheck.with:15848-15856`).
 
-**Mechanism A, the #357 owning wrapper** (`CImport.w:1608-1645`
+**Mechanism A, the #357 owning wrapper** (`CImport.with:1608-1645`
 `ci_emit_owning_wrapper`): for a hardcoded table of libc constructors
 (`strdup`, `strndup`, `fopen`, `fdopen`, `tmpfile`, `opendir` → their
 destructors, `:1433-1446`; `readdir`/`rewinddir` borrow `opendir`'s result,
@@ -67,7 +67,7 @@ destructors, `:1433-1446`; `readdir`/`rewinddir` borrow `opendir`'s result,
 because no fact says the raw parameters are safe), and a `.handle()` accessor
 that hands back the raw pointer. Everything downstream stays `unsafe`.
 
-**Mechanism B, §16.2a auto-methods** (`CImport.w:1856-2137`
+**Mechanism B, §16.2a auto-methods** (`CImport.with:1856-2137`
 `ci_detect_member_functions`): snake_case-prefix detection on the first
 parameter's struct type emits `impl S:` forwarding methods (`mut fn` for
 `T *`, `fn` for `const T *`, `unsafe` when any type is raw) and a static
@@ -75,36 +75,36 @@ constructor `fn S.<name>` for a function returning `*S`. **No `Drop` is
 generated** (the constructor leaks); the spec's "longest prefix wins" and
 `Type(args)` sugar are not implemented.
 
-**Every imported struct is Copy** (`CImport.w:2310-2311 impl Copy for`), and
-Sema forbids `Drop` on a Copy type (`SemaDecl.w:2470-2477`). A resource over
+**Every imported struct is Copy** (`CImport.with:2310-2311 impl Copy for`), and
+Sema forbids `Drop` on a Copy type (`SemaDecl.with:2470-2477`). A resource over
 a by-value representation is therefore a distinct non-Copy wrapper struct, as
 `COwned_*` already is over a pointer.
 
 **What Sema already provides for resources.** `impl Drop` collection with
-`move fn drop` enforcement (`SemaDecl.w:1559-1566`, `2408-2478`),
-`type_has_drop_impl` (`Sema.w:5585`); ephemeral types
+`move fn drop` enforcement (`SemaDecl.with:1559-1566`, `2408-2478`),
+`type_has_drop_impl` (`Sema.with:5585`); ephemeral types
 (`TDK_FLAG_EPHEMERAL`, `ephemeral_types`, `type_is_ephemeral_value`
-`SemaCheck.w:23654`); view origins per binding (`BindingProvenance`
-`Sema.w:53-64`, `record_view_binding_from_expr` `SemaCheck.w:10160`,
-`set_binding_view_deps` `Sema.w:5380`); §21.1 Rule 6 and Rule 7 diagnostics
-(`Sema.w:5734`, `5752`); the return-escape and heap-escape checks
-(`SemaCheck.w:10412`, `5419`); the struct-field ban on ephemerals
-(`SemaDecl.w:402`, `817`). Verified by running on 2026-09-20: a child
+`SemaCheck.with:23654`); view origins per binding (`BindingProvenance`
+`Sema.with:53-64`, `record_view_binding_from_expr` `SemaCheck.with:10160`,
+`set_binding_view_deps` `Sema.with:5380`); §21.1 Rule 6 and Rule 7 diagnostics
+(`Sema.with:5734`, `5752`); the return-escape and heap-escape checks
+(`SemaCheck.with:10412`, `5419`); the struct-field ban on ephemerals
+(`SemaDecl.with:402`, `817`). Verified by running on 2026-09-20: a child
 `ephemeral { db: &Db, … }` with `Drop` on both drops before its parent,
 cannot be returned past it, cannot survive the parent's move, cannot be
 stored. No lifetime machinery is added by this plan.
 
-**`CStr`.** Builtin `{ptr, len}` (`Sema.w:2547-2554`) with `len()`, `ptr()`,
-`to_owned()` and `unsafe fn CStr.from_ptr` (`lib/std/string.w:100-117`).
+**`CStr`.** Builtin `{ptr, len}` (`Sema.with:2547-2554`) with `len()`, `ptr()`,
+`to_owned()` and `unsafe fn CStr.from_ptr` (`lib/std/string.with:100-117`).
 `to_str()` (validating) and `to_str_lossy()` do not exist.
 
 **`with analyze`.** One `AnalysisReport` of `AnalysisFact` rows
-(`AnalysisTypes.w:120-141`), collected by `analysis_collect_sema`
-(`Analysis.w:707-719`), rendered by `facts`/`select:`/`matrix:`/`explain:`
-(`Analysis.w:1936-2032`). No contract view.
+(`AnalysisTypes.with:120-141`), collected by `analysis_collect_sema`
+(`Analysis.with:707-719`), rendered by `facts`/`select:`/`matrix:`/`explain:`
+(`Analysis.with:1936-2032`). No contract view.
 
 **Runtime foreign calls.** ~500 hand-written `extern fn` lines across
-`rt/*.w` and `lib/std/libc.w`; no contract data.
+`rt/*.with` and `lib/std/libc.with`; no contract data.
 
 ## Design decisions this plan makes (execution detail, not semantics)
 
@@ -116,13 +116,13 @@ stored. No lifetime machinery is added by this plan.
   table (D4 compatibility, deprecated).
 - **Raw classification consults the table.** `ci_function_requires_raw_abi`
   returns 0 for a parameter or return covered by a fact; this is the single
-  gate that makes a modeled call safe. `SemaCheck.w:15788`'s per-parameter
+  gate that makes a modeled call safe. `SemaCheck.with:15788`'s per-parameter
   consult generalizes to `lend` / `consumes` / `retains … by` / `destroys`.
 - **Resources render to ordinary With.** A resource is `type R { repr }` +
   `impl Drop for R` (`move fn drop` calling the designated destroyer inside
   `unsafe {}`) + a safe constructor whose raw call sits in an inner
   `unsafe {}` (the shape the #379 buffer wrapper already uses,
-  `CImport.w:1599`), never `unsafe fn`. A dependent child is
+  `CImport.with:1599`), never `unsafe fn`. A dependent child is
   `type C = ephemeral { parent: &P, repr }`. Alternate destroyers are
   `move fn` methods. Rendering happens after facts are read (a second
   Frontend splice, or emission from Sema facts); Mechanism A's generator and
@@ -137,20 +137,20 @@ stored. No lifetime machinery is added by this plan.
 
 ## Stages
 
-Each stage is an iterate-tier change (`with check src/main.w`, `with build
+Each stage is an iterate-tier change (`with check src/main.with`, `with build
 :dev`, targeted tests) with its own behavior and compile-error tests. "Flip"
 names existing tests whose expectation changes; a stage is not done until
 they are rewritten in the same batch (never left red, never deleted).
 
 **Stage 0 — spec text lands.** The blessed §16.2b and replacements land in
-`with-specification.md`; `spec-inventory-check` (`build.w:1822`) is updated
+`with-specification.md`; `spec-inventory-check` (`build.with:1822`) is updated
 for the new keywords and any inventoried CLI request in the same batch, or it
 goes red. No compiler change.
 
 **Stage 1 — parser and AST.** `c facade name:` as a new top-level declaration
 kind (d0 = facade name, d1 = extra_start, d2 = clause count), parsed by a
 `parse_c_facade_block` modeled on `parse_impl_block`
-(`Parser.w:3074-3316`); `resource`, `fn`, `domain`, `use convention` as
+(`Parser.with:3074-3316`); `resource`, `fn`, `domain`, `use convention` as
 spanned child nodes; clauses (`wraps`, `from`, `init`, `preinit`, `drop`,
 `destroys`, `ok`, `borrows`, `independent`, `lend`, `consumes`,
 `destroyed_by`, `retains … by`, `returns borrow|static`, `preserves`, `of`,
@@ -167,18 +167,18 @@ with a literal initializer, callback parameter callable, `consumes` target
 compatible, domain exists, thread combination legal — `send` requires
 `drop_any_thread`); §57 diagnostics printing the resolved C parameter;
 `retains:` rewritten as a writer of the table. Tests: one compile-error test
-per §61 check; `behav_retained_cstring_owned_ok.w` and
-`err_retained_cstring_str_temp.w` keep passing through the table, and
+per §61 check; `behav_retained_cstring_owned_ok.with` and
+`err_retained_cstring_str_temp.with` keep passing through the table, and
 facade-form twins are added. Flip: none.
 
 **Stage 3 — raw classification consults facts.** `ci_function_requires_raw_abi`
 returns 0 for covered parameters and returns; the per-parameter consult at
-`SemaCheck.w:15788` handles `lend` (default, asserted), `consumes` (move,
+`SemaCheck.with:15788` handles `lend` (default, asserted), `consumes` (move,
 suppress Drop), `destroys` (move, terminate), `retains … by`. Tests: a
 facaded call compiles with no `unsafe`; the same call without a facade still
-demands it. Flip: none — `err_c_import_destroy_heuristic_no_owning_wrapper.w`,
-`err_c_import_uncurated_ptr_return_raw.w` and
-`err_c_import_raw_call_requires_unsafe.w` must keep failing without a facade
+demands it. Flip: none — `err_c_import_destroy_heuristic_no_owning_wrapper.with`,
+`err_c_import_uncurated_ptr_return_raw.with` and
+`err_c_import_raw_call_requires_unsafe.with` must keep failing without a facade
 (ruling §60); they are the guard that nothing is inferred from a name.
 
 **Stage 4 — resource rendering with Drop.** Pointer and by-value resources
@@ -189,9 +189,9 @@ it — ruling §67). Mechanism A retired; its eight libc rows become the
 toolchain libc facade (ruling §5, "bounded knowledge"). Tests: Drop runs
 exactly once on every path; a producer with no destroyer is a compile error
 ("never half-model unsafely"); a destroyer callable as a lend is a compile
-error. Flip: `behav_c_import_owning_wrapper_fopen.w`, `_strdup.w`,
-`behav_c_import_owns_annotation.w`, `_borrows_annotation.w`,
-`behav_c_import_borrow_param_readdir.w` (and its `d_acceptance` copy) are
+error. Flip: `behav_c_import_owning_wrapper_fopen.with`, `_strdup.with`,
+`behav_c_import_owns_annotation.with`, `_borrows_annotation.with`,
+`behav_c_import_borrow_param_readdir.with` (and its `d_acceptance` copy) are
 rewritten to the libc facade; `owns:`/`borrows:` become deprecated spellings
 with a diagnostic naming the facade clause.
 
@@ -205,7 +205,7 @@ still closes its handle. Flip: none (the sqlite3 UAT is untouched until §66).
 **Stage 6 — dependency (ruling §26-§30).** Child resources rendered
 `ephemeral { parent: &P, repr }`; the producer call publishes the parent
 origin onto the binding (the one gap: today only ephemeral *parameter* types
-publish, `SemaCheck.w:10081-10084`); `independent` suppresses; `returns
+publish, `SemaCheck.with:10081-10084`); `independent` suppresses; `returns
 borrow R from param N` for borrowed returns. Tests: Rule 6/7 messages on
 facaded children; `type App { db, stmt }` rejected (§30); a statement cache
 owned by the connection compiles. Flip: none.
@@ -213,20 +213,20 @@ owned by the connection compiles. Flip: none.
 **Stage 7 — strings, buffers, domains (ruling §31-§43).** `returns borrow
 CStr from param N` and `returns static CStr` produce `Option[&CStr]` tied to
 the origin; `CStr.to_str()` (validating, `Result`) and `to_str_lossy()` added
-to `lib/std/string.w`; owned foreign text as a resource (`sqlite3_mprintf` →
+to `lib/std/string.with`; owned foreign text as a resource (`sqlite3_mprintf` →
 `sqlite3_free`); `domain X process|thread|resource|static`, coarse default
 from `link:`, `preserves`; unknown nullability represented as nullable or
 otherwise restricted. Tests: view invalidated by a later call on the
-resource; `errno` domain example. Flip: `behav_c_import_overlay_getenv_none.w`
-and `_strchr_borrowed.w` move from the `SemaDecl.w:692` table to the libc
-facade; `behav_cstr_from_ptr_to_owned.w` gains the `to_str` cases.
+resource; `errno` domain example. Flip: `behav_c_import_overlay_getenv_none.with`
+and `_strchr_borrowed.with` move from the `SemaDecl.with:692` table to the libc
+facade; `behav_cstr_from_ptr_to_owned.with` gains the `to_str` cases.
 
 **Stage 8 — presentation retargeted.** Mechanism B emits methods on the
 resource type; `of` and `rename` override; ambiguous grouping omits the sugar;
 multi-resource representations fail closed. Tests: `db.prepare(...)` on a
 facaded `Database`; `z_stream` with two resources rejects an unassigned
-operation naming both. Flip: `behav_c_import_auto_method_baseline.w` and
-`_auto_constructor.w` lose their `unsafe` blocks under a facade and keep them
+operation naming both. Flip: `behav_c_import_auto_method_baseline.with` and
+`_auto_constructor.with` lose their `unsafe` blocks under a facade and keep them
 without one.
 
 **Stage 9 — callbacks and threads (ruling §44-§51).** Callback-scope borrow
@@ -242,21 +242,21 @@ configuration checks as `report.violations` (producer with no destroy path;
 destroyer presented as a lend; retained callback with no owner; illegal
 thread combination; ambiguous profile match; profile fact shadowed; a
 destroyer-shaped borrow, advisory, suppressed by explicit `lend`). Tests:
-snapshot fixtures. The CLI spelling is settled: `with analyze file.w
+snapshot fixtures. The CLI spelling is settled: `with analyze file.with
 contract` prints the view, `audit:contract` (in `audit:all`) the checks
-(landed: `src/AnalysisContract.w`, `test/contract/`).
+(landed: `src/AnalysisContract.with`, `test/contract/`).
 
 **Stage 11 — convention profiles (ruling §7, §59).** `use convention
 pkg.vN` resolves through ordinary package rules; unique-or-nothing; explicit
 clauses override. Tests: a profile rule with two candidates contributes
 nothing. This stage may follow the SQLite facade, which needs no profile.
-Landed: `src/compiler/FacadeProfile.w` (the pass), `Parser.w
-parse_c_convention`, `SemaFacade.w` (stage 11 section), the contract view's
+Landed: `src/compiler/FacadeProfile.with` (the pass), `Parser.with
+parse_c_convention`, `SemaFacade.with` (stage 11 section), the contract view's
 `profile:` provenance and the two `audit:contract` checks; fixtures
-`test/lib/gobject/v1.w`, `test/contract/{ok_profile_applied,
-ok_profile_shadowed, bad_profile_ambiguous}.w`,
-`test/behavior/behav_c_facade_profile_supplies_drop.w`,
-`test/compile_errors/err_c_facade_profile_*.w`, `err_c_convention_bad_rule.w`.
+`test/lib/gobject/v1.with`, `test/contract/{ok_profile_applied,
+ok_profile_shadowed, bad_profile_ambiguous}.with`,
+`test/behavior/behav_c_facade_profile_supplies_drop.with`,
+`test/compile_errors/err_c_facade_profile_*.with`, `err_c_convention_bad_rule.with`.
 
 *Derived decisions (stage 11; execution detail where the ruling is
 silent, each taking the conservative reading):*
@@ -309,7 +309,7 @@ silent, each taking the conservative reading):*
   and before the facades render, because the renderer reads clauses off
   the AST: a profile-stated clause is an ordinary clause on the item by
   then, verified by Sema like any clause, carrying its rule as a trailing
-  operand (`Ast.w facade_clause_profile_rule`) — the provenance the
+  operand (`Ast.with facade_clause_profile_rule`) — the provenance the
   contract view prints as `profile:pkg.vN:rule@file:line` (§8).
 
 **Stage 12 — the SQLite facade (ruling §66).** Written against the real
@@ -322,9 +322,9 @@ statement mutation, a callback API with userdata,
 `sqlite3_create_function_v2`'s consume-with-destroy-callback, retained
 callback lifetime, thread capabilities, method presentation, one explicit
 presentation override. It compiles and typechecks. **Only then**:
-`build/release_uat_fixtures/sqlite3_main.w` (11 `unsafe`), the zlib, bzip2
+`build/release_uat_fixtures/sqlite3_main.with` (11 `unsafe`), the zlib, bzip2
 and libcurl fixtures, `examples/c-interop`, the blog and documentation
-examples are rewritten, and `user-programs-safe` (`build.w:1836`) goes green.
+examples are rewritten, and `user-programs-safe` (`build.with:1836`) goes green.
 
 **Stage 12b — what the SQLite facade exposed (#1618, #1612, #1610).** Three
 facade-language gaps stage 12 found and left as findings, closed against
@@ -378,7 +378,7 @@ Eric blesses):
 
 **Stage 13 — runtime audit (ruling §52).** Domain facts for the
 `rt_libc_*` / `with_libc_*` seams that touch `errno`, `environ`, `locale`,
-and an audit lane in the shape of `libc-surface-check` (`build/compiler.w:
+and an audit lane in the shape of `libc-surface-check` (`build/compiler.with:
 1243`) that fails when a runtime extern touching a declared domain is added
 without a contract row.
 
@@ -445,13 +445,13 @@ The CLI spellings are proposed, not ruled, and are settled with stage 10.
 
 ## Lanes and files this campaign touches
 
-- `spec-inventory-check`: new keywords in `Token.w`/`Parser.w`, any
+- `spec-inventory-check`: new keywords in `Token.with`/`Parser.with`, any
   inventoried CLI request.
 - `user-programs-safe`: goes green at stage 12; must not be weakened before.
 - `libc-surface-check` and the new runtime audit lane (stage 13).
 - Tests listed under each stage's Flip; the `d_acceptance` copies move with
   their originals.
-- Cache key: `Frontend.w:557-576` `#owns:`/`#borrows:` lines retire at stage
+- Cache key: `Frontend.with:557-576` `#owns:`/`#borrows:` lines retire at stage
   4; a facade does not affect translation, so it needs no key line unless
   stage 4 renders through the Frontend splice (then the facade text keys the
   splice).

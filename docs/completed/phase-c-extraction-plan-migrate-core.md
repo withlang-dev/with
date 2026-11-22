@@ -7,14 +7,14 @@ compiler-driver dispatch and into a repository-local build action.
 
 ## Placement
 
-The target will live in the repository-local `build_selfhost.w` module,
-imported by root `build.w`. These fixtures test this repository's C migrator;
+The target will live in the repository-local `build_selfhost.with` module,
+imported by root `build.with`. These fixtures test this repository's C migrator;
 they are not standard build-system APIs and do not belong in `lib/std`.
 
 ## What Moves
 
 Move the migrate-core selfhost implementation out of
-`src/BuildGraphSelfhost.w` and generic dispatch:
+`src/BuildGraphSelfhost.with` and generic dispatch:
 
 - `BuildKind 1018`, currently `cli_selfhost_migrate_core_test`
 - `run_cli_selfhost_migrate_core_test`
@@ -29,7 +29,7 @@ Move the migrate-core selfhost implementation out of
   - `bgs_check_migrate_typed_cast_macros`
 
 After migrate-core moves, delete these now-migrator-only shared helpers from
-`src/BuildGraphSelfhost.w`:
+`src/BuildGraphSelfhost.with`:
 
 - `bgs_migrate_error`
 - `bgs_migrate_assert_contains`
@@ -40,13 +40,13 @@ After migrate-core moves, delete these now-migrator-only shared helpers from
 - `bgs_index_of`
 - `bgs_count_occurrences`
 
-Reuse the equivalent `bs_*` helpers in `build_selfhost.w` introduced in the
+Reuse the equivalent `bs_*` helpers in `build_selfhost.with` introduced in the
 migrate-basic extraction. Do not add new helper layers in this slice unless a
 fixture has no existing `bs_*` equivalent.
 
 ## Target Shape
 
-`build.w` will declare `c-migrator-core-tests` as a standard `.Action` target:
+`build.with` will declare `c-migrator-core-tests` as a standard `.Action` target:
 
 ```with
 var c_migrator_core_tests = target_new(.Action, "c-migrator-core-tests", "").output("out/test-graph/c-migrator-core-tests")
@@ -87,11 +87,11 @@ Old serialized graphs should fail with the standard removed-kind diagnostic:
 
 ## Dispatch Removal
 
-After extraction, `src/main.w` must not dispatch kind `1018` or branch on the
+After extraction, `src/main.with` must not dispatch kind `1018` or branch on the
 `"migrate-core"` suite argument. Verify with:
 
 ```sh
-rg -n "cli_selfhost_migrate_core|run_cli_selfhost_migrate_core|migrate-core|bgs_migrate_|bgs_index_of|bgs_count_occurrences" src/main.w src/BuildGraphKinds.w src/BuildGraphSelfhost.w
+rg -n "cli_selfhost_migrate_core|run_cli_selfhost_migrate_core|migrate-core|bgs_migrate_|bgs_index_of|bgs_count_occurrences" src/main.with src/BuildGraphKinds.with src/BuildGraphSelfhost.with
 ```
 
 Expected remaining hits are limited to the removed-kind name/diagnostic and any
@@ -116,8 +116,8 @@ not transient path names.
 The implementation slice must run:
 
 ```sh
-out/bin/with check build_selfhost.w
-out/bin/with check build.w
+out/bin/with check build_selfhost.with
+out/bin/with check build.with
 out/bin/with build :c-migrator-core-tests
 make build
 make fixpoint

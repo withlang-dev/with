@@ -7,7 +7,7 @@ disagree the ruling stands. `resource type` landed 2026-10-16 (PR #2438),
 stage 1 the same day (PR #2440, under Amendment 1), stage 2 (PR #2441),
 stage 3 (PR #2442), stage 4 (PR #2444), stage 5 (PR #2445), and stage 6
 (PR #2446, the `.clone()` and value-copy sweep, plus
-`test/benchmark/cow_value_lists.w`). The measurement below was taken
+`test/benchmark/cow_value_lists.with`). The measurement below was taken
 against the pre-CoW compiler on 2026-10-18, after the stages had each been
 measured only against the main before them: self-host 1.093 before the
 last-use view-edge fix, 1.032 after; pcre2 0.966; zlib 0.992 (the decision
@@ -37,12 +37,12 @@ record's "Status of the work" has the figures and the cause).
 ## The seams that already exist (the `str` pattern, D111)
 
 - **The count.** A `str` buffer's holders beyond the first live in the
-  allocation header's second word (`rt_core.w str_holders`,
+  allocation header's second word (`rt_core.with str_holders`,
   `alloc_store_small_header` zeroes it); `rt_payload_start_is_owned`
   tells an owned payload from a literal or a view. `with_str_retain`,
   `with_str_free_drop_origin` (the release that frees when it finds no
   other holder) and `str_is_unique` are the three operations.
-- **Copy glue.** Sema's `is_copy` (Sema.w) says a `str` is Copy and
+- **Copy glue.** Sema's `is_copy` (Sema.with) says a `str` is Copy and
   `copy_is_bits` separates a bit copy from one with glue. MIR marks a
   consumed copy of a Copy-with-glue type `MIR_HOLD_RETAIN`
   (`MirLower.retain_consumed_copy`); codegen's `mir_emit_copy_glue_ptr`
@@ -56,9 +56,9 @@ record's "Status of the work" has the figures and the cause).
   allocation base is `ptr - start × es`, so the holder count sits in that
   allocation's header exactly as a `str`'s does.
 - **Mutations** reach the runtime through `MirIntrinsic.LIST_*`
-  (SemaTypes.w; dispatched in SemaCheck.w by method name) and the
+  (SemaTypes.with; dispatched in SemaCheck.with by method name) and the
   `with_vec_*` helpers; `HashMap`/`HashSet` are `ptr` wrappers over the
-  `with_hashmap_*` runtime (rt_core.w ~4038); `BTreeMap` is a struct over a
+  `with_hashmap_*` runtime (rt_core.with ~4038); `BTreeMap` is a struct over a
   `List[(K, V)]`, so it follows the struct rule.
 
 ## Stages
@@ -85,7 +85,7 @@ holds there.
   hoisting yet: correctness first, the check everywhere.
 - Tests: a value list copies (`let b = a; b.push(1)` leaves `a` alone);
   a shared list's drop frees once (debug allocator); a list of resources
-  still moves (`err_d116_moved_operand.w` stays); `with_vec_make_unique`
+  still moves (`err_d116_moved_operand.with` stays); `with_vec_make_unique`
   under WITH_DEBUG_ALLOC.
 - The Vec-level `.clone()` sites in `src/` and `lib/std/` keep working
   (a clone of a value is a copy); they are swept in stage 6.
@@ -126,7 +126,7 @@ as a mutable pointer (`as_mut_ptr`, a facade buffer pairing, `&raw mut`
 of an element) is made unique first. A generic instantiation's copy or
 move follows `is_copy` of the instantiated type, so `fn f[T](xs: List[T])`
 copies for values and moves for resources (an error names only resource
-element types). `with analyze file.w cow` reports every mutation site that
+element types). `with analyze file.with cow` reports every mutation site that
 keeps a check, with its reason (through a field, through a parameter,
 copied in the loop), the analysis the ruling asked for.
 
@@ -137,10 +137,10 @@ value, and the bar follows at the reseed. Corpora never edited (D112).
 
 ## The measurement
 
-`tools/ab_bench.w` (to write, With): builds the candidate and the baseline
+`tools/ab_bench.with` (to write, With): builds the candidate and the baseline
 compiler (the installed seed's release and the branch's), then runs the
 workload N times each, interleaved A B A B …, reporting the median and
-the ratio with its spread. Workloads: `with check src/main.w` (self-host
+the ratio with its spread. Workloads: `with check src/main.with` (self-host
 time; `WITH_PROFILE=1` for the profile when it regresses), the pcre2 and
 zlib corpus suites (`src/main build :pcre2-tests`, `:zlib-tests`, or the
 corpora's own runner), and the three microbenchmarks under

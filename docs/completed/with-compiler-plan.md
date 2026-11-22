@@ -488,9 +488,9 @@ Test: compile and run the `printf` test case above. Output:
 #### 0.8 Build Driver
 
 The `with build` and `with run` commands:
-- `with run file.w` → lex → parse → check → LLVM IR → link → run
+- `with run file.with` → lex → parse → check → LLVM IR → link → run
 - `with build` → reads `with.toml`, compiles all modules, links
-- `with test` → compile and run all `*_test.w` files
+- `with test` → compile and run all `*_test.with` files
 
 At this point you have a working (minimal) compiler. It can compile
 a With file that calls C functions and produces a native binary.
@@ -1304,12 +1304,12 @@ with/
 │       └── test_harness.zig # Snapshot test runner
 ├── stdlib/
 │   ├── std/
-│   │   ├── io.w
-│   │   ├── fs.w
-│   │   ├── time.w
+│   │   ├── io.with
+│   │   ├── fs.with
+│   │   ├── time.with
 │   │   ├── collections/
-│   │   │   ├── vec.w
-│   │   │   ├── hashmap.w
+│   │   │   ├── vec.with
+│   │   │   ├── hashmap.with
 │   │   │   └── ...
 │   │   └── ...
 │   └── os/

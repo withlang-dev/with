@@ -1,13 +1,13 @@
 # The zlib facade owns its chunk limit
 
 Removing embedded-header declarations at 9038f2fc exposed six references
-to `UINT_MAX` in the handwritten `lib/std/zlib.w` facade. Regeneration had
+to `UINT_MAX` in the handwritten `lib/std/zlib.with` facade. Regeneration had
 left the migrated C implementation files byte-identical; the remaining
 dependency was the facade's size checks and inflate chunk loop.
 
 Route: failing source diagnostic, demand the affected functions through
-`behav_zlib_std.w`, then LLDB on the compiler's diagnostic branch.
-`Sema.check_ident` reached `SemaCheck.w:7168`, its unknown-identifier branch,
+`behav_zlib_std.with`, then LLDB on the compiler's diagnostic branch.
+`Sema.check_ident` reached `SemaCheck.with:7168`, its unknown-identifier branch,
 at return PC 0x1001fa538. `/tmp/with-zlib-facade-limit-lldb.log` records the
 backtrace; the full test capture names every unresolved `UINT_MAX` use.
 Checking the facade alone did not demand those functions, so it was not

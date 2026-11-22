@@ -5,8 +5,8 @@ new directory
 run: with init .
 run: with get c.sqlite3
 expect stderr contains: facade sqlite3:
-write src/main.w from sqlite3_main.w
-write src/contracts/sqlite3.w:
+write src/main.with from sqlite3_main.with
+write src/contracts/sqlite3.with:
     // The SQLite facade — D51 stage 12, ruling §66: the first complete facade
     // written against the ruling, and the executable test of the facade
     // language. It is written against the real `sqlite3.h` (the one `c_import`
@@ -19,7 +19,7 @@ write src/contracts/sqlite3.w:
     // no facade beyond the C standard library's"). `c.sqlite3` is fetched from
     // Conan and ships none yet, so this is the project's own facade: the
     // acceptance scenario writes it into the fresh project as
-    // src/contracts/sqlite3.w, where `use contracts.sqlite3` finds it.
+    // src/contracts/sqlite3.with, where `use contracts.sqlite3` finds it.
     // It moves into the package when the package can carry it.
     //
     // What the ruling asks for and where it is met (§66):

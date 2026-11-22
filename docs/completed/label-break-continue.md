@@ -279,7 +279,7 @@ construct named `'foo` is in scope.
 
 ```
 error: no enclosing loop or block labeled 'foo
-  --> file.w:N:M
+  --> file.with:N:M
    |
    |     break 'foo
    |     ^^^^^^^^^^
@@ -291,11 +291,11 @@ a block, not a loop.
 
 ```
 error: cannot continue a labeled block; only loops support continue
-  --> file.w:N:M
+  --> file.with:N:M
    |
    |     continue 'find
    |     ^^^^^^^^^^^^^^
-note: 'find labels a block at file.w:K:L
+note: 'find labels a block at file.with:K:L
 help: use `break 'find` to exit the block, or label the enclosing loop
 ```
 
@@ -304,11 +304,11 @@ of the same name.
 
 ```
 error: label 'l shadows enclosing label 'l
-  --> file.w:N:M
+  --> file.with:N:M
    |
    |     'l while ...
    |     ^^
-note: enclosing 'l is at file.w:K:L
+note: enclosing 'l is at file.with:K:L
 ```
 
 **Label not at statement start.** A label token appearing somewhere
@@ -316,7 +316,7 @@ other than as the first token of a statement.
 
 ```
 error: a label must appear at the start of a statement
-  --> file.w:N:M
+  --> file.with:N:M
    |
    |     if cond: 'outer while true:
    |              ^^^^^^
@@ -327,7 +327,7 @@ by `while`, `for`, `{`, or `:`.
 
 ```
 error: a label must be followed by 'while', 'for', '{', or ':'
-  --> file.w:N:M
+  --> file.with:N:M
    |
    |     'l x = 1
    |     ^^
@@ -339,11 +339,11 @@ closure, `async:` block, or `gen fn`.
 
 ```
 error: label 'outer is not visible inside this nested function
-  --> file.w:N:M
+  --> file.with:N:M
    |
    |             break 'outer
    |             ^^^^^^^^^^^^
-note: 'outer is declared in the enclosing function at file.w:K:L
+note: 'outer is declared in the enclosing function at file.with:K:L
 note: labels do not cross function, closure, async, or gen boundaries
 ```
 

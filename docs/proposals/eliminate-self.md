@@ -21,9 +21,9 @@ until then §9.5 stands as D83 wrote it.
   never in scope bare.
 - What this costs: the tree writes `self.` 80,137 times (39,241 method
   calls, 39,930 field reads), the largest ceremony count in the codebase.
-  `impl Sema` sits in eight files beside Sema.w (66 blocks) and
+  `impl Sema` sits in eight files beside Sema.with (66 blocks) and
   `impl CiProject` in four, so D83's own-module rule reaches almost none of
-  the compiler's own methods. Eric's question, on a line of CiContracts.w
+  the compiler's own methods. Eric's question, on a line of CiContracts.with
   (2026-10-25):
 
   > why do we need 'self'? Can we make it so instead of
@@ -34,9 +34,9 @@ until then §9.5 stands as D83 wrote it.
   module than its type (D83's boundary), and `ct_ret_from` is a method.
 - An explicit receiver parameter is still accepted (`fn m(self: &Self)`
   inside an `impl`, `fn Type.m(self: &Self)` at top level). Outside trait
-  bodies 37 remain: 19 trait impls (`lib/std/sync.w`, the collections'
-  `IndexGet` impls) and 18 dotted top-level methods (`lib/std/alloc.w`,
-  `lib/std/build.w`, build-layer spellings the pinned seed's evaluator
+  bodies 37 remain: 19 trait impls (`lib/std/sync.with`, the collections'
+  `IndexGet` impls) and 18 dotted top-level methods (`lib/std/alloc.with`,
+  `lib/std/build.with`, build-layer spellings the pinned seed's evaluator
   compiles).
 - The prelude already has a qualified spelling: every prelude function and
   bare-callable intrinsic is reachable as `builtins.name` without a `use`
@@ -177,7 +177,7 @@ to reverse.
 ## 4. Phases
 
 Each phase self-hosts and passes the gate (`src/main build :gate`); the
-stack takes one seed-driven battery (`tools/battery.w`). The sweep is its
+stack takes one seed-driven battery (`tools/battery.with`). The sweep is its
 own PR under the ceremony census's falling bar. A spelling the compiler's
 own sources adopt before a seed carrying it is pinned is seed-gated: cut and
 pin the seed first, never hold the surface back.
@@ -204,7 +204,7 @@ pin the seed first, never hold the surface back.
   fits.
 - **5c — the sweep.** A compiler-driven rewrite, never a regex: a tool over
   `compiler_analyze_file` facts (the shape of `with migrate-receivers`,
-  `src/ReceiverMigration.w`) selects every `self.member` whose bare spelling
+  `src/ReceiverMigration.with`) selects every `self.member` whose bare spelling
   resolves to the same member under the new rule with no collision and no
   later binding of the name, and applies the byte edits through the Lexer.
   Before it rewrites, it reports the counts Eric asked for: methods with a
@@ -213,7 +213,7 @@ pin the seed first, never hold the surface back.
   member/module collisions, so the ruling's exceptions are measured on the
   real tree. Expected: most of the 80,137; the remainder are the collisions
   the error names, the later-binding cases, and `self` as a value. Per
-  directory, `with check src/main.w` and `:dev` between steps, the census
+  directory, `with check src/main.with` and `:dev` between steps, the census
   diff at each.
 - **5d — the census row.** `self.member` where the bare name would resolve
   becomes a counted ceremony pattern, so new code does not reintroduce it;
@@ -230,7 +230,7 @@ pin the seed first, never hold the surface back.
 - Fixtures (`test/behavior/behav_*`, `test/compile_errors/`) for each rule
   in §3 and each refusal in §4; `with build :drop-audit` before and after
   5b (a bare `mut fn` call is a receiver call, drop discipline unchanged).
-- `with run tools/ceremony_census.w --diff <base>` at every step of 5c; the
+- `with run tools/ceremony_census.with --diff <base>` at every step of 5c; the
   `:ceremony-census` gate after.
 - Fixpoint (stage2 == stage3) at the seed-cut tier, the self-host proof for
   a resolution change.

@@ -109,7 +109,7 @@ without a body.
 
 **The build and compiler APIs.** They need no marker: they run under
 driver-minted capabilities (§17.1b) and the capability registry states
-which functions they are. A user's `build.w` is evaluated at compile time
+which functions they are. A user's `build.with` is evaluated at compile time
 and calls them, so once the standard library is a bundle their bodies must
 still reach the evaluator. This design's answer: **they cross the boundary
 with their bodies**, exactly as a `comptime fn` does, and the registry is

@@ -31,20 +31,20 @@ box runs the same programs from its own machine file.
 
 ## What it delivers
 
-- **Codegen units per processor** (`src/compiler/CodegenUnits.w`,
-  `src/TargetSpec.w:115`): bodies instantiated for a non-host processor
+- **Codegen units per processor** (`src/compiler/CodegenUnits.with`,
+  `src/TargetSpec.with:115`): bodies instantiated for a non-host processor
   (`vx.md` §3) compile in a unit for that arch's target; the host unit
   holds the launch stub. The instance key the checker already puts in the
   symbol name is what keeps the two bodies apart. A body the device backend
   refuses is an error at the call site, as the checker already reports it;
   nothing falls back to the host.
-- **Address spaces** (`src/compiler/LlvmBridge.w:737`): a pointer into a
+- **Address spaces** (`src/compiler/LlvmBridge.with:737`): a pointer into a
   non-host space is an LLVM pointer in the address space the arch assigns
   to that kind of memory (global, workgroup-local, private, in each
   target's own numbering); the bridge gains a pointer-type-in-address-space
   constructor and the arch entry supplies the numbers. `FnAbi` is
   unchanged: a pointer with a space is a pointer (D6).
-- **The device facades** (`lib/std/device/<platform>.w`), one per platform
+- **The device facades** (`lib/std/device/<platform>.with`), one per platform
   API, each a `c facade` over the vendor's header with `c_import` as the
   evidence and every ownership fact from a clause (D51). The surface is
   the same for every platform, because it is Crux's `Backend` trait
@@ -59,7 +59,7 @@ box runs the same programs from its own machine file.
 - **Transfer lowering**: each hop of a routed transfer becomes the facade
   copy for its edge; `copy_engine` edges use the asynchronous copy and
   `async transfer` becomes a real task with a completion event behind it
-  (`lib/std/task.w`). A `peers` access (`vx.md` IV.1) is a plain load or
+  (`lib/std/task.with`). A `peers` access (`vx.md` IV.1) is a plain load or
   store through the mapped link. `async on` overlaps with host work; the
   sequential `on` waits at region exit. The checker's sequential forms
   are unchanged and stay correct.

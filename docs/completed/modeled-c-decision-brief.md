@@ -47,7 +47,7 @@ while rows.step() == SQLITE_ROW:
     print(rows.column_text(0) ?? "?")
 ```
 
-**Why `unsafe` is demanded today.** `SemaDecl.w` (~735-765) marks a
+**Why `unsafe` is demanded today.** `SemaDecl.with` (~735-765) marks a
 c_imported function *raw* when any parameter or the return is a pointer, with
 two exceptions (`const char *` inputs since D47; a short curated libc list). It
 is a test on type spelling, not a safety analysis. Nearly every real C function
@@ -66,7 +66,7 @@ proves the handle is live, by the same proof With uses for its own types.
 What the compiler must be told is a small set of *facts about the library*. The
 four decisions are about which facts, and where they come from.
 
-**Implementation state.** Two half-built mechanisms in `src/CImport.w` never
+**Implementation state.** Two half-built mechanisms in `src/CImport.with` never
 met:
 - The #357 curated owning wrapper (`ci_emit_owning_wrapper`, ~1608): a
   `COwned_<ctor>` type whose `Drop` calls the destructor. Its evidence is a
@@ -871,7 +871,7 @@ names. That is not in the vendored Swift tree (§3).
    or rewrites the words. Nothing lands before that.
 2. The blessed text lands as the ruling, and the compiler is non-compliant
    until it conforms.
-3. Implementation unifies the two mechanisms in `src/CImport.w` (§1) into one.
+3. Implementation unifies the two mechanisms in `src/CImport.with` (§1) into one.
 4. `examples/c-interop` comes off its parked branch (`c-interop-example`) and
    is rewritten with no `unsafe`; the 28 `unsafe` uses in the zlib, bzip2,
    sqlite3 and libcurl release UAT fixtures go the same way, and

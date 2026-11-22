@@ -1,0 +1,19 @@
+//! expect-stdout: ok
+
+use pre_d_build_runner
+
+// D226: a resource may state several `init` clauses, each a constructor
+// with its own success status. The contract view listed only the first,
+// said "status: none" though each stated `ok`, and labelled an initializer's
+// claim with an unrelated name (it read the status as a profile rule,
+// #3521). It now lists each with the name it is presented under, its
+// status, and where the claim is stated.
+fn main:
+    let dir = p7_prepare_case("contract_view_lists_every_initializer", "contract_view_inits")
+    p7_write(dir, "src/main.with", "use c_import(\"#define PAIR_OK 0\\ntypedef struct strm { void *state; int total; } strm;\\nstatic inline int strm_enc_open(strm *s, int level) { s->total = level; return PAIR_OK; }\\nstatic inline int strm_dec_open(strm *s) { s->total = 0; return 0; }\\nstatic inline void strm_close(strm *s) { s->total = 0; }\\n\")\n\nc contract pair:\n    resource Stream wraps strm\n        init strm_enc_open(self), ok PAIR_OK\n        init strm_dec_open(self), ok 0\n        drop strm_close\n\nfn main:\n    print(\"x\")\n")
+    let view = p7_run(dir, "contract", "analyze\0src/main.with\0contract\0")
+    p7_assert_success(view, "the contract view")
+    let ok = view.stdout.contains("init: strm_enc_open -> Stream.enc_open; production: in place, Drop armed by init; ok PAIR_OK: Result[Stream, StreamError]") and view.stdout.contains("init: strm_dec_open -> Stream.dec_open; production: in place, Drop armed by init; ok 0: Result[Stream, StreamError]") and not view.stdout.contains("status: none") and not view.stdout.contains("profile:")
+    if not ok: print(view.stdout)
+    assert(ok)
+    print("ok")

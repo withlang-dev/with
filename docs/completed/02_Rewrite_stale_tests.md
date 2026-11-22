@@ -12,7 +12,7 @@ be addressed when that work lands).
 
 ## How the Test Runner Works
 
-`scripts/run_tests.sh` scans `test/cases/*.w` and parses header
+`scripts/run_tests.sh` scans `test/cases/*.with` and parses header
 directives:
 
 ```
@@ -35,15 +35,15 @@ internal compiler modules (`use Ast`, `use Sema`, `use Types`,
 These tests verify internal constants or data structures already
 validated by fixpoint (`stage2 == stage3`). Delete outright.
 
-- [x] Delete `test/cases/ast_test.w` (tests AstPool node storage internals)
-- [x] Delete `test/cases/intern_test.w` (tests InternPool symbol dedup internals)
-- [x] Delete `test/cases/codegen_test.w` (tests LLVM type IDs, instruction opcodes)
-- [x] Delete `test/cases/mir_test.w` (tests MirBody, basic blocks, terminators)
-- [x] Delete `test/cases/safety_checks.w` (tests MIR terminator kind constants)
-- [x] Delete `test/cases/driver_test.w` (tests SourceFile, CImport, render, Driver internals)
-- [x] Delete `test/cases/err_diag_codes.w` (tests `E_UNDECLARED == 1` etc.)
-- [x] Delete `test/cases/lexer_test.w` (redundant with hundreds of behavior tests)
-- [x] Delete `test/cases/parser_test.w` (redundant — fixpoint is ultimate parser validation)
+- [x] Delete `test/cases/ast_test.with` (tests AstPool node storage internals)
+- [x] Delete `test/cases/intern_test.with` (tests InternPool symbol dedup internals)
+- [x] Delete `test/cases/codegen_test.with` (tests LLVM type IDs, instruction opcodes)
+- [x] Delete `test/cases/mir_test.with` (tests MirBody, basic blocks, terminators)
+- [x] Delete `test/cases/safety_checks.with` (tests MIR terminator kind constants)
+- [x] Delete `test/cases/driver_test.with` (tests SourceFile, CImport, render, Driver internals)
+- [x] Delete `test/cases/err_diag_codes.with` (tests `E_UNDECLARED == 1` etc.)
+- [x] Delete `test/cases/lexer_test.with` (redundant with hundreds of behavior tests)
+- [x] Delete `test/cases/parser_test.with` (redundant — fixpoint is ultimate parser validation)
 - [x] Run `./scripts/run_tests.sh` — confirm no regressions after deletions
 
 ---
@@ -54,120 +54,120 @@ Each test currently constructs Sema/TypeTable/AstPool objects
 directly. Rewrite as a `.w` program the user would write that
 triggers the same error via `//! expect-check-fail`.
 
-### 2.1 err_assign_immutable.w
+### 2.1 err_assign_immutable.with
 
 Current: Creates Sema, calls `define_var` with `is_mut=0`, checks `var_is_mut`.
 
-- [x] Read current `test/cases/err_assign_immutable.w`
+- [x] Read current `test/cases/err_assign_immutable.with`
 - [x] Rewrite as program that assigns to immutable variable:
       `//! expect-check-fail: immutable` + `let x = 5` then `x = 10`
-- [x] Optionally create `behav_mutability.w` for the success case
+- [x] Optionally create `behav_mutability.with` for the success case
       (`let mut x = 5; x = 10; println("{x}")` → `//! expect-stdout: 10`)
-- [x] Run `./scripts/run_tests.sh test/cases/err_assign_immutable.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_assign_immutable.with` — passes
 
-### 2.2 err_binop_types.w
+### 2.2 err_binop_types.with
 
 Current: Constructs AST nodes for `i32 + i32`, `i32 == i32`, `bool && bool`, checks types.
 
-- [x] Read current `test/cases/err_binop_types.w`
+- [x] Read current `test/cases/err_binop_types.with`
 - [x] Rewrite as end-to-end program exercising binary operations:
       `//! expect-stdout: 3` + arithmetic, comparison, logical ops
-- [x] Run `./scripts/run_tests.sh test/cases/err_binop_types.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_binop_types.with` — passes
 
-### 2.3 err_borrow_conflict.w
+### 2.3 err_borrow_conflict.with
 
 Current: Constructs MirBody, adds borrows, runs BorrowChecker, checks error counts.
 
-- [x] Read current `test/cases/err_borrow_conflict.w`
+- [x] Read current `test/cases/err_borrow_conflict.with`
 - [x] Rewrite as program with borrow conflict:
       `//! expect-check-fail: borrow` + shared ref then mutation
 - [x] If compiler doesn't detect this yet, use `//! expect-stdout` test
       showing borrows work + add TODO comment for negative test
-- [x] Run `./scripts/run_tests.sh test/cases/err_borrow_conflict.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_borrow_conflict.with` — passes
 
-### 2.4 err_invalid_cast.w
+### 2.4 err_invalid_cast.with
 
 Current: Calls `cast_instruction(types, TYPE_I32, TYPE_I64)`, checks return values.
 
-- [x] Read current `test/cases/err_invalid_cast.w`
+- [x] Read current `test/cases/err_invalid_cast.with`
 - [x] Rewrite as program with invalid cast:
       `//! expect-check-fail: cast` + `let s = "hello"; let x = s as i32`
-- [x] Run `./scripts/run_tests.sh test/cases/err_invalid_cast.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_invalid_cast.with` — passes
 
-### 2.5 err_match_str_exhaust.w
+### 2.5 err_match_str_exhaust.with
 
 Current: Checks `TypeTable.is_enum`, `TypeTable.is_bool`, pattern node kind constants.
 
-- [x] Read current `test/cases/err_match_str_exhaust.w`
+- [x] Read current `test/cases/err_match_str_exhaust.with`
 - [x] Rewrite as program with non-exhaustive match on string:
       `//! expect-check-fail: exhaustive` + match with no wildcard
-- [x] Run `./scripts/run_tests.sh test/cases/err_match_str_exhaust.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_match_str_exhaust.with` — passes
 
-### 2.6 err_return_type.w
+### 2.6 err_return_type.with
 
 Current: Sets `s.current_return_type = TYPE_I32`, checks `types_compatible`.
 
-- [x] Read current `test/cases/err_return_type.w`
+- [x] Read current `test/cases/err_return_type.with`
 - [x] Rewrite as program with return type mismatch:
       `//! expect-check-fail: type` + `fn get_num() -> i32: "not a number"`
-- [x] Run `./scripts/run_tests.sh test/cases/err_return_type.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_return_type.with` — passes
 
-### 2.7 err_trait_bound.w
+### 2.7 err_trait_bound.with
 
 Current: Creates TraitSolver, adds traits/impls, checks resolve and obligations.
 
-- [x] Read current `test/cases/err_trait_bound.w`
+- [x] Read current `test/cases/err_trait_bound.with`
 - [x] Rewrite as program with trait bound violation:
       `//! expect-check-fail: trait` + call requiring trait not implemented
 - [x] If compiler doesn't produce this error yet, use simpler trait test
       + add TODO for the negative case
-- [x] Run `./scripts/run_tests.sh test/cases/err_trait_bound.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_trait_bound.with` — passes
 
-### 2.8 err_type_mismatch.w
+### 2.8 err_type_mismatch.with
 
 Current: Checks `types_compatible(TYPE_I32, TYPE_STR)` etc.
 
-- [x] Read current `test/cases/err_type_mismatch.w`
+- [x] Read current `test/cases/err_type_mismatch.with`
 - [x] Rewrite as program with type mismatch:
       `//! expect-check-fail: type` + `let x: i32 = "hello"`
-- [x] Run `./scripts/run_tests.sh test/cases/err_type_mismatch.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_type_mismatch.with` — passes
 
-### 2.9 err_undefined_fn.w
+### 2.9 err_undefined_fn.with
 
 Current: Checks `Sema.find_fn(s, "foo") == -1`.
 
-- [x] Read current `test/cases/err_undefined_fn.w`
+- [x] Read current `test/cases/err_undefined_fn.with`
 - [x] Rewrite as program calling undefined function:
       `//! expect-check-fail: undefined` + `fn main: foo()`
-- [x] Run `./scripts/run_tests.sh test/cases/err_undefined_fn.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_undefined_fn.with` — passes
 
-### 2.10 err_undefined_type.w
+### 2.10 err_undefined_type.with
 
 Current: Checks `TypeTable.lookup(types, "NoSuchType") == -1`.
 
-- [x] Read current `test/cases/err_undefined_type.w`
+- [x] Read current `test/cases/err_undefined_type.with`
 - [x] Rewrite as program using undefined type:
       `//! expect-check-fail: undefined` + `let x: NoSuchType = 42`
-- [x] Run `./scripts/run_tests.sh test/cases/err_undefined_type.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_undefined_type.with` — passes
 
-### 2.11 err_undefined_var.w
+### 2.11 err_undefined_var.with
 
 Current: Constructs AST ident for "unknown", checks `TYPE_ERROR`.
 
-- [x] Read current `test/cases/err_undefined_var.w`
+- [x] Read current `test/cases/err_undefined_var.with`
 - [x] Rewrite as program using undefined variable:
       `//! expect-check-fail: undefined` + `fn main: println(x)`
-- [x] Run `./scripts/run_tests.sh test/cases/err_undefined_var.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_undefined_var.with` — passes
 
-### 2.12 err_wrong_arg_count.w
+### 2.12 err_wrong_arg_count.with
 
 Current: Registers function with 2 params, checks `fn_param_counts`.
 
-- [x] Read current `test/cases/err_wrong_arg_count.w`
+- [x] Read current `test/cases/err_wrong_arg_count.with`
 - [x] Rewrite as program calling function with wrong arg count:
       `//! expect-check-fail: argument` + `fn add(a: i32, b: i32) -> i32: a + b`
       then `add(1)`
-- [x] Run `./scripts/run_tests.sh test/cases/err_wrong_arg_count.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/err_wrong_arg_count.with` — passes
 
 ### Pass 2 verification
 
@@ -177,77 +177,77 @@ Current: Registers function with 2 params, checks `fn_param_counts`.
 
 ## Pass 3: Rewrite Internal & Integration Tests
 
-### 3.1 sema_test.w → behav_sema_basics.w
+### 3.1 sema_test.with → behav_sema_basics.with
 
 Current: 10 test functions checking builtin types, scope chains, function
 registration, type compatibility, expression type checking, variant lookup.
 
-- [x] Read current `test/cases/sema_test.w`
-- [x] Write `test/cases/behav_sema_basics.w` exercising scope chains:
+- [x] Read current `test/cases/sema_test.with`
+- [x] Write `test/cases/behav_sema_basics.with` exercising scope chains:
       `//! expect-stdout: 10` + nested scope with let bindings
 - [x] Add variant lookup test: enum declaration, match, correct output
-- [x] Delete `test/cases/sema_test.w`
-- [x] Run `./scripts/run_tests.sh test/cases/behav_sema_basics.w` — passes
+- [x] Delete `test/cases/sema_test.with`
+- [x] Run `./scripts/run_tests.sh test/cases/behav_sema_basics.with` — passes
 
-### 3.2 type_test.w → behav_type_system.w
+### 3.2 type_test.with → behav_type_system.with
 
 Current: 18 test functions covering struct/enum/array/slice/tuple/fn/ptr/ref/
 alias/option/result types, equality, generics, trait objects, scopes.
 
-- [x] Read current `test/cases/type_test.w`
-- [x] Write `test/cases/behav_type_system.w` with struct test:
+- [x] Read current `test/cases/type_test.with`
+- [x] Write `test/cases/behav_type_system.with` with struct test:
       type declaration, field access, `//! expect-stdout` verification
 - [x] Add enum test: variant construction, match, payload extraction
 - [x] Add tuple test: tuple literal, field access by index
 - [x] Add array test: array literal, `.len()` call
-- [x] Delete `test/cases/type_test.w`
-- [x] Run `./scripts/run_tests.sh test/cases/behav_type_system.w` — passes
+- [x] Delete `test/cases/type_test.with`
+- [x] Run `./scripts/run_tests.sh test/cases/behav_type_system.with` — passes
 
-### 3.3 borrow_test.w → behav_borrow_basic.w
+### 3.3 borrow_test.with → behav_borrow_basic.with
 
 Current: Tests BorrowInfo, NllRegion, BorrowChecker on manually-constructed MIR.
 
-- [x] Read current `test/cases/borrow_test.w`
-- [x] Write `test/cases/behav_borrow_basic.w` exercising borrows:
+- [x] Read current `test/cases/borrow_test.with`
+- [x] Write `test/cases/behav_borrow_basic.with` exercising borrows:
       `//! expect-stdout: ok` + shared borrow that compiles and runs
 - [x] If borrow checker catches conflicts at check time, add negative test
-      `err_borrow_mut.w` with `//! expect-check-fail: borrow`
-- [x] Delete `test/cases/borrow_test.w`
-- [x] Run `./scripts/run_tests.sh test/cases/behav_borrow_basic.w` — passes
+      `err_borrow_mut.with` with `//! expect-check-fail: borrow`
+- [x] Delete `test/cases/borrow_test.with`
+- [x] Run `./scripts/run_tests.sh test/cases/behav_borrow_basic.with` — passes
 
-### 3.4 traits_test.w → behav_trait_basics.w
+### 3.4 traits_test.with → behav_trait_basics.with
 
 Current: Tests TraitSolver (trait definition, impl registration, resolve,
 coherence, obligation lists).
 
-- [x] Read current `test/cases/traits_test.w`
-- [x] Write `test/cases/behav_trait_basics.w` with trait + impl + method call:
+- [x] Read current `test/cases/traits_test.with`
+- [x] Write `test/cases/behav_trait_basics.with` with trait + impl + method call:
       `//! expect-stdout: hello` + trait definition, struct impl, method call
-- [x] Delete `test/cases/traits_test.w`
-- [x] Run `./scripts/run_tests.sh test/cases/behav_trait_basics.w` — passes
+- [x] Delete `test/cases/traits_test.with`
+- [x] Run `./scripts/run_tests.sh test/cases/behav_trait_basics.with` — passes
 
-### 3.5 integ_full_pipeline.w — rewrite in place
+### 3.5 integ_full_pipeline.with — rewrite in place
 
 Current: Manually constructs AST, runs each compiler phase, checks results.
 
-- [x] Read current `test/cases/integ_full_pipeline.w`
+- [x] Read current `test/cases/integ_full_pipeline.with`
 - [x] Rewrite as real program exercising the full pipeline:
       `//! expect-stdout: 42` + nested function, if/else, arithmetic
-- [x] Run `./scripts/run_tests.sh test/cases/integ_full_pipeline.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/integ_full_pipeline.with` — passes
 
-### 3.6 integ_multi_module.w — rewrite in place
+### 3.6 integ_multi_module.with — rewrite in place
 
 Current: Imports every compiler module, creates one instance of each.
 
-- [x] Read current `test/cases/integ_multi_module.w`
-- [x] Check how existing multi-file tests work (e.g., `shadow_helper.w`)
-- [x] Create `test/cases/integ_helper_module.w` with `//! check-only` +
+- [x] Read current `test/cases/integ_multi_module.with`
+- [x] Check how existing multi-file tests work (e.g., `shadow_helper.with`)
+- [x] Create `test/cases/integ_helper_module.with` with `//! check-only` +
       `pub fn add(a: i32, b: i32) -> i32: a + b`
-- [x] Rewrite `test/cases/integ_multi_module.w`:
+- [x] Rewrite `test/cases/integ_multi_module.with`:
       `//! expect-stdout: 3` + `use integ_helper_module` + `println("{add(1, 2)}")`
 - [x] If `use` path resolution doesn't support relative test imports,
       make it a single-file test instead
-- [x] Run `./scripts/run_tests.sh test/cases/integ_multi_module.w` — passes
+- [x] Run `./scripts/run_tests.sh test/cases/integ_multi_module.with` — passes
 
 ### Pass 3 verification
 
@@ -257,7 +257,7 @@ Current: Imports every compiler module, creates one instance of each.
 
 ## Final Verification
 
-- [x] Run: `grep -r "^use " test/cases/*.w | grep -E "(Ast|Sema|Types|Mir|Codegen|Driver|BorrowCfg|Lexer|Token|Parser|InternPool|Source|CImport|render|Span|Diag|MirLower)"` — prints nothing
+- [x] Run: `grep -r "^use " test/cases/*.with | grep -E "(Ast|Sema|Types|Mir|Codegen|Driver|BorrowCfg|Lexer|Token|Parser|InternPool|Source|CImport|render|Span|Diag|MirLower)"` — prints nothing
 - [x] Run `./scripts/run_tests.sh` — zero failures
 - [x] Every rewritten error test triggers the expected diagnostic through normal compilation
 - [x] Every rewritten behavior test builds, runs, and produces correct output

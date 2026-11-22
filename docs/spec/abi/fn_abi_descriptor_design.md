@@ -2,7 +2,7 @@
 
 ## Implementation snapshot — 2026-09-12
 
-`src/FnAbi.w` defines the immutable `FnAbi` and `ArgAbi` records.
+`src/FnAbi.with` defines the immutable `FnAbi` and `ArgAbi` records.
 `Codegen.compute_fn_abi` interns descriptors from finalized source types,
 declared place/reference modes, and calling convention. Named declarations,
 concrete specializations, async declarations, callable types, closures, adapters, and destructor
@@ -29,7 +29,7 @@ targets, explicit pointers, C aggregate returns, closures and adapters,
 consuming receivers, inferred async returns, and aggregate parameters beyond
 the former 64-bit mask (including default trait methods).
 LLVM declaration and call audits check descriptor shapes and byval attributes.
-`da_trait_default_tail.w` additionally checks the cleanup frame shared in intent
+`da_trait_default_tail.with` additionally checks the cleanup frame shared in intent
 with ordinary function bodies; broader synthesized-body ownership audit coverage
 is tracked in #1117. Missing/undefined callee coverage in the audit is tracked
 in #1119; native execution also guards the wide default-method regression.
@@ -148,7 +148,7 @@ descriptor:
    This subsumes `value_ref_abi`, `internal_abi_needs_indirect_param`, the byval
    mask, `fn_ref_param_*`, and the sret flag into ONE place.
 2. **`declare_function` reads `FnAbi`** for the prologue — replaces the ad-hoc
-   param-type/byval/value_ref_abi logic (Codegen.w:4088-4123).
+   param-type/byval/value_ref_abi logic (Codegen.with:4088-4123).
 3. **Collapse the ~3 call-lowering loops** (concrete 14049-14158, generic
    12884-12909, Group B receiver blocks) into one `push_call_arg(fn_abi, i,
    operand)` keyed on `PassMode`. This is the cathedral — now *descriptor-driven*,

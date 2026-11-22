@@ -2,7 +2,7 @@
 
 ## Goal
 
-Delete the AST codegen path from `src/Codegen.w`. The compiler
+Delete the AST codegen path from `src/Codegen.with`. The compiler
 goes through MIR for all functions, no exceptions, no fallback.
 
 ```
@@ -35,7 +35,7 @@ functions from AST to MIR.
 
 Categorize the 1,217 failing functions by pattern.
 
-Add instrumentation to `src/MirLower.w` that logs the AST node
+Add instrumentation to `src/MirLower.with` that logs the AST node
 kind that caused `lowering_failed` to be set. The failures will
 cluster into a few categories. Expected top categories:
 
@@ -63,7 +63,7 @@ make build 2>&1 | grep "FATAL" | wc -l
 For each category, in order of frequency:
 
 1. Pick the most common failure pattern.
-2. Add the lowering code in `src/MirLower.w`.
+2. Add the lowering code in `src/MirLower.with`.
 3. `make build` — confirm fewer failures.
 4. `make fixpoint` — confirm no regressions.
 5. `./scripts/run_tests.sh` — confirm all pass.
@@ -139,7 +139,7 @@ function is called from both AST and MIR paths, keep it.
 make build
 make fixpoint
 ./scripts/run_tests.sh      # all pass
-wc -l src/Codegen.w         # expect 3,000-5,000 lines removed
+wc -l src/Codegen.with         # expect 3,000-5,000 lines removed
 ```
 
 Update seed:
@@ -205,7 +205,7 @@ field access chains would resolve ~92% of all lowering failures.
 
 ### Codegen-unsupported (205 functions)
 
-These pass MirLower but fail `mir_function_is_supported` in Codegen.w.
+These pass MirLower but fail `mir_function_is_supported` in Codegen.with.
 Root cause: rvalue kinds or terminator kinds that the MIR codegen
 doesn't handle yet. Need to audit which specific RK_*/TK_* are missing.
 
@@ -220,7 +220,7 @@ Environment-gated diagnostics added:
 
 Track progress:
 ```bash
-WITH_MIR_AUDIT=1 ./out/bin/with-stage2 build src/main.w -o /dev/null 2>&1 | grep '\[mir-fallback\]' | awk '{print $2}' | sort | uniq -c | sort -rn
+WITH_MIR_AUDIT=1 ./out/bin/with-stage2 build src/main.with -o /dev/null 2>&1 | grep '\[mir-fallback\]' | awk '{print $2}' | sort | uniq -c | sort -rn
 ```
 
 ## Progress Tracking
@@ -369,7 +369,7 @@ Phase 4: Delete AST codegen
   - Async (gen_async_function, spawn, select_await)
   Each is a standalone feature project, not cleanup.
 
-  Codegen.w: 14,336 lines (was ~14,000 pre-MIR).
+  Codegen.with: 14,336 lines (was ~14,000 pre-MIR).
   Net line growth from MIR handlers, but AST is fully dead for self-host.
 
 Phase 5: Validate
@@ -377,5 +377,5 @@ Phase 5: Validate
   [x] make fixpoint
   [x] ./scripts/run_tests.sh — 243/246 pass
   [x] Update seed
-  [x] Codegen.w line count: 14,336
+  [x] Codegen.with line count: 14,336
 ```

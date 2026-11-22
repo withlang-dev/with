@@ -79,37 +79,37 @@ Planned new files (exact names can vary slightly, but the split should hold):
 
 ```text
 src/compiler/foundation/
-  Ids.w
-  Arena.w
-  InternPool.w
-  Types.w              # interned type keys for foundation only
-  Values.w             # interned value keys for foundation only
-  Span.w
-  Source.w
-  SourceMap.w
-  Diagnostic.w
-  DiagnosticRender.w
-  Mod.w                # convenience re-export
+  Ids.with
+  Arena.with
+  InternPool.with
+  Types.with              # interned type keys for foundation only
+  Values.with             # interned value keys for foundation only
+  Span.with
+  Source.with
+  SourceMap.with
+  Diagnostic.with
+  DiagnosticRender.with
+  Mod.with                # convenience re-export
 ```
 
 Planned unit test files:
 
 ```text
 test/wave1/
-  ids_test.w
-  arena_test.w
-  intern_strings_test.w
-  intern_types_test.w
-  intern_values_test.w
-  span_source_test.w
-  source_map_test.w
-  diag_model_test.w
-  diag_render_test.w
+  ids_test.with
+  arena_test.with
+  intern_strings_test.with
+  intern_types_test.with
+  intern_values_test.with
+  span_source_test.with
+  source_map_test.with
+  diag_model_test.with
+  diag_render_test.with
 ```
 
 Compatibility shims (optional but recommended for incremental migration):
 
-- Keep existing root modules (`src/InternPool.w`, `src/Span.w`, `src/Source.w`, `src/Diagnostic.w`) as thin forwarding layers once foundation modules exist.
+- Keep existing root modules (`src/InternPool.with`, `src/Span.with`, `src/Source.with`, `src/Diagnostic.with`) as thin forwarding layers once foundation modules exist.
 
 ---
 
@@ -232,7 +232,7 @@ Rules:
 
 Deliverables:
 
-- `src/compiler/foundation/Mod.w` exports stable API surface.
+- `src/compiler/foundation/Mod.with` exports stable API surface.
 - Optional thin adapters in legacy root modules to reduce churn for later waves.
 - No behavior changes to compiler passes in this wave beyond import-path updates required for compilation.
 
@@ -288,24 +288,24 @@ Local command:
 
 ## Implementation Checklist
 
-- [x] Create `src/compiler/foundation/` module skeleton and `Mod.w` exports.
-- [x] Define all Wave 1 ID types in `Ids.w` with explicit invalid sentinels.
+- [x] Create `src/compiler/foundation/` module skeleton and `Mod.with` exports.
+- [x] Define all Wave 1 ID types in `Ids.with` with explicit invalid sentinels.
 - [x] Add ID helper APIs (construct/compare/format/raw conversion) and tests.
-- [x] Implement `Arena.w` with deterministic handle allocation and reset semantics.
+- [x] Implement `Arena.with` with deterministic handle allocation and reset semantics.
 - [x] Add arena unit tests (allocation order, reset, invalid handle behavior).
-- [x] Implement string interning in `InternPool.w`.
-- [x] Implement type-key definitions in `Types.w`.
-- [x] Implement value-key definitions in `Values.w`.
-- [x] Implement type/value interning in `InternPool.w`.
+- [x] Implement string interning in `InternPool.with`.
+- [x] Implement type-key definitions in `Types.with`.
+- [x] Implement value-key definitions in `Values.with`.
+- [x] Implement type/value interning in `InternPool.with`.
 - [x] Add intern tests for string/type/value canonicalization.
-- [x] Implement `Span.w` and span utilities (`len`, `merge`, validation).
-- [x] Implement `Source.w` (line starts + location mapping).
-- [x] Implement `SourceMap.w` (`FileId` registry + lookup APIs).
+- [x] Implement `Span.with` and span utilities (`len`, `merge`, validation).
+- [x] Implement `Source.with` (line starts + location mapping).
+- [x] Implement `SourceMap.with` (`FileId` registry + lookup APIs).
 - [x] Add span/source/source_map boundary and lookup tests.
-- [x] Implement `Diagnostic.w` structured model and store.
-- [x] Implement `DiagnosticRender.w` deterministic text renderer.
+- [x] Implement `Diagnostic.with` structured model and store.
+- [x] Implement `DiagnosticRender.with` deterministic text renderer.
 - [x] Add diagnostics model/render tests.
-- [ ] Add optional root-module adapters (`src/InternPool.w`, `src/Span.w`, `src/Source.w`, `src/Diagnostic.w`) to point at foundation modules.
+- [ ] Add optional root-module adapters (`src/InternPool.with`, `src/Span.with`, `src/Source.with`, `src/Diagnostic.with`) to point at foundation modules.
 - [x] Add Wave 1 test runner script and document commands.
 - [x] Verify Wave 1 gate: unit tests only, all passing.
 - [ ] Mark Wave 1 complete in `docs/with-selfhost-plan.md` and `docs/with-selfhost-detailed-plan.md`.

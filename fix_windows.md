@@ -60,18 +60,18 @@ pcre2test harness (after the errno/rlimit shims and
 `legacy_stdio_definitions.lib`); the two `nm` targets pass with `NM` set to
 the SDK's `llvm-nm.exe`, as the Windows lanes already do. One fixture is
 still red: `behav_project_overflow_modes` — its nested `with build` in a
-case directory under `out/tmp` reaches the repo's `build.w` graph, whose
+case directory under `out/tmp` reaches the repo's `build.with` graph, whose
 `with-sha256` link runs in a build-runner worker that does not carry the
 Windows linker variables (`missing Windows LLVM linker metadata … and no
 WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment`). Unix never
 notices because `cc` needs none of them. Two defects to file: the nested
 project resolving to the enclosing repo's graph, and action workers not
-forwarding the toolchain environment (build/compiler.w forwards it for
+forwarding the toolchain environment (build/compiler.with forwards it for
 stage compiles by hand). Also fixed while here: the ownership range
 tables grow instead of turning the invalid-free check off.
 
 **The seed ladder, and why the lanes stay red until a seed is published:**
-the v0.15.1.8 seed cannot evaluate main's `build.w` — `0173d08e` switched
+the v0.15.1.8 seed cannot evaluate main's `build.with` — `0173d08e` switched
 the build-driver files to comptime `str` indexing (`path[i]`), which that
 seed's evaluator lacks (`comptime index requires an array, tuple, or
 vec`). But `af7db8ce` is the commit that taught the evaluator `str`
@@ -81,7 +81,7 @@ fix (full build green, `:fixpoint` green) → its release `with.exe` as
 `WITH=` for main → main's full build green and `:fixpoint` green. Main's
 release `out/release/bin/with.exe` from that chain is the Windows seed to
 publish; then move the `seed.lock` Windows overrides off v0.15.1.8 and
-`with run tools/bump_seed_pins.w` (numbering per D40: main is the
+`with run tools/bump_seed_pins.with` (numbering per D40: main is the
 v0.15.2.x group). Two things to know on a fresh box: the SDK must come
 from the release (`windows-sdk-publish` makes `:deps` able to find one),
 and the toolchain env (`LLVM_PREFIX`, `WITH_LLVM_LD`, `WITH_LIBCLANG`,
@@ -95,7 +95,7 @@ defaults for that reason; `with build :clean` resets it).
 Building the pcre2 `.wo` bundle, the compiler **crashes** on native Windows:
 
 ```
- --> D:/a/with/with/lib/std/re/pcre2_auto_possess.w:3900:27
+ --> D:/a/with/with/lib/std/re/pcre2_auto_possess.with:3900:27
 3900 |             if not (((if (unsafe *__local_chr_ptr) != 4294967295: 1 else: 0) != 0)) {
   |                           ^^^^^^^^^^^^^^^^^^^^^^^
 invalid free addr=2164888967488
@@ -113,7 +113,7 @@ The trigger is the bundle emit, which the `pcre2-wo-build` action runs as a
 subprocess of the fresh stage compiler:
 
 ```
-with build lib/std/re/bundle.w --emit-obj --bundle-corpus std/re -o out/wo/pcre2.o
+with build lib/std/re/bundle.with --emit-obj --bundle-corpus std/re -o out/wo/pcre2.o
 ```
 
 ### Scope — this is the crucial fact
@@ -123,14 +123,14 @@ builds succeed (their seeds and CI are green). Cross-compiling the *identical
 target* from macOS —
 
 ```
-with build lib/std/re/bundle.w --emit-obj --target=windows_x86_64 --bundle-corpus std/re -o /tmp/x.o
+with build lib/std/re/bundle.with --emit-obj --target=windows_x86_64 --bundle-corpus std/re -o /tmp/x.o
 ```
 
 — exits 0 and emits the object cleanly (only warnings). So it is **not** a
 codegen-for-Windows defect and **not** the migrated pcre2 source; it is a
 drop/free bug in how the compiler's runtime behaves *running on Windows*,
 exposed by this corpus (likely a layout- or allocator-dependent garbage drop,
-#729 class — the huge Copy types in `lib/std/re/defs.w`, e.g. `heapframe` at
+#729 class — the huge Copy types in `lib/std/re/defs.with`, e.g. `heapframe` at
 1,048,712 bytes, are a prime suspect for a drop-state or move-checker edge).
 
 Because the bundle builder is the **fresh stage compiler** (`with-stage1.exe`
@@ -145,16 +145,16 @@ Windows machine, reproduce and instrument:
 
 ```
 # 1. reproduce
-with build lib/std/re/bundle.w --emit-obj --bundle-corpus std/re -o out\wo\pcre2.o
+with build lib/std/re/bundle.with --emit-obj --bundle-corpus std/re -o out\wo\pcre2.o
 
 # 2. allocator verdict + no-reuse so the address is stable
 set WITH_DEBUG_ALLOC=1
 set WITH_ALLOC_NO_REUSE=1
-with build lib\std\re\bundle.w --emit-obj --bundle-corpus std/re -o out\wo\pcre2.o
+with build lib\std\re\bundle.with --emit-obj --bundle-corpus std/re -o out\wo\pcre2.o
 
 # 3. trap every alloc/free of the bad block for its drop origins
 set WITH_DEBUG_ALLOC_TRAP_FREE=<the invalid-free address from the report>
-with build lib\std\re\bundle.w --emit-obj --bundle-corpus std/re -o out\wo\pcre2.o
+with build lib\std\re\bundle.with --emit-obj --bundle-corpus std/re -o out\wo\pcre2.o
 ```
 
 Then take the alloc site + the bad free's origin into the ownership/drop dumps
@@ -165,10 +165,10 @@ root cause** — name the exact line, function, branch, and condition.
 
 **If you have no Windows machine:** you can still run the allocator on the CI
 runner. Dispatch the release workflow on a scratch branch that (a) is
-af7db8ce-based so the v0.15.1.8 seed can materialize its `build.w`, (b) carries
+af7db8ce-based so the v0.15.1.8 seed can materialize its `build.with`, (b) carries
 the compiler fix or instrumentation you're testing, and (c) sets
 `WITH_DEBUG_ALLOC=1 WITH_ALLOC_NO_REUSE=1` in the `pcre2-wo-build` action's
-child env (`build/wo.w`, the `wo_run(ctx, "build", ...)` invocation). That is
+child env (`build/wo.with`, the `wo_run(ctx, "build", ...)` invocation). That is
 how the panic itself was captured:
 
 ```
@@ -185,10 +185,10 @@ diagnostic branch must include it).
 All on `main`; these were real and are correct, they just uncovered the deeper
 crash:
 
-- **#1075 — `Link.w` native-Windows lld-link env fallback** (main, in the D40
+- **#1075 — `Link.with` native-Windows lld-link env fallback** (main, in the D40
   chain): when `<runtime root>/llvm_ld` is absent, native Windows resolves the
   linker from `WITH_LLVM_LD` → `LLVM_LD` → `LLVM_PREFIX/bin/lld-link.exe`, the
-  same way `build/compiler.w comp_llvm_lld_tool` does. This fixed the stage
+  same way `build/compiler.with comp_llvm_lld_tool` does. This fixed the stage
   executable link (`with-stage1.exe` now links); it is not the crash.
 - **Build-runner retry (f5af0c98):** the driver retries the native build-runner
   compile once the bootstrap runtime objects + linker metadata exist. On Windows
@@ -212,24 +212,24 @@ crash:
 - **Version numbering:** if your fix is a plain compiler change that the current
   seeds can still bootstrap, it is a `Z` bump within `v0.15.2.x`. It only bumps
   `Y` if it makes the tree unbuildable by the group's seeds (it won't — a
-  codegen/drop fix doesn't touch comptime-evaluated `build.w`).
+  codegen/drop fix doesn't touch comptime-evaluated `build.with`).
 - **`with build :seed-driver`** (first in `:test`) refuses a battery driven by
   anything but the pinned seed; the battery itself proves the seed builds the
   tree. Keep it green.
 
 ## Files that matter
 
-- `lib/std/re/pcre2_auto_possess.w` (crash site line ~3900) and
-  `lib/std/re/defs.w` (the giant Copy types — `heapframe`, `heapframe_align`,
+- `lib/std/re/pcre2_auto_possess.with` (crash site line ~3900) and
+  `lib/std/re/defs.with` (the giant Copy types — `heapframe`, `heapframe_align`,
   `pcre2_real_match_data_8`).
-- `src/Mir.w` — drop-state dataflow (interned place keys, the worklist fixpoint);
-  `src/MirLower.w` — where drops are scheduled; the #729 garbage-drop class lives
+- `src/Mir.with` — drop-state dataflow (interned place keys, the worklist fixpoint);
+  `src/MirLower.with` — where drops are scheduled; the #729 garbage-drop class lives
   in this region.
-- `src/compiler/Link.w` — the Windows link path (already fixed for #1075; the
+- `src/compiler/Link.with` — the Windows link path (already fixed for #1075; the
   crash is not here).
-- `build/wo.w` — `run_wo_bundle_build_action`: the `.wo` bundle build action, its
+- `build/wo.with` — `run_wo_bundle_build_action`: the `.wo` bundle build action, its
   `--emit-obj` sub-invocation, and the captured-stderr echo.
-- Runtime: `rt/windows_x86_64.w`, `rt/windows_aarch64.w`, `rt/rt_core.w` — if the
+- Runtime: `rt/windows_x86_64.with`, `rt/windows_aarch64.with`, `rt/rt_core.with` — if the
   invalid free is a Windows allocator/runtime layout issue rather than a
   drop-scheduling bug, the difference between Windows and Unix free/alloc lives
   here.

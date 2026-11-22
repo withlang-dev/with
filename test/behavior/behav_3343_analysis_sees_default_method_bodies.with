@@ -1,0 +1,23 @@
+//! expect-stdout: ok
+
+use std.fs
+use std.process
+
+// #3343: `with analyze` reads the MIR of a default trait method an impl
+// inherits. The body was built inside codegen, so the MIR facts held only
+// the calls of it, and audit:resolution said ok over a call in it whose
+// argument count differed from Sema's (#3335).
+fn main:
+    let compiler = env("WITH_TEST_COMPILER")
+    assert(compiler.len() > 0)
+    let dir = f"out/tmp/analysis-default-body-{pid()}"
+    assert(mkdir_p(dir) == 0)
+    let result = run_to_files(&[compiler, "analyze", "test/behavior/behav_3343_default_method_body_is_the_modules.with", "select:stage=mir,kind=body,name~Twice."], dir ++ "/stdout", dir ++ "/stderr", 600000)
+    assert(not result.timed_out)
+    assert(result.code == 0)
+    let report = read_file(dir ++ "/stdout").unwrap()
+    assert(report.contains("\tTwice.Scaler.factor\t"))
+    assert(report.contains("\tTwice.scaled\t"), "no MIR body for the inherited Twice.scaled:\n" ++ report)
+    assert(report.contains("\tTwice.doubled\t"))
+    assert(remove_tree(dir) == 0)
+    print("ok")

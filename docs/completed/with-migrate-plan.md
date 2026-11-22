@@ -19,11 +19,11 @@ star. Key architectural decisions to adopt:
 ### 1. Intermediate AST, not string concatenation
 
 Zig builds a **typed Zig AST** (`ast.zig`, 3,114 lines) and then
-renders it to source text. With's CImport.w concatenates strings
+renders it to source text. With's CImport.with concatenates strings
 directly. This works but is fragile.
 
 **Decision:** Keep string concatenation for v1. The existing
-CImport.w translator is already 4,627 lines of working string
+CImport.with translator is already 4,627 lines of working string
 concat. Introducing an intermediate AST would be a rewrite.
 Adopt the AST approach in v2 if the string approach hits walls.
 
@@ -35,7 +35,7 @@ Zig uses `Scope.zig` (441 lines) with a proper scope struct:
 are looked up by walking the parent chain (`getAlias`). Name
 mangling increments `mangle_count` per block.
 
-CImport.w uses pipe-delimited strings (`"|name|"` or
+CImport.with uses pipe-delimited strings (`"|name|"` or
 `"|name=mangled|"`). This works but limits what we can express.
 
 **Decision:** Keep pipe-delimited strings for v1. Refactor to
@@ -74,10 +74,10 @@ Zig returns `TransError` (union of `TypeError`,
 can't be translated, it returns an error and the caller decides
 how to handle it (skip, emit comment, emit opaque type, etc.).
 
-CImport.w returns empty string `""` on failure, or emits
+CImport.with returns empty string `""` on failure, or emits
 `comptime_error(...)`.
 
-**Decision:** Keep CImport.w's approach. Return `""` on failure,
+**Decision:** Keep CImport.with's approach. Return `""` on failure,
 caller emits fallback. For migrate mode, never silently skip —
 emit `comptime_error` with explanation.
 
@@ -86,13 +86,13 @@ emit `comptime_error` with explanation.
 Zig's `transBoolExpr` checks the C type and inserts appropriate
 conversions (int→bool via `!= 0`, pointer→bool via `!= null`).
 
-CImport.w has `ci_trans_bool_expr` that does the same thing.
+CImport.with has `ci_trans_bool_expr` that does the same thing.
 Already aligned.
 
 ### 7. Wrapping arithmetic for unsigned types
 
 Zig emits `+%` (add_wrap), `-%` (sub_wrap), `*%` (mul_wrap) for
-unsigned integer operations. CImport.w does the same via
+unsigned integer operations. CImport.with does the same via
 `ci_bo_to_str_typed`.
 
 Already aligned.
@@ -113,7 +113,7 @@ fallthrough.
 
 ---
 
-## What Already Exists (CImport.w, 4,627 lines)
+## What Already Exists (CImport.with, 4,627 lines)
 
 All of the following are implemented and working:
 
@@ -145,10 +145,10 @@ All of the following are implemented and working:
 
 ### Step 1: File-level driver
 
-**Creates:** `pub fn migrate_c_file(...)` inside CImport.w
+**Creates:** `pub fn migrate_c_file(...)` inside CImport.with
 **Est:** ~150 LOC
 
-Add migrate mode to CImport.w. The key difference from
+Add migrate mode to CImport.with. The key difference from
 `process_c_import`: translate ALL function bodies, not just
 `static inline`.
 
@@ -197,7 +197,7 @@ stubs).
 
 ### Step 2: Switch fallthrough — Zig's duplication approach
 
-**Modifies:** `ci_trans_switch_body` in CImport.w
+**Modifies:** `ci_trans_switch_body` in CImport.with
 **Est:** ~100 LOC
 **Reference:** Zig `transSwitch` (lines 1942–2025),
 `transSwitchProngStmtInline` (lines 2088–2130)
@@ -249,7 +249,7 @@ Duff's device.
 
 ### Step 3: Goto detection and label collection
 
-**Adds to:** CImport.w
+**Adds to:** CImport.with
 **Est:** ~60 LOC
 
 ```
@@ -274,7 +274,7 @@ every label to a state ID.
 
 ### Step 4: Variable hoisting for goto functions
 
-**Adds to:** CImport.w
+**Adds to:** CImport.with
 **Est:** ~80 LOC
 
 ```
@@ -300,7 +300,7 @@ targeted blocks compiles after hoisting.
 
 ### Step 5: State-variable transform
 
-**Adds to:** CImport.w
+**Adds to:** CImport.with
 **Est:** ~300 LOC
 
 This is the core new feature — what Zig's translate-c cannot do.
@@ -434,7 +434,7 @@ With and produce identical output to the C versions.
 
 ### Step 6: Type topological ordering
 
-**Adds to:** CImport.w
+**Adds to:** CImport.with
 **Est:** ~60 LOC
 
 Currently `process_c_import` emits types in declaration order.
@@ -457,7 +457,7 @@ emitted in correct dependency order.
 
 ### Step 7: Multi-file and directory mode
 
-**Adds to:** CImport.w
+**Adds to:** CImport.with
 **Est:** ~100 LOC
 
 ```
@@ -470,7 +470,7 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str,
     //    with_cimport_is_name_emitted / mark_name_emitted.
     // 4. First file gets type definitions (c_void, c_int, etc.).
     //    Subsequent files reuse via dedup.
-    // 5. Emit shared types in _types.w if >1 file shares them.
+    // 5. Emit shared types in _types.with if >1 file shares them.
     // 6. Call migrate_c_file for each .c file.
 ```
 
@@ -481,10 +481,10 @@ set of `.w` files that compile together.
 
 ### Step 8: CLI integration
 
-**Modifies:** `src/main.w` (line 318), `src/Migrate.w`
+**Modifies:** `src/main.with` (line 318), `src/Migrate.with`
 **Est:** ~100 LOC
 
-Replace the stub at main.w:318:
+Replace the stub at main.with:318:
 ```
 if cli_command(argc) == "migrate":
     return run_migrate_command(argc)
@@ -613,8 +613,8 @@ After Step 5:
 ```
 # Write C test files with goto patterns, migrate, compile, run:
 echo '<test.c content>' > /tmp/test_goto.c
-with migrate /tmp/test_goto.c -o /tmp/test_goto.w
-with build /tmp/test_goto.w
+with migrate /tmp/test_goto.c -o /tmp/test_goto.with
+with build /tmp/test_goto.with
 ./test_goto    # verify identical output to C version
 ```
 

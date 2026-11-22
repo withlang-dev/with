@@ -102,7 +102,7 @@ jobs:
           # they need Windows-form paths (cygpath -m keeps forward slashes, which
           # both the file APIs and lld-link accept). Bash file ops keep msys paths.
 
-          # Seed resolution (build/compiler.w comp_resolve_seed_compiler) reads WITH
+          # Seed resolution (build/compiler.with comp_resolve_seed_compiler) reads WITH
           # and spawns it with CreateProcessW.
           echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
           echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc")" >> "$GITHUB_ENV"
@@ -136,7 +136,7 @@ jobs:
           # native, comptime-diff, debug-alloc, internals, deep-debug-tool, CLI
           # self-host and c-migrator suites, then records `test-green` evidence.
           # It is driven with the seed (WITH) for the same reason as build /
-          # fixpoint above: build.w's test actions invoke the already-built
+          # fixpoint above: build.with's test actions invoke the already-built
           # out/release/bin/with on the fixtures (no rebuild — the build step
           # populated the cache).
           #
@@ -171,11 +171,11 @@ jobs:
             echo "== $f ($(wc -l < "$f") lines)"; tail -60 "$f"
           done
           if [ -x out/bootstrap/bin/with-stage1.exe ]; then
-            echo "== probe: stage1 check src/main.w (Sema/MIR only, 900 s)"
-            timeout 900 ./out/bootstrap/bin/with-stage1.exe check src/main.w > out/probe-check.stdout 2> out/probe-check.stderr; echo "check rc=$?"
+            echo "== probe: stage1 check src/main.with (Sema/MIR only, 900 s)"
+            timeout 900 ./out/bootstrap/bin/with-stage1.exe check src/main.with > out/probe-check.stdout 2> out/probe-check.stderr; echo "check rc=$?"
             tail -20 out/probe-check.stderr
-            echo "== probe: stage1 build out/gen/main.w with one codegen unit (1500 s)"
-            WITH_CODEGEN_UNITS=1 WITH_PROFILE=1 timeout 1500 ./out/bootstrap/bin/with-stage1.exe build out/gen/main.w -O1 -o out/probe-single.exe > out/probe-single.stdout 2> out/probe-single.stderr; echo "single-unit build rc=$?"
+            echo "== probe: stage1 build out/gen/main.with with one codegen unit (1500 s)"
+            WITH_CODEGEN_UNITS=1 WITH_PROFILE=1 timeout 1500 ./out/bootstrap/bin/with-stage1.exe build out/gen/main.with -O1 -o out/probe-single.exe > out/probe-single.stdout 2> out/probe-single.stderr; echo "single-unit build rc=$?"
             tail -40 out/probe-single.stderr
           fi
 

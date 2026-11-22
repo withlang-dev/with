@@ -61,7 +61,7 @@ not describe them in Rust terminology.
 
 ---
 
-## 2. Build Doctrine: `build.w` Is the Build System
+## 2. Build Doctrine: `build.with` Is the Build System
 
 ### Decision
 
@@ -69,11 +69,11 @@ This is the strongest idea from the original proposal and survives
 with refinement.
 
 ```
-build.w   = executable build behavior (With code)
+build.with   = executable build behavior (With code)
 with.toml = declarative package configuration
 ```
 
-### Boundary between `with.toml` and `build.w`
+### Boundary between `with.toml` and `build.with`
 
 **Allowed in `with.toml`:**
 
@@ -97,15 +97,15 @@ with.toml = declarative package configuration
 - Platform-specific branching logic
 - Multi-binary or multi-library definitions
 
-Those belong in `build.w`.
+Those belong in `build.with`.
 
 For simple projects, the compiler synthesizes a default build recipe.
-For complex projects, users write `build.w`. There is never a question
+For complex projects, users write `build.with`. There is never a question
 about which file an imperative build concern belongs in.
 
 ### Default recipe
 
-A project with no `build.w` behaves as though this existed:
+A project with no `build.with` behaves as though this existed:
 
 ```
 use std.build
@@ -113,7 +113,7 @@ use std.build
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     let info = ctx.project_info()
-    ctx.new_build().executable(info.package_name(), "src/main.w")
+    ctx.new_build().executable(info.package_name(), "src/main.with")
 ```
 
 `BuildCtx` is a driver-minted capability. It exposes project metadata
@@ -130,18 +130,18 @@ comptime with BuildCtx as ctx:
 pub fn build -> Build:
     var out = ctx.new_build()
     out = out.generated_source(
-        "out/gen/version.w",
+        "out/gen/version.with",
         "pub fn build_version -> str:\n    \"dev\"\n",
     )
-    var game = target_new(.Executable, "game", "src/main.w")
+    var game = target_new(.Executable, "game", "src/main.with")
     game = game.target(BuildTarget.native)
     game = game.optimize(.debug)
     game = game.link_system_lib("SDL2")
     out = out.add_target(game)
-    out.test("unit", "tests/*.w")
+    out.test("unit", "tests/*.with")
 ```
 
-### `build.w` is capability-bearing `comptime`
+### `build.with` is capability-bearing `comptime`
 
 The spec's `comptime` is deterministic, side-effect-free, and cannot
 perform I/O, call FFI, or allocate heap memory that persists to
@@ -159,7 +159,7 @@ comptime with Workspace:        workspace compilation authority
 
 Normal `comptime` remains pure and deterministic. Effects are allowed
 only through unforgeable capability values minted by the compiler
-driver. The current Phase D implementation evaluates `build.w`,
+driver. The current Phase D implementation evaluates `build.with`,
 action functions, and workspace operations in-process with
 capability-aware comptime dispatch. `Workspace.begin_intercept`,
 `Workspace.compile`, and `Workspace.wait_for_message` already deliver
@@ -504,7 +504,7 @@ and feed diagnostics back into the error pipeline. This should not be
 underestimated.
 
 Note: `compiler_hook` functions run in tool-mode context (like
-`build.w`), not in pure `comptime` context. The name `compiler_hook`
+`build.with`), not in pure `comptime` context. The name `compiler_hook`
 rather than `comptime_hook` reflects this: these hooks are compiler
 driver extensions, not ordinary deterministic comptime evaluation.
 They may emit diagnostics and inspect the full project graph, but
@@ -616,7 +616,7 @@ async without the complexity of Rust's pinning model.
 ### The current state of the project
 
 The compiler is self-hosting and bootstraps through a three-stage
-fixpoint. The build system is now primarily expressed in `build.w`;
+fixpoint. The build system is now primarily expressed in `build.with`;
 Make remains as compatibility/bootstrap glue, not the architectural
 build system. Repository-specific compiler targets, PCRE2 migration
 targets, and emit-C targets live in project build modules and standard
@@ -656,7 +656,7 @@ compiler.
 
 ### Phase 0: Decisions (complete)
 
-- **Build doctrine**: `build.w` is the build system, `with.toml` is
+- **Build doctrine**: `build.with` is the build system, `with.toml` is
   declarative configuration.
 
 ### Phase 1: Near-term compiler work
@@ -675,7 +675,7 @@ compiler.
 ### Phase 2: Build/comptime driver work
 
 - **Capability-bearing `comptime with`**: The public model for
-  `build.w`, action functions, and workspace compilation.
+  `build.with`, action functions, and workspace compilation.
 
 - **Workspace message loop**: `Workspace.begin_intercept`,
   `wait_for_message`, `end_intercept`, and typed compiler messages.
@@ -702,7 +702,7 @@ compiler.
 
 - **Package-manager integration**: Dependencies, publishing metadata,
   and reproducible package graph behavior on top of the existing
-  `with.toml`/`build.w` split.
+  `with.toml`/`build.with` split.
 
 - **Read-only compiler introspection**: `ProjectInfo` API for
   project-wide lints and diagnostics. Significant compiler work.
@@ -793,7 +793,7 @@ lifetime annotations, `with` scoping instead of global context,
 ## 13. Summary of Concrete Decisions
 
 ```
-1.  build.w is the only build behavior mechanism.
+1.  build.with is the only build behavior mechanism.
 2.  with.toml is declarative package configuration.
 3.  std.build provides typed graph construction and driver-minted
     capabilities.
@@ -828,7 +828,7 @@ added or amended:
 | §4.4b (new) | `@[specified]` discriminant enums — attribute definition, compile error for missing values |
 | §8.3a (new) or std.alloc section | `TempArena` and `scratch_arena()` — type definition, arena distinction table, `with` integration |
 | §16.2b (new) | `allow_untranslated` — `c_import` parameter for explicit omission acknowledgment |
-| §18.5a (new) | `build.w` and `std.build` doctrine — capability-bearing comptime execution, default recipe synthesis, `with.toml` boundary |
+| §18.5a (new) | `build.with` and `std.build` doctrine — capability-bearing comptime execution, default recipe synthesis, `with.toml` boundary |
 | §7.3a (amend) | Add `std.context.Context` as the standard implicit context type |
 | §17 (amend) | Add capability-bearing `comptime with`, default capability bindings, `ProjectInfo`, `Workspace`, compiler messages, `compiler_hook`, and `SourceEmitter.emit_source()` |
 | stdlib module map | Add `std.context`, `std.build`, `std.alloc.TempArena` |

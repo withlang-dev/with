@@ -75,11 +75,11 @@ required. Defer to Eric Hartford.
 
 Evidence files:
 
-- `test/behavior/behav_std_encoding_rfc4648_vectors.w` — alphabets, published
+- `test/behavior/behav_std_encoding_rfc4648_vectors.with` — alphabets, published
   vectors, terminal quanta, case, and Section 9 examples.
-- `test/behavior/behav_std_encoding_rfc4648_strict.w` — exact errors,
+- `test/behavior/behav_std_encoding_rfc4648_strict.with` — exact errors,
   non-alphabet bytes, padding, and unused-bit rejection.
-- `test/behavior/behav_std_encoding_rfc4648_properties.w` — deterministic
+- `test/behavior/behav_std_encoding_rfc4648_properties.with` — deterministic
   round trips, boundaries, large input, ownership, and Base32hex order.
 
 | ID | RFC source | Verified requirement | Evidence | Status |

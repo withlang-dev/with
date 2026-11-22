@@ -21,9 +21,9 @@ Wave 0 deliverables:
 ## Current State (from this tree)
 
 - Stage0 already has debug commands in `bootstrap/src/main.zig`:
-  - `tokens <file.w>`
-  - `ast <file.w>`
-  - `ir <file.w>`
+  - `tokens <file.with>`
+  - `ast <file.with>`
+  - `ir <file.with>`
 - There is no typed dump path yet.
 - Existing behavior includes nondeterministic inputs in test tooling:
   - filesystem iteration order (`iterate`, `walk`)

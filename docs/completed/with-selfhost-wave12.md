@@ -103,7 +103,7 @@ Implementation (expected touch points):
 - `scripts/run_all_wave_tests.sh` (authoritative full-suite entrypoint)
 - `scripts/report_wave_parity_counts.sh` (global PASS/FAIL/KNOWN_DIVERGENCE rollup)
 - `scripts/parity_states.sh` (shared tri-state governance)
-- `src/main.w`, `src/Driver.w` (only if fixpoint bugs require compiler-side fixes)
+- `src/main.with`, `src/Driver.with` (only if fixpoint bugs require compiler-side fixes)
 
 New Wave 12 artifacts (planned):
 
@@ -259,7 +259,7 @@ When `run_wave12_selfhost_fixpoint.sh` fails:
 2. Run that wave's script in isolation (e.g., `bash scripts/run_wave7_mir_parity.sh`).
 3. Look for `FAIL(...)` lines — the tag identifies the failure category.
 4. If a parity failure, compare Stage0 vs Stage2 output for the failing test.
-5. Fix the compiler bug in `src/*.w`, rebuild Stage2, re-run.
+5. Fix the compiler bug in `src/*.with`, rebuild Stage2, re-run.
 
 **Level 2 failure (IR fixpoint):**
 
@@ -271,8 +271,8 @@ When `run_wave12_selfhost_fixpoint.sh` fails:
    - New LLVM metadata not covered by normalization → add stripping rule.
 4. To debug: run both compilers manually on the failing source:
    ```bash
-   ./out/bin/with-stage2 ir <source.w> > /tmp/stage2.ll
-   ./out/bin/with-stage3 ir <source.w> > /tmp/stage3.ll
+   ./out/bin/with-stage2 ir <source.with> > /tmp/stage2.ll
+   ./out/bin/with-stage3 ir <source.with> > /tmp/stage3.ll
    diff -u /tmp/stage2.ll /tmp/stage3.ll
    ```
 

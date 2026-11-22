@@ -1,0 +1,2594 @@
+use Archive
+use compiler.Runtime
+use compiler.LinkDiagnostics
+use compiler.HostLibs
+use compiler.EmbeddedBundles
+use compiler.BundleInterfaces
+use compiler.AbiStamp
+use compiler.WasmHost
+use compiler.LldDriver
+use compiler.EmbeddedSysroot
+use std.string.StringBuilder
+use TargetSpec
+use compiler.EmbeddedClangResourceData
+use rt.rt_core
+
+
+extern let with_embedded_cimport_stubs_o_start: u8
+extern let with_embedded_cimport_stubs_o_end: u8
+extern let with_embedded_fiber_asm_o_start: u8
+extern let with_embedded_fiber_asm_o_end: u8
+
+type LinkStageEnvVar {
+    name: str,
+    value: str,
+}
+
+type LinkStageCommand {
+    linker: str,
+    args: List[str],
+    cwd: str,
+    env: List[LinkStageEnvVar],
+    inputs: List[str],
+    outputs: List[str],
+    cleanup_files: List[str],
+}
+
+type LinkStageResult {
+    ok: bool,
+    rc: i32,
+    command: LinkStageCommand,
+}
+
+type LinkStagePlan {
+    ok: bool,
+    command: LinkStageCommand,
+}
+
+fn link_stage_empty_command() -> LinkStageCommand:
+    LinkStageCommand {
+        linker: "",
+        args: List.new(),
+        cwd: "",
+        env: List.new(),
+        inputs: List.new(),
+        outputs: List.new(),
+        cleanup_files: List.new(),
+    }
+
+fn link_stage_result_fail() -> LinkStageResult:
+    LinkStageResult { ok: false, rc: 1, command: link_stage_empty_command() }
+
+fn link_stage_plan_fail() -> LinkStagePlan:
+    LinkStagePlan { ok: false, command: link_stage_empty_command() }
+
+fn link_stage_plan_for_command(command: LinkStageCommand) -> LinkStagePlan:
+    LinkStagePlan { ok: true, command }
+
+fn link_stage_result_for_command(command: LinkStageCommand) -> LinkStageResult:
+    let rc = command.run()
+    link_stage_cleanup_files(command.cleanup_files)
+    LinkStageResult { ok: rc == 0, rc, command }
+
+fn link_stage_result_for_plan(plan: LinkStagePlan) -> LinkStageResult:
+    if not plan.ok:
+        return link_stage_result_fail()
+    // D32: field vacates need a mutable path — rebind the owned param.
+    var owned_plan = plan
+    link_stage_result_for_command(move owned_plan.command)
+
+fn link_stage_argv_append(argv: &str, arg: &str) -> str:
+    argv ++ arg ++ "\0"
+
+fn link_stage_is_digit(ch: i32) -> bool:
+    ch >= 48 and ch <= 57
+
+fn link_stage_read_u32_le(data: &str, offset: isize) -> i64:
+    if offset < 0 or offset + 3 >= data.len():
+        return -1
+    (data[offset] as i64) |
+        ((data[(offset + 1)] as i64) << 8) |
+        ((data[(offset + 2)] as i64) << 16) |
+        ((data[(offset + 3)] as i64) << 24)
+
+// The macOS a file was built for: a Mach-O object's own, an archive's
+// newest member's (#2316: a package's static library built for 13.0 linked
+// into a program targeting 11.0 warned once per object), 0 for anything else.
+fn link_stage_macho_macos_minos(path: &str) -> i64:
+    let data = runtime_read_file(path)
+    if data.starts_with("!<arch>\n"): link_stage_archive_macos_minos(data) else: link_stage_macho_minos_at(data, 0)
+
+// An ar archive's members: a 60-byte header (name, decimal size at 48), the
+// body padded to even length; a BSD name `#1/<n>` puts n name bytes first.
+fn link_stage_archive_macos_minos(data: &str) -> i64:
+    var best: i64 = 0
+    var offset: isize = 8
+    while offset + 60 <= data.len():
+        let header: str = data.slice(offset, offset + 60)
+        let size = host_lib_decimal(header.slice(48, 58).trim())
+        if size < 0: break
+        let body = offset + 60
+        let name = header.slice(0, 16).trim()
+        let name_len = if name.starts_with("#1/"): host_lib_decimal(name.slice(3, name.len())) else: 0
+        let minos = link_stage_macho_minos_at(data, body + name_len)
+        if minos > best: best = minos
+        offset = body + size + (size & 1)
+    best
+
+fn link_stage_macho_minos_at(data: &str, base: isize) -> i64:
+    if data.len() < base + 32:
+        return 0
+    // 64-bit little-endian Mach-O object.
+    if link_stage_read_u32_le(data, base) != 0xfeedfacf:
+        return 0
+    let ncmds = link_stage_read_u32_le(data, base + 16) as i32
+    var offset = base + 32
+    var best: i64 = 0
+    var i = 0
+    while i < ncmds and offset + 8 <= data.len():
+        let cmd = link_stage_read_u32_le(data, offset)
+        let cmdsize = link_stage_read_u32_le(data, offset + 4) as i32
+        if cmdsize < 8 or offset + cmdsize > data.len():
+            break
+        if cmd == 0x32 and cmdsize >= 24:
+            let platform = link_stage_read_u32_le(data, offset + 8)
+            let minos = link_stage_read_u32_le(data, offset + 12)
+            if platform == 1 and minos > best:
+                best = minos
+        else if cmd == 0x24 and cmdsize >= 16:
+            let minos = link_stage_read_u32_le(data, offset + 8)
+            if minos > best:
+                best = minos
+        offset = offset + cmdsize
+        i = i + 1
+    best
+
+fn link_stage_darwin_version_string(encoded: i64) -> str:
+    let major = encoded / 65536
+    let minor = (encoded / 256) % 256
+    let patch = encoded % 256
+    if patch != 0:
+        return f"{major}.{minor}.{patch}"
+    f"{major}.{minor}"
+
+// The link's deployment target: 11.0, or the newest macOS an input was
+// built for — the program's objects, its extra inputs, and the archives its
+// `-l` names resolve to — so no input is newer than the program.
+fn link_stage_darwin_platform_version(obj_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> str:
+    var best: i64 = 11 * 65536
+    let inputs: List[str] = []
+    inputs.push(obj_path.to_owned())
+    for extra in extras: inputs.push(extra)
+    let dirs = link_stage_explicit_search_dirs(extras, link_args, "")
+    for lib in link_libs:
+        let archive = link_stage_darwin_lib_archive(dirs, lib)
+        if archive.len() > 0: inputs.push(archive)
+    for input in inputs:
+        let minos = link_stage_macho_macos_minos(input)
+        if minos > best:
+            best = minos
+    link_stage_darwin_version_string(best)
+
+// The archive `-l<name>` links on Darwin, as ld64 searches: in each
+// directory a dylib or text stub first, then the archive. "" for a dylib, a
+// framework, or a name found nowhere.
+fn link_stage_darwin_lib_archive(dirs: &List[str], name: &str) -> str:
+    if link_stage_framework_name(name).len() > 0: return ""
+    for dir in dirs:
+        let base = dir ++ "/lib" ++ name
+        if link_stage_file_exists(base ++ ".dylib") or link_stage_file_exists(base ++ ".tbd"): return ""
+        if link_stage_file_exists(base ++ ".a"): return base ++ ".a"
+    ""
+
+fn link_stage_is_temp_archive_path(path: &str) -> bool:
+    if not path.ends_with(".a"):
+        return false
+    var i = 0
+    while i + 3 < path.len():
+        if path.slice(i as i64, (i + 3) as i64) == ".o.":
+            return link_stage_is_digit(path[(i + 3)])
+        i = i + 1
+    false
+
+// #357: a `link:` entry of the form "framework:Name" links an Apple framework
+// (`-framework Name`) instead of a plain library (`-l<name>`). Darwin-only —
+// the caller guards other platforms. Returns "" for a non-framework entry.
+fn link_stage_framework_name(lib: &str) -> str:
+    let prefix = "framework:"
+    if lib.len() > prefix.len() and lib.slice(0, prefix.len()) == prefix:
+        return lib.slice(prefix.len(), lib.len())
+    ""
+
+// The linker args for one `link:` entry. On Darwin a "framework:Name" entry
+// becomes `-framework Name` (two args); everything else `-l<lib>`. On a
+// non-Darwin target a framework entry is a loud error (frameworks are macOS)
+// and yields no args. (Returns a List because With has no safe mutable-ref
+// param to push through.)
+fn link_stage_lib_args(lib: &str, is_darwin: i32) -> List[str]:
+    let out: List[str] = []
+    let fw = link_stage_framework_name(lib)
+    if fw.len() > 0:
+        if is_darwin == 0:
+            with_eprint("error: link: \"" ++ lib ++ "\" — Apple frameworks are only available on macOS targets\n")
+            return out
+        out.push("-framework")
+        out.push(fw)
+        return out
+    out.push("-l" ++ lib)
+    out
+
+// #1193: GNU ld and lld resolve static archives left to right, once. A
+// package's archives arrive in scan order (libcrypto before libssl), so one
+// that depends on a later one leaves undefined references. On an ELF target
+// the user's libraries are linked as one group; ld64 and lld-link are
+// order-insensitive and take no marker. `via_driver` selects the `-Wl,`
+// spelling for a C compiler driver.
+fn link_stage_archive_group_marker(is_elf: i32, via_driver: i32, open: i32) -> str:
+    if is_elf == 0: return ""
+    let flag = if open != 0: "--start-group" else: "--end-group"
+    if via_driver != 0: "-Wl," ++ flag else: flag
+
+fn link_stage_collect_cleanup_files(extras: &List[str]) -> List[str]:
+    let cleanup: List[str] = []
+    for i in 0..extras.len():
+        let extra = extras[i]
+        if link_stage_is_temp_archive_path(extra):
+            cleanup.push(with_str_clone_ref(extra))
+    cleanup
+
+fn link_stage_cleanup_files(files: &List[str]):
+    for file in files:
+        let _remove = runtime_remove_file(file)
+
+fn link_stage_basename(path: &str) -> str:
+    var last_slash = -1
+    for i in 0..path.len():
+        if path[i] == 47:
+            last_slash = i as i32
+    if last_slash < 0:
+        return with_str_clone_ref(path)
+    path.slice((last_slash + 1) as i64, path.len())
+
+fn link_stage_owned_temp_archive(path: &str, pid_text: &str) -> bool:
+    let name = link_stage_basename(path)
+    if not name.ends_with(".a"):
+        return false
+    link_stage_str_contains(name, ".o." ++ pid_text ++ ".")
+
+fn link_stage_cleanup_owned_temp_archives_in(dir: &str, pid_text: &str):
+    let listing = runtime_list_files(dir)
+    var start = 0
+    for i in 0..listing.len():
+        let ch = listing[i]
+        if ch == 10 or ch == 13:
+            if i > start:
+                let path = listing.slice(start as i64, i as i64)
+                if link_stage_owned_temp_archive(path, pid_text):
+                    let remove_path = if link_stage_str_contains(path, "/"): path else: dir ++ "/" ++ path
+                    let _remove = runtime_remove_file(remove_path)
+            start = (i + 1) as i32
+    if start < listing.len():
+        let path = listing.slice(start as i64, listing.len())
+        if link_stage_owned_temp_archive(path, pid_text):
+            let remove_path = if link_stage_str_contains(path, "/"): path else: dir ++ "/" ++ path
+            let _remove = runtime_remove_file(remove_path)
+
+// A link's runtime archives are content-named and kept (link_stage_make_archive);
+// what this process can leave is a `<obj>.<pid>.<nanos>.a` it made and did
+// not rename into place.
+fn link_stage_cleanup_current_process_temp_archives():
+    let root = link_stage_artifact_root()
+    let pid_text = f"{runtime_getpid()}"
+    link_stage_cleanup_owned_temp_archives_in(root ++ "/lib", pid_text)
+    link_stage_cleanup_owned_temp_archives_in(root ++ "/bootstrap-lib", pid_text)
+
+type LinkStageSavedEnv {
+    names: List[str],
+    values: List[str],
+}
+
+fn link_stage_apply_env(env: &List[LinkStageEnvVar]) -> LinkStageSavedEnv:
+    let names: List[str] = []
+    let values: List[str] = []
+    for env_item in env:
+        let item = env_item
+        names.push(with_str_clone_ref(item.name))
+        values.push(runtime_getenv(item.name) ++ "")
+        runtime_setenv(item.name, item.value)
+    LinkStageSavedEnv { names, values }
+
+fn link_stage_restore_env(saved: &LinkStageSavedEnv):
+    for i in 0..saved.names.len():
+        runtime_setenv(saved.names[i], saved.values[i])
+
+// WITH_LINK_VERBOSE=1 prints every link's argv before it runs, and asks a
+// COFF link for lld-link's /verbose (each input it reads, each member it
+// loads): the evidence of what a link reads, for a toolchain audit (#1915).
+fn link_stage_verbose() -> bool: runtime_getenv("WITH_LINK_VERBOSE") == "1"
+
+impl LinkStageCommand:
+    fn run() -> i32:
+        var argv = ""
+        argv = link_stage_argv_append(argv, self.linker)
+        var shown = with_str_clone_ref(self.linker)
+        for i in 0..self.args.len():
+            argv = link_stage_argv_append(argv, self.args[i])
+            shown = shown ++ " " ++ self.args[i]
+        if link_stage_verbose():
+            with_eprint("link: " ++ shown)
+        let saved = link_stage_apply_env(self.env)
+        let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_active_kind() == 1 or target_spec_active_kind() == 2
+        // #1915, #1914: a failed macOS or Windows link says why (lld's own
+        // diagnostics, or the linker and its exit status), never a bare
+        // "build failed".
+        let darwin_native = target_spec_is_native() and runtime_sysinfo_os() == "Macos"
+        let windows_native = target_spec_is_native() and runtime_sysinfo_os() == "Windows"
+        let rc = if linux_target or darwin_native or windows_native:
+            link_run_with_diagnostics(argv, self.cwd)
+        else if self.cwd.len() > 0:
+            runtime_exec_argv_cwd(argv, self.cwd)
+        else:
+            runtime_exec_argv(argv)
+        link_stage_restore_env(saved)
+        rc
+
+fn link_stage_make_link_command(linker: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
+    args.push(with_str_clone_ref(obj_path))
+    inputs.push(with_str_clone_ref(obj_path))
+    for i in 0..extras.len():
+        let extra = extras[i]
+        args.push(with_str_clone_ref(extra))
+        inputs.push(with_str_clone_ref(extra))
+    if runtime_sysinfo_os() == "Macos":
+        args.push("-Wl,-dead_strip")
+    else if runtime_sysinfo_os() == "Linux":
+        // Native user programs use the platform C driver. Requiring lld here
+        // makes the release compiler depend on an external LLVM installation.
+        // Compiler/cross links use the explicit LLVM plan below, which owns
+        // its lld-specific flags (including identical-code folding).
+        args.push("-no-pie")
+        args.push("-Wl,--gc-sections")
+    args.push("-o")
+    args.push(with_str_clone_ref(bin_path))
+    outputs.push(with_str_clone_ref(bin_path))
+    let cc_is_darwin = (runtime_sysinfo_os() == "Macos") as i32
+    let cc_is_elf = runtime_sysinfo_os() == "Linux" and link_libs.len() > 0
+    if cc_is_elf: args.push(link_stage_archive_group_marker(1, 1, 1))
+    for link_lib in link_libs:
+        let cc_la = link_stage_lib_args(link_lib, cc_is_darwin)
+        for cc_la_item in cc_la:
+            args.push(with_str_clone_ref(cc_la_item))
+    if cc_is_elf: args.push(link_stage_archive_group_marker(1, 1, 0))
+    for link_arg in link_args:
+        args.push(with_str_clone_ref(link_arg))
+    if runtime_sysinfo_os() == "Linux":
+        args.push("-lm")
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker: with_str_clone_ref(linker), args, cwd: "", env, inputs, outputs, cleanup_files }
+
+fn link_stage_file_exists(path: &str) -> bool:
+    runtime_file_exists(path) != 0
+
+// Sysroot prefix for Linux link inputs. Native Linux hosts link
+// against the real root (""); a cross host must supply a Linux sysroot
+// (crt objects, libc, libgcc) via WITH_LINUX_SYSROOT.
+fn link_stage_linux_sysroot() -> str:
+    let explicit = runtime_getenv("WITH_LINUX_SYSROOT")
+    if explicit.len() > 0:
+        return explicit
+    ""
+
+// The Linux target arch this link is for: the --target selection when
+// cross, else the host arch (native Linux links).
+fn link_stage_linux_arch() -> str:
+    if not target_spec_is_native():
+        return target_spec_arch()
+    runtime_sysinfo_arch()
+
+// Debian-style multiarch directory name for the Linux target arch.
+fn link_stage_linux_multiarch() -> str:
+    if link_stage_linux_arch() == "aarch64":
+        return "aarch64-linux-gnu"
+    "x86_64-linux-gnu"
+
+fn link_stage_linux_emulation() -> str:
+    if link_stage_linux_arch() == "aarch64":
+        return "aarch64linux"
+    "elf_x86_64"
+
+fn link_stage_linux_dynamic_linker(sysroot: &str) -> str:
+    if link_stage_linux_arch() == "aarch64":
+        if link_stage_file_exists(sysroot ++ "/lib/ld-linux-aarch64.so.1"):
+            return "/lib/ld-linux-aarch64.so.1"
+        if link_stage_file_exists(sysroot ++ "/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"):
+            return "/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"
+        return ""
+    if link_stage_file_exists(sysroot ++ "/lib64/ld-linux-x86-64.so.2"):
+        return "/lib64/ld-linux-x86-64.so.2"
+    if link_stage_file_exists(sysroot ++ "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"):
+        return "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+    ""
+
+fn link_stage_linux_crt_object(sysroot: &str, name: &str) -> str:
+    for dir in host_library_trusted_dirs(sysroot, link_stage_linux_arch()):
+        let path = dir ++ "/" ++ name
+        if host_library_usable(path, link_stage_linux_arch()): return path
+    ""
+
+// gcc's own directory, `<libdir>/gcc/<triple>/<version>`: the triple is the
+// distribution's (x86_64-linux-gnu, x86_64-pc-linux-gnu, x86_64-redhat-linux),
+// so any naming this arch, at the highest major version with crtbegin.o.
+fn link_stage_linux_gcc_dir(sysroot: &str) -> str:
+    let arch = link_stage_linux_arch()
+    var best = ""
+    var best_major: i64 = -1
+    for libdir in ["/usr/lib", "/usr/lib64"]:
+        for triple in runtime_list_files(sysroot ++ libdir ++ "/gcc").split("\n"):
+            let base = host_library_dir(triple)
+            if not triple.slice(base.len() + 1, triple.len()).starts_with(arch ++ "-"): continue
+            for dir in runtime_list_files(triple).split("\n"):
+                let version = dir.slice(host_library_dir(dir).len() + 1, dir.len())
+                var major: i64 = 0
+                var digits = 0
+                while digits < version.len() and version[digits] >= '0' and version[digits] <= '9':
+                    major = major * 10 + (version[digits] - '0') as i64
+                    digits += 1
+                if digits == 0 or major <= best_major: continue
+                if not host_library_usable(dir ++ "/crtbegin.o", arch): continue
+                best = dir
+                best_major = major
+    best
+
+type LinkStageLinuxLibs {
+    dirs: List[str]
+    inputs: List[str]
+}
+
+fn link_stage_linux_dir_carries(dir: &str, name: &str) -> bool:
+    if name.starts_with(":"): return link_stage_file_exists(dir ++ "/" ++ name.slice(1, name.len()))
+    link_stage_file_exists(dir ++ "/lib" ++ name ++ ".so") or link_stage_file_exists(dir ++ "/lib" ++ name ++ ".a")
+
+// The directories a link names itself, `-L<dir>` or `-L <dir>`, in order:
+// a package's own (`with get`), the sysroot's, the program's.
+fn link_stage_explicit_search_dirs(extras: &List[str], link_args: &List[str], sysroot_lib: &str) -> List[str]:
+    let dirs: List[str] = []
+    if sysroot_lib.len() > 0: dirs.push(sysroot_lib)
+    for args in [extras, link_args]:
+        for i in 0..args.len():
+            if args[i] == "-L" and i + 1 < args.len(): dirs.push(args[i + 1])
+            else if args[i].starts_with("-L") and args[i].len() > 2: dirs.push(args[i].slice(2, args[i].len()))
+    dirs
+
+// The link inputs for the libraries a program names: `-l<name>` for one a
+// directory the link names carries (a package's own archive never gives way
+// to a same-named host library) or `host_dirs` lacks, so the linker finds it
+// or says it cannot; else its host file by path (HostLibs), with that file's
+// directory to search.
+fn link_stage_linux_resolve_libs(host_dirs: &List[str], link_libs: &List[str], explicit_dirs: &List[str]) -> LinkStageLinuxLibs:
+    let dirs: List[str] = []
+    let inputs: List[str] = []
+    for name in link_libs:
+        if link_stage_framework_name(name).len() > 0:
+            with_eprint("error: link: \"" ++ name ++ "\" — Apple frameworks are only available on macOS targets\n")
+            continue
+        var named = false
+        for dir in explicit_dirs:
+            if link_stage_linux_dir_carries(dir, name): named = true
+        let path = if named: "" else: host_library_path(host_dirs, name, link_stage_linux_arch())
+        if path.len() == 0:
+            inputs.push("-l" ++ name)
+            continue
+        inputs.push(path)
+        let dir = host_library_dir(path)
+        var seen = false
+        for d in dirs:
+            if d == dir: seen = true
+        if not seen: dirs.push(dir)
+    LinkStageLinuxLibs { dirs, inputs }
+
+/// The `<from>` of WITH_FILE_PREFIX_MAP=<from>=<to> (src/FnAbi.with), or "".
+fn link_stage_file_prefix_map_root() -> str:
+    let mapping = runtime_getenv("WITH_FILE_PREFIX_MAP")
+    let eq = mapping.find("=")
+    if eq <= 0: "" else: mapping.slice(0, eq)
+
+fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
+    let platform_version = link_stage_darwin_platform_version(obj_path, extras, link_libs, link_args)
+    args.push("-arch")
+    args.push("arm64")
+    args.push("-platform_version")
+    args.push("macos")
+    args.push(with_str_clone_ref(platform_version))
+    args.push(platform_version)
+    args.push("-dead_strip")
+    // The debug map (N_OSO) names every linked object by absolute path, 23
+    // checkout paths in the compiler's string table. Under WITH_FILE_PREFIX_MAP
+    // the linker drops the mapped root, and dsymutil is told where to look
+    // (compilation_run_dsymutil_best_effort).
+    let oso_root = link_stage_file_prefix_map_root()
+    if oso_root.len() > 0:
+        args.push("-oso_prefix")
+        args.push(oso_root ++ "/")
+    args.push("-o")
+    args.push(with_str_clone_ref(bin_path))
+    outputs.push(with_str_clone_ref(bin_path))
+    args.push(with_str_clone_ref(obj_path))
+    inputs.push(with_str_clone_ref(obj_path))
+    for i in 0..extras.len():
+        let extra = extras[i]
+        args.push(with_str_clone_ref(extra))
+        inputs.push(with_str_clone_ref(extra))
+    for link_lib in link_libs:
+        let dw_la = link_stage_lib_args(link_lib, 1)
+        for dw_la_item in dw_la:
+            args.push(with_str_clone_ref(dw_la_item))
+    for arg in link_stage_driver_args_for_ld(link_args):
+        args.push(arg)
+    args.push("-lSystem")
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
+
+// #1915 (D81): a native linux-x86_64 link reads this compiler's own sysroot
+// (compiler.EmbeddedSysroot: glibc 2.28 link stubs, glibc's crt objects,
+// compiler-rt's builtins and crtbegin/crtend), never the host's gcc or glibc
+// files. WITH_LINUX_SYSROOT names another sysroot explicitly (the host
+// layout, as a cross link uses it); a cross target and linux-aarch64 keep
+// that path until their slices.
+// On linux-x86_64 and linux-aarch64, native or cross.
+fn link_stage_linux_uses_own_sysroot() -> bool:
+    if runtime_getenv("WITH_LINUX_SYSROOT").len() > 0:
+        return false
+    let a = link_stage_linux_arch()
+    let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_os() == "Linux"
+    linux_target and (a == "x86_64" or a == "aarch64")
+
+// The own sysroot a Linux link reads: this compiler's embedded one for a
+// native link; for a cross link, the one the cross build put beside the
+// target's runtime objects (build.with's cross-*-sysroot). "" when absent.
+fn link_stage_linux_own_sysroot_dir() -> str:
+    if target_spec_is_native():
+        return embedded_linux_sysroot_dir()
+    let dir = link_stage_runtime_variant_dir() ++ "/sysroot"
+    if link_stage_file_exists(dir ++ "/usr/lib/libc.so.6"): dir else: ""
+
+fn link_stage_linux_own_dynamic_linker() -> str:
+    if link_stage_linux_arch() == "aarch64": "/lib/ld-linux-aarch64.so.1" else: "/lib64/ld-linux-x86-64.so.2"
+
+fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str], compiler_link: bool) -> LinkStageCommand:
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
+    let lib = sysroot ++ "/usr/lib"
+    args.push("-m")
+    args.push(link_stage_linux_emulation())
+    for a in ["--eh-frame-hdr", "--hash-style=gnu", "--build-id", "--gc-sections", "--as-needed", "-dynamic-linker"]:
+        args.push(a)
+    args.push(link_stage_linux_own_dynamic_linker())
+    // The sysroot's libc is link stubs: they define what a program may name,
+    // not glibc's private interfaces (GLIBC_PRIVATE). A shared library from
+    // a package or the host that reaches those (the host's libmvec:
+    // _rtld_global_ro) is complete on the machine it runs on and cannot be
+    // checked against stubs, so its own undefined references are not this
+    // link's to refuse. (Zig's linker does the same whenever it is not
+    // linking the native system's libraries.)
+    args.push("--allow-shlib-undefined")
+    // The compiler folds identical code, as its link always has.
+    if compiler_link: args.push("--icf=all")
+    args.push("-o")
+    args.push(with_str_clone_ref(bin_path))
+    outputs.push(with_str_clone_ref(bin_path))
+    for crt in ["crt1.o", "crti.o", "clang_rt.crtbegin.o"]:
+        args.push(lib ++ "/" ++ crt)
+        inputs.push(lib ++ "/" ++ crt)
+    args.push(with_str_clone_ref(obj_path))
+    inputs.push(with_str_clone_ref(obj_path))
+    for extra in extras:
+        args.push(with_str_clone_ref(extra))
+        inputs.push(with_str_clone_ref(extra))
+    args.push("-L" ++ lib)
+    // A library a program names that the sysroot does not carry (GL, zlib,
+    // curl) is the host's (HostLibs), linked by path; its directory is
+    // searched after the sysroot for what a linker script there names. The
+    // compiler's own link names none.
+    let host_dirs = if not compiler_link and link_libs.len() > 0 and target_spec_is_native(): host_library_dirs("", link_stage_linux_arch()) else: List.new()
+    let resolved = link_stage_linux_resolve_libs(host_dirs, link_libs, link_stage_explicit_search_dirs(extras, link_args, lib))
+    for dir in resolved.dirs: args.push("-L" ++ dir)
+    if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
+    for input in resolved.inputs:
+        args.push(input)
+        if not input.starts_with("-l"): inputs.push(input)
+    if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
+    for link_arg in link_args:
+        args.push(with_str_clone_ref(link_arg))
+    // libm, libpthread and libdl (separate libraries until glibc 2.34, and
+    // the sysroot targets 2.28), libc (glibc's script: libc.so.6,
+    // libc_nonshared, the dynamic linker), and compiler-rt where a gcc link
+    // has libgcc.
+    args.push("-lm")
+    args.push("-lpthread")
+    args.push("-ldl")
+    args.push("-lc")
+    for rt in ["libclang_rt.builtins.a", "clang_rt.crtend.o", "crtn.o"]:
+        args.push(lib ++ "/" ++ rt)
+        inputs.push(lib ++ "/" ++ rt)
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker: with_str_clone_ref(linker), args, cwd: "", env, inputs, outputs, cleanup_files }
+
+// A native linux-x86_64 program: this binary's own lld (`with __ld`) over
+// its own sysroot. No cc, no ld, no gcc, no host glibc development files.
+fn link_stage_linux_native_link_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStagePlan:
+    let self_exe = with_self_exe()
+    if self_exe.len() == 0:
+        with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
+        return link_stage_plan_fail()
+    let sysroot = embedded_linux_sysroot_dir()
+    if sysroot.len() == 0:
+        with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
+        return link_stage_plan_fail()
+    let ld_link_args = link_stage_linux_driver_args_for_ld(link_args)
+    let command = link_stage_make_linux_own_sysroot_command(self_exe, sysroot, obj_path, bin_path, extras, link_libs, ld_link_args, false)
+    let args: List[str] = []
+    args.push("__ld")
+    for i in 0..command.args.len():
+        args.push(with_str_clone_ref(command.args[i]))
+    command.args = args
+    link_stage_plan_for_command(command)
+
+// The driver spellings a program's link arguments use on Linux, for lld:
+// `-Wl,` unwrapped as on macOS, and `-pthread` (a driver flag) its library.
+fn link_stage_linux_driver_args_for_ld(link_args: &List[str]) -> List[str]:
+    let unwrapped = link_stage_driver_args_for_ld(link_args)
+    let out: List[str] = []
+    for unwrapped_item in unwrapped:
+        if unwrapped_item == "-pthread": out.push("-lpthread") else: out.push(with_str_clone_ref(unwrapped_item))
+    out
+
+fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
+    if link_stage_linux_uses_own_sysroot():
+        let own = link_stage_linux_own_sysroot_dir()
+        if own.len() == 0:
+            if target_spec_is_native():
+                with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
+            else:
+                with_eprint("error: link: no linux sysroot for " ++ target_spec_name() ++ " at " ++ link_stage_runtime_variant_dir() ++ "/sysroot (build the cross runtime, which puts it there), and WITH_LINUX_SYSROOT names none")
+            return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+        return link_stage_make_linux_own_sysroot_command(llvm_ld, own, obj_path, bin_path, extras, link_libs, link_args, true)
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
+    let sysroot = link_stage_linux_sysroot()
+    let dynamic_linker = link_stage_linux_dynamic_linker(sysroot)
+    let crt1 = link_stage_linux_crt_object(sysroot, "crt1.o")
+    let crti = link_stage_linux_crt_object(sysroot, "crti.o")
+    let crtn = link_stage_linux_crt_object(sysroot, "crtn.o")
+    let gcc_dir = link_stage_linux_gcc_dir(sysroot)
+    if dynamic_linker.len() == 0 or crt1.len() == 0 or crti.len() == 0 or crtn.len() == 0 or gcc_dir.len() == 0:
+        if sysroot.len() > 0:
+            with_eprint("error: could not locate Linux " ++ link_stage_linux_arch() ++ " crt/linker files under sysroot " ++ sysroot)
+        else if runtime_sysinfo_os() == "Linux":
+            with_eprint("error: could not locate Linux " ++ link_stage_linux_arch() ++ " crt/linker files for direct ld.lld link")
+        else:
+            with_eprint("error: linking a Linux " ++ link_stage_linux_arch() ++ " binary from this host needs a Linux sysroot (crt1.o, libc, libgcc); set WITH_LINUX_SYSROOT=<dir>")
+        return LinkStageCommand { linker: "", args, cwd: "", env, inputs, outputs, cleanup_files: List.new() }
+
+    args.push("-m")
+    args.push(link_stage_linux_emulation())
+    args.push("--eh-frame-hdr")
+    args.push("--hash-style=gnu")
+    args.push("--build-id")
+    args.push("--gc-sections")
+    args.push("--icf=all")
+    args.push("--as-needed")
+    if sysroot.len() > 0:
+        // Keep every implicit library search inside the sysroot; the
+        // embedded dynamic-linker path below stays the target's own.
+        args.push("--sysroot=" ++ sysroot)
+    args.push("-dynamic-linker")
+    args.push(dynamic_linker)
+    args.push("-o")
+    args.push(with_str_clone_ref(bin_path))
+    outputs.push(with_str_clone_ref(bin_path))
+
+    args.push(with_str_clone_ref(crt1))
+    inputs.push(crt1)
+    args.push(with_str_clone_ref(crti))
+    inputs.push(crti)
+    let crtbegin = gcc_dir ++ "/crtbegin.o"
+    args.push(with_str_clone_ref(crtbegin))
+    inputs.push(crtbegin)
+
+    args.push(with_str_clone_ref(obj_path))
+    inputs.push(with_str_clone_ref(obj_path))
+    for i in 0..extras.len():
+        let extra = extras[i]
+        args.push(with_str_clone_ref(extra))
+        inputs.push(with_str_clone_ref(extra))
+
+    args.push("-L" ++ gcc_dir)
+    for dir in host_library_trusted_dirs(sysroot, link_stage_linux_arch()): args.push("-L" ++ dir)
+    let host_dirs = if link_libs.len() > 0: host_library_dirs(sysroot, link_stage_linux_arch()) else: List.new()
+    let resolved = link_stage_linux_resolve_libs(host_dirs, link_libs, link_stage_explicit_search_dirs(extras, link_args, ""))
+    for dir in resolved.dirs: args.push("-L" ++ dir)
+    if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
+    for input in resolved.inputs:
+        args.push(input)
+        if not input.starts_with("-l"): inputs.push(input)
+    if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
+    for arg in link_stage_driver_args_for_ld(link_args):
+        args.push(arg)
+    args.push("-lc")
+    args.push("-lgcc")
+
+    let crtend = gcc_dir ++ "/crtend.o"
+    args.push(with_str_clone_ref(crtend))
+    inputs.push(crtend)
+    args.push(with_str_clone_ref(crtn))
+    inputs.push(crtn)
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
+
+fn link_stage_windows_libpath(var_name: &str, fallback: &str) -> str:
+    let v = runtime_getenv(var_name)
+    if v.len() > 0:
+        return v
+    fallback ++ ""
+
+// Unix-only library spellings that have no Windows import lib and whose
+// symbols the C runtime linked below already provides (cos/abs/... in the
+// UCRT and mingwex, strlen/malloc/... in the UCRT). A `link:` directive naming
+// one of these (e.g. `c_import("math.h", link: "m")`) must be dropped on the
+// Windows link, not turned into a nonexistent `m.lib`.
+fn link_stage_windows_lib_is_crt_implicit(name: &str): name == "m" or name == "c"
+
+// The compiler's own link (#1267): a link that carries the LLVM static bridge
+// response file (`@…/llvm_ld.rsp`) is the compiler being built as a program.
+// An SDK whose LLVM is a windows-gnu build against the SDK's own libc++
+// (#1915; its archives are GNU-named, lib/libclang.a) links the compiler
+// like any program, from the SDK only. The Visual Studio-built SDKs pinned
+// before it (lib/libclang.lib) are MultiThreaded (static UCRT) archives
+// that need Visual Studio's static C and C++ runtime (libcmt, libcpmt): that
+// link, with such an SDK, is the only one that still reads Visual Studio or a
+// Windows Kit (WITH_WINDOWS_*_LIBDIR).
+fn link_stage_windows_is_compiler_link(extras: &List[str]) -> bool:
+    for extra in extras:
+        if link_stage_is_llvm_bridge_rsp(extra):
+            return true
+    false
+
+fn link_stage_is_llvm_bridge_rsp(extra: &str) -> bool:
+    extra.starts_with("@") and extra.ends_with("/llvm_ld.rsp")
+
+// The SDK whose archives a compiler link reads is the one its llvm_ld.rsp
+// names. That is not necessarily the SDK containing the lld executable: a
+// cross link runs the host's lld-link over the target SDK's archives, and
+// its C runtime and compiler-rt builtins belong to that target SDK too.
+fn link_stage_windows_sdk_dir_from_rsp(extras: &List[str]) -> str:
+    for i in 0..extras.len():
+        let extra = extras[i]
+        if link_stage_is_llvm_bridge_rsp(extra):
+            for raw in runtime_read_file(extra.slice(1, extra.len())).split("\n"):
+                let path = raw.trim().replace("\"", "")
+                if path.ends_with("/lib/libclang.a") or path.ends_with("/lib/libclang.lib"):
+                    return link_stage_dirname(link_stage_dirname(path))
+    ""
+
+fn link_stage_windows_effective_sdk_dir(sdk_dir: &str, extras: &List[str], compiler_link: bool) -> str:
+    if compiler_link:
+        let rsp_sdk = link_stage_windows_sdk_dir_from_rsp(extras)
+        if rsp_sdk.len() > 0:
+            return rsp_sdk
+    sdk_dir ++ ""
+
+// The architecture of a Windows link: the cross target's, else the host's.
+fn link_stage_windows_arch() -> str:
+    if not target_spec_is_native():
+        return if target_spec_active_kind() == 6: "aarch64" else: "x86_64"
+    let arch = runtime_sysinfo_arch()
+    if arch == "armv8" or arch == "aarch64": "aarch64" else: "x86_64"
+
+// The LLVM SDK a link reads: the directory above the bin/ holding the lld it
+// runs (.deps/llvm-<ver>-<host>/bin/lld-link.exe).
+fn link_stage_sdk_dir_of(llvm_ld: &str) -> str: link_stage_dirname(link_stage_dirname(llvm_ld))
+
+// The SDK's Windows C runtime (#1915; build/sdk.with
+// run_sdk_windows_libc_action), the sysroot of the SDK's clang for a
+// <arch>-w64-windows-gnu target: include/ holds mingw-w64's headers, which
+// c_import parses; <arch>-w64-mingw32/lib holds its UCRT startup objects,
+// support libraries and the in-box DLLs' import libraries, which a program
+// links. WITH_WINDOWS_LIBC_DIR names another directory laid out the same.
+fn link_stage_windows_libc_root_in(sdk_dir: &str) -> str:
+    let explicit = runtime_getenv("WITH_WINDOWS_LIBC_DIR")
+    if explicit.len() > 0:
+        return explicit ++ ""
+    sdk_dir ++ "/libc/windows"
+
+fn link_stage_windows_libc_dir(sdk_dir: &str, arch: &str) -> str:
+    link_stage_windows_libc_root_in(sdk_dir) ++ "/" ++ arch ++ "-w64-mingw32/lib"
+
+// The C target a Windows c_import parses for: mingw-w64's headers are
+// written for the GNU environment, the environment With's own Windows
+// objects target too (TargetSpec).
+fn link_stage_windows_c_target() -> str: link_stage_windows_arch() ++ "-w64-windows-gnu"
+
+// Whether a Windows compilation reads the SDK's libc, the same one its
+// link reads. x86_64 always did (#1915); aarch64 does when the SDK
+// actually carries its aarch64 libc — the windows-gnu SDK since
+// #2470/#2471 does, a Visual Studio-built one does not and keeps the
+// explicit WITH_WINDOWS_*_INCDIR fallback. Without this, a native
+// aarch64 c_import parsed mingw-w64's headers as the host MSVC target
+// and every header failed (run 39296788835).
+fn link_stage_windows_uses_sdk_libc_for(windows: bool, arch: &str, sdk_dir: &str) -> bool:
+    if not windows: return false
+    if arch == "x86_64": return true
+    if sdk_dir.len() == 0: return false
+    link_stage_file_exists(link_stage_windows_libc_dir(sdk_dir, arch) ++ "/crt2.o")
+
+fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
+    let windows = if target_spec_is_native(): runtime_sysinfo_os() == "Windows" else: target_spec_active_kind() == 5 or target_spec_active_kind() == 6
+    link_stage_windows_uses_sdk_libc_for(windows, link_stage_windows_arch(), link_stage_windows_sdk_dir())
+
+// The Windows libc c_import reads for this compilation: the SDK's (the same
+// one the link will read), "" when the target does not use it or the SDK
+// carries none.
+// The toolchain a native Windows link and `with cc` read, laid out as the
+// LLVM SDK is: the SDK above the lld the link runs (the build's record, or
+// the SDK the environment names), else the one this compiler carries
+// (compiler.EmbeddedSysroot, #1915 D81). "" when there is neither.
+fn link_stage_windows_sdk_dir() -> str:
+    let ld = link_stage_llvm_ld_path()
+    if ld.len() > 0:
+        return link_stage_sdk_dir_of(ld)
+    if runtime_sysinfo_os() == "Windows" and target_spec_is_native():
+        return embedded_windows_sysroot_dir()
+    ""
+
+fn link_stage_windows_libc_root() -> str:
+    if not link_stage_windows_c_target_uses_sdk_libc():
+        return ""
+    let sdk = link_stage_windows_sdk_dir()
+    if sdk.len() == 0:
+        return ""
+    let root = link_stage_windows_libc_root_in(sdk)
+    if not link_stage_file_exists(root ++ "/include/stdio.h"):
+        return ""
+    root
+
+// A path the build recorded in a metadata file (#2016: the SDK and the
+// darwin sysroot lie under the project root, and the records name them
+// relative to it so they are the same bytes in every worktree and the build
+// store can serve them). A program is linked from any directory — a UAT's
+// fresh directory, `with -e` in a user's folder with `out/` beside the
+// compiler — so a relative record resolves against the project the runtime
+// root belongs to (`<project>/out/lib`, `<project>/out/bootstrap/lib`,
+// `<project>/out/bootstrap-lib`, or WITH_OUT_DIR's owner), never the cwd.
+// A relative runtime root is the cwd's project already.
+fn link_stage_recorded_path(root: &str, recorded: &str) -> str:
+    if recorded.len() == 0 or link_stage_path_is_absolute(recorded): return recorded ++ ""
+    let project = link_stage_project_root_of(root)
+    if project.len() == 0: return recorded ++ ""
+    project ++ "/" ++ recorded
+
+fn link_stage_path_is_absolute(path: &str) -> bool:
+    if path.len() == 0: return false
+    if path[0] == 47 or path[0] == 92: return true // '/' or '\'
+    path.len() >= 3 and path[1] == 58 and (path[2] == 47 or path[2] == 92) // 'X:/' or 'X:\'
+
+// The project that owns a runtime root: the prefix before its `out`
+// segment. "" for a relative root (the cwd's project) and for a root with
+// no `out` segment (an installed layout carries no recorded paths).
+fn link_stage_project_root_of(root: &str) -> str:
+    if not link_stage_path_is_absolute(root): return ""
+    var i = root.len() - 5
+    while i >= 0:
+        let sep_before = root[i] == 47 or root[i] == 92
+        let sep_after = root[i + 4] == 47 or root[i + 4] == 92
+        if sep_before and sep_after and root.slice(i + 1, i + 4) == "out": return root.slice(0, i)
+        i -= 1
+    ""
+
+// The lld a link runs, as link_stage_link_with_extras_libs_args_plan
+// resolves it: the build's recorded llvm_ld, else (a native Windows link
+// before the metadata exists) the environment's. "" when there is none.
+fn link_stage_llvm_ld_path() -> str:
+    let root = link_stage_resolve_runtime_root()
+    var ld_path = link_stage_recorded_path(root, link_stage_read_file_trimmed(root ++ "/llvm_ld"))
+    if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native():
+        ld_path = link_stage_windows_lld_from_env()
+    ld_path
+
+// compiler-rt's builtins for the target, in the SDK's clang resource dir: the
+// mingw-w64 runtime's ___chkstk_ms and its 128-bit and soft-float helpers.
+fn link_stage_windows_builtins(sdk_dir: &str, arch: &str) -> str:
+    sdk_dir ++ "/lib/clang/" ++ embedded_clang_resource_version() ++ "/lib/windows/libclang_rt.builtins-" ++ arch ++ ".a"
+
+// The in-box DLLs every program links, and uuid's GUIDs (their libraries ship
+// in the SDK's libc; build/sdk.with sdk_windows_import_libs names the DLLs).
+fn link_stage_windows_system_libs() -> List[str]:
+    let names: List[str] = []
+    names.push("kernel32.lib")
+    names.push("ntdll.lib")
+    names.push("advapi32.lib")
+    names.push("bcrypt.lib")
+    names.push("crypt32.lib")
+    names.push("ws2_32.lib")
+    names.push("dbghelp.lib")
+    names.push("shell32.lib")
+    names.push("user32.lib")
+    names.push("ole32.lib")
+    names.push("oleaut32.lib")
+    names.push("version.lib")
+    names.push("psapi.lib")
+    // GUID_NULL, IID_* and the other GUIDs windows.h declares extern.
+    names.push("uuid.lib")
+    names
+
+// A `link:` name on the SDK recipe, found as clang's MinGW driver finds `-l`
+// (lld MinGW's search order): lib<name>.a, <name>.lib, lib<name>.lib,
+// <name>.a in each search path, the extras' -L paths first, then the SDK's
+// libc. A library `with get` builds from source on Windows is a GNU-named
+// archive (libbz2.a), so `bz2` names it (#1915). A name found nowhere stays
+// `<name>.lib`, and lld says it could not open it.
+fn link_stage_windows_find_lib(name: &str, libc_dir: &str, extras: &List[str]) -> str:
+    let dirs: List[str] = []
+    for extra in extras:
+        if extra.starts_with("-L"):
+            dirs.push(extra.slice(2, extra.len()))
+    dirs.push(with_str_clone_ref(libc_dir))
+    for d in dirs:
+        for candidate in ["lib" ++ name ++ ".a", name ++ ".lib", "lib" ++ name ++ ".lib", name ++ ".a"]:
+            let path = d ++ "/" ++ candidate
+            if link_stage_file_exists(path):
+                return path
+    name ++ ".lib"
+
+fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
+    let compiler_link = link_stage_windows_is_compiler_link(extras)
+    let link_sdk_dir = link_stage_windows_effective_sdk_dir(sdk_dir, extras, compiler_link)
+    let arch = link_stage_windows_arch()
+    // The SDK recipe covers x86_64, and windows-aarch64 since its SDK is a
+    // windows-gnu build too (run 39180949033): a gnu SDK links from its own
+    // libc on either arch, while a Visual Studio-built aarch64 SDK (the one
+    // pinned before it) keeps the Visual Studio recipe below (#1915).
+    let sdk_is_gnu = link_stage_file_exists(link_sdk_dir ++ "/lib/libclang.a")
+    let sdk_libc = (arch == "x86_64" or sdk_is_gnu) and (not compiler_link or sdk_is_gnu)
+    let libc_dir = if sdk_libc: link_stage_windows_libc_dir(link_sdk_dir, arch) else: ""
+    let builtins = if sdk_libc: link_stage_windows_builtins(link_sdk_dir, arch) else: ""
+    if sdk_libc:
+        if not link_stage_file_exists(libc_dir ++ "/crt2.o"):
+            with_eprint("error: the LLVM SDK at " ++ link_sdk_dir ++ " carries no Windows C runtime (" ++ libc_dir ++ "/crt2.o); a Windows link reads the SDK only (#1915). Install an SDK built with `with build :sdk-windows-libc` (or name one with WITH_WINDOWS_LIBC_DIR).")
+            return link_stage_empty_command()
+        if not link_stage_file_exists(builtins):
+            with_eprint("error: the LLVM SDK at " ++ link_sdk_dir ++ " carries no compiler-rt builtins for Windows (" ++ builtins ++ "); build them with `with build :sdk-compiler-rt-builtins` (#1915).")
+            return link_stage_empty_command()
+    args.push("/nologo")
+    // Reproducible PE output: lld-link derives the header timestamp and the
+    // PDB GUID from a hash of the image instead of the wall clock, so
+    // relinking the same inputs yields the same bytes. Without it every
+    // relink of the release compiler differed, and the seed-driven gates
+    // (which relink per step) declared the test-pass marker stale on
+    // Windows only: fixpoint compares emitted objects, never the linked
+    // image, so the churn was invisible there.
+    args.push("/Brepro")
+    args.push("/subsystem:console")
+    args.push("/debug")
+    args.push("/pdb:" ++ bin_path ++ ".pdb")
+    // The image's debug directory names the PDB by file name (a debugger
+    // finds it beside the image); the absolute link path made one tool's
+    // bytes differ per directory, so the build store never served it (#2016).
+    args.push("/pdbaltpath:%_PDB%")
+    args.push("/stack:8388608")
+    args.push("/opt:ref")
+    args.push("/opt:icf")
+    if link_stage_verbose():
+        args.push("/verbose")
+    if sdk_libc:
+        // mingw-w64's startup code (crt2.o) is the entry point, and it reads
+        // what lld synthesizes only in MinGW mode: the __CTOR_LIST__ /
+        // __DTOR_LIST__ bounds and the runtime pseudo-relocation list.
+        args.push("-lldmingw")
+        args.push("/entry:mainCRTStartup")
+        args.push("/libpath:" ++ libc_dir)
+    else:
+        // The compiler's own link (and windows-aarch64): Visual Studio's
+        // import libraries and CRT, from WITH_WINDOWS_*_LIBDIR.
+        args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_UM_LIBDIR", "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64"))
+        args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_UCRT_LIBDIR", "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64"))
+        args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_MSVC_LIBDIR", "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64"))
+    args.push("/out:" ++ bin_path)
+    outputs.push(with_str_clone_ref(bin_path))
+    args.push(with_str_clone_ref(obj_path))
+    inputs.push(with_str_clone_ref(obj_path))
+    for i in 0..extras.len():
+        let extra = extras[i]
+        if extra.starts_with("-L"):
+            args.push("/libpath:" ++ extra.slice(2, extra.len()))
+        else if extra.starts_with("@"):
+            args.push(with_str_clone_ref(extra))
+        else:
+            args.push(with_str_clone_ref(extra))
+            inputs.push(with_str_clone_ref(extra))
+    for link_lib in link_libs:
+        let lib = link_lib
+        if lib.ends_with(".lib"):
+            args.push(with_str_clone_ref(lib))
+        else if not link_stage_windows_lib_is_crt_implicit(lib):
+            args.push(if sdk_libc: link_stage_windows_find_lib(lib, libc_dir, extras) else: lib ++ ".lib")
+        // else: `m` (libm) and `c` (libc) are Unix-only spellings — Windows has
+        // no `m.lib`/`c.lib`, and their symbols (cos, abs, strlen, …) resolve
+        // from the C runtime already linked below. Emitting a bare
+        // `<name>.lib` would make lld-link fail to open a nonexistent import
+        // lib, so drop it. Any other name still becomes `<name>.lib` so a
+        // genuinely missing library fails loudly rather than silently
+        // vanishing: an application's own libraries (opengl32, gdi32, ...)
+        // come from `with get` or its own link settings, never the SDK.
+    for link_arg in link_args:
+        args.push(with_str_clone_ref(link_arg))
+    if sdk_libc:
+        // The C runtime: mingw-w64's UCRT startup and support code, compiler-rt's
+        // builtins under it, and the UCRT itself (ucrtbase and the
+        // api-ms-win-crt-* API sets, in the box since Windows 10). No
+        // vcruntime140 or msvcp140: those are redistributables.
+        args.push(libc_dir ++ "/crt2.o")
+        inputs.push(libc_dir ++ "/crt2.o")
+        args.push("mingw32.lib")
+        args.push(with_str_clone_ref(builtins))
+        inputs.push(with_str_clone_ref(builtins))
+        args.push("mingwex.lib")
+        args.push("ucrt.lib")
+        let system = link_stage_windows_system_libs()
+        for system_item in system:
+            args.push(with_str_clone_ref(system_item))
+    else:
+        // Visual Studio's C runtime: static for the compiler (its LLVM
+        // archives are MultiThreaded), the DLL runtime otherwise.
+        if compiler_link:
+            args.push("libcpmt.lib")
+            args.push("libcmt.lib")
+        else:
+            args.push("msvcprt.lib")
+            args.push("msvcrt.lib")
+            args.push("ucrt.lib")
+            args.push("vcruntime.lib")
+        // UCRT exports printf/scanf-family functions such as sprintf and
+        // vfprintf only through this archive (they are inline in the headers
+        // since VS 2015); Darwin-migrated C (pcre2test.with) calls them by name.
+        args.push("legacy_stdio_definitions.lib")
+        args.push("oldnames.lib")
+        args.push("kernel32.lib")
+        args.push("advapi32.lib")
+        args.push("bcrypt.lib")
+        args.push("crypt32.lib")
+        args.push("shell32.lib")
+        args.push("user32.lib")
+        args.push("ole32.lib")
+        args.push("oleaut32.lib")
+        args.push("uuid.lib")
+        args.push("ws2_32.lib")
+        args.push("version.lib")
+        args.push("psapi.lib")
+        args.push("dbghelp.lib")
+        args.push("ntdll.lib")
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    let map_root = link_stage_file_prefix_map_root().replace("\\", "/")
+    if map_root.len() == 0:
+        return LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
+    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args: link_stage_windows_root_relative_args(args, map_root), cwd: map_root, env, inputs, outputs, cleanup_files }
+
+// Under WITH_FILE_PREFIX_MAP a PDB names nothing under the mapped root:
+// lld-link records its working directory, its command line and each
+// object's absolute path in the PDB, and /Brepro's image hash reads the GUID
+// the PDB was given, so one tool linked in two directories differed (#2016).
+// The link runs from the root with root-relative paths, and /pdbsourcepath
+// names the root as the map's <to>: the -oso_prefix of a Mach-O link.
+fn link_stage_windows_root_relative_args(args: &List[str], root: &str) -> List[str]:
+    let out: List[str] = []
+    for arg in args: out.push(link_stage_root_relative_arg(arg, root))
+    let mapping = runtime_getenv("WITH_FILE_PREFIX_MAP")
+    out.push("/pdbsourcepath:" ++ mapping.slice(mapping.find("=") + 1, mapping.len()))
+    out
+
+// `arg` with a path under `root` (bare or after a `/flag:`) spelled
+// relative to it; any other argument as it is.
+fn link_stage_root_relative_arg(arg: &str, root: &str) -> str:
+    let colon = if arg.starts_with("/"): arg.find(":") else: -1
+    let flag = if colon > 0: arg.slice(0, colon + 1) else: ""
+    let path = arg.slice(flag.len(), arg.len()).replace("\\", "/")
+    if path.starts_with(root ++ "/"): flag ++ path.slice(root.len() + 1, path.len()) else: arg
+
+// The lld flavor for a WebAssembly link: wasm-ld ships beside the host
+// flavor recorded in the llvm_ld metadata.
+fn link_stage_wasm_lld_for(llvm_ld: &str) -> str:
+    let name = if runtime_sysinfo_os() == "Windows": "wasm-ld.exe" else: "wasm-ld"
+    if link_stage_basename(llvm_ld) == name:
+        return llvm_ld ++ ""
+    let sibling = link_stage_dirname(llvm_ld) ++ "/" ++ name
+    if link_stage_file_exists(sibling):
+        return sibling
+    ""
+
+// The shadow stack a wasm program gets. wasm-ld's 64 KiB default is far
+// below what With code with page-sized stack buffers needs; 8 MiB matches
+// the native targets' main-thread stack. WITH_WASM_STACK_SIZE overrides.
+fn link_stage_wasm_stack_size() -> str:
+    let env = with_getenv_str("WITH_WASM_STACK_SIZE")
+    if env.len() > 0:
+        return env
+    "8388608"
+
+fn link_stage_make_wasm_llvm_link_command(wasm_ld: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
+    let args: List[str] = []
+    let env: List[LinkStageEnvVar] = []
+    let inputs: List[str] = []
+    let outputs: List[str] = []
+    if target_spec_active_kind() == 8:
+        args.push("-mwasm64")
+    // rt/wasm.with's with_wasm_startup/with_wasm_exit bracket codegen's
+    // `_start`; the stack goes first so an overflow traps on the guard
+    // below it instead of silently overwriting data.
+    args.push("--entry=_start")
+    args.push("--stack-first")
+    // A wasm-ld warning is a real defect: a function-signature mismatch
+    // between objects would otherwise link into a stub that traps at the
+    // first call. Fail the link instead.
+    args.push("--fatal-warnings")
+    args.push("-z")
+    args.push("stack-size=" ++ link_stage_wasm_stack_size())
+    args.push("-o")
+    args.push(with_str_clone_ref(bin_path))
+    outputs.push(with_str_clone_ref(bin_path))
+    args.push(with_str_clone_ref(obj_path))
+    inputs.push(with_str_clone_ref(obj_path))
+    for i in 0..extras.len():
+        let extra = extras[i]
+        if extra.starts_with("-L") or extra.starts_with("@"):
+            args.push(with_str_clone_ref(extra))
+        else:
+            args.push(with_str_clone_ref(extra))
+            inputs.push(with_str_clone_ref(extra))
+    for link_lib in link_libs:
+        // There is no libc or libm on this target; a request for one is a
+        // no-op, anything else must resolve as a wasm archive or fail loudly.
+        let lib = link_lib
+        if lib != "m" and lib != "c":
+            args.push("-l" ++ lib)
+    for link_arg in link_args:
+        args.push(with_str_clone_ref(link_arg))
+    if wasm_host_emit(bin_path):
+        return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+    outputs.push(wasm_host_js_path(bin_path))
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker: with_str_clone_ref(wasm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
+
+// The lld flavor for a Linux ELF link. The build's llvm_ld metadata
+// records the host flavor (ld64.lld on macOS); the ELF driver ships
+// beside it in the same SDK bin directory.
+fn link_stage_elf_lld_for(llvm_ld: &str) -> str:
+    if link_stage_basename(llvm_ld) == "ld.lld":
+        return llvm_ld ++ ""
+    let sibling = link_stage_dirname(llvm_ld) ++ "/ld.lld"
+    if link_stage_file_exists(sibling):
+        return sibling
+    ""
+
+// The lld flavor for a Windows COFF/PE link. `lld-link` ships beside
+// the host llvm_ld in the same SDK bin directory (a symlink to `lld`
+// in the published SDKs); invoking lld as lld-link performs a native
+// COFF link from any host, so no wine is needed for the link itself.
+fn link_stage_coff_lld_for(llvm_ld: &str) -> str:
+    if link_stage_basename(llvm_ld) == "lld-link" or link_stage_basename(llvm_ld) == "lld-link.exe":
+        return llvm_ld ++ ""
+    let sibling = link_stage_dirname(llvm_ld) ++ "/lld-link"
+    if link_stage_file_exists(sibling):
+        return sibling
+    ""
+
+fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStageCommand:
+    // A --target selection overrides the host: pick the target's link
+    // recipe and lld flavor (§18.5 — cross-compilation is a normal mode).
+    if not target_spec_is_native():
+        let cross_kind = target_spec_active_kind()
+        if cross_kind == 1 or cross_kind == 2:
+            let elf_ld = link_stage_elf_lld_for(llvm_ld)
+            if elf_ld.len() == 0:
+                with_eprint("error: cross link needs the ELF lld driver (ld.lld) next to " ++ llvm_ld)
+                return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+            return link_stage_make_linux_llvm_link_command(elf_ld, obj_path, bin_path, extras, link_libs, link_args)
+        if target_spec_active_kind() == 5 or target_spec_active_kind() == 6:
+            let coff_ld = link_stage_coff_lld_for(llvm_ld)
+            if coff_ld.len() == 0:
+                with_eprint("error: cross link needs the COFF lld driver (lld-link) next to " ++ llvm_ld)
+                return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+            return link_stage_make_windows_llvm_link_command(coff_ld, link_stage_sdk_dir_of(coff_ld), obj_path, bin_path, extras, link_libs, link_args)
+        if target_spec_is_wasm():
+            let wasm_ld = link_stage_wasm_lld_for(llvm_ld)
+            if wasm_ld.len() == 0:
+                with_eprint("error: cross link needs the WebAssembly lld driver (wasm-ld) next to " ++ llvm_ld)
+                return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+            return link_stage_make_wasm_llvm_link_command(wasm_ld, obj_path, bin_path, extras, link_libs, link_args)
+        with_eprint("error: unsupported cross link target: " ++ target_spec_name())
+        return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+    let os = runtime_sysinfo_os()
+    let arch = runtime_sysinfo_arch()
+    if os == "Linux" and arch == "x86_64":
+        return link_stage_make_linux_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+    if os == "Linux" and arch == "aarch64":
+        return link_stage_make_linux_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+    if os == "Macos" and arch == "aarch64":
+        return link_stage_make_darwin_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+    if os == "Windows" and arch == "x86_64":
+        return link_stage_make_windows_llvm_link_command(llvm_ld, link_stage_sdk_dir_of(llvm_ld), obj_path, bin_path, extras, link_libs, link_args)
+    if os == "Windows" and (arch == "armv8" or arch == "aarch64"):
+        return link_stage_make_windows_llvm_link_command(llvm_ld, link_stage_sdk_dir_of(llvm_ld), obj_path, bin_path, extras, link_libs, link_args)
+    with_eprint("error: unsupported host LLVM linker platform: " ++ os ++ "/" ++ arch)
+    LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+
+fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
+    if ptr as i64 == 0 or len <= 0:
+        return ""
+    let out = ""
+    unsafe:
+        let sp = &raw mut out as *mut u8
+        *(sp as *mut u64) = ptr as u64
+        *((sp + 8u64) as *mut i64) = len
+    out
+
+fn link_stage_embedded_obj_slice(start: *const u8, end: *const u8) -> str:
+    let len = end as i64 - start as i64
+    if len <= 0:
+        return ""
+    link_stage_str_from_raw_parts(start, len)
+
+// The two platform objects a compiler still carries beside its runtime
+// bundle: the on-demand cimport_stubs archive and the fiber assembly
+// (D30 step 4: the .w-derived runtime objects are the bundle's).
+fn link_stage_embedded_runtime_object(name: &str) -> str:
+    if name == "cimport_stubs.o":
+        return link_stage_embedded_obj_slice(&with_embedded_cimport_stubs_o_start as *const u8, &with_embedded_cimport_stubs_o_end as *const u8)
+    if name == "fiber_asm.o":
+        return link_stage_embedded_obj_slice(&with_embedded_fiber_asm_o_start as *const u8, &with_embedded_fiber_asm_o_end as *const u8)
+    ""
+
+fn link_stage_extract_runtime_obj(name: &str, path: &str) -> bool:
+    let data = link_stage_embedded_runtime_object(name)
+    if data.len() == 0:
+        return true
+    // Concurrent links (comptime parallel() threads and separate processes)
+    // extract to this shared path. Writing it directly truncates the file under
+    // a concurrent reader mid-link — empty reads ("cannot read member") or
+    // partial-object parses (#617). Reuse a complete matching extraction, else
+    // write a unique temp file and rename it into place: rename replaces
+    // atomically, so readers only ever observe a complete file.
+    let existing = runtime_read_file(path)
+    if existing.len() == data.len() and existing == data:
+        return false
+    let tmp_path = path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.tmp"
+    if runtime_write_file(tmp_path, data) != 0:
+        return true
+    if runtime_rename(tmp_path, path) != 0:
+        runtime_remove_file(tmp_path)
+        // A concurrent extractor may have won the rename; accept its complete copy.
+        let after = runtime_read_file(path)
+        if after.len() == data.len() and after == data:
+            return false
+        return true
+    false
+
+fn link_stage_link(obj_path: &str, bin_path: &str) -> bool:
+    let extras: List[str] = []
+    let link_libs: List[str] = []
+    link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
+
+fn link_stage_link_with_extras(obj_path: &str, bin_path: &str, extras: List[str]) -> bool:
+    let link_libs: List[str] = []
+    link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
+
+fn link_stage_link_with_extras_and_libs(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]) -> bool:
+    link_stage_link_with_extras_and_libs_result(obj_path, bin_path, extras, link_libs).ok
+
+fn link_stage_link_with_extras_and_libs_result(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]) -> LinkStageResult:
+    link_stage_result_for_plan(link_stage_link_with_extras_and_libs_plan(obj_path, bin_path, extras, link_libs))
+
+fn link_stage_link_with_extras_and_libs_plan(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]) -> LinkStagePlan:
+    let link_args: List[str] = []
+    link_stage_link_with_extras_libs_args_plan(obj_path, bin_path, extras, link_libs, link_args)
+
+fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStagePlan:
+    // Cross links never go through the host cc driver: route to the
+    // LLVM linker plan, which dispatches on the active target.
+    if runtime_sysinfo_os() == "Windows" or not target_spec_is_native():
+        let root = link_stage_resolve_runtime_root()
+        var ld_path = link_stage_recorded_path(root, link_stage_read_file_trimmed(root ++ "/llvm_ld"))
+        // The `llvm_ld` metadata file only records the lld-link path; the lib
+        // dirs and system libs come from the environment already
+        // (link_stage_make_windows_llvm_link_command). So a NATIVE Windows
+        // link that runs before the metadata target has written the file — a
+        // .wo bundle build's --emit-obj link is the case (#1075) — resolves
+        // the linker the same way the metadata target does
+        // (build/compiler.with comp_llvm_lld_tool): WITH_LLVM_LD, then LLVM_LD,
+        // then LLVM_PREFIX/bin/lld-link.exe. A cross link still requires the
+        // generated metadata (it also carries the cross SDK's lib response).
+        if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native():
+            ld_path = link_stage_windows_lld_from_env()
+        // #1915 (D81): with no SDK named, a native Windows link is this
+        // binary's own lld over the toolchain it carries, as a macOS link is.
+        if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native() and lld_flavor_linked("coff"):
+            let carried = embedded_windows_sysroot_dir()
+            if carried.len() > 0:
+                return link_stage_windows_native_link_plan(carried, obj_path, bin_path, extras, link_libs, link_args)
+        if target_spec_is_wasm() and (ld_path.len() == 0 or link_stage_wasm_lld_for(ld_path).len() == 0) and lld_flavor_linked("wasm"):
+            return link_stage_wasm_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
+        if ld_path.len() == 0:
+            if runtime_sysinfo_os() == "Windows":
+                with_eprint("error: missing Windows LLVM linker metadata (" ++ root ++ "/llvm_ld), no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment, and this compiler carries no Windows linker and C runtime of its own (one cross-linked from another host, or linked against a Visual Studio-built SDK): extract the with-llvm-sdk-<version>-windows-x86_64.tar.gz release asset sdk.lock pins and set LLVM_PREFIX to its llvm-<version>-windows-x86_64-msvc directory")
+            else:
+                with_eprint("error: cross-target link requires LLVM linker metadata (" ++ root ++ "/llvm_ld)")
+            return link_stage_plan_fail()
+        return link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, link_args, ld_path)
+    if runtime_sysinfo_os() == "Macos":
+        return link_stage_darwin_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
+    if link_stage_linux_uses_own_sysroot():
+        return link_stage_linux_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
+    let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
+    link_stage_plan_for_command(command)
+
+// #2131 / #1915: a wasm32 link with no external wasm-ld is this binary's own
+// lld wasm driver (`with __ld -flavor wasm`, src/compiler/LldDriver.with).
+fn link_stage_wasm_native_link_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStagePlan:
+    let self_exe = with_self_exe()
+    if self_exe.len() == 0:
+        with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
+        return link_stage_plan_fail()
+    let command = link_stage_make_wasm_llvm_link_command("wasm-ld", obj_path, bin_path, extras, link_libs, link_args)
+    if command.linker.len() == 0:
+        return link_stage_plan_fail()
+    let args: List[str] = []
+    args.push("__ld")
+    args.push("-flavor")
+    args.push("wasm")
+    for i in 0..command.args.len():
+        args.push(with_str_clone_ref(command.args[i]))
+    command.args = args
+    command.linker = with_str_clone_ref(self_exe)
+    link_stage_plan_for_command(command)
+
+// #1915 (D81): a native Windows link with no SDK named is this binary's own
+// lld-link (`with __ld -flavor link`, src/compiler/LldDriver.with) over the
+// Windows toolchain it carries (compiler.EmbeddedSysroot), read exactly as
+// an SDK's: no Visual Studio, no Windows Kits, no LLVM install.
+fn link_stage_windows_native_link_plan(toolchain: &str, obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStagePlan:
+    let self_exe = with_self_exe()
+    if self_exe.len() == 0:
+        with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
+        return link_stage_plan_fail()
+    let command = link_stage_make_windows_llvm_link_command("lld-link", toolchain, obj_path, bin_path, extras, link_libs, link_args)
+    if command.linker.len() == 0:
+        return link_stage_plan_fail()
+    let args: List[str] = []
+    args.push("__ld")
+    args.push("-flavor")
+    args.push("link")
+    for i in 0..command.args.len():
+        args.push(with_str_clone_ref(command.args[i]))
+    command.args = args
+    command.linker = with_str_clone_ref(self_exe)
+    link_stage_plan_for_command(command)
+
+// #1915: a native macOS link is this binary's own lld (`with __ld`, src/
+// compiler/LldDriver.with) over the darwin sysroot (compiler.EmbeddedSysroot):
+// no cc, no ld, no Xcode or Command Line Tools, no Apple SDK. A framework is
+// found only on the -F paths the program's dependencies give; lld names the
+// one it cannot find.
+fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStagePlan:
+    let self_exe = with_self_exe()
+    if self_exe.len() == 0:
+        with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
+        return link_stage_plan_fail()
+    let sysroot = darwin_sdk_root()
+    if sysroot.len() == 0:
+        with_eprint("error: link: no darwin sysroot: this compiler carries none, and WITH_SDKROOT / SDKROOT name none")
+        return link_stage_plan_fail()
+    // A named SDK that is gone (an Xcode update removes the one a running
+    // shell's SDKROOT named) left lld searching nothing: a page of
+    // undefined symbols, starting with `library not found for -lSystem`.
+    if with_fs_is_dir(sysroot) == 0:
+        let named_by = if runtime_getenv("WITH_SDKROOT").len() > 0: "WITH_SDKROOT" else if runtime_getenv("SDKROOT").len() > 0: "SDKROOT" else: "the [c_import] sdk_path"
+        with_eprint("error: link: " ++ named_by ++ " names the macOS SDK `" ++ sysroot ++ "`, which does not exist; point it at an installed SDK (`xcrun --sdk macosx --show-sdk-path`) or unset it to use this compiler's own sysroot")
+        return link_stage_plan_fail()
+    let command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, link_args)
+    let args: List[str] = []
+    args.push("__ld")
+    args.push("-syslibroot")
+    args.push(sysroot)
+    for i in 0..command.args.len():
+        args.push(with_str_clone_ref(command.args[i]))
+    command.args = args
+    link_stage_plan_for_command(command)
+
+// A program's link arguments are written for a C compiler driver (`cc`), as
+// they were when the native link ran through one: `-Wl,a,b` hands `a` and `b`
+// to the linker. The native macOS link is lld itself now (#1915), so the
+// driver's wrapper is unwrapped here; every other argument passes as written
+// and lld names one it does not know.
+fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
+    let out: List[str] = []
+    var i = 0
+    while i < link_args.len():
+        let arg = link_args[i]
+        if arg == "-Xlinker" and i + 1 < link_args.len():
+            i += 1
+            out.push(link_args[i])
+        else if arg.starts_with("-Wl,"):
+            for part in arg.slice(4, arg.len()).split(","):
+                if part.len() > 0: out.push(part)
+        else:
+            out.push(with_str_clone_ref(arg))
+        i += 1
+    out
+
+// Separate argv entries protect spaces, commas, dollar signs and loader
+// tokens. The command runs directly, so no shell ever expands these values.
+// Windows loads beside the executable itself; wasm has no dynamic loader.
+fn link_stage_rpath_driver_args(paths: &List[str], target_os: &str) -> List[str]:
+    let out: List[str] = []
+    if target_os != "Linux" and target_os != "Macos": return out
+    for path in paths:
+        out.push("-Xlinker")
+        out.push("-rpath")
+        out.push("-Xlinker")
+        out.push(path)
+    out
+
+// The native-Windows lld-link path, resolved from the environment when the
+// generated `llvm_ld` metadata file is not present yet (#1075). Mirrors
+// build/compiler.with's comp_llvm_lld_tool exactly so a pre-metadata link picks
+// the same linker the metadata target would have recorded.
+fn link_stage_windows_lld_from_env() -> str:
+    let explicit = runtime_getenv("WITH_LLVM_LD")
+    if explicit.len() > 0:
+        return explicit ++ ""
+    let alt = runtime_getenv("LLVM_LD")
+    if alt.len() > 0:
+        return alt ++ ""
+    let prefix = runtime_getenv("LLVM_PREFIX")
+    if prefix.len() > 0:
+        return prefix ++ "/bin/lld-link.exe"
+    ""
+
+fn link_stage_link_with_llvm(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str], llvm_ld: &str) -> bool:
+    link_stage_link_with_llvm_result(obj_path, bin_path, extras, link_libs, llvm_ld).ok
+
+fn link_stage_link_with_llvm_result(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str], llvm_ld: &str) -> LinkStageResult:
+    link_stage_result_for_plan(link_stage_link_with_llvm_plan(obj_path, bin_path, extras, link_libs, llvm_ld))
+
+fn link_stage_link_with_llvm_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], llvm_ld: &str) -> LinkStagePlan:
+    let link_args: List[str] = []
+    link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, link_args, llvm_ld)
+
+fn link_stage_link_with_llvm_args_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str], llvm_ld: &str) -> LinkStagePlan:
+    let command = link_stage_make_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+    if command.linker.len() == 0:
+        return link_stage_plan_fail()
+    link_stage_plan_for_command(command)
+
+fn link_stage_str_contains(hay: &str, needle: &str) -> bool:
+    let hay_len = hay.len()
+    let needle_len = needle.len()
+    if needle_len <= 0:
+        return true
+    if hay_len < needle_len:
+        return false
+
+    var i = 0
+    while i <= hay_len - needle_len:
+        var matched = true
+        var j = 0
+        while j < needle_len:
+            if hay[(i + j)] != needle[j]:
+                matched = false
+                break
+            j = j + 1
+        if matched:
+            return true
+        i = i + 1
+    false
+
+fn link_stage_undef_contains_symbol(undef: &str, name: &str) -> bool:
+    if link_stage_str_contains(undef, "_" ++ name):
+        return true
+    link_stage_str_contains(undef, name)
+
+// #1915: `nm -u` for a 64-bit Mach-O object, read here rather than from a
+// host `nm`: each undefined external symbol of LC_SYMTAB, one per line, as
+// nm prints them (with Mach-O's leading underscore). "<probe-failed>" when
+// the file is not a 64-bit little-endian Mach-O object this can read.
+fn link_stage_macho_undefined_symbols(path: &str) -> str:
+    let data = runtime_read_file(path)
+    if data.len() < 32 or link_stage_read_u32_le(data, 0) != 0xfeedfacf:
+        return "<probe-failed>"
+    let size = data.len()
+    let ncmds = link_stage_read_u32_le(data, 16) as i32
+    var offset = 32
+    for _ in 0..ncmds:
+        if offset + 8 > size:
+            return "<probe-failed>"
+        let cmd = link_stage_read_u32_le(data, offset)
+        let cmdsize = link_stage_read_u32_le(data, offset + 4) as i32
+        if cmdsize < 8 or offset + cmdsize > size:
+            return "<probe-failed>"
+        // LC_SYMTAB: symoff, nsyms, stroff, strsize.
+        if cmd == 0x2 and cmdsize >= 24:
+            let symoff = link_stage_read_u32_le(data, offset + 8) as i32
+            let nsyms = link_stage_read_u32_le(data, offset + 12) as i32
+            let stroff = link_stage_read_u32_le(data, offset + 16) as i32
+            let strsize = link_stage_read_u32_le(data, offset + 20) as i32
+            if symoff + nsyms * 16 > size or stroff + strsize > size:
+                return "<probe-failed>"
+            let out = StringBuilder.new()
+            for s in 0..nsyms:
+                // nlist_64: n_strx u32, n_type u8, n_sect u8, n_desc u16, n_value u64.
+                let entry = symoff + s * 16
+                let n_type = data[(entry + 4)] as i32
+                let n_value = link_stage_read_u32_le(data, entry + 8) + link_stage_read_u32_le(data, entry + 12)
+                // External (N_EXT), not a debugging entry (N_STAB), N_UNDF,
+                // and not a common symbol (an undefined one with a size).
+                if (n_type & 0xe0) == 0 and (n_type & 0x01) != 0 and (n_type & 0x0e) == 0 and n_value == 0:
+                    let strx = link_stage_read_u32_le(data, entry) as i32
+                    if strx <= 0 or strx >= strsize:
+                        return "<probe-failed>"
+                    var end = stroff + strx
+                    while end < stroff + strsize and data[end] != 0:
+                        end = end + 1
+                    out.push_str(data.slice((stroff + strx) as i64, end as i64))
+                    out.push_str("\n")
+            return out.to_str()
+        offset = offset + cmdsize
+    ""
+
+fn link_stage_read_u16_le(data: &str, offset: i64) -> i64:
+    if offset < 0 or offset + 1 >= data.len():
+        return -1
+    (data[offset] as i64) | ((data[offset + 1] as i64) << 8)
+
+// The external symbols a COFF object (regular or /bigobj) references and does
+// not define, one per line: storage class EXTERNAL, section 0, value 0 (a
+// nonzero value is a common symbol). "<probe-failed>" when it is not one.
+fn link_stage_coff_undefined_symbols(path: &str) -> str:
+    let data = runtime_read_file(path)
+    if data.len() < 20:
+        return "<probe-failed>"
+    let bigobj = link_stage_read_u16_le(data, 0) == 0 and link_stage_read_u16_le(data, 2) == 0xffff
+    let symtab = if bigobj: link_stage_read_u32_le(data, 48) else: link_stage_read_u32_le(data, 8)
+    let count = if bigobj: link_stage_read_u32_le(data, 52) else: link_stage_read_u32_le(data, 12)
+    let entry_size: i64 = if bigobj: 20 else: 18
+    if symtab <= 0 or count < 0 or symtab + count * entry_size + 4 > data.len():
+        return "<probe-failed>"
+    let strtab = symtab + count * entry_size
+    let out = StringBuilder.new()
+    var i: i64 = 0
+    while i < count:
+        let at = symtab + i * entry_size
+        let section = if bigobj: link_stage_read_u32_le(data, (at + 12) as i32) else: link_stage_read_u16_le(data, at + 12)
+        let class = data[at + entry_size - 2] as i32
+        let aux = data[at + entry_size - 1] as i64
+        let value = link_stage_read_u32_le(data, (at + 8) as i32)
+        if class == 2 and section == 0 and value == 0:
+            var name = ""
+            if link_stage_read_u32_le(data, at as i32) == 0:
+                let start = strtab + link_stage_read_u32_le(data, (at + 4) as i32)
+                var end = start
+                while end < data.len() and data[end] != 0:
+                    end = end + 1
+                name = data.slice(start, end)
+            else:
+                var end = at
+                while end < at + 8 and data[end] != 0:
+                    end = end + 1
+                name = data.slice(at, end)
+            if name.len() > 0:
+                out.push_str(name)
+                out.push_str("\n")
+        i = i + 1 + aux
+    out.to_str()
+
+// An ELF64 field the reader takes as 32 bits: -1 when its high word is set
+// (no object this compiler links has a section or table past 4 GiB).
+fn link_stage_read_u64_le_small(data: &str, offset: i32) -> i64:
+    let high = link_stage_read_u32_le(data, offset + 4)
+    if high != 0: -1 else: link_stage_read_u32_le(data, offset)
+
+// The global and weak symbols a 64-bit little-endian ELF relocatable object
+// references and does not define (st_shndx SHN_UNDEF), one per line — what
+// `nm -u` prints. "<not-elf>" when the file is no ELF object at all,
+// "<probe-failed>" when it is one this reader cannot read. Read in-process,
+// so a Linux link needs no host nm (#1915, D81).
+// The symbols a wasm object imports, one per line, read in-process like the
+// ELF, Mach-O and COFF readers (#1915, D81): a Linux host has no nm that
+// reads wasm, and the SDK's llvm-nm sits beside lld only once a runtime root
+// of this generation exists, so the wasm32 corpus bundles' manifests
+// (D138: a bundle records what it imports) failed on both Linux seed cuts.
+// The import section (id 2) lists every function, table, memory, global
+// and tag the object takes from its environment; each field name is an
+// undefined symbol of the link. "<not-wasm>" when the file is not a wasm
+// object, "<probe-failed>" when its sections cannot be read.
+fn link_stage_wasm_undefined_symbols(path: &str) -> str:
+    let data = runtime_read_file(path)
+    if data.len() < 8 or data[0] != 0 or data[1] != 'a' or data[2] != 's' or data[3] != 'm':
+        return "<not-wasm>"
+    let size = data.len()
+    var offset: i64 = 8
+    let out = StringBuilder.new()
+    while offset < size:
+        let id = data[offset] as i32
+        let (section_len, after_len) = link_stage_read_uleb(data, offset + 1)
+        if section_len < 0 or after_len + section_len > size:
+            return "<probe-failed>"
+        if id != 2:
+            offset = after_len + section_len
+            continue
+        let section_end = after_len + section_len
+        let (count, after_count) = link_stage_read_uleb(data, after_len)
+        if count < 0:
+            return "<probe-failed>"
+        offset = after_count
+        for _ in 0..count:
+            let (module_len, after_module_len) = link_stage_read_uleb(data, offset)
+            if module_len < 0 or after_module_len + module_len > section_end:
+                return "<probe-failed>"
+            let (field_len, after_field_len) = link_stage_read_uleb(data, after_module_len + module_len)
+            if field_len < 0 or after_field_len + field_len > section_end:
+                return "<probe-failed>"
+            let field = data.slice(after_field_len, after_field_len + field_len)
+            offset = after_field_len + field_len
+            if offset >= section_end:
+                return "<probe-failed>"
+            let kind = data[offset] as i32
+            offset = offset + 1
+            // A memory import (`__linear_memory`) is the module's address space,
+            // not a symbol; nm lists the functions, tables and globals.
+            if kind != 2:
+                out.push_str(field)
+                out.push_str("\n")
+            if kind == 0 or kind == 4:
+                // function: a type index; tag: an attribute byte then a type index
+                if kind == 4: offset = offset + 1
+                let (_, after_type) = link_stage_read_uleb(data, offset)
+                if after_type < 0: return "<probe-failed>"
+                offset = after_type
+            else if kind == 1:
+                // table: a reference type byte, then limits
+                offset = link_stage_skip_wasm_limits(data, offset + 1)
+            else if kind == 2:
+                offset = link_stage_skip_wasm_limits(data, offset)
+            else if kind == 3:
+                // global: a value type byte and a mutability byte
+                offset = offset + 2
+            else:
+                return "<probe-failed>"
+            if offset < 0 or offset > section_end:
+                return "<probe-failed>"
+        return out.to_str()
+    out.to_str()
+
+// An unsigned LEB128 at `offset`: (value, offset after it); (-1, -1) when it
+// runs off the data.
+fn link_stage_read_uleb(data: &str, offset: i64) -> (i64, i64):
+    var result: i64 = 0
+    var shift: u64 = 0
+    var at = offset
+    while at < data.len() and shift < 64:
+        let byte = data[at] as i64
+        at = at + 1
+        result = result | ((byte & 0x7f) << shift)
+        if (byte & 0x80) == 0:
+            return (result, at)
+        shift = shift + 7
+    (-1, -1)
+
+// wasm limits at `offset`: a flags byte, a minimum, and a maximum when flag
+// bit 0 is set; the offset after them, -1 when they run off the data.
+fn link_stage_skip_wasm_limits(data: &str, offset: i64) -> i64:
+    if offset < 0 or offset >= data.len(): return -1
+    let flags = data[offset] as i64
+    let (_, after_min) = link_stage_read_uleb(data, offset + 1)
+    if after_min < 0: return -1
+    if (flags & 1) == 0: return after_min
+    let (_, after_max) = link_stage_read_uleb(data, after_min)
+    after_max
+
+fn link_stage_elf_undefined_symbols(path: &str) -> str:
+    let data = runtime_read_file(path)
+    if data.len() < 64 or data[0] != 0x7f or data[1] != 'E' or data[2] != 'L' or data[3] != 'F':
+        return "<not-elf>"
+    // EI_CLASS ELFCLASS64, EI_DATA ELFDATA2LSB.
+    if data[4] != 2 or data[5] != 1:
+        return "<probe-failed>"
+    let size = data.len()
+    let shoff = link_stage_read_u64_le_small(data, 0x28) as i32
+    let shentsize = link_stage_read_u16_le(data, 0x3a) as i32
+    var shnum = link_stage_read_u16_le(data, 0x3c) as i32
+    if shoff <= 0 or shentsize < 64 or shoff + shentsize > size:
+        return "<probe-failed>"
+    // More than 0xff00 sections: e_shnum is 0 and section 0's sh_size holds it.
+    if shnum == 0: shnum = link_stage_read_u64_le_small(data, shoff + 0x20) as i32
+    if shnum <= 0 or shoff + shnum * shentsize > size:
+        return "<probe-failed>"
+    for s in 0..shnum:
+        let sh = shoff + s * shentsize
+        // SHT_SYMTAB; sh_link names its string table.
+        if link_stage_read_u32_le(data, sh + 4) == 2:
+            let symoff = link_stage_read_u64_le_small(data, sh + 0x18) as i32
+            let symsize = link_stage_read_u64_le_small(data, sh + 0x20) as i32
+            let strndx = link_stage_read_u32_le(data, sh + 0x28) as i32
+            if symoff < 0 or symsize < 0 or symoff + symsize > size or strndx <= 0 or strndx >= shnum:
+                return "<probe-failed>"
+            let strsh = shoff + strndx * shentsize
+            let stroff = link_stage_read_u64_le_small(data, strsh + 0x18) as i32
+            let strsize = link_stage_read_u64_le_small(data, strsh + 0x20) as i32
+            if stroff < 0 or strsize < 0 or stroff + strsize > size:
+                return "<probe-failed>"
+            let out = StringBuilder.new()
+            // Elf64_Sym: st_name u32, st_info u8, st_other u8, st_shndx u16,
+            // st_value u64, st_size u64. Entry 0 is the null symbol.
+            var at = symoff + 24
+            while at + 24 <= symoff + symsize:
+                let bind = (data[at + 4] as i32) >> 4
+                let shndx = link_stage_read_u16_le(data, (at + 6))
+                // STB_GLOBAL or STB_WEAK, SHN_UNDEF.
+                if (bind == 1 or bind == 2) and shndx == 0:
+                    let name = link_stage_read_u32_le(data, at) as i32
+                    if name <= 0 or name >= strsize:
+                        return "<probe-failed>"
+                    var end = stroff + name
+                    while end < stroff + strsize and data[end] != 0:
+                        end = end + 1
+                    out.push_str(data.slice((stroff + name) as i64, end as i64))
+                    out.push_str("\n")
+                at = at + 24
+            return out.to_str()
+    // No symbol table: nothing referenced.
+    ""
+
+// The object format a file's header names: "macho" (MH_MAGIC_64), "coff"
+// (an x86_64, arm64 or i386 machine, or the /bigobj signature), or "".
+fn link_stage_object_format(obj_path: &str) -> str:
+    let data = runtime_read_file(obj_path)
+    if data.len() < 4:
+        return ""
+    if link_stage_read_u32_le(data, 0) == 0xfeedfacf:
+        return "macho"
+    let machine = link_stage_read_u16_le(data, 0)
+    if machine == 0x8664 or machine == 0xaa64 or machine == 0x14c:
+        return "coff"
+    if machine == 0 and link_stage_read_u16_le(data, 2) == 0xffff:
+        return "coff"
+    ""
+
+fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
+    // Every object is read in-process by the reader its own header names,
+    // on any host (#1915, D81): no nm, the SDK's or the host's. A cross
+    // COFF object (a windows_aarch64 engine bundle built on Linux or on an
+    // x86_64 Windows host) went to a GNU nm that cannot read ARM64 COFF, or
+    // to a bare llvm-nm.exe not on PATH, and the bundle could not record
+    // the contracts it imports (#2780).
+    let format = link_stage_object_format(obj_path)
+    if format == "macho":
+        let symbols = link_stage_macho_undefined_symbols(obj_path)
+        if symbols == "<probe-failed>":
+            with_eprint(f"warning: link: {obj_path} is not a 64-bit Mach-O object this compiler can read for undefined symbols; linking every embedded bundle\n")
+        return symbols
+    if format == "coff":
+        let symbols = link_stage_coff_undefined_symbols(obj_path)
+        if symbols == "<probe-failed>":
+            with_eprint(f"warning: link: {obj_path} is not a COFF object this compiler can read for undefined symbols; linking every embedded bundle\n")
+        return symbols
+    // A wasm object: its import section, read in-process (no host nm reads
+    // wasm; the SDK's llvm-nm needs a runtime root of this generation).
+    let wasm = link_stage_wasm_undefined_symbols(obj_path)
+    if wasm == "<probe-failed>":
+        with_eprint(f"warning: link: {obj_path} is a wasm object whose import section this compiler cannot read; linking every embedded bundle\n")
+    if wasm != "<not-wasm>":
+        return wasm
+    // An ELF object, native or cross, is read in-process too (#1915, D81):
+    // a Linux host without binutils has no nm, its probe failed, and the
+    // compiler's own link then left out LLVM and libclang.
+    let elf = link_stage_elf_undefined_symbols(obj_path)
+    if elf == "<probe-failed>":
+        with_eprint(f"warning: link: {obj_path} is not a 64-bit little-endian ELF object this compiler can read for undefined symbols; linking every embedded bundle\n")
+    if elf != "<not-elf>":
+        return elf
+    // No object format this compiler links is left to a tool: an object
+    // none of the readers names is no relocatable object it can read. A
+    // failed probe links EVERY embedded bundle (link_stage_bundle_needed
+    // treats it as needed): correct, but the binary carries every corpus
+    // and every corpus's externs must resolve on this target (#1103), so
+    // say so.
+    with_eprint(f"warning: link: {obj_path} is no Mach-O, COFF, ELF or wasm object this compiler can read for undefined symbols; linking every embedded bundle\n")
+    "<probe-failed>"
+
+fn link_stage_undefined_symbols_need_helpers_runtime(undef: &str) -> bool:
+    if undef == "<probe-failed>":
+        return true
+    if undef.len() == 0:
+        return false
+    if link_stage_undef_contains_symbol(undef, "with_"):
+        return true
+    if link_stage_undef_contains_symbol(undef, "int_to_string"):
+        return true
+    if link_stage_undef_contains_symbol(undef, "i32_to_str"):
+        return true
+    if link_stage_undef_contains_symbol(undef, "str_from_byte"):
+        return true
+    false
+
+fn link_stage_undefined_symbols_need_fiber_runtime(undef: &str) -> i32:
+    if undef == "<probe-failed>":
+        return 0
+    if undef.len() == 0:
+        return 0
+    if link_stage_undef_contains_symbol(undef, "with_channel_"):
+        return 1
+    if link_stage_undef_contains_symbol(undef, "with_fiber_"):
+        return 1
+    0
+
+// ── .wo bundles (wo_bundles.md, D38) ─────────────────────────────
+
+// The value of the first manifest line `key <value>…` ("" if absent).
+fn link_stage_bundle_manifest_field(manifest: &str, key: &str) -> str:
+    let want = key ++ " "
+    var start: i64 = 0
+    while start < manifest.len():
+        var end = start
+        while end < manifest.len() and manifest[end] != '\n':
+            end = end + 1
+        let line = manifest.slice(start, end)
+        if line.starts_with(want):
+            let rest = line.slice(want.len(), line.len())
+            var sp: i64 = 0
+            while sp < rest.len() and rest[sp] != ' ':
+                sp = sp + 1
+            return rest.slice(0, sp)
+        start = end + 1
+    ""
+
+// True when an undefined symbol carries one of the manifest's module prefixes.
+fn link_stage_bundle_needed(manifest: &str, undef: &str) -> bool:
+    if undef == "<probe-failed>":
+        return true
+    if undef.len() == 0:
+        return false
+    var start: i64 = 0
+    while start < manifest.len():
+        var end = start
+        while end < manifest.len() and manifest[end] != '\n':
+            end = end + 1
+        let line = manifest.slice(start, end)
+        if line.starts_with("prefix "):
+            let rest = line.slice(7, line.len())
+            var sp: i64 = 0
+            while sp < rest.len() and rest[sp] != ' ':
+                sp = sp + 1
+            if sp > 0 and link_stage_str_contains(undef, rest.slice(0, sp)):
+                return true
+        start = end + 1
+    false
+
+// Atomic extraction of an embedded blob (the runtime-object discipline: a
+// complete matching file is reused, else unique temp + rename).
+fn link_stage_extract_blob(data: &str, path: &str) -> bool:
+    if data.len() == 0:
+        return true
+    let existing = runtime_read_file(path)
+    if existing.len() == data.len() and existing == data:
+        return false
+    let tmp_path = path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.tmp"
+    if runtime_write_file(tmp_path, data) != 0:
+        return true
+    if runtime_rename(tmp_path, path) != 0:
+        runtime_remove_file(tmp_path)
+        let after = runtime_read_file(path)
+        if after.len() == data.len() and after == data:
+            return false
+        return true
+    false
+
+// The extracted objects of every embedded bundle the program needs, in index
+// order. A needed bundle whose abi-sha or target differs from this link's,
+// whose interface is not its manifest's, or that cannot be extracted, yields
+// the single marker LINK_BUNDLE_FAILED (already reported) so the caller
+// fails the plan.
+fn LINK_BUNDLE_FAILED -> str: "<bundle-failed>"
+
+// Module prefixes of the bundles `--link-bundle` already put on the link
+// (Compilation.load_link_bundles): an embedded copy of the same modules
+// must not join too.
+var link_stage_explicit_bundle_prefixes: List[str] = List.new()
+
+fn link_stage_add_explicit_bundle_prefixes(prefixes: &List[str]):
+    for prefixe in prefixes:
+        let prefix = prefixe
+        if not link_stage_explicit_bundle_prefixes.contains(prefix):
+            link_stage_explicit_bundle_prefixes.push(with_str_clone_ref(prefix))
+
+fn link_stage_bundle_provided_explicitly(manifest: &str) -> bool:
+    let prefixes = bundle_manifest_prefixes(manifest)
+    if prefixes.len() == 0:
+        return false
+    for prefixe in prefixes:
+        if not link_stage_explicit_bundle_prefixes.contains(prefixe):
+            return false
+    true
+
+// The runtime bundle beside this compiler's runtime objects, for a compiler
+// whose `rt` slot is empty: a `:dev` stage1 builds the bundle itself into
+// out/bootstrap/lib, and its lane links that object, as the release links
+// the embedded one, instead of compiling the runtime into every program
+// (#2485). The root is this generation's by link_stage_resolve_runtime_root;
+// the manifest must name this target.
+// The directory holding this generation's runtime bundle for this target,
+// judged by rt.manifest's `generation` line (the bundle precedes the root's
+// objects — they compile against its interface — so the root's .producer
+// cannot vouch for it): the build's named root, then the same candidates
+// link_stage_resolve_runtime_root probes. "" when none.
+fn link_stage_runtime_root_bundle_dir() -> str:
+    let candidates: List[str] = []
+    let explicit = runtime_getenv("WITH_RUNTIME_ROOT") ++ ""
+    if explicit.len() > 0:
+        candidates.push(explicit)
+    candidates.push(link_stage_artifact_root() ++ "/lib")
+    candidates.push(link_stage_artifact_root() ++ "/bootstrap-lib")
+    let compiler_dir = link_stage_compiler_dir()
+    candidates.push(compiler_dir ++ "/runtime")
+    candidates.push(compiler_dir ++ "/../lib")
+    for candidate in candidates:
+        // A cross target's bundle sits in the root's cross/<target>/
+        // (link_stage_runtime_variant_dir's shape).
+        let dir = if target_spec_is_native(): with_str_clone_ref(candidate) else: candidate ++ "/cross/" ++ target_spec_name()
+        let manifest = runtime_read_file(dir ++ "/rt.manifest")
+        if manifest.len() == 0:
+            continue
+        if link_stage_bundle_manifest_field(manifest, "target") != target_spec_resolved_name():
+            continue
+        if compiler_generation_is_stamped() and link_stage_bundle_manifest_field(manifest, "generation") != compiler_generation():
+            continue
+        return dir
+    ""
+
+// ── Import contracts (durable .wo, D138) ───────────────────────────────
+// The manifest of this compiler's runtime bundle for the active target: the
+// embedded `rt` slot when it is this generation's, else this generation's
+// bundle beside the runtime root ("" when neither exists). Its `provides`
+// rows are the contracts a corpus bundle's `import` rows are checked
+// against, at the bundle's build and at every link.
+fn link_stage_runtime_manifest_text() -> str:
+    for bi in 0..embedded_bundle_count():
+        if embedded_bundle_name(bi) != "rt" or not embedded_bundle_present(bi) or not embedded_bundle_for_this_target(bi):
+            continue
+        if link_stage_embedded_runtime_is_this_generation():
+            return embedded_bundle_manifest_text(bi)
+    let dir = link_stage_runtime_root_bundle_dir()
+    if dir.len() > 0:
+        return runtime_read_file(dir ++ "/rt.manifest")
+    ""
+
+// Why this compiler cannot link the bundle `name` whose manifest this is
+// ("" when it can): a runtime symbol the bundle imports that this
+// compiler's runtime no longer provides, or provides under another
+// contract. A bundle is rebuilt for that, and for nothing else about the
+// compiler (D138: a .wo is keyed by its corpus, its target, the ABI and the
+// contracts it imports — never by the compiler that built it). A bundle or
+// a runtime from before the contract rows is judged as before: it must be
+// this compiler's own generation.
+fn link_stage_bundle_import_drift(name: &str, manifest: &str) -> str:
+    let imports = bundle_manifest_rows(manifest, "import")
+    let provides = bundle_manifest_rows(link_stage_runtime_manifest_text(), "provides")
+    if imports.len() == 0 or provides.len() == 0:
+        if not compiler_generation_is_stamped():
+            return ""
+        let generation = link_stage_bundle_manifest_field(manifest, "generation")
+        if generation == compiler_generation():
+            return ""
+        let why = if imports.len() == 0: "records no import contracts" else: "cannot be checked against this compiler's runtime, whose manifest records no contracts"
+        return "error: bundle '" ++ name ++ "' " ++ why ++ ", and it was built by compiler generation " ++ (if generation.len() > 0: generation else: "(unrecorded)") ++ ", not this one (" ++ compiler_generation() ++ "); rebuild the bundle"
+    for import in imports:
+        let row = import
+        if bundle_row_field(row, 1) != "rt":
+            continue
+        let symbol = bundle_row_field(row, 0)
+        let wanted = bundle_row_field(row, 2)
+        let provided = bundle_provided_contract(provides, symbol)
+        if provided.len() == 0:
+            return "error: bundle '" ++ name ++ "' imports the runtime symbol `" ++ symbol ++ "`, which this compiler's runtime no longer provides; rebuild the bundle"
+        if provided != wanted:
+            return "error: bundle '" ++ name ++ "' calls the runtime symbol `" ++ symbol ++ "` as `" ++ symbol ++ wanted ++ "`, but this compiler's runtime declares it `" ++ symbol ++ provided ++ "`; rebuild the bundle"
+    ""
+
+fn link_stage_runtime_root_bundle_object() -> str:
+    let dir = link_stage_runtime_root_bundle_dir()
+    if dir.len() == 0 or runtime_read_file(dir ++ "/rt.o").len() == 0:
+        return ""
+    if link_stage_bundle_provided_explicitly(runtime_read_file(dir ++ "/rt.manifest")):
+        return ""
+    dir ++ "/rt.o"
+
+fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[str]:
+    let out: List[str] = []
+    let count = embedded_bundle_count()
+    if count == 0:
+        return out
+    let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
+    for bi in 0..count:
+        // #2131: a slot carried for another target is not this link's. One
+        // slot per bundle is this target's (embedded_bundle_for_this_target),
+        // so the runtime joins once.
+        if not embedded_bundle_for_this_target(bi):
+            continue
+        if not embedded_bundle_present(bi):
+            // An empty `rt` slot under the lane: the runtime root's bundle.
+            if embedded_bundle_name(bi) == "rt" and needs_runtime:
+                let from_root = link_stage_runtime_root_bundle_object()
+                if from_root.len() > 0:
+                    out.push(from_root)
+            continue
+        let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
+        let name = embedded_bundle_name(bi)
+        // D30 R3: the runtime bundle joins every link of a unit compiled
+        // against its interface (the lane) and no other: its symbols are the
+        // flat `with_*` names, not module prefixes, and the object world
+        // links the rt objects instead. Like them it must be this
+        // compiler's own generation (D132).
+        if name == "rt":
+            if not needs_runtime or link_stage_bundle_provided_explicitly(manifest):
+                continue
+            if not link_stage_embedded_runtime_is_this_generation():
+                with_eprint(link_stage_runtime_generation_refusal())
+                let failed: List[str] = []
+                failed.push(LINK_BUNDLE_FAILED())
+                return failed
+        else if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
+            continue
+        let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
+        if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
+            with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
+            let failed: List[str] = []
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        // A bundle is compiled for one platform; a cross link of a program
+        // that needs it has no bundle for its target (§18.5: never link
+        // native output into a cross binary).
+        let bundle_target = link_stage_bundle_manifest_field(manifest, "target")
+        if bundle_target != target_spec_resolved_name():
+            with_eprint("error: embedded bundle '" ++ name ++ "' was built for target " ++ bundle_target ++ " but this link targets " ++ target_spec_resolved_name() ++ " (this compiler embeds no " ++ name ++ " bundle for that target)")
+            let failed: List[str] = []
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        // D138: every runtime symbol the bundle imports is provided under
+        // the contract it was compiled against.
+        let drift = link_stage_bundle_import_drift(name, manifest)
+        if drift.len() > 0:
+            with_eprint(drift)
+            let failed: List[str] = []
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        // D39 pairing: the embedded interface is the one the object was
+        // built with, or the binary's embedded bundles are corrupt.
+        let manifest_wi_sha = link_stage_bundle_manifest_field(manifest, "interface-sha")
+        let embedded_wi_sha = bundle_text_sha256(embedded_bundle_interface_text(bi))
+        if manifest_wi_sha.len() == 0 or embedded_wi_sha != manifest_wi_sha:
+            with_eprint("error: embedded bundle '" ++ name ++ "': its interface (sha256 " ++ embedded_wi_sha ++ ") is not the one its manifest was built with (" ++ manifest_wi_sha ++ "); this compiler's embedded bundles are corrupt")
+            let failed: List[str] = []
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        // The extracted object is named by the bundle it is (its interface
+        // sha): every compiler process shares this directory, two generations
+        // included (the drop audit runs the seed beside the candidate), and one
+        // path for both handed a link the other generation's object (#761's
+        // mixed-generation class; on one layout the module hashes agreed and
+        // hid it).
+        let obj_path = tmp_dir ++ "/wo_" ++ name ++ "_" ++ manifest_wi_sha.slice(0, 16) ++ ".o"
+        let data = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
+        if runtime_mkdir_p(tmp_dir) != 0 or link_stage_extract_blob(data, obj_path):
+            with_eprint("error: could not extract embedded bundle '" ++ name ++ "' to " ++ obj_path)
+            let failed: List[str] = []
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        out.push(obj_path)
+    out
+
+// The compiler's own directory: argv[0] is a bare `with` when it runs from
+// PATH, whose dirname is the cwd, not where the compiler lives.
+fn link_stage_compiler_dir() -> str:
+    let exe = with_self_exe()
+    if exe.len() > 0: link_stage_dirname(exe) else: "."
+
+fn link_stage_compiler_runtime_dir(): link_stage_compiler_dir() ++ "/runtime"
+
+// D30, #1815: a link takes runtime and bridge objects of this compiler's
+// generation only (compiler.AbiStamp). Anything else is #761's corruption
+// class: the seed-built runtime linked into stage1-compiled stage2 passed
+// every check because the build's WITH_OUT_DIR used to vouch for out/lib and
+// out/bootstrap-lib whoever had built them. The build now names the root a
+// stage link must use (WITH_RUNTIME_ROOT) and every object set it compiles
+// records its producer's generation in `<dir>/.producer`, so the say-so is
+// checked, not trusted. "" when the build's root is not this generation's:
+// the link fails (link_stage_find_runtime_object_path says why) and never
+// falls back to another directory or to the embedded objects.
+fn link_stage_resolve_runtime_root() -> str:
+    let explicit = runtime_getenv("WITH_RUNTIME_ROOT") ++ ""
+    if explicit.len() > 0:
+        if not link_stage_named_runtime_root_is_this_generation(explicit):
+            return ""
+        return explicit
+    let compiler_dir = link_stage_compiler_dir()
+    let candidates: List[str] = []
+    candidates.push(link_stage_artifact_root() ++ "/lib")
+    // Seed-built bootstrap runtime: the seed's generation, so only a seed
+    // (the build's driver) takes it.
+    candidates.push(link_stage_artifact_root() ++ "/bootstrap-lib")
+    // <compiler_dir>/runtime/ (symlink to ../lib in out/bin/)
+    candidates.push(compiler_dir ++ "/runtime")
+    // <compiler_dir>/../lib/ (direct FHS-style path): out/bootstrap/lib is
+    // the runtime stage1 compiles for the programs it links (`:dev`).
+    candidates.push(compiler_dir ++ "/../lib")
+    for candidate in candidates:
+        let dir = candidate
+        let probe = dir ++ "/cimport_stubs.o"
+        if runtime_read_file(probe).len() == 0:
+            continue
+        if link_stage_runtime_dir_is_this_generation(dir):
+            return with_str_clone_ref(dir)
+    // Fall back to compiler-relative runtime dir.
+    compiler_dir ++ "/runtime"
+
+// Whether a root the build names (WITH_RUNTIME_ROOT) may be linked: its
+// recorded producer is this compiler's generation. Named, it is checked,
+// never vouched for by bytes; a set whose .producer is not yet written is
+// not yet a root. The build asks this same question before it names one
+// (main.with build_runner_link_root), so it never names a root the link then
+// refuses (#1899: the runner named a seed-compiled out/bootstrap-lib whose
+// rt_core.o matched, before its .producer existed, and every action of the
+// run fell back to comptime evaluation).
+fn link_stage_named_runtime_root_is_this_generation(dir: &str) -> bool:
+    not compiler_generation_is_stamped() or link_stage_runtime_dir_producer(dir) == compiler_generation() or link_stage_runtime_dir_matches_embedded(dir)
+
+// A runtime directory whose objects are byte for byte the ones this compiler
+// embeds is this compiler's runtime, whichever generation compiled it: a link
+// from it is the link from the embedded objects (D30: a cache hit is byte
+// identical to the in-unit result). A generation is the whole src/ and rt/
+// tree, so every compiler edit made the last build's runtime another
+// generation's and refused it, though recompiling gave the same bytes. Only a
+// compiler whose embedded runtime is its own generation's can vouch this way
+// (stage1 embeds the seed's), every host runtime object the directory holds
+// is compared, and the bridges, which nothing embeds, still need the
+// generation (link_stage_find_llvm_static_bridge).
+fn link_stage_runtime_dir_matches_embedded(dir: &str) -> bool: link_stage_runtime_dir_embedded_mismatch(dir).len() == 0
+
+// Why `dir`'s runtime objects are not the ones this compiler embeds, or ""
+// when they are: the refusal names the object, so a mismatch on one host is
+// read from the error, not reconstructed (#2788).
+fn link_stage_runtime_dir_embedded_mismatch(dir: &str) -> str:
+    if not link_stage_embedded_runtime_is_this_generation():
+        return f"this compiler's embedded runtime is generation {compiler_runtime_generation()}, not its own"
+    var compared = 0
+    // The runtime bundle: the root's rt.o is the bytes the `rt` slot holds.
+    for bi in 0..embedded_bundle_count():
+        if embedded_bundle_name(bi) != "rt" or not embedded_bundle_present(bi) or not embedded_bundle_for_this_target(bi):
+            continue
+        let on_disk = runtime_read_file(dir ++ "/rt.o")
+        if on_disk.len() == 0: continue
+        let embedded = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
+        if embedded.len() != on_disk.len() or embedded != on_disk:
+            return f"rt.o differs from the embedded rt slot ({on_disk.len()} bytes on disk, {embedded.len()} embedded)"
+        compared += 1
+    let names = ["cimport_stubs.o", "fiber_asm.o"]
+    for name in names:
+        let on_disk = runtime_read_file(dir ++ "/" ++ name)
+        if on_disk.len() == 0: continue
+        let embedded = link_stage_embedded_runtime_object(name)
+        if embedded.len() != on_disk.len() or embedded != on_disk:
+            return f"{name} differs from the embedded one ({on_disk.len()} bytes on disk, {embedded.len()} embedded)"
+        compared += 1
+    if compared == 0: "it holds none of rt.o, cimport_stubs.o, fiber_asm.o" else: ""
+
+// The generation that compiled a runtime object set, as the build recorded it
+// (build/compiler.with run_write_runtime_producer_action); "" when none is.
+fn link_stage_runtime_dir_producer(dir: &str) -> str:
+    link_stage_read_file_trimmed(dir ++ "/.producer")
+
+// A directory is this compiler's runtime when its .producer names this
+// compiler's generation, or when its objects are the ones this compiler
+// embeds (link_stage_runtime_dir_matches_embedded), with or without a
+// .producer.
+fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
+    if compiler_generation_is_stamped():
+        return link_stage_runtime_dir_producer(dir) == compiler_generation() or link_stage_runtime_dir_matches_embedded(dir)
+    let embedded = link_stage_embedded_runtime_object("cimport_stubs.o")
+    // A binary that carries no runtime can only link from disk.
+    if embedded.len() == 0:
+        return true
+    let on_disk = runtime_read_file(dir ++ "/cimport_stubs.o")
+    on_disk.len() == embedded.len() and on_disk == embedded
+
+fn link_stage_embedded_runtime_is_this_generation() -> bool:
+    not compiler_generation_is_stamped() or compiler_runtime_generation() == compiler_generation()
+
+// Why a link has no runtime root of this compiler's generation (#1815).
+fn link_stage_runtime_generation_refusal() -> str:
+    let explicit = runtime_getenv("WITH_RUNTIME_ROOT") ++ ""
+    if explicit.len() > 0:
+        let producer = link_stage_runtime_dir_producer(explicit)
+        let recorded = if producer.len() > 0: producer else: "none recorded (no .producer)"
+        return "error: WITH_RUNTIME_ROOT=" ++ explicit ++ " holds runtime objects of compiler generation " ++ recorded ++ ", not this compiler's (" ++ compiler_generation() ++ "), and they are not the objects this compiler embeds (" ++ link_stage_runtime_dir_embedded_mismatch(explicit) ++ "); linking them would mix compiler generations (D30, #1815). Compile that root with this compiler."
+    "error: no runtime objects of this compiler's generation (" ++ compiler_generation() ++ ") to link: its embedded runtime is generation " ++ compiler_runtime_generation() ++ " (a stage1 carries the seed's) and no runtime directory holds this generation's; run `with build :dev`, which compiles out/bootstrap/lib with stage1 (D30, #1815)"
+
+// Directory holding the link inputs built FOR the active target:
+// the runtime root itself for native, its cross/<target>/ subdir
+// for a cross target (bridge objects, embedded objects, lld rsp).
+fn link_stage_runtime_variant_dir() -> str:
+    let root = link_stage_resolve_runtime_root()
+    if target_spec_is_native():
+        return root
+    root ++ "/cross/" ++ target_spec_name()
+
+// A root whose LLVM bridge this compiler may link: the bridges are compiled
+// by the root's producer and nothing embeds them, so byte-identical runtime
+// objects (link_stage_runtime_dir_matches_embedded) do not vouch for them —
+// the producer must be this generation. The build asks this before naming
+// the action runner's root (main.with build_runner_link_root): a stage2 whose
+// embedded runtime matched the seed's out/bootstrap-lib byte for byte was
+// handed that root and then refused its bridge ("missing LLVM static
+// bridge"), and every action fell back to comptime evaluation.
+fn link_stage_runtime_root_links_bridge(dir: &str) -> bool:
+    not compiler_generation_is_stamped() or link_stage_runtime_dir_producer(dir) == compiler_generation()
+
+fn link_stage_find_llvm_static_bridge() -> str:
+    let root = link_stage_resolve_runtime_root()
+    // The bridges' wl_* functions are this generation's ABI too (#1815).
+    if root.len() == 0:
+        return ""
+    if not link_stage_runtime_root_links_bridge(root):
+        // A root with a producer says whose bridge it holds; the fallback
+        // root of a cold worktree has none and no bridge either, and the
+        // caller's "missing LLVM static bridge" says all there is.
+        if link_stage_runtime_dir_producer(root).len() > 0:
+            with_eprint("error: runtime root " ++ root ++ " holds the runtime objects this compiler embeds, but its LLVM bridge was compiled by generation " ++ link_stage_runtime_dir_producer(root) ++ ", not this compiler's (" ++ compiler_generation() ++ "), and nothing embeds a bridge: a link of the compiler's modules needs a root this generation produced (D30, #1815)")
+        return ""
+    let variant = link_stage_runtime_variant_dir()
+    let bridge_o = variant ++ "/llvm_bridge.o"
+    let rsp = variant ++ "/llvm_ld.rsp"
+    let ld_file = root ++ "/llvm_ld"
+    if runtime_read_file(bridge_o).len() > 0 and runtime_read_file(rsp).len() > 0 and runtime_read_file(ld_file).len() > 0:
+        return bridge_o
+    ""
+
+fn link_stage_read_file_trimmed(path: &str) -> str:
+    let content = runtime_read_file(path)
+    if content.len() == 0:
+        return ""
+    // Trim trailing whitespace: CR and LF (a CRLF-authored metadata file on
+    // Windows must not leave a stray \r in the linker path — CreateProcessW
+    // cannot launch "…lld-link.exe\r"), plus spaces/tabs.
+    var end = content.len()
+    while end > 0:
+        let b = content[(end - 1)]
+        if b == 10 or b == 13 or b == 32 or b == 9:
+            end = end - 1
+        else:
+            break
+    content.slice(0, end as i64)
+
+fn link_stage_artifact_root() -> str:
+    let env_root = runtime_getenv("WITH_OUT_DIR")
+    if env_root.len() > 0:
+        return env_root
+    "out"
+
+fn link_stage_find_runtime_object_path(name: &str) -> str:
+    let root = link_stage_resolve_runtime_root()
+    if root.len() == 0:
+        with_eprint(link_stage_runtime_generation_refusal())
+        return ""
+    // Cross targets only ever link runtime objects built for the
+    // target; the embedded objects are host-built and never a valid
+    // fallback here (§18.5: fail loudly, never link native output).
+    if not target_spec_is_native():
+        let cross_path = root ++ "/cross/" ++ target_spec_name() ++ "/" ++ name
+        if runtime_read_file(cross_path).len() > 0:
+            return cross_path
+        // #2703: say what is true. A release carries every target's runtime
+        // bundle and engine bundles (a cross check works anywhere), but a
+        // cross link also needs the target's own objects and C runtime, which
+        // only a source checkout's cross runtime provides today (#1915).
+        with_eprint("error: missing " ++ target_spec_name() ++ " runtime object: " ++ cross_path ++ " (a " ++ target_spec_name() ++ " link needs the target's runtime objects: build them in a source checkout with `with build :cross-rt` for linux_x86_64, `:cross-rt-arm`, `:cross-rt-windows` or `:cross-rt-wasm`; a compiler does not carry them yet, #1915)")
+        return ""
+    let p = root ++ "/" ++ name
+    // The fallback root (compiler_dir/runtime) was not a candidate that
+    // passed: only a root this generation produced, or one whose objects
+    // are the ones this compiler embeds, is linked. A root with no
+    // .producer is no exception (#2491: a stale, producer-less
+    // <compiler_dir>/runtime of 2026-08 was linked by a current compiler
+    // and every current runtime symbol came up undefined).
+    if link_stage_runtime_dir_is_this_generation(root) and runtime_read_file(p).len() > 0:
+        return p
+    // Fall back to embedded runtime objects (self-contained binary) — when
+    // they are this compiler's generation (#1815).
+    if not link_stage_embedded_runtime_is_this_generation():
+        with_eprint(link_stage_runtime_generation_refusal())
+        return ""
+    let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
+    if runtime_mkdir_p(tmp_dir) != 0:
+        return ""
+    // Named by this compiler's generation: the directory is shared by every
+    // compiler process (see the bundle extraction above).
+    let generation = compiler_generation()
+    let generation_key = if generation.len() > 16: generation.slice(0, 16) else: generation
+    let tmp_path = tmp_dir ++ "/" ++ generation_key ++ "_" ++ name
+    if link_stage_extract_runtime_obj(name, tmp_path) == false:
+        return tmp_path
+    ""
+
+fn link_stage_make_archive(obj_path: &str) -> str:
+    // wasm-ld resolves plain objects; the runtime objects carry no
+    // overlapping definitions, so nothing needs archive semantics there.
+    if runtime_sysinfo_os() == "Windows" or target_spec_active_kind() == 5 or target_spec_active_kind() == 6 or target_spec_is_wasm():
+        return with_str_clone_ref(obj_path)
+    // Wrap a .o file in a .a archive so the linker treats it as a library
+    // (only pulling in symbols that aren't already defined).
+    // #2016: the archive is named by the object's content and kept: the
+    // program's debug map records its path, so a name made of the pid and
+    // the clock made every link of the same program different bytes. A
+    // concurrent link of the same object makes the same file; each writes
+    // its own and renames it into place.
+    // `.ar-<hex>`, never `.<digit>`: link_stage_is_temp_archive_path takes
+    // `.o.<digit>` for a per-link temporary and removes it after the link.
+    let ar_path = obj_path ++ ".ar-" ++ bundle_text_sha256(runtime_read_file(obj_path)).slice(0, 16) ++ ".a"
+    if runtime_file_exists(ar_path) != 0:
+        return ar_path
+    let tmp_path = obj_path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.a"
+    let made = link_stage_make_archive_to_path(obj_path, tmp_path)
+    if made.len() == 0:
+        return ""
+    if runtime_rename(made, ar_path) != 0:
+        let _remove = runtime_remove_file(made)
+        return ""
+    ar_path
+
+fn link_stage_make_archive_to_path(obj_path: &str, ar_path: &str) -> str:
+    let members: List[str] = []
+    members.push(with_str_clone_ref(obj_path))
+    let rc = create_static_archive(ar_path, members)
+    if rc == 0:
+        return with_str_clone_ref(ar_path)
+    ""
+
+fn link_stage_should_use_rt_core_from_undef(undef: &str) -> bool:
+    // Use the libc-free runtime for user programs that don't need LLVM bridge
+    // or c_import. The compiler itself needs LLVM/libclang symbols and always
+    // uses the libc-backed cimport_stubs.o runtime.
+    if undef == "<probe-failed>":
+        return false
+    // If it needs LLVM/libclang, it's the compiler — use libc runtime.
+    if link_stage_undefined_symbols_need_llvm_bridge(undef):
+        return false
+    // If it uses c_import symbols or libc functions directly, use libc runtime
+    if link_stage_undef_contains_symbol(undef, "fopen"):
+        return false
+    if link_stage_undef_contains_symbol(undef, "fwrite"):
+        return false
+    if link_stage_undef_contains_symbol(undef, "printf"):
+        return false
+    if link_stage_undef_contains_symbol(undef, "malloc"):
+        return false
+    if link_stage_undef_contains_symbol(undef, "fclose"):
+        return false
+    // Check if it needs with_* symbols (which we provide in rt_core)
+    if link_stage_undef_contains_symbol(undef, "with_"):
+        return true
+    false
+
+fn link_stage_undefined_symbols_need_llvm_bridge(undef: &str) -> bool:
+    link_stage_undef_contains_symbol(undef, "wl_") or
+        link_stage_undef_contains_symbol(undef, "LLVM") or
+        link_stage_undef_contains_symbol(undef, "clang_")
+
+fn link_stage_dirname(path: &str) -> str:
+    var last_slash = -1
+    for i in 0..path.len():
+        if path[i] == 47 or path[i] == 92: // '/' or '\'
+            last_slash = i as i32
+    if last_slash < 0:
+        return "."
+    path.slice(0, last_slash as i64)
+
+fn link_stage_source_stem(source_path: &str) -> str:
+    var last_slash = -1
+    for i in 0..source_path.len():
+        if source_path[i] == 47 or source_path[i] == 92: // '/' or '\'
+            last_slash = i as i32
+    let base = if last_slash >= 0:
+        source_path.slice((last_slash + 1) as i64, source_path.len() as i64)
+    else:
+        with_str_clone_ref(source_path)
+    // The name up to its last dot: `hello.potato` is `hello`, `a.b.with` is
+    // `a.b`. A name with no dot is the whole name, and a leading dot is not
+    // an extension separator (`.hidden` stays `.hidden`).
+    var last_dot = -1
+    for i in 1..base.len():
+        if base[i] == '.': last_dot = i as i32
+    if last_dot > 0: base.slice(0, last_dot as i64) else: base
+
+fn link_stage_sanitize_relative_dir(path: &str) -> str:
+    var out = ""
+    var segment_start = 0
+    var i = 0
+    while i <= path.len():
+        let at_end = i == path.len()
+        let ch = if at_end: 47 else: path[i]
+        if ch == 47 or ch == 92:
+            if i > segment_start:
+                let segment = path.slice(segment_start as i64, i as i64)
+                if segment != ".":
+                    if out.len() > 0:
+                        out = out ++ "/"
+                    if segment == "..":
+                        out = out ++ "__up__"
+                    else:
+                        // A Windows source carries a drive-letter segment ("C:")
+                        // whose colon is illegal in a path component; left intact
+                        // it yields an uncreatable artifact dir (out/C:/wt/...) and
+                        // mkdir fails before the program runs. Colons never appear
+                        // in this compiler's own source paths, so stripping them is
+                        // a no-op off Windows — fixpoint output stays byte-identical.
+                        out = out ++ segment.replace(":", "")
+            segment_start = i + 1
+        i = i + 1
+    out
+
+fn link_stage_output_dir_for_source(source_path: &str) -> str:
+    let artifact_root = link_stage_artifact_root()
+    let dir = link_stage_sanitize_relative_dir(link_stage_dirname(source_path))
+    if dir.len() == 0:
+        return artifact_root
+    artifact_root ++ "/" ++ dir
+
+fn link_stage_output_path_for_source(source_path: &str) -> str:
+    let base = link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
+    if target_spec_is_wasm():
+        return base ++ ".wasm"
+    if runtime_sysinfo_os() == "Windows":
+        return base ++ ".exe"
+    base
+
+fn link_stage_link_object_to_binary(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], needs_async_runtime: bool) -> bool:
+    let link_args: List[str] = []
+    link_stage_link_object_to_binary_result(obj_path, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime).ok
+
+fn link_stage_link_object_to_binary_result(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStageResult:
+    let no_extra_objects: List[str] = []
+    link_stage_result_for_plan(link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime))
+
+fn link_stage_link_object_to_binary_plan(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
+    let no_extra_objects: List[str] = []
+    link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime)
+
+fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_objects: &List[str], bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
+    let extras: List[str] = []
+    // #650 codegen units: sibling .o files are full linker inputs like the
+    // primary object (objects always load wholly, so position is irrelevant).
+    for extra_object in extra_objects:
+        extras.push(with_str_clone_ref(extra_object))
+    for link_search_path in link_search_paths:
+        extras.push("-L" ++ link_search_path)
+    var undef = link_stage_undefined_symbols_for_object(obj_path)
+    // Runtime-need detection must see undefined symbols from every unit, not
+    // just the primary object. A failed probe stays the pure sentinel so the
+    // conservative "<probe-failed>" equality checks keep firing.
+    for extra_object in extra_objects:
+        if undef == "<probe-failed>":
+            break
+        let unit_undef = link_stage_undefined_symbols_for_object(extra_object)
+        if unit_undef == "<probe-failed>":
+            undef = "<probe-failed>"
+        else:
+            undef = undef ++ unit_undef
+    var needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_undefined_symbols_need_fiber_runtime(undef)
+    // WebAssembly has no stack switching, so the fiber core (context-switch
+    // assembly plus guard-page signal handling) cannot exist there yet. A
+    // wasm program links fiber_stubs.o: it answers every lifecycle
+    // reference a non-spawning program makes, and a program that really
+    // spawns fails at wasm-ld with the undefined with_fiber_spawn /
+    // with_channel_* symbols the core alone defines. Neither the symbol
+    // probe nor the front end's requires_async_runtime can decide it
+    // earlier: both fire for any unit that merely contains async bodies
+    // (the prelude always does).
+    if target_spec_is_wasm():
+        needs_fiber_runtime = 0
+    // D38: embedded .wo bundles join on demand — an undefined symbol carrying
+    // one of a bundle's module prefixes selects it; its abi-sha must equal this
+    // compiler's (never a silent mixed-ABI link, #761). The program's own
+    // objects carry every such reference: a facade (std.regex) compiles in
+    // the unit and calls the corpus by its module link names.
+    let bundle_objects = link_stage_select_embedded_bundles(undef, link_stage_undefined_symbols_need_helpers_runtime(undef))
+    if bundle_objects.len() == 1 and bundle_objects[0] == LINK_BUNDLE_FAILED():
+        return link_stage_plan_fail()
+    var rt_bundle_joined = false
+    for bundle_object in bundle_objects:
+        // The embedded slot's extraction, or the runtime root's own rt.o.
+        // The extracted runtime bundle is `wo_rt_<interface sha>.o` (named by
+        // the bundle it is); a runtime root's is `rt.o`.
+        let bundle_name = link_stage_basename(bundle_object)
+        if (bundle_name.starts_with("wo_rt_") and bundle_name.ends_with(".o")) or bundle_name == "rt.o":
+            rt_bundle_joined = true
+        extras.push(with_str_clone_ref(bundle_object))
+    if needs_fiber_runtime != 0 or (rt_bundle_joined and not target_spec_is_wasm()):
+        // Runtime emitted in-unit: the asm-defined with_fiber_* symbols
+        // still trip the predicate, but only fiber_asm.o may link — the
+        // .w-derived trio would duplicate the in-unit definitions. The
+        // runtime bundle (D30 R3) is the whole runtime, fiber core
+        // included: its own reference to with_fiber_switch is not among the
+        // program's undefined symbols, so fiber_asm.o joins with it.
+        let fa_path = link_stage_find_runtime_object_path("fiber_asm.o")
+        if fa_path.len() == 0:
+            with_eprint("error: missing runtime/fiber_asm.o")
+            return link_stage_plan_fail()
+        extras.push(fa_path)
+
+    // D30 step 4: the runtime is the bundle that joined above (the program's
+    // own objects and the bundle hold every with_*/rt_* definition; no
+    // .w-derived runtime object links any more). A unit that reaches libc
+    // or c_import symbols takes the on-demand cimport_stubs archive, which
+    // fills in the C-only symbols; nothing else joins.
+    if link_stage_undefined_symbols_need_helpers_runtime(undef) and not link_stage_should_use_rt_core_from_undef(undef):
+        let stubs_path = link_stage_find_runtime_object_path("cimport_stubs.o")
+        if stubs_path.len() > 0:
+            let stubs_ar = link_stage_make_archive(stubs_path)
+            extras.push(if stubs_ar.len() > 0: stubs_ar else: stubs_path)
+
+    if link_stage_undefined_symbols_need_llvm_bridge(undef):
+        let static_bridge = link_stage_find_llvm_static_bridge()
+        if static_bridge.len() > 0:
+            // Static LLVM linking: use llvm_bridge.o + LLVM static libs.
+            // All target-built inputs come from the variant dir (the
+            // cross/<target>/ subdir on a cross link); only the linker
+            // path metadata is the host's.
+            let root = link_stage_resolve_runtime_root()
+            let variant = link_stage_runtime_variant_dir()
+            let rsp_path = variant ++ "/llvm_ld.rsp"
+            let ld_path = link_stage_recorded_path(root, link_stage_read_file_trimmed(root ++ "/llvm_ld"))
+            extras.push(static_bridge)
+            // The build supplies the stage's embedding object independently
+            // of the bridge/runtime root: stage2 needs populated bundle blobs
+            // while its bootstrap root still carries stage1's empty slots.
+            let embedded_override = runtime_getenv("WITH_COMPILER_EMBEDDED_OBJECT")
+            let embedded_path = if embedded_override.len() > 0: embedded_override else: variant ++ "/embedded_objects.o"
+            if runtime_read_file(embedded_path).len() == 0:
+                with_eprint("error: missing or empty compiler embedding object: " ++ embedded_path)
+                return link_stage_plan_fail()
+            extras.push(embedded_path)
+            // Include clang bridge for c_import support
+            let clang_bridge_path = variant ++ "/clang_bridge.o"
+            if runtime_read_file(clang_bridge_path).len() > 0:
+                extras.push(clang_bridge_path)
+            extras.push("@" ++ rsp_path)
+            let all_link_args = link_args
+            return link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, all_link_args, ld_path)
+        with_eprint("error: missing LLVM static bridge (need llvm_bridge.o + llvm_ld.rsp + llvm_ld)")
+        return link_stage_plan_fail()
+
+    if extras.len() == 0 and link_libs.len() == 0 and link_args.len() == 0:
+        return link_stage_link_with_extras_libs_args_plan(obj_path, bin_path, extras, link_libs, link_args)
+    link_stage_link_with_extras_libs_args_plan(obj_path, bin_path, extras, link_libs, link_args)

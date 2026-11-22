@@ -263,7 +263,7 @@ libarchive - C library and command-line tools for reading and writing tar, cpio,
 The pattern for every library is the same:
 
 ```
-1. with migrate libfoo.c --no-c-exports -o lib/std/foo/engine.w
-2. Write lib/std/foo.w — idiomatic With API wrapping engine internals
+1. with migrate libfoo.c --no-c-exports -o lib/std/foo/engine.with
+2. Write lib/std/foo.with — idiomatic With API wrapping engine internals
 3. (Rare) Add compiler support for syntax sugar
 ```

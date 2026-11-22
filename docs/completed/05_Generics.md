@@ -7,8 +7,8 @@ codegen. Codegen maintains ~2000 lines of parallel type-tracking
 workarounds (cache maps, local type maps, LLVM-based reverse
 lookups) that re-derive information sema should provide.
 
-Scope: `src/Sema.w` (type table, type resolution, compatibility),
-`src/Codegen.w` (delete workarounds, update consumers). One phase
+Scope: `src/Sema.with` (type table, type resolution, compatibility),
+`src/Codegen.with` (delete workarounds, update consumers). One phase
 at a time. `make build` after each change. `make fixpoint` after
 each phase.
 
@@ -23,7 +23,7 @@ must preserve fixpoint (stage2 == stage3). Work incrementally.
 Add a new TypeKind that represents an instantiated generic type,
 e.g. `Vec[i32]` as `GenericInst(base=Vec, args=[i32])`.
 
-**File:** `src/Sema.w` (lines 23-41 for TypeKind constants,
+**File:** `src/Sema.with` (lines 23-41 for TypeKind constants,
 lines 58-68 for type table, lines 742-748 for add_type)
 
 ### Tasks
@@ -50,7 +50,7 @@ lines 58-68 for type table, lines 742-748 for add_type)
 `Vec[i32]` mentioned 10 times must produce 1 TypeId. The cache
 maps `(base_sym, arg_tids...)` to an existing TypeId.
 
-**File:** `src/Sema.w`
+**File:** `src/Sema.with`
 
 ### Tasks
 
@@ -77,13 +77,13 @@ back without calling resolve_type_expr/add_type on the aliased Sema.
 Replace the `return 0` stub with actual generic type resolution.
 This is the core change.
 
-**File:** `src/Sema.w` (lines 2066-2068)
+**File:** `src/Sema.with` (lines 2066-2068)
 
 ### Tasks
 
 - [x] Read the NK_TYPE_GENERIC AST node layout:
       d0 = base type name sym, d1 = extra_start, d2 = arg_count
-      (Parser.w lines 3270-3282)
+      (Parser.with lines 3270-3282)
 - [x] In resolve_type_expr, replace the NK_TYPE_GENERIC handler:
       Implemented via `fn Sema.resolve_generic_type(node) -> i32`.
       Resolves all type args into local variables (gi_arg0..gi_arg3,
@@ -108,7 +108,7 @@ This is the core change.
 `types_compatible` and `types_compatible_fast` must handle the new
 TypeKind so that `Vec[i32]` != `Vec[str]`.
 
-**File:** `src/Sema.w` (lines 4557-4670)
+**File:** `src/Sema.with` (lines 4557-4670)
 
 ### Tasks
 
@@ -125,10 +125,10 @@ TypeKind so that `Vec[i32]` != `Vec[str]`.
       handles TY_GENERIC_INST vs TY_ENUM.
 - [x] ~~Add `fn Sema.generic_inst_types_compatible`~~ — logic inlined
       in both `types_compatible_fast` and `types_compatible`
-- [x] Write test `test/cases/err_generic_type_mismatch.w`
+- [x] Write test `test/cases/err_generic_type_mismatch.with`
 - [x] Enable strict arg comparison in `types_compatible_fast` —
-      fixed root cause: extern fn declarations in lib/std (iter.w,
-      process.w, string.w) changed from `&Vec[T]` to `*void` to match
+      fixed root cause: extern fn declarations in lib/std (iter.with,
+      process.with, string.with) changed from `&Vec[T]` to `*void` to match
       the actual C function signatures (`with_vec *` = void pointer)
 - [x] `make build`
 - [x] Run test — PASS
@@ -141,7 +141,7 @@ A single function that replaces type parameters with concrete types.
 Given `Option[T]` and the binding `T=i32`, produce `Option[i32]`.
 Used by trait resolution, method lookup, and for-loop desugaring.
 
-**File:** `src/Sema.w`
+**File:** `src/Sema.with`
 
 ### Tasks
 
@@ -165,7 +165,7 @@ Used by trait resolution, method lookup, and for-loop desugaring.
 Sema's expression checking must propagate TY_GENERIC_INST through
 assignments, function calls, field access, and method calls.
 
-**File:** `src/Sema.w`
+**File:** `src/Sema.with`
 
 ### Tasks
 
@@ -200,7 +200,7 @@ Instead of re-deriving generic types from LLVM values, codegen
 reads TypeId annotations from sema. This phase adds the new path
 alongside the existing workarounds (both paths active).
 
-**File:** `src/Codegen.w`
+**File:** `src/Codegen.with`
 
 ### Tasks
 
@@ -225,7 +225,7 @@ alongside the existing workarounds (both paths active).
 instantiated generic types. `impl Trait for Vec[i32]` must be
 distinguishable from `impl Trait for Vec[str]`.
 
-**File:** `src/Sema.w` (lines 1508-1606, 3856-3895)
+**File:** `src/Sema.with` (lines 1508-1606, 3856-3895)
 
 ### Tasks
 
@@ -237,7 +237,7 @@ distinguishable from `impl Trait for Vec[str]`.
       against actual argument types. Works for user-defined methods.
 - [x] Add builtin generic method arg checking for Vec.push,
       HashMap.insert — checks arg types against generic instance type
-      args without fn_decl nodes. Enables `err_vec_type_mismatch.w`.
+      args without fn_decl nodes. Enables `err_vec_type_mismatch.with`.
 - [x] In `collect_impl_decl`: when impl target is a generic type
       (e.g., `impl Display for Vec[i32]`), store TY_GENERIC_INST
       TypeId as the impl key, not just the base type symbol.
@@ -271,7 +271,7 @@ Once sema provides all generic type information and codegen reads
 it, delete the parallel tracking infrastructure. Do this one
 group at a time, verifying fixpoint after each deletion.
 
-**File:** `src/Codegen.w`
+**File:** `src/Codegen.with`
 
 ### 9.1 Delete Vec cache workarounds
 
@@ -369,12 +369,12 @@ Currently only `VecIter_i32` exists as a concrete type.
 - [x] Generic struct method dispatch: `mono_struct_base` fallback in
       `gen_method_call` allows methods defined on base generic struct
       to be called on monomorphized instances. Test:
-      `test/cases/behav_generic_struct_method.w`
+      `test/cases/behav_generic_struct_method.with`
 - [x] For-loop Vec[T] iteration already works generically via
       `gen_for_vec` (uses `with_vec_get_ptr` + `infer_vec_elem_type`)
-- [x] Test `test/cases/behav_vec_iter_generic.w` passes (added earlier)
+- [x] Test `test/cases/behav_vec_iter_generic.with` passes (added earlier)
 - [x] Replace `type VecIter_i32` with generic `type VecIter[T]`
-      in lib/std/collections.w. VecIter.next() is a codegen intrinsic
+      in lib/std/collections.with. VecIter.next() is a codegen intrinsic
       that uses mono_struct type param bindings to determine elem type.
       Vec.iter() codegen intrinsic creates VecIter[T] from Vec[T].
 - [x] `make build && make fixpoint` — 236/236 tests pass
@@ -388,9 +388,9 @@ Generic trait infrastructure wired through parser, sema, and codegen.
 - [x] Fix parser: store trait type args in impl blocks (`impl_trait_type_args`)
 - [x] Bind trait type params during impl method compilation
 - [x] Update trait stubs: `Iter[T].next() -> Option[T]`, `IntoIter[T].iter() -> VecIter[T]`
-- [x] Implement `impl[T] IntoIter[T] for Vec[T]` in `lib/std/traits.w`
+- [x] Implement `impl[T] IntoIter[T] for Vec[T]` in `lib/std/traits.with`
 - [x] VecIter-based for-loop dispatch in `gen_for` → `gen_for_veciter`
-- [x] Write tests: `behav_for_veciter.w`, `behav_intoiter_vec.w`
+- [x] Write tests: `behav_for_veciter.with`, `behav_intoiter_vec.with`
 - [x] `make build && make fixpoint` — 241/241 tests pass
 
 ### 10.3 Untyped Vec.new() inference
@@ -405,23 +405,23 @@ Generic trait infrastructure wired through parser, sema, and codegen.
       context. Codegen detects this pattern, resolves the element
       type via `resolve_named_type`, and creates the properly typed Vec.
       Works for all element types (i32, str, user structs).
-- [x] Write test `test/cases/behav_vec_type_infer.w` — tests
+- [x] Write test `test/cases/behav_vec_type_infer.with` — tests
       Vec[i32].new() and Vec[str].new() without annotations.
 - [x] `make build && make fixpoint` — 227/227 tests pass
 
 ### 10.4 Associated type bound checking
 
-- [x] Read current trait_assoc_names/defaults (Sema.w lines 107-110)
+- [x] Read current trait_assoc_names/defaults (Sema.with lines 107-110)
 - [x] Impl validation: check that all required (no-default) associated
       types are provided — already implemented in collect_impl_decl
 - [x] Store associated type bounds in sema (`trait_assoc_bound_syms/starts/counts`)
 - [x] Validate impl associated types against bounds — emit error if bound not satisfied
 - [x] Parse `T: Trait[Item=Type]` constraint syntax (consumed, stored for future checking)
 - [x] Resolve `T.Name` for type parameter associated types in sema and codegen
-- [x] Write tests: `err_assoc_type_bound.w`, `behav_type_param_assoc.w`
-- [x] Write test `test/cases/err_missing_assoc_type.w` — validates
+- [x] Write tests: `err_assoc_type_bound.with`, `behav_type_param_assoc.with`
+- [x] Write test `test/cases/err_missing_assoc_type.with` — validates
       impl-level associated type checking
-- [x] Write test `test/cases/behav_assoc_type_default.w` — validates
+- [x] Write test `test/cases/behav_assoc_type_default.with` — validates
       associated types with defaults
 - [x] `make build && make fixpoint` — 241/241 tests pass
 
@@ -435,7 +435,7 @@ to the associated type defined in the current impl.
 - [x] In sema type resolution: when encountering `Self.Name` (field
       access on `Self` in a type position), look up the associated
       type binding from the current impl's trait
-      Added NK_TYPE_ASSOC (kind 91) to Ast.w. Parser handles both
+      Added NK_TYPE_ASSOC (kind 91) to Ast.with. Parser handles both
       TK_DOT_IDENT (.Uppercase) and TK_DOT (lowercase) after ident.
 - [x] In impl block processing: record the mapping from associated
       type names to their concrete types for the current impl
@@ -447,7 +447,7 @@ to the associated type defined in the current impl.
       Sema: NK_TYPE_ASSOC handler in resolve_type_expr looks up
       assoc_type_bindings. Codegen: NK_TYPE_ASSOC handler in
       resolve_type looks up impl node via sema.method_impl_nodes.
-- [x] Write test `test/cases/behav_self_assoc_type.w`:
+- [x] Write test `test/cases/behav_self_assoc_type.with`:
       ```
       trait Transform =
           type Output
@@ -469,18 +469,18 @@ previously invisible.
 
 ### Tasks
 
-- [x] Write `test/cases/err_vec_type_mismatch.w`:
+- [x] Write `test/cases/err_vec_type_mismatch.with`:
       Added argument type checking for builtin generic methods (Vec.push,
       HashMap.insert) and user-defined methods on TY_GENERIC_INST receivers.
       check_method_call now resolves parameter types via substitution.
-- [x] Write `test/cases/err_generic_return_mismatch.w`:
+- [x] Write `test/cases/err_generic_return_mismatch.with`:
       Tail expression return type mismatch now caught via check_fn_body.
       Added expected_expr_type propagation for variant shorthand resolution.
-- [x] Write `test/cases/behav_generic_inst.w`:
+- [x] Write `test/cases/behav_generic_inst.with`:
       Already existed and passes (Vec[i32] and Vec[str] basic usage).
-- [x] Write `test/cases/behav_option_generic.w`:
+- [x] Write `test/cases/behav_option_generic.with`:
       Already existed and passes (Option[i32] match).
-- [x] Write `test/cases/behav_result_generic.w`:
+- [x] Write `test/cases/behav_result_generic.with`:
       Fixed: Result match dispatch (find_variant_index Ok=0/Err=1) and
       payload extraction (bitcast [N x i8] to declared Ok/Err type).
 - [x] Run `./scripts/run_tests.sh` — 225/225 tests pass
@@ -533,7 +533,7 @@ are verified to agree. Downstream features (Phase 10) are last.
 - [x] `resolve_generic_type` in codegen deleted — logic inlined into
       NK_TYPE_GENERIC handler. Box/ContextError handled before sema path,
       monomorphize_struct as final fallback.
-- [x] `behav_vec.w` and `behav_hashmap.w` pass without explicit
+- [x] `behav_vec.with` and `behav_hashmap.with` pass without explicit
       type annotations — uses `Vec[i32].new()` and `HashMap[str, i32].new()`
       turbofish syntax. Parser extended to handle comma-separated subscripts
       in `parse_index_or_slice` (d2 stores second index). Codegen
@@ -543,7 +543,7 @@ are verified to agree. Downstream features (Phase 10) are last.
 - [x] `Self.Name` resolves to associated type in impl blocks
 - [x] Generic trait infrastructure: trait type params stored in sema
       and codegen, trait type args stored in impl blocks via parser
-- [x] `impl[T] IntoIter[T] for Vec[T]` in `lib/std/traits.w`
+- [x] `impl[T] IntoIter[T] for Vec[T]` in `lib/std/traits.with`
       with correct `Iter[T].next() -> Option[T]` and
       `IntoIter[T].iter() -> VecIter[T]` signatures
 - [x] VecIter-based for-loop dispatch: `gen_for_veciter` inlines

@@ -5,7 +5,7 @@ Completed as task 1 of `docs/format-plan.md`.
 
 ---
 
-## 1. Lexer (`src/Lexer.w`)
+## 1. Lexer (`src/Lexer.with`)
 
 - **Line ~568**: F-string token detection. The lexer recognizes `f"..."` prefix
   and lexes the entire f-string as a single `TK_STRING` token. No separate
@@ -20,7 +20,7 @@ content inside the interpolation hole. All spec parsing would happen later.
 
 ---
 
-## 2. Parser (`src/Parser.w`)
+## 2. Parser (`src/Parser.with`)
 
 ### Entry point
 - **Line 1913–1916**: In `parse_string_literal()`, `is_fstring_token_text(text)`
@@ -55,7 +55,7 @@ content inside the interpolation hole. All spec parsing would happen later.
 
 ---
 
-## 3. AST (`src/Ast.w`)
+## 3. AST (`src/Ast.with`)
 
 - **Line 208**: `const OP_CONCAT: i32 = 19` — binary operator for string concat.
 - No `NK_FSTRING` or `NK_FSTRING_SPEC` node kinds exist yet.
@@ -64,7 +64,7 @@ content inside the interpolation hole. All spec parsing would happen later.
 
 ---
 
-## 4. Sema (`src/Sema.w`)
+## 4. Sema (`src/Sema.with`)
 
 - **Line 3801**: `NK_BINARY` dispatches to `check_binary()`.
 - **Line 4107**: `check_binary()` — type-checks binary operations.
@@ -79,7 +79,7 @@ content inside the interpolation hole. All spec parsing would happen later.
 
 ---
 
-## 5. Codegen (`src/Codegen.w`)
+## 5. Codegen (`src/Codegen.with`)
 
 ### String concatenation
 - **Line 5829**: Binary `OP_CONCAT` dispatches to `mir_str_concat()`.
@@ -143,29 +143,29 @@ content inside the interpolation hole. All spec parsing would happen later.
 (Task 2 of format-plan.md)
 
 ### AST node kind list
-- `src/Ast.w` — add constants after NK_COMPTIME_ERROR (71). Next available: 72, 73.
+- `src/Ast.with` — add constants after NK_COMPTIME_ERROR (71). Next available: 72, 73.
 
 ### AST name/debug tables
-- `src/main_emit_temp.w:324` — `ast_decl_kind_name()` — only handles decl kinds,
+- `src/main_emit_temp.with:324` — `ast_decl_kind_name()` — only handles decl kinds,
   f-string is an expression kind so no change needed here.
-- `src/main_emit_temp.w:432` — `dump_tag_name()` — token tags only, no change.
+- `src/main_emit_temp.with:432` — `dump_tag_name()` — token tags only, no change.
 
 ### Sema expression dispatch
-- `src/Sema.w:3783` — after `NK_STRING_LIT → ty_str`, add `NK_FSTRING → check_fstring()`.
-- `src/Sema.w:7884` — `kind_to_str` helper for error messages — add `NK_FSTRING → "f_string"`.
+- `src/Sema.with:3783` — after `NK_STRING_LIT → ty_str`, add `NK_FSTRING → check_fstring()`.
+- `src/Sema.with:7884` — `kind_to_str` helper for error messages — add `NK_FSTRING → "f_string"`.
 
 ### MirLower expression dispatch
-- `src/MirLower.w:651` — after `NK_STRING_LIT` handling, add `NK_FSTRING`.
-- `src/MirLower.w:3176` — second dispatch site (likely async MIR), same treatment.
+- `src/MirLower.with:651` — after `NK_STRING_LIT` handling, add `NK_FSTRING`.
+- `src/MirLower.with:3176` — second dispatch site (likely async MIR), same treatment.
 
 ### Codegen expression dispatch
-- `src/Codegen.w:2103` — after `NK_STRING_LIT` handling, add `NK_FSTRING`.
-- `src/Codegen.w:4579` — `try_eval_const_string` — may need to handle `NK_FSTRING`
+- `src/Codegen.with:2103` — after `NK_STRING_LIT` handling, add `NK_FSTRING`.
+- `src/Codegen.with:4579` — `try_eval_const_string` — may need to handle `NK_FSTRING`
   for compile-time f-string evaluation (or skip initially).
 
 ### Driver / dump utilities
-- `src/Driver.w:101` — `dump_typed()` — generic dump, no node-kind switch.
-- `src/compiler/Backend.w:83` — `backend_dump_struct_extras` — struct-specific, no change.
+- `src/Driver.with:101` — `dump_typed()` — generic dump, no node-kind switch.
+- `src/compiler/Backend.with:83` — `backend_dump_struct_extras` — struct-specific, no change.
 
 **Summary:** 6 dispatch sites need updating across Sema, MirLower, and Codegen.
 No changes needed to dump/debug utilities (they don't switch on expression node kinds).
@@ -185,26 +185,26 @@ Total `int_to_string` / `i64_to_string` / `with_f64_to_string` call sites:
 
 | Count | File |
 |-------|------|
-| 93 | `src/Mir.w` |
-| 62 | `src/Codegen.w` |
-| 62 | `src/CCodegen.w` |
-| 41 | `src/Sema.w` |
-| 32 | `src/CImport.w` |
-| 27 | `src/compiler/foundation/Types.w` |
-| 15 | `src/Resolve.w` |
-| 15 | `src/compiler/Backend.w` |
-| 14 | `src/AsyncMir.w` |
-| 12 | `src/compiler/Compilation.w` |
-| 11 | `src/compiler/Frontend.w` |
-| 9 | `src/render.w` |
-| 7 | `src/main.w` |
-| 7 | `src/compiler/Zcu.w` |
-| 6 | `src/Parser.w` |
-| 6 | `src/compiler/foundation/DiagnosticRender.w` |
-| 5 | `src/main_emit_temp.w` |
-| 4 | `src/DiagnosticRender.w` |
-| 4 | `src/compiler/foundation/Values.w` |
-| 3 | `src/MirLower.w` |
+| 93 | `src/Mir.with` |
+| 62 | `src/Codegen.with` |
+| 62 | `src/CCodegen.with` |
+| 41 | `src/Sema.with` |
+| 32 | `src/CImport.with` |
+| 27 | `src/compiler/foundation/Types.with` |
+| 15 | `src/Resolve.with` |
+| 15 | `src/compiler/Backend.with` |
+| 14 | `src/AsyncMir.with` |
+| 12 | `src/compiler/Compilation.with` |
+| 11 | `src/compiler/Frontend.with` |
+| 9 | `src/render.with` |
+| 7 | `src/main.with` |
+| 7 | `src/compiler/Zcu.with` |
+| 6 | `src/Parser.with` |
+| 6 | `src/compiler/foundation/DiagnosticRender.with` |
+| 5 | `src/main_emit_temp.with` |
+| 4 | `src/DiagnosticRender.with` |
+| 4 | `src/compiler/foundation/Values.with` |
+| 3 | `src/MirLower.with` |
 
 Most uses are diagnostic/debug messages: `"error at " ++ int_to_string(line)`.
 These all become `f"error at {line}"` after migration.
@@ -216,16 +216,16 @@ These all become `f"error at {line}"` after migration.
 (Task 4 of format-plan.md)
 
 ### Debug trait definition
-- `lib/std/traits.w:17`: `pub trait Debug = fn debug_str(self) -> str`
-- `lib/std/traits.w:20`: `pub trait Display = fn to_str(self) -> str`
+- `lib/std/traits.with:17`: `pub trait Debug = fn debug_str(self) -> str`
+- `lib/std/traits.with:20`: `pub trait Display = fn to_str(self) -> str`
 
 ### Existing Debug impls
 
 | Type | File:Line | Implementation |
 |------|-----------|----------------|
-| `i32` | `lib/std/traits.w:74` | `int_to_string(self)` |
-| `bool` | `lib/std/traits.w:78` | `if self: "true" else: "false"` |
-| `str` | `lib/std/traits.w:85` | `"\"" ++ self ++ "\""` |
+| `i32` | `lib/std/traits.with:74` | `int_to_string(self)` |
+| `bool` | `lib/std/traits.with:78` | `if self: "true" else: "false"` |
+| `str` | `lib/std/traits.with:85` | `"\"" ++ self ++ "\""` |
 
 ### Missing Debug impls needed for `:?`
 
@@ -242,9 +242,9 @@ These all become `f"error at {line}"` after migration.
 | `HashMap[K,V]` | Missing |
 
 ### `@[derive(Debug)]` support
-- Parser tracks `pending_derive_start` / `pending_derive_count` (Parser.w:35–36).
-- AST stores derive metadata via `AstPool.add_type_meta` (Ast.w:538).
-- Sema recognizes `"Debug"` as a known trait name (Sema.w:2611).
+- Parser tracks `pending_derive_start` / `pending_derive_count` (Parser.with:35–36).
+- AST stores derive metadata via `AstPool.add_type_meta` (Ast.with:538).
+- Sema recognizes `"Debug"` as a known trait name (Sema.with:2611).
 - **No codegen implementation** for derive(Debug) — the parser and sema infrastructure
   exists but no code generation happens.
 
@@ -264,7 +264,7 @@ f-string AST node require careful bootstrapping.
 
 ### Step 1: AST + Parser + Interim Codegen Fallback
 
-1. Add `NK_FSTRING`, `NK_FSTRING_SPEC` constants to `src/Ast.w`.
+1. Add `NK_FSTRING`, `NK_FSTRING_SPEC` constants to `src/Ast.with`.
 2. Replace parser `interp_concat` desugaring with `NK_FSTRING` emission.
 3. Add format spec parsing (`parse_format_spec`).
 4. Add `check_fstring` in Sema (returns `ty_str`).

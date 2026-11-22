@@ -1,4 +1,4 @@
-# Phase C Extraction Plan: Build.w Selfhost Tests
+# Phase C Extraction Plan: Build.with Selfhost Tests
 
 Status: completed extraction plan. Implementation complete.
 
@@ -7,19 +7,19 @@ compiler-driver dispatch and into a repository-local build action.
 
 ## Placement
 
-The target will live in the repository-local `build_selfhost.w` module,
-imported by root `build.w`. These fixtures test this repository's integrated
+The target will live in the repository-local `build_selfhost.with` module,
+imported by root `build.with`. These fixtures test this repository's integrated
 build-system behavior; they are not standard build-system APIs and do not
 belong in `lib/std`.
 
 ## What Moves
 
-Move the build.w selfhost implementation out of `src/BuildGraphSelfhost.w` and
+Move the build.with selfhost implementation out of `src/BuildGraphSelfhost.with` and
 generic dispatch:
 
 - `BuildKind 1011`, currently `cli_selfhost_build_w_test`
 - `run_cli_selfhost_build_w_test`
-- build.w fixture helpers:
+- build.with fixture helpers:
   - `bgs_tool_from_env`
   - `bgs_nm_smoke`
   - `bgs_check_build_w_not_ignored`
@@ -34,13 +34,13 @@ generic dispatch:
   - `bgs_check_build_w_action_target`
   - `bgs_check_build_w_action_failures`
 
-Reuse the equivalent `bs_*` helpers already in `build_selfhost.w` for fixture
+Reuse the equivalent `bs_*` helpers already in `build_selfhost.with` for fixture
 writing, capture, path handling, assertions, file existence, and binary runs.
 Do not introduce another generic helper layer in this slice.
 
 ## Target Shape
 
-`build.w` will declare `cli-selfhost-build-w-tests` as a standard `.Action`
+`build.with` will declare `cli-selfhost-build-w-tests` as a standard `.Action`
 target:
 
 ```with
@@ -82,11 +82,11 @@ Old serialized graphs should fail with the standard removed-kind diagnostic:
 
 ## Dispatch Removal
 
-After extraction, `src/main.w` must not dispatch kind `1011` or branch on the
+After extraction, `src/main.with` must not dispatch kind `1011` or branch on the
 `"build-w"` suite argument. Verify with:
 
 ```sh
-rg -n "cli_selfhost_build_w|run_cli_selfhost_build_w|build-w|bgs_check_build_w|bgs_graph_build_file|bgs_require_case_file|bgs_forbid_case_file" src/main.w src/BuildGraphKinds.w src/BuildGraphSelfhost.w
+rg -n "cli_selfhost_build_w|run_cli_selfhost_build_w|build-w|bgs_check_build_w|bgs_graph_build_file|bgs_require_case_file|bgs_forbid_case_file" src/main.with src/BuildGraphKinds.with src/BuildGraphSelfhost.with
 ```
 
 Expected remaining hits are limited to the removed-kind name/diagnostic and any
@@ -111,8 +111,8 @@ not transient path names.
 The implementation slice must run:
 
 ```sh
-out/bin/with check build_selfhost.w
-out/bin/with check build.w
+out/bin/with check build_selfhost.with
+out/bin/with check build.with
 out/bin/with build :cli-selfhost-build-w-tests
 make build
 make fixpoint

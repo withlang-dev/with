@@ -14,7 +14,7 @@
 #
 # Usage:
 #   lldb --batch -s tools/debug_drop_fields.lldb \
-#       -o "run build <leaky-repro.w> -o /tmp/x" \
+#       -o "run build <leaky-repro.with> -o /tmp/x" \
 #       -o "breakpoint list" -o "quit" -- out/release/bin/with
 #
 # The `bt 4` on mir_emit_drop_ptr shows its caller is mir_emit_drop_fields_ptr —

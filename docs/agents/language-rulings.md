@@ -171,7 +171,7 @@ timestamps, file sizes and offsets, hashes, IDs, money, anything serialized or
 crossing into a C struct. Supported targets today are 64-bit hosts and wasm32;
 other widths must stay possible without a redesign.
 
-**The backstop: the ceremony census.** `tools/ceremony_census.w` counts the
+**The backstop: the ceremony census.** `tools/ceremony_census.with` counts the
 known patterns. The bar is main's own counts (`:install-user` publishes them to
 the green store on reseed, so a cleanup lowers the bar once merged). `src/main
 build :ceremony-census` (in the gate) measures a tree against the bar: a count

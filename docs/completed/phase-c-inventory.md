@@ -17,7 +17,7 @@ Scope:
 
 No live project-specific build graph kind remains.
 
-`src/BuildGraphKinds.w` keeps the old 1000-series project kind numbers only as
+`src/BuildGraphKinds.with` keeps the old 1000-series project kind numbers only as
 removed-kind diagnostics for stale serialized build graphs. `build_graph_kind_is_project`
 returns `false` for all values.
 
@@ -62,19 +62,19 @@ and diagnosable.
 
 | File | Purpose |
 | --- | --- |
-| `src/BuildGraphDispatch.w` | Standard graph planning and dependency traversal. |
-| `src/BuildGraphKinds.w` | Stable standard kind names and removed-kind diagnostics. |
-| `src/BuildGraphModel.w` | Generic build graph data model and parser. |
-| `src/BuildGraphOps.w` | Generic standard target operations. |
-| `src/BuildGraphRuntime.w` | Runtime bridge for generic build graph operations. |
-| `src/BuildGraphSupport.w` | Generic path, argv, and validation helpers. |
-| `src/BuildGraphTests.w` | Generic graph parser/serializer tests. |
-| `src/BuildGraphTools.w` | Generic external tool execution helpers. |
-| `src/main.w` | CLI driver, standard graph execution, and project-local action invocation. |
+| `src/BuildGraphDispatch.with` | Standard graph planning and dependency traversal. |
+| `src/BuildGraphKinds.with` | Stable standard kind names and removed-kind diagnostics. |
+| `src/BuildGraphModel.with` | Generic build graph data model and parser. |
+| `src/BuildGraphOps.with` | Generic standard target operations. |
+| `src/BuildGraphRuntime.with` | Runtime bridge for generic build graph operations. |
+| `src/BuildGraphSupport.with` | Generic path, argv, and validation helpers. |
+| `src/BuildGraphTests.with` | Generic graph parser/serializer tests. |
+| `src/BuildGraphTools.with` | Generic external tool execution helpers. |
+| `src/main.with` | CLI driver, standard graph execution, and project-local action invocation. |
 
-The remaining `src/main.w` build-driver responsibilities are generic:
+The remaining `src/main.with` build-driver responsibilities are generic:
 
-- graph loading from `build.w`;
+- graph loading from `build.with`;
 - standard target execution;
 - project-local action runner generation;
 - capability minting;
@@ -89,13 +89,13 @@ Repository-specific build policy now lives outside `src/`:
 
 | Module | Owns |
 | --- | --- |
-| `build.w` | Repository target graph declaration. |
-| `build_compiler.w` | Compiler source generation, LLVM link metadata, compiler build, and compiler IR actions. |
-| `build_emit_c.w` | Emit-C test, fixpoint, and roundtrip actions. |
-| `build_pcre2.w` | PCRE2 reference, migrate, build, test, check, and promote actions. |
-| `build_runtime.w` | Runtime compatibility source generation actions. |
-| `build_seed.w` | Seed download/update actions. |
-| `build_selfhost.w` | Repository selfhost fixture actions. |
+| `build.with` | Repository target graph declaration. |
+| `build_compiler.with` | Compiler source generation, LLVM link metadata, compiler build, and compiler IR actions. |
+| `build_emit_c.with` | Emit-C test, fixpoint, and roundtrip actions. |
+| `build_pcre2.with` | PCRE2 reference, migrate, build, test, check, and promote actions. |
+| `build_runtime.with` | Runtime compatibility source generation actions. |
+| `build_seed.with` | Seed download/update actions. |
+| `build_selfhost.with` | Repository selfhost fixture actions. |
 
 ## Verification
 

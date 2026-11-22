@@ -1,0 +1,378 @@
+// rt/fiber_runtime.with -- migrated fiber helpers that do not need direct context
+// switching or queue ownership.
+
+extern fn with_fiber_in_fiber() -> i32
+extern fn with_fiber_yield() -> Unit
+extern fn with_runtime_core_init() -> Unit
+extern fn with_install_interrupt_handlers()
+extern fn with_runtime_core_shutdown() -> Unit
+extern fn with_debug_alloc_report_leaks() -> Unit
+extern fn with_runtime_core_has_fibers() -> i32
+extern fn with_runtime_core_run_one_step() -> Unit
+extern fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32
+extern fn with_runtime_fiber_is_live(fiber_id: i32) -> i32
+extern fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32
+extern fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32
+extern fn with_runtime_request_cancel(fiber_id: i32) -> i32
+extern fn with_runtime_current_cancel_requested() -> i32
+extern fn with_runtime_current_set_cancel_requested() -> Unit
+extern fn with_runtime_current_set_cancelled_return() -> Unit
+extern fn with_runtime_current_cancelled_return() -> i32
+extern fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32
+use std.builtins.c_void
+extern fn with_free(ptr: *mut c_void)
+extern fn with_ewrite(s: &str) -> Unit
+extern fn with_i64_to_str(n: i64) -> str
+@[link_name("_exit")]
+extern fn rt_libc_exit(code: i32) -> Never
+@[link_name("abort")]
+extern fn rt_libc_abort() -> Unit
+
+// The real definitions (fiber core) are unsafe fns: they write through the raw
+// out-pointers. These local unsafe wrappers spell that contract in both worlds
+// (standalone extern decls and D30 in-unit resolution to the real definitions).
+unsafe fn fiber_take_completed(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
+    with_runtime_take_completed_fiber(fiber_id, panic_msg_out, panic_msg_len_out, cancelled_return_out)
+
+unsafe fn fiber_take_panicked(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32:
+    with_runtime_take_panicked_fiber(fiber_id_out, panic_msg_out, panic_msg_len_out)
+
+type RawStr:
+    ptr: *const u8
+    len: i64
+
+pub fn make_str(ptr: *const u8, len: i64) -> str:
+    let raw = RawStr { ptr: ptr, len: len }
+    // D111: built from its parts, not copied out of memory: a raw-pointer
+    // read of a str is a copy, one more holder, and these parts hold nothing.
+    unsafe { transmute[str](raw) }
+
+var last_await_fiber_id: i32 = 0
+var last_await_cancelled_return: i32 = 0
+var select_rng_state: u32 = 1 as u32
+let MAX_DETACHED_FIBERS: i32 = 1024
+var detached_fiber_ids: [1024]i32 = [0 as i32; 1024]
+var detached_result_bufs: [1024]i64 = [0 as i64; 1024]
+var detached_fiber_count: i32 = 0
+
+fn select_next_u32() -> u32:
+    select_rng_state = (select_rng_state *% (1664525 as u32)) +% (1013904223 as u32)
+    select_rng_state
+
+fn fiber_report_unhandled_panics() -> i32:
+    var had_unhandled: i32 = 0
+    while true:
+        var fiber_id: i32 = 0
+        var panic_msg: *const u8 = 0 as *const u8
+        var panic_msg_len: i32 = 0
+        let took = unsafe { fiber_take_panicked(
+            &raw mut fiber_id as *mut i32,
+            &raw mut panic_msg as *mut *const u8,
+            &raw mut panic_msg_len as *mut i32
+        ) }
+        if took == 0:
+            return had_unhandled
+
+        had_unhandled = 1
+        with_ewrite("unhandled panic in fiber #")
+        with_ewrite(with_i64_to_str(fiber_id as i64))
+        with_ewrite(": ")
+        if panic_msg as i64 != 0 and panic_msg_len > 0:
+            with_ewrite(make_str(panic_msg, panic_msg_len as i64))
+        else:
+            with_ewrite("(null)")
+        with_ewrite("\n")
+
+pub fn with_runtime_init():
+    // A program that runs a child passes SIGINT, SIGTERM and SIGHUP on to it
+    // (the child runs in a process group of its own) and exits 128 + the
+    // signal. Only the compiler installed this: a timed-out `with run`
+    // program died and its own child ran on, orphaned.
+    with_install_interrupt_handlers()
+    with_runtime_core_init()
+
+pub fn with_runtime_shutdown():
+    fiber_drain_detached_ready()
+    fiber_clear_detached_buffers()
+    // Tear down the runtime (which recycles every remaining fiber and frees the
+    // fiber pool) BEFORE walking the debug-alloc ledger. Otherwise pooled fiber
+    // control blocks are still live during the leak walk and get reported as
+    // leaks even though core shutdown frees them moments later. Reporting last
+    // keeps true leaks visible while excluding runtime structures we do free.
+    with_runtime_core_shutdown()
+    with_debug_alloc_report_leaks()
+
+pub fn with_runtime_has_fibers() -> i32:
+    with_runtime_core_has_fibers()
+
+pub fn with_runtime_run_one_step():
+    with_runtime_core_run_one_step()
+    fiber_drain_detached_ready()
+
+pub fn with_runtime_run():
+    while with_runtime_core_has_fibers() != 0:
+        with_runtime_core_run_one_step()
+        fiber_drain_detached_ready()
+    fiber_drain_detached_ready()
+
+    if fiber_report_unhandled_panics() != 0:
+        rt_libc_exit(1)
+
+fn fiber_take_detached_completed(fiber_id: i32, result_buf: *mut u8) -> i32:
+    var panic_msg: *const u8 = 0 as *const u8
+    var panic_msg_len: i32 = 0
+    var cancelled_return: i32 = 0
+    let took = unsafe { fiber_take_completed(fiber_id, &raw mut panic_msg as *mut *const u8, &raw mut panic_msg_len as *mut i32, &raw mut cancelled_return as *mut i32) }
+    if took == 0:
+        return 0
+    if result_buf as i64 != 0:
+        with_free(result_buf)
+    if panic_msg as i64 != 0 and panic_msg_len > 0:
+        with_ewrite(make_str(panic_msg, panic_msg_len as i64))
+        with_ewrite("\n")
+        // Propagated fiber panic: terminate with the panic convention (134),
+        // same as with_panic. libc abort() diverges per platform (Windows → 3).
+        rt_libc_exit(134)
+    1
+
+fn fiber_remove_detached_at(index: isize):
+    if index < 0 or index >= detached_fiber_count:
+        return
+    detached_fiber_count = detached_fiber_count - 1
+    if index != detached_fiber_count:
+        detached_fiber_ids[index] = detached_fiber_ids[detached_fiber_count]
+        detached_result_bufs[index] = detached_result_bufs[detached_fiber_count]
+    detached_fiber_ids[detached_fiber_count] = 0
+    detached_result_bufs[detached_fiber_count] = 0
+
+fn fiber_drain_detached_ready():
+    var i = 0
+    while i < detached_fiber_count:
+        let fid = detached_fiber_ids[i]
+        let rbuf = detached_result_bufs[i] as *mut u8
+        if fiber_take_detached_completed(fid, rbuf) != 0:
+            fiber_remove_detached_at(i)
+        else:
+            i = i + 1
+
+fn fiber_clear_detached_buffers():
+    var i = 0
+    while i < detached_fiber_count:
+        let rbuf = detached_result_bufs[i] as *mut u8
+        if rbuf as i64 != 0:
+            with_free(rbuf)
+        detached_fiber_ids[i] = 0
+        detached_result_bufs[i] = 0
+        i = i + 1
+    detached_fiber_count = 0
+
+unsafe fn fiber_select_ready_index(fiber_ids: *const i32, count: i32, biased: i32) -> i32:
+    var chosen: i32 = -1
+    var ready_seen = 0
+    var i: i32 = 0
+    while i < count:
+        let fid = *((fiber_ids as i64 + i as i64 * 4) as *const i32)
+        if with_runtime_fiber_is_completed(fid) != 0:
+            if biased != 0:
+                return i
+            ready_seen = ready_seen + 1
+            if chosen < 0:
+                chosen = i
+            else if (select_next_u32() % (ready_seen as u32)) == 0 as u32:
+                chosen = i
+        i = i + 1
+    chosen
+
+pub unsafe fn with_fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_index: *mut i32):
+    while true:
+        let selected = fiber_select_ready_index(fiber_ids, count, biased)
+        if selected >= 0:
+            *result_index = selected
+            return
+
+        if with_fiber_in_fiber() != 0:
+            with_fiber_yield()
+        else if with_runtime_core_has_fibers() != 0:
+            with_runtime_core_run_one_step()
+        else:
+            *result_index = -1
+            return
+
+pub unsafe fn with_fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
+    with_fiber_select_mode(fiber_ids, count, 0, result_index)
+
+pub fn with_fiber_await(fiber_id: i32):
+    while true:
+        var panic_msg: *const u8 = 0 as *const u8
+        var panic_msg_len: i32 = 0
+        var cancelled_return: i32 = 0
+        let took = unsafe { fiber_take_completed(fiber_id, &raw mut panic_msg as *mut *const u8, &raw mut panic_msg_len as *mut i32, &raw mut cancelled_return as *mut i32) }
+        if took != 0:
+            last_await_fiber_id = fiber_id
+            last_await_cancelled_return = cancelled_return
+            if panic_msg as i64 != 0 and panic_msg_len > 0:
+                with_ewrite(make_str(panic_msg, panic_msg_len as i64))
+                with_ewrite("\n")
+                // Propagated fiber panic: exit 134 like with_panic, not libc
+                // abort() (which is 134 on Unix but 3 on Windows).
+                rt_libc_exit(134)
+            return
+        if with_runtime_fiber_is_live(fiber_id) == 0:
+            last_await_fiber_id = fiber_id
+            last_await_cancelled_return = 0
+            return
+
+        if with_fiber_in_fiber() != 0:
+            if with_runtime_current_cancel_requested() != 0:
+                last_await_fiber_id = fiber_id
+                last_await_cancelled_return = 0
+                return
+            with_fiber_yield()
+        else if with_runtime_core_has_fibers() != 0:
+            with_runtime_core_run_one_step()
+        else:
+            last_await_fiber_id = fiber_id
+            last_await_cancelled_return = 0
+            return
+
+pub fn with_fiber_cleanup_await(fiber_id: i32):
+    while true:
+        var panic_msg: *const u8 = 0 as *const u8
+        var panic_msg_len: i32 = 0
+        var cancelled_return: i32 = 0
+        let took = unsafe { fiber_take_completed(fiber_id, &raw mut panic_msg as *mut *const u8, &raw mut panic_msg_len as *mut i32, &raw mut cancelled_return as *mut i32) }
+        if took != 0:
+            last_await_fiber_id = fiber_id
+            last_await_cancelled_return = cancelled_return
+            if panic_msg as i64 != 0 and panic_msg_len > 0:
+                with_ewrite(make_str(panic_msg, panic_msg_len as i64))
+                with_ewrite("\n")
+                // Propagated fiber panic: exit 134 like with_panic, not libc
+                // abort() (which is 134 on Unix but 3 on Windows).
+                rt_libc_exit(134)
+            return
+        if with_runtime_fiber_is_live(fiber_id) == 0:
+            last_await_fiber_id = fiber_id
+            last_await_cancelled_return = 0
+            return
+
+        if with_fiber_in_fiber() != 0:
+            with_fiber_yield()
+        else if with_runtime_core_has_fibers() != 0:
+            with_runtime_core_run_one_step()
+        else:
+            last_await_fiber_id = fiber_id
+            last_await_cancelled_return = 0
+            return
+
+pub fn with_fiber_cancel(fiber_id: i32) -> i32:
+    if with_runtime_fiber_is_completed(fiber_id) != 0:
+        return 1
+    with_runtime_request_cancel(fiber_id)
+
+pub fn with_fiber_detach(fiber_id: i32, result_buf: *mut u8) -> i32:
+    if fiber_id <= 0:
+        if result_buf as i64 != 0:
+            with_free(result_buf)
+        return 0
+    if fiber_take_detached_completed(fiber_id, result_buf) != 0:
+        return 1
+    if with_runtime_fiber_is_live(fiber_id) == 0:
+        if result_buf as i64 != 0:
+            with_free(result_buf)
+        return 0
+    fiber_drain_detached_ready()
+    if detached_fiber_count >= MAX_DETACHED_FIBERS:
+        with_ewrite("fatal: too many detached fibers\n")
+        rt_libc_abort()
+    detached_fiber_ids[detached_fiber_count] = fiber_id
+    detached_result_bufs[detached_fiber_count] = result_buf as i64
+    detached_fiber_count = detached_fiber_count + 1
+    1
+
+pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
+    if fiber_id <= 0:
+        if result_buf as i64 != 0:
+            with_free(result_buf)
+        return 0
+    if fiber_take_detached_completed(fiber_id, result_buf) != 0:
+        return 1
+    let requested = with_runtime_request_cancel(fiber_id)
+    if fiber_take_detached_completed(fiber_id, result_buf) != 0:
+        return 1
+    if requested == 0:
+        if result_buf as i64 != 0:
+            with_free(result_buf)
+        return 0
+    fiber_drain_detached_ready()
+    if detached_fiber_count >= MAX_DETACHED_FIBERS:
+        with_ewrite("fatal: too many detached fibers\n")
+        rt_libc_abort()
+    detached_fiber_ids[detached_fiber_count] = fiber_id
+    detached_result_bufs[detached_fiber_count] = result_buf as i64
+    detached_fiber_count = detached_fiber_count + 1
+    1
+
+pub fn with_fiber_is_cancelled() -> i32:
+    with_runtime_current_cancel_requested()
+
+pub fn with_fiber_set_cancelled_return():
+    with_runtime_current_set_cancelled_return()
+
+// §14.7: a runtime wait (channel send/recv) that cancellation cut short
+// marks the current fiber's return as cancelled before returning to it; the
+// lowering reads this right after the wait and unwinds (#1293). A wait that
+// completed without parking leaves it clear.
+pub fn with_fiber_wait_cancelled() -> i32:
+    with_runtime_current_cancelled_return()
+
+pub fn with_fiber_was_cancelled_return(fiber_id: i32) -> i32:
+    if last_await_fiber_id == fiber_id:
+        return last_await_cancelled_return
+    with_runtime_completed_cancelled_return(fiber_id)
+
+pub fn with_fiber_request_cancel_self():
+    with_runtime_current_set_cancel_requested()
+
+// ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
+// The runtime is not exempt from the foreign-state model: every foreign
+// call above is described here, and the `runtime-domain-audit` lane
+// (build/compiler.with) refuses a foreign extern without a row. A row states
+// the view effect of the call on each domain the C library owns; "unknown
+// effect means invalidate" (§38), so a row that says nothing invalidates.
+// `preserves` appears only where the C standard says so:
+//   errno   (thread)  — C11 7.5p3: any library function may set errno, so
+//                       no call preserves it; the errno accessor is the
+//                       macro's lvalue itself (7.5p2) and preserves it.
+//   environ (process) — C11 7.22.4.6: altering the environment list is the
+//                       implementation's method — POSIX.1-2017 setenv,
+//                       unsetenv, putenv — and getenv may overwrite the
+//                       text it returned (XSH getenv); those rows do not
+//                       preserve it, every other call does.
+//   locale  (process) — C11 7.11.1.1: setlocale is the function that
+//                       changes the locale; the runtime never calls it.
+// The process-global state POSIX names beyond the C library's — signal
+// disposition and mask, the working directory, the descriptor table,
+// resource limits, process groups and children, the stdio streams — is no
+// domain: no safe view is presented over it, so it is "an effect the
+// runtime audit records, not a domain" (spec §16.2b.14, D76, ruling
+// Amendment 2). The runtime-domain-audit lane records each call's effect by
+// the C symbol it links (build/compiler.with comp_process_state_alterers:
+// chdir alters the working directory, setrlimit the limits, fork and exec
+// the children, …). One becomes a domain, with rows here, the first time a
+// facade presents a safe view whose validity it decides.
+c contract libc:
+    domain errno thread
+    domain environ process written by any
+    domain locale process written by any
+    // _exit (POSIX _exit(2); the UCRT's _exit on Windows): ends the process
+    // at once, running no atexit handler, and does not return: nothing the
+    // process holds outlives the call.
+    fn rt_libc_exit
+        preserves domain environ
+        preserves domain locale
+    // C abort (C11 7.22.4.1): ends the process abnormally and does not return
+    // to its caller: nothing the process holds outlives the call.
+    fn rt_libc_abort
+        preserves domain environ
+        preserves domain locale

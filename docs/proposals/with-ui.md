@@ -320,7 +320,7 @@ Nothing on this list is UI-specific. The compiler learns about queries, builder 
 | wasm reactor mode | A UI initializes, returns to the host and is called back per event | Command model only: `_start` runs `main`, then `proc_exit` |
 | First-class wasm exports | The host calls into With for events and lifecycle | None. `link_args` can pass `--export` by hand |
 | Extensible generated host | Application imports beyond WASI, generated per program | Host wires `wasi_snapshot_preview1` only |
-| wasm threads, shared memory, atomics | Engine off the main thread, zero-copy painter | `rt_thread_spawn` reports failure on wasm. The allocator in `rt/wasm.w` is single-threaded |
+| wasm threads, shared memory, atomics | Engine off the main thread, zero-copy painter | `rt_thread_spawn` reports failure on wasm. The allocator in `rt/wasm.with` is single-threaded |
 | Fibers on wasm through JSPI | `async` in handlers, fetch and timers without callbacks | wasm links `fiber_stubs.o` and the link refuses async programs |
 | Builder blocks | Markup-like views as ordinary checked code, consistent with "no macros" | Not in the language. Named arguments exist (spec 9.1a) |
 | `from` lowering to a plan value, with live sources | One engine for compile-time and runtime queries | Planned feature. SQL currently lowers to a string |

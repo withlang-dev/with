@@ -81,16 +81,16 @@ calling conventions — hinges on this.
 
 **Implementation status (2026-06-09):** The compiler implements
 **move-by-default**, not share-place. Non-Copy call arguments lower as
-`OK_MOVE` and invalidate the caller binding (`src/MirLower.w:2308-2323`,
+`OK_MOVE` and invalidate the caller binding (`src/MirLower.with:2308-2323`,
 reached from `lower_call_arg` at `:5697`). The call-site annotations
-`move x` / `copy x` do parse (`src/Parser.w:3172-3216`,
+`move x` / `copy x` do parse (`src/Parser.with:3172-3216`,
 `NK_MOVE_ARG`/`NK_COPY_ARG`), and there is an inferred effect system:
 when a callee parameter carries `EFF_CONSUME`/`EFF_ESCAPE_VALUE`,
 passing a non-Copy value *without* an explicit `move x`/`copy x` is a
 compile error — "non-Copy argument passed to a function that consumes
-or escapes it" (`src/SemaCheck.w:8177-8186`). Auto-ref for `&T`
-parameters is implemented (`src/SemaCheck.w:225-248`,
-`src/MirLower.w:5713-5726`). So the implementation matches §2.2,
+or escapes it" (`src/SemaCheck.with:8177-8186`). Auto-ref for `&T`
+parameters is implemented (`src/SemaCheck.with:225-248`,
+`src/MirLower.with:5713-5726`). So the implementation matches §2.2,
 contradicts §3.8/§12.4 — and is actually a *third* model
 (move-by-default plus consume-acknowledgement annotations driven by
 inferred effects) that no spec section describes. The ruling should
@@ -196,14 +196,14 @@ paragraph.
 
 **Implementation status (2026-06-09):** Shipped exactly as §9.7 says:
 `Result` and `Task` are **hardcoded** as must_use
-(`src/SemaDecl.w:116-122`), and statement-position partial match on
-them is a compile error (`src/SemaCheck.w:6072-6080`,
+(`src/SemaDecl.with:116-122`), and statement-position partial match on
+them is a compile error (`src/SemaCheck.with:6072-6080`,
 "non-exhaustive match: missing variant" at `:6183`). Meanwhile
 discarding an entire `Result` is silently allowed (no diagnostic
 exists), and the Task-disposition check E0801 is implemented
-(`src/SemaCheck.w:4384-4387`, `test/compile_errors/err_unused_task.w`).
+(`src/SemaCheck.with:4384-4387`, `test/compile_errors/err_unused_task.with`).
 The backwards incentive gradient ships today. The fix is a two-line
-change in `SemaDecl.w` (drop the `Result` insertion) plus the spec
+change in `SemaDecl.with` (drop the `Result` insertion) plus the spec
 edit.
 
 ### 3. Cancellation has two contradictory stories in §14.7
@@ -229,16 +229,16 @@ after) `await`. This must be decided before Weld builds on it.
 
 **Implementation status (2026-06-09):** The implementation already
 chose unwinding. Cancellation is a per-fiber flag
-(`rt/fiber_core_darwin.w:179-189`, set by
+(`rt/fiber_core_darwin.with:179-189`, set by
 `with_runtime_request_cancel` at `:622-627`); awaiting a cancelled
 task does **not** produce an `Err` value — the await site runs defers
 and drops, sets a cancelled-return flag, and propagates it to the
-awaiter (`src/MirLower.w:4847-4925`, `rt/fiber_runtime.w:174-203`,
-`src/CodegenDispatch.w:6655-6715`). `CancelledError` does not exist;
+awaiter (`src/MirLower.with:4847-4925`, `rt/fiber_runtime.with:174-203`,
+`src/CodegenDispatch.with:6655-6715`). `CancelledError` does not exist;
 `.is_cancelled()` does not exist anywhere; the runtime observation
 primitives are `with_fiber_is_cancelled()` and
 `with_fiber_was_cancelled_return(fiber_id)`
-(`rt/fiber_runtime.w:260-269`), reachable only as MIR intrinsics, not
+(`rt/fiber_runtime.with:260-269`), reachable only as MIR intrinsics, not
 public API. The §14.7 `Err(e) if e.is_cancelled()` text describes
 machinery that has never existed. **Fix the spec to the unwinding
 story** and spec a public observation surface over what the runtime
@@ -261,7 +261,7 @@ The rare case — code that genuinely needs to distinguish cancellation
 from failure — should pay explicitly and locally, not tax every error
 type in the program. Spec a method on the `Task` handle (the runtime
 already maintains exactly this state: `with_fiber_was_cancelled_return`,
-`rt/fiber_runtime.w:266-269`), checked instead of — not after —
+`rt/fiber_runtime.with:266-269`), checked instead of — not after —
 `await`. Replace §14.7's `CancelledError` / `.is_cancelled()` text
 with that surface, and keep the example showing the scope-boundary
 catch, which is the part of the section the implementation actually
@@ -321,13 +321,13 @@ borrows — available to user types by inference, not annotation.
 admits — the mechanism is an **attribute, not compiler magic**.
 For-loops special-case ranges, slices/arrays, Vec, and
 `iter()`/`iter_ref()`/`iter_place()`, then fall back to a generic
-`next()` protocol (`src/MirLower.w:3760-3890`); user types implementing
-`Iter[T]` (`lib/std/traits.w:48-49`) already work in for-loops
-(`test/spec/spec_ss13_2_iterator_borrowing.w`). The borrow-origin link
-is `@[iter_of_self]` (`lib/std/traits.w:71-73`, per docs/mut.md §15.8):
+`next()` protocol (`src/MirLower.with:3760-3890`); user types implementing
+`Iter[T]` (`lib/std/traits.with:48-49`) already work in for-loops
+(`test/spec/spec_ss13_2_iterator_borrowing.with`). The borrow-origin link
+is `@[iter_of_self]` (`lib/std/traits.with:71-73`, per docs/mut.md §15.8):
 it registers a shared borrow on the receiver's place root for the
 duration of the call, currently applied only to stdlib iterator
-constructors (`test/compile_errors/err_iter_of_self_vec_iter.w`). So
+constructors (`test/compile_errors/err_iter_of_self_vec_iter.with`). So
 the fix for this item is largely *spec and stdlib-policy* work:
 document `@[iter_of_self]` (or an inferred equivalent) as part of the
 language surface available to any library's iterator constructors, and
@@ -352,12 +352,12 @@ A tensor/compute library is made of mutable views. This needs a real
 subsection before Crux's API hardens around guesses.
 
 **Implementation status (2026-06-09):** Plain slices are real: `[]T`
-parses (`src/Parser.w:6698-6739`, `NK_TYPE_SLICE`), slices lower as fat
-pointers (`src/TypeLayout.w:295, 340`), indexing goes through place
-projection, and slice iteration works (`test/behavior/behav_slice.w`).
+parses (`src/Parser.with:6698-6739`, `NK_TYPE_SLICE`), slices lower as fat
+pointers (`src/TypeLayout.with:295, 340`), indexing goes through place
+projection, and slice iteration works (`test/behavior/behav_slice.with`).
 The `[]mut T`-specific story is thin: exclusivity is whatever generic
 place-based borrow checking provides (touch points at
-`src/SemaCheck.w:5789`, `src/Mir.w:1803`), there are no
+`src/SemaCheck.with:5789`, `src/Mir.with:1803`), there are no
 `split_at`/`split_at_mut` operations anywhere in `lib/std/`, and no
 `[]mut`-specific aliasing tests exist. The spec gap and the
 implementation gap are the same gap — Crux will hit both at once.
@@ -385,13 +385,13 @@ deliverable, not a hope.
 **Implementation status (2026-06-09):** The precedent is real and
 shipping: the §15.6 view-liveness diagnostic emits three labeled
 locations — mutation site (primary), "view created here," "view used
-here" (`src/SemaCheck.w:11797-11809`). Caveats the spec should absorb:
+here" (`src/SemaCheck.with:11797-11809`). Caveats the spec should absorb:
 NLL is implemented as last-use AST analysis, not CFG dataflow, and
-`src/BorrowCfg.w:22-29` documents the uncovered cases
+`src/BorrowCfg.with:22-29` documents the uncovered cases
 (branch-divergent uses, loop-iteration carry). More importantly,
 **returned-view origin tracking (§21.1 Rule 6) is not implemented at
 all** — ephemeral checking today is type-level only
-(`src/SemaCheck.w:12830-12861`) plus task-specific escape checks.
+(`src/SemaCheck.with:12830-12861`) plus task-specific escape checks.
 That means the diagnostics contract can be written *before* the origin
 subsystem is built, which is exactly the right order.
 
@@ -413,12 +413,12 @@ raw-surface calls that make the §16.1 pitch look aspirational.
 honest — which *proves* the corpus point. Commit 1373e453 implements
 safe/raw surfaces: an imported function is classified raw if it is
 variadic or its signature contains pointer or function types
-(`ci_function_requires_raw_abi`, `src/SemaDecl.w:461-496`, tracked in
+(`ci_function_requires_raw_abi`, `src/SemaDecl.with:461-496`, tracked in
 `ci_raw_syms`), and calling a raw binding requires `unsafe`
-(`test/compile_errors/err_c_import_raw_call_requires_unsafe.w`).
+(`test/compile_errors/err_c_import_raw_call_requires_unsafe.with`).
 `str` → `*const c_char` coercion is contract-gated — provably
 NUL-terminated values only; f-strings are rejected
-(`test/compile_errors/err_c_import_str_to_c_char_requires_contract.w`,
+(`test/compile_errors/err_c_import_str_to_c_char_requires_contract.with`,
 `docs/completed/c-import-auto-coercion.md`). The March-era
 name-heuristic auto-defer for destructor pairs was **removed**, in
 line with §16.2a's ownership-evidence rule. Net consequence: today
@@ -444,7 +444,7 @@ not a debt.
 
 **Implementation status (2026-06-09):** Confirms the recommendation
 exactly. Fiber stacks are **fixed 64 KB** plus a guard page, mmap'd
-(`rt/fiber_core_darwin.w:27` `FIBER_STACK_SIZE = 65536`, allocation at
+(`rt/fiber_core_darwin.with:27` `FIBER_STACK_SIZE = 65536`, allocation at
 `:345-352`) and pooled via a free list (`:354-407`, with
 `with_fiber_pool_reuses`/`_allocs` counters at `:701-705`). Not
 growable; no 8 KB initial allocation; no `with.toml`
@@ -452,7 +452,7 @@ growable; no 8 KB initial allocation; no `with.toml`
 no `ffi_reachable` analysis. (`docs/feature_plans/async-proposal.md:18-26` floats a
 minicoro migration for growable stacks later.) `may_suspend` analysis
 and the E0701 guard checks are implemented at compile time
-(`src/SemaCheck.w` `fn_symbol_may_suspend`, `src/MirSuspendCheck.w`).
+(`src/SemaCheck.with` `fn_symbol_may_suspend`, `src/MirSuspendCheck.with`).
 §14.19 currently reads as documentation of features that do not exist;
 respec the implemented model as conforming and move growth/FFI
 switching to roadmap status.
@@ -470,15 +470,15 @@ switching to roadmap status.
   consequence.
 
 **Implementation status (2026-06-09):** String literals lower
-uniformly to `CK_STR` constant operands (`src/MirLower.w:1770-1776`);
+uniformly to `CK_STR` constant operands (`src/MirLower.with:1770-1776`);
 no elision analysis exists — the promised rule has neither
 documentation nor implementation. The await combinators all exist in
-`lib/std/task.w` (`await_all` `:22-44`, `await_first` `:61-77`,
+`lib/std/task.with` (`await_all` `:22-44`, `await_first` `:61-77`,
 `await_any` `:81-105`, `await_settled` `:108-119`) and do implement
 cancel-and-join-before-return, so the slowest-loser latency behavior
 is live today, not hypothetical. Tuple `.await`
 (`FIBER_TUPLE_AWAIT`), `select await` (`FIBER_SELECT`/`_BIASED`), and
-`async scope` + `s.track()` (`rt/rt_core.w:2766-2839`) are all
+`async scope` + `s.track()` (`rt/rt_core.with:2766-2839`) are all
 implemented. (Side note from the survey: `docs/feature_plans/async-proposal.md`
 records a known bug — `with_scope_track` reallocating its tracking
 buffer while the caller holds the old handle.)
@@ -500,8 +500,8 @@ likely a forgotten return than a desired default.
 **Implementation status (2026-06-09):** Already much narrower than the
 spec: implicit default return is implemented for void/bool/integer
 returns only (`lower_implicit_default_return`,
-`src/MirLower.w:7440-7445`; comptime path
-`src/ComptimeEval.w:905-916`) — not for general `Default` types
+`src/MirLower.with:7440-7445`; comptime path
+`src/ComptimeEval.with:905-916`) — not for general `Default` types
 (`str`, `Option`, `Vec`, user `@[derive(Default)]` types). The spec
 promises more than the compiler does. Narrowing the spec (or adding
 the "no explicit return anywhere" gate) costs almost nothing because
@@ -520,8 +520,8 @@ lint-level policy, arguably not a language law.
 **Implementation status (2026-06-09):** Fully implemented and
 uniformly enforced — "shadowing is not allowed for '<name>'" across
 let/var bindings, for-loop bindings, match pattern bindings,
-with-block bindings, and globals (`src/Sema.w:2513-2574`; check sites
-at `src/SemaCheck.w:4505, 5244, 6653+, 7362`), with `let _` exempt as
+with-block bindings, and globals (`src/Sema.with:2513-2574`; check sites
+at `src/SemaCheck.with:4505, 5244, 6653+, 7362`), with `let _` exempt as
 a discard binding. Demoting to a lint is pure policy; no engineering
 blocker.
 
@@ -535,9 +535,9 @@ ceremony: "non-exhaustive statement match" as a default-on *warning*
 
 **Implementation status (2026-06-09):** As spec'd — partial
 statement-position match compiles silently for non-must_use types
-(`test/behavior/partial_match_stmt.w`). The exhaustiveness checker
+(`test/behavior/partial_match_stmt.with`). The exhaustiveness checker
 already computes the position (`match_in_stmt_pos`,
-`src/SemaCheck.w:6072-6080`) and the missing-variant analysis already
+`src/SemaCheck.with:6072-6080`) and the missing-variant analysis already
 runs for the must_use case, so a default-on warning is a small
 addition at an existing decision point.
 
@@ -555,9 +555,9 @@ The failure mode stands as documented; the remedy is downgraded.
 
 1. **Two enum syntaxes coexist in the spec — the compiler accepts only
    one.** The parser accepts `enum` forms only: block, braced inline,
-   and discriminant enums (`src/Parser.w:1436-1519, 1752-1877, 2092+`);
+   and discriminant enums (`src/Parser.with:1436-1519, 1752-1877, 2092+`);
    `type X = A | B` is explicitly **rejected** with a "use 'enum'"
-   diagnostic (`src/Parser.w:1310-1317`). §10.1's `Result`/`Option`
+   diagnostic (`src/Parser.with:1310-1317`). §10.1's `Result`/`Option`
    definitions and the §30.3 grammar show syntax the compiler
    deliberately rejects. Rewrite the spec to the `enum` forms.
 
@@ -581,52 +581,52 @@ The failure mode stands as documented; the remedy is downgraded.
    `Result`/`Option`, §11.7's `ParseResult`, §30.3's grammar. (While
    sweeping, note the stdlib uses an `=` body introducer —
    `pub trait Iter[T] = ...`, `impl Iter[Token] for TokenStream = ...`
-   in `lib/std/traits.w` — that §29.13's three body forms never
+   in `lib/std/traits.with` — that §29.13's three body forms never
    mention; either spec it as a fourth form or migrate the stdlib to
    `:`.)
 2. **Reserved-word lists are wrong in both directions.** Actual lexer
-   keywords (`src/Token.w:167-225`) vs the spec: `is`, `mod`,
+   keywords (`src/Token.with:167-225`) vs the spec: `is`, `mod`,
    `import`, `sealed`, `struct`, `newaxis` (§30.9) and `implicit`
    (§29.11) are **not** keywords. Conversely `spawn` **is** a live
    keyword with a live AST node — `NK_SPAWN` is exempted from the
-   E0801 unused-task check (`src/SemaCheck.w:4384`) — yet the spec's
+   E0801 unused-task check (`src/SemaCheck.with:4384`) — yet the spec's
    concurrency model never defines a `spawn` construct. Either spec it
    or remove it; an undocumented keyword with task-disposition
    semantics is a conformance hole, not just hygiene.
 3. **`usize` missing from §4.1; `isize` missing from the spec
    entirely.** Both are implemented as 64-bit types with literal
-   suffixes (`src/Sema.w:582-583, 1248-1249, 2156-2162`).
+   suffixes (`src/Sema.with:582-583, 1248-1249, 2156-2162`).
 4. There are two §18.7 sections (Freestanding Mode and Package
    Management). Spec-only.
 5. **§30.4's `let [ 'mut' ]` grammar is wrong.** The parser explicitly
    errors: "'let mut' is not supported; use 'var' for mutable
-   bindings" (`src/Parser.w:2358-2360`).
+   bindings" (`src/Parser.with:2358-2360`).
 6. **§14.21's example uses `->` for match arms and does not compile.**
-   Match arms require `=>` (`src/Parser.w:5494` expects
+   Match arms require `=>` (`src/Parser.with:5494` expects
    `TK_FAT_ARROW`).
 7. §15.4.5's f-string examples use `'hello'` single-quoted strings —
    illegal per the spec's own lexer rules (§29.5a) and the
    implemented lexer (single quote begins a char literal or label).
 8. **`impl Iter[T]` opaque return types describe a type form the
    language doesn't have.** Generators are fully implemented as state
-   machines (`src/MirLower.w:9034-9258`, codegen at
-   `src/Codegen.w:2704-2770`), but the return value is a concrete
+   machines (`src/MirLower.with:9034-9258`, codegen at
+   `src/Codegen.with:2704-2770`), but the return value is a concrete
    generated state struct with a `next()` method — there is no general
    `impl Trait` feature. Spec the actual mechanism.
 9. §14.11 cites "§4.6 tuple arity limits"; §4.6 is Type Inference.
    Spec-only.
 10. **Implicit main does not exist as a language feature.** It exists
-    only as CLI one-liner source synthesis (`src/main.w:525-559`);
+    only as CLI one-liner source synthesis (`src/main.with:525-559`);
     ordinary modules require `fn main`
-    (`src/Parser.w:687`). §18.5b's reference to "the normal
+    (`src/Parser.with:687`). §18.5b's reference to "the normal
     implicit-main feature" points at a feature that exists nowhere
     else. Either implement top-level statements for normal files or
     reword §18.5b.
 11. **Modules: `pub` visibility is recorded but not enforced.**
-    `module x.y` parses optionally (`src/Parser.w:693-709`); `use`
+    `module x.y` parses optionally (`src/Parser.with:693-709`); `use`
     resolution searches the embedded stdlib then filesystem paths
-    (`src/Resolve.w:937-997`); but visibility is only cached
-    (`src/Sema.w:1323-1349`) — **no error is emitted for accessing a
+    (`src/Resolve.with:937-997`); but visibility is only cached
+    (`src/Sema.with:1323-1349`) — **no error is emitted for accessing a
     private symbol from another module.** This is a conformance gap
     (§18.3 "No `pub` = module-private"), not just thin spec text, and
     it matters before external collaborators start consuming `pub` API
@@ -641,4 +641,4 @@ The failure mode stands as documented; the remedy is downgraded.
     non-exhaustive match" — if patterns are irrefutable bindings, the
     panic clause is dead text. (Implementation note: `select await` is
     implemented via `FIBER_SELECT`/`FIBER_SELECT_BIASED` intrinsics,
-    `src/MirLower.w:5945+`, `rt/fiber_runtime.w:156-172`.)
+    `src/MirLower.with:5945+`, `rt/fiber_runtime.with:156-172`.)

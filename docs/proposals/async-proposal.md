@@ -94,12 +94,12 @@ arc) already covers three OSes:
 
 - `runtime/fiber_asm_{aarch64,linux_aarch64,linux_x86_64,windows_aarch64,windows_x86_64,x86_64}.s`
   (~540 lines total) — register save sets verified correct per ABI.
-- `rt/fiber_core_darwin.w` (~1,090 lines): mmap stacks, `PROT_NONE`
+- `rt/fiber_core_darwin.with` (~1,090 lines): mmap stacks, `PROT_NONE`
   guard pages, SIGSEGV overflow handler with fiber attribution, stack
   pooling.
-- `rt/fiber_core_windows.w` (~814 lines): VirtualAlloc stacks, guard
+- `rt/fiber_core_windows.with` (~814 lines): VirtualAlloc stacks, guard
   protection, vectored handler.
-- `rt/fiber_runtime.w` (~320 lines): scheduler, ready queues, scope
+- `rt/fiber_runtime.with` (~320 lines): scheduler, ready queues, scope
   tracking, cancellation.
 
 The port is therefore a **convergence**, not a rewrite: walk minicoro
@@ -118,12 +118,12 @@ async fn / await / select await       (language)
         |
   MIR intrinsics                       (compiler)
         |
-  With scheduler + task runtime        (rt/fiber_runtime.w)
+  With scheduler + task runtime        (rt/fiber_runtime.with)
   ready queues, scope tracking, cancellation
         |
-  fiber backend interface              (rt/fiber_backend.w)  ← permanent seam
+  fiber backend interface              (rt/fiber_backend.with)  ← permanent seam
         |
-  converged backend                    (rt/fiber_core_*.w + runtime/*.s)
+  converged backend                    (rt/fiber_core_*.with + runtime/*.s)
   = verified minicoro port with documented deviations
 ```
 
@@ -146,7 +146,7 @@ Verified 2026-08-31:
 
 | Item | Status |
 |---|---|
-| 3.1 scope-track growth UAF | **Fixed** — `with_scope_track` (rt/rt_core.w:3801) uses a stable handle with in-place growth, the exact prescribed fix. |
+| 3.1 scope-track growth UAF | **Fixed** — `with_scope_track` (rt/rt_core.with:3801) uses a stable handle with in-place growth, the exact prescribed fix. |
 | 3.5 `await_first` awaits index 0 | **Fixed** — winner chosen by `with_runtime_fiber_completion_sequence`. |
 | 3.2 select-await arm typing | Verify against current MirLower before the port; fix if live. |
 | 3.3 select-await no-ready path | Same. |
@@ -159,7 +159,7 @@ Verified 2026-08-31:
 
 ### 5.1 Interface
 
-`rt/fiber_backend.w`, in current With (the earlier draft's `distinct`
+`rt/fiber_backend.with`, in current With (the earlier draft's `distinct`
 types await the #666 campaign; return types are `Unit`):
 
 ```with
@@ -205,7 +205,7 @@ on a fiber succeeds").
 ### 5.3 Wrap, rewire, verify
 
 As in the earlier draft: wrap the *current* (now multi-platform) backend
-behind the interface, rewire `rt/fiber_runtime.w` to backend calls only,
+behind the interface, rewire `rt/fiber_runtime.with` to backend calls only,
 run the full async corpus, require zero behavior change before any port
 work begins.
 
@@ -303,7 +303,7 @@ stack-registration tests (§5.2) for Windows.
 ```
 Slice:   TEB swap transcription + Windows stack tests      (days; live bug)
 Step 0:  §4 audit — verify 3.2/3.3/3.4, write 3.6 matrix   (clean baseline)
-Step 1:  fiber_backend.w interface (+ stack registration)  (permanent seam)
+Step 1:  fiber_backend.with interface (+ stack registration)  (permanent seam)
 Step 2:  Wrap current backend; rewire scheduler            (no-change gate)
 Step 3:  Port map skeleton + deviations ledger + fixtures  (fixtures FIRST)
 Step 4:  Convergence port, function-by-function            (the campaign)

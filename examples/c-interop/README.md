@@ -13,7 +13,7 @@ with build :test  # 13 tests over the real libraries
 
 ## What each file shows
 
-**`src/contracts/sqlite3.w` — the facade, and `src/main.w` — the program**
+**`src/contracts/sqlite3.with` — the facade, and `src/main.with` — the program**
 
 - `use c_import("sqlite3.h", link: "sqlite3")` brings in SQLite's functions,
   its handle types and its `#define` constants. The facade names the handle
@@ -41,13 +41,13 @@ with build :test  # 13 tests over the real libraries
 - A C error is With values: `Failed(status, message)`, the status the call
   returned and SQLite's message for it, copied from the connection before
   the next call replaces it.
-- The contract is the project's own (`src/contracts/sqlite3.w`), until the
+- The contract is the project's own (`src/contracts/sqlite3.with`), until the
   `c.sqlite3` package ships one.
 
-**`src/contracts/tally.w`, `src/tally.w` and `vendor/tally.{h,c}` — a vendored
+**`src/contracts/tally.with`, `src/tally.with` and `vendor/tally.{h,c}` — a vendored
 library, both directions**
 
-- `build.w` compiles `vendor/tally.c` and archives it. The With compiler
+- `build.with` compiles `vendor/tally.c` and archives it. The With compiler
   compiles the C; there is no Makefile and no C toolchain to install.
 - A string macro is a `str` constant (`TALLY_VERSION`); `tally_calls`, a C
   global, is read like any other binding.
@@ -59,7 +59,7 @@ library, both directions**
   callback and userdata, and the compiler handles C's `void *` transport.
 - `@[c_export("c_interop_score")]` gives a With function a C name and the C
   ABI. `tally.c` calls it without knowing it is With. For a C project,
-  `with emit-c-header src/tally.w` writes the prototype.
+  `with emit-c-header src/tally.with` writes the prototype.
 - `buffer param values len param count elements` presents a typed slice.
   The compiler supplies its pointer and checked element count; an empty
   slice reaches C as `null` and `0`.

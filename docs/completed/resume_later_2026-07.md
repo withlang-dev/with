@@ -46,7 +46,7 @@ Approved plan: `/Users/eric/.claude/plans/anything-windows-specific-waits-until-
   shell-out remains in c_import/migrate. Bootstrap pending for this commit.
   (Superseded route note below:)
 - **(superseded) Track 3b ROUTE RULED (#348).** Plan's premise
-  was WRONG: clang_bridge.o is compiled from ClangBridge.w — the bridge is
+  was WRONG: clang_bridge.o is compiled from ClangBridge.with — the bridge is
   pure With over libclang's C API; no C++ shim exists, and clang's
   Preprocessor/-E is C++-only (not in the C API). Ruled route (c') on the
   issue: a narrow With-side expander over the already-de-shelled
@@ -115,10 +115,10 @@ installed. This file records what that means for the remaining slices.
   `field_move_in_branch` counter, inc'd around if/match/while/loop bodies); an
   unconditional field move stays statically moved and the owner's partial drop
   skips it without a reset (preserved drop-plan, no dead store). The
-  `SemaCheck.w:18691` rejection is lifted. Fixtures:
+  `SemaCheck.with:18691` rejection is lifted. Fixtures:
   `behav_conditional_field_move_drop` (if + match), `da_conditional_field_move`.
   Field move-OUT of a `Drop` aggregate stays forbidden (§2.4;
-  `err_move_out_vec_field_*` + `SemaCheck.w:18685/18688/18741`).
+  `err_move_out_vec_field_*` + `SemaCheck.with:18685/18688/18741`).
 - **Slice F — M8 generator/async-state ownership audit** — done; the async path is
   sound. With's async is fiber-based, so a `Drop` value live across a suspend
   (await) stays on the fiber stack (no copy/zero of "generator state") and the
@@ -129,7 +129,7 @@ installed. This file records what that means for the remaining slices.
   `da_async_cancel_drops_live`. (No copy/zero hazard — the `gen_zero_operand` the
   plan worried about is the aggregate-init/reset helper, not used in async lowering.)
 - **Field-read drop suppression** — fixed. `cancel_scheduled_value_drop_for_receiver_expr`
-  (`MirLower.w`) marked *any* field-access RHS of a `let` moved (the #606 self-aliasing
+  (`MirLower.with`) marked *any* field-access RHS of a `let` moved (the #606 self-aliasing
   case), including a plain **Copy** field read (`let _ = r.ptr`). Marking a Copy field of
   a `Drop` struct moved degraded the owner's whole-value `Drop` into a partial drop that
   emits nothing (its fields are not individually needs-drop) → the user `Drop` was
@@ -146,7 +146,7 @@ installed. This file records what that means for the remaining slices.
    irrefutable destructure (A7), and precise per-element partial-extraction tracking to
    replace the conservative whole-base consume (A8). See `docs/completed/phase_8_handoff.md` and
    `docs/completed/a5_handoff.md`. (One A5 coverage gap noted while archiving: the
-   `behav_mut_self_vec_owner_receiver.w` test from the handoff's restore list was never
+   `behav_mut_self_vec_owner_receiver.with` test from the handoff's restore list was never
    restored; the other two A5 fixtures exist and pass.) The niche plus conditional
    whole-value and field moves (Slices
    A–F) and the field-read drop fix are complete; A6/A7/A8 are precision refinements
@@ -154,10 +154,10 @@ installed. This file records what that means for the remaining slices.
 
 ## Session state 2026-07-01 evening (A6/A7/A8 probes; resume here)
 
-- **A5 restore-list gap: RESOLVED, no restore.** `behav_mut_self_vec_owner_receiver.w`
+- **A5 restore-list gap: RESOLVED, no restore.** `behav_mut_self_vec_owner_receiver.with`
   cannot come back as a behavior test — its shape (move-self returning a `Vec[W]`
-  field) is deliberately rejected (#607 boundary, `SemaCheck.w` reject sites) and is
-  pinned by `err_move_out_vec_field_moveself.w`, which documents it flips back to a
+  field) is deliberately rejected (#607 boundary, `SemaCheck.with` reject sites) and is
+  pinned by `err_move_out_vec_field_moveself.with`, which documents it flips back to a
   behavior test (count 1) when #607 lands.
 - **A6 VERIFIED + FIXTURES LANDED (uncommitted).** All six shapes re-run heap-backed
   under `--debug-alloc`: exact counts, leak 0. New fixtures for the uncovered shapes:
@@ -168,11 +168,11 @@ installed. This file records what that means for the remaining slices.
   Every pattern-position discard orphans Drop values: `let (a,_)`, nested `_`,
   `let {x, y: _}`, `let {x, ..}` , match arm `(a,_)`, and whole-subject `_` arm
   (leaks the ENTIRE subject: `match make(): _ => ()` → 2 leaks). Root cause: the
-  consuming contexts (let-destructure/if-let/match, `MirLower.w` consume sites)
+  consuming contexts (let-destructure/if-let/match, `MirLower.with` consume sites)
   cancel the subject's drop while `lower_pattern` binds only NAMED elements; the
   match consume comment documented the leak as a known follow-up. `let _ = expr`
   (statement discard) and param patterns (`fn f({x, y: _}: P)`) were already sound.
-  FIX in `MirLower.w lower_pattern`: NK_PAT_WILDCARD moves a needs-value-drop
+  FIX in `MirLower.with lower_pattern`: NK_PAT_WILDCARD moves a needs-value-drop
   scrutinee into an anonymous drop-scheduled local (mirrors NK_PAT_IDENT; borrowed
   subjects arrive ref-typed → untouched); NK_PAT_STRUCT `..` rest iterates
   unmentioned fields via type reflection and does the same (by-value subjects only,
@@ -205,7 +205,7 @@ installed. This file records what that means for the remaining slices.
   (`let a = t.0` → t.1 still drops; existing machinery: static field move + partial
   base drop). ARRAY index extraction LEAKS siblings (`let a = arr[0]` → arr[1]
   leaked): root cause is the documented whole-base consume in the NK_INDEX branch
-  of `MirLower.w lower_expr` (search "#606: moving a non-Copy element out of an
+  of `MirLower.with lower_expr` (search "#606: moving a non-Copy element out of an
   ARRAY"), which cancels the array's drop and returns OK_COPY. NEXT CYCLE fix
   (designed, not yet applied): return OK_MOVE, push the index place onto
   `pending_reset_field_places`/`_types` (unconditional slot blank at stmt boundary;
@@ -216,7 +216,7 @@ installed. This file records what that means for the remaining slices.
   projections so `consume_moved_operand` won't record bogus static marks. Probe
   tail-position extraction (`return arr[0]`) for reset-before-scope-exit-drop
   ordering. Existing pinned fixtures (extract-both, count 2) must stay green.
-- **Verification per cycle:** check src/main.w → build → :fixpoint →
+- **Verification per cycle:** check src/main.with → build → :fixpoint →
   :debug-alloc-tests → fresh :test → :test-green. Commit A6 fixtures and A7
   fix+fixtures as separate commits after gates; A8 is its own cycle after.
 - Probes live in the session scratchpad (a6/, a7/, a8/) — regenerate trivially.
@@ -256,7 +256,7 @@ installed. This file records what that means for the remaining slices.
   Exact counts = no leak AND no double-free. So A6 is **verification + fixtures,
   not implementation**: (a) re-run the matrix heap-backed under `--debug-alloc`
   (leak-count oracle), (b) land the matrix as `behav_`/`da_` fixtures (+ restore
-  the missing `behav_mut_self_vec_owner_receiver.w` from the A5 list), (c) probe
+  the missing `behav_mut_self_vec_owner_receiver.with` from the A5 list), (c) probe
   A7 (wildcard/discard destructure) and A8 (partial extraction then drop) the
   same way — the whole A-tail may already be delivered by the niche, reducing
   #605/#606 to fixtures + close/retarget.
@@ -268,7 +268,7 @@ installed. This file records what that means for the remaining slices.
 
 ## Verification protocol (every change)
 
-`./out/release/bin/with check src/main.w` → `with build` → `with build :fixpoint`
+`./out/release/bin/with check src/main.with` → `with build` → `with build :fixpoint`
 → `with build :debug-alloc-tests` (the soundness oracle) →
 `rm -rf out/test-graph && with build :test` (fresh) → `with build :test-green`.
 For conditional moves the `da_*conditional_move*` fixtures must show `leak count=0`
@@ -276,20 +276,20 @@ and never `DOUBLE FREE`.
 
 ## Key files (current)
 
-- `src/Sema.w` / `src/SemaCheck.w` — move-checking diagnostic: `check_if_expr`,
+- `src/Sema.with` / `src/SemaCheck.with` — move-checking diagnostic: `check_if_expr`,
   `check_match_expr`, the loop dataflow (`finalize_loop_move_state`,
   `check_loop_continue_carried_move`, `capture_loop_break_move_state`), the
   field-move rejections (`:18685`–`:18741`).
-- `src/MirLower.w` — the niche: reset-on-move recorded at the single
+- `src/MirLower.with` — the niche: reset-on-move recorded at the single
   `pending_reset_locals.push` site (also marks `ever_moved_locals` for the Stage-4
   elision); the guarded drop in `emit_drop_entry`.
-- `src/Mir.w` — `MirBody.ever_moved_locals` (the elision set).
-- `rt/rt_core.w` — `rt_value_is_zero` (the reset-sentinel check); per-slot
+- `src/Mir.with` — `MirBody.ever_moved_locals` (the elision set).
+- `rt/rt_core.with` — `rt_value_is_zero` (the reset-sentinel check); per-slot
   `with_slotmap_*` generation for §6 handles.
-- Tests: `test/behavior/behav_{conditional,match_conditional}_move_drop_value.w`,
-  `test/debug_alloc/da_{drop,match}_conditional_move_value.w`,
-  `test/compile_errors/err_loop_conditional_move_drop_value.w`,
-  `test/compile_errors/err_move_out_vec_field_*.w`.
+- Tests: `test/behavior/behav_{conditional,match_conditional}_move_drop_value.with`,
+  `test/debug_alloc/da_{drop,match}_conditional_move_value.with`,
+  `test/compile_errors/err_loop_conditional_move_drop_value.with`,
+  `test/compile_errors/err_move_out_vec_field_*.with`.
 
 ## Open issues
 

@@ -9,14 +9,14 @@ Spec-focused example for testing:
 
 ## Files
 
-- `ephemerality_and_lowering.w` — primary example module (includes `@[test]` cases)
-- `test/ephemerality_and_lowering_test.w` — package-style test implementation
+- `ephemerality_and_lowering.with` — primary example module (includes `@[test]` cases)
+- `test/ephemerality_and_lowering_test.with` — package-style test implementation
 
 ## Run
 
 From this directory:
 
 ```bash
-with run ephemerality_and_lowering.w
-with test test/ephemerality_and_lowering_test.w
+with run ephemerality_and_lowering.with
+with test test/ephemerality_and_lowering_test.with
 ```

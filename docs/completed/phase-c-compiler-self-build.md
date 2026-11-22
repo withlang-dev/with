@@ -5,25 +5,25 @@ Status: completed design note. Phase C extraction is complete.
 Phase C moves project-specific build logic out of the generic compiler driver.
 The compiler project itself is one of those projects, so targets such as
 `with_compiler_build`, `with_compiler_ir`, `generate_compiler_entrypoints`, and
-`generate_llvm_link_metadata` ultimately belong in this repository's `build.w`
-or project-local build modules, not in generic `src/main.w` dispatch.
+`generate_llvm_link_metadata` ultimately belong in this repository's `build.with`
+or project-local build modules, not in generic `src/main.with` dispatch.
 
 ## Bootstrap Order
 
 The safe end-state bootstrap shape is:
 
-1. A seed compiler evaluates the repository `build.w`.
-2. `build.w` declares ordinary graph nodes and project-local actions for the
+1. A seed compiler evaluates the repository `build.with`.
+2. `build.with` declares ordinary graph nodes and project-local actions for the
    compiler build.
 3. The generic driver executes standard nodes and mints action capabilities.
 4. Project-local action functions implement With-repository policy: versioned
    entrypoint generation, stage compilation, IR emission, and LLVM link metadata.
 5. Stage1 is built by the seed.
-6. Stage1 evaluates the same `build.w` and builds stage2.
-7. Stage2 evaluates the same `build.w` and builds stage3.
+6. Stage1 evaluates the same `build.with` and builds stage2.
+7. Stage2 evaluates the same `build.with` and builds stage3.
 8. Fixpoint compares stage2 and stage3 byte-for-byte.
 
-The important invariant is that `build.w` must remain evaluable by the current
+The important invariant is that `build.with` must remain evaluable by the current
 seed before any newly built stage exists. Project-local action code can build
 the compiler, but it cannot require compiler features that are absent from the
 seed until the seed has been updated through the normal fixpoint path.
@@ -31,9 +31,9 @@ seed until the seed has been updated through the normal fixpoint path.
 ## The Seed
 
 For Phase C planning, "the seed" means the compiler binary that evaluates this
-repository's `build.w` before stage1 exists. In the normal local workflow, that
+repository's `build.with` before stage1 exists. In the normal local workflow, that
 is the checked build product `out/bin/with`. This is the canonical planning
-case for Phase C extraction slices: a capability can be used by `build.w` only
+case for Phase C extraction slices: a capability can be used by `build.with` only
 after it has landed in the compiler, reached fixpoint, and produced a new
 `out/bin/with`.
 
@@ -48,8 +48,8 @@ compiler-build graph targets whose entry is `"seed"` resolve a compiler through
 5. `with` as a final command fallback.
 
 Those fallbacks are recovery and compatibility paths, not permission to use
-arbitrary new `build.w` APIs. If a developer or CI job invokes an older
-`$WITH`, `$PATH` compiler, or downloaded `src/main`, then `build.w` must stay
+arbitrary new `build.with` APIs. If a developer or CI job invokes an older
+`$WITH`, `$PATH` compiler, or downloaded `src/main`, then `build.with` must stay
 within that compiler's embedded stdlib and driver capability set. Phase C
 planning therefore treats `out/bin/with` as the canonical local seed, while
 release/download/PATH seeds are compatibility boundaries that cannot rely on
@@ -57,7 +57,7 @@ new capabilities until they have been explicitly updated.
 
 ## Seed Sufficiency
 
-The seed is sufficient to evaluate `build.w` if the build file uses only:
+The seed is sufficient to evaluate `build.with` if the build file uses only:
 
 - standard `std.build` APIs already embedded in the seed;
 - project-local modules that the seed can parse and typecheck;
@@ -84,7 +84,7 @@ the new project-local build logic.
 
 The main risks are:
 
-- `build.w` uses a new stdlib API before the seed embeds it.
+- `build.with` uses a new stdlib API before the seed embeds it.
 - A project-local action needs a runtime primitive before the seed can link it.
 - A stage-build action shells out to compiler behavior that is being replaced
   in the same slice.
@@ -100,7 +100,7 @@ then migrate the compiler-project target that depends on it.
 ## Recommended Extraction Order
 
 1. Selfhost fixtures. These are pure repository tests and already fit the
-   action model. Moving them first reduces `src/main.w` dispatch without
+   action model. Moving them first reduces `src/main.with` dispatch without
    touching bootstrap-critical stage construction.
 2. PCRE2 targets. They are project-specific migrated-library workflows. They
    exercise filesystem, process, corpus-test, promotion, and generated-source

@@ -11,18 +11,18 @@
 
 Root modules to replace:
 
-1. `src/Span.w`
-2. `src/Source.w`
-3. `src/InternPool.w`
-4. `src/Diagnostic.w`
+1. `src/Span.with`
+2. `src/Source.with`
+3. `src/InternPool.with`
+4. `src/Diagnostic.with`
 
 Foundation sources of truth:
 
-- `src/compiler/foundation/Span.w`
-- `src/compiler/foundation/Source.w`
-- `src/compiler/foundation/InternPool.w`
-- `src/compiler/foundation/Diagnostic.w`
-- `src/compiler/foundation/DiagnosticRender.w`
+- `src/compiler/foundation/Span.with`
+- `src/compiler/foundation/Source.with`
+- `src/compiler/foundation/InternPool.with`
+- `src/compiler/foundation/Diagnostic.with`
+- `src/compiler/foundation/DiagnosticRender.with`
 
 ---
 
@@ -35,7 +35,7 @@ Foundation sources of truth:
   - `./bootstrap/zig-out/bin/with test bootstrap/test/cases/`
   - `./scripts/rebuild_selfhost.sh stage2`
 - [x] Save baseline logs/artifacts for comparison.
-  Note: both `with test .../cases/` commands currently return `error: no tests matched filter` in this tree; practical gating used was `run_wave1_unit_tests.sh`, `rebuild_selfhost.sh stage2`, and `out/bin/with-stage1 check src/main.w`.
+  Note: both `with test .../cases/` commands currently return `error: no tests matched filter` in this tree; practical gating used was `run_wave1_unit_tests.sh`, `rebuild_selfhost.sh stage2`, and `out/bin/with-stage1 check src/main.with`.
 
 ---
 
@@ -43,7 +43,7 @@ Foundation sources of truth:
 
 ## Commit 1 — Replace `Span`
 
-- [x] Replace `src/Span.w` with foundation-aligned implementation.
+- [x] Replace `src/Span.with` with foundation-aligned implementation.
 - [x] Update all callsites that depend on old `Span` API/behavior.
 - [x] Handle any bootstrap codegen edge-case patterns encountered (targeted fixes only).
 - [x] Run full suite.
@@ -52,7 +52,7 @@ Foundation sources of truth:
 
 ## Commit 2 — Replace `Source`
 
-- [x] Replace `src/Source.w` with foundation-aligned implementation.
+- [x] Replace `src/Source.with` with foundation-aligned implementation.
 - [x] Update callsites for field/API shape changes (`name/path`, location helpers, etc.).
 - [x] Keep behavior deterministic for diagnostics/path reporting.
 - [x] Run full suite.
@@ -61,7 +61,7 @@ Foundation sources of truth:
 
 ## Commit 3 — Replace `InternPool`
 
-- [x] Replace `src/InternPool.w` with foundation-aligned implementation.
+- [x] Replace `src/InternPool.with` with foundation-aligned implementation.
 - [x] Update parser/sema/codegen/front-end callsites to new interning API.
 - [x] Ensure symbol behavior remains stable where string-only callers exist.
 - [x] Run full suite.
@@ -70,7 +70,7 @@ Foundation sources of truth:
 
 ## Commit 4 — Replace `Diagnostic`
 
-- [x] Replace `src/Diagnostic.w` with foundation model + rendering integration.
+- [x] Replace `src/Diagnostic.with` with foundation model + rendering integration.
 - [x] Integrate `DiagnosticRender` where old in-module render paths were used.
 - [x] Update callsites across parser/sema/driver/frontend for new diagnostic APIs.
 - [x] Run full suite.

@@ -38,7 +38,7 @@ jobs:
       WITH_SEED_VERSION: nightly-20261122-44999614621-1-9096b55a07f7
       WITH_SEED_SHA256: 7d1e7c669eafcff479de88cfd605aa4d0be00e0343bc8e8bb269f5d2c16a75d2
       WITH_SDK_REPO: withlang-dev/with
-      # Built from build/sdk.w at 6f039463: the With linux sysroot, its own
+      # Built from build/sdk.with at 6f039463: the With linux sysroot, its own
       # compiler-rt and static libc++, no libxml2 (#1915, D81).
       WITH_SDK_VERSION: nightly-sdk-20261004-c4ddb7ddbef2
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
@@ -56,7 +56,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           # zstd: extract the SDK tarball. dev libs: the compiler link line uses
-          # -lz -lzstd -lxml2 (build/compiler.w), which need the .so dev symlinks.
+          # -lz -lzstd -lxml2 (build/compiler.with), which need the .so dev symlinks.
           # bz2, sqlite3, curl: the facade tests c_import the host's bzlib.h,
           # sqlite3.h and curl/curl.h (a UAT project gets them from `with get`).
           sudo apt-get install -y --no-install-recommends zstd zlib1g-dev libzstd-dev libxml2-dev \
@@ -144,7 +144,7 @@ jobs:
           # asserts `analyze audit:all` + `audit:storage`), CLI self-host, and
           # c-migrator suites, then records `test-green` evidence.
           #
-          # The stable seed runs build.w, whose test actions invoke the already-
+          # The stable seed runs build.with, whose test actions invoke the already-
           # built out/release/bin/with on the fixtures (no rebuild — the build
           # step above populated the cache).
           export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"

@@ -5,12 +5,12 @@ Sixteen With workloads translated from the implementation in `.reference/goose/b
 Run from repository root:
 
 ```sh
-GOOSE_EXE=out/benchmarks/goose/compiler/goose with run -O1 benchmarks/goose/run.w smoke all 1
-GOOSE_EXE=out/benchmarks/goose/compiler/goose with run -O1 benchmarks/goose/run.w small all 3
-GOOSE_EXE=out/benchmarks/goose/compiler/goose with run -O1 benchmarks/goose/run.w medium strlist,words,respond 3
+GOOSE_EXE=out/benchmarks/goose/compiler/goose with run -O1 benchmarks/goose/run.with smoke all 1
+GOOSE_EXE=out/benchmarks/goose/compiler/goose with run -O1 benchmarks/goose/run.with small all 3
+GOOSE_EXE=out/benchmarks/goose/compiler/goose with run -O1 benchmarks/goose/run.with medium strlist,words,respond 3
 ```
 
-Arguments are size, selector (`all` or comma-separated names), and measured repetitions. All sixteen ports can also be checked or run directly, at their default upstream small sizes. `common.w` supplies the exact unsigned xorshift sequence and modulo mapping; this benchmark adapter intentionally preserves upstream modulo bias. It is not a replacement for `std.random`.
+Arguments are size, selector (`all` or comma-separated names), and measured repetitions. All sixteen ports can also be checked or run directly, at their default upstream small sizes. `common.with` supplies the exact unsigned xorshift sequence and modulo mapping; this benchmark adapter intentionally preserves upstream modulo bias. It is not a replacement for `std.random`.
 
 The With runner uses `std.process.run_to_files` for argv execution, timeouts and per-child peak RSS. It compiles outside timing, discards two warmups, and records the best whole-process wall time and worst measured RSS. Input generation, allocations, output and destruction are included. Every warmup and measured run must produce identical stdout, and each implementation must match the first successful C++/Rust reference. Failures preserve build logs and stdout in `out/benchmarks/goose`; they return status 1. An unset `GOOSE_EXE` produces explicit pending rows and status 2. A complete run returns 0. Missing compilers are failures, not silently omitted comparisons.
 
@@ -33,7 +33,7 @@ The runner passes the checkout's stdlib explicitly. Generated Rust/Goose input c
 
 ## Representation and ceremony census
 
-The [token census](census.md) is regenerated with `with run -O1 benchmarks/goose/census.w`. It counts casts, clone calls and typed local bindings with the compiler lexer; the table below records what those spellings mean. Declaration counts alone do not distinguish required contracts from avoidable ceremony.
+The [token census](census.md) is regenerated with `with run -O1 benchmarks/goose/census.with`. It counts casts, clone calls and typed local bindings with the compiler lexer; the table below records what those spellings mean. Declaration counts alone do not distinguish required contracts from avoidable ceremony.
 
 | Workload | With representation | Relevant comparison / visible obligation |
 |---|---|---|

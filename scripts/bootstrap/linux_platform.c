@@ -264,9 +264,9 @@ void rt_fill_random(uint8_t *buf, uint64_t len) {
 int *__error(void) { return __errno_location(); }
 
 /* --- platform surface added after the original shim (mirrors
- * rt/linux_x86_64.w): stdio handles, lstat mode, readlink, wall clock,
+ * rt/linux_x86_64.with): stdio handles, lstat mode, readlink, wall clock,
  * rlimits, and the rt_compat_* process-exec boundary that
- * rt/compat_runtime.w declares as externs. --- */
+ * rt/compat_runtime.with declares as externs. --- */
 
 /* runtime/sys/resource.h (shipped stub, first on the include path) no-ops
  * rlimits and only defines RLIMIT_STACK; keep these fallbacks so the same
@@ -392,7 +392,7 @@ static int32_t rt_compat_wait_child(int pid, int32_t timeout_ms) {
                     kill(-pid, SIGKILL);
                     waitpid(pid, &status, 0);
                 }
-                return 124; /* capture timeout rc, matches rt/linux_x86_64.w */
+                return 124; /* capture timeout rc, matches rt/linux_x86_64.with */
             }
             usleep(10000);
         }
