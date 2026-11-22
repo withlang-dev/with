@@ -607,7 +607,7 @@ impl Compilation:
             if loaded_wi_sha != manifest_wi_sha:
                 with_eprint("error: --link-bundle: " ++ wi_path ++ " (sha256 " ++ loaded_wi_sha ++ ") is not the interface " ++ manifest_path ++ " was built with (" ++ manifest_wi_sha ++ "); rebuild the bundle")
                 return false
-            if bundle_interfaces_register_wi(wi_text) == 0:
+            if bundle_interfaces_register_package_wi(sema_path_last_segment(prefix_path), wi_text) == 0:
                 with_eprint("error: --link-bundle: no `module <path>` sections in " ++ wi_path)
                 return false
             if not self.link_objects.contains(obj_path):

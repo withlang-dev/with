@@ -8508,7 +8508,7 @@ impl ComptimeEvaluator:
                 // its module after `$in$`; the message names the function.
                 let displaced = fn_name.index_of("$in$")
                 let shown = if displaced > 0: fn_name.slice(0, displaced) else: fn_name
-                return self.fail(node, "cannot evaluate '" ++ shown ++ "' at compile time: it belongs to another package (" ++ callee_package ++ ") and is not declared `comptime fn`")
+                return self.fail(node, "cannot evaluate '" ++ shown ++ "' at compile time: it belongs to another package (" ++ sema_package_display(callee_package) ++ ") and is not declared `comptime fn`")
         // D91 (§17.1a): the target's OS and architecture are a declared
         // build input, readable by any compile-time code. Whether the
         // runtime symbol is an extern, an interface declaration (the runtime
@@ -8519,7 +8519,7 @@ impl ComptimeEvaluator:
         // D39: an interface declaration has no body to evaluate. A runtime ABI
         // function's (the runtime bundle's interface, D30 step 3) is judged
         // below as the extern it is to compile time, by D104's wording.
-        if fn_node != 0 and self.ast.fn_decl_body_is_interface(fn_node) and not reads_target and not self.sema.fn_is_in_unit_runtime_abi_def(fn_sym):
+        if fn_node != 0 and self.ast.fn_decl_body_is_interface(fn_node) and self.ast.fn_decl_evaluation_body(fn_node) == 0 and not reads_target and not self.sema.fn_is_in_unit_runtime_abi_def(fn_sym):
             return self.fail(node, "cannot evaluate '" ++ fn_name ++ "' at comptime: an interface declaration has no body (D39)")
         if fn_node != 0:
             let fn_decl_path = self.decl_path(fn_node)
@@ -8674,7 +8674,7 @@ impl ComptimeEvaluator:
                             return self.fail(ppat, "comptime argument did not match parameter pattern")
 
         self.body_fn_nodes.push(fn_node)
-        let body_signal = self.eval_expr(self.ast.get_data1(fn_node))
+        let body_signal = self.eval_expr(self.ast.fn_decl_evaluation_body(fn_node))
         self.body_fn_nodes.pop()
         var has_mut_receiver: i32 = 0
         var final_mut_receiver = comptime_value_invalid()

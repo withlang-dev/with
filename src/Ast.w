@@ -1148,6 +1148,15 @@ impl AstPool:
 
     // D39: the fn's body slot holds an interface body (looking through the
     // `unsafe fn` wrapper the parser inserts around every fn body).
+    // The body compile-time evaluation runs for `node`: its own body, or,
+    // for an interface declaration that crossed a bundle boundary with one
+    // (D39 as amended), the body it carries; 0 when it has none.
+    fn fn_decl_evaluation_body(node: NodeId) -> i32:
+        var body = self.get_data1(node)
+        if body != 0 and self.kind(body) == NodeKind.NK_UNSAFE_BLOCK and self.get_data2(body) == UNSAFE_ORIGIN_FN_BODY: body = self.get_data0(body)
+        if body != 0 and self.kind(body) == NodeKind.NK_INTERFACE_BODY: return self.get_data0(body)
+        self.get_data1(node)
+
     fn fn_decl_body_is_interface(node: NodeId) -> bool:
         if self.kind(node) != NodeKind.NK_FN_DECL:
             return false

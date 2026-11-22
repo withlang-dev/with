@@ -332,9 +332,14 @@ impl Parser:
         // compiler supplies; Sema refuses any other.
         if is_async != 0 or is_gen != 0:
             self.emit_error("interface declarations cannot be async or gen functions (D39)")
+        // D39 as amended (D227): a function of the package that one of its
+        // `comptime fn`s reaches crosses with its body, for the importer's
+        // evaluator. It is still an interface declaration: the object holds
+        // its code, and the body here is read at compile time only.
         if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_L_BRACE:
-            self.emit_error("interface declarations carry no bodies (D39: a .wi holds signatures; the object holds the code)")
-            return self.parse_body()
+            let start = self.current_start()
+            let evaluated = self.parse_body()
+            return self.pool.add_node(NodeKind.NK_INTERFACE_BODY, start, self.prev_end(), evaluated as i32, 0, 0)
         self.pool.add_node(NodeKind.NK_INTERFACE_BODY, self.prev_end(), self.prev_end(), 0, 0, 0)
 
     fn token_text_at(at: i32) -> str:
@@ -4069,7 +4074,7 @@ impl Parser:
             var body = 0 as NodeId
             if self.interface_mode != 0:
                 // D39: methods of an interface declaration carry no bodies either.
-                body = self.parse_interface_body(m_tp_count + impl_tp_count, m_async, m_gen, 0)
+                body = self.parse_interface_body(m_tp_count + impl_tp_count, m_async, m_gen, if m_comptime: 1 else: 0)
                 if body == 0:
                     break
             else if self.peek() == TokenKind.TK_COLON:

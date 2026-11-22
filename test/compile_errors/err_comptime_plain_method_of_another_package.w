@@ -1,4 +1,4 @@
-//! expect-check-fail: at compile time: it belongs to another package (test/compile_errors/lib/ctlib) and is not declared `comptime fn`
+//! expect-check-fail: at compile time: it belongs to another package (ctlib) and is not declared `comptime fn`
 // A method is a function: an unmarked one of another package is refused.
 use ctlib.math
 
