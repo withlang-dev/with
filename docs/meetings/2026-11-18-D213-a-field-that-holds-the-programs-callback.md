@@ -4,6 +4,10 @@
 absence), 1 (one cited line per field, not a fact repeated on every function
 that can reach it).
 
+**Implemented 2026-11-22** (the facts reader, the draft's contradiction and
+setter checks); the spec words were brought to Eric as a diff the same day
+and are not in the spec until he blesses them.
+
 **Date:** 2026-11-18. **Status:** ruled by Eric. The spec words are derived
 and come to him as a diff with the implementation.
 
