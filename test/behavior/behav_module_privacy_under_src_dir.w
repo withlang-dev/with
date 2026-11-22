@@ -34,7 +34,7 @@ fn main:
     let private_type = p7_run(case_dir, "privacy-src-dir-type", "check\0src/p1.w\0")
     p7_assert_failure_contains(private_type, "symbol 'Secret' is private to its package", "check src/p1.w")
     let private_c = p7_run(case_dir, "privacy-src-dir-c", "check\0src/p2.w\0")
-    p7_assert_failure_contains(private_c, "symbol 'FILE' is private to its package", "check src/p2.w")
+    p7_assert_failure_contains(private_c, "'FILE' is a name of the C header '<stdio.h>', which 'src/dep/cu.w' imports and this module does not", "check src/p2.w")
     let public_ok = p7_run(case_dir, "privacy-src-dir-pub", "check\0src/p3.w\0")
     p7_assert_success(public_ok, "check src/p3.w")
     // An impl on another package's private type names the cause at the impl
