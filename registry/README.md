@@ -29,7 +29,12 @@ about a parameter's or a return's shape, where the proofs reach neither;
 libxml2's optional encoding and the text `xmlGetProp` hands back, freed by
 `xmlFree`). An item may carry several. At the facade level, `text utf8`
 (D134: every text return presents as `Option[str]`, validated at the
-boundary; libxml2's `xmlChar` is a byte of UTF-8). The engine applies a
+boundary; libxml2's `xmlChar` is a byte of UTF-8). A resource a library
+initializes in place is stated as a contract states it: `resource R wraps
+T` with `init F(self)`, its success status (`init F(self), ok K`, or a
+resource-level `ok K`) and `drop G`; a parameter of such a function that the
+call always passes is fixed on its item (`fn F` with `param p fixed V`:
+zlib's `inflateInit_` takes `ZLIB_VERSION` and `sizeof(z_stream)`). The engine applies a
 fact only
 where a proof and the library's annotations said nothing (§16.2b.2), and
 the generated facade records each one with the provenance `registry:` and
