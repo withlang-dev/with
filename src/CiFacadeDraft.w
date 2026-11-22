@@ -452,9 +452,10 @@ impl CiProject:
         false
 
     // A function the proofs are about: one a unit defines, or one the
-    // package's introspection files declare facts for (D121 step 3).
+    // package's introspection files declare facts for (D121 step 3), or one
+    // a registry resource names (a prebuilt package defines none here).
     fn fd_subject(si: i32) -> bool:
-        self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and (self.symbols[si].has_definition != 0 or self.symbols[si].gir.len() > 0 or self.symbols[si].registry.len() > 0)
+        self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and (self.symbols[si].has_definition != 0 or self.symbols[si].gir.len() > 0 or self.symbols[si].registry.len() > 0 or self.registry_value_fns.contains(self.symbols[si].name))
 
     // The pointer parameters of `si`: how many, and the index of the one
     // when there is exactly one (else -1).
