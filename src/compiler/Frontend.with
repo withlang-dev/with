@@ -946,7 +946,7 @@ impl Zcu:
         // bare integer-suffix macro (`L`) is no longer an empty literal; v16
         // evaluated macro constants annotate by value range (#775); v15
         // suffixed >i64::MAX literals.
-        var key = header_spec ++ "\n#format:cimport-v19\n#links:"
+        var key = header_spec ++ "\n#format:cimport-v20\n#links:"
         // Preserve existing C cache keys; only C++ adds a language discriminator.
         if self.c_import_is_cxx_frontend(pool, decl): key = key ++ "\n#lang:c++\n"
         let link_start = pool.get_data1(decl)
