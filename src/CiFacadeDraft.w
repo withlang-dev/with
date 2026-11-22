@@ -1440,8 +1440,29 @@ impl CiProject:
         let status = self.fd_inplace_status(si, field)
         let proven = "an in-place initializer of " ++ record ++ " (gives its " ++ field ++ " field a fresh allocation, which " ++ self.symbols[pair[2]].name ++ " frees)"
         if status.len() == 0: return proven ++ ", but the status it returns on success is not proven; a contract states the resource with 'init " ++ self.symbols[si].name ++ "(self)', 'drop " ++ self.symbols[pair[2]].name ++ "' and 'ok <CONST>' (§16.2b.4)"
-        if status.starts_with("literal:"): return proven ++ ", and it returns " ++ status.slice(8, status.len()) ++ " on success, but 'ok' names a constant and the header gives that value no name"
+        // D226 (A): an init that can report success with the allocation
+        // failed is no proof, unless the destroyer accepts a null pointer.
+        if not self.fd_inplace_end_accepts_null(record): return proven ++ ", but it can report success after its allocation failed, and " ++ self.symbols[pair[2]].name ++ " hands the field to " ++ self.fd_inplace_end_callee(record) ++ ", which is not known to accept NULL; a contract states the resource"
         ""
+
+    // The function the end of an in-place `record` hands the shared field
+    // to, or "".
+    fn fd_inplace_end_callee(record: &str) -> str:
+        let pair = self.fd_inplace_functions(record)
+        if pair.len() != 4: return ""
+        let head = f"fieldsink:{pair[3]}:" ++ self.fd_inplace_field(record) ++ ":"
+        for line in self.symbols[pair[2]].own_evidence.split("\n"):
+            if line.starts_with(head):
+                let parts = line.slice(head.len(), line.len()).split(":")
+                if parts.len() == 2: return parts[0].to_owned()
+        ""
+
+    // Whether that function accepts a null pointer: C's `free` does
+    // nothing for one (C17 7.22.3.3), and so does a name the proofs found
+    // to be `free` itself. Nothing else is assumed to.
+    fn fd_inplace_end_accepts_null(record: &str) -> bool:
+        let callee = self.fd_inplace_end_callee(record)
+        callee.len() > 0 and (ci_own_is_libc_free(callee) or self.free_aliases.contains(callee))
 
     // What the proofs found of an in-place resource in `si` when no pair
     // was drafted: it fills or frees a field of a caller-allocated record,
@@ -1468,7 +1489,7 @@ impl CiProject:
         let pair = self.fd_inplace_functions(record)
         if pair.len() != 4: return pair
         let status = self.fd_inplace_status(pair[0], self.fd_inplace_field(record))
-        if status.len() == 0 or status.starts_with("literal:"): return []
+        if status.len() == 0 or not self.fd_inplace_end_accepts_null(record): return []
         pair
 
     // The field an in-place `record`'s proven pair shares.
@@ -1682,7 +1703,7 @@ impl CiProject:
                 self.presented.push(pair[0])
                 self.presented.push(pair[2])
                 let status = self.fd_inplace_status(pair[0], field)
-                let ok_line = if status == "void": "" else: "        ok " ++ status ++ "    // proof: returned only after the " ++ field ++ " field is filled; every return before that is another constant\n"
+                let ok_line = if status == "void": "" else: "        ok " ++ (if status.starts_with("literal:"): status.slice(8, status.len()) else: status) ++ "    // proof: returned only after the " ++ field ++ " field is filled; every return before that is another constant\n"
                 text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps " ++ record ++ "\n        init " ++ self.symbols[pair[0]].name ++ "(self)    // proof: gives the record's " ++ field ++ " field a fresh allocation nothing else keeps\n" ++ ok_line ++ "        drop " ++ self.symbols[pair[2]].name ++ "    // proof: frees the " ++ field ++ " field " ++ self.symbols[pair[0]].name ++ " filled\n"
                 continue
             text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
