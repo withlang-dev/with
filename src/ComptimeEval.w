@@ -8489,7 +8489,11 @@ impl ComptimeEvaluator:
             // The build and compiler APIs are the capability-bearing mode
             // (§17.1b): the capability registry is where they are stated.
             if callee_package != caller_package and not self.sema.fn_symbol_is_tool_comptime_allowed(fn_sym):
-                return self.fail(node, "cannot evaluate '" ++ fn_name ++ "' at compile time: it belongs to another package (" ++ callee_package ++ ") and is not declared `comptime fn`")
+                // A name displaced by another module's same name carries
+                // its module after `$in$`; the message names the function.
+                let displaced = fn_name.index_of("$in$")
+                let shown = if displaced > 0: fn_name.slice(0, displaced) else: fn_name
+                return self.fail(node, "cannot evaluate '" ++ shown ++ "' at compile time: it belongs to another package (" ++ callee_package ++ ") and is not declared `comptime fn`")
         // D91 (§17.1a): the target's OS and architecture are a declared
         // build input, readable by any compile-time code. Whether the
         // runtime symbol is an extern, an interface declaration (the runtime
