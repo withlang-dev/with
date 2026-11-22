@@ -1,4 +1,5 @@
 //! expect-check-fail: applies to a resource, not an fn item
+//! expect-check-fail: = help: move 'drop' under the 'resource <Name>' item it describes
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

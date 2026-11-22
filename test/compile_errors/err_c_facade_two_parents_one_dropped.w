@@ -1,4 +1,5 @@
 //! expect-check-fail: implicit drop of `backup` uses `&src` after `src` is moved (§21.1 Rule 7)
+//! expect-check-fail: = help: drop or finish with `backup` before `src` is moved or consumed
 
 // D51 stage 6 (ruling §27: "a resource may depend on multiple parents"; the
 // child remains valid only while all remain valid): a backup made from two

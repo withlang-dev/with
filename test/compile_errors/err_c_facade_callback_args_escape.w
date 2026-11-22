@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Arg' is a callback-scope handle, borrowed for the callback's invocation, and cannot outlive it
+//! expect-check-fail: = help: use the 'Arg' inside the callback C passes it to; copy out what must outlive it (the values its operations return)
 
 // Spec §16.2b.9 (D76, ruling Amendment 2): the argument vector a generated
 // wrapper hands a callback is "valid for the callback's invocation only".

@@ -1,4 +1,5 @@
 //! expect-check-fail: 'cwd' is process-global state: an effect the runtime audit records, not a domain, until a facade presents a safe view whose validity it decides
+//! expect-check-fail: = help: add 'domain cwd <scope>' to the contract, with <scope> one of process, thread, resource or static
 
 // Spec §16.2b.14 (D76, ruling Amendment 2, #1608): process-global C state
 // over which no safe view is presented is an effect the runtime audit

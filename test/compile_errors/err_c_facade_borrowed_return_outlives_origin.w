@@ -1,4 +1,5 @@
 //! expect-check-fail: view `handle` may originate from `s`, which no longer lives here (§21.1 Rule 6)
+//! expect-check-fail: = help: declare `handle` after `s`, or clear/drop `handle` before `s` goes out of scope
 
 // D51 stage 6 (ruling §26: a borrowed return "cannot outlive the named
 // origin"): the borrowed database cannot be used past the statement it

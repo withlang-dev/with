@@ -1,4 +1,5 @@
 //! expect-check-fail: unknown method 'count' for type 'FailedDatabase': a failed 'Database'
+//! expect-check-fail: = help: state 'valid on failed' on the fn item describing an operation the C library documents on the failed handle; its representation is the field `repr`, under the raw C rules (`unsafe`)
 
 // D51 stage 12b (#1612; spec §16.2b.4): a failed-state resource admits
 // only the operations its facade marks `valid on failed`. `db_errmsg` is

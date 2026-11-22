@@ -1,4 +1,5 @@
 //! expect-check-fail: names a field of a record passed by value
+//! expect-check-fail: = help: write 'from buf_open, nullable': the returned pointer is the one that may be NULL
 
 // §16.2b.4: a pointer resource's NULL is the representation's own.
 use c_import("typedef struct Buf { int *data; } Buf;

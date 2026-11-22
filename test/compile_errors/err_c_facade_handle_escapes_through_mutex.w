@@ -1,5 +1,6 @@
 //! expect-check-fail: this call stores a view of `t` into `keep` through its shared receiver, and `keep` outlives this call
 //! expect-check-fail: 'Tally' is a callback-scope handle, borrowed for the callback's invocation, and cannot outlive it
+//! expect-check-fail: = help: store an owned value, or keep the view in storage that lives no longer than its origin
 
 // #1778 (§16.2b.9, §21.1): a callback-scope handle cannot outlive the
 // callback. Stored through `Mutex.set` into the userdata — which outlives

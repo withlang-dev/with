@@ -1,4 +1,5 @@
 //! expect-check-fail: view `r` borrows from `h`, which `hold_bump` may have invalidated (§16.2b.7)
+//! expect-check-fail: = help: state `preserves param 0` on fn hold_bump in facade records if it leaves that storage valid, or copy `r` out (`to_owned()`) before the call
 
 // D66 (spec §16.2b.6): a record view backed by a resource is invalidated
 // by the resource's operations that state no preservation (§16.2b.7:

@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Handle' holds a retained borrow and cannot be returned or stored; it is ephemeral until the retention is released, or the resource reset or destroyed
+//! expect-check-fail: = help: keep it alive until the retention is released or the resource is reset or destroyed, or reset the resource first
 
 // D66 (spec §16.2b.9 "Retained borrows"): a resource holding a retained
 // borrow is ephemeral for that window — returning it would carry the

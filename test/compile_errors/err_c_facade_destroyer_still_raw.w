@@ -1,4 +1,5 @@
 //! expect-check-fail: 'db_close_ctx' is still a raw call after the facade covers the representation
+//! expect-check-fail: = help: add 'fn db_close_ctx' with a clause for each pointer parameter ('text param N', 'buffer param P len param L', 'param N fixed null')
 
 // D51 §16.2b.5 stage 4a: a rendered destroyer is the safe surface of a C
 // operation whose representation parameter the resource supplies. A

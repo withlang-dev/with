@@ -1,4 +1,5 @@
 //! expect-check-fail: view `t` borrows from `st`, which `kv_step` may have invalidated
+//! expect-check-fail: = help: state `preserves param 0` on fn kv_step in facade kv if it leaves that storage valid, or copy `t` out (`to_owned()`) before the call
 
 // D85 (#2003; spec §16.2b.6, §16.2b.7): a parent borrow changes what the
 // borrowed connection depends on, not what the statement's own views

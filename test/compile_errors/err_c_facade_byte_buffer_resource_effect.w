@@ -1,4 +1,5 @@
 //! expect-check-fail: view `view` borrows from `owner`, which `touch` may have invalidated
+//! expect-check-fail: = help: state `preserves param 2` on fn touch in facade values if it leaves that storage valid, or copy `view` out (`to_owned()`) before the call
 
 // The same index projection applies to the original byte buffer spelling.
 use c_import("#include <stdlib.h>

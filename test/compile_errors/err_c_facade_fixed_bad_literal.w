@@ -1,4 +1,5 @@
 //! expect-check-fail: a fixed argument is an integer literal
+//! expect-check-fail: = help: name a constant of the imported header, or write the literal
 
 // D64 §16.2b.11: a fixed argument is a literal, never an expression or a
 // name the facade would have to evaluate.

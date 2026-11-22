@@ -1,4 +1,5 @@
 //! expect-check-fail: 'body' dies while 'Req' still holds it as the storage 'Req.set' set
+//! expect-check-fail: = help: keep it alive until the retention is released or the resource is reset or destroyed, or reset the resource first
 
 // D194 (spec §16.2b.9 "Retained borrows"): a `CString` bound after the
 // handle dies before it, while the handle still holds the pointer.

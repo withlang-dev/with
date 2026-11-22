@@ -1,5 +1,6 @@
 //! expect-check-fail: view `v` borrows from `o`, which `st_new` may have invalidated
 //! expect-check-fail: state `preserves param 3` on fn st_new
+//! expect-check-fail: = help: state `preserves param 3` on fn st_new in facade stp if it leaves that storage valid, or copy `v` out (`to_owned()`) before the call
 
 // #1674 (§16.2b.7, §16.2b.14): a producer rendered as a method of its parent
 // (`d.st_new(flags, o)` for `st_new(db *, st **out, int, other *)`)

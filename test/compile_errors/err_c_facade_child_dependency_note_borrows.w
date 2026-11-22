@@ -1,4 +1,5 @@
 //! expect-check-fail: = note: dependency: 'Link' depends on 'Database', which producer 'link_new' receives as param 0: *mut db a — stated by 'borrows param 0' in facade dbf (§16.2b.6)
+//! expect-check-fail: = help: drop or finish with `link` before `a` is moved or consumed
 
 // D51 stage 6 (ruling §8): a dependency the facade states is reported with
 // the clause that states it.

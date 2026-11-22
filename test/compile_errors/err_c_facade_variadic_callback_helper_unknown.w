@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Handle.run' may invoke the callback pair of 'Handle', and on this path the pair is not proven compatible
+//! expect-check-fail: = help: complete the pair or run the abandonment path before the call
 
 // D66 (spec §16.2b.9): a helper the facade does not describe may change the
 // pair in any way; after it the pair is unknown until a modeled reset, so

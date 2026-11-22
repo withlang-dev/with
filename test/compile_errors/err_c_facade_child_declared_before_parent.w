@@ -1,4 +1,5 @@
 //! expect-check-fail: implicit drop of `keep` uses `&db` after `db` is destroyed (§21.1 Rule 7)
+//! expect-check-fail: = help: declare `keep` after `db`, or clear/drop `keep` before `db` goes out of scope
 
 // D51 stage 6 (ruling §29: "is destroyed before required origins"): an
 // Option holding a statement, declared before its database, would drop

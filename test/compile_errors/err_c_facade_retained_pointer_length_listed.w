@@ -1,4 +1,5 @@
 //! expect-check-fail: 'case OPT_DATA' sets its length through OPT_SIZE, so OPT_SIZE is not listed as a case of its own
+//! expect-check-fail: = help: delete 'case OPT_SIZE'
 
 // D194 (spec §16.2b.5; D51 §9): a sized retained case's length option is
 // set only through the case's own operation. Listing it as a case too would

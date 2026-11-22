@@ -1,4 +1,5 @@
 //! expect-check-fail: = note: dependency: 'Statement' depends on 'Database', which producer 'st_new' receives as param 0: *mut db d — conservative default of facade dbf: unknown independence means dependency (§16.2b.6)
+//! expect-check-fail: = help: drop or finish with `s` before `db` is moved or consumed
 
 // D51 stage 6 (ruling §8, §57): a dependency error on a facade's child names
 // what it depends on, the producer and the resolved C parameter, and that

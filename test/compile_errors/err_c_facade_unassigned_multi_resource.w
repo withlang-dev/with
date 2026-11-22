@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'z_reset': param 0: *mut z_stream s receives a representation several resources wrap ('InflateStream', 'DeflateStream'); an operation is callable through a resource only after the facade assigns it, so 'z_reset' is not presented on any of them (§16.2b.3)
+//! expect-check-fail: = help: state 'of InflateStream' or 'of DeflateStream' on this fn item
 
 // D51 stage 8 (ruling §14, §53): "When a foreign representation maps to
 // multiple modeled resources, an operation is callable through a modeled

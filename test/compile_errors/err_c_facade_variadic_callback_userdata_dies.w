@@ -1,4 +1,5 @@
 //! expect-check-fail: 'sink' dies while 'Handle' still holds it as callback userdata
+//! expect-check-fail: = help: keep it alive until the retention is released or the resource is reset or destroyed, or reset the resource first
 
 // D66 (spec §16.2b.9 "Retained borrows"): the userdata is a borrow the
 // handle holds until reset or destruction; a sink declared inside a

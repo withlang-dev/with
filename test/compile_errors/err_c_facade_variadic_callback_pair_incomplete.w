@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Handle.run' may invoke the callback pair of 'Handle', and on this path the pair is not proven compatible
+//! expect-check-fail: = help: set both the callback and its userdata, branch on the setter's status against its 'ok' constant, or run the resource's abandonment path first
 
 // D66 (spec §16.2b.9): a callback set without its userdata is an
 // incompatible pair — C would hand the callback the foreign default — and
