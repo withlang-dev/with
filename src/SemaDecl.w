@@ -63,6 +63,13 @@ fn disc_text(value: i64, signed: bool) -> str:
 
 // ── Pass 1: Declaration collection ───────────────────────────────
 
+// A contract module: `contracts/<name>` in a project, or the contract
+// `with get` wrote for a fetched package (`.with/deps/c/<name>/<version>/contract`).
+fn sema_path_is_contract_module(path: &str) -> bool:
+    let p = "/" ++ path.replace("\\", "/")
+    let stem = if p.ends_with(".with"): p.slice(0, p.len() - 5) else if p.ends_with(".w"): p.slice(0, p.len() - 2) else: p
+    p.contains("/contracts/") or (stem.ends_with("/contract") and p.contains("/.with/deps/c/"))
+
 impl Sema:
     // #1457: the type names more than one source file declares. Runs before
     // any type is registered (collect_declarations) and reads only the decl
@@ -985,6 +992,20 @@ impl Sema:
                     prev_path_sym = ps
         if has_ci == 0:
             return
+        // §16.2b.15: `use contracts.<name>` and a `c_import` of the
+        // library's header are two routes to one library and see the same
+        // names. A module that imports a contract sees the header the
+        // contract imports.
+        var importer = 0
+        for edge_start in self.module_import_starts:
+            if importer < self.module_paths.len() and importer < self.module_import_counts.len():
+                var edge = 0
+                while edge < self.module_import_counts[importer]:
+                    let target_path = self.module_paths[self.module_import_targets[edge_start + edge]]
+                    if sema_path_is_contract_module(target_path) and self.ci_modules.contains(self.pool_intern(target_path)):
+                        self.ci_modules.insert(self.pool_intern(self.module_paths[importer]), 1)
+                    edge += 1
+            importer += 1
         // Scoping (visibility filtering) only activates with multiple modules.
         if module_count >= 2:
             self.scoping_active = 1
