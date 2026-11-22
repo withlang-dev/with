@@ -746,8 +746,14 @@ impl MirBuilder:
     // plain bits are copied; one with drop glue moves out of a non-Copy
     // carrier (as before D111) and is copied, with its own hold, out of a
     // Copy carrier, which keeps its own hold and its drop.
+    // A carrier reached through a view (`names[0] ?? d` over a
+    // `List[Option[str]]`) is judged as the carrier it views: the view's own
+    // type is bits, which read as "not a Copy carrier", and the payload was
+    // moved out of the list's element and freed twice.
     fn carrier_read_kind(read_ty: i32, carrier_ty: i32) -> i32:
-        if self.copy_is_bits(read_ty) or (self.sema.is_copy_frozen(read_ty as TypeId) != 0 and self.carrier_copies(carrier_ty)): OperandKind.OK_COPY else: OperandKind.OK_MOVE
+        let resolved = self.sema.resolve_alias(carrier_ty as TypeId)
+        let carrier = if self.sema.get_type_kind(resolved) == TypeKind.TY_REF: self.sema.get_type_d0(resolved) else: carrier_ty
+        if self.copy_is_bits(read_ty) or (self.sema.is_copy_frozen(read_ty as TypeId) != 0 and self.carrier_copies(carrier)): OperandKind.OK_COPY else: OperandKind.OK_MOVE
 
     // A pattern binding over an observed subject (`match m:` on a place)
     // copies a Copy payload with its own hold; the subject keeps its own.
