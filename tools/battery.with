@@ -97,6 +97,16 @@ fn clear_runtime_dirs_on_seed_change():
     assert(mkdir_p("out/.build-state") == 0)
     assert(write_file(record, seed ++ "\n") == 0)
 
+// D228: a worktree built before the tree was renamed holds the generated
+// modules under their old extension, and the compiler refuses a directory
+// with both spellings of one module. They are this build's own outputs,
+// rewritten as `.with`; the old ones go.
+fn clear_old_spelling_generated_modules():
+    for path in list_files_text("out/gen").split("\n"):
+        if path.ends_with(".w"):
+            print("battery: removing " ++ path ++ " (generated before the rename to .with, D228)")
+            let _gone = remove_file(path)
+
 // The same rule as build/retention.with's ret_worktree_is_clean: a tracked change
 // dirties the tree; an untracked path dirties it only if it could be a build
 // input (docs/, examples/ and top-level *.md are not).
@@ -274,6 +284,7 @@ if not tree_is_clean():
     eprint("battery: the worktree is not clean (out/battery/git-status.txt); commit first — a battery blesses committed sources")
     exit_code(1)
 clear_runtime_dirs_on_seed_change()
+clear_old_spelling_generated_modules()
 let head = output_line(&["git", "rev-parse", "--short", "HEAD"])
 assert(head.len() > 0)
 assert(write_file("out/battery/head.txt", head ++ "\n") == 0)

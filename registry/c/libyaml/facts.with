@@ -1,0 +1,15 @@
+// libyaml 0.2.5, the version `with get c.libyaml` pins. Every citation is a
+// line of the package's installed header, include/yaml.h.
+//
+// A parser and an emitter are records the caller allocates; one function
+// initializes each in place and one ends it. A document is not stated here:
+// yaml_emitter_dump takes it over and destroys it (yaml.h line 1952, "The
+// emitter takes the responsibility for the document object and destroys its
+// content after it is emitted"), which a drop alone would repeat.
+c facade libyaml:
+    resource Parser wraps yaml_parser_t
+        init yaml_parser_initialize(self), ok 1    // yaml.h 0.2.5 line 1314: "This function creates a new parser object."; line 1319: "@returns @c 1 if the function succeeded, @c 0 on error."
+        drop yaml_parser_delete    // yaml.h 0.2.5 line 1314: "An application is responsible for destroying the object using the yaml_parser_delete() function."
+    resource Emitter wraps yaml_emitter_t
+        init yaml_emitter_initialize(self), ok 1    // yaml.h 0.2.5 line 1781: "This function creates a new emitter object."; line 1786: "@returns @c 1 if the function succeeded, @c 0 on error."
+        drop yaml_emitter_delete    // yaml.h 0.2.5 line 1781: "An application is responsible for destroying the object using the yaml_emitter_delete() function."
