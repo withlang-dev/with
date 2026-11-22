@@ -11,7 +11,7 @@ The string branch checked only operations 6 (`!=`) and 5 (`==`), then
 the `b.ne` at `0x1000c9a74` went to the rejection block at `0x1000c9b58`.
 The call to `ComptimeEvaluator.fail` was at `0x1000c9b7c`; its backtrace
 returned to `eval_binary_compare+536`. In the source this is the CV_STR
-branch in `src/ComptimeEval.w`, followed by the scalar-only diagnostic.
+branch in `src/ComptimeEval.with`, followed by the scalar-only diagnostic.
 Transcript: `out/zlib-1103-validation/comptime-string-compare-lldb.log`.
 
 The evaluator omitted all four string ordering operators even though

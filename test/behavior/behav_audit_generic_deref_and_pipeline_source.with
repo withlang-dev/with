@@ -1,0 +1,38 @@
+//! expect-stdout: ok
+
+// #3423: two records `analyze audit:resolution` judged against the wrong
+// type. A deref's type was not recorded where it was decided, so a generic
+// method's `Some(*v)` kept the pointee of the instantiation checked first
+// (MIR i64, Sema i32). A sequence piped into an iterator stage is read as
+// the iterator its inserted `.iter()` builds (MIR ListIter[str], Sema
+// List[str]).
+use pre_d_build_runner
+
+fn program_text -> str:
+    "use std.collections.HashMap\n" ++
+        "type Box2[K, V] { map: HashMap[K, V] }\n\n" ++
+        "impl[K, V] Box2[K, V]:\n" ++
+        "    fn get(key: &K) -> Option[V]:\n" ++
+        "        match self.map.get(key):\n" ++
+        "            Some(v) => Some(*v)\n" ++
+        "            None => None\n\n" ++
+        "fn names() -> List[str]: [\"alpha\", \"beta\"]\n\n" ++
+        "fn main:\n" ++
+        "    var a: Box2[i32, i32] = Box2 { map: HashMap.new() }\n" ++
+        "    a.map.insert(1, 7)\n" ++
+        "    var b: Box2[i32, i64] = Box2 { map: HashMap.new() }\n" ++
+        "    b.map.insert(1, 9)\n" ++
+        "    let symbol = \"alphabet\"\n" ++
+        "    let hit = names() |> any(symbol.starts_with(it))\n" ++
+        "    print(f\"{a.get(1).unwrap()} {b.get(1).unwrap()} {hit}\")\n"
+
+fn main:
+    let case_dir = p7_prepare_case("audit_generic_deref_and_pipeline_source", "audit_generic_deref_and_pipeline_source")
+    p7_write(case_dir, "src/program.with", program_text())
+    let ran = p7_run(case_dir, "program_run", "run\0src/program.with\0")
+    p7_assert_success(ran, "the program runs")
+    assert(ran.stdout.contains("7 9 true"))
+    let audited = p7_run(case_dir, "program_audit", "analyze\0src/program.with\0audit:resolution\0")
+    p7_assert_success(audited, "audit:resolution over a generic deref and a piped sequence")
+    assert(audited.stdout.contains("violations=0"))
+    print("ok")

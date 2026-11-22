@@ -463,7 +463,7 @@ Validate:
 * Diagnostics must match Stage0.
 * Explicit task-boundary ephemeral tests must pass in the Wave 8 corpus.
 
-`KNOWN_DEBT` (current repo state): Wave 8 behavior currently lives in `src/Sema.w` for corpus parity and must be rewritten onto MIR (`src/BorrowCheck.w` + `src/BorrowCfg.w`) after semantic fixpoint.
+`KNOWN_DEBT` (current repo state): Wave 8 behavior currently lives in `src/Sema.with` for corpus parity and must be rewritten onto MIR (`src/BorrowCheck.with` + `src/BorrowCfg.with`) after semantic fixpoint.
 
 ---
 
@@ -471,8 +471,8 @@ Validate:
 
 Implemented in self-host:
 
-* `src/AsyncMir.w` deterministic Async-MIR artifact model.
-* `src/AsyncLower.w` post-MIR async lowering pass (await/select/yield suspension points, state transitions, source spans, storage/drop snapshots).
+* `src/AsyncMir.with` deterministic Async-MIR artifact model.
+* `src/AsyncLower.with` post-MIR async lowering pass (await/select/yield suspension points, state transitions, source spans, storage/drop snapshots).
 * Driver integration after MIR lowering in `check`/`build`/`run`.
 * Deterministic CLI dump path via `--dump-async-mir`.
 * Runtime linkage gating for async runtime objects (`fiber.o`, `fiber_asm.o`) based on Async-MIR async usage.

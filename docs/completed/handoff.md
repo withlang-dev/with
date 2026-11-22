@@ -39,7 +39,7 @@ the earlier foundation, rebased onto 1e839443, pushed; PR body current).
 Implemented and verified on the branch stage1: `abandon` clause, `ok` on
 variadic operations, callback/userdata setter rendering with the implied
 userdata case, `U` binding for callback-only setters, the Sema pair-op
-registry, `MirForeignPairs.w` (place flow over the real CFG, findings in
+registry, `MirForeignPairs.with` (place flow over the real CFG, findings in
 the body's file, `WITH_DUMP_PAIR_FLOW=1` dump), libcurl facade + UAT under
 the amendment, 3 runtime/check fixtures and 7 compile-error fixtures.
 Runtime proof against real libcurl: the file:// transfer through the pair
@@ -122,7 +122,7 @@ phase 3). Eric decides compiler merges.
 - **Cleanup candidate verified locally:** branch `public-return-annotation-cleanup`
   remains **3a18dcc0**. Local self-host build and fixpoint both passed
   (`out/audit-current-local-{selfcompile,fixpoint}.log`, sessions 51545/71398
-  finished). Fresh `out/release/bin/with check build.w` passes; after moving
+  finished). Fresh `out/release/bin/with check build.with` passes; after moving
   the old runner aside, that exact fresh binary compiled a new native runner
   in 20.8s and passed :spec-inventory-check with no fallback
   (`out/audit-fresh-release-native-runner.log`). This is NONCANONICAL local
@@ -133,16 +133,16 @@ phase 3). Eric decides compiler merges.
 
 - **Current verification / cleanup bootstrap detail:** combined float battery
   60770 has passed build, fixpoint, drop/move and is in :test. Fresh combined
-  stage1 passes `behav_float_unsigned_cast.w` and the 592×8 C sweep under
+  stage1 passes `behav_float_unsigned_cast.with` and the 592×8 C sweep under
   debug allocator (zero leaks): `out/float-unsigned-after.log`,
   `out/c-float-final-sweep-alloc.log`.
   Cleanup branch rebased unchanged onto combined head: **3a18dcc0**, patch ID
   **7eb964bfe7d643d9bd809e0a8476b6fadf548c3a**. Compiler source check passes.
   **Its new seed needs both public inference AND the cleaned embedded
   Diagnostics.error Never signature.** Combined parent stage1 still embeds
-  old Unit, so checking cleaned build.w produces four missing-return errors
-  in selfhost.w (2646/3194/6678/6684). Old locally built cleanup stage1, with
-  the correct embedded Never, accepts the exact same build.w.
+  old Unit, so checking cleaned build.with produces four missing-return errors
+  in selfhost.with (2646/3194/6678/6684). Old locally built cleanup stage1, with
+  the correct embedded Never, accepts the exact same build.with.
   Logs `out/audit-current-{build,source}-check.log` and
   `out/audit-clean-stdlib-driver-check.log`. No annotations restored.
   Named copy `out/public-return-clean-stdlib-driver` now drives a explicitly
@@ -203,7 +203,7 @@ phase 3). Eric decides compiler merges.
 - Float **21978b22** has further UNCOMMITTED fixes: exact fixed rounding,
   no 18-digit scientific clamp, dynamically sized output for high precision,
   stack storage for common precision; obsolete fixed/shortest helpers removed.
-  LLDB `out/float-fixed-lldb-proof.log` observed rt_core.w:152 with val=1e30,
+  LLDB `out/float-fixed-lldb-proof.log` observed rt_core.with:152 with val=1e30,
   and the +0.5 rounding at :162. Old probe printed `0.13` for .125:.2f and
   nonsense for 1e30. Rebuilt stage1 via :dev **41527 PASS** (119.6s wall).
   Boundary and C differential tests PASS for 592 values × 8 formats,
@@ -211,11 +211,11 @@ phase 3). Eric decides compiler merges.
   (`out/c-fixed-{boundaries,sweep,sweep-alloc}.log`). Subsequent dead-helper
   removal/stack fast path source-check passes but needs the next rebuild.
 - The same hunt found an actual **float→unsigned cast compiler bug**:
-  CodegenDispatch.w:3890 used src_unsigned (always false for float) to choose
+  CodegenDispatch.with:3890 used src_unsigned (always false for float) to choose
   FPToUI/FPToSI. `out/float-unsigned-before.ll` has @convert(double) emitting
   fptosi for declared u64; runtime strtod probe fails, while a constant-only
   assertion was optimized away by poison. Uncommitted fix uses Sema's
-  destination type d1. New `behav_float_unsigned_cast.w` uses runtime values,
+  destination type d1. New `behav_float_unsigned_cast.with` uses runtime values,
   covers f64→u8/u16/u32/u64, f32→u32/u64 and signed control. Old stage1 fails
   at line15 as expected (`out/float-unsigned-regression-before.log`). Fix NOT
   yet rebuilt or tested; include it in float battery. No code builds active
@@ -224,7 +224,7 @@ phase 3). Eric decides compiler merges.
 - **Latest checkpoint (supersedes older running/dirty status below):** audit
   cleanup is committed as **3f7b3c3e** on `public-return-annotation-cleanup`
   in modeled-c-completion. It is not pushed or canonical-seed verified.
-  Local self-compile, fresh build.w check, scanner, libc/runtime-domain,
+  Local self-compile, fresh build.with check, scanner, libc/runtime-domain,
   spec-inventory and user-programs-safe gates pass. Runtime-domain negative
   mutation reported both bad rows and failed before restoration and clean pass.
   Independent foundation worktree `public-return-foundation` has **6621f4c6**
@@ -269,7 +269,7 @@ phase 3). Eric decides compiler merges.
   `~/.local/with-staging/modeled-c-ready-battery`, branch
   `verify-modeled-c-ready`, source **590aa2be** (#1672 + #1675 only).
   Exact pinned seed copied into src/main; WITH points there. Driver
-  `out/run_ready_battery.w` runs seed-driver, build, fixpoint, drop/move audit,
+  `out/run_ready_battery.with` runs seed-driver, build, fixpoint, drop/move audit,
   test, test-green, last-green, user-programs-safe, stopping on first failure.
   Exec session **31175**, log `out/ready-battery.log`, live status
   `out/ready-battery-status.txt`. Seed-driver passed; full build is running
@@ -279,7 +279,7 @@ phase 3). Eric decides compiler merges.
   Fresh stage1 embeds cleaned stdlib; scanner test passes and all three
   StringBuilder.push_* signatures remain Unit. Fatal-diagnostic negative
   regression fails at its intended unreachable statement. New compiler
-  checking build.w exposed additional unreachable error-reporting code:
+  checking build.with exposed additional unreachable error-reporting code:
   working through it in the audit worktree (uncommitted). Counted validation
   loops now print error details then retain their existing nonzero/fatal
   aggregate outcome; consecutive fatal calls are combined so details appear;
@@ -315,14 +315,14 @@ phase 3). Eric decides compiler merges.
   (`set_migrate_options`, `begin_intercept`, `end_intercept`, `set_link_command`)
   whose comptime implementation returns Unit although their native unsupported
   fallback exits. Removing those four inferred Never incorrectly; restored
-  with rationale before validation. `src/main.w` checks with the
+  with rationale before validation. `src/main.with` checks with the
   fixed stage1. Removing `Diagnostics.error -> Unit` exposes its real Never
-  return and dead callers. LLDB stopped at SemaCheck.w:9894 with
+  return and dead callers. LLDB stopped at SemaCheck.with:9894 with
   block_diverged=1 (`out/212e42b0-unreachable-proof.log`). Both native and
   comptime diagnostics.error abort; docs/with-build.md promises this.
   Removed 115 adjacent dead `return 1` statements in build actions and moved
   the unreachable checksum-failure temp-file deletion BEFORE the fatal
-  diagnostic (one additional dead return removed). Direct `lib/std/build.w`
+  diagnostic (one additional dead return removed). Direct `lib/std/build.with`
   check now passes; broader validation and regression for this cleanup remain.
   Changes are uncommitted; do not discard or blindly restore annotations.
 - A **local, noncanonical self-compile** is running to validate fresh embedded
@@ -375,12 +375,12 @@ phase 3). Eric decides compiler merges.
   defect filed #1673. Logs under the implementation worktree's `out/`.
 - **Latest dev build PASS:** `out/elements-dev-resolution.log`.
   Audit caught generic buffer/callback calls with a raw C callee operand:
-  LLDB `out/elements-resolution-proof.log` stopped at MirLower.w:15118,
+  LLDB `out/elements-resolution-proof.log` stopped at MirLower.with:15118,
   raw callee 13358, node 578114. The generic lowering now propagates
   `comp_resolved` instead of choosing the operand from AST spelling.
   Source check, runtime fixture and free-callback regression pass;
   `out/elements-final-audit.log`: 644407 facts, zero violations.
-  Added `behav_analysis_resolution_facade_generic.w` (runner needs stage2/
+  Added `behav_analysis_resolution_facade_generic.with` (runner needs stage2/
   release path, so final battery tests it; no fake stage2 copy).
 - **Tally migrated under approved ruling:** real-header facade check passed
   before application rewrite. No unsafe remains. Stage1-direct example
@@ -408,7 +408,7 @@ phase 3). Eric decides compiler merges.
   explicit callback type and per-case retention, but Sema deliberately
   rejects retained variadic cases until safety checks are wired. Latest
   `out/callback-state-dev.log` :dev PASS, clause behavior/negative tests
-  PASS. `ForeignPairState.w` and its internal test cover setter outcomes,
+  PASS. `ForeignPairState.with` and its internal test cover setter outcomes,
   unknown failures retaining old/new origins, replacement, backward joins,
   callback-capable cleanup, callback-free destruction and creation loops.
   These abstract tests PASS but are NOT compiler integration or runtime
@@ -427,7 +427,7 @@ phase 3). Eric decides compiler merges.
   selector-value alias. Existing real-libcurl setopt, variadic free cases
   and callbacks-none behavior PASS. Latest gate PASS:
   **out/user-programs-safe-callback-state.log**.
-  `out/curl-pair-failure-probe.w` runs the real variadic ABI: WRITEFUNCTION
+  `out/curl-pair-failure-probe.with` runs the real variadic ABI: WRITEFUNCTION
   succeeds, deliberately invalid LASTENTRY fails UNKNOWN_OPTION, reset
   and cleanup complete. Raw probe only, not safe-facade acceptance; never
   add LASTENTRY to the production facade. Reset also has a MIME freefunc
@@ -514,9 +514,9 @@ phase 3). Eric decides compiler merges.
   At helper +356, `w20=1`, `w10=w12=w13=0xffffffff`, `w15=0xfffffffe`;
   stepping the sign test reached +1016 (panic). The fix returns the already
   sorted order for fewer than two spans.
-- Added `behav_analysis_resolution_no_prelude.w`: no-body diagnostic,
+- Added `behav_analysis_resolution_no_prelude.with`: no-body diagnostic,
   singleton indirect call, two bodies. It fails on the previous compiler and
-  passes on the new stage2. The original `behav_c_va_list_target_abi.w`
+  passes on the new stage2. The original `behav_c_va_list_target_abi.with`
   passes on the new stage2, including all five targets. Planted resolution
   and unknown-callee validator tests pass on the new stage1.
 - `audit-res` is clean at 974c8bac; its build log is
@@ -543,7 +543,7 @@ phase 3). Eric decides compiler merges.
   x8=0x40000001, x27=0x40000000, takes the global guard branch and exits 1.
   The implementation in progress makes budgets explicit per target
   (`Target.rss_limit(bytes)`), defaults to reporting-only, configures the
-  compiler stage targets in build.w, preserves budgets in graph/cache/clone
+  compiler stage targets in build.with, preserves budgets in graph/cache/clone
   paths, and tests synthetic measurements. Stage1 and the synthetic policy
   test pass (`out/rss-dev.log`, `out/rss-policy-stage1.log`). The iterate
   stage2 build passed (`out/rss-stage2.log`), driven by the new stage1.
@@ -552,7 +552,7 @@ phase 3). Eric decides compiler merges.
   blocking, metadata isolation, invalid-budget rejection. Spec inventory
   also passed (`out/rss-spec-inventory.log`). The worktree is clean and
   pushed; #1666 stays draft pending the pinned-seed battery.
-- **#1665 bootstrap prerequisite:** the pinned seed rejects src/main.w:2008
+- **#1665 bootstrap prerequisite:** the pinned seed rejects src/main.with:2008
   with its known false field-move diagnostic; the verified stack compiler
   accepts it. Do not call an alternate-driver run the final pinned-seed
   battery. Eric has been asked once for permission to merge the green first
@@ -634,7 +634,7 @@ branch, a PR, a worktree) and described in §4.
   `with-darwin-aarch64` + `.sha256` + `.provenance` sidecars (copy the
   format from `gh release view nightly-20260925-local-1-fa33bda543c2`),
   bump `seed.lock` (version + darwin digest), `with run
-  tools/bump_seed_pins.w`, fetch with the OLD seed (`~/with/src/main build
+  tools/bump_seed_pins.with`, fetch with the OLD seed (`~/with/src/main build
   :seed`), commit lock + `.github/workflows` pins, PR, then run the full
   battery on that branch **driven by the new seed** — green validates it;
   Eric merges; then `~/with`: `git pull && with build :seed`. The
@@ -651,7 +651,7 @@ branch, a PR, a worktree) and described in §4.
   with one addition", "rule (A)"), open the docs PR, run `with build
   :spec-inventory-check`, merge it yourself, start implementing. A new CLI
   command needs a spec-ahead row in the inventory lane
-  (`build/compiler.w` `comp_known_missing_command` + the known-lines
+  (`build/compiler.with` `comp_known_missing_command` + the known-lines
   table) until it's implemented.
 - **D65 — one owner per fact** (in CLAUDE.md): Sema decides what, MIR
   where/when, codegen how; no stage re-derives another's answer; fix bugs
@@ -705,25 +705,25 @@ Open items needing Eric (ask once, one line each):
   contracts (rendered `<name>__<CONST>` methods over the still-variadic
   declaration; Sema retargets by the compile-time selector), record views
   (`Option[&T]`), `c_import` `typedef void H` → `type H = c_void`,
-  `lib/facades/libcurl.w` (Easy resource, `setopt` 9 cases, version record
+  `lib/facades/libcurl.with` (Easy resource, `setopt` 9 cases, version record
   from `domain version_info`, `curl_version`/`curl_easy_strerror` static),
-  `build/release_uat_fixtures/libcurl_main.w` 8 → 0 `unsafe`. Its own
+  `build/release_uat_fixtures/libcurl_main.with` 8 → 0 `unsafe`. Its own
   duplicate of the packing fix was dropped in the restack; **one
-  accommodation commit** copies instead of field-moving in `src/main.w`
+  accommodation commit** copies instead of field-moving in `src/main.with`
   `run_cli` because the pinned seed still has the bug — **delete that line
   in the first PR after the next seed cut.**
 - **#1662** `analyze-audit-resolution` (d95194af, worktree `audit-res`,
-  clean): `src/AnalysisResolution.w`, `audit:resolution` in `audit:all`
+  clean): `src/AnalysisResolution.with`, `audit:resolution` in `audit:all`
   (every MIR callee + argument count agrees with Sema's resolution), the
   #1639 validator (`mir_validate_call_callee_known`), planted fixtures in
   `test/internals/`, `MirBody.elided_call_nodes`. Zero violations on
-  1218 behavior fixtures, `src/main.w`, `build.w`.
+  1218 behavior fixtures, `src/main.with`, `build.with`.
 - **Battery** (worktree `fold2`, checkout `s1664-battery` = d95194af, logs
   `fold2/out/logs/`): build, fixpoint, drop-audit, move-audit **green**;
-  `:test` **red on one fixture**: `test/behavior/behav_c_va_list_target_abi.w`,
-  step "indirect ABI audit for darwin_aarch64": `with analyze src/indirect.w
+  `:test` **red on one fixture**: `test/behavior/behav_c_va_list_target_abi.with`,
+  step "indirect ABI audit for darwin_aarch64": `with analyze src/indirect.with
   audit:all --target=darwin_aarch64 --no-prelude` → `panic: index out of
-  bounds`, where `indirect.w` is `pub unsafe fn indirect(cb: extern "C"
+  bounds`, where `indirect.with` is `pub unsafe fn indirect(cb: extern "C"
   fn(c_va_list) -> i32, args: c_va_list) -> i32: cb(args)`. Isolated: only
   `audit:resolution`, only under `--no-prelude` (with the prelude it is
   `violations=0 ok`; `audit:calls`/`audit:mir` fine). Diagnosis: a table
@@ -732,8 +732,8 @@ Open items needing Eric (ask once, one line each):
   indexed unconditionally. **Fix on the #1662 layer** in `audit-res`:
   bounds-check (an audit must report a violation/BUG line naming the
   fact, never panic), make `--no-prelude` work, add a `--no-prelude`
-  planted fixture, verify `behav_c_va_list_target_abi.w` passes (it runs
-  the release binary through `test/behavior/lib/pre_d_build_runner.w`, so
+  planted fixture, verify `behav_c_va_list_target_abi.with` passes (it runs
+  the release binary through `test/behavior/lib/pre_d_build_runner.with`, so
   `with build` in the worktree first). Push `--force-with-lease origin
   HEAD:analyze-audit-resolution`, then re-run the full battery on the new
   top in `fold2` (§5 command), post the verdict table on #1662, `gh pr
@@ -747,12 +747,12 @@ Open items needing Eric (ask once, one line each):
   `CURLOPT_WRITEFUNCTION`/`POSTFIELDS`), #1653 (`<pwd.h>` translation),
   #1654 (build graph marks a stale output fresh when an input changes
   mid-action), #1655 (view invalidation flow-insensitive on returning
-  branches), #1663 (pre-existing red `behav_c_facade_libc_system_headers.w`
+  branches), #1663 (pre-existing red `behav_c_facade_libc_system_headers.with`
   under stage1 — std.re `memchr` vs the #379 wrapper, also #1485).
 
 ### 4.2 `:user-programs-safe` — one file left
 All four release UAT fixtures are at 0 `unsafe` once #1661 lands. The gate
-stays red only on `examples/c-interop/src/tally.w` (4 `unsafe`): `tally_each`
+stays red only on `examples/c-interop/src/tally.with` (4 `unsafe`): `tally_each`
 is a *free function* taking a callback, and stage 9 only allowed callback
 contracts on resource methods (#1644) — a stage-9 derived restriction, not
 a ruling (§16.2b.9 and ruling §44 don't restrict it). Also element-count
@@ -764,14 +764,14 @@ batch; the gate goes green when both land.
 ### 4.3 Next batch (after #1664 merges and the seed is cut)
 One stack, one battery:
 1. **#1659 `with uat`** — plan `docs/uat-plan.md` (product feature:
-   `src/Uat.w`, `with uat [<scenario>] --list --keep --record-images`,
+   `src/Uat.with`, `with uat [<scenario>] --list --keep --record-images`,
    `WITH_UAT_WITH`, `requires:` probes, verdicts pass/skip/fail, `expect
    (human):`; `with init` writes `uat/hello.uat` + `uat/README.md` via
-   generated templates; migrate the nine `build/release_uat.w` actions to
+   generated templates; migrate the nine `build/release_uat.with` actions to
    `uat/*.uat`, `build/release_uat_fixtures` → `uat/fixtures`,
    `release-uat` target re-wired, `user-programs-safe` re-pointed; #1375
    closes via `requires: display`). Remove `uat` from the spec-ahead table
-   in `build/compiler.w` when the command exists.
+   in `build/compiler.with` when the command exists.
 2. **#1644** callbacks on free functions.
 3. **#1652** callback / retained variadic cases.
 4. Optionally #1643 after Eric's yes.
@@ -787,7 +787,7 @@ migrator, never hand-edit output.
 `docs/mir-sema-hardening.md`: phase 2 codegen mode provenance (the `&fn`
 marshalling class), phase 3 places, phase 4 effects, phase 5 MirLower
 cleanup after STC. #1631's second face (one stage1 binary gives different
-answers for `src/main.w` via `check` vs the generated `out/gen/main.w`)
+answers for `src/main.with` via `check` vs the generated `out/gen/main.with`)
 is explained by the 16-bit bug (text-dependent verdict) — re-verify after
 #1656 lands and the seed is cut, then close.
 
@@ -817,16 +817,16 @@ Exact worktree setup (`git worktree add ~/.local/with-staging/<name> -b
 read in order (ruling → plan → prior diffs → spec); scope verbatim;
 decisions already made (incl. the inference test "what happens if this
 inference is wrong?" and D65); iterate-tier verification only (fixtures,
-`analyze audit:all`, stage1 `check src/main.w`, targeted corpus targets,
+`analyze audit:all`, stage1 `check src/main.with`, targeted corpus targets,
 `:dev`; the debug-alloc lane and `contract-view-tests` allowed; never
 `:fixpoint`/`:test`/audits); ONE draft PR, no stack link (the coordinator
 folds); report PR/SHA/fixtures/derived decisions/left-undone; "file,
 don't fix" for out-of-scope bugs; name off-limits worktrees; migration
 scripts must run over EVERY test lane (`test/behavior`,
 `test/compile_errors`, `test/phase`, `test/debug_alloc`, `test/spec`,
-`test/contract`, `test/*.w`) — 12b missed three lanes and cost two
-batteries; generated files (`src/InitTemplates.w` from
-`docs/with_for_ai.md` via `tools/gen_init_templates.w`, run with the
+`test/contract`, `test/*.with`) — 12b missed three lanes and cost two
+batteries; generated files (`src/InitTemplates.with` from
+`docs/with_for_ai.md` via `tools/gen_init_templates.with`, run with the
 stack's `out/release/bin/with`) must be regenerated when their source
 changes.
 
@@ -848,5 +848,5 @@ with "File name too long" needs `rm -rf <dir>; git worktree prune`.
 - Facade facts are collected (`SemaDecl` `collect_c_facades`) BEFORE
   `ci_syms` is filled — use `decl_is_c_import` for "is this a c_import
   translation" at facade-verification time.
-- The OLD seed segfaults running `tools/gen_init_templates.w`; use the
+- The OLD seed segfaults running `tools/gen_init_templates.with`; use the
   current release binary.

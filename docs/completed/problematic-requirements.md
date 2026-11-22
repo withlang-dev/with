@@ -1356,7 +1356,7 @@ Affected requirements:
 - `17.1.1.9` - comptime cannot perform I/O, allocate heap memory that persists to runtime, or call FFI functions.
 - `17.6.2.2` - `embed_file(path)` reads a file at compile time.
 - `17.7.1.3` - comptime code cannot read files, make network calls, or access the environment.
-- `18.5.2.22` - `build.w` runs as capability-bearing comptime, not ordinary pure comptime.
+- `18.5.2.22` - `build.with` runs as capability-bearing comptime, not ordinary pure comptime.
 
 Argument:
 
@@ -1382,7 +1382,7 @@ BDFL Ruling: Accept with clarification.
 
 The contradiction is real, and it guards the fixpoint, so it cannot stand.
 
-The spec currently uses “comptime” for several different execution modes, then applies the purity rule for one of them to all of them. Pure comptime should be deterministic and effect-limited. But `embed_file` reads a file, `c_import` parses C headers with the compiler’s C toolchain, and `build.w` intentionally performs filesystem, process, package, and toolchain effects. Those are not mistakes. They are part of With’s promise. The mistake is pretending they are all the same kind of comptime.
+The spec currently uses “comptime” for several different execution modes, then applies the purity rule for one of them to all of them. Pure comptime should be deterministic and effect-limited. But `embed_file` reads a file, `c_import` parses C headers with the compiler’s C toolchain, and `build.with` intentionally performs filesystem, process, package, and toolchain effects. Those are not mistakes. They are part of With’s promise. The mistake is pretending they are all the same kind of comptime.
 
 The invariant that matters is not “no effects.” The invariant is:
 
@@ -1399,7 +1399,7 @@ There are two independent axes:
 1. **Determinism:** is the result a deterministic function of declared, tracked inputs?
 2. **Access authority:** is the operation allowed to touch the thing it wants to touch?
 
-These axes do not move together. `embed_file("logo.png")` inside the package root is deterministic and covered by the compiler’s implicit authority over declared package inputs. `embed_file("/outside/root/logo.png")` may still be deterministic, but it needs explicit access authority. A `build.w` package fetch needs authority and must also be made deterministic through pinning and content addressing.
+These axes do not move together. `embed_file("logo.png")` inside the package root is deterministic and covered by the compiler’s implicit authority over declared package inputs. `embed_file("/outside/root/logo.png")` may still be deterministic, but it needs explicit access authority. A `build.with` package fetch needs authority and must also be made deterministic through pinning and content addressing.
 
 A capability answers what code may touch. It does not grant permission to produce nondeterministic output.
 
@@ -1449,7 +1449,7 @@ The model may be extended beyond `embed_file`, but only through compiler-recogni
 
 Capability-bearing comptime is a separate mode for build orchestration, package integration, C interop, migration, code generation, and tool execution.
 
-This is where `build.w`, `with get`, package fetching, C library integration, generated binding workflows, and build-time tool invocations live.
+This is where `build.with`, `with get`, package fetching, C library integration, generated binding workflows, and build-time tool invocations live.
 
 Capability-bearing comptime may perform effects only through driver-minted capabilities. A capability is an unforgeable value granting specific authority: filesystem access, process execution, package/network access, environment access, output writing, tool invocation, or similar.
 
@@ -1459,7 +1459,7 @@ First, they are an access-control boundary:
 
 > What may this code touch?
 
-A dependency’s `build.w` does not receive ambient access to the user’s machine merely because the package was fetched. The driver chooses what capabilities to mint. Untrusted fetched build code gets only the authority it was granted, so compiling a project does not automatically let a dependency read credentials, phone home, or write outside its sandbox.
+A dependency’s `build.with` does not receive ambient access to the user’s machine merely because the package was fetched. The driver chooses what capabilities to mint. Untrusted fetched build code gets only the authority it was granted, so compiling a project does not automatically let a dependency read credentials, phone home, or write outside its sandbox.
 
 Second, they are not a determinism waiver.
 
@@ -1505,7 +1505,7 @@ The compiler’s own self-hosting build has no escape hatch. The fixpoint requir
 
 ### Spec update
 
-Replace the blanket purity wording in `17.1.1.7`, `17.1.1.9`, and `17.7.1.3`, and reconcile `embed_file` and `build.w` in `17.6.2.2` and `18.5.2.22`, with a comptime model organized around two axes: determinism over declared/tracked inputs, and access authority.
+Replace the blanket purity wording in `17.1.1.7`, `17.1.1.9`, and `17.7.1.3`, and reconcile `embed_file` and `build.with` in `17.6.2.2` and `18.5.2.22`, with a comptime model organized around two axes: determinism over declared/tracked inputs, and access authority.
 
 * **Pure comptime:** deterministic computation over values. No ambient I/O, filesystem inspection, environment access, clock reads, network, FFI, process execution, capability minting, runtime allocation, or host-global state. It may produce static program data.
 

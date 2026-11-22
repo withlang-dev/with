@@ -5,8 +5,8 @@ run: with version
 expect stdout contains: with 
 run: with -e 'print("artifact smoke")'
 expect stdout: artifact smoke
-write smoke.w:
+write smoke.with:
     fn main:
         print("artifact run")
-run: with run smoke.w
+run: with run smoke.with
 expect stdout: artifact run

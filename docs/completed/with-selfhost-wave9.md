@@ -31,11 +31,11 @@ Wave 9 exit gate:
   - `bootstrap/test/run_phase4_*.sh` async/runtime suites
   - `bootstrap/test/run_phase2_denied_patterns_tests.sh` (`E0701` may_suspend guard)
 - Existing self-host implementation:
-  - `src/Mir.w`
-  - `src/MirLower.w`
-  - `src/Sema.w`
-  - `src/Codegen.w`
-  - `src/Driver.w`
+  - `src/Mir.with`
+  - `src/MirLower.with`
+  - `src/Sema.with`
+  - `src/Codegen.with`
+  - `src/Driver.with`
   - `scripts/parity_states.sh`
 - Reference architecture:
   - Zig:
@@ -63,9 +63,9 @@ Constraints:
 
 Primary parity artifacts:
 
-- `check <file.w>` diagnostics for async semantics.
-- `build <file.w>` warnings/errors and runtime-linkage behavior.
-- `run <file.w>` output and exit status for async programs.
+- `check <file.with>` diagnostics for async semantics.
+- `build <file.with>` warnings/errors and runtime-linkage behavior.
+- `run <file.with>` output and exit status for async programs.
 
 Wave 9 parity contract:
 
@@ -139,18 +139,18 @@ Each `KNOWN_DIVERGENCE` entry must include:
 
 Implementation (expected touch points):
 
-- `src/AsyncMir.w` (new; Async-MIR data model)
-- `src/AsyncLower.w` (new; MIR -> Async-MIR lowering)
-- `src/Mir.w` (metadata needed for suspend-aware lowering)
-- `src/MirLower.w` (ensure async nodes preserved as Wave 9 input)
-- `src/Sema.w` (async diagnostic parity checkpoints where needed)
-- `src/Codegen.w` (consume Async-MIR instead of AST-level async stubs)
-- `src/Driver.w` (wire Async-MIR pass and optional dump flow)
-- `src/main.w` (CLI flag wiring if adding `--dump-async-mir`)
+- `src/AsyncMir.with` (new; Async-MIR data model)
+- `src/AsyncLower.with` (new; MIR -> Async-MIR lowering)
+- `src/Mir.with` (metadata needed for suspend-aware lowering)
+- `src/MirLower.with` (ensure async nodes preserved as Wave 9 input)
+- `src/Sema.with` (async diagnostic parity checkpoints where needed)
+- `src/Codegen.with` (consume Async-MIR instead of AST-level async stubs)
+- `src/Driver.with` (wire Async-MIR pass and optional dump flow)
+- `src/main.with` (CLI flag wiring if adding `--dump-async-mir`)
 
 Tests/scripts (new):
 
-- `test/wave9/cases/*.w`
+- `test/wave9/cases/*.with`
 - `test/wave9/async_corpus.txt`
 - `scripts/run_wave9_async_unit_tests.sh`
 - `scripts/run_wave9_async_parity.sh`
@@ -203,8 +203,8 @@ Any uncovered script behavior requires either:
 
 ## 1) Async-MIR Pass Boundary
 
-- [x] Introduce `src/AsyncMir.w` as a distinct IR after MIR + borrow phases.
-- [x] Introduce `src/AsyncLower.w` as the sole Wave 9 lowering pass.
+- [x] Introduce `src/AsyncMir.with` as a distinct IR after MIR + borrow phases.
+- [x] Introduce `src/AsyncLower.with` as the sole Wave 9 lowering pass.
 - [x] Define input/output contract:
   - input: borrow-validated `MirModule` + sema/type/source metadata
   - output: `AsyncMirModule` + diagnostics only
@@ -342,10 +342,10 @@ Any uncovered script behavior requires either:
 - Added `test/wave9/async_corpus.txt` with tri-state parity outcomes and explicit divergence rationale.
 - Added `test/wave9/coverage_matrix.md` mapping current Wave 9 cases to Stage0 phase4 script buckets.
 - Added `test/wave9/coverage_manifest.txt` and `scripts/verify_wave9_coverage.sh` to enforce complete Phase4 script mapping coverage at parity-harness start.
-- Added `src/AsyncMir.w` and `src/AsyncLower.w` for deterministic post-MIR Async-MIR artifact lowering.
-- Wired Async-MIR into `src/Driver.w` post-MIR pipeline and exposed deterministic `--dump-async-mir` in `src/main.w`.
+- Added `src/AsyncMir.with` and `src/AsyncLower.with` for deterministic post-MIR Async-MIR artifact lowering.
+- Wired Async-MIR into `src/Driver.with` post-MIR pipeline and exposed deterministic `--dump-async-mir` in `src/main.with`.
 - Runtime linkage now gates async runtime objects (`fiber.o`, `fiber_asm.o`) on Async-MIR async usage while preserving existing sync behavior.
-- Added `test/wave9/cases/yield_outside_generator_fail.w` and parity coverage for generator-context `yield` misuse diagnostics.
+- Added `test/wave9/cases/yield_outside_generator_fail.with` and parity coverage for generator-context `yield` misuse diagnostics.
 - Extended unit harness to assert deterministic `--dump-async-mir` output.
 - Implemented Wave 9 parity fixes in self-host:
   - `E0701` may_suspend/no_await_guard enforcement for `await` and `select await`.
@@ -357,7 +357,7 @@ Any uncovered script behavior requires either:
   - `scripts/run_wave9_async_unit_tests.sh`: `PASS`.
   - `scripts/run_wave9_async_parity.sh`: `PASS` (`processed=38`, `failures=0`, `known_divergences=2`, coverage verification gate enabled).
 - Current accepted divergences:
-  - Stage0 run instability (`incorrect alignment`) on `run|test/wave9/cases/async_block_inline_await_ok.w`.
-  - Stage0 run instability (`incorrect alignment`) on `run|test/wave9/cases/select_await_prefer_fast_ok.w`.
+  - Stage0 run instability (`incorrect alignment`) on `run|test/wave9/cases/async_block_inline_await_ok.with`.
+  - Stage0 run instability (`incorrect alignment`) on `run|test/wave9/cases/select_await_prefer_fast_ok.with`.
 - Resolved parity gap:
-  - `run|bootstrap/test/cases/import_std_net.w` now passes after self-host runtime object linking was aligned with Stage0 behavior.
+  - `run|bootstrap/test/cases/import_std_net.with` now passes after self-host runtime object linking was aligned with Stage0 behavior.

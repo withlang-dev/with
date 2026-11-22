@@ -22,7 +22,7 @@ Evidence from a single day (2026-09-01):
 - #926 — compiler-source `into_iter()` links fail while `with check`
   says ok.
 - #929 — unknown string escapes silently drop the backslash.
-- `analyze lib/std/build.w audit:all` → 11 violations nobody knew about,
+- `analyze lib/std/build.with audit:all` → 11 violations nobody knew about,
   because nothing runs audits over our own code.
 
 Ranked by how much silent wrongness each item can hide.
@@ -41,7 +41,7 @@ idea in embryo. Scale it:
   never silent.
 - Expected first harvest: #925-class marshalling bugs, promotion/
   conversion divergences, evaluator gaps (each of which is a real
-  finding: the evaluator runs every build.w).
+  finding: the evaluator runs every build.with).
 
 Gate: lane green; exclusion list reviewed as a number that only goes
 down.
@@ -51,8 +51,8 @@ down.
 `audit:all` / `--validate-all` / `--validate-ownership` run only on
 ad-hoc repros today.
 
-- Battery + CI lane: `analyze <file> audit:all` over every `lib/std/*.w`
-  and a maintained list of `src/*.w` modules (start with MirLower,
+- Battery + CI lane: `analyze <file> audit:all` over every `lib/std/*.with`
+  and a maintained list of `src/*.with` modules (start with MirLower,
   SemaCheck, CodegenDispatch, ComptimeEval).
 - Baseline the current violation count PER FILE
   (`out/.build-state/audit-baseline.tsv`, checked in); the lane fails on
@@ -143,7 +143,7 @@ source with platform arms.
 ## 9. Windows: alive or labeled
 
 CI self-host lanes exist (good). RSS accounting stubs to 0, 18 tests
-carry `skip-on: windows`, build.w treats cross-target as unimplemented.
+carry `skip-on: windows`, build.with treats cross-target as unimplemented.
 Either the skip list ratchets down with an owner and a lane that counts
 it, or Windows is labeled best-effort in docs/mission.md. Half-maintained
 targets rot silently.

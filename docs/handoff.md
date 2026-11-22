@@ -27,10 +27,10 @@ earlier windows and is superseded where it disagrees.
   signatures take `&InternPool`/`&AstPool`; keepers store clones; the
   parser holds the caller's intern pool (no `x = parser.intern`
   hand-backs); backend seams give codegen clones; `take_pool`/`take_intern`
-  and `src/compiler/foundation/InternPool.w` removed; arena pages start
+  and `src/compiler/foundation/InternPool.with` removed; arena pages start
   strings at offset 16 (a page-start str read as an owned allocation to
   `rt_payload_start_is_owned`). Pins: `test/debug_alloc/
-  da_2449_pools_free_on_last_drop.w` (main's pool: leak count=283/286) and
+  da_2449_pools_free_on_last_drop.with` (main's pool: leak count=283/286) and
   `lsp-memory-flat` in `cli-selfhost-lsp-tests` (new `with/memory` LSP
   request → runtime committed bytes; <1 MB growth over 50 edits; main's
   server: peak RSS 45 MB @40 edits, 126 MB @200; now flat 24 MB).
@@ -58,8 +58,8 @@ earlier windows and is superseded where it disagrees.
 - **#2454 → 8f72c913a:** this handoff became the tracked
   `docs/handoff.md`; no root `handoff.md` any more.
 
-**Filed:** #2452 — the build-graph cache key hashes build.w/build/ but not
-the directory listings build.w enumerates (`list_files("src")`): a deleted
+**Filed:** #2452 — the build-graph cache key hashes build.with/build/ but not
+the directory listings build.with enumerates (`list_files("src")`): a deleted
 source file fails loudly ("missing declared input"), an added one is
 silently not an input of `compiler-no-c-export` until the cache dies.
 Workaround `rm out/.build-state/build-graph.cache`.
@@ -70,7 +70,7 @@ restructure above is a scope call.
 
 **Traps this window:** the Bash tool's `=`/`===` as an echo separator is a
 zsh glob error that aborts the chain; `use InternPool` in a probe program
-resolves to the *current directory's* `src/InternPool.w`, so a "main
+resolves to the *current directory's* `src/InternPool.with`, so a "main
 compiler" probe run from a worktree tests the worktree's source; the
 compiler process exits via `exit(run_cli())` and never prints the
 debug-allocator leak report (only programs do, through
@@ -80,7 +80,7 @@ invalidates the gate (the guard hook only blocks under a battery).
 ## 1. The decisions still to implement, in the record's order
 
 1. **D120** — done (stages 1–6, measured, Amendment 2). Microbenchmarks
-   tracked in `test/benchmark/cow_value_lists.w`.
+   tracked in `test/benchmark/cow_value_lists.with`.
 2. **D118 aarch64 seeds (#2305)** — the seeds are cut and pinned (#2451);
    the GitHub lanes run nightly; check `linux aarch64` / `windows aarch64`
    lanes go green on the next run (they are post-hoc, D56).
@@ -100,7 +100,7 @@ Pinned seed `nightly-20261015-local-1-efcb91c30a6a` drives everything
 ~/.local/with-staging/reseed-main/src/main src/main`, `.deps` symlinks to
 `~/with/.deps/llvm-22.1.6-darwin-arm64{,-release}`, `with build :dev` before
 anything. Read gate/build/battery logs only via `with run
-~/.claude/hooks/verdict.w <log>` (`--times`, `--progress`, `--detail
+~/.claude/hooks/verdict.with <log>` (`--times`, `--progress`, `--detail
 <needle>`); the guard hook blocks the rest. Hold the Mac awake for long
 runs (keep_awake) and release after. With-only tooling; `with -p` with
 `/re/.replace(line, …)` (not `line.replace(/re/…)`, #2434); the Bash tool
@@ -111,8 +111,8 @@ hash. Order: `:dev` + targeted tests → `src/main build :gate` (+
 `:debug-alloc-tests --no-deps`, `:drop-audit --no-deps`,
 `:deep-debug-tool-tests --no-deps` after a MirLower/codegen change; they
 need the gate's `out/release/bin/with`) → `with run
-tools/ceremony_census.w --diff HEAD` and the full census → `with run
-tools/battery.w` → post → `gh pr ready` → merge → reseed → install → pull
+tools/ceremony_census.with --diff HEAD` and the full census → `with run
+tools/battery.with` → post → `gh pr ready` → merge → reseed → install → pull
 → remove worktree. Only Eric blesses normative spec wording; a ruling that
 breaks a fixture updates the fixture in the same change and says so.
 
@@ -138,8 +138,8 @@ this order: D120 stage 3 (PR #2442, squash e38e86f02), stage 4 (PR #2444,
 merge commit a47fce2b2 over df583a52a: the uniqueness proof, loop
 hoisting, wider last-use takes), stage 5 (PR #2445, merge commit over
 40402de2a: C-boundary make-unique, per-instantiation generics, `with
-analyze file.w cow`), stage 6 (PR #2446, squash 5b4939669: the `.clone()`
-sweep, `test/benchmark/cow_value_lists.w`, plus a MirLower tail-view fix
+analyze file.with cow`), stage 6 (PR #2446, squash 5b4939669: the `.clone()`
+sweep, `test/benchmark/cow_value_lists.with`, plus a MirLower tail-view fix
 and a `validate_read_after_drop` extension), and #2131 wasm32 bundles (PR
 #2447, squash 3d73b98cd). Every tip has a green-store row
 (`~/.local/with-green/green.tsv`: 813f412d2, df583a52a, 40402de2a,
@@ -150,7 +150,7 @@ f19fe59f9), so a battery reached `:test-green` on each.
   1.0415 (the stage meant to recover stage 1's cost made it slower),
   stages 5 and 6 none posted. Measured 2026-10-18 against the last
   pre-CoW compiler (60693617b, release build in
-  `~/.local/with-staging/pre-d120-base`): `check src/main.w` rounds
+  `~/.local/with-staging/pre-d120-base`): `check src/main.with` rounds
   1.1045, 1.1449 clean (a third round was perturbed by a stray process);
   the clean re-run and the `WITH_PROFILE=1` phase profiles of both
   compilers are in `~/.local/with-staging/ab-main-vs-pre-d120-selfhost-2.log`
@@ -158,17 +158,17 @@ f19fe59f9), so a battery reached `:test-green` on each.
   reopen it" is >2% not removable; Amendment 1's merge bar is 5% per
   interleaved A/B. Eric has not yet been briefed with the table; that
   brief, with the profile's phase deltas, is the next thing owed.
-- The pcre2 and zlib corpus suites were never A/B'd. `tools/corpus_ab.w`
+- The pcre2 and zlib corpus suites were never A/B'd. `tools/corpus_ab.with`
   (branch `d120-take-sema`, worktree `~/.local/with-staging/d120-take-sema`)
-  now does it: `with run tools/corpus_ab.w <base> <cand> 3 pcre2|zlib`
-  builds `lib/std/re/pcre2test.w` / `lib/std/zl/minigzip.w` with each
+  now does it: `with run tools/corpus_ab.with <base> <cand> 3 pcre2|zlib`
+  builds `lib/std/re/pcre2test.with` / `lib/std/zl/minigzip.with` with each
   compiler and times RunTest -8 0-29 / a 16 MB minigzip round trip.
-- PR #2445's description cited `battery.w --local-only`, a flag that does
+- PR #2445's description cited `battery.with --local-only`, a flag that does
   not exist; corrected on GitHub 2026-10-18 (the green row is real).
 - Stage 3's `comptime_take_sema` (the evaluator takes the Sema instead of
   a retained copy; 1,908 >64 KB copies per self-check at stage 3) was
   uncommitted when the agent took over and was dropped. On today's main
-  `WITH_TRACE_COW_COPIES=65536 with check src/main.w` already reports 0
+  `WITH_TRACE_COW_COPIES=65536 with check src/main.with` already reports 0
   copies (stage 4's proof covers it), so it is now a clarity change, kept
   on `d120-take-sema` with the corpus tool.
 - A `with check` of a file with an inline `(match e: { A => x, B => y })`
@@ -181,7 +181,7 @@ live claude process):** `~/.local/with-staging/noncompliance-stack`
 (branch `noncompliance-stack`, uncommitted, ~88 files): the D22/D44
 promotion (test/non_compliant/d22 fixtures moved to test/behavior,
 CLAUDE.md/AGENTS.md paragraphs rewritten to "implemented"), D100's
-`tools/pub_lint.w`, compiler edits in SemaCheck/CodegenDispatch/
+`tools/pub_lint.with`, compiler edits in SemaCheck/CodegenDispatch/
 ComptimeEval/Analysis/InitTemplates, and a `seed.lock` bump to a
 linux-aarch64 seed cut from 3d73b98cd (D118). It needs splitting into
 logical commits; the CLAUDE.md compliance rewrite needs Eric's reading
@@ -192,7 +192,7 @@ the line and its fix (the last-use pass drew a view edge for an integer
 copied out of a list; `WITH_TRACE_COW=1` now prints `[cow-last-use] …
 taken / kept, <why>` per site), the drop guard word-wise, the uniqueness
 dataflow's arrays per candidate, the comptime evaluator taking the Sema,
-`tools/corpus_ab.w`, the parser hang fix. Self-host 1.093 → 1.032 against
+`tools/corpus_ab.with`, the parser hang fix. Self-host 1.093 → 1.032 against
 the pre-CoW compiler, pcre2 0.966, zlib 0.992 (table on the PR). Reseeded, installed, worktree removed. `~/.local/with-staging/pre-d120-base` (detached at 60693617b, release built) is the pre-CoW baseline for any further A/B; remove it when D120 measurement is closed.
 
 **#2449, found 2026-10-18, Eric's call on scope:** `InternPool` and
@@ -211,7 +211,7 @@ creation site per compilation.
    the two corpus suites against the pre-CoW compiler, above), Eric's
    ruling on the held cumulative cost, and whatever that profile says is
    removable (`WITH_TRACE_COW=1` prints each kept uniqueness check; `with
-   analyze file.w cow` reports them per program). D120-adjacent and still
+   analyze file.with cow` reports them per program). D120-adjacent and still
    open: #2406 (`impl Copy` ordering), #1137 (views compared by address).
 2. **D118 — the aarch64 seeds (#2305).** A linux-aarch64 seed cut from
    3d73b98cd is in the other agent's uncommitted `seed.lock`; the
@@ -260,7 +260,7 @@ order: D120 CoW (#2304), D118 aarch64 seeds (#2305), D123 mssql, #2131.
 
 Main is 92d47d7b0 (334c8f010 = step 5, plus the §16.2b.15 words Eric
 blessed 2026-10-16, PR #2433 docs-only). The branch (four commits, rebased
-on main) adds `uat/libxml2.uat` + `uat/fixtures/libxml2_main.w`: `with get
+on main) adds `uat/libxml2.uat` + `uat/fixtures/libxml2_main.with`: `with get
 c.libxml2`, then `use facades.libxml2` parses, walks, reads attributes and
 content; no hand facade, no `unsafe`. Verified with stage1 in the
 scratchpad before the battery ("libxml2 UAT passed"; `with get` 25 s, the
@@ -269,16 +269,16 @@ in memory `d121-step6-libxml2-2026-10-16.md`: the engine's list-walk
 proof, modeled-record fixed point and presentability rule (mirrors Sema's
 `facade_op_raw_beyond`), the registry's shape facts (`nullable param`,
 `text param`, `text return … freed by F`, facade-level `text utf8`;
-`registry/c/libxml2/facts.w`), `freed by` through a global function
+`registry/c/libxml2/facts.with`), `freed by` through a global function
 pointer (`xmlFree`), `Option[&str]` for a nullable C string, camel-case
 shortening, the c_import macro-calls-unsafe-macro fix, and the renderer's
 per-pool indexes (`AstPool.shape()`), which took the UAT program's check
 from 194 s to 39 s. `with uat` now sets `WITH_REGISTRY=file://<root>`.
 Gate log `~/.local/with-staging/d121-libxml2-gate1.log`; then
 `:c-migrator-basic-tests --no-deps`, the full ceremony census (needs
-out/release), `with run tools/battery.w`, post, ready, squash-merge,
+out/release), `with run tools/battery.with`, post, ready, squash-merge,
 reseed. Filed #2434 (one-liner regex replace BUG). Known stage1-only red:
-`behav_c_facade_pending_producer_warns.w`.
+`behav_c_facade_pending_producer_warns.with`.
 
 Then, in the record's order: D120 CoW (#2304, merge gated on 2% self-host
 and corpus), D118 aarch64 seeds (#2305), D123 std.mssql, #2131 wasm32.
@@ -288,14 +288,14 @@ and corpus), D118 aarch64 seeds (#2305), D123 std.mssql, #2131 wasm32.
 Eric asked (2026-10-15) to continue implementing the remaining decisions.
 The record's order: D121 steps 2–6, D120 (#2304), D118 aarch64 seeds
 (#2305), D123 mssql. Step 2 is built: `with migrate --facade NAME
-<dir|file.c>` (`src/CiFacadeDraft.w`; the walker
-`ci_body_ownership_evidence` in `CImport.w` beside D107's; the flag in
-`main.w`; `migrate_c_facade` in `CiMigrate.w`). Proofs are a corpus fixed
+<dir|file.c>` (`src/CiFacadeDraft.with`; the walker
+`ci_body_ownership_evidence` in `CImport.with` beside D107's; the flag in
+`main.with`; `migrate_c_facade` in `CiMigrate.with`). Proofs are a corpus fixed
 point: retention, destruction, then returns (owned / borrow-from-param);
 the draft pairs producers with the one unary destroyer per representation,
 states proven borrows and lends, and the report says why the rest is raw.
 Spellings are D133 (delegated). Test: `migrate-facade-by-evidence` in
-`build/selfhost.w` (the draft is compiled against its header). Docs:
+`build/selfhost.with` (the draft is compiled against its header). Docs:
 `docs/spec/toolchain/with-migrate-spec.md` "Usage", the D121 doc's status.
 `WITH_DEBUG_MIGRATE_FACADE=1` prints every definition's evidence.
 
@@ -307,7 +307,7 @@ in-place resource (deflateInit_/deflateEnd), outside pointer-producer
 proofs: raw with reason. **Merged: PR #2420 → main 0b7f0cbe4** (battery
 green, 332 s, `~/.local/with-staging/d121-battery1.log`; the first gate was
 red on spec-inventory — `--facade` is a migrator flag, listed internal in
-`build/compiler.w` — and on ceremony-census — four `&x` at `&T` params,
+`build/compiler.with` — and on ceremony-census — four `&x` at `&T` params,
 dropped). Reseed from 0b7f0cbe4 in `~/.local/with-staging/reseed-main`
 (`~/.local/with-staging/reseed-0b7f0cbe4.log`); `~/with` fast-forwarded.
 
@@ -352,10 +352,10 @@ The bridge reads `__attribute__((…))` tokens (`with_cimport_fn_attributes`),
 
 **D121 step 4, the package registry: landed 2026-10-15 (D136, Eric's
 "proceed" on the brief).** PR #2430 → main 7147a1d5f (battery 496 s),
-reseeded and installed. `registry/c/<package>/facts.w` in this repository,
+reseeded and installed. `registry/c/<package>/facts.with` in this repository,
 a cited facade fragment read by `with migrate --facade … --facts FILE`
-(`src/CiFacts.w`; `registry/README.md` holds the review rule). One cited
-fact (`registry/c/zlib/facts.w`: `drop gzclose`) takes real zlib from 15 to
+(`src/CiFacts.with`; `registry/README.md` holds the review rule). One cited
+fact (`registry/c/zlib/facts.with`: `drop gzclose`) takes real zlib from 15 to
 35 safe functions. Open for Eric: the two package-management.md sentences
 that contradict D121 (proposed replacements in the session's last report).
 The two sentences were blessed ("I bless the two sentences") and merged
@@ -369,9 +369,9 @@ reason in the report, `migrate_c_facade_for_package` with `use c_import`
 lines), b9ef8216d (`with get`: engine over the package's CMake build via
 compile_commands.json, binary packages get a configure-only pass under
 `<dep>/.build`, registry facts fetched from github main at one commit with
-`WITH_REGISTRY=<base URL>` override, `facade.w` / `facade-report.txt` /
+`WITH_REGISTRY=<base URL>` override, `facade.with` / `facade-report.txt` /
 `facade.json`, lock `registry` + `facts_sha256`, `use facades.<name>` →
-dep facade in `src/Resolve.w`, project override by AST item surgery in
+dep facade in `src/Resolve.with`, project override by AST item surgery in
 `Frontend.merge_fetched_facades_frontend`; selfhost fetched-mini case;
 zlib/sqlite3 UATs expect the summary), 2914d21ba (shell escapes in
 compile commands; attribute reader stops at a body), 186bbc4bd (census).
@@ -381,8 +381,8 @@ libcurl 62 s, sdl 59 s. **Merged: PR #2432 → main 334c8f010** (battery
 equal), reseeded from 334c8f010 and installed
 (`~/.local/with-staging/reseed-334c8f010.log`); worktree removed. The
 fifth commit c2b4cadfb fixed two things the first battery's migrator run
-found: `use facades.<name>` imported one name (Resolve.w
-`resolve_dotted_selection` took `facade.w` for the parent module) and a
+found: `use facades.<name>` imported one name (Resolve.with
+`resolve_dotted_selection` took `facade.with` for the parent module) and a
 project override had to join the written block (one module renders the
 facade; Frontend `merge_fetched_facades_frontend` moves the project's
 items in and empties its blocks). Then step 6 (libxml2 UAT over the
@@ -407,7 +407,7 @@ std module raises the minimum seed (the seed embeds its own std), so seed
 published; the lock bump is branch `seed-lock-local-1`
 (`~/.local/with-staging/seed-lock`), battery under the new seed in
 `~/.local/with-staging/seed-lock-battery1.log`. The engine itself
-(`src/CiGir.w`; the join in CiMigrate.w; the verdicts in CiFacadeDraft.w:
+(`src/CiGir.with`; the join in CiMigrate.with; the verdicts in CiFacadeDraft.with:
 transfer full → owned, none → borrow of the instance or sole pointer
 parameter, a `full` parameter → `consumes param N`, `free-function` → the
 destroyer or the `drop` among several; a declared-only function is a
@@ -431,12 +431,12 @@ iteration saves under 5%; then write the table into
 `docs/spec/toolchain/battery-time.md` and here. Rules as in CLAUDE.md: the
 pinned seed drives the battery; With-only tooling; `Eric Hartford
 <eric@quixi.ai>`; never `git stash`; read logs only with `with run
-~/.claude/hooks/verdict.w` (`--times`, `--progress`, `--detail`).
+~/.claude/hooks/verdict.with` (`--times`, `--progress`, `--detail`).
 
 ## 1. Where it stands
 
 **Under ten minutes, officially, and the stop rule is met.** `with run
-tools/battery.w` on main 592eb6602 under the pinned seed
+tools/battery.with` on main 592eb6602 under the pinned seed
 `nightly-20261014-local-3-c411d0e45`: **390 s** on a warm worktree, **491 s**
 on a fresh one (green, rc=0). The next cut tried (#2416, a critical lane's
 parallel window capped at half the jobserver budget) measured 562 s fresh
@@ -477,7 +477,7 @@ another's path. Sema now spells the path (`source_path_text`: a std module
 as `<embedded-std>/…`, an absolute path by its `WITH_FILE_PREFIX_MAP`
 spelling, a relative one as spelled; D38, D50, D65); MIR reads it. Proof:
 36d5f43f4 built in two worktrees gives byte-identical unstamped images and
-one self-id. Pin: `behav_panic_path_is_canonical.w`. `FnAbi.w` was left
+one self-id. Pin: `behav_panic_path_is_canonical.with`. `FnAbi.with` was left
 untouched on purpose: it is ABI-defining and its hash keys every `.wo`.
 Expected effect from here: a re-run of identical sources in any worktree
 finds its passed tests in the verdict store.
@@ -510,8 +510,8 @@ first (`seed-driver` goes red, the rest measures), then cut.
 - Never run tests from a checkout whose `out/lib` is stale (`~/with` after a
   reseed elsewhere): the child compilers find no runtime of their generation.
 - Remote work runs in `screen -dmS`, polling a file for `rc=`. Sequencer:
-  `~/seedcut` on eric-5090 (source `~/.local/with-staging/seedcut.w`);
-  Windows uses `C:/Users/Eric/wsb.w` in the `wtr` checkout over a held ssh.
+  `~/seedcut` on eric-5090 (source `~/.local/with-staging/seedcut.with`);
+  Windows uses `C:/Users/Eric/wsb.with` in the `wtr` checkout over a held ssh.
 - Publish from `~/.local/with-staging/reseed-main` with
   `:publish-release-asset`, darwin first; zsh does not word-split
   `set -- $p`.

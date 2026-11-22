@@ -27,10 +27,10 @@ Wave 7 exit gate:
   - `bootstrap/src/Codegen.zig` — current lowering reference (AST → LLVM direct)
   - `bootstrap/src/Sema.zig` — typed IR oracle
 - Existing self-host files:
-  - `src/Mir.w` — minimal scaffold to be replaced
-  - `src/BorrowCfg.w` — lightweight CFG (node/edge lists); Wave 7 supersedes it for MIR
-  - `src/Sema.w` — typed IR (Wave 6 output, Wave 7 input)
-  - `src/Driver.w` — pipeline wiring
+  - `src/Mir.with` — minimal scaffold to be replaced
+  - `src/BorrowCfg.with` — lightweight CFG (node/edge lists); Wave 7 supersedes it for MIR
+  - `src/Sema.with` — typed IR (Wave 6 output, Wave 7 input)
+  - `src/Driver.with` — pipeline wiring
 - Reference architecture:
   - Zig: `.reference/zig/src/Air.zig` — AIR (Zig's post-Sema IR, analog to MIR)
   - Rust:
@@ -101,8 +101,8 @@ Basic blocks where every block contains:
 
 ### In scope
 
-- Full MIR data structure replacing the scaffold in `src/Mir.w`.
-- MIR builder (`src/MirLower.w`):
+- Full MIR data structure replacing the scaffold in `src/Mir.with`.
+- MIR builder (`src/MirLower.with`):
   - Basic block creation and management.
   - Statement/terminator construction.
   - Scope stack for drop scheduling.
@@ -110,7 +110,7 @@ Basic blocks where every block contains:
 - Lowering of all typed IR constructs to MIR.
 - All sugar lowering per the single-source-of-truth table above.
 - Explicit drop insertion at scope exits (normal, break, continue, return).
-- `--dump-mir` flag wired through `Driver.w` and `main.w`.
+- `--dump-mir` flag wired through `Driver.with` and `main.with`.
 - Wave 7 parity harness and unit tests.
 
 ### Out of scope
@@ -119,11 +119,11 @@ Basic blocks where every block contains:
 - Async lowering (Wave 9): `async fn`, `.await`, `select`, `spawn`, `gen` remain
   as opaque MIR nodes in Wave 7. They are preserved structurally, not lowered.
 - LLVM codegen changes (Wave 10).
-- MIR optimizations (`MirOpt.w` is a separate concern).
+- MIR optimizations (`MirOpt.with` is a separate concern).
 
 ---
 
-## New File: `src/MirLower.w`
+## New File: `src/MirLower.with`
 
 This is the primary deliverable. It contains:
 
@@ -133,8 +133,8 @@ This is the primary deliverable. It contains:
 - Sugar lowering methods.
 - Drop elaboration.
 
-`src/Mir.w` is rewritten to hold the shared MIR data types used by both
-`MirLower.w` and downstream passes (BorrowCfg, codegen).
+`src/Mir.with` is rewritten to hold the shared MIR data types used by both
+`MirLower.with` and downstream passes (BorrowCfg, codegen).
 
 ---
 
@@ -439,7 +439,7 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
 - [x] Keep bootstrap unchanged for Wave 7 (no Stage0 `--dump-mir` requirement).
 - [x] Document the `--dump-mir` text format spec in `docs/wave7-mir-dump-spec.md`.
 
-### 1) Rewrite `src/Mir.w` — Full MIR Data Structures
+### 1) Rewrite `src/Mir.with` — Full MIR Data Structures
 
 - [x] Replace scaffold `MirFunction` / `MirModule` with full MIR types.
 - [x] Define all `SK_*`, `TK_*`, `RK_*`, `OK_*`, `CK_*`, `PK_*` constants.
@@ -463,7 +463,7 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
 - [x] Implement `MirBody.new_call_args(operands: &[i32]) -> i32`.
 - [x] Unit tests for all MirBody builder primitives.
 
-### 2) Create `src/MirLower.w` — Builder and Drop Elaboration
+### 2) Create `src/MirLower.with` — Builder and Drop Elaboration
 
 - [x] Define `ScopeEntry`, `DropScope`, `LoopInfo`, `MirBuilder` types.
 - [x] Implement `MirBuilder.init(sema, fn_sym) -> MirBuilder`.
@@ -650,15 +650,15 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
     - Call `lower_fn(builder, fn_node)`.
     - Append resulting `MirBody` to `MirModule`.
   - Return completed `MirModule`.
-- [x] Wire `lower_module` into `Driver.w`:
+- [x] Wire `lower_module` into `Driver.with`:
   - After `Sema` pass completes without errors.
   - Store `MirModule` in `Driver` state.
   - Gate `--dump-mir` output on this stage.
-- [x] Update `src/Driver.w`:
+- [x] Update `src/Driver.with`:
   - Add `mir_module: MirModule` field.
   - Add `run_mir_lower()` method.
   - Add `dump_mir()` method (for `--dump-mir` flag).
-- [x] Update `src/main.w`:
+- [x] Update `src/main.with`:
   - Add `--dump-mir` flag handling.
   - Pass flag through to Driver.
 
@@ -758,16 +758,16 @@ Rules:
 
 ## Key Architectural Decisions
 
-### Why rewrite `src/Mir.w` rather than extend it?
+### Why rewrite `src/Mir.with` rather than extend it?
 
 The scaffold only has `MirFunction { name, block_count }` — it has no instructions,
 no places, no types. Wave 7 replaces it entirely with the full SoA representation.
-`BorrowCfg.w` remains for the lightweight borrow-analysis CFG (Wave 8 will build on it).
+`BorrowCfg.with` remains for the lightweight borrow-analysis CFG (Wave 8 will build on it).
 
-### Why separate `MirLower.w` from `Mir.w`?
+### Why separate `MirLower.with` from `Mir.with`?
 
-`Mir.w` is the data model (types, constructors, dump).
-`MirLower.w` is the lowering algorithm (builder, sugar expansion, drop elaboration).
+`Mir.with` is the data model (types, constructors, dump).
+`MirLower.with` is the lowering algorithm (builder, sugar expansion, drop elaboration).
 This separation keeps the data structure stable while the lowering algorithm evolves.
 
 ### Drop Elaboration Strategy
@@ -812,7 +812,7 @@ state-machine lowering in Wave 7 (Wave 9).
 Stage0 (`bootstrap/src/Codegen.zig`) does not have an explicit MIR pass — it
 lowers AST → LLVM directly. Wave 7 does not add MIR features to Stage0.
 Stage0 is used only as the bootstrap compiler for self-host sources; MIR work is
-implemented in self-host (`src/Mir.w`, `src/MirLower.w`) and validated via
+implemented in self-host (`src/Mir.with`, `src/MirLower.with`) and validated via
 self-host deterministic dumps and runtime behavior.
 
 ---

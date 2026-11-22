@@ -12,9 +12,9 @@ On macOS, libSystem.B.dylib is the stable kernel interface (not "libc" — it's 
 
 | File | Lines | Status |
 |---|---|---|
-| ~~`runtime/helpers.c`~~ | ~~80~~ | **Deleted** — replaced by `rt/cimport_stubs.w` |
-| ~~`runtime/with_runtime.c`~~ | ~~84~~ | **Deleted** — already in `rt/fiber_stubs.w` + `rt/panic_runtime.w` |
-| ~~`runtime/llvm_bridge.c`~~ | ~~930~~ | **Deleted** — replaced by `rt/llvm_bridge.w` |
+| ~~`runtime/helpers.c`~~ | ~~80~~ | **Deleted** — replaced by `rt/cimport_stubs.with` |
+| ~~`runtime/with_runtime.c`~~ | ~~84~~ | **Deleted** — already in `rt/fiber_stubs.with` + `rt/panic_runtime.with` |
+| ~~`runtime/llvm_bridge.c`~~ | ~~930~~ | **Deleted** — replaced by `rt/llvm_bridge.with` |
 | `runtime/clang_bridge.c` | 2454 | Phase 5 (planned) |
 
 `src/main.c` (233K lines) is a build artifact (`--emit-c` output), not source.
@@ -25,12 +25,12 @@ On macOS, libSystem.B.dylib is the stable kernel interface (not "libc" — it's 
 
 ---
 
-## Phase 1: Remove c_import from darwin_aarch64.w ✅
+## Phase 1: Remove c_import from darwin_aarch64.with ✅
 
 **Status: DONE** (commit `ec76973`)
 
 - [x] Write `open()` ABI test — confirmed variadic `open` breaks on aarch64 Darwin, `__open` works
-- [x] Remove all 4 `use c_import(...)` lines from `rt/darwin_aarch64.w`
+- [x] Remove all 4 `use c_import(...)` lines from `rt/darwin_aarch64.with`
 - [x] Add explicit `extern fn` declarations for every imported function
 - [x] Replace `open` with `__open` (non-variadic libSystem internal symbol)
 - [x] Replace `c_void` with `u8` in pointer types
@@ -57,36 +57,36 @@ Added `@[weak]` attribute support to the With language:
 
 **Status: DONE** (commit `5f4649e`)
 
-- [x] Created `rt/cimport_stubs.w` with 53 `@[weak] @[c_export]` stubs
+- [x] Created `rt/cimport_stubs.with` with 53 `@[weak] @[c_export]` stubs
 - [x] Deleted `runtime/helpers.c` (80 lines C)
 - [x] Deleted `runtime/with_runtime.c` (84 lines C)
 - [x] Updated Makefile: `HELPERS_OBJ` → `CIMPORT_STUBS_OBJ`
-- [x] Updated `src/compiler/Link.w`: `helpers.o` → `cimport_stubs.o`
+- [x] Updated `src/compiler/Link.with`: `helpers.o` → `cimport_stubs.o`
 - [x] Updated `scripts/embed_runtime_objects.sh`: `helpers_o` → `cimport_stubs_o`
 - [x] C allowlist reduced from 4 files to 2
 - [x] Fixpoint verified, all tests pass
 
 ---
 
-## Phase 3: Remove libc from compat_runtime.w and fiber_core_darwin.w
+## Phase 3: Remove libc from compat_runtime.with and fiber_core_darwin.with
 
 **Status: TODO**. **Effort:** 1 day. **Risk:** Low. Already mostly done.
 
 Both files already use `extern fn` for everything. The only real libc dependency is `malloc/free` calls.
 
-**compat_runtime.w changes:**
+**compat_runtime.with changes:**
 - [ ] `malloc/free` → `with_alloc/with_free` (from rt_core). Used in `str_to_c_buf` for temporary C strings passed to `fork`/`execv`/`setenv` — these functions expect null-terminated C strings. The replacement is `with_alloc` + `with_memcpy` + explicit null terminator, same logic as today with a different allocator. **Do not remove the null termination** — the slab allocator does not zero memory.
 - [ ] `memcpy/memset` → `with_memcpy/with_memset` (from rt_core)
 - [ ] `strlen` → inline `c_strlen` helper (5-line loop)
 - [ ] `fork/execv/waitpid/sigaction/etc.` → already `extern fn` from libSystem, keep as-is
 
-**fiber_core_darwin.w changes:**
+**fiber_core_darwin.with changes:**
 - [ ] `malloc/free` → `with_alloc/with_free`
 - [ ] `memcpy/memset` → `with_memcpy/with_memset`
 - [ ] `sysconf(_SC_PAGESIZE)` → hardcoded `16384` (aarch64 macOS always uses 16K pages) or `extern fn vm_page_size` from Mach
 - [ ] `mmap/mprotect/munmap/sigaction/sigaltstack/raise/write/_exit/abort` → keep as libSystem `extern fn`
 
-**Files:** `rt/compat_runtime.w`, `rt/fiber_core_darwin.w`
+**Files:** `rt/compat_runtime.with`, `rt/fiber_core_darwin.with`
 
 **Verify:** `make build && make fixpoint && make test`
 
@@ -96,11 +96,11 @@ Both files already use `extern fn` for everything. The only real libc dependency
 
 **Status: DONE**
 
-- [x] Created `rt/llvm_bridge.w` (1271 lines) with all `extern fn LLVM*` declarations (~200)
+- [x] Created `rt/llvm_bridge.with` (1271 lines) with all `extern fn LLVM*` declarations (~200)
 - [x] Added ~60 LLVM enum constants (extracted from LLVM 22 headers)
 - [x] Implemented `to_cstr` rotating buffer, `c_strlen`, `empty_cstr` helpers in With
 - [x] Translated all 197 `wl_*` wrappers with `@[c_export]`
-- [x] Updated Makefile: compile `rt/llvm_bridge.w` with seed compiler instead of C compilation
+- [x] Updated Makefile: compile `rt/llvm_bridge.with` with seed compiler instead of C compilation
 - [x] Removed `runtime/llvm_bridge.c` from C allowlist
 - [x] Deleted `runtime/llvm_bridge.c` (930 lines C)
 - [x] Fixpoint verified, all tests pass (same pre-existing failures)
@@ -159,7 +159,7 @@ If the test fails, the fallback is a small assembly thunk that adapts the callin
 8. [ ] Translate macro extraction (preprocessor invocation)
 9. [ ] Update Makefile, delete `runtime/clang_bridge.c`
 
-**Files:** `rt/clang_bridge.w` (new), `runtime/clang_bridge.c` (delete), `Makefile`
+**Files:** `rt/clang_bridge.with` (new), `runtime/clang_bridge.c` (delete), `Makefile`
 
 **Verify:** `make build && make fixpoint && c_import("stdio.h") test passes && make test`
 
@@ -168,8 +168,8 @@ If the test fails, the fallback is a small assembly thunk that adapts the callin
 ## Phase 6: Linux raw syscalls (future)
 
 **Status: NOT IN SCOPE.** When Linux is targeted:
-- [ ] Create `rt/linux_aarch64.w` using inline assembly (`asm("svc #0" ...)`)
-- [ ] Create `rt/linux_x86_64.w` using inline assembly (`asm("syscall" ...)`)
+- [ ] Create `rt/linux_aarch64.with` using inline assembly (`asm("svc #0" ...)`)
+- [ ] Create `rt/linux_x86_64.with` using inline assembly (`asm("syscall" ...)`)
 - [ ] Zero library dependencies — pure kernel interface
 
 ---
@@ -184,17 +184,17 @@ runtime/
   clang_bridge.c          ← Phase 5 (pending rewrite to With)
 
 rt/
-  rt_core.w               ← core runtime (allocator, strings, vec, hashmap, fmt)
-  darwin_aarch64.w         ← macOS syscall wrappers (extern fn to libSystem, no c_import) ✅
-  llvm_bridge.w            ← LLVM-C API bridge (1271 lines With, replaces 930 lines C) ✅
-  clang_bridge.w           ← libclang bridge (Phase 5, planned)
-  compat_runtime.w         ← compiler-only: fork/exec/signals (extern fn to libSystem)
-  panic_runtime.w          ← panic handler
-  fiber_stubs.w            ← non-async stubs
-  fiber_core_darwin.w      ← fiber scheduler
-  fiber_runtime.w          ← fiber lifecycle
-  channel_runtime.w        ← channel implementation
-  cimport_stubs.w          ← c_import fallback stubs (@[weak] @[c_export]) ✅
+  rt_core.with               ← core runtime (allocator, strings, vec, hashmap, fmt)
+  darwin_aarch64.with         ← macOS syscall wrappers (extern fn to libSystem, no c_import) ✅
+  llvm_bridge.with            ← LLVM-C API bridge (1271 lines With, replaces 930 lines C) ✅
+  clang_bridge.with           ← libclang bridge (Phase 5, planned)
+  compat_runtime.with         ← compiler-only: fork/exec/signals (extern fn to libSystem)
+  panic_runtime.with          ← panic handler
+  fiber_stubs.with            ← non-async stubs
+  fiber_core_darwin.with      ← fiber scheduler
+  fiber_runtime.with          ← fiber lifecycle
+  channel_runtime.with        ← channel implementation
+  cimport_stubs.with          ← c_import fallback stubs (@[weak] @[c_export]) ✅
 ```
 
 **Current: 1 C source file remaining (2,454 lines).** Down from 4 files (3,548 lines).
@@ -222,7 +222,7 @@ make build && make fixpoint && make test
 make emit-c-test
 
 # c_import still works
-./out/bin/with run test/behavior/c_import_basic.w
+./out/bin/with run test/behavior/c_import_basic.with
 
 # Cross-compile still works
 make cross CROSS_TARGET=aarch64-linux

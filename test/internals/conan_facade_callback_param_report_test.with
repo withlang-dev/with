@@ -1,0 +1,53 @@
+//! expect-stdout: ok
+// #3178 (§16.2b.9, §16.2b.15): a callback parameter with no userdata.
+// Where the body only calls it (or tests it for NULL), the drafter writes
+// 'callback param N' with that proof. Where the body stores it, passes it
+// on or copies it to a local, the function stays raw, and the report names
+// the parameter and the clause a person would state. With a `void *`
+// beside it the userdata pairing is the contract, stated and never drawn.
+use compiler.ConanClient
+use std.fs
+use std.process
+
+fn main:
+    let root = "out/tmp/conan_facade_callback_param_report_test"
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    let header = "void each(void (*cb)(int, void *), void *ud);\nvoid each_bare(int n, void (*cb)(int));\nint maybe_bare(int (*cb)(int), int x);\nvoid keep_bare(void (*cb)(int));\nvoid pass_bare(void (*cb)(int));\nvoid alias_bare(void (*cb)(int));\n"
+    assert(write_file(dep ++ "/include/cbs.h", header) == 0)
+    assert(write_file(src ++ "/cbs.h", header) == 0)
+    var unit = "#include \"cbs.h\"\nstatic void (*kept)(int);\n"
+    unit = unit ++ "void each(void (*cb)(int, void *), void *ud) { (void)cb; (void)ud; }\n"
+    unit = unit ++ "void each_bare(int n, void (*cb)(int)) { for (int i = 0; i < n; i++) cb(i); }\n"
+    unit = unit ++ "int maybe_bare(int (*cb)(int), int x) { if (!cb) return -1; return cb != 0 ? (*cb)(x) : 0; }\n"
+    unit = unit ++ "void keep_bare(void (*cb)(int)) { kept = cb; }\n"
+    unit = unit ++ "void pass_bare(void (*cb)(int)) { each_bare(3, cb); }\n"
+    unit = unit ++ "void alias_bare(void (*cb)(int)) { void (*g)(int) = cb; kept = g; }\n"
+    assert(write_file(src ++ "/cbs.c", unit) == 0)
+    let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c cbs.c\",\n  \"file\": \"cbs.c\"\n}\n]\n"
+    assert(write_file(build ++ "/compile_commands.json", commands) == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"cbs\"]}\n") == 0)
+    assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
+    conan_write_facade("cbs", "1.0", dep, src, build)
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    let facade = read_file(dep ++ "/contract.with") ?? ""
+    var raw = 0
+    var hinted = 0
+    var each_line = ""
+    for line in report.split("\n"):
+        if line.starts_with("  each:"): each_line = line.to_owned()
+        for name in ["keep_bare", "pass_bare", "alias_bare"]:
+            if not line.starts_with(f"  {name}:"): continue
+            if line.contains("raw"): raw += 1
+            if line.contains("no `void *` userdata parameter") and line.contains("'callback param 0', which takes a function or a closure that captures nothing"): hinted += 1
+    let proof = "    // proof: the function calls it, and neither stores it, passes it on nor returns it\n"
+    let ok = each_line.contains("(param 0)") and each_line.contains("'callback param 0 userdata param 1'") and raw == 3 and hinted == 3 and facade.contains("    fn each_bare\n        callback param 1" ++ proof) and facade.contains("    fn maybe_bare\n        callback param 0" ++ proof) and not facade.contains("fn keep_bare") and not facade.contains("fn pass_bare") and not facade.contains("fn alias_bare") and not facade.contains("fn each\n")
+    if not ok:
+        print(report)
+        print(facade)
+    assert(ok)
+    print("ok")

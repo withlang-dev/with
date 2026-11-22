@@ -2,7 +2,7 @@
 
 Status: current as of `8f47830`.
 
-This audit covers `src/BuildGraphKinds.w` after the Phase C selfhost smoke,
+This audit covers `src/BuildGraphKinds.with` after the Phase C selfhost smoke,
 one-liner, object-symbol, project, edge, PCRE2-prep, migrate-basic, and
 migrate-core, and build-w extractions. The old selfhost suite dispatcher is
 also removed. The embedded-runtime regression, all PCRE2 project targets, seed

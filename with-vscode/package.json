@@ -18,7 +18,7 @@
     "languages": [{
       "id": "with",
       "aliases": ["With", "with"],
-      "extensions": [".w"],
+      "extensions": [".with"],
       "configuration": "./language-configuration.json"
     }],
     "grammars": [{

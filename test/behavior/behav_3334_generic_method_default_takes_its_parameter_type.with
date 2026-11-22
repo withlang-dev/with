@@ -1,0 +1,18 @@
+//! expect-stdout: ok
+// #3334 (§4.2.1): a literal default takes its parameter's type. A generic
+// method has no signature, so its default was checked with no demand: the
+// `0` of `base: i32 = 0` was an `isize`, and every call that omitted it
+// warned that `isize` narrows to `i32`, pointing at the caller's binding.
+use std.fs
+use pre_d_build_runner
+
+fn main:
+    let root = p7_prepare_case("generic_method_default_3334", "defaults")
+    p7_write(root, "with.toml", "[package]\nname = \"defaults\"\nversion = \"0.1.0\"\n")
+    p7_write(root, "src/main.with", "type B { n: i32 }\nimpl B:\n    fn pick[T: Default](base: i32 = 0) -> T: T.default()\n    fn plain(base: i32 = 0) -> i32: base\n\nfn main:\n    let b = B { n: 1 }\n    let x: i64 = b.pick()\n    let y = b.plain()\n    let n: i32 = \"42\".parse() ?? 0\n    print(f\"{x} {y} {n}\")\n")
+    let checked = p7_run(root, "check", p7_argv_append(p7_argv_append("", "check"), "src/main.with"))
+    p7_assert_success(checked, "a generic method called without its defaulted argument")
+    let said = checked.stdout ++ checked.stderr
+    if said.contains("warning"): print(said)
+    assert(not said.contains("warning"))
+    print("ok")

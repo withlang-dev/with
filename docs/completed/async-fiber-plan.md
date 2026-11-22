@@ -234,7 +234,7 @@ Task is a struct wrapping an i32 fiber_id plus a pointer to
 the heap-allocated result buffer. The `T` parameter exists for
 sema type checking.
 
-File: `lib/std/async.w`:
+File: `lib/std/async.with`:
 ```
 pub type Task[T] {
     fiber_id: i32,
@@ -250,7 +250,7 @@ result and free the buffer.
 When `FnFlags.ASYNC` is set, sema wraps the declared return
 type `T` in `Task[T]`.
 
-File: `src/SemaDecl.w` — in `collect_fn_decl`, after resolving
+File: `src/SemaDecl.with` — in `collect_fn_decl`, after resolving
 return type:
 ```
 if (flags / FnFlags.ASYNC) % 2 == 1:
@@ -261,13 +261,13 @@ if (flags / FnFlags.ASYNC) % 2 == 1:
     ret_type = task_ty
 ```
 
-File: `src/SemaCheck.w` — in `check_fn_body`, when ASYNC flag,
+File: `src/SemaCheck.with` — in `check_fn_body`, when ASYNC flag,
 the body's expected type is the unwrapped `T`, not `Task[T]`.
 The fiber wrapping happens at the call site, not inside the body.
 
 ### 1c. `.await` in non-async context is a compile error
 
-File: `src/SemaCheck.w` — in `check_await`:
+File: `src/SemaCheck.with` — in `check_await`:
 ```
 if not self.current_fn_is_async():
     self.emit_error("await requires async context", node)
@@ -289,7 +289,7 @@ every intermediate test during development has a working runtime.
 
 ### 2a. Runtime init in `__with_main`
 
-File: `src/Codegen.w` — in `__with_main` generation:
+File: `src/Codegen.with` — in `__with_main` generation:
 ```
 if program_uses_async:
     call @with_runtime_init()
@@ -325,7 +325,7 @@ and prints a diagnostic before aborting.
 ### 2c. Smoke test
 
 ```
-// test/behavior/behav_async_runtime_init.w
+// test/behavior/behav_async_runtime_init.with
 //! expect-stdout: ok
 
 fn main:
@@ -351,9 +351,9 @@ MIR_INTRINSIC_FIBER_SELECT    // (tasks...) -> (index, result)
 MIR_INTRINSIC_FIBER_CANCEL    // (task) -> void
 ```
 
-File: `src/Mir.w` — add to intrinsic enum.
+File: `src/Mir.with` — add to intrinsic enum.
 
-File: `src/MirLower.w`:
+File: `src/MirLower.with`:
 - `NK_SPAWN` → emit `MIR_INTRINSIC_FIBER_SPAWN`
 - `NK_AWAIT` → emit `MIR_INTRINSIC_FIBER_AWAIT`
 - `NK_SELECT_AWAIT` → emit `MIR_INTRINSIC_FIBER_SELECT`
@@ -394,7 +394,7 @@ define void @__async_tramp_FUNCNAME(i8* %env, i8* %result_buf) {
 }
 ```
 
-File: `src/Codegen.w` — add trampoline cache:
+File: `src/Codegen.with` — add trampoline cache:
 ```
 async_trampolines: HashMap[i32, i64],  // fn_sym → LLVMValueRef
 ```
@@ -471,7 +471,7 @@ The unwind path must:
 Before adding more features, verify the core works:
 
 ```
-// test/behavior/behav_async_basic.w
+// test/behavior/behav_async_basic.with
 //! expect-stdout: ok
 
 async fn double(x: i32) -> i32:
@@ -489,7 +489,7 @@ arg packaging, heap result buffer, spawn, await, cancellation
 check, buffer free, runtime init/run/shutdown.
 
 ```
-// test/behavior/behav_async_multiple.w
+// test/behavior/behav_async_multiple.with
 //! expect-stdout: ok
 
 async fn add(a: i32, b: i32) -> i32:
@@ -509,7 +509,7 @@ Verifies multiple concurrent fibers with independent result
 buffers.
 
 ```
-// test/behavior/behav_async_escape.w
+// test/behavior/behav_async_escape.with
 //! expect-stdout: ok
 
 async fn compute(x: i32) -> i32:
@@ -529,7 +529,7 @@ Verifies that Task escaping its defining scope doesn't corrupt
 the result buffer (heap allocation makes this safe).
 
 ```
-// test/behavior/behav_async_struct_return.w
+// test/behavior/behav_async_struct_return.with
 //! expect-stdout: ok
 
 type Point { x: f64, y: f64 }
@@ -631,7 +631,7 @@ no double-write, no use-after-free.
 
 ## Phase 9: Channels
 
-File: `lib/std/async.w`:
+File: `lib/std/async.with`:
 ```
 pub type Channel[T] { handle: i64 }
 pub type Sender[T] { ch: i64 }
@@ -694,32 +694,32 @@ details deferred.
 ### Behavior tests
 
 ```
-behav_async_basic.w          — async fn + .await
-behav_async_multiple.w       — multiple concurrent tasks
-behav_async_escape.w         — Task escaping defining scope
-behav_async_struct_return.w  — async fn returning large struct
-behav_async_spawn.w          — spawn fire-and-forget
-behav_async_scope.w          — async scope with s.track()
-behav_async_select.w         — select await
-behav_async_block.w          — async: inline block
-behav_async_tuple_await.w    — (t1, t2).await
-behav_async_cancel.w         — task.cancel() + propagation
-behav_async_cancel_noop.w    — cancel already-completed task
-behav_async_result.w         — ? in async context
-behav_async_panic.w          — panic in fiber re-raises at await
-behav_async_stack_overflow.w — deep recursion in fiber → clean error
-behav_channel_basic.w        — send/recv
-behav_channel_bounded.w      — bounded backpressure
-behav_channel_close.w        — close + recv after close
+behav_async_basic.with          — async fn + .await
+behav_async_multiple.with       — multiple concurrent tasks
+behav_async_escape.with         — Task escaping defining scope
+behav_async_struct_return.with  — async fn returning large struct
+behav_async_spawn.with          — spawn fire-and-forget
+behav_async_scope.with          — async scope with s.track()
+behav_async_select.with         — select await
+behav_async_block.with          — async: inline block
+behav_async_tuple_await.with    — (t1, t2).await
+behav_async_cancel.with         — task.cancel() + propagation
+behav_async_cancel_noop.with    — cancel already-completed task
+behav_async_result.with         — ? in async context
+behav_async_panic.with          — panic in fiber re-raises at await
+behav_async_stack_overflow.with — deep recursion in fiber → clean error
+behav_channel_basic.with        — send/recv
+behav_channel_bounded.with      — bounded backpressure
+behav_channel_close.with        — close + recv after close
 ```
 
 ### Compile-error tests
 
 ```
-err_await_outside_async.w    — .await in non-async fn → error
-err_await_in_comptime.w      — .await in comptime → error
-err_unused_task.w            — Task not awaited → must_use warning
-err_suspend_under_guard.w    — .await while holding lock → E0701
+err_await_outside_async.with    — .await in non-async fn → error
+err_await_in_comptime.with      — .await in comptime → error
+err_unused_task.with            — Task not awaited → must_use warning
+err_suspend_under_guard.with    — .await while holding lock → E0701
 ```
 
 ---

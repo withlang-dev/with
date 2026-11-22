@@ -2448,7 +2448,7 @@ For embedded, kernel, and bare-metal targets, With can run without
 the standard library. Pass `--no-std` to the compiler:
 
 ```
-with build --no-std firmware.w
+with build --no-std firmware.with
 ```
 
 **What you keep:** All primitives (`i8`–`i64`, `u8`–`u64`, `f32`,

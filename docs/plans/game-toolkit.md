@@ -72,16 +72,16 @@ Roughly 3,500 of WIPE's 11,000 lines are toolkit, not game:
 
 | Piece | WIPE file | Game-specific? |
 |---|---|---|
-| Platform seam: overlay pause, achievement mirror, controller, prompts | `src/platform.w` | No |
-| Steam: Input manifest and layouts, achievements, manual callback dispatch, one-build rule | `src/steam.w`, `src/achievement_sync.w`, `assets/steam/` | The action names |
-| Actions-not-buttons contract; keyboard sampled once into `Keys`; pure arbitration | `src/controls.w`, `src/keyboard.w`, `src/input.w` | The action list |
-| SDL controllers: every pad open, last-used drives, Steam Controller lizard mode | `src/gamepads.w`, `src/sdl.w` | No |
-| Atomic save with backup and newer-version refusal; settings; paths | `src/save.w`, `src/settings.w`, `src/paths.w` | The fields |
-| Window, aspect-ratio view, fullscreen, vsync, frame limit, fixed-step loop | `src/run.w`, the step clock in `src/game.w` | No |
-| Deterministic recording and exact replay | `src/record.w` | No |
-| Resource lifecycle in drop order; audio bank | `src/devices.w`, `src/audio.w` | No |
-| Packaging with an explicit allowlist; UAT harnesses; tour; gallery | `build.w`, `src/uat.w`, `src/tour.w`, `src/gallery.w` | The pattern |
-| The game | `src/game.w`, `src/loadout.w`, `src/app.w`, `src/presentation.w` | Yes |
+| Platform seam: overlay pause, achievement mirror, controller, prompts | `src/platform.with` | No |
+| Steam: Input manifest and layouts, achievements, manual callback dispatch, one-build rule | `src/steam.with`, `src/achievement_sync.with`, `assets/steam/` | The action names |
+| Actions-not-buttons contract; keyboard sampled once into `Keys`; pure arbitration | `src/controls.with`, `src/keyboard.with`, `src/input.with` | The action list |
+| SDL controllers: every pad open, last-used drives, Steam Controller lizard mode | `src/gamepads.with`, `src/sdl.with` | No |
+| Atomic save with backup and newer-version refusal; settings; paths | `src/save.with`, `src/settings.with`, `src/paths.with` | The fields |
+| Window, aspect-ratio view, fullscreen, vsync, frame limit, fixed-step loop | `src/run.with`, the step clock in `src/game.with` | No |
+| Deterministic recording and exact replay | `src/record.with` | No |
+| Resource lifecycle in drop order; audio bank | `src/devices.with`, `src/audio.with` | No |
+| Packaging with an explicit allowlist; UAT harnesses; tour; gallery | `build.with`, `src/uat.with`, `src/tour.with`, `src/gallery.with` | The pattern |
+| The game | `src/game.with`, `src/loadout.with`, `src/app.with`, `src/presentation.with` | Yes |
 
 Three of these exist in no surveyed ecosystem and are the toolkit's
 differentiators: the fixed-step clock with exact replay; prompts named by
@@ -118,7 +118,7 @@ when the client is absent.
    wizard.
 8. **No template language.** A template is real With files, included or
    excluded per choice. No Liquid, no Rhai, no `#if` inside sources. The
-   choices become facts the generated `build.w` already states. Generated
+   choices become facts the generated `build.with` already states. Generated
    With uses braces.
 9. **Templates live in the compiler and run in the battery.** Every
    template is generated, built and tested on every host the battery
@@ -185,7 +185,7 @@ with add achievements
 with add audio
 ```
 
-Each add-on is a named set of files, dependencies and `build.w` edits.
+Each add-on is a named set of files, dependencies and `build.with` edits.
 Adding one twice is a no-op. Removing is manual; the toolkit does not
 guess which of the developer's files depend on it.
 
@@ -218,7 +218,7 @@ in this order:
    lifetime of returned text such as `GetStringForActionOrigin`'s. Nobody
    writes a facade per project.
 3. **The backend.** The `game.steam` platform, the Steam Input assets
-   generated from the game's action declaration (§4.1), and the `build.w`
+   generated from the game's action declaration (§4.1), and the `build.with`
    edits (link `steam_api`, the library beside the executable,
    `steam_appid.txt` for development runs).
 4. **The report.** Like `with get`, it says how many functions present
@@ -239,19 +239,19 @@ dependency order, each with the WIPE file it is extracted from:
 
 | Module | From | Contents |
 |---|---|---|
-| `game.controls` | `controls.w` | `ActionFrame`, the action bits, `Keys` |
-| `game.platform` | `platform.w` | `trait Platform`, `PlatformFrame`, `NoPlatform` |
-| `game.input` | `input.w` | `Device`, `Prompts`, `MenuState`, stick deadzones, echo suppression |
-| `game.keyboard` | `keyboard.w` | `sample_keys()`: the only raylib input call |
-| `game.gamepads` | `gamepads.w`, `sdl.w` | The SDL producer, every pad open, last-used drives, lizard mode |
-| `game.steam` | `steam.w`, `achievement_sync.w` | `SteamPlatform` over the Steam facade of §3.2.1: Input, achievements, overlay, manual dispatch. No `unsafe` (rule 10). |
-| `game.save` | `save.w`, `settings.w`, `paths.w` | Atomic writes, backup, version refusal, the settings file, asset and data paths |
-| `game.clock` | the step clock in `game.w` | `STEPS_PER_SECOND`, `simulation_steps`, elapsed derived from steps |
-| `game.record` | `record.w` | Recording and exact replay |
-| `game.window` | `run.w` | The aspect-ratio view, fullscreen, vsync, frame limit, the frame loop |
-| `game.devices` | `devices.w` | Window, audio and renderer lifetimes in drop order |
-| `game.audio` | `audio.w` | A sound bank with cue-on-event playback |
-| `game.package` | `build.w` | Build actions: allowlist packaging, the Steam library beside the executable, the Steam Input assets |
+| `game.controls` | `controls.with` | `ActionFrame`, the action bits, `Keys` |
+| `game.platform` | `platform.with` | `trait Platform`, `PlatformFrame`, `NoPlatform` |
+| `game.input` | `input.with` | `Device`, `Prompts`, `MenuState`, stick deadzones, echo suppression |
+| `game.keyboard` | `keyboard.with` | `sample_keys()`: the only raylib input call |
+| `game.gamepads` | `gamepads.with`, `sdl.with` | The SDL producer, every pad open, last-used drives, lizard mode |
+| `game.steam` | `steam.with`, `achievement_sync.with` | `SteamPlatform` over the Steam facade of §3.2.1: Input, achievements, overlay, manual dispatch. No `unsafe` (rule 10). |
+| `game.save` | `save.with`, `settings.with`, `paths.with` | Atomic writes, backup, version refusal, the settings file, asset and data paths |
+| `game.clock` | the step clock in `game.with` | `STEPS_PER_SECOND`, `simulation_steps`, elapsed derived from steps |
+| `game.record` | `record.with` | Recording and exact replay |
+| `game.window` | `run.with` | The aspect-ratio view, fullscreen, vsync, frame limit, the frame loop |
+| `game.devices` | `devices.with` | Window, audio and renderer lifetimes in drop order |
+| `game.audio` | `audio.with` | A sound bank with cue-on-event playback |
+| `game.package` | `build.with` | Build actions: allowlist packaging, the Steam library beside the executable, the Steam Input assets |
 
 What stays in the template, not the package: the action *list* (a game
 names its own actions), the save *fields*, the screens, the Steam Input
@@ -264,7 +264,7 @@ declares the actions. The Steam Input manifest and the SDL layout are
 generated from that one declaration, so the three never disagree:
 
 ```with
-// src/actions.w, generated by the template, edited by the developer
+// src/actions.with, generated by the template, edited by the developer
 actions Menu { confirm, back, up, down, left, right, pause }
 actions Flight { pause }
 analog Menu { navigate }
@@ -277,7 +277,7 @@ files at build time, not by hand.
 
 ### 4.2 Console slots
 
-`with add platform switch` writes `src/platform_switch.w`:
+`with add platform switch` writes `src/platform_switch.with`:
 
 ```with
 // Nintendo Switch. The backend is the private package platform.switch,
@@ -286,7 +286,7 @@ files at build time, not by hand.
 comptime_error("platform.switch is not installed; see docs/platforms.md")
 ```
 
-and a `build.w` target that lists the toolchain and SDK paths it will
+and a `build.with` target that lists the toolchain and SDK paths it will
 need. When the package exists, the slot becomes `use platform.switch` and
 `impl Platform for SwitchPlatform` lives in the package. The game never
 changes.
@@ -297,11 +297,11 @@ changes.
 
 1. WIPE's Steam binding moves onto a facade built from `steam_api.json`
    and a facts file (§3.2.1 step 2), written by hand this once.
-   `src/steam.w` keeps no `unsafe` except the callback pump, and that only
+   `src/steam.with` keeps no `unsafe` except the callback pump, and that only
    until #2425 lands. Every place the facade can't say what the code
    needs is filed as a compiler issue.
 2. Create `lib/game/` in the `with` repository with the modules of §4,
-   moved from WIPE with their tests (`test/*_contracts.w`).
+   moved from WIPE with their tests (`test/*_contracts.with`).
 3. WIPE depends on `game` through `with get`; its own copies are deleted.
 4. WIPE builds on Mac, Linux and Windows, and all its test files pass. The
    Steam UAT passes on a machine with Steam and a controller.
@@ -316,7 +316,7 @@ the game.
    frame limit), pause, results. An empty play state with the fixed-step
    loop and replay wired.
 2. The action declaration of §4.1 and the generated Steam Input assets.
-3. `build.w` with packaging, and `test/` with the contract tests.
+3. `build.with` with packaging, and `test/` with the contract tests.
 4. A README that says what the project has, what a console port replaces,
    and the Deck Verified checklist.
 5. The battery generates the template for every platform and store
@@ -371,7 +371,7 @@ replaces the drawing module of §2 rule 4 for its renderer. Then mobile.
 | Advice | Why not |
 |---|---|
 | "Abstract the renderer now so consoles are free later." | That is an engine. Bevy and Godot own their renderers and still have no console story; MonoGame and Ebitengine got consoles by doing each backend. Confine drawing and say so. |
-| "Use a template language so files can be conditional." | Rule 8. The conditions are platforms and stores, which the generated `build.w` already states as facts; files are included or not. |
+| "Use a template language so files can be conditional." | Rule 8. The conditions are platforms and stores, which the generated `build.with` already states as facts; files are included or not. |
 | "Let the community host templates." | Rule 9. Every out-of-toolchain template in the survey drifted. `--example` exists for community starting points and says it is off the versioned path. |
 | "Ask the renderer or quality settings at creation." | Godot and Unreal do; neither question belongs to a project. |
 

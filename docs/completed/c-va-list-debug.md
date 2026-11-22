@@ -34,7 +34,7 @@ and the canonical shape for wrappers. Ordinary nested typedefs retain their
 identity. The migration regression also checks array and void-pointer macros.
 Regeneration with the corrected stage2 restores every shared definition and
 every library implementation byte for byte; the only PCRE2 change is
-`pcre2test.w`'s `cfprintf` local becoming `c_va_list`. That generated harness
+`pcre2test.with`'s `cfprintf` local becoming `c_va_list`. That generated harness
 has been promoted (`/tmp/with-va-shape-pcre2-migrate.log`).
 The promoted harness passes `check` (generated-code style warnings remain).
 Zlib regeneration is byte-identical to the branch's already promoted corpus,
@@ -171,12 +171,12 @@ ABI cases. These are local iteration checks, not a complete battery.
 
 ### va_list cases
 
-`behav_migrate_va_list.w` generates C fixtures under out/, verifies an
+`behav_migrate_va_list.with` generates C fixtures under out/, verifies an
 unrelated typedef, a va_list alias and an explicit pointer alias, then
 executes mixed integer/floating-point variadic formatting through both
 pointer and value calls. Its argument count crosses register capacity.
 
-`behav_c_va_list_target_abi.w` covers all five supported targets: storage
+`behav_c_va_list_target_abi.with` covers all five supported targets: storage
 size, enclosing-struct size, alignment, physical field offset, foreign-call
 copy versus place behavior, analysis matrices and audits, and rejection of
 an invalid analysis target. The compiler's own code does not gain a foreign
@@ -186,6 +186,6 @@ The updated stage2 passed both regressions, including the AArch64 matrix's
 `needs-copy=true` assertion (`/tmp/with-va-audit-target-test.log` and
 `/tmp/with-va-audit-migrate-test.log`). Its compiler-wide audit checked
 2,509,581 facts with zero violations (`/tmp/with-va-dev-compiler-audit.log`).
-The recorded ABI hashes also match `FnAbi.w` and `TypeLayout.w`. These are
+The recorded ABI hashes also match `FnAbi.with` and `TypeLayout.with`. These are
 iteration results; the committed batch still requires the full stage-chain,
 test, seed-compatibility, and move/drop verification.

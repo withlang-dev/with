@@ -20,7 +20,7 @@ with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz=d3abcdfd6f6ccc8094929e4053a15c28c45d1
 with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256=f4dc074646a19a24167ef577ed2f6965211601563d9cd31acecff65169b41415
 with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest=889371bbfebf203482fa4c2d3dd072681dedec557ad58f21b3f269385dbc064f
 
-# linux-x86_64: built by build/sdk.w at c4ddb7dd against the With linux
+# linux-x86_64: built by build/sdk.with at c4ddb7dd against the With linux
 # sysroot (glibc 2.28), with its own compiler-rt and static libc++ and no
 # libxml2 (#1915, D81); every executable in it, cmake and ninja included,
 # needs glibc 2.28+ and nothing else of the host. It carries its sysroot

@@ -7,41 +7,41 @@
 #   KNOWN_DIVERGENCE|<mode>|<entry>|<what_differs>|<correct_compiler>|<why>
 
 # Check-mode
-check|test/wave11/cases/driver_simple.w
-check|test/wave11/cases/imports/relative_root.w
-check|test/wave11/cases/imports/qualified_root.w
-check|test/wave11/cases/imports/missing_root.w
-check|test/wave11/cases/c_import_macro_constants_ok.w
-check|test/wave11/cases/c_import_macro_function_like_ok.w
-check|test/wave11/cases/c_import_bad_header_fail.w
-check|test/wave11/cases/c_import_cache_same.w
-check|test/wave11/cases/c_import_cache_diff_links.w
-check|test/wave11/cases/c_import_cache_epoch_override.w
-check|test/wave11/cases/c_import_link_ok.w
-check|test/wave9/cases/runtime_linkage_sync_ok.w
-check|test/wave9/cases/runtime_linkage_async_ok.w
+check|test/wave11/cases/driver_simple.with
+check|test/wave11/cases/imports/relative_root.with
+check|test/wave11/cases/imports/qualified_root.with
+check|test/wave11/cases/imports/missing_root.with
+check|test/wave11/cases/c_import_macro_constants_ok.with
+check|test/wave11/cases/c_import_macro_function_like_ok.with
+check|test/wave11/cases/c_import_bad_header_fail.with
+check|test/wave11/cases/c_import_cache_same.with
+check|test/wave11/cases/c_import_cache_diff_links.with
+check|test/wave11/cases/c_import_cache_epoch_override.with
+check|test/wave11/cases/c_import_link_ok.with
+check|test/wave9/cases/runtime_linkage_sync_ok.with
+check|test/wave9/cases/runtime_linkage_async_ok.with
 
 # Build-mode
-build|test/wave11/cases/driver_simple.w
-build|test/wave11/cases/imports/relative_root.w
-build|test/wave11/cases/c_import_link_ok.w
-build|test/wave11/cases/c_import_link_missing_fail.w
-build|test/wave11/cases/c_import_bad_header_fail.w
-build|test/wave9/cases/runtime_linkage_sync_ok.w
-build|test/wave9/cases/runtime_linkage_async_ok.w
+build|test/wave11/cases/driver_simple.with
+build|test/wave11/cases/imports/relative_root.with
+build|test/wave11/cases/c_import_link_ok.with
+build|test/wave11/cases/c_import_link_missing_fail.with
+build|test/wave11/cases/c_import_bad_header_fail.with
+build|test/wave9/cases/runtime_linkage_sync_ok.with
+build|test/wave9/cases/runtime_linkage_async_ok.with
 
 # Run-mode
-run|test/wave11/cases/driver_simple.w
-run|test/wave11/cases/imports/relative_root.w
-run|test/wave11/cases/imports/qualified_root.w
-run|test/wave11/cases/c_import_stdio_ok.w
-run|test/wave11/cases/c_import_link_ok.w
-run|test/wave9/cases/runtime_linkage_sync_ok.w
-run|test/wave9/cases/runtime_linkage_async_ok.w
+run|test/wave11/cases/driver_simple.with
+run|test/wave11/cases/imports/relative_root.with
+run|test/wave11/cases/imports/qualified_root.with
+run|test/wave11/cases/c_import_stdio_ok.with
+run|test/wave11/cases/c_import_link_ok.with
+run|test/wave9/cases/runtime_linkage_sync_ok.with
+run|test/wave9/cases/runtime_linkage_async_ok.with
 
 # Test-mode (command behavior)
-test|test/wave11/cases/c_import_bad_header_fail.w
-test|test/wave11/cases/does_not_exist.w
+test|test/wave11/cases/c_import_bad_header_fail.with
+test|test/wave11/cases/does_not_exist.with
 
 # CLI-mode (command surface)
 cli|help
@@ -52,5 +52,5 @@ cli|run_missing_arg
 cli|test_unknown_flag
 cli|clean
 
-KNOWN_DIVERGENCE|check|test/wave11/cases/c_import_macro_constants_ok.w|stage0 rejects c_import object-like macro constants while selfhost resolves them|selfhost|selfhost implements wave11 macro constant extraction; stage0 still diagnoses undefined macro bindings.
-KNOWN_DIVERGENCE|check|test/wave11/cases/c_import_macro_function_like_ok.w|stage0 treats function-like macro tokenization as fatal c_import failure while selfhost skips function-like macros|selfhost|selfhost matches wave11 c_import macro diagnostics policy (skip unsupported function-like macros).
+KNOWN_DIVERGENCE|check|test/wave11/cases/c_import_macro_constants_ok.with|stage0 rejects c_import object-like macro constants while selfhost resolves them|selfhost|selfhost implements wave11 macro constant extraction; stage0 still diagnoses undefined macro bindings.
+KNOWN_DIVERGENCE|check|test/wave11/cases/c_import_macro_function_like_ok.with|stage0 treats function-like macro tokenization as fatal c_import failure while selfhost skips function-like macros|selfhost|selfhost matches wave11 c_import macro diagnostics policy (skip unsupported function-like macros).

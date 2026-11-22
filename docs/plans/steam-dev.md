@@ -36,12 +36,12 @@ Paths are relative to the `with` repository unless they name WIPE.
 
 | Need | State | Where |
 |---|---|---|
-| Source-level debug info | **Emitted by default; nothing to pass (`-g0` or `--release` turns it off).** Verified on macOS arm64 (v0.15.3.0, 2026-10-18): `with build -O0` gives a `.dSYM`, line breakpoints in `.w` files, `frame variable` with parameters and locals, and a backtrace in With source. The default build optimizes, so small functions are inlined and a breakpoint on their lines has no location; a dev build is `-O0`. `--release` writes no `.dSYM`. | `docs/completed/debug.md`, `test/behavior/behav_debug_info_variables.w` |
-| Build for `linux_x86_64` from a Mac | **Not possible for a game yet.** `BuildTarget.linux_x86_64` exists, and the link stage already takes a Linux sysroot (`WITH_LINUX_SYSROOT`, `src/compiler/Link.w:385-412`) and the bundled `ld.lld`. What refuses is `c_import` under `--target` (`src/CImport.w:754`: it would parse the host's headers), and Conan selection uses the host OS. `with build :cross` fails loudly. | `src/CImport.w`, `src/compiler/Link.w`, `docs/spec/toolchain/with-build.md` §Cross-Platform Targets |
-| A Linux build that runs on the Deck | Proven by WIPE: built **on the Deck** with the Deck's own With install, `libsteam_api.so` beside the executable with an `$ORIGIN` rpath. This is the only deployment path used so far. | WIPE `build.w`, `docs/steam-and-steam-deck-support.md` §8 |
+| Source-level debug info | **Emitted by default; nothing to pass (`-g0` or `--release` turns it off).** Verified on macOS arm64 (v0.15.3.0, 2026-10-18): `with build -O0` gives a `.dSYM`, line breakpoints in `.w` files, `frame variable` with parameters and locals, and a backtrace in With source. The default build optimizes, so small functions are inlined and a breakpoint on their lines has no location; a dev build is `-O0`. `--release` writes no `.dSYM`. | `docs/completed/debug.md`, `test/behavior/behav_debug_info_variables.with` |
+| Build for `linux_x86_64` from a Mac | **Not possible for a game yet.** `BuildTarget.linux_x86_64` exists, and the link stage already takes a Linux sysroot (`WITH_LINUX_SYSROOT`, `src/compiler/Link.with:385-412`) and the bundled `ld.lld`. What refuses is `c_import` under `--target` (`src/CImport.with:754`: it would parse the host's headers), and Conan selection uses the host OS. `with build :cross` fails loudly. | `src/CImport.with`, `src/compiler/Link.with`, `docs/spec/toolchain/with-build.md` §Cross-Platform Targets |
+| A Linux build that runs on the Deck | Proven by WIPE: built **on the Deck** with the Deck's own With install, `libsteam_api.so` beside the executable with an `$ORIGIN` rpath. This is the only deployment path used so far. | WIPE `build.with`, `docs/steam-and-steam-deck-support.md` §8 |
 | Shared-library output and a loader | None | — |
 | Hot reload | None. `docs/proposals/with-ui.md` proposes state-as-snapshot reload for UI; nothing is built. | — |
-| Deterministic recording and exact replay | Proven in WIPE; becomes `game.record` | WIPE `src/record.w` |
+| Deterministic recording and exact replay | Proven in WIPE; becomes `game.record` | WIPE `src/record.with` |
 | An editor integration | `with-vscode`, `with lsp` | `with-vscode/` |
 
 ### 1.2 On the Deck (probed 2026-10-18)
@@ -213,7 +213,7 @@ WIPE at `5653888`, v0.15.3.0 on both ends, 2026-10-18:
 | | Deck (8 threads) | Mac (Apple M5 Max, 18 cores) |
 |---|---|---|
 | Clean build of `:wipe` | 66.8 s (peak RSS 411 MB) | 20.4 s |
-| One real edit (a function added to `src/presentation.w`) | 65.5 s | 18.1 s |
+| One real edit (a function added to `src/presentation.with`) | 65.5 s | 18.1 s |
 | No change | 0.4 s | — |
 
 Any source change rebuilds the whole executable; there is no per-module
@@ -239,7 +239,7 @@ The compiler work, each an issue to file:
 
 1. **`c_import` under `--target`** parses headers with the target triple
    and the sysroot (`--sysroot`, `-isystem <sysroot>/usr/include`) instead
-   of refusing (`src/CImport.w:754`). This is the one hard piece: layouts,
+   of refusing (`src/CImport.with:754`). This is the one hard piece: layouts,
    macros and `#if __linux__` must come from the target, never the host.
 2. **Target-keyed C dependencies.** Conan selection takes the target, and
    `.with/deps/c/<name>/<version>` gains a target key. raylib and SDL3 for
@@ -252,7 +252,7 @@ The compiler work, each an issue to file:
    that already reads `WITH_LINUX_SYSROOT`.
 4. **The link with the bundled `ld.lld`** and that sysroot, so no Linux
    `cc` is needed on a Mac. The Linux link path already uses the sysroot's
-   crt objects and dynamic linker (`src/compiler/Link.w:385-420`).
+   crt objects and dynamic linker (`src/compiler/Link.with:385-420`).
 
 When these land, the device's `build` defaults to `cross`.
 
@@ -266,7 +266,7 @@ the Mac's and offers to install the matching compiler under `~`. The
 Deck's `.with/deps` and build cache persist. The DWARF then names Deck
 paths, which §6's source map maps back to the checkout.
 
-Every builder runs `with build` on the same `build.w`, so the program that
+Every builder runs `with build` on the same `build.with`, so the program that
 decides what a package is never forks.
 
 ## 5. The dev channel
@@ -460,7 +460,7 @@ Answered 2026-10-18 on Eric's Deck:
    not a cost. Recordings made on 2026-09-26 to 10-07 no longer land where
    they ended, because the rules changed on 10-15; that is the tier 2
    contract: same build, exact; new rules, honest.
-   `test/record_contracts.w` holds the same-build case.
+   `test/record_contracts.with` holds the same-build case.
 
 Still open:
 
@@ -537,7 +537,7 @@ Two things seen along the way that the tool must handle:
 2. `with dev screenshot` and `with dev view` (window and `--port`).
 3. The `with-vscode` debug type over `lldb-dap`, the `with dev` tasks and
    the screen webview (§6b).
-4. WIPE: a breakpoint in `src/game.w` hit on the Deck, a local variable
+4. WIPE: a breakpoint in `src/game.with` hit on the Deck, a local variable
    printed, a step over, from the Mac. Every value LLDB cannot show
    usefully is filed.
 5. Visual Studio: Attach to Process over SSH to WIPE on the Deck from a

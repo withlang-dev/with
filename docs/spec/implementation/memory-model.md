@@ -53,7 +53,7 @@ monolith.
   owns the value; every exit path hands it back; the source binding is blank
   (reset-on-move) in between. Reconciling two copies after the fact
   ("re-sync") is aliasing wearing a costume and is forbidden. Precedent:
-  `lower_module` (Compilation.w); the Backend follows the same pattern.
+  `lower_module` (Compilation.with); the Backend follows the same pattern.
 - **Consuming a field of a linear value reached through a borrow** blanks
   the field and *writes* the root (D17) — never promotion to consuming the
   whole root. Copy-typed projections keep the promotion: escaping a copied

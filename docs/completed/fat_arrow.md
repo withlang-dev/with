@@ -545,8 +545,8 @@ fixpoint after each migration step.
 
 Order:
 1. Add `=>` closure parsing and `=>` match arm parsing (new syntax works alongside old).
-2. Migrate all `src/*.w` closures from `|x|` to `=>` or `it`.
-3. Migrate all `src/*.w` match arms from `->` to `=>`.
+2. Migrate all `src/*.with` closures from `|x|` to `=>` or `it`.
+3. Migrate all `src/*.with` match arms from `->` to `=>`.
 4. Verify fixpoint.
 5. Remove `|x|` closure parsing.
 6. Remove `->` match arm parsing.

@@ -245,7 +245,7 @@ a >> n      // right shift (arithmetic for signed, logical for unsigned)
 ```
 All operators work on i8-i128, u8-u128. Mixed-width operands are promoted to the wider type.
 
-**Implementation:** These operators already parse and work for i32. The issue is that codegen emits incorrect LLVM IR for 64-bit and 128-bit operands. Debug: Find where `OP_BIT_AND`, `OP_BIT_OR`, `OP_BIT_XOR`, `OP_SHL`, `OP_SHR` are lowered in Codegen.w. Verify that the LLVM instruction uses the correct integer width (not always i32). Fix: In `mir_emit_binop` (or equivalent), ensure the operands are widened/narrowed to match before emitting `LLVMBuildAnd`, `LLVMBuildOr`, `LLVMBuildXor`, `LLVMBuildShl`, `LLVMBuildAShr` (signed) / `LLVMBuildLShr` (unsigned).
+**Implementation:** These operators already parse and work for i32. The issue is that codegen emits incorrect LLVM IR for 64-bit and 128-bit operands. Debug: Find where `OP_BIT_AND`, `OP_BIT_OR`, `OP_BIT_XOR`, `OP_SHL`, `OP_SHR` are lowered in Codegen.with. Verify that the LLVM instruction uses the correct integer width (not always i32). Fix: In `mir_emit_binop` (or equivalent), ensure the operands are widened/narrowed to match before emitting `LLVMBuildAnd`, `LLVMBuildOr`, `LLVMBuildXor`, `LLVMBuildShl`, `LLVMBuildAShr` (signed) / `LLVMBuildLShr` (unsigned).
 
 ### H5. String interpolation
 **First needed:** Session 6 (MSL source generation)

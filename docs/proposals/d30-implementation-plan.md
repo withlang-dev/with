@@ -28,14 +28,14 @@ of the same ~134 symbols**:
 1. **Codegen's synthesized LLVM decls** — ~125 live `with_*` symbols built
    from literal name strings across five mechanisms: the generic
    `ensure_internal_runtime_fn`/`call_internal_runtime_fn` path
-   (`src/CodegenDispatch.w:2780,2820`, with its own Windows-only aggregate
-   ABI re-derivation at `src/Codegen.w:4878`); per-family helpers with
+   (`src/CodegenDispatch.with:2780,2820`, with its own Windows-only aggregate
+   ABI re-derivation at `src/Codegen.with:4878`); per-family helpers with
    hardcoded name→type if-chains (`get_runtime_fn_type` at
-   `src/CodegenDispatch.w:17997` defaults unmatched params to `i64`);
+   `src/CodegenDispatch.with:17997` defaults unmatched params to `i64`);
    single-symbol `ensure_*` helpers; **56 raw inline
    `wl_add_function(self.llmod, "with_…")` sites**; and a
    reuse-if-source-declared fallback (`call_runtime_str_fn`,
-   `src/CodegenDispatch.w:2764`) under which one call site's ABI depends on
+   `src/CodegenDispatch.with:2764`) under which one call site's ABI depends on
    whether a `lib/std` extern decl happened to be seen first.
 2. **`lib/std` extern decls** — 222 `extern fn with_*` decls / 134 distinct
    symbols across 33 files, with heavy redeclaration (`with_free` ×11).
@@ -43,51 +43,51 @@ of the same ~134 symbols**:
 3. **`runtime/with_runtime.h`** — hand-written C prototypes for `--emit-c`,
    only partially synced to the `&str` flip (#785).
 
-Nothing ties any of these to `rt/rt_core.w`'s definitions. The caller-side
-doctrine `extern_param_is_bit_copy` (`src/SemaCheck.w:22868`) never
+Nothing ties any of these to `rt/rt_core.with`'s definitions. The caller-side
+doctrine `extern_param_is_bit_copy` (`src/SemaCheck.with:22868`) never
 consults the parameter type — every extern `str` param is ruled
 non-transferring regardless of what the callee body does. That is the
 double-derived contract #761 proved corrupts silently.
 
-Runtime source honesty: `rt/rt_core.w` has 247 pub fns — 51 `&str`-honest,
+Runtime source honesty: `rt/rt_core.with` has 247 pub fns — 51 `&str`-honest,
 **39 plain-consuming-`str` holdouts, of which only 5 are reachable**
 (`with_vec_str_join`, `with_str_concat`-family `*const str` callers,
-`with_vec_push_str`, plus `with_panic` in `rt/panic_runtime.w`); the other
+`with_vec_push_str`, plus `with_panic` in `rt/panic_runtime.with`); the other
 34 are orphans with no codegen emitter and no `lib/std` decl.
-`rt/linux_aarch64.w:1029–1147` missed the compat `&str` flip; the net
+`rt/linux_aarch64.with:1029–1147` missed the compat `&str` flip; the net
 family (`with_net_tcp_connect`/`udp_connect`/`send`) takes plain `str` on
 all three platforms.
 
 Build/link facts:
 
 - All `out/lib` rt objects are **seed-built** under the loud `#747 INTERIM`
-  block at `build.w:1725-1731` — the flip-built runtime frees every str
+  block at `build.with:1725-1731` — the flip-built runtime frees every str
   operand it is shown; the seed pin is the bridge this plan retires.
-- `rt/rt_core.w` compiles `--emit-obj --no-prelude` (no main); pub fns keep
+- `rt/rt_core.with` compiles `--emit-obj --no-prelude` (no main); pub fns keep
   raw C names only via the hardcoded carve-out
-  `codegen_preserve_runtime_link_name` (`src/Codegen.w:4107-4125`: path
+  `codegen_preserve_runtime_link_name` (`src/Codegen.with:4107-4125`: path
   contains `rt/` AND name starts `with_`/`rt_`/`wl_`); everything else in
   the object is path-hash-mangled.
-- `Link.w` decides which runtime to link by shelling `nm -u` and
-  substring-matching undefined symbols (`src/compiler/Link.w:816-869`,
+- `Link.with` decides which runtime to link by shelling `nm -u` and
+  substring-matching undefined symbols (`src/compiler/Link.with:816-869`,
   `1021-1046`), then pushes `rt_core.o` first in all three link branches.
 - The embedded-stdlib model to mirror: sources embedded as string data
-  (`build/runtime.w:195-236` → `out/gen/compiler/EmbeddedStdlibData.w`),
+  (`build/runtime.with:195-236` → `out/gen/compiler/EmbeddedStdlibData.with`),
   resolved under a synthetic path prefix (`<embedded-std>/`,
-  `src/compiler/EmbeddedStdlib.w`), parsed into the **same AST pool** as
-  user code (`src/compiler/Frontend.w:1476-1487`), one Sema, MIR-cost-based
+  `src/compiler/EmbeddedStdlib.with`), parsed into the **same AST pool** as
+  user code (`src/compiler/Frontend.with:1476-1487`), one Sema, MIR-cost-based
   unit splitting. No per-module objects.
-- Cache precedents: `build_cache_graph_key` (`src/BuildGraphCache.w:774`)
+- Cache precedents: `build_cache_graph_key` (`src/BuildGraphCache.with:774`)
   is already keyed by compiler-binary sha256 + target kind;
-  `EmbeddedClangResource.w` has the stamp-last + per-file identity-manifest
+  `EmbeddedClangResource.with` has the stamp-last + per-file identity-manifest
   discipline ("hit is byte-identical" verification, #312); the c_import fs
-  cache (`src/compiler/Frontend.w:455-498`) has the torn-write-is-a-miss
+  cache (`src/compiler/Frontend.with:455-498`) has the torn-write-is-a-miss
   two-file entry.
 
 ## Staged execution plan
 
 Ordering rules that govern every stage: the bootstrap protocol (runtime
-files and `Link.w` never change in the same commit; every commit
+files and `Link.with` never change in the same commit; every commit
 independently passes `with build :fixpoint`), and the drop-class isolation
 rule (any stage that touches ownership/callee-drop behavior is alone in
 its battery batch with `:move-audit`/`:drop-audit`).
@@ -101,7 +101,7 @@ set — with_vec_push_str disarms, with_panic never returns, weak stubs
 unreachable), R1c seed-pin retirement with byte-identity proof
 (stage2-built rt_core.o == seed-built bootstrap object).
 
-R1a. **Delete the 34 orphan plain-`str` fns** in `rt/rt_core.w` and the
+R1a. **Delete the 34 orphan plain-`str` fns** in `rt/rt_core.with` and the
 dead codegen references (the 11-name if-chain in `get_runtime_fn_type`,
 the uncalled `gen_fmt_buf_write_str`). Where a `_ref` twin exists, the
 orphan dies and the twin stays. No behavior change; shrinks the honesty
@@ -109,16 +109,16 @@ problem to the reachable surface.
 
 R1b. **Flip the reachable holdouts to honest signatures**: the 5 live
 plain-`str` rt fns, the 7 plain-`str` extern decls in `lib/std`
-(`builtins.w:19` `with_panic`, `testing.w:3`, `process.w:21`, `net.w:7,8,12`,
-`regex.w:16`), the `rt/linux_aarch64.w` compat stragglers, and the
+(`builtins.with:19` `with_panic`, `testing.with:3`, `process.with:21`, `net.with:7,8,12`,
+`regex.with:16`), the `rt/linux_aarch64.with` compat stragglers, and the
 `with_net_*` family on all platforms. Caller sides (codegen emitters,
-`MirLower.w:13873`'s `with_panic` lowering) update in the same commit as
+`MirLower.with:13873`'s `with_panic` lowering) update in the same commit as
 their decl — the decl and its emitter are one contract, not a
-Link.w/runtime split.
+Link.with/runtime split.
 
 R1c. **Retire the `#747 INTERIM` seed pin**: with rt sources honest,
 `out/lib` rt objects build with the current stage compiler again
-(`build.w:1732-1750`). Gate: disassembly spot-check of the former #761
+(`build.with:1732-1750`). Gate: disassembly spot-check of the former #761
 poison set (`with_str_eq` & co. — no callee-side frees), full battery,
 `:drop-audit`. This closes #761's interim and is the proof the sources are
 both-worlds honest.
@@ -147,15 +147,15 @@ The stages therefore cannot land by flipping a default in one commit:
 R2b lands **dark behind an internal mode flag** (in-unit parse +
 link-suppression together, off by default), R2c retargets codegen
 family-by-family against that mode's test lane, and the default flip +
-Link.w cleanup is the final, separately-gated commit pair per the
+Link.with cleanup is the final, separately-gated commit pair per the
 bootstrap protocol.
 
 R2a. **Embed rt sources** in the compiler binary exactly like the
-stdlib — **COMPLETE (69f3d87a, 2026-08-18)**: `EmbeddedRuntimeData.w`
-generated as a third output of compat-runtime-source with rt/*.w as
-declared inputs; `EmbeddedRuntime.w` accessor under `<embedded-rt>/`;
+stdlib — **COMPLETE (69f3d87a, 2026-08-18)**: `EmbeddedRuntimeData.with`
+generated as a third output of compat-runtime-source with rt/*.with as
+declared inputs; `EmbeddedRuntime.with` accessor under `<embedded-rt>/`;
 the four source-read sites consult it; internals pin
-`embedded_runtime_data_test.w`. No resolve-side behavior change yet —
+`embedded_runtime_data_test.with`. No resolve-side behavior change yet —
 the runtime has **no user-spellable module name** (resolver-internal
 prefix only); giving it one is language surface and needs Eric (open
 question 3).
@@ -181,7 +181,7 @@ transition-tail: compiling the compiler itself under the lane trips
 decls — exactly the decls R2c deletes family-by-family. R2c also owes
 the harness an env-directive test cell so the lane's green surface is
 pinned. The `symbol_visible_from_current` `with_`-prefix bypass
-(`src/Sema.w:2632`) still dies with the seam at the end of R2c.
+(`src/Sema.with:2632`) still dies with the seam at the end of R2c.
 
 **R2c substrate facts (probed 2026-08-19 on the lane):** MIR bodies exist
 for the ENTIRE in-unit runtime (analyze shows `with_runtime_init/run/
@@ -227,13 +227,13 @@ helpers (root-tier `make_str` captures rt_core internals after the
 tier merge decl-drops the rt def) — needs module-scoped fn identity
 (#751 adjacency) or a full rt-private prefix sweep before the default
 flip. Sweep driver: per-file `WITH_RT_IN_UNIT=1 with test <file>`
-(never `with build` targets — the lane env poisons build.w's own
+(never `with build` targets — the lane env poisons build.with's own
 evaluation through the seed's embedded stdlib).
 
 **R2c lane sweep, re-measured 2026-08-20 (release at cff51561):** 7
 failures / ~950 behavior tests, all in parked classes — flat-namespace
 capture (`behav_annotated_top_level_runtime_init`,
-`issue142_global_struct_init`: rt/fiber_runtime.w:42's `ptr` resolves to
+`issue142_global_struct_init`: rt/fiber_runtime.with:42's `ptr` resolves to
 the USER file's private `ptr`, so the blocker runs in both directions,
 not just root-tier capturing rt privates), no_std prelude
 (`behav_no_std_alloc_prelude`, `behav_no_std_core_prelude`),
@@ -255,7 +255,7 @@ signature — the §16.3e R4 error class), `with_str_hash` `i64` vs `u64`,
 and the Windows net family still `str` where R1 flipped darwin/linux to
 `&str`. Tranche 1 (28f7f19a) took the 24 return-type sites whose callers
 discard the value. **Remaining 39:** the pcre2 `*i8` family
-(`lib/std/re/defs.w` declares alloc/free/realloc/memcpy/memmove/memset/
+(`lib/std/re/defs.with` declares alloc/free/realloc/memcpy/memmove/memset/
 memcmp as `*i8`; ~217 call sites across 15 files pass `*i8` — needs a
 migration tool, not a hand sweep), `with_str_hash` (EmbeddedClangResource
 formats the value into a manifest, so the signedness flip changes
@@ -278,10 +278,10 @@ in-unit decls; #785's partial sync becomes moot).
 
 R2d. **Retire the object boundary**: once no user-program symbol resolves
 to `rt_core.o`, drop the rt-object pushes from the pure-With and cc link
-branches (`src/compiler/Link.w:1174-1216`, `1263-1311`) and the `nm -u`
+branches (`src/compiler/Link.with:1174-1216`, `1263-1311`) and the `nm -u`
 runtime gating; delete the mangling carve-out
 (`codegen_preserve_runtime_link_name`) so runtime internals mangle like
-any module. `Link.w`-only commit, after the R2c commits, per the bootstrap
+any module. `Link.with`-only commit, after the R2c commits, per the bootstrap
 protocol. The compiler-build (lld) branch keeps its bridge objects — they
 are genuinely foreign (LLVM/clang), not runtime.
 
@@ -293,7 +293,7 @@ component) + target spec; entry discipline = stamp-last with a per-file
 identity manifest (the `EmbeddedClangResource` pattern); torn write = miss
 (the c_import-cache pattern). The hit condition is byte-identity with the
 in-unit result — verified in CI by compiling one unit both ways and
-comparing hashes (the `fixpoint-compare` machinery at `build.w:1691-1710`
+comparing hashes (the `fixpoint-compare` machinery at `build.with:1691-1710`
 already does exactly this shape of check). A runtime object built by a
 different compiler fingerprint can never be linked, by construction of the
 key. R3 is pure build-performance work; R2 must not wait for it.
@@ -301,7 +301,7 @@ key. R3 is pure build-performance work; R2 must not wait for it.
 ### Stage R4 — §16.3e enforcement
 
 Extend the C-representability gate from `validate_c_export_signature`
-(`src/SemaCheck.w:2962`, today `@[c_export]`-only) to **all three**
+(`src/SemaCheck.with:2962`, today `@[c_export]`-only) to **all three**
 surfaces: `extern fn` decls and `c_import` bindings included. Hard error
 per the spec sentence; diagnostic names the §16.3c modeled coercion for
 the call-site direction and the pointer-and-length spelling for the raw
@@ -315,7 +315,7 @@ direction. Sequencing within R4:
   doctrine — with §16.3e in force there are no With-managed extern params
   left to rule on, and the predicate reduces to genuine C-type semantics.
 - R4c. Retire the `sema_name_is_compiler_abi_extern` exemptions
-  (`src/SemaCheck.w:160,185`) — nothing needs them once the seam is gone.
+  (`src/SemaCheck.with:160,185`) — nothing needs them once the seam is gone.
 
 ### Stage R5 — docs and doctrine
 
@@ -359,7 +359,7 @@ this section; it has not landed yet.
 With only, rules enforced). R2a is dark code in tree (the cache-key
 ownership gate, #762/#761 closed by it). R2b is dark code in tree (the
 `WITH_RT_IN_UNIT=1` lane compiles rt in-unit and links no rt object;
-`test/behavior/behav_rt_in_unit_check_lane.w` passes today). R2c is
+`test/behavior/behav_rt_in_unit_check_lane.with` passes today). R2c is
 mid-flight and is the next code: finish erasing the ABI-shaped boundary
 types from shared surfaces, then flip the lane on. R3 (retire the two
 link paths) has not started.
@@ -375,7 +375,7 @@ again name the remedies.
 
 **Fact base, re-counted.** `extern fn with_*` declarations in lib/std:
 304 (222 in August — the surface grew while the lane waited).
-`pub fn with_*`/`rt_*` definitions in rt/rt_core.w: 259 (247). The lane
+`pub fn with_*`/`rt_*` definitions in rt/rt_core.with: 259 (247). The lane
 sweep numbers in section 8 (7 distinct failures, ~950 parked classes,
 39 divergent declaration sites) are two months old and must be
 re-measured before any R2c code: the section 7 sweep procedure is step 0,
@@ -421,18 +421,18 @@ named-remedy diagnostic noted in the sense checks. (2) R2c type
 erasures in the order of ascending blast radius already recorded (libc
 primitives, then ListView places, then &str pairs), lane-green at each
 step. (3) The flip, and R3's deletion of the legacy link, as separate
-commits per the bootstrap rules (runtime exports and Link.w never in
+commits per the bootstrap rules (runtime exports and Link.with never in
 the same commit).
 
 **Steps (0) and (1), done 2026-10-19 (branch `d30-module-identity`).**
 The sweep driver is now per-file `WITH_RT_IN_UNIT=1 <release> test` over
 the behavior files that spawn no compiler or process: a test that runs
-a nested `with build` inherits the variable, evaluates build.w under the
+a nested `with build` inherits the variable, evaluates build.with under the
 lane, and rewrote the tree's runtime objects mid-sweep (the "generation
 f932…" link failures that made two sweeps of one tree disagree). A
 second tool lied the same way: the test-verdict cache did not key on the
 variable, so a lane sweep was served 1367 of 1695 passes recorded
-without it (fixed, `test_verdict_key_env_test.w`).
+without it (fixed, `test_verdict_key_env_test.with`).
 
 Re-measured on main `13a81f9c1`: 202 of 1695 such files failed under the
 lane (fresh), in these classes, each now fixed at its line with a lane
@@ -450,8 +450,8 @@ fixture (`behav_d30_*`, `//! env: WITH_RT_IN_UNIT=1`):
 | local callable vs unsafe fn | 1 | `check_call` (and #2235's walk) asked the free `unsafe fn` about a call through a same-named local |
 
 Module identity (ruling 4): a runtime fn a program's fn shadows is now
-displaced like any prelude fn instead of dropped, so rt_core.w's
-`make_str`, fiber_runtime.w's, panic_runtime.w's `str_data` and the
+displaced like any prelude fn instead of dropped, so rt_core.with's
+`make_str`, fiber_runtime.with's, panic_runtime.with's `str_data` and the
 program's own are distinct; only a runtime ABI symbol
 (`codegen_is_runtime_abi_symbol`) keeps the drop. The "named-remedy
 diagnostic" had no August text to restore (830018de carried the generic
@@ -465,7 +465,7 @@ compiler-self lane.
 
 **The other corpora, measured 2026-10-19** (release of branch
 `d30-lane-equivalence`, all fresh): test/spec 210 of 210, test/internals
-72 of 72, and `with check src/main.w` clean under the lane (the
+72 of 72, and `with check src/main.with` clean under the lane (the
 self-lane flip-blocker recorded in August is gone). test/compile_errors
 had three real failures, each a way the in-unit runtime showed through
 where the object-linked one never did: a program facade saw the runtime
@@ -483,7 +483,7 @@ that stays red until then).
 Still to measure: the process-spawning behavior files with the lane
 confined to the program under test, and building (not just checking)
 the compiler under the lane, which needs a driver that keeps the
-variable out of build.w's own evaluation.
+variable out of build.with's own evaluation.
 
 **No seed cut needed for the spawn contract (2026-10-20).** Instead of
 pinning the runtime's with_thread_spawn (seed-compiled source), the
@@ -496,7 +496,7 @@ claims, so the toolchain libc facade lost `domain environ` (61 lane
 files). Fixed. Every lane sweep from here covers all four corpora.
 
 Lane state: behavior (non-spawning) 1701/1701, compile_errors 1790/1790,
-spec + internals 282/282, `with check src/main.w` clean, the compiler
+spec + internals 282/282, `with check src/main.with` clean, the compiler
 builds under the lane (stage2 replayed with the variable confined to
 that compile) and the compiler so built passes 1700/1700 behavior files
 in default mode. rt_decl_audit: 0 divergent of 1216 defs / 1750 decls.
@@ -548,12 +548,12 @@ every compile; std imports the interface, and the hand-written
 3. std imports the interface (runtime module under an `internal` path,
    open question 3 answered as predicted); delete the externs.
 4. The flip: bundle path by default, `WITH_RT_IN_UNIT` deleted, the
-   legacy rt_core.o link paths deleted (Link.w-only commit, bootstrap
+   legacy rt_core.o link paths deleted (Link.with-only commit, bootstrap
    rules), the `with_*` Sema exemptions retired (R4c).
 
 **Step 1 landed (2026-10-20).** The runtime is a bundle corpus:
 `--bundle-corpus rt`, `use rt.<module>` resolving to the embedded runtime,
-`build/rt_bundle.w` compiling the generated root under the lane into
+`build/rt_bundle.with` compiling the generated root under the lane into
 `out/bootstrap/lib/rt.{o,wi,manifest}` (stage1) and `out/lib/` (stage2),
 the stage compilers embedding the blobs in the `rt` slot, and
 `rt-bundle-fixpoint` in `:fixpoint` comparing the two bundles' sha256
@@ -581,7 +581,7 @@ that rule (`seed.lock`), the pins moved from `lib/std`'s and `src/`'s
 externs onto the `rt/` definitions (with_thread_spawn's fn_ptr/ctx
 escape_value, with_vec_push_str's val, with_vec_append_bytes's v),
 #2482's extern-inheritance deleted (one fact, one place: the definition),
-and `tools/rt_decl_audit.w` comparing pins beside types — on the tree
+and `tools/rt_decl_audit.with` comparing pins beside types — on the tree
 before the move it reports the five pinned externs against their unpinned
 definitions, which is the gate on deleting the externs (correction 3).
 The runtime bundle's interface now reads `@[effect(fn_ptr: escape_value,
@@ -609,9 +609,9 @@ default — the frontend parses the runtime interface into every unit with a
 prelude and the link joins the bundle whenever the unit's undefined symbols
 reach the runtime — and `WITH_RT_IN_UNIT` is read nowhere (the lane
 fixtures run as every test does; the test-verdict key dropped it; the lane
-sweep tool is gone). Link.w's three object-world branches are gone with the
+sweep tool is gone). Link.with's three object-world branches are gone with the
 per-compile lane flag; the `.w`-derived runtime objects are no longer
-produced, embedded, installed or compared anywhere (build.w, the emit-C and
+produced, embedded, installed or compared anywhere (build.with, the emit-C and
 selfhost C links, the stale-root fixture), and a runtime root's identity is
 its `rt.o` against the embedded `rt` slot plus `cimport_stubs.o` and
 `fiber_asm.o`. R4c landed in its own stack: a runtime function is safe by
@@ -620,7 +620,7 @@ and the corpora re-promoted without the 85 wrappers (D112 reason 3); the
 transition branch that counted such a call as an unsafe operation is gone,
 and the eight such blocks in std and src are unwrapped. The post-flip seed
 (nightly-20261020-local-3, cut from 763d0e54c) closed the two waits: the
-compiler's own `src/` externs are `use rt.*` (`tools/sweep_rt_externs.w`
+compiler's own `src/` externs are `use rt.*` (`tools/sweep_rt_externs.with`
 over `out/lib/rt.wi`, keeping the LLVM/clang bridge externs the interface
 does not provide), and the seed-built `out/bootstrap-lib` runtime objects
 are gone — the seed links stage1 against its own embedded bundle, so

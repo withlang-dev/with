@@ -19,7 +19,7 @@ WIPE at `5653888`; nothing here is an estimate unless it says so.
 ## 1. Where the time goes
 
 `WITH_PROFILE=1 with build` after adding one function to
-`src/presentation.w` (Mac, warm build cache):
+`src/presentation.with` (Mac, warm build cache):
 
 | Phase | Time | Share |
 |---|---|---|
@@ -44,7 +44,7 @@ What the profile says:
 1. **C headers are translated again every build.** WIPE's `c_import`s of
    raylib, SDL3 and the Steamworks flat API do not change between edits,
    but cost 3.4 s each time. A disk cache exists
-   (`c_import_fs_cache_lookup`, `src/compiler/Frontend.w:470`) and is
+   (`c_import_fs_cache_lookup`, `src/compiler/Frontend.with:470`) and is
    skipped whenever a compilation has more than one `c_import`, because
    the translator deduplicates declarations shared between imports and a
    cached expansion would make that table wrong. WIPE has nineteen files
@@ -53,11 +53,11 @@ What the profile says:
    whose numeric type its uses decide (D89, §4.3) or a literal typed by
    its uses (D93, §4.3c) is checked twice: the first pass hears the
    demands and reports nothing, the second has every such type decided
-   (`src/compiler/Frontend.w:2253-2282`). WIPE has both, so both 4.3 s
+   (`src/compiler/Frontend.with:2253-2282`). WIPE has both, so both 4.3 s
    passes run over all 917 bodies. The second pass re-checks every body,
    not only the bodies whose types the demands changed.
 3. **LLVM redoes every unit.** Codegen units exist (#681,
-   `src/compiler/CodegenUnits.w`) and are emitted in parallel, but every
+   `src/compiler/CodegenUnits.with`) and are emitted in parallel, but every
    unit is regenerated, optimized and emitted on every build.
 4. **Linking is not the problem.** 0.15 s. Incremental linking, the hard
    part of Zig's design, buys almost nothing here.
@@ -142,7 +142,7 @@ change separately.
    optimization level and compiler ABI identity (`with version --abi-sha`).
    A hit reuses the unit's object file from the build cache; a miss
    regenerates it.
-3. **Determinism holds per unit.** `CodegenUnits.w` already makes unit
+3. **Determinism holds per unit.** `CodegenUnits.with` already makes unit
    pipelines order-driven so stage2 equals stage3 per unit; a cached
    object must be byte-identical to a freshly generated one, and the
    fixpoint checks it.
@@ -215,6 +215,6 @@ document once Stages 1 and 2 have been measured.
 - Rust 2026 goal, Cranelift performance: https://rust-lang.github.io/goals/2026/improve-cg_clif-performance.html
 - Live++ FAQ (hot-patching instead of incremental linking): https://liveplusplus.tech/faq.html
 - mold 2.42.1 release notes: https://github.com/rui314/mold/releases/tag/v2.42.1
-- In this repository: `src/compiler/CodegenUnits.w` (#681),
-  `src/compiler/Frontend.w` (the `c_import` caches),
+- In this repository: `src/compiler/CodegenUnits.with` (#681),
+  `src/compiler/Frontend.with` (the `c_import` caches),
   `docs/spec/toolchain/bundles-and-interfaces.md` (interfaces and fingerprints).

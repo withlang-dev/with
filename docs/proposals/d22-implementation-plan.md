@@ -84,8 +84,8 @@ Before changing compiler behavior:
    - suspect work requiring a fresh proof;
    - test/diagnostic evidence only.
 4. Reapply only reviewed D22 hunks. File proximity is not evidence: mixed files
-   such as `Sema.w`, `SemaCheck.w`, `MirLower.w`, `CodegenDispatch.w`,
-   `rt_core.w`, and `collections.w` must be split by function and purpose.
+   such as `Sema.with`, `SemaCheck.with`, `MirLower.with`, `CodegenDispatch.with`,
+   `rt_core.with`, and `collections.with` must be split by function and purpose.
 5. Quarantine all broad `str`/parameter/bootstrap ABI edits and the
    `Vec[T: Clone].clone` rewrite. D22 does not authorize them.
 
@@ -136,7 +136,7 @@ HashMap or BTreeMap lookup representation. Do not add backend-local Copy
 inference.
 
 **Gate:** check-only fixtures prove exact inferred types and every single-value
-owned-demand position. `with check src/main.w` answers whether the compiler
+owned-demand position. `with check src/main.with` answers whether the compiler
 sources remain type-correct. Targeted semantic checks answer whether Sema
 records one adjustment without changing resolution or ABI. No runtime build is
 earned yet.
@@ -226,7 +226,7 @@ implies correct storage destruction.
 
 **Gate:** run the native debug allocator on Copy and nested non-Copy values for
 get, replace, remove, clear, and scope destruction. Use the D22 allocation/drop
-fixtures, `tools/debug_drop.w`, drop plans, and LLDB on the exact glue-emission
+fixtures, `tools/debug_drop.with`, drop plans, and LLDB on the exact glue-emission
 branch. The gate is zero leaks and exactly one drop per owner—not merely the
 absence of the original double free. Because this stage touches ownership,
 drop scheduling, and an internal ABI, it remains alone in its batch and earns
@@ -286,7 +286,7 @@ Run verification in increasing cost order:
 2. MIR validators and origin/ownership/drop traces;
 3. comptime/native/C parity fixtures;
 4. native debug allocator and move/drop audits;
-5. `with check src/main.w` and the targeted D22 suite;
+5. `with check src/main.with` and the targeted D22 suite;
 6. `with build` and `with build :fixpoint`;
 7. `audit:all` and `with build :test`;
 8. `with build :test-green`, `with build :last-green`, reseed, and install only

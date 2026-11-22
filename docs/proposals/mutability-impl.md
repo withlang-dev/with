@@ -7,9 +7,9 @@
 **Goal**: Implement all features described in the doc.
 
 **Already implemented (skip):**
-- `var` keyword / `let` for binding stability (Parser.w:801, 5107)
-- `mut self: Self` receiver mode with call-site enforcement (Ast.w:214, SemaCheck.w:8255)
-- Basic borrow checker with SHARED/EXCLUSIVE live borrows (Sema.w:341–350)
+- `var` keyword / `let` for binding stability (Parser.with:801, 5107)
+- `mut self: Self` receiver mode with call-site enforcement (Ast.with:214, SemaCheck.with:8255)
+- Basic borrow checker with SHARED/EXCLUSIVE live borrows (Sema.with:341–350)
 - `&T` reference type (TY_REF = 14)
 
 **Not yet implemented (this plan):**
@@ -28,9 +28,9 @@
 
 ### 1a. Token and AST Nodes
 
-**src/Token.w**: Add `TK_KW_COPY` token near `TK_KW_MOVE` (line ~132). The keyword `copy` is not yet in the lexer.
+**src/Token.with**: Add `TK_KW_COPY` token near `TK_KW_MOVE` (line ~132). The keyword `copy` is not yet in the lexer.
 
-**src/Ast.w**: Add two new node kinds:
+**src/Ast.with**: Add two new node kinds:
 - `NK_COPY_ARG` — wraps an expression to indicate copy-passing at call site
 - `NK_MOVE_ARG` — wraps an expression to indicate move-passing at call site (distinct from `move ||` closures)
 
@@ -38,7 +38,7 @@ Both nodes: `d0 = inner_expr_node`, d1/d2 unused.
 
 ### 1b. Parsing
 
-**src/Parser.w**: In `parse_call` (around line 3274), in the argument loop before calling `parse_expr()`, check:
+**src/Parser.with**: In `parse_call` (around line 3274), in the argument loop before calling `parse_expr()`, check:
 ```
 if self.peek() == TK_KW_COPY:
     self.advance()
@@ -58,7 +58,7 @@ else:
 
 ### 1c. Semantic Checking
 
-**src/SemaCheck.w**: In call argument checking:
+**src/SemaCheck.with**: In call argument checking:
 
 For `NK_MOVE_ARG`:
 - Type-check inner expr normally
@@ -72,15 +72,15 @@ For `NK_COPY_ARG`:
 
 ### 1d. MIR / Codegen
 
-**src/MIR.w** and **src/Codegen.w**:
+**src/MIR.with** and **src/Codegen.with**:
 - `NK_MOVE_ARG`: lower as the inner expression (same as a value move — the key difference is binding invalidation in sema, codegen is same as passing the value)
 - `NK_COPY_ARG` on `Copy` types: lower as inner expression (copy happens automatically)
 - `NK_COPY_ARG` on `Clone`-only types: lower as `inner.clone()` method call
 
 ### Tests
-- `test/behavior/behav_mut_md_copy_move.w`: test `f(copy x)` and `f(move x)` basic cases
-- `test/compile_errors/err_copy_non_copy.w`: error when `copy x` on non-Copy/non-Clone type
-- `test/compile_errors/err_move_invalidates.w`: error when using moved binding
+- `test/behavior/behav_mut_md_copy_move.with`: test `f(copy x)` and `f(move x)` basic cases
+- `test/compile_errors/err_copy_non_copy.with`: error when `copy x` on non-Copy/non-Clone type
+- `test/compile_errors/err_move_invalidates.with`: error when using moved binding
 
 ---
 
@@ -90,26 +90,26 @@ The doc says: primitives are `Copy` by default; aggregate types are non-Copy by 
 
 ### 2a. Determine Current State
 
-First, grep for `is_copy`, `trait_copy`, `impl Copy` in src/Sema.w and src/SemaCheck.w to see what's already tracked. (The trait system has blanket impl support; `Copy` may already exist.)
+First, grep for `is_copy`, `trait_copy`, `impl Copy` in src/Sema.with and src/SemaCheck.with to see what's already tracked. (The trait system has blanket impl support; `Copy` may already exist.)
 
 ### 2b. If Not Tracked: Add Copy Flag to Type Descriptors
 
-**src/Sema.w**: Add a `is_copy` flag to struct/enum type descriptors. Primitives (i32, u8, bool, f64, char, etc.) are marked copy at type-system initialization. Structs/enums default to non-copy unless `impl Copy for T` is present.
+**src/Sema.with**: Add a `is_copy` flag to struct/enum type descriptors. Primitives (i32, u8, bool, f64, char, etc.) are marked copy at type-system initialization. Structs/enums default to non-copy unless `impl Copy for T` is present.
 
 ### 2c. `type T: Copy { ... }` Syntax
 
-Parser.w may already parse the `: TraitName` after type declaration name. Verify it creates an impl for Copy and sets the is_copy flag.
+Parser.with may already parse the `: TraitName` after type declaration name. Verify it creates an impl for Copy and sets the is_copy flag.
 
 ### 2d. Call-Site Copy-ness Rules
 
-**src/SemaCheck.w**: At call argument checking:
+**src/SemaCheck.with**: At call argument checking:
 - For default `f(x)` where arg type is Copy: no action needed (codegen copies)
 - For default `f(x)` where arg type is non-Copy: track as share-place alias (ephemeral borrow)
 - This distinction matters for effect checking in Phase 4
 
 ### Tests
-- `test/behavior/behav_copy_aggregate.w`: Copy struct passed by value; mutation in callee doesn't affect caller
-- `test/behavior/behav_non_copy_shared.w`: Non-Copy struct share-place; mutation in callee visible in caller
+- `test/behavior/behav_copy_aggregate.with`: Copy struct passed by value; mutation in callee doesn't affect caller
+- `test/behavior/behav_non_copy_shared.with`: Non-Copy struct share-place; mutation in callee visible in caller
 
 ---
 
@@ -119,13 +119,13 @@ Only `mut self: Self` is fully implemented. `&Self` and `move self: Self` need e
 
 ### 3a. Flags
 
-**src/Ast.w** (around line 214 near `FN_PARAM_FLAG_MUT_SELF`): Add:
+**src/Ast.with** (around line 214 near `FN_PARAM_FLAG_MUT_SELF`): Add:
 - `FN_PARAM_FLAG_REF_SELF` — receiver is `&Self` (read-only view)
 - `FN_PARAM_FLAG_MOVE_SELF` — receiver is `move self: Self` (consuming)
 
 ### 3b. Parsing
 
-**src/Parser.w**: In method parameter parsing (around line 5997 where `FN_PARAM_FLAG_MUT_SELF` is set), also detect:
+**src/Parser.with**: In method parameter parsing (around line 5997 where `FN_PARAM_FLAG_MUT_SELF` is set), also detect:
 - `self: &Self` → set `FN_PARAM_FLAG_REF_SELF`
 - `move self: Self` → set `FN_PARAM_FLAG_MOVE_SELF`
 
@@ -133,7 +133,7 @@ The `&Self` case currently parses `&Self` as a type annotation. Change to also s
 
 ### 3c. Semantic Enforcement
 
-**src/SemaCheck.w**:
+**src/SemaCheck.with**:
 
 For `&Self` methods:
 - At method body: flag that self is a read-only reference. Any mutation of self (field assignment, calling a `mut self` method on self) is a compile error.
@@ -147,9 +147,9 @@ For `move self` methods:
 **Plain `fn method(self: Self)` with no mode annotation**: Per the doc, this is a compile error. Enforce this: if a method's self parameter has no receiver mode flag, emit error "method receiver must be &Self, mut Self, or move Self".
 
 ### Tests
-- `test/compile_errors/err_no_receiver_mode.w`: method without receiver mode annotation → error
-- `test/compile_errors/err_ref_self_mutation.w`: mutation of `&Self` receiver → error
-- `test/behavior/behav_move_self.w`: `move self` method invalidates receiver at call site
+- `test/compile_errors/err_no_receiver_mode.with`: method without receiver mode annotation → error
+- `test/compile_errors/err_ref_self_mutation.with`: mutation of `&Self` receiver → error
+- `test/behavior/behav_move_self.with`: `move self` method invalidates receiver at call site
 
 ---
 
@@ -161,7 +161,7 @@ This is the largest phase. The doc's full borrow-checking model depends on per-p
 
 ### 4a. Data Structures
 
-**src/Sema.w**: Add per-function effect tracking during body analysis:
+**src/Sema.with**: Add per-function effect tracking during body analysis:
 ```
 fn_param_effects: Vec[i32]      // bit set per param: EFF_READ|EFF_WRITE|EFF_CONSUME|EFF_ESCAPE_VALUE|EFF_ESCAPE_VIEW
 fn_param_origins: Vec[i32]      // for escape_view: which params are view origins (bitmask over param indices)
@@ -178,7 +178,7 @@ EFF_ESCAPE_VIEW  = 0x10
 
 ### 4b. Effect Inference During Type-Checking
 
-**src/SemaCheck.w**: As each operation on a parameter is analyzed, update the effect set:
+**src/SemaCheck.with**: As each operation on a parameter is analyzed, update the effect set:
 
 | Operation | Effect contributed |
 |---|---|
@@ -195,7 +195,7 @@ EFF_ESCAPE_VIEW  = 0x10
 
 ### 4c. Call-Site Effect Checking
 
-**src/SemaCheck.w**: At call sites, look up the callee's effect summary for each argument:
+**src/SemaCheck.with**: At call sites, look up the callee's effect summary for each argument:
 
 ```
 for each arg at call site:
@@ -220,9 +220,9 @@ for each arg at call site:
 Effects must be persisted alongside function type signatures so cross-module calls can be checked. Store effect vectors in the serialized type information.
 
 ### Tests
-- `test/behavior/behav_eff_write.w`: callee with write effect; mutation visible at caller
-- `test/behavior/behav_eff_escape.w`: callee with escape_value; requires move/copy
-- `test/compile_errors/err_eff_escape_no_move.w`: non-Copy arg to escape_value function without move/copy
+- `test/behavior/behav_eff_write.with`: callee with write effect; mutation visible at caller
+- `test/behavior/behav_eff_escape.with`: callee with escape_value; requires move/copy
+- `test/compile_errors/err_eff_escape_no_move.with`: non-Copy arg to escape_value function without move/copy
 
 **Critical path note**: Phase 4 requires that all existing tests still pass (`make fixpoint`). Effect inference must be added conservatively — when a function's effects can't be fully computed (e.g., recursive or mutually recursive), assume worst case (all effects present) or use a fixpoint iteration.
 
@@ -247,9 +247,9 @@ This requires tracking view liveness: when `let v = f(x)`, `v` is a view into `x
 **Implementation**: Extend the existing borrow tracking to associate returned reference bindings with their origin symbols. When an origin is invalidated, all dependent views become invalid.
 
 ### Tests
-- `test/compile_errors/err_escape_view_move_origin.w`: `f(move xs)` where f has `escape_view` → error
-- `test/compile_errors/err_view_dangling.w`: view outlives origin → error
-- `test/behavior/behav_escape_view_valid.w`: valid use of escaped view within origin lifetime
+- `test/compile_errors/err_escape_view_move_origin.with`: `f(move xs)` where f has `escape_view` → error
+- `test/compile_errors/err_view_dangling.with`: view outlives origin → error
+- `test/behavior/behav_escape_view_valid.with`: valid use of escaped view within origin lifetime
 
 ---
 
@@ -257,22 +257,22 @@ This requires tracking view liveness: when `let v = f(x)`, `v` is a view into `x
 
 ### 6a. Attribute Parsing
 
-**src/Parser.w** (around line 343–353 in `skip_attributes`/attribute parsing): Add `effect` to recognized attribute names. Parse `@[effect(param = effect_set)]` where effect_set is one of: `read`, `write`, `consume`, `escape_value`, `escape_view`, or `[effect, effect, ...]`.
+**src/Parser.with** (around line 343–353 in `skip_attributes`/attribute parsing): Add `effect` to recognized attribute names. Parse `@[effect(param = effect_set)]` where effect_set is one of: `read`, `write`, `consume`, `escape_value`, `escape_view`, or `[effect, effect, ...]`.
 
-**src/Ast.w**: Store parsed effect pins in function node extra data (or in the existing pending_attrs mechanism).
+**src/Ast.with**: Store parsed effect pins in function node extra data (or in the existing pending_attrs mechanism).
 
 ### 6b. Floor/Ceiling Enforcement
 
-**src/SemaCheck.w**: After effect inference for a function body:
+**src/SemaCheck.with**: After effect inference for a function body:
 - **Floor check**: inferred effects must be ⊇ pinned effects. If inferred < pinned, error: "body doesn't satisfy pinned effect floor"
 - **Ceiling check**: inferred effects must be ⊆ pinned effects. If inferred > pinned, error: "body exceeds pinned effect ceiling"
 
 Also: the exported effect summary for a pinned function is the pinned set (not the inferred set), so downstream callers are checked against the pin.
 
 ### Tests
-- `test/compile_errors/err_pin_floor.w`: body doesn't satisfy pinned floor
-- `test/compile_errors/err_pin_ceiling.w`: body exceeds pinned ceiling
-- `test/behavior/behav_effect_pin.w`: pinned function with future-reserved write
+- `test/compile_errors/err_pin_floor.with`: body doesn't satisfy pinned floor
+- `test/compile_errors/err_pin_ceiling.with`: body exceeds pinned ceiling
+- `test/behavior/behav_effect_pin.with`: pinned function with future-reserved write
 
 ---
 
@@ -303,13 +303,13 @@ make build && make fixpoint && make test
 
 | File | Phases | Key Changes |
 |---|---|---|
-| `src/Token.w` | 1 | Add TK_KW_COPY |
-| `src/Ast.w` | 1,3 | NK_COPY_ARG, NK_MOVE_ARG, FN_PARAM_FLAG_REF_SELF, FN_PARAM_FLAG_MOVE_SELF |
-| `src/Parser.w` | 1,3,6 | Call-site copy/move parsing; receiver mode flags; effect attribute |
-| `src/Sema.w` | 2,4 | Copy flag in type descriptors; effect set Vecs |
-| `src/SemaCheck.w` | 1,2,3,4,5,6 | Bulk of semantic enforcement |
-| `src/MIR.w` | 1 | Lower NK_COPY_ARG / NK_MOVE_ARG |
-| `src/Codegen.w` | 1 | Codegen for copy/move args (Clone call if needed) |
+| `src/Token.with` | 1 | Add TK_KW_COPY |
+| `src/Ast.with` | 1,3 | NK_COPY_ARG, NK_MOVE_ARG, FN_PARAM_FLAG_REF_SELF, FN_PARAM_FLAG_MOVE_SELF |
+| `src/Parser.with` | 1,3,6 | Call-site copy/move parsing; receiver mode flags; effect attribute |
+| `src/Sema.with` | 2,4 | Copy flag in type descriptors; effect set Vecs |
+| `src/SemaCheck.with` | 1,2,3,4,5,6 | Bulk of semantic enforcement |
+| `src/MIR.with` | 1 | Lower NK_COPY_ARG / NK_MOVE_ARG |
+| `src/Codegen.with` | 1 | Codegen for copy/move args (Clone call if needed) |
 
 ---
 
@@ -319,6 +319,6 @@ Full end-to-end verification after each phase:
 1. `make build` — compiler compiles
 2. `make fixpoint` — stage2 == stage3 (nondeterminism check)
 3. `make test` — no regressions
-4. New tests in `test/behavior/behav_mut_md_*.w` and `test/compile_errors/err_mut_md_*.w`
+4. New tests in `test/behavior/behav_mut_md_*.with` and `test/compile_errors/err_mut_md_*.with`
 
 The hardest fixpoint risk is Phase 4 (effect inference), because any nondeterminism in effect computation (e.g., HashMap iteration order) will break fixpoint. Use parallel Vec arrays for effect storage, not HashMap — same pattern used for `try_eval_const_int` in memory.

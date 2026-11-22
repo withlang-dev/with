@@ -141,7 +141,7 @@ Three dedicated error codes:
 
 ```
 error[E0901]: nested implicit closure is ambiguous
-  --> src/main.w:12:42
+  --> src/main.with:12:42
    |
 12 |     groups |> map(it.items |> filter(it.active))
    |                                      ^^ which `it`?
@@ -152,7 +152,7 @@ error[E0901]: nested implicit closure is ambiguous
 
 ```
 error[E0902]: `it` used in context expecting 2 parameters
-  --> src/main.w:8:30
+  --> src/main.with:8:30
    |
  8 |     pairs |> reduce(0, it + 1)
    |                        ^^ `reduce` expects fn(Acc, T) -> Acc
@@ -162,7 +162,7 @@ error[E0902]: `it` used in context expecting 2 parameters
 
 ```
 error[E0903]: `it` is a reserved keyword
-  --> src/main.w:3:9
+  --> src/main.with:3:9
    |
  3 |     let it = 42
    |         ^^ cannot use `it` as a variable name
@@ -186,14 +186,14 @@ error[E0903]: `it` is a reserved keyword
 - [ ] Document the desugaring algorithm in the spec.
 - [ ] Add error code definitions for E0901, E0902, E0903.
 
-### 2. Tokenizer / Parser (`src/Token.w`, `src/Parser.w`)
+### 2. Tokenizer / Parser (`src/Token.with`, `src/Parser.with`)
 - [ ] Add `it` as a reserved keyword token (e.g., `TK_IT`).
 - [ ] Reject `it` as an identifier in let bindings, fn declarations, parameter lists, and field names.
 - [ ] Detect implicit closure form: when parsing a call argument in a closure-expected position, check if the expression contains `it` with no explicit `|...|` parameter list.
 - [ ] Desugar to an explicit closure AST node with a synthetic parameter bound to `it`.
 - [ ] Handle nested detection: if an implicit closure body contains another `it` reference at a nested closure-expected position, emit E0901.
 
-### 3. Sema (`src/Sema.w`)
+### 3. Sema (`src/Sema.with`)
 - [ ] Type-check desugared implicit closures the same as explicit closures (no special path needed if desugaring is complete before sema).
 - [ ] Validate arity: if `it` appears in a context expecting `fn(A, B, ...) -> R` with arity != 1, emit E0902.
 - [ ] Validate keyword: if `it` appears as a binding name (let, fn, param, field), emit E0903.

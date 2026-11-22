@@ -35,14 +35,14 @@ out/migrate/                    # Migration workspace (generated, gitignored)
 
 lib/std/                        # Final With source (checked into git)
   re/                           # PCRE2 → std.re
-    defs.w
-    pcre2_compile.w
+    defs.with
+    pcre2_compile.with
     ...
   re.w                          # Layer 2 API wrapper (hand-written)
   json/                         # jq → std.json
-    defs.w
+    defs.with
     ...
-  json.w                        # Layer 2 API wrapper (hand-written)
+  json.with                        # Layer 2 API wrapper (hand-written)
   ...
 
 out/lib/                        # Compiled objects and archives (generated)
@@ -83,8 +83,8 @@ MIGRATE_EXCLUDE="pcre2_jit_compile.c pcre2_ucptables.c"
 PATCH_SCRIPT=scripts/migrate/pcre2_post.sh
 
 # Preamble file for check (types, externs shared across modules)
-PREAMBLE_FILE=pcre2_tables.w
-DEFS_FILE=defs.w
+PREAMBLE_FILE=pcre2_tables.with
+DEFS_FILE=defs.with
 ```
 
 ---
@@ -191,9 +191,9 @@ STDLIB_ARCHIVES = $(foreach lib,$(STDLIB_LIBS),\
 1. Create scripts/migrate/{lib}.conf
 2. Create scripts/migrate/{lib}_post.sh (can be empty)
 3. make stdlib-init-{lib}
-4. Write lib/std/{module}.w (Layer 2 API wrapper)
-5. Write test/test_{module}.w
-6. git add lib/std/{module}/ lib/std/{module}.w scripts/migrate/{lib}.*
+4. Write lib/std/{module}.with (Layer 2 API wrapper)
+5. Write test/test_{module}.with
+6. git add lib/std/{module}/ lib/std/{module}.with scripts/migrate/{lib}.*
 7. git commit -m "add std.{module} (migrated from {lib})"
 ```
 
@@ -247,7 +247,7 @@ for conf in scripts/migrate/*.conf; do
     raw_dir="out/migrate/${lib}/raw"
     post_script="scripts/migrate/${lib}_post.sh"
     
-    total=$(ls "$raw_dir"/*.w 2>/dev/null | wc -l | tr -d ' ')
+    total=$(ls "$raw_dir"/*.with 2>/dev/null | wc -l | tr -d ' ')
     if [ "$total" = "0" ]; then
         printf "%-18s %6s %4s %7s %10s\n" "$lib" "-" "-" "-" "not migrated"
         continue
@@ -292,12 +292,12 @@ follows the same pipeline: fetch → migrate → prepare → check → promote �
 ### Key rules
 
 1. **Never edit files in `lib/std/{module}/` directly.** They are generated.
-   Fix the migrator (`src/CImport.w`) or the post-processing script
+   Fix the migrator (`src/CImport.with`) or the post-processing script
    (`scripts/migrate/{lib}_post.sh`).
 
 2. **Never edit files in `out/migrate/`.** They are generated and disposable.
 
-3. **After ANY change to `src/CImport.w`:** run `make build && make fixpoint`,
+3. **After ANY change to `src/CImport.with`:** run `make build && make fixpoint`,
    then `make stdlib-remigrate-all` to verify the change didn't regress
    other libraries.
 
@@ -338,12 +338,12 @@ follows the same pipeline: fetch → migrate → prepare → check → promote �
 |---|---|---|
 | `scripts/migrate/{lib}.conf` | Human | Yes |
 | `scripts/migrate/{lib}_post.sh` | Human or agent | Yes |
-| `lib/std/{module}/*.w` | Generated (promote) | Yes |
-| `lib/std/{module}.w` | Human (Layer 2 API) | Yes |
+| `lib/std/{module}/*.with` | Generated (promote) | Yes |
+| `lib/std/{module}.with` | Human (Layer 2 API) | Yes |
 | `out/migrate/{lib}/raw/` | Generated (migrate) | No |
 | `out/migrate/{lib}/prepared/` | Generated (prepare) | No |
 | `.reference/{lib}/` | Downloaded (fetch) | No |
-| `src/CImport.w` | Human or agent (migrator fixes) | Yes |
+| `src/CImport.with` | Human or agent (migrator fixes) | Yes |
 ```
 
 ---
@@ -363,12 +363,12 @@ Key files:
 - `scripts/migrate.sh` — Universal migration driver
 - `scripts/migrate/{lib}.conf` — Per-library config
 - `scripts/migrate/{lib}_post.sh` — Per-library fixups
-- `src/CImport.w` — The migrator (with migrate implementation)
+- `src/CImport.with` — The migrator (with migrate implementation)
 
 ### When asked to fix migration errors:
 
 1. Determine if the error is a **migrator bug** or a **library-specific quirk**
-2. Migrator bugs → fix in `src/CImport.w`, write a minimal C repro first
+2. Migrator bugs → fix in `src/CImport.with`, write a minimal C repro first
 3. Library quirks → fix in `scripts/migrate/{lib}_post.sh`
 4. After migrator fixes: `make build && make fixpoint && make stdlib-remigrate-all`
 5. After post-processing fixes: `scripts/migrate.sh prepare {lib} && scripts/migrate.sh check {lib}`
@@ -379,8 +379,8 @@ Key files:
 2. Create `scripts/migrate/{lib}_post.sh` (empty initially)
 3. Run `make stdlib-init-{lib}`
 4. Fix errors — migrator bugs first, post-processing for the rest
-5. Write `lib/std/{module}.w` (Layer 2 idiomatic API)
-6. Write a With test program in `test/test_{module}.w`
+5. Write `lib/std/{module}.with` (Layer 2 idiomatic API)
+6. Write a With test program in `test/test_{module}.with`
 
 ### When asked to bump a dependency:
 
@@ -392,7 +392,7 @@ Key files:
 
 ### Critical rules:
 
-- Never edit `lib/std/{module}/*.w` directly — they are generated
+- Never edit `lib/std/{module}/*.with` directly — they are generated
 - Never `rm -rf lib/std/{module}/` — deploy module-by-module
 - Always `make build && make fixpoint` after migrator changes
 - Always measure error counts before and after any fix
@@ -461,7 +461,7 @@ make stdlib-init-jq           1. Downloads jq source from GitHub
                               5. Copies to lib/std/json/
                               6. Compiles to out/lib/libjq_with.a
 
-vim lib/std/json.w            Developer writes idiomatic With API
+vim lib/std/json.with            Developer writes idiomatic With API
 
 make build                    Compiler links against libjq_with.a
 

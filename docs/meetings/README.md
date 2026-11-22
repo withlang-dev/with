@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D228 — With source files use the extension `.with`; the extension governs what the toolchain discovers, never what a user names; migrated corpora are renamed and never edited (ruled)](2026-11-21-D228-with-source-files-use-the-extension-with.md)
 - [D227 — A compile-time call that crosses a package boundary reaches only a `comptime fn`; the target queries are answered by the compiler; reflection and the build API are outside the rule; a bundle carries a `comptime fn`'s body (ruled)](2026-11-21-D227-a-compile-time-call-across-a-package-boundary-reaches-a-comptime-fn.md)
 - [D226 — In-place resources: several `init` clauses each with its own `ok`, an integer literal after `ok`, an in-place resource stated in a facts file, and what the proof of a drafted one is (ruled; spec v7.77)](2026-11-21-D226-in-place-resources-several-initializers-a-literal-status-and-the-drafts-proof.md)
 - [D225 — windows-aarch64 is not a supported platform until someone asks for it: its builds are disabled and its issues are held (ruled; supersedes D137)](2026-11-20-D225-windows-aarch64-is-not-supported-until-someone-asks.md)

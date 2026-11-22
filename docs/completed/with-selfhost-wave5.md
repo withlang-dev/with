@@ -31,11 +31,11 @@ Wave 5 exit gate:
 - Typed dump format contract:
   - `docs/wave0-dump-spec.md` (typed section)
 - Existing self-host architecture spine:
-  - `src/compiler/Zcu.w`
-  - `src/compiler/Frontend.w`
-  - `src/Sema.w` (current semantic engine)
-  - `src/compiler/foundation/InternPool.w`
-  - `src/compiler/foundation/Types.w`
+  - `src/compiler/Zcu.with`
+  - `src/compiler/Frontend.with`
+  - `src/Sema.with` (current semantic engine)
+  - `src/compiler/foundation/InternPool.with`
+  - `src/compiler/foundation/Types.with`
 - Reference architecture:
   - Zig:
     - `.reference/zig/src/InternPool.zig`
@@ -80,7 +80,7 @@ Constraints:
 
 ## Current Gaps (in this tree)
 
-- Type truth is still largely embedded in `src/Sema.w`, not cleanly separated into reusable type/trait tables attached to `Zcu`.
+- Type truth is still largely embedded in `src/Sema.with`, not cleanly separated into reusable type/trait tables attached to `Zcu`.
 - Existing foundation intern pool has minimal `TypeKey` coverage and does not yet model the full Wave 5 type surface.
 - Trait solver behavior is not yet isolated as a dedicated obligation pipeline.
 - No dedicated Wave 5 typed parity corpus/scripts exist yet.
@@ -128,15 +128,15 @@ Note:
 
 Core implementation targets (exact final split may vary, but one canonical path only):
 
-- `src/compiler/typeck/TypeSystem.w` (new)
-- `src/compiler/typeck/TraitSolver.w` (new)
-- `src/compiler/typeck/Coherence.w` (new)
-- `src/compiler/typeck/Instantiate.w` (new)
-- `src/compiler/typeck/TypedDump.w` (new)
-- `src/compiler/Zcu.w` (type/trait state ownership)
-- `src/compiler/Frontend.w` (typecheck stage wiring)
-- `src/main.w` (`--dump-typed` path)
-- `src/Sema.w` (shrink/bridge or migrate into `compiler/typeck` path)
+- `src/compiler/typeck/TypeSystem.with` (new)
+- `src/compiler/typeck/TraitSolver.with` (new)
+- `src/compiler/typeck/Coherence.with` (new)
+- `src/compiler/typeck/Instantiate.with` (new)
+- `src/compiler/typeck/TypedDump.with` (new)
+- `src/compiler/Zcu.with` (type/trait state ownership)
+- `src/compiler/Frontend.with` (typecheck stage wiring)
+- `src/main.with` (`--dump-typed` path)
+- `src/Sema.with` (shrink/bridge or migrate into `compiler/typeck` path)
 
 Wave 5 tests/scripts:
 
@@ -311,7 +311,7 @@ Stage0 renders generic function signatures as `fn first(<unknown>)` — it does 
 
 ### Gap: No unit test for orphan rule violation
 
-The orphan-rule check is implemented in `collect_impl_decl` (line ~793) and fires correctly, but there is no `orphan_rule_error.w` test case exercising it directly. Only `duplicate_impl_error.w` and `unknown_trait_error.w` are tested.
+The orphan-rule check is implemented in `collect_impl_decl` (line ~793) and fires correctly, but there is no `orphan_rule_error.with` test case exercising it directly. Only `duplicate_impl_error.with` and `unknown_trait_error.with` are tested.
 
 ---
 

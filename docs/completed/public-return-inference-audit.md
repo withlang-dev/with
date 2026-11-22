@@ -55,7 +55,7 @@ Consecutive fatal diagnostics are combined so the first cannot hide the
 remaining context or recovery instruction. The parallel test runner reports
 failed workers and reaps every child before returning failure.
 
-LLDB stopped at `Sema.check_block`, `SemaCheck.w:9894`, with
+LLDB stopped at `Sema.check_block`, `SemaCheck.with:9894`, with
 `block_diverged = 1`, `reported_unreachable = 0`, and statement index 1.
 This is the rejection of the statement after the now-Never call, not an
 inference failure to work around. The native implementation calls `exit(1)`;
@@ -76,7 +76,7 @@ standalone failures require the actual compiler-module context or runtime
 Windows runtime check pass. `std.string` must be checked as embedded stdlib,
 where its types are not duplicated by another imported copy. After the local
 self-compile, all three affected embedded StringBuilder signatures remain
-Unit. The fresh compiler checks `build.w`; scanner tests pass; the fatal-call
+Unit. The fresh compiler checks `build.with`; scanner tests pass; the fatal-call
 negative test rejects its unreachable continuation. The libc surface,
 runtime domain, spec inventory and user-programs-safe gates pass. A temporary
 runtime file missing two foreign domain rows produces both errors and exit 1;

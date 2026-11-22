@@ -39,23 +39,23 @@ itself, as the macOS one carries its sysroot: lld's drivers and LLVM's dlltool
 are linked into it (`with __ld`, `with __dlltool`), and `libc/windows`,
 `lib/clang/<major>` (clang's headers and compiler-rt's builtins),
 `bin/cmake.exe`, `bin/ninja.exe` and `share/cmake-<v>` are embedded
-(gzip-compressed, `:windows-sysroot`, build/sdk.w run_windows_sysroot_action)
+(gzip-compressed, `:windows-sysroot`, build/sdk.with run_windows_sysroot_action)
 and unpacked to the user's cache on first use. With no SDK named (no link
 record, no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX), a native Windows link, a
 c_import, `with cc` (handed the compiler itself as `ld.lld.exe`) and
-`with get` read only that: `with build hi.w` works on a machine that has
+`with get` read only that: `with build hi.with` works on a machine that has
 only `with.exe`, and a fresh checkout runs `:deps` with no SDK present.
 
 ## Provenance
 
 - mingw-w64 v14.0.0, `https://github.com/mingw-w64/mingw-w64/archive/refs/tags/v14.0.0.tar.gz`,
   sha256 `d71cc644cd5a37c337f2719f3e0c79d89e8d8d5fb9e2952a62d3fa23623dc137`
-  (pinned in `build/sdk.w`), fetched at SDK build time like LLVM's source;
+  (pinned in `build/sdk.with`), fetched at SDK build time like LLVM's source;
   nothing of it is checked into this repository.
 - compiler-rt, libunwind, libc++abi and libc++ from the LLVM source the SDK
   is built from (`llvm-project` at the pinned release tag).
 - Every object is compiled by the SDK's own clang; import libraries are
-  made by the SDK's own `llvm-dlltool`. The build is `build/sdk.w`.
+  made by the SDK's own `llvm-dlltool`. The build is `build/sdk.with`.
 
 ## Licenses
 

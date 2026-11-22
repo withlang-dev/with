@@ -158,7 +158,7 @@ jobs:
           ls -la out/stage/bin out/release/bin 2>&1
           echo "== stage2 probe"
           ./out/stage/bin/with-stage2 version; echo "rc=$?"
-          ./out/stage/bin/with-stage2 check src/main.w >/dev/null 2>out/stage2-selfcheck.stderr; echo "check rc=$?"
+          ./out/stage/bin/with-stage2 check src/main.with >/dev/null 2>out/stage2-selfcheck.stderr; echo "check rc=$?"
           tail -40 out/stage2-selfcheck.stderr 2>/dev/null
           for f in out/test-graph/*/*.stdout out/test-graph/*/*.stderr out/corpus/*/stdout.txt out/corpus/*/stderr.txt out/command/*/*.stdout out/command/*/*.stderr out/tmp/pre-d-p7-capture/*/*.txt; do
             [ -f "$f" ] || continue

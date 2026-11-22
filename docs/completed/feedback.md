@@ -11,9 +11,9 @@ open item in `docs/finalize.md`.
 
 `distinct` is fully functional with transparent LLVM lowering (no
 wrapper struct — distinct types are bare integers at LLVM level).
-21-test compatibility suite at `test/behavior/behav_distinct_compat.w`.
+21-test compatibility suite at `test/behavior/behav_distinct_compat.with`.
 
-`type BlockId = distinct i32` migrated in Mir.w + MirLower.w (15
+`type BlockId = distinct i32` migrated in Mir.with + MirLower.with (15
 boundary casts). NodeId and TypeId deferred (450+ and 300+ sites
 respectively — very large mechanical changes).
 
@@ -54,7 +54,7 @@ not by sema type identity. Fixed: cache by sema_tid.**
    phase, which changes which Vec specialization is registered first.
 
 4. **Why does registration order matter?**
-   Because `sema_type_to_llvm` (Codegen.w line 2122) converts sema
+   Because `sema_type_to_llvm` (Codegen.with line 2122) converts sema
    types to LLVM types, and `get_or_create_vec_type` caches the first
    one it sees. All subsequent Vec instantiations with the same LLVM
    element type share that cached entry.
@@ -84,7 +84,7 @@ fn get_or_create_vec_type(sema_tid: i32, elem_ty: i64) -> i64:
 Same fix needed for `get_or_create_hashmap_type`,
 `get_or_create_option_type`, `get_or_create_result_type`.
 
-**Files:** `src/Codegen.w` — `get_or_create_vec_type` (line 3239),
+**Files:** `src/Codegen.with` — `get_or_create_vec_type` (line 3239),
 `sema_type_to_llvm` (line 2122+), and all callers.
 
 ---
@@ -110,7 +110,7 @@ remain intentionally (primitive types, ABI names, runtime C functions).
 ## 5. C Backend (Phase II-5) — Intrinsics DONE ✓
 
 ### Current state:
-CCodegen.w (4,440 lines) handles all 54 MIR intrinsics (commit
+CCodegen.with (4,440 lines) handles all 54 MIR intrinsics (commit
 `f434b08`). All 37 previously missing intrinsics implemented.
 
 ### Remaining path to self-compile:
@@ -124,7 +124,7 @@ CCodegen.w (4,440 lines) handles all 54 MIR intrinsics (commit
 ## 6. Tooling (Phase II-6) — DONE ✓
 
 ### `with fmt` — Code Formatter — DONE ✓
-Implemented in main.w (commit `e72847c`). Supports `-w` (write)
+Implemented in main.with (commit `e72847c`). Supports `-w` (write)
 and `-l` (list) modes. AST round-trip formatting.
 
 ### `with test` — Test Runner — DONE ✓
@@ -133,7 +133,7 @@ and `-l` (list) modes. AST round-trip formatting.
 
 ### `with bench` — Benchmarking — DONE ✓
 `@[bench]` attribute + `bench_*` naming. Go-style auto-calibration.
-Reports name, N, ns/op. `--filter` support. `lib/test/bench.w`.
+Reports name, N, ns/op. `--filter` support. `lib/test/bench.with`.
 Commit: `6ef5b8b`.
 
 ### Error Messages with Suggestions — Partially DONE
@@ -148,7 +148,7 @@ Levenshtein distance (commit `169dac7`).
 ## 8. MIR Verification and Regression Testing
 
 ### Typed MIR Verifier — DONE ✓
-408-line verifier in `src/Mir.w` runs before codegen (commit `99ceb09`).
+408-line verifier in `src/Mir.with` runs before codegen (commit `99ceb09`).
 Validates type consistency across MIR.
 
 ### Bug Fixes (5 with regression tests)
@@ -160,7 +160,7 @@ Validates type consistency across MIR.
 
 ### Regression Matrix — DONE ✓
 Comprehensive regression suites (commit `c1c302d`):
-`regression_aggregate_flow_matrix.w`, `regression_projection_import_matrix.w`.
+`regression_aggregate_flow_matrix.with`, `regression_projection_import_matrix.with`.
 
 ---
 
@@ -176,14 +176,14 @@ Audit complete: all 160 HashMaps are lookup-only, no iteration found.
 Fixpoint proves determinism.
 
 ### P8: Poisoned Nodes — DONE ✓
-`NK_POISONED_EXPR` (69) already defined in Ast.w. Added
+`NK_POISONED_EXPR` (69) already defined in Ast.with. Added
 `Parser.poisoned_expr()` helper. Converted 15 expression-level
 error sites. Added MirLower handler. 4 new tests. Commit: `73c6116`.
 
 ### P11: File Complexity Budget — DONE ✓
-Codegen.w: 10,494 → 3,974 lines (split into CodegenDispatch.w +
-CodegenTraits.w). Sema.w: 9,112 → 1,997 lines (split into
-SemaCheck.w + SemaDecl.w + SemaDiag.w). Commit: `c694460`.
+Codegen.with: 10,494 → 3,974 lines (split into CodegenDispatch.with +
+CodegenTraits.with). Sema.with: 9,112 → 1,997 lines (split into
+SemaCheck.with + SemaDecl.with + SemaDiag.with). Commit: `c694460`.
 
 ### P13: Phase Boundary Tests — DONE ✓
 13 tests covering --dump-tokens, --dump-ast, --dump-mir. Added

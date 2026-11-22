@@ -171,7 +171,7 @@ Each phase lands as one stack with its battery.
    validation. Gate: encrypted login in `strict` (TDS 8.0) and in
    PRELOGIN-negotiated (TDS 7.4) mode, and a refused connection to a
    certificate that does not match.
-4. **The facade, `lib/std/mssql.w`.**
+4. **The facade, `lib/std/mssql.with`.**
    - `Connection` is a resource: dropped means logged out and closed.
    - `query` and `execute`.
    - `Rows` is an iterator of row views valid until the next fetch (D22,

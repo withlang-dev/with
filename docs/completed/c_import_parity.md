@@ -50,7 +50,7 @@ we need to build on top of libclang.
 - [x] AST-based expression translator (15+ expression types)
 - [x] AST-based statement translator (10+ statement types)
 - [x] Static inline function body translation (try AST, fallback to stub)
-- [x] Test suite: tests/test_cimport.w (build + run, all pass)
+- [x] Test suite: tests/test_cimport.with (build + run, all pass)
 - [x] 13 system headers pass (stdio, stdlib, string, unistd, math, errno, signal, sys/types, sys/stat, fcntl, time, limits, stddef)
 
 ---
@@ -64,7 +64,7 @@ clang_bridge.c:  Metadata queries only
                  (name, type string, field count, ...)
                  CXTranslationUnit_SkipFunctionBodies ← THIS IS THE PROBLEM
 
-CImport.w:       String pattern matching on metadata
+CImport.with:       String pattern matching on metadata
                  Can't see function bodies
                  Can't see expressions
                  Can't see statements
@@ -80,7 +80,7 @@ clang_bridge.c:  Full AST traversal primitives
                  Constant evaluation
                  NO SkipFunctionBodies
 
-CImport.w:       Recursive AST walker
+CImport.with:       Recursive AST walker
                  ci_trans_top_level_decl()  → dispatches on cursor kind
                  ci_trans_stmt()            → all C statements
                  ci_trans_expr()            → all C expressions
@@ -142,7 +142,7 @@ else builds on. Without this, nothing else works.
 - [x] Local name registration — handled by ci_escape_reserved
 - [x] Name resolution — existing dedup + escape covers this
 
-**CImport.w — ~200 new lines**
+**CImport.with — ~200 new lines**
 
 ---
 
@@ -164,7 +164,7 @@ else builds on. Without this, nothing else works.
 - [x] Vector types (__UNSUPPORTED demotes container)
 - [x] Complex types (Complex32/Complex64)
 
-**CImport.w — ~300 lines replacing ~200 existing**
+**CImport.with — ~300 lines replacing ~200 existing**
 
 ---
 
@@ -185,7 +185,7 @@ else builds on. Without this, nothing else works.
 - [x] Declaration reference expressions (identifier resolution)
 - [x] Compound assignment operators
 
-**CImport.w — ~300 new lines**
+**CImport.with — ~300 new lines**
 
 ### Session 6: Member access, subscript, call, sizeof, compound literals
 
@@ -202,7 +202,7 @@ else builds on. Without this, nothing else works.
 - [x] VA_ARG — handled via UnexposedExpr fallback
 - [x] All ~50 builtin function remappings
 
-**CImport.w — ~300 new lines**
+**CImport.with — ~300 new lines**
 
 ---
 
@@ -220,7 +220,7 @@ else builds on. Without this, nothing else works.
 - [x] Null statements (→ `pass`)
 - [x] Break / continue statements
 
-**CImport.w — ~250 new lines**
+**CImport.with — ~250 new lines**
 
 ### Session 8: Switch, goto/label, local var decls
 
@@ -231,7 +231,7 @@ else builds on. Without this, nothing else works.
 - [x] Label statements (→ comment)
 - [x] Local variable declarations with type and initializer (in ci_trans_stmt)
 
-**CImport.w — ~250 new lines**
+**CImport.with — ~250 new lines**
 
 ---
 
@@ -246,7 +246,7 @@ else builds on. Without this, nothing else works.
 - [x] Constant evaluation for variable initializers
 - [x] Source location comments (`// file:line:col`)
 
-**CImport.w — ~300 lines replacing existing**
+**CImport.with — ~300 lines replacing existing**
 
 ### Session 10: Structs, unions, enums (with full fidelity)
 
@@ -258,7 +258,7 @@ else builds on. Without this, nothing else works.
 - [x] MSVC empty struct — __pad0: u8 padding for empty structs
 - [x] Opaque demotion with warning comments
 
-**CImport.w — ~300 lines replacing existing**
+**CImport.with — ~300 lines replacing existing**
 
 ---
 
@@ -273,7 +273,7 @@ else builds on. Without this, nothing else works.
   - [ ] `DISCARD(X)` — `(void)(X)` with const/volatile variants
   - [ ] `WL_CONTAINER_OF(ptr, sample, member)`
 
-**CImport.w — ~350 new lines**
+**CImport.with — ~350 new lines**
 
 ### Session 12: Recursive descent macro expression parser
 
@@ -289,7 +289,7 @@ else builds on. Without this, nothing else works.
 - [x] Variable reference — macros with untranslatable refs get comptime_error
 - [x] Function pointer alias — translated as identifier reference
 
-**CImport.w — ~500 new lines**
+**CImport.with — ~500 new lines**
 
 ---
 
@@ -304,7 +304,7 @@ else builds on. Without this, nothing else works.
 - [x] Remove `CXTranslationUnit_SkipFunctionBodies` from parse flags (done — flags=0)
 - [x] Fixpoint verification
 
-**CImport.w (integration), Parser.w (~30 lines), Codegen.w (~30 lines), llvm_bridge.c (~10 lines)**
+**CImport.with (integration), Parser.with (~30 lines), Codegen.with (~30 lines), llvm_bridge.c (~10 lines)**
 
 ---
 
@@ -326,22 +326,22 @@ else builds on. Without this, nothing else works.
 |---------|-------|---------|-------|--------|
 | 1 | 1 | AST bridge: cursor traversal, type queries, linkage | ~400 clang_bridge.c | ✓ |
 | 2 | 1 | AST bridge: operator kinds, eval, calling conv | ~400 clang_bridge.c | ✓ |
-| 3 | 2 | Name resolution: two-pass, scope hierarchy | ~200 CImport.w | partial |
-| 4 | 3 | Type translator: all CXTypeKind | ~300 CImport.w | existing works |
-| 5 | 4 | Expr translator part 1: literals, binary, unary, cast | ~300 CImport.w | ✓ |
-| 6 | 4 | Expr translator part 2: member, subscript, call, sizeof, init | ~300 CImport.w | partial |
-| 7 | 5 | Stmt translator part 1: compound, return, if, while, for | ~250 CImport.w | partial |
-| 8 | 5 | Stmt translator part 2: switch, goto, local decls | ~250 CImport.w | partial |
-| 9 | 6 | Decl translator: functions with bodies, variables with init | ~300 CImport.w | partial |
-| 10 | 6 | Decl translator: structs (align, FAM, member fns), enums (anon) | ~300 CImport.w | partial |
-| 11 | 7 | Macro tokenizer + PatternList (all 34 patterns) | ~350 CImport.w | partial |
-| 12 | 7 | Macro recursive descent parser (13 precedence levels) | ~500 CImport.w | existing works |
+| 3 | 2 | Name resolution: two-pass, scope hierarchy | ~200 CImport.with | partial |
+| 4 | 3 | Type translator: all CXTypeKind | ~300 CImport.with | existing works |
+| 5 | 4 | Expr translator part 1: literals, binary, unary, cast | ~300 CImport.with | ✓ |
+| 6 | 4 | Expr translator part 2: member, subscript, call, sizeof, init | ~300 CImport.with | partial |
+| 7 | 5 | Stmt translator part 1: compound, return, if, while, for | ~250 CImport.with | partial |
+| 8 | 5 | Stmt translator part 2: switch, goto, local decls | ~250 CImport.with | partial |
+| 9 | 6 | Decl translator: functions with bodies, variables with init | ~300 CImport.with | partial |
+| 10 | 6 | Decl translator: structs (align, FAM, member fns), enums (anon) | ~300 CImport.with | partial |
+| 11 | 7 | Macro tokenizer + PatternList (all 34 patterns) | ~350 CImport.with | partial |
+| 12 | 7 | Macro recursive descent parser (13 precedence levels) | ~500 CImport.with | existing works |
 | 13 | 8 | Integration, @[section], volatile codegen, callconv | ~100 across files | partial |
 | 14 | 9 | 20-header verification, Zig comparison, fixpoint | tests only | partial |
 
 **Total: 14 sessions.**
-**New code: ~800 lines clang_bridge.c + ~3500 lines CImport.w = ~4300 lines.**
-**Replacing: ~1250 lines clang_bridge.c + ~2100 lines CImport.w = ~3350 lines.**
+**New code: ~800 lines clang_bridge.c + ~3500 lines CImport.with = ~4300 lines.**
+**Replacing: ~1250 lines clang_bridge.c + ~2100 lines CImport.with = ~3350 lines.**
 **Net growth: ~950 lines.** (The new code is denser because it does more per line.)
 
 ### What this achieves

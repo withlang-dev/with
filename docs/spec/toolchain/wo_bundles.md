@@ -79,7 +79,7 @@ representations, the drop protocol, and mangling may change with any
 commit. For `.wo` they change only deliberately:
 
 - `docs/spec/abi/with-abi.md` names the boundary rules; the rules live in
-  ABI-owned files (`src/FnAbi.w`, `src/TypeLayout.w`).
+  ABI-owned files (`src/FnAbi.with`, `src/TypeLayout.with`).
 - The `.wo` object key is `corpus content sha × target × sha256(ABI-defining
   sources)` and nothing else (`docs/spec/abi/abi_roadmap.md`, Level 0). The compiler
   generation is not in the key. An edit to an ABI-defining file changes
@@ -96,7 +96,7 @@ compiler.
 
 ## How the compiler build uses `.wo`s
 
-1. `build.w` has, per corpus, the pipeline `docs/completed/stdlib_sourcing_plan.md`
+1. `build.with` has, per corpus, the pipeline `docs/completed/stdlib_sourcing_plan.md`
    describes: pin, reference fetch, whole-corpus migrate, upstream tests.
    Its output is the bundle's `src/` and `tests/`.
 2. A `<corpus>-wo` target compiles `src/` to `obj/<sha>-<target>-abi<N>.o`
@@ -159,30 +159,30 @@ linked by G+k), so two checks replace it:
 ## Conforming pcre2 and zlib (the first two bundles)
 
 (c-algorithms is the third bundle, 2026-09-13: `lib/std/engines/c_algorithms/`,
-package `std.engines.c_algorithms`, root `bundle.w`, harness `test_cpp.w`. See
+package `std.engines.c_algorithms`, root `bundle.with`, harness `test_cpp.with`. See
 `docs/completed/stdlib_sourcing_plan.md`, "Phase 1 status". TommyDS is the fourth,
-2026-09-14: `lib/std/engines/tommyds/`, package `std.engines.tommyds`, root `bundle.w`,
-harness `check_.w` (upstream's `check.c`; `check` collides with the
+2026-09-14: `lib/std/engines/tommyds/`, package `std.engines.tommyds`, root `bundle.with`,
+harness `check_.with` (upstream's `check.c`; `check` collides with the
 prelude name), corpora lane `tommyds-test`. See "Phase 2 status" in the
 same plan. Since 2026-09-14 every corpus is one entry in the registry
-below; nothing in `build.w` names a corpus.)
+below; nothing in `build.with` names a corpus.)
 
-## The corpus registry (build/corpus.w, build/corpora.w)
+## The corpus registry (build/corpus.with, build/corpora.with)
 
 Four corpora were enough to see the repeated shape, and enough to see the
 failure mode: corpus identity was threaded by hand through 27 sites of
-`build.w` (the compat runtime's bundle args, the stage and release
+`build.with` (the compat runtime's bundle args, the stage and release
 embeddings, the bootstrap empty slots, four stage links, two Linux and two
 Windows cross plans, the drift and root-check lanes) plus three exclusion
-lists in `build.w`, `build/runtime.w` and `build/compiler.w`, and each
-`build/<corpus>.w` copied the same fetch/stage/migrate/root/check/promote
+lists in `build.with`, `build/runtime.with` and `build/compiler.with`, and each
+`build/<corpus>.with` copied the same fetch/stage/migrate/root/check/promote
 pipeline. Missing one site does not fail cleanly; it embeds a corpus as
 source, or links a stage without its bundle, or leaves a cross target
 without it. At 20 corpora that is a hand-expanded database in code.
 
 The registry replaces that with two records and one loop:
 
-- **`Corpus`** (`build/corpus.w`) is the upstream source, its migration and
+- **`Corpus`** (`build/corpus.with`) is the upstream source, its migration and
   its test oracle: name, target stem, package, corpus directory, the pinned
   `Upstream` (URL, sha256, revision, where the tree lives under `out/`),
   the license file, the harness modules, the drift harness, the module
@@ -195,14 +195,14 @@ The registry replaces that with two records and one loop:
   `prepare_reference` and completes cross-module imports in
   `finish_generated`; zlib migrates its two test programs one at a time in
   `migrate`; STC will stage template instantiations in `stage`.
-- **`WoBundle`** (`build/wo.w`) is the compiled artifact: name, corpus
+- **`WoBundle`** (`build/wo.with`) is the compiled artifact: name, corpus
   spelling, root, target, ABI stamp, store slot. `corpus_bundle_plan`
   derives one from a `Corpus`; today every corpus produces one bundle, and
   the two records stay separate so that can change (one upstream backing
   several bundles, or several small corpora sharing one) without touching
   the registry.
-- **The registry** (`build/corpora.w`): `corpus_count()` and
-  `corpus_at(i)`, in bundle order. `build.w` derives `corpus_plans` from
+- **The registry** (`build/corpora.with`): `corpus_count()` and
+  `corpus_at(i)`, in bundle order. `build.with` derives `corpus_plans` from
   it and every site loops; the embedded-stdlib exclusion, the compat
   runtime's `exclude=` args and the spec inventory's `internal-module=`
   args come from the same list; `corpus_pipeline` registers the generic
@@ -212,7 +212,7 @@ The registry replaces that with two records and one loop:
   `<stem>-bundle-root-check`, `<name>-wo-drift` — and then the corpus's
   own lanes. A corpus is present everywhere it must be by construction.
 
-Adding a corpus: one `build/<corpus>.w` with `pub fn <corpus>_corpus() ->
+Adding a corpus: one `build/<corpus>.with` with `pub fn <corpus>_corpus() ->
 Corpus` (its facts and hooks; the lanes hook registers its upstream test
 lane), one line in `corpus_at`, and `corpus_count` bumped. The registry
 is indexed rather than a `List[Corpus]` because a `Corpus` is ephemeral
@@ -231,26 +231,26 @@ What each is today, and what changes. Both follow the one pattern; every
 later corpus follows it from day one.
 
 **pcre2 today.** `lib/std/engines/pcre2/` holds the migrated modules. A 297-line
-shim, `rt/regex_runtime.w`, imports all of them and exports `with_regex_*`;
+shim, `rt/regex_runtime.with`, imports all of them and exports `with_regex_*`;
 it is compiled whole-module to IR and then to `regex_runtime.o` three
 times per build (`bootstrap-`, `stage2-`, `cross-` targets), embedded
 through the `EmbedObjectFiles` assembly generator
 (`with_embedded_regex_runtime_o_start/_end`), and linked on demand when a
-program's undefined symbols need it (`Link.w`'s
+program's undefined symbols need it (`Link.with`'s
 `link_stage_undefined_symbols_need_regex_runtime`). `std.regex` and the
 compiler itself (SemaCheck 12 call sites, CCodegen 10, CiMigrate 3,
 CodegenDispatch 1) call the shim.
 
 **zlib today.** `lib/std/engines/zlib/` holds the migrated modules (package
 `std.engines.zlib`); `std.zlib` imports them directly (the model facade). Nothing
-prebuilt: every consumer (`std.build`, `build/zlib_gzip.w`,
-`build/zlib_gunzip.w`) compiles the corpus in-unit.
+prebuilt: every consumer (`std.build`, `build/zlib_gzip.with`,
+`build/zlib_gunzip.with`) compiles the corpus in-unit.
 
 The corpus package and the facade never share a dotted path (`std.engines.pcre2` /
 `std.regex`, `std.engines.zlib` / `std.zlib`): the frontend resolves a dotted
-import's parent module as a fallback, so a `lib/std/zlib.w` beside a
+import's parent module as a fallback, so a `lib/std/zlib.with` beside a
 `lib/std/zlib/` corpus would be pulled into the `--no-prelude` bundle build
-and fail there. `build/wo.w` refuses such a corpus by name.
+and fail there. `build/wo.with` refuses such a corpus by name.
 
 **After.**
 - `pcre2.wo` = `lib/std/engines/pcre2/` (source) + its migrated tests + one object per
@@ -258,38 +258,38 @@ and fail there. `build/wo.w` refuses such a corpus by name.
   imports every module (today that root is the shim's `use` list), keyed
   and stored per §"How the compiler build uses `.wo`s", built only when
   absent. `zlib.wo` likewise from `lib/std/engines/zlib/`.
-- The embed generator and `Link.w`'s name→slice table become data-driven
+- The embed generator and `Link.with`'s name→slice table become data-driven
   over the set of bundles instead of three hardcoded objects; on-demand
   linking generalizes from "needs regex runtime" to "an undefined symbol
   belongs to bundle X" using each bundle's manifest symbol list (this is
   also the link-time interface check).
 - `std.regex` imports `std.engines.pcre2` directly, exactly as `std.zlib` imports
   `std.engines.zlib.*`; the compiler's internal callers move onto `std.regex`;
-  `rt/regex_runtime.w` and the `with_regex_*` seam are deleted (D30).
+  `rt/regex_runtime.with` and the `with_regex_*` seam are deleted (D30).
 - Each bootstrap stage links the store's objects; stage1 (built by the
-  seed) receives them as plain link inputs from `build.w`, stage2 and the
+  seed) receives them as plain link inputs from `build.with`, stage2 and the
   release binary embed them.
 
 **Order of batches.** (A) extract the ABI-defining classifier and naming
-into `src/FnAbi.w` beside `TypeLayout.w`, add `WITH_ABI_VERSION`, record
+into `src/FnAbi.with` beside `TypeLayout.with`, add `WITH_ABI_VERSION`, record
 the ABI-source hash, add the battery check — alone in its battery
 (codegen-touching). (B) the `.wo` mechanism: store, key, manifest,
 data-driven embed and link tables, on-demand linking. (C) pcre2: bundle
 target, `std.regex` over `std.engines.pcre2`, compiler callers off the shim, shim
 deleted. (D) zlib: bundle target, consumers link it. (A) comes first so
 the key is narrow from the first bundle; without it the only correct key
-includes the whole of `Codegen.w`, which recompiles the corpora on most
+includes the whole of `Codegen.with`, which recompiles the corpora on most
 compiler commits — the thing this design exists to stop.
 
 ## Implementation notes (batch B, the mechanism)
 
 Everything below reuses an existing mechanism; the new code is glue.
 
-**Object build.** `with build <root>.w --emit-obj -o <store>/<name>-<key>.o`
+**Object build.** `with build <root>.with --emit-obj -o <store>/<name>-<key>.o`
 compiles the bundle in module-object mode (`emit_object_to_path`), so
 every function is `__with_mod_<hash>__<base>`. The hash is of the module's
 *canonical* path, and a bundle's modules are reached as `std.<corpus>.*`,
-whose canonical path is `<embedded-std>/std/<corpus>/<module>.w` — the
+whose canonical path is `<embedded-std>/std/<corpus>/<module>.with` — the
 same string in every checkout and every compiler generation. This is why
 bundle sources live inside the embedded stdlib tree (`lib/std/<corpus>/`,
 as pcre2's and zlib's already do) rather than a checkout-relative
@@ -321,7 +321,7 @@ ABI-defining sources. The compiler bakes its own `abi_sha` in at link time
 identity, and a compiler that links a bundle checks the manifest's
 `abi_sha` against its own — a mismatch is a hard error, never a silent
 link (#761). An unstamped image — linked as a program (`with build
-main.w`), so `with version --abi-sha` prints the placeholder — has no
+main.with`), so `with version --abi-sha` prints the placeholder — has no
 identity to compare and links its embedded bundles and an explicit
 `--link-bundle` unchecked, as a hand-linked compiler keeps no generation
 (#1815, #1330).
@@ -356,7 +356,7 @@ bundle, `--link-bundle` — refuses a bundle whose `rt` imports this
 compiler's runtime no longer provides as declared
 (`Link.link_stage_bundle_import_drift`, naming the symbol and both
 contracts), and the store applies the same rule before reusing a slot
-(`build/wo.w wo_slot_status`), so a compiler never embeds a bundle it would
+(`build/wo.with wo_slot_status`), so a compiler never embeds a bundle it would
 refuse. A bundle or a runtime from before the rows is judged as before: it
 must be the compiler's own generation.
 
@@ -379,18 +379,18 @@ symbol starting with a bundle's prefix means that bundle links.
 **Store.** `$WITH_WO_DIR`, default `~/.local/with-wo/`, outside `out/`.
 Release assets per corpus version later; source always in the tree.
 
-**Link.** `Link.w` gains: `--link-object <path>` (repeatable; a plain
+**Link.** `Link.with` gains: `--link-object <path>` (repeatable; a plain
 extra object, the way workspace units already join through
-`extra_objects`) for `build.w` to hand a stage link its bundles; and
+`extra_objects`) for `build.with` to hand a stage link its bundles; and
 on-demand bundle selection after the undefined-symbol probe, over the
 compiler's *embedded* bundles — a generated `out/gen/compiler/
-EmbeddedBundles.w` (the `EmbeddedStdlibData.w` pattern) listing each
+EmbeddedBundles.with` (the `EmbeddedStdlibData.with` pattern) listing each
 bundle's name with `with_embedded_wo_<name>_o` and `_manifest` blobs
 (produced by the existing `EmbedObjectFiles` generator from the store
 files). Empty index until the first bundle. Selection extracts the blob
 to the link temp dir, exactly as `regex_runtime.o` is extracted today.
 
-**Build.** `build.w` gains a `wo_bundle(name, root, source_dir)` helper
+**Build.** `build.with` gains a `wo_bundle(name, root, source_dir)` helper
 that registers `<name>-wo` (key computation; skip when the store has the
 object; else run the right compiler with `--emit-obj
 --emit-bundle-manifest`; publish atomically), adds the object and
@@ -418,10 +418,10 @@ compiles the corpus in-unit into stage2 while stage2 links the bundle
 into stage3 and fixpoint breaks.)
 
 **Order inside the batch.** (1) `--link-object`; (2) the ABI-sha stamp and
-`with version --abi-sha`; (3) `--emit-bundle-manifest`; (4) `Link.w`
+`with version --abi-sha`; (3) `--emit-bundle-manifest`; (4) `Link.with`
 embedded-bundle selection with an empty index; (5) declarations-only
 codegen for bundle-provided modules — all landed in `467aae3e` and
-`8014b8e3`, battery green, reseeded. (6) the `build.w` helper and store
+`8014b8e3`, battery green, reseeded. (6) the `build.with` helper and store
 land with the first bundle (batch C).
 
 ## Implementation notes (batch C, pcre2) — ruled, decisions.md D39
@@ -436,7 +436,7 @@ alone in a battery because both touch symbol naming):
   The three `module_object_mode != 0` naming guards in `Codegen` become
   one predicate — this path uses module link names — true in
   module-object mode or when an embedded bundle provides the path.
-- `codegen_canonical_module_path` joins a tree-resolved `lib/std/engines/pcre2/x.w`
+- `codegen_canonical_module_path` joins a tree-resolved `lib/std/engines/pcre2/x.with`
   with `$PWD`, so a bundle built from a checkout would hash an absolute
   path into every symbol. The rule maps `lib/std/<rest>` (and
   `…/lib/std/<rest>`) to `<embedded-std>/std/<rest>`, the identity Sema's
@@ -444,7 +444,7 @@ alone in a battery because both touch symbol naming):
   `docs/with-abi.sha256`. Verified by `--emit-bundle-manifest` on the
   corpus root printing `<embedded-std>/std/engines/pcre2/…` prefixes.
 
-**The measured constraint.** `with check lib/std/engines/pcre2/pcre2test.w` takes
+**The measured constraint.** `with check lib/std/engines/pcre2/pcre2test.with` takes
 6.06 s; hello world 0.03 s. `std.regex` is imported by the prelude, so
 "the facade imports `std.engines.pcre2.*` directly" would put six seconds of Sema on
 every program. Batch B's declarations-only rule saves codegen, not Sema.
@@ -464,7 +464,7 @@ anything requiring implementation information rejects or ignores
 on both. The compiler writes the interface after full Sema
 (`--emit-bundle-interface <path>`, beside `--emit-obj`) from finalized
 semantic declarations, never as a syntactic projection: one `module
-<embedded-std>/std/<corpus>/<name>.w` section per bundle module holding
+<embedded-std>/std/<corpus>/<name>.with` section per bundle module holding
 the `pub` types with exactly the declarations needed to reproduce their
 layout (canonicalized, no alias or import chains), `pub const NAME: T =
 <folded value>` (canonical folded constants, never the source
@@ -556,8 +556,8 @@ interface-side fingerprint; the bundle build requires `a == b`. The
 manifest records `fingerprint` and `interface-sha` (sha256 of the `.wi`
 bytes); `--link-bundle` refuses an interface whose sha is not the
 manifest's. `--bundle-corpus std/engines/pcre2` selects `<embedded-std>/std/engines/pcre2/…`;
-`std/wi_demo` selects the single module `<embedded-std>/std/wi_demo.w`.
-The emitter (`src/compiler/BundleInterfaceEmit.w`) prints from Sema's
+`std/wi_demo` selects the single module `<embedded-std>/std/wi_demo.with`.
+The emitter (`src/compiler/BundleInterfaceEmit.with`) prints from Sema's
 finalized tables only, never source text, never a placeholder: a
 declaration it cannot state exactly is a loud error naming it and
 nothing is written. Per section: the `use` lines its declarations need, in
@@ -592,7 +592,7 @@ parameters, a type with a `drop` method, a droppable mutable global, a
 const whose folded value is not a literal, an ambiguous returned
 reference (the C1 message), trait objects and Range types, ephemeral or
 derived types, traits, `c_import`, extern storage, selector imports.
-The fingerprint (`src/compiler/BundleFingerprint.w`) is sha256 over
+The fingerprint (`src/compiler/BundleFingerprint.with`) is sha256 over
 sorted TSV rows holding spellings and layout numbers only — one `module`
 row per corpus module; type rows with kind, size, align, Copy-ness,
 layout flags, visibility, fields (name, spelling, offset, explicit
@@ -611,16 +611,16 @@ the consumer against the emitted interface, and fires each refusal.
 Measured on pcre2 (2026-09-02, stage1): a 4.3k-line `.wi`, source and
 interface fingerprints equal, and a tiny `std.engines.pcre2` consumer's `check`
 drops from 5.2 s through the source to 0.26 s through the interface.
-Corpus findings for batch C3: `defs.w` exports 46 generic functions
+Corpus findings for batch C3: `defs.with` exports 46 generic functions
 (migrated C macros such as `INT8_C[T]`, `PCRE2_GLUE[T]`, `MAX_255[T]`);
 they stay corpus-internal and are omitted from the interface (above);
-`pcre2_chartables.w`, `pcre2_tables.w` and `pcre2_ucd.w` carry only
+`pcre2_chartables.with`, `pcre2_tables.with` and `pcre2_ucd.with` carry only
 `use` lines.
 
 **Resolver.** `use std.engines.pcre2.X` on a compiler whose bundle index provides
-`<embedded-std>/std/engines/pcre2/X.w` reads that module's interface section;
+`<embedded-std>/std/engines/pcre2/X.with` reads that module's interface section;
 otherwise the source, as today. `lib/std/engines/pcre2/` stays out of
-`EmbeddedStdlibData.w` (it is excluded today), and that exclusion becomes
+`EmbeddedStdlibData.with` (it is excluded today), and that exclusion becomes
 the rule for every corpus: three blobs per bundle (object, manifest,
 interface), never the 5.5 MB of source.
 
@@ -642,7 +642,7 @@ stage2: `--link-bundle` with the tree-ABI bundle stage1 built; stage2
 embeds it. stage2 → stage3: stage2's index; same stored bytes, so
 fixpoint holds by construction. Cross compilers embed the `--target`
 bundles the release compiler builds (#946): each cross lane has its own
-plan (`wo_bundle_plan_for_target`, `build/wo.w`) — the same corpus, root
+plan (`wo_bundle_plan_for_target`, `build/wo.with`) — the same corpus, root
 and ABI, a store slot keyed by the target's `target_spec_resolved_name`
 spelling, targets `pcre2-wo-<os>-<arch>{,-build,-install-*}`, the tree
 copy under `out/wo/<target>/` — built by the release compiler with
@@ -651,8 +651,8 @@ second fingerprint pass (`with check <x>.wi --target=<triple>`), so both
 fingerprints are the target's; the lane's embedded-objects set carries
 that slot's blobs. Only bootstrap-lib keeps zero-length blobs (stage1 is
 linked before the tree's bundle exists). The five `regex-runtime-ir`/`-object`
-target pairs and the `regex_runtime.o` entries in `Link.w`,
-`build/package.w`, `build/emit_c.w`, `build/runtime.w`, and
+target pairs and the `regex_runtime.o` entries in `Link.with`,
+`build/package.with`, `build/emit_c.with`, `build/runtime.with`, and
 `install-regex-runtime` go away.
 
 Stage2 and stage3 receive `out/stage/lib/embedded_objects.o` explicitly
@@ -667,9 +667,9 @@ compiler. The explicit embedding input also prevents a warm `out/lib`
 from masking an empty stage payload. A missing selected embedding object
 is a hard link failure. See [the cold-build diagnosis](macos-stage-bundle-debug.md).
 
-**Root.** `rt/regex_runtime.w`'s `use` list (32 modules; `pcre2test` and
+**Root.** `rt/regex_runtime.with`'s `use` list (32 modules; `pcre2test` and
 `pcre2posix` are harness, not bundle) is the bundle root, moved to
-`lib/std/engines/pcre2/bundle.w` and written by the migrate action, which already
+`lib/std/engines/pcre2/bundle.with` and written by the migrate action, which already
 post-patches `use` lines into three modules
 (`pcre2_ensure_generated_dependencies`).
 
@@ -680,8 +680,8 @@ codegen's `gen_regex_literal_value` calls facade functions only;
 SemaCheck's compile-time literal validation (`validate_regex_literal`)
 uses `std.regex` like any program — the compiler is one more user of the
 facade and links the bundle on demand; `CCodegen`'s ten `with_regex_*`
-prototypes, `CiMigrate`'s borrowed-str mask, and `rt/regex_runtime.w` are
-deleted; `build/emit_c.w` stops harvesting `with_regex_` exports (its
+prototypes, `CiMigrate`'s borrowed-str mask, and `rt/regex_runtime.with` are
+deleted; `build/emit_c.with` stops harvesting `with_regex_` exports (its
 "found no runtime exports" check retires with the last runtime export; in
 the emit-C lane the corpus compiles in-unit as C, no bundle involved).
 
@@ -692,7 +692,7 @@ are unchanged (determinism of the bundle itself) — and run `:pcre2-test`
 `abi-hash-check` already guards the key.
 
 **Known debt.** #941: the migrator emits `/`-based 128-bit overflow
-helpers; the promoted `defs.w` files carry a hand edit a re-migrate would
+helpers; the promoted `defs.with` files carry a hand edit a re-migrate would
 drop. The generator is fixed before the first `wo-drift` run.
 
 **Ruled** as decisions.md D39 (2026-09-02); the spec projection landed
@@ -701,7 +701,7 @@ separate-compilation origin rule) and §18.5c (bundles and interfaces).
 
 ## Shim retired (batch C4, 2026-09-04)
 
-`rt/regex_runtime.w` and every `with_regex_*` hook are gone (D30's
+`rt/regex_runtime.with` and every `with_regex_*` hook are gone (D30's
 regex seam). `std.regex` imports ten `std.engines.pcre2` modules through the
 embedded interface and calls pcre2 directly; `Regex.__literal_code` and
 `Regex.__capture_count` are the regex-literal entry points codegen calls
@@ -710,11 +710,11 @@ compiles the literal with `Regex.compile_flags`, so the compiler is one
 more user of the facade and its own link selects the embedded bundle.
 Retired with the shim: the five `regex-runtime-ir`/`-object` lane pairs
 and the `with_ir_target` helpers, the `regex_runtime_o` blob in every
-embedded-objects set, `install-regex-runtime`, Link.w's on-demand
+embedded-objects set, `install-regex-runtime`, Link.with's on-demand
 selection and its transitive probe (no on-demand runtime object references
 a bundle any more; selection reads the program's own undefined symbols),
-CCodegen's prototypes, CiMigrate's borrowed-str mask, emit_c.w's harvest
-and `package.w`'s `regex_runtime.c`. The emit-C lane compiles every
+CCodegen's prototypes, CiMigrate's borrowed-str mask, emit_c.with's harvest
+and `package.with`'s `regex_runtime.c`. The emit-C lane compiles every
 embedded bundle's corpus in-unit: `--emit-c` registers no interface
 (`Compilation.emit_c_in_unit`), the compiler's own C is emitted by the
 release compiler with `--bundle-corpus std/engines/pcre2` (#955, option a), and the
@@ -798,7 +798,7 @@ frontend's) over the 3,828 interface declarations — 97 ms each — plus the
 
 Measured on this box (stage1/release, idle, cold run excluded):
 hello-world check 0.46 → 0.07 (lazy) → 0.05 (on demand) → 0.04 s (text
-imports); `behav_derive_clone.w` check 21 ms on the seed, 40 ms here
+imports); `behav_derive_clone.with` check 21 ms on the seed, 40 ms here
 (parse 5.5, resolve 10.3, imports 0.5, interface 4.7, comptime ~8,
 sema ~5); `test` of it 0.40 s vs the seed's 0.39–0.54 s and the
 shim-retired compiler's 0.81 s.
@@ -837,9 +837,9 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
 
 - **Corpus.** `--bundle-corpus rt` names the embedded runtime tree
   `<embedded-rt>/rt` (`bundle_corpus_contains`), and `use rt.<module>`
-  resolves to `<embedded-rt>/rt/<module>.w` as `use std.x` resolves to the
+  resolves to `<embedded-rt>/rt/<module>.with` as `use std.x` resolves to the
   embedded stdlib. The root is generated per host by `rt-bundle`
-  (build/rt_bundle.w): one `use` per module of the in-unit lane's set.
+  (build/rt_bundle.with): one `use` per module of the in-unit lane's set.
 - **Build.** `stage1-rt-bundle` compiles it with stage1 under
   `WITH_RT_IN_UNIT=1` into `out/bootstrap/lib/rt.{o,wi,manifest}`;
   `rt-bundle` compiles it with stage2 into `out/lib/`. The interface is
@@ -867,7 +867,7 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
   `rt.panic_runtime`); the migrator's shared defs do the same. The 227
   `extern fn with_*` declarations of the standard library are gone, and
   the three `@[effect]` pins they carried live on the definitions.
-- **By role, never by host.** `rt/platform.w` and `rt/fiber_core.w` resolve
+- **By role, never by host.** `rt/platform.with` and `rt/fiber_core.with` resolve
   to the active target's platform module and fiber core
   (`EmbeddedRuntime.embedded_rt_platform_file`, the one owner the in-unit
   parse reads too): `std.net` writes `use rt.platform`, `std.task` writes
@@ -921,7 +921,7 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
 - **Waiting for a seed cut from this tree.** The seed-built
   `out/bootstrap-lib` objects (the pinned seed links stage1 in the object
   world), and the compiler's own `src/` externs becoming `use rt.*`
-  (`tools/sweep_rt_externs.w`; the resolver admits the compiler's sources,
+  (`tools/sweep_rt_externs.with`; the resolver admits the compiler's sources,
   the pinned seed's does not).
 
 ## Tree bundles (#3351, 2026-11-17)
@@ -929,7 +929,7 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
 A **tree bundle** is the modules of one checkout's directories compiled
 once, for that checkout's own tests: `--bundle-corpus tree:<dir>[,<dir>]`
 (canonical directory paths) beside the flags every bundle build takes. The
-first is the compiler's own (`build/compiler_bundle.w`: `src/` and
+first is the compiler's own (`build/compiler_bundle.with`: `src/` and
 `out/gen/`, target `compiler-bundle`, `out/compiler-bundle/compiler.{o,wi,
 manifest}`). A test that says `use Sema` used to check, lower and generate
 every body of the compiler: 34 s of Sema for a 31-line test, 260 s for

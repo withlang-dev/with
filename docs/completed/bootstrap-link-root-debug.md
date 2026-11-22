@@ -17,7 +17,7 @@ absent. LLDB on a minimal `LLVMGetGlobalContext` caller confirms the effect:
 stop in `link_stage_find_llvm_static_bridge`, then in
 `link_stage_resolve_runtime_root`, disable breakpoints and step out. The
 return registers are `x0 -> "out/lib"`, `x1 = 7`. The accepting condition
-in `src/compiler/Link.w` is the nonempty cimport and platform probe check;
+in `src/compiler/Link.with` is the nonempty cimport and platform probe check;
 the caller subsequently rejects that root's missing LLVM bridge.
 
 The stage1 build action now invokes the existing cleanup helper immediately

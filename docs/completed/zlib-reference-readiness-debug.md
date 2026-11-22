@@ -6,7 +6,7 @@ after `zlib-reference` had succeeded. The reference directory contained only
 
 The route was the action's own native build runner under LLDB. Breaking on
 `run_zlib_reference_action`, then `ToolFs.is_dir`, and stepping out reached
-the action's directory-only guard (`build/zlib.w`, original line 276).
+the action's directory-only guard (`build/zlib.with`, original line 276).
 At PC `0x100082020` (`run_zlib_reference_action+728`), `w22` was 1.
 The `cbz w22` instruction fell through to `+732` instead of entering the
 extraction block. The next block wrote the success markers. Transcripts:
@@ -14,7 +14,7 @@ extraction block. The next block wrote the success markers. Transcripts:
 `/tmp/with-zlib-reference-verdict-lldb.log`.
 
 The directory exists because `Build.__driver_run_action` creates every
-declared output's parent before invoking an action (`lib/std/build.w`,
+declared output's parent before invoking an action (`lib/std/build.with`,
 original lines 2963–2977). This target declares a ready stamp inside its
 reference directory. The action therefore mistook output preparation for
 completed work. PCRE2 had already corrected the analogous directory-only

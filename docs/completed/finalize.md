@@ -14,9 +14,9 @@ Rule: One file at a time. Verify fixpoint after each file.
 Never batch multiple files.
 
 **Codebase stats (updated 2026-03-29):** 55,192 total lines
-across 63 source files. Largest files: CodegenDispatch.w (5,571),
-Parser.w (5,042), SemaCheck.w (4,916), CImport.w (4,628),
-CCodegen.w (4,440), Codegen.w (3,998), MirLower.w (3,937).
+across 63 source files. Largest files: CodegenDispatch.with (5,571),
+Parser.with (5,042), SemaCheck.with (4,916), CImport.with (4,628),
+CCodegen.with (4,440), Codegen.with (3,998), MirLower.with (3,937).
 
 ---
 
@@ -26,39 +26,39 @@ Convert integer constant groups to discriminant enums. Each file
 is a standalone unit of work. `make build && make fixpoint` after
 each file.
 
-### 1.1 src/Ast.w — Node Kinds (92 constants)
+### 1.1 src/Ast.with — Node Kinds (92 constants)
 
 **Current:** `const NK_FN_DECL: i32 = 1` through 92 NK_* constants
 **Target:** `type NodeKind = disc i32 { FN_DECL = 1, TYPE_DECL = 2, ... }`
 
-- [x] Read src/Ast.w to catalog all 92 NK_* constants
+- [x] Read src/Ast.with to catalog all 92 NK_* constants
 - [x] Define `type NodeKind` discriminant enum with all variants
       preserving existing integer values
 - [x] Delete all `const NK_*` definitions
 - [x] `make build` — fix all compilation errors from removed constants
-- [x] Update src/Ast.w internal uses
+- [x] Update src/Ast.with internal uses
 - [x] `make build && make fixpoint`
 
-- [x] Update src/Sema.w: replace ~430 `if kind == NK_*` with `match kind`
+- [x] Update src/Sema.with: replace ~430 `if kind == NK_*` with `match kind`
       (largest consumer — do in batches of ~50 if-chains per sub-step)
 - [x] `make build && make fixpoint`
-- [x] Update src/Codegen.w: replace ~125 NK_* if-chains with `match kind`
+- [x] Update src/Codegen.with: replace ~125 NK_* if-chains with `match kind`
 - [x] `make build && make fixpoint`
-- [x] Update src/render.w: replace NK_* if-chains with `match kind`
+- [x] Update src/render.with: replace NK_* if-chains with `match kind`
 - [x] `make build && make fixpoint`
-- [x] Update src/Resolve.w: replace NK_* if-chains with `match kind`
+- [x] Update src/Resolve.with: replace NK_* if-chains with `match kind`
 - [x] `make build && make fixpoint`
-- [x] Update src/MirLower.w: replace NK_* if-chains with `match kind`
+- [x] Update src/MirLower.with: replace NK_* if-chains with `match kind`
 - [x] `make build && make fixpoint`
-- [x] Update src/AsyncLower.w: replace NK_* if-chains with `match kind`
+- [x] Update src/AsyncLower.with: replace NK_* if-chains with `match kind`
 - [x] `make build && make fixpoint`
-- [x] Update src/Parser.w: replace NK_* references with enum variants
+- [x] Update src/Parser.with: replace NK_* references with enum variants
 - [x] `make build && make fixpoint`
-- [x] Update src/main.w and src/main_emit_temp.w: replace NK_* uses
-- [x] Update src/BorrowCfg.w: replace NK_* uses
+- [x] Update src/main.with and src/main_emit_temp.with: replace NK_* uses
+- [x] Update src/BorrowCfg.with: replace NK_* uses
 - [x] `make build && make fixpoint`
 
-### 1.2 src/Ast.w — Operator Kinds (25 + 7 constants)
+### 1.2 src/Ast.with — Operator Kinds (25 + 7 constants)
 
 **Current:** `const OP_ADD: i32 = 0` through `const OP_NOT_IN: i32 = 24`,
 `const UOP_NEGATE: i32 = 0` through `const UOP_BIT_NOT: i32 = 6`
@@ -69,7 +69,7 @@ each file.
 - [x] Update all consumers across src/ files
 - [x] `make build && make fixpoint`
 
-### 1.3 src/Ast.w — Other Constant Groups
+### 1.3 src/Ast.with — Other Constant Groups
 
 **Current:** TDK_* (7 type decl sub-kinds + 2 flag bits), FN_FLAG_* (13 bit flags),
 VIS_* (2 visibility levels), FSTR_SEG_* (2 f-string segment types)
@@ -82,44 +82,44 @@ VIS_* (2 visibility levels), FSTR_SEG_* (2 f-string segment types)
 - [x] Update all consumers
 - [x] `make build && make fixpoint`
 
-### 1.4 src/Token.w — Token Kinds (~125 constants)
+### 1.4 src/Token.with — Token Kinds (~125 constants)
 
 **Current:** `const TK_INT_LIT: i32 = 0` through ~125 TK_* constants
 **Target:** `type TokenKind` discriminant enum
 
-- [x] Read src/Token.w to catalog all ~125 TK_* constants
+- [x] Read src/Token.with to catalog all ~125 TK_* constants
 - [x] Define `type TokenKind` discriminant enum preserving integer values
 - [x] Delete all `const TK_*` definitions
-- [x] Update src/Token.w internal uses (114 occurrences in `tag_name`)
+- [x] Update src/Token.with internal uses (114 occurrences in `tag_name`)
 - [x] `make build && make fixpoint`
-- [x] Update src/Parser.w TK_* references
-- [x] Update src/Lexer.w TK_* references
-- [x] Update src/main.w and src/main_emit_temp.w TK_* references
+- [x] Update src/Parser.with TK_* references
+- [x] Update src/Lexer.with TK_* references
+- [x] Update src/main.with and src/main_emit_temp.with TK_* references
 - [x] `make build && make fixpoint`
 
-### 1.5 src/Sema.w — Type Kinds (20 constants)
+### 1.5 src/Sema.with — Type Kinds (20 constants)
 
 **Current:** `const TY_ERR: i32 = 0` through 20 TY_* constants
 **Target:** `type TypeKind` discriminant enum
 
 - [x] Define `type TypeKind` discriminant enum with 20 TY_* variants
 - [x] Delete all `const TY_*` definitions
-- [x] Update src/Sema.w internal uses
-- [x] Update src/Codegen.w TY_* references
-- [x] Update any other consumers (CCodegen.w, MirLower.w)
+- [x] Update src/Sema.with internal uses
+- [x] Update src/Codegen.with TY_* references
+- [x] Update any other consumers (CCodegen.with, MirLower.with)
 - [x] `make build && make fixpoint`
 
-### 1.6 src/Sema.w — Other Constant Groups
+### 1.6 src/Sema.with — Other Constant Groups
 
 **Current:** VS_* (2 var states), BK_* (2 borrow kinds), DR_* (3 derive reqs)
 
 - [x] Define `type VarState` discriminant enum (LIVE, MOVED)
 - [x] Define `type BorrowKind` discriminant enum (SHARED, EXCLUSIVE)
 - [x] Define `type DeriveReq` discriminant enum (COPY, CLONE, EQ)
-- [x] Update all consumers (Sema.w, Mir.w, MirLower.w — 21 refs)
+- [x] Update all consumers (Sema.with, Mir.with, MirLower.with — 21 refs)
 - [x] `make build && make fixpoint` ✓
 
-### 1.7 src/Mir.w — All MIR Constant Groups (85+ constants)
+### 1.7 src/Mir.with — All MIR Constant Groups (85+ constants)
 
 **Current:** SK_* (5), TK_* (6), RK_* (9), OK_* (3), CK_* (7),
 PK_* (4), DK_* (2), MIR_INTRINSIC_* (54)
@@ -133,26 +133,26 @@ PK_* (4), DK_* (2), MIR_INTRINSIC_* (54)
 - [x] Define `type DropKind` discriminant enum (2 DK_* variants)
 - [x] Define `type MirIntrinsic` discriminant enum (54 variants)
 - [x] Delete all original constant definitions
-- [x] Update src/Mir.w internal uses
-- [x] Update src/MirLower.w consumers
-- [x] Update src/Codegen.w MIR consumers
-- [x] Update src/MirOpt.w consumers
-- [x] Update src/BorrowCfg.w consumers
+- [x] Update src/Mir.with internal uses
+- [x] Update src/MirLower.with consumers
+- [x] Update src/Codegen.with MIR consumers
+- [x] Update src/MirOpt.with consumers
+- [x] Update src/BorrowCfg.with consumers
 - [x] `make build && make fixpoint`
 
-### 1.8 src/Resolve.w — Constant Groups (20 constants)
+### 1.8 src/Resolve.with — Constant Groups (20 constants)
 
 **Current:** IMPORT_KIND_* (2), DEF_KIND_* (9), SCOPE_KIND_* (7)
 
 - [x] Define `type ImportKind` discriminant enum (USE, C_IMPORT)
 - [x] Define `type DefKind` discriminant enum (9 DEF_KIND_* variants)
 - [x] Define `type ScopeKind` discriminant enum (7 SCOPE_KIND_* variants)
-- [x] Update all consumers in src/Resolve.w
+- [x] Update all consumers in src/Resolve.with
 - [x] `make build && make fixpoint`
 
-### 1.9 src/Codegen.w — Remaining Integer Constants
+### 1.9 src/Codegen.with — Remaining Integer Constants
 
-- [x] Audit src/Codegen.w for any integer constant groups not
+- [x] Audit src/Codegen.with for any integer constant groups not
       covered by Ast/Token/Sema/Mir/Resolve enums
 - [x] Convert any found groups to discriminant enums
 - [x] `make build && make fixpoint`
@@ -162,7 +162,7 @@ PK_* (4), DK_* (2), MIR_INTRINSIC_* (54)
 ## Phase 2: Handle Types (distinct i32) — DONE ✓
 
 All three handle types migrated to `distinct i32`:
-BlockId (Mir.w), NodeId (Ast.w), TypeId (Sema.w).
+BlockId (Mir.with), NodeId (Ast.with), TypeId (Sema.with).
 
 ### 2.0 Implement `distinct` keyword support — DONE ✓
 
@@ -170,37 +170,37 @@ BlockId (Mir.w), NodeId (Ast.w), TypeId (Sema.w).
 - [x] Implement `type X = distinct Y` in sema
 - [x] Implement explicit cast: `val as X` and `val as Y`
 - [x] Transparent LLVM lowering (no wrapper struct)
-- [x] 21-test compatibility suite (`test/behavior/behav_distinct_compat.w`)
+- [x] 21-test compatibility suite (`test/behavior/behav_distinct_compat.with`)
 - [x] `make build && make fixpoint`
 
 ### 2.1 type NodeId = distinct i32 — DONE ✓
 
-**File:** src/Ast.w — Two-phase migration (Phase A: type alias, Phase B: flip to distinct).
+**File:** src/Ast.with — Two-phase migration (Phase A: type alias, Phase B: flip to distinct).
 Commits: `de304e7`, `551db26`.
 
-- [x] Add `type NodeId = distinct i32` to src/Ast.w
+- [x] Add `type NodeId = distinct i32` to src/Ast.with
 - [x] Update AstPool functions to accept/return NodeId
-- [x] Update all consumer files (Parser.w, Resolve.w, Sema.w,
-      Codegen.w, MirLower.w, render.w, etc.)
+- [x] Update all consumer files (Parser.with, Resolve.with, Sema.with,
+      Codegen.with, MirLower.with, render.with, etc.)
 - [x] `make build && make fixpoint`
 
 ### 2.2 type TypeId = distinct i32 — DONE ✓
 
-**File:** src/Sema.w — Two-phase migration (Phase A: type alias, Phase B: flip to distinct).
+**File:** src/Sema.with — Two-phase migration (Phase A: type alias, Phase B: flip to distinct).
 Commits: `4a54003`, `1aa2f50`.
 
-- [x] Add `type TypeId = distinct i32` to src/Sema.w
+- [x] Add `type TypeId = distinct i32` to src/Sema.with
 - [x] Update type table functions to accept/return TypeId
 - [x] Update all consumer files
 - [x] `make build && make fixpoint`
 
 ### 2.3 type BlockId = distinct i32 — DONE ✓
 
-**File:** src/Mir.w
+**File:** src/Mir.with
 
-- [x] Add `type BlockId = distinct i32` to src/Mir.w
+- [x] Add `type BlockId = distinct i32` to src/Mir.with
 - [x] Update MIR basic block functions to use BlockId
-- [x] Update MirLower.w (15 boundary casts)
+- [x] Update MirLower.with (15 boundary casts)
 - [x] `make build && make fixpoint`
 
 ---
@@ -219,7 +219,7 @@ Compiler source does not currently use `it` anywhere.
 does not use higher-order functions with single-argument closures.
 No sites to convert.
 
-- [x] Search all src/*.w files for single-parameter closure patterns
+- [x] Search all src/*.with files for single-parameter closure patterns
 - [x] Replace eligible closures with `it` shorthand (none found)
 - [x] Verify no nested `it` usage (parser rejects this)
 - [x] `make build && make fixpoint` (no changes needed)
@@ -230,23 +230,23 @@ No sites to convert.
 types. All error handling uses sentinel values (`0`, `-1`). No manual
 error matching patterns exist to convert.
 
-- [x] Search all src/*.w files for match result/option patterns (none found)
+- [x] Search all src/*.with files for match result/option patterns (none found)
 - [x] No sites to convert — compiler uses sentinel returns, not Result/Option
 
 ### 3.3 Replace nested calls with `|>` pipelines
 
-**N/A:** Already 27 uses of `|>` in Compilation.w, Link.w, main.w
+**N/A:** Already 27 uses of `|>` in Compilation.with, Link.with, main.with
 (shell commands). Core compiler files use `let` chains and LLVM builder
 nesting (`wl_const_int(wl_i64_type(ctx), ...)`) where `|>` would not
 improve readability. No further conversion sites identified.
 
-- [x] Audit all src/*.w for deeply nested function call chains
+- [x] Audit all src/*.with for deeply nested function call chains
 - [x] Existing 27 `|>` uses already cover natural pipeline sites
 - [x] No additional sites where `|>` improves readability
 
 ### 3.4 Replace `== false` with `not`
 
-**Current:** 5 occurrences remain (Sema.w: 4, Lexer.w: 1)
+**Current:** 5 occurrences remain (Sema.with: 4, Lexer.with: 1)
 
 - [x] Replace 5 remaining `== false` patterns with `not`
 - [x] `make build && make fixpoint` ✓
@@ -254,12 +254,12 @@ improve readability. No further conversion sites identified.
 ### 3.5 Replace remaining int_to_string with f-strings — DONE ✓
 
 Generic type erasure fixed (codegen caches by sema_tid instead of
-LLVM pointer). All 12 Sema.w cache key sites migrated to f-strings.
-Also migrated sites in Codegen.w. Method calls extracted to
+LLVM pointer). All 12 Sema.with cache key sites migrated to f-strings.
+Also migrated sites in Codegen.with. Method calls extracted to
 intermediate variables to avoid f-string parser interaction.
 
 - [x] Fix generic type erasure bug (codegen sema_tid cache keys)
-- [x] Convert all Sema.w and Codegen.w cache key sites to f-strings
+- [x] Convert all Sema.with and Codegen.with cache key sites to f-strings
 - [x] `make build && make fixpoint`
 
 ---
@@ -268,7 +268,7 @@ intermediate variables to avoid f-string parser interaction.
 
 ### 4.1 AstPool Metadata: Add HashMaps for O(1) Lookup
 
-**File:** src/Ast.w
+**File:** src/Ast.with
 
 **Current:** 9 functions do O(n) linear scans on metadata arrays:
 `find_fn_meta`, `find_type_meta`, `find_where_meta`,
@@ -285,7 +285,7 @@ intermediate variables to avoid f-string parser interaction.
 
 ### 4.2 Sema Scope Lookup: Add HashMap Overlay
 
-**File:** src/Sema.w
+**File:** src/Sema.with
 
 **Current:** `scope_lookup` and 12 related functions do reverse
 linear scans of `bind_names` Vec.
@@ -297,7 +297,7 @@ linear scans of `bind_names` Vec.
 
 ### 4.3 Lexer: Replace Remaining Magic Numbers
 
-**File:** src/Lexer.w
+**File:** src/Lexer.with
 
 **Current:** 36 CH_* constants defined, but ~50+ magic number
 comparisons still used with inline comments.
@@ -308,7 +308,7 @@ comparisons still used with inline comments.
 
 ### 4.4 Document find_source_arg Assumptions
 
-**File:** src/main.w
+**File:** src/main.with
 
 - [x] Added documenting comments to `find_source_arg`
 - [x] Cached result: computed once, stored in `source` variable, passed to
@@ -319,15 +319,15 @@ comparisons still used with inline comments.
 
 ## Phase 5: Pipeline Ownership
 
-**Status: 95% complete.** main.w already routes through
-compiler.Compilation. Zcu is the canonical state owner. Driver.w
+**Status: 95% complete.** main.with already routes through
+compiler.Compilation. Zcu is the canonical state owner. Driver.with
 is a thin adapter (205 lines).
 
 ### 5.1 Delete Driver or reduce further
 
-- [x] Checked: only Lsp.w imported Driver (unused), now removed
-- [x] Delete src/Driver.w (only string references remain in CCodegen.w
-      and Scaffold.w — not actual imports)
+- [x] Checked: only Lsp.with imported Driver (unused), now removed
+- [x] Delete src/Driver.with (only string references remain in CCodegen.with
+      and Scaffold.with — not actual imports)
 - [x] Remove `use Driver` imports ✓
 - [x] `make build && make fixpoint` ✓
 
@@ -364,8 +364,8 @@ C function names, 3 other).
 
 - [x] `--no-prelude` flag exists (FULL_MODE=0, CORE_MODE=1, NONE_MODE=2)
 - [x] Verified manually: `--no-prelude` rejects `println`, `Vec`, and `HashMap`
-- [x] Automated tests: `test/compile_errors/err_no_prelude_println.w`,
-      `test/compile_errors/err_no_prelude_vec.w`
+- [x] Automated tests: `test/compile_errors/err_no_prelude_println.with`,
+      `test/compile_errors/err_no_prelude_vec.with`
 - [x] `make build && make fixpoint`
 
 ---
@@ -395,7 +395,7 @@ cache by sema_tid instead of LLVM pointer. Sema-level types were
 already correct. Remaining: remove redundant codegen parallel tracking.
 
 - [x] Fix generic type erasure (codegen sema_tid cache keys)
-- [x] Generic distinctness test (`behav_generic_distinct.w`)
+- [x] Generic distinctness test (`behav_generic_distinct.with`)
 - [x] Remove 10 dead cache fields + 4 reverse lookup functions
 - [x] Layer 1: place_sema_types in MIR (every place carries sema type)
 - [x] Layer 2: Replace Option/Result reverse lookups with sema queries
@@ -406,7 +406,7 @@ already correct. Remaining: remove redundant codegen parallel tracking.
 
 ## Phase II-3: Pipeline Ownership — DONE ✓
 
-See Part I Phase 5. Driver.w deleted. main.w routes through Compilation.
+See Part I Phase 5. Driver.with deleted. main.with routes through Compilation.
 
 ---
 
@@ -421,7 +421,7 @@ Phase 6.3 done (--no-prelude verified with automated tests).
 
 ## Phase II-5: C Backend Completion
 
-**Current state:** CCodegen.w (4,440 lines). All 54 MIR intrinsics
+**Current state:** CCodegen.with (4,440 lines). All 54 MIR intrinsics
 implemented (commit `f434b08`). `--emit-c` flag works. Runtime files
 exist. Not yet tested for self-compile or cross-compilation.
 
@@ -437,14 +437,14 @@ CCodegen now handles all 54 MIR intrinsics.
 
 ### 5.2 Self-Compile via C Backend
 
-- [ ] Attempt: `./out/bin/with-stage2 build src/main.w --emit-c`
+- [ ] Attempt: `./out/bin/with-stage2 build src/main.with --emit-c`
 - [ ] Fix CCodegen gaps until self-compile completes
 - [ ] After each fix: `make build && make fixpoint`
 
 ### 5.3 Compile Emitted C to Working Binary
 
 - [ ] Compile out/main.c with host C compiler
-- [ ] Run C-compiled compiler: `check src/main.w` must succeed
+- [ ] Run C-compiled compiler: `check src/main.with` must succeed
 - [ ] Compare output vs LLVM-compiled compiler
 
 ### 5.4 Cross-Compilation for 4 Targets
@@ -467,12 +467,12 @@ CCodegen now handles all 54 MIR intrinsics.
 
 ### 6.1 `with fmt` — Code Formatter — DONE ✓
 
-Implemented in main.w. Commit: `e72847c`.
+Implemented in main.with. Commit: `e72847c`.
 Supports `-w` (write) and `-l` (list) modes.
 
 - [x] Design formatting rules (indent, width, whitespace)
 - [x] Implement as AST round-trip: parse → walk → emit
-- [x] Wire `with fmt` command in main.w
+- [x] Wire `with fmt` command in main.with
 - [x] Run on compiler source, verify fixpoint holds
 - [x] `make build && make fixpoint`
 
@@ -490,7 +490,7 @@ Commit: `cbcfa85`.
 
 `@[bench]` attribute + `bench_*` naming convention. Go-style
 calibration (ramp up until ~1s elapsed). Reports name, N, ns/op.
-`--filter` support. `lib/test/bench.w` provides the `Bench` type.
+`--filter` support. `lib/test/bench.with` provides the `Bench` type.
 
 - [x] Design `@[bench]` attribute support
 - [x] Implement benchmark runner with timing
@@ -528,7 +528,7 @@ Compile-time evaluation system. Phases 1-4 and 7-9 implemented.
 
 ### Typed MIR Verifier — DONE ✓
 
-408-line verifier in `src/Mir.w` runs before codegen (commit `99ceb09`).
+408-line verifier in `src/Mir.with` runs before codegen (commit `99ceb09`).
 Validates MIR type consistency (aggregate destinations, projection
 typing, operand types).
 
@@ -540,17 +540,17 @@ typing, operand types).
 
 Five codegen/sema bugs fixed, each with a regression test:
 
-- [x] Generic option match inference (`4b69f1d`) — SemaCheck.w
-- [x] Nested Vec field string comparisons (`bd1021a`) — CodegenDispatch.w
-- [x] MIR aggregate destination typing (`47240f3`) — CodegenDispatch.w
-- [x] Semantic comparison dispatch (`13003db`) — Codegen.w + CodegenDispatch.w
-- [x] Nested projection typing (`6411c91`) — CodegenDispatch.w + MirLower.w
+- [x] Generic option match inference (`4b69f1d`) — SemaCheck.with
+- [x] Nested Vec field string comparisons (`bd1021a`) — CodegenDispatch.with
+- [x] MIR aggregate destination typing (`47240f3`) — CodegenDispatch.with
+- [x] Semantic comparison dispatch (`13003db`) — Codegen.with + CodegenDispatch.with
+- [x] Nested projection typing (`6411c91`) — CodegenDispatch.with + MirLower.with
 
 ### Compiler Regression Matrix — DONE ✓
 
 Comprehensive regression test suites (commit `c1c302d`):
-- `regression_aggregate_flow_matrix.w` (110 lines)
-- `regression_projection_import_matrix.w` (123 lines)
+- `regression_aggregate_flow_matrix.with` (110 lines)
+- `regression_projection_import_matrix.with` (123 lines)
 
 ---
 
@@ -582,7 +582,7 @@ Fixpoint proves output determinism.
 
 ### P8: Errors Are Values — Poisoned Nodes — DONE ✓
 
-NK_POISONED_EXPR (69) already defined in Ast.w. Added
+NK_POISONED_EXPR (69) already defined in Ast.with. Added
 `Parser.poisoned_expr()` helper, converted 15 expression-level error
 sites, added MirLower handler. Sema already returned TY_ERR.
 4 new tests. Commit: `73c6116`.
@@ -594,19 +594,19 @@ sites, added MirLower handler. Sema already returned TY_ERR.
 
 ### P11: File Complexity Budget — DONE ✓
 
-Split Codegen.w from 10,559 → 3,974 lines. Two new files:
-CodegenDispatch.w (5,566 lines) and CodegenTraits.w (1,380 lines).
+Split Codegen.with from 10,559 → 3,974 lines. Two new files:
+CodegenDispatch.with (5,566 lines) and CodegenTraits.with (1,380 lines).
 
-Split Sema.w from 9,112 → 1,997 lines (commit `c694460`). Three new
-files: SemaCheck.w (4,811 lines), SemaDecl.w (1,761 lines),
-SemaDiag.w (1,130 lines).
+Split Sema.with from 9,112 → 1,997 lines (commit `c694460`). Three new
+files: SemaCheck.with (4,811 lines), SemaDecl.with (1,761 lines),
+SemaDiag.with (1,130 lines).
 
 All files now under or near the 5,000 line budget.
 
-- [x] Split Codegen.w: CodegenDispatch.w + CodegenTraits.w
-- [x] Split Sema.w: SemaCheck.w + SemaDecl.w + SemaDiag.w
+- [x] Split Codegen.with: CodegenDispatch.with + CodegenTraits.with
+- [x] Split Sema.with: SemaCheck.with + SemaDecl.with + SemaDiag.with
 - [x] Each split verified with fixpoint
-- [x] Codegen.w: 3,974 lines, Sema.w: 1,997 lines (both under budget)
+- [x] Codegen.with: 3,974 lines, Sema.with: 1,997 lines (both under budget)
 - [x] `make build && make fixpoint`
 
 ### P12: Compile Time Tracking — DONE ✓
@@ -680,10 +680,10 @@ All other phases are complete.
 - [x] No if-chains for node kind dispatch (all converted to match)
 - [x] All 9 AstPool metadata lookups use O(1) HashMap
 - [x] Sema scope lookup uses HashMap overlay
-- [x] No magic number characters in Lexer.w
+- [x] No magic number characters in Lexer.with
 - [x] find_source_arg documented and deduplicated
 - [x] Driver deleted or reduced to thin adapter
-- [x] main.w routes through compiler.Compilation
+- [x] main.with routes through compiler.Compilation
 - [x] No string-based method dispatch in Codegen (pre-interned symbols)
 - [x] `--no-prelude` makes println unavailable (verified + automated tests)
 - [x] Compiler source uses f-strings consistently (zero int_to_string)

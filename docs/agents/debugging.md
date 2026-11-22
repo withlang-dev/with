@@ -45,11 +45,11 @@ printed; improvising flags is how a hunt stalls (an unknown flag is refused,
   `WITH_DEBUG_PERMUTE_TAGS=1 with-stage1 test test/behavior` and
   `WITH_TRACE_VARIANT_FALLBACK=1`; corpora run under
   `out/bootstrap/bin/with-stage1 test <dirs>`;
-- a wrong view origin: `with analyze repro.w 'explain:origin:<fn>[:<binding>]'`
+- a wrong view origin: `with analyze repro.with 'explain:origin:<fn>[:<binding>]'`
   (works on a failing program), then `WITH_DEBUG_BORROWS=1`;
 - a generic-instance `BUG:`: `WITH_TRACE_INST=1`;
 - codegen reading a value as the wrong type (wrong formatter, comparison, ABI):
-  `with analyze repro.w audit:resolution`, whose operand-type check names the
+  `with analyze repro.with audit:resolution`, whose operand-type check names the
   expression whose MIR type Sema did not give it.
 A fix commit cites the tool output that proves the exact line: the allocator
 report and backtrace, the `matrix` row, the validator error, the IR of the
@@ -73,7 +73,7 @@ or a smaller checked repro. Do not start a fourth.
 it during the hunt and prefer building it over a workaround when the workaround
 is a race or a manual lldb session. Before building, grep the runtime and the
 doc for the flag that already exists — the address trap sat unmentioned in
-`rt_core.w` for a month.
+`rt_core.with` for a month.
 
 **One owner per fact (D65).** Sema decides *what* (declaration, type,
 place/value/view category, origin, effect, capture semantics, call target,
@@ -98,7 +98,7 @@ prints. For fixpoint failures, run `with build :fixpoint-diff` first.
 
 **Memory bugs.** Any drop/lifetime/double-free/use-after-free/leak bug starts
 with the native debug allocator: `--debug-alloc` or `WITH_DEBUG_ALLOC=1`
-(`docs/spec/toolchain/debug-allocator.md`), then `tools/debug_drop.w` /
+(`docs/spec/toolchain/debug-allocator.md`), then `tools/debug_drop.with` /
 `tools/debug_drop*.lldb` to turn its verdict into alloc/free sites, the
 `--dump-drop-state`/`--trace-ownership`/`--dump-drop-plan` dumps for MIR
 ownership state, then `lldb` on the branch that emitted the bad drop. Allocator
@@ -116,18 +116,18 @@ live and scheduled; debugger = why codegen emitted it.
 
 ### Quick repro
 ```
-out/bootstrap/bin/with-stage1 check src/main.w
+out/bootstrap/bin/with-stage1 check src/main.with
 ```
 
 ### Deep compiler tools (before edit/compile/trace loops)
 ```
-with reduce repro.w --contains "diagnostic" -- with check {file}
-with check repro.w --trace-place main:_1
-with check repro.w --explain-mir-origin main:_1
-with check repro.w --trace-ownership main:_1
-with check repro.w --dump-drop-plan | --dump-place-map | --dump-abi | --dump-drop-state
-with check repro.w --trace-cleanup-edge 'main:bb0->bb1'
-with check repro.w --validate-all | --validate-ownership
+with reduce repro.with --contains "diagnostic" -- with check {file}
+with check repro.with --trace-place main:_1
+with check repro.with --explain-mir-origin main:_1
+with check repro.with --trace-ownership main:_1
+with check repro.with --dump-drop-plan | --dump-place-map | --dump-abi | --dump-drop-state
+with check repro.with --trace-cleanup-edge 'main:bb0->bb1'
+with check repro.with --validate-all | --validate-ownership
 with build :fixpoint-diff
 ```
 
@@ -140,13 +140,13 @@ its own marshalling coverage — an uninstrumented call path is a failure, not a
 blind spot.
 
 ```sh
-with analyze repro.w audit:all | audit:storage | summary | contract | move-sites
-with analyze repro.w 'matrix:name~function_name'
-with analyze repro.w 'select:stage=sema,kind=parameter,name~function_name'
-with analyze repro.w 'explain:call:function_name' | 'explain:origin:function_name' | 'explain:effect:Type.method:self'
-with analyze repro.w 'select:kind=operator,detail~fn:function_name'
-with analyze repro.w 'path:call:caller:callee' | 'closure:call:root_function'
-with analyze repro.w 'lldb:kind=call,name~function_name'
+with analyze repro.with audit:all | audit:storage | summary | contract | move-sites
+with analyze repro.with 'matrix:name~function_name'
+with analyze repro.with 'select:stage=sema,kind=parameter,name~function_name'
+with analyze repro.with 'explain:call:function_name' | 'explain:origin:function_name' | 'explain:effect:Type.method:self'
+with analyze repro.with 'select:kind=operator,detail~fn:function_name'
+with analyze repro.with 'path:call:caller:callee' | 'closure:call:root_function'
+with analyze repro.with 'lldb:kind=call,name~function_name'
 ```
 
 - `facts` / `snapshot`: stable TSV facts for fixtures or a text diff — all AST
@@ -156,7 +156,7 @@ with analyze repro.w 'lldb:kind=call,name~function_name'
   callee binding, source identity with exact byte `start`/`end`; MIR
   call-argument facts join lowered operands to Sema's canonical AST nodes.
 - `select:` / `summary[:]` / `matrix:`: comma-separated `field=value`,
-  `field!=value`, `field~substring` predicates (`with analyze file.w help`).
+  `field!=value`, `field~substring` predicates (`with analyze file.with help`).
 - `contract` / `audit:contract`: the modeled foreign contract of every `c
   facade` (ruling §63) with provenance and the suspicious-configuration audit.
 - `audit:resolution`: D65 — every MIR callee and argument count agrees with
@@ -174,16 +174,16 @@ with analyze repro.w 'lldb:kind=call,name~function_name'
   instead of source-text reconstruction. `lldb:<query>` emits breakpoints from
   matching facts and refuses to invent one.
 
-Also a reducer predicate: `with reduce repro.w --exit-code nonzero -- with
+Also a reducer predicate: `with reduce repro.with --exit-code nonzero -- with
 analyze {file} audit:all`. Do not start a full build to test an ABI/ownership
 hypothesis: first require the focused repro's `audit:all` to pass and inspect
 its `matrix`; a build is the final repo-wide verification. There are no
 source-scanner semantic fallbacks — if analysis can't reach the needed phase,
 reduce the repro or attach LLDB. Source rewrite tools may use the Lexer to
 apply byte edits, but selection and contracts come from `compiler_analyze_file`
-facts: `tools/annotate_receivers.w`, `tools/migrate_receivers.w`, `with
-migrate-receivers` (built in, `src/ReceiverMigration.w`; `--report`, `--list`,
-`--apply`), `tools/migrate_method_arg_moves.w`. The removed
+facts: `tools/annotate_receivers.with`, `tools/migrate_receivers.with`, `with
+migrate-receivers` (built in, `src/ReceiverMigration.with`; `--report`, `--list`,
+`--apply`), `tools/migrate_method_arg_moves.with`. The removed
 receiver/frozen/closure/diagnostic-map tools must not be recreated.
 
 `--dump-abi` prints, per signature, each parameter's ownership/ABI
@@ -194,7 +194,7 @@ implementation terminology for `IndirectPlace`, not permission to reinterpret
 a consuming `T` as a borrow.
 
 For drop-exactly-once across (value shape × control flow × ownership op ×
-receiver mode), run `with build :drop-audit` (`tools/drop_audit.w`; candidate =
+receiver mode), run `with build :drop-audit` (`tools/drop_audit.with`; candidate =
 the fresh release binary, baseline = the verified seed) before and after ANY
 change to drop scheduling, ownership or receiver lowering. One bad cell means
 the whole region is untested; a cell is red only when the verdicts DIFFER
@@ -207,7 +207,7 @@ to a checkout of the commit the binary was built from: for
 green commit; `~/with` once fast-forwarded). A different checkout lists the
 wrong lines.
 ```
-lldb -o "settings set target.source-map /with-src $PWD" -- out/bootstrap/bin/with-stage1 check src/main.w
+lldb -o "settings set target.source-map /with-src $PWD" -- out/bootstrap/bin/with-stage1 check src/main.with
 (lldb) run
 (lldb) bt all
 ```
@@ -217,7 +217,7 @@ With's dotted names (`Type.method`, or a free function's name);
 ```
 lldb --batch -o "settings set target.source-map /with-src $HOME/with" \
   -o "b Sema.source_path_text" -o run -o "bt 8" -o "frame variable" -o kill \
-  -- ~/.local/bin/with build repro.w -o repro
+  -- ~/.local/bin/with build repro.with -o repro
 lldb --batch -o "image lookup -n Sema.source_path_text -v" -- ~/.local/bin/with   # where a function lives
 llvm-dwarfdump --uuid ~/.local/bin/with ~/.local/bin/with.dSYM   # the dSYM is this binary's (UUIDs equal)
 ```
@@ -229,12 +229,12 @@ source-map path: spell `$HOME`. `llvm-dwarfdump` is the SDK's
 
 ### Native Debug Allocator
 ```
-with run --debug-alloc repro.w
-with run --debug-alloc --debug-alloc-filter=non-root repro.w
-with check repro.w --dump-drop-state | --dump-drop-plan | --trace-ownership main:_1
+with run --debug-alloc repro.with
+with run --debug-alloc --debug-alloc-filter=non-root repro.with
+with check repro.with --dump-drop-state | --dump-drop-plan | --trace-ownership main:_1
 with build :debug-alloc-tests
-./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
-out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
+./out/release/bin/with build tools/debug_drop.with -o out/debug-alloc-tests/debug_drop
+out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.with
 lldb --batch -o "settings set target.env-vars WITH_DEBUG_ALLOC=1" -o run -- ./bin   # learn the addr (stable only under lldb)
 lldb --batch -s tools/debug_drop_sites.lldb \
   -o "settings set target.env-vars WITH_DEBUG_ALLOC=1 WITH_DEBUG_ALLOC_TRAP_FREE=<addr>" \
@@ -245,8 +245,8 @@ lldb --batch -s tools/debug_drop_sites.lldb \
 The malloc tools see only malloc zones; With's allocator is its own, so without
 `WITH_ALLOC_SYSTEM=1` they report a clean heap whatever happened:
 ```
-WITH_ALLOC_SYSTEM=1 MallocScribble=1 MallocGuardEdges=1 out/bootstrap/bin/with-stage1 check src/main.w
-WITH_ALLOC_SYSTEM=1 leaks --atExit -- out/bootstrap/bin/with-stage1 check src/main.w
+WITH_ALLOC_SYSTEM=1 MallocScribble=1 MallocGuardEdges=1 out/bootstrap/bin/with-stage1 check src/main.with
+WITH_ALLOC_SYSTEM=1 leaks --atExit -- out/bootstrap/bin/with-stage1 check src/main.with
 ```
 First choice for leaks is the debug allocator (`WITH_DEBUG_ALLOC=1`, it names
 the block and origin). If stacks are nonsense, suspect seed corruption and

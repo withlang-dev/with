@@ -87,9 +87,9 @@ Stage0 remains the oracle. No semantics changes are allowed in Wave 2.
 
 Primary implementation files:
 
-- `src/Token.w`
-- `src/Lexer.w`
-- `src/main.w` (CLI dump flag plumbing and token dump emitter)
+- `src/Token.with`
+- `src/Lexer.with`
+- `src/main.with` (CLI dump flag plumbing and token dump emitter)
 
 New Wave 2 tests/scripts:
 
@@ -99,7 +99,7 @@ New Wave 2 tests/scripts:
 
 Potential helper file (if needed):
 
-- `src/compiler/frontend/LexDump.w` (shared deterministic dump formatter)
+- `src/compiler/frontend/LexDump.with` (shared deterministic dump formatter)
 
 If helper files are added, keep a single implementation path and avoid duplicate lexer logic.
 
@@ -115,7 +115,7 @@ If helper files are added, keep a single implementation path and avoid duplicate
 
 ## 1. Token Model Parity
 
-- Align `src/Token.w` tag set with `bootstrap/src/Token.zig`.
+- Align `src/Token.with` tag set with `bootstrap/src/Token.zig`.
 - Align keyword lookup behavior (`fromKeyword` equivalent).
 - Align tag-name mapping used by deterministic dumps.
 - Keep token list API deterministic and stable for parser consumers.
@@ -138,7 +138,7 @@ If helper files are added, keep a single implementation path and avoid duplicate
 
 - Add `--dump-tokens` support to self-host `check` command.
 - Implement deterministic token dump output in self-host matching Stage0 escape rules.
-- Keep `tokens <file.w>` as compatibility command; route through shared dump path where possible.
+- Keep `tokens <file.with>` as compatibility command; route through shared dump path where possible.
 
 ## 4. Wave 2 Tests
 
@@ -217,19 +217,19 @@ Wave 2 should extend this with lexer-focused edge cases (especially literals/ope
 
 - [x] Freeze Wave 2 token oracle contract against Stage0 current output.
 - [x] Define Wave 2 token parity corpus file.
-- [x] Align `src/Token.w` tag set with `bootstrap/src/Token.zig`.
+- [x] Align `src/Token.with` tag set with `bootstrap/src/Token.zig`.
 - [x] Align keyword lookup behavior with Stage0.
 - [x] Align tag-name mapping used by dump output.
-- [x] Align `src/Lexer.w` whitespace and newline behavior.
+- [x] Align `src/Lexer.with` whitespace and newline behavior.
 - [x] Align operator and compound token scanning behavior.
 - [x] Align identifier/keyword/label/dot-identifier behavior.
 - [x] Align number literal scanning and suffix handling.
 - [x] Align string/c-string/triple-string scanning behavior.
 - [x] Align comment scanning/filtering behavior.
 - [x] Align invalid token behavior and lexer diagnostics behavior.
-- [x] Add self-host `check --dump-tokens` support in `src/main.w`.
+- [x] Add self-host `check --dump-tokens` support in `src/main.with`.
 - [x] Implement Stage0-compatible deterministic token dump formatting and escaping.
-- [x] Keep/update `tokens <file.w>` compatibility path to use the same dump logic.
+- [x] Keep/update `tokens <file.with>` compatibility path to use the same dump logic.
 - [x] Add `test/wave2/` lexer unit tests for all Stage0 lexer categories.
 - [x] Add deterministic dump-format unit checks.
 - [x] Add `scripts/run_wave2_lexer_unit_tests.sh`.

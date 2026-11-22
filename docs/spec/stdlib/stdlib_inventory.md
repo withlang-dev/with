@@ -12,7 +12,7 @@ cleanup scans capacity; permanently retired generations also retain their slot.
 
 | Surface | Current implementation | Required cost | Gap / next source |
 |---|---|---|---|
-| `List[T]` | Contiguous runtime buffer, geometric growth | Amortized O(1) push/pop; O(1) access; O(n) arbitrary insertion/removal | Ruled D157: rt_core is the engine (the compiler's knowledge of the layout is the engine); STC `vec` is the comparison row in `test/benchmark/stc_engines.w` |
+| `List[T]` | Contiguous runtime buffer, geometric growth | Amortized O(1) push/pop; O(1) access; O(n) arbitrary insertion/removal | Ruled D157: rt_core is the engine (the compiler's knowledge of the layout is the engine); STC `vec` is the comparison row in `test/benchmark/stc_engines.with` |
 | `ListIter[T]` | Borrowed contiguous traversal | O(1) per next, O(n) full traversal | Retain; iteration must preserve element views |
 | `ListIntoIter[T]` | `next()` calls `remove(0)` | O(1) amortized per next; O(n) full consumption, including partial-iterator cleanup | **#938:** each next shifts the tail; O(n²) full consumption |
 | `HashMap[K, V]` | Runtime open addressing and linear probing | Expected O(1) lookup/insert; removal O(cluster length), with no allocation | **#939:** removal allocates two temporary buffers for each displaced entry; selected replacement is STC `hmap` in Phase 3 |
@@ -22,8 +22,8 @@ cleanup scans capacity; permanently retired generations also retain their slot.
 | `SlotMap[T]`, `Handle[T]` | Runtime indexed slots and generations | Amortized O(1) insert; O(1) remove/lookup; preserve valid handles across growth | **#936:** Phase 0 replaces insertion's occupancy scan with a FIFO free list; no C engine |
 | `str` and string views | Native runtime representation and operations | O(1) byte length/access/view creation; O(n) copying and concatenation | Preserve With's public semantics; use STC `cstr` selectively where useful |
 
-Existing definitions are in `lib/std/collections.w`; storage engines are in
-`rt/rt_core.w`. The keyed-map ownership contract remains D22: lookup returns a
+Existing definitions are in `lib/std/collections.with`; storage engines are in
+`rt/rt_core.with`. The keyed-map ownership contract remains D22: lookup returns a
 view, removal transfers ownership. The inventory does not treat Copy elements
 as an exception to that contract.
 

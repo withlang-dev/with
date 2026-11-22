@@ -25,7 +25,7 @@ Common rules:
 
 Command intent:
 
-- `--dump-tokens` or `tokens <file.w>`
+- `--dump-tokens` or `tokens <file.with>`
 
 Header:
 
@@ -64,7 +64,7 @@ tok[1] tag=identifier span=3..7 lex="main"
 
 Command intent:
 
-- `--dump-ast` or `ast <file.w>`
+- `--dump-ast` or `ast <file.with>`
 
 Header:
 
@@ -170,7 +170,7 @@ Type naming rules:
 
 Command intent:
 
-- `--dump-llvm-ir` or `ir <file.w>`
+- `--dump-llvm-ir` or `ir <file.with>`
 
 Canonical mode emits textual LLVM IR with normalization:
 

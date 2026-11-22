@@ -29,7 +29,7 @@ In `ci_translate_struct`, after building the field list:
    to `demoted_types`
 4. Run in a fixpoint loop (demoting a parent may trigger further demotions)
 
-**Files:** `src/CImport.w`
+**Files:** `src/CImport.with`
 **Verify:** Import a header with nested bitfield structs. Parent struct
 should become opaque.
 
@@ -44,11 +44,11 @@ width. `size_t → usize`, `ssize_t → isize`, `ptrdiff_t → isize`.
 
 **Implementation:**
 
-**Lexer (src/Lexer.w):**
+**Lexer (src/Lexer.with):**
 - Add `usize` and `isize` as keywords (alongside `i32`, `i64`, etc.)
 - They tokenize as `TK_IDENT` — no new token kind needed
 
-**Sema (src/Sema.w):**
+**Sema (src/Sema.with):**
 - Add `ty_usize` and `ty_isize` fields to Sema, initialized in `init`
 - Register via `add_type(TY_INT, ...)` with pointer-width size
 - Add to `primitive_type_by_sym`: `"usize" → ty_usize`, `"isize" → ty_isize`
@@ -57,12 +57,12 @@ width. `size_t → usize`, `ssize_t → isize`, `ptrdiff_t → isize`.
 - Implicit conversions: `usize` widens to `u64`, narrows to `u32`;
   `isize` widens to `i64`, narrows to `i32`
 
-**Codegen (src/Codegen.w):**
+**Codegen (src/Codegen.with):**
 - Map `ty_usize` → `wl_i64_type(ctx)` on 64-bit, `wl_i32_type(ctx)` on 32-bit
 - Query pointer size: `LLVMPointerSize(data_layout)` or hardcode per target triple
 - All array indexing, slice length, Vec.len() return `usize`
 
-**CImport (src/CImport.w):**
+**CImport (src/CImport.with):**
 - Update `ci_map_builtin_typedef`: `size_t → usize`, `ssize_t → isize`,
   `ptrdiff_t → isize`, `intptr_t → isize`, `uintptr_t → usize`
 
@@ -98,14 +98,14 @@ inventing a new pointer kind.
 
 **Implementation:**
 
-**Sema (src/Sema.w):**
+**Sema (src/Sema.with):**
 - Allow `TY_PTR` as a type argument to `Option` generic instantiation
 - Currently Option works with struct/enum types; extend to pointers
 - `Option[*mut T]` has representation: `{ tag: i32, payload: *mut T }`
 - Optimize: null pointer = None, non-null = Some (same as Zig's
   optional pointer optimization — a null pointer IS None)
 
-**Codegen (src/Codegen.w):**
+**Codegen (src/Codegen.with):**
 - For `Option[*mut T]`, use bare pointer representation (no tag field)
 - `None` → null pointer
 - `Some(ptr)` → the pointer value
@@ -113,7 +113,7 @@ inventing a new pointer kind.
 - `unwrap()` → the pointer value (with null check in debug mode)
 - This matches Zig's optional pointer optimization exactly
 
-**CImport (src/CImport.w):**
+**CImport (src/CImport.with):**
 - C `T*` parameter/return → `Option[*mut T]`
 - C `const T*` → `Option[*const T]`
 - C `void*` → `Option[*mut c_void]`
@@ -128,15 +128,15 @@ inventing a new pointer kind.
 
 **Implementation:**
 
-**Parser (src/Parser.w):**
+**Parser (src/Parser.with):**
 - Add `@[noalias]` as a parameter attribute
 - Store as a flag bit in the parameter's extra data
 
-**Codegen (src/Codegen.w):**
+**Codegen (src/Codegen.with):**
 - When declaring a function, if a parameter has the noalias flag,
   call `LLVMAddAttributeAtIndex(fn, param_idx+1, noalias_attr)`
 
-**CImport (src/CImport.w):**
+**CImport (src/CImport.with):**
 - Detect `restrict` in parameter type spelling (libclang includes it)
 - Emit `@[noalias]` prefix on the parameter
 
@@ -160,15 +160,15 @@ use wrapping by default in translated C code.
 
 **Implementation:**
 
-**Lexer (src/Lexer.w):**
+**Lexer (src/Lexer.with):**
 - Add `TK_PLUS_PERCENT`, `TK_MINUS_PERCENT`, `TK_STAR_PERCENT`
 - Lex `+%`, `-%`, `*%` as new token kinds
 
-**Parser (src/Parser.w):**
+**Parser (src/Parser.with):**
 - Parse wrapping ops at same precedence as their non-wrapping equivalents
-- Emit `OP_ADD_WRAP`, `OP_SUB_WRAP`, `OP_MUL_WRAP` (already defined in Ast.w)
+- Emit `OP_ADD_WRAP`, `OP_SUB_WRAP`, `OP_MUL_WRAP` (already defined in Ast.with)
 
-**Codegen (src/Codegen.w):**
+**Codegen (src/Codegen.with):**
 - `OP_ADD_WRAP` → `LLVMBuildAdd` (no nsw)
 - `OP_SUB_WRAP` → `LLVMBuildSub` (no nsw)
 - `OP_MUL_WRAP` → `LLVMBuildMul` (no nsw)
@@ -181,13 +181,13 @@ use wrapping by default in translated C code.
 
 **Implementation:**
 
-**Sema (src/Sema.w):**
+**Sema (src/Sema.with):**
 - Track signedness in type metadata (already exists via `u8`/`u16`/`u32`/`u64`)
 - In `check_binary_op`, when both operands are unsigned, silently
   convert `OP_ADD` to `OP_ADD_WRAP` (etc.)
 - Signed overflow remains undefined behavior (matches C)
 
-**CImport (src/CImport.w):**
+**CImport (src/CImport.with):**
 - When emitting expressions on unsigned C types, use `+%`, `-%`, `*%`
   in macro translations
 - For regular declarations, the type system handles it automatically
@@ -203,7 +203,7 @@ use wrapping by default in translated C code.
 
 **Implementation:**
 
-**clang_bridge.c / CImport.w:**
+**clang_bridge.c / CImport.with:**
 - `cc -E -dM` output for function-like macros looks like:
   `#define MAX(a,b) ((a) > (b) ? (a) : (b))`
 - Parse the parameter list from the `#define NAME(params)` prefix
@@ -255,7 +255,7 @@ fn MAX[T](a: T, b: T) -> T:
   always an integer literal), use `T`, `U`, etc.
 - Simple heuristic: all params → `T` (works for 90% of macros)
 
-**Files:** `src/CImport.w`, `runtime/clang_bridge.c` (macro param extraction)
+**Files:** `src/CImport.with`, `runtime/clang_bridge.c` (macro param extraction)
 
 ---
 
@@ -267,11 +267,11 @@ fn MAX[T](a: T, b: T) -> T:
 
 **Implementation:**
 
-**Parser (src/Parser.w):**
+**Parser (src/Parser.with):**
 - Parse `@TypeOf(expr)` in type position
 - Emit `NK_TYPEOF` node, data0 = inner expression node
 
-**Sema (src/Sema.w):**
+**Sema (src/Sema.with):**
 - In `resolve_type_expr`, handle `NK_TYPEOF`:
   1. Type-check the inner expression
   2. Return its resolved type
@@ -302,7 +302,7 @@ when field types match. Add explicit `@[repr(C)]` attribute for
 documentation and to prevent future reordering optimizations.
 
 **Parser/Codegen:**
-- Add `TDK_FLAG_REPR_C = 32` to Ast.w
+- Add `TDK_FLAG_REPR_C = 32` to Ast.with
 - c_import sets this flag on all emitted structs
 - Codegen reads the flag (currently a no-op since LLVM default is C layout,
   but reserves the bit for when With adds layout optimizations)
@@ -313,15 +313,15 @@ documentation and to prevent future reordering optimizations.
 
 **Implementation:**
 
-**Parser (src/Parser.w):**
+**Parser (src/Parser.with):**
 - Parse `@[align(N)]` before a struct field declaration
 - Store alignment value in the field's extra data (add a 4th field slot:
   `name, type_node, default, alignment`)
 
-**Sema (src/Sema.w):**
+**Sema (src/Sema.with):**
 - Store per-field alignment in type_extra alongside field name and type
 
-**Codegen (src/Codegen.w):**
+**Codegen (src/Codegen.with):**
 - When emitting struct body, if a field has explicit alignment,
   insert padding bytes before the field to achieve the alignment
 - Or: use LLVM's `LLVMSetAlignment` on loads/stores to aligned fields
@@ -331,7 +331,7 @@ documentation and to prevent future reordering optimizations.
 - Uses `clang_Type_getAlignOf(field_type)` and compares to natural alignment
 - Only emit `@[align(N)]` when alignment differs from natural
 
-**CImport (src/CImport.w):**
+**CImport (src/CImport.with):**
 - Query field alignment for each field
 - Emit `@[align(N)]` when non-natural
 
@@ -359,14 +359,14 @@ Check that With emits `@[packed]`.
 
 **Implementation:**
 
-**Parser (src/Parser.w):**
+**Parser (src/Parser.with):**
 - Add `@[callconv("stdcall")]` etc. as function attribute
 - Store as a string sym in the function declaration's extra data
 
-**Ast.w:**
+**Ast.with:**
 - Add `FN_FLAG_CALLCONV = 64` or store callconv separately
 
-**Codegen (src/Codegen.w):**
+**Codegen (src/Codegen.with):**
 - In `declare_extern_fn`, if callconv is set:
   ```
   LLVMSetFunctionCallConv(function, conv_id)
@@ -380,7 +380,7 @@ Check that With emits `@[packed]`.
 - Uses `clang_getFunctionTypeCallingConv(fn_type)`
 - Returns `"c"` for default, `"stdcall"`, `"fastcall"`, etc.
 
-**CImport (src/CImport.w):**
+**CImport (src/CImport.with):**
 - Query calling convention for each function
 - Emit `@[callconv("stdcall")]` when non-default
 
@@ -392,7 +392,7 @@ Check that With emits `@[packed]`.
 
 **Zig:** Maps 76+ builtins via `src/zig_clang_builtins.zig`.
 
-**Implementation approach:** Add a mapping table in CImport.w. When a
+**Implementation approach:** Add a mapping table in CImport.with. When a
 `static inline` function body (Phase 4 of the previous plan) or macro
 references a `__builtin_X`, replace with the With equivalent.
 
@@ -503,7 +503,7 @@ Track: `parent_name_stack: Vec[str]` during recursive translation.
 This prevents name collisions between a struct and its typedef alias
 (a common C pattern: `typedef struct Foo { ... } Foo;`).
 
-**Files:** `src/CImport.w` — restructure `process_c_import` into two passes.
+**Files:** `src/CImport.with` — restructure `process_c_import` into two passes.
 
 ---
 
@@ -560,38 +560,38 @@ at least one function from each header.
 ```
 Session  Item                                 Files
 ──────── ──────────────────────────────────── ─────────────────────────────────────
-   1     0a. Opaque demotion cascade          CImport.w
-         1a. usize/isize types               Lexer.w, Sema.w, Codegen.w, CImport.w
+   1     0a. Opaque demotion cascade          CImport.with
+         1a. usize/isize types               Lexer.with, Sema.with, Codegen.with, CImport.with
 
-   2     1b. i128/u128 types                 Sema.w, Codegen.w, CImport.w
-         2b. restrict → @[noalias]           Parser.w, Codegen.w, clang_bridge.c, CImport.w
+   2     1b. i128/u128 types                 Sema.with, Codegen.with, CImport.with
+         2b. restrict → @[noalias]           Parser.with, Codegen.with, clang_bridge.c, CImport.with
 
-   3     2a. Option[*mut T] nullable ptrs    Sema.w, Codegen.w, CImport.w
-         10b. Null pointer optimization      Codegen.w (verify)
+   3     2a. Option[*mut T] nullable ptrs    Sema.with, Codegen.with, CImport.with
+         10b. Null pointer optimization      Codegen.with (verify)
 
-   4     3a. Wrapping operators +% -% *%     Lexer.w, Parser.w, Codegen.w
-         3b. Unsigned default wrapping       Sema.w, Codegen.w
+   4     3a. Wrapping operators +% -% *%     Lexer.with, Parser.with, Codegen.with
+         3b. Unsigned default wrapping       Sema.with, Codegen.with
 
-   5     4a. Macro parameter detection       CImport.w, clang_bridge.c
-         4b. Expression-to-source emitter    CImport.w
+   5     4a. Macro parameter detection       CImport.with, clang_bridge.c
+         4b. Expression-to-source emitter    CImport.with
 
-   6     4c. Generic function emission       CImport.w
-         5a. @TypeOf intrinsic               Parser.w, Sema.w
+   6     4c. Generic function emission       CImport.with
+         5a. @TypeOf intrinsic               Parser.with, Sema.with
 
-   7     6a. @[repr(C)] on c_import structs  Ast.w, Parser.w, CImport.w
-         6b. @[align(N)] field attribute     Parser.w, Sema.w, Codegen.w, clang_bridge.c
+   7     6a. @[repr(C)] on c_import structs  Ast.with, Parser.with, CImport.with
+         6b. @[align(N)] field attribute     Parser.with, Sema.with, Codegen.with, clang_bridge.c
 
-   8     6c. Packed struct detection extend  clang_bridge.c, CImport.w
-         7a. @[callconv] attribute           Parser.w, Codegen.w, clang_bridge.c, CImport.w
+   8     6c. Packed struct detection extend  clang_bridge.c, CImport.with
+         7a. @[callconv] attribute           Parser.with, Codegen.with, clang_bridge.c, CImport.with
 
-   9     8a. Builtin mapping (Tier 1+2)     CImport.w, runtime/helpers.c, Codegen.w
-         8b. offsetof intrinsic             Parser.w, Sema.w, Codegen.w
+   9     8a. Builtin mapping (Tier 1+2)     CImport.with, runtime/helpers.c, Codegen.with
+         8b. offsetof intrinsic             Parser.with, Sema.with, Codegen.with
 
-  10     9a. _Complex as struct             CImport.w, prelude
-         9b. Scope-aware anon naming        CImport.w, clang_bridge.c
+  10     9a. _Complex as struct             CImport.with, prelude
+         9b. Scope-aware anon naming        CImport.with, clang_bridge.c
 
-  11     9c. Name pre-population two-pass   CImport.w
-         10a. FAM getter generation         CImport.w
+  11     9c. Name pre-population two-pass   CImport.with
+         10a. FAM getter generation         CImport.with
 
   12     10c. Final header verification     test suite
          Release and publish

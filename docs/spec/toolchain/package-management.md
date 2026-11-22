@@ -65,7 +65,7 @@ link = ["custom"]
 
 | Command | Action |
 |---------|--------|
-| `with init` | Create new project with `with.toml`, `src/main.w`, `test/`, and `uat/hello.uat` (§18.5d) |
+| `with init` | Create new project with `with.toml`, `src/main.with`, `test/`, and `uat/hello.uat` (§18.5d) |
 | `with get c.X` | Add C dependency via Conan |
 | `with get c.X@2.78` | Pin specific version |
 | `with get --force-reinstall c.X@2.78` | Delete and recreate the local installed C package |
@@ -106,7 +106,7 @@ digest, and every fact it contributes carries the provenance
 provenance (§16.2b.2); a facade a project writes by hand is the project's
 own and overrides any single fact. The toolchain publishes no facade beyond
 the C standard library's; it publishes the package registry
-(`registry/c/<package>/facts.w`, §16.2b.15), one cited facts file per
+(`registry/c/<package>/facts.with`, §16.2b.15), one cited facts file per
 package, landing by pull request.
 
 ---

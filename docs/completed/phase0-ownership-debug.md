@@ -71,7 +71,7 @@ Local transcripts are under `out/fnabi-validation/`: `vec-clone-address-trap.txt
 `literal-insert-exact.txt`, and `field-comparison-exact.txt`.
 # Box field observation
 
-The final behavior battery found `behav_box_drop.w` failing LLVM verification:
+The final behavior battery found `behav_box_drop.with` failing LLVM verification:
 `icmp eq i32 undef, %str ...` in `test_box_drops_payload_at_scope_exit`.
 MIR placed the string comparison on `_2.id`, where `_2` was `Box[BoxDropGuard]`,
 instead of dereferencing its payload first. `check --validate-all` accepted it.

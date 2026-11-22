@@ -8,7 +8,7 @@ with the same diagnostic under `build --emit-obj --bundle-corpus std/wi_va
 The route was a minimal interface reproduction followed by LLDB on
 `BundleEmitter.refuse`. The backtrace reached `BundleEmitter.spell` at
 PC `0x1002350a4`, through its reference-type recursion at `0x100234874`.
-`src/compiler/BundleInterfaceEmit.w` fell through to its unsupported-kind
+`src/compiler/BundleInterfaceEmit.with` fell through to its unsupported-kind
 branch because it had no `TypeKind.TY_VA_LIST` case. The emitter correctly
 failed loudly; its spelling table was incomplete.
 

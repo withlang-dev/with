@@ -17,10 +17,10 @@ Stage2 and Stage3 during fixpoint validation.
 ## Normalization Rules
 
 1. **Path stripping**: Replace absolute file paths with basename only.
-   `/Users/foo/project/test/wave10/cases/llvm_minimal.w` → `llvm_minimal.w`
+   `/Users/foo/project/test/wave10/cases/llvm_minimal.with` → `llvm_minimal.with`
 
 2. **Column stripping**: Remove column numbers from span references.
-   `file.w:10:5` → `file.w:10`
+   `file.with:10:5` → `file.with:10`
 
 3. **Whitespace normalization**: Collapse runs of whitespace to single space,
    trim leading/trailing whitespace from each line.

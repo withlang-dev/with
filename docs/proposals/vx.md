@@ -171,44 +171,44 @@ disagree, this document follows the code. Paths written `Vx …` are under
 - **Ownership, drops, leaks.** Vx recomputes drop points on its syntax tree
   (`Vx src/hir/check/drops.rs:8-26`, 1300 lines) and makes device buffers
   linear so a leak is visible. With's MIR owns every allocation's drop point
-  (`src/MirCore.w:1111` the drop-state keys, `:1649` the per-block state,
-  `src/Mir.w:639` the plan dump) and calls a leak a defect. Device memory is
+  (`src/MirCore.with:1111` the drop-state keys, `:1649` the per-block state,
+  `src/Mir.with:639` the plan dump) and calls a leak a defect. Device memory is
   memory.
 - **Regions as blocks.** `docs/spec/014_concurrency.md:300-330` (§14.7 and
   §14.22): an `async:` block captures under closure rules, its `Task` is
   ephemeral when it captures a view, and dropping an un-awaited task cancels
-  it. `src/AsyncLower.w:62` (`lower_async_module`) is how such a block
+  it. `src/AsyncLower.with:62` (`lower_async_module`) is how such a block
   becomes an outlined body. A region is that block with a processor. This
   plan depends on the cancel-on-drop rule being enforced, and step 2 tests
   it (V.8).
 - **Target-conditional compilation.** `docs/spec/017_metaprogramming.md:349-395`
   (§17.5, D91): `comptime match Target.os`, exhaustive, the untaken branch
-  parsed and not compiled; `src/SemaCheck.w:23153` (`select_comptime_if_branch`)
-  and `src/ComptimeTransform.w:626` do the pruning; `lib/std/os.w:40-56`
+  parsed and not compiled; `src/SemaCheck.with:23153` (`select_comptime_if_branch`)
+  and `src/ComptimeTransform.with:626` do the pruning; `lib/std/os.with:40-56`
   answers `Target.os` from the `--target` value through the intrinsic at
-  `src/ComptimeEval.w:7932`, never from the host; `src/TargetSpec.w:86-87`
+  `src/ComptimeEval.with:7932`, never from the host; `src/TargetSpec.with:86-87`
   lists the kinds. The processor is one more such constant.
 - **A declared build input.** §17.1a: a tracked input is part of the build
-  key (`src/compiler/TrackedInputs.w`); `src/compiler/DriverOptions.w:41-42`
-  holds the target kind and whether it was explicit; `src/main.w:1140`
+  key (`src/compiler/TrackedInputs.with`); `src/compiler/DriverOptions.with:41-42`
+  holds the target kind and whether it was explicit; `src/main.with:1140`
   applies `--target` to `check`. A machine lands beside the target here.
 - **Instantiation per parameter.** A generic body is checked once and
-  compiled per instantiation (`src/Sema.w` specializations, the
+  compiled per instantiation (`src/Sema.with` specializations, the
   `specialization` facts). A body that runs on more than one processor is
   the same mechanism over the processor (§3).
-- **One fact database.** `src/AnalysisTypes.w:17` (`AnalysisFactKind`, 28
-  kinds today), `src/Analysis.w:93-780` (one collector per kind),
+- **One fact database.** `src/AnalysisTypes.with:17` (`AnalysisFactKind`, 28
+  kinds today), `src/Analysis.with:93-780` (one collector per kind),
   `with analyze … select:kind=…` and the `lldb:` and `path:call` requests
   over the live MIR call graph. Placement, route, capacity and traffic
   become kinds 29-32; there is no second schema to version.
 - **Modeled C.** `docs/spec/016_ffi.md:351-375` (§16.2b, the `c facade` block:
   `resource X wraps *mut T`, producers `from`, `drop`, `destroys`, `ok`);
-  `src/SemaFacade.w`. When dispatch comes, the runtime is facades over the
+  `src/SemaFacade.with`. When dispatch comes, the runtime is facades over the
   driver APIs, in With, not Vx's twenty C++ files under `Vx runtime/`.
-- **Types instead of a solver.** `lib/std/task.w:20` (`Task[T]`) is the
+- **Types instead of a solver.** `lib/std/task.with:20` (`Task[T]`) is the
   completion obligation: an asynchronous transfer is a task that becomes the
   placed value when awaited.
-- **One ABI source.** `src/FnAbi.w:26` (`PassMode`, computed once). A pointer
+- **One ABI source.** `src/FnAbi.with:26` (`PassMode`, computed once). A pointer
   into another space is a pointer type with a space argument; its passing
   mode is whatever `compute_fn_abi` says for a pointer, and nothing per path.
 - **Crux's substrate, already covered.** Crux's `free`/`free_after` are the
@@ -411,7 +411,7 @@ Two shapes, with figures from whichever part is at hand; the shapes are
 the point, the figures are examples.
 
 ```
-// lib/std/machine/uma_soc.w — a unified-memory system on a chip
+// lib/std/machine/uma_soc.with — a unified-memory system on a chip
 machine uma_soc:
     memory Unified:
         capacity 32 GiB            measured: <os query>, this host
@@ -439,7 +439,7 @@ machine uma_soc:
 ```
 
 ```
-// lib/std/machine/two_gpu_box.w — discrete devices on a host (shape only)
+// lib/std/machine/two_gpu_box.with — discrete devices on a host (shape only)
 machine two_gpu_box:
     memory HBM[0]:
         capacity 32 GiB            spec: <vendor datasheet, date>
@@ -522,7 +522,7 @@ Rules:
   (its failure modes, its asynchrony) is `vx-frontier.md`'s, and host DRAM
   stays uncapacity-checked.
 - A phone's NPU with 8 MiB of SRAM is a processor with a `sees` set and a
-  capacity: `with check --machine pixel_npu.w` says whether the model fits
+  capacity: `with check --machine pixel_npu.with` says whether the model fits
   before it ships. Same checker, no new language; that is why machines are
   data.
 - Coherence checks on the file alone, before any program: `within` acyclic;
@@ -537,8 +537,8 @@ Rules:
 ```
 with build                          # [machine] detected uma_soc (unambiguous)
 with build --machine two_gpu_box     # pins a shipped description
-with build --machine ./fleet/box.w  # pins a project file
-with check prog.w --machine two_gpu_box --target x86_64-linux
+with build --machine ./fleet/box.with  # pins a project file
+with check prog.with --machine two_gpu_box --target x86_64-linux
 ```
 
 - `--target` stays what it is: the host, its triple and its spaces.
@@ -552,7 +552,7 @@ with check prog.w --machine two_gpu_box --target x86_64-linux
   rather than guesses: a Linux box with no GPU detects `host only`; a box
   with two different GPUs refuses without `--machine`.
 - **Anything shipped pins.** `machine = "two_gpu_box"` in `with.toml`
-  (`src/compiler/ProjectConfig.w:131`) is the pin; a project that places
+  (`src/compiler/ProjectConfig.with:131`) is the pin; a project that places
   buffers and has no pin gets a warning naming the detected machine and the
   line to add. The pinned machine is a tracked input of the build key
   (§17.1a), so a changed description rebuilds.
@@ -760,13 +760,13 @@ spellings for the two escape routes are a Part IX decision before step 2.
 ### IV.6 Verdicts
 
 ```
-with analyze prog.w 'select:kind=placement'  // owner, space, bytes, provenance of the size
-with analyze prog.w 'select:kind=route'      // transfer site, path, per-edge cost, unit, source
-with analyze prog.w 'select:kind=capacity'   // function, processor instance, space, required, available, margin
-with analyze prog.w 'select:kind=traffic'    // region, buffer, bytes read, bytes written, or absent: <reason>
-with analyze prog.w 'explain:machine'        // the pinned machine, every figure with its provenance
-with analyze prog.w 'explain:route:<site>'   // why this route and not another
-with analyze prog.w 'explain:instances:<fn>' // the processors a package-local function is compiled for, and why
+with analyze prog.with 'select:kind=placement'  // owner, space, bytes, provenance of the size
+with analyze prog.with 'select:kind=route'      // transfer site, path, per-edge cost, unit, source
+with analyze prog.with 'select:kind=capacity'   // function, processor instance, space, required, available, margin
+with analyze prog.with 'select:kind=traffic'    // region, buffer, bytes read, bytes written, or absent: <reason>
+with analyze prog.with 'explain:machine'        // the pinned machine, every figure with its provenance
+with analyze prog.with 'explain:route:<site>'   // why this route and not another
+with analyze prog.with 'explain:instances:<fn>' // the processors a package-local function is compiled for, and why
 ```
 
 ### IV.7 Diagnostics
@@ -798,55 +798,55 @@ here needs a device backend.
 
 ### V.1 Machine files
 
-- **Parser** (`src/Parser.w`, `src/Ast.w`): new declaration kinds
+- **Parser** (`src/Parser.with`, `src/Ast.with`): new declaration kinds
   `NK_MACHINE`, `NK_MEMORY_DECL`, `NK_PROCESSOR_DECL`, `NK_TRANSFER_DECL`,
   a size/rate literal grammar (`80 GiB`, `3.35 TB/s`, `128 B/cyc`), the
   `as OTHER` copy, and the provenance trailer as a token sequence on the
   item.
-- **Loading** (`src/compiler/DriverOptions.w`, `src/main.w`,
-  `src/compiler/Frontend.w:2587`, `src/compiler/Zcu.w:220`): `--machine`
+- **Loading** (`src/compiler/DriverOptions.with`, `src/main.with`,
+  `src/compiler/Frontend.with:2587`, `src/compiler/Zcu.with:220`): `--machine`
   resolves a name under the embedded `lib/std/machine/` or a path, and the
   file enters the compilation as a peer module the way the prelude does. It
-  is a tracked input (`src/compiler/TrackedInputs.w`), part of the build key
+  is a tracked input (`src/compiler/TrackedInputs.with`), part of the build key
   and the bundle fingerprint; `with.toml` pins it
-  (`src/compiler/ProjectConfig.w`). Detection lives beside
-  `target_spec_host_kind` (`src/TargetSpec.w:50`), answers a name or
+  (`src/compiler/ProjectConfig.with`). Detection lives beside
+  `target_spec_host_kind` (`src/TargetSpec.with:50`), answers a name or
   "cannot tell", and is printed on every build.
-- **Sema** (new `src/SemaMachine.w`): one `MachineModel` per compilation:
+- **Sema** (new `src/SemaMachine.with`): one `MachineModel` per compilation:
   spaces, processors, edges, the containment tree, the all-pairs route
   table computed once, and the coherence checks run on the model before any
   body is checked. The host's spaces come from the target. Duplicate names
   across host, machine and program are refused here.
-- **Facts** (`src/AnalysisTypes.w:17`, `src/Analysis.w`): `explain:machine`.
+- **Facts** (`src/AnalysisTypes.with:17`, `src/Analysis.with`): `explain:machine`.
 
 ### V.2 Placement in types
 
-- **Types** (`src/SemaTypes.w`, `src/Sema.w`): a space is a type-level
+- **Types** (`src/SemaTypes.with`, `src/Sema.with`): a space is a type-level
   constant, `TypeKind.TY_SPACE`, interned by machine and name the way
-  `Vector[N, T]` carries `N` in a data slot (`src/SemaVector.w:4`,
+  `Vector[N, T]` carries `N` in a data slot (`src/SemaVector.with:4`,
   `ensure_exact_type` at `:48`). Pointer, reference and slice type kinds gain
   a space slot; the host space is id 0 so every existing type interns to
   the same id, which is what keeps today's programs, ABI hashes and the
   fixpoint untouched. `Buffer[T, S]` is a `std` type whose second parameter
   is a space.
-- **Checking** (`src/SemaCheck.w`): a `current_processor` stack set by `on`
+- **Checking** (`src/SemaCheck.with`): a `current_processor` stack set by `on`
   blocks and by an `on` clause on a signature; every place read or write
   and every call argument asks `MachineModel.sees(current_processor,
   space_of(type))`. Element-type admission at every placement site.
-- **Instantiation** (`src/Sema.w` specializations): a package-local function
+- **Instantiation** (`src/Sema.with` specializations): a package-local function
   reached from a region is specialized on the processor as on a type
   argument; the instance is keyed `(fn, processor)`, appears in the
   `specialization` facts and in `explain:instances`, and is checked once
   per processor so a construct unlowerable on one is reported at that
   caller. A `pub` function with an `on` clause has one instance.
-- **Codegen** (`src/Codegen.w`): in this plan every instance compiles in the
+- **Codegen** (`src/Codegen.with`): in this plan every instance compiles in the
   host unit; the instance key reaches the symbol name so two bodies never
   collide. Address spaces in the LLVM bridge belong to the dispatch
   proposal.
 
 ### V.3 Transfer and routing
 
-- **std** (`lib/std/buffer.w`, new): `Buffer[T, S]` with `zeroed`, `uninit`,
+- **std** (`lib/std/buffer.with`, new): `Buffer[T, S]` with `zeroed`, `uninit`,
   `len`, indexing, views, `Drop`; `transfer[T, A, B]`. Allocation, free and
   copy are selected by `comptime match` on the processor owning `S`; in
   this plan every arm is the host allocator and a host copy, with the
@@ -855,7 +855,7 @@ here needs a device backend.
 - **Sema**: at each `transfer` call, `MachineModel.route(A, B)`; no route is
   the diagnostic; the route is recorded as a `route` fact with per-hop cost
   (derived from bandwidths or the declared rate, with unit and source).
-- **MIR** (`src/MirLower.w`): a multi-hop transfer lowers as a chain of
+- **MIR** (`src/MirLower.with`): a multi-hop transfer lowers as a chain of
   single-hop calls with the intermediate buffers as ordinary temporaries,
   dropped by the ordinary drop plan; nothing new in drop scheduling.
 
@@ -863,7 +863,7 @@ here needs a device backend.
 
 - **Sema**: `on` pushes the processor; `async on` is an `async:` block with
   a processor (§14.22 capture rules, ephemeral when a view is captured).
-- **MIR/async** (`src/AsyncLower.w:62`): a region body is outlined into its
+- **MIR/async** (`src/AsyncLower.with:62`): a region body is outlined into its
   own body tagged with its processor, the way an async block is; the
   sequential form is the same outlining followed by an immediate await. The
   tag is a MIR fact that the dispatch proposal's codegen units will read;
@@ -871,7 +871,7 @@ here needs a device backend.
 
 ### V.5 Capacity
 
-- **MIR pass** (new `src/MirCapacity.w`, reading `src/MirCore.w:1649`): per
+- **MIR pass** (new `src/MirCapacity.with`, reading `src/MirCore.with:1649`): per
   body instance, per space, the maximum over program points of the
   granule-rounded sum of live placed locals whose size is static; the
   summary also records, for each call, what is live across it. Sizes are
@@ -879,24 +879,24 @@ here needs a device backend.
   length makes the owner "unverified" and the function's verdict a warning,
   pending the Part IX decision.
 - **Fold** over the live MIR call graph (`with analyze`'s `path:call` data,
-  `src/Analysis.w:707`): sequential calls by max, held-across by plus,
+  `src/Analysis.with:707`): sequential calls by max, held-across by plus,
   strongly connected components refused when they place into a bounded
   space; `overcommit` on the space turns the refusal into a warning.
 - **Facts**: `capacity` rows with required, available, margin, buffers.
 
 ### V.6 Facts and tools
 
-- `src/AnalysisTypes.w`: `Placement = 29`, `Route = 30`, `Capacity = 31`,
+- `src/AnalysisTypes.with`: `Placement = 29`, `Route = 30`, `Capacity = 31`,
   `Traffic = 32`. Collectors beside `analysis_collect_types`
-  (`src/Analysis.w:292`). `explain:machine`, `explain:route:<site>`,
-  `explain:instances:<fn>` dispatched in `src/compiler/Compilation.w` with
+  (`src/Analysis.with:292`). `explain:machine`, `explain:route:<site>`,
+  `explain:instances:<fn>` dispatched in `src/compiler/Compilation.with` with
   the other explainers.
 - `docs/spec/toolchain/deep-debugging-tools.md`: a placement route (the
   hunt for "why was this refused" is one `explain:route` run).
 
 ### V.7 The test machine
 
-`test/placement/machines/two_space.w` declares a host and one `managed
+`test/placement/machines/two_space.with` declares a host and one `managed
 explicit` device space with a scratchpad under it, a processor whose arch
 is `test` (lowered on the host), and the edges; a second file declares two
 such devices with a peer edge, for the routing pairs. The test runtime
@@ -941,7 +941,7 @@ Each step is one stack with one battery, buildable by the pinned seed.
 
 1. **Machine files and facts.** Parser, loader, `SemaMachine`, coherence
    checks, `--machine`, detection printed on every build, the `with.toml`
-   pin, `lib/std/machine/uma_soc.w` and `two_gpu_box.w` with cited figures,
+   pin, `lib/std/machine/uma_soc.with` and `two_gpu_box.with` with cited figures,
    `explain:machine`, `:machine-check`. No codegen change. Also the host
    half of the probe: `with machine probe` enumerates devices and reads
    what the host can learn without a launch (memory sizes, device
@@ -1056,4 +1056,4 @@ in one run) is `vx-frontier.md`, each entry with what it waits on.
   collective names, and whether a collective is a `transfer` or its own
   verb.
 - Who measures the shipped descriptions' figures, and when the `policy:`
-  figures in `two_gpu_box.w` become `measured:`.
+  figures in `two_gpu_box.with` become `measured:`.

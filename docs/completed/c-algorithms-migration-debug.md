@@ -37,7 +37,7 @@ declarations. Proof: `out/phase1-drafts/global-initializer-proof.txt`.
 The allocation-testing framework stopped at its two `assert` expressions.
 LLDB on the release compiler observed `ci_is_stringify_macro("assert")`
 returning `1`; the caller was `ci_try_expand_stringify_call + 240`.
-The incorrect branch was `CImport.w`'s `return true` on any isolated `#`
+The incorrect branch was `CImport.with`'s `return true` on any isolated `#`
 inside the macro body. Darwin's assertion macro includes `#e` only as an
 argument to its failure reporter. It is not a string-valued expression.
 
@@ -89,7 +89,7 @@ Transcript: `out/phase1-drafts/assert-literal-proof.txt`.
 ## Closure bodies must retain concrete specialization types
 
 The retained `behav_generic_closure_reference` test binary crashed at
-`rt_memcmp` (`rt_core.w:315`, `ldrb w14, [x11, x10]`, `x11=7`). Its first
+`rt_memcmp` (`rt_core.with:315`, `ldrb w14, [x11, x10]`, `x11=7`). Its first
 integer comparator had reached `with_str_cmp_ref`: the later string
 specialization had supplied the types for the earlier integer closure.
 The debug allocator reported no invalid free before this wrong-pointer read.
@@ -190,7 +190,7 @@ the facade does not calculate a struct layout itself.
 
 `hash_table_iter_next` initializes a `HashTablePair`. Its underlying tag is
 `_HashTablePair`, a named two-field record. `translate_type_recursive_mode`
-in `src/compiler/ClangBridge.w` tested `*bare == 95` and returned `c_void`
+in `src/compiler/ClangBridge.with` tested `*bare == 95` and returned `c_void`
 for all underscore-prefixed tags. LLDB on the retained FnAbi compiler
 observed `w8=95`, `x23="_HashTablePair"`, then the branch at
 `translate_type_recursive_mode+3008` into the `c_void` return. The caller's

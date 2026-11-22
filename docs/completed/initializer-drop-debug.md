@@ -16,7 +16,7 @@ LLDB on bd02ff27 stage1 stopped at MirBuilder.schedule_drop with body sym221,
 local 2 and value-drop kind 0. Its caller is lower_let_binding+408:
 `0x100904068` schedules cleanup, before the initializer's lower_expr call at
 `0x1009040a0` and assignment at `0x1009040c8`. This proves the premature
-schedule at MirLower.w:5736. Evidence: `/tmp/with-initializer-schedule-lldb.log`,
+schedule at MirLower.with:5736. Evidence: `/tmp/with-initializer-schedule-lldb.log`,
 `/tmp/with-initializer-lowering-lldb.log`, and
 `/tmp/with-initializer-return-verdict.log`.
 
@@ -27,7 +27,7 @@ bindings retain their existing ownership behavior.
 The validator also needs to model StorageLive's explicit zero-initialization
 marker. The zero-storage phase fixture failed as `fn sym222 stmt1` on the
 old compiler, while its emitted `empty` IR stores null/zero in all four Vec
-fields before calling drop glue. The producer is CodegenDispatch.w:5466-5474;
+fields before calling drop glue. The producer is CodegenDispatch.with:5466-5474;
 the transfer function ignored d1. `/tmp/with-zero-init.ll` and
 `/tmp/with-zero-init-verdict.log` record both sides. Direct MIR tests require
 zero-initialized storage to pass and ordinary uninitialized storage to fail.

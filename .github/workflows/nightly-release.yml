@@ -93,7 +93,7 @@ jobs:
         working-directory: out/dll-copy-probe
         run: ../diagnostic-seed.exe init .
       - name: Install copy action
-        run: cp tools/diagnose_dll_copy_build.w out/dll-copy-probe/build.w
+        run: cp tools/diagnose_dll_copy_build.with out/dll-copy-probe/build.with
       - name: Copy through the pinned evaluator
         working-directory: out/dll-copy-probe
         run: ../diagnostic-seed.exe build --strict-effects
@@ -199,13 +199,13 @@ jobs:
         working-directory: out/diagnostic-project
         run: ../diagnostic-compiler/release/bin/with.exe get c.${{ matrix.package }}
       - name: Install the actual UAT fixture
-        run: cp build/release_uat_fixtures/${{ matrix.package }}_main.w out/diagnostic-project/src/main.w
+        run: cp build/release_uat_fixtures/${{ matrix.package }}_main.with out/diagnostic-project/src/main.with
       - name: Capture native check stacks
         working-directory: out/diagnostic-project
         timeout-minutes: 3
         env:
           WITH_PROFILE: '1'
-        run: ../procdump/${{ matrix.procdump }} -accepteula -mm -n 3 -s 15 -x ../package-dumps ../diagnostic-compiler/release/bin/with.exe check src/main.w
+        run: ../procdump/${{ matrix.procdump }} -accepteula -mm -n 3 -s 15 -x ../package-dumps ../diagnostic-compiler/release/bin/with.exe check src/main.with
       - name: Preserve stack evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -224,7 +224,7 @@ jobs:
         include:
           # darwin-aarch64 is a local-first platform: on a `v*` tag push the
           # maintainer's Mac builds, verifies and publishes it (with
-          # linux-aarch64, via tools/release_local.w) before CI even starts;
+          # linux-aarch64, via tools/release_local.with) before CI even starts;
           # CI builds it only for the nightly and test channels, in the
           # build-darwin-aarch64 job below. On a tag push CI builds and
           # appends the x86_64 platforms and windows-aarch64 (which no Mac
@@ -432,7 +432,7 @@ jobs:
 
       # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
       # and out/release-uat/; the log carries one line per scenario (the
-      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.with target
       # failed: tmp" stderr that way).
       - name: Upload release UAT captures
         if: failure()
@@ -473,7 +473,7 @@ jobs:
 
       # Publish-first: this platform's asset goes onto the release the moment
       # it is verified (the release is created by whichever platform gets
-      # there first, add-only after that; build/release_publish.w). Nobody
+      # there first, add-only after that; build/release_publish.with). Nobody
       # waits for the slowest runner.
       - name: Resolve release metadata
         id: release
@@ -481,7 +481,7 @@ jobs:
           REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
         run: |
           set -euo pipefail
-          ./out/release/bin/with run tools/nightly_release_metadata.w \
+          ./out/release/bin/with run tools/nightly_release_metadata.with \
             "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md "${{ matrix.platform }}"
@@ -534,7 +534,7 @@ jobs:
   build-darwin-aarch64:
     name: Verify and package darwin-aarch64
     # Local-first: on a `v*` tag push this platform is built, verified and
-    # published from the maintainer's Mac (tools/release_local.w) minutes
+    # published from the maintainer's Mac (tools/release_local.with) minutes
     # after the tag; CI builds it for the nightly and test channels only.
     # The body mirrors the unix matrix job above.
     if: github.event_name != 'push' && inputs.diagnostic_run == ''
@@ -720,7 +720,7 @@ jobs:
 
       # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
       # and out/release-uat/; the log carries one line per scenario (the
-      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.with target
       # failed: tmp" stderr that way).
       - name: Upload release UAT captures
         if: failure()
@@ -765,7 +765,7 @@ jobs:
           REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
         run: |
           set -euo pipefail
-          ./out/release/bin/with run tools/nightly_release_metadata.w \
+          ./out/release/bin/with run tools/nightly_release_metadata.with \
             "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md "${{ matrix.platform }}"
@@ -933,7 +933,7 @@ jobs:
           mkdir -p out/fetch-diag
           for who in seed release; do
             if [ "$who" = seed ]; then c=./src/main.exe; else c=./out/release/bin/with.exe; fi
-            "$c" build build/https_fetch.w -o "out/fetch-diag/https_fetch_$who.exe" > "out/fetch-diag/compile_$who.log" 2>&1 || true
+            "$c" build build/https_fetch.with -o "out/fetch-diag/https_fetch_$who.exe" > "out/fetch-diag/compile_$who.log" 2>&1 || true
             for url in https://zlib.net/fossils/zlib-1.3.2.tar.gz https://github.com/withlang-dev/with/releases/download/seed-windows-aarch64/with-windows-aarch64.exe.sha256; do
               name=$(basename "$url")
               timeout 120 "out/fetch-diag/https_fetch_$who.exe" --probe "$url" > "out/fetch-diag/probe_${who}_$name.log" 2>&1 || echo "probe rc=$?" >> "out/fetch-diag/probe_${who}_$name.log"
@@ -941,8 +941,8 @@ jobs:
               ls -l "out/fetch-diag/$name.$who" >> "out/fetch-diag/fetch_${who}_$name.log" 2>&1 || true
             done
           done
-          ./src/main.exe run test/behavior/behav_crypto_kats.w > out/fetch-diag/crypto_kats_seed.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_seed.log
-          ./out/release/bin/with.exe run test/behavior/behav_crypto_kats.w > out/fetch-diag/crypto_kats_release.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_release.log
+          ./src/main.exe run test/behavior/behav_crypto_kats.with > out/fetch-diag/crypto_kats_seed.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_seed.log
+          ./out/release/bin/with.exe run test/behavior/behav_crypto_kats.with > out/fetch-diag/crypto_kats_release.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_release.log
           rm -f out/fetch-diag/*.seed out/fetch-diag/*.release
 
       - name: Preserve HTTPS fetch diagnostics (test channel)
@@ -963,7 +963,7 @@ jobs:
         # exact comptime path here: this fixture is pure /.../ regex literals with
         # no member imports, so a poison binary aborts and this step fails instead
         # of packaging it green.
-        run: ./out/release/bin/with.exe check test/behavior/behav_regex_language_semantics.w
+        run: ./out/release/bin/with.exe check test/behavior/behav_regex_language_semantics.with
 
       - name: WebAssembly fixtures
         run: ./src/main.exe build :wasm-tests
@@ -1040,7 +1040,7 @@ jobs:
         working-directory: out/uat/bzip2/tmp
         env:
           WITH_PROFILE: '1'
-        run: ../../../procdump/procdump64.exe -accepteula -mm -n 3 -s 15 -x ../../../package-dumps/bzip2 ../../../release/bin/with.exe check src/main.w
+        run: ../../../procdump/procdump64.exe -accepteula -mm -n 3 -s 15 -x ../../../package-dumps/bzip2 ../../../release/bin/with.exe check src/main.with
 
       - name: Diagnose libcurl check (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
@@ -1049,7 +1049,7 @@ jobs:
         working-directory: out/uat/libcurl/tmp
         env:
           WITH_PROFILE: '1'
-        run: ../../../procdump/procdump64.exe -accepteula -mm -n 3 -s 15 -x ../../../package-dumps/libcurl ../../../release/bin/with.exe check src/main.w
+        run: ../../../procdump/procdump64.exe -accepteula -mm -n 3 -s 15 -x ../../../package-dumps/libcurl ../../../release/bin/with.exe check src/main.with
 
       - name: Inspect spiral DLL integrity (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
@@ -1073,7 +1073,7 @@ jobs:
 
       # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
       # and out/release-uat/; the log carries one line per scenario (the
-      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.with target
       # failed: tmp" stderr that way).
       - name: Upload release UAT captures
         if: failure()
@@ -1096,7 +1096,7 @@ jobs:
           # A compiler linked from a windows-gnu SDK (lib/libclang.a) carries
           # mingw-w64's runtime code, whose licenses require their notices in
           # a binary distribution (#1915): publish them beside the binary, as
-          # build/package.w's pkg_write_windows_notice does for :package-*.
+          # build/package.with's pkg_write_windows_notice does for :package-*.
           if [ -f "$LLVM_PREFIX/lib/libclang.a" ]; then
             { printf 'The With compiler for Windows (with-windows-x86_64.exe) statically links the mingw-w64\nruntime (startup and support code) from its LLVM SDK. Its notices follow.\n\n'; cat "$LLVM_PREFIX/libc/windows/COPYING.MinGW-w64-runtime.txt"; } > out/release/with-windows-x86_64-NOTICE.txt
             echo "WITH_NOTICE_FILES=,out/release/with-windows-x86_64-NOTICE.txt" >> "$GITHUB_ENV"
@@ -1124,7 +1124,7 @@ jobs:
           REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
         run: |
           set -euo pipefail
-          ./out/release/bin/with.exe run tools/nightly_release_metadata.w \
+          ./out/release/bin/with.exe run tools/nightly_release_metadata.with \
             "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md windows-x86_64
@@ -1173,7 +1173,7 @@ jobs:
   build-linux-aarch64:
     name: Verify and package linux-aarch64
     # Local-first: on a `v*` tag push this platform is built, verified and
-    # published from the maintainer's Mac (tools/release_local.w, the
+    # published from the maintainer's Mac (tools/release_local.with, the
     # linux/arm64 container in tools/docker/linux-aarch64). CI builds it for
     # the nightly and test channels only.
     if: github.event_name != 'push' && inputs.diagnostic_run == ''
@@ -1263,8 +1263,8 @@ jobs:
           chmod +x src/main
           ./src/main version
           # Fail fast if the seed cannot link, rather than part-way through a build.
-          printf 'fn main:\n    print("seed links")\n' > "$RUNNER_TEMP/seedcheck.w"
-          ./src/main run "$RUNNER_TEMP/seedcheck.w"
+          printf 'fn main:\n    print("seed links")\n' > "$RUNNER_TEMP/seedcheck.with"
+          ./src/main run "$RUNNER_TEMP/seedcheck.with"
 
       - name: Build seed to release compiler
         run: ./src/main build
@@ -1329,7 +1329,7 @@ jobs:
 
       # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
       # and out/release-uat/; the log carries one line per scenario (the
-      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.with target
       # failed: tmp" stderr that way).
       - name: Upload release UAT captures
         if: failure()
@@ -1372,7 +1372,7 @@ jobs:
           REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
         run: |
           set -euo pipefail
-          ./out/release/bin/with run tools/nightly_release_metadata.w \
+          ./out/release/bin/with run tools/nightly_release_metadata.with \
             "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md linux-aarch64
@@ -1509,7 +1509,7 @@ jobs:
           # both the file APIs and lld-link accept).
           echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
           echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc")" >> "$GITHUB_ENV"
-          # MSVC CRT + Windows SDK import libs (Link.w reads WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR).
+          # MSVC CRT + Windows SDK import libs (Link.with reads WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR).
           # This is the arm64 runner, so the ARM64 lib subdirs are the native target.
           vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
           vs_root="$(cygpath -u "$("$vswhere" -latest -products '*' -property installationPath)")"
@@ -1542,7 +1542,7 @@ jobs:
           mkdir -p out/fetch-diag
           for who in seed release; do
             if [ "$who" = seed ]; then c=./src/main.exe; else c=./out/release/bin/with.exe; fi
-            "$c" build build/https_fetch.w -o "out/fetch-diag/https_fetch_$who.exe" > "out/fetch-diag/compile_$who.log" 2>&1 || true
+            "$c" build build/https_fetch.with -o "out/fetch-diag/https_fetch_$who.exe" > "out/fetch-diag/compile_$who.log" 2>&1 || true
             for url in https://zlib.net/fossils/zlib-1.3.2.tar.gz https://github.com/withlang-dev/with/releases/download/seed-windows-aarch64/with-windows-aarch64.exe.sha256; do
               name=$(basename "$url")
               timeout 120 "out/fetch-diag/https_fetch_$who.exe" --probe "$url" > "out/fetch-diag/probe_${who}_$name.log" 2>&1 || echo "probe rc=$?" >> "out/fetch-diag/probe_${who}_$name.log"
@@ -1550,8 +1550,8 @@ jobs:
               ls -l "out/fetch-diag/$name.$who" >> "out/fetch-diag/fetch_${who}_$name.log" 2>&1 || true
             done
           done
-          ./src/main.exe run test/behavior/behav_crypto_kats.w > out/fetch-diag/crypto_kats_seed.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_seed.log
-          ./out/release/bin/with.exe run test/behavior/behav_crypto_kats.w > out/fetch-diag/crypto_kats_release.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_release.log
+          ./src/main.exe run test/behavior/behav_crypto_kats.with > out/fetch-diag/crypto_kats_seed.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_seed.log
+          ./out/release/bin/with.exe run test/behavior/behav_crypto_kats.with > out/fetch-diag/crypto_kats_release.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_release.log
           rm -f out/fetch-diag/*.seed out/fetch-diag/*.release
 
       - name: Preserve HTTPS fetch diagnostics (test channel)
@@ -1640,7 +1640,7 @@ jobs:
         working-directory: out/uat/bzip2/tmp
         env:
           WITH_PROFILE: '1'
-        run: ../../../procdump/procdump64a.exe -accepteula -mm -n 3 -s 15 -x ../../../package-dumps/bzip2 ../../../release/bin/with.exe check src/main.w
+        run: ../../../procdump/procdump64a.exe -accepteula -mm -n 3 -s 15 -x ../../../package-dumps/bzip2 ../../../release/bin/with.exe check src/main.with
 
       - name: Diagnose libcurl check (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
@@ -1649,7 +1649,7 @@ jobs:
         working-directory: out/uat/libcurl/tmp
         env:
           WITH_PROFILE: '1'
-        run: ../../../procdump/procdump64a.exe -accepteula -mm -n 3 -s 15 -x ../../../package-dumps/libcurl ../../../release/bin/with.exe check src/main.w
+        run: ../../../procdump/procdump64a.exe -accepteula -mm -n 3 -s 15 -x ../../../package-dumps/libcurl ../../../release/bin/with.exe check src/main.with
 
       - name: Inspect spiral DLL integrity (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
@@ -1673,7 +1673,7 @@ jobs:
 
       # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
       # and out/release-uat/; the log carries one line per scenario (the
-      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.with target
       # failed: tmp" stderr that way).
       - name: Upload release UAT captures
         if: failure()
@@ -1715,7 +1715,7 @@ jobs:
           REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
         run: |
           set -euo pipefail
-          ./out/release/bin/with.exe run tools/nightly_release_metadata.w \
+          ./out/release/bin/with.exe run tools/nightly_release_metadata.with \
             "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md windows-aarch64

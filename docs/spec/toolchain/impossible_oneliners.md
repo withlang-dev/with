@@ -52,10 +52,10 @@ Affected recipe:
 
 - Launch a simple web server
 
-[`lib/std/net.w`](../lib/std/net.w) exposes `tcp_listen`, `tcp_accept`, and
+[`lib/std/net.with`](../lib/std/net.with) exposes `tcp_listen`, `tcp_accept`, and
 `udp_bind`, so the source-level API appears to support servers. The user
 runtime does not implement those operations: the corresponding functions in
-[`rt/rt_core.w`](../rt/rt_core.w) unconditionally return `-1`. The failure is
+[`rt/rt_core.with`](../rt/rt_core.with) unconditionally return `-1`. The failure is
 therefore below one-liner syntax; every server written against the advertised
 API fails before it can accept a connection. There is also no high-level HTTP
 server package in the repository. The standard-library plan intentionally

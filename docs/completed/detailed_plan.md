@@ -10,7 +10,7 @@ Replaced with `lang_trait_syms` HashMap (4 language-level traits:
 Copy, Drop, Send, ScopedSend). Other 13 resolve from prelude.
 Orphan rule only enforced for local impl decls. Commit: `392de03`.
 
-~~**Location:** `src/Sema.w:2612-2629`~~
+~~**Location:** `src/Sema.with:2612-2629`~~
 
 **Problem:** 17 trait names are hardcoded in a function. Five call sites
 check "is this a builtin trait?" before allowing impl/bound/trait-object
@@ -29,11 +29,11 @@ IndexMut, Send, ScopedSend
 5. Line 3349 — trait object type resolution
 
 **Current prelude coverage:** 11 of 17 traits defined in
-`lib/std/traits.w`. Missing: Copy, Contains, Index, IndexMut, Send,
+`lib/std/traits.with`. Missing: Copy, Contains, Index, IndexMut, Send,
 ScopedSend.
 
 **Implementation:**
-1. Define the 6 missing traits in `lib/std/traits.w` (stub declarations)
+1. Define the 6 missing traits in `lib/std/traits.with` (stub declarations)
 2. Ensure all 17 traits are imported via prelude
 3. At all 5 call sites, replace `sema_is_builtin_trait_name(name)` with
    `self.trait_lookup.contains(trait_sym)` (traits from prelude are
@@ -43,7 +43,7 @@ ScopedSend.
 5. Delete `sema_is_builtin_trait_name` function
 6. `make build && make fixpoint`
 
-**Complexity:** Medium. Files: `src/Sema.w`, `lib/std/traits.w`
+**Complexity:** Medium. Files: `src/Sema.with`, `lib/std/traits.with`
 
 ---
 
@@ -54,7 +54,7 @@ Added 36 pre-interned sym_* fields to Codegen struct. Converted all
 comparisons remain intentionally (primitive types, ABI names, runtime
 C functions).
 
-~~**Location:** `src/Codegen.w` — 92 string comparisons~~
+~~**Location:** `src/Codegen.with` — 92 string comparisons~~
 
 **Problem:** Codegen dispatches on type/function names using string
 equality (`name == "Vec"`, `name == "Option"`, etc.). This is O(n)
@@ -73,13 +73,13 @@ sizeof (4), size_of (4), Option (4), Unit (2), Box (2)
 3. Replace each `name == "Vec"` with `name_sym == self.sym_vec`
 4. `make build && make fixpoint`
 
-**Complexity:** Medium (mechanical). Files: `src/Codegen.w`
+**Complexity:** Medium (mechanical). Files: `src/Codegen.with`
 
 ---
 
 ## P2: Eliminate i32 Fallbacks
 
-**Location:** `src/Codegen.w` — 103 uses of `wl_i32_type`
+**Location:** `src/Codegen.with` — 103 uses of `wl_i32_type`
 
 **Problem:** ~68 uses are fallbacks where unknown types default to i32.
 This masks type resolution bugs silently.
@@ -103,7 +103,7 @@ This masks type resolution bugs silently.
 4. Replace fallback sites incrementally (5-10 per commit)
 5. `make build && make fixpoint` after each batch
 
-**Complexity:** Medium-High. Files: `src/Codegen.w`
+**Complexity:** Medium-High. Files: `src/Codegen.with`
 
 ---
 
@@ -132,51 +132,51 @@ in `docs/finalize.md` documenting the audit result.
 ## P8: NK_POISONED Error Recovery — DONE ✓
 
 Added `Parser.poisoned_expr()` helper that creates NK_POISONED_EXPR
-nodes. Changed 15 expression-level error sites in Parser.w to return
+nodes. Changed 15 expression-level error sites in Parser.with to return
 poisoned nodes instead of 0. Added NK_POISONED_EXPR handler in
-MirLower.w (returns unit_operand). Sema already handled it (returns
+MirLower.with (returns unit_operand). Sema already handled it (returns
 TY_ERR). Bottom-of-stack dispatchers (parse_primary, parse_pattern,
 parse_type_expr) advance past bad token for forward progress.
 4 new error recovery tests. Commit: `73c6116`.
 
-~~**Location:** `src/Ast.w` (lines 26, 78), `src/Parser.w`~~
+~~**Location:** `src/Ast.with` (lines 26, 78), `src/Parser.with`~~
 
 **Problem:** Parser returns `0` (null node) after errors. Downstream
 passes receive null nodes and may crash or produce confusing secondary
 errors.
 
 **Current state:** `NK_POISONED_DECL = 9` and `NK_POISONED_EXPR = 69`
-already defined in Ast.w but NEVER EMITTED by the parser. 85 `return 0`
-statements in Parser.w after `emit_error` calls.
+already defined in Ast.with but NEVER EMITTED by the parser. 85 `return 0`
+statements in Parser.with after `emit_error` calls.
 
 **Implementation:**
 1. Create helper `fn Parser.poisoned_node(start, end) -> NodeId` that
    emits `NK_POISONED_EXPR`
 2. Replace `return 0` after `emit_error` calls with
    `return self.poisoned_node(start, end)`
-3. In Sema.w: when `kind == NK_POISONED_EXPR`, return `TY_ERR` without
+3. In Sema.with: when `kind == NK_POISONED_EXPR`, return `TY_ERR` without
    emitting secondary errors
-4. In Codegen.w: when `kind == NK_POISONED_EXPR`, skip codegen (emit
+4. In Codegen.with: when `kind == NK_POISONED_EXPR`, skip codegen (emit
    nothing)
 5. `make build && make fixpoint`
 
-**Complexity:** Medium. Files: `src/Parser.w`, `src/Sema.w`,
-`src/Codegen.w`, `src/MirLower.w`
+**Complexity:** Medium. Files: `src/Parser.with`, `src/Sema.with`,
+`src/Codegen.with`, `src/MirLower.with`
 
 ---
 
-## P11: Split Codegen.w and Sema.w — DONE ✓
+## P11: Split Codegen.with and Sema.with — DONE ✓
 
 Both large files split to under budget:
 
-**Codegen.w:** 10,491 → 3,974 lines. Split into:
-- CodegenDispatch.w (5,566 lines — MIR dispatch + mono)
-- CodegenTraits.w (1,380 lines — trait collection + vtables)
+**Codegen.with:** 10,491 → 3,974 lines. Split into:
+- CodegenDispatch.with (5,566 lines — MIR dispatch + mono)
+- CodegenTraits.with (1,380 lines — trait collection + vtables)
 
-**Sema.w:** 9,112 → 1,997 lines (commit `c694460`). Split into:
-- SemaCheck.w (4,811 lines — type checking)
-- SemaDecl.w (1,761 lines — declaration processing)
-- SemaDiag.w (1,130 lines — diagnostics)
+**Sema.with:** 9,112 → 1,997 lines (commit `c694460`). Split into:
+- SemaCheck.with (4,811 lines — type checking)
+- SemaDecl.with (1,761 lines — declaration processing)
+- SemaDiag.with (1,130 lines — diagnostics)
 
 Uses `use Codegen`/`use Sema` pattern to define methods on the type
 from separate files.
@@ -201,13 +201,13 @@ from separate files.
 5. Write 3 MIR tests: basic blocks, drop insertion, control flow
 6. `make build && make fixpoint`
 
-**Complexity:** Small. Files: test runner in `src/main.w`, new test files
+**Complexity:** Small. Files: test runner in `src/main.with`, new test files
 
 ---
 
 ## P14: Verify Reserved Syntax — DONE ✓ (11 tests, commit `3e1ef15`)
 
-**Location:** `src/Token.w`, `src/Parser.w`
+**Location:** `src/Token.with`, `src/Parser.with`
 
 **Problem:** Some reserved keywords lack error-case tests.
 
@@ -217,10 +217,10 @@ but unimplemented: `ERRDEFER` (partially), `MOVE` (partially),
 
 **Implementation:**
 1. Write test for each reserved keyword that emits an error:
-   - `test/compile_errors/err_reserved_errdefer.w`
-   - `test/compile_errors/err_reserved_move.w`
-   - `test/compile_errors/err_reserved_opaque.w`
-   - `test/compile_errors/err_reserved_null.w`
+   - `test/compile_errors/err_reserved_errdefer.with`
+   - `test/compile_errors/err_reserved_move.with`
+   - `test/compile_errors/err_reserved_opaque.with`
+   - `test/compile_errors/err_reserved_null.with`
 2. Verify `const`, `it`, `where`, `async`, `await`, `yield` all work
    (behavioral tests)
 3. Audit for missing reservations: `macro` is not reserved — add it?
@@ -237,27 +237,27 @@ MIR places carry sema types. Option/Result reverse lookups replaced
 with sema queries. Instantiation cache replaced with i64 hash keys
 (commit `9775c13`). All layers complete.
 
-**Complexity:** Large. Files: `src/Codegen.w`, `src/Sema.w`, new tests
+**Complexity:** Large. Files: `src/Codegen.with`, `src/Sema.with`, new tests
 
 ---
 
 ## Phase II-5: C Backend Completion — Intrinsics DONE ✓
 
-**Location:** `src/CCodegen.w` (4,440 lines)
+**Location:** `src/CCodegen.with` (4,440 lines)
 
-All 54 MIR intrinsics now handled (commit `f434b08`). CCodegen.w
+All 54 MIR intrinsics now handled (commit `f434b08`). CCodegen.with
 grew from 3,775 → 4,440 lines with the 37 new intrinsic handlers.
 
 **Remaining work:** Self-compile + cross-compilation testing.
 
 **Path to self-compile:**
 1. ~~Handle all intrinsics~~ — DONE
-2. `with build --emit-c src/main.w` produces `out/main.c`
+2. `with build --emit-c src/main.with` produces `out/main.c`
 3. `gcc out/main.c runtime/*.c -o with_from_c`
-4. `./with_from_c check src/main.w` must succeed
+4. `./with_from_c check src/main.with` must succeed
 
 **Complexity:** Medium (intrinsics done, integration testing remains).
-Files: `src/CCodegen.w`
+Files: `src/CCodegen.with`
 
 ---
 
@@ -265,14 +265,14 @@ Files: `src/CCodegen.w`
 
 ### `with fmt` — Code Formatter — DONE ✓
 
-Implemented in main.w (commit `e72847c`). Supports `-w` (write)
+Implemented in main.with (commit `e72847c`). Supports `-w` (write)
 and `-l` (list) modes. AST round-trip formatting.
 
 ### `with bench` — Benchmarking — DONE ✓
 
 `@[bench]` attribute + `bench_*` naming convention. Go-style
 auto-calibration (ramp up until ~1s elapsed). Reports name, N, ns/op.
-`--filter` support. `lib/test/bench.w` provides the `Bench` type.
+`--filter` support. `lib/test/bench.with` provides the `Bench` type.
 Commit: `6ef5b8b`.
 
 ### `with test` improvements — DONE ✓
@@ -285,7 +285,7 @@ Commit: `6ef5b8b`.
 "Did you mean?" for undefined variables/types implemented with
 Levenshtein distance (commit `169dac7`). Remaining: function
 signature display on arity mismatch, audit for missing locations.
-**Files:** `src/Sema.w`, `src/SemaDiag.w`
+**Files:** `src/Sema.with`, `src/SemaDiag.with`
 
 ---
 

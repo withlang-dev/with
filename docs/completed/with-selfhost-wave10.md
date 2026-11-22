@@ -44,12 +44,12 @@ Wave 10 exit gate:
     - `bootstrap/test/run_phase5_box_ref_dyn_tests.sh`
     - `bootstrap/test/run_phase5_object_safety_diagnostics_tests.sh`
 - Existing self-host implementation:
-  - `src/Codegen.w`
-  - `src/Mir.w`
-  - `src/MirLower.w`
-  - `src/AsyncMir.w`
-  - `src/Driver.w`
-  - `src/main.w`
+  - `src/Codegen.with`
+  - `src/Mir.with`
+  - `src/MirLower.with`
+  - `src/AsyncMir.with`
+  - `src/Driver.with`
+  - `src/main.with`
   - `scripts/parity_states.sh`
 - Reference architecture:
   - Zig:
@@ -79,10 +79,10 @@ Constraints:
 
 Primary parity artifacts:
 
-- `check <file.w>` diagnostics for codegen-relevant rejects.
-- `ir <file.w>` LLVM IR generation success/failure and key structural markers.
-- `build <file.w>` object/link success and diagnostics/warnings.
-- `run <file.w>` stdout/stderr + exit status.
+- `check <file.with>` diagnostics for codegen-relevant rejects.
+- `ir <file.with>` LLVM IR generation success/failure and key structural markers.
+- `build <file.with>` object/link success and diagnostics/warnings.
+- `run <file.with>` stdout/stderr + exit status.
 
 Wave 10 parity contract:
 
@@ -153,22 +153,22 @@ Each `KNOWN_DIVERGENCE` entry must include:
 
 Implementation (expected touch points):
 
-- `src/Codegen.w` (existing backend; migrate/align to MIR-first contract)
-- `src/Driver.w` (pipeline handoff from MIR/Async-MIR into codegen)
-- `src/Mir.w` (metadata needed by backend lowering fidelity)
-- `src/MirLower.w` (ensure backend-required MIR invariants)
-- `src/AsyncMir.w` (async-codegen interaction points where required)
-- `src/main.w` (`ir` command stability and optional dump/control flags)
+- `src/Codegen.with` (existing backend; migrate/align to MIR-first contract)
+- `src/Driver.with` (pipeline handoff from MIR/Async-MIR into codegen)
+- `src/Mir.with` (metadata needed by backend lowering fidelity)
+- `src/MirLower.with` (ensure backend-required MIR invariants)
+- `src/AsyncMir.with` (async-codegen interaction points where required)
+- `src/main.with` (`ir` command stability and optional dump/control flags)
 
 Optional refactor split if needed during execution:
 
-- `src/CodegenMir.w` (new; MIR->LLVM lowering helpers)
-- `src/CodegenLayout.w` (new; struct/enum/option/result layout helpers)
-- `src/CodegenVtable.w` (new; vtable + dyn dispatch helpers)
+- `src/CodegenMir.with` (new; MIR->LLVM lowering helpers)
+- `src/CodegenLayout.with` (new; struct/enum/option/result layout helpers)
+- `src/CodegenVtable.with` (new; vtable + dyn dispatch helpers)
 
 Tests/scripts (new):
 
-- `test/wave10/cases/*.w`
+- `test/wave10/cases/*.with`
 - `test/wave10/codegen_corpus.txt`
 - `test/wave10/coverage_matrix.md`
 - `test/wave10/coverage_manifest.txt`
@@ -337,55 +337,55 @@ Any uncovered behavior requires either:
 - Expanded `test/wave10/codegen_corpus.txt` to include explicit `check|ir|build|run` coverage across LLVM/codegen, generics/monomorphization, enum accessors/shorthand, dyn/vtable, devirtualization, and object-safety diagnostics.
 - Parity state governance was extended to support `ir` mode entries in `scripts/parity_states.sh`.
 - Added Wave 10 regression cases for dyn missing-impl diagnostics:
-  - `test/wave10/cases/dyn_missing_impl_fail.w`
-  - `test/wave10/cases/ref_dyn_missing_impl_fail.w`
-  - `test/wave10/cases/box_dyn_missing_impl_fail.w`
-- Self-host codegen now emits unresolved `printf` calls from `c_import`-style programs (`src/Codegen.w`) via a minimal variadic fallback declaration path, restoring `llvm_extern` run parity.
+  - `test/wave10/cases/dyn_missing_impl_fail.with`
+  - `test/wave10/cases/ref_dyn_missing_impl_fail.with`
+  - `test/wave10/cases/box_dyn_missing_impl_fail.with`
+- Self-host codegen now emits unresolved `printf` calls from `c_import`-style programs (`src/Codegen.with`) via a minimal variadic fallback declaration path, restoring `llvm_extern` run parity.
 - Backend entry for `ir/build/run` now consumes MIR first (`Driver.ensure_codegen_mir` + `Codegen.gen_module_from_mir`) and validates MIR invariants through `validate_mir_module` before LLVM emission.
-- MIR validation now enforces explicit backend invariants (table length coherence, index/span bounds, terminator/statement/reference integrity, and deterministic body symbol mapping) in `src/Mir.w`.
-- Section 3 LLVM type/ABI lowering updates landed in `src/Codegen.w`:
+- MIR validation now enforces explicit backend invariants (table length coherence, index/span bounds, terminator/statement/reference integrity, and deterministic body symbol mapping) in `src/Mir.with`.
+- Section 3 LLVM type/ABI lowering updates landed in `src/Codegen.with`:
   - centralized primitive/user type lookup (`resolve_primitive_named_type` + `resolve_user_named_type`),
   - Stage0-style integer-width coercion only for implicit type adaptation,
   - aggregate autoref for call arguments to `&T`/pointer params,
   - shared coercion enforcement in AST+MIR call lowering to prevent verifier-invalid calls.
 - Added Wave 10 ABI regression corpus case:
-  - `test/wave10/cases/abi_ref_param_autoref.w`
+  - `test/wave10/cases/abi_ref_param_autoref.with`
   - wired into unit harness and parity corpus (`check|ir|build|run`).
-- Section 4 monomorphization hardening landed in `src/Codegen.w`:
+- Section 4 monomorphization hardening landed in `src/Codegen.with`:
   - removed implicit `i32` fallback for unbound generic params in function monomorphization,
   - require full type-parameter binding before mangling/emission (`unknown type` failure parity),
   - aligned fallback mangling tokens with Stage0 (`int`/`unknown`),
   - added dedicated monomorphized-function cache tracking (`mono_values`/`mono_types`) to keep specialization emission deterministic and non-duplicated.
 - Added Wave 10 monomorphization regression cases:
-  - `test/wave10/cases/generic_instantiation_key_order.w`
-  - `test/wave10/cases/generic_instantiation_reuse.w`
+  - `test/wave10/cases/generic_instantiation_key_order.with`
+  - `test/wave10/cases/generic_instantiation_reuse.with`
   - wired into unit harness + parity corpus (`check|ir|build|run`) with explicit IR symbol-count assertions.
-- Section 6 enum/discriminant alignment landed in `src/Codegen.w`:
+- Section 6 enum/discriminant alignment landed in `src/Codegen.with`:
   - deterministic enum-type selection by LLVM type + variant symbol (avoids map-collision ambiguity),
   - Stage0-compatible enum accessor lowering for `.is_*()` and `.as_*[_ref|_mut]()` on enum values,
   - unit-variant `as_*` now rejects at codegen time (`unsupported call`) to match Stage0 `ir/build` behavior.
 - Added explicit Wave 10 enum runtime correctness cases:
-  - `test/wave10/cases/enum_layout_unit_runtime.w`
-  - `test/wave10/cases/enum_layout_payload_runtime.w`
-  - `test/wave10/cases/enum_layout_multi_payload_runtime.w`
+  - `test/wave10/cases/enum_layout_unit_runtime.with`
+  - `test/wave10/cases/enum_layout_payload_runtime.with`
+  - `test/wave10/cases/enum_layout_multi_payload_runtime.with`
   - wired into parity corpus for `check|ir|build|run`.
-- Section 7 runtime/link integration landed in `src/Driver.w`:
+- Section 7 runtime/link integration landed in `src/Driver.with`:
   - helpers runtime object linking is now symbol-driven (`nm -u` probe over emitted object) with conservative fallback when probing is unavailable,
   - async runtime linkage remains Wave 9-consistent (`AsyncMirModule.requires_async_runtime()` gates `fiber.o` + `fiber_asm.o`),
   - missing required runtime objects now fail with explicit diagnostics (`runtime/helpers.o`, `runtime/fiber.o`, `runtime/fiber_asm.o`),
   - `c_import` link libraries collected during resolve are now propagated into linker invocation (`-l<name>`),
   - LLVM bridge runtime remains scoped to compiler-main builds only (no unrelated binary dependency).
 - Added runtime-linkage parity coverage entries:
-  - `test/wave9/cases/runtime_linkage_sync_ok.w`
-  - `test/wave9/cases/runtime_linkage_async_ok.w`
+  - `test/wave9/cases/runtime_linkage_sync_ok.with`
+  - `test/wave9/cases/runtime_linkage_async_ok.with`
   - wired into Wave 10 corpus for `check|build|run`.
 - Current gate status:
   - `./scripts/run_wave10_codegen_unit_tests.sh` -> PASS
   - `./scripts/verify_wave10_coverage.sh` -> PASS (`processed=13`)
   - `./scripts/run_wave10_codegen_parity.sh` -> PASS (`processed=104`, `failures=0`, `known_divergences=1`)
-- Resolved Wave 10 parity gaps in self-host (`src/Sema.w`, `src/Codegen.w`):
+- Resolved Wave 10 parity gaps in self-host (`src/Sema.with`, `src/Codegen.with`):
   - enum shorthand typed-context flow now matches Stage0 in `check` and `run`,
-  - enum accessor runtime output now matches Stage0 for `run|bootstrap/test/cases/enum_accessor.w`,
+  - enum accessor runtime output now matches Stage0 for `run|bootstrap/test/cases/enum_accessor.with`,
   - aggregate enum equality lowering is verifier-clean under MIR->LLVM (no struct `icmp` invalid IR).
 - Wave 10 accepted `KNOWN_DIVERGENCE` set is now:
-  - `ir|bootstrap/test/cases/enum_accessor_ref.w` (`selfhost` correct; Stage0 IR path still lacks accessor-ref lowering).
+  - `ir|bootstrap/test/cases/enum_accessor_ref.with` (`selfhost` correct; Stage0 IR path still lacks accessor-ref lowering).

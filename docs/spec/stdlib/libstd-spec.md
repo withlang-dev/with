@@ -64,7 +64,7 @@ document does not redefine them; each module's header comment does.
 | `mem` | alloc, free_mem, mem_copy, mem_move, mem_set, mem_cmp |
 | `alloc` | Arena, Pool |
 | `hash` | Hasher, DefaultHasher, hash_str, hash_i64, combine |
-| `math` | Seven helpers; transcendentals are width-generic compiler builtins (D42, `src/MathBuiltins.w`) |
+| `math` | Seven helpers; transcendentals are width-generic compiler builtins (D42, `src/MathBuiltins.with`) |
 | `process` | args, env, set_env, exit_code, pid, run, Command |
 | `sys`, `sysinfo`, `os` | cpu_count, total_memory, page_size; os, arch, hostname; Layer-1 wrapper (os_kind, arch_kind, env, set_env, has_env, path_exists, posix_*) |
 | `signal` | sigint, sigterm, sigkill, raise_signal |
@@ -99,8 +99,8 @@ tracks first steps).
 
 `docs/completed/stdlib_sourcing_plan.md` (ruled 2026-09-12) settles which
 containers and algorithms are *facades over migrated corpora* rather
-than native modules, and the corpus registry (`build/corpus.w`,
-`build/corpora.w`) wires each corpus as a `.wo` bundle with its upstream
+than native modules, and the corpus registry (`build/corpus.with`,
+`build/corpora.with`) wires each corpus as a `.wo` bundle with its upstream
 test suite as the drift lane. What that resolves in this plan:
 
 | Corpus | Phase / status | Facades landed | Resolves here |
@@ -133,7 +133,7 @@ These modules are prerequisites for serious programs. Implement first.
 
 #### 1.1 `std.path` — Cross-platform path manipulation
 
-**Status (2026-09-22): not started.** No `lib/std/path.w`; path logic is duplicated privately in `lib/std/build.w` (`tool_path_dirname`, `build_path_dirname`). Native With; first in the refreshed sequencing.
+**Status (2026-09-22): not started.** No `lib/std/path.with`; path logic is duplicated privately in `lib/std/build.with` (`tool_path_dirname`, `build_path_dirname`). Native With; first in the refreshed sequencing.
 
 ```
 type Path {
@@ -221,11 +221,11 @@ No serialization in v1. Parse-only.
 
 #### 1.4 `std.encoding` — Base64 and Hex
 
-**Resolved — landed 2026-08-31 (`aacace23`, `f89a4cec`), specified in `docs/spec/stdlib/std-encoding-rfc4648.md`.** `lib/std/encoding.w` (shared `DecodeError`: `InvalidLength`, `InvalidByte`, `InvalidPadding`, `NonCanonicalBits`) plus `encoding/base64.w` (`base64_encode`/`base64_decode`), `encoding/base64url.w`, `encoding/base16.w` (`base16_encode`/`base16_decode`), `encoding/base32.w`, `encoding/base32hex.w`. Module-prefixed names, `[]u8`/`&str` in, `Result[List[u8], DecodeError]` out. Not exposed: `encoded_len`/`decoded_len`, an upper-case hex encoder.
+**Resolved — landed 2026-08-31 (`aacace23`, `f89a4cec`), specified in `docs/spec/stdlib/std-encoding-rfc4648.md`.** `lib/std/encoding.with` (shared `DecodeError`: `InvalidLength`, `InvalidByte`, `InvalidPadding`, `NonCanonicalBits`) plus `encoding/base64.with` (`base64_encode`/`base64_decode`), `encoding/base64url.with`, `encoding/base16.with` (`base16_encode`/`base16_decode`), `encoding/base32.with`, `encoding/base32hex.with`. Module-prefixed names, `[]u8`/`&str` in, `Result[List[u8], DecodeError]` out. Not exposed: `encoded_len`/`decoded_len`, an upper-case hex encoder.
 
 #### 1.5 `std.testing` — Test framework utilities
 
-**Status (2026-09-22): partial (2 of 14).** `lib/std/testing.w` has `assert`, `require`, `check`, `assert_eq`, `assert_ne`, `assert_matches_failed` (the `expect_eq`/`expect_ne` of this section under the `assert_` name). The rest of the `expect_*` vocabulary, `fail`, `skip`, diff output: not started.
+**Status (2026-09-22): partial (2 of 14).** `lib/std/testing.with` has `assert`, `require`, `check`, `assert_eq`, `assert_ne`, `assert_matches_failed` (the `expect_eq`/`expect_ne` of this section under the `assert_` name). The rest of the `expect_*` vocabulary, `fail`, `skip`, diff output: not started.
 
 ```
 fn expect(cond: bool, msg: str)
@@ -259,7 +259,7 @@ the assertion vocabulary.
 
 #### 1.6 `std.bytes` — Byte buffer for binary protocols
 
-**Status (2026-09-22): not started.** No `Buf`; the endian helpers still live privately in `lib/std/crypto/endian.w` (see 3.7).
+**Status (2026-09-22): not started.** No `Buf`; the endian helpers still live privately in `lib/std/crypto/endian.with` (see 3.7).
 
 ```
 type Buf {
@@ -342,9 +342,9 @@ enum BufError:
 This is the foundation for binary protocol parsing: TLS, HTTP/2,
 DNS, WebSocket frames, serialization formats. Consolidates the
 endian byte manipulation currently scattered across `crypto/*`
-and `net.w`.
+and `net.with`.
 
-Pure With. The `crypto/endian.w` module should be reimplemented
+Pure With. The `crypto/endian.with` module should be reimplemented
 as methods on Buf (or deprecated in favor of Buf).
 
 ---
@@ -355,7 +355,7 @@ These modules make With viable for production CLI tools and servers.
 
 #### 2.1 `std.log` — Structured logging
 
-**Status (2026-09-22): not started.** `lib/std/context.w` carries a `trait Logger`/`NoopLogger` (see 2.5) that this module should absorb or build on.
+**Status (2026-09-22): not started.** `lib/std/context.with` carries a `trait Logger`/`NoopLogger` (see 2.5) that this module should absorb or build on.
 
 ```
 enum Level:
@@ -393,7 +393,7 @@ Thread-safe. The writer function is called under a lock.
 
 #### 2.2 `std.errors` — Enhanced error handling
 
-**Status (2026-09-22): partial (trait landed, module not).** `trait Error { display, source }` is in `lib/std/traits.w:82` (`display` is this section's `message`); `ContextError` in `result.w`. `wrap`, `chain`, `ErrorChain`, `is`, `downcast`: not started.
+**Status (2026-09-22): partial (trait landed, module not).** `trait Error { display, source }` is in `lib/std/traits.with:82` (`display` is this section's `message`); `ContextError` in `result.with`. `wrap`, `chain`, `ErrorChain`, `is`, `downcast`: not started.
 
 ```
 trait Error:
@@ -417,12 +417,12 @@ The `Error` trait provides a standard interface for all error
 types. `wrap` adds context messages. `chain` iterates the
 `.source()` chain for display.
 
-`ContextError` (already in `result.w`) is the concrete wrapper.
+`ContextError` (already in `result.with`) is the concrete wrapper.
 This module adds the trait and traversal utilities.
 
 #### 2.3 `std.unicode` — Unicode and UTF-8
 
-**Status (2026-09-22): not started.** `string.w` has ASCII-only `is_alpha`/`is_digit`/`to_lower`/… on `i32` chars — same names, not codepoint semantics. Sourcing candidate: `utf8proc` (MIT, hardened, tables included) migrated whole and facaded — the shape of module the sourcing rule exists for.
+**Status (2026-09-22): not started.** `string.with` has ASCII-only `is_alpha`/`is_digit`/`to_lower`/… on `i32` chars — same names, not codepoint semantics. Sourcing candidate: `utf8proc` (MIT, hardened, tables included) migrated whole and facaded — the shape of module the sourcing rule exists for.
 
 ```
 fn is_valid_utf8(data: &[u8]) -> bool
@@ -472,7 +472,7 @@ the common cases, not the full Thai/Hangul complexity in v1).
 
 #### 2.4 `std.flag` — Command-line argument parsing
 
-**Status (2026-09-22): not started.** No `FlagSet`; argument parsing is ad hoc in `build.w` and the tools. Native With.
+**Status (2026-09-22): not started.** No `FlagSet`; argument parsing is ad hoc in `build.with` and the tools. Native With.
 
 ```
 type FlagSet {
@@ -509,7 +509,7 @@ registration. This keeps it simple and debuggable.
 
 #### 2.5 `std.context` — Cancellation, deadlines, and scoped values
 
-**Status (2026-09-22): diverged — the name is taken by a different design.** `lib/std/context.w` (2026-05-09) is an ambient execution record: `TraceId`, `CancellationToken`, `trait Logger`, `NoopLogger`, `type Context ephemeral`, `default_context()`. The Go-style cancellation tree below (`with_cancel`/`with_timeout`/`with_deadline`/`with_value`, `done`/`err`/`deadline`, `with`-block integration) is not started and must reconcile with the existing record rather than replace it silently — a design item to rule before implementation.
+**Status (2026-09-22): diverged — the name is taken by a different design.** `lib/std/context.with` (2026-05-09) is an ambient execution record: `TraceId`, `CancellationToken`, `trait Logger`, `NoopLogger`, `type Context ephemeral`, `default_context()`. The Go-style cancellation tree below (`with_cancel`/`with_timeout`/`with_deadline`/`with_value`, `done`/`err`/`deadline`, `with`-block integration) is not started and must reconcile with the existing record rather than replace it silently — a design item to rule before implementation.
 
 ```
 type Context = opaque
@@ -579,11 +579,11 @@ These round out the standard library for production use.
 
 #### 3.1 `std.compress` — Compression
 
-**Resolved by the corpus sourcing plan — landed (`1ca0beac`, `b509e340`).** `lib/std/zlib.w` is the facade over migrated zlib (`lib/std/engines/zlib/`, the second `.wo` bundle): `compress`, `compress_level`, `decompress`, `decompress_with_limit`, `compress_gzip`, `compress_gzip_level`, `decompress_gzip`, `decompress_gzip_with_limit`, `ZlibError`; `&List[u8]` in, `Result[List[u8], ZlibError]` out. The pure-With deflate this section demanded is superseded by the hardenedness rule. Not yet facaded: streaming `Inflater`/`Deflater` (the in-place `z_stream` resource — modeled-C stage 4b/D54 pinned resources are the mechanism) and raw-deflate entry points.
+**Resolved by the corpus sourcing plan — landed (`1ca0beac`, `b509e340`).** `lib/std/zlib.with` is the facade over migrated zlib (`lib/std/engines/zlib/`, the second `.wo` bundle): `compress`, `compress_level`, `decompress`, `decompress_with_limit`, `compress_gzip`, `compress_gzip_level`, `decompress_gzip`, `decompress_gzip_with_limit`, `ZlibError`; `&List[u8]` in, `Result[List[u8], ZlibError]` out. The pure-With deflate this section demanded is superseded by the hardenedness rule. Not yet facaded: streaming `Inflater`/`Deflater` (the in-place `z_stream` resource — modeled-C stage 4b/D54 pinned resources are the mechanism) and raw-deflate entry points.
 
 #### 3.2 `std.archive` — Tar
 
-**Status (2026-09-22): tar not started; ZIP landed instead.** `lib/std/zip.w` (`ZipArchive.open`, `ZipEntry`, `extract`, `ZipError`) reads ZIP archives over minizip in the zlib corpus (`lib/std/engines/zlib/`); the minizip writer waits on `setjmp` (#1217). Tar: the format is small enough for native With; the sourcing rule does not demand a corpus for it.
+**Status (2026-09-22): tar not started; ZIP landed instead.** `lib/std/zip.with` (`ZipArchive.open`, `ZipEntry`, `extract`, `ZipError`) reads ZIP archives over minizip in the zlib corpus (`lib/std/engines/zlib/`); the minizip writer waits on `setjmp` (#1217). Tar: the format is small enough for native With; the sourcing rule does not demand a corpus for it.
 
 ```
 // std.archive.tar
@@ -621,7 +621,7 @@ and large files. UStar format for writing.
 
 #### 3.3 `std.net` enhancements — DNS, addresses, socket options
 
-**Status (2026-09-22): not started (0 of 12).** `net.w` is the original surface plus `socket_close`, `udp_connect`, `sock_port`. `IpAddr`/`SocketAddr`, `resolve`, socket options: none.
+**Status (2026-09-22): not started (0 of 12).** `net.with` is the original surface plus `socket_close`, `udp_connect`, `sock_port`. `IpAddr`/`SocketAddr`, `resolve`, socket options: none.
 
 ```
 // Address types
@@ -658,7 +658,7 @@ DNS resolution requires system configuration awareness
 
 #### 3.4 `std.regex` — Regular expressions
 
-**Resolved — landed (`b0291d9f`), specified in `docs/regex-spec.md`.** `lib/std/regex.w` is the facade over migrated PCRE2 (`lib/std/engines/pcre2/`, the first `.wo` bundle): `Regex.compile`/`compile_flags`, `is_match`, `find`/`find_at`/`find_all`, `captures`/`captures_at`/`captures_all`, `replace`/`replace_all`/`replace_fn`, `split`/`splitn`, `Captures.get/by_name/text`, regex literals `/…/` with `=~`. Complete per its spec.
+**Resolved — landed (`b0291d9f`), specified in `docs/regex-spec.md`.** `lib/std/regex.with` is the facade over migrated PCRE2 (`lib/std/engines/pcre2/`, the first `.wo` bundle): `Regex.compile`/`compile_flags`, `is_match`, `find`/`find_at`/`find_all`, `captures`/`captures_at`/`captures_all`, `replace`/`replace_all`/`replace_fn`, `split`/`splitn`, `Captures.get/by_name/text`, regex literals `/…/` with `=~`. Complete per its spec.
 
 #### 3.5 `std.encoding.csv` — CSV reader/writer
 
@@ -727,9 +727,9 @@ Does not handle: DTD processing, external entities, namespaces
 
 #### 3.7 `std.encoding.binary` — Endian primitives
 
-**Status (2026-09-22): not started (0 exported).** All twelve functions exist by these exact names in `lib/std/crypto/endian.w` but are private and pointer+offset based; promotion is a slice-typed `pub` surface over them.
+**Status (2026-09-22): not started (0 exported).** All twelve functions exist by these exact names in `lib/std/crypto/endian.with` but are private and pointer+offset based; promotion is a slice-typed `pub` surface over them.
 
-Promote the existing `crypto/endian.w` to a proper module.
+Promote the existing `crypto/endian.with` to a proper module.
 
 ```
 fn u16_from_be(data: &[u8]) -> u16
@@ -808,7 +808,7 @@ reaches 1.0.
 
 #### 4.1 `std.url` — URL parsing
 
-**Status (2026-09-22): private partial.** `http_parse_url`/`HttpUrl`/`http_resolve_redirect` are private inside `lib/std/http.w`; this module is their promotion.
+**Status (2026-09-22): private partial.** `http_parse_url`/`HttpUrl`/`http_resolve_redirect` are private inside `lib/std/http.with`; this module is their promotion.
 
 ```
 type Url {
@@ -833,7 +833,7 @@ RFC 3986 compliant parsing.
 
 #### 4.2 `std.io.buffered` — Buffered I/O
 
-**Status (2026-09-22): not started.** `io.w` has `Stdin.lines()` returning a whole `List[str]`; no `BufReader`/`BufWriter`.
+**Status (2026-09-22): not started.** `io.with` has `Stdin.lines()` returning a whole `List[str]`; no `BufReader`/`BufWriter`.
 
 ```
 type BufReader { ... }
@@ -859,7 +859,7 @@ line-at-a-time I/O.
 
 #### 4.3 `std.env` — Environment utilities
 
-**Status (2026-09-22): partial (2 of 9), diverged.** `env`/`set_env` exist in *both* `process.w` and `os.w` (+ `has_env`, `args`) — a second surface instead of the consolidation asked for. `vars`, `remove`, `home_dir`, `temp_dir`, `current_dir`, `set_current_dir`, `current_exe`: none.
+**Status (2026-09-22): partial (2 of 9), diverged.** `env`/`set_env` exist in *both* `process.with` and `os.with` (+ `has_env`, `args`) — a second surface instead of the consolidation asked for. `vars`, `remove`, `home_dir`, `temp_dir`, `current_dir`, `set_current_dir`, `current_exe`: none.
 
 Consolidate and extend `process.env`/`process.set_env`:
 
@@ -941,11 +941,11 @@ Refreshed order for the native remainder, by what it unblocks:
 
 | # | Module | Rationale |
 |---|---|---|
-| 1 | `std.path` | Still unblocks fs, archive, process, env; duplicated privately in `build.w` today |
+| 1 | `std.path` | Still unblocks fs, archive, process, env; duplicated privately in `build.with` today |
 | 2 | `std.env` consolidation | One surface; `home_dir`/`temp_dir`/`current_dir` are prerequisites for path and tools |
-| 3 | `std.bytes` + `std.encoding.binary` | Promote `crypto/endian.w`; foundation for binary protocols and tar |
+| 3 | `std.bytes` + `std.encoding.binary` | Promote `crypto/endian.with`; foundation for binary protocols and tar |
 | 4 | `std.testing` `expect_*` | Better tests for everything after |
-| 5 | `std.log` | Absorb `context.w`'s `Logger`; needed for real programs |
+| 5 | `std.log` | Absorb `context.with`'s `Logger`; needed for real programs |
 | 6 | `std.flag` | CLI tools are the first users (the compiler's own tools included) |
 | 7 | `std.toml` | With must parse its own config; sourcing candidate `tomlc99` to rule |
 | 8 | `std.errors` chains | `wrap`/`chain` over the landed trait |
@@ -953,9 +953,9 @@ Refreshed order for the native remainder, by what it unblocks:
 | 10 | `std.unicode` | Sourcing candidate `utf8proc` to rule; else native tables |
 | 11 | `std.archive.tar` | Native; ZIP reading already landed |
 | 12 | `std.net` enhancements | DNS, addresses, socket options |
-| 13 | `std.url` | Promote `http.w`'s private parser |
+| 13 | `std.url` | Promote `http.with`'s private parser |
 | 14 | `std.io.buffered` | Reduces syscall overhead |
-| 15 | `std.context` cancellation | Reconcile with the existing `context.w` record (ruling) |
+| 15 | `std.context` cancellation | Reconcile with the existing `context.with` record (ruling) |
 | 16 | `std.encoding.csv`, `.xml` | Data interchange; `.xml` landed native (D135) |
 | 17 | `std.debug` | Stack traces, panic hooks |
 | 18 | `std.semver` | Package management support |

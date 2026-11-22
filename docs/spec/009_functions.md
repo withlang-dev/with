@@ -306,12 +306,12 @@ introduced concurrency and offer the remedies (wrap in `Atomic` /
 
 ```
 error[E0921]: mutation of global `counter` may race
-  --> src/serve.w:40:5
+  --> src/serve.with:40:5
    |
 40 |     counter += 1
    |     ^^^^^^^^^^^^ global mutated here
    |
-  ::: src/serve.w:12:9
+  ::: src/serve.with:12:9
    |
 12 |     let task = handle(conn)     // program creates fibers here
    |
@@ -1388,7 +1388,7 @@ If `C` does not implement `Contains[T]`, the compiler emits:
 
 ```
 error[E0277]: cannot test membership of `Foo` in `Bar`
-  --> src/main.w:12:15
+  --> src/main.with:12:15
    |
 12 |     if x in bar:
    |           ^^ `Bar` does not implement `Contains[Foo]`

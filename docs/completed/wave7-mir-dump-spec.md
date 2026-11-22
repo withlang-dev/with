@@ -1,7 +1,7 @@
 # Wave 7 MIR Dump Specification
 
 This document defines the deterministic text format emitted by
-`with check <file.w> --dump-mir`.
+`with check <file.with> --dump-mir`.
 
 ## Header
 

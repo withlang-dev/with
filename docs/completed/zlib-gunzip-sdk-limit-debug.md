@@ -1,7 +1,7 @@
 # The gunzip build helper also depended on an SDK export
 
 After SDK-origin declarations were removed from the promoted zlib definitions,
-`build/zlib_gunzip.w:79` still referenced `UINT_MAX`. This helper is used by
+`build/zlib_gunzip.with:79` still referenced `UINT_MAX`. This helper is used by
 both reference-fetch actions and is covered by `build-helper-programs`.
 
 The failing `zlib-reference` action reported both undefined references on

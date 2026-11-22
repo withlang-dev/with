@@ -2,7 +2,7 @@
 
 ## Scope
 - [x] Add tuple concurrent-await language semantics to the spec.
-- [x] Add collection await combinators to the stdlib (`lib/std/async.w`).
+- [x] Add collection await combinators to the stdlib (`lib/std/async.with`).
 - [x] Add idiomatic and migration guide sections for concurrent await usage.
 
 ## 1. Spec Change (`docs/with-specification.md`)
@@ -26,13 +26,13 @@
       calls `with_fiber_await` and unpacks i64 result. Tuple await supported.
       Async blocks with captures still deferred.
 
-      ### 2a. Async Runtime Function Declarations (`src/Codegen.w`) — DONE
+      ### 2a. Async Runtime Function Declarations (`src/Codegen.with`) — DONE
       Implemented `ensure_async_runtime_declared()` which lazily declares all fiber
       runtime functions: `with_runtime_init/run/shutdown`, `with_fiber_spawn/await/
       cancel/set_result/yield/select`. Also added `ensure_malloc_declared()` for
       args struct heap allocation, `pack_result_to_i64`, `unpack_result_from_i64`.
 
-      ### 2b. Async Function Declaration (`src/Codegen.w`) — DONE
+      ### 2b. Async Function Declaration (`src/Codegen.with`) — DONE
       Implemented `declare_async_function()` and `gen_async_function()`:
       - [x] `declare_async_function`: creates `name_async` (impl), `name_fiber`
             (trampoline), `name` (spawn wrapper) LLVM functions.
@@ -42,12 +42,12 @@
       - [x] Pass 1 routes FN_FLAG_ASYNC to `declare_async_function`.
       - [x] Pass 2 routes FN_FLAG_ASYNC to `gen_async_function`.
 
-      ### 2c. Implement `gen_await` for Single Task (`src/Codegen.w`) — DONE
+      ### 2c. Implement `gen_await` for Single Task (`src/Codegen.with`) — DONE
       - [x] Evaluates inner expression → task ID (i32).
       - [x] Calls `with_fiber_await(task_id)` → i64.
       - [x] Unpacks i64 to expected type (i32 trunc, i64 passthrough, ptr inttoptr).
 
-      ### 2d. Implement `gen_await` for Tuple Case (`src/Codegen.w`) — DONE
+      ### 2d. Implement `gen_await` for Tuple Case (`src/Codegen.with`) — DONE
       - [x] Detects NK_TUPLE in await node.
       - [x] For each element: gen_expr → task_id → with_fiber_await → unpack.
       - [x] Builds result tuple via insert_value.
@@ -66,20 +66,20 @@
       ID. The existing passthrough is correct.
 
       ### 2g. Tests — PARTIAL
-      - [x] `test/wave9/cases/runtime_linkage_async_ok.w` — single async fn + await.
-      - [x] `test/cases/async_basic.w` — multi-param async fn, multiple awaits.
+      - [x] `test/wave9/cases/runtime_linkage_async_ok.with` — single async fn + await.
+      - [x] `test/cases/async_basic.with` — multi-param async fn, multiple awaits.
       - [x] Stage chain passes with async codegen changes.
-      - [x] Tuple await runtime test (`test/cases/async_tuple_await.w`).
-      - [x] Async block with captures test (`test/cases/async_block_capture.w`).
+      - [x] Tuple await runtime test (`test/cases/async_tuple_await.with`).
+      - [x] Async block with captures test (`test/cases/async_block_capture.with`).
 
-      ### 2h. Linker Fix (`src/compiler/Link.w`)
+      ### 2h. Linker Fix (`src/compiler/Link.with`)
       - [x] Added `_with_fiber_` symbol detection to `link_stage_object_needs_fiber_runtime`
             so fiber.o/fiber_asm.o are linked when async functions generate fiber calls.
 - [x] Add diagnostics for invalid tuple-await arity and non-task tuple elements.
 - [x] Validate tuple-await + `?` behavior for tuple-of-`Result` tasks.
 
-## 3. Stdlib Change (`lib/std/async.w`)
-- [x] Add new module `lib/std/async.w`.
+## 3. Stdlib Change (`lib/std/async.with`)
+- [x] Add new module `lib/std/async.with`.
 - [x] Add `pub async fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T], E]`.
 - [x] Add `pub async fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]`.
 - [x] Add `pub async fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T`.
@@ -91,7 +91,7 @@
 - [x] Add optional `pub fn with_concurrency[T](tasks: impl IntoIter[Task[T]], n: i32) -> impl IntoIter[Task[T]]`.
 
 Implementation note:
-- `lib/std/async.w` now contains concrete implementations for all declared combinators.
+- `lib/std/async.with` now contains concrete implementations for all declared combinators.
 - Self-host runtime tests and parity are tracked via:
   - `scripts/run_fix_more_annoyances_async_selfhost_tests.sh`
   - `scripts/run_fix_more_annoyances_async_parity.sh`
@@ -133,7 +133,7 @@ Implementation note:
 Test assets:
 - `scripts/run_fix_more_annoyances_async_selfhost_tests.sh`
 - `scripts/run_fix_more_annoyances_async_parity.sh`
-- `test/annoyances/cases/*.w`
+- `test/annoyances/cases/*.with`
 - `test/annoyances/async_parity_corpus.txt` (`KNOWN_DIVERGENCE` tracked per case)
 
 ## 7. Decisions to Lock Before Implementation
@@ -163,17 +163,17 @@ Stdlib async combinators use `impl IntoIter[T]` signatures.
 - [x] Update iterator-facing stdlib pipeline functions (`map`, `filter`, `count`, and peers) to accept `impl IntoIter[T]` instead of `Iter[T]`.
 - [x] Add `for x in vec` support — Vec for-loop codegen implemented via `gen_for_vec`
       using `with_vec_get_ptr` runtime function. Supports break/continue.
-      Tests: `test/cases/for_vec_basic.w`, `test/cases/for_vec_break.w`.
+      Tests: `test/cases/for_vec_basic.with`, `test/cases/for_vec_break.with`.
 - [x] Add compiler behavior for iterator pipeline support.
       Parser blocker RESOLVED: generic trait parameters (`trait Iter[T]`) now parse.
-      `Iter[T]` and `IntoIter[T]` trait definitions added to `lib/std/traits.w`.
+      `Iter[T]` and `IntoIter[T]` trait definitions added to `lib/std/traits.with`.
       For-loop Vec iteration DONE. Iterator pattern with Option return DONE.
       `.Some(val)` and `.None` variant shorthand in methods FIXED.
 
       ### 9a. Iterator Infrastructure — DONE (concrete i32)
-      - [x] `VecIter_i32` type in `lib/std/collections.w` with `next() -> Option[i32]`.
-      - [x] `vec_iter_i32(v: Vec[i32]) -> VecIter_i32` function in `lib/std/collections.w`.
-      - [x] `iter_sum(iter: VecIter_i32) -> i32` function in `lib/std/iter.w`.
+      - [x] `VecIter_i32` type in `lib/std/collections.with` with `next() -> Option[i32]`.
+      - [x] `vec_iter_i32(v: Vec[i32]) -> VecIter_i32` function in `lib/std/collections.with`.
+      - [x] `iter_sum(iter: VecIter_i32) -> i32` function in `lib/std/iter.with`.
       - [x] `with_ptr_get_i32` runtime function for raw pointer element access.
       - [x] Existing `sum`, `filter`, `map` continue to accept Vec directly (no regression).
       - [x] `count[T](arr: [T])` and `contains` unchanged for arrays.
@@ -188,9 +188,9 @@ Stdlib async combinators use `impl IntoIter[T]` signatures.
       for the current stdlib.
 
       ### 9c. Tests — PARTIAL
-      - [x] `Vec[i32] |> sum` works: `test/cases/for_vec_pipeline.w`.
-      - [x] `vec_iter_i32(v) |> iter_sum` works: `test/cases/vec_iter_pipeline.w`.
-      - [x] `VecIter_i32.next() -> Option[i32]` works: `test/cases/vec_iter_basic.w`.
+      - [x] `Vec[i32] |> sum` works: `test/cases/for_vec_pipeline.with`.
+      - [x] `vec_iter_i32(v) |> iter_sum` works: `test/cases/vec_iter_pipeline.with`.
+      - [x] `VecIter_i32.next() -> Option[i32]` works: `test/cases/vec_iter_basic.with`.
       - [ ] `vec.iter() |> sum` — needs `.iter()` method on Vec (method dispatch
             on generic types blocked by sema type erasure).
       - [ ] Custom type with IntoIter — needs generic trait type param resolution.
@@ -203,7 +203,7 @@ Stdlib async combinators use `impl IntoIter[T]` signatures.
       - `.None` uses `current_ret_type` to find the correct Option type.
 
 - [x] Preserve explicit `.iter()` behavior (no regression) and keep method-resolution deterministic.
-- [x] Add tests for Vec pipelines: `test/cases/for_vec_pipeline.w`, `test/cases/vec_iter_pipeline.w`.
+- [x] Add tests for Vec pipelines: `test/cases/for_vec_pipeline.with`, `test/cases/vec_iter_pipeline.with`.
 - [x] Document this as ergonomics behavior in guides (no new syntax).
 
 ## 10. Drop `collect` When Target Type Is Known (REMOVED)
@@ -230,7 +230,7 @@ match and enforces exhaustiveness only in expression position.
 - [x] Keep existing reachability/usefulness diagnostics where still applicable.
 - [x] Update spec and guides to clarify this split behavior with examples.
 - [x] Add regression tests for expression-required exhaustiveness and statement partial matching.
-      `test/cases/partial_match_stmt.w` tests partial enum match in statement
+      `test/cases/partial_match_stmt.with` tests partial enum match in statement
       position (no warning) and exhaustive enum match in expression position.
 - [x] Partial match is NOT allowed on `@[must_use]` types (e.g. Result, Task). If the type is `@[must_use]`, match must be exhaustive or have an explicit `_ -> ...` arm. This prevents silently ignoring Err arms which contradicts `@[must_use]` semantics.
 
@@ -250,12 +250,12 @@ match and enforces exhaustiveness only in expression position.
       - [x] Warning emitted: "non-exhaustive match: missing variant" (same as expr position).
 
       ### 12c. Tests — DONE
-      - [x] `test/cases/must_use_match.w` tests:
+      - [x] `test/cases/must_use_match.with` tests:
             - Custom `@[must_use]` type with exhaustive match (ok)
             - Custom `@[must_use]` type with wildcard arm (ok)
             - Non-must-use type partial match in statement position (ok)
       - [x] Result partial match in statement position triggers warning (verified manually).
-      - [x] Non-must-use enum partial match unchanged (test/cases/partial_match_stmt.w).
+      - [x] Non-must-use enum partial match unchanged (test/cases/partial_match_stmt.with).
 
 KNOWN_DIVERGENCE: Wildcard (`_`) pattern on enum types does not match
 variants beyond index 1. This is a pre-existing codegen bug in the enum
@@ -271,16 +271,16 @@ Only types/traits that exist as With source in `lib/std/` should be in the prelu
 - [x] Add `Debug`, `Display`, `Default`, `Eq`, `Hash`, `Ord`, `Drop`, `Scoped`, `ScopedMut` to prelude exports.
       Iter/IntoIter skipped — parser doesn't support generic trait parameters yet.
 
-      ### 13a. Create Trait Definitions in `lib/std/traits.w`
+      ### 13a. Create Trait Definitions in `lib/std/traits.with`
       The compiler already handles trait declarations (NK_TRAIT_DECL, `collect_trait_decl`
-      in Sema.w lines 1298-1328). These names are registered as builtin trait names
-      in `sema_is_builtin_trait_name()` (Sema.w lines 1329-1340), but have no source
+      in Sema.with lines 1298-1328). These names are registered as builtin trait names
+      in `sema_is_builtin_trait_name()` (Sema.with lines 1329-1340), but have no source
       definitions. Creating source definitions lets them be imported via prelude and
       enables `impl TraitName for MyType` in user code.
 
       Trait extra layout: `[assoc_count, [assoc_name, bound_count, bounds..., default_type]*, method_count, [method_name, method_flags, param_start, param_count, ret_type, default_body]*]`
 
-      - [x] Create `lib/std/traits.w` with the following trait declarations:
+      - [x] Create `lib/std/traits.with` with the following trait declarations:
             ```
             pub trait Eq =
                 fn eq(self: Self, other: Self) -> bool
@@ -310,36 +310,36 @@ Only types/traits that exist as With source in `lib/std/` should be in the prelu
       - [x] Ensure builtin trait name list in `sema_is_builtin_trait_name()` still matches.
             Source definitions coexist with builtin handling — both mechanisms work.
       - [x] Verify `impl Eq for MyType` works with the source-defined trait.
-            `test/cases/prelude_traits.w` and `test/cases/trait_impl_builtin.w` verify.
+            `test/cases/prelude_traits.with` and `test/cases/trait_impl_builtin.with` verify.
 
       ### 13b. Add Traits to Prelude
-      - [x] Add `use std.traits` to `lib/std/prelude.w`.
-      - [x] Add `use std.traits` to `lib/std/prelude_core.w`.
+      - [x] Add `use std.traits` to `lib/std/prelude.with`.
+      - [x] Add `use std.traits` to `lib/std/prelude_core.with`.
       - [x] Verify trait names are available without explicit `use` in user code.
-            `test/cases/prelude_traits.w` uses `impl Eq for Point` without explicit import.
+            `test/cases/prelude_traits.with` uses `impl Eq for Point` without explicit import.
 
       ### 13c. Implement Core Trait Impls for Builtin Types — DONE
       These are the minimum impls needed to make the traits useful.
-      - [x] Fix codegen for `impl Trait for i32` — three fixes in `src/Codegen.w`:
+      - [x] Fix codegen for `impl Trait for i32` — three fixes in `src/Codegen.with`:
             1. `declare_function`: Only lower method self as pointer for struct/enum types, not primitives.
             2. `gen_method_call`: Infer primitive type names from LLVM types (i32_ty→"i32", i1_ty→"bool").
             3. `gen_method_call`: Recognize primitive type names for static method calls (`i32.default()`).
-      - [x] `impl Eq for i32`, `impl Eq for bool` in `lib/std/traits.w`.
-      - [x] `impl Default for i32` (returns 0), `impl Default for bool` (returns false) in `lib/std/traits.w`.
-      - [x] `test/cases/trait_impl_primitive.w` — uses prelude-provided impls, tests method dispatch.
+      - [x] `impl Eq for i32`, `impl Eq for bool` in `lib/std/traits.with`.
+      - [x] `impl Default for i32` (returns 0), `impl Default for bool` (returns false) in `lib/std/traits.with`.
+      - [x] `test/cases/trait_impl_primitive.with` — uses prelude-provided impls, tests method dispatch.
       - [x] `impl Eq for i64`, `impl Eq for str` — codegen fix: user-defined Type.method
             lookup now runs BEFORE builtin handlers (gen_str_method, gen_vec_method, etc.),
             so trait impls on builtin types are found. str excluded from ptr param lowering
             since it has value semantics for `==` via `with_str_eq`.
-            Tests: `test/cases/trait_impl_str.w`, `test/cases/trait_impl_i64.w`.
+            Tests: `test/cases/trait_impl_str.with`, `test/cases/trait_impl_i64.with`.
       - [x] `impl Debug for i32`, `impl Debug for bool` — uses `int_to_string` from runtime
-            (`extern fn int_to_string` declared in `lib/std/builtins.w`).
-            Test: `test/cases/trait_impl_debug.w`.
+            (`extern fn int_to_string` declared in `lib/std/builtins.with`).
+            Test: `test/cases/trait_impl_debug.with`.
       - [x] `impl Debug for str` — wraps in quotes using `++`. Fixed heap corruption
             from `record_local_pointee_struct` being called for str method params.
-            Test: `test/cases/trait_impl_debug.w`.
+            Test: `test/cases/trait_impl_debug.with`.
       - [x] `impl Hash for i32`, `impl Hash for i64`, `impl Hash for bool`, `impl Hash for str`
-            — inline FNV hash. Test: `test/cases/trait_impl_hash.w`.
+            — inline FNV hash. Test: `test/cases/trait_impl_hash.with`.
 
       ### 13c½. Fix `is_local_decl` Bug — DONE
       After import merging, decl order is: prelude → user imports → root.
@@ -359,11 +359,11 @@ Only types/traits that exist as With source in `lib/std/` should be in the prelu
             primitive trait impl examples.
 - [x] Add compile tests proving these names work without explicit `use`.
       - [x] Test: `impl Eq for MyStruct` compiles without `use std.traits`.
-            `test/cases/prelude_traits.w` — `impl Eq for Point`
+            `test/cases/prelude_traits.with` — `impl Eq for Point`
       - [x] Test: `impl Debug for MyStruct` compiles without `use std.traits`.
-            `test/cases/prelude_traits.w` — `impl Debug for Point`
+            `test/cases/prelude_traits.with` — `impl Debug for Point`
       - [x] Test: `impl Default for MyStruct` compiles and runs.
-            `test/cases/trait_impl_builtin.w` — `impl Default for MyInt`
+            `test/cases/trait_impl_builtin.with` — `impl Default for MyInt`
 - [x] Add a follow-up tracking task: audit first 20 real programs and adjust prelude as needed.
 
 Follow-up tracking task: `Wave 6+ prelude audit` — run the first 20 real self-host programs, collect missing/over-eager prelude names, and adjust the default prelude set.
@@ -373,9 +373,9 @@ Follow-up tracking task: `Wave 6+ prelude audit` — run the first 20 real self-
 - [x] Implement sema coercions for allowed widenings in assignments, call args, returns, and expression unification.
 - [x] Keep narrowing conversions explicit-only via `as`, with unchanged hard errors.
 - [x] Add tests for accepted widenings and rejected narrowings across literals and typed values.
-      `test/cases/widening_conversions.w` tests i32→i64 in let bindings,
+      `test/cases/widening_conversions.with` tests i32→i64 in let bindings,
       function arguments, and arithmetic (i32 + i64 → i64). Basic narrowing
-      rejection test exists in `test/cases/behav_spec_sema.w`.
+      rejection test exists in `test/cases/behav_spec_sema.with`.
 - [x] Add migration-guide examples showing where explicit casts are no longer needed.
 
 ## 15. Precondition Functions: `require` and `check`
@@ -414,9 +414,9 @@ of forcing error handling on the caller for programming bugs.
 
 ### Compiler
 - [x] Register `require` and `check` as prelude builtin functions in sema.
-      Added to `lib/std/builtins.w`, imported via prelude.
+      Added to `lib/std/builtins.with`, imported via prelude.
 - [x] Implement lazy message evaluation (do not evaluate the format string when the condition holds).
-      `gen_precondition_call` in `src/Codegen.w` branches on condition;
+      `gen_precondition_call` in `src/Codegen.with` branches on condition;
       message expression is only generated in the fail branch.
 - [x] Implement distinct panic messages that include the function name (`require` vs `check`) and the user-provided message.
       Output: `assert` → "assertion failed", `require` → "IllegalArgumentError: {msg}",
@@ -424,12 +424,12 @@ of forcing error handling on the caller for programming bugs.
 - [x] Ensure `require` and `check` are available without explicit `use` (prelude).
 
 ### Stdlib / Runtime
-- [x] Add `require` and `check` implementations in `lib/std/builtins.w`.
+- [x] Add `require` and `check` implementations in `lib/std/builtins.with`.
       Fallback implementations call `with_panic(msg, "", 0)`.
       Codegen intercepts calls for lazy evaluation and prefixed stderr output.
 - [x] Define `IllegalArgumentError` and `IllegalStateError` types (or string tags) used in panic output.
       String tags printed as stderr prefixes by `gen_precondition_call`.
-- [x] Added `wl_get_named_global` to `runtime/llvm_bridge.c` and `src/Codegen.w`
+- [x] Added `wl_get_named_global` to `runtime/llvm_bridge.c` and `src/Codegen.with`
       to fix duplicate `__stderrp` global declarations.
 
 ### Tests
@@ -438,11 +438,11 @@ of forcing error handling on the caller for programming bugs.
 - [x] Add test: `check(true, ...)` does not panic.
 - [x] Add test: `check(false, ...)` panics with `IllegalStateError` and the message.
 - [x] Add test: lazy message — side-effecting expression in message is not evaluated when condition is true.
-      `test/cases/precondition_lazy.w` — calls `side_effect()` (which prints)
+      `test/cases/precondition_lazy.with` — calls `side_effect()` (which prints)
       as message arg to `require(true, ...)` and `check(true, ...)`. Output
       contains only "ok", confirming the message expression is not evaluated.
 - [x] Add test: `require` and `check` are available without `use` (prelude).
-      `test/cases/precondition_basic.w` tests happy-path + prelude availability.
+      `test/cases/precondition_basic.with` tests happy-path + prelude availability.
 
 ### Docs
 - [x] Update `docs/with-specification.md` prelude section with `require` and `check`.
@@ -466,7 +466,7 @@ of forcing error handling on the caller for programming bugs.
       - Codegen: Vec LLVM type names use heap addresses, causing IR non-determinism.
       - Codegen: struct type forward reference — if struct is defined after main, method
         calls on it may crash. Type must be defined before first use.
-      - Bootstrap tests `generic_identity.w`/`generic_struct_fn.w` use `println(i32)`
+      - Bootstrap tests `generic_identity.with`/`generic_struct_fn.with` use `println(i32)`
         which self-host doesn't support (println only accepts str).
 
 ## Completion Summary

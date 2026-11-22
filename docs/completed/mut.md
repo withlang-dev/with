@@ -1232,7 +1232,7 @@ print(first)
 
 ```text
 error: cannot mutate `xs` while read-only view `first` is live
-  --> example.w:4:5
+  --> example.with:4:5
    |
 3  |     let first = &xs[0]
    |                 ------ view created here

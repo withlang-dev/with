@@ -4,9 +4,9 @@
 
 ```
 env -i PATH=/usr/bin:/bin HOME=/Users/eric \
-  ./out/release/bin/with test test/spec/spec_ss03_9_box_dyn_coercion.w   # FAILS
+  ./out/release/bin/with test test/spec/spec_ss03_9_box_dyn_coercion.with   # FAILS
 env -i PATH=/usr/bin:/bin HOME=/Users/eric X=1 \
-  ./out/release/bin/with test test/spec/spec_ss03_9_box_dyn_coercion.w   # PASSES
+  ./out/release/bin/with test test/spec/spec_ss03_9_box_dyn_coercion.with   # PASSES
 ```
 
 Any env/argv byte change re-rolls the lottery (adding ONE var flips it; `check`
@@ -36,7 +36,7 @@ exact `test` argv — anything else observes a different world.
 - `check_generic_method_body_concrete` breakpoint: exactly ONE hit in BOTH
   failing and passing envs (x2=0x239 x3=0x184) — either not the divergence
   point or my register reading of its args is wrong. Only 3 `__receiver__`
-  name producers exist (SemaCheck.w 17136/17244/17299).
+  name producers exist (SemaCheck.with 17136/17244/17299).
 - Both envs' `analyze facts` dumps are byte-identical (8670 facts) and DO
   contain the Box.new specialization — because the analyze argv re-rolls the
   lottery. Do not trust any observation that changes argv/env.

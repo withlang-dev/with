@@ -30,7 +30,7 @@ priority.**
 ### Optimization level: ALWAYS `-O1`, NEVER `-O0`
 
 Every stage, runtime object and the release binary are built at `-O1`; there
-is no `-O0` in `build.w` / `build/*.w` — an invariant, not a preference. `-O0`
+is no `-O0` in `build.with` / `build/*.with` — an invariant, not a preference. `-O0`
 is pathologically slow (a 26k-line module: 31+ min vs seconds), and `-O1` is
 fully deterministic: a fixpoint break under `-O1` is a real nondeterminism bug
 (`with build :fixpoint-diff`), and a bug only at `-O1` is a real UB or
@@ -69,7 +69,7 @@ The iterate tier (`with check`, `with build :dev`) uses the installed compiler.
 seed and the host (`~/.local/with-green/green.tsv`). The inputs are the
 committed tree without `docs/` and top-level `*.md` (the build measures
 software, not documents, Eric 2026-09-21; D50: key on what the output is made
-from). `GreenEvidence.w` and `build/retention.w` apply the same rule and must
+from). `GreenEvidence.with` and `build/retention.with` apply the same rule and must
 agree byte for byte. After a squash-merge of a battery-green branch, the
 reseed on main is `git pull`, `src/main build`, `out/release/bin/with build
 :install-user`: no second `:fixpoint` or `:test`. The gate refuses a dirty
@@ -126,18 +126,18 @@ PRs as one commit, 2026-09-22).
 Each PR must be green and buildable from a tagged seed release that exists
 before it merges; if a change needs a newer seed, tag one first. The pinned
 seed is `seed.lock` (version and per-platform digests); every CI lane and `with
-build :seed` read it, and the local battery is driven by it: `build.w`,
-`build/*.w` and `lib/std/build.w` are comptime-evaluated by the driver under
+build :seed` read it, and the local battery is driven by it: `build.with`,
+`build/*.with` and `lib/std/build.with` are comptime-evaluated by the driver under
 the pinned seed's evaluator. `seed-driver` refuses any other driver and any
 workflow pin that disagrees with the lock. A language or evaluator feature used
 in the build layer raises the minimum seed — never revert the surface to
 appease an old seed (Eric, 2026-09-04): cut a newer seed, bump `seed.lock`
-(`with run tools/bump_seed_pins.w`, `with build :seed`), then land the change.
+(`with run tools/bump_seed_pins.with`, `with build :seed`), then land the change.
 (Main was unbuildable by every published seed for two days, 2026-09-02..04;
 `seed-driver` red is stop-the-line.)
 
 ### The seed compiler is frozen
-The installed compiler at `~/.local/bin/with` has its own Link.w, embedded
+The installed compiler at `~/.local/bin/with` has its own Link.with, embedded
 runtime objects and codegen baked in; editing source files does not change it
 until you install a new seed.
 
@@ -145,15 +145,15 @@ until you install a new seed.
 It updates the seed, and a broken seed breaks all future builds. Install only
 after `with build :fixpoint` passes on committed code.
 
-### Never change Link.w and runtime files in the same commit
-Commit 1: new exports in rt_core.w (old link path still works). Commit 2:
-Link.w (new path activates). Each must independently pass `:fixpoint`.
+### Never change Link.with and runtime files in the same commit
+Commit 1: new exports in rt_core.with (old link path still works). Commit 2:
+Link.with (new path activates). Each must independently pass `:fixpoint`.
 
 ### Bootstrap order for runtime migration
 1. Checkout all runtime/link files to the last green state.
 2. `with build && with build :fixpoint` (green baseline).
-3. Apply rt_core.w changes only (new exports, ABI fixes); build and fixpoint.
-4. Apply Link.w changes; stage1 is built with the old seed (old link path),
-   stage1 has the new Link.w and builds stage2 with the new path.
+3. Apply rt_core.with changes only (new exports, ABI fixes); build and fixpoint.
+4. Apply Link.with changes; stage1 is built with the old seed (old link path),
+   stage1 has the new Link.with and builds stage2 with the new path.
 5. `with build :fixpoint` (stage2 == stage3 converges); then `with build
    :install` (seed updated).

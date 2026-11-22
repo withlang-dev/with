@@ -60,7 +60,7 @@ au User lsp_setup call lsp#register_server({
     \ 'allowlist': ['with'],
     \ })
 
-au BufRead,BufNewFile *.w set filetype=with
+au BufRead,BufNewFile *.with set filetype=with
 ```
 
 Using [coc.nvim](https://github.com/neoclide/coc.nvim), add to

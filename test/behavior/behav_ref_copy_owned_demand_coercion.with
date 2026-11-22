@@ -1,0 +1,17 @@
+//! expect-stdout: ok
+
+// Were test/compile_errors/err_ref_copy_no_binding_coercion.with and
+// err_ref_copy_no_return_coercion.with. Their headers pinned the pre-D22 verdict
+// "only until the approved implementation flips it into a must-compile
+// fixture": under D22, an annotated binding and a declared return type are
+// owned-value demands, so a `&i32` materializes an independent i32.
+
+fn copied_return(reference: &i32) -> i32: reference
+
+fn main:
+    let value: i32 = 42
+    let reference = &value
+    let copied: i32 = reference
+    assert(copied == 42)
+    assert(copied_return(&value) == 42)
+    print("ok")

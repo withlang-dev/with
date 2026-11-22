@@ -16,7 +16,7 @@ The rules agents and maintainers work by are in [CLAUDE.md](CLAUDE.md)
 - No system LLVM. The toolchain builds its own static LLVM/Clang/lld SDK
   (`tools/build-static-llvm.sh`, under `.deps/`); the release binary embeds it.
 - A `with` compiler. The repo is 100% With: every tool and script is a `.w`
-  file (`with run tools/x.w`).
+  file (`with run tools/x.with`).
 
 ### The seed
 
@@ -40,15 +40,15 @@ The release compiler is `out/release/bin/with`; the stages are
 ### The Compiler Pipeline
 
 ```
-source.w
-    → Lexer (src/Lexer.w)         tokens
-    → Parser (src/Parser.w)       AST
-    → Resolve (src/Resolve.w)     import graph, name resolution
-    → Sema (src/Sema.w)           type checking, trait resolution
-    → MIR (src/MirLower.w)        desugared control flow graph
-    → Async MIR (src/AsyncMir.w)  async/await lowering
-    → Codegen (src/Codegen.w)     LLVM IR via llvm_bridge.c
-    → Link (src/compiler/Link.w)  binary
+source.with
+    → Lexer (src/Lexer.with)         tokens
+    → Parser (src/Parser.with)       AST
+    → Resolve (src/Resolve.with)     import graph, name resolution
+    → Sema (src/Sema.with)           type checking, trait resolution
+    → MIR (src/MirLower.with)        desugared control flow graph
+    → Async MIR (src/AsyncMir.with)  async/await lowering
+    → Codegen (src/Codegen.with)     LLVM IR via llvm_bridge.c
+    → Link (src/compiler/Link.with)  binary
 ```
 
 Each phase has a `--dump-*` flag that prints its output and stops:
@@ -59,38 +59,38 @@ Each phase has a `--dump-*` flag that prints its output and stops:
 
 ```
 src/
-    main.w              CLI entry point
-    Lexer.w             tokenizer
-    Token.w             token types
-    Parser.w            AST construction
-    Ast.w               AST node types and pool
-    Resolve.w           name resolution and import graph
-    Sema.w              type checking
-    MirLower.w          typed IR → MIR lowering
-    Mir.w               MIR data structures
-    AsyncMir.w          async/await MIR transformation
-    Codegen.w           MIR → LLVM IR
-    CCodegen.w          MIR → C (--emit-c backend)
+    main.with              CLI entry point
+    Lexer.with             tokenizer
+    Token.with             token types
+    Parser.with            AST construction
+    Ast.with               AST node types and pool
+    Resolve.with           name resolution and import graph
+    Sema.with              type checking
+    MirLower.with          typed IR → MIR lowering
+    Mir.with               MIR data structures
+    AsyncMir.with          async/await MIR transformation
+    Codegen.with           MIR → LLVM IR
+    CCodegen.with          MIR → C (--emit-c backend)
     compiler/
-        Compilation.w   orchestration root
-        Zcu.w           canonical compilation state
-        Frontend.w      lex/parse/import/prelude injection
-        Backend.w       backend dispatch
-        Link.w          linker invocation and runtime policy
-        Config.w        build configuration
+        Compilation.with   orchestration root
+        Zcu.with           canonical compilation state
+        Frontend.with      lex/parse/import/prelude injection
+        Backend.with       backend dispatch
+        Link.with          linker invocation and runtime policy
+        Config.with        build configuration
 
 lib/
     std/                standard library (With source)
-        prelude.w       implicitly imported into every module
-        iter.w          iterator functions
-        string.w        string operations
+        prelude.with       implicitly imported into every module
+        iter.with          iterator functions
+        string.with        string operations
         ...
 
 rt/
-    rt_core.w           core runtime (With source)
-    llvm_bridge.w       LLVM-C API bridge
-    clang_bridge.w      libclang bridge
-    fiber_core_darwin.w fiber runtime
+    rt_core.with           core runtime (With source)
+    llvm_bridge.with       LLVM-C API bridge
+    clang_bridge.with      libclang bridge
+    fiber_core_darwin.with fiber runtime
     ...
 
 runtime/
@@ -111,7 +111,7 @@ byte-identical — that's the fixpoint. When you change the
 compiler, you're changing the program that compiles itself.
 
 **SoA and handles.** The compiler uses Struct-of-Arrays layout
-with `i32` handles instead of pointers. `Ast.w` stores nodes as
+with `i32` handles instead of pointers. `Ast.with` stores nodes as
 parallel arrays indexed by node ID. This is cache-friendly and
 avoids reference management. You'll see patterns like
 `node_kinds[id]`, `node_spans[id]` everywhere.
@@ -121,7 +121,7 @@ backend consume MIR. All syntactic sugar is gone by MIR — no
 `|>`, no `?.`, no `with` blocks, no implicit returns. Just
 basic blocks, assignments, branches, calls, and drops.
 
-**The prelude.** Every module implicitly imports `lib/std/prelude.w`.
+**The prelude.** Every module implicitly imports `lib/std/prelude.with`.
 Functions like `println`, `map`, `filter` are normal With functions
 made ambient by the prelude, not compiler builtins.
 
@@ -135,8 +135,8 @@ Each tier runs only what it must prove.
 
 | Tier | Must prove | Run |
 |---|---|---|
-| A fix | it does what it says and breaks nothing nearby | `with check src/main.w`, `with build :dev`, the tests for what you touched |
-| A PR | main stays correct and buildable | `with run tools/battery.w` (the battery), once per stack |
+| A fix | it does what it says and breaks nothing nearby | `with check src/main.with`, `with build :dev`, the tests for what you touched |
+| A PR | main stays correct and buildable | `with run tools/battery.with` (the battery), once per stack |
 | A seed cut or a release | the toolchain reproduces itself; the migrator and the corpora agree | `src/main build :release-checks` |
 
 **A fix.** Write the test first and watch it fail, then fix the root cause
@@ -144,14 +144,14 @@ Each tier runs only what it must prove.
 [docs/spec/toolchain/deep-debugging-tools.md](docs/spec/toolchain/deep-debugging-tools.md)).
 Iterate with `with check` and `with build :dev` (stage1) and run the tests you
 wrote or touched with `out/bootstrap/bin/with-stage1 test <files>`. New code in
-`src/` also runs `with run tools/ceremony_census.w --diff HEAD`. Before calling
+`src/` also runs `with run tools/ceremony_census.with --diff HEAD`. Before calling
 a layer done, run `src/main build :gate`.
 
 **A PR.** Work landing together goes on one `gh stack`; one battery blesses
 the whole stack on its top commit:
 
 ```sh
-with run tools/battery.w
+with run tools/battery.with
 ```
 
 It refuses a dirty tree and runs one graph: the gate, the acceptance scenarios
@@ -175,7 +175,7 @@ and wo-drift. It migrates nothing (D206). A seed is cut, and a release made, onl
 whose `:release-checks` is green; `release-uat` depends on it. Then follow
 [docs/spec/toolchain/with-release-runbook.md](docs/spec/toolchain/with-release-runbook.md).
 A newer seed lands as its own PR: bump `seed.lock`, `with run
-tools/bump_seed_pins.w`, `with build :seed`.
+tools/bump_seed_pins.with`, `with build :seed`.
 
 ### Pull requests
 
@@ -237,7 +237,7 @@ directory:
 echo '//! expect-stdout: 42
 fn main:
     let x = 42
-    println("{x}")' > test/behavior/my_feature.w
+    println("{x}")' > test/behavior/my_feature.with
 ```
 
 For a bug fix, add a regression test that reproduces the bug:
@@ -248,7 +248,7 @@ echo '//! expect-stdout: ok
 fn main:
     // This used to crash in the resolver
     let x = some_edge_case()
-    println("ok")' > test/behavior/issue_123_resolver_crash.w
+    println("ok")' > test/behavior/issue_123_resolver_crash.with
 ```
 
 ---
@@ -266,17 +266,17 @@ Before reaching for any tool, get a minimal reproducing command
 and narrow it to a compiler phase:
 
 ```bash
-time ./out/stage/bin/with-stage2 check your_file.w
+time ./out/stage/bin/with-stage2 check your_file.with
 
 # Narrow by phase
-./out/stage/bin/with-stage2 check your_file.w --dump-tokens    # lexer
-./out/stage/bin/with-stage2 check your_file.w --dump-ast       # parser
-./out/stage/bin/with-stage2 check your_file.w --dump-resolved  # resolver
-./out/stage/bin/with-stage2 check your_file.w --dump-typed     # sema
-./out/stage/bin/with-stage2 check your_file.w --dump-mir       # MIR lowering
-./out/stage/bin/with-stage2 check your_file.w --dump-drop-state # MIR ownership state
-./out/stage/bin/with-stage2 check your_file.w --dump-drop-plan  # MIR cleanup plan
-./out/stage/bin/with-stage2 build your_file.w                  # full pipeline
+./out/stage/bin/with-stage2 check your_file.with --dump-tokens    # lexer
+./out/stage/bin/with-stage2 check your_file.with --dump-ast       # parser
+./out/stage/bin/with-stage2 check your_file.with --dump-resolved  # resolver
+./out/stage/bin/with-stage2 check your_file.with --dump-typed     # sema
+./out/stage/bin/with-stage2 check your_file.with --dump-mir       # MIR lowering
+./out/stage/bin/with-stage2 check your_file.with --dump-drop-state # MIR ownership state
+./out/stage/bin/with-stage2 check your_file.with --dump-drop-plan  # MIR cleanup plan
+./out/stage/bin/with-stage2 build your_file.with                  # full pipeline
 ```
 
 If `--dump-tokens` works but `--dump-ast` crashes, the bug is in
@@ -286,7 +286,7 @@ it's in sema. Narrow it down before diving deeper.
 When a repro is larger than the failure needs, reduce it before editing:
 
 ```bash
-./out/stage/bin/with-stage2 reduce your_file.w \
+./out/stage/bin/with-stage2 reduce your_file.with \
     --contains "diagnostic text" \
     -- ./out/stage/bin/with-stage2 check {file}
 ```
@@ -297,15 +297,15 @@ For MIR lowering, ownership, and codegen bugs, use the targeted MIR tools before
 adding trace prints:
 
 ```bash
-./out/stage/bin/with-stage2 check your_file.w --trace-place main:_1
-./out/stage/bin/with-stage2 check your_file.w --explain-mir-origin main:_1
-./out/stage/bin/with-stage2 check your_file.w --trace-ownership main:_1
-./out/stage/bin/with-stage2 check your_file.w --dump-drop-plan
-./out/stage/bin/with-stage2 check your_file.w --dump-place-map
-./out/stage/bin/with-stage2 check your_file.w --trace-cleanup-edge 'main:bb0->bb1'
-./out/stage/bin/with-stage2 check your_file.w --dump-drop-flags
-./out/stage/bin/with-stage2 check your_file.w --validate-all
-./out/stage/bin/with-stage2 check your_file.w --validate-ownership
+./out/stage/bin/with-stage2 check your_file.with --trace-place main:_1
+./out/stage/bin/with-stage2 check your_file.with --explain-mir-origin main:_1
+./out/stage/bin/with-stage2 check your_file.with --trace-ownership main:_1
+./out/stage/bin/with-stage2 check your_file.with --dump-drop-plan
+./out/stage/bin/with-stage2 check your_file.with --dump-place-map
+./out/stage/bin/with-stage2 check your_file.with --trace-cleanup-edge 'main:bb0->bb1'
+./out/stage/bin/with-stage2 check your_file.with --dump-drop-flags
+./out/stage/bin/with-stage2 check your_file.with --validate-all
+./out/stage/bin/with-stage2 check your_file.with --validate-ownership
 ```
 
 For fixpoint failures, generate the byte-level diff report:
@@ -321,7 +321,7 @@ command syntax and limits.
 ### Crashes: LLDB
 
 ```bash
-lldb -- ./out/stage/bin/with-stage2 check your_file.w
+lldb -- ./out/stage/bin/with-stage2 check your_file.with
 ```
 
 Inside LLDB:
@@ -349,11 +349,11 @@ the native debug allocator. The With runtime uses its own slab allocator, so
 libc malloc tools do not see most With allocations.
 
 ```bash
-./out/stage/bin/with-stage2 run --debug-alloc repro.w
-./out/stage/bin/with-stage2 run --debug-alloc --debug-alloc-filter=non-root repro.w
-./out/stage/bin/with-stage2 check repro.w --dump-drop-state
-./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
-./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
+./out/stage/bin/with-stage2 run --debug-alloc repro.with
+./out/stage/bin/with-stage2 run --debug-alloc --debug-alloc-filter=non-root repro.with
+./out/stage/bin/with-stage2 check repro.with --dump-drop-state
+./out/stage/bin/with-stage2 check repro.with --trace-ownership main:_1
+./out/stage/bin/with-stage2 check repro.with --dump-drop-plan
 WITH_DEBUG_ALLOC=1 ./path/to/already-built-repro
 with build :debug-alloc-tests
 ```
@@ -364,10 +364,10 @@ The report prints allocator verdicts such as `DOUBLE FREE`, `LEAK`, and
 resolve source sites for a flagged address:
 
 ```bash
-./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
-out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
+./out/release/bin/with build tools/debug_drop.with -o out/debug-alloc-tests/debug_drop
+out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.with
 lldb --batch -s tools/debug_drop_sites.lldb \
-    -o "run run repro.w" -o "quit" -- ./out/release/bin/with
+    -o "run run repro.with" -o "quit" -- ./out/release/bin/with
 ```
 
 Use `tools/debug_drop_fields.lldb` when the allocator verdict points at a
@@ -379,7 +379,7 @@ drop/codegen bug and you need to observe which codegen drop path fired. See
 
 ```bash
 MallocScribble=1 MallocGuardEdges=1 \
-    ./out/stage/bin/with-stage2 check your_file.w
+    ./out/stage/bin/with-stage2 check your_file.with
 ```
 
 - **MallocScribble** fills freed memory with `0x55` and new
@@ -392,13 +392,13 @@ To see where a corrupted allocation was created:
 
 ```bash
 MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 \
-    ./out/stage/bin/with-stage2 check your_file.w
+    ./out/stage/bin/with-stage2 check your_file.with
 ```
 
 ### Memory Leaks
 
 ```bash
-leaks --atExit -- ./out/stage/bin/with-stage2 check your_file.w
+leaks --atExit -- ./out/stage/bin/with-stage2 check your_file.with
 ```
 
 Use this for host/libc-level leaks. For With runtime allocations, prefer
@@ -411,7 +411,7 @@ runtime slab.
 xcrun xctrace record \
     --template "Leaks" \
     --output /tmp/with-leaks.trace \
-    --launch -- ./out/stage/bin/with-stage2 check your_file.w
+    --launch -- ./out/stage/bin/with-stage2 check your_file.with
 
 open /tmp/with-leaks.trace
 ```
@@ -423,13 +423,13 @@ Other useful templates: **Allocations** (track every allocation),
 
 ```bash
 # Quick timing
-time ./out/stage/bin/with-stage2 check src/main.w
+time ./out/stage/bin/with-stage2 check src/main.with
 
 # Instruments
 xcrun xctrace record \
     --template "Time Profiler" \
     --output /tmp/with-profile.trace \
-    --launch -- ./out/stage/bin/with-stage2 check src/main.w
+    --launch -- ./out/stage/bin/with-stage2 check src/main.with
 
 open /tmp/with-profile.trace
 ```
@@ -437,7 +437,7 @@ open /tmp/with-profile.trace
 For a quick command-line sample without Instruments:
 
 ```bash
-./out/stage/bin/with-stage2 check src/main.w &
+./out/stage/bin/with-stage2 check src/main.with &
 sample $(pgrep -n with-stage2) 5 -file /tmp/with-sample.txt
 cat /tmp/with-sample.txt
 ```
@@ -478,7 +478,7 @@ sudo dseditgroup -o edit -a "$USER" -t user _developer
 | Large repro | `with reduce` | Predicate cost |
 | MIR ownership/codegen bug | `--trace-place`, `--explain-mir-origin`, `--trace-ownership`, `--dump-place-map`, `--validate-all`, `--validate-ownership` | Check-only |
 | Fixpoint nondeterminism | `with build :fixpoint-diff` | Stage-object build |
-| With double-free / leak / drop bug | `--debug-alloc`, `--dump-drop-state`, `--dump-drop-plan`, `--trace-cleanup-edge`, `tools/debug_drop.w`, `tools/debug_drop*.lldb` | Runtime-gated |
+| With double-free / leak / drop bug | `--debug-alloc`, `--dump-drop-state`, `--dump-drop-plan`, `--trace-cleanup-edge`, `tools/debug_drop.with`, `tools/debug_drop*.lldb` | Runtime-gated |
 | Host use-after-free / overflow | `MallocScribble` + `MallocGuardEdges` | ~1.2x |
 | Host memory leaks | `leaks --atExit` | ~1.5x |
 | Allocation tracking | `MallocStackLogging` | ~3x |

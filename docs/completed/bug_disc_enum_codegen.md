@@ -78,7 +78,7 @@ codegen's symbol table has stale or incorrectly scoped entries.
 
 ## Fix Location
 
-The fix is in `src/Codegen.w` — the function that generates LLVM
+The fix is in `src/Codegen.with` — the function that generates LLVM
 constant values for disc enum variant access (e.g., `EnumType.Variant`
 as a constant expression). It must qualify the lookup by both the
 enum type and the variant name.
@@ -91,7 +91,7 @@ registered variant table, not a global variant name scan.
 ## Repro
 
 ```
-// File: /tmp/bug_disc_repro.w
+// File: /tmp/bug_disc_repro.with
 enum A: i32:
     FOO = 42
     BAR = 99

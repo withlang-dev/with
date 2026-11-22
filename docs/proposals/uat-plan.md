@@ -6,7 +6,7 @@ way that users can use too … `with init` should set up their project with
 an example UAT"). This is a **product feature of the toolchain**, not a
 compiler-repo test harness: `with uat` runs a project's acceptance
 scenarios the same way `with test` runs its tests, and `with init` creates
-one. The With compiler's own release UATs (today `build/release_uat.w`) are
+one. The With compiler's own release UATs (today `build/release_uat.with`) are
 just the first user of it. Sequenced after the libcurl campaign; tooling +
 build-layer work, batches freely; the spec words in §8 need Eric's
 blessing before the command lands (CLI commands are inventoried, §18.5).
@@ -16,8 +16,8 @@ blessing before the command lands (CLI commands are inventoried, §18.5).
 ```
 my-app/
   with.toml
-  src/main.w
-  test/main_test.w          # unit tests: with test
+  src/main.with
+  test/main_test.with          # unit tests: with test
   uat/
     README.md               # the verbs, one page
     hello.uat               # the scenario `with init` wrote
@@ -65,7 +65,7 @@ platforms: darwin, linux, windows
 new directory
 run: with init
 run: with get c.sqlite3@3.53.4
-write src/main.w from fixtures/sqlite3_main.w
+write src/main.with from fixtures/sqlite3_main.with
 run: with run
 expect exit: 0
 expect stdout: sqlite3 UAT passed
@@ -147,9 +147,9 @@ human checks for this host:
   spiral: colored balls moving on a field of black
 ```
 
-Implementation: `src/Uat.w` in the compiler (the parser, the interpreter,
+Implementation: `src/Uat.with` in the compiler (the parser, the interpreter,
 the report), `with uat` dispatched like `with test`; the step library is
-the process/capture code that `build/release_uat.w` has today, moved into
+the process/capture code that `build/release_uat.with` has today, moved into
 the compiler so users get it. The build layer's `:release-uat` target calls
 the same code (§7); nothing about UATs lives in `build/` afterwards.
 
@@ -172,16 +172,16 @@ never by a normal run.
 ## 6. The compiler's own UATs
 
 `uat/` at the repo root holds the nine scenarios that replace
-`build/release_uat.w` (table below) and `uat/fixtures/` holds what
+`build/release_uat.with` (table below) and `uat/fixtures/` holds what
 `build/release_uat_fixtures/` holds today, with every rule those files have:
 they are what an application developer writes, no `unsafe`, a spec change
 updates them in the same change and says so, a compiler or stdlib change
 that breaks one is a defect in the change; `with build :user-programs-safe`
 re-points to `uat/fixtures` + `examples`. Programs are referenced from
 scenarios, never inlined, so those gates stay mechanical. The release-only
-policy step "copy `lib/facades/<lib>.w` into the fresh project as
-`src/facades/<lib>.w`" (§16.2b.1, until packages ship facades) becomes a
-visible `copy lib/facades/sqlite3.w to src/facades/sqlite3.w` line that is
+policy step "copy `lib/facades/<lib>.with` into the fresh project as
+`src/facades/<lib>.with`" (§16.2b.1, until packages ship facades) becomes a
+visible `copy lib/facades/sqlite3.with to src/facades/sqlite3.with` line that is
 deleted when B.8 lands.
 
 | today's action | scenario |
@@ -194,7 +194,7 @@ deleted when B.8 lands.
 | `release-raylib-spiral-uat` | `uat/raylib_spiral.uat` (`requires: display, opengl`, the human line) |
 | `release-one-liner-uat` | `uat/one_liners.uat` (`stdin:` blocks) |
 
-## 7. build.w wiring
+## 7. build.with wiring
 
 One action target, still named `release-uat` (the runbook, the
 `package-<platform>` dependency and the CI lanes do not change), whose
@@ -214,7 +214,7 @@ with uat [<scenario>]                        # run the project's acceptance scen
 ```
 
 §18.8 command table: `with init` row becomes "Create new project with
-`with.toml`, `src/main.w`, `test/`, and `uat/hello.uat` (§18.5d)".
+`with.toml`, `src/main.with`, `test/`, and `uat/hello.uat` (§18.5d)".
 
 New §18.5d, proposed text:
 
@@ -233,18 +233,18 @@ New §18.5d, proposed text:
 
 ## 9. Order of work (one batch, one battery)
 
-1. `src/Uat.w`: parser, interpreter, report; `with uat`, `--list`, `--keep`,
+1. `src/Uat.with`: parser, interpreter, report; `with uat`, `--list`, `--keep`,
    `WITH_UAT_WITH`; `requires:` probes; tests under `test/uat/` (planted
    scenario files: one per verb, one per verdict, a parse error naming the
    line).
 2. `with init` writes `uat/hello.uat` and `uat/README.md` (the templates
-   generated the way `src/InitTemplates.w` is, so the README is the same
+   generated the way `src/InitTemplates.with` is, so the README is the same
    text as this plan's §3); `cli-selfhost-project-tests` asserts the
    scaffold runs green under `with uat`.
 3. Spec words (§8) landed once blessed; `spec-inventory-check` row.
 4. The nine scenarios, byte-for-byte the same expectations as today;
    `build/release_uat_fixtures` → `uat/fixtures`; `:release-uat` re-wired;
-   `build/release_uat.w` deleted; `user-programs-safe` re-pointed; runbook
+   `build/release_uat.with` deleted; `user-programs-safe` re-pointed; runbook
    updated (skips, human checks).
 5. `expect image:` and the spiral's `--capture` option — separate PR under
    the "spec change updates the example" rule.
@@ -258,7 +258,7 @@ New §18.5d, proposed text:
 - `with build :release-uat` yields the same verdicts as before the
   migration on the release host, and `skip (requires display: none)` on the
   macOS runner.
-- `build/release_uat.w` is gone; no scenario logic lives in the build layer.
+- `build/release_uat.with` is gone; no scenario logic lives in the build layer.
 - `:user-programs-safe` green over `uat/fixtures` + `examples`.
 
 ## 11. Not in this plan

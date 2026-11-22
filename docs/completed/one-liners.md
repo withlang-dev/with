@@ -519,7 +519,7 @@ Pseudocode:
 ```with
 fn handle_cli_code(code_parts: Vec[str], mode: CliCodeMode):
     let source = build_synthetic_entry_source(code_parts, mode)
-    let tmp_src = tmp_path(".w")
+    let tmp_src = tmp_path(".with")
     let tmp_bin = tmp_path("")
     write_file(tmp_src, source)
     compile(tmp_src, tmp_bin, opt_level)

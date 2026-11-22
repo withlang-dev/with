@@ -33,11 +33,11 @@ Wave 8 exit gate:
   - `bootstrap/src/BorrowCfg.zig`
   - `bootstrap/test/run_phase1_*.sh` borrow/NLL/ephemeral suites
 - Existing self-host implementation:
-  - `src/Sema.w`
-  - `src/BorrowCfg.w`
-  - `src/Mir.w`
-  - `src/MirLower.w`
-  - `src/Driver.w`
+  - `src/Sema.with`
+  - `src/BorrowCfg.with`
+  - `src/Mir.with`
+  - `src/MirLower.with`
+  - `src/Driver.with`
   - `scripts/parity_states.sh`
 - Reference architecture:
   - Zig:
@@ -64,7 +64,7 @@ Constraints:
 
 Primary parity artifact:
 
-- `check <file.w>` diagnostic behavior for borrow/move/ephemeral failures.
+- `check <file.with>` diagnostic behavior for borrow/move/ephemeral failures.
 
 Wave 8 parity contract:
 
@@ -131,16 +131,16 @@ Each `KNOWN_DIVERGENCE` entry must include:
 
 Implementation (expected touch points):
 
-- `src/BorrowCheck.w` (new; primary Wave 8 pass)
-- `src/BorrowCfg.w` (CFG/liveness support needed by Wave 8)
-- `src/Mir.w` (place/projection metadata needed for alias checks)
-- `src/MirLower.w` (if additional source-map metadata is required)
-- `src/Sema.w` (handoff points; remove/align partial borrow logic)
-- `src/Driver.w` (wire borrow pass into `check` pipeline)
+- `src/BorrowCheck.with` (new; primary Wave 8 pass)
+- `src/BorrowCfg.with` (CFG/liveness support needed by Wave 8)
+- `src/Mir.with` (place/projection metadata needed for alias checks)
+- `src/MirLower.with` (if additional source-map metadata is required)
+- `src/Sema.with` (handoff points; remove/align partial borrow logic)
+- `src/Driver.with` (wire borrow pass into `check` pipeline)
 
 Tests/scripts (new):
 
-- `test/wave8/cases/*.w`
+- `test/wave8/cases/*.with`
 - `test/wave8/borrow_corpus.txt`
 - `scripts/run_wave8_borrow_unit_tests.sh`
 - `scripts/run_wave8_borrow_parity.sh`
@@ -166,7 +166,7 @@ Tests/scripts (new):
 
 ## 1) Borrow Pass Boundary
 
-- [ ] Introduce `src/BorrowCheck.w` as a distinct pass after MIR lowering.
+- [ ] Introduce `src/BorrowCheck.with` as a distinct pass after MIR lowering.
 - [ ] Define pass input/output contract:
   - input: `MirModule` + sema/type/source metadata
   - output: diagnostics only (no semantic redesign)
@@ -182,7 +182,7 @@ Tests/scripts (new):
 
 ## 3) CFG + NLL Liveness Substrate
 
-- [ ] Upgrade `src/BorrowCfg.w` to expose predecessor/successor sets needed for dataflow.
+- [ ] Upgrade `src/BorrowCfg.with` to expose predecessor/successor sets needed for dataflow.
 - [ ] Add per-block use/def summaries for borrow-reference bindings.
 - [ ] Implement backward liveness over CFG for reference-binding symbols/locals.
 - [x] Keep lexical scope expiration as a fallback guard for scope-exit cleanup.
@@ -276,19 +276,19 @@ Tests/scripts (new):
 
 ### Implementation Notes (Current)
 
-- Core Wave 8 behavior is implemented in `src/Sema.w` (self-host only):
+- Core Wave 8 behavior is implemented in `src/Sema.with` (self-host only):
   - borrow creation/conflict checks (`&`/`&mut`)
   - disjoint-field vs whole-place overlap checks
   - NLL-style dead-borrow expiration within blocks
   - move/use-after-move checks in borrow-relevant flows
   - ephemeral boundary checks for structs/collections/returns/closures
 - Parser/AST plumbing for `ephemeral` type declarations is implemented:
-  - `src/Ast.w`: packed type-decl kind helpers (`pack_type_decl_kind`, `type_decl_sub_kind`, `type_decl_is_ephemeral`)
-  - `src/Parser.w`: preserve `ephemeral` flag on type declarations
-  - `src/Sema.w`: tracks `ephemeral_types` and enforces return restrictions
-  - `src/render.w` and `src/Codegen.w`: decode packed type-decl kind
+  - `src/Ast.with`: packed type-decl kind helpers (`pack_type_decl_kind`, `type_decl_sub_kind`, `type_decl_is_ephemeral`)
+  - `src/Parser.with`: preserve `ephemeral` flag on type declarations
+  - `src/Sema.with`: tracks `ephemeral_types` and enforces return restrictions
+  - `src/render.with` and `src/Codegen.with`: decode packed type-decl kind
 - Wave 8 test/harness artifacts added:
-  - `test/wave8/cases/*.w`
+  - `test/wave8/cases/*.with`
   - `test/wave8/borrow_corpus.txt`
   - `scripts/run_wave8_borrow_unit_tests.sh`
   - `scripts/run_wave8_borrow_parity.sh`
@@ -296,7 +296,7 @@ Tests/scripts (new):
 
 ### Known Debt (Explicit)
 
-- `KNOWN_DEBT-W8-ARCH-001`: Current borrow behavior lives in `src/Sema.w` for corpus parity; rewrite to MIR pass (`src/BorrowCheck.w` + `src/BorrowCfg.w`) after semantic fixpoint.
+- `KNOWN_DEBT-W8-ARCH-001`: Current borrow behavior lives in `src/Sema.with` for corpus parity; rewrite to MIR pass (`src/BorrowCheck.with` + `src/BorrowCfg.with`) after semantic fixpoint.
 - `KNOWN_DEBT-W8-ARCH-002`: Task-boundary ephemeral escape checks and dedicated corpus coverage remain open and must be completed in Wave 8 conformance work.
 
 ---

@@ -156,7 +156,7 @@ void with_ewrite(with_str s) {
 
 ### 2.3 Prelude Changes
 
-**`lib/std/prelude.w`** (or wherever builtins are declared):
+**`lib/std/prelude.with`** (or wherever builtins are declared):
 
 ```
 // Before:
@@ -187,8 +187,8 @@ The compiler source uses `with_eprintln(...)` extensively for debug/error output
 The `with_eprintln` → `with_eprint` rename is mechanical. A sed script handles it:
 
 ```bash
-find src/ -name '*.w' -exec sed -i '' 's/with_eprintln/with_eprint/g' {} +
-find test/ -name '*.w' -exec sed -i '' 's/println/print/g' {} +
+find src/ -name '*.with' -exec sed -i '' 's/with_eprintln/with_eprint/g' {} +
+find test/ -name '*.with' -exec sed -i '' 's/println/print/g' {} +
 ```
 
 ### 2.5 Sites That Currently Rely on No-Newline `print`
@@ -198,7 +198,7 @@ Search for `print(` calls that intentionally omit newlines. These are the sites 
 ```bash
 # Find print calls where the string doesn't end with \n
 # These are the ones that rely on no-newline behavior
-grep -rn 'print(' src/ test/ --include='*.w' | grep -v 'println\|eprintln\|with_eprintln'
+grep -rn 'print(' src/ test/ --include='*.with' | grep -v 'println\|eprintln\|with_eprintln'
 ```
 
 Common patterns:
@@ -215,7 +215,7 @@ For launch: convert all no-newline print calls to either:
 Test files that use `println` need updating:
 
 ```bash
-grep -rn 'println(' test/ --include='*.w' | wc -l
+grep -rn 'println(' test/ --include='*.with' | wc -l
 ```
 
 Each `println(x)` becomes `print(x)`. The output is identical since `println` already added a newline and `print` now does too.

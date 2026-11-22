@@ -30,11 +30,11 @@ never a reason to add ceremony. There are no directory-wide exemptions.
 For focused iteration on already tracked files:
 
 ```
-with run tools/unit_return_review.w <base>
+with run tools/unit_return_review.with <base>
 ```
 
-`test/internals/unit_return_review_test.w` verifies detection and review
-matching. `test/behavior/behav_public_private_return_inference.w` generates
+`test/internals/unit_return_review_test.with` verifies detection and review
+matching. `test/behavior/behav_public_private_return_inference.with` generates
 private and public declarations from the same source, checks their runtime
 results, and requires the same D43 rejection for mixed branch types. This
 prevents an annotation-only rewrite of the public half from hiding a bug.

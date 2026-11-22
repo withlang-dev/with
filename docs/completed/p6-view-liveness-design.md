@@ -3,7 +3,7 @@
 Design document for implementing non-lexical-lifetime (NLL) view-liveness
 analysis, per docs/mut.md Rev 8 §8.4.
 
-**Revision 2** — revised after verification trace against SemaCheck.w
+**Revision 2** — revised after verification trace against SemaCheck.with
 discovered false negatives in branching and loop cases.
 
 ---
@@ -29,7 +29,7 @@ site, last-use site.
 
 ## 2. What already exists
 
-### 2a. Borrow tracking infrastructure (SemaCheck.w)
+### 2a. Borrow tracking infrastructure (SemaCheck.with)
 
 The borrow checker operates during sema, on the AST (not MIR). Core state:
 
@@ -41,7 +41,7 @@ The borrow checker operates during sema, on the AST (not MIR). Core state:
 - `borrow_path_starts/counts + borrow_path_data` — field-path chain for
   disjoint-path checks via `are_borrows_disjoint_paths`
 
-### 2b. NLL-equivalent expiry (SemaCheck.w:7610)
+### 2b. NLL-equivalent expiry (SemaCheck.with:7610)
 
 `expire_dead_borrows_in_block` provides NLL-equivalent behavior for
 **straight-line code within a single block** by scanning forward through
@@ -49,7 +49,7 @@ the remaining statements + tail. For each named borrow, it calls
 `expr_uses_symbol` recursively through the remaining AST. If no future
 use is found, the borrow is removed.
 
-### 2c. check_mutation_against_views (SemaCheck.w:6835)
+### 2c. check_mutation_against_views (SemaCheck.with:6835)
 
 When a mutation is detected, `check_mutation_against_views` scans the active
 borrow table for SHARED borrows on overlapping places. Uses disjoint-path
@@ -58,7 +58,7 @@ analysis to avoid false positives on independent field projections.
 Currently emits a single-location warning. The spec requires a three-location
 diagnostic (§15.6).
 
-### 2d. BorrowCfg.w stub (227 lines)
+### 2d. BorrowCfg.with stub (227 lines)
 
 CFG construction from AST expression subtrees. Handles block, if, while, loop,
 return, break, goto. Does NOT handle match or for. Builds CfgGraph with
@@ -103,7 +103,7 @@ else:
 print(first)           // view used here — should conflict with xs.push
 ```
 
-**Root cause:** `check_if_expr` (SemaCheck.w:2377) calls `check_expr` on the
+**Root cause:** `check_if_expr` (SemaCheck.with:2377) calls `check_expr` on the
 then-body and else-body sequentially with NO save/restore of the borrow table.
 The then-body's inner `check_block` runs `expire_dead_borrows_in_block`, which
 operates on ALL borrows regardless of which scope created them. The then-body's
@@ -134,7 +134,7 @@ it scans the remaining body stmts. `xs.push(42)` doesn't use `first`, so the
 borrow is expired. The back-edge (loop re-execution) is invisible to the
 forward scan.
 
-`check_while` (SemaCheck.w:1462) and `check_for` (SemaCheck.w:2554) check
+`check_while` (SemaCheck.with:1462) and `check_for` (SemaCheck.with:2554) check
 the body exactly once with no borrow table save/restore.
 
 ### 3.4 §15.6 diagnostic — MISSING INFRASTRUCTURE
@@ -287,7 +287,7 @@ When conflict is found:
 Emit format per §15.6:
 ```
 error: cannot mutate `xs` while read-only view `first` is live
-  --> example.w:4:5
+  --> example.with:4:5
    |
 3  |     let first = &xs[0]
    |                 ------ view created here
@@ -325,7 +325,7 @@ Add two new parallel Vecs to Sema's borrow table. Add `scope_depth: i32`
 counter. Populate both in `check_borrow_create`, `check_borrow_create_direct`.
 Mirror in `remove_borrow_at`.
 
-Files: `src/Sema.w`, `src/SemaCheck.w`.
+Files: `src/Sema.with`, `src/SemaCheck.with`.
 
 ### 6.2 Scope the expiry in expire_dead_borrows_in_block
 
@@ -333,7 +333,7 @@ Add the scope-depth guard: skip borrows where `borrow_scope_depths[i]`
 is less than the current `scope_depth`. This is a one-line condition
 added to the existing while loop.
 
-File: `src/SemaCheck.w` (line ~7612).
+File: `src/SemaCheck.with` (line ~7612).
 
 ### 6.3 Add block context tracking for §15.6
 
@@ -341,29 +341,29 @@ Add `current_block_extra_start`, `current_block_stmt_count`,
 `current_block_stmt_index`, `current_block_tail` fields to Sema.
 Set them in `check_block`'s statement loop.
 
-File: `src/Sema.w`, `src/SemaCheck.w`.
+File: `src/Sema.with`, `src/SemaCheck.with`.
 
 ### 6.4 Implement find_last_use_in_block
 
 Forward-scan variant of `expire_dead_borrows_in_block` that returns the
 last node using a symbol instead of removing the borrow.
 
-File: `src/SemaCheck.w`.
+File: `src/SemaCheck.with`.
 
 ### 6.5 Upgrade check_mutation_against_views diagnostic
 
 Replace single-location warning with three-location diagnostic using
 creation node, mutation node, and last-use node.
 
-File: `src/SemaCheck.w` (line ~6859).
+File: `src/SemaCheck.with` (line ~6859).
 
 ### 6.6 Add §18 test cases
 
 Test files under `test/`:
-- `test/mut_view_liveness.w` — straight-line accepted/rejected cases
-- `test/mut_view_branch.w` — branching cases (borrow survives branches)
-- `test/mut_view_loop.w` — loop cases (borrow survives loop body)
-- `test/mut_view_disjoint.w` — disjoint field paths accepted
+- `test/mut_view_liveness.with` — straight-line accepted/rejected cases
+- `test/mut_view_branch.with` — branching cases (borrow survives branches)
+- `test/mut_view_loop.with` — loop cases (borrow survives loop body)
+- `test/mut_view_disjoint.with` — disjoint field paths accepted
 
 ### 6.7 Promote to errors (deferred to P12)
 
@@ -375,7 +375,7 @@ P6 ships with warnings. P12 flips.
 ## 7. What P6 does NOT do
 
 - **Full CFG-based dataflow.** Not needed. Scoped expiry handles the
-  false-negative cases without building a separate CFG. The BorrowCfg.w
+  false-negative cases without building a separate CFG. The BorrowCfg.with
   stub remains for future optimization.
 - **Branch-sensitive precision.** If a borrow is only used in one branch,
   the other branch could theoretically allow mutation. Scoped expiry
@@ -407,7 +407,7 @@ P6 ships with warnings. P12 flips.
 These check conflicts at closure CALL sites, not at mutation statement sites.
 Complementary to §15.6. P6 does not change them.
 
-### 9.2 BorrowCfg.w stub
+### 9.2 BorrowCfg.with stub
 
 Keep as-is. The scoped-expiry approach makes it unnecessary for P6's
 correctness, but the CFG infrastructure remains available for future
@@ -427,7 +427,7 @@ should be: `if ref_sym != 0 and borrow_scope_depths[bi] < scope_depth: skip`.
 
 1. **scope_depth field.** Does Sema already track scope depth, or only
    a scope stack? If no counter exists, add one. If one exists, reuse it.
-   **Action:** grep for `scope_depth` in Sema.w before implementing.
+   **Action:** grep for `scope_depth` in Sema.with before implementing.
 
 2. **Multi-span diagnostics.** Does the diagnostic system support multiple
    spans per diagnostic? If not, emit as primary + notes.

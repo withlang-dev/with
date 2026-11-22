@@ -109,7 +109,7 @@ Only shows the summary. Failures print details:
 ```
 $ with test
 --- FAIL: test_parser_edge (0.002s)
-    src/parser.w:42: assert_eq failed
+    src/parser.with:42: assert_eq failed
       left:  3
       right: 5
 FAIL
@@ -128,7 +128,7 @@ $ with test -v
 --- PASS: test_parser_basic (0.003s)
 === RUN   test_parser_edge
 --- FAIL: test_parser_edge (0.002s)
-    src/parser.w:42: assert_eq failed
+    src/parser.with:42: assert_eq failed
       left:  3
       right: 5
 FAIL
@@ -250,14 +250,14 @@ at the bottom of the file, wherever.
 For a package with these tests:
 
 ```with
-// src/math.w
+// src/math.with
 @[test]
 fn test_add: ...
 
 @[test]
 fn test_sub: ...
 
-// src/parser.w
+// src/parser.with
 @[before]
 fn parser_setup: ...
 
@@ -285,10 +285,10 @@ fn tearDown:
 
 fn main -> i32:
     runner.begin()
-    runner.run_test("test_add", test_add, "src/math.w", 5)
-    runner.run_test("test_sub", test_sub, "src/math.w", 9)
-    runner.run_test("test_parse_basic", test_parse_basic, "src/parser.w", 12)
-    runner.run_test("test_parse_edge", test_parse_edge, "src/parser.w", 18)
+    runner.run_test("test_add", test_add, "src/math.with", 5)
+    runner.run_test("test_sub", test_sub, "src/math.with", 9)
+    runner.run_test("test_parse_basic", test_parse_basic, "src/parser.with", 12)
+    runner.run_test("test_parse_edge", test_parse_edge, "src/parser.with", 18)
     runner.finish()
 ```
 
@@ -323,7 +323,7 @@ Files in `testdata/` are available to tests but not compiled:
 ```
 my-project/
 ├── src/
-│   ├── parser.w
+│   ├── parser.with
 │   └── parser_test_data/    # also fine, any name works
 ├── testdata/                # convention, not enforced
 │   ├── sample.json
@@ -402,7 +402,7 @@ Good enough.
 
 ```
 $ with new my-lib --lib
-$ cat src/lib.w
+$ cat src/lib.with
 pub fn add(a: i32, b: i32) -> i32: a + b
 pub fn sub(a: i32, b: i32) -> i32: a - b
 

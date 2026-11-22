@@ -7,14 +7,14 @@ Status: completed extraction plan. Implementation complete.
 Seed acquisition is specific to the With compiler repository. The generic build
 driver should not know that this project stores its seed compiler at `src/main`
 or downloads release assets from `withlang-dev/with`. The extracted action will
-live in a new project-local module, `build_seed.w`, imported by the repository
-root `build.w`.
+live in a new project-local module, `build_seed.with`, imported by the repository
+root `build.with`.
 
 ## What Moves
 
 - BuildKind `1024`, currently `seed_download`.
-- `build_graph_seed_release_from_api` from `src/BuildGraphOps.w`.
-- `build_graph_run_seed_download` from `src/BuildGraphOps.w`.
+- `build_graph_seed_release_from_api` from `src/BuildGraphOps.with`.
+- `build_graph_run_seed_download` from `src/BuildGraphOps.with`.
 
 Shared generic helpers stay where they are unless they become unused by generic
 code after the extraction. The project action will use `std.build` capabilities
@@ -22,7 +22,7 @@ and small local string/path helpers instead of calling `BuildGraphRuntime`.
 
 ## Target Shape
 
-`build.w` will replace:
+`build.with` will replace:
 
 ```with
 target_new(project_kind_seed_download(), "seed", "withlang-dev/with")
@@ -34,7 +34,7 @@ with:
 target_new(.Action, "seed", "").output("src/main")
 ```
 
-The action function will be `run_seed_download_action` in `build_seed.w`. The
+The action function will be `run_seed_download_action` in `build_seed.with`. The
 repository and asset name will be action arguments, preserving the current
 `withlang-dev/with` and `main` configuration.
 
@@ -84,8 +84,8 @@ would replace the local seed.
 
 ## Verification Sequence
 
-1. `out/bin/with check build.w`
-2. `out/bin/with check src/main.w`
+1. `out/bin/with check build.with`
+2. `out/bin/with check src/main.with`
 3. `out/bin/with build :seed`, compared against the captured baseline above
 4. `make build`
 5. `make fixpoint`

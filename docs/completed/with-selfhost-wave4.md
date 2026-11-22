@@ -137,18 +137,18 @@ Note:
 
 Core implementation:
 
-- `src/compiler/foundation/Ids.w` (use/extend `ModuleId`, `DefId`)
-- `src/compiler/resolve/ModuleGraph.w` (new)
-- `src/compiler/resolve/DefTable.w` (new)
-- `src/compiler/resolve/Hir.w` (new resolved HIR schema)
-- `src/compiler/resolve/Resolver.w` (new)
-- `src/compiler/Frontend.w` (wire resolve stage after parse/import discovery)
-- `src/compiler/Zcu.w` (persist graph/resolve state)
-- `src/main.w` (add `--dump-resolved` plumbing)
+- `src/compiler/foundation/Ids.with` (use/extend `ModuleId`, `DefId`)
+- `src/compiler/resolve/ModuleGraph.with` (new)
+- `src/compiler/resolve/DefTable.with` (new)
+- `src/compiler/resolve/Hir.with` (new resolved HIR schema)
+- `src/compiler/resolve/Resolver.with` (new)
+- `src/compiler/Frontend.with` (wire resolve stage after parse/import discovery)
+- `src/compiler/Zcu.with` (persist graph/resolve state)
+- `src/main.with` (add `--dump-resolved` plumbing)
 
 Compatibility path (if needed while old driver path exists):
 
-- `src/Driver.w` and/or `src/Compilation.w` bridge to resolved stage without forking behavior.
+- `src/Driver.with` and/or `src/Compilation.with` bridge to resolved stage without forking behavior.
 
 Wave 4 tests/scripts:
 
@@ -190,7 +190,7 @@ Optional documentation:
   - source-dir relative lookup
   - `lib/` parent-walk/project-root search
   - `src/` fallback
-  - item-import fallback (`foo/bar/Baz.w` -> `foo/bar.w`)
+  - item-import fallback (`foo/bar/Baz.with` -> `foo/bar.with`)
 - Canonicalize module paths for graph-key stability.
 - Add cycle/duplicate import suppression semantics equivalent to Stage0.
 
@@ -329,7 +329,7 @@ Stage0 has no `--dump-resolved` flag, so `run_wave4_resolved_parity.sh` cannot d
 
 ### Quirk: Body traversal only for the root module
 
-`walk_bodies = module_id == 0` in `process_module_with_pool` (Resolve.w line ~342). For imported modules (module ID > 0), only parameter types and return types are walked; function bodies are skipped. `use[*]` entries for calls inside imported module bodies are therefore absent from the dump. This is documented as a performance guard and is intentional for Wave 4.
+`walk_bodies = module_id == 0` in `process_module_with_pool` (Resolve.with line ~342). For imported modules (module ID > 0), only parameter types and return types are walked; function bodies are skipped. `use[*]` entries for calls inside imported module bodies are therefore absent from the dump. This is documented as a performance guard and is intentional for Wave 4.
 
 ### Quirk: Param defs carry the parent function's span, not the param's own span
 
@@ -341,7 +341,7 @@ Calls to imported functions in the root module body show `def=-1` in the use tab
 
 ### Gap: No error-case tests
 
-The plan listed "include targeted error cases" in the corpus. No `unresolved_import_error.w` or similar error-triggering test exists. All 4 corpus files and all 4 unit-test cases are passing cases only.
+The plan listed "include targeted error cases" in the corpus. No `unresolved_import_error.with` or similar error-triggering test exists. All 4 corpus files and all 4 unit-test cases are passing cases only.
 
 ### Gap: `run_case` PASS message suppressed if any earlier test failed
 

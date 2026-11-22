@@ -1017,7 +1017,7 @@ once — ownership, destruction, status, borrowed text, callbacks — and the
 program uses the presented methods:
 
 ```with
-use contracts.sqlite3            // src/contracts/sqlite3.w, the project's own
+use contracts.sqlite3            // src/contracts/sqlite3.with, the project's own
 use c_import("sqlite3.h")
 
 fn print_values -> Result[Unit, SqliteError]:
@@ -1377,7 +1377,7 @@ Useful project facts for AI contributors:
 - The With compiler is self-hosting.
 - Bootstrap uses a multi-stage fixpoint; stage outputs should match.
 - LLVM is the backend.
-- Build system: `build.w` using With code (`with build`).
+- Build system: `build.with` using With code (`with build`).
 - `with build`, `with run`, `with test`, `with fmt`, `with doc`, `with repl` are the CLI surface.
 - `with migrate` translates C source to With.
 - C interop is a day-zero requirement.
@@ -1387,7 +1387,7 @@ When proposing build/tooling changes, keep the distinction clear:
 
 ```text
 with.toml = declarative package configuration
-build.w   = executable build behavior in tool-mode With
+build.with   = executable build behavior in tool-mode With
 ```
 
 Ordinary `comptime` is deterministic and side-effect-free. Build scripts and future compiler hooks are tool-mode compiler-driver execution, not ordinary pure comptime.

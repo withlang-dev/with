@@ -439,10 +439,10 @@ cast is. A value out of range says so:
 
 ```
 panic: cannot parse i32 from "abc"
-  at main.w:12:17
+  at main.with:12:17
 
 panic: cannot parse u8 from "300": overflow
-  at main.w:13:17
+  at main.with:13:17
 ```
 
 Text too long to print whole is cut short in the message.

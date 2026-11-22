@@ -27,39 +27,39 @@ recorded here only as superseded provenance and must not be executed.
 
 ## The exact sites (from the recon map)
 
-Effect infra (Sema.w:296 constants, `sig_param_effects`, `note_*` inference,
-`@[effect]` pins, view-origin) — **complete, no change.** `is_copy` (Sema.w:5207,
+Effect infra (Sema.with:296 constants, `sig_param_effects`, `note_*` inference,
+`@[effect]` pins, view-origin) — **complete, no change.** `is_copy` (Sema.with:5207,
 aggregate-Copy opt-in) — **no change.** `&T` niche — **no change.**
 
 CHANGE (coordinated — Sema+MIR+codegen must flip together or it miscompiles):
 
-1. **Callee drop (the pivot).** MirLower.w:11961 (`lower_fn_with_sig`) and the
+1. **Callee drop (the pivot).** MirLower.with:11961 (`lower_fn_with_sig`) and the
    identical clause path 12068: REPLACE the unconditional non-Copy `DK_VALUE`
    drop with: drop only when `sig_param_effect(sig, pi) & (EFF_CONSUME |
    EFF_ESCAPE_VALUE)` — i.e. owned params only. Generalize the existing
    `borrowed_receiver` carve-out to "any share-place param."
-2. **Call-site consume (Sema).** SemaCheck.w:12465-12483: REMOVE the
+2. **Call-site consume (Sema).** SemaCheck.with:12465-12483: REMOVE the
    unconditional `arg_consumed_by_value` for non-Copy and its "a plain T
    parameter consumes" comment. Invalidate the caller binding only when
    `param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)` or the arg is
    `NK_MOVE_ARG`/`NK_COPY_ARG`. For plain non-Copy to a consume/escape_value
    param → error "requires `move`/`copy`".
-3. **Call-site passing mode (MIR).** `lower_var` MirLower.w:2973 and
+3. **Call-site passing mode (MIR).** `lower_var` MirLower.with:2973 and
    `lower_call_arg` 7824: a default non-Copy value arg → share-place alias
    (address of caller's place), SKIP `consume_moved_operand`. Keep `OK_MOVE` for
    `move x`, clone for `copy x`. Plain `x` and `move x` now diverge (were both
    `OK_MOVE`).
 4. **Codegen ABI.** Generalize the value-ref pointer ABI
-   (`sig_value_ref_abi_params` / `fn_param_uses_value_ref_abi`, SemaDecl.w:1081)
+   (`sig_value_ref_abi_params` / `fn_param_uses_value_ref_abi`, SemaDecl.with:1081)
    from "owner-type method params only" to "any non-Copy value param passed
    share-place," so the callee receives a pointer to the caller's place. Template:
-   the receiver plumbing (Codegen.w:3849, 4094 `record_ref_param`). Verify the
-   generic monomorphization ABI (CodegenDispatch.w:12882, 16225).
-5. **Effect-driven borrow at call sites.** SemaCheck.w:~12459 arg loop: take a
+   the receiver plumbing (Codegen.with:3849, 4094 `record_ref_param`). Verify the
+   generic monomorphization ABI (CodegenDispatch.with:12882, 16225).
+5. **Effect-driven borrow at call sites.** SemaCheck.with:~12459 arg loop: take a
    borrow keyed on `param_eff` (read→SHARED, write→EXCLUSIVE +
    `check_mutation_against_views`), mirroring `note_auto_ref_call_arg`.
 6. **REMOVE the inverted vestige lints.** `should_warn_by_value_read_only_param`
-   and `emit_by_value_param_returned_view_error` (SemaCheck.w:1076-1139) — their
+   and `emit_by_value_param_returned_view_error` (SemaCheck.with:1076-1139) — their
    text ("by-value here, so the callee owns it"; "consider `&T` so callers keep
    their binding") is the precise inversion of the doc. Delete them; under
    share-place, a by-value read-only param is the correct default, not a lint.
@@ -67,14 +67,14 @@ CHANGE (coordinated — Sema+MIR+codegen must flip together or it miscompiles):
 ## CRITICAL FINDING — effect inference must be a pre-pass (fixpoint), or share-place double-frees
 
 The call site decides share-place-vs-move from the **callee's inferred effect**,
-read from the persistent sig via `sig_param_effect(sig_idx, pi)` (SemaCheck.w
+read from the persistent sig via `sig_param_effect(sig_idx, pi)` (SemaCheck.with
 ~12459, `propagate_*_param_effect` 7998/8007). But `sig_param_effects` is
-populated *per function body* as it is checked (flush at SemaCheck.w:1461), with
+populated *per function body* as it is checked (flush at SemaCheck.with:1461), with
 **no pre-pass and no callee-first ordering**. Bodies are checked roughly in decl
 order.
 
 Under the current MOVE model this is harmless: the call site moves every non-Copy
-arg **unconditionally** (SemaCheck.w:12470-12476), independent of the callee's
+arg **unconditionally** (SemaCheck.with:12470-12476), independent of the callee's
 effect. The effect is only consumed for `escape_view` + transitive propagation.
 
 Under SHARE-PLACE it is a **correctness landmine**. If caller A is checked before
@@ -111,7 +111,7 @@ committed pre-pass the convention can depend on.
 - **P1** — sites 1-4 + 6 coordinated (the core + vestige removal). Build stage1
   with the old (move) seed → stage1 is share-place. Verify the doc's `append_byte`
   / `store` / `rename` examples on a scratch program.
-- **P2 — self-host migration.** Run `stage1 check src/main.w`: share-place stage1
+- **P2 — self-host migration.** Run `stage1 check src/main.with`: share-place stage1
   flags every compiler-source site that relied on implicit consume/escape as
   "requires move/copy." Add explicit `move`/`copy` (compatible with BOTH the old
   seed and share-place — only NAMED non-Copy bindings passed to consume/
@@ -126,23 +126,23 @@ committed pre-pass the convention can depend on.
 The callee side is a one-flag change; the caller side is the real work.
 
 - **Callee (easy).** `value_ref_abi` on a param makes `declare_function_from_sig`
-  emit a plain `ptr` (NOT byval) + `record_ref_param` (Codegen.w:4094-4098), so
+  emit a plain `ptr` (NOT byval) + `record_ref_param` (Codegen.with:4094-4098), so
   the callee body operates on the *pointed-to caller place* = share-place. A
   non-value_ref_abi non-Copy struct instead goes byval-indirect
-  (`internal_abi_needs_indirect_param`, Codegen.w:4115) = callee gets a COPY.
+  (`internal_abi_needs_indirect_param`, Codegen.with:4115) = callee gets a COPY.
   So: **setting value_ref_abi for a share-place param flips the callee to
   share-place.** Drive it from the final effect, in a pass right after
   `fixpoint_effect_flow`: for each sig param that is non-Copy, by-value (not
   ref/ptr/slice), and whose effect excludes CONSUME|ESCAPE_VALUE, call
   `set_sig_param_value_ref_abi(sig, pi, 1)`.
-- **Callee drop.** MirLower.w:11961 + clause path 12068: generalize the
+- **Callee drop.** MirLower.with:11961 + clause path 12068: generalize the
   `borrowed_receiver` exemption — skip `schedule_drop(DK_VALUE)` for any param
   whose effect is share-place (equivalently, whose value_ref_abi is set). Only
   CONSUME|ESCAPE_VALUE params (and move/copy args) are owned + dropped.
 - **Caller (the work).** The caller passes an address for a ref param via
   `is_ref_param(fn_sym, pi)` + `mir_try_place_ptr_for_ref` /
   `get_mutable_receiver_ptr`, but this is done **per-call-path for the receiver
-  (param 0)** — e.g. CodegenDispatch.w:5887 (multi-index), 12797/12899 (generic),
+  (param 0)** — e.g. CodegenDispatch.with:5887 (multi-index), 12797/12899 (generic),
   13392 — NOT in one general marshalling loop. To generalize: every call path
   that pushes arguments must, for each arg `pi`, check `is_ref_param(fn_sym, pi)`
   and push `mir_operand_place_addr`/`mir_try_place_ptr_for_ref` (address of the
@@ -151,19 +151,19 @@ The callee side is a one-flag change; the caller side is the real work.
   the caller scope after the call. Enumerate the call-lowering paths first
   (`build_call_fn_value` and every builder of `call_args`) — this is the bulk of
   P1 and the highest miscompile risk; verify byval and sret interactions.
-- **Call-site consume (Sema).** SemaCheck.w:12470-12483: stop the unconditional
+- **Call-site consume (Sema).** SemaCheck.with:12470-12483: stop the unconditional
   `arg_consumed_by_value` for non-Copy; mark-moved only for explicit
   NK_MOVE_ARG/NK_COPY_ARG. Add a POST-fixpoint validation pass over recorded call
   sites emitting "requires move/copy" for a plain non-Copy binding passed to a
   CONSUME|ESCAPE_VALUE param (needs call sites recorded like the effect edges).
 - **Vestige lints.** Remove `emit_by_value_param_returned_view_error` (1459-1460)
   and `should_warn_by_value_read_only_param` (1469-1471) as part of the flip.
-- **Generic mono.** CodegenDispatch.w:12882, 16225 recompute value_ref_abi
+- **Generic mono.** CodegenDispatch.with:12882, 16225 recompute value_ref_abi
   structurally (`fn_param_uses_value_ref_abi`) — make them honor the effect-driven
   flag too (read the sig flag, or extend the structural check to share-place).
 
 Estimated: P1 is the large unit; P2 (self-host migration) blast radius is unknown
-until share-place stage1 runs `check src/main.w`. Both need fresh context; the P0
+until share-place stage1 runs `check src/main.with`. Both need fresh context; the P0
 foundation they build on is committed and green.
 
 ## THE CATHEDRAL — centralize argument marshalling before the flip (Eric's directive)
@@ -177,7 +177,7 @@ share-place flip is a one-line `value_ref_abi` extension in one place.
 
 ### The seam: one per-arg helper `push_call_arg`
 
-`Codegen.build_call_fn_value` (Codegen.w:1759) is the common tail and already
+`Codegen.build_call_fn_value` (Codegen.with:1759) is the common tail and already
 owns sret prepend, byval indirection (via `coerce_call_args_for_fn_value`
 1715-1757), dyn-trait wrapping, coercion, ABI attrs. Callers own exactly one
 thing: **value-vs-address per parameter.** Centralize THAT:
@@ -198,17 +198,17 @@ concrete path R7, the most complete existing logic), it must reproduce:
 
 ### The three loops to route through it (behavior-neutral)
 
-1. **Group B receiver blocks** (6): CodegenDispatch.w 5904, 13399, 13435, 13607;
-   Codegen.w 5147, 5374 (5147/5374 use a precomputed `obj_ptr` → a value-level
+1. **Group B receiver blocks** (6): CodegenDispatch.with 5904, 13399, 13435, 13607;
+   Codegen.with 5147, 5374 (5147/5374 use a precomputed `obj_ptr` → a value-level
    variant). Today these special-case index 0 only and push args 1..n as values;
    routing every index through `push_call_arg` matches R7 and is neutral because
    `is_ref_param` at index>0 is true only for `&T`/same-owner params whose value
    is already a pointer (the short-circuit yields the same value push).
-2. **Concrete/direct path** (CodegenDispatch.w 13913-14245, bypasses the tail):
+2. **Concrete/direct path** (CodegenDispatch.with 13913-14245, bypasses the tail):
    the 14101-14131 per-param `needs_ref` sub-block maps 1:1 to `push_call_arg`.
    Leave its byval (14062-14076), direct-aggregate (14080), dyn-trait
    (14132-14152), ctx_ptr (14042), sret (14046) branches in place.
-3. **Generic-call eval loop** (CodegenDispatch.w 12884-12909): the receiver
+3. **Generic-call eval loop** (CodegenDispatch.with 12884-12909): the receiver
    value-vs-address decision one level above `monomorphize_generic_call_core`
    (which just forwards pre-built `arg_vals`). Route through `push_call_arg`.
 
@@ -257,7 +257,7 @@ Net: migrate one site → gate (build+fixpoint+suite) → commit, never batch, s
 fixpoint break isolates to one swap.
 
 ### Out of scope (leave alone)
-- Group A (18 runtime/intrinsic sites, Codegen.w 1989-3214 area): no MIR operand;
+- Group A (18 runtime/intrinsic sites, Codegen.with 1989-3214 area): no MIR operand;
   LLVM constants. Not addressable by an operand-keyed helper.
 - Structural injections: ctx_ptr (closure env), sret buffer, fmt-spec constants,
   multi-index specs-ref/count, str_concat parts/count — pushed directly, never
@@ -283,14 +283,14 @@ transparent divergence is retired). The flip itself is 4 coordinated parts:
    cathedral marshals its address automatically. Note: generic mono recomputes
    ABI structurally, so this naturally lands on CONCRETE functions first;
    generics stay move until the mono ABI reads the flag (follow-on).
-2. Callee no-drop for IndirectPlace params (MirLower.w:11961/12068): schedule the
+2. Callee no-drop for IndirectPlace params (MirLower.with:11961/12068): schedule the
    `DK_VALUE` drop only when the param is OWNED (not `value_ref_abi`). MIR runs
    post-fixpoint, so it reads the final flag — correct.
 3. Call-site: a non-Copy value arg to a share-place param must NOT be marked
    consumed (the caller keeps ownership and drops it); a non-Copy arg to an
    OWNED (consume/escape_value) param is consumed as today (later: require
    explicit `move`/`copy`). Delete the `arg_consumed_by_value`-for-all-non-Copy.
-4. Delete the inverted lints (SemaCheck.w:1459-60/1469-71).
+4. Delete the inverted lints (SemaCheck.with:1459-60/1469-71).
 
 **The crux (verified):** part 3 runs DURING `check_bodies` (per call, inline with
 use-after-move tracking), but the share-place-vs-owned determination needs the

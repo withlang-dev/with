@@ -11,9 +11,9 @@ describes the same evaluator and mis-characterizes it. See "Relationship to
 \#914" below.
 
 Verified by reading `main` at `22e534c6`. Runtime measurements were taken with
-the released `v0.15.1.7` binary (`04ca1a74`); `src/Overflow.w` and
-`src/ComptimeValue.w` are byte-identical between the two revisions, and the
-five `src/ComptimeEval.w` hunks that differ are all #679 decl-index caching,
+the released `v0.15.1.7` binary (`04ca1a74`); `src/Overflow.with` and
+`src/ComptimeValue.with` are byte-identical between the two revisions, and the
+five `src/ComptimeEval.with` hunks that differ are all #679 decl-index caching,
 touching neither `:6742` nor `:7862`.
 
 ---
@@ -117,7 +117,7 @@ LIT >> 33 = 2147483648      // correct
 ADD >> 33 = 0               // ADD folded to 1
 ```
 
-`ComptimeEval.w:7861` is the boundary:
+`ComptimeEval.with:7861` is the boundary:
 
 ```with
 comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), exact.lo)
@@ -174,7 +174,7 @@ was inferred when this plan was first written and is now confirmed; see
 
 ### L1 — the literal constructor guesses a type
 
-`src/ComptimeEval.w:7861-7862`:
+`src/ComptimeEval.with:7861-7862`:
 
 ```with
 return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), exact.lo))
@@ -192,7 +192,7 @@ lines disagree on their default is the tell that neither is principled.
 
 ### L2 — the fallback propagates into arithmetic
 
-`src/ComptimeEval.w:6742`:
+`src/ComptimeEval.with:6742`:
 
 ```with
 let result_ty = self.node_type_or(node, if lhs.type_id != 0: lhs.type_id else: rhs.type_id)
@@ -203,7 +203,7 @@ every subsequent operation.
 
 ### L3 — operands are truncated before the overflow check
 
-`src/Overflow.w:152-215`. All six helpers share the ordering:
+`src/Overflow.with:152-215`. All six helpers share the ordering:
 
 ```with
 fn int_signed_add(lhs: i64, rhs: i64, width_raw: i32, mode: i32) -> IntArithmeticResult:
@@ -222,7 +222,7 @@ cannot overflow, so the corruption is never flagged. `int_signed_sub` `:171-172`
 `int_signed_mul` `:203-204`, `int_unsigned_add` `:109-110`, `int_unsigned_sub`
 `:125-126`, `int_unsigned_mul` `:138-139` are identical in this respect.
 
-`OP_DIV` and `OP_MOD` escape because their arms in `ComptimeEval.w` compute on
+`OP_DIV` and `OP_MOD` escape because their arms in `ComptimeEval.with` compute on
 raw operands and consult the width only for `int_div_overflows`. That is luck,
 not design — `3000000000i64 / 1000000000i64` is correct today.
 
@@ -232,7 +232,7 @@ guaranteed, so the helper defensively normalizes inputs it cannot trust.
 
 ### Why the lookup misses — confirmed
 
-**Comptime folding runs before sema.** `Frontend.w:1683-1688`:
+**Comptime folding runs before sema.** `Frontend.with:1683-1688`:
 
 ```with
 pre_sema.prepare_for_comptime_transform()
@@ -240,31 +240,31 @@ pre_sema.prepare_for_comptime_transform()
 pool = pre_sema.comptime_transform_module(pool, self.pool)
 ```
 
-`prepare_for_comptime_transform` (`Sema.w:6517`) does six things —
+`prepare_for_comptime_transform` (`Sema.with:6517`) does six things —
 `compute_method_origins`, `collect_declarations`, `build_ci_scoping`,
 `validate_copy_derives`, `validate_compiler_hooks`,
 `validate_generic_type_decls` — and **no `check_expr`**. So `typed_expr_types`
 is empty for function bodies while folding runs. Every fold entry point
 (`comptime_try_eval_expr` / `comptime_force_eval_expr`) is called from
-`ComptimeTransform.w` inside this pass; the only caller outside it is an
-`embed_file` path in `SemaCheck.w`.
+`ComptimeTransform.with` inside this pass; the only caller outside it is an
+`embed_file` path in `SemaCheck.with`.
 
-`typed_expr_types` is a partial `HashMap[i32, i32]` (`Sema.w:960`). It is not
-cleared by `prepare_comptime_eval_copy` (`Sema.w:1500`) — a stale-copy
+`typed_expr_types` is a partial `HashMap[i32, i32]` (`Sema.with:960`). It is not
+cleared by `prepare_comptime_eval_copy` (`Sema.with:1500`) — a stale-copy
 explanation is ruled out. The table is simply not populated yet.
 
 **Three things that should supply the width, and do not:**
 
 - **Literal suffixes are never consulted.** `literal_suffix` appears **zero**
-  times in `src/ComptimeEval.w`. `5381u64` evaluates as `i32`. Sema knows the
-  rule (`SemaCheck.w:6062`) but has not run. This is why an explicitly suffixed
+  times in `src/ComptimeEval.with`. `5381u64` evaluates as `i32`. Sema knows the
+  rule (`SemaCheck.with:6062`) but has not run. This is why an explicitly suffixed
   `3000000001i64` still corrupts.
 - **Parameter types are not applied.** `eval_fn_symbol_call_values` binds
   arguments raw; a declared `a: i64` never reaches the value.
 - **`let`/`var` annotations are ignored.** `eval_let_binding` reads `data1` and
   binds without consulting the annotation.
 
-The only type seeding that exists is `ComptimeTransform.w:1105` (local `let`)
+The only type seeding that exists is `ComptimeTransform.with:1105` (local `let`)
 and `:2992` (top-level `let`/`const`), which stamp a `const X: T = comptime …`
 annotation onto the outermost `NK_COMPTIME` node and its immediate child. That
 is why shallow cases pass while anything deeper does not, and why plain const
@@ -272,12 +272,12 @@ folding is correct within 64 bits while the explicit `comptime (...)` form is
 not.
 
 **Cloned nodes can never be in the table.** `ct_clone_tree_with_subst`
-(`ComptimeTransform.w:590`) mints fresh node ids per unrolled `comptime for`
+(`ComptimeTransform.with:590`) mints fresh node ids per unrolled `comptime for`
 iteration. Those ids are absent from `typed_expr_types` by construction, so any
 fix relying on the table alone must also cover them.
 
 **An existing band-aid confirms the class.** `apply_implicit_default_return`
-(`ComptimeEval.w:~1847`) masks the *returned* value to the declared return
+(`ComptimeEval.with:~1847`) masks the *returned* value to the declared return
 width, citing #767: "fold-order evaluation can compute an int body value in the
 operand's default representation … before the tail expr has its checked type
 record." That repairs the final value only — intermediates were already computed
@@ -335,13 +335,13 @@ truncates every format path to 64 bits. Use the `>> n` layer discriminators from
 that renders correctly. This also keeps the two campaigns' 128-bit tests
 mutually intelligible.
 
-- `test/behavior/behav_comptime_int_width.w` — the agreement matrix across
+- `test/behavior/behav_comptime_int_width.with` — the agreement matrix across
   `i8/i16/i32/i64` and `u8/u16/u32/u64`, with operands straddling each width
   boundary, exercising `+ 0`, `- 0`, `* 1`, `<< 0`, `/ 1`.
-- `test/behavior/behav_comptime_overflow_modes.w` — the same under
+- `test/behavior/behav_comptime_overflow_modes.with` — the same under
   `--overflow=panic|wrap|saturate`; comptime and runtime must make the same
   decision, differing only in whether it surfaces as a compile error or a trap.
-- `test/compile_errors/comptime_int_width.w` — pins the current diagnostics so
+- `test/compile_errors/comptime_int_width.with` — pins the current diagnostics so
   later stages show a visible diff, including the misleading
   "integer literal does not fit expected type" for the unsigned case.
 
@@ -349,7 +349,7 @@ Mark expected-fail where the harness supports it.
 
 ### S1 — L3: check before normalize (1 day)
 
-`src/Overflow.w`, all six arithmetic helpers.
+`src/Overflow.with`, all six arithmetic helpers.
 
 Replace *truncate-then-check* with *check-then-normalize*. An operand that does
 not fit `width` is not silently normalized; it is reported through the existing
@@ -364,7 +364,7 @@ not fit `width` is not silently normalized; it is reported through the existing
   behavior change for any call site that already passes canonical operands.**
 
 That last point is the fixpoint-safety property and must be verified, not
-assumed: `Overflow.w` is reached by Sema, the comptime evaluator, and both
+assumed: `Overflow.with` is reached by Sema, the comptime evaluator, and both
 codegens.
 
 **Acceptance:** every silent case in S0 becomes a diagnostic; no correct
@@ -382,7 +382,7 @@ stage builds rather than investigates. Three increments, cheapest first; **S2a
 and S2b are compatible and can land together**, and each is independently
 shippable.
 
-**S2a — honor literal suffixes.** `ComptimeEval.w:7862`: consult
+**S2a — honor literal suffixes.** `ComptimeEval.with:7862`: consult
 `self.ast.literal_suffix(node)` → `self.sema.literal_suffix_type(...)` before
 falling back. Small, self-evidently correct, and it makes the documented user
 workaround behave as users expect. Does not help un-suffixed code.
@@ -401,7 +401,7 @@ a value that legitimately overflowed a narrow declared type — that would trade
 this bug for a quieter one.
 
 **S2c — structural.** Populate `typed_expr_types` for comptime-reachable bodies
-during `prepare_for_comptime_transform` (`Sema.w:6517`) so folding sees checked
+during `prepare_for_comptime_transform` (`Sema.with:6517`) so folding sees checked
 types, and carry types across `ct_clone_tree_with_subst` for unrolled bodies.
 Fixes the whole class including generic comptime fns and `comptime for`.
 Supersedes S2a/S2b. Largest blast radius; needs care about ordering against
@@ -427,7 +427,7 @@ node classes S2c covers.
 
 ### S4 — Canonical representation (1 day)
 
-Enforce invariant 2 at the constructor. `comptime_value_int` (`ComptimeValue.w:86`)
+Enforce invariant 2 at the constructor. `comptime_value_int` (`ComptimeValue.with:86`)
 asserts the payload is canonical in `type_id`:
 
 ```
@@ -443,7 +443,7 @@ constructor contract, not to the struct layout.
 
 ### S5 — Fixpoint and full battery (½ day)
 
-`with build :fixpoint` — stage2 byte-identical to stage3. `Overflow.w` is shared
+`with build :fixpoint` — stage2 byte-identical to stage3. `Overflow.with` is shared
 across Sema and both codegens, so run fixpoint after S1 **alone**, before
 starting S2. Full battery per CONTRIBUTING's "Compiler Changes vs Library
 Changes".
@@ -476,7 +476,7 @@ This plan should land first; #914's D4 then reduces to the widening alone.
 
 | Risk | Why it bites | Mitigation |
 |---|---|---|
-| **`Overflow.w` is shared by Sema and both codegens** | S1 touches helpers reached by four subsystems; the i128 plan flags the same hazard for its own `Overflow.w` work. | Additive predicate only; byte-identical behavior for canonical operands; fixpoint after S1 alone before S2 starts. |
+| **`Overflow.with` is shared by Sema and both codegens** | S1 touches helpers reached by four subsystems; the i128 plan flags the same hazard for its own `Overflow.with` work. | Additive predicate only; byte-identical behavior for canonical operands; fixpoint after S1 alone before S2 starts. |
 | **S1 surfaces latent errors in existing comptime code** | Any std/lib comptime currently relying on the silent truncation begins erroring. | Full battery on S1 in isolation. Treat each new failure as a real bug found, not as S1 regressing — but budget time to triage them. |
 | **Sema/comptime re-entrancy in S2c** | Populating `typed_expr_types` during `prepare_for_comptime_transform` runs checking where none ran before, and comptime folding can re-enter sema. | Recursion guard; check the enclosing declaration once rather than per-node; S2a/S2b carry none of this risk, which is why they land first. |
 | **S3 before S2** | Turning the fallback into an ICE while lookups still miss breaks every comptime evaluation. | Strict stage ordering; S3 gated on the S0 oracle being green and on S2c for cloned nodes. |
@@ -517,7 +517,7 @@ even though the asset is published on `v0.15.1.7` and every nightly. The
 documented escape hatch is `WITH_LLVM_SDK_VERSION=<tag> with build :deps`;
 fetching the asset by hand and extracting into `.deps/` also works, since the
 tarball's top-level directory is already `llvm-22.1.6-darwin-arm64` as
-`BuildGraphTools.w:58` expects. Note the asset name says `aarch64` while the
+`BuildGraphTools.with:58` expects. Note the asset name says `aarch64` while the
 directory says `arm64`. Root cause of the `:deps` failure is not established —
 the release-lookup parser works on the live API response when simulated, so do
 not assume it is the culprit.
@@ -563,7 +563,7 @@ Branch `issue943`. All commits gate-verified: `:fixpoint` FIXPOINT and the full
   width resolution rather than making the lookup reliable, so the fallback is
   still reachable in principle. S4 below is the stronger guard and lands first.
 
-- **S4 — done in part.** `checked_int_value` in `ComptimeEval.w` asserts the
+- **S4 — done in part.** `checked_int_value` in `ComptimeEval.with` asserts the
   payload is canonical in its own `type_id` and aborts with a `BUG:` diagnostic
   otherwise, matching the `ast_pool_phase_bug` idiom.
 
@@ -601,5 +601,5 @@ with the original `(i32, 3000000001)` defect.
 
 S4 is strictly upstream: every case S1 could see must pass through the
 constructor first, plus cases S1 structurally cannot see. Recommendation: leave
-S1 undone, and fold it into #914's word-pair work on `Overflow.w`, where the
+S1 undone, and fold it into #914's word-pair work on `Overflow.with`, where the
 file is open anyway and the change is close to free.

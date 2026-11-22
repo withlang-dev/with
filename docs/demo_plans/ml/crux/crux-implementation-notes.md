@@ -197,38 +197,38 @@ explicitly distributed and require a composite device.
 
 ```
 lib/crux/
-├── core.w                  # Shape, Strides, View, DType, Scalar, Bindings
-├── error.w                 # CruxError enum
-├── device.w                # Device API (dispatches to backend)
-├── memory.w                # alloc, free, free_after, Arena, MemoryPlacement
-├── view.w                  # View constructors and operations
-├── program.w               # compile, ProgramSource, ProgramSig
-├── stream.w                # Stream, Event, dispatch
-├── collective.w            # allreduce, allgather, broadcast, reduce_scatter
-├── ir.w                    # IROp, IRInst, IR builder, IR validation
-├── ir_text.w               # Text parser (debug/testing only)
+├── core.with                  # Shape, Strides, View, DType, Scalar, Bindings
+├── error.with                 # CruxError enum
+├── device.with                # Device API (dispatches to backend)
+├── memory.with                # alloc, free, free_after, Arena, MemoryPlacement
+├── view.with                  # View constructors and operations
+├── program.with               # compile, ProgramSource, ProgramSig
+├── stream.with                # Stream, Event, dispatch
+├── collective.with            # allreduce, allgather, broadcast, reduce_scatter
+├── ir.with                    # IROp, IRInst, IR builder, IR validation
+├── ir_text.with               # Text parser (debug/testing only)
 ├── backend/
-│   ├── backend.w           # Backend trait / vtable definition
-│   ├── cpu.w               # CPU backend
-│   ├── cpu_compiler.w      # IR → C emission + dlopen
-│   ├── cpu_interp.w        # IR interpreter (correctness reference)
-│   ├── metal.w             # Metal backend
-│   └── metal_compiler.w    # IR → MSL emission
+│   ├── backend.with           # Backend trait / vtable definition
+│   ├── cpu.with               # CPU backend
+│   ├── cpu_compiler.with      # IR → C emission + dlopen
+│   ├── cpu_interp.with        # IR interpreter (correctness reference)
+│   ├── metal.with             # Metal backend
+│   └── metal_compiler.with    # IR → MSL emission
 ├── runtime/
 │   └── crux_metal_bridge.m # Objective-C Metal bridge
 ├── test/
-│   ├── test_view.w         # View arithmetic tests
-│   ├── test_cpu.w          # CPU backend tests
-│   ├── test_metal.w        # Metal backend tests
-│   ├── test_ir.w           # IR parsing/validation tests
-│   ├── test_elementwise.w  # Elementwise kernel tests
-│   ├── test_matmul.w       # Matmul correctness tests
-│   ├── test_softmax.w      # Softmax correctness tests
-│   ├── test_collective.w   # Collective operation tests
+│   ├── test_view.with         # View arithmetic tests
+│   ├── test_cpu.with          # CPU backend tests
+│   ├── test_metal.with        # Metal backend tests
+│   ├── test_ir.with           # IR parsing/validation tests
+│   ├── test_elementwise.with  # Elementwise kernel tests
+│   ├── test_matmul.with       # Matmul correctness tests
+│   ├── test_softmax.with      # Softmax correctness tests
+│   ├── test_collective.with   # Collective operation tests
 │   └── bench/
-│       ├── bench_elementwise.w
-│       ├── bench_matmul.w
-│       └── bench_softmax.w
+│       ├── bench_elementwise.with
+│       ├── bench_matmul.with
+│       └── bench_softmax.with
 └── kernels/
     ├── elementwise.ir      # Text IR for elementwise ops
     ├── matmul.ir           # Text IR for matrix multiply

@@ -26,13 +26,13 @@ With has two build configuration surfaces:
 
 ```text
 with.toml  declarative package metadata
-build.w    executable build behavior
+build.with    executable build behavior
 ```
 
 `with.toml` contains package identity, dependencies, minimum compiler version,
 feature defaults, publishing metadata, and declarative defaults.
 
-`build.w` contains imperative build behavior:
+`build.with` contains imperative build behavior:
 
 - conditionals and loops;
 - target graph construction;
@@ -46,7 +46,7 @@ feature defaults, publishing metadata, and declarative defaults.
 - install, clean, and promotion operations.
 
 Imperative build behavior in `with.toml` is invalid. The compiler must reject
-it and point the user to `build.w`.
+it and point the user to `build.with`.
 
 ---
 
@@ -64,7 +64,7 @@ with install-user
 
 `with test`, `with clean`, and `with install-user` are driver conveniences for
 the corresponding build targets. They must not contain behavior that cannot be
-expressed in `build.w`.
+expressed in `build.with`.
 
 Required build flags:
 
@@ -90,13 +90,13 @@ producer edges selected it, and which declared inputs/outputs are involved.
 Direct source builds remain supported:
 
 ```sh
-with build src/main.w
-with build src/main.w -o out/bin/app
-with build src/main.w --emit-obj -o out/main.o
-with build src/main.w --emit-c -o out/main.c
+with build src/main.with
+with build src/main.with -o out/bin/app
+with build src/main.with --emit-obj -o out/main.o
+with build src/main.with --emit-c -o out/main.c
 ```
 
-Direct source builds bypass `build.w`.
+Direct source builds bypass `build.with`.
 
 ---
 
@@ -104,10 +104,10 @@ Direct source builds bypass `build.w`.
 
 When `with build` is run in a project directory:
 
-1. The driver searches upward for `with.toml` or `build.w`.
+1. The driver searches upward for `with.toml` or `build.with`.
 2. The driver reads `with.toml` if present.
-3. If `build.w` exists, the driver compiles and executes it in tool mode.
-4. If no `build.w` exists, the driver synthesizes the default recipe.
+3. If `build.with` exists, the driver compiles and executes it in tool mode.
+4. If no `build.with` exists, the driver synthesizes the default recipe.
 
 Default recipe:
 
@@ -117,17 +117,17 @@ use std.build
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     let info = ctx.project_info()
-    ctx.new_build().executable(info.package_name(), "src/main.w")
+    ctx.new_build().executable(info.package_name(), "src/main.with")
 ```
 
-If neither `build.w` nor `src/main.w` exists, the driver fails with a
+If neither `build.with` nor `src/main.with` exists, the driver fails with a
 diagnostic.
 
 ---
 
 ## 4. Tool Mode
 
-`build.w` is compiled and run by the compiler driver as capability-bearing
+`build.with` is compiled and run by the compiler driver as capability-bearing
 comptime With code. Pure `comptime` remains deterministic and side-effect-free.
 Tool-mode effects are available only through compiler-provided capabilities.
 
@@ -163,7 +163,7 @@ The driver constructs `BuildCtx`, binds it into the capability-bearing
 comptime entry point as `ctx`, evaluates `build`, receives a `Build` graph,
 validates it, selects the requested target closure, and executes it.
 
-`build.w` is normal With code. There is no separate build language.
+`build.with` is normal With code. There is no separate build language.
 
 ---
 
@@ -459,7 +459,7 @@ location only after declared verification dependencies pass.
 
 Project-specific build behavior must not require compiler source changes.
 
-`build.w` can declare project-local tool actions as typed graph nodes backed by
+`build.with` can declare project-local tool actions as typed graph nodes backed by
 ordinary With functions:
 
 ```with
@@ -660,7 +660,7 @@ directories. The state database records one entry per graph node:
 - build schema version;
 - compiler identity and compiler build fingerprint;
 - package root and normalized graph node name;
-- graph node kind and source location in `build.w` when available;
+- graph node kind and source location in `build.with` when available;
 - stable action signature;
 - sorted declared input fingerprints;
 - sorted dependency output fingerprints;
@@ -794,7 +794,7 @@ Build diagnostics include:
 
 - selected build target;
 - graph node name;
-- source location in `build.w` when available;
+- source location in `build.with` when available;
 - workspace name when relevant;
 - underlying compiler diagnostic when available;
 - process exit code when applicable;
@@ -914,6 +914,6 @@ and:
 - no silent migrator fallback is used;
 - every standard target kind executes or has been deliberately removed from
   the standard vocabulary;
-- project-specific build behavior lives in project `build.w` modules, not in
+- project-specific build behavior lives in project `build.with` modules, not in
   generic compiler driver source;
 - no Python, Perl, Make, or shell script is required for the compiler build.

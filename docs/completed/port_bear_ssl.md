@@ -8,12 +8,12 @@ The With package manager needs HTTPS to download packages from Conan Center. We'
 
 ## What's Done
 
-- **Phase 0 complete:** TCP networking (`lib/std/net.w` + runtime), sysinfo (`lib/std/sysinfo.w`), ConanClient uses dynamic OS/arch detection
-- **Phase 1 complete:** SHA-256 — `lib/std/crypto/sha256.w`, passes NIST test vectors (empty string + "abc")
-- **Phase 2 complete:** HMAC-SHA256 — `lib/std/crypto/hmac.w`, passes RFC 4231 test cases 1 and 2
-- **Phase 3 complete:** AES-128 — `lib/std/crypto/aes.w`, passes NIST ECB test vector
-- **Phase 4 complete:** AES-128-GCM — `lib/std/crypto/gcm.w`, passes NIST SP 800-38D test case 2
-- **Phase 5 complete:** ChaCha20-Poly1305 — `lib/std/crypto/chacha20.w`, `lib/std/crypto/poly1305.w`, `lib/std/crypto/chacha20poly1305.w`, all pass RFC 8439 test vectors
+- **Phase 0 complete:** TCP networking (`lib/std/net.with` + runtime), sysinfo (`lib/std/sysinfo.with`), ConanClient uses dynamic OS/arch detection
+- **Phase 1 complete:** SHA-256 — `lib/std/crypto/sha256.with`, passes NIST test vectors (empty string + "abc")
+- **Phase 2 complete:** HMAC-SHA256 — `lib/std/crypto/hmac.with`, passes RFC 4231 test cases 1 and 2
+- **Phase 3 complete:** AES-128 — `lib/std/crypto/aes.with`, passes NIST ECB test vector
+- **Phase 4 complete:** AES-128-GCM — `lib/std/crypto/gcm.with`, passes NIST SP 800-38D test case 2
+- **Phase 5 complete:** ChaCha20-Poly1305 — `lib/std/crypto/chacha20.with`, `lib/std/crypto/poly1305.with`, `lib/std/crypto/chacha20poly1305.with`, all pass RFC 8439 test vectors
 
 ## Compiler bugs found and fixed during this work
 
@@ -26,7 +26,7 @@ The With package manager needs HTTPS to download packages from Conan Center. We'
 
 5. **Poly1305 limb reassembly carry corruption** — 26-bit limb→32-bit word reassembly produced overlapping u64 values. When pad addition used `f0 >> 32` as carry, it double-counted the overlap bits. Fixed: truncate each word to u32 before the carry-chain addition.
 6. **Borrow checker: temporary borrows never expire** — `&mut x as *mut T` borrows were registered with `ref_sym = 0` and the expiry logic skipped all ref_sym==0 entries. Temporary borrows persisted for the entire function. Fixed: expire ref_sym==0 borrows at statement boundaries.
-7. **Embedded stdlib not rebuilt** — Makefile dependency for `embedded_stdlib.inc.h` only listed the generator script, not the `.w` source files. Fixed: added `$(shell find lib/std -name '*.w')` dependency.
+7. **Embedded stdlib not rebuilt** — Makefile dependency for `embedded_stdlib.inc.h` only listed the generator script, not the `.w` source files. Fixed: added `$(shell find lib/std -name '*.with')` dependency.
 
 ## Blocker (resolved)
 
@@ -37,28 +37,28 @@ The With package manager needs HTTPS to download packages from Conan Center. We'
 ```
 lib/std/
 ├── crypto/
-│   ├── sha256.w          # SHA-256 hash
-│   ├── hmac.w            # HMAC-SHA256
-│   ├── aes.w             # AES block cipher (constant-time)
-│   ├── gcm.w             # AES-GCM authenticated encryption
-│   ├── chacha20.w        # ChaCha20 stream cipher
-│   ├── poly1305.w        # Poly1305 MAC
-│   ├── chacha20poly1305.w # ChaCha20-Poly1305 AEAD
-│   ├── bigint.w          # Big integer arithmetic (i31 variant)
-│   ├── rsa.w             # RSA signature verification
-│   ├── ec.w              # Elliptic curve operations (P-256)
-│   ├── ecdsa.w           # ECDSA signature verification
-│   ├── ecdh.w            # ECDHE key exchange
-│   └── random.w          # CSPRNG (seeded from OS entropy)
+│   ├── sha256.with          # SHA-256 hash
+│   ├── hmac.with            # HMAC-SHA256
+│   ├── aes.with             # AES block cipher (constant-time)
+│   ├── gcm.with             # AES-GCM authenticated encryption
+│   ├── chacha20.with        # ChaCha20 stream cipher
+│   ├── poly1305.with        # Poly1305 MAC
+│   ├── chacha20poly1305.with # ChaCha20-Poly1305 AEAD
+│   ├── bigint.with          # Big integer arithmetic (i31 variant)
+│   ├── rsa.with             # RSA signature verification
+│   ├── ec.with              # Elliptic curve operations (P-256)
+│   ├── ecdsa.with           # ECDSA signature verification
+│   ├── ecdh.with            # ECDHE key exchange
+│   └── random.with          # CSPRNG (seeded from OS entropy)
 ├── tls/
-│   ├── engine.w          # TLS record layer engine
-│   ├── handshake.w       # TLS 1.2 client handshake
-│   ├── record.w          # Record encryption/decryption
-│   ├── prf.w             # TLS PRF (key derivation)
-│   └── x509.w            # X.509 certificate validation
-├── net.w                 # TCP (implemented)
-├── http.w                # HTTP/1.1 client (new)
-└── sysinfo.w             # OS/arch detection (implemented)
+│   ├── engine.with          # TLS record layer engine
+│   ├── handshake.with       # TLS 1.2 client handshake
+│   ├── record.with          # Record encryption/decryption
+│   ├── prf.with             # TLS PRF (key derivation)
+│   └── x509.with            # X.509 certificate validation
+├── net.with                 # TCP (implemented)
+├── http.with                # HTTP/1.1 client (new)
+└── sysinfo.with             # OS/arch detection (implemented)
 ```
 
 ## Implementation Phases
@@ -87,19 +87,19 @@ lib/std/
 
 | With module | BearSSL source | LOC |
 |-------------|---------------|-----|
-| crypto/sha256.w | src/hash/sha2small.c | 299 |
-| crypto/hmac.w | src/mac/hmac.c | 52 |
-| crypto/aes.w | src/symcipher/aes_ct.c | 255 |
-| crypto/gcm.w | src/aead/gcm.c | 176 |
-| crypto/chacha20.w | src/symcipher/chacha20_ct.c | 138 |
-| crypto/poly1305.w | src/mac/poly1305_ctmul.c | 199 |
-| crypto/bigint.w | src/int/i31_*.c | ~2000 |
-| crypto/rsa.w | src/rsa/rsa_i31_pkcs1_vrfy.c | 127 |
-| crypto/ec.w | src/ec/ec_p256_m31.c | 1096 |
-| crypto/ecdsa.w | src/ec/ecdsa_i31_vrfy_*.c | 88 |
-| tls/engine.w | src/ssl/ssl_engine.c | 1584 |
-| tls/handshake.w | src/ssl/ssl_hs_client.c | 1915 |
-| tls/x509.w | src/x509/x509_minimal.c | 1722 |
+| crypto/sha256.with | src/hash/sha2small.c | 299 |
+| crypto/hmac.with | src/mac/hmac.c | 52 |
+| crypto/aes.with | src/symcipher/aes_ct.c | 255 |
+| crypto/gcm.with | src/aead/gcm.c | 176 |
+| crypto/chacha20.with | src/symcipher/chacha20_ct.c | 138 |
+| crypto/poly1305.with | src/mac/poly1305_ctmul.c | 199 |
+| crypto/bigint.with | src/int/i31_*.c | ~2000 |
+| crypto/rsa.with | src/rsa/rsa_i31_pkcs1_vrfy.c | 127 |
+| crypto/ec.with | src/ec/ec_p256_m31.c | 1096 |
+| crypto/ecdsa.with | src/ec/ecdsa_i31_vrfy_*.c | 88 |
+| tls/engine.with | src/ssl/ssl_engine.c | 1584 |
+| tls/handshake.with | src/ssl/ssl_hs_client.c | 1915 |
+| tls/x509.with | src/x509/x509_minimal.c | 1722 |
 
 ## BearSSL Design Notes (for when we resume)
 

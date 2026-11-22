@@ -396,23 +396,23 @@ returns Self. Keep it as the positive consuming-builder model.
 
 ### Existing tests to migrate, not delete
 
-- `behav_pipeline_vec_push_chain.w`: retain the rvalue chain and add one
+- `behav_pipeline_vec_push_chain.with`: retain the rvalue chain and add one
   expression chaining over a named Vec that remains live afterward.
-- `behav_drop_vec_pipeline_elements.w`: rewrite the ownership explanation from
+- `behav_drop_vec_pipeline_elements.with`: rewrite the ownership explanation from
   self-aliasing result temps to one hidden place; retain exact element drops.
-- `da_vecdrop_field_push_chain_tail.w`: replace obsolete dot chaining
+- `da_vecdrop_field_push_chain_tail.with`: replace obsolete dot chaining
   `h.items.push(...).push(...)` with a D21 pipeline over the field place.
-- `behav_drop_vec_push_value_tail.w`: stop returning `push`; perform the Unit
+- `behav_drop_vec_push_value_tail.with`: stop returning `push`; perform the Unit
   call and return the Vec explicitly so the test pins a real move.
-- `behav_drop_vec_push_stmt_reuse.w` and
-  `behav_drop_vec_push_void_tail.w`: keep behavior, replace receiver-returning
+- `behav_drop_vec_push_stmt_reuse.with` and
+  `behav_drop_vec_push_void_tail.with`: keep behavior, replace receiver-returning
   comments with the Unit contract.
-- `behav_mut_self_vec_return.w`: retain as the consuming `move fn` builder
+- `behav_mut_self_vec_return.with`: retain as the consuming `move fn` builder
   control.
-- `behav_pipeline_methods.w`: retain method-over-free resolution coverage.
-- `behav_comptime_pipeline_intrinsic.w`: extend or add a sibling for mutator
+- `behav_pipeline_methods.with`: retain method-over-free resolution coverage.
+- `behav_comptime_pipeline_intrinsic.with`: extend or add a sibling for mutator
   pipeline parity.
-- `behav_process_env_builder.w` and build ProcessSpec fixtures: retain fluent
+- `behav_process_env_builder.with` and build ProcessSpec fixtures: retain fluent
   value-builder behavior under consuming receiver contracts.
 
 Search all source and non-superseded docs for bound, returned, dotted, or piped
@@ -485,7 +485,7 @@ dumps, and the debugger first.
 
 ### Iterate tier
 
-1. `with check src/main.w`
+1. `with check src/main.with`
    - Question: is the edited compiler source accepted by the current blessed
      seed?
 2. Targeted `with check`/run of the semantic matrix
@@ -511,7 +511,7 @@ dumps, and the debugger first.
    - Question: can the seed produce one self-hosted stage containing D21?
 
 For a memory verdict, start with the native debug allocator, then use
-`tools/debug_drop.w`/LLDB plus the ownership and drop-plan dumps to reach the
+`tools/debug_drop.with`/LLDB plus the ownership and drop-plan dumps to reach the
 exact lowering/codegen branch. For a large failure, minimize with `with reduce`.
 Do not enter an edit/build/trace loop. For a fixpoint failure, run
 `with build :fixpoint-diff` before inspecting generated objects.
@@ -522,7 +522,7 @@ After targeted evidence is green:
 
 1. `with build`
 2. `with build :fixpoint`
-3. `./out/stage/bin/with-stage2 analyze src/main.w audit:all`
+3. `./out/stage/bin/with-stage2 analyze src/main.with audit:all`
 4. `with build :move-audit`
 5. `with build :drop-audit`
 6. `with build :emit-c-test`

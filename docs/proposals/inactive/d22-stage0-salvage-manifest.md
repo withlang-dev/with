@@ -22,7 +22,7 @@ These hunks were reviewed by function and reapplied on top of the doctrine
 baseline. Their presence means only “in D22 scope”; later stages still own the
 semantic and runtime proofs.
 
-### `src/Sema.w`
+### `src/Sema.with`
 
 - `Sema` contextual-adjustment sidecars: replace the call-only
   `auto_copy_ref_args` record with `contextual_copy_targets` and
@@ -36,7 +36,7 @@ semantic and runtime proofs.
   handles as owning allocations whose opaque fields require explicit drop
   glue. The existing Vec classification remains unchanged.
 
-### `src/SemaCheck.w`
+### `src/SemaCheck.with`
 
 - One contextual-Copy predicate and one Sema-owned adjustment record.
 - Independently established demands for calls, constructors, typed bindings,
@@ -55,7 +55,7 @@ semantic and runtime proofs.
 - Builtin receiver-mode and generic-method lookup support used by D22
   Option/Result ownership boundaries and generic collection methods.
 
-### `src/MirLower.w`
+### `src/MirLower.with`
 
 - Consume Sema's contextual-Copy record instead of the old call-only sidecar.
 - Lower a contextual copy from the exact shared-reference place, then apply an
@@ -66,7 +66,7 @@ semantic and runtime proofs.
 - Preserve exact payload behavior for unadjusted Option/Result operations and
   use the resolved Clone contract.
 
-### `lib/std/collections.w`
+### `lib/std/collections.with`
 
 - BTreeMap internal checked entry view.
 - Uniform `BTreeMap.get -> Option[&V]`.
@@ -76,7 +76,7 @@ semantic and runtime proofs.
 No public Vec lookup signature was changed. The rescue's `Vec[T: Clone].clone`
 rewrite was not reapplied.
 
-### `rt/rt_core.w`
+### `rt/rt_core.with`
 
 - SlotMap capacity, occupancy, and value-address helpers needed by typed drop
   iteration.
@@ -85,7 +85,7 @@ rewrite was not reapplied.
 The HashMap nullable-pointer lookup and HashMap free primitive were already in
 the committed baseline; no mixed runtime string/Vec ABI hunk was reapplied.
 
-### `src/CodegenDispatch.w`
+### `src/CodegenDispatch.with`
 
 - Recover the SlotMap element type from the MIR/Sema snapshot.
 - Iterate occupied SlotMap entries and emit typed element drops before freeing
@@ -104,37 +104,37 @@ into `test/non_compliant/d22/`; see that directory's README for its current
 owner stage and verdict.
 
 - Negative origin, join, generic, and diagnostic evidence:
-  - `test/compile_errors/err_d22_btreemap_origin_after_clear.w`;
-  - `test/compile_errors/err_d22_closure_capture_preserves_view.w`;
-  - `test/compile_errors/err_d22_diverging_default_preserves_view.w`;
-  - `test/compile_errors/err_d22_expect_origin_after_clear.w`;
-  - `test/compile_errors/err_d22_if_join_origin_union.w`;
-  - `test/compile_errors/err_d22_inferred_return_preserves_view.w`;
-  - `test/compile_errors/err_d22_named_borrowed_default_remedy.w`;
-  - `test/compile_errors/err_d22_nested_pattern_origin_after_clear.w`;
-  - `test/compile_errors/err_d22_nonclone_default_remedies.w`;
-  - `test/compile_errors/err_d22_raw_pointer_not_contextual_copy.w`;
-  - `test/compile_errors/err_d22_result_origin_after_clear.w`;
-  - `test/compile_errors/err_d22_result_unwrap_or_origin_union.w`;
-  - `test/compile_errors/err_d22_tuple_origin_after_clear.w`;
-  - `test/compile_errors/err_d22_unwrap_or_origin_union.w`;
-  - `test/compile_errors/err_d22_user_try_origin_after_clear.w`.
+  - `test/compile_errors/err_d22_btreemap_origin_after_clear.with`;
+  - `test/compile_errors/err_d22_closure_capture_preserves_view.with`;
+  - `test/compile_errors/err_d22_diverging_default_preserves_view.with`;
+  - `test/compile_errors/err_d22_expect_origin_after_clear.with`;
+  - `test/compile_errors/err_d22_if_join_origin_union.with`;
+  - `test/compile_errors/err_d22_inferred_return_preserves_view.with`;
+  - `test/compile_errors/err_d22_named_borrowed_default_remedy.with`;
+  - `test/compile_errors/err_d22_nested_pattern_origin_after_clear.with`;
+  - `test/compile_errors/err_d22_nonclone_default_remedies.with`;
+  - `test/compile_errors/err_d22_raw_pointer_not_contextual_copy.with`;
+  - `test/compile_errors/err_d22_result_origin_after_clear.with`;
+  - `test/compile_errors/err_d22_result_unwrap_or_origin_union.with`;
+  - `test/compile_errors/err_d22_tuple_origin_after_clear.with`;
+  - `test/compile_errors/err_d22_unwrap_or_origin_union.with`;
+  - `test/compile_errors/err_d22_user_try_origin_after_clear.with`.
 - Positive contextual-Copy, exact-type, forwarding, and keyed-map
   ownership/drop evidence (later stages own activation):
-  - `test/debug_alloc/da_d22_btreemap_get_borrow_remove_owned.w`;
-  - `test/debug_alloc/da_d22_contextual_copy_positions.w`;
-  - `test/debug_alloc/da_d22_contextual_default_eliminators.w`;
-  - `test/debug_alloc/da_d22_direct_vec_storage_reborrow.w`;
-  - `test/debug_alloc/da_d22_map_get_origin_excludes_key.w`;
-  - `test/debug_alloc/da_d22_nested_join_value_context.w`;
-  - `test/debug_alloc/da_d22_option_view_ownership_boundaries.w`;
-  - `test/debug_alloc/da_d22_result_carrier_forwarding.w`;
-  - `test/debug_alloc/da_d22_sequence_join_materialization.w`;
-  - `test/debug_alloc/da_d22_slotmap_contextual_copy.w`;
-  - `test/debug_alloc/da_d22_uniform_generic_map_forwarding.w`.
-- `test/debug_alloc/da_slotmap_owned_storage_drop.w`: Stage 6 SlotMap ownership
+  - `test/debug_alloc/da_d22_btreemap_get_borrow_remove_owned.with`;
+  - `test/debug_alloc/da_d22_contextual_copy_positions.with`;
+  - `test/debug_alloc/da_d22_contextual_default_eliminators.with`;
+  - `test/debug_alloc/da_d22_direct_vec_storage_reborrow.with`;
+  - `test/debug_alloc/da_d22_map_get_origin_excludes_key.with`;
+  - `test/debug_alloc/da_d22_nested_join_value_context.with`;
+  - `test/debug_alloc/da_d22_option_view_ownership_boundaries.with`;
+  - `test/debug_alloc/da_d22_result_carrier_forwarding.with`;
+  - `test/debug_alloc/da_d22_sequence_join_materialization.with`;
+  - `test/debug_alloc/da_d22_slotmap_contextual_copy.with`;
+  - `test/debug_alloc/da_d22_uniform_generic_map_forwarding.with`.
+- `test/debug_alloc/da_slotmap_owned_storage_drop.with`: Stage 6 SlotMap ownership
   and drop control.
-- `tools/migrate_d22_copy_views.w`: Stage 9 candidate. It applies only
+- `tools/migrate_d22_copy_views.with`: Stage 9 candidate. It applies only
   compiler-proven diagnostic fix-its and does not infer intent from `.get()`
   spelling. Its extern signatures were restored to the current share-place
   contract; the unrelated `&str` migration was removed.
@@ -157,69 +157,69 @@ part of the extracted D22 worktree.
 
 Files wholly quarantined in this class:
 
-- `build/selfhost.w`;
-- `lib/std/build.w`, `builtins.w`, `compiler.w`, `fs.w`, `http.w`, `io.w`,
-  `net.w`, `os.w`, `process.w`, `regex.w`, `string.w`, `testing.w`, `tls.w`;
-- `lib/test/bench.w`;
-- `rt/cimport_stubs.w`, `compat_runtime.w`, `darwin_aarch64.w`,
-  `fiber_runtime.w`, `linux_x86_64.w`, `panic_runtime.w`, `regex_runtime.w`,
-  `windows_x86_64.w`;
-- `src/Archive.w`, `Ast.w`, `BuildGraphRuntime.w`, `BuildGraphTools.w`,
-  `CImport.w`, `CiIR.w`, `CiMigrate.w`, `CiPrint.w`, `CodegenTraits.w`,
-  `ComptimeTransform.w`, `ComptimeValue.w`, `Diagnostic.w`, `Fmt.w`,
-  `InternPool.w`, `Lsp.w`, `Migrate.w`, `Mir.w`, `Parser.w`,
-  `ReceiverMigration.w`, `Resolve.w`, `Scaffold.w`, `SemaDecl.w`,
-  `SemaDiag.w`, `Source.w`, `Token.w`, `bootstrap_main.w`, `main.w`;
-- `src/compiler/ClangBridge.w`, `CodegenUnits.w`, `DriverOptions.w`,
-  `EmbeddedClangResource.w`, `Runtime.w`, `foundation/Diagnostic.w`,
-  `foundation/Source.w`;
-- `src/tools/generate_embedded_stdlib.w`;
-- `test/behavior/behav_async_scope_panic_cancels_siblings.w`,
-  `test/behavior/lib/pre_d_build_runner.w`,
-  `test/codegen/regex_literal_code_abi.w`, `test/hello.w`;
-- `tools/annotate_receivers.w`, `debug_drop.w`, `drop_audit.w`,
-  `materialize_predicate.w`, `migrate_method_arg_moves.w`,
-  `migrate_receivers.w`, `move_audit.w`, `with-sha256.w`.
+- `build/selfhost.with`;
+- `lib/std/build.with`, `builtins.with`, `compiler.with`, `fs.with`, `http.with`, `io.with`,
+  `net.with`, `os.with`, `process.with`, `regex.with`, `string.with`, `testing.with`, `tls.with`;
+- `lib/test/bench.with`;
+- `rt/cimport_stubs.with`, `compat_runtime.with`, `darwin_aarch64.with`,
+  `fiber_runtime.with`, `linux_x86_64.with`, `panic_runtime.with`, `regex_runtime.with`,
+  `windows_x86_64.with`;
+- `src/Archive.with`, `Ast.with`, `BuildGraphRuntime.with`, `BuildGraphTools.with`,
+  `CImport.with`, `CiIR.with`, `CiMigrate.with`, `CiPrint.with`, `CodegenTraits.with`,
+  `ComptimeTransform.with`, `ComptimeValue.with`, `Diagnostic.with`, `Fmt.with`,
+  `InternPool.with`, `Lsp.with`, `Migrate.with`, `Mir.with`, `Parser.with`,
+  `ReceiverMigration.with`, `Resolve.with`, `Scaffold.with`, `SemaDecl.with`,
+  `SemaDiag.with`, `Source.with`, `Token.with`, `bootstrap_main.with`, `main.with`;
+- `src/compiler/ClangBridge.with`, `CodegenUnits.with`, `DriverOptions.with`,
+  `EmbeddedClangResource.with`, `Runtime.with`, `foundation/Diagnostic.with`,
+  `foundation/Source.with`;
+- `src/tools/generate_embedded_stdlib.with`;
+- `test/behavior/behav_async_scope_panic_cancels_siblings.with`,
+  `test/behavior/lib/pre_d_build_runner.with`,
+  `test/codegen/regex_literal_code_abi.with`, `test/hello.with`;
+- `tools/annotate_receivers.with`, `debug_drop.with`, `drop_audit.with`,
+  `materialize_predicate.with`, `migrate_method_arg_moves.with`,
+  `migrate_receivers.with`, `move_audit.with`, `with-sha256.with`.
 
 Mixed-file hunks quarantined in this class:
 
-- `src/Sema.w`: runtime extern signatures, D5/parameter-mode comments and
+- `src/Sema.with`: runtime extern signatures, D5/parameter-mode comments and
   TODOs, legacy classifier commentary, `str` Copy/drop reclassification, and
   mechanical local annotations.
-- `src/SemaCheck.w`: runtime extern signatures, wrong-D5 comments, and
+- `src/SemaCheck.with`: runtime extern signatures, wrong-D5 comments, and
   mechanical local annotations.
-- `src/MirLower.w`: runtime extern signatures, wrong-D5 lowering comments, and
+- `src/MirLower.with`: runtime extern signatures, wrong-D5 lowering comments, and
   mechanical local annotations.
-- `src/CodegenDispatch.w`: every string ABI, tagged-length, formatting,
+- `src/CodegenDispatch.with`: every string ABI, tagged-length, formatting,
   intrinsic, and string-drop hunk.
-- `rt/rt_core.w`: allocator-range changes; owned/tagged-string layout and drop;
+- `rt/rt_core.with`: allocator-range changes; owned/tagged-string layout and drop;
   string operations; Vec string-transfer/bootstrap ABI; filesystem/process
   string signatures; and string collection helpers.
 
 ### Suspect collection work requiring a fresh proof
 
-- `lib/std/collections.w`: the rescue rewrote `Vec[T: Clone].clone` to copy raw
+- `lib/std/collections.with`: the rescue rewrote `Vec[T: Clone].clone` to copy raw
   elements from storage. That does not implement the declared Clone contract
   for non-Copy T and is not authorized by D22.
-- `test/debug_alloc/da_vec_clone_body_control.w` and
-  `da_vec_clone_copy_elements.w` remain rescue-only evidence for that separate
+- `test/debug_alloc/da_vec_clone_body_control.with` and
+  `da_vec_clone_copy_elements.with` remain rescue-only evidence for that separate
   issue.
 
 ### No uncommitted D22 behavior to salvage
 
-- `src/CCodegen.w`: only unrelated string signatures, tagged string length,
+- `src/CCodegen.with`: only unrelated string signatures, tagged string length,
   and string-drop emission changed. D22 C-backend parity remains future Stage 7
   work.
-- `src/ComptimeEval.w`: only unrelated string signatures and a TODO wording
+- `src/ComptimeEval.with`: only unrelated string signatures and a TODO wording
   change were uncommitted. The existing committed HashMap view snapshot remains
   subject to Stage 7 proof.
-- `src/Codegen.w`: only string ABI and mechanical annotation changes were
+- `src/Codegen.with`: only string ABI and mechanical annotation changes were
   uncommitted.
 
 ### Test evidence outside D22
 
-- `test/debug_alloc/da_fstring_i32.w`;
-- `test/debug_alloc/da_str_shared_param.w`.
+- `test/debug_alloc/da_fstring_i32.with`;
+- `test/debug_alloc/da_str_shared_param.with`.
 
 These remain available in the rescue commit and are not part of D22.
 

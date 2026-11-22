@@ -1,41 +1,41 @@
 ruling	claim	state	fixture	issue
 D29	a unique standard-library name resolves with no import (§18.1 tier 5)	open		#752
-D87	an implicit fill observes the binding and never consumes it; std.context APIs take implicit &Context (§7.3a)	implemented	test/debug_alloc/da_2049_context_arena_implicit_borrow.w	#2049
+D87	an implicit fill observes the binding and never consumes it; std.context APIs take implicit &Context (§7.3a)	implemented	test/debug_alloc/da_2049_context_arena_implicit_borrow.with	#2049
 D91	Target.os and Target.arch are compile-time constants; a per-target value is an exhaustive comptime match (§17.5)	open		#2949
-D95	structural types derive: a tuple implements Clone (and Eq, Ord, Hash, Debug) when every element does (§11.8)	implemented	test/behavior/behav_d95_tuple_clone.w	#2945
-D95	pub const may omit its type; ?? has its own precedence level; let _ = x moves and drops (§9.1b, §9.9, §29.6)	implemented	test/behavior/behav_d95_pub_const_takes_its_value_type.w	
-D96	a key is structural; a key projection fn key(); HashMap and HashSet walk in insertion order (§11.7)	implemented	test/behavior/behav_2180_map_keys_by_value.w	
-D97	std.TotalF64 is a float key; derived Ord orders variants by declaration (§11.7, §11.8)	implemented	test/behavior/behav_d97_option_none_first.w	
-D97	a facade states one error type for all its fallible operations: error E (§16.2b.4)	implemented	test/behavior/behav_2179_facade_one_error_type.w	
-D100	a declaration without pub is visible throughout its package; internal segments (§18.3, §18.4)	implemented	test/behavior/behav_d100_field_visibility.w	
-D109	offsetof[T](field) (§16.12)	implemented	test/behavior/behav_2131_offsetof.w	
-D124	a cast converts an untyped constant exactly (§4.2.1 rule 7)	implemented	test/behavior/behav_d124_cast_constant_exact.w	
-D125	literal join arms take the typed arms' type; what a cast does (§4.2.1 rule 8, §4.2.6)	implemented	test/behavior/behav_d125_carrier_literal_default.w	
-D126	a slice demand supplies the element type to a literal in argument position (§4.3c)	implemented	test/behavior/behav_d126_slice_demand_literal.w	#2944
-D127	a view of a constant is a view of an immutable static (§3.1)	implemented	test/behavior/behav_d127_view_of_constant_is_static.w	
-D128	a binding whose untyped integer literal typed it takes the type its uses agree on (§4.2.1)	implemented	test/behavior/behav_d128_int_local_shapes.w	
-D181	an integer beside a float is the float (§4.2.6)	implemented	test/behavior/behav_d181_int_beside_float_is_float.w	
-D182	a float where a narrower float is demanded converts (§4.2.6)	implemented	test/behavior/behav_d182_float_widths.w	
-D183	an integer where a narrower integer is demanded converts with a range check; as is the wrap; a comptime value out of range is an error; the lint names the narrow declaration (§4.2.6)	implemented	test/behavior/behav_d183_narrowing_out_of_range_panics.w	#2522
-D184	a script's top-level binding is a local of the implicit main; a helper that names it captures it (§29.15)	implemented	test/behavior/behav_d184_script_captures.w	#2951
-D184	a script helper that captures an ephemeral binding is non-escaping: value use refused (§29.15)	implemented	test/compile_errors/err_d184_view_capture_escapes_value.w	#2984
-D184	a script helper that captures an ephemeral binding is non-escaping: store refused (§29.15)	implemented	test/compile_errors/err_d184_view_capture_escapes_store.w	#2984
-D184	a script helper that captures an ephemeral binding is non-escaping: spawn refused (§29.15)	implemented	test/compile_errors/err_d184_view_capture_escapes_spawn.w	#2984
-D185	one comprehension family: the bracket form over Option/Result yields the carrier of the element; the yield expression form is retired; the statement form stays (§13.6, §13.6a)	implemented	test/behavior/behav_for_comprehension_yield_types.w	#2960
-D186	the iterator adapter is skip(n); drop(value) stays the prelude's (§13.3)	implemented	test/behavior/behav_d186_skip_adapter.w	
-D186	zip, chain and zip_with take any iterable (§13.3)	implemented	test/behavior/behav_d186_iterable_zip.w	
-D187	returns borrow T from params N, M: a view borrowed from two parameters (§16.2b.6)	implemented	test/behavior/behav_d187_borrow_from_two_params.w	#2965
-D188	Duration is a value type over i64 nanoseconds; 50.millis() reads as §14 writes it	implemented	test/behavior/behav_d188_duration.w	
-D189	tuple .await has no arity limit (§14.11)	implemented	test/behavior/behav_d189_tuple_await_any_arity.w	
-§13.3	every operation in the collection-operations table compiles and runs as written	implemented	test/behavior/behav_s13_3_lazy_adapters.w	
-§13.5a	a label may appear alone on a line and label the next statement	implemented	test/behavior/behav_s13_5a_label_alone.w	#2947
-§18.1	a grouped import at the package root: use std.{a, b}	implemented	test/behavior/behav_s18_1_root_grouped_import.w	#2948
-§14.10	a channel receive is a select await arm	implemented	test/behavior/behav_s14_10_channel_select_arm.w	#2956
-§14.11.1	ids |> map(f(it)) |> await_all	implemented	test/behavior/behav_s14_11_1_await_all_pipeline.w	
-D190	`?` in fn main: and in a script: an Err ends the program (stderr, exit 1)	implemented	test/behavior/behav_d190_question_in_main_err.w	#2935
+D95	structural types derive: a tuple implements Clone (and Eq, Ord, Hash, Debug) when every element does (§11.8)	implemented	test/behavior/behav_d95_tuple_clone.with	#2945
+D95	pub const may omit its type; ?? has its own precedence level; let _ = x moves and drops (§9.1b, §9.9, §29.6)	implemented	test/behavior/behav_d95_pub_const_takes_its_value_type.with	
+D96	a key is structural; a key projection fn key(); HashMap and HashSet walk in insertion order (§11.7)	implemented	test/behavior/behav_2180_map_keys_by_value.with	
+D97	std.TotalF64 is a float key; derived Ord orders variants by declaration (§11.7, §11.8)	implemented	test/behavior/behav_d97_option_none_first.with	
+D97	a facade states one error type for all its fallible operations: error E (§16.2b.4)	implemented	test/behavior/behav_2179_facade_one_error_type.with	
+D100	a declaration without pub is visible throughout its package; internal segments (§18.3, §18.4)	implemented	test/behavior/behav_d100_field_visibility.with	
+D109	offsetof[T](field) (§16.12)	implemented	test/behavior/behav_2131_offsetof.with	
+D124	a cast converts an untyped constant exactly (§4.2.1 rule 7)	implemented	test/behavior/behav_d124_cast_constant_exact.with	
+D125	literal join arms take the typed arms' type; what a cast does (§4.2.1 rule 8, §4.2.6)	implemented	test/behavior/behav_d125_carrier_literal_default.with	
+D126	a slice demand supplies the element type to a literal in argument position (§4.3c)	implemented	test/behavior/behav_d126_slice_demand_literal.with	#2944
+D127	a view of a constant is a view of an immutable static (§3.1)	implemented	test/behavior/behav_d127_view_of_constant_is_static.with	
+D128	a binding whose untyped integer literal typed it takes the type its uses agree on (§4.2.1)	implemented	test/behavior/behav_d128_int_local_shapes.with	
+D181	an integer beside a float is the float (§4.2.6)	implemented	test/behavior/behav_d181_int_beside_float_is_float.with	
+D182	a float where a narrower float is demanded converts (§4.2.6)	implemented	test/behavior/behav_d182_float_widths.with	
+D183	an integer where a narrower integer is demanded converts with a range check; as is the wrap; a comptime value out of range is an error; the lint names the narrow declaration (§4.2.6)	implemented	test/behavior/behav_d183_narrowing_out_of_range_panics.with	#2522
+D184	a script's top-level binding is a local of the implicit main; a helper that names it captures it (§29.15)	implemented	test/behavior/behav_d184_script_captures.with	#2951
+D184	a script helper that captures an ephemeral binding is non-escaping: value use refused (§29.15)	implemented	test/compile_errors/err_d184_view_capture_escapes_value.with	#2984
+D184	a script helper that captures an ephemeral binding is non-escaping: store refused (§29.15)	implemented	test/compile_errors/err_d184_view_capture_escapes_store.with	#2984
+D184	a script helper that captures an ephemeral binding is non-escaping: spawn refused (§29.15)	implemented	test/compile_errors/err_d184_view_capture_escapes_spawn.with	#2984
+D185	one comprehension family: the bracket form over Option/Result yields the carrier of the element; the yield expression form is retired; the statement form stays (§13.6, §13.6a)	implemented	test/behavior/behav_for_comprehension_yield_types.with	#2960
+D186	the iterator adapter is skip(n); drop(value) stays the prelude's (§13.3)	implemented	test/behavior/behav_d186_skip_adapter.with	
+D186	zip, chain and zip_with take any iterable (§13.3)	implemented	test/behavior/behav_d186_iterable_zip.with	
+D187	returns borrow T from params N, M: a view borrowed from two parameters (§16.2b.6)	implemented	test/behavior/behav_d187_borrow_from_two_params.with	#2965
+D188	Duration is a value type over i64 nanoseconds; 50.millis() reads as §14 writes it	implemented	test/behavior/behav_d188_duration.with	
+D189	tuple .await has no arity limit (§14.11)	implemented	test/behavior/behav_d189_tuple_await_any_arity.with	
+§13.3	every operation in the collection-operations table compiles and runs as written	implemented	test/behavior/behav_s13_3_lazy_adapters.with	
+§13.5a	a label may appear alone on a line and label the next statement	implemented	test/behavior/behav_s13_5a_label_alone.with	#2947
+§18.1	a grouped import at the package root: use std.{a, b}	implemented	test/behavior/behav_s18_1_root_grouped_import.with	#2948
+§14.10	a channel receive is a select await arm	implemented	test/behavior/behav_s14_10_channel_select_arm.with	#2956
+§14.11.1	ids |> map(f(it)) |> await_all	implemented	test/behavior/behav_s14_11_1_await_all_pipeline.with	
+D190	`?` in fn main: and in a script: an Err ends the program (stderr, exit 1)	implemented	test/behavior/behav_d190_question_in_main_err.with	#2935
 §14.19	@[ffi_stack]	open		#583
 §8.3	List.new_in(allocator)	open		#570
-§18.5	REPL persistent declarations	implemented	test/behavior/behav_3012_repl_persistent_decls.w	#3012
-§17	comptime enum payload shorthand; comptime f-string format specs	implemented	test/behavior/behav_2950_comptime_payload_variant.w	#2950
-D147	bitfields in member records under c_import	implemented	test/behavior/behav_d147_member_record_bitfields.w	#3014
-D191	a line beginning with |> (or <|, ??) continues the expression whose line is indented no more than its own; at a match's column it pipes the whole match (§9.6)	implemented	test/behavior/behav_d191_pipe_line_indent.w	
+§18.5	REPL persistent declarations	implemented	test/behavior/behav_3012_repl_persistent_decls.with	#3012
+§17	comptime enum payload shorthand; comptime f-string format specs	implemented	test/behavior/behav_2950_comptime_payload_variant.with	#2950
+D147	bitfields in member records under c_import	implemented	test/behavior/behav_d147_member_record_bitfields.with	#3014
+D191	a line beginning with |> (or <|, ??) continues the expression whose line is indented no more than its own; at a match's column it pipes the whole match (§9.6)	implemented	test/behavior/behav_d191_pipe_line_indent.with	

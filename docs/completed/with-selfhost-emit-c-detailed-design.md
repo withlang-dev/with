@@ -14,7 +14,7 @@ Goal: deliver a deterministic, interruptible, portable C11 backend for distribut
 
 ## 1. Design Goals
 
-1. `with build --emit-c src/main.w -o out.c` emits valid C11.
+1. `with build --emit-c src/main.with -o out.c` emits valid C11.
 2. Emitted C compiles with `zig cc -target ...` + runtime sources.
 3. Backend is deterministic and interruptible.
 4. Backend does not rely on heuristic type guessing inside emission.

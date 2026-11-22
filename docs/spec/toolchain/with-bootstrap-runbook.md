@@ -453,7 +453,7 @@ Test-Path .\with-bootstrap.pdb
   Select-String "DLL name"
 .\with-bootstrap.exe --version
 .\with-bootstrap.exe --help
-.\with-bootstrap.exe check rt\windows_x86_64.w
+.\with-bootstrap.exe check rt\windows_x86_64.with
 ```
 
 The stack reserve must report `8388608`. The COFF imports must not include `LLVM-C.dll`,
@@ -469,7 +469,7 @@ lldb.exe -b `
   -o "run" `
   -k "bt all" `
   -k "image lookup -a `$pc" `
-  -- .\with-bootstrap.exe check build.w
+  -- .\with-bootstrap.exe check build.with
 ```
 
 Do not continue bootstrap with a crashing seed.

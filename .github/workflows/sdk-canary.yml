@@ -88,7 +88,7 @@ jobs:
           grep -m1 -A1 '^targets:' "$sdk/usr/lib/libSystem.tbd"
 
       # Fails with the SDK, the linker and the stub entry TextAPI rejected
-      # (build/compiler.w comp_require_linkable_host_sdk), for example:
+      # (build/compiler.with comp_require_linkable_host_sdk), for example:
       #   unreadable: …/MacOSX27.0.sdk/usr/lib/libSystem.tbd:4:20: unknown architecture 'arm64e.x1-macos'
       - name: Pre-stage SDK link check
         run: |

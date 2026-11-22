@@ -1,8 +1,8 @@
 # 18.5a Project Builds
 
-`build.w` is executable build behavior written in With. `with.toml`
+`build.with` is executable build behavior written in With. `with.toml`
 is declarative package configuration. Imperative build concerns belong
-in `build.w`, not in `with.toml`.
+in `build.with`, not in `with.toml`.
 
 Allowed in `with.toml`:
 
@@ -22,9 +22,9 @@ Not allowed in `with.toml`:
 - Platform-specific branching logic
 - Multi-binary or multi-library build behavior
 
-Those belong in `build.w`.
+Those belong in `build.with`.
 
-For simple projects with no `build.w`, the compiler synthesizes the
+For simple projects with no `build.with`, the compiler synthesizes the
 default recipe:
 
 ```
@@ -33,7 +33,7 @@ use std.build
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     let info = ctx.project_info()
-    ctx.new_build().executable(info.package_name(), "src/main.w")
+    ctx.new_build().executable(info.package_name(), "src/main.with")
 ```
 
 Build targets have no implicit peak-memory budget. RSS measurement and
@@ -54,7 +54,7 @@ The standard build graph API lives in `std.build`. It defines
 `Build.generated_source`, `Target.optimize`, `Target.link_system_lib`,
 `Target.include_path`, `Target.library_path`, `Target.rpath`, and `Target.define`.
 
-`build.w` runs as capability-bearing comptime, not ordinary pure
+`build.with` runs as capability-bearing comptime, not ordinary pure
 `comptime`. Build code may perform effects only through `std.build`
 capabilities supplied by the driver. Those capabilities grant authority,
 not nondeterminism: any output-affecting effect must be deterministic
@@ -65,7 +65,7 @@ grants it; compiling a project does not give dependencies ambient access
 to the user's filesystem, environment, network, process table, or
 toolchain.
 
-The compiler driver discovers `build.w`, evaluates the `build` entry
+The compiler driver discovers `build.with`, evaluates the `build` entry
 point with a driver-minted `BuildCtx`, consumes the returned typed build
 graph, and builds executable, library, and test targets. Per-target
 `link_system_lib`, `include_path`, `library_path`, `rpath`, and `define` settings are honored by
@@ -84,6 +84,6 @@ must fail loudly. `BuildTarget` can represent non-native targets, but
 until cross-target codegen/linking is implemented those selections must
 fail loudly instead of falling back to native output. Unsupported graph
 features must likewise fail loudly instead of being ignored. A compiler
-version that recognizes project `build.w` files but does not execute
+version that recognizes project `build.with` files but does not execute
 them must likewise fail loudly instead of silently building some other
 target.

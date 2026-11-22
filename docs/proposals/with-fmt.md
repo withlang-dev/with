@@ -2,7 +2,7 @@
 
 > **Status (2026-09-19): design recovered, not implemented, not reviewed against
 > the current language.** Written 2026-04-12 and never committed; this is the
-> text as written, unchanged below this note. `src/Fmt.w` today does layout only
+> text as written, unchanged below this note. `src/Fmt.with` today does layout only
 > and implements none of the idiom rewrites in §2.
 >
 > Known to need a review pass before implementation — the language moved since:

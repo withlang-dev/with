@@ -200,7 +200,7 @@ deps, adds missing ones:
 ```
 $ with tidy
 removed: json v0.4.1 (not imported)
-added:   http v1.0.0 (imported in src/client.w)
+added:   http v1.0.0 (imported in src/client.with)
 removed: c.libpng 1.6.40 (not linked)
 ```
 

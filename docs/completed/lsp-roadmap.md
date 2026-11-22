@@ -20,7 +20,7 @@ tier. The slow tier result is opportunistic — if it's available and
 fresh, use it. If not, degrade gracefully to fast-tier results.
 
 **JSON parsing** uses a jsmn-based tokenizer (same algorithm as
-`lib/std/json.w`). Messages are parsed once per request into a token
+`lib/std/json.with`). Messages are parsed once per request into a token
 array; fields are navigated by token index.
 
 ---

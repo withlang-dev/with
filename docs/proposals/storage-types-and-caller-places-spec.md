@@ -644,19 +644,19 @@ an ABI descriptor change (`docs/spec/abi/with-abi.md`, `WITH_ABI_VERSION` bump).
 
 ### B.7 What it looks like to compiler maintainers
 
-- `ReceiverMode` (`Sema.w`) gains no variants; a parallel `ParamMode`
+- `ReceiverMode` (`Sema.with`) gains no variants; a parallel `ParamMode`
   (`Value | Inout | Byref`) is added to parameters. Mode participates in
   signature identity and mangling.
-- The per-argument ABI descriptor (`FnAbi.w`) gains an alias contract
+- The per-argument ABI descriptor (`FnAbi.with`) gains an alias contract
   derived from access mode; `PM_INDIRECT_PLACE` itself remains purely
   the transport mode and implies nothing about aliasing.
-- `apply_noalias_param_attrs` (`Codegen.w`) must skip `MayAlias`
+- `apply_noalias_param_attrs` (`Codegen.with`) must skip `MayAlias`
   parameters.
 - The borrow checker gains: a "reserved place" liveness state between
   designator evaluation and invocation; range-overlap queries on storage
   origins; a per-function may-alias class for compatible `byref`
   parameters.
-- `MirSuspendCheck.w` gains a rule: caller-place parameters on a
+- `MirSuspendCheck.with` gains a rule: caller-place parameters on a
   may-suspend body are an error.
 
 ### B.8 Diagnostics contract

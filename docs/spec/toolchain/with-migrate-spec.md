@@ -30,8 +30,8 @@ code can be incrementally cleaned up later.
 ## Usage
 
 ```
-with migrate foo.c                    # writes foo.w
-with migrate foo.c -o bar.w           # explicit output path
+with migrate foo.c                    # writes foo.with
+with migrate foo.c -o bar.with           # explicit output path
 with migrate src/ -o out/             # directory mode
 with migrate src/ --check             # dry run: exit 1 if changes needed
 with migrate src/ --diff              # show unified diff
@@ -58,7 +58,7 @@ proves nothing is an owned producer with the provenance `annotation:`;
 `nonnull` and `returns_nonnull` are header facts `c_import` reads directly
 and the report names them beside the function. The package's
 GObject-introspection files (every `*.gir` under the input directory, or
-one named with `--gir FILE`) are read the same way (`src/CiGir.w`, over
+one named with `--gir FILE`) are read the same way (`src/CiGir.with`, over
 `std.encoding.xml`), joined by C identifier: a return with
 `transfer-ownership="full"` the body proves nothing about is an owned
 producer; one with `"none"` is a borrow of the instance parameter when the
@@ -72,8 +72,8 @@ declared signature. `transfer-ownership="container"`, callbacks, closures
 and out-parameters stay raw with their reason. The report prints what the
 file said beside each function and says DISAGREES where the proof and the
 file differ; the proof stands. Below both comes the package registry
-(`--facts FILE`, `registry/c/<package>/facts.w` in the toolchain's
-repository, `registry/README.md`; `src/CiFacts.w`): a facade fragment in
+(`--facts FILE`, `registry/c/<package>/facts.with` in the toolchain's
+repository, `registry/README.md`; `src/CiFacts.with`): a facade fragment in
 the draft's own spelling whose every fact carries its citation after `//`
 (a fact without one is refused with its line), stating what neither a
 proof nor an annotation settled: `from F`, `drop F` and `destroys F` on a
@@ -103,7 +103,7 @@ corpus is exactly the C units that build compiles, with its include paths
 and defines (`compile_commands.json`), every `.gir` under the source, and
 the registry's facts file for the package, fetched from the toolchain's
 repository at one commit (`WITH_REGISTRY=<base URL>` names a mirror or a
-fixture instead). It writes `.with/deps/c/<name>/<version>/contract.w`, a
+fixture instead). It writes `.with/deps/c/<name>/<version>/contract.with`, a
 complete module (`use c_import` of each installed header that declares a
 presented function, then the draft), and `contract-report.txt` beside it,
 whose summary `with get` prints; a function whose prototype is only in a
@@ -112,7 +112,7 @@ says so, and a unit the parser could not read is named with the reason. The
 lock pins the registry commit and the facts file's digest (`registry`,
 `facts_sha256`), and a restore fetches the file at that commit. A program
 reaches the facade as `use contracts.<name>` when the project has no
-`contracts/<name>.w` of its own under `lib/` or `src/`; a `c contract <name>:`
+`contracts/<name>.with` of its own under `lib/` or `src/`; a `c contract <name>:`
 block in the project's source overrides any item (an fn item, or a
 resource) the written block also has, and the rest of the written block
 stays. Without CMake, Ninja or `with cc` the package installs with no
@@ -172,7 +172,7 @@ Structs, enums, typedefs, globals, function signatures
 Remove redundant casts, simplify trivial unsafe blocks
 ```
 
-### What already exists (in CImport.w)
+### What already exists (in CImport.with)
 
 The following are **already implemented** and working:
 
@@ -472,8 +472,8 @@ The first rule depends on the guaranteed no-heap lowering of §4.3c: the
 migrator emits a `List` for local and file-scope arrays only once that
 lowering holds, and each corpus is benchmarked against its C before and
 after the switch. The lowering held on 2026-10-12
-(`test/debug_alloc/da_d119_literal_no_heap.w`), and the migrator emits the
-`List` since then: `tools/corpus_bench.w` is the benchmark, and its before
+(`test/debug_alloc/da_d119_literal_no_heap.with`), and the migrator emits the
+`List` since then: `tools/corpus_bench.with` is the benchmark, and its before
 and after numbers are recorded with D119 in the decision log. An array
 whose element has no zero spelling (a record the migration does not lay
 out) stays `[T; N]`, since an uninitialized C buffer of it has no fill.
@@ -490,7 +490,7 @@ A C project has multiple `.c` files that share headers.
    resolves includes automatically)
 2. Each `.c` file becomes one `.w` file
 3. Shared declarations (from headers) are emitted in a common
-   module (`_types.w` or similar) and imported by each file
+   module (`_types.with` or similar) and imported by each file
 4. Deduplication: track which names have been emitted across files
    (the `with_cimport_is_name_emitted` / `mark_name_emitted`
    mechanism already exists)
@@ -672,7 +672,7 @@ validation path.
 
 ## Output Format
 
-### Single file (`foo.c` → `foo.w`)
+### Single file (`foo.c` → `foo.with`)
 
 ```
 // Generated by: with migrate foo.c
@@ -720,10 +720,10 @@ fn foo_process(ctx: *mut FooContext, data: *const u8, len: i32) -> i32:
 ```
 with migrate pcre2/src/ --prefer-brace --stats
 
-pcre2_compile.c   → pcre2_compile.w   2847 lines  0 gotos  123 unsafe
-pcre2_match.c     → pcre2_match.w     3012 lines  47 gotos  456 unsafe
-pcre2_dfa_match.c → pcre2_dfa_match.w 3521 lines  31 gotos  389 unsafe
-pcre2_tables.c    → pcre2_tables.w     892 lines  0 gotos    0 unsafe
+pcre2_compile.c   → pcre2_compile.with   2847 lines  0 gotos  123 unsafe
+pcre2_match.c     → pcre2_match.with     3012 lines  47 gotos  456 unsafe
+pcre2_dfa_match.c → pcre2_dfa_match.with 3521 lines  31 gotos  389 unsafe
+pcre2_tables.c    → pcre2_tables.with     892 lines  0 gotos    0 unsafe
 ...
 total: 23 files, 31847 lines, 78 gotos eliminated, 2341 unsafe blocks
 ```
@@ -734,10 +734,10 @@ total: 23 files, 31847 lines, 78 gotos eliminated, 2341 unsafe blocks
 
 ### Step 1: File-level driver
 
-Create `src/MigrateC.w`. Read a `.c` file, pass to libclang,
+Create `src/MigrateC.with`. Read a `.c` file, pass to libclang,
 iterate all declarations, call existing translators.
 
-**Key difference from CImport.w:** CImport skips non-inline
+**Key difference from CImport.with:** CImport skips non-inline
 function bodies and emits `extern fn`. MigrateC translates
 every function body.
 
@@ -745,10 +745,10 @@ Reuse: `ci_translate_struct`, `ci_translate_enum`,
 `ci_translate_typedef`, `ci_translate_var`,
 `ci_trans_expr`, `ci_trans_stmt`, `ci_trans_bool_expr`,
 `ci_try_translate_fn_body`, scope tracking, name collision
-resolution — all from CImport.w.
+resolution — all from CImport.with.
 
 **Done when:** `with migrate hello.c` produces a compilable
-`hello.w` for a trivial C program.
+`hello.with` for a trivial C program.
 
 ### Step 2: Goto detection and basic block construction
 

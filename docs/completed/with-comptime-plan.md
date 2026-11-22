@@ -15,12 +15,12 @@ The current self-hosted compiler already has surface-level comptime syntax and s
 
 ### 1.1 Parser and AST
 
-- `src/Token.w` already has `TK_KW_COMPTIME` and `TK_KW_CONST`.
-- `src/Ast.w` already has:
+- `src/Token.with` already has `TK_KW_COMPTIME` and `TK_KW_CONST`.
+- `src/Ast.with` already has:
   - `NodeKind.NK_COMPTIME`
   - `NodeKind.NK_COMPTIME_ERROR`
   - `FnFlags.COMPTIME`
-- `src/Parser.w` already supports:
+- `src/Parser.with` already supports:
   - `comptime fn ...`
   - `comptime expr`
   - `comptime if ...` via `NK_COMPTIME(NK_IF_EXPR(...))`
@@ -30,7 +30,7 @@ The current self-hosted compiler already has surface-level comptime syntax and s
 
 ### 1.2 Sema
 
-- `src/Sema.w` and `src/SemaCheck.w` track `in_comptime_fn`.
+- `src/Sema.with` and `src/SemaCheck.with` track `in_comptime_fn`.
 - `NK_COMPTIME` is currently type-checked by simply type-checking the inner expression.
 - `NK_COMPTIME_ERROR` is typed as `Never`.
 - `check_if_expr` still type-checks both branches unconditionally.
@@ -40,26 +40,26 @@ The current self-hosted compiler already has surface-level comptime syntax and s
 
 ### 1.3 MIR
 
-- `src/MirLower.w` has a tiny integer-only `try_eval_const`.
+- `src/MirLower.with` has a tiny integer-only `try_eval_const`.
 - `NK_COMPTIME` is mostly treated as a wrapper.
 - `comptime if` gets a narrow special case during MIR lowering: if the condition is an integer/bool constant, only the taken branch is lowered.
 - This is too late and too weak for the spec because dead branches are still sema-checked first.
 
 ### 1.4 Codegen
 
-- `src/CodegenTraits.w` has ad hoc evaluators for:
+- `src/CodegenTraits.with` has ad hoc evaluators for:
   - integer constants
   - string constants
   - `embed_file(...)`
   - a few `sizeof/alignof` cases
-- `src/CodegenDispatch.w` also contains special handling for `embed_file`.
+- `src/CodegenDispatch.with` also contains special handling for `embed_file`.
 - `@[derive(Clone)]` is currently implemented by direct codegen synthesis, not through comptime-generated AST.
 
 ### 1.5 Pipeline
 
-- `src/compiler/Frontend.w` freezes the merged AST before semantic analysis.
+- `src/compiler/Frontend.with` freezes the merged AST before semantic analysis.
 - There is no dedicated pass between sema and MIR for comptime execution / AST transformation.
-- `src/compiler/Compilation.w` currently does:
+- `src/compiler/Compilation.with` currently does:
   - parse/import expansion
   - sema
   - MIR lowering
@@ -133,26 +133,26 @@ This is the cleanest way to satisfy the spec's "discarded branches are not type-
 
 Add at least these new modules:
 
-- `src/ComptimeValue.w`
-- `src/ComptimeEval.w`
-- `src/ComptimeTransform.w`
-- `src/TypeLayout.w` or equivalent shared layout helper
+- `src/ComptimeValue.with`
+- `src/ComptimeEval.with`
+- `src/ComptimeTransform.with`
+- `src/TypeLayout.with` or equivalent shared layout helper
 
 Responsibilities:
 
-- `ComptimeValue.w`
+- `ComptimeValue.with`
   - tagged compile-time value representation
   - cloning / equality / formatting helpers
-- `ComptimeEval.w`
+- `ComptimeEval.with`
   - tree-walking evaluator over typed AST
   - call frames, local bindings, recursion/step limits
   - evaluator intrinsics
-- `ComptimeTransform.w`
+- `ComptimeTransform.with`
   - AST cloning / rewriting
   - branch elimination
   - loop unrolling
   - constant embedding as AST literals / aggregates
-- `TypeLayout.w`
+- `TypeLayout.with`
   - reusable `size` / `align` queries for sema types
   - cache layout results by `TypeId`
 
@@ -224,10 +224,10 @@ Recommended v1 result types:
 
 Files:
 
-- `src/Sema.w`
-- `src/SemaCheck.w`
-- `src/Parser.w`
-- `src/Ast.w`
+- `src/Sema.with`
+- `src/SemaCheck.with`
+- `src/Parser.with`
+- `src/Ast.with`
 
 Changes:
 
@@ -253,8 +253,8 @@ Acceptance:
 
 Files:
 
-- `src/ComptimeValue.w`
-- `src/ComptimeEval.w`
+- `src/ComptimeValue.with`
+- `src/ComptimeEval.with`
 
 Implement:
 
@@ -295,10 +295,10 @@ Acceptance:
 
 Files:
 
-- `src/ComptimeTransform.w`
-- `src/compiler/Frontend.w`
-- `src/compiler/Compilation.w`
-- `src/compiler/Zcu.w`
+- `src/ComptimeTransform.with`
+- `src/compiler/Frontend.with`
+- `src/compiler/Compilation.with`
+- `src/compiler/Zcu.with`
 
 Changes:
 
@@ -327,9 +327,9 @@ Acceptance:
 
 Files:
 
-- `src/MirLower.w`
-- `src/CodegenTraits.w`
-- `src/CodegenDispatch.w`
+- `src/MirLower.with`
+- `src/CodegenTraits.with`
+- `src/CodegenDispatch.with`
 
 Changes:
 
@@ -347,10 +347,10 @@ Acceptance:
 
 Files:
 
-- `src/ComptimeEval.w`
-- `src/SemaCheck.w`
-- `src/TypeLayout.w`
-- possibly `src/Ast.w` / `src/Parser.w` if new syntax is required
+- `src/ComptimeEval.with`
+- `src/SemaCheck.with`
+- `src/TypeLayout.with`
+- possibly `src/Ast.with` / `src/Parser.with` if new syntax is required
 
 Implement:
 
@@ -380,10 +380,10 @@ The spec depends on `self.{field.name}`. The current self-hosted AST does not ha
 
 Files:
 
-- `src/Ast.w`
-- `src/Parser.w`
-- `src/SemaCheck.w`
-- `src/ComptimeTransform.w`
+- `src/Ast.with`
+- `src/Parser.with`
+- `src/SemaCheck.with`
+- `src/ComptimeTransform.with`
 
 Implement either:
 
@@ -407,12 +407,12 @@ This is the hardest semantic extension because the spec wants comptime to genera
 
 Files:
 
-- `src/ComptimeTransform.w`
-- `src/Ast.w`
-- `src/Parser.w`
-- `src/SemaDecl.w`
-- `src/Codegen.w`
-- `src/CodegenDispatch.w`
+- `src/ComptimeTransform.with`
+- `src/Ast.with`
+- `src/Parser.with`
+- `src/SemaDecl.with`
+- `src/Codegen.with`
+- `src/CodegenDispatch.with`
 
 Recommended rollout:
 
@@ -433,8 +433,8 @@ Why staged:
 
 Files:
 
-- `src/ComptimeEval.w`
-- `src/SemaCheck.w`
+- `src/ComptimeEval.with`
+- `src/SemaCheck.with`
 
 Move or formalize:
 
@@ -493,7 +493,7 @@ Also add stage-safety gates after each major phase:
 - `make build`
 - `make smoke`
 - `make fixpoint`
-- `./out/bin/with-stage2 check src/main.w`
+- `./out/bin/with-stage2 check src/main.with`
 
 ## 7. Order of Implementation I Recommend
 

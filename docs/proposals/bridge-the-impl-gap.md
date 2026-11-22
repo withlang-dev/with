@@ -114,7 +114,7 @@ the truth in the `state` column.
 
 A ruling's PR carries, in the same PR: the spec words, the decision record,
 the row in `conformance.tsv`, and the fixture. The fixture is a
-`test/behavior/behav_d<N>_*.w` (or `test/compile_errors/err_d<N>_*.w`) that
+`test/behavior/behav_d<N>_*.with` (or `test/compile_errors/err_d<N>_*.with`) that
 spells the spec's own example. Until the implementation lands the fixture
 is listed in `test/conformance/open.txt`, which a lane runs expecting
 failure: a fixture that starts passing is the signal to flip the row and

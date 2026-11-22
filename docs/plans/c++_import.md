@@ -38,10 +38,10 @@ the repository root and were verified at `99939352`.
   Valve's documentation calls the header "not pure C code", even though
   the functions use C linkage and calling conventions.
 - `c_import` parses with `-x c`, hard-coded at all four parse sites
-  (`src/compiler/ClangBridge.w:1989-1991`, `:3096-3098`, `:3192-3194`,
+  (`src/compiler/ClangBridge.with:1989-1991`, `:3096-3098`, `:3192-3194`,
   `:3293-3295`). Any clang error fails the import (`:1921-1934`).
 - Even parsed as C++, the importer would collect nothing useful:
-  - `collect_decl` (`ClangBridge.w:1246-1259`) never descends into
+  - `collect_decl` (`ClangBridge.with:1246-1259`) never descends into
     `extern "C"`. Each `S_API` function sits under a LinkageSpec cursor, so
     the whole flat API would be invisible.
   - Without a linkage check, a C++ inline function such as `SteamAPI_Init()`
@@ -57,16 +57,16 @@ Five changes. None alters the output of an existing C import.
 
 - `lang: "c"` (the default) or `lang: "c++"`. Any other value is an error.
 - **Parser:** pack it beside `strict` in `NK_C_IMPORT`'s extra pool
-  (`src/Parser.w:2594-2813`) and pass it through
-  `Zcu.expand_c_imports_frontend` (`src/compiler/Frontend.w:355-568`) to
-  `process_c_import_with_defines` (`src/CImport.w:579-782`).
+  (`src/Parser.with:2594-2813`) and pass it through
+  `Zcu.expand_c_imports_frontend` (`src/compiler/Frontend.with:355-568`) to
+  `process_c_import_with_defines` (`src/CImport.with:579-782`).
 - **Cache:** add it to the key in `c_import_cache_key_frontend`
-  (`Frontend.w:763-803`). Bump `#format:cimport-v18` only if C output
+  (`Frontend.with:763-803`). Bump `#format:cimport-v18` only if C output
   changes, which it should not.
 
 ### 2.2 One argv builder
 
-The four argv blocks are copies (`ClangBridge.w:1974-2004`, `:3083-3111`,
+The four argv blocks are copies (`ClangBridge.with:1974-2004`, `:3083-3111`,
 `:3179-3207`, `:3280-3308`). Replace them with one helper that takes the
 language, so the declaration parse, the macro collection, and both macro
 probe parses always agree. In C++ mode it passes `-x c++` and otherwise
@@ -102,13 +102,13 @@ mangling.
 
 Fields come only from FieldDecls. A C++ record with a vtable pointer or a
 base class would get a With layout that is too small. The C fallback for a
-record with no fields, `{ __pad0: u8 }` plus `Copy` (`CImport.w:2156-2163`),
+record with no fields, `{ __pad0: u8 }` plus `Copy` (`CImport.with:2156-2163`),
 would turn an interface class into a 1-byte value.
 
 So, in C++ mode, every record's translated size and field offsets are
 compared with `clang_Type_getSizeOf` and `clang_Type_getOffsetOf`, which
 are already bound. Any mismatch demotes the record to opaque, and the
-existing cascade (`CImport.w:1261-1288`) demotes records that hold it by
+existing cascade (`CImport.with:1261-1288`) demotes records that hold it by
 value.
 
 For Steam this means:
@@ -116,7 +116,7 @@ For Steam this means:
 - **Plain structs:** `CallbackMsg_t` and callback structs such as
   `UserStatsStored_t` and `GameOverlayActivated_t` import as values.
 - **`#pragma pack(push, 4)`** is already honored
-  (`CImport.w:2188-2295`).
+  (`CImport.with:2188-2295`).
 - **CSteamID** contains a bitfield union, which the C rules already demote.
   Callback structs that hold a CSteamID by value (`UserStatsReceived_t`,
   for example) become opaque. The flat functions pass IDs as `uint64_steamid`
@@ -129,8 +129,8 @@ For Steam this means:
 ### 2.5 Nested enumerators named by their record
 
 Steam gives each callback struct `enum { k_iCallback = … };`. Today nested
-anonymous enums are hoisted to file scope (`ClangBridge.w:1284-1318`), and
-collisions are renamed `_2`, `_3` (`CImport.w:852-863`). That turns the
+anonymous enums are hoisted to file scope (`ClangBridge.with:1284-1318`), and
+collisions are renamed `_2`, `_3` (`CImport.with:852-863`). That turns the
 callback IDs into `k_iCallback`, `k_iCallback_2`, and so on, which is
 useless for manual dispatch.
 
@@ -145,7 +145,7 @@ and a collision is a C error.
 
 | Stage | Change | Notes |
 |---|---|---|
-| 0 | **Check the list against the real header. Done; results below.** Dump the pinned SDK's `steam_api_flat.h` with the compiler's own clang (`with cc -x c++ -fsyntax-only -Xclang -ast-dump=json …`, `src/compiler/ClangDriver.w`). Record which cursor kinds the flat functions and callback structs reach; any `using` alias, `enum class`, or fixed-type enum; namespaced types; references; and C++ standard-library includes | Each finding either needs nothing, or adds one line to §2. For example, `using` aliases would mean collecting TypeAliasDecl (36) like TypedefDecl, and a fixed-type enum used by a flat function would need the enum use-site fix |
+| 0 | **Check the list against the real header. Done; results below.** Dump the pinned SDK's `steam_api_flat.h` with the compiler's own clang (`with cc -x c++ -fsyntax-only -Xclang -ast-dump=json …`, `src/compiler/ClangDriver.with`). Record which cursor kinds the flat functions and callback structs reach; any `using` alias, `enum class`, or fixed-type enum; namespaced types; references; and C++ standard-library includes | Each finding either needs nothing, or adds one line to §2. For example, `using` aliases would mean collecting TypeAliasDecl (36) like TypedefDecl, and a fixed-type enum used by a flat function would need the enum use-site fix |
 | 1 | §2.2, the argv helper, with no behavior change | Can land before the spec sentence |
 | 2 | §2.1, §2.3, §2.4, §2.5, plus tests | Plan approved 2026-09-27 |
 | 3 | Acceptance against the SDK (§4) | Out of tree: the SDK is not redistributable |
@@ -194,7 +194,7 @@ licensed copy exists:
 ## 4. Tests
 
 No C++ compiler is needed. The pattern in
-`test/behavior/behav_c_export_defines_a_c_imported_prototype.w` supplies
+`test/behavior/behav_c_export_defines_a_c_imported_prototype.with` supplies
 bodies: `@[c_export("name")]` With functions define the symbols that the
 imported prototypes name.
 
@@ -241,9 +241,9 @@ so on Linux the loader would not find `libsteam_api.so` without
 The minimum is one list of runtime search paths:
 
 - `[link] rpath = ["$ORIGIN"]` in `with.toml`, parsed beside
-  `libs`/`search_paths` (`src/compiler/ProjectConfig.w:281-288`), and/or
-  `Target.rpath(...)` in `lib/std/build.w`.
-- `src/compiler/Link.w` emits `-Wl,-rpath,<path>` on the Linux link line
+  `libs`/`search_paths` (`src/compiler/ProjectConfig.with:281-288`), and/or
+  `Target.rpath(...)` in `lib/std/build.with`.
+- `src/compiler/Link.with` emits `-Wl,-rpath,<path>` on the Linux link line
   (`:331-367`) and the macOS equivalent. `@executable_path` is the macOS
   spelling of `$ORIGIN`.
 

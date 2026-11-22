@@ -56,7 +56,7 @@ fn draw_spiral(cx: f64, cy: f64, t: f64):
         DrawCircle(x as i32, y as i32, (4.0 + p * 4.0) as f32, col)
 ```
 
-These lines are from [`uat/fixtures/raylib_spiral_main.w`](uat/fixtures/raylib_spiral_main.w).
+These lines are from [`uat/fixtures/raylib_spiral_main.with`](uat/fixtures/raylib_spiral_main.with).
 The scenario [`uat/raylib_spiral.uat`](uat/raylib_spiral.uat) runs exactly
 the three commands above in a new directory, then reads the rendered frame
 back and checks its pixels. `with uat` runs every scenario in [`uat/`](uat).
@@ -121,14 +121,14 @@ fn main:
 ```
 
 Today the facade is a file in your project
-([`examples/c-interop/src/contracts/sqlite3.w`](examples/c-interop/src/contracts/sqlite3.w) is the one used here).
+([`examples/c-interop/src/contracts/sqlite3.with`](examples/c-interop/src/contracts/sqlite3.with) is the one used here).
 The rules are in [spec §16.2b](docs/spec/016_ffi.md).
 
 ## Translate C into With
 
 ```sh
-with migrate tiny.c -o tiny.w
-with run tiny.w
+with migrate tiny.c -o tiny.with
+with run tiny.with
 ```
 
 `with migrate` turns C source into With source that you check in and
@@ -157,7 +157,7 @@ fn main:
 
 ```
 error: use of moved value
- --> main.w:12:17
+ --> main.with:12:17
 12 |     print(total(xs))
    |                 ^^
 ```
@@ -217,7 +217,7 @@ special does not leak ([spec §2](docs/spec/002_ownership.md)). The compiler has
 a debug allocator built in to check it:
 
 ```sh
-with run --debug-alloc main.w      # debug-alloc: leak count=0 allocations=9
+with run --debug-alloc main.with      # debug-alloc: leak count=0 allocations=9
 ```
 
 ## The happy path is just the value
@@ -282,7 +282,7 @@ fn main:
 ## A scripting language too
 
 A file needs no `main`; top-level statements are the program, and
-`with run tool.w a b` compiles and runs it with arguments. The compiler
+`with run tool.with a b` compiles and runs it with arguments. The compiler
 also runs one-liners, which makes With a replacement for `grep`, `sed`,
 `awk` and `jq`:
 

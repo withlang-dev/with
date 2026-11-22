@@ -238,7 +238,7 @@ variants** denotes the sequence of that enum's values.
 - **Variant order is part of a public enum's interface.** Reordering the
   variants of an exported enum changes what `for x in E` yields. It is an
   interface change and belongs in the bundle fingerprint
-  (`BundleFingerprint.w`) and the bundle interface row.
+  (`BundleFingerprint.with`) and the bundle interface row.
 - **Adding a variant extends every loop over the type.** This sits next
   to the existing rule that adding a variant breaks non-exhaustive
   `match`es: both are the compiler keeping code that enumerates an enum

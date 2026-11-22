@@ -5,25 +5,25 @@ while preserving current compiler behavior.
 
 ## Zig-shaped boundaries now in `src/compiler/`
 
-- `Compilation.w`:
+- `Compilation.with`:
   orchestration root (equivalent role to Zig `Compilation`).
-- `Compilation/Config.w`:
+- `Compilation/Config.with`:
   normalized compiler settings (equivalent role to Zig `Compilation.Config`).
-- `Zcu.w`:
+- `Zcu.with`:
   canonical compilation-unit state (`InternPool`, diagnostics, import/source context).
-- `Frontend.w`:
+- `Frontend.with`:
   lex/parse/import/sema pipeline stage.
-- `Backend.w`:
+- `Backend.with`:
   LLVM codegen emission stage wrapper.
-- `Link.w`:
+- `Link.with`:
   linker/runtime-bridge policy and command construction.
 
 Call sites import `compiler.Compilation` directly: imports are not transitive
-(§18.2, #1708), so the former `src/Compilation.w` re-export shim is gone.
+(§18.2, #1708), so the former `src/Compilation.with` re-export shim is gone.
 
 ## Current migration state
 
-- CLI (`src/main.w`) runs through `Compilation`.
+- CLI (`src/main.with`) runs through `Compilation`.
 - Pipeline state ownership moved out of `Driver` and into `Compilation + Zcu`.
 - Existing heavy implementations are still reused:
   `Sema` and `Codegen` remain the engines behind frontend/backend wrappers.

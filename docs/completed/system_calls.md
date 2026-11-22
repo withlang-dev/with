@@ -94,23 +94,23 @@ Replace `clock_gettime`, `sigaction`, `socket`/`bind`/`listen`/`accept`.
 ## Architecture
 
 ```
-lib/sys/darwin_aarch64.w    — syscall number constants + extern declarations
-lib/sys/darwin_x86_64.w     — syscall number constants + extern declarations
-lib/sys/linux_aarch64.w     — syscall number constants + extern declarations
-lib/sys/linux_x86_64.w      — syscall number constants + extern declarations
+lib/sys/darwin_aarch64.with    — syscall number constants + extern declarations
+lib/sys/darwin_x86_64.with     — syscall number constants + extern declarations
+lib/sys/linux_aarch64.with     — syscall number constants + extern declarations
+lib/sys/linux_x86_64.with      — syscall number constants + extern declarations
 
 runtime/syscall_aarch64_darwin.s   — raw syscall stubs
 runtime/syscall_x86_64_darwin.s    — raw syscall stubs
 runtime/syscall_aarch64_linux.s    — raw syscall stubs
 runtime/syscall_x86_64_linux.s     — raw syscall stubs
 
-lib/std/io.w                — print/eprint/write/ewrite using sys_write
-lib/std/fs.w                — file operations using sys_open/read/write/close
-lib/std/process.w           — process operations using sys_fork/exec/wait
-lib/std/mem.w               — allocator using sys_mmap/munmap
+lib/std/io.with                — print/eprint/write/ewrite using sys_write
+lib/std/fs.with                — file operations using sys_open/read/write/close
+lib/std/process.with           — process operations using sys_fork/exec/wait
+lib/std/mem.with               — allocator using sys_mmap/munmap
 ```
 
-The With source files (`lib/sys/*.w`) declare the extern syscall
+The With source files (`lib/sys/*.with`) declare the extern syscall
 functions. The assembly files implement them. User code never sees
 syscall numbers — they use `std.io.print`, `std.fs.read_file`, etc.
 

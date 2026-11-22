@@ -6,9 +6,9 @@ Moved verbatim from AGENTS.md (#2374). Nothing here was reworded.
 
 **D30 landed (steps 1–4, 2026-10-20;
 `docs/meetings/2026-08-09-D30-retire-the-internal-runtime-abi-remaining-boundaries-speak-c.md`).**
-The runtime is a bundle: `rt/*.w` compiled as one unit per (compiler
+The runtime is a bundle: `rt/*.with` compiled as one unit per (compiler
 generation, target) at compiler build time into `rt.{o,wi,manifest}`
-(`build/rt_bundle.w`), embedded in the compiler's `rt` slot (the host's) and
+(`build/rt_bundle.with`), embedded in the compiler's `rt` slot (the host's) and
 `rt@<tag>` slots (wasm32, the cross tags), and found beside a runtime root
 (`out/bootstrap/lib`, `out/lib`, `<compiler_dir>/../lib`) when the slot is
 empty (a `:dev` stage1). Every unit with a prelude parses the runtime's
@@ -42,7 +42,7 @@ not rename them into another internal export mechanism.
 
 Two surfaces, never conflated: user programs use exactly the language
 syntax and the `std.*` APIs (`lib/std/`); `with_*` symbols and everything in
-`rt/*.w` are the compiler's own runtime — user source never names one; the
+`rt/*.with` are the compiler's own runtime — user source never names one; the
 compiler emits those calls (`std.regex` is a facade over the pcre2 `.wo`
 bundle, `std.engines.pcre2`, D38/D39). If you catch yourself asking "how does a user
 program get the `with_*` symbols?", the question is malformed. The standard
@@ -81,7 +81,7 @@ compiler or any other system tool, ask **whose action it is**:
   use the host's system tools. A missing tool is named, and installing it is
   the user's step (package-management.md).
 - **The toolchain's.** The compiler, its runtime, its build system
-  (`build.w`, `build/*.w`), the SDK and the migrated corpora. These may
+  (`build.with`, `build/*.with`), the SDK and the migrated corpora. These may
   **not**: everything they need is bootstrapped from our own sources and SDK
   (D81, and the next section).
 
@@ -145,10 +145,10 @@ never Python, bash, perl or awk. With IS a scripting language.
   let argv = args()
   for i in 1..argv.len() as i32: print(shout(argv[i]))
   ```
-- **Run without a build step**: `with run tool.w a b` forwards `a b` as argv.
+- **Run without a build step**: `with run tool.with a b` forwards `a b` as argv.
   Reuse the compiler's modules (`use Lexer`, `use Token`) for token-accurate
   source tooling — regex hacks are not acceptable for self-host-critical
-  rewrites (see `tools/migrate_receivers.w`).
+  rewrites (see `tools/migrate_receivers.with`).
 - File I/O via `use std.fs` (`read_file`, `write_file`, `list_files_text`,
   newline-separated). Never declare the `with_fs_*` externs in a tool or user
   program: that seam SEGFAULTS in user programs (#901) and dies with #761.

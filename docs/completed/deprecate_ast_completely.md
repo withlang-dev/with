@@ -35,7 +35,7 @@ MIR codegen never checks `fn_ref_param_starts`.
 
 ## Fix A: Method Key Registration
 
-**File: `src/Codegen.w`**
+**File: `src/Codegen.with`**
 
 - [x] **A1.** Compute `method_key_sym` early in `declare_function`
 - [x] **A2.** Register method_key in `fn_values` / `fn_fn_types`
@@ -46,7 +46,7 @@ MIR codegen never checks `fn_ref_param_starts`.
 
 ## Fix B: Ref-Param-Aware Call Emission
 
-**File: `src/Codegen.w`**
+**File: `src/Codegen.with`**
 
 - [x] **B1.** Add `is_ref_param` helper
 - [x] **B2.** Add `mir_try_place_ptr_for_ref` helper
@@ -76,7 +76,7 @@ Self-host chain required no additional fixes beyond the test-harness work.
 
 ```bash
 make build
-./out/bin/with-stage2 build src/main.w -o /tmp/with-stage3   # no crash
+./out/bin/with-stage2 build src/main.with -o /tmp/with-stage3   # no crash
 cp out/bin/with-stage2 src/main && cp out/bin/with-stage2 ~/.local/bin/with
 make fixpoint
 ./scripts/run_tests.sh

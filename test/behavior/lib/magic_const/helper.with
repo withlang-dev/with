@@ -1,0 +1,7 @@
+fn imported_default_line(line: u32 = __LINE__) -> u32: line
+
+pub fn imported_magic_is_precise -> bool:
+    let expected_line = __LINE__ + 1
+    if imported_default_line() != expected_line:
+        return false
+    src().contains("lib/magic_const/helper.with")

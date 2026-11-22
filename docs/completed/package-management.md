@@ -28,7 +28,7 @@ Produces:
 myapp/
 ├── with.toml
 └── src/
-    └── main.w
+    └── main.with
 ```
 
 `with.toml`:
@@ -38,7 +38,7 @@ name = "myapp"
 version = "0.1.0"
 ```
 
-`src/main.w`:
+`src/main.with`:
 ```
 fn main:
     print("Hello, World!")
@@ -46,8 +46,8 @@ fn main:
 
 Options:
 ```
-with init              # interactive — asks for name, creates src/main.w
-with init --lib        # library project — creates src/lib.w, no main
+with init              # interactive — asks for name, creates src/main.with
+with init --lib        # library project — creates src/lib.with, no main
 with init --name foo   # non-interactive, uses "foo" as project name
 ```
 
@@ -305,7 +305,7 @@ extra_defines = {}          # additional -D flags
 
 ```
 Phase 1: with init (~50 lines)
-  - Create with.toml and src/main.w
+  - Create with.toml and src/main.with
   - Read with.toml in compiler for project name
 
 Phase 2: with.toml dep reading (~80 lines)

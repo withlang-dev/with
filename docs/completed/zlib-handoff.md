@@ -26,17 +26,17 @@ tests have since landed.
 
 As of 2026-06-24:
 
-- `build/zlib.w` defines graph-owned `:zlib-reference`, `:zlib-migrate`,
+- `build/zlib.with` defines graph-owned `:zlib-reference`, `:zlib-migrate`,
   `:zlib-build`, `:zlib-test`, `:zlib-check-generated`, and `:zlib-promote`
   actions.
-- `build.w` wires those targets into the project graph.
-- `lib/std/zlib.w` provides the safe in-memory facade:
+- `build.with` wires those targets into the project graph.
+- `lib/std/zlib.with` provides the safe in-memory facade:
   `compress`, `compress_level`, `compress_gzip`, `compress_gzip_level`,
   `decompress`, `decompress_with_limit`, `decompress_gzip`, and
   `decompress_gzip_with_limit`.
 - `lib/std/zlib/` contains the promoted migrated modules, including the
   upstream `example` and `minigzip` test programs.
-- `build/zlib_gzip.w` and `build/zlib_gunzip.w` use the migrated `std.zlib`
+- `build/zlib_gzip.with` and `build/zlib_gunzip.with` use the migrated `std.zlib`
   implementation for build/package archive flows.
 - `run_zlib_test_action` compiles and runs migrated `example` and `minigzip`
   round-trip checks.
@@ -49,7 +49,7 @@ As of 2026-06-24:
   `.w`.** Loop until all of zlib migrates AND compiles.
 - **Migrator bugs are fixed in THIS work, not filed** as issues.
 - **Validate** via zlib's own migrated test suite.
-- **Compiler-owned code (`src/`, `rt/`, `lib/std/`, `build.w`, `build/`) must
+- **Compiler-owned code (`src/`, `rt/`, `lib/std/`, `build.with`, `build/`) must
   NEVER `c_import`.** Packaging needs migrated `std.zlib`, never `c_import zlib`.
 - **Commit discipline:** `with build` + `with build :fixpoint` + `with build
   :test` all green before every commit. Eric Hartford is the SOLE author — never
@@ -80,20 +80,20 @@ seconds; only *changing the migrator* needs a ~5-min `with build`):
   --shared-defs std.zlib.defs --no-c-export -I out/zlib_src
 ```
 
-`with migrate` CLI flags (handler `run_migrate_command`, `src/main.w:~2402`):
+`with migrate` CLI flags (handler `run_migrate_command`, `src/main.with:~2402`):
 `-o <out>`, `-I <inc>`, `-include <hdr>`, `-D <define>`, `--no-c-export`,
 `--prefer-brace|--prefer-colon`, `--width-slice N`, `--shared-defs <prefix>`,
 `--migrate-one <basename>`, `--exclude <basename>`.
 
 **Synthetic per-module compile check** (mirrors the pcre2 pipeline — inline
-`defs.w`, drop the `use std.zlib` line, `with check`):
+`defs.with`, drop the `use std.zlib` line, `with check`):
 ```sh
-defs=$(cat out/zlib_migrated/defs.w)
-for f in out/zlib_migrated/*.w; do
+defs=$(cat out/zlib_migrated/defs.with)
+for f in out/zlib_migrated/*.with; do
   mod=$(basename "$f" .w); [ "$mod" = defs ] && continue
   body=$(grep -v '^use std.zlib' "$f")
-  printf '%s\n%s\n' "$defs" "$body" > out/zcheck/$mod.w
-  errs=$(./out/release/bin/with check out/zcheck/$mod.w 2>&1 | rg -c '^error')
+  printf '%s\n%s\n' "$defs" "$body" > out/zcheck/$mod.with
+  errs=$(./out/release/bin/with check out/zcheck/$mod.with 2>&1 | rg -c '^error')
   echo "$mod: ${errs:-0}"
 done
 ```
@@ -104,8 +104,8 @@ All three verified green (build + fixpoint + test):
 
 | Commit | What |
 | --- | --- |
-| `1382b866` | 3 general migrator fixes: (a) recover `sizeof` under function-like / cross-file macro expansion via new bridge accessor `with_ci_cursor_spelling_head` (reads the operator keyword at the cursor's spelling-START location, which points into the macro body even when the operand type lives in another header); (b) portable-baseline migrate preamble (`ci_migrate_portable_baseline_preamble`, in `ci_migrate_source_prefix`) that `#undef`s host CPU-feature macros (`__ARM_FEATURE_CRC32`, AVX/SSE4, NEON crypto…) so libs take their generic C path, not inline-asm/SIMD; (c) treat an empty translated function body `{}` as success not failure (CiMigrate.w `~1341`, gated `ret == "Unit" and fn_body_cursor>=0 and num_children==0`). **Result: all 11 codec files migrate with 0 untranslatable.** |
-| `7b44d300` | `calloc` IR-path lowering (CImport.w `build_libc_call_value_expr`, `~7862`) now mirrors `malloc`: cast args to i64, `unsafe` wrap, cast `*i8` result to `*c_void`, call `with_alloc_zeroed`; and the migrate preamble (CiMigrate.w `~516`) declares `extern fn with_alloc_zeroed(count: i64, size: i64) -> *i8`. |
+| `1382b866` | 3 general migrator fixes: (a) recover `sizeof` under function-like / cross-file macro expansion via new bridge accessor `with_ci_cursor_spelling_head` (reads the operator keyword at the cursor's spelling-START location, which points into the macro body even when the operand type lives in another header); (b) portable-baseline migrate preamble (`ci_migrate_portable_baseline_preamble`, in `ci_migrate_source_prefix`) that `#undef`s host CPU-feature macros (`__ARM_FEATURE_CRC32`, AVX/SSE4, NEON crypto…) so libs take their generic C path, not inline-asm/SIMD; (c) treat an empty translated function body `{}` as success not failure (CiMigrate.with `~1341`, gated `ret == "Unit" and fn_body_cursor>=0 and num_children==0`). **Result: all 11 codec files migrate with 0 untranslatable.** |
+| `7b44d300` | `calloc` IR-path lowering (CImport.with `build_libc_call_value_expr`, `~7862`) now mirrors `malloc`: cast args to i64, `unsafe` wrap, cast `*i8` result to `*c_void`, call `with_alloc_zeroed`; and the migrate preamble (CiMigrate.with `~516`) declares `extern fn with_alloc_zeroed(count: i64, size: i64) -> *i8`. |
 | `445a45f1` | Parser: `sizeof[T]`/`alignof[T]` accept function-pointer types. In `Parser.parse_index_or_slice`, when the bracket starts with `extern`/`fn` (tokens that can't begin an index expression), parse a TYPE and store it as `NK_INDEX.data1` (sema's `sizeof_alignof_type_arg_node` resolves it as a type). |
 
 ## 5. Migration and synthetic compile bar: DONE for all 15 library files
@@ -142,10 +142,10 @@ rm -rf out/zlib_migrated out/zcheck
 ./out/release/bin/with migrate out/zlib_src -o out/zlib_migrated \
   --shared-defs std.zlib.defs --no-c-export -I out/zlib_src
 mkdir -p out/zcheck
-for f in out/zlib_migrated/*.w; do
+for f in out/zlib_migrated/*.with; do
   mod=$(basename "$f" .w); [ "$mod" = defs ] && continue
-  { cat out/zlib_migrated/defs.w; rg -v '^use std\.zlib' "$f"; } > "out/zcheck/$mod.w"
-  errs=$(./out/release/bin/with check "out/zcheck/$mod.w" 2>&1 | tee "out/zcheck/$mod.err" | rg -c '^error')
+  { cat out/zlib_migrated/defs.with; rg -v '^use std\.zlib' "$f"; } > "out/zcheck/$mod.with"
+  errs=$(./out/release/bin/with check "out/zcheck/$mod.with" 2>&1 | tee "out/zcheck/$mod.err" | rg -c '^error')
   printf '%s: %s\n' "$mod" "${errs:-0}"
 done
 ```
@@ -192,7 +192,7 @@ and link as normal With modules.
 ### Cosmetic / generalization residue
 - Migrator emits redundant `unsafe` (warnings only).
 - Hardcoded `"Migrated from PCRE2"` / "migrated PCRE2" labels at
-  `src/CiMigrate.w:~338, ~341, ~830` — genericize (derive from the lib /
+  `src/CiMigrate.with:~338, ~341, ~830` — genericize (derive from the lib /
   shared-defs prefix).
 
 ## 7. Completion status
@@ -208,7 +208,7 @@ and link as normal With modules.
 
 ## 8. Key files / functions / line numbers
 
-- `src/CiMigrate.w`
+- `src/CiMigrate.with`
   - `ci_migrate_shared_decl_add` (143) — shared-defs dedup (first-sighting)
   - `ci_migrate_shared_decl_upgrade_opaque_type` — opaque→concrete
   - `ci_migrate_write_shared_defs` (337; reads `g_migrate_shared_decl_buf` @354)
@@ -219,7 +219,7 @@ and link as normal With modules.
     calls `with_cimport_parse(source)` directly)
   - empty-body success fix (~1341); preamble libc externs (~456–520)
   - hardcoded "PCRE2" labels (~338, 341, 830)
-- `src/CImport.w`
+- `src/CImport.with`
   - type rendering → `ci_migrate_shared_decl_add("type", …)` at 1701 (demoted
     opaque), 1785 (concrete struct), 1935, 1954; forward-decl-skip-if-defined at
     1690 (`ci_record_definition_exists`, 824)
@@ -227,14 +227,14 @@ and link as normal With modules.
   - `ci_render_missing_pointer_opaques` (946) — **c_import only**, not migrate
   - sizeof macro recovery in `CiExprPool.lower_expr_ir` `CXK_UNARY_EXPR` (~6298,
     committed); `calloc` in `build_libc_call_value_expr` (~7862, committed)
-- `src/compiler/ClangBridge.w`
+- `src/compiler/ClangBridge.with`
   - `with_ci_cursor_spelling_head` (committed) + helper
     `cursor_spelling_head_from_cursor`
-- `src/Parser.w` — `parse_index_or_slice` sizeof[fn-type] fix (committed)
-- `src/SemaCheck.w` — `sizeof_alignof_type_arg_node` (10509),
+- `src/Parser.with` — `parse_index_or_slice` sizeof[fn-type] fix (committed)
+- `src/SemaCheck.with` — `sizeof_alignof_type_arg_node` (10509),
   `is_sizeof_or_alignof` (10489)
-- `src/main.w` — `run_migrate_command` (~2402)
-- Pipeline template: `build/pcre2.w` (mirror for `:zlib-*` targets, but
+- `src/main.with` — `run_migrate_command` (~2402)
+- Pipeline template: `build/pcre2.with` (mirror for `:zlib-*` targets, but
   generalize — do NOT clone its per-lib knobs: hardcoded file-rank table, import
   injection, width-slice, test-output normalization)
 
@@ -243,14 +243,14 @@ and link as normal With modules.
 1. **`:zlib-test` validation:** `run_zlib_test_action` migrates zlib's upstream
    `example.c` and `minigzip.c`, compiles them against the migrated library, and
    runs example plus gzip/decompress round-trip checks.
-2. **`build/zlib.w` graph targets:** `:zlib-reference`, `:zlib-migrate`,
+2. **`build/zlib.with` graph targets:** `:zlib-reference`, `:zlib-migrate`,
    `:zlib-build`, `:zlib-check-generated`, `:zlib-test`, and `:zlib-promote`
    are implemented.
-3. **Thin `lib/std/zlib.w` facade:** `std.zlib` exposes in-memory zlib and gzip
+3. **Thin `lib/std/zlib.with` facade:** `std.zlib` exposes in-memory zlib and gzip
    compression/decompression over the migrated internals. It is pure With: no
    `c_import` and no extern dependency on system libz.
-4. **Packaging:** build/package flows use `build/zlib_gzip.w` and
-   `build/zlib_gunzip.w` helpers backed by `std.zlib` for `.tar.gz` archive
+4. **Packaging:** build/package flows use `build/zlib_gzip.with` and
+   `build/zlib_gunzip.with` helpers backed by `std.zlib` for `.tar.gz` archive
    creation and extraction.
 
 ## 10. Verification before any commit

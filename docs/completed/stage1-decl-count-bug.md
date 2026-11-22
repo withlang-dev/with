@@ -6,9 +6,9 @@ Updated: 2026-04-29 (session 3 — root cause found and fixed)
 
 ## Root Cause
 
-`parse_const_decl` in `src/Parser.w` packed the type-annotation extras
+`parse_const_decl` in `src/Parser.with` packed the type-annotation extras
 index with `(type_extra + 1) * 4`, but all readers (including
-`top_level_let_type_ann_extra` in `src/SemaDecl.w`) expected `* 16`.
+`top_level_let_type_ann_extra` in `src/SemaDecl.with`) expected `* 16`.
 
 Commit **f2e202c** (p7.11+p7.12: §15.4/§15.12) migrated the
 `NK_LET_DECL.d2` flag layout from 2-bit (`mut|pub|type_extra*4`) to
@@ -28,14 +28,14 @@ rejected it.
 
 ## Fix
 
-One-character change: `src/Parser.w:1879` — `* 4` → `* 16`.
+One-character change: `src/Parser.with:1879` — `* 4` → `* 16`.
 
 ## Why the Bisect Found 365e5ab
 
 The actual encoding bug was introduced in f2e202c (the parent commit).
 365e5ab was found by bisect because it added enough extras (new AstPool
 fields, `@[iter_of_self]` attribute handling) to shift the decoded
-index from a harmless target to a TokenList type node from Token.w.
+index from a harmless target to a TokenList type node from Token.with.
 The bug was latent in f2e202c — it just happened to point to an
 innocuous node by luck.
 
@@ -44,15 +44,15 @@ innocuous node by luck.
 Stage1/stage2 produced bogus **"unknown type X"** errors at unrelated
 source locations when the top-level declaration count in certain
 compiler source modules changed by even one. The affected `const`
-declarations were `SEV_ERROR` and `SEV_WARNING` in `src/Diagnostic.w`.
+declarations were `SEV_ERROR` and `SEV_WARNING` in `src/Diagnostic.with`.
 
 ## Verification
 
 - `make build` — passes
 - `make fixpoint` — stage2 == stage3
 - `make test` — 721 pass, 1 pre-existing fail (issue114_condition_assign)
-- All 6 module reproducers (Token.w, CImport.w, Parser.w, Lexer.w,
-  InternPool.w, Source.w) now pass with dummy functions appended
+- All 6 module reproducers (Token.with, CImport.with, Parser.with, Lexer.with,
+  InternPool.with, Source.with) now pass with dummy functions appended
 
 ## False Trails Ruled Out
 

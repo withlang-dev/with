@@ -1,6 +1,6 @@
 # Battery time
 
-The battery (`with run tools/battery.w`: the gate, the acceptance scenarios
+The battery (`with run tools/battery.with`: the gate, the acceptance scenarios
 and `:battery-checks`, one scheduled graph driven by the pinned seed) is
 measured by wall clock on the release host, an 18-core Mac. Every number
 below is an official run: the pinned seed driving, a committed tree, no
@@ -32,7 +32,7 @@ Elapsed stamps from the run's `[time]` lines:
 
 | At | Target | Lane time |
 |---|---|---|
-| 28 s | build.w evaluated, bootstrap runtime compiled by the seed | |
+| 28 s | build.with evaluated, bootstrap runtime compiled by the seed | |
 | 86 s | stage1 | 76 s |
 | 175 s | stage2 | 74 s |
 | 184 s | build (the release stamp) | 3 s |
@@ -63,13 +63,13 @@ std module compiled from a checkout carries that checkout's absolute path.
 The canonical spelling (`codegen_canonical_module_path`: `<embedded-std>/…`
 for std, the prefix map otherwise; D38, D50) is what Sema now spells and MIR
 reads (#2418); two worktrees build one commit to byte-identical images. The pin is
-`test/behavior/behav_panic_path_is_canonical.w`.
+`test/behavior/behav_panic_path_is_canonical.with`.
 
 ## How to measure
 
 - Never `time`-wrapped: the driver prints `[build] :battery wall N s` and the
   battery log's `[time] <target> <lane> @<elapsed>` lines are the timeline.
-- Read logs with `with run ~/.claude/hooks/verdict.w <log>` (`--times`,
+- Read logs with `with run ~/.claude/hooks/verdict.with <log>` (`--times`,
   `--progress`, `--detail <needle>`).
 - A measurement with a driver that is not the pinned seed (a release binary
   built from the tree, to time a driver change before a seed carries it)
@@ -96,7 +96,7 @@ reads (#2418); two worktrees build one commit to byte-identical images. The pin 
   top level (`rt_list_dir`, `std.fs.list_dir_text`) and the listing
   accumulates in one buffer: 20,798 files in under a millisecond.
 - **An Action before the runner exists ran as a `build :X --no-deps` child**,
-  re-evaluating build.w around a 2 s compile (18 s under stage1, 55 s under
+  re-evaluating build.with around a 2 s compile (18 s under stage1, 55 s under
   the seed), eighteen of them one after another in a cold worktree (993 s).
   It runs in the driver's own evaluation now (56 s for the eighteen).
 - **emit-c emitted the whole program** (24 MB of C for `print("hi")`); it

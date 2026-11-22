@@ -491,14 +491,14 @@ Typed dump parity harness passes on Wave 6 corpus with explicit `KNOWN_DIVERGENC
 * No sugar beyond this point
 
 Delivered artifacts:
-- `src/Mir.w` rewritten as full SoA MIR model + deterministic dump rendering.
-- `src/MirLower.w` implemented for MIR lowering, drop scheduling/elaboration, pattern/discriminant lowering, and sugar lowering (`?.`, `??`, `with`, record update, `let...else`, pipeline).
-- Driver/CLI plumbing for `--dump-mir` in `src/Driver.w` and `src/main.w`.
+- `src/Mir.with` rewritten as full SoA MIR model + deterministic dump rendering.
+- `src/MirLower.with` implemented for MIR lowering, drop scheduling/elaboration, pattern/discriminant lowering, and sugar lowering (`?.`, `??`, `with`, record update, `let...else`, pipeline).
+- Driver/CLI plumbing for `--dump-mir` in `src/Driver.with` and `src/main.with`.
 - Test infrastructure:
   - `test/wave7/mir_corpus.txt`
   - `scripts/run_wave7_mir_parity.sh`
   - `scripts/run_wave7_mir_unit_tests.sh`
-  - `test/wave7/cases/*.w`
+  - `test/wave7/cases/*.with`
 
 Validation:
 - Wave 7 MIR parity harness passes deterministic self-host validation on 26/26 corpus files.
@@ -514,21 +514,21 @@ v3 contract (authoritative):
 * NLL, aliasing, and ephemeral enforcement execute after MIR lowering.
 
 Current repo state (parity implementation):
-* NLL-style expiration, aliasing/disjoint-field checks, and core ephemeral checks are currently implemented in `src/Sema.w` for Wave 8 corpus parity.
+* NLL-style expiration, aliasing/disjoint-field checks, and core ephemeral checks are currently implemented in `src/Sema.with` for Wave 8 corpus parity.
 * This is implementation debt, not architectural target.
 
 Delivered artifacts:
-- `src/Sema.w` borrow-check/ephemeral enforcement updates:
+- `src/Sema.with` borrow-check/ephemeral enforcement updates:
   - `check_borrow_create` + disjoint overlap logic
   - active-borrow binding association + dead-borrow expiration
   - ephemeral type declaration tracking + return restrictions
   - closure capture ephemeral diagnostics parity
 - Type-decl ephemeral flag plumbing:
-  - `src/Ast.w` packed type-decl kind helpers
-  - `src/Parser.w` ephemeral type-decl encoding
-  - `src/render.w` / `src/Codegen.w` packed-kind decoding
+  - `src/Ast.with` packed type-decl kind helpers
+  - `src/Parser.with` ephemeral type-decl encoding
+  - `src/render.with` / `src/Codegen.with` packed-kind decoding
 - Test infrastructure:
-  - `test/wave8/cases/*.w`
+  - `test/wave8/cases/*.with`
   - `test/wave8/borrow_corpus.txt`
   - `scripts/run_wave8_borrow_unit_tests.sh`
   - `scripts/run_wave8_borrow_parity.sh`
@@ -539,7 +539,7 @@ Validation:
 - Accepted Wave 8 `KNOWN_DIVERGENCE` entries are explicit and tracked (current count: 6).
 
 Known debt (must remain explicit):
-- `KNOWN_DEBT-W8-ARCH-001`: Move borrow checking from `src/Sema.w` to MIR-based pass modules (`src/BorrowCheck.w`, `src/BorrowCfg.w`) after semantic fixpoint.
+- `KNOWN_DEBT-W8-ARCH-001`: Move borrow checking from `src/Sema.with` to MIR-based pass modules (`src/BorrowCheck.with`, `src/BorrowCfg.with`) after semantic fixpoint.
 - `KNOWN_DEBT-W8-ARCH-002`: Add/enable task-boundary ephemeral escape checks (`may_suspend`/guard boundary behavior) with explicit Wave 8 corpus coverage.
 
 ---
@@ -547,7 +547,7 @@ Known debt (must remain explicit):
 ## Wave 9 — Async-MIR ✓
 
 Implemented:
-* Suspend-aware Async-MIR artifact (`src/AsyncMir.w`) and lowering pass (`src/AsyncLower.w`) after MIR.
+* Suspend-aware Async-MIR artifact (`src/AsyncMir.with`) and lowering pass (`src/AsyncLower.with`) after MIR.
 * Explicit suspend-point modeling for `await` / `select await` / `yield` with:
   - deterministic state transitions (`state_from -> state_to`)
   - source-span preservation
@@ -581,7 +581,7 @@ Validation:
 * `scripts/verify_wave10_coverage.sh`: PASS (`processed=13`)
 * `scripts/run_wave10_codegen_parity.sh`: PASS (`processed=104`, `failures=0`, `known_divergences=1`)
 * Accepted `KNOWN_DIVERGENCE`:
-  - `ir|bootstrap/test/cases/enum_accessor_ref.w` (`selfhost` correct; Stage0 IR path missing accessor-ref lowering)
+  - `ir|bootstrap/test/cases/enum_accessor_ref.with` (`selfhost` correct; Stage0 IR path missing accessor-ref lowering)
 
 ---
 
@@ -607,8 +607,8 @@ Validation:
 * `scripts/verify_wave11_coverage.sh`: PASS (`processed=9`)
 * `scripts/run_wave11_driver_parity.sh`: PASS (`processed=30`, `failures=0`, `known_divergences=2`)
 * Accepted `KNOWN_DIVERGENCE`:
-  - `check|test/wave11/cases/c_import_macro_constants_ok.w` (`selfhost` correct; Stage0 macro constant path behind)
-  - `check|test/wave11/cases/c_import_macro_function_like_ok.w` (`selfhost` correct; Stage0 function-like macro diagnostics path behind)
+  - `check|test/wave11/cases/c_import_macro_constants_ok.with` (`selfhost` correct; Stage0 macro constant path behind)
+  - `check|test/wave11/cases/c_import_macro_function_like_ok.with` (`selfhost` correct; Stage0 function-like macro diagnostics path behind)
 
 ---
 

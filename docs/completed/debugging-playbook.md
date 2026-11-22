@@ -5,7 +5,7 @@ Use this when `out/bin/with-stage2` is hanging, crashing, or showing suspicious 
 ## 10.1 Quick triage (repro + timing)
 
 ```bash
-time ./out/bin/with-stage2 check src/main.w --dump-resolved
+time ./out/bin/with-stage2 check src/main.with --dump-resolved
 ```
 
 If this is unexpectedly slow, keep the exact command line and use it for all tools below.
@@ -13,7 +13,7 @@ If this is unexpectedly slow, keep the exact command line and use it for all too
 ## 10.2 Crash triage with LLDB
 
 ```bash
-lldb -- ./out/bin/with-stage2 check src/main.w --dump-resolved
+lldb -- ./out/bin/with-stage2 check src/main.with --dump-resolved
 # inside lldb:
 run
 bt all
@@ -25,13 +25,13 @@ For repeated crashes, set a breakpoint in likely hot paths (resolver, parser, al
 ## 10.3 Heap corruption checks (fast, native)
 
 ```bash
-MallocScribble=1 MallocGuardEdges=1 ./out/bin/with-stage2 check src/main.w --dump-resolved
+MallocScribble=1 MallocGuardEdges=1 ./out/bin/with-stage2 check src/main.with --dump-resolved
 ```
 
 Add stack logging when needed:
 
 ```bash
-MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 ./out/bin/with-stage2 check src/main.w --dump-resolved
+MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 ./out/bin/with-stage2 check src/main.with --dump-resolved
 ```
 
 ## 10.4 Leak checks
@@ -39,13 +39,13 @@ MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 ./out/bin/with-stage2 c
 Single-run leak report:
 
 ```bash
-leaks --atExit -- ./out/bin/with-stage2 check src/main.w --dump-resolved
+leaks --atExit -- ./out/bin/with-stage2 check src/main.with --dump-resolved
 ```
 
 If attaching to a live process is needed:
 
 ```bash
-./out/bin/with-stage2 check src/main.w --dump-resolved &
+./out/bin/with-stage2 check src/main.with --dump-resolved &
 leaks $(pgrep -n with-stage2)
 ```
 
@@ -54,7 +54,7 @@ leaks $(pgrep -n with-stage2)
 Record a Leaks trace:
 
 ```bash
-xcrun xctrace record --template "Leaks" --output /tmp/with-stage2-leaks.trace --launch -- ./out/bin/with-stage2 check src/main.w --dump-resolved
+xcrun xctrace record --template "Leaks" --output /tmp/with-stage2-leaks.trace --launch -- ./out/bin/with-stage2 check src/main.with --dump-resolved
 ```
 
 Optional export for inspection/diffing:

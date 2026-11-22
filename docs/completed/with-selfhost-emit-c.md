@@ -9,7 +9,7 @@ that can be compiled to a native binary by any C compiler on any
 supported platform.
 
 ```
-with build --emit-c src/main.w -o main.c
+with build --emit-c src/main.with -o main.c
 zig cc -target x86_64-linux-gnu main.c runtime/fiber.c runtime/fiber_asm_x86_64.s -o with-linux-x86
 ```
 
@@ -30,12 +30,12 @@ and cross-compilation tool.
 ## Architecture
 
 ```
-MIR (existing) → CCodegen.w (new) → .c file
+MIR (existing) → CCodegen.with (new) → .c file
                                    + runtime/ (existing, ships alongside)
                                    + fiber_asm_<arch>.s (existing, ships alongside)
 ```
 
-One new file: `src/CCodegen.w`. It walks a `MirModule` and writes C.
+One new file: `src/CCodegen.with`. It walks a `MirModule` and writes C.
 Nothing else in the compiler changes.
 
 ---
@@ -280,7 +280,7 @@ zig cc -target <triple> \
 - [x] Implement `with_runtime_init` (fiber scheduler startup) and `with_runtime_shutdown`.
 - [x] Verify existing `fiber.c` works standalone when compiled with `zig cc`.
 
-### 3. `src/CCodegen.w` — MIR → C emitter
+### 3. `src/CCodegen.with` — MIR → C emitter
 
 This is the core deliverable. It walks `MirModule` and writes a `.c` file.
 
@@ -350,8 +350,8 @@ This is the core deliverable. It walks `MirModule` and writes a `.c` file.
 
 ### 4. Driver integration
 
-- [x] Add `--emit-c` flag to CLI parser in `src/main.w`.
-- [x] Thread flag through `Driver.w`.
+- [x] Add `--emit-c` flag to CLI parser in `src/main.with`.
+- [x] Thread flag through `Driver.with`.
 - [x] When `--emit-c` is set, after MIR pass, call `CCodegen.emit_module(mir_module)` instead of
       `Codegen.emit_module(mir_module)`.
 - [x] Write output to file specified by `-o` (default: input name with `.c` extension).
@@ -363,14 +363,14 @@ This is the core deliverable. It walks `MirModule` and writes a `.c` file.
 - [ ] Round-trip test: compile the test suite to C, compile with `zig cc`, run all tests.
 - [x] Cross-compilation test: emit C on macOS, compile with `zig cc -target x86_64-linux-gnu`,
       run in Docker container, verify output.
-- [ ] Compare: `with build program.w && ./program` vs
-      `with build --emit-c program.w -o program.c && zig cc program.c runtime/*.c -o program && ./program`.
+- [ ] Compare: `with build program.with && ./program` vs
+      `with build --emit-c program.with -o program.c && zig cc program.c runtime/*.c -o program && ./program`.
       Output must be identical.
 - [ ] Verify emitted C compiles cleanly with `-Wall -Werror` under GCC, Clang, and `zig cc`.
 
 ### 6. Cross-compilation convenience script
 
-- [x] `scripts/cross-build.sh <target-triple> <source.w>`:
+- [x] `scripts/cross-build.sh <target-triple> <source.with>`:
   - Runs `with build --emit-c` on source.
   - Selects correct `fiber_asm_<arch>.s` based on target.
   - Invokes `zig cc -target <triple>` with all runtime files.
@@ -378,7 +378,7 @@ This is the core deliverable. It walks `MirModule` and writes a `.c` file.
 
 ### 7. Self-hosting cross-compilation test
 
-- [ ] Compile the With compiler itself to C: `with build --emit-c src/main.w -o with_compiler.c`
+- [ ] Compile the With compiler itself to C: `with build --emit-c src/main.with -o with_compiler.c`
 - [ ] Cross-compile for all four targets:
   ```
   zig cc -target aarch64-macos    with_compiler.c runtime/*.c runtime/fiber_asm_aarch64.s -o with-aarch64-macos
@@ -392,7 +392,7 @@ This is the core deliverable. It walks `MirModule` and writes a `.c` file.
 
 ## Acceptance Criteria
 
-1. `with build --emit-c hello.w -o hello.c` produces valid C11.
+1. `with build --emit-c hello.with -o hello.c` produces valid C11.
 2. `zig cc hello.c runtime/with_runtime.c runtime/fiber.c runtime/fiber_asm_x86_64.s -o hello`
    produces a working binary.
 3. All existing tests pass when run through the C backend path.

@@ -8,12 +8,12 @@ planned disposition.
 
 | Category | Sites | Target | Effort | Status |
 |---|---|---|---|---|
-| Secondary `&mut Pool` params (CImport.w) | 56 | Handle-type refactoring | **Structural** | Pending (Slice B) |
-| Call-site `&mut` expressions (CImport.w) | 8 | Resolve when params converted | Automatic | 3 resolved by Slice A |
-| Free functions with `&mut` (CImport.w) | 0 | — | — | **Done** (Slice A) |
-| Multi-`&mut` free functions (ComptimeTransform.w) | 19 | Handle-type | **Structural** | `&mut InternPool` done; `&mut AstPool`/`&mut Sema` pending |
-| Single-`&mut` free functions (ComptimeTransform.w) | 6 | Method extraction or by-value | Mechanical | `&mut InternPool` params done |
-| `&mut DiagnosticList` params (ComptimeEval.w) | 0 | — | — | **Done** (Slice A) |
+| Secondary `&mut Pool` params (CImport.with) | 56 | Handle-type refactoring | **Structural** | Pending (Slice B) |
+| Call-site `&mut` expressions (CImport.with) | 8 | Resolve when params converted | Automatic | 3 resolved by Slice A |
+| Free functions with `&mut` (CImport.with) | 0 | — | — | **Done** (Slice A) |
+| Multi-`&mut` free functions (ComptimeTransform.with) | 19 | Handle-type | **Structural** | `&mut InternPool` done; `&mut AstPool`/`&mut Sema` pending |
+| Single-`&mut` free functions (ComptimeTransform.with) | 6 | Method extraction or by-value | Mechanical | `&mut InternPool` params done |
+| `&mut DiagnosticList` params (ComptimeEval.with) | 0 | — | — | **Done** (Slice A) |
 | Comment/string-literal references to `&mut` | 19 | Update text at P12 lockdown | Trivial | Pending |
 | Render/diagnostic output of `&mut T` types | 4 | Keep until UOP_MUT_REF deleted at P12 | Trivial | Pending |
 | `MultiIndex.multi_index_set(self: &mut Self, ...)` | 1 | Delete at P12 (deprecated alias) | Trivial | Pending |
@@ -27,7 +27,7 @@ fields — they do NOT use pointer-indirected interior mutability like InternPoo
 Passing by value would break mutation visibility (Vec len/cap updates in the
 callee would not propagate to the caller).
 
-56 of 67 CImport.w sites and 19 of 29 ComptimeTransform.w sites are
+56 of 67 CImport.with sites and 19 of 29 ComptimeTransform.with sites are
 **secondary `&mut` parameters** on methods whose receiver slot is already
 occupied by a different type's `mut self`. Method extraction cannot solve
 these because you can only have one receiver per method.
@@ -47,7 +47,7 @@ Plan" section for the per-pool plan.
 
 ---
 
-## 1. CImport.w — 67 sites
+## 1. CImport.with — 67 sites
 
 ### 1a. Secondary `&mut` pool parameters (56 sites) — STRUCTURAL
 
@@ -76,7 +76,7 @@ handle wrapping `*mut PoolState`. By-value passing then shares state. One pool
 at a time, each conversion independently passes fixpoint.
 
 **Disposition:** P10 finish. CiTypePool first (24 secondary-param sites across
-CImport.w + ComptimeTransform.w — highest per-commit yield), then CiExprPool,
+CImport.with + ComptimeTransform.with — highest per-commit yield), then CiExprPool,
 then CiStmtPool.
 
 ### 1b. Free functions with single `&mut` (3 sites) — ~~MECHANICAL~~ **DONE**
@@ -106,7 +106,7 @@ automatically when the corresponding parameter types are converted.
 
 ---
 
-## 2. ComptimeTransform.w — 29 sites
+## 2. ComptimeTransform.with — 29 sites
 
 ### 2a. Multi-`&mut` free functions (19 sites) — STRUCTURAL
 
@@ -119,7 +119,7 @@ fn ct_build_type_expr(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, 
 
 AstPool and Sema are regular structs with Vec fields — NOT handle types.
 `&mut AstPool` → `AstPool` by-value would break mutation visibility (same
-analysis as CImport.w pool types: Vec len/cap updates in callee don't propagate).
+analysis as CImport.with pool types: Vec len/cap updates in callee don't propagate).
 
 InternPool IS a handle type (`*mut InternPoolState`), so `&mut InternPool` →
 `InternPool` is safe for that parameter specifically.
@@ -146,12 +146,12 @@ handle-type, then Sema handle-type (most complex — see Sema sub-analysis).
 
 ### 2c. Call-site `&mut sema.diags` expressions (5 sites) — **DONE**
 
-All 5 call sites resolved when ComptimeEval.w `diags` parameter was removed
+All 5 call sites resolved when ComptimeEval.with `diags` parameter was removed
 in Slice A (b7bf86b).
 
 ---
 
-## 3. ComptimeEval.w — 5 sites
+## 3. ComptimeEval.with — 5 sites
 
 ### 3a. `diags: &mut DiagnosticList` parameter (4 function signatures) — ~~MECHANICAL~~ **DONE**
 
@@ -168,7 +168,7 @@ All 6 call sites resolved when 3a parameters were removed. Done in Slice A (b7bf
 
 ---
 
-## 4. SemaCheck.w — 16 sites
+## 4. SemaCheck.with — 16 sites
 
 ### 4a. §15.1 lockdown diagnostic strings (2 sites)
 
@@ -189,7 +189,7 @@ Comments documenting how `&mut` is handled during the bridge period.
 
 ### 4c. `&mut self.diags` call-site (1 site) — **DONE**
 
-Resolved when ComptimeEval.w parameters were changed (3a). Done in Slice A (b7bf86b).
+Resolved when ComptimeEval.with parameters were changed (3a). Done in Slice A (b7bf86b).
 
 ### 4d. `&mut` in comment describing legacy borrow semantics (2 sites)
 
@@ -201,7 +201,7 @@ Lines 7283, 7612: Comments about legacy `&mut T` (TY_REF with d1=1) semantics.
 
 ## 5. Render/diagnostic output — 4 sites
 
-### 5a. Type rendering (2 sites in render.w)
+### 5a. Type rendering (2 sites in render.with)
 
 - Line 911: `return "&mut " ++ render_type_expr(...)` — renders `&mut T` type for display
 - Line 1079: `if op == UnaryOp.UOP_MUT_REF: return "&mut "` — renders `&mut` unary op
@@ -212,7 +212,7 @@ Lines 7283, 7612: Comments about legacy `&mut T` (TY_REF with d1=1) semantics.
 
 **Disposition:** Delete at P12 lockdown.
 
-### 5b. CiPrint.w (1 site)
+### 5b. CiPrint.with (1 site)
 
 - Line 471: `let kw = if is_mut != 0: "&mut " else: "&"` — renders C import reference types.
 
@@ -222,7 +222,7 @@ May need to keep for c_import display, or change to `*mut`/`*const`.
 
 **Disposition:** Evaluate at P12. Likely keep for c_import rendering accuracy.
 
-### 5c. SemaDiag.w (1 site)
+### 5c. SemaDiag.with (1 site)
 
 - Line 1134: `return "&mut " ++ pointee` — renders `&mut T` in type-mismatch diagnostics.
 
@@ -234,9 +234,9 @@ May need to keep for c_import display, or change to `*mut`/`*const`.
 
 ### 6a. CLI help strings
 
-- `src/main.w:1382`: `" 12. unary: not - & &mut\n"` — grammar help
-- `src/main_emit_temp.w:732`: Same help text in temp emitter
-- `src/bootstrap_main.w:239`: Same help text in bootstrap
+- `src/main.with:1382`: `" 12. unary: not - & &mut\n"` — grammar help
+- `src/main_emit_temp.with:732`: Same help text in temp emitter
+- `src/bootstrap_main.with:239`: Same help text in bootstrap
 
 **Disposition:** Update at P12 to `" 12. unary: not - & &raw\n"` (removing `&mut`,
 adding `&raw const` / `&raw mut`).
@@ -245,7 +245,7 @@ adding `&raw const` / `&raw mut`).
 
 ## 7. Enum constants / IR representation — 2 sites
 
-### 7a. CiIR.w
+### 7a. CiIR.with
 
 - Line 188: `CIE_ADDR_OF = 35  // d0 = operand, d1 = is_mut (0 = '&', 1 = '&mut')`
 
@@ -255,7 +255,7 @@ references (`&mut` in C = pointer to non-const). The d1=is_mut field maps C's
 
 **Disposition:** Keep. Rename comment to reference `*const`/`*mut` at P12.
 
-### 7b. Sema.w comment
+### 7b. Sema.with comment
 
 - Line 449: Comment about `&mut HashMap params` in comptime error checking.
 
@@ -263,7 +263,7 @@ references (`&mut` in C = pointer to non-const). The d1=is_mut field maps C's
 
 ---
 
-## 8. lib/std/traits.w — 1 site
+## 8. lib/std/traits.with — 1 site
 
 - Line 141: `fn multi_index_set(self: &mut Self, specs: &[IndexSpec], count: i32, value: Self)`
 
@@ -275,7 +275,7 @@ references (`&mut` in C = pointer to non-const). The d1=is_mut field maps C's
 
 ---
 
-## 9. CodegenDispatch.w — 1 site (comment)
+## 9. CodegenDispatch.with — 1 site (comment)
 
 - Line 5422: `// When the receiver is &mut Vec[T], we need to dispatch on Vec[T].`
 
@@ -283,7 +283,7 @@ references (`&mut` in C = pointer to non-const). The d1=is_mut field maps C's
 
 ---
 
-## 10. MirLower.w — 1 site (comment)
+## 10. MirLower.with — 1 site (comment)
 
 - Line 2048: `// Indexing through '&Vec[T]' / '&mut Vec[T]' should index the container,`
 
@@ -291,7 +291,7 @@ references (`&mut` in C = pointer to non-const). The d1=is_mut field maps C's
 
 ---
 
-## 11. CCodegen.w — 1 site (comment)
+## 11. CCodegen.with — 1 site (comment)
 
 - Line 4657: `// separate '&mut' accumulators.`
 
@@ -310,25 +310,25 @@ Binary needs reinstall via `make install-user` after current work stabilizes.
 ### P5 — Stdlib leaf migrations
 
 **Status: Verified complete.** API shape checked for all four files:
-- `hash.w` — Mutating methods use `mut self: Hasher`. Read-only use `self: Hasher`.
+- `hash.with` — Mutating methods use `mut self: Hasher`. Read-only use `self: Hasher`.
   No out-params. Correct §16 shape.
-- `sync.w` — `Mutex.set`, `RwLock.write`, `AtomicI64.store/add` use `mut self`.
+- `sync.with` — `Mutex.set`, `RwLock.write`, `AtomicI64.store/add` use `mut self`.
   `enter`/`enter_mut` return guard values. Correct §16 shape.
-- `tls.w` — All unsafe code, `*mut TlsConn` raw pointers. Correct for unsafe/FFI.
+- `tls.with` — All unsafe code, `*mut TlsConn` raw pointers. Correct for unsafe/FFI.
   Public API `tls_connect` returns by value.
-- `http.w` — Fixed in this session: `http_parse_url` converted from `*mut` out-params
+- `http.with` — Fixed in this session: `http_parse_url` converted from `*mut` out-params
   to `HttpUrl` return struct (commit f40dcc9). Now correct §16 shape.
 
 ### P8 — Compiler leaf modules
 
 **Status: Verified complete.** API shape checked for all nine files:
-- `Ast.w` — Mutating methods use `mut self: AstPool`. Read methods use `self: &AstPool`. Correct.
-- `Token.w` — `TokenList.append` uses `mut self: TokenList`. Reads use `self: TokenList`. Correct.
-- `Lexer.w` — Fixed in this session: all lex/tokenize methods converted to `mut self: Lexer`
+- `Ast.with` — Mutating methods use `mut self: AstPool`. Read methods use `self: &AstPool`. Correct.
+- `Token.with` — `TokenList.append` uses `mut self: TokenList`. Reads use `self: TokenList`. Correct.
+- `Lexer.with` — Fixed in this session: all lex/tokenize methods converted to `mut self: Lexer`
   (commit e2daccd). Now correct.
-- `Diagnostic.w` — Fixed in this session: `set_code`, `add_label`, `add_note`, `add_help`,
+- `Diagnostic.with` — Fixed in this session: `set_code`, `add_label`, `add_note`, `add_help`,
   `DiagnosticList.emit` converted to `mut self` (commit 2507b11). Now correct.
-- `InternPool.w` — Two layers verified separately:
+- `InternPool.with` — Two layers verified separately:
   - `InternPool` handle type: `self: InternPool` is correct — InternPool is a thin
     handle wrapping `*mut InternPoolState`. Copies share state. The handle doesn't
     mutate; mutations flow through the raw pointer. §16 doesn't require `mut self`
@@ -337,10 +337,10 @@ Binary needs reinstall via `make install-user` after current work stabilizes.
     but mutates `self.offset` and `self.pages.push()`. The mutation worked at runtime
     because callers access it through `*mut InternPoolState` → field dereference, but
     the API shape violated §16.2. Now `mut self: InternStringArena`.
-- `Span.w` — All read-only value methods. Correct.
-- `Source.w` — All read-only or destructor. Correct.
-- `Diag.w` — Re-export facade, no methods. Correct.
-- `TypeLayout.w` — All read-only `self: Sema` methods. Correct.
+- `Span.with` — All read-only value methods. Correct.
+- `Source.with` — All read-only or destructor. Correct.
+- `Diag.with` — Re-export facade, no methods. Correct.
+- `TypeLayout.with` — All read-only `self: Sema` methods. Correct.
 
 ---
 
@@ -348,11 +348,11 @@ Binary needs reinstall via `make install-user` after current work stabilizes.
 
 | Step | Sites | Pattern | Effort |
 |---|---|---|---|
-| P10 mechanical: CImport.w free functions | 3 | Return-value / method extraction | 1 commit |
-| P10 mechanical: ComptimeEval.w redundant params | 5+6 | Remove param, access through `sema_ptr` | 1 commit |
+| P10 mechanical: CImport.with free functions | 3 | Return-value / method extraction | 1 commit |
+| P10 mechanical: ComptimeEval.with redundant params | 5+6 | Remove param, access through `sema_ptr` | 1 commit |
 | P10 mechanical: InternPool `&mut` params | ~20 | `&mut InternPool` → `InternPool` (handle type) | 1 commit |
-| P10 structural: CImport.w secondary pool params | 56 | Handle-type refactoring for CiTypePool/CiExprPool/CiStmtPool | 3-6 commits |
-| P10 structural: ComptimeTransform.w AstPool/Sema | ~19 | Handle-type or context-struct refactoring | 2-4 commits |
+| P10 structural: CImport.with secondary pool params | 56 | Handle-type refactoring for CiTypePool/CiExprPool/CiStmtPool | 3-6 commits |
+| P10 structural: ComptimeTransform.with AstPool/Sema | ~19 | Handle-type or context-struct refactoring | 2-4 commits |
 | P12 lockdown: Delete UOP_MUT_REF | — | Parser/sema/render/help text | Coordinated, 1 commit |
 | P12 lockdown: Delete MultiIndex.multi_index_set | 1 | Remove deprecated alias | Part of P12 commit |
 | P12 lockdown: Update comments | 19 | Text-only changes | Part of P12 commit |

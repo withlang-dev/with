@@ -1,4 +1,4 @@
-module <embedded-std>/std/wi_demo.w
+module <embedded-std>/std/wi_demo.with
 pub type Bits = union { whole: u32, half: u16 }
 impl Copy for Bits
 @[repr(C)]

@@ -4,10 +4,10 @@
 
 The compiler already does most of the work:
 
-- **Parser** (`src/Parser.w:3554-3658`): parses optional `[T: Trait]` bounds and `where` clauses; `bound_count` is 0 when no bounds are written
-- **Sema** (`src/Sema.w:4720-4743`): `check_generic_trait_bounds` only iterates explicit bounds — if `bound_count == 0`, the inner loop is a no-op, so unbounded generics already pass sema
-- **Sema** (`src/Sema.w:2524-2535`): `ensure_generic_substitutions` infers T from call arguments; only errors if T is unresolvable (doesn't appear in any parameter)
-- **Codegen** (`src/Codegen.w:7476-7770`): `monomorphize_generic_call` substitutes concrete types and compiles the body — this is where duck typing is actually checked
+- **Parser** (`src/Parser.with:3554-3658`): parses optional `[T: Trait]` bounds and `where` clauses; `bound_count` is 0 when no bounds are written
+- **Sema** (`src/Sema.with:4720-4743`): `check_generic_trait_bounds` only iterates explicit bounds — if `bound_count == 0`, the inner loop is a no-op, so unbounded generics already pass sema
+- **Sema** (`src/Sema.with:2524-2535`): `ensure_generic_substitutions` infers T from call arguments; only errors if T is unresolvable (doesn't appear in any parameter)
+- **Codegen** (`src/Codegen.with:7476-7770`): `monomorphize_generic_call` substitutes concrete types and compiles the body — this is where duck typing is actually checked
 
 **What this means:** unbounded `fn double[T](x: T): x + x` called with `double(5)` likely already compiles. The feature gap is not "make it work" — it's "make failures useful."
 
@@ -26,7 +26,7 @@ The compiler already does most of the work:
 
 ## Phase 1 — Sema: make unbounded generics explicitly legal
 
-**File:** `src/Sema.w`
+**File:** `src/Sema.with`
 
 - [x] Trace `check_generic_call` (line ~4596) end-to-end for an unbounded generic call — confirm `bound_count == 0` causes no rejection
 - [x] Trace `ensure_generic_substitutions` (lines 2524-2535) — confirm inferrable params don't hit the `"unknown type"` fallback
@@ -35,7 +35,7 @@ The compiler already does most of the work:
 
 ## Phase 2 — Codegen: upgrade failure paths to real errors with context
 
-**File:** `src/Codegen.w`
+**File:** `src/Codegen.with`
 
 ### 2a — Thread instantiation context through monomorphization
 
@@ -73,17 +73,17 @@ error: no method 'len' on type 'i32' in instantiation of 'get_len__i32'
 
 ### Existing bound tests verified
 
-- [x] `test/cases/err_trait_bound.w` — `[T: Show]` with wrong type → early error
-- [x] `test/cases/where_violation.w` — `where T: Printable` violated → early error
-- [x] `test/wave5/cases/generic_bound_pass.w` — `[T: Show]` with correct type → success
+- [x] `test/cases/err_trait_bound.with` — `[T: Show]` with wrong type → early error
+- [x] `test/cases/where_violation.with` — `where T: Printable` violated → early error
+- [x] `test/wave5/cases/generic_bound_pass.with` — `[T: Show]` with correct type → success
 
 ### New duck-typing tests
 
-- [x] `test/cases/duck_binop_ok.w` — `fn double[T](x: T): x + x` with `i32` → `//! expect-stdout: 10`
-- [x] `test/cases/duck_binop_fail.w` — `fn double[T](x: T): x + x` with `str` → `//! expect-build-fail: unsupported operator`
-- [x] `test/cases/duck_method_ok.w` — unbounded generic calling `.len()` on `str` → success
-- [x] `test/cases/duck_method_fail.w` — unbounded generic calling `.len()` on `i32` → `//! expect-build-fail: no method 'len'`
-- [x] `test/cases/duck_unused_generic.w` — `fn broken[T](x: T): x.nope()` never called → `//! check-only` → no error
+- [x] `test/cases/duck_binop_ok.with` — `fn double[T](x: T): x + x` with `i32` → `//! expect-stdout: 10`
+- [x] `test/cases/duck_binop_fail.with` — `fn double[T](x: T): x + x` with `str` → `//! expect-build-fail: unsupported operator`
+- [x] `test/cases/duck_method_ok.with` — unbounded generic calling `.len()` on `str` → success
+- [x] `test/cases/duck_method_fail.with` — unbounded generic calling `.len()` on `i32` → `//! expect-build-fail: no method 'len'`
+- [x] `test/cases/duck_unused_generic.with` — `fn broken[T](x: T): x.nope()` never called → `//! check-only` → no error
 
 ## Phase 4 — Docs
 
@@ -94,7 +94,7 @@ error: no method 'len' on type 'i32' in instantiation of 'get_len__i32'
 ## Phase 5 — Self-host validation
 
 - [x] `make build`
-- [x] `./out/bin/with-stage2 check src/main.w`
+- [x] `./out/bin/with-stage2 check src/main.with`
 - [x] `make fixpoint` (byte-identical stage2 == stage3)
 
 ## Done criteria
@@ -107,4 +107,4 @@ All of the following are true:
 - [x] Explicit `[T: Trait]` and `where T: Trait` bounds still fail early at the call site
 - [x] Unused generic functions with broken bodies produce no error
 - [x] The focused test set passes
-- [x] `make build`, `./out/bin/with-stage2 check src/main.w`, and `make fixpoint` all pass
+- [x] `make build`, `./out/bin/with-stage2 check src/main.with`, and `make fixpoint` all pass

@@ -56,8 +56,8 @@ not a usable-language milestone.
 
 ### S1. Capabilities
 
-**Where.** `SemaTypes.w` (type property queries), `SemaDecl.w` (derive
-at declaration), `CapabilityRegistry.w` if the existing registry is the
+**Where.** `SemaTypes.with` (type property queries), `SemaDecl.with` (derive
+at declaration), `CapabilityRegistry.with` if the existing registry is the
 right home for compiler-derived traits (check before adding a parallel
 mechanism).
 
@@ -102,10 +102,10 @@ reflection once S5 exposes it.
 
 ### S2. Parse, declare, layout check
 
-**Where.** `Lexer.w` (no new token kinds; `storage`, `overlay`, `at` are
-contextual identifiers), `Parser.w`/`Parse.w` (new decl form), `Ast.w`
+**Where.** `Lexer.with` (no new token kinds; `storage`, `overlay`, `at` are
+contextual identifiers), `Parser.with`/`Parse.with` (new decl form), `Ast.with`
 (`TypeDeclKind.Storage = 7`; a new node kind for a projection carrying
-`(name, type_node, offset, overlay_group)`), `SemaDecl.w` (declaration
+`(name, type_node, offset, overlay_group)`), `SemaDecl.with` (declaration
 and layout verification).
 
 **Parsing.** `storage` is recognized only as the first token of a
@@ -140,7 +140,7 @@ deferred; see spec A.8). After the projection types resolve:
    With copybook-scale counts, plain O(n²) pairwise comparison is also
    acceptable and easier to audit; either is fine, adjacent-pair is not.
 4. Reject `impl Drop for` the storage type at the impl site
-   (`SemaDecl.w` impl handling), reject ephemeral flag on the decl.
+   (`SemaDecl.with` impl handling), reject ephemeral flag on the decl.
 4a. Recursive views: add storage types to the declaration-cycle audit,
    but with their own rule. A projection whose type is (or transitively
    projects) the enclosing storage type is rejected with
@@ -148,21 +148,21 @@ deferred; see spec A.8). After the projection types resolve:
    aggregate cycle checker, which would either mis-diagnose it as
    infinitely sized or, worse, accept it because projections add no
    size. Mutual reference between two storage types is rejected the same
-   way. Fixture: `err_storage_recursive_view.w`, `err_storage_mutual_view.w`.
+   way. Fixture: `err_storage_recursive_view.with`, `err_storage_mutual_view.with`.
 5. Record the storage type's layout as `(N, align, projections)` in the
    type table. Layout is *declared*; the existing struct-layout
-   computation in `Codegen.w` (`wl_struct_set_body` path) must not run
+   computation in `Codegen.with` (`wl_struct_set_body` path) must not run
    for `Storage`.
 
-**Fieldwise initializer.** In `SemaCheck.w`'s struct-literal path, a
+**Fieldwise initializer.** In `SemaCheck.with`'s struct-literal path, a
 literal whose type is `Storage` is an error with the `zeroed()` /
 `from_bytes()` suggestion. Add `zeroed` and `from_bytes` as compiler
 intrinsics on storage types (or as generated methods; intrinsic is
 simpler for v1 since they are a `memset` and a `memcpy`). There is no
 literal construction form in v1; `from_bytes` already covers it.
 
-**Tests.** `test/compile_errors/err_storage_*.w` for every S2
-diagnostic. `test/behavior/behav_storage_decl_sizes.w` asserting
+**Tests.** `test/compile_errors/err_storage_*.with` for every S2
+diagnostic. `test/behavior/behav_storage_decl_sizes.with` asserting
 `sizeof` and array stride via existing size-probe helpers.
 
 **Done when.** A storage type declares, all layout diagnostics fire, and
@@ -170,9 +170,9 @@ diagnostic. `test/behavior/behav_storage_decl_sizes.w` asserting
 
 ### S3. Projections as places; origin facts
 
-**Where.** `SemaCheck.w` (place classification, view-origin machinery
+**Where.** `SemaCheck.with` (place classification, view-origin machinery
 around `compute_expr_view_origin_mask` and `set_sig_param_view_origin`),
-`BorrowCfg.w` if the CFG walk needs a new place kind, `Mir.w`/`MirCore.w`
+`BorrowCfg.with` if the CFG walk needs a new place kind, `Mir.with`/`MirCore.with`
 (a place projection variant).
 
 **Place kind.** Add a place projection `StorageField(base_place, offset,
@@ -186,8 +186,8 @@ narrow `i != j`). The borrow checker never sees a chain, only the
 flattened range on the root. This is rule A.5.4 and it is what makes
 the overlap query cheap; it is also what makes `inout r.items[0], inout
 r.items[1]` provably disjoint, which the `OCCURS` modernization path
-depends on. Fixtures: `behav_storage_index_disjoint_inout_ok.w`,
-`err_storage_runtime_index_inout_overlap.w`.
+depends on. Fixtures: `behav_storage_index_disjoint_inout_ok.with`,
+`err_storage_runtime_index_inout_overlap.with`.
 
 **Overlap query.** Two storage places on the same root overlap iff their
 ranges intersect. Two storage places on different *owned* roots never
@@ -217,9 +217,9 @@ marshalling, `memcpy` lowering), the latter lets *source* duplicate a
 value. Wire this through the same owned-demand resolution used by D22
 (`resolve_contextual_join` and the owned-anchor path), not as a separate
 check, so it behaves identically to any other non-`Copy` place. Neither touches the
-union last-written tracking (`Sema.w`'s `union_last_written`); storage
+union last-written tracking (`Sema.with`'s `union_last_written`); storage
 overlays are a different kind and that map must not be consulted for
-them. Add an assertion in `SemaCheck.w` that a `Storage` place never
+them. Add an assertion in `SemaCheck.with` that a `Storage` place never
 reaches the union tracking path.
 
 **Views.** `&record.field` is permitted when the alignment proof (rule
@@ -237,17 +237,17 @@ projection's range; bounds-check `n <= K` at runtime. Origin: the root.
 It is a typed view, so it is subject to the same alignment proof as
 `&P`; on an under-aligned `[u32; 4] at 1` it is rejected. The same
 applies to `with r.field as mut b:` place aliases. Add fixtures
-`err_storage_prefix_unaligned.w` and `err_storage_with_alias_unaligned.w`
-alongside `err_storage_unaligned_ref.w`.
+`err_storage_prefix_unaligned.with` and `err_storage_with_alias_unaligned.with`
+alongside `err_storage_unaligned_ref.with`.
 
-**Tests.** `test/behavior/behav_storage_overlay_read.w` (write via one
+**Tests.** `test/behavior/behav_storage_overlay_read.with` (write via one
 overlay member, read via the other, assert bytes);
-`err_storage_owned_read_non_copy.w` (`let c = parent.child` for a
-non-`Copy` nested storage type); `behav_storage_owned_read_copy_ok.w`
-(same shape with `impl Copy for Child`); `behav_storage_non_copy_place_ok.w`
-(borrow / `inout` / assign to a non-`Copy` projection all fine); `behav_storage_nested_origin.w`
+`err_storage_owned_read_non_copy.with` (`let c = parent.child` for a
+non-`Copy` nested storage type); `behav_storage_owned_read_copy_ok.with`
+(same shape with `impl Copy for Child`); `behav_storage_non_copy_place_ok.with`
+(borrow / `inout` / assign to a non-`Copy` projection all fine); `behav_storage_nested_origin.with`
 (mutate `r.address.zip`, confirm a live `&r.address` view is rejected —
-a `compile_errors` fixture); `err_storage_unaligned_ref.w`.
+a `compile_errors` fixture); `err_storage_unaligned_ref.with`.
 
 **Done when.** Overlapping projections are readable and writable in safe
 code; the borrow checker rejects a live view across an overlapping write;
@@ -255,8 +255,8 @@ the alignment proof fires correctly for `at 4` in an align-1 type.
 
 ### S4. Codegen
 
-**Where.** `Codegen.w` (type lowering; `declare_function` is untouched),
-`CodegenDispatch.w` (MIR op lowering).
+**Where.** `Codegen.with` (type lowering; `declare_function` is untouched),
+`CodegenDispatch.with` (MIR op lowering).
 
 **Note on `bytes[N]`.** Wherever the spec says `bytes[N]` it means
 `[u8; N]`. No new type is introduced by this campaign; if a prelude alias
@@ -264,7 +264,7 @@ is wanted, it is a one-line std change.
 
 **Type lowering.** A storage type lowers to `[N x i8]`. Never to an LLVM
 struct with typed fields. `align(A)` is recorded in the central
-type-layout record (`SemaTypes.w`, wherever `alignof` is answered), not
+type-layout record (`SemaTypes.with`, wherever `alignof` is answered), not
 inferred from the LLVM byte-array type: every site that asks `alignof`,
 lays a storage value inside another aggregate, allocates one, or
 classifies its ABI (`fn_abi_platform_aggregate_indirect`) reads that
@@ -303,7 +303,7 @@ possible overlap                          → memmove(N), or RHS into a
 `r.a = r.b` with `a` and `b` overlapping projections must leave `r.a`
 holding the pre-assignment bytes of `r.b`; an unconditional `memcpy` on
 overlapping ranges is UB and will produce garbage under LLVM. Fixture:
-`behav_storage_assign_partial_overlay.w` (12-byte record, two 8-byte
+`behav_storage_assign_partial_overlay.with` (12-byte record, two 8-byte
 `Copy` blocks at 0 and 4, assign, assert bytes). Because storage types
 have no `Drop`, the existing drop-state machinery (see the
 `*-drop-state-debug.md` docs) has nothing to do; add a `debug_assert`
@@ -312,7 +312,7 @@ in the drop lowering that a `Storage` value never reaches it.
 **`zeroed` / `from_bytes`.** `memset` / `memcpy` into the destination
 alloca.
 
-**Optimizer.** `MirOpt.w`: storage loads/stores are ordinary memory ops
+**Optimizer.** `MirOpt.with`: storage loads/stores are ordinary memory ops
 on the root's alloca; alias analysis at the MIR level should use the
 same range-intersection query as S3 (share the helper). LLVM will see
 byte GEPs on an `[N x i8]` and can reason about them precisely on its
@@ -332,9 +332,9 @@ not used by the compiler itself).
 
 ### S5. Reflection and polish
 
-**Where.** `ComptimeEval.w` / `ComptimeValue.w` (`T.fields()`
-extension), `Lsp.w` (hover shows offset/range/overlay), `Fmt.w`
-(formatting the new decl form), `Analysis.w` (`analysis_collect_types`
+**Where.** `ComptimeEval.with` / `ComptimeValue.with` (`T.fields()`
+extension), `Lsp.with` (hover shows offset/range/overlay), `Fmt.with`
+(formatting the new decl form), `Analysis.with` (`analysis_collect_types`
 reports storage layout for the `with analyze` output).
 
 **Reflection.** `T.fields()` for a storage type returns entries with
@@ -359,11 +359,11 @@ comptime without further compiler changes.
 
 ### P1. Parameter mode in signatures; call-site spelling
 
-**Where.** `Ast.w` (param node gets a mode field; arg node gets a mode
-prefix), `Parser.w` (accept `inout`/`byref` in both positions), `Sema.w`
+**Where.** `Ast.with` (param node gets a mode field; arg node gets a mode
+prefix), `Parser.with` (accept `inout`/`byref` in both positions), `Sema.with`
 (a `ParamMode: i32` enum `Value=0, Inout=1, Byref=2` beside
-`ReceiverMode`; do not extend `ReceiverMode`), `SemaTypes.w` (signature
-identity includes per-param mode), `Codegen.w` (monomorphization cache
+`ReceiverMode`; do not extend `ReceiverMode`), `SemaTypes.with` (signature
+identity includes per-param mode), `Codegen.with` (monomorphization cache
 key includes mode — the `llvm_type_mangle` / mono-cache path). Precisely:
 every signature, type, and monomorphization identity that distinguishes
 parameter *types* must also distinguish parameter *mode* (overload
@@ -385,7 +385,7 @@ not add an "immutable binding" rejection; it would break
 expression (`f(target: inout x)`); caller-place parameters may not have
 defaults and may not be omitted, and `implicit` combined with `inout` or
 `byref` is a direct declaration-site error (fixture
-`err_inout_implicit_param.w`), not something left to fail at the
+`err_inout_implicit_param.with`), not something left to fail at the
 omission rule. **Evaluation order:** With's
 named-argument sema normalizes the argument list into parameter order.
 That normalization must not reorder side effects or reservation timing.
@@ -406,9 +406,9 @@ if it exists), closure parameters, explicit `fn(...)` type syntax, and
 trait method parameters (v1). The trait rejection keeps `ParamMode` out
 of trait metadata, vtable function types, indirect-call lowering, and
 interface matching for this campaign; lifting it is a self-contained
-later stage. Fixtures: `err_inout_extern_fn.w`, `err_inout_c_import.w`,
-`err_inout_closure_param.w`, `err_inout_fn_type.w`,
-`err_inout_trait_method.w`.
+later stage. Fixtures: `err_inout_extern_fn.with`, `err_inout_c_import.with`,
+`err_inout_closure_param.with`, `err_inout_fn_type.with`,
+`err_inout_trait_method.with`.
 
 **No new overloading.** Mode is in signature identity, but two same-name
 declarations differing only in `T` vs `inout T` must be rejected exactly
@@ -416,19 +416,19 @@ where `T` vs `U` would be. Verify against the current free-function and
 method declaration rules before P1 lands: if With turns out to permit
 signature-only overloading somewhere, the preserved link-name policy is
 insufficient there and needs a separate decision. Fixture:
-`err_inout_mode_only_overload.w`.
+`err_inout_mode_only_overload.with`.
 
 **Receiver alignment.** Document in code that `ReceiverMode.Mut` is the
 receiver form of `ParamMode.Inout`; the two share the checking helpers
 introduced in P3.
 
-**Tests.** `err_inout_missing_callsite.w`, `err_inout_spurious_callsite.w`,
-`err_byref_non_bitwise.w`, `err_inout_rvalue_arg.w` (`f(inout make_value())`),
-`err_byref_read_view_arg.w`, `err_byref_const_item.w`,
-`behav_inout_let_binding_ok.w`, `err_inout_param_default.w`,
-`behav_inout_named_arg.w`,
-`behav_inout_basic.w` (mutation visible to caller),
-`behav_byref_same_arg_twice.w`.
+**Tests.** `err_inout_missing_callsite.with`, `err_inout_spurious_callsite.with`,
+`err_byref_non_bitwise.with`, `err_inout_rvalue_arg.with` (`f(inout make_value())`),
+`err_byref_read_view_arg.with`, `err_byref_const_item.with`,
+`behav_inout_let_binding_ok.with`, `err_inout_param_default.with`,
+`behav_inout_named_arg.with`,
+`behav_inout_basic.with` (mutation visible to caller),
+`behav_byref_same_arg_twice.with`.
 
 **Done when.** Signatures with modes parse, resolve, mangle distinctly,
 and reject mis-spelled call sites. No ABI change yet: temporarily lower
@@ -437,8 +437,8 @@ green before P2.
 
 ### P2. FnAbi alias contract; codegen attributes
 
-**Where.** `FnAbi.w`, `Codegen.w` (`declare_function_from_sig`,
-`apply_noalias_param_attrs_with_offset`), `CodegenDispatch.w`
+**Where.** `FnAbi.with`, `Codegen.with` (`declare_function_from_sig`,
+`apply_noalias_param_attrs_with_offset`), `CodegenDispatch.with`
 (`mir_ref_arg_ptr` and the `push_call_arg` arm for indirect place),
 `docs/spec/abi/with-abi.md`, `WITH_ABI_VERSION`.
 
@@ -456,7 +456,7 @@ fn_abi_alias_contract(receiver_mode, param_mode):
 ```
 
 The default is `MayAlias`. Today's compiler uses `PM_INDIRECT_PLACE` for
-non-`move` read receivers too (`SemaDecl.w`: non-`move` `self` remains
+non-`move` read receivers too (`SemaDecl.with`: non-`move` `self` remains
 share-place), and `IndirectPlace` by itself only means "pointer to the
 caller's place." A classifier of "not `byref` → `Exclusive`" would
 retroactively promote every read receiver to `noalias`. Pin with an
@@ -506,7 +506,7 @@ the signature via `ParamMode` and is a language fact; backend
 optimization eligibility is a *separate* fact and must not be
 regenerated from `ParamMode.Inout` alone. If it ever matters, the
 interface can carry a dedicated, fingerprinted backend-proof row
-(`BundleInterfaceEmit.w`), populated only by the producing compiler
+(`BundleInterfaceEmit.with`), populated only by the producing compiler
 after running (b). Fixture: a `.wo` consumer calling an imported `inout`
 function; IR-grep that the call site and the imported declaration carry
 no `noalias`.
@@ -527,9 +527,9 @@ established.
 
 ### P3. Borrow checker: exclusivity, byref class, no-move-out
 
-**Where.** `SemaCheck.w` (the argument-conflict check that today rejects
+**Where.** `SemaCheck.with` (the argument-conflict check that today rejects
 arguments retaining access to a `mut self` receiver — generalize it),
-`BorrowCfg.w` if liveness needs a new edge kind.
+`BorrowCfg.with` if liveness needs a new edge kind.
 
 **Exclusivity (rule B.4.4/5).** At a call, collect the set of places
 each argument designates or retains: `inout` → its place; `byref` → its
@@ -553,10 +553,10 @@ value's drop — which for `inout` of a `Drop` type means the callee drops
 the caller's old value in place; that is the intended semantics and
 matches `mut self` field assignment today.
 
-**Tests.** `err_inout_overlap_inout.w`, `err_inout_overlap_ref.w`,
-`err_byref_overlap_inout.w`, `err_byref_hetero_outside_storage.w`,
-`behav_byref_hetero_storage_ok.w`, `err_inout_move_out.w`,
-`err_inout_return_owned.w`, `behav_inout_assign_replace.w`.
+**Tests.** `err_inout_overlap_inout.with`, `err_inout_overlap_ref.with`,
+`err_byref_overlap_inout.with`, `err_byref_hetero_outside_storage.with`,
+`behav_byref_hetero_storage_ok.with`, `err_inout_move_out.with`,
+`err_inout_return_owned.with`, `behav_inout_assign_replace.with`.
 
 **Done when.** Every conflict shape in the spec's rule table has a
 fixture and the receiver conflict check is a special case of the new
@@ -564,7 +564,7 @@ generalized check (no duplicated logic).
 
 ### P4. Reservation
 
-**Where.** `SemaCheck.w` argument evaluation; `MirLower.w` argument
+**Where.** `SemaCheck.with` argument evaluation; `MirLower.with` argument
 ordering.
 
 **Model.** Introduce a liveness state `RESERVED(place)` created when a
@@ -613,7 +613,7 @@ conservatively: any `mut self` method on a growable container sets it
 unless annotated otherwise. The reserved-place check consults the bit on
 the parameter (or receiver) the enclosing container is passed to, and
 only when the reserved place is a descendant of that argument. Fixture:
-`err_inout_reservation_via_inout_callee.w` for the `grow` case.
+`err_inout_reservation_via_inout_callee.with` for the `grow` case.
 
 **Single evaluation — the invariant.**
 
@@ -638,17 +638,17 @@ re-lower the designator at the call. The reservation check runs in Sema
 between designator evaluation and invocation; MIR carries no reserved
 state.
 
-**Tests.** `behav_inout_reservation_len_ok.w`, `behav_inout_reservation_update_ok.w`,
-`behav_inout_reservation_index_evaluated_once.w` (the `xs[i]` /
+**Tests.** `behav_inout_reservation_len_ok.with`, `behav_inout_reservation_update_ok.with`,
+`behav_inout_reservation_index_evaluated_once.with` (the `xs[i]` /
 `change_i()` case: assert the callee saw the original element),
-`err_inout_reservation_pop.w`, `err_inout_reservation_push.w`,
-`err_inout_reservation_move.w`.
+`err_inout_reservation_pop.with`, `err_inout_reservation_push.with`,
+`err_inout_reservation_move.with`.
 
 **Done when.** The five spec examples in rule B.4.7 behave as listed.
 
 ### P4b. Returned-view provenance across calls
 
-**Where.** `SemaCheck.w` (`set_sig_param_view_origin`,
+**Where.** `SemaCheck.with` (`set_sig_param_view_origin`,
 `check_returned_view_origins`, the call-site origin substitution that
 already maps a returned view's declared parameter origin onto the actual
 argument's origin).
@@ -672,16 +672,16 @@ originating from `a` only, not from the whole may-alias class. The class
 is consulted for intra-callee conflicts (P6); provenance is not widened
 by it.
 
-**Tests.** `err_inout_returned_view_conflict.w` (the example above),
-`behav_inout_returned_view_ok.w` (view dropped before mutation),
-`behav_byref_returned_view_specific.w` (a view returned from `a` does not
+**Tests.** `err_inout_returned_view_conflict.with` (the example above),
+`behav_inout_returned_view_ok.with` (view dropped before mutation),
+`behav_byref_returned_view_specific.with` (a view returned from `a` does not
 block mutation through an unrelated caller place that was passed as
 `b`).
 
 ### P5. Restrictions: suspend, first-class, closures
 
-**Where.** `MirSuspendCheck.w` (`suspend_body_calls_may_suspend` and the
-per-body `may_suspend` bits), `SemaCheck.w` (function-value formation,
+**Where.** `MirSuspendCheck.with` (`suspend_body_calls_may_suspend` and the
+per-body `may_suspend` bits), `SemaCheck.with` (function-value formation,
 closure capture analysis).
 
 - After `may_suspend` is computed, any body with a caller-place
@@ -694,12 +694,12 @@ closure capture analysis).
 - Closure capture of an `inout`/`byref` parameter: error, marked in the
   message as a v1 restriction.
 
-**Tests.** `err_inout_async_fn.w`, `err_inout_may_suspend_transitive.w`,
-`err_inout_fn_value.w`, `err_inout_closure_capture.w`.
+**Tests.** `err_inout_async_fn.with`, `err_inout_may_suspend_transitive.with`,
+`err_inout_fn_value.with`, `err_inout_closure_capture.with`.
 
 ### P6. Intra-callee byref may-alias
 
-**Where.** `SemaCheck.w` view-origin tracking inside a function body.
+**Where.** `SemaCheck.with` view-origin tracking inside a function body.
 
 **Model.** The callee cannot see argument provenance, so grouping is
 by *type*, not by whether the parameter "is a storage projection": at
@@ -731,11 +731,11 @@ This exercises caller aliasing → `byref` → callee may-alias facts →
 storage projection → attempted `inout` refinement across all three
 layers at once.
 
-**Tests.** `err_byref_intra_callee_view_conflict.w` (the spec's
-`let r = &a; b = 42; r` example), `behav_byref_intra_callee_no_view_ok.w`
+**Tests.** `err_byref_intra_callee_view_conflict.with` (the spec's
+`let r = &a; b = 42; r` example), `behav_byref_intra_callee_no_view_ok.with`
 (write through `b` with no live view from `a` is fine),
-`err_byref_nested_inout_refinement.w` and
-`behav_owned_nested_inout_ok.w` (the pair above).
+`err_byref_nested_inout_refinement.with` and
+`behav_owned_nested_inout_ok.with` (the pair above).
 
 **Done when.** The checker never assumes disjointness for a pair of
 places that the source semantics allow to alias, and the backend never
@@ -756,7 +756,7 @@ green for two consecutive releases with the feature present.
 
 ### Bundle interfaces
 
-`src/compiler/BundleInterfaceEmit.w` currently has struct/union-specific
+`src/compiler/BundleInterfaceEmit.with` currently has struct/union-specific
 emission (`kind_row = "union" | "struct"`) and no storage case. Public
 storage types must round-trip through the bundle interface, so:
 
@@ -764,13 +764,13 @@ storage types must round-trip through the bundle interface, so:
   as `(name, type, offset, overlay_group)`. Overlay groups must be
   preserved, not just offsets, or a consumer re-checking S2's overlap
   rule would reject a legitimately overlaid layout.
-- **Reconstruct:** `BundleInterfaces.w` rebuilds the `TypeDeclKind.Storage`
+- **Reconstruct:** `BundleInterfaces.with` rebuilds the `TypeDeclKind.Storage`
   decl from the row and re-runs S2's validation as a consistency check
   (declared layout is the contract; recomputation must agree).
 - **Signatures:** parameter mode is already in interface signature
   identity (P1); the alias contract follows from it and needs no
   separate row.
-- **Fingerprint:** `BundleFingerprint.w` must include the storage row so
+- **Fingerprint:** `BundleFingerprint.with` must include the storage row so
   a layout change invalidates dependents.
 
 Fixture: an end-to-end `.wo` test where module A exports a storage type
@@ -780,7 +780,7 @@ visible mutation across the module boundary.
 
 ### `with migrate`
 
-The C migrator (`CiMigrate.w`, `Migrate.w`) should *not* start emitting
+The C migrator (`CiMigrate.with`, `Migrate.with`) should *not* start emitting
 storage types for C unions in this campaign; that is a separate
 decision. Add a `// storage-type candidate` marker in emitted code where
 a C union or explicitly-laid-out struct is encountered, so the census

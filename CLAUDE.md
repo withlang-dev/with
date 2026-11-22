@@ -154,7 +154,7 @@ writing them is not editing the spec to match the code.
   compiler cannot be recovered.
 - **Tiers.** Per change: `with check`, `with build :dev`, the targeted
   tests. Per layer: `src/main build :gate`. Per stack: one battery
-  (`with run tools/battery.w`) on its top commit. Before a seed cut or a
+  (`with run tools/battery.with`) on its top commit. Before a seed cut or a
   release: `:release-checks`.
 - **Changes land by pull request**; dependent ones are a `gh stack`. A PR
   is a draft until its battery is green. CI is not a merge signal (D56).
@@ -178,11 +178,11 @@ writing them is not editing the spec to match the code.
   `out/bootstrap/bin/with-stage1` (from `:dev`) for source you changed;
   `src/main` (the pinned seed, `WITH=$PWD/src/main`) for `:gate` and the
   battery.
-- **Tests:** `test/behavior/behav_*.w` (`//! expect-stdout:`) and
-  `test/compile_errors/err_*.w` (`//! expect-check-fail:`); read one of
+- **Tests:** `test/behavior/behav_*.with` (`//! expect-stdout:`) and
+  `test/compile_errors/err_*.with` (`//! expect-check-fail:`); read one of
   the same kind first. Run with `out/bootstrap/bin/with-stage1 test
   <files>`. Show a new test failing before its fix.
-- **Results:** read a gate or battery with `with run tools/verdict.w
+- **Results:** read a gate or battery with `with run tools/verdict.with
   <log>`, never by eye.
 - **Debugging routes:** `docs/spec/toolchain/deep-debugging-tools.md`.
 - **A bug you find is fixed, not filed**; an issue is for what must wait.
@@ -192,7 +192,7 @@ writing them is not editing the spec to match the code.
 ```
 src/        compiler source (.w)        lib/std/   standard library (.w)
 rt/         runtime + platform backends  runtime/   platform assembly (fiber_asm_*.s)
-test/       test suite                   build.w    build system
+test/       test suite                   build.with    build system
 out/bin/    compiler binaries            out/lib/   compiled runtime objects
 docs/       specifications
 ```

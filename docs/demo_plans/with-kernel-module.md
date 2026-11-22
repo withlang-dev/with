@@ -154,7 +154,7 @@ that most people ignore.
 This is the target structure. ~350–400 lines of With.
 
 ```with
-// ringbuf.w — A shared ring buffer character device
+// ringbuf.with — A shared ring buffer character device
 //
 // Load:   sudo insmod ringbuf.ko bufsize=8192
 // Use:    echo "hello" > /dev/ringbuf
@@ -491,8 +491,8 @@ compiles to C. This is actually a natural fit:
 obj-m := ringbuf.o
 
 # Step 1: compile With → C
-ringbuf.c: ringbuf.w
-	with build --emit-c --target=kernel ringbuf.w -o ringbuf.c
+ringbuf.c: ringbuf.with
+	with build --emit-c --target=kernel ringbuf.with -o ringbuf.c
 
 # Step 2: let kbuild compile C → .ko
 all: ringbuf.c
@@ -523,7 +523,7 @@ structured as:
 
 1. **What this is** — a Linux kernel module written in With
 2. **Build & run** — 4 commands (make, insmod, echo, cat)
-3. **The code** — link to ringbuf.w with a "read it, it's 350 lines"
+3. **The code** — link to ringbuf.with with a "read it, it's 350 lines"
 4. **Why With for kernel modules** — the `with` block / lock safety
    pitch, in 3 paragraphs
 5. **What's still hard** — honest about raw pointers, global state,

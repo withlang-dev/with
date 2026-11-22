@@ -62,23 +62,23 @@ Used throughout the recommendations below:
 
 | Item | Spec | Evidence | Confidence |
 |------|------|----------|------------|
-| Named arguments (`connect(port: 8080)`) | §9.1a | `test/spec/spec_ss09_1a_named_arguments_and_implicit_context.w:14` — "blocked: named arguments". Default parameters DO work. | High |
-| Implicit parameters + `with name(expr):` contexts | §7.3a, §9.1a | Same test: "blocked: implicit context". `lib/std/context.w` has the `Context` type but no `implicit` modifier resolution. (`NK_WITH_IMPLICIT` parses; resolution absent.) | High |
-| `let ... else` | §9.7 | `test/behavior/behav_let_else.w:4` — "not yet implemented" | High |
+| Named arguments (`connect(port: 8080)`) | §9.1a | `test/spec/spec_ss09_1a_named_arguments_and_implicit_context.with:14` — "blocked: named arguments". Default parameters DO work. | High |
+| Implicit parameters + `with name(expr):` contexts | §7.3a, §9.1a | Same test: "blocked: implicit context". `lib/std/context.with` has the `Context` type but no `implicit` modifier resolution. (`NK_WITH_IMPLICIT` parses; resolution absent.) | High |
+| `let ... else` | §9.7 | `test/behavior/behav_let_else.with:4` — "not yet implemented" | High |
 | `while let` | §9.7 | No tests, no parse evidence found | Medium ⚠ |
 | Match in pipelines (`\|> match:`) | §9.7 | No tests found | Medium ⚠ |
 | Set/map comprehensions | §30.5 grammar only (informative; no normative body text) | List comprehensions fully work; `{x for ...}`/`{k: v for ...}` absent | High — this is a *spec bug*: the appendix invents forms §13.6 never defines |
-| `break expr` (value-carrying break from `loop`) | §13.5c claims it; §13.5a reserves the labeled form | `test/compile_errors/err_break_value.w` — "break with a value is not supported" | High — spec also internally inconsistent (§13.5a vs §13.5c) |
-| `loop` construct has no defining section | used in examples; §29.13 list | implemented (`behav_loop_stmt.w`) but never formally defined (no §30.4 production, no semantics section) | High — spec gap, impl fine |
-| User `Deref` trait | §3.7 | Auto-deref hardcoded to `&T`/Box/Arc/Rc (`SemaCheck.w:5448`) | High |
+| `break expr` (value-carrying break from `loop`) | §13.5c claims it; §13.5a reserves the labeled form | `test/compile_errors/err_break_value.with` — "break with a value is not supported" | High — spec also internally inconsistent (§13.5a vs §13.5c) |
+| `loop` construct has no defining section | used in examples; §29.13 list | implemented (`behav_loop_stmt.with`) but never formally defined (no §30.4 production, no semantics section) | High — spec gap, impl fine |
+| User `Deref` trait | §3.7 | Auto-deref hardcoded to `&T`/Box/Arc/Rc (`SemaCheck.with:5448`) | High |
 | User `Try` trait / `ControlFlow` | §10.2, §11.7 | No Try trait, no ControlFlow type; `?` is Result/Option-only | High |
-| `MultiIndexMut`; tensor slicing `t[2:5, :, newaxis]`, `...`, `IndexSpec` | §11.7 | `MultiIndex` partial (trait + intrinsic, `behav_multi_index.w`); `MultiIndexMut` absent; slice/ellipsis/newaxis syntax unverified | High for Mut-absence; ⚠ for slicing syntax |
+| `MultiIndexMut`; tensor slicing `t[2:5, :, newaxis]`, `...`, `IndexSpec` | §11.7 | `MultiIndex` partial (trait + intrinsic, `behav_multi_index.with`); `MultiIndexMut` absent; slice/ellipsis/newaxis syntax unverified | High for Mut-absence; ⚠ for slicing syntax |
 | Right-side operator dispatch | §11.7 | No test/evidence found | Medium ⚠ |
 | `??` early-exit forms (`?? return e`, `?? break 'l`, `?? continue`) | §10.4 | Basic `??` works; early-exit forms untested | Medium ⚠ |
 | Box[dyn Trait] consuming-receiver shim | §11.3 | Unverified | Medium ⚠ |
 | Async methods in traits via dyn dispatch | §11.5 | No test found | Medium ⚠ |
 | Associated type defaults | §11.6 | Basics work; defaults unverified | Medium ⚠ |
-| Generic `extend` blocks | §9.5 | `examples/ecs/src/storage.w`: "compiler does not yet support generic extend blocks" | High |
+| Generic `extend` blocks | §9.5 | `examples/ecs/src/storage.with`: "compiler does not yet support generic extend blocks" | High |
 
 ### A2. Stdlib surface gaps
 
@@ -88,7 +88,7 @@ in the spec and the delta gets issue-tracked and priority-ordered.
 (The earlier draft of this survey proposed roadmap-marking the long
 tail; withdrawn — that was spec-retreat.)
 
-Inventory (high confidence; `Mir.w:130-140` + `lib/std/collections.w:114-131`):
+Inventory (high confidence; `Mir.with:130-140` + `lib/std/collections.with:114-131`):
 
 - **Iterator adapters:** have map, filter, flat_map, take, zip.
   Missing: `filter_map`, `flatten`, `drop`, `take_while`,
@@ -103,7 +103,7 @@ Inventory (high confidence; `Mir.w:130-140` + `lib/std/collections.w:114-131`):
 - **Option:** missing `zip`, `unzip`, `flatten`, `cloned`, `inspect`.
 - **Result:** missing `ok`, `err`, `inspect`, `inspect_err`,
   **`context`/`with_context`** (`ContextError` type exists,
-  `lib/std/result.w:21`; methods don't ⚠ verify).
+  `lib/std/result.with:21`; methods don't ⚠ verify).
 - **HashMap:** `entry` unverified ⚠; `append` absent.
 - **SlotMap.for_each** not found.
 - **Sync:** `Condvar`, `Barrier`, `Once` absent. `Atomic[T]` spec'd
@@ -130,8 +130,8 @@ becomes the generics test suite (the proven self-hosting pattern).
 ### A3. Derive gaps (§11.8)
 
 Implemented: Copy (opt-in), Clone, Eq, Debug. Reported absent:
-`Default`, `Hash`, `Ord`, `Display` (`Sema.w:85-87` DeriveReq enum) —
-⚠ medium confidence, verify against `ComptimeTransform.w` before
+`Default`, `Hash`, `Ord`, `Display` (`Sema.with:85-87` DeriveReq enum) —
+⚠ medium confidence, verify against `ComptimeTransform.with` before
 filing. `@[derive(all)]`, `@[derive(Builder)]`, user-defined derive
 targets: unverified ⚠. Resolution: keep-and-track; `Builder` stays
 spec'd (it is also the forcing function for user-defined comptime
@@ -157,8 +157,8 @@ derives, §17.3, which nothing else exercises).
 
 ### B1. `global` declarations — biggest unspecified surface
 
-`global` keyword (`Token.w:156`) with real syntax and tests
-(`behav_globals.w`: `global var g: i32 = 0`, `global X: T`). The spec
+`global` keyword (`Token.with:156`) with real syntax and tests
+(`behav_globals.with`: `global var g: i32 = 0`, `global X: T`). The spec
 has **no section on globals at all** — mutability, initialization
 order, borrow-checker interaction, Send/Sync obligations. (§18.7's
 no_std example even uses a `static` keyword that doesn't exist.)
@@ -183,8 +183,8 @@ proof as a precision upgrade.
 
 ### B2. Regex — flagship feature hiding in a CLI appendix
 
-Regex literals `/pattern/flags` (`Lexer.w:722`, `Parser.w:3422`),
-`=~`/`!~` (`Token.w:137-138`), capture expansion, and the full
+Regex literals `/pattern/flags` (`Lexer.with:722`, `Parser.with:3422`),
+`=~`/`!~` (`Token.with:137-138`), capture expansion, and the full
 PCRE2-migrated `std.regex` API all work in normal code; the spec
 defines regex only inside §18.5b one-liners.
 
@@ -201,7 +201,7 @@ design all along; it just needs promoting.
 
 ### B3. Attributes accepted by the parser, absent from the spec
 
-`@[effect(...)]` (parameter effect pinning, `Parser.w:600-649` —
+`@[effect(...)]` (parameter effect pinning, `Parser.with:600-649` —
 load-bearing for the §3.8 call-mode model), `@[compiler_hook]`,
 `@[bench]`, `@[stack_size]`, `@[noinline]`, `@[callconv]`, plus
 parser-recognized `@[biased]`, `@[TypeOf]`, etc.
@@ -214,7 +214,7 @@ where no body exists to infer from (intrinsic-backed stdlib stubs,
 documented in the FFI/stdlib-authoring sections, never presented as
 general user surface.
 
-### B4. CLI surface (§18.5 lists ~8 entries; main.w implements ~25)
+### B4. CLI surface (§18.5 lists ~8 entries; main.with implements ~25)
 
 Unspecified commands: `check`, `ir`, `ast`, `tokens`, `init`,
 `migrate`, `version`, `help`. Unspecified flags: `--emit-c`,
@@ -236,7 +236,7 @@ Mapped but hollow: `std.signal` (2 lines), `std.testing` (absent).
 
 ### B6. Concurrency API detail
 
-`chan[T](capacity)` + `Sender`/`Receiver` (`lib/std/channel.w`);
+`chan[T](capacity)` + `Sender`/`Receiver` (`lib/std/channel.with`);
 `thread.spawn_os` + `ScopedJoinHandle`. Spec uses them in examples
 without API definitions. **Recommendation:** spec the surfaces
 (§14.15/§14.14 expansions or libstd-spec).
@@ -263,7 +263,7 @@ without API definitions. **Recommendation:** spec the surfaces
    Keep-and-track; tier 1.
 4. **Box[dyn] consuming shims**: possibly silent divergence; Phase 0
    verify.
-5. **Stale in-repo claims**: `test/spec/spec_ss09_7_pattern_matching.w`
+5. **Stale in-repo claims**: `test/spec/spec_ss09_7_pattern_matching.with`
    says "slice patterns not yet supported" while they pass elsewhere.
    Test-comment hygiene; cheap fix.
 

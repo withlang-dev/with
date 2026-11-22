@@ -15,7 +15,7 @@ Phase D closes the gap between the current Make-parity build graph and the
 Jai-style integrated compiler driver described in
 `docs/completed/build-spec.md`.
 The current build system can express this repository's targets, but it still
-uses generated runner binaries for `build.w` and project-local actions, and it
+uses generated runner binaries for `build.with` and project-local actions, and it
 does not expose compiler workspaces or compiler message interception to build
 code. Phase D replaces that transitional machinery with in-process tool-mode
 execution, compiler workspaces, a structured message loop, and stable compiler
@@ -30,7 +30,7 @@ need exact boundaries and verification points.
 With build code is ordinary With code executed by the compiler driver in
 tool mode. Tool power is capability-based:
 
-- discovery is by convention (`build.w`) or annotation (`@[compiler_hook]`);
+- discovery is by convention (`build.with`) or annotation (`@[compiler_hook]`);
 - capability parameters determine what privileged operations are available;
 - compiler phases determine when hooks run, not what power they have;
 - ordinary `comptime` remains pure and deterministic;
@@ -65,14 +65,14 @@ inside the compiler process.
 
 Current transitional behavior:
 
-1. The driver writes `__with_build_runner.<stamp>.w`.
+1. The driver writes `__with_build_runner.<stamp>.with`.
 2. The driver compiles that source to a runner binary.
 3. The driver executes the runner binary with environment capability tokens.
 4. Action targets repeat the same pattern with a second generated runner.
 
 Target behavior:
 
-1. The driver parses, resolves, typechecks, and lowers `build.w` as tool code.
+1. The driver parses, resolves, typechecks, and lowers `build.with` as tool code.
 2. The driver mints a `BuildCtx` capability.
 3. The driver invokes `pub fn build(ctx: BuildCtx) -> Build` through an
    in-process tool executor.
@@ -81,7 +81,7 @@ Target behavior:
    function through the same in-process executor with an `ActionCtx`.
 
 No generated action runner source files, runner binaries, exported symbols, or
-subprocess calls are allowed for normal `build.w` or action dispatch after D1.
+subprocess calls are allowed for normal `build.with` or action dispatch after D1.
 
 The executor may initially reuse the compiler's typed AST, MIR, or another
 internal callable representation. The required property is user-visible: tool
@@ -492,9 +492,9 @@ Forbidden shared state:
 
 The following compiler areas need explicit integration:
 
-- `src/main.w`: replace generated build/action runner execution with
+- `src/main.with`: replace generated build/action runner execution with
   in-process tool dispatch; route direct CLI flags through `BuildOptions`.
-- `src/compiler/Compilation.w`: own workspace lifecycle, phase emission,
+- `src/compiler/Compilation.with`: own workspace lifecycle, phase emission,
   message queues, generated-source re-entry, hook scheduling, and
   `BuildResult` construction.
 - Parser/Ast: support named in-memory source units from `Workspace.add_string`.
@@ -511,7 +511,7 @@ The following compiler areas need explicit integration:
 
 ### D1: In-Process Action Execution
 
-Implement in-process tool dispatch for `build.w` and `Action` targets.
+Implement in-process tool dispatch for `build.with` and `Action` targets.
 Remove generated build/action runner binaries from normal build execution.
 Keep existing public `BuildCtx` and `ActionCtx` user code working.
 
@@ -520,7 +520,7 @@ Focused verification:
 - existing `with build :cli-selfhost-build-w-tests`;
 - action target with filesystem and process capabilities;
 - action crash diagnostic includes target and source location;
-- no generated `__with_build_runner.*.w` or `__with_build_action_runner.*.w`
+- no generated `__with_build_runner.*.with` or `__with_build_action_runner.*.with`
   files are created during normal execution.
 
 ### D2: Workspace Skeleton and Shared BuildOptions
@@ -529,7 +529,7 @@ Add workspace handles, source file/string addition, typed options, compile,
 and parallel scheduling. Co-design `BuildOptions` with CLI parsing so direct
 source builds and workspace builds share defaults and validation.
 
-Validation target: port `build_emit_c.w` or an equivalent emit-C build flow to
+Validation target: port `build_emit_c.with` or an equivalent emit-C build flow to
 use `Workspace` directly.
 
 ### D3: Full Message Loop

@@ -96,7 +96,7 @@ Already fits (keep):
   is the refinement layer, richer than the minimum. `sig_param_effects` is the
   `leaks` summary.
 - **P0 (done):** the call-graph fixpoint = Go's `solve.go`. The analysis exists.
-- `value_ref_abi` → plain-`ptr` ABI (Codegen.w:4094) = Zig's by-ref. The Borrow
+- `value_ref_abi` → plain-`ptr` ABI (Codegen.with:4094) = Zig's by-ref. The Borrow
   ABI mechanism exists; receivers already use it (share-place already works for
   `self`).
 - `is_copy` aggregate-opt-in, the `&T` niche — already correct.

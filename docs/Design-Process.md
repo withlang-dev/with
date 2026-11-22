@@ -94,7 +94,7 @@ can't amend a ruling or the specification.
 
 ### Rebuild and verify (tiered — see D14, D19)
 
-**Iterate tier — the only per-change requirement.** `with check src/main.w`
+**Iterate tier — the only per-change requirement.** `with check src/main.with`
 and/or `with build :dev` (seed → stage1, one self-compile), plus the targeted
 tests for what you touched. Never run the full battery per edit.
 

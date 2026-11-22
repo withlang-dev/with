@@ -1,0 +1,31 @@
+//! expect-check-fail: unknown method 'count' for type 'FailedDatabase': a failed 'Database'
+//! expect-check-fail: = help: state 'valid on failed' on the fn item describing an operation the C library documents on the failed handle; its representation is the field `repr`, under the raw C rules (`unsafe`)
+
+// D51 stage 5 (Eric, 2026-09-23, on #1426): the resource a failed producer
+// still produced — `FailedWithResource`'s `FailedDatabase` — admits only the
+// operations the facade states are valid on the failure state. A facade has
+// no clause for that yet, so it admits none: `count` (`db_count`), a lend method of a
+// live `Database`, is not a method of the failed one. Raw access to its
+// representation under the raw C rules compiles
+// (da_c_facade_error_owns_resource.with).
+
+use c_import("typedef struct db db;
+#define DB_OK 0
+int db_open(const char* path, db** out);
+void db_close(db* d);
+int db_count(db* d);
+")
+
+c contract dbl:
+    resource Database wraps *mut db
+        from db_open(out param 1)
+        drop db_close
+        ok DB_OK
+    fn db_count
+        lend
+
+fn main:
+    match Database.open("x.db"):
+        Ok(db) => print(f"{db.count()}")
+        Err(DatabaseError.FailedWithResource(_, failed)) => print(f"{failed.count()}")
+        Err(_) => print("failed")

@@ -8,7 +8,7 @@ double-drop. Written 2026-06-27.
 A `Drop` value that is **moved out** and then **reassigned** (or whose scope ends) is
 **dropped a second time** by codegen. The move/ownership dataflow is *correct* and
 already proves the drop should be skipped — but that analysis is **diagnostic-only**.
-The actual code generator (`CodegenDispatch.w`) emits every `StmtKind.Drop`
+The actual code generator (`CodegenDispatch.with`) emits every `StmtKind.Drop`
 unconditionally, never consulting the dataflow. With built the **Conditional** arm of
 drop elaboration (runtime drop-flags for *maybe*-moved values) but never the **Dead**
 arm (static skip for *definitely*-moved values). The fix is to make the existing,
@@ -78,7 +78,7 @@ bb3.stmt10 place=_2 ty=ty106 state_before=Moved action=skip  drop(_2) @ drop#10 
 `action=skip`. The analysis is **completely correct**. Yet the value is dropped at
 runtime, and `--validate-ownership` reports `ok`.
 
-**The disconnect is codegen.** `Codegen.mir_emit_stmt` (`CodegenDispatch.w:4634`):
+**The disconnect is codegen.** `Codegen.mir_emit_stmt` (`CodegenDispatch.with:4634`):
 
 ```
 if sk == StmtKind.Drop:
@@ -87,13 +87,13 @@ if sk == StmtKind.Drop:
     return ok
 ```
 
-`mir_emit_drop_place_current_origin` (`CodegenDispatch.w`) emits the drop (box/refcount
+`mir_emit_drop_place_current_origin` (`CodegenDispatch.with`) emits the drop (box/refcount
 special-cases, then `mir_emit_drop_ptr`) with **no consultation of the drop-state and
 no drop-flag check**. Every `StmtKind.Drop` becomes a drop call.
 
 The `Moved → skip` verdict lives **only** in the diagnostic path: `mir_drop_state_*`
-(`Mir.w`) and `mir_drop_plan_action` (`Mir.w:1848`) are reached **exclusively** from
-`--dump-drop-state` / `--dump-drop-plan` in `main.w`. **Codegen never computes or
+(`Mir.with`) and `mir_drop_plan_action` (`Mir.with:1848`) are reached **exclusively** from
+`--dump-drop-state` / `--dump-drop-plan` in `main.with`. **Codegen never computes or
 queries the drop-state.** There is no `elaborate_drops` pass.
 
 ### How the *conditional* case still works (and why the static case doesn't)
@@ -110,18 +110,18 @@ A **definite** move has **no flag** (static analysis already knows it is moved).
 
 **The exact deepest cause:** there is no step that consumes `mir_drop_state` to prune
 `StmtKind.Drop` statements whose place is statically `Moved`. The dataflow at
-`Mir.w:1673` (`mir_drop_state_get_place`) is authoritative and correct but unused by
-`CodegenDispatch.w:4634`.
+`Mir.with:1673` (`mir_drop_state_get_place`) is authoritative and correct but unused by
+`CodegenDispatch.with:4634`.
 
 ## 3. Five Whys
 
 1. **Why does the program double-drop?** `main` emits `drop(_2)` (drop-before-overwrite
    for `r = make()`) on `_2`, which was already moved into `take()`.
 2. **Why is that drop emitted when `_2` is moved?** Codegen's `StmtKind.Drop` handler
-   (`CodegenDispatch.w:4634` → `mir_emit_drop_place_current_origin`) emits every drop
+   (`CodegenDispatch.with:4634` → `mir_emit_drop_place_current_origin`) emits every drop
    unconditionally; it does not consult the drop-state.
 3. **Why doesn't codegen consult the drop-state?** The drop-state dataflow
-   (`mir_drop_state`, `Mir.w`) is computed only for the `--dump-drop-state` /
+   (`mir_drop_state`, `Mir.with`) is computed only for the `--dump-drop-state` /
    `--dump-drop-plan` diagnostics. No elaboration pass applies it to the MIR that
    codegen consumes.
 4. **Why is the dataflow diagnostic-only?** The conditional-move feature (M7)
@@ -196,7 +196,7 @@ Why this is the mission-aligned fix:
 - **"Don't make the user write what the compiler already knows."** Entirely
   compiler-internal — no `let _ =`, no manual `mem::forget`, no reordering. The compiler
   already *computes* the right answer; this just uses it.
-- **Reuses existing, verified code.** The dataflow (`mir_drop_state`, `Mir.w`) is the
+- **Reuses existing, verified code.** The dataflow (`mir_drop_state`, `Mir.with`) is the
   same one the diagnostic prints and that `--validate-ownership` rides on. No new
   analysis, minimal new surface.
 
@@ -209,7 +209,7 @@ codegen — mirroring `dump_drop_plan_body`'s existing per-statement walk:
    diagnostic).
 2. For each `StmtKind.Drop` at a statement, query `mir_drop_state_get_place`:
    - **`Moved`** → **rewrite the statement to `StmtKind.Nop`** (Dead). Codegen already
-     treats `Nop` as a no-op (`CodegenDispatch.w:4643`), so this needs *no codegen
+     treats `Nop` as a no-op (`CodegenDispatch.with:4643`), so this needs *no codegen
      change* — the cleanest possible landing.
    - **`Init`** → leave as-is (Static; emitted unconditionally — already correct).
    - **`Maybe`** → leave as-is (Conditional; the existing drop-flag / branch structure
@@ -222,11 +222,11 @@ because `Nop` is already a no-op. Place the pass so it sees the same MIR codegen
 
 ### Verification plan
 
-- The native debug allocator is the oracle. Add `test/debug_alloc/da_reassign_after_move.w`
+- The native debug allocator is the oracle. Add `test/debug_alloc/da_reassign_after_move.with`
   (heap-allocating `Drop`): the moved-then-reassigned value must show **no DOUBLE FREE**
   and `leak count=0`.
-- Behavior: the #614 repro above must print **2**; tighten `behav_while_reinit_move.w`
-  and `behav_for_reinit_move.w` to assert exact drop counts (they are currently relaxed
+- Behavior: the #614 repro above must print **2**; tighten `behav_while_reinit_move.with`
+  and `behav_for_reinit_move.with` to assert exact drop counts (they are currently relaxed
   *because* of this bug).
 - Regression: `da_manual_double_free` must still report `DOUBLE FREE`; `da_pod_vec` must
   stay `leak count=1`; full `:debug-alloc-tests` + fresh `:test` + `:fixpoint`.
@@ -239,7 +239,7 @@ because `Nop` is already a no-op. Place the pass so it sees the same MIR codegen
 - **Don't Nop `Maybe` drops.** Those are sound only via the runtime flag; converting them
   to `Nop` would leak. The pass must skip *only* statically-`Moved` drops.
 - **Partial/field moves.** A struct with some fields moved drops the live fields
-  (`emit_drop_place_respecting_moved_fields`, `MirLower.w:582`). The dataflow tracks
+  (`emit_drop_place_respecting_moved_fields`, `MirLower.with:582`). The dataflow tracks
   place granularity; the pass must use the same place-keyed state, not whole-local, so a
   partially-moved aggregate still drops its live fields. Verify with a field-move
   `da_*` fixture.

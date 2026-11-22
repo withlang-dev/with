@@ -34,10 +34,10 @@ Wave 6 exit gate:
   - `bootstrap/src/Driver.zig` (`writeTyped`)
   - `bootstrap/src/main.zig` (`--dump-typed`)
 - Existing self-host implementation:
-  - `src/Sema.w`
-  - `src/compiler/Zcu.w`
-  - `src/compiler/Frontend.w`
-  - `src/Driver.w`
+  - `src/Sema.with`
+  - `src/compiler/Zcu.with`
+  - `src/compiler/Frontend.with`
+  - `src/Driver.with`
 - Reference architecture:
   - Zig:
     - `.reference/zig/src/Sema.zig`
@@ -114,11 +114,11 @@ Known divergence policy:
 
 Implementation (expected touch points):
 
-- `src/Sema.w` (primary Wave 6 work)
-- `src/compiler/Zcu.w` (semantic state ownership and typed sidecars)
-- `src/compiler/Frontend.w` (pass ordering/wiring)
-- `src/Driver.w` (typed dump plumbing if needed)
-- `src/main.w` (CLI passthrough for parity mode if needed)
+- `src/Sema.with` (primary Wave 6 work)
+- `src/compiler/Zcu.with` (semantic state ownership and typed sidecars)
+- `src/compiler/Frontend.with` (pass ordering/wiring)
+- `src/Driver.with` (typed dump plumbing if needed)
+- `src/main.with` (CLI passthrough for parity mode if needed)
 
 Tests/scripts (new):
 
@@ -198,7 +198,7 @@ Tests/scripts (new):
 
 - [x] Normalize diagnostic ordering and wording for deterministic parity checks.
 - [x] Ensure span fidelity for declaration and body-check errors.
-- [x] Add Wave 6 diagnostics tests for representative semantic failures (`undefined_var_error.w`, `type_mismatch_error.w`, `arity_mismatch_error.w`).
+- [x] Add Wave 6 diagnostics tests for representative semantic failures (`undefined_var_error.with`, `type_mismatch_error.with`, `arity_mismatch_error.with`).
 
 ## 9) Typed Dump Emission Alignment
 
@@ -208,10 +208,10 @@ Tests/scripts (new):
 
 ## 10) Unit Tests
 
-- [x] Add declaration-collection unit tests (`test/wave6/cases/decl_collection_pass.w`).
-- [x] Add body-check expression typing unit tests (`test/wave6/cases/body_typing_pass.w`).
-- [x] Add call/method/generic semantic-check unit tests (`test/wave6/cases/method_call_pass.w`, `trait_impl_pass.w`).
-- [x] Add scope/pattern binding unit tests (`test/wave6/cases/scope_binding_pass.w`, `pattern_binding_pass.w`).
+- [x] Add declaration-collection unit tests (`test/wave6/cases/decl_collection_pass.with`).
+- [x] Add body-check expression typing unit tests (`test/wave6/cases/body_typing_pass.with`).
+- [x] Add call/method/generic semantic-check unit tests (`test/wave6/cases/method_call_pass.with`, `trait_impl_pass.with`).
+- [x] Add scope/pattern binding unit tests (`test/wave6/cases/scope_binding_pass.with`, `pattern_binding_pass.with`).
 - [x] Add diagnostics determinism tests (`scripts/run_wave6_sema_unit_tests.sh` — 30 checks including 3 determinism runs, 5 Wave 5 regressions).
 
 ## 11) Stage0 Parity Harness
@@ -268,7 +268,7 @@ corpus design rather than by code.
 
 **Self-host behavior:** Parser fails on the `,` after the first binding — only single-binding `if let Pat = expr:` is implemented.
 
-**Rationale:** This is a parser extension, not a Sema gap. The chained form is sugar that lowers to nested `if let` in HIR→MIR (Wave 7). The Wave 6 corpus excludes `bootstrap/test/cases/chained_if_let.w` to avoid triggering this.
+**Rationale:** This is a parser extension, not a Sema gap. The chained form is sugar that lowers to nested `if let` in HIR→MIR (Wave 7). The Wave 6 corpus excludes `bootstrap/test/cases/chained_if_let.with` to avoid triggering this.
 
 **Test coverage:** Excluded from `test/wave6/typed_corpus.txt` with inline comment. Will be added back once the parser is extended.
 

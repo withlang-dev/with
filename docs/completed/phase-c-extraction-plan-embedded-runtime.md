@@ -8,7 +8,7 @@ build actions.
 
 ## 1. Placement
 
-The extracted action will live in `build_selfhost.w`.
+The extracted action will live in `build_selfhost.with`.
 
 This is a repository selfhost fixture, not a standard build primitive. It tests
 the With compiler binary's embedded runtime-object behavior by building and
@@ -16,23 +16,23 @@ running a tiny program in an isolated fixture directory.
 
 ## 2. What Moves
 
-Move from `src/main.w`:
+Move from `src/main.with`:
 
 - `build_graph_run_embedded_runtime_extract_test`
 - the `run_build_graph` dispatch branch for
   `build_graph_kind_embedded_runtime_extract_test()`
 
-Move from `build.w`:
+Move from `build.with`:
 
 - `project_kind_embedded_runtime_extract_test() -> BuildKind: 1000 as BuildKind`
 
-Reserve in `src/BuildGraphKinds.w`:
+Reserve in `src/BuildGraphKinds.with`:
 
 - `1000` as `removed_embedded_runtime_extract_test`
 
 ## 3. Target Shape
 
-`build.w` will define `embedded-runtime-regression` as a `.Action` target:
+`build.with` will define `embedded-runtime-regression` as a `.Action` target:
 
 ```with
 var embedded_runtime_regression = target_new(.Action, "embedded-runtime-regression", "")
@@ -43,7 +43,7 @@ embedded_runtime_regression = embedded_runtime_regression.dep("build")
 ```
 
 The action will copy the compiler input into its output fixture directory, write
-`hello.w`, run the copied compiler with `WITH_OUT_DIR` set to a nonexistent
+`hello.with`, run the copied compiler with `WITH_OUT_DIR` set to a nonexistent
 directory, run the produced program, and assert stdout is exactly `hello`.
 
 ## 4. Capabilities
@@ -73,10 +73,10 @@ removed-kind diagnostic and tell the user to regenerate the build graph.
 
 ## 6. Dispatch Removal
 
-After extraction, `src/main.w` must not dispatch kind `1000` or branch on
+After extraction, `src/main.with` must not dispatch kind `1000` or branch on
 `build_graph_kind_embedded_runtime_extract_test()`.
 
-`src/BuildGraphKinds.w` must not expose
+`src/BuildGraphKinds.with` must not expose
 `build_graph_kind_embedded_runtime_extract_test()`.
 
 ## 7. Parity Standard
@@ -96,7 +96,7 @@ For the prerequisite `ToolFs` capability slice:
 
 1. Implement `ToolFs.copy_file` and `ToolFs.chmod` with sandbox checks.
 2. Add focused selfhost fixture coverage.
-3. Run `out/bin/with check build_selfhost.w`.
+3. Run `out/bin/with check build_selfhost.with`.
 4. Run `make build`.
 5. Run `make fixpoint`.
 6. Run `make test`.
@@ -105,7 +105,7 @@ For the prerequisite `ToolFs` capability slice:
 For the extraction slice:
 
 1. Capture the before output.
-2. Move the target to `build_selfhost.w`.
+2. Move the target to `build_selfhost.with`.
 3. Reserve kind `1000`.
 4. Remove generic-driver dispatch.
 5. Run focused checks and the before/after parity comparison.

@@ -1,0 +1,702 @@
+// `with uat` — a project's acceptance scenarios (spec §18.5d, D67;
+// uat-plan.md): plain-text files under `uat/`, one scenario each, a
+// header (`scenario:`, `requires:`, `platforms:`) and one step per line in
+// the verbs a person would say at a terminal. The runner parses every
+// scenario, skips the ones whose requirements this host cannot meet (with
+// the reason), performs the rest step by step, and reports one verdict per
+// scenario and one line per failed step. `expect (human):` is recorded and
+// printed, never executed. Nothing here is a framework: the verbs are the
+// runner's.
+//
+// Captures: out/uat/<scenario>/step-<N>.stdout|.stderr; the human checks:
+// out/uat/human-checks.txt. `new directory` moves the scenario into
+// out/uat/<scenario>/tmp/, deleted on pass unless `--keep`. `with` at the
+// head of a `run:` line is the running toolchain, or `WITH_UAT_WITH`.
+
+use rt.rt_core
+use rt.compat_runtime
+use std.process
+use TargetSpec
+use compiler.Runtime.runtime_path_is_absolute
+use compiler.Runtime.runtime_cwd
+use std.time
+use std.builtins.print
+use std.builtins.eprint
+
+
+const UAT_RUN_TIMEOUT_MS: i32 = 600000
+
+// Verbs (the grammar of uat-plan.md §3).
+const UAT_NEW_DIRECTORY: i32 = 1
+const UAT_RUN: i32 = 2
+const UAT_RUN_FAILS: i32 = 3
+const UAT_WRITE_FROM: i32 = 4
+const UAT_WRITE_INLINE: i32 = 5
+const UAT_COPY: i32 = 6
+const UAT_ENV: i32 = 7
+const UAT_STDIN: i32 = 8
+const UAT_EXPECT_EXIT: i32 = 9
+const UAT_EXPECT_STDOUT: i32 = 10
+const UAT_EXPECT_STDOUT_CONTAINS: i32 = 11
+const UAT_EXPECT_STDERR_CONTAINS: i32 = 12
+const UAT_EXPECT_FILE_EXISTS: i32 = 13
+const UAT_EXPECT_FILE_CONTAINS: i32 = 14
+const UAT_EXPECT_IMAGE: i32 = 15
+const UAT_EXPECT_HUMAN: i32 = 16
+
+type UatStep {
+    verb: i32,
+    a: str,       // the verb's first operand: a command line, a path, a name, text
+    b: str,       // its second: a fixture, a destination, a value, an int as text
+    line: isize,  // 1-based, for the report
+}
+
+type UatScenario {
+    name: str,            // the file stem
+    path: str,
+    title: str,
+    requires: List[str],
+    platforms: List[str],
+    steps: List[UatStep],
+    problem: str,         // a parse error, with its line already named
+}
+
+type UatRun {
+    rc: i32,
+    stdout: str,
+    stderr: str,
+    label: str,
+}
+
+// ── parsing ──────────────────────────────────────────────────────────────
+
+fn uat_trim_trailing_line_endings(text: &str) -> str:
+    var end = text.len()
+    while end > 0 and (text[end - 1] == '\n' or text[end - 1] == '\r'):
+        end = end - 1
+    text.slice(0, end)
+
+fn uat_split_list(text: &str) -> List[str]:
+    let out: List[str] = []
+    for part in text.split(","):
+        let t = part.trim()
+        if t.len() > 0: out.push(t)
+    out
+
+fn uat_rest_after(line: &str, prefix: &str) -> str: line.slice(prefix.len(), line.len()).trim()
+
+// The lines of an indented block after `at` (exclusive), de-indented by
+// the first line's indentation; returns the block and the index of the
+// first line after it.
+fn uat_indented_block(lines: &List[str], at: i32) -> (str, i32):
+    var i = at + 1
+    var indent = -1
+    var out = ""
+    while i < lines.len():
+        let raw = lines[i]
+        if raw.trim().len() == 0:
+            out = out ++ "\n"
+            i = i + 1
+            continue
+        var spaces = 0
+        while spaces < raw.len() and raw[spaces] == ' ': spaces = spaces + 1
+        if spaces == 0:
+            break
+        if indent < 0: indent = spaces
+        let cut = if spaces < indent: spaces else: indent
+        out = out ++ raw.slice(cut, raw.len()) ++ "\n"
+        i = i + 1
+    // A block ends where the file does; trailing blank lines are not content.
+    (uat_trim_trailing_line_endings(out) ++ "\n", i)
+
+fn uat_step(verb: i32, a: str, b: str, line: isize) -> UatStep: UatStep { verb, a, b, line }
+
+// A decimal integer with an optional sign; (false, 0) otherwise.
+fn uat_parse_int(text: &str) -> (bool, i64):
+    var i = 0
+    var neg = false
+    if text.len() > 0 and (text[0] == '-' or text[0] == '+'):
+        neg = text[0] == '-'
+        i = 1
+    if i >= text.len(): return (false, 0)
+    var value: i64 = 0
+    while i < text.len():
+        let c = text[i]
+        if c < '0' or c > '9': return (false, 0)
+        value = value * 10 + (c - '0') as i64
+        i = i + 1
+    (true, if neg: 0 - value else: value)
+
+fn uat_sort_strings(items: List[str]) -> List[str]:
+    let sorted = items
+    for i in 1..sorted.len():
+        var j = i
+        while j > 0 and sorted[j - 1] > sorted[j]:
+            let t = sorted[j - 1]
+            sorted[j - 1] = sorted[j]
+            sorted[j] = t
+            j = j - 1
+    sorted
+
+fn uat_error(sc: UatScenario, line: isize, message: &str) -> UatScenario:
+    let out = sc
+    out.problem = f"{out.path}:{line}: {message}"
+    out
+
+fn uat_stem(path: &str) -> str:
+    var start = 0
+    for i in 0..path.len():
+        if path[i] == '/': start = (i + 1) as i32
+    var end = path.len()
+    if path.ends_with(".uat"): end = end - 4
+    path.slice(start, end)
+
+fn uat_parse(path: &str, text: &str) -> UatScenario:
+    let sc = UatScenario { name: uat_stem(path), path: path, title: "", requires: List.new(), platforms: List.new(), steps: List.new(), problem: "" }
+    let lines: List[str] = []
+    for raw in text.split("\n"):
+        lines.push(uat_trim_trailing_line_endings(raw))
+    var i: i32 = 0
+    var header_done = false
+    while i < lines.len():
+        let lineno = i + 1
+        let line = lines[i].trim()
+        if line.len() == 0 or line.starts_with("#"):
+            i = i + 1
+            continue
+        if not header_done:
+            if sc.title.len() == 0:
+                if not line.starts_with("scenario:"):
+                    return uat_error(sc, lineno, "a scenario starts with 'scenario: <title>'")
+                sc.title = uat_rest_after(line, "scenario:")
+                if sc.title.len() == 0:
+                    return uat_error(sc, lineno, "'scenario:' needs a title")
+                i = i + 1
+                continue
+            if line.starts_with("requires:"):
+                sc.requires = uat_split_list(uat_rest_after(line, "requires:"))
+                i = i + 1
+                continue
+            if line.starts_with("platforms:"):
+                sc.platforms = uat_split_list(uat_rest_after(line, "platforms:"))
+                i = i + 1
+                continue
+            header_done = true
+        if line == "new directory":
+            sc.steps.push(uat_step(UAT_NEW_DIRECTORY, "", "", lineno))
+        else if line.starts_with("run (fails):"):
+            sc.steps.push(uat_step(UAT_RUN_FAILS, uat_rest_after(line, "run (fails):"), "", lineno))
+        else if line.starts_with("run:"):
+            let cmd = uat_rest_after(line, "run:")
+            if cmd.len() == 0:
+                return uat_error(sc, lineno, "'run:' needs a command")
+            sc.steps.push(uat_step(UAT_RUN, cmd, "", lineno))
+        else if line.starts_with("write "):
+            let rest = uat_rest_after(line, "write ")
+            let from = rest.find(" from ")
+            if from >= 0:
+                sc.steps.push(uat_step(UAT_WRITE_FROM, rest.slice(0, from).trim(), rest.slice(from + 6, rest.len()).trim(), lineno))
+            else if rest.ends_with(":"):
+                let (block, next) = uat_indented_block(lines, i)
+                sc.steps.push(uat_step(UAT_WRITE_INLINE, rest.slice(0, rest.len() - 1).trim(), block, lineno))
+                i = next
+                continue
+            else:
+                return uat_error(sc, lineno, "'write' is 'write <path> from <fixture>' or 'write <path>:' followed by an indented block")
+        else if line.starts_with("copy "):
+            let rest = uat_rest_after(line, "copy ")
+            let to = rest.find(" to ")
+            if to < 0:
+                return uat_error(sc, lineno, "'copy' is 'copy <path> to <path>'")
+            sc.steps.push(uat_step(UAT_COPY, rest.slice(0, to).trim(), rest.slice(to + 4, rest.len()).trim(), lineno))
+        else if line.starts_with("env "):
+            let rest = uat_rest_after(line, "env ")
+            let eq = rest.find("=")
+            if eq <= 0:
+                return uat_error(sc, lineno, "'env' is 'env NAME=value'")
+            sc.steps.push(uat_step(UAT_ENV, rest.slice(0, eq).trim(), rest.slice(eq + 1, rest.len()).trim(), lineno))
+        else if line == "stdin:":
+            let (block, next) = uat_indented_block(lines, i)
+            sc.steps.push(uat_step(UAT_STDIN, block, "", lineno))
+            i = next
+            continue
+        else if line.starts_with("expect exit:"):
+            let exit_text = uat_rest_after(line, "expect exit:")
+            let (ok, _) = uat_parse_int(exit_text)
+            if not ok:
+                return uat_error(sc, lineno, "'expect exit:' needs an integer")
+            sc.steps.push(uat_step(UAT_EXPECT_EXIT, exit_text, "", lineno))
+        else if line.starts_with("expect stdout contains:"):
+            sc.steps.push(uat_step(UAT_EXPECT_STDOUT_CONTAINS, uat_rest_after(line, "expect stdout contains:"), "", lineno))
+        else if line.starts_with("expect stdout:"):
+            let stdout_text = uat_rest_after(line, "expect stdout:")
+            if stdout_text.len() == 0:
+                // Several lines: an indented block, compared exactly.
+                let (block, next) = uat_indented_block(lines, i)
+                sc.steps.push(uat_step(UAT_EXPECT_STDOUT, uat_trim_trailing_line_endings(block), "", lineno))
+                i = next
+                continue
+            sc.steps.push(uat_step(UAT_EXPECT_STDOUT, stdout_text, "", lineno))
+        else if line.starts_with("expect stderr contains:"):
+            sc.steps.push(uat_step(UAT_EXPECT_STDERR_CONTAINS, uat_rest_after(line, "expect stderr contains:"), "", lineno))
+        else if line.starts_with("expect file "):
+            let rest = uat_rest_after(line, "expect file ")
+            if rest.ends_with(" exists"):
+                sc.steps.push(uat_step(UAT_EXPECT_FILE_EXISTS, rest.slice(0, rest.len() - 7).trim(), "", lineno))
+            else:
+                let at = rest.find(" contains:")
+                if at < 0:
+                    return uat_error(sc, lineno, "'expect file' is 'expect file <path> exists' or 'expect file <path> contains: <text>'")
+                sc.steps.push(uat_step(UAT_EXPECT_FILE_CONTAINS, rest.slice(0, at).trim(), rest.slice(at + 10, rest.len()).trim(), lineno))
+        else if line.starts_with("expect image:"):
+            return uat_error(sc, lineno, "'expect image:' is not implemented yet (uat-plan.md §5, #3013); record the check as 'expect (human):' meanwhile")
+        else if line.starts_with("expect (human):"):
+            sc.steps.push(uat_step(UAT_EXPECT_HUMAN, uat_rest_after(line, "expect (human):"), "", lineno))
+        else:
+            return uat_error(sc, lineno, "not a step: '" ++ line ++ "' (the verbs are in uat/README.md)")
+        i = i + 1
+    if sc.title.len() == 0:
+        return uat_error(sc, 1, "a scenario starts with 'scenario: <title>'")
+    sc
+
+// A command line into argv: whitespace-separated, single or double quotes
+// group, a backslash escapes the next character inside double quotes.
+fn uat_split_command(text: &str) -> List[str]:
+    let out: List[str] = []
+    var cur = ""
+    var have = false
+    var quote = 0
+    var i = 0
+    while i < text.len():
+        let c = text[i]
+        if quote != 0:
+            if c == quote:
+                quote = 0
+            else if c == '\\' and quote == '"' and i + 1 < text.len():
+                i = i + 1
+                cur = cur ++ text.slice(i, i + 1)
+            else:
+                cur = cur ++ text.slice(i, i + 1)
+        else if c == '\'' or c == '"':
+            quote = c
+            have = true
+        else if c == ' ' or c == '\t':
+            if have:
+                out.push(cur)
+                cur = ""
+                have = false
+        else:
+            cur = cur ++ text.slice(i, i + 1)
+            have = true
+        i = i + 1
+    if have: out.push(cur)
+    out
+
+fn uat_argv_blob(items: &List[str]) -> str:
+    var out = ""
+    for item in items:
+        out = out ++ item ++ "\0"
+    out
+
+// ── host probes (`requires:`) ─────────────────────────────────────────────
+
+fn uat_host_platform() -> str:
+    let name = target_spec_os()
+    if name == "Macos": return "darwin"
+    if name == "Linux": return "linux"
+    if name == "Windows": return "windows"
+    name
+
+// #1166: a `platforms:` entry is an OS (darwin, linux, windows), an
+// architecture (aarch64, x86_64), or an os-arch pair (linux-x86_64) —
+// the test gates' forms (#795), so a scenario can say the one host
+// combination it cannot run on without giving up the OS everywhere.
+// 1 = host matches, 0 = host does not match, -1 = unknown value.
+fn uat_platform_is_os(value: &str) -> bool:
+    value == "windows" or value == "linux" or value == "darwin"
+
+fn uat_platform_is_arch(value: &str) -> bool:
+    value == "aarch64" or value == "arm64" or value == "x86_64" or value == "amd64" or value == "x64"
+
+fn uat_platform_arch_matches(required: &str, host: &str) -> bool:
+    let req_arm = required == "aarch64" or required == "arm64"
+    let host_arm = host == "aarch64" or host == "arm64"
+    if req_arm or host_arm: return req_arm and host_arm
+    let req_x64 = required == "x86_64" or required == "amd64" or required == "x64"
+    let host_x64 = host == "x86_64" or host == "amd64" or host == "x64"
+    if req_x64 or host_x64: return req_x64 and host_x64
+    required == host
+
+fn uat_platform_matches(value: &str) -> i32:
+    if uat_platform_is_os(value):
+        return (uat_host_platform() == value) as i32
+    if uat_platform_is_arch(value):
+        return (uat_platform_arch_matches(value, target_spec_arch())) as i32
+    var dash = -1
+    var i = 0
+    while i < value.len():
+        if value[i] == 45:
+            dash = i
+            break
+        i = i + 1
+    if dash > 0:
+        let os_part = value.slice(0, dash as i64)
+        let arch_part = value.slice((dash + 1) as i64, value.len())
+        if uat_platform_is_os(os_part) and uat_platform_is_arch(arch_part):
+            let m = uat_host_platform() == os_part and uat_platform_arch_matches(arch_part, target_spec_arch())
+            return (m) as i32
+    -1
+
+fn uat_probe_capture(argv: &List[str], scratch: &str) -> i32:
+    with_fs_mkdir_p(scratch)
+    with_exec_argv_capture_cwd(uat_argv_blob(argv), scratch ++ "/probe.stdout", scratch ++ "/probe.stderr", 20000, ".")
+
+// Whether the console session's screen is locked: `ioreg` (in the base
+// system) prints the session dictionary with `"CGSSessionScreenIsLocked"=Yes`.
+fn uat_darwin_screen_locked(scratch: &str) -> bool:
+    let argv: List[str] = []
+    argv.push("/usr/sbin/ioreg")
+    argv.push("-n")
+    argv.push("Root")
+    argv.push("-d1")
+    if uat_probe_capture(argv, scratch) != 0: return false
+    uat_read_text(scratch ++ "/probe.stdout").contains("\"CGSSessionScreenIsLocked\"=Yes")
+
+// "" when the requirement is met, else the reason the scenario skips.
+fn uat_unmet(req: &str, scratch: &str) -> str:
+    if req == "network":
+        if env("WITH_UAT_OFFLINE").len() > 0: return "requires network: WITH_UAT_OFFLINE is set"
+        return ""
+    if req == "display" or req == "opengl":
+        if env("WITH_UAT_NO_DISPLAY").len() > 0: return "requires " ++ req ++ ": WITH_UAT_NO_DISPLAY is set"
+        let host = uat_host_platform()
+        if host == "linux" and env("DISPLAY").len() == 0 and env("WAYLAND_DISPLAY").len() == 0: return "requires " ++ req ++ ": none"
+        if host == "darwin" and env("SSH_CONNECTION").len() > 0: return "requires " ++ req ++ ": none (ssh session)"
+        // Windows: an ssh session runs in session 0, which has no desktop;
+        // with nobody logged on the console there is no monitor either, and
+        // GLFW fails to initialize its platform (v0.16.0.1 Windows leg).
+        if host == "windows" and env("SSH_CONNECTION").len() > 0: return "requires " ++ req ++ ": none (ssh session)"
+        // A locked session has a display online and no window can open on
+        // it: GLFW finds no monitor and the scenario failed red, with the
+        // compiler blameless (2026-10-05 battery). The session's own record
+        // says so.
+        if host == "darwin" and uat_darwin_screen_locked(scratch): return "requires " ++ req ++ ": the screen is locked"
+        return ""
+    if req.starts_with("lib "):
+        let name = req.slice(4, req.len()).trim().to_owned()
+        let argv: List[str] = []
+        argv.push("pkg-config")
+        argv.push("--exists")
+        argv.push(name)
+        if uat_probe_capture(argv, scratch) == 0: return ""
+        for dir in ["/usr/include", "/usr/local/include", "/opt/homebrew/include"]:
+            if with_fs_file_exists(dir ++ "/" ++ name ++ ".h") != 0 or with_fs_file_exists(dir ++ "/" ++ name ++ "/" ++ name ++ ".h") != 0: return ""
+        return "requires lib " ++ name ++ ": not found"
+    if req.starts_with("tool "):
+        let name = req.slice(5, req.len()).trim().to_owned()
+        let argv: List[str] = []
+        argv.push(if uat_host_platform() == "windows": "where" else: "which")
+        argv.push(name)
+        if uat_probe_capture(argv, scratch) == 0: return ""
+        return "requires tool " ++ name ++ ": not on PATH"
+    if req.starts_with("env "):
+        let name = req.slice(4, req.len()).trim().to_owned()
+        if env(name).len() > 0: return ""
+        return "requires env " ++ name ++ ": unset"
+    "unknown requirement '" ++ req ++ "'"
+
+fn uat_skip_reason(sc: &UatScenario, scratch: &str) -> str:
+    if sc.platforms.len() > 0:
+        let host = uat_host_platform() ++ "-" ++ target_spec_arch()
+        var listed = false
+        for i in 0..sc.platforms.len():
+            let m = uat_platform_matches(sc.platforms[i])
+            if m < 0: return "platforms: unknown platform value '" ++ sc.platforms[i] ++ "' (expected windows|linux|darwin, aarch64|x86_64, or an os-arch pair)"
+            if m == 1: listed = true
+        if not listed: return "platforms: " ++ host ++ " not listed"
+    for i in 0..sc.requires.len():
+        let why = uat_unmet(sc.requires[i], scratch)
+        if why.len() > 0: return why
+    ""
+
+// ── running ──────────────────────────────────────────────────────────────
+
+type UatOutcome {
+    verdict: str,     // "pass", "skip", "FAIL"
+    detail: str,      // the failed step's line, or the skip reason
+    stderr_path: str,
+    steps: isize,
+    human: List[str],
+}
+
+fn uat_join(dir: &str, path: &str) -> str:
+    if runtime_path_is_absolute(path): return path
+    if dir.ends_with("/"): dir ++ path else: dir ++ "/" ++ path
+
+fn uat_dirname(path: &str) -> str:
+    var cut = -1
+    for i in 0..path.len():
+        if path[i] == '/': cut = i as i32
+    if cut <= 0: "." else: path.slice(0, cut)
+
+fn uat_write_text(path: &str, text: &str) -> i32:
+    with_fs_mkdir_p(uat_dirname(path))
+    with_fs_write_file(path, text)
+
+fn uat_read_text(path: &str) -> str: with_fs_read_file(path)
+
+fn uat_fail(steps: isize, step: &UatStep, what: &str, stderr_path: &str, human: List[str]) -> UatOutcome:
+    UatOutcome { verdict: "FAIL", detail: f"step {steps} (line {step.line}): {what}", stderr_path: stderr_path, steps, human }
+
+// The toolchain a `run:` line's leading `with` names: WITH_UAT_WITH, else
+// the running binary.
+fn uat_exe_suffix_for(executable: bool, path: &str): if executable and uat_host_platform() == "windows" and not path.ends_with(".exe"): ".exe" else: ""
+
+fn uat_toolchain(self_path: &str) -> str:
+    let override = env("WITH_UAT_WITH")
+    if override.len() > 0: override else: self_path
+
+// A scenario that writes a file before any `new directory` writes it into
+// the project itself. What it created there is removed when it ends (unless
+// `--keep`): a run leaves the project as it found it. A file that was there
+// before the run is the project's and stays.
+fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
+    let created: List[str] = []
+    for si in 0..sc.steps.len():
+        let verb = sc.steps[si].verb
+        if verb == UAT_NEW_DIRECTORY: break
+        if verb != UAT_WRITE_FROM and verb != UAT_WRITE_INLINE: continue
+        let path = uat_join(root, sc.steps[si].a)
+        if with_fs_file_exists(path) == 0: created.push(path)
+    let outcome = uat_run_steps(sc, root, self_path, keep)
+    if not keep:
+        for path in created:
+            with_fs_remove_file(path)
+    outcome
+
+fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
+    let human: List[str] = []
+    let capture_dir = uat_join(root, "out/uat/" ++ sc.name)
+    with_fs_mkdir_p(capture_dir)
+    var cwd = root
+    var temp_dir = ""
+    var stdin_text = ""
+    var have_stdin = false
+    var last = UatRun { rc: 0, stdout: "", stderr: "", label: "" }
+    var have_run = false
+    var steps = 0
+    for si in 0..sc.steps.len():
+        let step = &sc.steps[si]
+        steps = steps + 1
+        let verb = step.verb
+        if verb == UAT_NEW_DIRECTORY:
+            temp_dir = uat_join(capture_dir, "tmp")
+            with_fs_remove_tree(temp_dir)
+            if with_fs_mkdir_p(temp_dir) != 0: return uat_fail(steps, step, "could not create " ++ temp_dir, "", human)
+            cwd = temp_dir
+        else if verb == UAT_RUN or verb == UAT_RUN_FAILS:
+            let argv = uat_split_command(step.a)
+            if argv.len() == 0: return uat_fail(steps, step, "empty command", "", human)
+            if argv[0] == "with": argv[0] = uat_toolchain(self_path)
+            // `./bin/with` names a file of the scenario directory. Windows resolves
+            // a relative program against the runner, and wants the `.exe`.
+            else if uat_host_platform() == "windows" and argv[0].starts_with("./"): argv[0] = uat_join(cwd, argv[0].slice(2, argv[0].len())) ++ uat_exe_suffix_for(true, argv[0])
+            let label = f"step-{steps}"
+            let stdout_path = uat_join(capture_dir, label ++ ".stdout")
+            let stderr_path = uat_join(capture_dir, label ++ ".stderr")
+            var rc: i32 = 0
+            if have_stdin:
+                if cwd != root:
+                    return uat_fail(steps, step, "'stdin:' cannot follow 'new directory' yet: the runtime has no capture-with-input-and-cwd seam; put the stdin step before 'new directory'", "", human)
+                let stdin_path = uat_join(capture_dir, label ++ ".stdin")
+                if uat_write_text(stdin_path, stdin_text) != 0: return uat_fail(steps, step, "could not write " ++ stdin_path, "", human)
+                rc = with_exec_argv_capture_input(uat_argv_blob(argv), stdout_path, stderr_path, UAT_RUN_TIMEOUT_MS, stdin_path)
+                have_stdin = false
+                stdin_text = ""
+            else:
+                rc = with_exec_argv_capture_cwd(uat_argv_blob(argv), stdout_path, stderr_path, UAT_RUN_TIMEOUT_MS, cwd)
+            last = UatRun { rc, stdout: uat_read_text(stdout_path), stderr: uat_read_text(stderr_path), label: label }
+            have_run = true
+            if verb == UAT_RUN and rc != 0:
+                return uat_fail(steps, step, "`run: " ++ step.a ++ "`: exit " ++ f"{rc}", stderr_path, human)
+            if verb == UAT_RUN_FAILS and rc == 0:
+                return uat_fail(steps, step, "`run (fails): " ++ step.a ++ "`: exit 0, expected a failure", stderr_path, human)
+        else if verb == UAT_WRITE_FROM:
+            let src = uat_join(root, "uat/fixtures/" ++ step.b)
+            if with_fs_file_exists(src) == 0: return uat_fail(steps, step, "no fixture uat/fixtures/" ++ step.b, "", human)
+            if uat_write_text(uat_join(cwd, step.a), uat_read_text(src)) != 0: return uat_fail(steps, step, "could not write " ++ step.a, "", human)
+        else if verb == UAT_WRITE_INLINE:
+            if uat_write_text(uat_join(cwd, step.a), step.b) != 0: return uat_fail(steps, step, "could not write " ++ step.a, "", human)
+        else if verb == UAT_COPY:
+            // `copy $NAME to <path>`: the file the environment variable names.
+            // `copy with to <path>`: the toolchain itself, made executable —
+            // an install layout's `bin/with`.
+            let src = if step.a == "with": uat_toolchain(self_path) else if step.a.starts_with("$"): uat_join(root, env(step.a.slice(1, step.a.len()))) else: uat_join(root, step.a)
+            if with_fs_file_exists(src) == 0: return uat_fail(steps, step, "nothing to copy at " ++ step.a, "", human)
+            // On Windows an executable is named `.exe`: `bin/with` is `bin/with.exe`.
+            let dst = uat_join(cwd, step.b) ++ uat_exe_suffix_for(step.a == "with", step.b)
+            if uat_write_text(dst, uat_read_text(src)) != 0: return uat_fail(steps, step, "could not write " ++ step.b, "", human)
+            if step.a == "with" and with_fs_chmod(dst, 493) != 0: return uat_fail(steps, step, "could not make " ++ step.b ++ " executable", "", human)
+        else if verb == UAT_ENV:
+            if set_env(step.a, step.b) != 0: return uat_fail(steps, step, "could not set " ++ step.a, "", human)
+        else if verb == UAT_STDIN:
+            stdin_text = step.a
+            have_stdin = true
+        else if verb == UAT_EXPECT_HUMAN:
+            human.push(step.a)
+        else:
+            if not have_run and verb != UAT_EXPECT_FILE_EXISTS and verb != UAT_EXPECT_FILE_CONTAINS: return uat_fail(steps, step, "an 'expect' needs a 'run:' before it", "", human)
+            let err_path = if have_run: uat_join(capture_dir, last.label ++ ".stderr") else: ""
+            if verb == UAT_EXPECT_EXIT:
+                let (_, want) = uat_parse_int(step.a)
+                if last.rc as i64 != want: return uat_fail(steps, step, f"exit {last.rc}, expected {want}", err_path, human)
+            else if verb == UAT_EXPECT_STDOUT:
+                let actual = uat_trim_trailing_line_endings(last.stdout)
+                if actual != step.a: return uat_fail(steps, step, "stdout was '" ++ actual ++ "', expected '" ++ step.a ++ "'", err_path, human)
+            else if verb == UAT_EXPECT_STDOUT_CONTAINS:
+                if not last.stdout.contains(step.a): return uat_fail(steps, step, "stdout did not contain '" ++ step.a ++ "'", err_path, human)
+            else if verb == UAT_EXPECT_STDERR_CONTAINS:
+                if not last.stderr.contains(step.a): return uat_fail(steps, step, "stderr did not contain '" ++ step.a ++ "'", err_path, human)
+            else if verb == UAT_EXPECT_FILE_EXISTS:
+                if with_fs_file_exists(uat_join(cwd, step.a)) == 0: return uat_fail(steps, step, "no file " ++ step.a, err_path, human)
+            else if verb == UAT_EXPECT_FILE_CONTAINS:
+                let p = uat_join(cwd, step.a)
+                if with_fs_file_exists(p) == 0: return uat_fail(steps, step, "no file " ++ step.a, err_path, human)
+                if not uat_read_text(p).contains(step.b): return uat_fail(steps, step, step.a ++ " did not contain '" ++ step.b ++ "'", err_path, human)
+    if temp_dir.len() > 0 and not keep:
+        with_fs_remove_tree(temp_dir)
+    UatOutcome { verdict: "pass", detail: "", stderr_path: "", steps, human }
+
+// ── the command ──────────────────────────────────────────────────────────
+
+fn uat_dots(name: &str) -> str:
+    var out = "uat: " ++ name ++ " "
+    while out.len() < 50: out = out ++ "."
+    out ++ " "
+
+// A relative path made absolute against the shell's PWD: a scenario's
+// `new directory` changes the cwd its commands run in, and the project
+// root and a relative toolchain path must survive that. Without PWD it
+// stays as it is.
+fn uat_abs(path: &str) -> str:
+    if runtime_path_is_absolute(path): return path
+    let pwd = runtime_cwd()
+    if pwd.len() == 0: return path
+    if path == ".": pwd else: pwd ++ "/" ++ path
+
+fn uat_project_root() -> str:
+    // The project is the current directory (as `with test` and `with init`
+    // take it); scenarios live in its `uat/`.
+    uat_abs(".")
+
+fn uat_list_scenarios(root: &str) -> List[str]:
+    let out: List[str] = []
+    let listing = with_fs_list_files(uat_join(root, "uat"))
+    for line in listing.split("\n"):
+        let p = line.trim()
+        if p.ends_with(".uat") and not p.contains("/fixtures/"): out.push(p)
+    uat_sort_strings(out)
+
+fn run_uat_command(argv: &List[str]) -> i32:
+    var list_only = false
+    var keep = false
+    // `--strict` (the battery's mode): a scenario this host is listed for
+    // and cannot run is BLOCKED, and the run fails. A scenario that is not
+    // for this platform is still a skip.
+    var strict = false
+    var wanted = ""
+    for i in 2..argv.len():
+        let a = argv[i]
+        if a == "--list": list_only = true
+        else if a == "--keep": keep = true
+        else if a == "--strict": strict = true
+        else if a == "--help" or a == "-h":
+            print("usage: with uat [<scenario>] [--list] [--keep] [--strict]\n  runs the project's acceptance scenarios (uat/*.uat, spec §18.5d);\n  WITH_UAT_WITH=<path> names the toolchain a scenario's `with` runs")
+            return 0
+        else if a.starts_with("-"):
+            eprint("error: unknown option '" ++ a ++ "' (with uat [<scenario>] [--list] [--keep] [--strict])")
+            return 2
+        else if wanted.len() == 0: wanted = a
+        else:
+            eprint("error: one scenario name at most")
+            return 2
+    let root = uat_project_root()
+    // A scenario's `with get` reads this checkout's package registry
+    // (registry/c/<name>/facts.with, D136) rather than the repository's main:
+    // the battery proves the tree, its facts included. `WITH_REGISTRY` set
+    // by the caller stands.
+    if env("WITH_REGISTRY").len() == 0 and with_fs_file_exists(uat_join(root, "registry/README.md")) != 0: set_env("WITH_REGISTRY", "file://" ++ root)
+    let paths = uat_list_scenarios(root)
+    if paths.len() == 0:
+        eprint("error: no scenarios: uat/*.uat is empty or missing (with init writes uat/hello.uat)")
+        return 1
+    let scratch = uat_join(root, "out/uat/.probe")
+    var pass = 0
+    var skip = 0
+    var fail = 0
+    var found = false
+    var human_all = ""
+    for path in paths:
+        // Reported paths are the project's own (`uat/<name>.uat`).
+        let shown = if path.starts_with(root ++ "/"): path.slice(root.len() + 1, path.len()) else: path
+        let sc = uat_parse(shown, uat_read_text(path))
+        if wanted.len() > 0 and sc.name != wanted: continue
+        found = true
+        if sc.problem.len() > 0:
+            print(uat_dots(sc.name) ++ "FAIL  " ++ sc.problem)
+            fail = fail + 1
+            continue
+        let why = uat_skip_reason(sc, scratch)
+        if list_only:
+            var reqs = ""
+            for ri in 0..sc.requires.len(): reqs = reqs ++ (if ri > 0: ", " else: "") ++ sc.requires[ri]
+            var plats = ""
+            for qi in 0..sc.platforms.len(): plats = plats ++ (if qi > 0: ", " else: "") ++ sc.platforms[qi]
+            let applies = if why.len() == 0: "applies here" else: "skip (" ++ why ++ ")"
+            print(uat_dots(sc.name) ++ applies ++ (if reqs.len() > 0: "  requires: " ++ reqs else: "") ++ (if plats.len() > 0: "  platforms: " ++ plats else: ""))
+            continue
+        if why.len() > 0:
+            if strict and (not why.starts_with("platforms: ") or why.starts_with("platforms: unknown")):
+                print(uat_dots(sc.name) ++ "BLOCKED  (" ++ why ++ ")")
+                fail = fail + 1
+                continue
+            print(uat_dots(sc.name) ++ "skip  (" ++ why ++ ")")
+            skip = skip + 1
+            continue
+        let started = now_ns()
+        let self_path = if argv[0].contains("/"): uat_abs(argv[0]) else: argv[0]
+        let outcome = uat_run_scenario(sc, root, self_path, keep)
+        let ms = (now_ns() - started) / 1000000
+        if outcome.verdict == "pass":
+            print(uat_dots(sc.name) ++ f"pass  ({outcome.steps} steps, {ms / 1000}.{(ms % 1000) / 100}s)")
+            pass = pass + 1
+        else:
+            print(uat_dots(sc.name) ++ "FAIL  " ++ outcome.detail)
+            if outcome.stderr_path.len() > 0:
+                let tail = uat_trim_trailing_line_endings(uat_read_text(outcome.stderr_path))
+                if tail.len() > 0:
+                    var last_line = ""
+                    for l in tail.split("\n"): last_line = l
+                    let shown_err = if outcome.stderr_path.starts_with(root ++ "/"): outcome.stderr_path.slice(root.len() + 1, outcome.stderr_path.len()) else: outcome.stderr_path
+                    print("        stderr: " ++ last_line ++ "  (" ++ shown_err ++ ")")
+            fail = fail + 1
+        for hi in 0..outcome.human.len():
+            human_all = human_all ++ "  " ++ sc.name ++ ": " ++ outcome.human[hi] ++ "\n"
+    if not found:
+        eprint("error: no scenario named '" ++ wanted ++ "' in uat/")
+        return 1
+    if list_only: return 0
+    var human_count = 0
+    for l in human_all.split("\n"):
+        if l.len() > 0: human_count = human_count + 1
+    let total = pass + skip + fail
+    var summary = f"uat: {total} scenario" ++ (if total == 1: "" else: "s") ++ f": {pass} pass"
+    if skip > 0: summary = summary ++ f", {skip} skip"
+    if fail > 0: summary = summary ++ f", {fail} FAIL"
+    if human_count > 0: summary = summary ++ f"; {human_count} human check" ++ (if human_count == 1: "" else: "s") ++ " recorded"
+    print(summary)
+    if human_count > 0:
+        print("human checks for this host:")
+        print(uat_trim_trailing_line_endings(human_all))
+        uat_write_text(uat_join(root, "out/uat/human-checks.txt"), human_all)
+    (fail > 0) as i32

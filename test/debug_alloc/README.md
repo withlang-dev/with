@@ -10,7 +10,7 @@ to select the leak view for that test. Run the lane with:
 with build :debug-alloc-tests
 ```
 
-(which builds `tools/debug_drop.w` and runs it in `check` mode over this corpus).
+(which builds `tools/debug_drop.with` and runs it in `check` mode over this corpus).
 
 The directives are now soundness gates for #607's inline-drop field ownership
 work. Inline-drop fields must be freed exactly once in every covered

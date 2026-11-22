@@ -15,7 +15,7 @@ allocated where, freed where, freed again where, or never freed.
 
 The With runtime is a **custom slab allocator**: it `rt_mmap`s anonymous pages once and
 hands out size-classed sub-blocks from inside them (`rt_alloc` / `free_small_block` in
-`rt/rt_core.w`). It never calls libc `malloc`/`free`.
+`rt/rt_core.with`). It never calls libc `malloc`/`free`.
 
 ASan derives its power from interposing libc `malloc`/`free` and redzoning each allocation
 in shadow memory. To ASan, our whole mmap region is **one opaque blob** — it cannot see the
@@ -70,7 +70,7 @@ this.
 
 ## Architecture: detection in-process, origin tags in reports
 
-All additive to `rt/rt_core.w`; pure `.w`.
+All additive to `rt/rt_core.with`; pure `.w`.
 
 > **Why no in-process backtraces.** The original design captured alloc/free backtraces by
 > walking the frame-pointer chain (read `x29` via inline asm, follow `*(fp)` / `*(fp+8)`).
@@ -159,7 +159,7 @@ are independent axes.
 
 ## Allocation request tracing
 
-`with run --trace-alloc program.w` writes one record to stderr for each runtime
+`with run --trace-alloc program.with` writes one record to stderr for each runtime
 allocation request. For an already-built binary, set `WITH_DEBUG_ALLOC_TRACE=1`.
 The record format is `ALLOC <requested bytes> <payload address> <origin token>`.
 Tracing is off by default and independent of `--debug-alloc`; both can be enabled
@@ -170,20 +170,20 @@ This counts requests even when their storage is freed before the measured
 operation returns. It therefore detects temporary allocation costs that a leak
 report or a reserved-byte counter misses. Bracket the operation with stderr
 markers and count the records between them; include an empty span and a known
-allocating control. `test/complexity/stdlib.w` does this for HashMap deletion
+allocating control. `test/complexity/stdlib.with` does this for HashMap deletion
 (#939). Run tracing separately from timing measurements: writing the records
 changes execution time.
 
 ## Harness driver
 
-`tools/debug_drop.w` (pure `.w`, no shell script): runs a repro or fixture corpus under the
+`tools/debug_drop.with` (pure `.w`, no shell script): runs a repro or fixture corpus under the
 debug allocator and parses the ledger/abort/leak output into a verdict. The
 `:debug-alloc-tests` target builds it to `out/debug-alloc-tests/debug_drop` and runs it in
 `check` mode over the committed corpus. For one-off repros:
 
 ```sh
-./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
-out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
+./out/release/bin/with build tools/debug_drop.with -o out/debug-alloc-tests/debug_drop
+out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.with
 ```
 
 Source sites are resolved separately with lldb command files (the lldb on the dev box has
@@ -213,7 +213,7 @@ suppressing ordinary leaks. `da_pod_vec` intentionally remains `leak count=1` fo
   exits via `rt_exit`/panic skip the report.
 - **Ledger overflows at scale.** The per-allocation ledger is fixed-size and overflows on
   large compilations (`debug-alloc: ledger full, tracking truncated` — millions of
-  allocations, e.g. `with check src/main.w`). Past that point the leak report is truncated,
+  allocations, e.g. `with check src/main.with`). Past that point the leak report is truncated,
   so the debug allocator cannot profile whole-compiler *allocation volume*. Use the
   committed-bytes technique below for that; a bounded call-site profiler is tracked in #618.
 
@@ -222,7 +222,7 @@ suppressing ordinary leaks. `da_pod_vec` intentionally remains `leak count=1` fo
 When you need *how much* memory a phase allocates (not double-free/leak verdicts), and the
 ledger overflows, bracket the phase with the committed-byte counter instead:
 
-- `with_alloc_committed_bytes()` (`rt/rt_core.w`) returns the current committed (reserved)
+- `with_alloc_committed_bytes()` (`rt/rt_core.with`) returns the current committed (reserved)
   byte count — mmap reserve/release for large allocations plus slab-page growth, so it
   tracks real RSS growth.
 - Read it before and after each sub-step of the suspect phase, accumulate the deltas into
@@ -232,7 +232,7 @@ ledger overflows, bracket the phase with the committed-byte counter instead:
 
 This is how the comptime source-text deep-clone leak (`Sema.prepare_comptime_eval_copy`
 was deep-cloning the full ~8.5 MB source text on every comptime eval — ~2 GB across ~239
-evals; `check src/main.w` 4.76 GB → 2.51 GB) was localized, after the debug allocator and
+evals; `check src/main.with` 4.76 GB → 2.51 GB) was localized, after the debug allocator and
 disable-and-remeasure both proved inadequate. It only localizes to a manually chosen phase;
 #618 is the reusable call-site version.
 

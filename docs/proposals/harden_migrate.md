@@ -83,7 +83,7 @@ nobody edits.
 ## Engine ruling (unchanged from v1)
 
 Zero library-specific special cases in the engine
-(`src/CImport.w`, `src/CiMigrate.w`, `src/CiIR.w`, `src/CiPrint.w`).
+(`src/CImport.with`, `src/CiMigrate.with`, `src/CiIR.with`, `src/CiPrint.with`).
 Per-library policy lives in the library's **recipe** (see below). The fix
 for a special case is the general mechanism it papered over.
 
@@ -92,12 +92,12 @@ never a code condition; no phase may grow the list:
 
 ```
 grep -in "pcre2\|raylib\|cliteral\|sljit\|zlib\|adler\|deflate" \
-  src/CImport.w src/CiMigrate.w src/CiIR.w src/CiPrint.w
+  src/CImport.with src/CiMigrate.with src/CiIR.with src/CiPrint.with
 ```
 
 ## The 40-library process shape: recipes
 
-Each upstream gets a declarative recipe (the `build/pcre2.w` action is
+Each upstream gets a declarative recipe (the `build/pcre2.with` action is
 the prototype; formalize the shape as data, one per library):
 
 - pin: upstream repo + version/commit
@@ -121,9 +121,9 @@ re-migrate + compile + suite).
 Kept from v1, re-grouped by which adopted mechanism deletes each:
 
 **Deleted by (i) canonical types / clang queries:**
-- `ci_type_is_small_int` / `_unsigned_` (CImport.w:~4013-4028):
+- `ci_type_is_small_int` / `_unsigned_` (CImport.with:~4013-4028):
   integer promotion by type-spelling lists incl. `PCRE2_UCHAR8`.
-- `CiPrint.w:~453-466`: scalar-vs-memcpy assignment by
+- `CiPrint.with:~453-466`: scalar-vs-memcpy assignment by
   `starts_with(name, "c_")` — **produces wrong code today** on any
   `c_`-prefixed aggregate typedef; highest severity item in this doc.
 - `CT_NAMED(spelling)` leaves (~6285), `type_from_translated_text`
@@ -138,7 +138,7 @@ Kept from v1, re-grouped by which adopted mechanism deletes each:
   cascade (~8595-8625), stringify/paste machinery (~13164-13443), the
   hand-rolled re-expander (~13100), `ci_string_text_contains_macro_like_ident`
   ALL-CAPS heuristic (~13228).
-- Width-slice entirely (CiMigrate.w:~34-56, incl. the `_16`/`_32`
+- Width-slice entirely (CiMigrate.with:~34-56, incl. the `_16`/`_32`
   suffix prune that would silently delete `sha_256`/`crc_32`-style
   identifiers in other codebases) → recipe-level -D selection.
 - Macro-expression translation limits (variadic/statement-macro bails)
@@ -146,16 +146,16 @@ Kept from v1, re-grouped by which adopted mechanism deletes each:
 
 **Deleted by recipe extraction:**
 - `lower_cfprintf_effect_ir` + dispatch + value-position rejection
-  (CImport.w:~5923-5980, ~6083, ~10141): pcre2test's helper hand-lowered
+  (CImport.with:~5923-5980, ~6083, ~10141): pcre2test's helper hand-lowered
   in the engine → pcre2 recipe's forced-include shim, or loud failure.
 - `CLITERAL` name matches (~550, ~2828 — raylib!) → same treatment.
 - `std.re` destination-prefix sniffing for unsafe/unreachable semantics
-  (CiMigrate.w:~139; CImport.w:~3726, ~8959, ~15634) → explicit
+  (CiMigrate.with:~139; CImport.with:~3726, ~8959, ~15634) → explicit
   `--modeled-zone` flag in the recipe.
 - `ci_migrate_pcre2_order_rank` 32-entry filename table
-  (CiMigrate.w:~1199-1260) → dies with order-independent dedup (below),
+  (CiMigrate.with:~1199-1260) → dies with order-independent dedup (below),
   not by moving the table.
-- `defs.w` header hardcoding "PCRE2" (~462) → use the prefix.
+- `defs.with` header hardcoding "PCRE2" (~462) → use the prefix.
 
 **Independent structural fixes:**
 - Order-independent shared-defs dedup: collect per key, merge with
@@ -163,7 +163,7 @@ Kept from v1, re-grouped by which adopted mechanism deletes each:
   `upgrade_opaque_type` string hack at ~163 structural), then emit.
   Removes the ordering requirement entirely.
 - `normalize_output`'s global `"-> void"`→`"-> Unit"` text replace
-  (CiMigrate.w:~400-406) rewrites string literals too → fix emission
+  (CiMigrate.with:~400-406) rewrites string literals too → fix emission
   sites, delete the replace.
 - The >512-element initializer cliff (~11269): one path, or verify the
   text path against the AST and bail on mismatch.
@@ -176,7 +176,7 @@ Kept from v1, re-grouped by which adopted mechanism deletes each:
 | Phase | Contents | Proof |
 |---|---|---|
 | 1 | Bridge enrichment + canonical types end-to-end (mechanism i). Kills the promotion lists, the `c_` memcpy bug, the text prostheses. | battery + typedef/`c_`-aggregate fixtures |
-| 2 | Order-independent dedup; delete the pcre2 rank table. | battery; pcre2 defs.w semantically identical |
+| 2 | Order-independent dedup; delete the pcre2 rank table. | battery; pcre2 defs.with semantically identical |
 | 3 | Recipe extraction: `--modeled-zone`, forced-include shims (cfprintf, CLITERAL), recipe files for pcre2 + zlib; delete the engine cases. | battery + grep gate shrinks to comments-only |
 | 4 | Post-expansion migration (mechanism ii): delete recovery machinery + width-slice; pcre2 recipe switches to -D width selection. One-time large regeneration diff, reviewed. | battery; migrated suites green; engine line count drops |
 | 5 | Decl layer through CiIR; remaining loud-not-guess fixes. | battery + decl round-trip coverage |
@@ -195,7 +195,7 @@ plus the grep gate.
   is the pattern); Phase 1 must kill second derivations it finds.
 - The B11 `LEGACY` comments (~14390-14419) are fossils; the legacy
   fallback is gone and body failure is already loud and fatal
-  (CiMigrate.w:~1614). Loud-and-stop stays the contract.
+  (CiMigrate.with:~1614). Loud-and-stop stays the contract.
 - Phase 4's regeneration diff is large by construction — review it as
   a semantic diff (suite-verified), not line-by-line; every later bump
   diff gets smaller because of it.

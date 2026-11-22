@@ -81,16 +81,16 @@
 - [x] No unresolved known divergences for these features
 
 ## Conformance Run Notes (2026-03-03)
-- Full source check sweep run over `find src lib -name '*.w'`:
+- Full source check sweep run over `find src lib -name '*.with'`:
 - `./with check`: `65` checked, `0` failed.
 - `./with-stage2 check`: `65` checked, `0` failed.
 - Pipeline-style replacements applied in core self-host sources:
-- `lib/std/collections.w`: `slotmap_insert` ID->string transform now uses `|>`.
-- `src/main.w`: deterministic token dump lexeme escaping now uses `|>`.
-- `src/Driver.w` and `src/compiler/Link.w`: linker command execution now uses `|>` in command->system-call transforms.
+- `lib/std/collections.with`: `slotmap_insert` ID->string transform now uses `|>`.
+- `src/main.with`: deterministic token dump lexeme escaping now uses `|>`.
+- `src/Driver.with` and `src/compiler/Link.with`: linker command execution now uses `|>` in command->system-call transforms.
 - Example/test no-shadowing migrations:
-- `examples/service/src/service.w`: renamed post-insert `user` rebinding to `created_user`.
-- `examples/service/src/tests.w`: renamed insert rebinding `user` -> `stored_user`; renamed `with` builder alias `ids` -> `out`.
+- `examples/service/src/service.with`: renamed post-insert `user` rebinding to `created_user`.
+- `examples/service/src/tests.with`: renamed insert rebinding `user` -> `stored_user`; renamed `with` builder alias `ids` -> `out`.
 - Static audit checks for direct self-shadowing patterns in `examples/` and `test/` now return no matches:
   - `let x = { x with ... }`
   - `let x = with ... as mut x:`

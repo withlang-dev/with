@@ -375,7 +375,7 @@ error naming the failed check:
 
 ```
 error[E0801]: task result must be observed
-  --> src/service.w:42:9
+  --> src/service.with:42:9
    |
 42 |     send_invoice(invoice)
    |     ^^^^^^^^^^^^^^^^^^^^^ this task is marked must-observe
@@ -383,7 +383,7 @@ error[E0801]: task result must be observed
    = help: await, cancel, return, store, or otherwise handle the task
 
 error[E0802]: task cannot be detached safely
-  --> src/service.w:51:9
+  --> src/service.with:51:9
    |
 51 |     borrow_until_done(&buffer)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ task captures data owned by this scope
@@ -838,7 +838,7 @@ Cancellation/drop contract for collection combinators:
 - If the combinator itself is cancelled/dropped mid-flight, it
   cancels remaining owned tasks and joins them before unwinding.
 
-See `lib/std/async.w` and `lib/std/async/` docs for API details.
+See `lib/std/async.with` and `lib/std/async/` docs for API details.
 
 *§14.12 Why Fibers, Not State Machines? moved to `docs/spec/implementation/why-fibers.md`.*
 

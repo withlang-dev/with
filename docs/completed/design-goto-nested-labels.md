@@ -37,13 +37,13 @@ reference have no arms (Bug B).
 
 | File | Missing states | Total labels |
 |------|---------------|-------------|
-| pcre2_match.w | 3,10,27,53,59,60,61,64,70,78 | ~88 (incl. L_RM) |
-| pcre2_dfa_match.w | 3,4,6,7,9 | ~11 |
-| pcre2_compile.w | 7,8,9,10,11,12 | 21 |
-| pcre2_study.w | 1,2 | ~4 |
-| pcre2_convert.w | 1,2 | ~3 |
+| pcre2_match.with | 3,10,27,53,59,60,61,64,70,78 | ~88 (incl. L_RM) |
+| pcre2_dfa_match.with | 3,4,6,7,9 | ~11 |
+| pcre2_compile.with | 7,8,9,10,11,12 | 21 |
+| pcre2_study.with | 1,2 | ~4 |
+| pcre2_convert.with | 1,2 | ~3 |
 
-Additionally, in pcre2_match.w: the `switch(Freturn_id)` dispatch
+Additionally, in pcre2_match.with: the `switch(Freturn_id)` dispatch
 table in the RETURN_SWITCH arm is silently dropped (Bug A: the
 default case's `do{}while(0)` fails the no-fallthrough path), and
 ~72 case bodies in the main `switch(Fop)` that contain RMATCH

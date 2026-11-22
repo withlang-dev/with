@@ -13,12 +13,12 @@ Nothing is trusted before the first step.
 a. **The build cache.** A change to any contract input causes a rebuild. A
    changed contract that keeps an old safety verdict is a soundness bug.
    The inputs a build reads: every module it loads through `use`, a fetched
-   package's `contract.w` among them; the project's `with.toml` and each
+   package's `contract.with` among them; the project's `with.toml` and each
    fetched package's `metadata.json`, which decide which package's contract
    applies to an import. A registry facts file is not read by a build:
-   `with get` reads it, writes its clauses into the package's `contract.w`
+   `with get` reads it, writes its clauses into the package's `contract.with`
    and pins its digest in `contract.json`, so a changed facts file reaches a
-   build as a changed `contract.w`.
+   build as a changed `contract.with`.
 b. **The checker sees a callback that arrives through a variadic case.**
    Today `callback_thread` on `curl_easy_setopt` is refused as "takes no
    callback".
@@ -32,7 +32,7 @@ d. **The two default grants removed,** with the claim lines they make
    destroyer named through a function-pointer global, under which libxml2
    needs no `runs no threads` line; and
    `callback_thread registering` on `fn curl_easy_setopt` in
-   `lib/contracts/libcurl.w` on three conditions (its citation says which
+   `lib/contracts/libcurl.with` on three conditions (its citation says which
    thread libcurl invokes the callback on; the contract leaves `Easy`
    `thread creator`; the compose check of section 10, rule 5 exists).
 e. **The recount,** by compiling every published program, to confirm

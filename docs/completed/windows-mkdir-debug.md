@@ -7,7 +7,7 @@ Run 34432173059 retains `windows-test-captures`.
 
 Route: filesystem runtime, minimal `std.fs.mkdir_p` call, native LLDB on
 `fs_mkdir_p_c` and its platform `rt_mkdir` calls. The shared loop at
-`rt/rt_core.w:3467` recognized only byte 47. At byte 92, LLDB observed
+`rt/rt_core.with:3467` recognized only byte 47. At byte 92, LLDB observed
 `w8=0x5c`, PC 0x1000078c8 (`fs_mkdir_p_c+92`); stepping the compare and
 branch reached +64, advancing without creating the parent. The next mkdir
 received `/tmp/with-mkdir-proof/mixed\Windows Kits`, without an intervening

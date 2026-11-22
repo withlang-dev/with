@@ -1,4 +1,4 @@
-*.w linguist-language=With
+*.with linguist-language=With
 bootstrap/** linguist-vendored
 out/** linguist-generated
 
@@ -19,13 +19,13 @@ test/behavior/*.txt text eol=lf
 test/behavior/**/*.txt text eol=lf
 
 # With source is content-hashed cross-platform: docs/with-abi.sha256 records the
-# sha256 of the ABI-defining sources (build/abi.w, docs/spec/abi/with-abi.md §7 / D38), and
+# sha256 of the ABI-defining sources (build/abi.with, docs/spec/abi/with-abi.md §7 / D38), and
 # that hash keys every .wo bundle, so the bytes fed to it must be identical on
 # every platform. Under core.autocrlf=true a Windows checkout rewrites LF to CRLF,
 # which both changes each source's hash (abi-hash-check mismatch) and leaves a
 # trailing "\r" on the record's path column that trips the comptime ToolFs
 # project-root check. Pin LF so the hash is stable and the record parses cleanly.
-*.w text eol=lf
+*.with text eol=lf
 docs/with-abi.sha256 text eol=lf
 
 # .wi interface fixtures (test/bundle_interface/*.wi) are compared byte-for-byte
@@ -37,7 +37,7 @@ docs/with-abi.sha256 text eol=lf
 *.wi text eol=lf
 
 # Contract-view and UAT expectations are compared byte-for-byte as well: each
-# test/contract/*.w's contract view against its .expected file, and the UAT
+# test/contract/*.with's contract view against its .expected file, and the UAT
 # runner's report and listing against test/uat/expected*.txt. Under
 # core.autocrlf=true a native Windows checkout rewrites them to CRLF, so every
 # line carries a "\r" the (LF) output never has, and contract-view-tests and

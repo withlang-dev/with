@@ -178,7 +178,7 @@ int32_t wl_fork_emit(int64_t tm, int64_t m, with_str path, int32_t opt_level) {
 
 ### Phase 2: Module Splitter in With
 
-Add `src/compiler/ParallelEmit.w`:
+Add `src/compiler/ParallelEmit.with`:
 
 ```
 extern fn wl_clone_module(m: i64) -> i64
@@ -231,7 +231,7 @@ fn parallel_emit(tm: i64, module: i64, base_path: str,
 
 ### Phase 3: Backend Integration
 
-Modify `src/compiler/Backend.w` `compile_to_object_backend`:
+Modify `src/compiler/Backend.with` `compile_to_object_backend`:
 
 ```
 // Before:

@@ -3,5 +3,5 @@
 # each and expects it to FAIL; one that passes is the signal to flip its
 # row in test/conformance/conformance.tsv to implemented, delete the spec
 # changelog's NON-COMPLIANT sentence, and move the fixture out of here.
-test/conformance/open_d29_fallback_tier.w
-test/conformance/open_d91_target_os.w
+test/conformance/open_d29_fallback_tier.with
+test/conformance/open_d91_target_os.with

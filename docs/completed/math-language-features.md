@@ -690,7 +690,7 @@ When a function has `@[tailrec]`:
 
 ```
 error: recursive call is not in tail position
-src/foo.w:5:10
+src/foo.with:5:10
 5 |     1 + sum_to(n - 1, acc)
   |         ^^^^^^^^^^^^^^^^^^
   = note: function is annotated @[tailrec]

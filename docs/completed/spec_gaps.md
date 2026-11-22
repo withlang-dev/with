@@ -59,8 +59,8 @@ repeats the lvalue.
 existing `+=`, `-=`, etc.
 
 **Spec change:** §5.3 add wrapping compound assignment.
-~3 lines of spec, ~10 lines of Parser.w, ~5 lines of
-MirLower.w (desugar to read + wrapping_op + write).
+~3 lines of spec, ~10 lines of Parser.with, ~5 lines of
+MirLower.with (desugar to read + wrapping_op + write).
 
 ## 3. Auto-deref for pointer method receivers
 
@@ -89,7 +89,7 @@ raw pointer is unsafe. But with `unsafe fn`, the function body
 is already in an unsafe context, so the deref is permitted.
 
 **Spec change:** §6.2 add auto-deref for pointer field access.
-~5 lines of spec, ~15 lines of Sema.w (check_field_access
+~5 lines of spec, ~15 lines of Sema.with (check_field_access
 inserts deref when base is pointer type).
 
 ## 4. Byte-order builtins
@@ -163,7 +163,7 @@ takes `&mut Self`, the borrow checker should allow it — the
 original borrow is "reborrowed" for the duration of the call.
 
 **Spec change:** §12.3 add reborrowing rule.
-~10 lines of spec, ~30-50 lines in Sema.w borrow checking.
+~10 lines of spec, ~30-50 lines in Sema.with borrow checking.
 
 ## 6. Rotate intrinsic
 
@@ -199,7 +199,7 @@ rotate instructions on all modern architectures.
 | 1 | `unsafe fn` | **Done** — Parser wraps body in NK_UNSAFE_BLOCK |
 | 2 | Compound wrapping assign (`+%=`) | **Done** — Lexer, Parser, Codegen |
 | 3 | Auto-deref pointer fields | **Done** — Sema auto-derefs TY_PTR/TY_REF in check_field_access |
-| 4 | Byte-order builtins | **Done** — `lib/std/crypto/endian.w` has all functions; `swap_bytes()` intrinsic on integer types emits `@llvm.bswap` |
+| 4 | Byte-order builtins | **Done** — `lib/std/crypto/endian.with` has all functions; `swap_bytes()` intrinsic on integer types emits `@llvm.bswap` |
 | 5 | Borrow checker reborrowing | **Done** — Exclusive-to-exclusive reborrowing works (Sema check_borrow_create) |
 | 6 | Rotate intrinsic | **Done** — `rotate_left`/`rotate_right` methods with MIR intrinsics |
 

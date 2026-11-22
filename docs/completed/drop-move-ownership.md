@@ -74,17 +74,17 @@ Internal compiler-owned field transfers: allowed only through the MIR ownership 
 Before implementation resumes, restore the tree to a policy-clean state:
 
 ```text
-restore test/compile_errors/err_move_out_vec_field_let.w
-restore test/compile_errors/err_move_out_vec_field_return.w
-restore test/compile_errors/err_move_out_vec_field_moveself.w
+restore test/compile_errors/err_move_out_vec_field_let.with
+restore test/compile_errors/err_move_out_vec_field_return.with
+restore test/compile_errors/err_move_out_vec_field_moveself.with
 
 delete or shelve:
-  test/behavior/behav_move_out_vec_field_let.w
-  test/behavior/behav_move_out_vec_field_return.w
-  test/behavior/behav_move_out_vec_field_moveself.w
-  test/debug_alloc/da_vecdrop_moveout_let.w
-  test/debug_alloc/da_vecdrop_moveout_return.w
-  test/debug_alloc/da_vecdrop_moveout_moveself.w
+  test/behavior/behav_move_out_vec_field_let.with
+  test/behavior/behav_move_out_vec_field_return.with
+  test/behavior/behav_move_out_vec_field_moveself.with
+  test/debug_alloc/da_vecdrop_moveout_let.with
+  test/debug_alloc/da_vecdrop_moveout_return.with
+  test/debug_alloc/da_vecdrop_moveout_moveself.with
 ```
 
 Also revert or isolate the generator-state clear edit unless it is separately proven. The previous evidence showed it did **not** fix the channel double-free; the path-sensitivity fix did.
@@ -563,8 +563,8 @@ were zero `origin=channel` leaks, which proves `Sender`/`Receiver` `Drop` alread
 the handle and buffer. The blocks were not truly leaked: `with_runtime_core_shutdown`
 recycles every fiber and calls `free_fiber_pool`, but `with_runtime_shutdown` ran the
 debug-alloc ledger walk *before* that teardown, so the still-pooled blocks were reported
-as leaks. Fix: report leaks *after* `with_runtime_core_shutdown` (`rt/fiber_runtime.w`).
-`behav_channel_bounded` now reports `leak count=0`, and `test/debug_alloc/da_channel_task_fiber.w`
+as leaks. Fix: report leaks *after* `with_runtime_core_shutdown` (`rt/fiber_runtime.with`).
+`behav_channel_bounded` now reports `leak count=0`, and `test/debug_alloc/da_channel_task_fiber.with`
 pins it as a deterministic oracle.
 
 ---
@@ -649,9 +649,9 @@ moving a drop-needing field out of an aggregate is rejected
 Then these should remain compile-error tests:
 
 ```text
-test/compile_errors/err_move_out_vec_field_let.w
-test/compile_errors/err_move_out_vec_field_return.w
-test/compile_errors/err_move_out_vec_field_moveself.w
+test/compile_errors/err_move_out_vec_field_let.with
+test/compile_errors/err_move_out_vec_field_return.with
+test/compile_errors/err_move_out_vec_field_moveself.with
 ```
 
 Sema must reject user-visible expressions like:
@@ -705,7 +705,7 @@ verify git diff contains only intended substrate files
 Gates:
 
 ```text
-with check src/main.w
+with check src/main.with
 known baseline tests, or document current reds exactly
 ```
 
@@ -772,7 +772,7 @@ no raw "0" vs 0 mismatch in partial-drop synthesized places
 Gate:
 
 ```text
-with check src/main.w
+with check src/main.with
 with build
 ```
 
@@ -825,12 +825,12 @@ struct, tuple, array, enum, and `Vec[T]` drop glue from those sema types. The
 debug-alloc corpus now includes allocation-owning `Drop` elements in:
 
 ```text
-test/debug_alloc/da_vecdrop_struct_field_owned_elements.w
-test/debug_alloc/da_vecdrop_tuple_field.w
-test/debug_alloc/da_drop_array_field.w
-test/debug_alloc/da_vecdrop_nested_struct_field.w
-test/debug_alloc/da_vecdrop_enum_payload.w
-test/debug_alloc/da_vecdrop_option_payload.w
+test/debug_alloc/da_vecdrop_struct_field_owned_elements.with
+test/debug_alloc/da_vecdrop_tuple_field.with
+test/debug_alloc/da_drop_array_field.with
+test/debug_alloc/da_vecdrop_nested_struct_field.with
+test/debug_alloc/da_vecdrop_enum_payload.with
+test/debug_alloc/da_vecdrop_option_payload.with
 ```
 
 These cover struct fields, tuple elements, fixed-array fields, nested struct
@@ -880,7 +880,7 @@ field receiver chain remains valid under chosen semantics
 Gates:
 
 ```text
-with check src/main.w
+with check src/main.with
 with build
 focused debug-alloc fixtures
 ```
@@ -894,14 +894,14 @@ aggregate fields at cleanup.
 Additional debug-alloc coverage added:
 
 ```text
-test/debug_alloc/da_vecdrop_field_reassign_owned_elements.w
-test/debug_alloc/da_drop_tuple_field_reassign_owned_elements.w
-test/debug_alloc/da_vecdrop_moved_var_reassign.w
+test/debug_alloc/da_vecdrop_field_reassign_owned_elements.with
+test/debug_alloc/da_drop_tuple_field_reassign_owned_elements.with
+test/debug_alloc/da_vecdrop_moved_var_reassign.with
 ```
 
 These force straight-line reassignment to free old contents and later drop the
 replacement contents exactly once. The `:debug-alloc-tests` build target now
-declares `tools/debug_drop.w` and `test/debug_alloc` as inputs, so adding or
+declares `tools/debug_drop.with` and `test/debug_alloc` as inputs, so adding or
 editing fixtures invalidates the cached lane. Verified with
 `with build :debug-alloc-tests`.
 
@@ -972,8 +972,8 @@ early-return/fallthrough paths through a tuple partial move have allocator
 coverage:
 
 ```text
-test/debug_alloc/da_drop_tuple_field_extract_early_return.w
-test/debug_alloc/da_drop_tuple_field_extract_defer_return.w
+test/debug_alloc/da_drop_tuple_field_extract_early_return.with
+test/debug_alloc/da_drop_tuple_field_extract_defer_return.with
 ```
 
 These run both the early-return path, where only `pair.0` has moved, and the
@@ -981,9 +981,9 @@ fallthrough path, where both tuple fields have moved. The second fixture keeps a
 active `defer` in the cleanup path. Existing channel tuple coverage remains in:
 
 ```text
-test/behavior/behav_channel_bounded.w
-test/behavior/behav_channel_close.w
-test/behavior/behav_channel_basic.w
+test/behavior/behav_channel_bounded.with
+test/behavior/behav_channel_close.with
+test/behavior/behav_channel_basic.with
 ```
 
 Verified with `with build :debug-alloc-tests` and focused channel behavior runs.
@@ -1015,12 +1015,12 @@ let moved = h.items is a user-visible field move.
 Tests:
 
 ```text
-err_move_out_vec_field_let.w
-err_move_out_vec_field_return.w
-err_move_out_vec_field_explicit_return.w
-err_move_out_vec_field_moveself.w
-err_use_after_move_struct_field.w
-err_use_after_move_vec_into_struct_field.w
+err_move_out_vec_field_let.with
+err_move_out_vec_field_return.with
+err_move_out_vec_field_explicit_return.with
+err_move_out_vec_field_moveself.with
+err_use_after_move_struct_field.with
+err_use_after_move_vec_into_struct_field.with
 ```
 
 Gate:
@@ -1142,8 +1142,8 @@ if runtime-root allocation remains, it is tagged and documented
 Gates:
 
 ```text
-behav_channel_bounded.w
-behav_channel_close.w
+behav_channel_bounded.with
+behav_channel_close.with
 new focused debug-alloc channel/task fixture
 with build :debug-alloc-tests
 ```
@@ -1212,7 +1212,7 @@ move-out-of-Drop-field compile-error tests remain errors unless policy changes
 Minimum gates:
 
 ```text
-with check src/main.w
+with check src/main.with
 with build
 with build :fixpoint
 with build :debug-alloc-tests
@@ -1358,8 +1358,8 @@ Scribble-on-free is opt-in (WITH_DEBUG_ALLOC_SCRIBBLE), default off — because 
 Runtime-gated by a single cached bool, with two discoverable front doors: a --debug-alloc CLI flag (shows in --help; sets WITH_DEBUG_ALLOC for the child process before exec) and the WITH_DEBUG_ALLOC env var directly (for toggling an already-built binary). Read once and cached at init — never per-allocation, which would be a hot-path regression. No compiler/comptime/build-graph plumbing, so it's fixpoint-safe; the gating code compiles in but stays dormant.
 ## What surrounds the core
 
-- A .w harness driver (tools/debug_drop.w) — runs a repro or a corpus under the allocator, parses the ledger output into a verdict, drives lldb (plain command files, since lldb on the box has no Python).
+- A .w harness driver (tools/debug_drop.with) — runs a repro or a corpus under the allocator, parses the ledger output into a verdict, drives lldb (plain command files, since lldb on the box has no Python).
 - lldb command files (tools/debug_drop_sites.lldb, debug_drop_fields.lldb) — resolve alloc/free sites for a flagged address, and surface the codegen branch behind a field-drop bug.
-- A commit-gate lane (:debug-alloc-tests) running a fixture corpus (test/debug_alloc/*.w) — the Vec[Drop]/array/tuple × construction/escape matrix. This is the structural fix for the deepest recurring problem: the normal test floor has zero Vec[Drop] and is blind to over/under-drop in both directions. The lane gives the corpus eyes for exactly that blind spot.
+- A commit-gate lane (:debug-alloc-tests) running a fixture corpus (test/debug_alloc/*.with) — the Vec[Drop]/array/tuple × construction/escape matrix. This is the structural fix for the deepest recurring problem: the normal test floor has zero Vec[Drop] and is blind to over/under-drop in both directions. The lane gives the corpus eyes for exactly that blind spot.
 - A committed design note (docs/debug-allocator.md) recording the zero-C principle, why ASan is out, and that future sanitizer-ecosystem compatibility is permitted only by no-C means (emitting ASan's shadow-memory format via inline asm, never linking ASan's C runtime).
 - AGENTS.md rules making it the default: a root cause isn't established until you can name the exact branch observed in the debugger or the debug allocator (not inferred from run-counts); the workflow default for any drop/lifetime/double-free/leak bug is --debug-alloc first, then lldb.

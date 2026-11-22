@@ -6,7 +6,7 @@ Completed state:
 
 - Session A allocation-origin tagging is implemented in the native debug
   allocator. Reports include coarse origins such as `Vec`, `channel`, `fiber`,
-  and `with_alloc`; see `docs/debug-allocator.md`, `tools/debug_drop.w`, and
+  and `with_alloc`; see `docs/debug-allocator.md`, `tools/debug_drop.with`, and
   `test/debug_alloc/README.md`.
 - Session B drop-origin MIR tagging is implemented. MIR `Drop` statements carry
   a stable `drop#...` origin string, codegen threads it into runtime frees, and
@@ -16,7 +16,7 @@ Completed state:
 
 The debug allocator is now the default first tool for drop, lifetime,
 double-free, use-after-free, and leak bugs. Use `--debug-alloc`,
-`with build :debug-alloc-tests`, `tools/debug_drop.w`, and
+`with build :debug-alloc-tests`, `tools/debug_drop.with`, and
 `tools/debug_drop*.lldb` before entering any edit/compile/trace loop.
 
 Verification from completion run:

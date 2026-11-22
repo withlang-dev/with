@@ -17,7 +17,7 @@ cli-selfhost-edge-tests → emit_c_receiver_abi: now a LOUD cc type error
 marshaller must take addresses for &str params on the direct-extern
 path (`with_print_str(WITH_STR_LIT("ok"))` needs `&((with_str){...})`),
 ideally via one FnAbi descriptor (D6) instead of per-path classification.
-Start at src/CCodegen.w ~5720 (gen_call args) + callee_sig_from_operand.
+Start at src/CCodegen.with ~5720 (gen_call args) + callee_sig_from_operand.
 Verify: rerun the emit→cc→run cycle in
 out/test-graph/cli-selfhost-edge-tests/emit_c_receiver_abi_case, then
 `with build :test` (everything else is cached green).

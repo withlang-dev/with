@@ -34,10 +34,10 @@ The first pass should answer:
 
 The compiler already has environment-variable-driven debug plumbing in:
 
-- `src/compiler/Compilation.w`
-- `src/compiler/Frontend.w`
-- `src/compiler/Backend.w`
-- `src/compiler/Zcu.w`
+- `src/compiler/Compilation.with`
+- `src/compiler/Frontend.with`
+- `src/compiler/Backend.with`
+- `src/compiler/Zcu.with`
 
 The runtime already has a monotonic timer implementation:
 
@@ -60,7 +60,7 @@ Add one cached `WITH_PROFILE=1` switch and measure the major compilation phases.
 
 Instrument `Zcu.compile_file_frontend` and `Zcu.compile_source_frontend` in:
 
-- `src/compiler/Frontend.w`
+- `src/compiler/Frontend.with`
 
 Measure these phases separately:
 
@@ -75,7 +75,7 @@ Measure these phases separately:
 
 Instrument in:
 
-- `src/compiler/Compilation.w`
+- `src/compiler/Compilation.with`
 
 Measure separately:
 
@@ -86,7 +86,7 @@ Measure separately:
 
 Instrument in:
 
-- `src/compiler/Backend.w`
+- `src/compiler/Backend.with`
 
 Measure separately:
 
@@ -98,8 +98,8 @@ Measure separately:
 
 Instrument in:
 
-- `src/compiler/Compilation.w`
-- `src/compiler/Link.w`
+- `src/compiler/Compilation.with`
+- `src/compiler/Link.with`
 
 Measure separately:
 
@@ -178,8 +178,8 @@ For import-heavy compiles, global phase timing is not enough.
 
 Add per-module timing in:
 
-- `src/Resolve.w`
-- `src/compiler/Frontend.w`
+- `src/Resolve.with`
+- `src/compiler/Frontend.with`
 
 Track, per imported module:
 
@@ -335,11 +335,11 @@ defer profile_scope_end(scope)
 
 High-value insertion points:
 
-- `src/compiler/Frontend.w`
-- `src/compiler/Compilation.w`
-- `src/compiler/Backend.w`
-- `src/compiler/Link.w`
-- `src/Resolve.w`
+- `src/compiler/Frontend.with`
+- `src/compiler/Compilation.with`
+- `src/compiler/Backend.with`
+- `src/compiler/Link.with`
+- `src/Resolve.with`
 
 Start with:
 

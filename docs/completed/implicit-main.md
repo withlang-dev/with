@@ -213,7 +213,7 @@ print("also top-level")
 
 ```
 error: file has both `fn main` and top-level executable statements
-  --> script.w:4:1
+  --> script.with:4:1
    |
 1  | fn main:
    | -------- `fn main` defined here
@@ -232,7 +232,7 @@ Same error as E1. The presence of any `fn main` (regardless of return type) conf
 ### E3: Top-level statements in a non-entry file
 
 ```
-// lib.w (imported by another file)
+// lib.with (imported by another file)
 print("side effect on import")
 ```
 
@@ -240,7 +240,7 @@ print("side effect on import")
 
 ```
 error: top-level executable statements are not allowed in library files
-  --> lib.w:1:1
+  --> lib.with:1:1
    |
 1  | print("side effect on import")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
