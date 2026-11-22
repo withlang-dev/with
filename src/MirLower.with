@@ -13309,6 +13309,12 @@ impl MirBuilder:
     // and a later reassign re-arms cleanly.
     mut fn lower_drop_glue_and_consume(recv_node: i32, origin: &str, node: i32) -> i32:
         let place = self.lower_expr_place(recv_node)
+        // A value that is only its bits has nothing to drop and stays
+        // usable (§2.5): `drop(value)` in a generic body instantiated at
+        // `i32` emitted a drop of an integer, and the ownership validator
+        // then held the parameter to a drop on every path (BTreeSet[i32]'s
+        // insert was refused as a leak).
+        if self.copy_is_bits(self.expr_type(recv_node)): return self.unit_operand()
         // #747 instance F: capture live views BEFORE the drop destroys the
         // storage — consume_moved_operand's own capture would clone freed
         // bytes here. It finds the aliases already dead-named and is a no-op.
