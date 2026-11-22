@@ -102,9 +102,9 @@ Evaluation in the capability-bearing mode, of a build file or a tool, runs
 under driver-minted capabilities (§17.1b); the rule does not apply there,
 and the build and compiler APIs need no marker.
 
-*Status: implemented for calls of functions and methods. The methods the
-evaluator runs itself for `str`, `List`, maps, `Option` and `StringBuilder`
-are not yet gated on the marker.*
+*Status: implemented for calls of functions and methods, the methods the
+evaluator runs itself included: one the standard library declares needs
+the marker, and one it does not declare is the compiler's own operation.*
 
 A comptime-callable function uses types that are available at compile
 time. It cannot

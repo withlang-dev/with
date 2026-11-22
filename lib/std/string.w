@@ -50,30 +50,30 @@ impl StringBuilder:
     // #919: one grow-to-fit + one memcpy — the old per-byte push loop was
     // ~100x slower natively and interpreted per byte under the comptime
     // evaluator (the test-green 77s anomaly's core).
-    pub mut fn push_str(s: &str):
+    pub comptime mut fn push_str(s: &str):
         with_vec_append_bytes((&raw mut self.bytes) as *mut u8, s)
         return
 
     /// Append one byte.
-    pub mut fn push_byte(b: u8):
+    pub comptime mut fn push_byte(b: u8):
         self.bytes.push(b)
         return
 
     /// Append one byte from an integer code point.
-    pub mut fn push_char(b: i32):
+    pub comptime mut fn push_char(b: i32):
         self.bytes.push(b as u8)
         return
 
     /// Number of bytes appended so far.
-    pub fn len() -> isize:
+    pub comptime fn len() -> isize:
         self.bytes.len()
 
     /// True when no bytes have been appended.
-    pub fn is_empty() -> bool:
+    pub comptime fn is_empty() -> bool:
         self.bytes.len == 0
 
     /// Materialize the accumulated bytes as an owned str.
-    pub fn to_str() -> str:
+    pub comptime fn to_str() -> str:
         with_str_from_vec_u8((&raw const self.bytes) as *const u8)
 
 /// String length (same as `s.len()`).
@@ -204,46 +204,46 @@ pub unsafe fn CStr.from_ptr(ptr: *const c_char) -> CStr:
 /// Borrow an owned `String` as a `StrView` (`&str`). The view borrows `self`
 /// and must not outlive it.
 impl str:
-    pub fn as_view() -> StrView:
+    pub comptime fn as_view() -> StrView:
         self
 
     /// Whether `needle` occurs in the text. Bytes are compared. Declared
     /// here, as D110 asks of every built-in method (#3483).
-    pub fn contains(needle: &str) -> bool: with_str_contains_ref(self, needle) != 0
+    pub comptime fn contains(needle: &str) -> bool: with_str_contains_ref(self, needle) != 0
 
     /// Whether the text begins with `prefix`.
-    pub fn starts_with(prefix: &str) -> bool: with_str_starts_with_ref(self, prefix) != 0
+    pub comptime fn starts_with(prefix: &str) -> bool: with_str_starts_with_ref(self, prefix) != 0
 
     /// Whether the text ends with `suffix`.
-    pub fn ends_with(suffix: &str) -> bool: with_str_ends_with_ref(self, suffix) != 0
+    pub comptime fn ends_with(suffix: &str) -> bool: with_str_ends_with_ref(self, suffix) != 0
 
     /// The byte index of the first occurrence of `needle`, or -1.
-    pub fn index_of(needle: &str) -> isize: with_str_index_of_ref(self, needle) as isize
+    pub comptime fn index_of(needle: &str) -> isize: with_str_index_of_ref(self, needle) as isize
 
     /// The text with its ASCII letters in upper case.
-    pub fn to_upper() -> str: with_str_to_upper_ref(self)
-    pub fn upper() -> str: with_str_to_upper_ref(self)
+    pub comptime fn to_upper() -> str: with_str_to_upper_ref(self)
+    pub comptime fn upper() -> str: self.to_upper()
 
     /// The text with its ASCII letters in lower case.
-    pub fn to_lower() -> str: with_str_to_lower_ref(self)
-    pub fn lower() -> str: with_str_to_lower_ref(self)
+    pub comptime fn to_lower() -> str: with_str_to_lower_ref(self)
+    pub comptime fn lower() -> str: self.to_lower()
 
     /// The text with every occurrence of `from` replaced by `to`.
-    pub fn replace(from: &str, to: &str) -> str: with_str_replace_ref(self, from, to)
+    pub comptime fn replace(from: &str, to: &str) -> str: with_str_replace_ref(self, from, to)
 
     /// The text repeated `count` times.
-    pub fn repeat(count: i64) -> str: with_str_repeat_ref(self, count)
+    pub comptime fn repeat(count: i64) -> str: with_str_repeat_ref(self, count)
 
     /// The byte at `index`, counted from 0.
-    pub fn byte_at(index: i64) -> i32: with_str_byte_at_ref(self, index)
+    pub comptime fn byte_at(index: i64) -> i32: with_str_byte_at_ref(self, index)
 
     /// A copy of the bytes from `start` up to, not including, `end`. Both
     /// are clamped to the text; an empty range gives the empty text.
-    pub fn slice(start: i64, end: i64) -> str: with_str_slice_ref(self, start, end)
+    pub comptime fn slice(start: i64, end: i64) -> str: with_str_slice_ref(self, start, end)
 
     /// The pieces of the text between occurrences of `sep`. An empty text
     /// has no pieces; an empty `sep` gives the whole text as one piece.
-    pub fn split(sep: &str) -> List[str]:
+    pub comptime fn split(sep: &str) -> List[str]:
         var pieces = List[str].new()
         with_str_split_vec_ref(&raw mut pieces as *mut u8, self, sep)
         pieces
@@ -253,7 +253,7 @@ impl str:
         (*self) as []u8
 
     /// Copy a `StrView` (or any `&str`) into a fresh owned `str`.
-    pub fn to_owned() -> str:
+    pub comptime fn to_owned() -> str:
         var sb = StringBuilder.new()
         for i in 0..self.len():
             sb.push_byte(self[i] as u8)
@@ -271,7 +271,7 @@ impl str:
     /// The byte index of the last occurrence of `needle`, or -1 (#2206):
     /// `find` from the other end. An empty needle is found at `len()`.
     /// Bytes are compared: a view cut inside a multibyte character panics.
-    pub fn rfind(needle: &str) -> i64:
+    pub comptime fn rfind(needle: &str) -> i64:
         let hay = self.as_bytes()
         let pat = needle.as_bytes()
         let n = pat.len()
@@ -285,7 +285,7 @@ impl str:
 
     /// The view past any leading ASCII whitespace (`' '`, `'\t'`, `'\n'`,
     /// `'\r'`): the rest of an indented line (#2206). A view, never a copy.
-    pub fn trim_start() -> &str:
+    pub comptime fn trim_start() -> &str:
         var start: i64 = 0
         while start < self.len() and str_is_ascii_space(self[start]):
             start += 1
@@ -307,7 +307,7 @@ impl str:
 
     /// The view before any trailing ASCII whitespace (#2206). A view, never
     /// a copy.
-    pub fn trim_end() -> &str:
+    pub comptime fn trim_end() -> &str:
         var end = self.len()
         while end > 0 and str_is_ascii_space(self[end - 1]):
             end -= 1
@@ -318,7 +318,7 @@ impl str:
     /// leading, trailing or repeated blanks make no empty field (unlike
     /// `split(" ")`). `" a\tb  c ".fields()` is `["a", "b", "c"]`; an
     /// all-blank string has none. Owned, like `lines()` and `split()`.
-    pub fn fields() -> List[str]:
+    pub comptime fn fields() -> List[str]:
         var out: List[str] = List.new()
         let n = self.len()
         var i: i64 = 0
@@ -334,7 +334,7 @@ impl str:
 
     /// The characters in reverse order, as `rev` prints a line (#960). A
     /// UTF-8 sequence stays whole: `"héllo".reverse()` is `"olléh"`.
-    pub fn reverse() -> str:
+    pub comptime fn reverse() -> str:
         var out = StringBuilder.with_capacity(self.len())
         var end = self.len()
         while end > 0:

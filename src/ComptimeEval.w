@@ -2624,6 +2624,28 @@ impl ComptimeEvaluator:
             return ""
         self.builders[builder.extra_start].to_str()
 
+    // D227: a method the evaluator runs itself is still a function of the
+    // standard library when the library declares it; then another package's
+    // compile-time code reaches it only if it is declared `comptime fn`. A
+    // method the library does not declare is the compiler's own operation,
+    // as reflection on a type is. True when the call was refused.
+    mut fn native_method_refused(owner: &str, field: i32, node: i32) -> bool:
+        if self.allow_runtime_calls != 0: return false
+        let method = with_str_clone_ref(self.pool.resolve(field))
+        var fn_sym = self.sema.pool_lookup_symbol(owner ++ "." ++ method)
+        var fn_node = if fn_sym != 0: self.find_fn_decl_node(fn_sym) else: 0
+        if fn_node == 0:
+            let owner_sym = self.sema.pool_lookup_symbol(owner)
+            if owner_sym != 0:
+                fn_sym = self.sema.lookup_generic_method_fn(owner_sym, field)
+                fn_node = if fn_sym != 0: self.find_fn_decl_node(fn_sym) else: 0
+        if fn_node == 0 or (self.ast.get_data2(fn_node) / FnFlags.COMPTIME) % 2 == 1: return false
+        let callee_package = self.sema.package_of(self.sema.fn_symbol_source_path(fn_sym))
+        let caller_path = if self.active_fn_syms.len() > 0: self.sema.fn_symbol_source_path(self.active_fn_syms[self.active_fn_syms.len() - 1]) else: self.current_source_path()
+        if callee_package == self.sema.package_of(caller_path): return false
+        let _refused = self.fail(node, "cannot evaluate '" ++ owner ++ "." ++ method ++ "' at compile time: it belongs to another package (" ++ callee_package ++ ") and is not declared `comptime fn`")
+        true
+
     mut fn eval_static_string_builder_method_call(result_type: i32, method: &str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
         if method == "new":
             if arg_count != 0:
@@ -2656,6 +2678,7 @@ fn comptime_string_builder_constructor_method(name: &str) -> str:
 
 impl ComptimeEvaluator:
     mut fn eval_string_builder_method_call(recv_node: i32, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if self.native_method_refused("StringBuilder", field, node): return comptime_control_error()
         let method = with_str_clone_ref(self.pool.resolve(field))
         let builder = self.string_builder_from_value(recv_value, node)
         if builder.kind != ComptimeValueKind.CV_STRING_BUILDER:
@@ -3159,6 +3182,7 @@ impl ComptimeEvaluator:
         self.fail(node, "List[u8] method '" ++ method ++ "' is not comptime-evaluable yet")
 
     mut fn eval_list_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if self.native_method_refused("List", field, node): return comptime_control_error()
         let method = self.pool.resolve(field)
 
         if method == "push":
@@ -3312,6 +3336,7 @@ impl ComptimeEvaluator:
         comptime_control_value(comptime_value_enum(result_tid, self.sema.syms.some, slot, 1))
 
     mut fn eval_map_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if self.native_method_refused("HashMap", field, node): return comptime_control_error()
         let method = self.pool.resolve(field)
 
         if method == "insert":
@@ -3461,6 +3486,7 @@ impl ComptimeEvaluator:
         self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.option
 
     mut fn eval_option_method_call(recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if self.native_method_refused("Option", field, node): return comptime_control_error()
         // §10.5's non-closure combinators. The closure-taking ones (map,
         // and_then, filter) wait on comptime closure evaluation (#665.3).
         let method = self.pool.resolve(field)
@@ -3520,6 +3546,7 @@ fn comptime_str_find(haystack: &str, needle: &str) -> i32:
 
 impl ComptimeEvaluator:
     mut fn eval_str_method_call(recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if self.native_method_refused("str", field, node): return comptime_control_error()
         let method = self.pool.resolve(field)
         let text = recv_value.text
         if method == "len":
