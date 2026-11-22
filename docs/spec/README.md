@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.78
+# The With Programming Language — Specification v7.79
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.79:** (Eric, 2026-11-21.) §18.1: a file named on the command line is With source whatever its name; where the toolchain finds source files itself, it finds files with the extension `.with` (status note: `.w` is still found while the extension changes). §17.1 (D227): the package rule does not apply to evaluation in the capability-bearing mode, of a build file or a tool; the sentence that exempted only the build and compiler APIs is replaced.
+
 **Changelog v7.78:** D227 (Eric, 2026-11-21; words blessed the same day). §17.1: a compile-time call that crosses a package boundary reaches only a `comptime fn`, transitively; the runtime's target queries are `comptime fn`s the compiler answers; reflection on a type and the build and compiler APIs are outside the rule. §18.5c (D39 amended): a `comptime fn` crosses a bundle boundary with its body and the bodies of the functions of its package it reaches. Implemented for calls of functions and methods; status notes say what is not yet.
 
 **Changelog v7.77:** #3173 (Eric, 2026-11-21; rulings A to E, words blessed the same day). §31: a status after `ok` is a constant's name or an integer literal (`status_value`); a resource may state several `init` clauses, each a constructor, and `init f(self), ok K` states that initializer's own success status. §16.2b.3: what the proof of a drafted in-place resource is, including a failed allocation and the init's `ok`. §16.2b.15: a facts file may state an in-place resource. Implemented: the grammar, several initializers, and the facts-file form. Not yet: the draft's proof, and checking a stated pair against it.

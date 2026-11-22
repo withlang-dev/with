@@ -14,6 +14,14 @@ hierarchical paths. `use` resolution searches, in order: the embedded
 standard library, paths relative to the importing module's directory,
 the project's `lib/` roots, and the project root.
 
+A file named on the command line is With source whatever its name. Where
+the toolchain finds source files itself, it finds files with the extension
+`.with`.
+
+*Status: while the extension changes from `.w`, the toolchain also finds
+files with the extension `.w`; a directory holding both spellings of one
+module is an error.*
+
 A module names itself by the last segment of its module path: the `module` header's last segment, else the file's stem. The self-name is a qualifier only: `name.decl` reaches the module's own declaration `decl`, and the bare self-name names nothing. A file whose stem is not an identifier names itself by its stem with each character that cannot appear in an identifier replaced by `_`, and a leading digit prefixed with `_`.
 
 ### 18.2 Imports
