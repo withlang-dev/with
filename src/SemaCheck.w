@@ -19114,7 +19114,16 @@ impl Sema:
 // evaluator answers for the target, never for the host. The declaration
 // states `comptime fn`; this is the one list of them.
 fn sema_comptime_answer_is_compilers(name: &str, path: &str) -> bool:
-    (name == "with_sysinfo_os" or name == "with_sysinfo_arch") and sema_path_is_runtime_implementation(path)
+    if (name == "with_sysinfo_os" or name == "with_sysinfo_arch") and sema_path_is_runtime_implementation(path): return true
+    // The methods of `str`, `StringBuilder` and `List` the evaluator runs
+    // itself: std.string and std.collections declare them `comptime fn`,
+    // and their bodies, which call the runtime, are what runs at run time.
+    if not (sema_path_is_std_module(path, "string") or sema_path_is_std_module(path, "collections")): return false
+    let dot = name.rfind(".")
+    let method = if dot >= 0: name.slice(dot + 1, name.len()) else: name
+    for answered in ["contains", "starts_with", "ends_with", "index_of", "to_upper", "to_lower", "replace", "repeat", "byte_at", "slice", "split", "to_owned", "push_str", "push_byte", "push_char", "is_empty", "to_str", "len"]:
+        if method == answered: return true
+    false
 
 fn sema_is_string_builder_comptime_method_name(name: &str) -> bool:
     if name == "new" or name.ends_with(".new"): return true
