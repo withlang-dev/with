@@ -17,3 +17,22 @@ pub type Pair:
 impl Pair:
     pub comptime fn sum() -> i32: self.a + self.b
     pub fn product() -> i32: self.a * self.b
+
+// An operator, a trait method and a generic function are functions too:
+// each with the marker, and each without.
+pub type Money:
+    pub cents: i32
+
+impl Money:
+    pub comptime fn add(other: &Money) -> Money: Money { cents: self.cents + other.cents }
+    pub fn sub(other: &Money) -> Money: Money { cents: self.cents - other.cents }
+
+pub trait Scaled:
+    fn scaled(self: &Self, k: i32) -> i32
+
+impl Scaled for Money:
+    comptime fn scaled(self: &Self, k: i32) -> i32: self.cents * k
+
+pub comptime fn first_of[T](a: T, b: T) -> T: a
+
+pub fn second_of[T](a: T, b: T) -> T: b
