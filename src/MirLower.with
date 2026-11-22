@@ -632,7 +632,13 @@ impl MirBuilder:
             let payload_ty = self.local_type(payload_local)
             let payload_place = self.place_for_local(payload_local)
             let payload_expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 1: self.sema.sig_param_type(sig_idx, 1) else: 0
-            args.push(self.operand_for_place_arg(payload_place, payload_ty, payload_expected, 0))
+            // The exit takes the payload back by value (a Mutex's
+            // `with_exit_mut` stores it): that is a move, and said as one.
+            // Passed as a copy, the payload's storage then ended "holding a
+            // value no path dropped or moved" for the ownership validator.
+            let payload_arg = self.operand_for_place_arg(payload_place, payload_ty, payload_expected, 0)
+            let given_back = self.body.operand_kinds[payload_arg] == OperandKind.OK_COPY and self.body.operand_d0[payload_arg] == payload_place and self.type_needs_value_drop(payload_ty)
+            args.push(if given_back: self.body.new_operand(OperandKind.OK_MOVE, payload_place) else: payload_arg)
         let args_id = self.body.new_call_args(args)
         self.body.set_call_contract(args_id, sig_idx, mono_sym)
         let cleanup_generic_node = self.generic_fn_node_for_sym(method_sym)
