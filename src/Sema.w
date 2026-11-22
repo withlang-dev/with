@@ -11859,8 +11859,8 @@ impl Sema:
         let max_dist: i32 = if target.len() <= 3: 1 else: 2
         var best_name = ""
         var best_dist = max_dist + 1
-        for si in 0..self.sig_names.len():
-            let full = self.pool_resolve(self.sig_names[si])
+        for sym in self.sig_names:
+            let full = self.pool_resolve(sym)
             if not full.starts_with(prefix): continue
             let name = full.slice(prefix.len(), full.len())
             if name.len() == 0 or name == target: continue
