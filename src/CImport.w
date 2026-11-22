@@ -574,6 +574,61 @@ fn ci_infer_macro_return_type_from_expr(type_session: i64, translated: &str, kno
         return "i32"
     with_str_clone_ref(fallback)
 
+// Whether `text` names the identifier `name`: an occurrence with no
+// identifier character on either side (`s` is not named by `sizeof(st)`).
+fn ci_text_names(text: &str, name: &str) -> bool:
+    if name.len() == 0: return false
+    var from = 0
+    while from + name.len() <= text.len():
+        let at = text.find(name, from)
+        if at < 0: return false
+        let before = if at > 0: text[at - 1] else: ' '
+        let after = if at + name.len() < text.len(): text[at + name.len()] else: ' '
+        if not ci_is_ident_char(before) and not ci_is_ident_char(after): return true
+        from = at + 1
+    false
+
+// The parameter list of a function-like macro whose body is one call of a
+// declared function with each macro parameter passed, whole, as exactly one
+// argument and named nowhere else: each parameter with the type of the
+// callee's parameter it is passed to. "" for any other macro.
+fn ci_macro_forwarding_params(session: i64, value: &str, bindings: &List[str]) -> str:
+    if bindings.len() == 0: return ""
+    let body = ci_strip_parens(ci_trim(value))
+    let open = body.find("(")
+    if open <= 0 or not body.ends_with(")"): return ""
+    let callee = ci_trim(body.slice(0, open))
+    if not ci_is_c_ident(callee): return ""
+    // The call's parentheses close at the end: nothing follows the call.
+    var depth = 0
+    var at = 0
+    for c in body.bytes():
+        if c == '(': depth += 1
+        if c == ')':
+            depth -= 1
+            if depth == 0 and at != body.len() - 1: return ""
+        at += 1
+    let decl = ci_lookup_c_function_decl_idx(session, callee)
+    if decl < 0: return ""
+    let args = ci_split_top_level(body.slice(open + 1, body.len() - 1), ',')
+    if args.len() != with_cimport_fn_param_count(session, decl) as isize: return ""
+    var out = ""
+    for binding in bindings:
+        var position = -1
+        var index = 0
+        for arg in args:
+            let whole = ci_strip_parens(ci_trim(arg))
+            if whole == binding:
+                if position >= 0: return ""
+                position = index
+            else if ci_text_names(arg, binding): return ""
+            index += 1
+        if position < 0: return ""
+        let ty = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, decl, position))
+        if ty.len() == 0 or ci_starts_with(ty, "__UNSUPPORTED:"): return ""
+        out = out ++ (if out.len() > 0: ", " else: "") ++ binding ++ ": " ++ ty
+    out
+
 fn ci_object_macro_is_function_alias(type_session: i64, value: &str) -> bool:
     let t = ci_strip_parens(ci_trim(value))
     if not ci_is_c_ident(t):
@@ -4523,6 +4578,16 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                         // which calls `xmlCharInRange`): the caller is
                         // `unsafe fn` too, or its body would not check.
                         if fn_kw == "unsafe fn ": ci_record_raw_function_name(safe_name)
+                        // A macro that is one call, forwarding each of its
+                        // parameters straight to an argument, has the
+                        // callee's own parameter types (zlib's
+                        // `inflateInit(strm)` is `inflateInit_((strm),
+                        // ZLIB_VERSION, (int)sizeof(z_stream))`). It is then a
+                        // concrete function, which a contract can name.
+                        let forwarded = ci_macro_forwarding_params(type_session, work_value, bindings)
+                        if forwarded.len() > 0:
+                            param_decl = forwarded
+                            type_params = ""
                         let r = ci_render_generated_fn_body(fn_kw ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ")" ++ ci_ret_suffix(inferred_ret), "    " ++ translated)
                         with_cimport_mark_name_emitted(name)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):

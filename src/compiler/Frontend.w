@@ -933,6 +933,8 @@ impl Zcu:
         out
 
     fn c_import_cache_key_frontend(pool: &AstPool, decl: i32, header_spec: &str) -> str:
+        // v19: a macro that forwards its parameters to one call takes the
+        // callee's parameter types (#3516);
         // v18: the #357 COwned owning/borrowing wrappers are retired — libc's
         // owned resources are the toolchain libc facade, rendered after
         // translation, and `owns:`/`borrows:` no longer shape the text; v17:
@@ -940,7 +942,7 @@ impl Zcu:
         // bare integer-suffix macro (`L`) is no longer an empty literal; v16
         // evaluated macro constants annotate by value range (#775); v15
         // suffixed >i64::MAX literals.
-        var key = header_spec ++ "\n#format:cimport-v18\n#links:"
+        var key = header_spec ++ "\n#format:cimport-v19\n#links:"
         // Preserve existing C cache keys; only C++ adds a language discriminator.
         if self.c_import_is_cxx_frontend(pool, decl): key = key ++ "\n#lang:c++\n"
         let link_start = pool.get_data1(decl)
