@@ -1,4 +1,5 @@
 //! expect-check-fail: view `keep` may originate from `db`, which no longer lives here (§21.1 Rule 6)
+//! expect-check-fail: = help: declare `keep` after `db`, or clear/drop `keep` before `db` goes out of scope
 
 // D51 stage 6 (ruling §29): a statement kept past its database's scope is
 // refused where it is used.

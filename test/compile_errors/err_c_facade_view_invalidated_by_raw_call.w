@@ -1,5 +1,6 @@
 //! expect-check-fail: view `e` borrows from foreign-state domain `errno`, which `note_fail` may have invalidated (§16.2b.7)
 //! expect-check-fail: describe note_fail with an fn item in a facade and state `preserves domain errno` if it leaves that storage valid, or copy `e` out (`to_owned()`) before the call
+//! expect-check-fail: = help: describe note_fail with an fn item in a facade and state `preserves domain errno` if it leaves that storage valid, or copy `e` out (`to_owned()`) before the call
 
 // D51 stage 7 (ruling §34, §38): a library operation the facade does not
 // describe still touches every domain of that library — unknown effect

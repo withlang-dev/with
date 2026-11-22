@@ -1,4 +1,5 @@
 //! expect-check-fail: state `preserves domain errno` on fn note_fail in facade checks if it leaves that storage valid, or copy `e` out (`to_owned()`) before the call
+//! expect-check-fail: = help: state `preserves domain errno` on fn note_fail in facade checks if it leaves that storage valid, or copy `e` out (`to_owned()`) before the call
 
 // Ruling §35: two facades declaring `domain errno thread` name one errno.
 // `checks` describes `note_fail` and states nothing about the domain, so

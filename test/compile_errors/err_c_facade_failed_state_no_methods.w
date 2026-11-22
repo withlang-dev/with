@@ -1,4 +1,5 @@
 //! expect-check-fail: unknown method 'count' for type 'FailedDatabase': a failed 'Database'
+//! expect-check-fail: = help: state 'valid on failed' on the fn item describing an operation the C library documents on the failed handle; its representation is the field `repr`, under the raw C rules (`unsafe`)
 
 // D51 stage 5 (Eric, 2026-09-23, on #1426): the resource a failed producer
 // still produced — `FailedWithResource`'s `FailedDatabase` — admits only the

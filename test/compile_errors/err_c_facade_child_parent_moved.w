@@ -1,4 +1,5 @@
 //! expect-check-fail: implicit drop of `s` uses `&db` after `db` is moved (§21.1 Rule 7)
+//! expect-check-fail: = help: drop or finish with `s` before `db` is moved or consumed
 
 // D51 stage 6 (ruling §27, §29; spec §16.2b.6): a statement depends on the
 // database it was prepared on, so moving the database while the statement

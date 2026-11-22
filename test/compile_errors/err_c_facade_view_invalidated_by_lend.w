@@ -1,5 +1,6 @@
 //! expect-check-fail: view `t` borrows from `n`, which `note_fill` may have invalidated (§16.2b.7)
 //! expect-check-fail: state `preserves param 0` on fn note_fill in facade notes if it leaves that storage valid, or copy `t` out (`to_owned()`) before the call
+//! expect-check-fail: = help: state `preserves param 0` on fn note_fill in facade notes if it leaves that storage valid, or copy `t` out (`to_owned()`) before the call
 
 // D51 stage 7 (ruling §38: "Unknown effect means invalidate"): a lend of
 // the note that states no preservation invalidates the text borrowed from

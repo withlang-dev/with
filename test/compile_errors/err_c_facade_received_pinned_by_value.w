@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Summary': producer 'sum_new' receives param 0: z_stream s, which a borrow of 'Stream' cannot hand to C: 'Stream' is pinned in place, and a copy of its representation is not the resource (§16.2b.3) (§16.2b.6)
+//! expect-check-fail: = help: leave 'sum_new' raw, or model 'Stream' so a borrowed one carries its pointer
 
 // D51 stage 6 (ruling §13, D54): a pinned in-place resource is reached by
 // the address of its storage; a producer taking the representation by value

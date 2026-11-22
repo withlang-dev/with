@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Handle': 'abandon h_run' names an operation that may invoke callbacks, so it cannot safely abandon an incomplete callback pair
+//! expect-check-fail: = help: describe 'h_run' with an fn item stating 'callbacks none' when verified foreign-library evidence guarantees it invokes none
 
 // D66 (spec §16.2b.9): the abandonment path must itself be `callbacks
 // none`, or abandoning a half-configured pair could invoke it.

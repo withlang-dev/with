@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'tex_width': 'of Texture' assigns it to a resource param 0: i32 w does not receive; it receives no modeled resource (§16.2b.3)
+//! expect-check-fail: = help: delete 'of Texture'
 
 // #1669: an `of` is verified even when the operation's first parameter
 // receives no pointer or in-place resource. Accepted silently, an `of`

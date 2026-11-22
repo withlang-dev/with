@@ -1,4 +1,5 @@
 //! expect-check-fail: view `keep` may originate from `db`, which no longer lives here (§21.1 Rule 6)
+//! expect-check-fail: = help: declare `keep` after `db`, or clear/drop `keep` before `db` goes out of scope
 
 // D51 stage 12 (ruling §29, §54): a statement produced through the
 // parent's presented method (`db.prepare(…)`, stage 8) depends on the

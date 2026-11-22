@@ -1,4 +1,5 @@
 //! expect-check-fail: 'body' dies while 'Req' still holds it as the storage 'Req.set' set
+//! expect-check-fail: = help: release the retention or run the abandonment path first, or keep the resource in this frame
 
 // D194 (spec §16.2b.5, §16.2b.9): a handle holding a retained pointer
 // borrow is ephemeral; returning it carries the borrow of the local

@@ -1,4 +1,5 @@
 //! expect-check-fail: = note: borrowed: 'BorrowedDatabase' is borrowed from the 'Statement' that 'st_db' receives as param 0: *mut st s — stated by 'returns borrow Database from param 0' in facade dbf; it has no Drop and cannot outlive that origin (§16.2b.6)
+//! expect-check-fail: = help: drop or finish with `handle` before `s` is moved or consumed
 
 // D51 stage 6 (ruling §26, §57): dropping the statement while its borrowed
 // database is still used is refused, naming the clause.

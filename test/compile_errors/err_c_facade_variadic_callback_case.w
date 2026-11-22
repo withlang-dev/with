@@ -1,4 +1,5 @@
 //! expect-check-fail: a variadic callback requires its C type
+//! expect-check-fail: = help: move the statement inside `fn main`, or remove `fn main` to use implicit main mode
 
 // D66 requires an explicit `as T`: a variadic declaration has no callback
 // signature, and neither an option's name nor the userdata pairing proves it.

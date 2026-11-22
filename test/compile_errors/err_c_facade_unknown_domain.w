@@ -1,4 +1,5 @@
 //! expect-check-fail: unknown domain 'locale'
+//! expect-check-fail: = help: add 'domain locale <scope>' to the contract, with <scope> one of process, thread, resource or static
 
 // D51 §16.2b.13 / ruling §61: a facade statement that does not verify is an error.
 

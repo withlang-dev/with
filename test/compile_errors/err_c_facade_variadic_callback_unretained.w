@@ -1,4 +1,5 @@
 //! expect-check-fail: fn 'h_set': 'case OPT_CB' installs a callback the library keeps for later calls; state its retention
+//! expect-check-fail: = help: write 'case OPT_CB: callback param N as T userdata param CONST retains by param 0'
 
 // D66 (spec §16.2b.5, §16.2b.9): retention is stated, never inferred — a
 // callback case without `retains by param N` is refused rather than

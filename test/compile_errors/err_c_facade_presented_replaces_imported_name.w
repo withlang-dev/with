@@ -1,4 +1,5 @@
 //! expect-check-fail: unknown method 'db_count' for type 'Database'
+//! expect-check-fail: = help: did you mean `count`?
 
 // D51 stage 8 (spec §16.2b.11): a presented operation has one spelling on
 // the resource, its presented name (`d.count()`); the imported name is the

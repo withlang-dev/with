@@ -1,4 +1,5 @@
 //! expect-check-fail: view `t` may originate from `n`, which no longer lives here (§21.1 Rule 6)
+//! expect-check-fail: = help: copy the data out before the origin's scope ends, or declare `n` in the outer scope
 
 // D51 stage 7 (ruling §32: "Later operations that invalidate the
 // underlying resource also invalidate the view through ordinary With

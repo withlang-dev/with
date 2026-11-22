@@ -1,4 +1,5 @@
 //! expect-check-fail: view `m` borrows from `db`, which `kv_changes` may have invalidated
+//! expect-check-fail: = help: state `preserves param 0` on fn kv_changes in facade kv if it leaves that storage valid, or copy `m` out (`to_owned()`) before the call
 
 // D85 (#2003; spec §16.2b.6): "Every operation through it is an operation
 // on the parent's origin: it invalidates the parent's views exactly as the

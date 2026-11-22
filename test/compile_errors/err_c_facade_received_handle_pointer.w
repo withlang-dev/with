@@ -1,4 +1,5 @@
 //! expect-check-fail: resource 'Statement': producer 'st_swap' receives param 0: *mut *mut db d, which a borrow of 'Database' cannot hand to C: it points at 'Database''s handle, through which C could replace or release it (§16.2b.6)
+//! expect-check-fail: = help: leave 'st_swap' raw, or model 'Database' so a borrowed one carries its pointer
 
 // D51 stage 6 (ruling §27): a producer that receives a pointer to a
 // resource's handle (other than its own out slot) could replace or release

@@ -1,4 +1,5 @@
 //! expect-check-fail: domain 'notes_cache' is 'thread' in facade 'notes' and 'process' here; one state has one scope (§16.2b.7)
+//! expect-check-fail: = help: write 'domain notes_cache process written by <fn>, <fn>', naming the functions that rewrite this state, or 'domain notes_cache process written by any' when they are not known
 
 // Ruling §35-§36: two facades may declare the same domain and mean the same
 // state, but one state has one scope. `notes` says its cache is per thread;

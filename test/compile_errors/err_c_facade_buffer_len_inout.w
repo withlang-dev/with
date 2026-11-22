@@ -1,4 +1,5 @@
 //! expect-check-fail: pairs an input buffer, which C only reads
+//! expect-check-fail: = help: move the statement inside `fn main`, or remove `fn main` to use implicit main mode
 
 // D64 §16.2b.8: `len` is an input pairing; `inout` belongs to `capacity`.
 use c_import("static inline int sum_bytes(const unsigned char *p, unsigned long n) { if (n > 0) return p[0]; return 0; }\n")

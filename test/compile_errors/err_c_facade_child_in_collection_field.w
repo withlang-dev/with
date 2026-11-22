@@ -1,4 +1,5 @@
 //! expect-check-fail: 'Holder' stores a 'Statement', which depends on its 'Database' and cannot be stored in a non-ephemeral type (§16.2b.6)
+//! expect-check-fail: = help: make Holder ephemeral, so it lives no longer than the parent: `type Holder ephemeral { stmts: List[Statement], n: i32 }`; or keep the 'Statement' in a local declared after its parent
 
 // D51 stage 6 (ruling §29: "cannot be stored where origin relationships
 // cannot be preserved"): a collection of statements is ephemeral too.

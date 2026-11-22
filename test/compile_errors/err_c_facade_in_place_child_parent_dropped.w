@@ -1,4 +1,5 @@
 //! expect-check-fail: implicit drop of `iter` uses `&db` after `db` is moved (§21.1 Rule 7)
+//! expect-check-fail: = help: drop or finish with `iter` before `db` is moved or consumed
 
 // D51 stage 6: an in-place resource whose init receives a database depends on
 // it like any other product.

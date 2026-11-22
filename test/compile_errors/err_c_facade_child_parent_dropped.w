@@ -1,4 +1,5 @@
 //! expect-check-fail: `db` is moved here while `s` still borrows it
+//! expect-check-fail: = help: drop or finish with `s` before `db` is moved or consumed
 
 // D51 stage 6 (ruling §29): dropping the database while a statement made
 // from it lives is refused at the drop.

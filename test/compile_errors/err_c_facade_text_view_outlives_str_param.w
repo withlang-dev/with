@@ -1,4 +1,5 @@
 //! expect-check-fail: view `hit` may originate from `s`, which no longer lives here (§21.1 Rule 6)
+//! expect-check-fail: = help: copy the data out before the origin's scope ends, or declare `s` in the outer scope
 
 // D51 stage 7 (ruling §31: the origin of strchr's result is the string it
 // was lent, `returns borrow CStr from param 0`): the text cannot outlive

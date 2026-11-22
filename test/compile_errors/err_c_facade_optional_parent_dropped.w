@@ -1,4 +1,5 @@
 //! expect-check-fail: implicit drop of `opened` uses `&db` after `db` is moved (§21.1 Rule 7)
+//! expect-check-fail: = help: drop or finish with `opened` before `db` is moved or consumed
 
 // D51 stage 6: a cursor's producers differ — one receives a database, one
 // does not — and the one made over a database still depends on it.
