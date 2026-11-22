@@ -86,6 +86,26 @@ deep (this is Zig's model, and that is its hole); `comptime fn` is the
 spelling a library author uses to promise otherwise, and the diagnostic
 names the upstream culprit. (D104, 2026-10-07.)
 
+A compile-time call that crosses a package boundary reaches only a
+`comptime fn`, and so does every call made from it across a boundary.
+Within a package no marker is needed. The marker is the author's promise
+to importers that the function stays evaluable at compile time; removing
+it is a breaking change.
+
+The runtime's target queries are `comptime fn`s whose compile-time answer
+the compiler supplies: the target's (§17.1a). Reflection on a type (`size`,
+`align`, `implements`, `fields`, `is_copy`, `name`) is outside this rule:
+these are operations on a type that the compiler answers, not calls of a
+function in a package.
+
+The build and compiler APIs run under driver-minted capabilities (§17.1b)
+and are stated by the capability registry; they need no marker.
+
+*Status: implemented for calls of functions and methods. The evaluation of
+a build file is the capability-bearing mode and is not subject to the rule.
+The methods the evaluator runs itself for `str`, `List`, maps, `Option` and
+`StringBuilder` are not yet gated on the marker.*
+
 A comptime-callable function uses types that are available at compile
 time. It cannot
 perform ambient I/O, inspect directories, read the environment or clock,
