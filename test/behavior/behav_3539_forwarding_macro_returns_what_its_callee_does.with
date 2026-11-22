@@ -1,0 +1,17 @@
+//! expect-stdout: 0 9 9 0
+
+// #3539: a forwarding macro is imported as a function with its callee's
+// parameter types, and so with its callee's return type. The macro's own
+// inferred return was still the type parameter of the generic form:
+// `fn MyZero(p_d: *mut c_void, p_l: u64) -> T` — "unknown type 'T'" for
+// every program that imported the header. Windows' headers define
+// `ZeroMemory`, `FillMemory` and `MIDL_memset` this way, so `bzlib.h`,
+// which includes them there, stopped importing.
+
+use c_import("#include <string.h>\n#define MyFill(Destination,Length,Fill) memset((Destination),(Fill),(Length))\n#define MyZero(Destination,Length) memset((Destination),0,(Length))\n#define my_strlen(s) strlen(s)\n")
+
+fn main:
+    var buf: [u8; 4] = [7; 4]
+    unsafe { MyZero(&raw mut buf[0] as *mut c_void, 4) }
+    unsafe { MyFill(&raw mut buf[1] as *mut c_void, 2, 9) }
+    print(f"{buf[0]} {buf[1]} {buf[2]} {buf[3]}")

@@ -629,6 +629,17 @@ fn ci_macro_forwarding_params(session: i64, value: &str, bindings: &List[str]) -
         out = out ++ (if out.len() > 0: ", " else: "") ++ binding ++ ": " ++ ty
     out
 
+// The return type of the function a forwarding macro calls
+// (ci_macro_forwarding_params), or "" when it has none this import can
+// state. The macro's own inferred return may be a type parameter (`T`),
+// which the concrete function no longer declares: Windows' `ZeroMemory(d, l)`
+// is `memset((d), 0, (l))` and was emitted `-> T` (#3539).
+fn ci_macro_forwarding_return(session: i64, value: &str) -> str:
+    let body = ci_strip_parens(ci_trim(value))
+    let open = body.find("(")
+    if open <= 0: return ""
+    ci_lookup_c_function_return_type(session, ci_trim(body.slice(0, open)))
+
 fn ci_object_macro_is_function_alias(type_session: i64, value: &str) -> bool:
     let t = ci_strip_parens(ci_trim(value))
     if not ci_is_c_ident(t):
@@ -4585,9 +4596,11 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                         // ZLIB_VERSION, (int)sizeof(z_stream))`). It is then a
                         // concrete function, which a contract can name.
                         let forwarded = ci_macro_forwarding_params(type_session, work_value, bindings)
-                        if forwarded.len() > 0:
+                        let forwarded_ret = ci_macro_forwarding_return(type_session, work_value)
+                        if forwarded.len() > 0 and forwarded_ret.len() > 0:
                             param_decl = forwarded
                             type_params = ""
+                            inferred_ret = forwarded_ret
                         let r = ci_render_generated_fn_body(fn_kw ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ")" ++ ci_ret_suffix(inferred_ret), "    " ++ translated)
                         with_cimport_mark_name_emitted(name)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
