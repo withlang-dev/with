@@ -121,6 +121,19 @@ with bundles and one built from source accept and reject the same
 programs" true for build files too. This is to be confirmed before
 standard-library bundling (step 6) starts.
 
+**The question is wider than the registry (Eric, 2026-11-21).** The rule
+does not apply in the capability-bearing mode at all: a build file or a
+tool may call any function of any package (`env`, `print`, a helper
+package's functions). So in that mode the evaluator may need the body of
+any function in any package, not only the registry's, and a bundle built
+for importers that only check and link carries none of them. Still open:
+how the evaluator gets those bodies when packages are bundles. The
+candidates are that a build file's dependencies are read from source (a
+build file's imports are few, and a fetched package's source is on disk
+beside its bundle), or that every bundle carries every body for this mode.
+The first keeps bundles small and is this design's proposal; it is to be
+decided with the question above.
+
 ### 5. Globals and initialization
 
 - A package's globals are storage in its bundle, initialized by the

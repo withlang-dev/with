@@ -98,13 +98,13 @@ the compiler supplies: the target's (§17.1a). Reflection on a type (`size`,
 these are operations on a type that the compiler answers, not calls of a
 function in a package.
 
-The build and compiler APIs run under driver-minted capabilities (§17.1b)
-and are stated by the capability registry; they need no marker.
+Evaluation in the capability-bearing mode, of a build file or a tool, runs
+under driver-minted capabilities (§17.1b); the rule does not apply there,
+and the build and compiler APIs need no marker.
 
-*Status: implemented for calls of functions and methods. The evaluation of
-a build file is the capability-bearing mode and is not subject to the rule.
-The methods the evaluator runs itself for `str`, `List`, maps, `Option` and
-`StringBuilder` are not yet gated on the marker.*
+*Status: implemented for calls of functions and methods. The methods the
+evaluator runs itself for `str`, `List`, maps, `Option` and `StringBuilder`
+are not yet gated on the marker.*
 
 A comptime-callable function uses types that are available at compile
 time. It cannot
