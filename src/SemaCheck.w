@@ -19011,7 +19011,7 @@ impl Sema:
     // reads the same records).
     fn comptime_reached_in_package(fn_sym: i32) -> List[i32]:
         let package = self.package_of(self.fn_symbol_source_path(fn_sym))
-        let reached: List[i32] = []
+        let reached = []
         let work = [fn_sym]
         var at = 0
         while at < work.len():

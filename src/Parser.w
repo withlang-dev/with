@@ -4074,7 +4074,7 @@ impl Parser:
             var body = 0 as NodeId
             if self.interface_mode != 0:
                 // D39: methods of an interface declaration carry no bodies either.
-                body = self.parse_interface_body(m_tp_count + impl_tp_count, m_async, m_gen, if m_comptime: 1 else: 0)
+                body = self.parse_interface_body(m_tp_count + impl_tp_count, m_async, m_gen, m_comptime as i32)
                 if body == 0:
                     break
             else if self.peek() == TokenKind.TK_COLON:
