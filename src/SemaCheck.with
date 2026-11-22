@@ -26761,6 +26761,17 @@ impl Sema:
             // bits take the value.
             // A bare local is a place too (Eric, 2026-10-22): `let (tx, rx)
             // = pair` observes `pair`; taking it apart is spelled `move pair`.
+            // Inside `name @ pattern` the outer name owns the value, so a
+            // binding that is not plain bits is a view of it there: nothing
+            // makes a second owner (`whole @ .Click(tag, n)` moved `tag` out
+            // of `whole` and left it blank).
+            if self.pattern_at_owner != 0 and not self.type_is_plain_bits(subject_type) and self.is_copy(subject_type as TypeId) == 0:
+                self.pattern_place_bindings.insert(node, 1)
+                self.ensure_exact_type(TypeKind.TY_REF, subject_type as TypeId, 0, 0)
+                self.scope_set_is_view_bound(sym)
+                self.set_binding_view_deps(sym, 0, [self.pattern_at_owner])
+                self.register_view_binding_borrows(sym, node)
+                return
             if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_owned and not self.type_is_plain_bits(subject_type):
                 self.pattern_place_bindings.insert(node, 1)
                 // #823: in an or-pattern the place differs by alternative,
@@ -26972,7 +26983,12 @@ impl Sema:
             let at_name = self.ast.get_data0(node)
             let inner = self.ast.get_data1(node)
             self.scope_put_at(at_name, subject_type, self.pattern_bind_mut, node)
+            // An owned subject is the outer name's from here; what the
+            // inner pattern binds observes it (see NK_PAT_IDENT).
+            let saved_owner = self.pattern_at_owner
+            if self.pattern_subject_owned and saved_owner == 0: self.pattern_at_owner = at_name
             self.check_pattern(inner, subject_type)
+            self.pattern_at_owner = saved_owner
             return
 
         if kind == NodeKind.NK_PAT_TUPLE:

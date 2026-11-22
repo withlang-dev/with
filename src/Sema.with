@@ -1660,6 +1660,7 @@ type Sema {
     current_drop_type_sym: i32,
     pattern_subject_node: i32,         // subject expr of the pattern being checked (#1272 fix-its); 0 when none
     pattern_subject_owned: bool,       // whether that subject is an owned one (set_pattern_subject, #3461)
+    pattern_at_owner: i32,             // the outer name of the `name @ pattern` being checked over an owned subject, or 0
     pattern_bind_mut: i32,             // 1 while checking a `var PATTERN` head: its bindings are mutable (#1354)
     drop_control_flow_depth: i32,
     move_control_flow_depth: i32,
@@ -4203,6 +4204,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         current_drop_type_sym: 0,
         pattern_subject_node: 0,
         pattern_subject_owned: false,
+        pattern_at_owner: 0,
         pattern_bind_mut: 0,
         drop_control_flow_depth: 0,
         move_control_flow_depth: 0,
@@ -10308,7 +10310,9 @@ impl Sema:
             // facade resource) as much as `S` itself. Shallow
             // type_has_drop_impl let an `Option[S]` declared before its
             // origin drop after it.
-            let view_has_drop = self.type_owns_user_drop(view_ty)
+            // A binding that views its place (a pattern's place binding) is
+            // never dropped: its type's destructor runs for the owner.
+            let view_has_drop = if self.scope_is_view_bound(view_sym) != 0: 0 else: self.type_owns_user_drop(view_ty)
             let active_view = depends and self.binding_has_active_borrow_from(view_sym, origin_sym)
             if active_view or view_has_drop != 0:
                 let err_node = if node != 0: node else: self.binding_decl_node(view_sym)

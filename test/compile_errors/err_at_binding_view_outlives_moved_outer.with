@@ -1,0 +1,23 @@
+//! expect-check-fail: view 'tag' may outlive its origin 'whole'
+
+// §9.7, §21.1: inside `whole @ .Click(tag, n)` a `tag` that is not Copy is
+// a view of `whole`. Moving `whole` while `tag` is in scope is refused, as
+// for any view. It compiled, and `tag` had been moved out of `whole`, which
+// then held a blank.
+type Tag { name: str }
+impl Drop for Tag:
+    move fn drop(): print(f"drop {self.name}")
+
+enum Ev:
+    Click(tag: Tag, n: i32)
+
+fn take(e: Ev) -> i32:
+    match move e:
+        .Click(t, n) => n + t.name.len() as i32
+
+fn handle(e: Ev) -> i32:
+    match move e:
+        whole @ .Click(tag, n) => tag.name.len() as i32 + take(whole)
+
+fn main:
+    print(handle(.Click(Tag { name: "a" }, 9)))
