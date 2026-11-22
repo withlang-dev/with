@@ -452,9 +452,10 @@ impl CiProject:
         false
 
     // A function the proofs are about: one a unit defines, or one the
-    // package's introspection files declare facts for (D121 step 3).
+    // package's introspection files declare facts for (D121 step 3), or one
+    // a registry resource names (a prebuilt package defines none here).
     fn fd_subject(si: i32) -> bool:
-        self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and (self.symbols[si].has_definition != 0 or self.symbols[si].gir.len() > 0 or self.symbols[si].registry.len() > 0)
+        self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and (self.symbols[si].has_definition != 0 or self.symbols[si].gir.len() > 0 or self.symbols[si].registry.len() > 0 or self.registry_value_fns.contains(self.symbols[si].name))
 
     // The pointer parameters of `si`: how many, and the index of the one
     // when there is exactly one (else -1).
@@ -1583,7 +1584,11 @@ impl CiProject:
             let ret = fd_record_pointee(self.symbols[si].ret_ty)
             var verdict = ""
             let unpresentable = if self.symbols[si].owns_return != 0 and modeled.contains(ret): self.fd_unpresentable_param(si as i32, -1, modeled) else: -1
-            if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.fd_copy_source_param(si as i32) >= 0:
+            if self.registry_value_fns.contains(self.symbols[si].name):
+                // The registry's by-value resource names this function: its
+                // stanza presents it, whatever the draft's own proof found.
+                verdict = "stated by the registry's resource"
+            else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.fd_copy_source_param(si as i32) >= 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ f", but param {self.fd_copy_source_param(si as i32)} is another " ++ fd_resource_name(ret) ++ ": that the copy shares nothing with its source is not proven; a contract states 'independent' on the resource (§16.2b.6)"
             else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.symbols[si].variadic != 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ ", but variadic, which the facade does not describe"

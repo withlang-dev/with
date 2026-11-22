@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.79
+# The With Programming Language — Specification v7.80
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.80:** #3173 (Eric, 2026-11-21; words blessed the same day). §31: a fixed argument is a literal, a constant the header defines, or `sizeof` of a type the header declares (`fixed_value`). §16.2b.11 says what each must be: a constant is a value of the parameter's type, and a size fits the integer parameter that receives it. Implemented, with an in-place initializer taking fixed arguments (zlib's `inflateInit_` passes `ZLIB_VERSION` and `sizeof(z_stream)`).
+
 **Changelog v7.79:** (Eric, 2026-11-21.) §18.1: a file named on the command line is With source whatever its name; where the toolchain finds source files itself, it finds files with the extension `.with` (status note: `.w` is still found while the extension changes). §17.1 (D227): the package rule does not apply to evaluation in the capability-bearing mode, of a build file or a tool; the sentence that exempted only the build and compiler APIs is replaced.
 
 **Changelog v7.78:** D227 (Eric, 2026-11-21; words blessed the same day). §17.1: a compile-time call that crosses a package boundary reaches only a `comptime fn`, transitively; the runtime's target queries are `comptime fn`s the compiler answers; reflection on a type and the build and compiler APIs are outside the rule. §18.5c (D39 amended): a `comptime fn` crosses a bundle boundary with its body and the bodies of the functions of its package it reaches. Implemented for calls of functions and methods; status notes say what is not yet.

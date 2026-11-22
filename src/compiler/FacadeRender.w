@@ -2561,7 +2561,8 @@ fn facade_render_fixed_literal(pool: &AstPool, intern: &InternPool, decl: i32, p
         let ops = pool.get_data1(clause as NodeId)
         if facade_render_param_ref(pool, intern, decl, pool.get_extra(ops)) != pi:
             continue
-        return facade_render_literal(pool, pool.get_extra(ops + 1))
+        let start = pool.fn_meta_param_start(pool.find_fn_meta(decl as NodeId))
+        return facade_render_fixed_value(pool, intern, pool.get_extra(ops + 1), render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId))
     ""
 
 // D209 (§16.2b.11): whether `param N discarded` names parameter `pi`.
@@ -2662,6 +2663,14 @@ fn facade_render_literal(pool: &AstPool, node: i32) -> str:
     if kind == NodeKind.NK_INT_LIT: return f"{pool.int_lit_value(node as NodeId)}"
     if kind == NodeKind.NK_UNARY and pool.get_data0(node as NodeId) == UnaryOp.UOP_NEGATE: return "-" ++ facade_render_literal(pool, pool.get_data1(node as NodeId))
     ""
+
+// `fixed NAME` passes the header's constant; `fixed sizeof(T)` passes the
+// type's size as the parameter's integer type (Sema checked that it fits).
+fn facade_render_fixed_value(pool: &AstPool, intern: &InternPool, node: i32, ptype: &str) -> str:
+    let kind = pool.kind(node as NodeId)
+    if kind == NodeKind.NK_IDENT: return intern.resolve(pool.get_data0(node as NodeId))
+    if kind == NodeKind.NK_GROUPED: return "sizeof[" ++ intern.resolve(pool.get_data0(pool.get_data0(node as NodeId) as NodeId)) ++ "]() as " ++ ptype
+    facade_render_literal(pool, node)
 
 // The buffer pairing parameter `pi` takes part in: (the pointer parameter,
 // the length parameter, inout), or (-1, -1, 0).

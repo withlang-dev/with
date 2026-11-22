@@ -122,6 +122,9 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
     var in_value = false
     var current_fn = ""
     var in_resource = false
+    // The `fn` item the carried text last opened, so several clauses of
+    // one function share one item.
+    var value_item = ""
     var record = ""
     var line_no: isize = 0
     for raw in source.split("\n"):
@@ -148,6 +151,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
                 if words[1] == words[3]: return Err(facts_error(path, line_no, "a by-value resource needs a name of its own: `" ++ words[1] ++ "` is the record's"))
                 facts.value_resources.push(words[1])
                 facts.value_text = facts.value_text ++ "    " ++ stripped ++ "\n"
+                value_item = ""
                 continue
             let at = stripped.find(" wraps *mut ")
             record = stripped.slice(at + 12, stripped.len()).trim()
@@ -213,7 +217,17 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             // An operation of a by-value resource: it reads the record it
             // is passed and keeps nothing of it.
             facts.value_fns.push(current_fn)
-            facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+            value_item = current_fn
+            facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+        else if clause.starts_with("param ") and clause.contains(" fixed ") and facts.value_fns.contains(current_fn):
+            // §16.2b.11: a parameter of a by-value resource's function that
+            // the presented call always passes (zlib's `inflateInit_` takes
+            // the header's version text and the stream's size). Carried as
+            // written, like the resource that names the function.
+            if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+            value_item = current_fn
+            facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
         else if clause == "lend":
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "lend", record: "", cite: cite })
         else if clause.starts_with("consumes param "):

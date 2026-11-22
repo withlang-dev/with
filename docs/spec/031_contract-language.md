@@ -180,7 +180,8 @@ retention       = "retains" "by" param_ref
                   [ "length" "param" CONST "as" type ]
                   [ "until" name { "," name } ]
 domain_clause   = "establishes" "domain" name | "ends" "domain" name | "requires" "domain" name
-presentation    = "of" TypeName | "rename" name | param_ref "fixed" literal | param_ref "discarded"
+presentation    = "of" TypeName | "rename" name | param_ref "fixed" fixed_value | param_ref "discarded"
+fixed_value     = literal | CONST | "sizeof" "(" type ")"
 
 param_ref       = "param" ( name | INTEGER | "type" type )
 ref             = name | INTEGER
