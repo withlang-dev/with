@@ -7307,6 +7307,18 @@ impl ComptimeEvaluator:
             if op == BinaryOp.OP_DIV: return comptime_control_value(comptime_value_float(float_ty, lf / rf, ""))
             return self.fail(node, "operator is not comptime-evaluable on floats")
         if comptime_value_is_intlike(lhs) == false or comptime_value_is_intlike(rhs) == false:
+            // An operator on a user's type is a call of its method (#1819):
+            // Sema chose the method, and the evaluator calls it as any
+            // other function, the package rule included.
+            // Fold-order evaluation can reach an operator Sema has not
+            // checked yet: ask Sema now, as a generic call does.
+            if not self.sema.operator_method_calls.contains(node):
+                let _checked = self.sema.check_expr(node)
+            if self.sema.operator_method_calls.contains(node) and not self.sema.operator_method_derived.contains(node):
+                let operator_fn = self.sema.operator_method_calls.get(node).unwrap()
+                let reversed = (self.sema.operator_method_reversed.get(node) ?? 0) != 0
+                let operands = if reversed: [rhs, lhs] else: [lhs, rhs]
+                return self.eval_fn_symbol_call_values(operator_fn, operands, node)
             return self.fail(node, "operator requires integer comptime values")
         let lv = comptime_value_intlike(lhs)
         let rv = comptime_value_intlike(rhs)
