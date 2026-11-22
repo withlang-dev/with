@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.80
+# The With Programming Language — Specification v7.81
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.81:** #3521 (Eric, 2026-11-21). §16.2b.15: `use contracts.<name>` and a `c_import` of the library's header see the same types, functions, constants and globals; the sentence listed only types and functions, and through the contract route only the modeled resource was visible. Implemented.
+
 **Changelog v7.80:** #3173 (Eric, 2026-11-21; words blessed the same day). §31: a fixed argument is a literal, a constant the header defines, or `sizeof` of a type the header declares (`fixed_value`). §16.2b.11 says what each must be: a constant is a value of the parameter's type, and a size fits the integer parameter that receives it. Implemented, with an in-place initializer taking fixed arguments (zlib's `inflateInit_` passes `ZLIB_VERSION` and `sizeof(z_stream)`).
 
 **Changelog v7.79:** (Eric, 2026-11-21.) §18.1: a file named on the command line is With source whatever its name; where the toolchain finds source files itself, it finds files with the extension `.with` (status note: `.w` is still found while the extension changes). §17.1 (D227): the package rule does not apply to evaluation in the capability-bearing mode, of a build file or a tool; the sentence that exempted only the build and compiler APIs is replaced.
