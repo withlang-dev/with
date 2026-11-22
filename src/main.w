@@ -1,5 +1,6 @@
 // CLI entry point for With compiler.
 
+use compiler.SourceExt
 use Lexer
 use Token
 use Ast
@@ -2835,7 +2836,7 @@ fn build_graph_find_build_root(start_dir: &str) -> str:
     var cur = if start_dir.len() > 0: with_str_clone_ref(start_dir) else: "."
     while true:
         let manifest = resolve_join(cur, "with.toml")
-        let build_file = resolve_join(cur, "build.w")
+        let build_file = source_ext_found(resolve_join(cur, "build.w"))
         if project_config_file_exists(manifest) or project_config_file_exists(build_file):
             return project_config_absolutize_path(cur)
         let parent = resolve_dirname(cur)
@@ -3848,7 +3849,7 @@ fn reseed_gate_smoke(root: &str, compiler_path: &str) -> i32:
     var check_argv = ""
     check_argv = build_graph_argv_append(check_argv, compiler_path)
     check_argv = build_graph_argv_append(check_argv, "check")
-    check_argv = build_graph_argv_append(check_argv, resolve_join(root, "build.w"))
+    check_argv = build_graph_argv_append(check_argv, source_ext_found(resolve_join(root, "build.w")))
     let check_out = resolve_join(gate_dir, "check.stdout")
     let check_err = resolve_join(gate_dir, "check.stderr")
     let check_rc = build_graph_rt_exec_argv_capture(check_argv, check_out, check_err, 300000)
@@ -4012,8 +4013,8 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
         if root.len() == 0:
             with_eprint("error: 'build' requires a source file argument, build.w, or a with.toml project")
             return 1
-        let build_path = resolve_join(root, "build.w")
-        let cfg = project_config_load_for_source(root ++ "/src/main.w")
+        let build_path = source_ext_found(resolve_join(root, "build.w"))
+        let cfg = project_config_load_for_source(source_ext_found(root ++ "/src/main.w"))
         if cfg.manifest_error.len() > 0:
             with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
             return 1
@@ -4105,8 +4106,8 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
             link_stage_cleanup_current_process_temp_archives()
             build_report_wall(selected_target_name, cmd_t0)
             return build_rc
-        let root_main = root ++ "/main.w"
-        actual_source = if with_fs_file_exists(root_main) != 0: root_main else: root ++ "/src/main.w"
+        let root_main = source_ext_found(root ++ "/main.w")
+        actual_source = if with_fs_file_exists(root_main) != 0: root_main else: source_ext_found(root ++ "/src/main.w")
         actual_options.source_path = actual_source
         if actual_options.output_path == "" and cfg.package_name.len() > 0:
             actual_options.output_path = runtime_program_path("out/bin/" ++ cfg.package_name)
@@ -4167,11 +4168,11 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     if root.len() == 0:
         with_eprint("error: 'run' requires a source file argument, build.w, or a with.toml project")
         return 1
-    let build_path = resolve_join(root, "build.w")
+    let build_path = source_ext_found(resolve_join(root, "build.w"))
     if not project_config_file_exists(build_path):
         with_eprint("error: 'run' requires a source file argument or build.w project")
         return 1
-    let cfg = project_config_load_for_source(root ++ "/src/main.w")
+    let cfg = project_config_load_for_source(source_ext_found(root ++ "/src/main.w"))
     if cfg.manifest_error.len() > 0:
         with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
         return 1
@@ -6154,11 +6155,11 @@ fn doc_default_source(source: &str) -> str:
         return with_str_clone_ref(source)
     let root = build_graph_find_build_root(".")
     if root.len() > 0:
-        let project_main = resolve_join(root, "src/main.w")
+        let project_main = source_ext_found(resolve_join(root, "src/main.w"))
         if with_fs_file_exists(project_main) != 0:
             return project_main
-    if with_fs_file_exists("src/main.w") != 0:
-        return "src/main.w"
+    if with_fs_file_exists(source_ext_found("src/main.w")) != 0:
+        return source_ext_found("src/main.w")
     ""
 
 fn doc_output_path(output: &str) -> str:
@@ -6510,7 +6511,7 @@ fn run_fmt_command(argc: i32) -> i32:
 fn run_clean_command -> i32:
     let root = build_graph_find_build_root(".")
     if root.len() > 0:
-        let build_path = resolve_join(root, "build.w")
+        let build_path = source_ext_found(resolve_join(root, "build.w"))
         if project_config_file_exists(build_path):
             return run_graph_target_command("clean")
     let out_rc = with_fs_remove_tree("out")

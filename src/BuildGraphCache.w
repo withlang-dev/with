@@ -483,9 +483,9 @@ fn build_cache_hash_action_sources(root: &str, paths: &List[str]) -> str:
     build_cache_sha256_text(combined)
 
 fn build_cache_hash_build_graph_sources(root: &str) -> str:
-    var combined = "build.w:" ++ build_cache_fingerprint_file(root ++ "/build.w") ++ "\n"
+    var combined = "build.w:" ++ build_cache_fingerprint_file(source_ext_found(root ++ "/build.w")) ++ "\n"
     combined = combined ++ "build:" ++ build_cache_hash_directory_w_files(root, "build") ++ "\n"
-    combined = combined ++ "std.build:" ++ build_cache_fingerprint_file(root ++ "/lib/std/build.w") ++ "\n"
+    combined = combined ++ "std.build:" ++ build_cache_fingerprint_file(source_ext_found(root ++ "/lib/std/build.w")) ++ "\n"
     build_cache_sha256_text(combined)
 
 // Plain content hash (no mode/exec framing) so external evidence checkers
@@ -1411,7 +1411,7 @@ fn build_cache_record_build_effects(root: &str, effects: &List[str]):
         let _remove = build_graph_rt_remove_file(path)
 
 fn build_cache_print_effects(root: &str, graph: &BuildGraph, target_filter: &str) -> i32:
-    if target_filter.len() == 0 or target_filter == "build.w":
+    if target_filter.len() == 0 or target_filter == "build.w" or target_filter == "build.with":
         build_graph_rt_write("target build.w\n")
         build_graph_rt_write("  capabilities: BuildCtx ProjectInfo Diagnostics SourceEmitter ToolFs ProcessRunner Workspace\n")
         let build_effects_path = build_cache_build_effects_path(root)
