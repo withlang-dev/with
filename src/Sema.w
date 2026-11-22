@@ -5991,6 +5991,25 @@ impl Sema:
             listed = listed ++ "use " ++ modules[best] ++ "." ++ name
         "; candidates: " ++ listed
 
+    // The module whose `c_import` declares `sym`, when it is not this one.
+    fn c_import_declaring_path(sym: i32) -> str:
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            let path = self.decl_visibility_paths[i]
+            if path.len() > 0 and path != self.current_module_path: return with_str_clone_ref(path)
+            i = self.decl_visibility_prev[i]
+        ""
+
+    // The header the module at `path` imports with `c_import`, or "".
+    fn c_import_header_of_module(path: &str) -> str:
+        var di = 0
+        for decl_path in self.decl_source_paths:
+            if decl_path == path and di < self.ast.decl_count():
+                let decl = self.ast.get_decl(di as i32)
+                if self.ast.kind(decl) == NodeKind.NK_C_IMPORT: return self.safe_symbol_text(self.ast.get_data0(decl))
+            di += 1
+        ""
+
     mut fn emit_private_symbol_error(sym: i32, node: i32) -> Unit:
         // A symbol this unit's own c_import omitted names the import gap,
         // whatever a std module of the same name would need.
@@ -6013,7 +6032,17 @@ impl Sema:
             self.emit_error("'" ++ name ++ "' requires an explicit import (§18.1)" ++ gate_note, node)
             return
         let path = self.private_symbol_path_from_current(sym)
-        if path.len() > 0:
+        // A C header's name is seen by the module that imports the header
+        // or the library's contract (§16.2b.15). It is never "private" to
+        // the module that happened to import it, whether or not that
+        // module is itself imported here.
+        let importer = if self.ci_syms.contains(sym): self.c_import_declaring_path(sym) else: ""
+        if importer.len() > 0:
+            let header = self.c_import_header_of_module(importer)
+            let from_header = if header.len() > 0 and not header.contains("\n"): " of the C header '" ++ header ++ "'" else: " of a C header"
+            let fix = if sema_path_is_contract_module(importer): "import the library's contract in this module (`use contracts.<name>`), or its header" else if header.len() > 0 and not header.contains("\n"): "import the header in this module: `use c_import(\"" ++ header ++ "\")`" else: "import the header in this module"
+            self.emit_error_with_help("'" ++ name ++ "' is a name" ++ from_header ++ ", which '" ++ importer ++ "' imports and this module does not (§16.2b.15)", node, fix)
+        else if path.len() > 0:
             self.emit_error("symbol '" ++ name ++ "' is private to its package (declared in '" ++ path ++ "', §18.3)", node)
         else:
             self.emit_error("symbol '" ++ name ++ "' is not visible from this module", node)
