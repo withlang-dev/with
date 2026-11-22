@@ -11849,6 +11849,27 @@ impl Sema:
                         best_name = with_str_clone_ref(name)
         best_name
 
+    // The method of `type_name` the programmer most likely meant by
+    // `target`: one within a small edit distance, or the same name with or
+    // without a prefix (a facade presents `lzma_easy_encoder` on `Stream`
+    // as `easy_encoder`). "" when none is close.
+    fn suggest_method_name(type_name: &str, target: &str) -> str:
+        if target.len() == 0 or type_name.len() == 0: return ""
+        let prefix = type_name ++ "."
+        let max_dist: i32 = if target.len() <= 3: 1 else: 2
+        var best_name = ""
+        var best_dist = max_dist + 1
+        for sym in self.sig_names:
+            let full = self.pool_resolve(sym)
+            if not full.starts_with(prefix): continue
+            let name = full.slice(prefix.len(), full.len())
+            if name.len() == 0 or name == target: continue
+            let d = if target.ends_with("_" ++ name) or name.ends_with("_" ++ target): 0 else: sema_levenshtein(target, name, max_dist)
+            if d < best_dist:
+                best_dist = d
+                best_name = with_str_clone_ref(name)
+        best_name
+
     fn suggest_type_name(target: &str, node: i32) -> str:
         if target.len() == 0 or sema_str_has_data(target) == false:
             return ""
