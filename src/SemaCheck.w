@@ -39837,7 +39837,11 @@ impl Sema:
         if self.get_type_kind(self.auto_deref_ref_ptr_type(seq_resolved)) == TypeKind.TY_STR and not string_module_loaded:
             self.emit_error_with_help("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node, "`str` methods are declared in std.string, which this unit does not import (it is compiled without the prelude): add `use std.string`")
             return 0
-        self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node)
+        let meant = self.suggest_method_name(receiver_name, method_name)
+        if meant.len() > 0:
+            self.emit_error_with_help("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node, "did you mean `" ++ meant ++ "`?")
+        else:
+            self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node)
         0
 
     fn is_intrinsic_fn_sym(fn_sym: i32) -> bool:
