@@ -1326,6 +1326,215 @@ impl CiProject:
 
     // The pointer-to-record representations the corpus produces or
     // destroys, in first-seen order of the symbol table.
+    // #3173 (§16.2b.3, D198): an in-place resource is proposed only from a
+    // proof over the source, never from a name. The record is one the
+    // caller allocates: a header the package installs defines it, and no
+    // function produces or destroys a pointer to it. Its init function is
+    // handed the record and gives one of its fields a fresh allocation
+    // nothing else keeps; its end function hands that same field to a
+    // destroyer. Exactly one of each, over one field: two init functions
+    // or two end functions are two resources over one record
+    // (inflateInit/inflateEnd and deflateInit/deflateEnd over a z_stream),
+    // which a contract states.
+    //
+    // Whether local `local` of `si` is a fresh allocation whose only store
+    // is into field `field` of the record parameter `pi` names.
+    fn fd_local_fresh_for_field(si: i32, local: &str, pi: i32, field: &str) -> bool:
+        var stores = 0
+        var field_stores = 0
+        var fresh = false
+        for line in self.symbols[si].own_evidence.split("\n"):
+            let parts = line.split(":")
+            if parts.len() < 2 or parts[1] != local: continue
+            if parts[0] == "localstore": stores += 1
+            else if parts[0] == "localfield" and parts.len() == 4 and fd_i32(parts[2]) == pi and parts[3] == field: field_stores += 1
+            else if parts[0] == "localout" or parts[0] == "localaddr" or parts[0] == "localfield": return false
+            else if parts[0] == "localsink" and parts.len() == 4:
+                if self.fd_callee_retains(parts[2], fd_i32(parts[3])): return false
+            else if parts[0] == "localsrc" and parts.len() >= 3:
+                let src = line.slice(("localsrc:" ++ local ++ ":").len(), line.len())
+                if src == "null": continue
+                if not src.starts_with("call:") and not src.starts_with("indirect:"): return false
+                if self.fd_source_verdict(si, src, 1, -1) != "owned": return false
+                fresh = true
+        fresh and stores == field_stores and field_stores > 0
+
+    // The fields of the record parameter `pi` of `si` names that the body
+    // gives a fresh allocation (`want_init`), or hands to a destroyer.
+    fn fd_inplace_fields(si: i32, pi: i32, want_init: bool) -> List[str]:
+        let out = []
+        let head = if want_init: f"fieldset:{pi}:" else: f"fieldsink:{pi}:"
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if not line.starts_with(head): continue
+            let parts = line.slice(head.len(), line.len()).split(":")
+            if parts.len() < 2 or out.contains(parts[0]): continue
+            if not want_init:
+                if parts.len() == 3 and self.fd_callee_destroys(parts[1], fd_i32(parts[2])): out.push(parts[0].to_owned())
+                continue
+            // Every value the field is given here is NULL or the one fresh
+            // local; at least one is the local.
+            var fresh = false
+            var other = false
+            let field_head = head ++ parts[0] ++ ":"
+            for given in self.symbols[si].own_evidence.split("\n"):
+                if not given.starts_with(field_head): continue
+                let src = given.slice(field_head.len(), given.len())
+                if src == "null": continue
+                if src.starts_with("local:") and self.fd_local_fresh_for_field(si, src.slice(6, src.len()), pi, parts[0]): fresh = true
+                // `p->state = alloc(...)`: the call's result goes nowhere else.
+                else if (src.starts_with("call:") or src.starts_with("indirect:")) and self.fd_source_verdict(si, src, 1, -1) == "owned": fresh = true
+                else: other = true
+            if fresh and not other: out.push(parts[0].to_owned())
+        out
+
+    // `si:pi:field` for every function that is an init (`want_init`) or an
+    // end of an in-place `record`.
+    fn fd_inplace_candidates(record: &str, want_init: bool) -> List[str]:
+        let out = []
+        var si = -1
+        for symbol in self.symbols:
+            si += 1
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si) or symbol.header_declared == 0 or symbol.has_definition == 0 or symbol.variadic != 0 or symbol.unanalyzable != 0: continue
+            var pi = 0
+            for ty in symbol.param_ty:
+                if ty == "*mut " ++ record:
+                    for field in self.fd_inplace_fields(si, pi, want_init): out.push(f"{si}:{pi}:" ++ field)
+                pi += 1
+        out
+
+    // The init and end functions of `record` when exactly one of each is
+    // proven over one field, as `[init si, init pi, end si, end pi]`; an
+    // empty list otherwise.
+    fn fd_inplace_functions(record: &str) -> List[i32]:
+        if self.unread.len() > 0 or not self.installed_pointer_records.contains(record) or self.fd_representations().contains(record): return []
+        let inits = self.fd_inplace_candidates(record, true)
+        let ends = self.fd_inplace_candidates(record, false)
+        if inits.len() != 1 or ends.len() != 1: return []
+        let i = inits[0].split(":")
+        let e = ends[0].split(":")
+        // The init is handed the record first (`init f(self)`), the end
+        // takes it alone, and both name the one field.
+        if i[2] != e[2] or fd_i32(i[1]) != 0 or fd_i32(e[1]) != 0 or self.symbols[fd_i32(e[0])].param_ty.len() != 1: return []
+        [fd_i32(i[0]), fd_i32(i[1]), fd_i32(e[0]), fd_i32(e[1])]
+
+    // What the init function `si` returns once it has filled `field`:
+    // `void` when it returns nothing, the constant's name when the body
+    // proves one (CImport.w ci_init_shape_evidence), `literal:<K>` when the
+    // proven constant has no name, and "" when nothing is proven.
+    fn fd_inplace_status(si: i32, field: &str) -> str:
+        if self.symbols[si].ret_ty == "Unit" or self.symbols[si].ret_ty == "void" or self.symbols[si].ret_ty.len() == 0: return "void"
+        for line in self.symbols[si].own_evidence.split("\n"):
+            let parts = line.split(":")
+            if parts.len() == 5 and parts[0] == "initshape" and parts[1] == "0" and parts[2] == field: return if parts[4].len() > 0: parts[4].to_owned() else: "literal:" ++ parts[3]
+        ""
+
+    // Why `si`, a proven init function of an in-place record, is still not
+    // drafted: its success status is unproven, or is a literal an `ok`
+    // clause cannot name. "" for any other function.
+    fn fd_inplace_unstated_status(si: i32) -> str:
+        if self.symbols[si].header_declared == 0 or self.symbols[si].param_ty.len() == 0 or not self.symbols[si].param_ty[0].starts_with("*mut "): return ""
+        let record = self.symbols[si].param_ty[0].slice(5, self.symbols[si].param_ty[0].len())
+        let pair = self.fd_inplace_functions(record)
+        if pair.len() != 4 or pair[0] != si: return ""
+        let field = self.fd_inplace_field(record)
+        let status = self.fd_inplace_status(si, field)
+        let proven = "an in-place initializer of " ++ record ++ " (gives its " ++ field ++ " field a fresh allocation, which " ++ self.symbols[pair[2]].name ++ " frees)"
+        if status.len() == 0: return proven ++ ", but the status it returns on success is not proven; a contract states the resource with 'init " ++ self.symbols[si].name ++ "(self)', 'drop " ++ self.symbols[pair[2]].name ++ "' and 'ok <CONST>' (§16.2b.4)"
+        // D226 (A): an init that can report success with the allocation
+        // failed is no proof, unless the destroyer accepts a null pointer.
+        if not self.fd_inplace_end_accepts_null(record): return proven ++ ", but it can report success after its allocation failed, and " ++ self.symbols[pair[2]].name ++ " hands the field to " ++ self.fd_inplace_end_callee(record) ++ ", which is not known to accept NULL; a contract states the resource"
+        ""
+
+    // The function the end of an in-place `record` hands the shared field
+    // to, or "".
+    fn fd_inplace_end_callee(record: &str) -> str:
+        let pair = self.fd_inplace_functions(record)
+        if pair.len() != 4: return ""
+        let head = f"fieldsink:{pair[3]}:" ++ self.fd_inplace_field(record) ++ ":"
+        for line in self.symbols[pair[2]].own_evidence.split("\n"):
+            if line.starts_with(head):
+                let parts = line.slice(head.len(), line.len()).split(":")
+                if parts.len() == 2: return parts[0].to_owned()
+        ""
+
+    // Whether that function accepts a null pointer: C's `free` does
+    // nothing for one (C17 7.22.3.3), and so does a name the proofs found
+    // to be `free` itself. Nothing else is assumed to.
+    fn fd_inplace_end_accepts_null(record: &str) -> bool:
+        let callee = self.fd_inplace_end_callee(record)
+        callee.len() > 0 and (ci_own_is_libc_free(callee) or self.free_aliases.contains(callee))
+
+    // What the proofs found of an in-place resource in `si` when no pair
+    // was drafted: it fills or frees a field of a caller-allocated record,
+    // and how many functions do each. "" when it does neither.
+    fn fd_inplace_partial(si: i32) -> str:
+        if self.symbols[si].header_declared == 0 or self.symbols[si].has_definition == 0: return ""
+        var pi = 0
+        for ty in self.symbols[si].param_ty:
+            if ty.starts_with("*mut ") and self.installed_pointer_records.contains(ty.slice(5, ty.len())):
+                let record = ty.slice(5, ty.len())
+                let filled = self.fd_inplace_fields(si, pi, true)
+                let freed = self.fd_inplace_fields(si, pi, false)
+                if (filled.len() > 0 or freed.len() > 0) and self.fd_inplace_functions(record).len() != 4:
+                    let what = if filled.len() > 0: "gives the " ++ filled[0] ++ " field of " ++ record ++ " a fresh allocation" else: "frees the " ++ freed[0] ++ " field of " ++ record
+                    return what ++ f"; {self.fd_inplace_candidates(record, true).len()} function(s) fill a field of {record} and {self.fd_inplace_candidates(record, false).len()} free one, so no one init and end pair is proven: a contract states each pair as a resource"
+            pi += 1
+        ""
+
+    // The proven pair for `record`, or an empty list. A status-returning
+    // init is one only with its success status proven and named: without
+    // `ok` the resource would be live after a failed init, and its end
+    // function would run on storage the init never filled.
+    fn fd_inplace_pair(record: &str) -> List[i32]:
+        let pair = self.fd_inplace_functions(record)
+        if pair.len() != 4: return pair
+        let status = self.fd_inplace_status(pair[0], self.fd_inplace_field(record))
+        if status.len() == 0 or not self.fd_inplace_end_accepts_null(record): return []
+        pair
+
+    // The field an in-place `record`'s proven pair shares.
+    fn fd_inplace_field(record: &str) -> str:
+        let inits = self.fd_inplace_candidates(record, true)
+        if inits.len() != 1: "" else: inits[0].split(":")[2].to_owned()
+
+    // §16.2b.3: a field of an in-place resource's record is read through
+    // the resource, so an operation presented under a field's name is a
+    // contract error. The presented name is a shortening of the C name, so
+    // an operation whose C name ends in a field's name (case and
+    // underscores apart) may clash; the draft leaves it raw and says so.
+    fn fd_inplace_field_clash(si: i32, inplace: &List[str]) -> str:
+        let cname = self.symbols[si].name.to_lower().replace("_", "")
+        for ty in self.symbols[si].param_ty:
+            let record = fd_record_pointee(ty)
+            if record.len() == 0 or not inplace.contains(record): continue
+            for field in (self.pointer_record_fields.get(record).cloned() ?? "").split(","):
+                if field.len() > 0 and cname.ends_with(field.to_lower().replace("_", "")): return field.to_owned()
+        ""
+
+    // The records proven in-place resources, in the order the functions
+    // that take them are declared.
+    fn fd_inplace_records() -> List[str]:
+        let out = []
+        let seen = []
+        for symbol in self.symbols:
+            if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.header_declared == 0: continue
+            for ty in symbol.param_ty:
+                if not ty.starts_with("*mut "): continue
+                let record = ty.slice(5, ty.len())
+                if seen.contains(record) or not self.installed_pointer_records.contains(record): continue
+                seen.push(record.to_owned())
+                if self.fd_inplace_pair(record).len() == 4: out.push(record.to_owned())
+        out
+
+    // `init:<record>` or `end:<record>` when `si` is the proven init or
+    // end function of an in-place record; "" otherwise.
+    fn fd_inplace_role(si: i32, inplace: &List[str]) -> str:
+        for record in inplace:
+            let pair = self.fd_inplace_pair(record)
+            if pair.len() == 4 and pair[0] == si: return "init:" ++ record
+            if pair.len() == 4 and pair[2] == si: return "end:" ++ record
+        ""
+
     fn fd_representations() -> List[str]:
         let out: List[str] = []
         for si in 0..self.symbols.len():
@@ -1451,6 +1660,10 @@ impl CiProject:
                 if self.fd_presentable_producers_of(record, out).len() > 0 or self.fd_borrow_candidates_from(record, out).len() > 0:
                     out.push(record)
                     changed = true
+        // #3173: an in-place resource's record is modeled too: an operation
+        // that takes a pointer to it lends that resource.
+        for record in self.fd_inplace_records():
+            if not out.contains(record): out.push(record)
         out
 
     // #3123: every typedef of `void` is one representation to the checker
@@ -1480,7 +1693,19 @@ impl CiProject:
         if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
         if self.registry_threads.len() > 0: text = text ++ "    runs threads    // registry: " ++ self.registry_threads ++ "\n"
         self.draft_name = name
+        let inplace = self.fd_inplace_records()
         for record in modeled:
+            // #3173: the record itself, in storage With provides, between
+            // its proven init and end.
+            if inplace.contains(record):
+                let pair = self.fd_inplace_pair(record)
+                let field = self.fd_inplace_field(record)
+                self.presented.push(pair[0])
+                self.presented.push(pair[2])
+                let status = self.fd_inplace_status(pair[0], field)
+                let ok_line = if status == "void": "" else: "        ok " ++ (if status.starts_with("literal:"): status.slice(8, status.len()) else: status) ++ "    // proof: returned only after the " ++ field ++ " field is filled; every return before that is another constant\n"
+                text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps " ++ record ++ "\n        init " ++ self.symbols[pair[0]].name ++ "(self)    // proof: gives the record's " ++ field ++ " field a fresh allocation nothing else keeps\n" ++ ok_line ++ "        drop " ++ self.symbols[pair[2]].name ++ "    // proof: frees the " ++ field ++ " field " ++ self.symbols[pair[0]].name ++ " filled\n"
+                continue
             text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
             let producers = self.fd_presentable_producers_of(record, modeled)
             for si in producers:
@@ -1513,6 +1738,8 @@ impl CiProject:
         // and presents the operation on its resource.
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
+            // #3173: an in-place resource's init and end are its clauses.
+            if self.fd_inplace_role(si as i32, inplace).len() > 0 or self.fd_inplace_field_clash(si as i32, inplace).len() > 0: continue
             // D198: an operation the registry states on a by-value resource
             // is that resource's; its block is the registry's.
             if self.registry_value_fns.contains(self.symbols[si].name):
@@ -1569,6 +1796,7 @@ impl CiProject:
     // raw; a summary first.
     fn facade_report(name: &str) -> str:
         let modeled = self.fd_modeled_records()
+        let inplace = self.fd_inplace_records()
         var lines = ""
         var safe = 0
         var raw = 0
@@ -1584,10 +1812,21 @@ impl CiProject:
             let ret = fd_record_pointee(self.symbols[si].ret_ty)
             var verdict = ""
             let unpresentable = if self.symbols[si].owns_return != 0 and modeled.contains(ret): self.fd_unpresentable_param(si as i32, -1, modeled) else: -1
+            let inplace_role = self.fd_inplace_role(si as i32, inplace)
+            let unstated = self.fd_inplace_unstated_status(si as i32)
+            let field_clash = if inplace_role.len() == 0: self.fd_inplace_field_clash(si as i32, inplace) else: ""
             if self.registry_value_fns.contains(self.symbols[si].name):
                 // The registry's by-value resource names this function: its
                 // stanza presents it, whatever the draft's own proof found.
                 verdict = "stated by the registry's resource"
+            else if unstated.len() > 0:
+                verdict = "raw: " ++ unstated
+            else if field_clash.len() > 0:
+                verdict = "raw: its name ends in '" ++ field_clash ++ "', a field of the record its in-place resource wraps, and a field is read through the resource under that name; a contract states the operation with 'rename' (§16.2b.3)"
+            else if inplace_role.starts_with("init:"):
+                verdict = "in-place initializer of " ++ fd_resource_name(inplace_role.slice(5, inplace_role.len())) ++ " (proof: gives the record's " ++ self.fd_inplace_field(inplace_role.slice(5, inplace_role.len())) ++ " field a fresh allocation nothing else keeps)"
+            else if inplace_role.starts_with("end:"):
+                verdict = "destroyer of the in-place " ++ fd_resource_name(inplace_role.slice(4, inplace_role.len())) ++ " (proof: frees the " ++ self.fd_inplace_field(inplace_role.slice(4, inplace_role.len())) ++ " field its initializer filled)"
             else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.fd_copy_source_param(si as i32) >= 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ f", but param {self.fd_copy_source_param(si as i32)} is another " ++ fd_resource_name(ret) ++ ": that the copy shares nothing with its source is not proven; a contract states 'independent' on the resource (§16.2b.6)"
             else if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.symbols[si].variadic != 0:
@@ -1653,7 +1892,9 @@ impl CiProject:
             let attrs = self.symbols[si].attrs
             if attrs.len() > 0: verdict = verdict ++ " [attributes: " ++ attrs.replace(";", " ").trim() ++ "]"
             verdict = verdict ++ self.fd_gir_summary(si as i32) ++ self.fd_registry_summary(si as i32)
-            lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ "\n"
+            // #3173: what was found of an in-place resource when none is drafted.
+            let partial = if verdict.starts_with("raw:"): self.fd_inplace_partial(si as i32) else: ""
+            lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ (if partial.len() > 0: " [in place: " ++ partial ++ "]" else: "") ++ "\n"
         var head = "facade " ++ name ++ f": {total} functions, {safe} presented safely, {raw} raw" ++ (if internal > 0: f"; {internal} internal (no prototype declares them)" else: "") ++ "\n"
         // A registry line is never dropped without a word: a presentation
         // fact (`text param`, `nullable param`, `text return`) is written

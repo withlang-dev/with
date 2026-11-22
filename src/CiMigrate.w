@@ -1147,7 +1147,10 @@ impl CiProject:
                 // D198 (§16.2b.5): where a record is complete and flat; a value record
                 // must be complete in a header the package installs.
                 if rname.len() > 0 and rloc.len() > 0 and ci_decl_is_complete_record(session, i, decl_kind, rcursor): self.complete_records.insert(ci_escape_reserved(rname), ci_migrate_location_file(rloc))
-                else if rname.len() > 0 and ci_decl_is_defined_record(session, i, decl_kind, rcursor): self.pointer_records.insert(ci_escape_reserved(rname), true)
+                else if rname.len() > 0 and ci_decl_is_defined_record(session, i, decl_kind, rcursor):
+                    self.pointer_records.insert(ci_escape_reserved(rname), true)
+                    if rloc.len() > 0: self.pointer_record_files.insert(ci_escape_reserved(rname), ci_migrate_location_file(rloc))
+                    self.pointer_record_fields.insert(ci_escape_reserved(rname), ci_decl_record_field_names(session, rcursor))
             if decl_kind == CK_VAR:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
@@ -2283,6 +2286,11 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         if not file_installed.contains(file): file_installed.insert(file.to_owned(), ci_facade_import_spelling(file, import_dirs).len() > 0)
         if file_installed.get(file).copied() ?? false: installed.push(record.to_owned())
     for record in installed: project.installed_records.insert(record, true)
+    let installed_pointer = []
+    for (record, file) in project.pointer_record_files:
+        if not file_installed.contains(file): file_installed.insert(file.to_owned(), ci_facade_import_spelling(file, import_dirs).len() > 0)
+        if file_installed.get(file).copied() ?? false: installed_pointer.push(record.to_owned())
+    for record in installed_pointer: project.installed_pointer_records.insert(record, true)
     let draft = project.facade_draft(facade_name)
     var spellings: List[str] = []
     for si in project.presented:
@@ -3426,6 +3434,18 @@ fn ci_decl_is_complete_record(session: i64, idx: i32, decl_kind: i32, cursor: i3
     ci_decl_is_defined_record(session, idx, decl_kind, cursor) and ci_type_is_flat(session, with_ci_type_canonical(session, with_ci_cursor_type(session, cursor)), 0)
 
 // Whether the declaration is a record with a definition, or a typedef of one.
+// #3173: the field names of the record a declaration defines, `,`-separated.
+fn ci_decl_record_field_names(session: i64, cursor: i32) -> str:
+    let canonical = with_ci_type_canonical(session, with_ci_cursor_type(session, cursor))
+    if canonical < 0 or with_ci_type_kind(session, canonical) != CXT_Record: return ""
+    let record = with_ci_type_declaration(session, canonical)
+    if record < 0: return ""
+    var out = ""
+    for i in 0..with_ci_num_children(session, record):
+        let child = with_ci_child(session, record, i)
+        if with_ci_cursor_kind(session, child) == CXK_FIELD_DECL: out = out ++ (if out.len() > 0: "," else: "") ++ with_ci_cursor_spelling(session, child)
+    out
+
 fn ci_decl_is_defined_record(session: i64, idx: i32, decl_kind: i32, cursor: i32) -> bool:
     if cursor < 0 or (decl_kind != CK_STRUCT and decl_kind != CK_TYPEDEF): return false
     if decl_kind == CK_STRUCT and not with_cimport_struct_has_definition(session, idx): return false
