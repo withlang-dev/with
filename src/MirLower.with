@@ -12496,7 +12496,16 @@ impl MirBuilder:
             let inner_pat = self.ast.get_data1(pat_node)
             if inner_pat != 0 and self.ast.kind(inner_pat) == NodeKind.NK_PAT_WILDCARD:
                 return out
-            let inner = self.lower_pattern(inner_pat, scrutinee_place)
+            // The outer name owns the whole value; what the inner pattern
+            // binds observes it there (access observes, nothing makes a
+            // second owner). Bound from the subject the outer binding had
+            // just emptied, `err @ .Bad(msg)` moved the string twice: `err`
+            // and `msg` each freed it.
+            let outer_took = self.body.operand_kinds[outer_op] == OperandKind.OK_MOVE
+            let saved_observed = self.pattern_subject_observed
+            if outer_took: self.pattern_subject_observed = 1
+            let inner = self.lower_pattern(inner_pat, if outer_took: outer_place else: scrutinee_place)
+            self.pattern_subject_observed = saved_observed
             for inner_item in inner:
                 out.push(inner_item)
             return out

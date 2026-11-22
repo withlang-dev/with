@@ -1,0 +1,64 @@
+//! expect-stdout: 36
+//! expect-stdout: drop s1111111111111111
+//! expect-stdout: 26
+//! expect-stdout: drop s2222222222222222
+//! expect-stdout: 10
+//! expect-stdout: 17
+//! expect-stdout: s4444444444444444/s4444444444444444
+//! expect-stdout: s5555555555555555
+//! expect-debug-alloc: leak count=0
+
+// §9.7: in `name @ pattern` over an owned subject the outer name owns the
+// value and what the inner pattern binds observes it there. Both were bound
+// from the subject: `err @ .Bad(msg)` moved the string twice and `err` and
+// `msg` each freed it (a double free in safe code, named by `with check
+// --validate-all`), and `whole @ .Click(tag, n)` moved `tag` out of `whole`
+// and left it blank. A Copy payload is copied with its own hold; any other
+// is a view of the outer name. A failed guard gives the value back whole.
+error ParseErr =
+    Bad(msg: str)
+
+type Tag { name: str }
+impl Drop for Tag:
+    move fn drop(): print(f"drop {self.name}")
+
+enum Ev:
+    Click(tag: Tag, n: i32)
+    Key(text: str)
+
+type Point { label: str, x: i32 }
+
+fn make(n: i32) -> str: f"s{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}"
+
+fn code(err: ParseErr) -> i32:
+    match move err:
+        .Bad(m) => m.len() as i32
+
+fn extract(r: Result[i32, ParseErr]) -> i32:
+    match move r:
+        Err(err @ .Bad(msg)) if msg.len() > 3 => code(err) + msg.len() as i32 + 2
+        _ => 0
+
+fn take(e: Ev) -> i32:
+    match move e:
+        .Click(t, n) => n + t.name.len() as i32
+        .Key(text) => text.len() as i32
+
+fn handle(e: Ev) -> i32:
+    match move e:
+        whole @ .Click(tag, n) if n > 5 => tag.name.len() as i32 + n
+        whole @ .Key(text) if text.len() > 100 => 0
+        other => take(other)
+
+fn point(p: Point) -> str:
+    match move p:
+        all @ Point { label, x } if x > 0 => label ++ "/" ++ all.label
+        all => all.label
+
+fn main:
+    print(extract(Err(.Bad(make(0)))))
+    print(handle(.Click(Tag { name: make(1) }, 9)))
+    print(handle(.Click(Tag { name: make(2) }, -7)))
+    print(handle(.Key(make(3))))
+    print(point(Point { label: make(4), x: 1 }))
+    print(point(Point { label: make(5), x: 0 }))
