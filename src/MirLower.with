@@ -632,7 +632,13 @@ impl MirBuilder:
             let payload_ty = self.local_type(payload_local)
             let payload_place = self.place_for_local(payload_local)
             let payload_expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 1: self.sema.sig_param_type(sig_idx, 1) else: 0
-            args.push(self.operand_for_place_arg(payload_place, payload_ty, payload_expected, 0))
+            // The exit takes the payload back by value (a Mutex's
+            // `with_exit_mut` stores it): that is a move, and said as one.
+            // Passed as a copy, the payload's storage then ended "holding a
+            // value no path dropped or moved" for the ownership validator.
+            let payload_arg = self.operand_for_place_arg(payload_place, payload_ty, payload_expected, 0)
+            let given_back = self.body.operand_kinds[payload_arg] == OperandKind.OK_COPY and self.body.operand_d0[payload_arg] == payload_place and self.type_needs_value_drop(payload_ty)
+            args.push(if given_back: self.body.new_operand(OperandKind.OK_MOVE, payload_place) else: payload_arg)
         let args_id = self.body.new_call_args(args)
         self.body.set_call_contract(args_id, sig_idx, mono_sym)
         let cleanup_generic_node = self.generic_fn_node_for_sym(method_sym)
@@ -746,8 +752,14 @@ impl MirBuilder:
     // plain bits are copied; one with drop glue moves out of a non-Copy
     // carrier (as before D111) and is copied, with its own hold, out of a
     // Copy carrier, which keeps its own hold and its drop.
+    // A carrier reached through a view (`names[0] ?? d` over a
+    // `List[Option[str]]`) is judged as the carrier it views: the view's own
+    // type is bits, which read as "not a Copy carrier", and the payload was
+    // moved out of the list's element and freed twice.
     fn carrier_read_kind(read_ty: i32, carrier_ty: i32) -> i32:
-        if self.copy_is_bits(read_ty) or (self.sema.is_copy_frozen(read_ty as TypeId) != 0 and self.carrier_copies(carrier_ty)): OperandKind.OK_COPY else: OperandKind.OK_MOVE
+        let resolved = self.sema.resolve_alias(carrier_ty as TypeId)
+        let carrier = if self.sema.get_type_kind(resolved) == TypeKind.TY_REF: self.sema.get_type_d0(resolved) else: carrier_ty
+        if self.copy_is_bits(read_ty) or (self.sema.is_copy_frozen(read_ty as TypeId) != 0 and self.carrier_copies(carrier)): OperandKind.OK_COPY else: OperandKind.OK_MOVE
 
     // A pattern binding over an observed subject (`match m:` on a place)
     // copies a Copy payload with its own hold; the subject keeps its own.
@@ -12215,7 +12227,13 @@ impl MirBuilder:
         let names: List[i32] = []
         for ci in 0..covered:
             let child = child_places[ci]
-            let moves = self.type_needs_value_drop(self.place_local_type(child))
+            // Over an observed subject (`match t:` on a place) an element
+            // is copied with its own hold, as a named binding is
+            // (pattern_whole_read_kind); the subject keeps its own. Moved
+            // out, the element was freed with the rest tuple and again with
+            // the subject: a double free in `(h, ..rest) if g => …` over a
+            // `(str, str, str)` parameter.
+            let moves = self.pattern_whole_read_kind(self.place_local_type(child)) == OperandKind.OK_MOVE
             let op = self.body.new_operand(if moves: OperandKind.OK_MOVE else: OperandKind.OK_COPY, child)
             if moves:
                 let slot_ty = self.place_local_type(child)
@@ -12223,6 +12241,15 @@ impl MirBuilder:
                 self.log_pattern_move(slot, op)
             fields.push(op)
             names.push(0)
+        // A copy that takes its own hold is an assignment's to make: an
+        // aggregate of copied operands stores the bits and takes none. Each
+        // such element is copied into a temporary, which the tuple takes.
+        for ci in 0..covered:
+            let elem_ty = self.place_local_type(child_places[ci])
+            if self.body.operand_kinds[fields[ci]] == OperandKind.OK_COPY and self.type_needs_value_drop(elem_ty):
+                let held = self.place_for_local(self.new_temp(elem_ty))
+                self.assign_operand_to_place(held, fields[ci], span)
+                fields[ci] = self.body.new_operand(OperandKind.OK_MOVE, held)
         if covered == 0:
             let unit = self.unit_operand()
             self.assign_operand_to_place(local_place, unit, span)
@@ -13309,6 +13336,12 @@ impl MirBuilder:
     // and a later reassign re-arms cleanly.
     mut fn lower_drop_glue_and_consume(recv_node: i32, origin: &str, node: i32) -> i32:
         let place = self.lower_expr_place(recv_node)
+        // A value that is only its bits has nothing to drop and stays
+        // usable (§2.5): `drop(value)` in a generic body instantiated at
+        // `i32` emitted a drop of an integer, and the ownership validator
+        // then held the parameter to a drop on every path (BTreeSet[i32]'s
+        // insert was refused as a leak).
+        if self.copy_is_bits(self.expr_type(recv_node)): return self.unit_operand()
         // #747 instance F: capture live views BEFORE the drop destroys the
         // storage — consume_moved_operand's own capture would clone freed
         // bytes here. It finds the aliases already dead-named and is a no-op.
@@ -15116,6 +15149,14 @@ impl MirBuilder:
         let err_payload_place = self.body.new_field_place(err_downcast, 0, err_ty)
         let err_op = self.body.new_operand(self.carrier_read_kind(err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place)
         let msg = self.lower_fmt_debug(err_op, err_ty, span_node)
+        // The message exists on this path only, and the process ends on it.
+        // Its statement-temp drop ran on the pass path too, over a local
+        // that path never wrote (`drop(_5)` of an uninitialized str).
+        if self.body.operand_kinds[msg] != OperandKind.OK_CONSTANT:
+            let msg_local = mir_place_plain_local(self.body, self.body.operand_d0[msg])
+            if msg_local >= 0:
+                self.cancel_stmt_temp_for_local(msg_local)
+                self.cancel_scheduled_value_drop_for_local(msg_local)
         let exit_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("with_main_error_exit"), self.sema.ty_void)
         let args: List[i32] = []
         args.push(msg)

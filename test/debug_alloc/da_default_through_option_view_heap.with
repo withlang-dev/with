@@ -1,0 +1,20 @@
+//! expect-stdout: s1111111111111111
+//! expect-stdout: none
+//! expect-stdout: s1111111111111111
+//! expect-stdout: s1111111111111111
+//! expect-debug-alloc: leak count=0
+
+// `names[0] ?? d` reads its carrier through the element's view. The view's
+// own type is bits, so the payload was moved out of the list's element: the
+// result freed it and the list freed it again (a double free in safe code,
+// which `with check --validate-all` named: "moves out … through a
+// reference"). The carrier a view shows is judged as that carrier: a Copy
+// one gives its payload with a new hold and keeps its own.
+fn make(n: i32) -> str: f"s{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}"
+
+fn main:
+    let names: List[Option[str]] = [Some(make(1)), None]
+    print(names[0] ?? "none")
+    print(names[1] ?? "none")
+    print(names[0] ?? "none")
+    print(names[0] ?? "none")

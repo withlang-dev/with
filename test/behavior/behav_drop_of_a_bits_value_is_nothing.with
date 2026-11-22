@@ -1,0 +1,32 @@
+//! expect-stdout: 7 2
+//! expect-stdout: drop a
+//! expect-stdout: 1
+
+// `drop(value)` in a generic body instantiated at a type that is only its
+// bits (`i32`) dropped nothing and still lowered to a drop of the integer.
+// The ownership validator then held the parameter to a drop on every path:
+// `BTreeSet[i32].insert` was refused as a leak (`with check --validate-all`).
+// A bits value has nothing to drop and stays usable (§2.5).
+use std.collections.BTreeSet
+
+type Tag { name: str }
+impl Drop for Tag:
+    move fn drop(): print(f"drop {self.name}")
+
+fn keep_or_drop[T](value: T, keep: bool, mut into: List[T]):
+    if not keep:
+        drop(value)
+        return
+    into.push(value)
+
+fn main:
+    var n = 7
+    drop(n)
+    var set: BTreeSet[i32] = [3, 5]
+    print(f"{n} {set.len()}")
+    var tags: List[Tag] = []
+    keep_or_drop(Tag { name: "a" }, false, tags)
+    var nums: List[i32] = []
+    keep_or_drop(4, false, nums)
+    keep_or_drop(4, true, nums)
+    print(nums.len())
