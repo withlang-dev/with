@@ -367,6 +367,10 @@ fn facade_item_is_handle(pool: &AstPool, item: i32) -> bool:
 
 fn facade_clause_profile_rule(pool: &AstPool, clause: i32) -> i32:
     if clause <= 0 or pool.kind(clause as NodeId) != NodeKind.NK_FACADE_CLAUSE: return 0
+    // An `init` states its own success statuses after its function
+    // (`init f(self), ok K`, D226): every operand is the clause's own, and
+    // no profile states an `init`.
+    if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_INIT: return 0
     let own = facade_clause_operand_count(pool.get_data0(clause as NodeId))
     if own < 0 or pool.get_data2(clause as NodeId) <= own: return 0
     pool.get_extra(pool.get_data1(clause as NodeId) + own)

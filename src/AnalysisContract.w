@@ -370,10 +370,19 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
     if r.preinit != 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_PREINIT, 0)
         contract_row(report, sema, site, subject, CONTRACT_RESOURCE, clause, r.preinit, owner, -1, "preinit", sema.safe_symbol_text(r.preinit) ++ " constructs the storage", contract_clause_at(sema, site, clause))
-    if r.init != 0:
-        let clause = contract_clause(sema, node, FACADE_CLAUSE_INIT, 0)
-        let init = sema.safe_symbol_text(r.init)
-        contract_row(report, sema, site, subject, CONTRACT_RESOURCE, clause, r.init, owner, 0, "init", f"{init} -> {rname}.{sema.facade_presented(ri, init)}; production: in place, Drop armed by init", contract_clause_at(sema, site, clause))
+    // Every `init` is a constructor (D226), with its own success status
+    // when it states one.
+    var init_states_ok = false
+    var nth = 0
+    for each_init in r.inits:
+        let clause = contract_clause(sema, node, FACADE_CLAUSE_INIT, nth as i32)
+        let init = sema.safe_symbol_text(each_init)
+        let words = sema.facade_item_words(r.decl, clause)
+        let ok_at = words.find(", ok ")
+        let own_ok = if nth < r.init_ok.len() and r.init_ok[nth] > 0 and ok_at >= 0: "; " ++ words.slice(ok_at + 2, words.len()) ++ f": Result[{rname}, {rname}Error]" else: ""
+        if own_ok.len() > 0: init_states_ok = true
+        contract_row(report, sema, site, subject, CONTRACT_RESOURCE, clause, each_init, owner, 0, "init", f"{init} -> {rname}.{sema.facade_presented(ri, init)}; production: in place, Drop armed by init{own_ok}", contract_clause_at(sema, site, clause))
+        nth += 1
     if r.producers.len() == 0 and r.init == 0 and r.handle == 0:
         contract_row(report, sema, site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "producer", "none; nothing constructs this resource safely", "default:no from/init clause")
     if r.ok_consts.len() > 0:
@@ -385,7 +394,7 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
         // beside the produced value (§16.2b.4).
         let ok_side = if r.ok_consts.len() > 1: f"(status, {rname})" else: rname
         contract_row(report, sema, site, subject, CONTRACT_RESOURCE, clause, r.ok_consts[0], owner, -1, "status", f"ok {c}; a status-returning producer is Result[{ok_side}, {rname}Error]", contract_clause_at(sema, site, clause))
-    else if r.handle == 0:
+    else if r.handle == 0 and not init_states_ok:
         contract_row(report, sema, site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "status", "none; a producer's failure is None, or (status, None) through an out parameter", "default:no status convention is inferred (§16.2b.4)")
     // Destroy paths (§16.2b.3, §16.2b.5).
     if r.drop != 0:

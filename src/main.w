@@ -435,7 +435,7 @@ fn contract_report_lines_of(view: &str, function: &str) -> str:
             subject_shown = own_item
             if own_item: out = out ++ line ++ "\n"
             continue
-        if not (own_item or line.starts_with("    producer: " ++ function ++ " ") or line.starts_with("    destroyer: " ++ function ++ ";")): continue
+        if not (own_item or line.starts_with("    producer: " ++ function ++ " ") or line.starts_with("    init: " ++ function ++ " ") or line.starts_with("    destroyer: " ++ function ++ ";")): continue
         if not subject_shown:
             out = out ++ subject ++ "\n"
             subject_shown = true
