@@ -1,0 +1,14 @@
+//! expect-check-fail: unknown field 'error' for type 'parser_s'
+//! expect-check-fail: = help: did you mean `error_`?
+//! expect-check-fail: unknown field 'offst' for type 'parser_s'
+//! expect-check-fail: = help: did you mean `offset`?
+
+// A C field whose name is a With word is imported with an underscore
+// (libyaml's `parser.error` is `error_`). The refusal said only "unknown
+// field"; it now names the field meant, as it does for a misspelling.
+
+use c_import("typedef struct parser_s { int error; long offset; } parser_s;\n")
+
+fn main:
+    let p = parser_s.zeroed()
+    print(f"{p.error} {p.offst}")

@@ -22630,6 +22630,26 @@ impl Sema:
         else if self.ast.kind(place_node) == NodeKind.NK_FIELD_ACCESS:
             self.mark_field_moved(place_node)
 
+    // The field of the record `struct_type` the programmer most likely
+    // meant by `target`: one within a small edit distance, or the name with
+    // the underscore an imported C field takes when its name is a With word
+    // (libyaml's `parser.error` is `error_`). "" when none is close.
+    fn suggest_field_name(struct_type: i32, target: &str) -> str:
+        let resolved = self.resolve_alias(struct_type)
+        if target.len() == 0 or self.get_type_kind(resolved) != TypeKind.TY_STRUCT: return ""
+        let te_start = self.get_type_d1(resolved)
+        let max_dist: i32 = if target.len() <= 3: 1 else: 2
+        var best_name = ""
+        var best_dist = max_dist + 1
+        for fi in 0..self.get_type_d2(resolved):
+            let name = self.pool_resolve(self.type_extra[(te_start + fi * 3)])
+            if name.len() == 0 or name == target: continue
+            let d = if name == target ++ "_": 0 else: sema_levenshtein(target, name, max_dist)
+            if d < best_dist:
+                best_dist = d
+                best_name = with_str_clone_ref(name)
+        best_name
+
     mut fn struct_field_type(struct_type: i32, field: i32) -> i32:
         if struct_type == 0:
             return 0
@@ -23216,7 +23236,10 @@ impl Sema:
             self.get_type_d0(field_base)
             let field_ty = self.struct_field_type(field_base as i32, field)
             if field_ty == 0:
-                self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
+                let unknown = "unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'"
+                let meant = self.suggest_field_name(field_base as i32, self.pool_resolve(field))
+                if meant.len() > 0: self.emit_error_with_help(unknown, node, f"did you mean `{meant}`?")
+                else: self.emit_error(unknown, node)
             self.note_view_field_projection(node, obj_type as i32, field_ty)
             self.note_field_access_decl(node, field_base as i32, field)
             self.check_field_visible(field_base as i32, field, node)
