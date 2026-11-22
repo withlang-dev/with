@@ -8482,7 +8482,10 @@ impl ComptimeEvaluator:
         // The callee's file is Sema's record of where the function is
         // declared; the caller is the function this call is evaluated in,
         // or, outside any, the module whose expression is being evaluated.
-        if fn_node != 0 and (self.ast.get_data2(fn_node) / FnFlags.COMPTIME) % 2 == 0:
+        // The evaluation of a build file is the capability-bearing mode
+        // (§17.1b): it runs commands, reads the environment and prints
+        // under what the driver grants, so the promise does not apply.
+        if fn_node != 0 and self.allow_runtime_calls == 0 and (self.ast.get_data2(fn_node) / FnFlags.COMPTIME) % 2 == 0:
             let callee_package = self.sema.package_of(self.sema.fn_symbol_source_path(fn_sym))
             let caller_path = if self.active_fn_syms.len() > 0: self.sema.fn_symbol_source_path(self.active_fn_syms[self.active_fn_syms.len() - 1]) else: self.current_source_path()
             let caller_package = self.sema.package_of(caller_path)
