@@ -12215,7 +12215,13 @@ impl MirBuilder:
         let names: List[i32] = []
         for ci in 0..covered:
             let child = child_places[ci]
-            let moves = self.type_needs_value_drop(self.place_local_type(child))
+            // Over an observed subject (`match t:` on a place) an element
+            // is copied with its own hold, as a named binding is
+            // (pattern_whole_read_kind); the subject keeps its own. Moved
+            // out, the element was freed with the rest tuple and again with
+            // the subject: a double free in `(h, ..rest) if g => …` over a
+            // `(str, str, str)` parameter.
+            let moves = self.pattern_whole_read_kind(self.place_local_type(child)) == OperandKind.OK_MOVE
             let op = self.body.new_operand(if moves: OperandKind.OK_MOVE else: OperandKind.OK_COPY, child)
             if moves:
                 let slot_ty = self.place_local_type(child)
@@ -12223,6 +12229,15 @@ impl MirBuilder:
                 self.log_pattern_move(slot, op)
             fields.push(op)
             names.push(0)
+        // A copy that takes its own hold is an assignment's to make: an
+        // aggregate of copied operands stores the bits and takes none. Each
+        // such element is copied into a temporary, which the tuple takes.
+        for ci in 0..covered:
+            let elem_ty = self.place_local_type(child_places[ci])
+            if self.body.operand_kinds[fields[ci]] == OperandKind.OK_COPY and self.type_needs_value_drop(elem_ty):
+                let held = self.place_for_local(self.new_temp(elem_ty))
+                self.assign_operand_to_place(held, fields[ci], span)
+                fields[ci] = self.body.new_operand(OperandKind.OK_MOVE, held)
         if covered == 0:
             let unit = self.unit_operand()
             self.assign_operand_to_place(local_place, unit, span)

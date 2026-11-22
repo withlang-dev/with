@@ -1,0 +1,27 @@
+//! expect-stdout: first:s1111111111111111 rest:x,s3333333333333333
+//! expect-stdout: long s1111111111111111
+//! expect-stdout: again s1111111111111111
+//! expect-debug-alloc: leak count=0
+
+// §9.7: `match t:` on a place observes it, so a `..rest` binding copies
+// its elements, each with its own hold, as a named binding does. They were
+// moved out and never blanked: when the guarded arm ran, the rest tuple
+// freed them and the subject freed them again (a double free in safe
+// code; `with check --validate-all` named it and no lane ran it here).
+fn describe(t: (str, str, str)) -> str:
+    match t:
+        (h, ..rest) if rest.0.len() > 5 => "long " ++ h
+        (h, ..rest) => f"first:{h} rest:{rest.0},{rest.1}"
+
+fn twice(t: (str, str, str)) -> str:
+    let first = match t:
+        (h, ..rest) if rest.1.len() > 0 => rest.0.len()
+        _ => 0
+    if first > 5: "again " ++ t.0 else: "short"
+
+fn make(n: i32) -> str: f"s{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}{n}"
+
+fn main:
+    print(describe((make(1), "x", make(3))))
+    print(describe((make(1), make(2), make(3))))
+    print(twice((make(1), make(2), make(3))))
