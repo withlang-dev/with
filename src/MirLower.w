@@ -482,6 +482,9 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         pool: pool.clone(),
     }
 
+// The positions of the three pending-reset lists (reset_mark).
+type ResetMark { locals: isize, fields: isize, temps: isize }
+
 impl MirBuilder:
 
     fn has_contextual_copy_adjustment(node: i32) -> bool:
@@ -1395,6 +1398,17 @@ impl MirBuilder:
 
     mut fn flush_pending_resets() -> Unit:
         self.flush_pending_resets_since(0, 0, 0)
+
+    // §2.5 reset-on-move: where the pending source resets stand. Taken
+    // before a branch, a loop body or a nested expression is lowered, so
+    // the resets it adds are flushed inside it (conditionally) and not
+    // after it on every path (#616: the three positions were three
+    // variables at each of a dozen sites).
+    fn reset_mark() -> ResetMark:
+        ResetMark { locals: self.pending_reset_locals.len(), fields: self.pending_reset_field_places.len(), temps: self.pending_move_temp_locals.len() }
+
+    mut fn flush_pending_resets_from(mark: ResetMark):
+        self.flush_pending_resets_since(mark.locals, mark.fields, mark.temps)
 
     // Reset-on-move (spec §2.5.1): emit `local = <zero>` for each owned local moved
     // since `start`, AFTER the move read it, then truncate the pending list back to
@@ -5728,9 +5742,7 @@ impl MirBuilder:
         // temps, its pending source-resets, and its move state on the RHS
         // path, before merging.
         let rhs_move_state = self.save_move_state()
-        let pending_reset_start = self.pending_reset_locals.len()
-        let pending_reset_field_start = self.pending_reset_field_places.len()
-        let pending_move_temp_start = self.pending_move_temp_locals.len()
+        let pending_reset_mark = self.reset_mark()
         self.field_move_in_branch = self.field_move_in_branch + 1
         let rhs_temp_frame = self.push_stmt_temp_frame()
         let rhs = self.lower_truth_test(rhs_expr, self.lower_expr(rhs_expr))
@@ -5738,7 +5750,7 @@ impl MirBuilder:
         let result_place2 = self.place_for_local(result)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place2, rhs_rv, self.ast.get_start(node))
         self.finish_stmt_temp_frame(rhs_temp_frame)
-        self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
+        self.flush_pending_resets_from(pending_reset_mark)
         self.field_move_in_branch = self.field_move_in_branch - 1
         self.terminate(TermKind.TK_GOTO, end_bb, 0, 0, 0)
         self.restore_move_state(rhs_move_state)
@@ -7266,14 +7278,14 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, slice_place, slice_rv, self.ast.get_start(node))
         self.body.new_operand(OperandKind.OK_COPY, slice_place)
 
-    mut fn finish_assignment_to_place(place_expr: i32, place: i32, dest_ty: i32, rhs: i32, rhs_reset_start: isize, rhs_field_reset_start: isize, rhs_move_temp_start: isize) -> i32:
+    mut fn finish_assignment_to_place(place_expr: i32, place: i32, dest_ty: i32, rhs: i32, rhs_reset_mark: ResetMark) -> i32:
         // A consuming call in the RHS may move the assignment target itself
         // (`x = normalize(move x)`). Its source reset must run after the call has
         // read x but before drop-before-overwrite and the result store. Leaving it
         // for finish_stmt_temp_frame emits `x = result; x = zero`, erasing the new
         // owner. Resets created later by moving `rhs` into the destination still
         // flush at the ordinary statement boundary.
-        self.flush_pending_resets_since(rhs_reset_start, rhs_field_reset_start, rhs_move_temp_start)
+        self.flush_pending_resets_from(rhs_reset_mark)
         // An exact `x = move x` (including an identical projected place) moves the
         // owner out and immediately back into the same storage. Decide that it is a
         // no-op before drop-before-overwrite; dropping here would destroy the value
@@ -7478,15 +7490,13 @@ impl MirBuilder:
             self.make_unique_indexed_bases_of_place(place)
         let saved_expected = self.expected_type
         let dest_ty = self.assignment_place_value_type(place_expr)
-        let rhs_reset_start = self.pending_reset_locals.len()
-        let rhs_field_reset_start = self.pending_reset_field_places.len()
-        let rhs_move_temp_start = self.pending_move_temp_locals.len()
+        let rhs_reset_mark = self.reset_mark()
         if dest_ty != 0 and dest_ty != self.sema.ty_void:
             self.expected_type = dest_ty
         // `x .= f(args)`: the call's receiver is this place, evaluated above.
         let rhs = if self.is_method_assign(place_expr, rhs_expr): self.lower_expr_reading_place(place_expr, place, rhs_expr) else: self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
-        self.finish_assignment_to_place(place_expr, place, dest_ty, rhs, rhs_reset_start, rhs_field_reset_start, rhs_move_temp_start)
+        self.finish_assignment_to_place(place_expr, place, dest_ty, rhs, rhs_reset_mark)
         if read_back != 0: self.read_assigned_place(place_expr, place, read_back) else: -1
 
     // §9.1 / D60: a tail assignment's value is a read of its place after the
@@ -7837,14 +7847,12 @@ impl MirBuilder:
     // `else: return consume(keep)` blanked `keep` for the matched path, which
     // then read "" and leaked the buffer).
     mut fn lower_let_else_branch(else_body: i32):
-        let reset_start = self.pending_reset_locals.len()
-        let reset_field_start = self.pending_reset_field_places.len()
-        let move_temp_start = self.pending_move_temp_locals.len()
+        let reset_mark = self.reset_mark()
         self.field_move_in_branch = self.field_move_in_branch + 1
         let frame = self.push_stmt_temp_frame()
         self.lower_expr(else_body)
         self.finish_stmt_temp_frame(frame)
-        self.flush_pending_resets_since(reset_start, reset_field_start, move_temp_start)
+        self.flush_pending_resets_from(reset_mark)
         self.field_move_in_branch = self.field_move_in_branch - 1
         if self.body.term_kind(self.cur_bb) == TermKind.TK_UNREACHABLE:
             self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
@@ -7882,9 +7890,7 @@ impl MirBuilder:
                 self.terminate(TermKind.TK_GOTO, obs_cont_bb, 0, 0, 0)
                 self.switch_to(obs_cont_bb)
             return
-        let rhs_reset_start = self.pending_reset_locals.len()
-        let rhs_reset_field_start = self.pending_reset_field_places.len()
-        let rhs_move_temp_start = self.pending_move_temp_locals.len()
+        let rhs_reset_mark = self.reset_mark()
         // §30.4: an annotated pattern let lowers its subject against the
         // annotation, as a typed named let does (Sema recorded it as rhs_ty).
         let saved_expected = self.expected_type
@@ -7953,7 +7959,7 @@ impl MirBuilder:
         // The subject's source was moved into the materialized subject; blank it
         // on this path too (reset-on-move, §2.5.1) — the statement-end flush
         // runs only on the continuing path.
-        self.emit_pending_resets_since(rhs_reset_start, rhs_reset_field_start, rhs_move_temp_start)
+        self.emit_pending_resets_since(rhs_reset_mark.locals, rhs_reset_mark.fields, rhs_reset_mark.temps)
         // #2049: the failing path drops the subject whenever the success path
         // keeps a cleanup for it (the statement temp or scheduled drop retired
         // above) — the same owner on both paths. Gated on drop glue alone, a
@@ -8419,9 +8425,7 @@ impl MirBuilder:
         // Reset-on-move (spec §2.5.1): only flush resets recorded WITHIN a branch,
         // so an outer-scope move's reset is not pulled inside (and made conditional
         // by) this if.
-        let pending_reset_start = self.pending_reset_locals.len()
-        let pending_reset_field_start = self.pending_reset_field_places.len()
-        let pending_move_temp_start = self.pending_move_temp_locals.len()
+        let pending_reset_mark = self.reset_mark()
 
         let then_bb = self.new_block()
         let else_bb = self.new_block()
@@ -8485,7 +8489,7 @@ impl MirBuilder:
         // INSIDE the branch, before merging. A move in the branch's tail expression
         // has no per-statement flush; left pending it would be emitted after the if
         // on BOTH paths and blank a still-live value on the not-taken path.
-        self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
+        self.flush_pending_resets_from(pending_reset_mark)
         if capture_scoped:
             self.pop_scope_inline()
         self.field_move_in_branch = self.field_move_in_branch - 1
@@ -8508,7 +8512,7 @@ impl MirBuilder:
             self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
         self.leave_body_scope(else_scoped)
         self.finish_stmt_temp_frame(else_temp_frame)
-        self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
+        self.flush_pending_resets_from(pending_reset_mark)
         self.field_move_in_branch = self.field_move_in_branch - 1
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -8645,9 +8649,7 @@ impl MirBuilder:
         self.push_control_target(self.ast.get_data1(node), ControlTargetKind.CT_LOOP, header_bb, break_bb, result_place)
 
         self.switch_to(body_bb)
-        let pending_reset_start = self.pending_reset_locals.len()
-        let pending_reset_field_start = self.pending_reset_field_places.len()
-        let pending_move_temp_start = self.pending_move_temp_locals.len()
+        let pending_reset_mark = self.reset_mark()
         self.field_move_in_branch = self.field_move_in_branch + 1
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
@@ -8659,7 +8661,7 @@ impl MirBuilder:
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         // Reset-on-move (spec §2.5.1): flush body-local resets before the back-edge,
         // so a move in the loop body's tail is reset inside the body (same as lower_if).
-        self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
+        self.flush_pending_resets_from(pending_reset_mark)
         self.field_move_in_branch = self.field_move_in_branch - 1
         // Back-edge when body does not diverge.
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
@@ -8717,9 +8719,7 @@ impl MirBuilder:
         // iteration (and on break/continue) — not once, at function exit,
         // after every iteration overwrote them and on the no-match exit that
         // never wrote them.
-        let pending_reset_start = self.pending_reset_locals.len()
-        let pending_reset_field_start = self.pending_reset_field_places.len()
-        let pending_move_temp_start = self.pending_move_temp_locals.len()
+        let pending_reset_mark = self.reset_mark()
         let capture_scoped = regex_capture_node != 0
         if capture_scoped:
             self.push_scope()
@@ -8733,7 +8733,7 @@ impl MirBuilder:
         self.lower_expr_discard(body_expr)
         self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
-        self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
+        self.flush_pending_resets_from(pending_reset_mark)
         if capture_scoped:
             self.pop_scope_inline()
         self.field_move_in_branch = self.field_move_in_branch - 1
@@ -9131,14 +9131,12 @@ impl MirBuilder:
         // lower_comprehension_generic_iter): the join still drops a
         // filtered-out element.
         let pass_move_state = child.save_move_state()
-        let pass_reset_start = child.pending_reset_locals.len()
-        let pass_reset_field_start = child.pending_reset_field_places.len()
-        let pass_move_temp_start = child.pending_move_temp_locals.len()
+        let pass_reset_mark = child.reset_mark()
         let leaf_frame = child.push_stmt_temp_frame()
         child.lower_comprehension_next_or_push(comp_node, clause_index + 1, child_out_place, out_elem_ty)
         child.finish_stmt_temp_frame(leaf_frame)
         if clause_filter != 0:
-            child.flush_pending_resets_since(pass_reset_start, pass_reset_field_start, pass_move_temp_start)
+            child.flush_pending_resets_from(pass_reset_mark)
         child.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
         if clause_filter != 0:
             child.restore_move_state(pass_move_state)
@@ -9573,11 +9571,9 @@ impl MirBuilder:
             // that path only, and its resets are flushed inside the arm.
             self.switch_to(pass_bb)
             let pass_move_state = self.save_move_state()
-            let pass_reset_start = self.pending_reset_locals.len()
-            let pass_reset_field_start = self.pending_reset_field_places.len()
-            let pass_move_temp_start = self.pending_move_temp_locals.len()
+            let pass_reset_mark = self.reset_mark()
             self.lower_comprehension_iteration(comp_node, clause_index, out_place, out_elem_ty)
-            self.flush_pending_resets_since(pass_reset_start, pass_reset_field_start, pass_move_temp_start)
+            self.flush_pending_resets_from(pass_reset_mark)
             self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
             self.restore_move_state(pass_move_state)
 
@@ -9926,13 +9922,11 @@ impl MirBuilder:
             // element; its resets are flushed inside the arm, so the
             // binding the push took is blank at the join.
             let pass_move_state = self.save_move_state()
-            let pass_reset_start = self.pending_reset_locals.len()
-            let pass_reset_field_start = self.pending_reset_field_places.len()
-            let pass_move_temp_start = self.pending_move_temp_locals.len()
+            let pass_reset_mark = self.reset_mark()
             let pass_frame = self.push_stmt_temp_frame()
             self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
             self.finish_stmt_temp_frame(pass_frame)
-            self.flush_pending_resets_since(pass_reset_start, pass_reset_field_start, pass_move_temp_start)
+            self.flush_pending_resets_from(pass_reset_mark)
             self.terminate(TermKind.TK_GOTO, iter_join_bb, 0, 0, 0)
             self.restore_move_state(pass_move_state)
         else:
@@ -12749,9 +12743,7 @@ impl MirBuilder:
         let scrutinee_ty = self.expr_type(scrutinee_expr)
         let observed_place = self.observed_pattern_subject_place(node, scrutinee_expr)
         // The marks the subject's resets and then each arm's are flushed from.
-        let pending_reset_start = self.pending_reset_locals.len()
-        let pending_reset_field_start = self.pending_reset_field_places.len()
-        let pending_move_temp_start = self.pending_move_temp_locals.len()
+        let pending_reset_mark = self.reset_mark()
         var scrutinee_place = observed_place
         // The subject was read as a copy (a value that is used again takes a
         // count, D111/D120): its source keeps what it holds, and its own drop.
@@ -12772,7 +12764,7 @@ impl MirBuilder:
             // an arm's `self.list = rest` and erased it, so a cursor yielded
             // its first element and leaked the rest. The flush truncates the
             // queues back to the marks, which the arms then start from.
-            self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
+            self.flush_pending_resets_from(pending_reset_mark)
 
         // #3165: the arms copy out a D179 demand (lower_if's copy_join).
         let copy_join = want_result != 0 and self.copy_out_join_node == node
@@ -12903,7 +12895,7 @@ impl MirBuilder:
             self.finish_stmt_temp_frame(arm_temp_frame)
             // Reset-on-move (spec §2.5.1): flush this arm's pending source-resets
             // inside the arm, before it merges to the join (same reason as lower_if).
-            self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
+            self.flush_pending_resets_from(pending_reset_mark)
             self.field_move_in_branch = self.field_move_in_branch - 1
             self.pop_scope_with_goto(join_bb)
             self.restore_move_state(branch_move_state)
@@ -13139,9 +13131,7 @@ impl MirBuilder:
         // source-resets flush inside it (lower_if): left pending they would
         // blank, on the passing path, a value the message did not move.
         let str_entry = self.save_string_flow_facts()
-        let pending_reset_start = self.pending_reset_locals.len()
-        let pending_reset_field_start = self.pending_reset_field_places.len()
-        let pending_move_temp_start = self.pending_move_temp_locals.len()
+        let pending_reset_mark = self.reset_mark()
         self.switch_to(fail_bb)
         let fail_arm = self.begin_lazy_arm()
         let args: List[i32] = []
@@ -13164,7 +13154,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, after_bb)
         self.switch_to(after_bb)
         self.register_stmt_temp(result_local, ret_ty)
-        self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
+        self.flush_pending_resets_from(pending_reset_mark)
         self.end_lazy_arm(fail_arm)
         // The declaration does not return on a false condition.
         self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
@@ -18114,15 +18104,13 @@ impl MirBuilder:
             // block and constant-folding the surrounding null check.
             let saved_expected = self.expected_type
             let target_ty = self.assignment_place_value_type(target)
-            let rhs_reset_start = self.pending_reset_locals.len()
-            let rhs_field_reset_start = self.pending_reset_field_places.len()
-            let rhs_move_temp_start = self.pending_move_temp_locals.len()
+            let rhs_reset_mark = self.reset_mark()
             if target_ty != 0 and target_ty != self.sema.ty_void as i32:
                 self.expected_type = target_ty
             let rhs_op = self.lower_expr(rhs_node)
             self.expected_type = saved_expected
             let place = self.lower_expr_place(target)
-            return self.finish_assignment_to_place(target, place, target_ty, rhs_op, rhs_reset_start, rhs_field_reset_start, rhs_move_temp_start)
+            return self.finish_assignment_to_place(target, place, target_ty, rhs_op, rhs_reset_mark)
 
         if kind == NodeKind.NK_IF_EXPR:
             return self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node, 1)
