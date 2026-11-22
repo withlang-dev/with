@@ -15137,6 +15137,14 @@ impl MirBuilder:
         let err_payload_place = self.body.new_field_place(err_downcast, 0, err_ty)
         let err_op = self.body.new_operand(self.carrier_read_kind(err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place)
         let msg = self.lower_fmt_debug(err_op, err_ty, span_node)
+        // The message exists on this path only, and the process ends on it.
+        // Its statement-temp drop ran on the pass path too, over a local
+        // that path never wrote (`drop(_5)` of an uninitialized str).
+        if self.body.operand_kinds[msg] != OperandKind.OK_CONSTANT:
+            let msg_local = mir_place_plain_local(self.body, self.body.operand_d0[msg])
+            if msg_local >= 0:
+                self.cancel_stmt_temp_for_local(msg_local)
+                self.cancel_scheduled_value_drop_for_local(msg_local)
         let exit_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("with_main_error_exit"), self.sema.ty_void)
         let args: List[i32] = []
         args.push(msg)
