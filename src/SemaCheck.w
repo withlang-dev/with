@@ -3317,6 +3317,11 @@ impl Sema:
                     // effects come from the signature and there is no body.
                     if self.ast.fn_decl_body_is_interface(decl):
                         self.update_module_context(di)
+                        // A `comptime fn` crosses a bundle boundary with its
+                        // body, which the importer evaluates. One without a
+                        // body is one whose answer the compiler supplies.
+                        if (self.ast.get_data2(decl) / FnFlags.COMPTIME) % 2 == 1 and not self.fn_comptime_answer_is_compilers(fn_name):
+                            self.emit_error(f"interface declaration of comptime fn '{self.pool_resolve(fn_name)}' has no body to evaluate (D39)", decl)
                         self.apply_interface_declared_effects(decl, fn_name)
                         self.resolve_declared_global_writes(decl, true)
                         let interface_sig = self.get_sig(fn_name)
@@ -6506,7 +6511,10 @@ impl Sema:
             self.current_gen_yield_type = 0 as TypeId
             self.has_gen_yield_type = 0
         let saved_comptime = self.in_comptime_fn
-        if (flags / FnFlags.COMPTIME) % 2 == 1:
+        // A `comptime fn` is judged here, at its declaration, unless its
+        // compile-time answer is the compiler's: then the body is what runs
+        // at run time and compile-time code never enters it.
+        if (flags / FnFlags.COMPTIME) % 2 == 1 and not sema_comptime_answer_is_compilers(self.safe_symbol_text(self.ast.get_data0(node)), self.decl_source_path_for_node(node)):
             self.in_comptime_fn = self.in_comptime_fn + 1
         let saved_async = self.in_async_fn
         if (flags / FnFlags.ASYNC) % 2 == 1:
@@ -18933,8 +18941,9 @@ impl Sema:
             return if self.comptime_callable_memo.get(fn_sym).unwrap() != 0: "" else: self.comptime_callable_chain.get(fn_sym).unwrap()
         if self.comptime_callable_visiting.contains(fn_sym): return ""
         let name = self.pool_resolve(fn_sym)
+        if self.fn_comptime_answer_is_compilers(fn_sym): return ""
         if self.extern_fn_names.contains(fn_sym) or self.fn_is_in_unit_runtime_abi_def(fn_sym):
-            return if name == "with_sysinfo_os" or name == "with_sysinfo_arch": "" else: name ++ " (an extern)"
+            return name ++ " (an extern)"
         if self.is_intrinsic_fn_sym(fn_sym):
             return if fn_sym == self.syms.src or fn_sym == self.syms.embed_file: "" else: name ++ " (a runtime intrinsic)"
         if self.fn_symbol_is_comptime(fn_sym) or self.fn_symbol_is_tool_comptime_allowed(fn_sym) or self.fn_symbol_is_std_string_builder_comptime_allowed(fn_sym) or self.fn_symbol_is_std_str_comptime_allowed(fn_sym) or self.fn_symbol_is_builtin_list_comptime_allowed(fn_sym):
@@ -18989,6 +18998,11 @@ impl Sema:
         self.comptime_callable_chain.insert(fn_sym, chain)
         chain
 
+    // Whether `fn_sym` is declared `comptime fn` and the compiler supplies
+    // its compile-time answer (sema_comptime_answer_is_compilers).
+    fn fn_comptime_answer_is_compilers(fn_sym: i32) -> bool:
+        self.fn_symbol_is_comptime(fn_sym) and sema_comptime_answer_is_compilers(self.pool_resolve(fn_sym), self.fn_symbol_source_path(fn_sym))
+
     fn fn_symbol_is_comptime(fn_sym: i32) -> bool:
         let fn_node = self.fn_symbol_decl_node(fn_sym)
         if fn_node == 0:
@@ -19037,6 +19051,15 @@ impl Sema:
         if capability_registry_is_std_compiler_path(source_path):
             return true
         false
+
+// The `comptime fn`s whose compile-time answer the compiler supplies, and
+// whose body is therefore what runs at run time only. The target a
+// compilation is for is a declared build input (D91, §17.1a): the runtime
+// declares the two functions that read it, and at compile time the
+// evaluator answers for the target, never for the host. The declaration
+// states `comptime fn`; this is the one list of them.
+fn sema_comptime_answer_is_compilers(name: &str, path: &str) -> bool:
+    (name == "with_sysinfo_os" or name == "with_sysinfo_arch") and sema_path_is_runtime_implementation(path)
 
 fn sema_is_string_builder_comptime_method_name(name: &str) -> bool:
     if name == "new" or name.ends_with(".new"): return true
@@ -19095,12 +19118,8 @@ impl Sema:
     mut fn check_comptime_call_restriction(fn_sym: i32, node: i32) -> bool:
         if self.in_comptime_fn == 0 or fn_sym == 0:
             return false
+        if self.fn_comptime_answer_is_compilers(fn_sym): return false
         if self.extern_fn_names.contains(fn_sym):
-            // D91 (§17.1a): the target is a declared build input, and the
-            // evaluator answers these two with it (ComptimeEval).
-            let extern_name = self.pool_resolve(fn_sym)
-            if extern_name == "with_sysinfo_os" or extern_name == "with_sysinfo_arch":
-                return false
             self.emit_error("comptime call of extern function", node)
             return true
         if self.is_intrinsic_fn_sym(fn_sym):

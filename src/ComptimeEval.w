@@ -8475,13 +8475,35 @@ impl ComptimeEvaluator:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
             return comptime_control_value(self.empty_string_builder_value(result_type, comptime_value_intlike(arg_values[0])))
         let fn_node = self.find_fn_decl_node(fn_sym)
+        // A compile-time call that crosses a package boundary reaches only a
+        // `comptime fn`: the marker is the author's promise to importers
+        // that the function stays evaluable, and it is what tells a bundle
+        // which bodies to carry. Inside a package no marker is needed.
+        // The callee's file is Sema's record of where the function is
+        // declared; the caller is the function this call is evaluated in,
+        // or, outside any, the module whose expression is being evaluated.
+        // The evaluation of a build file is the capability-bearing mode
+        // (§17.1b): it runs commands, reads the environment and prints
+        // under what the driver grants, so the promise does not apply.
+        if fn_node != 0 and self.allow_runtime_calls == 0 and (self.ast.get_data2(fn_node) / FnFlags.COMPTIME) % 2 == 0:
+            let callee_package = self.sema.package_of(self.sema.fn_symbol_source_path(fn_sym))
+            let caller_path = if self.active_fn_syms.len() > 0: self.sema.fn_symbol_source_path(self.active_fn_syms[self.active_fn_syms.len() - 1]) else: self.current_source_path()
+            let caller_package = self.sema.package_of(caller_path)
+            // The build and compiler APIs are the capability-bearing mode
+            // (§17.1b): the capability registry is where they are stated.
+            if callee_package != caller_package and not self.sema.fn_symbol_is_tool_comptime_allowed(fn_sym):
+                // A name displaced by another module's same name carries
+                // its module after `$in$`; the message names the function.
+                let displaced = fn_name.index_of("$in$")
+                let shown = if displaced > 0: fn_name.slice(0, displaced) else: fn_name
+                return self.fail(node, "cannot evaluate '" ++ shown ++ "' at compile time: it belongs to another package (" ++ callee_package ++ ") and is not declared `comptime fn`")
         // D91 (§17.1a): the target's OS and architecture are a declared
         // build input, readable by any compile-time code. Whether the
         // runtime symbol is an extern, an interface declaration (the runtime
         // bundle's, D30 R3) or, with the runtime in-unit (D30), its body:
         // that body reads the host (rt_sysinfo_os), never the target, and
         // its c"..." literal is not comptime-evaluable.
-        let reads_target = fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch"
+        let reads_target = self.sema.fn_comptime_answer_is_compilers(fn_sym)
         // D39: an interface declaration has no body to evaluate. A runtime ABI
         // function's (the runtime bundle's interface, D30 step 3) is judged
         // below as the extern it is to compile time, by D104's wording.

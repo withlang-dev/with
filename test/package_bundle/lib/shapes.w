@@ -61,3 +61,7 @@ pub type Tally { n: i32 }
 impl Tally:
     /// A generic method of a type that is not generic.
     pub fn plus_count[T](xs: &List[T]) -> i32: self.n + xs.len32()
+
+/// A `comptime` function is evaluated by whoever calls it: the interface
+/// carries it as the source wrote it.
+pub comptime fn squared(n: i32) -> i32: n * n

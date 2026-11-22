@@ -7,7 +7,7 @@ use rt.rt_core
 
 // Returns the operating system name.
 // "Macos" on macOS, "Linux" on Linux, "Windows" on Windows.
-pub fn os() -> str:
+pub comptime fn os() -> str:
     with_sysinfo_os()
 
 // Returns the CPU architecture.
@@ -15,7 +15,7 @@ pub fn os() -> str:
 // architecture on every platform -- notably "aarch64" on Apple Silicon
 // too, matching the target kinds (darwin_aarch64), the runtime sources
 // (rt/darwin_aarch64.w) and the published asset names.
-pub fn arch() -> str:
+pub comptime fn arch() -> str:
     with_sysinfo_arch()
 
 // Returns the system hostname.

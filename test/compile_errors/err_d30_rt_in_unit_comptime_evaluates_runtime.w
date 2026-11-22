@@ -1,4 +1,4 @@
-//! expect-check-fail: 'with_println_str' has no With body to evaluate at compile time
+//! expect-check-fail: cannot evaluate 'print' at compile time: it belongs to another package (<std>) and is not declared `comptime fn`; reached through shout
 
 // D104 under D30: evaluating a call that reaches the runtime stops at the
 // runtime function, as with the object-linked runtime; the evaluator walked

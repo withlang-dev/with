@@ -249,7 +249,7 @@ impl str:
         pieces
 
     /// The bytes as a view (§16.5): `s as []u8`, spelled as a method.
-    pub fn as_bytes() -> []u8:
+    pub comptime fn as_bytes() -> []u8:
         (*self) as []u8
 
     /// Copy a `StrView` (or any `&str`) into a fresh owned `str`.
@@ -263,7 +263,7 @@ impl str:
     /// `from`, or -1 (#2377, D129): `s.find(x, first + 1)` finds the next
     /// one. `from` past `len()` finds nothing; a negative `from` is out of
     /// range (D71); an empty needle is found at `from`.
-    pub fn find(needle: &str, from: isize = 0) -> isize:
+    pub comptime fn find(needle: &str, from: isize = 0) -> isize:
         if from > self.len(): return -1
         let at = self[from..self.len()].index_of(needle)
         if at < 0: -1 else: from + at
@@ -296,7 +296,7 @@ impl str:
     /// the `STR_TRIM` intrinsic over an owned runtime copy, from before D71
     /// made `s[a..b]` a view; a caller that keeps the result past `s`
     /// spells `.to_owned()`.)
-    pub fn trim() -> &str:
+    pub comptime fn trim() -> &str:
         var start: i64 = 0
         while start < self.len() and str_is_ascii_space(self[start]):
             start += 1
@@ -352,7 +352,7 @@ impl str:
 
     /// The bytes, one at a time (#2206): `for b in s.bytes()`.
     @[iter_of_self]
-    pub fn bytes() -> ByteIter: ByteIter { bytes: self.as_bytes(), at: 0 }
+    pub comptime fn bytes() -> ByteIter: ByteIter { bytes: self.as_bytes(), at: 0 }
 
 fn str_is_ascii_space(c: i32): c == ' ' or c == '\t' or c == '\n' or c == '\r'
 
@@ -361,7 +361,7 @@ fn str_is_ascii_space(c: i32): c == ' ' or c == '\t' or c == '\n' or c == '\r'
 pub type ByteIter ephemeral { bytes: []u8, at: i64 }
 
 impl Iter[u8] for ByteIter:
-    mut fn next() -> Option[u8]:
+    comptime mut fn next() -> Option[u8]:
         if self.at >= self.bytes.len(): return None
         let b = self.bytes[self.at]
         self.at += 1
@@ -473,7 +473,7 @@ pub fn to_upper(c: i32) -> i32:
 /// A With digit loop, not the runtime's with_parse_i64_ref: parsing is pure,
 /// so it is comptime-evaluable (#2460; a build action evaluated at comptime
 /// parses its env and args through here).
-pub fn string_to_int(s: &str) -> i64:
+pub comptime fn string_to_int(s: &str) -> i64:
     if s.len() == 0: return 0
     var neg = false
     var i: i64 = 0
@@ -497,7 +497,7 @@ pub fn lines(s: &str) -> List[str]:
     out
 
 /// Parse a string as an i32 integer.
-pub fn parse(s: &str) -> i32:
+pub comptime fn parse(s: &str) -> i32:
     let n = string_to_int(s)
     n as i32
 

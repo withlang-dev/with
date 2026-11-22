@@ -3551,6 +3551,9 @@ impl Sema:
         var transform_sema = Sema.init(transform_pool, move self.diags, out)
         transform_sema.source_text = move self.source_text
         transform_sema.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
+        // The package of each file: compile-time evaluation here asks
+        // whether a call crosses a package boundary.
+        transform_sema.package_keys = sema_clone_str_str_hashmap(self.package_keys)
         transform_sema.decl_source_file_ids = sema_clone_i32_list(self.decl_source_file_ids)
         transform_sema.decl_is_c_import = sema_clone_i32_list(self.decl_is_c_import)
         transform_sema.source_text_file_ids = sema_clone_i32_list(self.source_text_file_ids)
