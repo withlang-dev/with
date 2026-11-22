@@ -20,9 +20,10 @@ stays internal to its corpus and is omitted from the interface, which
 names it. A `comptime fn` crosses the boundary with its body, and with the
 body of every function of its package that it reaches: the importer
 evaluates them. A `comptime fn` whose compile-time answer the compiler
-supplies crosses as a declaration without a body. *(Status: a tree bundle
-carries a `comptime fn`'s own body; the functions it reaches are not yet
-carried, and a stored bundle carries only the declaration form.)*
+supplies crosses as a declaration without a body. *(Status: implemented for
+a tree bundle, for functions and methods; a body in an interface is
+accepted only on a function one of its `comptime fn`s reaches. A stored
+bundle carries only the declaration form.)*
 The bundle build proves that the interface yields the same
 exported declaration model as the source, records that fingerprint in the
 manifest, and rejects a mismatch before linking.
