@@ -1840,9 +1840,16 @@ impl CiProject:
         self.symbols[symbol_id].ret_ty = ci_ir_owned_text(self.signature_type(with_cimport_fn_return_type_translated(session, decl_idx), with_cimport_fn_return_type_written(session, decl_idx)))
         self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
         // D198: with how the body uses each pointer parameter's record (`vw`/`vr`/`va`/`vx`).
-        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names) ++ ci_value_record_evidence(session, cursor, names))
         // D198: its writes of function-pointer fields and the records it lets escape.
-        self.fnptr_evidence = self.fnptr_evidence ++ ci_fnptr_field_evidence(session, cursor)
+        let field_evidence = ci_fnptr_field_evidence(session, cursor)
+        self.fnptr_evidence = self.fnptr_evidence ++ field_evidence
+        // D213: `fieldstore:<Record.field>` for each function-pointer field
+        // the body stores a value it was handed into: it is a setter of it.
+        var setter_evidence = ""
+        for line in field_evidence.split("\n"):
+            let f = line.split("\t")
+            if f.len() == 5 and f[0] == "fs" and f[3] == "value" and not setter_evidence.contains("fieldstore:" ++ f[1] ++ "." ++ f[2] ++ "\n"): setter_evidence = setter_evidence ++ "fieldstore:" ++ f[1] ++ "." ++ f[2] ++ "\n"
+        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names) ++ ci_value_record_evidence(session, cursor, names) ++ setter_evidence)
         // D159: what the body proves about the pointers it is handed.
         self.symbols[symbol_id].contract_evidence = ci_ir_owned_text(ci_body_contract_evidence(session, cursor, names))
         for pi in 0..count:
@@ -2144,11 +2151,31 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
         for (field, role) in registry.field_roles:
             let dot = field.find(".")
             project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is " ++ facts_kind(role) ++ "    // registry: " ++ facts_cite(role) ++ "\n"
+            // D213 (§31.7): the package does not fill a `callback` field. A
+            // store of a named package function into it contradicts the
+            // role; a null store, a store of a caller's value and a
+            // whole-record copy do not.
+            if facts_kind(role) == "callback":
+                for line in project.fnptr_evidence.split("\n"):
+                    let f = line.split("\t")
+                    if f.len() == 5 and f[0] == "fw" and f[1] ++ "." ++ f[2] == field and f[3] != "?":
+                        return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered; DISAGREES: the package stores its own function `" ++ f[3] ++ "` into it (" ++ f[4] ++ ")")
             project.field_roles.insert(field, role)
         for si in 0..project.symbols.len():
             if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
             project.symbols[si].registry = registry.of(project.symbols[si].name)
             project.symbols[si].registry_more = registry.presentation(project.symbols[si].name)
+        // D213: the drafter finds a `callback` field's setters from source:
+        // each function that stores a value it was handed into the field.
+        // The facts describe each one with a callback clause, or the role
+        // is refused naming it.
+        for (field, role) in registry.field_roles:
+            if facts_kind(role) != "callback": continue
+            let dot = field.find(".")
+            for symbol in project.symbols:
+                if symbol.kind != CiProjectSymbolKind.CIPS_FN or not symbol.own_evidence.contains("fieldstore:" ++ field ++ "\n"): continue
+                if not symbol.registry_more.contains("callback:"):
+                    return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered through a presented operation; DISAGREES: `" ++ symbol.name ++ "` stores into it and the facts describe it with no `callback param N`")
     project.resolve_ownership()
     Ok(project)
 
@@ -2229,6 +2256,10 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     let project = match ci_facade_project(files, facade_name, gir_files, facts_path, true):
         Ok(p) => p
         Err(message) =>
+            // D213 (§31.7): a registry line the source contradicts is
+            // handed back, so the caller refuses the package as it does for
+            // a line a proof contradicts.
+            if message.starts_with("contradicted: "): return message
             if message.len() > 0: eprint("with get: facade of " ++ facade_name ++ ": " ++ message)
             return ""
     // A prototype in a header the package does not install cannot be

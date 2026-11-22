@@ -190,6 +190,9 @@ impl CiProject:
                 if h.callee.starts_with("*"):
                     let field = h.callee.slice(1, h.callee.len())
                     if self.fd_field_closed(writers, field): continue
+                    // D213: a call through a `callback` field lends the
+                    // record to the program's code, which writes no field.
+                    if self.fd_field_role(h.callee) == "callback" and self.unread.len() == 0: continue
                     self.fnptr_verdicts.insert(record_key, "why:a pointer to the record is passed to a call through the function pointer field " ++ field ++ ", which the proofs do not close (" ++ h.place ++ ")")
                 else:
                     if self.fd_reads_callee(h.callee): continue
@@ -263,7 +266,13 @@ impl CiProject:
         // D198: through a function-pointer field, the one function it is
         // proven to hold decides; an unproven field retains.
         if callee.starts_with("*"):
-            if self.fd_field_role(callee).len() > 0: return false
+            // D213: a `callback` field holds only what the program registered,
+            // and a call through it lends its arguments. That is checked
+            // against every unit, so one that could not be read leaves the
+            // field undecided.
+            let role = self.fd_field_role(callee)
+            if role == "callback" and self.unread.len() > 0: return true
+            if role.len() > 0: return false
             // D211: retained if any member of the set retains it.
             return self.fd_fnptr_proven_callee(callee).len() == 0 or self.fd_fnptr_retaining_member(callee, index).len() > 0
         if self.fd_is_free_call(callee) or self.fd_is_alloc_call(callee) or ci_own_is_libc_observer(callee): return false
@@ -631,7 +640,7 @@ impl CiProject:
         for line in self.symbols[si].registry_more.split("\n"):
             if line.len() == 0: continue
             let kind = facts_kind(line)
-            let clause = if kind.starts_with("nullable:"): "nullable param " ++ kind.slice(9, kind.len()) else if kind.starts_with("text_param:"): "text param " ++ kind.slice(11, kind.len()) else: "text return, owned, freed by " ++ kind.slice(12, kind.len())
+            let clause = if kind.starts_with("nullable:"): "nullable param " ++ kind.slice(9, kind.len()) else if kind.starts_with("text_param:"): "text param " ++ kind.slice(11, kind.len()) else if kind.starts_with("callback:"): "callback param " ++ kind.slice(9, kind.len()) else if kind.starts_with("retains_by:"): "retains param " ++ kind.slice(11, kind.len()).replace(":", " by param ") else if kind.starts_with("callback_thread:"): "callback_thread " ++ kind.slice(16, kind.len()) else: "text return, owned, freed by " ++ kind.slice(12, kind.len())
             out = out ++ "        " ++ clause ++ "    // registry: " ++ facts_cite(line) ++ "\n"
         out
 
@@ -835,9 +844,15 @@ impl CiProject:
             pi += 1
         out
 
+    // D213: the registry's `callback param N` for parameter `pi` of `si`.
+    fn fd_registry_callback(si: i32, pi: i32) -> bool:
+        for line in self.symbols[si].registry_more.split("\n"):
+            if facts_kind(line) == f"callback:{pi}": return true
+        false
+
     fn fd_param_presentable(si: i32, pi: i32, modeled: &List[str]) -> bool:
         let p = with_str_clone_ref(self.symbols[si].param_ty[pi])
-        if self.fd_called_only_callback(si, pi): return true
+        if self.fd_called_only_callback(si, pi) or self.fd_registry_callback(si, pi): return true
         // D198: a record passed by value that holds a pointer is raw until
         // a contract models it. A clause on such a function is refused by
         // the compiler (raylib's DrawMeshInstanced: `Mesh` by value beside

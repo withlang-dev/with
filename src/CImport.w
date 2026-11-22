@@ -19486,7 +19486,13 @@ fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
     if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
         let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
         if with_ci_cursor_kind(session, lhs) == CXK_MEMBER_REF and with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, lhs)):
-            out = out ++ "fw\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ ci_fp_named_function(session, with_ci_child(session, cursor, 1)) ++ "\t" ++ loc ++ "\n"
+            let written = with_ci_child(session, cursor, 1)
+            let named = ci_fp_named_function(session, written)
+            out = out ++ "fw\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ named ++ "\t" ++ loc ++ "\n"
+            // D213: a store that names no function is a null store or a
+            // value the function was handed; the second makes the function
+            // a setter of the field.
+            if named == "?": out = out ++ "fs\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ (if ci_cursor_is_null_like(session, written): "null" else: "value") ++ "\t" ++ loc ++ "\n"
     // D211: a record assigned whole takes every function-pointer field from
     // its source, which no field write names. An initializer list or a
     // compound literal on the right is read field by field below.
