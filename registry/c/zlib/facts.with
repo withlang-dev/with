@@ -31,9 +31,9 @@ c facade zlib:
         drop deflateEnd    // zlib.h 1.4 line 369, deflateEnd: "All dynamically allocated data structures for this stream are freed."
     fn inflate
         of Inflater    // zlib.h 1.4 line 405: inflate(z_streamp strm, int flush) works on the stream inflateInit set up; line 507: "inflate() returns Z_OK if some progress has been made"
-        buffer field next_in remaining field avail_in    // zlib.h 1.4 lines 91 to 92: "next input byte", "number of bytes available at next_in"; line 415: "Decompress more input starting at next_in and update next_in and avail_in accordingly"
+        buffer field next_in remaining field avail_in reads    // zlib.h 1.4 lines 91 to 92: "next input byte", "number of bytes available at next_in"; line 415: "Decompress more input starting at next_in and update next_in and avail_in accordingly"
         buffer field next_out remaining field avail_out    // zlib.h 1.4 lines 95 to 96: "next output byte will go here", "remaining free space at next_out"; line 421: "Generate more output starting at next_out and update next_out and avail_out accordingly"
     fn deflate
         of Deflater    // zlib.h 1.4 line 254: deflate(z_streamp strm, int flush) works on the stream deflateInit set up; line 355: "deflate() returns Z_OK if some progress has been made"
-        buffer field next_in remaining field avail_in    // zlib.h 1.4 lines 91 to 92; line 264: "Compress more input starting at next_in and update next_in and avail_in accordingly"
+        buffer field next_in remaining field avail_in reads    // zlib.h 1.4 lines 91 to 92; line 264: "Compress more input starting at next_in and update next_in and avail_in accordingly"
         buffer field next_out remaining field avail_out    // zlib.h 1.4 lines 95 to 96; line 269: "Generate more output starting at next_out and update next_out and avail_out accordingly"

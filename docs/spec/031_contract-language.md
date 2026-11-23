@@ -165,7 +165,7 @@ text_clause     = "text" param_ref
                 | "text" "return" "," "owned" "," "freed" "by" c_name
                 | "text" "return" "bytes"
 buffer_clause   = "buffer" param_ref ( "len" param_ref | "capacity" param_ref "inout" ) [ "elements" ]
-                | "buffer" "field" name "remaining" "field" name
+                | "buffer" "field" name "remaining" "field" name [ "reads" ]
 callback_clause = "callback" param_ref
                 | "callback" "consumes" param_ref
                 | "callback" param_ref "userdata" param_ref
@@ -506,6 +506,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `text return bytes` | under `text utf8`, this result stays bytes. | R | | §16.2b.8 |
 | `buffer param b len param n` | `b` and `n` are one input slice C only reads. `capacity param n inout`: one writable slice whose length C writes back. `elements`: the count is in elements, not bytes. Never inferred from the C types. | G | two unrelated parameters; the pointer is raw | §16.2b.8 |
 | `buffer field p remaining field n` | fields `p` and `n` of the lent resource's record are one slice for the call: stored before it, the count read back and both cleared after it. C keeps no copy of the pointer. | G | raw | §16.2b.8 |
+| `buffer field p remaining field n reads` | C only reads through `p`; the slice is `[]u8`. From a facts file it applies only where the check against the package's source ran and passed; a store through the pointer in any unit contradicts it. | G | the slice is writable | §16.2b.8 |
 | `callback param c` | `c` has no userdata parameter: a function or a closure that captures nothing is passed. A retained one states `callback_thread`. | G | raw | §16.2b.9 |
 | `callback param c userdata param u` | `c` is called with `u`; a With closure is passed as the pair. | G | raw | §16.2b.9 |
 | `callback consumes param p` | the callback takes ownership of `p`. | G | | §16.2b.9 |

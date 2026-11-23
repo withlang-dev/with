@@ -19501,6 +19501,181 @@ fn ci_fp_stored_source(session: i64, written: i32) -> str:
     if with_ci_cursor_kind(session, value) == CXK_DECL_REF and with_ci_cursor_references_parameter(session, value): return "param:" ++ with_ci_cursor_spelling(session, value)
     "other"
 
+// ── What a body does through a record's pointer field (§16.2b.8 `reads`) ──
+//
+// `buffer field P remaining field N reads` says C only reads through `P`.
+// The claim is checked by following the pointer: a value read from the
+// field, copied to a local, cast, or moved by arithmetic is still that
+// pointer. Three kinds of line come out, each `kind\tsource\twhy\tloc`,
+// where the source is `Record.field` or `@<i>` for the function's own
+// parameter i:
+//   `pw`  a store through it, which contradicts the claim;
+//   `pu`  a use the walk does not follow (stored somewhere other than a
+//         local or the field itself, returned), which leaves the claim
+//         undecided;
+//   `pc`  it is passed to a call; `why` is `callee:arg:const|mut:header`,
+//         and the package-wide judgment (ci_pointee_verdict) reads the
+//         callee's own lines for that parameter.
+type CiPointeeScan { names: List[str], sources: List[str], locals: List[str] }
+
+impl CiPointeeScan:
+    fn source_of(name: &str) -> str:
+        var i = 0
+        for n in self.names:
+            if n == name: return self.sources[i].to_owned()
+            i += 1
+        ""
+
+// The `Record.field` whose pointer `e` is, through casts, arithmetic and the
+// locals `scan` has seen take it; "" when it is none.
+fn ci_pf_source(session: i64, e: i32, scan: &CiPointeeScan, depth: i32) -> str:
+    if e < 0 or depth > 24: return ""
+    let c = ci_peel_transparent_and_cstyle(session, e)
+    let kind = with_ci_cursor_kind(session, c)
+    let nc = with_ci_num_children(session, c)
+    if kind == CXK_MEMBER_REF:
+        if not with_ci_type_is_pointer(session, c) or with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, c)): return ""
+        let record = ci_fp_member_record(session, c)
+        return if record.len() > 0: record ++ "." ++ with_ci_cursor_spelling(session, c) else: ""
+    if kind == CXK_DECL_REF: return if with_ci_type_is_pointer(session, c): scan.source_of(with_ci_cursor_spelling(session, c)) else: ""
+    if kind == CXK_BINARY_OP and nc == 2 and (with_ci_binary_op(session, c) == BO_ADD or with_ci_binary_op(session, c) == BO_SUB):
+        // Only a pointer result is the pointer: `p - q` is a distance, and
+        // in `p + n` the pointer is the operand that is one.
+        if not with_ci_type_is_pointer(session, c): return ""
+        for side in 0..2:
+            let operand = with_ci_child(session, c, side)
+            if with_ci_type_is_pointer(session, ci_peel_transparent(session, operand)):
+                let found = ci_pf_source(session, operand, scan, depth + 1)
+                if found.len() > 0: return found
+        return ""
+    if kind == CXK_CONDITIONAL_OP and nc == 3:
+        let first = ci_pf_source(session, with_ci_child(session, c, 1), scan, depth + 1)
+        return if first.len() > 0: first else: ci_pf_source(session, with_ci_child(session, c, 2), scan, depth + 1)
+    if kind == CXK_UNARY_OP and nc == 1:
+        let op = with_ci_unary_op(session, c)
+        if op == UO_PRE_INC or op == UO_PRE_DEC or op == UO_POST_INC or op == UO_POST_DEC or op == UO_PLUS or op == UO_EXTENSION:
+            return ci_pf_source(session, with_ci_child(session, c, 0), scan, depth + 1)
+        // `&p[i]` and `&*p` are the pointer again.
+        if op == UO_ADDR: return ci_pf_through(session, with_ci_child(session, c, 0), scan, depth + 1)
+    ""
+
+// The `Record.field` an lvalue is reached through (`*p`, `p[i]`, `p->m`),
+// or "".
+fn ci_pf_through(session: i64, lvalue: i32, scan: &CiPointeeScan, depth: i32) -> str:
+    let l = ci_peel_transparent(session, lvalue)
+    let kind = with_ci_cursor_kind(session, l)
+    let nc = with_ci_num_children(session, l)
+    if kind == CXK_UNARY_OP and nc == 1 and with_ci_unary_op(session, l) == UO_DEREF: return ci_pf_source(session, with_ci_child(session, l, 0), scan, depth + 1)
+    if kind == CXK_ARRAY_SUBSCRIPT and nc == 2:
+        let base = ci_pf_source(session, with_ci_child(session, l, 0), scan, depth + 1)
+        return if base.len() > 0: base else: ci_pf_source(session, with_ci_child(session, l, 1), scan, depth + 1)
+    if kind == CXK_MEMBER_REF and nc == 1:
+        let base = with_ci_child(session, l, 0)
+        if with_ci_type_is_pointer(session, ci_peel_transparent(session, base)): return ci_pf_source(session, base, scan, depth + 1)
+    ""
+
+impl CiPointeeScan:
+    // The locals of a body, and which of them take a field's pointer. Called
+    // until it adds nothing: a copy of a copy is found on the next round.
+    mut fn collect(session: i64, cursor: i32, depth: i32) -> bool:
+        if cursor < 0 or depth > 200 or ci_unevaluated(session, cursor): return false
+        var grew = false
+        let kind = with_ci_cursor_kind(session, cursor)
+        let nc = with_ci_num_children(session, cursor)
+        var target = ""
+        var value = -1
+        if kind == CXK_VAR_DECL:
+            target = with_ci_cursor_spelling(session, cursor)
+            if not self.locals.contains(target): self.locals.push(target.to_owned())
+            if nc >= 1 and with_ci_cursor_kind(session, with_ci_child(session, cursor, nc - 1)) >= 100: value = with_ci_child(session, cursor, nc - 1)
+        if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
+            let l = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+            if with_ci_cursor_kind(session, l) == CXK_DECL_REF:
+                target = with_ci_cursor_spelling(session, l)
+                value = with_ci_child(session, cursor, 1)
+        if target.len() > 0 and value >= 0 and self.source_of(target).len() == 0:
+            let source = ci_pf_source(session, value, self, 0)
+            if source.len() > 0:
+                self.names.push(target.to_owned())
+                self.sources.push(source)
+                grew = true
+        for i in 0..nc:
+            if self.collect(session, with_ci_child(session, cursor, i), depth + 1): grew = true
+        grew
+
+fn ci_pf_line(kind: &str, field: &str, why: &str, loc: &str, out: &str) -> str:
+    if out.contains(kind ++ "\t" ++ field ++ "\t"): "" else: kind ++ "\t" ++ field ++ "\t" ++ why ++ "\t" ++ loc ++ "\n"
+
+fn ci_pf_events(session: i64, cursor: i32, scan: &CiPointeeScan, params: &List[str], depth: i32, so_far: &str) -> str:
+    if cursor < 0 or depth > 200 or ci_unevaluated(session, cursor): return ""
+    var out = ""
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    let loc = with_ci_cursor_location(session, cursor)
+    let assigns = kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN
+    if assigns or (kind == CXK_COMPOUND_ASSIGN_OP and nc == 2):
+        let through = ci_pf_through(session, with_ci_child(session, cursor, 0), scan, 0)
+        if through.len() > 0: out = out ++ ci_pf_line("pw", through, "a store through it", loc, so_far ++ out)
+    if assigns:
+        let source = ci_pf_source(session, with_ci_child(session, cursor, 1), scan, 0)
+        if source.len() > 0:
+            let l = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+            let lk = with_ci_cursor_kind(session, l)
+            let to_local = lk == CXK_DECL_REF and (scan.locals.contains(with_ci_cursor_spelling(session, l)) or params.contains(with_ci_cursor_spelling(session, l)))
+            let to_itself = lk == CXK_MEMBER_REF and ci_fp_member_record(session, l) ++ "." ++ with_ci_cursor_spelling(session, l) == source
+            if not to_local and not to_itself: out = out ++ ci_pf_line("pu", source, "it is stored where the walk does not follow", loc, so_far ++ out)
+            // A variable holds one followed pointer: the first it took.
+            if to_local and scan.source_of(with_ci_cursor_spelling(session, l)) != source: out = out ++ ci_pf_line("pu", source, "it is copied into a variable that already holds another pointer", loc, so_far ++ out)
+    if kind == CXK_UNARY_OP and nc == 1:
+        let op = with_ci_unary_op(session, cursor)
+        if op == UO_PRE_INC or op == UO_PRE_DEC or op == UO_POST_INC or op == UO_POST_DEC:
+            let through = ci_pf_through(session, with_ci_child(session, cursor, 0), scan, 0)
+            if through.len() > 0: out = out ++ ci_pf_line("pw", through, "a store through it", loc, so_far ++ out)
+    if kind == CXK_CALL_EXPR:
+        for i in 1..nc:
+            let arg = with_ci_child(session, cursor, i)
+            let source = ci_pf_source(session, arg, scan, 0)
+            if source.len() == 0: continue
+            // Where the pointer goes is judged over the whole package: the
+            // callee's own body when the package defines it, and only then
+            // its declaration (a declared const proves nothing in C). The
+            // line carries what that judgment needs: the callee, which
+            // argument, whether the parameter is a pointer to const (the
+            // argument's own type is the parameter's after conversion), and
+            // the header that declares the callee.
+            let pointee = with_ci_type_pointee(session, with_ci_type_canonical(session, with_ci_cursor_type(session, arg)))
+            let to_const = pointee >= 0 and with_ci_type_is_const(session, pointee) != 0
+            let callee = with_ci_cursor_spelling(session, cursor)
+            let why = callee ++ ":" ++ f"{i - 1}" ++ (if to_const: ":const:" else: ":mut:") ++ with_ci_cursor_referenced_location(session, cursor)
+            if callee.len() == 0: out = out ++ ci_pf_line("pu", source, "it is passed to a call through a pointer", loc, so_far ++ out)
+            else if not (so_far ++ out).contains("pc\t" ++ source ++ "\t" ++ callee ++ ":" ++ f"{i - 1}:"): out = out ++ "pc\t" ++ source ++ "\t" ++ why ++ "\t" ++ loc ++ "\n"
+    if kind == CXK_RETURN_STMT and nc == 1:
+        let source = ci_pf_source(session, with_ci_child(session, cursor, 0), scan, 0)
+        if source.len() > 0: out = out ++ ci_pf_line("pu", source, "it is returned", loc, so_far ++ out)
+    if kind == CXK_INIT_LIST:
+        for i in 0..nc:
+            let source = ci_pf_source(session, with_ci_child(session, cursor, i), scan, 0)
+            if source.len() > 0: out = out ++ ci_pf_line("pu", source, "it is stored in an aggregate", loc, so_far ++ out)
+    for i in 0..nc:
+        out = out ++ ci_pf_events(session, with_ci_child(session, cursor, i), scan, params, depth + 1, so_far ++ out)
+    out
+
+// The `pw`, `pu` and `pc` lines of one function definition. A pointer the
+// function was handed is followed like a field's: its source is `@<i>`, the
+// parameter's index, so a caller that passes a field's pointer here reads
+// this function's lines for that parameter.
+fn ci_field_pointee_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+    let scan = CiPointeeScan { names: [], sources: [], locals: [] }
+    var pi = 0
+    for name in params:
+        if name.len() > 0:
+            scan.names.push(name.to_owned())
+            scan.sources.push(f"@{pi}")
+        pi += 1
+    var rounds = 0
+    while rounds < 8 and scan.collect(session, cursor, 0): rounds += 1
+    ci_pf_events(session, cursor, scan, params, 0, "")
+
 fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
     if cursor < 0 or ci_unevaluated(session, cursor): return ""
     var out = ""

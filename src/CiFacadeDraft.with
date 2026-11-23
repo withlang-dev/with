@@ -1920,6 +1920,9 @@ impl CiProject:
         for symbol in self.symbols:
             if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.registry_more.len() == 0 or presented_names.contains(symbol.name): continue
             head = head ++ "  " ++ symbol.name ++ ": the registry's presentation lines are not applied: nothing presents the function (the registry states `lend`, or what it does with its pointers)\n"
+        // A stated fact that was not applied is said here, not only beside
+        // its clause.
+        head = head ++ self.facts_not_applied
         for record in self.fd_representations():
             if modeled.contains(record): continue
             let producers = self.fd_producers_of(record).len()

@@ -1196,6 +1196,11 @@ type CiProject {
     // ci_fnptr_field_evidence), one line each, and the verdict per
     // `Record.field` drawn from them once (fd_fnptr_field_verdict).
     fnptr_evidence: str,
+    // §16.2b.8 `reads`: `function\tpw|pu\tRecord.field\twhy\tloc` for what
+    // each body does through a record's pointer field.
+    pointee_evidence: List[str],
+    // Facts a registry states that were not applied, one report line each.
+    facts_not_applied: str,
     // §31.8.6: what the static definitions assign and call, by the
     // static's name. A static is not a project symbol, and a function
     // that reaches one that assigns a destroyer global assigns it.
@@ -1259,6 +1264,8 @@ fn CiProject.new -> CiProject:
         registry_value_fns: [],
         void_typedefs: [],
         fnptr_evidence: "",
+        pointee_evidence: [],
+        facts_not_applied: "",
         static_index: HashMap.new(),
         static_names: [],
         static_assigns: [],

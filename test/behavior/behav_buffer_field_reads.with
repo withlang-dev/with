@@ -1,0 +1,45 @@
+//! expect-stdout: step 0 5 5 72 79
+//! expect-stdout: partial 0 3 3 87 82
+//! expect-stdout: empty 0 0 0
+//! expect-stdout: idle true
+
+// §16.2b.8: `reads` after a pairing says C only reads through the pointer
+// field though the header does not declare it const (zlib's `next_in`
+// without ZLIB_CONST). The slice is then `[]u8`: the program passes bytes
+// it cannot write, and the step's result counts them as consumed. Without
+// `reads` this stream's input would be a second output.
+use c_import("typedef struct { unsigned char *next_in; unsigned int avail_in; unsigned char *next_out; unsigned int avail_out; int steps; } stream;
+static inline int streamInit(stream* s) { s->next_in = 0; s->avail_in = 0; s->next_out = 0; s->avail_out = 0; s->steps = 0; return 0; }
+static inline void streamEnd(stream* s) { s->steps = 0; }
+static inline int streamStep(stream* s, int flush) { s->steps++; if (!s->next_out || !s->next_in) return -2; while (s->avail_in > 0 && s->avail_out > 0) { unsigned char c = *s->next_in++; *s->next_out++ = (c >= 'a' && c <= 'z') ? (unsigned char)(c - 32) : c; s->avail_in--; s->avail_out--; } return flush; }
+static inline int streamIdle(stream* s) { return s->next_in == 0 && s->next_out == 0 && s->avail_in == 0 && s->avail_out == 0; }
+")
+
+c contract st:
+    resource Stream wraps stream
+        init streamInit(self)
+        drop streamEnd
+    fn streamStep
+        lend
+        rename step
+        buffer field next_in remaining field avail_in reads
+        buffer field next_out remaining field avail_out
+    fn streamIdle
+        lend
+        rename idle
+
+fn main:
+    let (_, s) = Stream.init()
+    let hello: [u8; 5] = [104, 101, 108, 108, 111]
+    var out: [u8; 8] = [0; 8]
+    let a = s.step(hello, out, 0)
+    print(f"step {a.status} {a.consumed} {a.produced} {out[0]} {out[4]}")
+    let world: [u8; 5] = [119, 111, 114, 108, 100]
+    var small: [u8; 3] = [0; 3]
+    let b = s.step(world, small, 0)
+    print(f"partial {b.status} {b.consumed} {b.produced} {small[0]} {small[2]}")
+    let none: [u8; 0] = []
+    var nowhere: [u8; 0] = []
+    let c = s.step(none, nowhere, 0)
+    print(f"empty {c.status} {c.consumed} {c.produced}")
+    print(f"idle {s.idle() != 0}")
