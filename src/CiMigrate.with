@@ -390,6 +390,23 @@ fn ci_migrate_insert_collections_use(output: &str) -> str:
     else:
         "use std.collections\n\n" ++ output
 
+// A migrated module that lowered an atomic builtin names `Atomic`, its
+// orderings and `fence` from std.sync (CImport records that it did).
+fn ci_migrate_insert_atomic_support(output: &str) -> str:
+    if not g_ci_atomic_names_used:
+        return with_str_clone_ref(output)
+    g_ci_atomic_names_used = false
+    // The compare-exchange helper, when a body of this module called it.
+    let helper = ci_render_atomic_helpers_needed()
+    let text = if helper.len() > 0: output ++ "\n" ++ helper else: with_str_clone_ref(output)
+    if ci_find_str(text, "\nuse std.sync\n") >= 0 or ci_starts_with(text, "use std.sync\n"):
+        return text
+    let header_end = ci_find_str(text, "\n\n")
+    if header_end >= 0:
+        text.slice(0, header_end as i64) ++ "\nuse std.sync" ++ text.slice(header_end as i64, text.len())
+    else:
+        "use std.sync\n\n" ++ text
+
 fn ci_migrate_shared_module_prefix() -> str:
     if g_migrate_shared_defs_prefix.ends_with(".defs"):
         return g_migrate_shared_defs_prefix.slice(0, g_migrate_shared_defs_prefix.len() - 5)
@@ -1515,6 +1532,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     output = ci_migrate_insert_libc_use(output)
     output = ci_migrate_insert_option_use(output)
     output = ci_migrate_insert_collections_use(output)
+    output = ci_migrate_insert_atomic_support(output)
 
     ci_migrate_shared_note_output_uses(output)
     output = ci_migrate_publicize_types(ci_migrate_normalize_output(output))

@@ -473,6 +473,23 @@ fn ci_render_libc_allocator_needed() -> str:
     g_ci_libc_allocator_needed = ""
     out
 
+// A translation that lowered an atomic builtin names `Atomic`, `Order` and
+// `fence` from std.sync (g_ci_atomic_names_used, read by the migrator when
+// it writes the module's imports), and a compare-exchange needs one helper:
+// C's form returns whether it swapped and writes the value it found through
+// `expected` when it did not.
+var g_ci_atomic_names_used = false
+var g_ci_atomic_cas_needed = false
+
+fn ci_render_atomic_helpers_needed() -> str:
+    let helper = "__ci_atomic_cas"
+    if not g_ci_atomic_cas_needed or with_cimport_is_name_emitted(helper) != 0:
+        g_ci_atomic_cas_needed = false
+        return ""
+    g_ci_atomic_cas_needed = false
+    with_cimport_mark_name_emitted(helper)
+    "unsafe fn __ci_atomic_cas[T](place: *mut Atomic[T], expected: *mut T, desired: T, success: Order, failure: Order) -> bool:\n    match (*place).compare_exchange(*expected, desired, success, failure):\n        Ok(_) => true\n        Err(found) =>\n            *expected = found\n            false\n"
+
 fn ci_render_overflow_helpers_needed() -> str:
     var out = ""
     for g_ci_overflow_helpers_needed_item in g_ci_overflow_helpers_needed:
@@ -1131,6 +1148,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
         output.push_str(ci_translate_macros(macro_session, session, include_text))
         with_cimport_dispose_macros(macro_session)
     output.push_str(ci_render_overflow_helpers_needed())
+    output.push_str(ci_render_atomic_helpers_needed())
     output.push_str(ci_render_libc_allocator_needed())
     with_cimport_dispose(session)
     ci_fn_decl_index_reset()
@@ -8066,6 +8084,13 @@ impl CiStmtPool:
                 return self.lower_effect_expr_ir(session, inner, exprs, types, scope)
             return 0
 
+        // An atomic builtin as a statement (a store, a fence): the
+        // operation, its value unused.
+        if ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_ATOMIC:
+            let atomic_id = exprs.lower_atomic_expr_ir(session, cursor, types, scope)
+            if atomic_id == 0: return 0
+            return if ci_cursor_value_is_void(session, cursor): self.expr_stmt_void(atomic_id) else: self.expr_stmt(atomic_id)
+
         if ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_CHOOSE:
             let chosen = ci_choose_expr_selected(session, cursor)
             if chosen < 0:
@@ -9908,6 +9933,8 @@ impl CiExprPool:
                     ci_bail_unsupported_unexposed(session, cursor)
                     return 0
                 return self.lower_expr_ir(session, selected, types, scope)
+            if form == CI_UNEXPOSED_ATOMIC:
+                return self.lower_atomic_expr_ir(session, cursor, types, scope)
             if form != CI_UNEXPOSED_WRAPPER:
                 // `a ?: b` evaluates a once: it needs the statement-level
                 // lowering (lower_value_expr_ir) and its temporary.
@@ -12526,6 +12553,91 @@ impl CiExprPool:
         if name == "u128": return "u128"
         ""
 
+    // A GCC atomic builtin is the method of that name on `std.sync.Atomic[T]`
+    // (one `T`, so a pointer to the `T` is a pointer to the atomic), as std's
+    // own locks spell it: `(*(p as *mut Atomic[T])).swap(v, .Acquire)`.
+    // clang's children are the pointer, the ordering, then the value; a
+    // compare-exchange continues with the failure ordering, the desired value
+    // and the weak flag. The ordering must be a constant. `X_fetch` returns the
+    // new value: the old one with the operation applied again, so its operand
+    // is evaluated twice and must be a literal or a name.
+    fn lower_atomic_expr_ir(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+        let name = ci_atomic_builtin_name(session, cursor)
+        let nc = with_ci_num_children(session, cursor)
+        if name == "__atomic_thread_fence":
+            let fence_order = if nc == 1: ci_atomic_order_text(session, with_ci_child(session, cursor, 0)) else: ""
+            if fence_order.len() == 0: return self.reject_builtin_call(session, cursor, name, "the ordering is not a constant")
+            let fence_args = self.extra_len()
+            self.add_extra(self.ident(self.add_string(fence_order), 0) as i32)
+            return self.add(CiExprKind.CIE_CALL, self.ident(self.add_string("fence"), 0) as i32, fence_args, 1, 0)
+        if nc < 2: return self.reject_builtin_call(session, cursor, name, "expected a pointer and an ordering")
+        let pointer = with_ci_child(session, cursor, 0)
+        let order = ci_atomic_order_text(session, with_ci_child(session, cursor, 1))
+        if order.len() == 0: return self.reject_builtin_call(session, cursor, name, "the ordering is not a constant")
+        let value_text = with_ci_type_translated(session, with_ci_type_pointee(session, with_ci_cursor_type(session, pointer)))
+        if value_text.len() == 0: return self.reject_builtin_call(session, cursor, name, "the pointer's value type has no translation")
+        let pointer_id = self.lower_expr_ir(session, pointer, types, scope)
+        if pointer_id == 0: return 0
+        g_ci_atomic_names_used = true
+        let atomic_ty = types.named_type_from_text("*mut Atomic[" ++ value_text ++ "]")
+        let value_ty = types.named_type_from_text(value_text)
+        let atomic_ptr = self.cast(atomic_ty, pointer_id)
+        let order_id = self.ident(self.add_string(order), 0)
+        if name == "__atomic_compare_exchange_n":
+            if nc != 6: return self.reject_builtin_call(session, cursor, name, "expected six operands")
+            let failure = ci_atomic_order_text(session, with_ci_child(session, cursor, 3))
+            if failure.len() == 0: return self.reject_builtin_call(session, cursor, name, "the failure ordering is not a constant")
+            let expected_id = self.lower_expr_ir(session, with_ci_child(session, cursor, 2), types, scope)
+            let desired_id = self.lower_expr_ir(session, with_ci_child(session, cursor, 4), types, scope)
+            if expected_id == 0 or desired_id == 0: return 0
+            let cas_args = self.extra_len()
+            self.add_extra(atomic_ptr as i32)
+            self.add_extra(expected_id as i32)
+            self.add_extra(desired_id as i32)
+            self.add_extra(order_id as i32)
+            self.add_extra(self.ident(self.add_string(failure), 0) as i32)
+            g_ci_atomic_cas_needed = true
+            let cas_call = self.add(CiExprKind.CIE_CALL, self.ident(self.add_string("__ci_atomic_cas"), 0) as i32, cas_args, 5, 0)
+            // The helper writes through `expected`: an `unsafe fn`.
+            let cas = self.add(CiExprKind.CIE_UNSAFE, cas_call as i32, 0, 0, 0)
+            return self.bool_value_expr_ir(session, cursor, cas, types)
+        let place = self.add(CiExprKind.CIE_DEREF, atomic_ptr as i32, 0, 0, 0)
+        var method = ""
+        var reapply = -1
+        if name == "__atomic_load_n": method = "load"
+        else if name == "__atomic_store_n": method = "store"
+        else if name == "__atomic_exchange_n": method = "swap"
+        else if name == "__atomic_fetch_add": method = "fetch_add"
+        else if name == "__atomic_fetch_sub": method = "fetch_sub"
+        else if name == "__atomic_fetch_and": method = "fetch_and"
+        else if name == "__atomic_fetch_or": method = "fetch_or"
+        else if name == "__atomic_fetch_xor": method = "fetch_xor"
+        else if name == "__atomic_add_fetch":
+            method = "fetch_add"
+            reapply = CiBinOp.CIBO_ADD_WRAP
+        else if name == "__atomic_sub_fetch":
+            method = "fetch_sub"
+            reapply = CiBinOp.CIBO_SUB_WRAP
+        else: return self.reject_builtin_call(session, cursor, name, "no translation for this atomic operation")
+        let callee = self.add(CiExprKind.CIE_FIELD, place as i32, self.add_string(method), 2, 0)
+        if method == "load":
+            if nc != 2: return self.reject_builtin_call(session, cursor, name, "expected two operands")
+            let load_args = self.extra_len()
+            self.add_extra(order_id as i32)
+            return self.add(CiExprKind.CIE_CALL, callee as i32, load_args, 1, value_ty)
+        if nc != 3: return self.reject_builtin_call(session, cursor, name, "expected three operands")
+        let operand = with_ci_child(session, cursor, 2)
+        let operand_id = self.lower_expr_ir(session, operand, types, scope)
+        if operand_id == 0: return 0
+        let args = self.extra_len()
+        self.add_extra(self.cast(value_ty, operand_id) as i32)
+        self.add_extra(order_id as i32)
+        let call = self.add(CiExprKind.CIE_CALL, callee as i32, args, 2, value_ty)
+        if reapply < 0: return call
+        if with_ci_eval_int_valid(session, operand) == false and with_ci_cursor_kind(session, ci_peel_transparent_and_cstyle(session, operand)) != CXK_DECL_REF:
+            return self.reject_builtin_call(session, cursor, name, "the operand is evaluated twice and is neither a constant nor a name")
+        self.binary(reapply, call, self.cast(value_ty, operand_id), value_ty)
+
     fn reject_builtin_call(session: i64, cursor: i32, callee_text: &str, reason: &str):
         if g_ci_bail_message.len() == 0:
             g_ci_bail_location = with_ci_cursor_location(session, cursor)
@@ -12870,7 +12982,17 @@ impl CiExprPool:
             let args_start = self.extra_len() as i32
             let result_ty = if bit_method == "swap_bytes": operand_ty else: types.named_type_from_text("i32")
             return self.add(CiExprKind.CIE_CALL, callee as i32, args_start, 0, result_ty)
-        if ci_starts_with(callee_text, "__builtin"):
+        // The fence is a plain builtin call to clang (the other atomic
+        // builtins are atomic expressions, lower_atomic_expr_ir): std.sync's
+        // `fence`, its ordering a constant.
+        if callee_text == "__atomic_thread_fence":
+            let fence_order = if arg_ids.len() == 1 and with_ci_num_children(session, cursor) == 2: ci_atomic_order_text(session, with_ci_child(session, cursor, 1)) else: ""
+            if fence_order.len() == 0: return self.reject_builtin_call(session, cursor, callee_text, "the ordering is not a constant")
+            let fence_args = self.extra_len()
+            self.add_extra(self.ident(self.add_string(fence_order), 0) as i32)
+            g_ci_atomic_names_used = true
+            return self.add(CiExprKind.CIE_CALL, self.ident(self.add_string("fence"), 0) as i32, fence_args, 1, 0)
+        if ci_starts_with(callee_text, "__builtin") or ci_starts_with(callee_text, "__atomic_") or ci_starts_with(callee_text, "__sync_"):
             return self.reject_builtin_call(session, cursor, callee_text, "no structural lowering")
         0 as CiExprId
 
@@ -13039,6 +13161,10 @@ impl CiStmtPool:
                 return self.lower_value_expr_ir(session, selected, exprs, types, scope)
             if form == CI_UNEXPOSED_ELVIS:
                 return self.lower_elvis_value_ir(session, cursor, exprs, types, scope)
+            if form == CI_UNEXPOSED_ATOMIC:
+                let atomic_id = exprs.lower_atomic_expr_ir(session, cursor, types, scope)
+                if atomic_id == 0: return ci_value_ir_invalid()
+                return ci_value_ir_plain(atomic_id)
             if form == CI_UNEXPOSED_UNSUPPORTED:
                 ci_bail_unsupported_unexposed(session, cursor)
                 return ci_value_ir_invalid()
@@ -21836,12 +21962,45 @@ let CI_UNEXPOSED_UNSUPPORTED: i32 = 3
 // D109: clang's OffsetOfExpr, which libclang leaves unexposed; it is the
 // `offsetof[T](field)` builtin, never the host's folded number.
 let CI_UNEXPOSED_OFFSETOF: i32 = 4
+// A GCC atomic builtin (`__atomic_load_n(&g, order)`): clang's AtomicExpr,
+// whose children are the pointer, the ordering, then the operation's own
+// operands (ci_atomic_builtin_name).
+let CI_UNEXPOSED_ATOMIC: i32 = 5
+
+// The builtin an atomic expression spells, or "". An implicit cast around
+// one has the same source text and the expression as its only child: that is
+// a wrapper, not the operation.
+fn ci_atomic_builtin_name(session: i64, cursor: i32) -> str:
+    if with_ci_cursor_kind(session, cursor) != 100: return ""
+    let text = ci_trim(with_ci_cursor_source_text(session, cursor))
+    if not ci_starts_with(text, "__atomic_"): return ""
+    let open = text.find("(")
+    if open <= 0: return ""
+    if with_ci_num_children(session, cursor) == 1 and ci_trim(with_ci_cursor_source_text(session, with_ci_child(session, cursor, 0))) == text: return ""
+    ci_trim(text.slice(0, open))
+
+// The `std.sync.Order` variant a constant ordering argument names (GCC's
+// `__ATOMIC_RELAXED` … `__ATOMIC_SEQ_CST` are 0 to 5; 1, consume, is
+// acquire), or "" when clang cannot evaluate it.
+fn ci_atomic_order_text(session: i64, cursor: i32) -> str:
+    if with_ci_eval_int_valid(session, cursor) == false: return ""
+    let order = with_ci_eval_int_value(session, cursor)
+    if order == 0: return ".Relaxed"
+    if order == 1 or order == 2: return ".Acquire"
+    if order == 3: return ".Release"
+    if order == 4: return ".AcqRel"
+    if order == 5: return ".SeqCst"
+    ""
 
 fn ci_unexposed_expr_form(session: i64, cursor: i32) -> i32:
     if with_ci_cursor_kind(session, cursor) != 100 or ci_unexposed_expr_is_va_arg(session, cursor):
         return CI_UNEXPOSED_WRAPPER
     if ci_source_is_offsetof_call(session, with_ci_cursor_source_text(session, cursor)):
         return CI_UNEXPOSED_OFFSETOF
+    // Before the wrapper test: `__atomic_thread_fence(order)` has one child,
+    // its ordering, which is not its value.
+    if ci_atomic_builtin_name(session, cursor).len() > 0:
+        return CI_UNEXPOSED_ATOMIC
     let nc = with_ci_num_children(session, cursor)
     var expr_children = 0
     for i in 0..nc:
@@ -22824,7 +22983,9 @@ fn ci_has_value_libc_call_mapping(callee: &str) -> bool:
     // pointer normalization as their libc spellings (#740, #880).
     if callee == "with_free" or callee == "with_memcpy" or callee == "with_memmove" or callee == "with_memset" or callee == "with_memcmp":
         return true
-    if ci_starts_with(callee, "__builtin") or callee == "isnormal":
+    // The atomic and sync builtins clang presents as calls (the fence):
+    // translated or refused there, never passed through as an undeclared name.
+    if ci_starts_with(callee, "__builtin") or ci_starts_with(callee, "__atomic_") or ci_starts_with(callee, "__sync_") or callee == "isnormal":
         return true
     false
 
