@@ -3062,6 +3062,21 @@ fn facade_render_field_buffers(pool: &AstPool, intern: &InternPool, decl: i32) -
         out.push(intern.resolve(pool.get_extra(ops + 1)))
     out
 
+// Whether the pairing of pointer field `field` lets C write through it: the
+// field is a pointer to writable bytes and the clause does not end in
+// `reads`.
+fn facade_render_field_buffer_writable(pool: &AstPool, intern: &InternPool, decl: i32, record: &str, field: &str) -> bool:
+    if not facade_render_unalias(pool, intern, facade_render_record_field_type(pool, intern, record, field)).starts_with("*mut "): return false
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0: return true
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_BUFFER_FIELD: continue
+        let ops = pool.get_data1(clause as NodeId)
+        if intern.resolve(pool.get_extra(ops)) == field: return pool.get_extra(ops + 2) == 0
+    true
+
 // The declared type of `field` in the record `record`, or "".
 fn facade_render_record_field_type(pool: &AstPool, intern: &InternPool, record: &str, field: &str) -> str:
     for di in 0..pool.decl_count():
@@ -3097,12 +3112,12 @@ fn facade_render_step_fields(pool: &AstPool, intern: &InternPool, decl: i32) -> 
     var outputs = 0
     var k = 0
     while k < pairs.len():
-        if facade_render_unalias(pool, intern, facade_render_record_field_type(pool, intern, record, pairs[k])).starts_with("*mut "): outputs += 1 else: inputs += 1
+        if facade_render_field_buffer_writable(pool, intern, decl, record, pairs[k]): outputs += 1 else: inputs += 1
         k += 2
     let names = []
     k = 0
     while k < pairs.len():
-        let writable = facade_render_unalias(pool, intern, facade_render_record_field_type(pool, intern, record, pairs[k])).starts_with("*mut ")
+        let writable = facade_render_field_buffer_writable(pool, intern, decl, record, pairs[k])
         let word = if writable: "produced" else: "consumed"
         names.push(if (if writable: outputs else: inputs) == 1: word else: pairs[k] ++ "_" ++ word)
         k += 2
@@ -3153,7 +3168,7 @@ fn facade_render_field_buffer_method(pool: &AstPool, intern: &InternPool, decl: 
         let n = pairs[k + 1]
         let ptype = facade_render_record_field_type(pool, intern, record, p)
         let ctype = facade_render_record_field_type(pool, intern, record, n)
-        let writable = facade_render_unalias(pool, intern, ptype).starts_with("*mut ")
+        let writable = facade_render_field_buffer_writable(pool, intern, decl, record, p)
         let raw = if writable: "&raw mut " else: "&raw const "
         let take = p ++ "_take"
         let left = p ++ "_left"

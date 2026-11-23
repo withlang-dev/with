@@ -1,0 +1,28 @@
+//! expect-check-fail: fn 'streamStep': 'buffer field next_in … reads' states what the header already declares: next_in points at const bytes (§16.2b.8)
+//! expect-check-fail: = help: remove 'reads'
+
+// §16.2b.8: `reads` is for a pointer the header leaves writable. On one
+// the header declares const it says nothing new, and is refused.
+use c_import("typedef struct { const unsigned char *next_in; unsigned int avail_in; unsigned char *next_out; unsigned int avail_out; int steps; } stream;
+static inline int streamInit(stream* s) { s->next_in = 0; s->avail_in = 0; s->next_out = 0; s->avail_out = 0; s->steps = 0; return 0; }
+static inline void streamEnd(stream* s) { s->steps = 0; }
+static inline int streamStep(stream* s, int flush) { s->steps++; if (!s->next_out || !s->next_in) return -2; while (s->avail_in > 0 && s->avail_out > 0) { unsigned char c = *s->next_in++; *s->next_out++ = (c >= 'a' && c <= 'z') ? (unsigned char)(c - 32) : c; s->avail_in--; s->avail_out--; } return flush; }
+static inline int streamIdle(stream* s) { return s->next_in == 0 && s->next_out == 0 && s->avail_in == 0 && s->avail_out == 0; }
+")
+
+c contract st:
+    resource Stream wraps stream
+        init streamInit(self)
+        drop streamEnd
+    fn streamStep
+        lend
+        rename step
+        buffer field next_in remaining field avail_in reads
+        buffer field next_out remaining field avail_out
+    fn streamIdle
+        lend
+        rename idle
+
+fn main:
+    let (_, s) = Stream.init()
+    print(s.idle())

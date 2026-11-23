@@ -5679,6 +5679,13 @@ impl Parser:
             if count == 0: return 0
             ops.push(pointer)
             ops.push(count)
+            // `reads`: C only reads through P, though the header does not
+            // declare it const (zlib's `next_in`). A stated, cited claim.
+            if self.current_ident_is("reads"):
+                self.advance()
+                ops.push(1)
+            else:
+                ops.push(0)
         else if word == "buffer":
             // `buffer param P len param L` / `buffer param P capacity param L
             // inout` (D64, §16.2b.8): the pointer and the integer that
