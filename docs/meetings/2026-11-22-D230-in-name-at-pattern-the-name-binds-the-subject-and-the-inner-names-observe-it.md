@@ -20,12 +20,15 @@ it: each is a binding from a place (§3)."
 
 The message at a move of the origin says what happened, "'whole' is moved
 while 'tag' still views it", for every view and not only this one. Its help
-names a rewrite that compiles: the inner name is in scope until its block
-ends, so reading it in a `let` before the move is not enough inside the arm;
-a `match` on a borrow of the value, ended before the move, is.
+names the rewrite: read what is needed from the view in a `let` on an
+earlier line, then move.
 
-**Not decided here.** Ending a view at its last use would accept the program
-above as written. It relaxes every view, so it is its own question.
+**Followed up (#3548).** A view bound by `let` already ended at its last
+use; a pattern binding was held to the end of its arm, so the `let` rewrite
+was itself refused inside an arm. A pattern binding now ends at its last use
+too, when the arm's body is a block. The program above, with the read and
+the move in one expression, is still refused: within one expression nothing
+says the view's value is gone before the move.
 
 **Found on the way.** A match whose arms all bind the whole value
 (`whole @ .Click(..)`, `whole @ .Key(..)`) was refused as missing every

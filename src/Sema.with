@@ -10332,7 +10332,7 @@ impl Sema:
                 let said = if moved: "'" ++ origin_name ++ "' is moved while '" ++ view_name ++ "' still views it" else: "view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'"
                 var diag = Diagnostic.err(said, Span { file: self.local_file_id, start: start, end: end })
                 if moved:
-                    diag.add_help("`" ++ view_name ++ "` is in scope until its block ends: read what you need from it in a scope that ends before the move (for a pattern binding, a `match` on a borrow of the value), then move `" ++ origin_name ++ "`")
+                    diag.add_help("a view ends at its last use: read what you need from `" ++ view_name ++ "` in a `let` on an earlier line, then move `" ++ origin_name ++ "`")
                 diag = self.with_copy_view_fixit(diag, view_sym, true)
                 diag = self.with_facade_dependency_notes(diag, view_ty)
                 self.diags.emit(diag)
