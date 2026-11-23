@@ -1424,6 +1424,76 @@ fn conan_source_fail(dep_dir: &str, message: &str) -> str:
         let _remove = runtime_remove_tree(dep_dir)
     ""
 
+// §31.8.1: the settings the registry's facts file states for `name`
+// (`build|NAME[=value]|cite` or `both|…`), read once per package.
+var g_conan_build_defines: str = ""
+
+fn conan_package_settings(name: &str) -> List[str]:
+    let scratch = with_user_cache_dir() ++ "/with/c-builds/.settings-" ++ f"{runtime_getpid()}"
+    if runtime_mkdir_p(scratch) != 0: return []
+    let registry = conan_registry_facts(name, scratch)
+    let read = if registry.path.len() > 0: facts_read_file(registry.path) else: Err("")
+    let _gone = runtime_remove_tree(scratch)
+    match read:
+        Ok(facts) => return facts.settings
+        Err(_) => {}
+    []
+
+// A header's text with every `const` and all white space removed: what
+// two preprocessed copies must agree on for a `build define` to pass.
+fn conan_text_without_const(text: &str) -> str:
+    let out = StringBuilder.new()
+    var i = 0
+    while i < text.len():
+        let c = text[i]
+        if c == ' ' or c == '\n' or c == '\t' or c == '\r':
+            i += 1
+            continue
+        let word = (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_'
+        if word:
+            var j = i
+            while j < text.len() and ((text[j] >= 'a' and text[j] <= 'z') or (text[j] >= 'A' and text[j] <= 'Z') or (text[j] >= '0' and text[j] <= '9') or text[j] == '_'): j += 1
+            if text.slice(i, j) != "const":
+                out.push_str(text.slice(i, j))
+                // Two words stay two words.
+                out.push_byte(' ')
+            i = j
+            continue
+        out.push_byte(c)
+        i += 1
+    out.to_str()
+
+// §31.8.1: a `build define` reaches the library's build and not the
+// program's import, so it must not change what the installed headers
+// declare: a layout, a type or a symbol's name. Each installed header is
+// preprocessed with and without it and the two texts compared; a
+// difference in `const` alone passes (zlib's ZLIB_CONST). "" when it
+// passes, else the first header that differs.
+fn conan_build_define_changes(self_exe: &str, dep_dir: &str, setting: &str, work: &str) -> str:
+    let include = dep_dir ++ "/include"
+    for header in with_fs_list_files(include).split("\n"):
+        if not header.ends_with(".h"): continue
+        let texts = []
+        for with_it in [false, true]:
+            let out = work ++ (if with_it: "/header-with.i" else: "/header-without.i")
+            let _old = runtime_remove_file(out)
+            var argv = ""
+            argv = conan_argv_append(argv, self_exe)
+            for word in ["cc", "-E", "-P", "-I", include]: argv = conan_argv_append(argv, word)
+            if with_it: argv = conan_argv_append(argv, "-D" ++ setting)
+            for word in [header, "-o", out]: argv = conan_argv_append(argv, word)
+            // A header that does not preprocess alone is judged through the
+            // header that includes it.
+            texts.push(if conan_run_tool(argv, 120000) == 0: conan_text_without_const(runtime_read_file(out)) else: "")
+        if texts[0] != texts[1]: return header.to_owned()
+    ""
+
+// The names of those settings, `,`-joined.
+fn conan_setting_names(settings: &List[str]) -> str:
+    var names = ""
+    for setting in settings: names = names ++ (if names.len() > 0: "," else: "") ++ facts_setting_name(setting)
+    names
+
 // The per-user cache of source builds (D212): the installed tree of one
 // package with the contract drawn from that build. The key is what the
 // result depends on: the package's version, source and recipe, the target,
@@ -1849,6 +1919,10 @@ fn conan_configure_source(name: &str, version: &str, project_root: &str, dep_dir
     configure = conan_argv_append(configure, "-DCMAKE_BUILD_TYPE=Release")
     configure = conan_argv_append(configure, "-DBUILD_SHARED_LIBS=OFF")
     configure = conan_argv_append(configure, "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+    // §31.8.1: the defines the package's facts file states for its build.
+    if g_conan_build_defines.len() > 0:
+        configure = conan_argv_append(configure, "-DCMAKE_C_FLAGS=" ++ g_conan_build_defines)
+        configure = conan_argv_append(configure, "-DCMAKE_CXX_FLAGS=" ++ g_conan_build_defines)
     configure = conan_argv_append(configure, "-DCMAKE_INSTALL_PREFIX=" ++ dep_dir)
     configure = conan_argv_append(configure, "-DCMAKE_INSTALL_LIBDIR=lib")
     configure = conan_argv_append(configure, "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
@@ -2470,7 +2544,17 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     if tree.problem.len() > 0: return conan_source_fail(dep_dir, tree.problem)
     let source_dir = tree.source_dir
 
+    // §31.8.1: the settings the facts file states are set explicitly, never
+    // left to a default; each is said.
+    let settings = conan_package_settings(name)
+    g_conan_build_defines = ""
+    for setting in settings:
+        let parts = setting.split("|")
+        g_conan_build_defines = g_conan_build_defines ++ (if g_conan_build_defines.len() > 0: " " else: "") ++ "-D" ++ parts[1]
+        runtime_eprint("  " ++ (if parts[0] == "build": "build define " else: "define ") ++ parts[1] ++ " (registry: " ++ parts[2] ++ ")")
+    migrate_set_unapplied_settings("")
     let configured = conan_configure_source(name, version, project_root, dep_dir, work, source_dir, resolved, recipe, fetched.recipe_cmake, recipe_env, cmake_env, cmake_env_name, tools)
+    g_conan_build_defines = ""
     if configured.len() > 0: return conan_source_fail(dep_dir, configured)
     let cmake = tools.cmake
     // Keep going past a test or example program that does not link: the
@@ -2493,6 +2577,19 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     let package_env = conan_built_recipe_env(version, dep_dir)
     if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, package_env, recipe, true) != 0:
         return conan_source_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ version)
+    for setting in settings:
+        let parts = setting.split("|")
+        if parts[0] == "build":
+            let changed = conan_build_define_changes(tools.self_exe, dep_dir, parts[1], work)
+            if changed.len() > 0: return conan_source_fail(dep_dir, "the registry's facts for " ++ name ++ " state `build define " ++ parts[1] ++ "`, which changes what " ++ changed.slice(dep_dir.len() + 1, changed.len()) ++ " declares; a setting that changes the headers is stated `define " ++ parts[1] ++ "`, so the program's import sees it too")
+        if parts[0] != "both": continue
+        let meta = runtime_read_file(dep_dir ++ "/metadata.json")
+        let q = "\x22"
+        let key = q ++ "defines" ++ q ++ ": ["
+        let at = conan_find_text(meta, key)
+        if at < 0: return conan_source_fail(dep_dir, "could not record the define " ++ parts[1] ++ " for " ++ name ++ "/" ++ version)
+        let after = meta.slice(at + key.len(), meta.len())
+        let _w = runtime_write_file(dep_dir ++ "/metadata.json", meta.slice(0, at + key.len()) ++ q ++ conan_json_escape(parts[1]) ++ q ++ (if after.starts_with("]"): "" else: ", ") ++ after)
     runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     // D121 step 5: the facade, from the build that just ran.
     conan_write_facade(name, version, dep_dir, source_dir, work ++ "/b")
@@ -2564,13 +2661,17 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         let declined = g_conan_source_declined.to_owned()
         g_conan_source_optional = outer
         if built.len() > 0: return built
+        migrate_set_unapplied_settings(conan_setting_names(conan_package_settings(name)))
         let fallback = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
+        migrate_set_unapplied_settings("")
         if fallback.len() > 0:
             runtime_eprint("  c." ++ name ++ "@" ++ version ++ ": a prebuilt binary, with no proofs; it was not built from source: " ++ declined ++ " (`with contract report c." ++ name ++ "`)")
             return fallback
         runtime_eprint("error: " ++ name ++ "/" ++ version ++ " was not built from source (" ++ declined ++ ") and Conan Center has no binary of it for this platform")
         return ""
+    migrate_set_unapplied_settings(conan_setting_names(conan_package_settings(name)))
     let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
+    migrate_set_unapplied_settings("")
     if installed_binary.len() > 0:
         runtime_eprint("  c." ++ name ++ "@" ++ version ++ ": a prebuilt binary, with no proofs (--binary) (`with contract report c." ++ name ++ "`)")
         return installed_binary

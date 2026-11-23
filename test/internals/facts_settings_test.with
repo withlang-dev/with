@@ -1,0 +1,42 @@
+//! expect-stdout: ok
+// §16.2b.15, §31: a facts file states how its package is configured when it
+// is built from source, before its items. `build define NAME[=value]`
+// reaches the library's build only; `define NAME[=value]` reaches the build
+// and the program's import of the headers. Each carries its citation, a
+// setting is stated once, and one whose citation names a setting is dropped
+// when the library was not built with it.
+use CiFacts
+use std.fs
+
+fn read(text: &str) -> Result[Facts, str]:
+    let path = "out/tmp/facts_settings_test.with"
+    assert(mkdir_p("out/tmp") == 0)
+    assert(write_file(path, text) == 0)
+    facts_read_file(path)
+
+fn main:
+    let stated = read("c facts zs:\n    build define ZS_CONST    // zs.h: makes the input pointer const in the library\n    define ZS_WIDE=2    // zs.h: changes the character type\n    fn zs_step\n        lend    // zs.h: with ZS_CONST the step keeps nothing\n        nullable param 1    // zs.h: a null hint is allowed\n")
+    match stated:
+        Ok(f) =>
+            assert(f.settings.len() == 2)
+            assert(f.settings[0] == "build|ZS_CONST|zs.h: makes the input pointer const in the library")
+            assert(f.settings[1] == "both|ZS_WIDE=2|zs.h: changes the character type")
+            assert(facts_setting_name(f.settings[1]) == "ZS_WIDE")
+            // A fact whose citation names a setting goes with the setting.
+            var held = f
+            let dropped = held.drop_citing("ZS_CONST")
+            assert(dropped.len() == 1 and dropped[0] == "zs_step: `lend`")
+            assert(held.of("zs_step") == "")
+            assert(held.presentation("zs_step").contains("nullable:1"))
+        Err(message) =>
+            print(message)
+            assert(false)
+    // Stated twice, a name that is no identifier, and a setting after the
+    // items are each refused.
+    for bad in ["c facts zs:\n    build define A    // one\n    define A=1    // two\n", "c facts zs:\n    build define 9A    // digits first\n", "c facts zs:\n    build define A B    // two words\n", "c facts zs:\n    fn zs_step\n        lend    // zs.h\n    build define A    // too late\n"]:
+        match read(bad):
+            Ok(_) =>
+                print("accepted: " ++ bad)
+                assert(false)
+            Err(_) => {}
+    print("ok")

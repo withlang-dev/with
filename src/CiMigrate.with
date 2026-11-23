@@ -2162,9 +2162,13 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
             if gir.names_drop(project.symbols[si].name): facts = facts ++ (if facts.len() > 0: ";" else: "") ++ "drop=1"
             project.symbols[si].gir = facts
     if facts_path.len() > 0:
-        let registry = match facts_read_file(ci_migrate_fs_path(facts_path)):
+        var registry = match facts_read_file(ci_migrate_fs_path(facts_path)):
             Ok(f) => f
             Err(message) => return Err("registry: " ++ message)
+        for setting in g_migrate_unapplied_settings.split(","):
+            if setting.len() == 0: continue
+            for dropped in registry.drop_citing(setting):
+                project.facts_not_applied = project.facts_not_applied ++ "  " ++ dropped ++ ": stated and not applied: it cites the setting `" ++ setting ++ "`, and this library was not built with it\n"
         if registry.package != facade_name:
             return Err("registry: " ++ facts_path ++ " states facts for `" ++ registry.package ++ "`, not `" ++ facade_name ++ "`")
         project.registry_utf8 = with_str_clone_ref(registry.utf8_cite)
@@ -3617,6 +3621,14 @@ var g_migrate_platform_facts: str = ""
 
 fn migrate_set_platform_facts(path: &str):
     g_migrate_platform_facts = path.to_owned()
+
+// §31.8.1: the settings of the package's facts file that this build of the
+// library was not made with (a prebuilt binary), `,`-joined. A fact that
+// cites one is dropped, and the report says which.
+var g_migrate_unapplied_settings: str = ""
+
+fn migrate_set_unapplied_settings(names: &str):
+    g_migrate_unapplied_settings = names.to_owned()
 
 fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val

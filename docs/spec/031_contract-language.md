@@ -116,7 +116,8 @@ contract generates, `.repr` is the only one a program can name (§16.2b.3).
 unit            = contract | facts | convention
 
 contract        = "c" "contract" name [ "error" TypeName ] ":" INDENT item+ DEDENT
-facts           = "c" "facts" name ":" INDENT item+ DEDENT
+facts           = "c" "facts" name ":" INDENT { setting } item+ DEDENT
+setting         = [ "build" ] "define" NAME [ "=" value ]
 convention      = "c" "convention" dotted_name ":" INDENT rule+ DEDENT
 
 item            = resource | handle | fn_item | domain | library_clause

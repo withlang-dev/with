@@ -58,6 +58,11 @@ type Facts {
     // §16.2b.15: the role of a function-pointer field, one per line:
     // `Record.field` and `role|Record|cite`.
     pub field_roles: List[(str, str)],
+    // §31.8.1: how the package is configured when it is built from
+    // source, one `build|NAME[=value]|cite` or `both|NAME[=value]|cite` per
+    // line: `build define` reaches the library's build only, `define` the
+    // build and the program's import of its headers.
+    pub settings: List[str],
 }
 
 /// Whether `kind` is a presentation fact (a parameter's or a return's
@@ -73,6 +78,27 @@ impl Facts:
             if e.fn_name == name and not facts_is_presentation(e.kind): return e.kind ++ "|" ++ e.record ++ "|" ++ e.cite
         ""
 
+    /// Drops every fact whose citation names `setting`, and says which:
+    /// one `function: clause` (or `field …`) per fact dropped.
+    mut fn drop_citing(setting: &str) -> List[str]:
+        let dropped = []
+        let kept = []
+        for e in self.entries:
+            if e.cite.contains(setting): dropped.push(e.fn_name ++ ": `" ++ e.kind ++ "`")
+            else: kept.push(FactsEntry { fn_name: e.fn_name.to_owned(), kind: e.kind.to_owned(), record: e.record.to_owned(), cite: e.cite.to_owned() })
+        self.entries = kept
+        var text = ""
+        for line in self.value_text.split("\n"):
+            if line.contains("// registry: ") and line.slice(line.find("// registry: "), line.len()).contains(setting): dropped.push("`" ++ line.slice(0, line.find("// registry: ")).trim() ++ "`")
+            else: text = text ++ line ++ "\n"
+        self.value_text = if text.len() > 0: text.slice(0, text.len() - 1).to_owned() else: ""
+        let roles = []
+        for (field, role) in self.field_roles:
+            if facts_cite(role).contains(setting): dropped.push("`field " ++ field ++ "`")
+            else: roles.push((field.to_owned(), role.to_owned()))
+        self.field_roles = roles
+        dropped
+
     /// Every `reads param N` the file states, as `function:N`.
     fn reads() -> List[str]:
         let out = []
@@ -87,6 +113,13 @@ impl Facts:
         for e in self.entries:
             if e.fn_name == name and facts_is_presentation(e.kind): out = out ++ e.kind ++ "|" ++ e.record ++ "|" ++ e.cite ++ "\n"
         out
+
+/// The name of a setting line (`build|NAME[=value]|cite`).
+fn facts_setting_name(setting: &str) -> str:
+    let parts = setting.split("|")
+    if parts.len() < 2: return ""
+    let eq = parts[1].find("=")
+    if eq < 0: parts[1].to_owned() else: parts[1].slice(0, eq).to_owned()
 
 /// The `kind` of a fact string `of` gave.
 fn facts_kind(fact: &str) -> str:
@@ -125,7 +158,7 @@ fn facts_read_file(path: &str) -> Result[Facts, str]:
     facts_read(path, source)
 
 fn facts_read(path: &str, source: str) -> Result[Facts, str]:
-    let facts = Facts { package: "", entries: List.new(), utf8_cite: "", threads_cite: "", value_text: "", value_fns: [], value_resources: [], field_roles: [] }
+    let facts = Facts { package: "", entries: List.new(), utf8_cite: "", threads_cite: "", value_text: "", value_fns: [], value_resources: [], field_roles: [], settings: [] }
     var in_value = false
     var current_fn = ""
     var in_resource = false
@@ -183,6 +216,26 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             in_resource = false
             current_fn = ""
             facts.field_roles.push((words[3] ++ "." ++ words[1], words[5] ++ "|" ++ words[3] ++ "|" ++ cite))
+            continue
+        if (clause.starts_with("build define ") or clause.starts_with("define ")) and not in_resource and current_fn.len() == 0:
+            // `build define NAME[=value]`: the library is built with it, and
+            // the program's import of the headers is not (zlib's ZLIB_CONST
+            // makes the C compiler check that nothing writes through
+            // `next_in`, and must not reach the import, where it would make
+            // the header say what the facts state). `define NAME[=value]`:
+            // both, for a setting that changes what the headers declare
+            // (expat's XML_UNICODE changes XML_Char).
+            let build_only = clause.starts_with("build ")
+            let setting = clause.slice(if build_only: 13 else: 7, clause.len()).trim()
+            let eq = setting.find("=")
+            let name = if eq < 0: setting else: setting.slice(0, eq)
+            var named = name.len() > 0 and not is_digit(name[0])
+            for c in name.bytes():
+                if not (is_alnum(c) or c == '_'): named = false
+            if not named or setting.contains(" "): return Err(facts_error(path, line_no, "a setting is `build define NAME`, `build define NAME=value`, `define NAME` or `define NAME=value`"))
+            for stated in facts.settings:
+                if facts_setting_name(stated) == name: return Err(facts_error(path, line_no, "the setting `" ++ name ++ "` is stated twice"))
+            facts.settings.push((if build_only: "build" else: "both") ++ "|" ++ setting ++ "|" ++ cite)
             continue
         if clause == "text utf8" and not in_resource and current_fn.len() == 0:
             if facts.utf8_cite.len() > 0: return Err(facts_error(path, line_no, "`text utf8` is stated twice"))

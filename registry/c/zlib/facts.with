@@ -17,6 +17,7 @@
 // that forwards its parameters, so it is imported as a function and a
 // resource names it directly.
 c facade zlib:
+    build define ZLIB_CONST    // zconf.h 1.4 lines 245 to 249: with ZLIB_CONST, z_const is const, so the C compiler refuses a write through next_in anywhere in the library's own source
     resource GzFileS wraps *mut gzFile_s
         drop gzclose    // zlib.h 1.4 line 1761, gzclose: "Flush all pending output for file, if necessary, close file and deallocate the (de)compression state"
         destroys gzclose_r    // zlib.h 1.4 line 1775: "Same as gzclose(), but gzclose_r() is only for use when reading"
