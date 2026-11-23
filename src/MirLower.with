@@ -6165,6 +6165,7 @@ impl MirBuilder:
         if mode == CastMode.MOVE as i32:
             return self.lower_move_cast(expr, target_type_id, node)
         var op = self.lower_expr(expr)
+        var moved_into_cast = false
         // D120: a cast of a Copy value with drop glue (a value List into its
         // distinct type) consumes a copy: one more holder, as a consuming
         // call's argument is (retain_consumed_copy decides by the type).
@@ -6175,6 +6176,7 @@ impl MirBuilder:
                 // A temporary (a call's result) cast into the distinct type
                 // moves into it: its own drop is cancelled.
                 self.consume_moved_operand(op)
+                moved_into_cast = true
         // D22 contextual materialization records the cast target on its source
         // expression. The central adjustment consumer has already copied the
         // pointee and performed this ordinary value cast, so do not cast the
@@ -6216,7 +6218,9 @@ impl MirBuilder:
         // resolved-call contracts exactly that way (gates6 flip).
         if self.sema.type_is_std_box_inst(src_sema_ty):
             self.consume_moved_operand(op)
-        else if self.body.operand_kinds[op] == OperandKind.OK_MOVE:
+        else if self.body.operand_kinds[op] == OperandKind.OK_MOVE and not moved_into_cast:
+            // The temporary moved into the cast above stays a move: read as
+            // a copy, its reset blanked "a value no path moved".
             // #1719: every other cast READS its source. Sema records no move
             // for a cast (a second `input as []u8` is not a use after move),
             // and no reset follows, so an OK_MOVE here was a move only in
@@ -16310,7 +16314,10 @@ impl MirBuilder:
             // The predicate only observed: a rejected payload is still the
             // subject's, and is dropped here, once.
             self.switch_to(reject_bb)
-            if mir_place_plain_local(self.body, value_place) >= 0:
+            // A Copy carrier (D111: an `Option[List[i32]]`) keeps its own
+            // hold and its own drop on every path; dropped here as well, its
+            // later drop ran over a value already dropped.
+            if mir_place_plain_local(self.body, value_place) >= 0 and not self.carrier_copies(value_ty):
                 self.emit_drop_stmt(value_place, "filter-reject", span)
             let rejected_fields: List[i32] = []
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, rejected_fields, span)
