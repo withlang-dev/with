@@ -1,0 +1,11 @@
+//! expect-error: `xs` is a read-only view; to let `zero_first` mutate it, declare the parameter `mut xs: List[i32]`
+// D172 (1): a `&T` parameter is read-only for every write through it, a
+// write through a slot included.
+fn zero_first(xs: &List[i32]):
+    with xs.slot(0) as mut slot:
+        slot.set(0)
+
+fn main:
+    let xs = [1, 2, 3]
+    zero_first(xs)
+    print(xs[0])

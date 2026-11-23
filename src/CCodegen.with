@@ -2517,8 +2517,8 @@ impl CCodegen:
         let base_name = self.generic_inst_base_name(tid)
         if base_name == "ListSlot":
             return true
-        if base_name == "ListIter":
-            return true
+        // (`ListIter` is a struct std declares since #2526: its fields come
+        // from the declaration, as any generic struct's do.)
         if base_name == "ListIterPlace":
             return true
         if base_name == "HashMapEntry":
@@ -11746,7 +11746,11 @@ impl CCodegen:
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
         if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STR:
             return "with_str_retain(&(" ++ lv ++ "));"
-        self.ensure_glue("copy", resolved) ++ "(" ++ self.glue_arg(lv, resolved) ++ ");"
+        // A hold reads the record it is taken on: the holder count lives in
+        // the buffer, not the record. A copy out of a view (`const T*`)
+        // therefore passes the record as the glue's `T*` by a cast.
+        let glue = self.ensure_glue("copy", resolved)
+        glue ++ "((" ++ self.glue_param_c_type(resolved) ++ "*)" ++ self.glue_arg(lv, resolved) ++ ");"
 
     mut fn copy_glue_body(lv: &str, resolved: i32) -> str:
         let tk = self.sema.get_type_kind(resolved as TypeId)

@@ -1,4 +1,4 @@
-//! expect-check-fail: method 'List.split_at_mut' requires a mutable receiver
+//! expect-check-fail: `xs` is a read-only view; to let `halves` mutate it, declare the parameter `mut xs: List[i32]`
 
 // A read-only view of a List cannot be split into mutable halves.
 fn halves(xs: &List[i32]):

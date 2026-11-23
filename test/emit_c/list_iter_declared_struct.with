@@ -1,0 +1,22 @@
+//! expect-stdout: 32
+//! expect-stdout: 6
+
+// #2409: `ListIter[T]` is a struct std declares (a view of its list and a
+// position). The C backend still took it for a built-in with a hand-written
+// layout that no code wrote, so its struct came out of the instance's
+// argument list: `_Alignas(23646) const int32_t* string;`, and the emitted
+// compiler did not compile.
+fn main:
+    let xs = [1, 2, 3]
+    let ys = [4, 5, 6]
+    var dot = 0
+    for (x, y) in xs.iter().zip(ys.iter()):
+        dot = dot + x * y
+    print(dot)
+    var walk = xs.iter()
+    var sum = 0
+    while true:
+        match walk.next():
+            Some(v) => sum = sum + v
+            None => break
+    print(sum)

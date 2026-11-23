@@ -37880,6 +37880,12 @@ impl Sema:
                 return ReceiverMode.Mut
             if field == self.syms.push or field == self.syms.remove or field == self.syms.clear or field == self.syms.pop:
                 return ReceiverMode.Mut
+            // D172 (1): a slot is the handle an element is written through
+            // (`slot.set(v)`), so making one is the write. Read as a plain
+            // `fn`'s, a slot let a read-only method or a `&T` parameter
+            // overwrite an element a caller held a view of.
+            if field == self.syms.slot or field == self.syms.iter_place or field == self.syms.get_disjoint:
+                return ReceiverMode.Mut
         if type_name_sym == self.syms.listrange:
             if field == self.syms.split_at_mut:
                 return ReceiverMode.Mut
@@ -39002,13 +39008,19 @@ impl Sema:
                     let packed = self.classify_place(indexed)
                     element_place = unpack_place_kind(packed) != PlaceKind.PK_NotPlace and unpack_place_mut(packed) != PlaceMut.PM_ReadOnly and self.place_base_is_read_only_ref(indexed) == 0
                 if self.is_shared_ref_like_receiver(obj_type as i32) and not element_place:
-                    self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
+                    // A `&T` parameter is named with the `mut` parameter it
+                    // could be, as a user `mut fn` call through one is.
+                    let through_param = self.read_only_mutation_message(expr, node)
+                    if through_param.len() > 0: self.emit_error(through_param, node) else: self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
                     return 0
                 // D27 (§2.3): projections through a shared view type bare, so
                 // the ref-ness only shows at the chain root — same walk as the
                 // user mut-method path.
                 if self.place_base_is_read_only_ref(expr) != 0:
-                    self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
+                    // A `&T` parameter is named with the `mut` parameter it
+                    // could be, as a user `mut fn` call through one is.
+                    let through_view = self.read_only_mutation_message(expr, node)
+                    if through_view.len() > 0: self.emit_error(through_view, node) else: self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
                     return 0
                 // D172 (1), §9: a binding-rooted chain is read-only by its root
                 // (a plain `fn`'s receiver borrows immutably), which only

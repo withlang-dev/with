@@ -5198,6 +5198,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_checks = release_checks.dep("issue61-regression")
     release_checks = release_checks.dep("invariance-check")
     release_checks = release_checks.dep("wo-drift")
+    // #2409: the no-LLVM bootstrap (the compiler emitted as C, compiled, and
+    // emitting itself again to the same bytes). It was in no lane, and
+    // stopped compiling unseen.
+    release_checks = release_checks.dep("emit-c-fixpoint")
     // The corpora lane (stdlib_sourcing_plan.md): every migrated
     // container corpus runs its upstream test programs under With.
     release_checks = corpora_test_deps(release_checks)

@@ -1,4 +1,4 @@
-//! expect-error: requires a mutable receiver
+//! expect-error: `items[0]` is a read-only view (`&Thing`), so `items[0].vals.push` cannot mutate through it
 
 // D27 E1: an element read through a borrowed collection is a read-only view.
 // Mutation needs a mutable place: `items[0]` on a `var` or `mut` receiver.

@@ -1,4 +1,4 @@
-//! expect-error: requires a mutable receiver
+//! expect-error: `rows[0]` is a read-only view (`&List[i32]`), so `rows[0].push` cannot mutate through it
 
 // #2095: an element of a vector the function only borrows is a read-only
 // view; `rows[i].push(x)` needs a vector the program may mutate.

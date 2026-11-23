@@ -10600,10 +10600,12 @@ impl MirBuilder:
         self.unit_operand()
 
     mut fn lower_for_iter_place(for_node: i32, pat_or_sym: i32, list_expr: i32, body_expr: i32) -> i32:
-        let list_op = self.lower_expr(list_expr)
-        let list_ty = self.expr_type(list_expr)
         let slot_ty = self.loop_element_type(for_node)
-        let list_place = self.materialize_operand(list_op, list_ty, self.ast.get_start(list_expr))
+        // The slots write the list where it is (Sema requires a writable
+        // place, D172). Lowered as a value, the list was a retained copy
+        // (D120): the loop made the copy unique and every `slot.set`
+        // landed in it, so the list itself never changed.
+        let list_place = self.lower_expr_place(list_expr)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
         let len_args: List[i32] = []
