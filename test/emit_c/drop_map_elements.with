@@ -1,0 +1,39 @@
+//! expect-debug-alloc: leak count=0
+//! expect-stdout: 3
+//! expect-stdout: 0
+//! expect-stdout: 1
+//! expect-stdout: 2
+//! expect-stdout: 0
+//! expect-stdout: 2
+
+// #1192: a map owns its keys and values. `clear` drops every live entry, a
+// map leaving scope with entries in it drops them, and so does a set; an
+// owning value type (a list of heap strings) is dropped all the way down.
+use std.collections.HashMap
+use std.collections.HashSet
+
+fn heap(s: &str) -> str: s ++ ""
+
+fn fill -> HashMap[str, List[str]]:
+    var m: HashMap[str, List[str]] = HashMap.new()
+    m.insert(heap("a"), [heap("a1"), heap("a2")])
+    m.insert(heap("b"), [heap("b1")])
+    m.insert(heap("c"), [])
+    m
+
+fn main:
+    var m = fill()
+    print(m.len())
+    m.clear()
+    print(m.len())
+    m.insert(heap("d"), [heap("d1")])
+    print(m.len())
+    var names: HashSet[str] = HashSet.new()
+    names.insert(heap("x"))
+    names.insert(heap("y"))
+    print(names.len())
+    names.clear()
+    print(names.len())
+    names.insert(heap("z"))
+    names.insert(heap("w"))
+    print(names.len())
