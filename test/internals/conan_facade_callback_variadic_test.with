@@ -15,7 +15,10 @@ use std.os
 use std.process
 
 fn draft(rel: &str, cases: bool, through: &str, extra: &str) -> str:
-    let root = current_dir() ++ "/" ++ rel
+    // The root is written into compile_commands.json, where a Windows
+    // path's backslashes read as escapes (`D:\a\with` became `D:awith`,
+    // and every unit was "cannot read").
+    let root = current_dir().replace("\\", "/") ++ "/" ++ rel
     // A contradicted draft writes no contract: none from an earlier run
     // may stand in for it.
     remove_tree(root)

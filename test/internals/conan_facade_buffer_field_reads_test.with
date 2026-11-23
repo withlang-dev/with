@@ -17,7 +17,10 @@ use std.process
 use std.os
 
 fn draft(rel: &str, step: &str, platform: &str) -> str:
-    let root = current_dir() ++ "/" ++ rel
+    // The root is written into compile_commands.json, where a Windows
+    // path's backslashes read as escapes (`D:\a\with` became `D:awith`,
+    // and every unit was "cannot read").
+    let root = current_dir().replace("\\", "/") ++ "/" ++ rel
     remove_tree(root)
     let dep = root ++ "/dep"
     let src = root ++ "/src"
