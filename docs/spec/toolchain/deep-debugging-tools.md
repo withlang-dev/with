@@ -862,6 +862,8 @@ read the local's number from `--dump-mir` first.
   Quote the argument; `>` is a shell redirection.
 - `--validate-ownership` rejects a drop of a `MaybeGarbage` place and
   reports the first error; `--validate-all` runs every MIR validator.
+  `with test --validate-only <files>` runs every MIR validator over each
+  test and runs none of them.
 - `--dump-place-map` lists each MIR place with base local, type id, and
   projection list, for when `_N.fK` does not mean what the source seemed
   to say.
@@ -1152,7 +1154,7 @@ CLI dumps (`with check <file> <flag>`):
 | `--dump-mir`, `--dump-async-mir` | the lowered MIR bodies (synchronous, and after the async transform); every dump and trace flag reads `--bundle-corpus <corpus>` as `check` does, so a corpus module dumps from its source rather than vanishing behind its embedded interface; also when the typed validator refused one (`internal compiler error: invalid MIR before codegen … in \`Type.fn\``): the ICE names the body, and `--dump-mir` / `--explain-mir-origin '<fn>:_N'` read the invalid statement |
 | `--dump-place-map`, `--dump-drop-state`, `--dump-drop-plan`, `--dump-abi` | see the drop-state view and `--dump-abi` above |
 | `--trace-place`, `--explain-mir-origin`, `--trace-ownership`, `--trace-cleanup-edge` | one place's history, where a MIR local came from, its ownership states, one CFG edge |
-| `--validate-ownership`, `--validate-all` | the MIR validators |
+| `--validate-ownership`, `--validate-all`, `--validate-only` | the MIR validators |
 | `--dump-project-info` | the project the compilation resolved for the file |
 | `--sema-body-order-reverse` | check bodies last to first (see Declaration-Order Independence) |
 

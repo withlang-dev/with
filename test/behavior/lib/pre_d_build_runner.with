@@ -80,7 +80,7 @@ pub fn p7_compiler_path -> str:
 
 pub fn p7_case_dir(name: &str) -> str:
     // Per process: two targets run one fixture at once (with-test and
-    // validate-all-async both select an `await` case), and a shared case
+    // validate-all-tests both run an `await` case), and a shared case
     // directory let one run delete the other's files.
     p7_abs(f"out/tmp/pre-d-p7/{pid()}/" ++ name)
 

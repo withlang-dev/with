@@ -15061,6 +15061,10 @@ impl MirBuilder:
         // reset-on-move keeps the receiver's scope-exit drop from freeing it
         // again (#1394: `.context(..)` on an Err double-freed the error).
         self.consume_moved_operand(source_op)
+        // The message is the ContextError's too: `with_context`'s closure
+        // result is a temporary, and its scope-exit drop stayed recorded
+        // beside the move into this aggregate.
+        self.consume_moved_operand(message_op)
         self.operand_for_place(place, context_error_ty)
 
     mut fn lower_enum_accessor_call(self_expr: i32, method_sym: i32, node: i32) -> i32:
@@ -16415,7 +16419,7 @@ impl MirBuilder:
                 self.assign_operand_to_place(message_place, context_message_op, span)
                 context_message_op = self.body.new_operand(OperandKind.OK_MOVE, message_place)
         else if lowering == MethodLowering.ResWithContext:
-            context_fn_op = self.lower_expr(self.ast.get_extra(arg_start))
+            context_fn_op = self.mapper_callee_operand(self.lower_expr(self.ast.get_extra(arg_start)))
         else:
             mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
             mapper_op = self.mapper_callee_operand(mapper_op)
