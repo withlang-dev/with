@@ -33,8 +33,10 @@ callback, and every call of such a function from inside the package with
 selector K passes null or the same field of another record
 (`vdns/doh.c:316` passes `data->set.fdebug`). A named package function
 passed there contradicts the role; anything else leaves it undecided. The
-words are in v7.84; the implementation follows, after finding what
-libcurl's unread unit is, since it bears on 40 functions.
+words are in v7.84. Implemented 2026-11-23, after libcurl's unread units
+turned out to be its tool's and its tests' (the drafter now reads only the
+units that feed the installed library). A facts file may state a variadic
+function's cases, as the contract language already allowed.
 
 **Date:** 2026-11-18. **Status:** ruled by Eric. The spec words are derived
 and come to him as a diff with the implementation.

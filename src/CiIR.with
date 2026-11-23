@@ -1201,6 +1201,9 @@ type CiProject {
     pointee_evidence: List[str],
     // Facts a registry states that were not applied, one report line each.
     facts_not_applied: str,
+    // D213: `function\tfv|vc|vk\t…` for stores of the next variadic
+    // argument and the calls that hand an argument list on.
+    va_evidence: List[str],
     // §31.8.6: what the static definitions assign and call, by the
     // static's name. A static is not a project symbol, and a function
     // that reaches one that assigns a destroyer global assigns it.
@@ -1266,6 +1269,7 @@ fn CiProject.new -> CiProject:
         fnptr_evidence: "",
         pointee_evidence: [],
         facts_not_applied: "",
+        va_evidence: [],
         static_index: HashMap.new(),
         static_names: [],
         static_assigns: [],

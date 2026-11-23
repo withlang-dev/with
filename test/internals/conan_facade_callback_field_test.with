@@ -86,11 +86,11 @@ fn main:
     if not shared_ok: print(shared)
     assert(shared_ok)
     // libcurl's shape: the public setter is variadic and hands its
-    // arguments to an internal function, which stores the next one. The
-    // stored value is no parameter of the storing function, so the field is
-    // undecided until a rule says which variadic argument it is.
+    // arguments to an internal function, which stores the next one. Here
+    // the store sits under an `if`, not a `case` of a switch on the
+    // selector, so which option it belongs to is not proven.
     let variadic = draft("out/tmp/conan_facade_callback_field_test/variadic", role, "#include <stdarg.h>\nstatic void vset(handle *h, int opt, va_list ap) { if (opt == 1) h->trace = va_arg(ap, trace_fn); }\nvoid handle_setopt(handle *h, int opt, ...) { va_list ap; va_start(ap, opt); vset(h, opt, ap); va_end(ap); }\n")
-    let variadic_ok = variadic.contains("field trace of handle: undecided: `vset` stores a value that is not one of its parameters into it") and variadic.contains("handle_run: raw: retains param 0")
+    let variadic_ok = variadic.contains("field trace of handle: undecided: `vset` stores the next variadic argument into it: in `vset` the store is not under a `case K` of a switch on a parameter") and variadic.contains("handle_run: raw: retains param 0")
     if not variadic_ok: print(variadic)
     assert(variadic_ok)
     assert(loaded_ok)

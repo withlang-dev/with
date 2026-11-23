@@ -640,7 +640,7 @@ impl CiProject:
         for line in self.symbols[si].registry_more.split("\n"):
             if line.len() == 0: continue
             let kind = facts_kind(line)
-            let clause = if kind.starts_with("nullable:"): "nullable param " ++ kind.slice(9, kind.len()) else if kind.starts_with("text_param:"): "text param " ++ kind.slice(11, kind.len()) else if kind.starts_with("callback:"): "callback param " ++ kind.slice(9, kind.len()) else if kind.starts_with("retains_by:"): "retains param " ++ kind.slice(11, kind.len()).replace(":", " by param ") else if kind.starts_with("callback_thread:"): "callback_thread " ++ kind.slice(16, kind.len()) else: "text return, owned, freed by " ++ kind.slice(12, kind.len())
+            let clause = if kind.starts_with("nullable:"): "nullable param " ++ kind.slice(9, kind.len()) else if kind.starts_with("text_param:"): "text param " ++ kind.slice(11, kind.len()) else if kind.starts_with("callback:"): "callback param " ++ kind.slice(9, kind.len()) else if kind.starts_with("retains_by:"): "retains param " ++ kind.slice(11, kind.len()).replace(":", " by param ") else if kind.starts_with("callback_thread:"): "callback_thread " ++ kind.slice(16, kind.len()) else if kind.starts_with("variadic:"): "variadic param " ++ kind.slice(9, kind.len()).replace(":", " selected by param ") ++ ":" else if kind.starts_with("case:"): fd_case_clause(kind) else: "text return, owned, freed by " ++ kind.slice(12, kind.len())
             out = out ++ "        " ++ clause ++ "    // registry: " ++ facts_cite(line) ++ "\n"
         out
 
@@ -959,10 +959,13 @@ impl CiProject:
     // destroyer, a value-only call, a lend (every pointer parameter is a
     // modeled resource it reads and keeps), or `raw:` with the reason.
     fn fd_lend_verdict(si: i32, modeled: &List[str]) -> str:
-        // A variadic call stays raw until a facade states its cases
-        // (§16.2b.5): the draft has none to state, and the report said
-        // `lend ... presented safely` of a printf-style function.
-        if self.symbols[si].variadic != 0: return "raw: variadic: the arguments after the fixed ones are an unmodeled contract; a facade states them as cases (§16.2b.5)"
+        // A variadic call stays raw until its cases are stated (§16.2b.5):
+        // the draft has none of its own to state, and the report said
+        // `lend ... presented safely` of a printf-style function. The
+        // registry may state them (`variadic param V selected by param
+        // S:` and its `case` lines); the function is then judged like any
+        // other and carries them.
+        if self.symbols[si].variadic != 0 and not self.symbols[si].registry_more.contains("variadic:"): return "raw: variadic: the arguments after the fixed ones are an unmodeled contract; a facade states them as cases (§16.2b.5)"
         // A character pointer the registry says is new text the caller owns
         // (`text return, owned, freed by F`) is presented; any other pointer
         // to no record stays raw.
@@ -1951,6 +1954,12 @@ impl CiProject:
 // A pointer to `record` handed to `callee` (`*Record.field` for a call
 // through a function-pointer field, `?` for another indirect call).
 type HandedRecord { record: str, callee: str, place: str }
+
+// The contract line of a `case:<K>:<what the argument is>` fact.
+fn fd_case_clause(kind: &str) -> str:
+    let rest = kind.slice(5, kind.len())
+    let colon = rest.find(":")
+    "    case " ++ rest.slice(0, colon) ++ ": " ++ rest.slice(colon + 1, rest.len())
 
 // Whether the `, `-separated list has `name`.
 fn fd_name_list_has(names: &str, name: &str) -> bool:

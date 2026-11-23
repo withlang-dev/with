@@ -1,0 +1,77 @@
+//! expect-stdout: ok
+// D213 (§16.2b.15): a variadic setter under the role `callback`. libcurl's
+// `curl_easy_setopt` hands its argument list and option to an internal
+// function, which stores the next argument under a `case` of a switch on
+// the option. That store fits the role when it is the first argument read
+// under `case K`, at the field's type; the list and the selector reach the
+// storing function unchanged from every function that can reach it; each
+// such entry's facts state case K as a callback; and every call of an entry
+// from inside the package with selector K passes null or the same field of
+// another record. A package function passed there contradicts the role;
+// anything else leaves the field undecided, and the contract says what.
+use compiler.ConanClient
+use std.fs
+use std.os
+use std.process
+
+fn draft(rel: &str, cases: bool, through: &str, extra: &str) -> str:
+    let root = current_dir() ++ "/" ++ rel
+    // A contradicted draft writes no contract: none from an earlier run
+    // may stand in for it.
+    remove_tree(root)
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    let registry = root ++ "/registry"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    assert(mkdir_p(registry ++ "/registry/c/traced") == 0)
+    let header = "typedef struct handle handle;\ntypedef void (*trace_fn)(handle *h, const char *text, void *user);\nenum { OPT_TRACE = 1, OPT_TRACE_DATA = 2, OPT_COUNT = 3 };\nhandle *handle_new(void);\nvoid handle_free(handle *h);\nvoid handle_setopt(handle *h, int opt, ...);\nint handle_run(handle *h);\n"
+    assert(write_file(dep ++ "/include/traced.h", header) == 0)
+    assert(write_file(src ++ "/traced.h", header) == 0)
+    assert(write_file(src ++ "/traced.c", "#include <stdarg.h>\n#include <stdlib.h>\n#include \"traced.h\"\nstruct handle { trace_fn trace; void *trace_data; int n; };\nhandle *handle_new(void) { handle *h = malloc(sizeof(handle)); if (!h) return 0; h->trace = 0; h->trace_data = 0; h->n = 0; return h; }\nvoid handle_free(handle *h) { free(h); }\nstatic void vset(handle *h, int opt, va_list ap) { switch (opt) { case OPT_TRACE: h->trace = va_arg(ap, trace_fn); break; case OPT_TRACE_DATA: h->trace_data = va_arg(ap, void *); break; default: break; } }\nstatic void vsetopt(handle *h, int opt, va_list ap) { if (opt == OPT_COUNT) { h->n = va_arg(ap, int); return; } " ++ through ++ " vset(h, opt, ap); }\nvoid handle_setopt(handle *h, int opt, ...) { va_list ap; va_start(ap, opt); vsetopt(h, opt, ap); va_end(ap); }\nint handle_run(handle *h) { if (h->trace) h->trace(h, \"run\", h->trace_data); h->n = h->n + 1; return h->n; }\n" ++ extra) == 0)
+    let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c traced.c\",\n  \"file\": \"traced.c\"\n}\n]\n"
+    assert(write_file(build ++ "/compile_commands.json", commands) == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"traced\"]}\n") == 0)
+    let role = "    field trace of handle is callback    // traced.h: the trace function is the program's, set with handle_setopt\n"
+    let stated = "    fn handle_setopt\n        variadic param 2 selected by param 1:    // traced.h: the option says what the argument is\n            case OPT_TRACE: callback param 2 as trace_fn userdata param OPT_TRACE_DATA    // traced.h: called with the handle, a message and the trace data\n            case OPT_TRACE_DATA: *mut c_void retains by param 0    // traced.c: stored in the handle\n        callback_thread registering    // traced.c: called from handle_run, on the caller's thread\n"
+    assert(write_file(registry ++ "/registry/c/traced/facts.with", "c facts traced:\n" ++ role ++ (if cases: stated else: "")) == 0)
+    assert(set_env("WITH_REGISTRY", "file://" ++ registry) == 0)
+    conan_write_facade("traced", "1.0", dep, src, build)
+    (read_file(dep ++ "/contract.with") ?? "") ++ "\n====\n" ++ (read_file(dep ++ "/contract-report.txt") ?? "")
+
+fn main:
+    let base = "out/tmp/conan_facade_callback_variadic_test"
+    // The store fits: the operation that calls through the field lends.
+    let fits = draft(base ++ "/fits", true, "", "")
+    let fits_ok = fits.contains("    fn handle_run\n        lend") and not fits.contains("undecided") and fits.contains("        variadic param 2 selected by param 1:    // registry: ") and fits.contains("            case OPT_TRACE: callback param 2 as trace_fn userdata param OPT_TRACE_DATA    // registry: ") and conan_facts_contradicted().len() == 0
+    // The package calls its own setter with the same field of another
+    // record (libcurl's DoH handle takes its parent's debug callback).
+    let shared = draft(base ++ "/shared", true, "", "void handle_inherit(handle *to, handle *from) { handle_setopt(to, OPT_TRACE, from->trace); }\n")
+    let shared_ok = shared.contains("    fn handle_run\n        lend") and not shared.contains("undecided") and conan_facts_contradicted().len() == 0
+    // Passing one of its own functions contradicts the role.
+    let own = draft(base ++ "/own", true, "", "static void quiet(handle *h, const char *text, void *user) { (void)h; (void)text; (void)user; }\nvoid handle_quiet(handle *h) { handle_setopt(h, OPT_TRACE, quiet); }\n")
+    let refusal = conan_facts_contradicted()
+    let own_ok = not own.contains("c contract traced:") and refusal.contains("DISAGREES: `handle_quiet` passes the package's own function `quiet` to `handle_setopt` for OPT_TRACE")
+    // A read from the list on the way to the storing function: the store
+    // is no longer the first argument, so nothing is proven.
+    let before = conan_facts_contradicted().len()
+    let read = draft(base ++ "/read", true, "(void)va_arg(ap, int);", "")
+    let read_ok = conan_facts_contradicted().len() == before and read.contains("field trace of handle: undecided: `vset` stores the next variadic argument into it: `vsetopt` reads from the argument list before passing it to `vset`") and read.contains("handle_run: raw: retains param 0")
+    // The entry's facts state no callback case for the option.
+    let unstated = draft(base ++ "/unstated", false, "", "")
+    let unstated_ok = unstated.contains("field trace of handle: undecided: `vset` stores the next variadic argument into it: the facts for `handle_setopt` state no `case OPT_TRACE: callback …`")
+    if not (fits_ok and shared_ok and own_ok and read_ok and unstated_ok):
+        print(fits)
+        print(shared)
+        print(own)
+        print(refusal)
+        print(read)
+        print(unstated)
+    assert(fits_ok)
+    assert(shared_ok)
+    assert(own_ok)
+    assert(read_ok)
+    assert(unstated_ok)
+    print("ok")

@@ -63,7 +63,7 @@ type Facts {
 /// Whether `kind` is a presentation fact (a parameter's or a return's
 /// shape) rather than an ownership fact.
 fn facts_is_presentation(kind: &str) -> bool:
-    kind.starts_with("nullable:") or kind.starts_with("text_param:") or kind.starts_with("text_return:") or kind.starts_with("callback:") or kind.starts_with("retains_by:") or kind.starts_with("callback_thread:")
+    kind.starts_with("nullable:") or kind.starts_with("text_param:") or kind.starts_with("text_return:") or kind.starts_with("callback:") or kind.starts_with("retains_by:") or kind.starts_with("callback_thread:") or kind.starts_with("variadic:") or kind.starts_with("case:")
 
 impl Facts:
     /// The ownership fact for the C function `name` as `kind|record|cite`,
@@ -125,6 +125,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
     // The `fn` item the carried text last opened, so several clauses of
     // one function share one item.
     var value_item = ""
+    var variadic_item = ""
     var record = ""
     var line_no: isize = 0
     for raw in source.split("\n"):
@@ -159,6 +160,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             continue
         if stripped.starts_with("fn "):
             current_fn = stripped.slice(3, stripped.len()).trim()
+            variadic_item = ""
             in_resource = false
             if current_fn.len() == 0 or current_fn.contains(" "): return Err(facts_error(path, line_no, "an item is `fn NAME`"))
             continue
@@ -270,6 +272,20 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             let words = clause.fields()
             if words.len() != 6 or not is_digit(words[2][0]) or not is_digit(words[5][0]): return Err(facts_error(path, line_no, "`retains param N by param M` takes two parameter indexes"))
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "retains_by:" ++ words[2] ++ ":" ++ words[5], record: "", cite: cite })
+        else if clause.starts_with("variadic param ") and clause.contains(" selected by param ") and clause.ends_with(":"):
+            // §16.2b.5: a variadic function's cases, stated as a contract
+            // states them (libcurl's `curl_easy_setopt`): the header line,
+            // then one `case K: …` line per selector value, each cited.
+            let at = clause.find(" selected by param ")
+            let v = clause.slice(15, at).trim()
+            let s = clause.slice(at + 19, clause.len() - 1).trim()
+            if v.len() == 0 or s.len() == 0 or not is_digit(v[0]) or not is_digit(s[0]): return Err(facts_error(path, line_no, "`variadic param V selected by param S:` takes two parameter indexes"))
+            variadic_item = current_fn
+            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "variadic:" ++ v ++ ":" ++ s, record: "", cite: cite })
+        else if clause.starts_with("case "):
+            let colon = clause.find(": ")
+            if variadic_item != current_fn or colon < 6 or colon + 2 >= clause.len(): return Err(facts_error(path, line_no, "a case is `case K: <what the argument is>`, under the item's `variadic param V selected by param S:`"))
+            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "case:" ++ clause.slice(5, colon).trim() ++ ":" ++ clause.slice(colon + 2, clause.len()).trim(), record: "", cite: cite })
         else if clause == "callback_thread any" or clause == "callback_thread registering":
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback_thread:" ++ clause.slice(16, clause.len()), record: "", cite: cite })
         else: return Err(facts_error(path, line_no, "an item fact is `consumes param N`, `returns borrow R from param N`, `lend`, `nullable param N`, `text param N`, `text return, owned, freed by F`, `callback param N`, `retains param N by param M` or `callback_thread any|registering`"))
