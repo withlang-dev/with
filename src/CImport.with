@@ -19107,6 +19107,16 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
                     if ci_cursor_names(session, arg, param):
                         out = out ++ f"sink:{callee}:{index}:" ++ param ++ "\n"
                 ai = ai + 1
+        else:
+            // #3206: a call through a constant table of named functions
+            // hands its arguments to each of them.
+            for member in ci_call_fn_table(session, cursor):
+                out = out ++ f"calls:{member}\n"
+                var ti = 1
+                while ti < nc:
+                    for param in params:
+                        if ci_cursor_names(session, with_ci_child(session, cursor, ti), param): out = out ++ f"sink:{member}:{ti - 1}:" ++ param ++ "\n"
+                    ti = ti + 1
     if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
         let lhs = with_ci_child(session, cursor, 0)
         let rhs = with_ci_child(session, cursor, 1)
@@ -19376,7 +19386,7 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("local:"):
                 if callee.len() > 0: out = out ++ "localsink:" ++ root.slice(6, root.len()) ++ ":" ++ callee ++ f":{ai - 1}\n"
                 else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
-            else if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("param:") and callee.len() == 0:
+            else if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("param:") and callee.len() == 0 and ci_call_fn_table(session, cursor).len() == 0:
                 // A call the walk cannot name (through an expression that
                 // yields a function pointer: libcurl's `setopt_call[i](data,
                 // …)`) may keep what it is handed, so the parameter counts
@@ -19484,6 +19494,33 @@ fn ci_fp_named_function(session: i64, value: i32) -> str:
     let ty = with_ci_type_canonical(session, with_ci_cursor_type(session, c))
     let kind = if ty >= 0: with_ci_type_kind(session, ty) else: 0
     if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: with_ci_cursor_spelling(session, c) else: "?"
+
+// #3206: the functions a call through a constant table can reach. `table[i]
+// (…)` where `table` is a `const` array whose initializer lists named
+// functions and nothing else (libcurl's `static const setoptfunc
+// setopt_call[] = { setopt_long_bool, … }`) calls one of exactly those: a
+// const array is never written, so the set is closed by its initializer.
+// Empty when the callee is not that shape, and the call stays unnamed.
+fn ci_call_fn_table(session: i64, call: i32) -> List[str]:
+    let none = []
+    if with_ci_num_children(session, call) < 1: return none
+    let callee = ci_peel_transparent(session, with_ci_child(session, call, 0))
+    if with_ci_cursor_kind(session, callee) != CXK_ARRAY_SUBSCRIPT or with_ci_num_children(session, callee) != 2: return none
+    let base = ci_peel_transparent(session, with_ci_child(session, callee, 0))
+    if with_ci_cursor_kind(session, base) != CXK_DECL_REF: return none
+    let table = with_ci_cursor_definition(session, base)
+    if table < 0 or with_ci_cursor_kind(session, table) != CXK_VAR_DECL: return none
+    // An array of const elements is, in its canonical form, a const array
+    // of unqualified elements: the qualifier is asked of the array type.
+    if with_ci_type_is_const(session, with_ci_type_canonical(session, with_ci_cursor_type(session, table))) == 0: return none
+    let init = with_ci_var_initializer(session, table)
+    if init < 0 or with_ci_cursor_kind(session, init) != CXK_INIT_LIST: return none
+    let members = []
+    for i in 0..with_ci_num_children(session, init):
+        let named = ci_fp_named_function(session, with_ci_child(session, init, i))
+        if named == "?": return none
+        if not members.contains(named): members.push(named)
+    members
 
 // D211: whether a whole-record value is one the proofs follow. A variable
 // of the package that is not a parameter holds only what its own writes

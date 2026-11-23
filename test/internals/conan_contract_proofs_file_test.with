@@ -8,9 +8,14 @@
 //   forward      hands it to a function no unit defines -> nothing: the
 //                proof stopped, which is weaker than a grant
 //   dispatch     hands it to a call through a table of  -> nothing: the
-//                function pointers (libcurl's             callee is not
-//                `setopt_call[i](data, …)`)               named, which is
+//                function pointers that can be written    callee is not
+//                                                         named, which is
 //                no proof of a store; the report says where it went
+//   dispatch_c   the table is `const` and lists named   -> nothing, and
+//                functions (libcurl's `setopt_call[i]     it keeps
+//                (data, …)`): the call reaches exactly     nothing: each
+//                those                                     member is read
+//   dispatch_k   one member of such a table keeps it     -> stores 0
 //   node_new     a fresh allocation                     -> nothing
 //   node_size    only reads                             -> nothing
 use compiler.ConanClient
@@ -25,7 +30,7 @@ fn main:
     assert(mkdir_p(dep ++ "/include") == 0)
     assert(mkdir_p(src) == 0)
     assert(mkdir_p(build) == 0)
-    let header = "typedef struct Node { struct Node *child; int n; } Node;\nNode *node_new(void);\nvoid node_free(Node *n);\nvoid keep(Node *n);\nNode *first_child(Node *n);\nvoid forward(Node *n);\nvoid dispatch(Node *n, int i);\nint node_size(Node *n);\n"
+    let header = "typedef struct Node { struct Node *child; int n; } Node;\nNode *node_new(void);\nvoid node_free(Node *n);\nvoid keep(Node *n);\nNode *first_child(Node *n);\nvoid forward(Node *n);\nvoid dispatch(Node *n, int i);\nvoid dispatch_c(Node *n, int i);\nvoid dispatch_k(Node *n, int i);\nint node_size(Node *n);\n"
     assert(write_file(dep ++ "/include/nodes.h", header) == 0)
     assert(write_file(src ++ "/nodes.h", header) == 0)
     var unit = "#include <stdlib.h>\n#include \"nodes.h\"\nvoid ext_take(Node *n);\nstatic Node *kept;\n"
@@ -35,7 +40,7 @@ fn main:
     unit = unit ++ "Node *first_child(Node *n) { return n->child; }\n"
     unit = unit ++ "void forward(Node *n) { ext_take(n); }\n"
     unit = unit ++ "int node_size(Node *n) { return n->n; }\n"
-    unit = unit ++ "static void bump(Node *n) { n->n = n->n + 1; }\nstatic void (*const table[1])(Node *) = { bump };\nvoid dispatch(Node *n, int i) { table[i](n); }\n"
+    unit = unit ++ "static void bump(Node *n) { n->n = n->n + 1; }\nstatic void (*table[1])(Node *) = { bump };\nvoid dispatch(Node *n, int i) { table[i](n); }\nvoid dispatch_c(Node *n, int i) { static void (*const members[2])(Node *) = { bump, bump }; members[i](n); }\nvoid dispatch_k(Node *n, int i) { static void (*const members[2])(Node *) = { bump, keep }; members[i](n); }\n"
     assert(write_file(src ++ "/nodes.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c nodes.c\",\n  \"file\": \"nodes.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
@@ -43,7 +48,8 @@ fn main:
     assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
     conan_write_facade("nodes", "1.0", dep, src, build)
     let proofs = read_file(dep ++ "/contract-proofs.txt") ?? "<no contract-proofs.txt>"
-    let ok = proofs.contains("keep\tstores\t0\tstored in a global\n") and proofs.contains("node_free\tfrees\t0\tfrees ") and proofs.contains("first_child\treturns-part\t0\t") and not proofs.contains("forward\t") and not proofs.contains("dispatch\t") and (read_file(dep ++ "/contract-report.txt") ?? "").contains("dispatch: raw: retains param 0 (passed to a call through `table[i]`, which the proofs cannot name)") and not proofs.contains("node_new\t") and not proofs.contains("node_size\t")
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    let ok = proofs.contains("keep\tstores\t0\tstored in a global\n") and proofs.contains("node_free\tfrees\t0\tfrees ") and proofs.contains("first_child\treturns-part\t0\t") and not proofs.contains("forward\t") and not proofs.contains("dispatch\t") and not proofs.contains("dispatch_c\t") and report.contains("  dispatch_c: lend") and proofs.contains("dispatch_k\tstores\t0\t") and report.contains("dispatch: raw: retains param 0 (passed to a call through `table[i]`, which the proofs cannot name)") and not proofs.contains("node_new\t") and not proofs.contains("node_size\t")
     if not ok:
         print(proofs)
         print(read_file(dep ++ "/contract-report.txt") ?? "")
