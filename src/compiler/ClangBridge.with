@@ -4662,6 +4662,16 @@ fn with_ci_type_is_reserved_system_record(session: i64, type_idx: i32) -> bool:
         let canonical = clang_getCanonicalType(*(((*s).types as i64 + type_idx as i64 * 24) as *const CXType))
         canonical.kind == CXType_Record and record_is_reserved_system(canonical)
 
+// Whether the type is `_Atomic`-qualified (C11 6.7.2.4). Its translation is
+// the value type (translate_type_recursive_mode), so the qualifier is asked
+// here.
+fn with_ci_type_is_atomic(session: i64, type_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return 0
+        let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
+        (ty.kind == CXType_Atomic or clang_getCanonicalType(ty).kind == CXType_Atomic) as i32
+
 fn with_ci_type_is_volatile(session: i64, type_idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession
