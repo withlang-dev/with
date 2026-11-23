@@ -12988,6 +12988,16 @@ impl Sema:
                 if sr != cr and self.get_type_kind(sr) == TypeKind.TY_INT and self.get_type_kind(cr) == TypeKind.TY_INT and not self.int_narrowing_requires_cast(cast_tid, src_tid):
                     self.ceremony_widening_casts.insert(node, src_node)
                     self.ceremony_let_paths.insert(node, self.ceremony_node_path(node))
+            // #2522 (D183): a narrowing cast of a length, for `with
+            // fix-ceremony --report`: the cast is what the ruling says should
+            // stop being a conversion, by the declaration it feeds moving to
+            // the length's own width.
+            if src_tid != 0 and cast_tid != 0 and self.int_narrowing_requires_cast(cast_tid, src_tid) and self.ast.kind(src_node) == NodeKind.NK_CALL:
+                let len_callee = self.ast.get_data0(src_node)
+                if self.ast.kind(len_callee) == NodeKind.NK_FIELD_ACCESS and self.sym_is_len(self.ast.get_data1(len_callee)):
+                    let demanded = self.has_expected_type != 0 and self.resolve_alias(self.expected_expr_type) == self.resolve_alias(cast_tid)
+                    self.ceremony_len_casts.insert(node, if demanded: 1 else: 2)
+                    self.ceremony_len_cast_paths.insert(node, self.ceremony_node_path(node))
             if src_tid != 0 and cast_tid != 0:
                 let src_resolved = self.resolve_alias(src_tid)
                 let cast_resolved = self.resolve_alias(cast_tid)

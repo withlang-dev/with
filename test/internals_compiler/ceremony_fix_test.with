@@ -59,7 +59,28 @@ fn fixes(path: str, sample: str, expected: str, count: isize):
     let pool2 = again.compile_entry_file(path)
     assert(pool2.decl_count() > 0 and not again.zcu.diagnostics.has_errors())
 
+// #2522 (D183): the narrowing casts of a length are reported, never
+// rewritten, in two classes: an `i32` declaration demands the cast (an
+// annotated binding, a field, a parameter), or nothing does (a plain
+// binding, a range bound). A widening cast of a length is neither.
+let SAMPLE_LEN_CASTS = "type Table { count: i32 }\nfn take(n: i32) -> i32: n\nfn main:\n    let xs = [1, 2, 3]\n    let n = xs.len() as i32\n    let m: i32 = xs.len() as i32\n    let t = Table { count: xs.len() as i32 }\n    var sum = take(xs.len() as i32)\n    for i in 0..xs.len() as i32:\n        sum = sum + i\n    let wide = xs.len() as i64\n    print(n + m + t.count + sum + wide as i32)\n"
+
+fn reports_len_casts(path: str):
+    assert(write_file(path, SAMPLE_LEN_CASTS) == 0)
+    var comp = Compilation.init()
+    let pool = comp.compile_entry_file(path)
+    assert(pool.decl_count() > 0 and not comp.zcu.diagnostics.has_errors())
+    let notes = cf_len_cast_notes(comp.zcu.last_sema, pool, [], false)
+    let text = notes.join("\n")
+    for line in [5, 9]: assert(text.contains(f"{path}:{line}: len cast: nothing demands `i32` here"))
+    for line in [6, 7, 8]: assert(text.contains(f"{path}:{line}: len cast: an `i32` declaration demands it"))
+    assert(not text.contains(f"{path}:11:"))
+    assert(text.contains("fix-ceremony: 5 length cast(s): 3 demanded by a declaration, 2 that set a width nothing asks for"))
+    // Reported, not rewritten: no edit touches a narrowing cast.
+    assert_eq([e for e in cf_collect(comp.zcu.last_sema, pool, [], false) if e.what.contains("as i32")].len(), 0)
+
 fn main:
+    reports_len_casts("out/ceremony_fix_len_casts_sample.with")
     fixes("out/ceremony_fix_sample.with", SAMPLE_BASIC, EXPECTED_BASIC, 6)
     fixes("out/ceremony_fix_loops_sample.with", SAMPLE_LOOPS, EXPECTED_LOOPS, 4)
     fixes("out/ceremony_fix_casts_sample.with", SAMPLE_CASTS, EXPECTED_CASTS, 6)
