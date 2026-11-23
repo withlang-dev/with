@@ -179,6 +179,34 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
                 edits.push(CeremonyEdit { path: with_str_clone_ref(path), start, end: start + 3, replacement: "let", what: "`var` is never rebound: `let`" })
     edits
 
+// #2522 (D183): the narrowing casts of a length, which no rewrite removes:
+// dropping one turns a wrap into a range check where it stands, and the
+// ruling's fix is the declaration that makes it a conversion at all. Each is
+// reported with its line, in two classes: a context of the cast's width
+// demands it (a parameter, a field, an annotated binding, a return: that
+// declaration is what to move to the length's width), or nothing does (the
+// cast alone gives its binding or loop variable that width).
+// One line per cast, then the summary line.
+fn cf_len_cast_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[str]:
+    let notes = []
+    let texts: HashMap[str, str] = [:]
+    var demanded = 0
+    var setting = 0
+    for (node, path) in sema.ceremony_len_cast_paths:
+        if not cf_rewritable(path, excludes, std_too): continue
+        if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
+        let text = texts.get(path).unwrap()
+        let target = sema.type_name(sema.typed_expr_types.get(node) ?? 0)
+        let line = cf_line_of(text, pool.get_start(node))
+        if (sema.ceremony_len_casts.get(node) ?? 0) == 1:
+            demanded = demanded + 1
+            notes.push(f"{path}:{line}: len cast: an `{target}` declaration demands it; that declaration is what to widen (D183)")
+        else:
+            setting = setting + 1
+            notes.push(f"{path}:{line}: len cast: nothing demands `{target}` here; without the cast this is the length's own width (D183)")
+    notes.push(f"fix-ceremony: {demanded + setting} length cast(s): {demanded} demanded by a declaration, {setting} that set a width nothing asks for")
+    notes
+
 // Apply a file's edits from the end back, so earlier offsets stay valid.
 fn cf_rewrite(text: &str, edits: &List[CeremonyEdit]) -> str:
     let order = [i for i in 0..edits.len()]
@@ -233,6 +261,8 @@ fn run_ceremony_fix() -> i32:
         for e in edits:
             if e.path == path: print(f"{path}:{cf_line_of(text, e.start)}: {e.what}")
     print(f"fix-ceremony: {edits.len()} rewrite(s) in {paths.len()} file(s)")
+    if not apply:
+        for note in cf_len_cast_notes(comp.zcu.last_sema, pool, excludes, std_too): print(note)
     if not apply or edits.len() == 0: return 0
     let originals: HashMap[str, str] = [:]
     for path in paths:

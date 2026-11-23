@@ -1320,6 +1320,12 @@ type Sema {
     ceremony_let_values: HashMap[i32, i32, Minted],
     ceremony_let_type_nodes: HashMap[i32, i32, Minted],
     ceremony_let_paths: HashMap[i32, str, Minted],
+    // #2522 (D183): a narrowing `as` on a `len()` call (node → 1 when the
+    // context demands the cast's target, so a declaration of that width is
+    // what asks for it; 2 when nothing does, so the cast alone sets the
+    // type of what it initializes), and the file each is written in.
+    ceremony_len_casts: HashMap[i32, i32, Minted],
+    ceremony_len_cast_paths: HashMap[i32, str, Minted],
     ceremony_rebound_lets: HashMap[i32, i32, Minted],
     ceremony_widening_casts: HashMap[i32, i32, Minted],   // a widening `as` under a demand of its target (node → its source expression)
     ceremony_list_news: HashMap[i32, i32, Minted],        // a `List.new()` / `HashMap.new()` whose binding's type is written (node → 1)
@@ -3717,6 +3723,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let ceremony_let_values = sema_new_map_i32_i32()
     let ceremony_let_type_nodes = sema_new_map_i32_i32()
     let ceremony_let_paths: HashMap[i32, str, Minted] = [:]
+    let ceremony_len_casts = sema_new_map_i32_i32()
+    let ceremony_len_cast_paths: HashMap[i32, str, Minted] = [:]
     let ceremony_rebound_lets = sema_new_map_i32_i32()
     let ceremony_widening_casts = sema_new_map_i32_i32()
     let ceremony_list_news = sema_new_map_i32_i32()
@@ -4041,6 +4049,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         ceremony_let_values,
         ceremony_let_type_nodes,
         ceremony_let_paths,
+        ceremony_len_casts,
+        ceremony_len_cast_paths,
         ceremony_rebound_lets,
         ceremony_widening_casts,
         ceremony_list_news,
