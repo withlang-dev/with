@@ -37889,6 +37889,11 @@ impl Sema:
         if type_name_sym == self.syms.listrange:
             if field == self.syms.split_at_mut:
                 return ReceiverMode.Mut
+        // The same rule for a SlotMap's slots (§6): `sm.slot(h)` through a
+        // `&SlotMap` parameter wrote the element.
+        if type_name_sym == self.syms.slotmap:
+            if field == self.syms.slot or field == self.syms.get_disjoint:
+                return ReceiverMode.Mut
         if type_name_sym == self.syms.hashmap:
             if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
                 return ReceiverMode.Mut
