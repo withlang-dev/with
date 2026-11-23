@@ -19675,7 +19675,8 @@ fn ci_stmt_ends_in_return(session: i64, stmt: i32) -> bool:
 //   `pu`  a use the walk does not follow (stored somewhere other than a
 //         local or the field itself, returned), which leaves the claim
 //         undecided;
-//   `pc`  it is passed to a call; `why` is `callee:arg:const|mut:header`,
+//   `pc`  it is passed to a call; `why` is `callee:arg:const|mut:system|other`
+//         (whether a system header declares the callee),
 //         and the package-wide judgment (ci_pointee_verdict) reads the
 //         callee's own lines for that parameter.
 type CiPointeeScan { names: List[str], sources: List[str], locals: List[str] }
@@ -19804,11 +19805,11 @@ fn ci_pf_events(session: i64, cursor: i32, scan: &CiPointeeScan, params: &List[s
             // line carries what that judgment needs: the callee, which
             // argument, whether the parameter is a pointer to const (the
             // argument's own type is the parameter's after conversion), and
-            // the header that declares the callee.
+            // whether a system header declares the callee.
             let pointee = with_ci_type_pointee(session, with_ci_type_canonical(session, with_ci_cursor_type(session, arg)))
             let to_const = pointee >= 0 and with_ci_type_is_const(session, pointee) != 0
             let callee = with_ci_cursor_spelling(session, cursor)
-            let why = callee ++ ":" ++ f"{i - 1}" ++ (if to_const: ":const:" else: ":mut:") ++ with_ci_cursor_referenced_location(session, cursor)
+            let why = callee ++ ":" ++ f"{i - 1}" ++ (if to_const: ":const:" else: ":mut:") ++ (if with_ci_cursor_referenced_in_system_header(session, cursor): "system" else: "other")
             if callee.len() == 0: out = out ++ ci_pf_line("pu", source, "it is passed to a call through a pointer", loc, so_far ++ out)
             else if not (so_far ++ out).contains("pc\t" ++ source ++ "\t" ++ callee ++ ":" ++ f"{i - 1}:"): out = out ++ "pc\t" ++ source ++ "\t" ++ why ++ "\t" ++ loc ++ "\n"
     if kind == CXK_RETURN_STMT and nc == 1:

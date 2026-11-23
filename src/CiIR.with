@@ -1201,6 +1201,10 @@ type CiProject {
     pointee_evidence: List[str],
     // Facts a registry states that were not applied, one report line each.
     facts_not_applied: str,
+    // §16.2b.8: `function:N` for each `reads param N` the platform C
+    // library's facts file states, and that file's path for a message.
+    platform_reads: List[str],
+    platform_facts_path: str,
     // D213: `function\tfv|vc|vk\t…` for stores of the next variadic
     // argument and the calls that hand an argument list on.
     va_evidence: List[str],
@@ -1269,6 +1273,8 @@ fn CiProject.new -> CiProject:
         fnptr_evidence: "",
         pointee_evidence: [],
         facts_not_applied: "",
+        platform_reads: [],
+        platform_facts_path: "",
         va_evidence: [],
         static_index: HashMap.new(),
         static_names: [],

@@ -1,0 +1,85 @@
+// The platform C library: what ISO C, POSIX and the Windows C runtime
+// specify of their own functions. Every C build links it, so these facts
+// are consulted for a callee outside a package, when a system header
+// declares that callee and the package defines no function of that name.
+//
+// `reads param N`: the function only reads through pointer parameter N.
+// Each line cites the clause that specifies it. A function that returns a
+// pointer into the object it was given (memchr, strchr, strrchr, strstr,
+// strpbrk, bsearch) or stores one through an out-parameter (the strto*
+// family) is not listed: the caller may write through what comes back, and
+// nothing here follows it.
+//
+// Citations: "C17" is ISO/IEC 9899:2018; "POSIX" is IEEE Std 1003.1-2024,
+// System Interfaces; "UCRT" is Microsoft's Universal C Runtime reference.
+c facts libc:
+    fn memcpy
+        reads param 1    // C17 7.24.2.1: "copies n characters from the object pointed to by s2 into the object pointed to by s1"
+    fn memmove
+        reads param 1    // C17 7.24.2.2: "copies n characters from the object pointed to by s2 into the object pointed to by s1"
+    fn memcmp
+        reads param 0    // C17 7.24.4.1: "compares the first n characters of the object pointed to by s1 to the first n characters of the object pointed to by s2"
+        reads param 1    // C17 7.24.4.1: the same sentence; s2 is the second object compared
+    fn strlen
+        reads param 0    // C17 7.24.6.3: "computes the length of the string pointed to by s"
+    fn strcmp
+        reads param 0    // C17 7.24.4.2: "compares the string pointed to by s1 to the string pointed to by s2"
+        reads param 1    // C17 7.24.4.2: the same sentence; s2 is the second string compared
+    fn strncmp
+        reads param 0    // C17 7.24.4.4: "compares not more than n characters ... from the array pointed to by s1 to the array pointed to by s2"
+        reads param 1    // C17 7.24.4.4: the same sentence; s2 is the second array compared
+    fn strcpy
+        reads param 1    // C17 7.24.2.3: "copies the string pointed to by s2 ... into the array pointed to by s1"
+    fn strncpy
+        reads param 1    // C17 7.24.2.4: "copies not more than n characters ... from the array pointed to by s2 to the array pointed to by s1"
+    fn strcat
+        reads param 1    // C17 7.24.3.1: "appends a copy of the string pointed to by s2 ... to the end of the string pointed to by s1"
+    fn strncat
+        reads param 1    // C17 7.24.3.2: "appends not more than n characters ... from the array pointed to by s2 to the end of the string pointed to by s1"
+    fn strspn
+        reads param 0    // C17 7.24.5.6: "computes the length of the maximum initial segment of the string pointed to by s1"
+        reads param 1    // C17 7.24.5.6: "which consists entirely of characters from the string pointed to by s2"
+    fn strcspn
+        reads param 0    // C17 7.24.5.3: "computes the length of the maximum initial segment of the string pointed to by s1"
+        reads param 1    // C17 7.24.5.3: "which consists entirely of characters not from the string pointed to by s2"
+    fn strcoll
+        reads param 0    // C17 7.24.4.3: "compares the string pointed to by s1 to the string pointed to by s2"
+        reads param 1    // C17 7.24.4.3: the same sentence; s2 is the second string compared
+    fn strxfrm
+        reads param 1    // C17 7.24.4.5: "transforms the string pointed to by s2 and places the resulting string into the array pointed to by s1"
+    fn atoi
+        reads param 0    // C17 7.22.1.2: "convert the initial portion of the string pointed to by nptr to int"
+    fn atol
+        reads param 0    // C17 7.22.1.2: "convert the initial portion of the string pointed to by nptr to ... long int"
+    fn atoll
+        reads param 0    // C17 7.22.1.2: "convert the initial portion of the string pointed to by nptr to ... long long int"
+    fn atof
+        reads param 0    // C17 7.22.1.1: "converts the initial portion of the string pointed to by nptr to double representation"
+    fn fwrite
+        reads param 0    // C17 7.21.8.2: "writes, from the array pointed to by ptr, up to nmemb elements ... to the stream pointed to by stream"
+    fn fputs
+        reads param 0    // C17 7.21.7.4: "writes the string pointed to by s to the stream pointed to by stream"
+    fn puts
+        reads param 0    // C17 7.21.7.9: "writes the string pointed to by s to the stream pointed to by stdout"
+    fn write
+        reads param 1    // POSIX write(): "shall attempt to write nbyte bytes from the buffer pointed to by buf to the file associated with the open file descriptor"
+    fn pwrite
+        reads param 1    // POSIX pwrite(): "shall be equivalent to write(), except that it writes into a given position"
+    fn send
+        reads param 1    // POSIX send(): buffer "points to the buffer containing the message to send"
+    fn sendto
+        reads param 1    // POSIX sendto(): message "points to a buffer containing the message to be sent"
+    fn strnlen
+        reads param 0    // POSIX strnlen(): "shall compute the smaller of the number of bytes in the array to which s points ... and the maxlen argument"
+    fn strdup
+        reads param 0    // POSIX strdup(): "shall return a pointer to a new string, which is a duplicate of the string pointed to by s"
+    fn strndup
+        reads param 0    // POSIX strndup(): "shall be equivalent to the strdup() function, duplicating the provided s in a new block of memory"
+    fn memccpy
+        reads param 1    // POSIX memccpy(): "shall copy bytes from memory area s2 into s1"
+    fn _write
+        reads param 1    // UCRT _write: "writes count bytes from buffer into the file associated with fd"
+    fn _strdup
+        reads param 0    // UCRT _strdup: "returns a pointer to the storage location for the copied string"; strSource is the "null-terminated source string"
+    fn _memccpy
+        reads param 1    // UCRT _memccpy: "copies zero or more characters of src to dest"

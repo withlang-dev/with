@@ -37,13 +37,34 @@ safety fact. Building the library with it is still worth doing, as a check
 the C compiler runs on every build; that needs a build setting the facts
 file can state, which is its own decision.
 
+**Amended 2026-11-23 (Eric): the platform C library's facts file.** The
+trusted functions are not a list in the compiler. One facts file for the
+platform C library (`registry/c/libc/facts.with`) states `reads param N`
+for the functions ISO C, POSIX and the Windows C runtime specify as reading
+through a pointer, each line cited to its standard, and is pinned like any
+other. Every C build links that library, so its facts are always consulted
+for a callee outside the package. Four rules:
+
+- The facts apply only when a system header declares the callee and the
+  package defines no function of that name; a library with its own `write`
+  is judged by that body.
+- If the facts say `reads param 1` and the header in use does not declare
+  that parameter a pointer to const, that is an error in the facts file,
+  not a pass.
+- A function that returns a pointer into what it was given (`memchr`,
+  `strchr`, `strstr`, `bsearch`) or stores one through an out-parameter
+  (`strtol`) is not listed: the caller may write through what comes back.
+  The compiler's first list had trusted several of these.
+- The check reports every use that stops it, not the first.
+
+With it, zlib's `gz_comp` passing the pointer to POSIX `write` no longer
+stops the check.
+
 **A contract written by hand** states `reads` as it states `lend` or
 `drop`: the programmer's claim, applied as written.
 
 **Known beside it.** zlib's facts state `reads` on `next_in`, and it is not
-applied yet, for two reasons the report names. `with get` links zlib as a
-prebuilt binary, so its source is not the build linked. And read against
-its pinned source, the check stops in the gz layer: `gz_comp` passes the
-pointer to POSIX `write`, which takes a pointer to const and is not a
-function of the C standard library. Whether POSIX's readers are trusted as
-the C standard library's are is a question for Eric.
+applied until two things land, both ruled: `with get` building from source
+by default (D212), since a prebuilt binary's source is not the build
+linked; and the platform C library's facts (the amendment above), since
+the gz layer's `gz_comp` passes the pointer to POSIX `write`.

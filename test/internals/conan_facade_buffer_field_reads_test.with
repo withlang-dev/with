@@ -1,20 +1,24 @@
 //! expect-stdout: ok
-// §16.2b.8: `buffer field P remaining field N reads` says C only reads
-// through `P` though the header does not declare it const. From a facts
-// file the claim is checked against the library's source by following the
-// pointer: through a local copy, a cast, arithmetic, and into every
-// function of the package it is passed to, whose body is what counts and
-// never its declared parameter type. A store through it contradicts the
-// claim. A C standard library function that takes it as a pointer to const
-// does not write through it. Any other function outside the package leaves
-// the claim undecided: `reads` is not applied, the slice is writable, and
-// the contract and the report say which use stopped the check.
+// §16.2b.8 (D231): `buffer field P remaining field N reads` says C only
+// reads through `P` though the header does not declare it const. From a
+// facts file the claim takes effect only where it was checked against the
+// library's source and passed. The check follows the pointer through a
+// local copy, a cast, arithmetic, and into every function of the package it
+// is passed to, whose body is what counts and never its declared parameter
+// type. A store through it contradicts the claim. A callee outside the
+// package does not write through it when a facts file states `reads` for
+// that parameter: the platform C library's facts, consulted when a system
+// header declares the callee. Anything else leaves the claim undecided:
+// `reads` is not applied, the slice is writable, and the contract and the
+// report name every use that stopped the check.
 use compiler.ConanClient
 use std.fs
 use std.process
 use std.os
 
-fn draft(root: &str, step: &str) -> str:
+fn draft(rel: &str, step: &str, platform: &str) -> str:
+    let root = current_dir() ++ "/" ++ rel
+    remove_tree(root)
     let dep = root ++ "/dep"
     let src = root ++ "/src"
     let build = root ++ "/build"
@@ -23,52 +27,71 @@ fn draft(root: &str, step: &str) -> str:
     assert(mkdir_p(src) == 0)
     assert(mkdir_p(build) == 0)
     assert(mkdir_p(registry ++ "/registry/c/zs") == 0)
+    assert(mkdir_p(registry ++ "/registry/c/libc") == 0)
     let header = "typedef struct strm { unsigned char *next_in; unsigned avail_in; unsigned char *next_out; unsigned avail_out; void *state; } strm;\nint strm_init(strm *s);\nint strm_step(strm *s, int flush);\nint strm_end(strm *s);\n"
     assert(write_file(dep ++ "/include/zs.h", header) == 0)
     assert(write_file(src ++ "/zs.h", header) == 0)
-    assert(write_file(src ++ "/zs.c", "#include <stdlib.h>\n#include \"zs.h\"\nstatic unsigned sum(const unsigned char *p, unsigned n) { unsigned t = 0; while (n--) t += *p++; return t; }\nstatic unsigned peek(unsigned char *p) { return p[0]; }\nstatic void sneak(const unsigned char *p) { ((unsigned char *)p)[0] = 0; }\nvoid outside(const unsigned char *p);\n#include <string.h>\nint strm_init(strm *s) { s->state = malloc(8); return s->state ? 0 : -4; }\nint strm_step(strm *s, int flush) { " ++ step ++ " return flush; }\nint strm_end(strm *s) { free(s->state); s->state = 0; return 0; }\n") == 0)
+    assert(write_file(src ++ "/zs.c", "#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include \"zs.h\"\nstatic unsigned sum(const unsigned char *p, unsigned n) { unsigned t = 0; while (n--) t += *p++; return t; }\nstatic unsigned peek(unsigned char *p) { return p[0]; }\nstatic void sneak(const unsigned char *p) { ((unsigned char *)p)[0] = 0; }\nvoid outside(const unsigned char *p);\nvoid elsewhere(const unsigned char *p);\nint strm_init(strm *s) { s->state = malloc(8); return s->state ? 0 : -4; }\nint strm_step(strm *s, int flush) { " ++ step ++ " return flush; }\nint strm_end(strm *s) { free(s->state); s->state = 0; return 0; }\n") == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c zs.c\",\n  \"file\": \"zs.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"zs\"]}\n") == 0)
     assert(write_file(registry ++ "/registry/c/zs/facts.with", "c facts zs:\n    resource Stream wraps strm\n        init strm_init(self), ok 0    // zs.h: returns 0 once the state is allocated\n        drop strm_end    // zs.h: frees the state\n    fn strm_step\n        of Stream    // zs.h: steps the stream strm_init set up\n        buffer field next_in remaining field avail_in reads    // zs.h: reads avail_in bytes at next_in\n        buffer field next_out remaining field avail_out    // zs.h: writes at most avail_out bytes at next_out\n") == 0)
-    assert(set_env("WITH_REGISTRY", "file://" ++ current_dir() ++ "/" ++ registry) == 0)
+    // The platform C library's facts: the registry's own file, or a
+    // doctored one.
+    assert(write_file(registry ++ "/registry/c/libc/facts.with", if platform.len() > 0: platform.to_owned() else: read_file("registry/c/libc/facts.with") ?? "") == 0)
+    assert(set_env("WITH_REGISTRY", "file://" ++ registry) == 0)
     conan_write_facade("zs", "1.0", dep, src, build)
     (read_file(dep ++ "/contract.with") ?? "") ++ "\n====\n" ++ (read_file(dep ++ "/contract-report.txt") ?? "")
 
 fn main:
     let base = "out/tmp/conan_facade_buffer_field_reads_test"
     // Read through a local copy, moved by arithmetic, copied out with
-    // memcpy, handed to a package function that takes a writable pointer and
-    // only reads, and stored back into the field: all followed, none a
-    // store through it. A distance between two pointers is not the pointer:
-    // zlib's gz layer writes at `state->in + (next_in - state->in)`, which
-    // is a write through `state->in`.
-    let kept = draft(base ++ "/kept", "unsigned char *own = (unsigned char *)s->state; unsigned char spare[8]; own[s->next_in - own] = 0; if (s->avail_in >= 8) memcpy(spare, s->next_in, 8); (void)peek(s->next_in); const unsigned char *in = s->next_in; unsigned char *raw = (unsigned char *)in + 0; (void)sum(raw, s->avail_in); while (s->avail_in > 0 && s->avail_out > 0) { *s->next_out++ = *in++; s->avail_in--; s->avail_out--; } s->next_in = (unsigned char *)in;")
+    // memcpy and written to a file with POSIX write (the platform facts
+    // state `reads` for both), handed to a package function that takes a
+    // writable pointer and only reads, and stored back into the field: all
+    // followed, none a store through it. A distance between two pointers
+    // is not the pointer: zlib's gz layer writes at `state->in + (next_in -
+    // state->in)`, which is a write through `state->in`.
+    let kept = draft(base ++ "/kept", "unsigned char *own = (unsigned char *)s->state; unsigned char spare[8]; own[s->next_in - own] = 0; if (s->avail_in >= 8) memcpy(spare, s->next_in, 8); (void)write(2, s->next_in, 0); (void)peek(s->next_in); const unsigned char *in = s->next_in; unsigned char *raw = (unsigned char *)in + 0; (void)sum(raw, s->avail_in); while (s->avail_in > 0 && s->avail_out > 0) { *s->next_out++ = *in++; s->avail_in--; s->avail_out--; } s->next_in = (unsigned char *)in;", "")
     let kept_ok = kept.contains("        buffer field next_in remaining field avail_in reads    // registry: zs.h: reads avail_in bytes at next_in\n") and conan_facts_contradicted().len() == 0
     // A store through a copy of the pointer contradicts the claim.
-    let stored = draft(base ++ "/stored", "unsigned char *p = s->next_in; if (s->avail_in > 0) p[0] = 0;")
+    let stored = draft(base ++ "/stored", "unsigned char *p = s->next_in; if (s->avail_in > 0) p[0] = 0;", "")
     let refusal = conan_facts_contradicted()
     let stored_ok = not stored.contains("c contract zs:") and refusal.contains("`buffer field next_in … reads` on `strm_step` says C only reads through next_in; DISAGREES: `strm_step` has a store through it")
     // So does a store inside a package function that declares its
     // parameter const and casts that away: the body is read, not the type.
     let before_sneak = conan_facts_contradicted().len()
-    let sneaked = draft(base ++ "/sneaked", "sneak(s->next_in);")
+    let sneaked = draft(base ++ "/sneaked", "sneak(s->next_in);", "")
     let sneak_refusal = conan_facts_contradicted().slice(before_sneak, conan_facts_contradicted().len())
     let sneaked_ok = not sneaked.contains("c contract zs:") and sneak_refusal.contains("DISAGREES: `sneak` has a store through it")
-    // Handed to a function the package does not define: undecided, whatever
-    // its declared parameter type.
+    // Handed to functions the package does not define and no facts
+    // describe: undecided, and every such use is named, not the first.
     let before = conan_facts_contradicted().len()
-    let passed = draft(base ++ "/passed", "outside(s->next_in);")
-    let said = "`buffer field next_in … reads` is stated and not applied, so its slice is writable: in `strm_step` it is passed to `outside`, which the package does not define"
-    let passed_ok = conan_facts_contradicted().len() == before and passed.contains("        buffer field next_in remaining field avail_in    // registry: zs.h: reads avail_in bytes at next_in\n        // `reads` is not applied, so the slice is writable: in `strm_step` it is passed to `outside`, which the package does not define") and passed.contains("  strm_step: " ++ said)
-    if not (kept_ok and stored_ok and sneaked_ok and passed_ok):
+    let passed = draft(base ++ "/passed", "outside(s->next_in); elsewhere(s->next_in);", "")
+    let said = "`buffer field next_in … reads` is stated and not applied, so its slice is writable: in `strm_step` it is passed to `"
+    let passed_ok = conan_facts_contradicted().len() == before and passed.contains("        buffer field next_in remaining field avail_in    // registry: zs.h: reads avail_in bytes at next_in\n        // `reads` is not applied, so the slice is writable:\n        //   in `strm_step` it is passed to `outside`, which the package does not define") and passed.contains("  strm_step: " ++ said ++ "outside`, which the package does not define") and passed.contains("  strm_step: " ++ said ++ "elsewhere`, which the package does not define")
+    // A system function the platform facts say nothing of: undecided.
+    let silent = draft(base ++ "/silent", "(void)write(2, s->next_in, 0);", "c facts libc:\n    fn memcpy\n        reads param 1    // C17 7.24.2.1\n")
+    let silent_ok = silent.contains("it is passed to `write`, for which the platform C library's facts state no `reads param 1`")
+    // A facts line the header in use contradicts is an error in the facts
+    // file, never a pass: memset's first parameter is not a pointer to const.
+    let before_wrong = conan_facts_contradicted().len()
+    let wrong = draft(base ++ "/wrong", "memset(s->next_in, 0, 0);", "c facts libc:\n    fn memset\n        reads param 0    // a wrong line\n")
+    let wrong_refusal = conan_facts_contradicted().slice(before_wrong, conan_facts_contradicted().len())
+    let wrong_ok = not wrong.contains("c contract zs:") and wrong_refusal.contains("states `fn memset` `reads param 0`, and the header in use does not declare that parameter a pointer to const")
+    if not (kept_ok and stored_ok and sneaked_ok and passed_ok and silent_ok and wrong_ok):
         print(kept)
         print(stored)
         print(refusal)
         print(sneaked)
         print(passed)
+        print(silent)
+        print(wrong)
+        print(wrong_refusal)
     assert(kept_ok)
     assert(stored_ok)
     assert(sneaked_ok)
     assert(passed_ok)
+    assert(silent_ok)
+    assert(wrong_ok)
     print("ok")

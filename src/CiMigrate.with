@@ -2222,6 +2222,14 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
                     project.field_roles.remove(field)
                     project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ ": undecided: `" ++ symbol.name ++ "` stores " ++ (if unfit.starts_with("the next variadic argument, and "): "the next variadic argument into it: " ++ unfit.slice(32, unfit.len()) else: unfit ++ (if unfit.starts_with("param "): "," else: "") ++ " into it") ++ "\n"
 
+    // §16.2b.8: every C build links the platform C library, so its facts
+    // are always consulted for a callee outside the package.
+    if g_migrate_platform_facts.len() > 0:
+        match facts_read_file(ci_migrate_fs_path(g_migrate_platform_facts)):
+            Ok(platform) =>
+                project.platform_reads = platform.reads()
+                project.platform_facts_path = g_migrate_platform_facts.to_owned()
+            Err(message) => return Err("registry: " ++ message)
     // §16.2b.8: `buffer field P remaining field N reads` takes effect only
     // where it was checked against the package's source and the check
     // passed. A store through the pointer in any unit contradicts the
@@ -2247,64 +2255,68 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
             let pointer = t.slice(13, t.find(" remaining field ")).to_owned()
             let at = project.find_symbol(CiProjectSymbolKind.CIPS_FN, current)
             let record = if at >= 0 and project.symbols[at].param_ty.len() > 0: ct_record_pointee(project.symbols[at].param_ty[0]) else: ""
-            var undecided = if g_migrate_facade_without_bodies != 0: "the library is linked as a prebuilt binary, so its source was not checked" else if record.len() == 0: "the record `" ++ current ++ "` takes was not found" else if project.unread.len() > 0: "a unit of the package could not be read" else: ""
-            if undecided.len() == 0:
+            var stops = if g_migrate_facade_without_bodies != 0: "the library is linked as a prebuilt binary, so its source was not checked\n" else if record.len() == 0: "the record `" ++ current ++ "` takes was not found\n" else if project.unread.len() > 0: "a unit of the package could not be read\n" else: ""
+            if stops.len() == 0:
                 let source = record ++ "." ++ pointer
                 for symbol in project.symbols:
                     if symbol.kind != CiProjectSymbolKind.CIPS_FN or not index.contains(symbol.name ++ "\t" ++ source): continue
                     let visiting = []
-                    let verdict = ci_pointee_verdict(project, index, symbol.name, source, visiting, 0)
-                    if verdict.starts_with("w:"):
-                        return Err("contradicted: registry: `buffer field " ++ pointer ++ " … reads` on `" ++ current ++ "` says C only reads through " ++ pointer ++ "; DISAGREES: " ++ verdict.slice(2, verdict.len()))
-                    if verdict.starts_with("u:") and undecided.len() == 0: undecided = verdict.slice(2, verdict.len()).to_owned()
-            if undecided.len() == 0:
+                    for verdict in ci_pointee_verdict(project, index, symbol.name, source, visiting, 0).split("\n"):
+                        if verdict.starts_with("w:"):
+                            return Err("contradicted: registry: `buffer field " ++ pointer ++ " … reads` on `" ++ current ++ "` says C only reads through " ++ pointer ++ "; DISAGREES: " ++ verdict.slice(2, verdict.len()))
+                        // A facts line that disagrees with the header in use
+                        // is an error in the facts file, never a pass.
+                        if verdict.starts_with("e:"): return Err("contradicted: registry: " ++ verdict.slice(2, verdict.len()))
+                        if verdict.starts_with("u:") and not stops.contains(verdict.slice(2, verdict.len()) ++ "\n"): stops = stops ++ verdict.slice(2, verdict.len()) ++ "\n"
+            if stops.len() == 0:
                 checked = checked ++ line ++ "\n"
             else:
-                checked = checked ++ line.replace(" reads    // registry: ", "    // registry: ") ++ "\n" ++ "        // `reads` is not applied, so the slice is writable: " ++ undecided ++ "\n"
-                project.facts_not_applied = project.facts_not_applied ++ "  " ++ current ++ ": `buffer field " ++ pointer ++ " … reads` is stated and not applied, so its slice is writable: " ++ undecided ++ "\n"
+                // Every use that stopped the check is named, not the first.
+                checked = checked ++ line.replace(" reads    // registry: ", "    // registry: ") ++ "\n" ++ "        // `reads` is not applied, so the slice is writable:\n"
+                for stop in stops.split("\n"):
+                    if stop.len() == 0: continue
+                    checked = checked ++ "        //   " ++ stop ++ "\n"
+                    project.facts_not_applied = project.facts_not_applied ++ "  " ++ current ++ ": `buffer field " ++ pointer ++ " … reads` is stated and not applied, so its slice is writable: " ++ stop ++ "\n"
         project.registry_value_text = checked.slice(0, checked.len() - 1).to_owned()
     project.resolve_ownership()
     Ok(project)
 
-// The functions of the C standard library that take a pointer to const and
-// do not write through it. A callee outside the package is trusted for
-// nothing else: its declared const is the only evidence there is, and for
-// these the standard says what they do.
-fn ci_c_standard_reader(name: &str) -> bool:
-    for known in ["memcpy", "memmove", "memcmp", "memchr", "strlen", "strcmp", "strncmp", "strcpy", "strncpy", "strcat", "strncat", "strchr", "strrchr", "strstr", "strspn", "strcspn", "strpbrk", "strcoll", "strxfrm", "strtol", "strtoul", "strtoll", "strtoull", "strtod", "strtof", "atoi", "atol", "atoll", "atof", "fwrite", "fputs", "puts", "bsearch"]:
-        if name == known: return true
-    false
-
 // What the package does through the pointer `source` (`Record.field`, or
-// `@<i>` for parameter i) once it is in `function`: "" when every use is a
-// read, `w:<what>` for a store through it, `u:<what>` for a use that is not
-// followed. A callee the package defines is judged by its own body, never
-// by its declared parameter type; one outside it is trusted only as a C
-// standard library function taking a pointer to const.
+// `@<i>` for parameter i) once it is in `function`, one line per finding:
+// nothing when every use is a read; `w:<what>` for a store through it;
+// `u:<what>` for each use that is not followed; `e:<what>` for a facts line
+// the header in use contradicts. A callee the package defines is judged by
+// its own body, never by its declared parameter type. One outside it does
+// not write through the pointer when a facts file states `reads` for that
+// parameter: the platform C library's facts, consulted when a system
+// header declares the callee and the package defines no function of that
+// name.
 fn ci_pointee_verdict(project: &CiProject, index: &HashMap[str, str], function: &str, source: &str, visiting: List[str], depth: i32) -> str:
     let key = function ++ "\t" ++ source
     if depth > 64 or visiting.contains(key) or not index.contains(key): return ""
     visiting.push(key.to_owned())
-    var undecided = ""
+    var found = ""
     for line in (index.get(key) ?? "").split("\n"):
         let f = line.split("\t")
         if f.len() != 5: continue
         if f[1] == "pw": return "w:`" ++ function ++ "` has a store through it (" ++ f[4] ++ ")"
         if f[1] == "pu":
-            if undecided.len() == 0: undecided = "u:in `" ++ function ++ "` " ++ f[3] ++ " (" ++ f[4] ++ ")"
+            found = found ++ "u:in `" ++ function ++ "` " ++ f[3] ++ " (" ++ f[4] ++ ")\n"
             continue
-        // pc: callee:arg:const|mut:header
+        // pc: callee:arg:const|mut:system|other
         let parts = f[3].split(":")
-        if parts.len() < 3: continue
+        if parts.len() < 4: continue
         let callee = parts[0]
         let at = project.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
         if at >= 0 and project.symbols[at].has_definition != 0:
-            let inner = ci_pointee_verdict(project, index, callee, "@" ++ parts[1], visiting, depth + 1)
-            if inner.starts_with("w:"): return inner
-            if inner.len() > 0 and undecided.len() == 0: undecided = inner
-        else if not (parts[2] == "const" and ci_c_standard_reader(callee)):
-            if undecided.len() == 0: undecided = "u:in `" ++ function ++ "` it is passed to `" ++ callee ++ "`, which the package does not define (" ++ f[4] ++ ")"
-    undecided
+            for inner in ci_pointee_verdict(project, index, callee, "@" ++ parts[1], visiting, depth + 1).split("\n"):
+                if inner.starts_with("w:") or inner.starts_with("e:"): return inner
+                if inner.len() > 0 and not found.contains(inner ++ "\n"): found = found ++ inner ++ "\n"
+        else if parts[3] == "system" and project.platform_reads.contains(callee ++ ":" ++ parts[1]):
+            if parts[2] != "const": return "e:" ++ project.platform_facts_path ++ " states `fn " ++ callee ++ "` `reads param " ++ parts[1] ++ "`, and the header in use does not declare that parameter a pointer to const (" ++ f[4] ++ ")"
+        else:
+            found = found ++ "u:in `" ++ function ++ "` it is passed to `" ++ callee ++ "`, " ++ (if parts[3] == "system": "for which the platform C library's facts state no `reads param " ++ parts[1] ++ "`" else: "which the package does not define") ++ " (" ++ f[4] ++ ")\n"
+    found
 
 // `p<k>` for the parameter named `name`, or `?`.
 fn ci_param_shape(names: &List[str], name: &str) -> str:
@@ -3598,6 +3610,13 @@ var g_migrate_no_c_export: i32 = 0
 // 1 while a package's contract is drafted with no proof from its source
 // (a prebuilt binary's, §31.6.3).
 var g_migrate_facade_without_bodies: i32 = 0
+
+// §16.2b.8: the platform C library's facts file, set by whoever drafts a
+// package's contract (`with get`); "" when there is none to consult.
+var g_migrate_platform_facts: str = ""
+
+fn migrate_set_platform_facts(path: &str):
+    g_migrate_platform_facts = path.to_owned()
 
 fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val

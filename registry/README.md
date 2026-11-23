@@ -40,6 +40,13 @@ where a proof and the library's annotations said nothing (§16.2b.2), and
 the generated facade records each one with the provenance `registry:` and
 its citation.
 
+`c/libc/facts.with` is the platform C library's file: what ISO C, POSIX and
+the Windows C runtime specify of their own functions, as `reads param N`
+lines, each cited to its standard. It belongs to no `with get` package.
+Every C build links that library, so the file is consulted whenever a proof
+follows a pointer into a function a system header declares and the package
+does not define (§16.2b.8).
+
 ## The review rule
 
 - **Every fact carries its citation** after `//`: the source file and line,
