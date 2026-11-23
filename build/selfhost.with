@@ -5678,6 +5678,24 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     if run.rc != 0: return run.rc
     0
 
+// #955: a GNU statement expression used as a value (`x = ({ T t = …; t; })`)
+// is its statements, then its last expression: as an initializer, on the
+// right of an assignment in a function lowered with gotos, and as an
+// operand. Two that declare a local of one name keep them apart, and each is
+// evaluated once, in order. The C program returns the number of the first
+// wrong result; the migrated program must return 0 as C does.
+fn bs_check_migrate_statement_expression_values(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "statement_expression_values.c")
+    let out_w = bs_join(case_dir, "statement_expression_values.with")
+    let rc = bs_write_fixture(ctx, src, "struct pair { int (*fn)(int); void *env; };\nstatic int twice(int x) { return x * 2; }\nstatic int calls;\nstatic int next(void) { return ++calls; }\nstatic int f(int a) {\n    int r = ({ int t = a + 1; t * 2; });\n    int s = ({ long t = a; (int)t + r; });\n    return r + s;\n}\nstatic int g(int a) {\n    int out = 0;\n    int slot;\n    struct pair p;\n    if (a < 0) goto done;\n    p = ({ int *at = &slot; *at = a; (struct pair){ twice, (void *)at }; });\n    out = p.fn(*(int *)p.env);\ndone:\n    return out;\n}\nstatic int h(void) { return ({ int first = next(); first * 10; }) + ({ int second = next(); second; }); }\nint main(void) {\n    if (f(3) != 19) return 1;\n    if (g(5) != 10) return 2;\n    if (g(-1) != 0) return 3;\n    if (h() != 12 || calls != 2) return 4;\n    return 0;\n}\n", "migrate statement expression values")
+    if rc != 0: return rc
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-statement-expression-values", ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)])
+    if result.rc != 0: return result.rc
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-statement-expression-values", ["run", bs_abs(root, out_w)])
+    if run.rc != 0: return run.rc
+    0
+
 // #955: the GCC atomic builtins are the methods of `std.sync.Atomic[T]` on
 // the same memory, their constant ordering an `Order`; a compare-exchange
 // returns whether it swapped and writes the value found through `expected`.
@@ -7002,6 +7020,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_enum_constants_are_int(ctx, compiler_path, bs_join(output_dir, "enum_constants_are_int"))
     if rc != 0: return rc
     rc = bs_check_migrate_atomic_builtins(ctx, compiler_path, bs_join(output_dir, "atomic_builtins"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_statement_expression_values(ctx, compiler_path, bs_join(output_dir, "statement_expression_values"))
     if rc != 0: return rc
     rc = bs_check_migrate_rvalue_sequencing(ctx, compiler_path, bs_join(output_dir, "rvalue_sequencing"))
     if rc != 0: return rc
