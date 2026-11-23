@@ -19256,10 +19256,19 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
         let callee = if field.len() > 0: "*" ++ field else: with_ci_cursor_spelling(session, cursor)
         if callee.len() > 0:
             if field.len() == 0: out = out ++ f"calls:{callee}\n"
+            // C 7.16.1.4: `va_start(ap, parmN)` names the rightmost
+            // parameter so the list can start after it; its value is neither
+            // read nor kept. Recorded as an argument, the format string of
+            // every printf-style function was "passed to __builtin_va_start,
+            // which no unit defines" (zlib's gzprintf, libcurl's curl_mprintf).
+            let names_last_param = field.len() == 0 and ci_stdarg_call_name(session, cursor) == "va_start"
             var ai = 1
             while ai < nc:
                 let arg = with_ci_child(session, cursor, ai)
                 let index = ai - 1
+                if names_last_param and index == 1:
+                    ai = ai + 1
+                    continue
                 if ci_cursor_is_null_like(session, arg):
                     out = out ++ f"null:{callee}:{index}\n"
                 for param in params:

@@ -1,0 +1,32 @@
+//! expect-stdout: ok
+// C 7.16.1.4: `va_start(ap, parmN)` names the rightmost parameter so the
+// list can start after it; its value is neither read nor kept. The scanner
+// recorded it as an argument, so the format of every printf-style function
+// was "passed to __builtin_va_start, which no unit defines" and counted as
+// retained (zlib's gzprintf, libcurl's curl_mprintf; #3174). A real pass of
+// the same parameter is still recorded.
+use compiler.ClangBridge
+use CImport
+
+fn body_evidence(session: i64, name: &str) -> str:
+    let root = with_ci_root_cursor(session)
+    for i in 0..with_ci_num_children(session, root):
+        let top = with_ci_child(session, root, i)
+        if with_ci_cursor_spelling(session, top) != name: continue
+        let last = with_ci_child(session, top, with_ci_num_children(session, top) - 1)
+        return ci_body_call_evidence_walk(session, last, ["fmt"], [], [])
+    "<no function " ++ name ++ ">"
+
+fn main:
+    ci_prepare_clang_resource_dir()
+    let code = "#include <stdarg.h>\nstatic int vnote(const char *fmt, va_list ap) { return va_arg(ap, int) + (fmt[0] != 0); }\nint note(const char *fmt, ...) { va_list ap; int k; va_start(ap, fmt); k = vnote(fmt, ap); va_end(ap); return k; }\nint direct(const char *fmt, ...) { __builtin_va_list ap; __builtin_va_start(ap, fmt); __builtin_va_end(ap); return 0; }\n"
+    let session = with_cimport_parse(code)
+    assert(with_cimport_error(session).len() == 0)
+    let note = body_evidence(session, "note")
+    let direct = body_evidence(session, "direct")
+    let ok = note.contains("sink:vnote:0:fmt\n") and note.contains("calls:__builtin_va_start\n") and not note.contains("sink:__builtin_va_start") and not direct.contains("sink:")
+    if not ok:
+        print(note)
+        print(direct)
+    assert(ok)
+    print("ok")
