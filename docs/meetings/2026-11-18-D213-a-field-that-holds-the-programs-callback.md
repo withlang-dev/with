@@ -19,6 +19,23 @@ function, which stores the next one (libcurl's `curl_easy_setopt`), stores
 no parameter of the storing function, so its field is undecided until a rule
 says which variadic argument the store reads.
 
+**Amended again 2026-11-22 (Eric, after reading libcurl 8.23.0).** Two more
+stores fit. A single-field copy, `second->set.fdebug = data->set.fdebug`
+(`http2.c:742`): the same field of another record of the same type. And the
+variadic setter: `curl_easy_setopt` passes its list and option to
+`Curl_vsetopt`, which passes both unchanged to `setopt_func`, where `case
+CURLOPT_DEBUGFUNCTION` does the first read (`setopt.c:2558`). The store of
+the next variadic argument fits when it is the first argument read under
+`case K` of a switch on the selector, it is read at the field's type, the
+list and the selector reach the storing function unchanged from every public
+function that can reach it, each such function's contract states case K as a
+callback, and every call of such a function from inside the package with
+selector K passes null or the same field of another record
+(`vdns/doh.c:316` passes `data->set.fdebug`). A named package function
+passed there contradicts the role; anything else leaves it undecided. The
+words are in v7.84; the implementation follows, after finding what
+libcurl's unread unit is, since it bears on 40 functions.
+
 **Date:** 2026-11-18. **Status:** ruled by Eric. The spec words are derived
 and come to him as a diff with the implementation.
 
