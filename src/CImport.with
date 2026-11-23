@@ -19146,6 +19146,8 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
 //   `localstore:<local>`             a local stored into a field, a global or
 //                                    an unknown place, or its address taken
 //   `localsink:<local>:<callee>:<i>` a local passed to a direct call
+//   `paramunnamed:<i>:<callee>`      parameter i is handed to a call whose
+//                                    callee is an expression, not a name
 //   `paramstoreat:<i>:<place>`       the place such a store assigned, as the
 //                                    source spells it (the report names it)
 //   `paramstore:<i>`                 parameter i stored through a pointer or
@@ -19375,7 +19377,15 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
                 if callee.len() > 0: out = out ++ "localsink:" ++ root.slice(6, root.len()) ++ ":" ++ callee ++ f":{ai - 1}\n"
                 else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
             else if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("param:") and callee.len() == 0:
+                // A call the walk cannot name (through an expression that
+                // yields a function pointer: libcurl's `setopt_call[i](data,
+                // …)`) may keep what it is handed, so the parameter counts
+                // as kept. It is not a store: `paramunnamed:<i>:<callee
+                // text>` says what it is, and nothing is proven of it. The
+                // report said "stored", and the proofs file recorded a
+                // store, which then contradicted a stated `lend`.
                 out = out ++ "paramstore:" ++ root.slice(6, root.len()) ++ "\n"
+                out = out ++ "paramunnamed:" ++ root.slice(6, root.len()) ++ ":" ++ with_ci_cursor_source_text(session, with_ci_child(session, cursor, 0)).replace("\n", " ").replace(":", " ") ++ "\n"
             else if with_ci_cursor_kind(session, a) == CXK_UNARY_OP and with_ci_unary_op(session, a) == UO_ADDR and root.starts_with("local:") and with_ci_cursor_kind(session, ci_peel_transparent(session, with_ci_child(session, a, 0))) == CXK_DECL_REF:
                 // `f(&p)`: the callee may replace or keep the pointer. #3179:
                 // `f(&p->field)` is the address of a part of what p names,

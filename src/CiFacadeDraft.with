@@ -670,7 +670,12 @@ impl CiProject:
         if sinks.contains("field;"): return "stored in a field" ++ place
         if sinks.contains("global;"): return "stored in a global" ++ place
         for line in self.symbols[si].own_evidence.split("\n"):
-            if line == f"paramstore:{pi}": return if place.len() > 0: "stored in" ++ place.slice(1, place.len()) else: "stored"
+            if line == f"paramstore:{pi}":
+                // Handed to a call the walk cannot name: kept for all the
+                // proofs know, and no proof of a store.
+                for other in self.symbols[si].own_evidence.split("\n"):
+                    if place.len() == 0 and other.starts_with(f"paramunnamed:{pi}:"): return if places: "passed to a call through `" ++ other.slice(f"paramunnamed:{pi}:".len(), other.len()) ++ "`, which the proofs cannot name" else: "passed to a call the proofs cannot name"
+                return if place.len() > 0: "stored in" ++ place.slice(1, place.len()) else: "stored"
         for sink in sinks.split(";"):
             if not sink.contains(":"): continue
             let kv = sink.split(":")
