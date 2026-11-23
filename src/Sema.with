@@ -9069,7 +9069,7 @@ impl Sema:
             return self.bind_provenance[opt.unwrap()].is_ephemeral_task != 0
         false
 
-    fn scope_set_is_ephemeral_task(sym: i32, is_ephemeral_task: bool):
+    mut fn scope_set_is_ephemeral_task(sym: i32, is_ephemeral_task: bool):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx = opt.unwrap()
@@ -9085,7 +9085,7 @@ impl Sema:
             return self.bind_provenance[opt.unwrap()].is_non_send_task != 0
         false
 
-    fn scope_set_is_non_send_task(sym: i32, is_non_send_task: i32):
+    mut fn scope_set_is_non_send_task(sym: i32, is_non_send_task: i32):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx = opt.unwrap()
@@ -9101,7 +9101,7 @@ impl Sema:
             return self.bind_provenance[opt.unwrap()].is_ephemeral_value != 0
         false
 
-    fn scope_set_is_ephemeral_value(sym: i32, is_ephemeral_value: bool):
+    mut fn scope_set_is_ephemeral_value(sym: i32, is_ephemeral_value: bool):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx = opt.unwrap()
@@ -9111,7 +9111,7 @@ impl Sema:
                 provenance.is_ephemeral_value = is_ephemeral_value as i32
                 slot.set(provenance)
 
-    fn scope_set_effect_dep_sym(sym: i32, dep_sym: i32):
+    mut fn scope_set_effect_dep_sym(sym: i32, dep_sym: i32):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx = opt.unwrap()
@@ -9314,7 +9314,7 @@ impl Sema:
             out.push(self.bind_provenance[i].poisoned_origin_node)
         out
 
-    fn restore_poison(path_syms: &List[i32], nodes: &List[i32]):
+    mut fn restore_poison(path_syms: &List[i32], nodes: &List[i32]):
         for i in 0..path_syms.len():
             if i >= self.bind_provenance.len():
                 break
@@ -9497,7 +9497,7 @@ impl Sema:
                     self.loop_entry_flat.pop()
         self.restore_scope_states(post)
 
-    fn clear_binding_view_deps(sym: i32):
+    mut fn clear_binding_view_deps(sym: i32):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx = opt.unwrap()
@@ -9539,7 +9539,7 @@ impl Sema:
 
     // Narrows the storage subset of a binding's origin mask; called after
     // set_binding_view_deps, which resets it to the whole mask.
-    fn set_binding_view_storage_mask(sym: i32, storage_mask: i32):
+    mut fn set_binding_view_storage_mask(sym: i32, storage_mask: i32):
         let opt = self.scope_name_map.get(sym)
         if opt.is_none():
             return
@@ -9620,7 +9620,7 @@ impl Sema:
                 return true
         false
 
-    fn mark_binding_poisoned_by_origin(view_sym: i32, origin_sym: i32, origin_node: i32):
+    mut fn mark_binding_poisoned_by_origin(view_sym: i32, origin_sym: i32, origin_node: i32):
         let opt = self.scope_name_map.get(view_sym)
         if not opt.is_some():
             return

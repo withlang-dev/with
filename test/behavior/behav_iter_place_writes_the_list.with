@@ -1,0 +1,40 @@
+//! expect-stdout: 0 0 0
+//! expect-stdout: 11 12 13
+//! expect-stdout: 1 2 3
+//! expect-stdout: ADA GRACE
+//! expect-stdout: 5 5
+
+// §19.5: `for slot in xs.iter_place()` writes the list where it is. The loop
+// lowered the list as a value, a retained copy since lists share their
+// buffer (D120), made the copy unique and wrote every `slot.set` into it:
+// the list never changed, with no error. A list that shares its buffer with
+// another keeps the other one as it was.
+type Roster:
+    names: List[str]
+
+impl Roster:
+    mut fn shout():
+        for slot in self.names.iter_place():
+            slot.set(slot.get().to_upper())
+
+fn fill(mut xs: List[i32], v: i32):
+    for slot in xs.iter_place():
+        slot.set(v)
+
+fn main:
+    var xs = [10, 20, 30]
+    for slot in xs.iter_place():
+        slot.set(0)
+    print(f"{xs[0]} {xs[1]} {xs[2]}")
+    var ys = [1, 2, 3]
+    let before = ys
+    for slot in ys.iter_place():
+        slot.set(slot.get() + 10)
+    print(f"{ys[0]} {ys[1]} {ys[2]}")
+    print(f"{before[0]} {before[1]} {before[2]}")
+    var r = Roster { names: ["ada" ++ "", "grace" ++ ""] }
+    r.shout()
+    print(f"{r.names[0]} {r.names[1]}")
+    var zs = [1, 2]
+    fill(zs, 5)
+    print(f"{zs[0]} {zs[1]}")

@@ -1,0 +1,18 @@
+//! expect-error: `rename` mutates its receiver (`self.names.slot`, line 11); declare it `mut fn rename`
+// D172 (1), §9: a `fn` receiver is read-only for every write through it. A
+// slot is the handle an element is written through, so making one is the
+// write. `rename` replaced an element through its read receiver while a
+// caller held a view of it: the old string was dropped under the view.
+type Roster:
+    names: List[str]
+
+impl Roster:
+    fn rename(i: i32, name: str):
+        with self.names.slot(i) as mut slot:
+            slot.set(name)
+
+fn main:
+    var r = Roster { names: ["ada" ++ "", "grace" ++ ""] }
+    let first = &r.names[0]
+    r.rename(0, "edsger" ++ "")
+    print(*first)

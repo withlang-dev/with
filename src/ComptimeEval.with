@@ -1571,7 +1571,7 @@ impl ComptimeEvaluator:
     fn extra_snapshot_value_at(index: i64) -> ComptimeValue:
         comptime_value_share(self.extra_values[index])
 
-    fn cleanup_workspace_pending_links():
+    mut fn cleanup_workspace_pending_links():
         for wi in 0..self.workspace_records.len():
             let record = ce_clone_workspace_record(self.workspace_records[wi])
             if record.pending_link_active == 0:
@@ -2022,7 +2022,7 @@ impl ComptimeEvaluator:
 
     // Consumes: the record moves into the registry slot (a view here
     // bit-copies through #730 and the caller's drop guts the stored vecs).
-    fn store_workspace_record(workspace_id: i32, record: ComptimeWorkspaceRecord):
+    mut fn store_workspace_record(workspace_id: i32, record: ComptimeWorkspaceRecord):
         let slot_index = workspace_id as i64
         with self.workspace_records.slot(slot_index) as mut slot:
             slot.set(record)
@@ -2080,7 +2080,7 @@ impl ComptimeEvaluator:
         self.slot_values.push(value)
         self.slot_muts.push(is_mut)
 
-    fn update_slot_value(idx: i32, value: ComptimeValue) -> Unit:
+    mut fn update_slot_value(idx: i32, value: ComptimeValue) -> Unit:
         let slot_index = idx as i64
         with self.slot_values.slot(slot_index) as mut slot:
             slot.set(value)
