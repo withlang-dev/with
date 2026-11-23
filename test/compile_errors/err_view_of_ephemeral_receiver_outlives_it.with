@@ -1,4 +1,4 @@
-//! expect-check-fail: view 'h' may outlive its origin 's'
+//! expect-check-fail: 's' is moved while 'h' still views it
 
 // §21.1 Rule 6 / §5.5: a view a method returns from an ephemeral VALUE
 // receiver depends on that value's own storage, not only on the origins the

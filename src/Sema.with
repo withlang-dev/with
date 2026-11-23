@@ -10324,9 +10324,14 @@ impl Sema:
                     return
                 let view_name = with_str_clone_ref(self.pool_resolve(view_sym))
                 let origin_name = with_str_clone_ref(self.pool_resolve(origin_sym))
+                // At a move of the origin nothing outlives anything yet: the
+                // origin is given away while a view of it is still in scope.
                 let start = self.ast.get_start(err_node)
                 let end = self.ast.get_end(err_node)
-                var diag = Diagnostic.err("view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'", Span { file: self.local_file_id, start: start, end: end })
+                let said = if moved: "'" ++ origin_name ++ "' is moved while '" ++ view_name ++ "' still views it" else: "view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'"
+                var diag = Diagnostic.err(said, Span { file: self.local_file_id, start: start, end: end })
+                if moved:
+                    diag.add_help("`" ++ view_name ++ "` is in scope until its block ends: read what you need from it in a scope that ends before the move (for a pattern binding, a `match` on a borrow of the value), then move `" ++ origin_name ++ "`")
                 diag = self.with_copy_view_fixit(diag, view_sym, true)
                 diag = self.with_facade_dependency_notes(diag, view_ty)
                 self.diags.emit(diag)

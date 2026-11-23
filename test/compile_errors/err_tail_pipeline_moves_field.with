@@ -1,0 +1,26 @@
+//! expect-check-fail: a field never moves out implicitly (§2.2, D32)
+//! expect-check-fail: = help: this pipeline is the function's last line, so its value, `h.items`, is what the function returns: write `-> Unit` on the function to return nothing, or end with `move h.items` on a line of its own to return it
+
+// §9.5, §2.2: a pipeline of Unit `mut fn` stages carries its receiver
+// place, so as a function's last line its value is that place. Here the
+// place is a field, and a field never moves out implicitly. This program
+// compiled: `run` returned `h.items` after `h` was dropped, an empty list
+// whose elements were already destroyed, and only the ownership validator
+// said so.
+use std.builtins.print_i32
+type W { slot: *mut i32 }
+impl Drop for W:
+    fn drop(move self: Self):
+        unsafe:
+            *self.slot = *self.slot + 1
+
+type H { items: List[W] }
+
+fn run(s: *mut i32):
+    let h = H { items: List.new() }
+    h.items |> push(W { slot: s }) |> push(W { slot: s })
+
+fn main:
+    var c = 0
+    run(&raw mut c)
+    print_i32(c)

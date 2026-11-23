@@ -1,4 +1,4 @@
-//! expect-check-fail: may outlive its origin
+//! expect-check-fail: 'n' is moved while 'w' still views it
 
 // §4.5 (D75, #1802): `n as &List[Tok]` borrows `n`, exactly as `&n` does, so
 // `n` cannot move out (`n as List[Tok]`) while the view is still used. A

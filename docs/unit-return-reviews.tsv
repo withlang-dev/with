@@ -41,3 +41,4 @@ src/Sema.with	fn clear_moved_fields_for_binding ( sym : i32 ) -> Unit	an effect:
 src/compiler/LlvmBridge.with	fn wl_build_fence ( b : i64 , order : i32 ) -> Unit	an effect + bridge ABI contract: matches extern fn wl_build_fence -> Unit in src/; the body ends in LLVMBuildFence -> *mut u8 (#2941)
 tools/drop_audit.with	fn nap_us ( us : i32 ) -> Unit	an effect: the body ends in with_usleep -> i32, discarded; without -> Unit D43 would make the function return i32 (#2941)
 tools/with-sha256.with	fn ewrite ( msg : str ) -> Unit	an effect: best-effort stderr write ending in with_libc_write -> i64; without -> Unit D43 would make the function return i64 (#2941)
+test/debug_alloc/da_vecdrop_field_push_chain_tail.with	fn run ( s : * mut i32 ) -> Unit	an effect: the body ends in a pipeline of pushes whose value is the receiver place h.items; without -> Unit D43 would make the function return that field, which D229 refuses

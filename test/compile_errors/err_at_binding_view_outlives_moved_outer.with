@@ -1,4 +1,5 @@
-//! expect-check-fail: view 'tag' may outlive its origin 'whole'
+//! expect-check-fail: 'whole' is moved while 'tag' still views it
+//! expect-check-fail: = help: `tag` is in scope until its block ends: read what you need from it in a scope that ends before the move (for a pattern binding, a `match` on a borrow of the value), then move `whole`
 
 // §9.7, §21.1: inside `whole @ .Click(tag, n)` a `tag` that is not Copy is
 // a view of `whole`. Moving `whole` while `tag` is in scope is refused, as

@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D230 — In `name @ pattern` the name binds the subject and the inner names observe it; a move of the name while an inner name is in scope is refused (ruled)](2026-11-22-D230-in-name-at-pattern-the-name-binds-the-subject-and-the-inner-names-observe-it.md)
+- [D229 — A pipeline over a field as a function's last line is refused, as the field written alone is; the help leads with `-> Unit` (ruled)](2026-11-22-D229-a-pipeline-over-a-field-as-a-functions-last-line-is-refused.md)
 - [D228 — With source files use the extension `.with`; the extension governs what the toolchain discovers, never what a user names; migrated corpora are renamed and never edited (ruled)](2026-11-21-D228-with-source-files-use-the-extension-with.md)
 - [D227 — A compile-time call that crosses a package boundary reaches only a `comptime fn`; the target queries are answered by the compiler; reflection and the build API are outside the rule; a bundle carries a `comptime fn`'s body (ruled)](2026-11-21-D227-a-compile-time-call-across-a-package-boundary-reaches-a-comptime-fn.md)
 - [D226 — In-place resources: several `init` clauses each with its own `ok`, an integer literal after `ok`, an in-place resource stated in a facts file, and what the proof of a drafted one is (ruled; spec v7.77)](2026-11-21-D226-in-place-resources-several-initializers-a-literal-status-and-the-drafts-proof.md)
