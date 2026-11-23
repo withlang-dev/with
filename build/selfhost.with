@@ -5678,6 +5678,27 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     if run.rc != 0: return run.rc
     0
 
+// #955: the GCC atomic builtins are the methods of `std.sync.Atomic[T]` on
+// the same memory, their constant ordering an `Order`; a compare-exchange
+// returns whether it swapped and writes the value found through `expected`.
+// The C program returns the number of the first operation whose result or
+// effect is wrong, and the migrated program must return 0 as C does.
+fn bs_check_migrate_atomic_builtins(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "atomic_builtins.c")
+    let out_w = bs_join(case_dir, "atomic_builtins.with")
+    var rc = bs_write_fixture(ctx, src, "static int g = 5;\nstatic long wide = 7;\nstatic void *slot;\nstatic int target;\nint main(void) {\n    if (__atomic_load_n(&g, __ATOMIC_SEQ_CST) != 5) return 1;\n    __atomic_store_n(&g, 9, __ATOMIC_RELEASE);\n    if (g != 9) return 2;\n    if (__atomic_exchange_n(&g, 3, __ATOMIC_ACQUIRE) != 9 || g != 3) return 3;\n    if (__atomic_fetch_add(&g, 4, __ATOMIC_ACQ_REL) != 3 || g != 7) return 4;\n    if (__atomic_fetch_sub(&g, 2, __ATOMIC_RELAXED) != 7 || g != 5) return 5;\n    if (__atomic_fetch_or(&g, 8, (4) == 0 ? __ATOMIC_RELAXED : __ATOMIC_SEQ_CST) != 5 || g != 13) return 6;\n    if (__atomic_fetch_and(&g, 12, __ATOMIC_SEQ_CST) != 13 || g != 12) return 7;\n    if (__atomic_fetch_xor(&g, 5, __ATOMIC_SEQ_CST) != 12 || g != 9) return 8;\n    if (__atomic_add_fetch(&g, 1, __ATOMIC_SEQ_CST) != 10) return 9;\n    if (__atomic_sub_fetch(&g, 10, __ATOMIC_SEQ_CST) != 0) return 10;\n    int expected = 4;\n    if (__atomic_compare_exchange_n(&g, &expected, 1, 0, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED) || expected != 0 || g != 0) return 11;\n    if (!__atomic_compare_exchange_n(&g, &expected, 6, 1, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED) || g != 6) return 12;\n    if (__atomic_exchange_n(&wide, 1L << 40, __ATOMIC_SEQ_CST) != 7 || wide != (1L << 40)) return 13;\n    __atomic_store_n(&slot, &target, __ATOMIC_SEQ_CST);\n    if (__atomic_load_n(&slot, __ATOMIC_ACQUIRE) != (void *)&target) return 14;\n    __atomic_thread_fence(__ATOMIC_SEQ_CST);\n    return 0;\n}\n", "migrate atomic builtins")
+    if rc != 0: return rc
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-atomic-builtins", ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)])
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    for use_text in ["use std.sync", " as *mut Atomic[i32])).swap(", " as *mut Atomic[i64])).swap(", " as *mut Atomic[*mut c_void])).load(.Acquire)", "__ci_atomic_cas(", "fence(.SeqCst)"]:
+        rc = bs_assert_contains(ctx, out_text, use_text, "atomic_builtins")
+        if rc != 0: return rc
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-atomic-builtins", ["run", bs_abs(root, out_w)])
+    if run.rc != 0: return run.rc
+    0
+
 // D109 (#2131): `offsetof(T, f)` migrates to the `offsetof[T](f)` builtin,
 // never to clang's folded number (the host's layout; pcre2's frame offsets
 // were wrong on wasm32). An initializer, a macro constant and an expression
@@ -6979,6 +7000,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_compound_small_int_promotion(ctx, compiler_path, bs_join(output_dir, "compound_small_int_promotion"))
     if rc != 0: return rc
     rc = bs_check_migrate_enum_constants_are_int(ctx, compiler_path, bs_join(output_dir, "enum_constants_are_int"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_atomic_builtins(ctx, compiler_path, bs_join(output_dir, "atomic_builtins"))
     if rc != 0: return rc
     rc = bs_check_migrate_rvalue_sequencing(ctx, compiler_path, bs_join(output_dir, "rvalue_sequencing"))
     if rc != 0: return rc

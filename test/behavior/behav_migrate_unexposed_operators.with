@@ -27,12 +27,15 @@ fn main:
     p7_assert_success(executed, "run the selected operand, the single evaluation and the arm's call")
     assert(executed.stdout.contains("unexposed ok"))
 
-    let atomic = migrate_case("migrate_unexposed_atomic", "static int g;\nint load(void) { return __atomic_load_n(&g, 0); }\n")
-    p7_assert_failure_contains(atomic, "has no translation", "an atomic builtin is refused by name, not read as its last operand")
+    // An atomic builtin is translated (#955) when its ordering is a
+    // constant; with an ordering known only at run time it is refused by
+    // name, never read as its last operand.
+    let atomic = migrate_case("migrate_unexposed_atomic", "static int g;\nint load(int order) { return __atomic_load_n(&g, order); }\n")
+    p7_assert_failure_contains(atomic, "unsupported compiler builtin '__atomic_load_n': the ordering is not a constant", "an atomic builtin with a run-time ordering is refused by name, not read as its last operand")
 
     // A discarded compound literal is its elements' effects (a union
     // initializer that sets two arms has none), so the construct that
     // cannot lower even when discarded is a call with no translation.
-    let refused_arm = migrate_case("migrate_refused_arm", "static int g;\nvoid t(int c) { int arr[4] = { 0 }; c ? arr[__atomic_load_n(&g, 0)] : 0; }\n")
-    p7_assert_failure_contains(refused_arm, "has no translation", "a discarded arm whose lowering fails fails the function")
+    let refused_arm = migrate_case("migrate_refused_arm", "static int g;\nvoid t(int c) { int arr[4] = { 0 }; c ? arr[__atomic_load_n(&g, c)] : 0; }\n")
+    p7_assert_failure_contains(refused_arm, "the ordering is not a constant", "a discarded arm whose lowering fails fails the function")
     print("ok")
