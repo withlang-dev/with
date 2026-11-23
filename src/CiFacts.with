@@ -73,6 +73,13 @@ impl Facts:
             if e.fn_name == name and not facts_is_presentation(e.kind): return e.kind ++ "|" ++ e.record ++ "|" ++ e.cite
         ""
 
+    /// Every `reads param N` the file states, as `function:N`.
+    fn reads() -> List[str]:
+        let out = []
+        for e in self.entries:
+            if e.kind.starts_with("reads:"): out.push(e.fn_name ++ ":" ++ e.kind.slice(6, e.kind.len()))
+        out
+
     /// The presentation facts for `name`, one `kind|record|cite` per line,
     /// in the file's order; "" when it states none.
     fn presentation(name: &str) -> str:
@@ -286,6 +293,13 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             let colon = clause.find(": ")
             if variadic_item != current_fn or colon < 6 or colon + 2 >= clause.len(): return Err(facts_error(path, line_no, "a case is `case K: <what the argument is>`, under the item's `variadic param V selected by param S:`"))
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "case:" ++ clause.slice(5, colon).trim() ++ ":" ++ clause.slice(colon + 2, clause.len()).trim(), record: "", cite: cite })
+        else if clause.starts_with("reads param "):
+            // §16.2b.8: the function only reads through this pointer
+            // parameter. The platform C library's facts state it for the
+            // functions ISO C and POSIX specify that way.
+            let n = clause.slice(12, clause.len()).trim()
+            if n.len() == 0 or not is_digit(n[0]) or n.contains(" "): return Err(facts_error(path, line_no, "`reads param N` takes a parameter index"))
+            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "reads:" ++ n, record: "", cite: cite })
         else if clause == "callback_thread any" or clause == "callback_thread registering":
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback_thread:" ++ clause.slice(16, clause.len()), record: "", cite: cite })
         else: return Err(facts_error(path, line_no, "an item fact is `consumes param N`, `returns borrow R from param N`, `lend`, `nullable param N`, `text param N`, `text return, owned, freed by F`, `callback param N`, `retains param N by param M` or `callback_thread any|registering`"))

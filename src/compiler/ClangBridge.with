@@ -5223,6 +5223,16 @@ fn with_ci_cursor_referenced_location(session: i64, cursor_idx: i32) -> str:
             return ""
         session_cursor_location(s, referenced)
 
+// Whether the declaration `cursor_idx` refers to is in a system header
+// (one found through the sysroot's include directories).
+fn with_ci_cursor_referenced_in_system_header(session: i64, cursor_idx: i32) -> bool:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return false
+        let referenced = clang_getCursorReferenced(*(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor))
+        if clang_Cursor_isNull(referenced) != 0: return false
+        clang_Location_isInSystemHeader(clang_getCursorLocation(referenced)) != 0
+
 fn with_ci_cursor_expansion_location(session: i64, cursor_idx: i32) -> str:
     unsafe:
         let s = session as *mut CImportSession

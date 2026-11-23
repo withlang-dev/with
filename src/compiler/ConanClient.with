@@ -1428,7 +1428,8 @@ fn conan_source_fail(dep_dir: &str, message: &str) -> str:
 // package with the contract drawn from that build. The key is what the
 // result depends on: the package's version, source and recipe, the target,
 // this compiler (its toolchain and its proofs), the CMake settings the user
-// gave, and the registry's facts. "" when this compiler has no identity to
+// gave, and the registry's facts for the package and for the platform C
+// library. "" when this compiler has no identity to
 // key on (an unstamped development build), which builds every time.
 fn conan_source_cache_dir(name: &str, version: &str, fetched: &ConanFetchedRecipe, cmake_env_text: &str) -> str:
     if not compiler_self_id_is_stamped() or runtime_getenv("WITH_NO_BUILD_CACHE").len() > 0: return ""
@@ -1436,8 +1437,9 @@ fn conan_source_cache_dir(name: &str, version: &str, fetched: &ConanFetchedRecip
     let scratch = root ++ "/.facts-" ++ f"{runtime_getpid()}"
     if runtime_mkdir_p(scratch) != 0: return ""
     let facts = conan_registry_facts(name, scratch)
+    let platform = conan_registry_facts(CONAN_PLATFORM_FACTS(), scratch)
     let _gone = runtime_remove_tree(scratch)
-    let key = "v1|" ++ name ++ "|" ++ version ++ "|" ++ fetched.source.sha256 ++ "|" ++ conan_sha256_text(fetched.recipe ++ "\n" ++ fetched.data ++ "\n" ++ fetched.recipe_cmake) ++ "|" ++ conan_detect_os() ++ "/" ++ conan_detect_arch() ++ "|" ++ compiler_self_id() ++ "|" ++ cmake_env_text ++ "|" ++ facts.sha256 ++ "|" ++ facts.note
+    let key = "v1|" ++ name ++ "|" ++ version ++ "|" ++ fetched.source.sha256 ++ "|" ++ conan_sha256_text(fetched.recipe ++ "\n" ++ fetched.data ++ "\n" ++ fetched.recipe_cmake) ++ "|" ++ conan_detect_os() ++ "/" ++ conan_detect_arch() ++ "|" ++ compiler_self_id() ++ "|" ++ cmake_env_text ++ "|" ++ facts.sha256 ++ "|" ++ facts.note ++ "|" ++ platform.sha256
     root ++ "/" ++ name ++ "-" ++ version ++ "-" ++ conan_sha256_text(key).slice(0, 16)
 
 // This executable, for the `cc` / `ar` / `ranlib` launchers.
@@ -2112,6 +2114,10 @@ fn conan_library_units(build_dir: &str, libs: &List[str], corpus: &ConanCorpus) 
 // be asked at all.
 type ConanRegistryFacts { path: str, commit: str, sha256: str, note: str }
 
+// The registry's name for the platform C library's facts file: what ISO C,
+// POSIX and the Windows C runtime specify of their own functions.
+fn CONAN_PLATFORM_FACTS() -> str: "libc"
+
 fn conan_registry_none(commit: &str, note: &str) -> ConanRegistryFacts: ConanRegistryFacts { path: "", commit: commit.to_owned(), sha256: "", note: note.to_owned() }
 
 var g_conan_registry_commit: str = ""
@@ -2260,6 +2266,12 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
                         g_conan_facts_refused = g_conan_facts_refused ++ (if g_conan_facts_refused.len() > 0: "; " else: "") ++ name ++ ": " ++ message
                         return
     if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
+    // §16.2b.8: the platform C library's facts, consulted for a callee
+    // outside the package and pinned beside the package's own.
+    let platform_dir = dep_dir ++ "/platform"
+    var platform = conan_registry_none("", "")
+    if runtime_mkdir_p(platform_dir) == 0: platform = conan_registry_facts(CONAN_PLATFORM_FACTS(), platform_dir)
+    migrate_set_platform_facts(platform.path)
     let report_path = dep_dir ++ "/contract-report.txt"
     migrate_parse_c_as_c_import()
     var library = conan_library_units(build_dir, libs, corpus)
@@ -2272,7 +2284,7 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
         g_conan_facts_contradicted = g_conan_facts_contradicted ++ "\n  " ++ name ++ ": " ++ summary.slice(14, summary.len())
         return
     let q = "\x22"
-    let pin = "{\n  " ++ q ++ "registry_commit" ++ q ++ ": " ++ q ++ conan_json_escape(registry.commit) ++ q ++ ",\n  " ++ q ++ "facts_sha256" ++ q ++ ": " ++ q ++ registry.sha256 ++ q ++ "\n}\n"
+    let pin = "{\n  " ++ q ++ "registry_commit" ++ q ++ ": " ++ q ++ conan_json_escape(registry.commit) ++ q ++ ",\n  " ++ q ++ "facts_sha256" ++ q ++ ": " ++ q ++ registry.sha256 ++ q ++ ",\n  " ++ q ++ "platform_facts_sha256" ++ q ++ ": " ++ q ++ platform.sha256 ++ q ++ "\n}\n"
     let _pin = runtime_write_file(dep_dir ++ "/contract.json", pin)
     // #3117: the coverage line says where the raw ones are explained.
     let explain = if summary.contains(", 0 raw"): "" else: "; `with contract report c." ++ name ++ "` says why each raw one is raw"
