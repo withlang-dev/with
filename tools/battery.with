@@ -383,6 +383,15 @@ if run_rc != 0:
         let scenarios = uat_failed("out/battery/uat.log")
         print("RED (uat): " ++ scenarios)
         append(status, "RED (uat): " ++ scenarios)
+// What only another gating host would refuse, said here first: the lanes'
+// recorded command lines against Windows' limit (tools/portable_limits.with,
+// #3572). A battery green on this host and red there is not green.
+let limits_rc = run_logged(&["with", "run", "tools/portable_limits.with"], "out/battery/portable-limits.log")
+if limits_rc != 0:
+    rc = limits_rc
+    let limits = read_file("out/battery/portable-limits.log") ?? ""
+    print(limits)
+    append(status, "failed: portable-limits")
 // The ledger goes to the green store too: a fresh worktree's driver orders
 // its lanes by the machine's last battery (build_graph_priorities).
 let green_dir = if env("WITH_GREEN_DIR").len() > 0: env("WITH_GREEN_DIR") else: env("HOME") ++ "/.local/with-green"

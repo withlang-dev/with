@@ -1,0 +1,54 @@
+// Limits of the strictest gating host, checked on every host.
+//
+// The build records each process it runs, with its command line, in
+// out/.build-state/<target>.effects. A command line Windows refuses
+// (CreateProcess: 32767 UTF-16 units) runs fine on macOS and Linux, so a
+// lane that passed every file on one command line was green here and red on
+// Windows the first night it ran there (#3572: validate-all-tests, 238,142
+// characters). This reads the recorded runs and fails on any that Windows
+// would refuse, so the Mac's battery says so first.
+//
+//   with run tools/portable_limits.with            # scan out/.build-state
+//   with run tools/portable_limits.with <dir>      # scan another directory
+//
+// The budget is below the limit: a path under the CI checkout root is
+// shorter than one under a staging worktree, but quoting adds to each
+// argument, and the margin keeps a near miss from depending on where the
+// tree sits.
+use std.fs
+use std.process
+
+let WINDOWS_COMMAND_LINE_BUDGET: isize = 30000
+
+// The `argv=` field of a `process` effect line, or "".
+fn argv_field(line: &str) -> str:
+    for field in line.split("\t"):
+        if field.starts_with("argv="): return field.slice(5, field.len())
+    ""
+
+fn target_field(line: &str) -> str:
+    for field in line.split("\t"):
+        if field.starts_with("target="): return field.slice(7, field.len())
+    "<build>"
+
+// One line per command over the budget, in `dir`'s effects files.
+fn over_budget(dir: &str) -> List[str]:
+    let found = []
+    for path in list_files_text(dir).split("\n"):
+        if not path.ends_with(".effects"): continue
+        for line in (read_file(path) ?? "").split("\n"):
+            if not line.starts_with("process\t"): continue
+            let argv = argv_field(line)
+            if argv.len() <= WINDOWS_COMMAND_LINE_BUDGET: continue
+            found.push(f"{target_field(line)}: a command line of {argv.len()} characters; Windows allows 32767 (it begins `{argv.slice(0, 80)}`)")
+    found
+
+fn main:
+    let argv = args()
+    let dir = if argv.len() > 1: argv[1] else: "out/.build-state"
+    let found = over_budget(dir)
+    for line in found: print("portable-limits: " ++ line)
+    if found.len() > 0:
+        print(f"portable-limits: {found.len()} command line(s) no Windows host can run: pass the list in batches or through a file")
+        exit_code(1)
+    print("portable-limits: every recorded command line fits every gating host")
