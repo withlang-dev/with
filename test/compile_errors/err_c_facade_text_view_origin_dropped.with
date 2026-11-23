@@ -1,4 +1,4 @@
-//! expect-check-fail: view 't' may outlive its origin 'n'
+//! expect-check-fail: 'n' is moved while 't' still views it
 
 // D51 stage 7 (ruling §32): dropping the note while its borrowed text is
 // still used is refused.

@@ -1,4 +1,4 @@
-//! expect-check-fail: view 'v' may outlive its origin 'd'
+//! expect-check-fail: 'd' is moved while 'v' still views it
 
 // D51 stage 7 (ruling §42: "The owned resource may expose a borrowed CStr
 // view"): the view of caller-owned text does not outlive the resource that

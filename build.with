@@ -2085,12 +2085,6 @@ fn run_validate_all_tests_action(ctx: ActionCtx) -> i32:
         let files = fs.list_files(dirs[di])
         for fi in 0..files.len():
             let p = files[fi]
-            // One test is not judged: a pipeline as a function's last line
-            // moves a field out of its receiver, and whether that program is
-            // refused is an open ruling (#3467).
-            if p.ends_with("/da_vecdrop_field_push_chain_tail.with"):
-                print("validate-all-tests: not judged (awaits a ruling): " ++ p)
-                continue
             if p.ends_with(".with") and not p.contains("/lib/"):
                 args.push(build_project_abs(root, p))
                 count = count + 1

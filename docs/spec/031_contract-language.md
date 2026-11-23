@@ -522,7 +522,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `valid on failed` | the operation may be called on a resource whose production failed. | G | an operation needs a produced resource | §16.2b.4 |
 | `of R` | the operation is presented on resource `R`. Required when its resource parameter's representation is wrapped by more than one resource. | P | the one resource that wraps the representation | §16.2b.3 |
 | `rename n` | the With name of the operation. | P | the convention's shortening of the C name | §16.2b.11 |
-| `param p fixed literal` | the presented operation omits `p` and always passes the literal. | P | | §16.2b.11 |
+| `param p fixed V` | the presented operation omits `p` and always passes `V`: a literal, a named constant of the library, or `sizeof(T)`. | P | | §16.2b.11 |
 | `param p discarded` | `p` is an out-pointer fixed as discarded: the wrapper passes scratch storage and ignores what C writes. | P | | §16.2b.11 |
 
 **Value records** (`reads`, `fills`, `updates`). The parameter points to one

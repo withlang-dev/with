@@ -25133,6 +25133,10 @@ fn sema_pattern_covers_variant(ast: &AstPool, pat: i32, variant_sym: i32) -> boo
         return ast.get_data0(pat) == variant_sym
     if kind == NodeKind.NK_PAT_TYPED_BIND:
         return ast.get_data1(pat) == variant_sym
+    // `name @ pattern` covers what its pattern covers. Unread, a match whose
+    // arms all bind the whole value was refused as missing every variant.
+    if kind == NodeKind.NK_PAT_AT_BINDING:
+        return sema_pattern_covers_variant(ast, ast.get_data1(pat), variant_sym)
     if kind == NodeKind.NK_PAT_OR:
         let or_start = ast.get_data0(pat)
         let or_count = ast.get_data1(pat)
@@ -43668,6 +43672,25 @@ impl Sema:
             // A returned global is not routed through mark_moved_if_consumed
             // either; the ident record survives the body scope's pop.
             self.reject_move_out_of_global(expr, ret_tid)
+            return
+        // §9.5: a pipeline whose stage is a Unit `mut fn` still carries its
+        // receiver place, so its value is a read of that place, under the
+        // same rule as the place spelled alone. Unwalked, `h.items |>
+        // push(a) |> push(b)` as a tail returned the field after `drop(h)`:
+        // an empty list, its elements already destroyed.
+        if k == NodeKind.NK_PIPELINE and (self.pipeline_carrier_kinds.get(expr) ?? 0) != 0:
+            var receiver = self.ast.get_data0(expr)
+            while self.ast.kind(receiver) == NodeKind.NK_PIPELINE and (self.pipeline_carrier_kinds.get(receiver) ?? 0) != 0:
+                receiver = self.ast.get_data0(receiver)
+            if self.ast.kind(receiver) == NodeKind.NK_FIELD_ACCESS and self.returned_field_moves(receiver):
+                if self.field_move_diag_nodes.contains(receiver): return
+                self.field_move_diag_nodes.insert(receiver, 1)
+                // The help leads with what was almost always meant: the
+                // function does the pushes and returns nothing.
+                let place = render_expr(self.ast, self.pool, receiver as NodeId, 0)
+                self.emit_error_with_help("a field never moves out implicitly (§2.2, D32)", receiver, "this pipeline is the function's last line, so its value, `" ++ place ++ "`, is what the function returns: write `-> Unit` on the function to return nothing, or end with `move " ++ place ++ "` on a line of its own to return it")
+                return
+            self.check_returned_field_move(receiver, ret_tid)
             return
         if k == NodeKind.NK_FIELD_ACCESS and self.returned_field_moves(expr):
             self.d32_emit_implicit_field_move_error(expr)

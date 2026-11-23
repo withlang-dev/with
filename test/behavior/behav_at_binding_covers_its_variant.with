@@ -1,0 +1,24 @@
+//! expect-stdout: 10
+//! expect-stdout: 3
+//! expect-stdout: 7
+
+// §9.7: `name @ pattern` covers what its pattern covers. A match whose arms
+// all bind the whole value was refused: "non-exhaustive match: missing
+// variant 'Click'".
+type Tag { name: str }
+
+enum Ev:
+    Click(tag: Tag, n: i32)
+    Key(code: i32)
+    Quit
+
+fn score(e: Ev) -> i32:
+    match move e:
+        whole @ .Click(tag, n) => n + tag.name.len() as i32
+        whole @ .Key(code) => code
+        whole @ .Quit => 7
+
+fn main:
+    print(score(.Click(Tag { name: "a" }, 9)))
+    print(score(.Key(3)))
+    print(score(.Quit))

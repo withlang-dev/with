@@ -933,6 +933,9 @@ match event:
         handle(click)
 ```
 
+In `name @ pattern`, `name` binds the subject as a plain binding would, and
+the names inside the pattern observe it: each is a binding from a place (§3).
+
 **Literal and range patterns:**
 ```
 match status_code:

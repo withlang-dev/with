@@ -8,7 +8,7 @@ impl Drop for W:
 
 type H { items: List[W] }
 
-fn run(s: *mut i32):
+fn run(s: *mut i32) -> Unit:
     let h = H { items: List.new() }
     h.items |> push(W { slot: s }) |> push(W { slot: s })
 
