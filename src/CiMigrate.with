@@ -2348,8 +2348,13 @@ fn ci_va_store_verdict(project: &CiProject, function: &str, field: &str) -> str:
         if f.len() != 10 or f[0] != function or f[1] != "fv" or f[2] ++ "." ++ f[3] != field: continue
         if f[7] != "same": return "u:`" ++ function ++ "` reads the variadic argument at another type than the field's (" ++ f[9] ++ ")"
         if f[8] != "first": return "u:in `" ++ function ++ "` it is not the first variadic argument read under its case (" ++ f[9] ++ ")"
-        if not f[4].starts_with("p") or not f[5].starts_with("p") or f[6].len() == 0 or f[6].contains("?") or f[6].contains("default"): return "u:in `" ++ function ++ "` the store is not under a `case K` of a switch on a parameter (" ++ f[9] ++ ")"
-        let reached = ci_va_entries(project, function, f[4].slice(1, f[4].len()), f[5].slice(1, f[5].len()), 0)
+        // A variadic function that reads its own list (libcurl's
+        // `curl_share_setopt` stores `va_arg(param, curl_lock_function)`
+        // itself) is where the list starts: the list is no parameter of it.
+        let own = project.find_symbol(CiProjectSymbolKind.CIPS_FN, function)
+        let starts_here = f[4] == "?" and own >= 0 and project.symbols[own].variadic != 0
+        if (not f[4].starts_with("p") and not starts_here) or not f[5].starts_with("p") or f[6].len() == 0 or f[6].contains("?") or f[6].contains("default"): return "u:in `" ++ function ++ "` the store is not under a `case K` of a switch on a parameter (" ++ f[9] ++ ")"
+        let reached = if starts_here: function ++ "|" ++ f[5].slice(1, f[5].len()) ++ "\n" else: ci_va_entries(project, function, f[4].slice(1, f[4].len()), f[5].slice(1, f[5].len()), 0)
         if reached.starts_with("u:"): return reached
         let entries = []
         for entry in reached.split("\n"):

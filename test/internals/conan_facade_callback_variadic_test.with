@@ -27,7 +27,7 @@ fn draft(rel: &str, cases: bool, through: &str, extra: &str) -> str:
     assert(mkdir_p(src) == 0)
     assert(mkdir_p(build) == 0)
     assert(mkdir_p(registry ++ "/registry/c/traced") == 0)
-    let header = "typedef struct handle handle;\ntypedef void (*trace_fn)(handle *h, const char *text, void *user);\nenum { OPT_TRACE = 1, OPT_TRACE_DATA = 2, OPT_COUNT = 3 };\nhandle *handle_new(void);\nvoid handle_free(handle *h);\nvoid handle_setopt(handle *h, int opt, ...);\nint handle_run(handle *h);\n"
+    let header = "typedef struct handle handle;\ntypedef void (*trace_fn)(handle *h, const char *text, void *user);\nenum { OPT_TRACE = 1, OPT_TRACE_DATA = 2, OPT_COUNT = 3 };\nhandle *handle_new(void);\nvoid handle_free(handle *h);\nvoid handle_setopt(handle *h, int opt, ...);\nvoid handle_direct(handle *h, int opt, ...);\nint handle_run(handle *h);\n"
     assert(write_file(dep ++ "/include/traced.h", header) == 0)
     assert(write_file(src ++ "/traced.h", header) == 0)
     assert(write_file(src ++ "/traced.c", "#include <stdarg.h>\n#include <stdlib.h>\n#include \"traced.h\"\nstruct handle { trace_fn trace; void *trace_data; int n; };\nhandle *handle_new(void) { handle *h = malloc(sizeof(handle)); if (!h) return 0; h->trace = 0; h->trace_data = 0; h->n = 0; return h; }\nvoid handle_free(handle *h) { free(h); }\nstatic void vset(handle *h, int opt, va_list ap) { switch (opt) { case OPT_TRACE: h->trace = va_arg(ap, trace_fn); break; case OPT_TRACE_DATA: h->trace_data = va_arg(ap, void *); break; default: break; } }\nstatic void vsetopt(handle *h, int opt, va_list ap) { if (opt == OPT_COUNT) { h->n = va_arg(ap, int); return; } " ++ through ++ " vset(h, opt, ap); }\nvoid handle_setopt(handle *h, int opt, ...) { va_list ap; va_start(ap, opt); vsetopt(h, opt, ap); va_end(ap); }\nint handle_run(handle *h) { if (h->trace) h->trace(h, \"run\", h->trace_data); h->n = h->n + 1; return h->n; }\n" ++ extra) == 0)
@@ -35,7 +35,7 @@ fn draft(rel: &str, cases: bool, through: &str, extra: &str) -> str:
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
     assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"traced\"]}\n") == 0)
     let role = "    field trace of handle is callback    // traced.h: the trace function is the program's, set with handle_setopt\n"
-    let stated = "    fn handle_setopt\n        variadic param 2 selected by param 1:    // traced.h: the option says what the argument is\n            case OPT_TRACE: callback param 2 as trace_fn userdata param OPT_TRACE_DATA    // traced.h: called with the handle, a message and the trace data\n            case OPT_TRACE_DATA: *mut c_void retains by param 0    // traced.c: stored in the handle\n        callback_thread registering    // traced.c: called from handle_run, on the caller's thread\n"
+    let stated = "    fn handle_setopt\n        variadic param 2 selected by param 1:    // traced.h: the option says what the argument is\n            case OPT_TRACE: callback param 2 as trace_fn userdata param OPT_TRACE_DATA    // traced.h: called with the handle, a message and the trace data\n            case OPT_TRACE_DATA: *mut c_void retains by param 0    // traced.c: stored in the handle\n        callback_thread registering    // traced.c: called from handle_run, on the caller's thread\n    fn handle_direct\n        variadic param 2 selected by param 1:    // traced.h: the option says what the argument is\n            case OPT_TRACE: callback param 2 as trace_fn userdata param OPT_TRACE_DATA    // traced.h: the same callback\n        callback_thread registering    // traced.c: called from handle_run\n"
     assert(write_file(registry ++ "/registry/c/traced/facts.with", "c facts traced:\n" ++ role ++ (if cases: stated else: "")) == 0)
     assert(set_env("WITH_REGISTRY", "file://" ++ registry) == 0)
     conan_write_facade("traced", "1.0", dep, src, build)
@@ -59,6 +59,14 @@ fn main:
     let before = conan_facts_contradicted().len()
     let read = draft(base ++ "/read", true, "(void)va_arg(ap, int);", "")
     let read_ok = conan_facts_contradicted().len() == before and read.contains("field trace of handle: undecided: `vset` stores the next variadic argument into it: `vsetopt` reads from the argument list before passing it to `vset`") and read.contains("handle_run: raw: retains param 0")
+    // The simplest shape: the public variadic function stores its own next
+    // argument (libcurl's `curl_share_setopt`). It is where the list
+    // starts, so its own facts are the ones asked.
+    let direct_source = "void handle_direct(handle *h, int opt, ...) { va_list ap; va_start(ap, opt); switch (opt) { case OPT_TRACE: h->trace = va_arg(ap, trace_fn); break; default: break; } va_end(ap); }\n"
+    let direct = draft(base ++ "/direct", true, "", direct_source)
+    let direct_ok = direct.contains("    fn handle_run\n        lend") and not direct.contains("undecided") and conan_facts_contradicted().len() == before
+    if not direct_ok: print(direct)
+    assert(direct_ok)
     // The entry's facts state no callback case for the option.
     let unstated = draft(base ++ "/unstated", false, "", "")
     let unstated_ok = unstated.contains("field trace of handle: undecided: `vset` stores the next variadic argument into it: the facts for `handle_setopt` state no `case OPT_TRACE: callback …`")
