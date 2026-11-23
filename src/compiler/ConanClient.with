@@ -9,6 +9,7 @@ use compiler.RecipeInterp
 use compiler.ProjectConfig
 use compiler.ConanPatch
 use compiler.ClangDriver
+use compiler.AbiStamp
 use compiler.FrameworkStubs
 use compiler.WindowsImportLibs
 use compiler.TarExtract
@@ -1404,11 +1405,40 @@ fn conan_package_cmake_env(name: &str) -> ConanCMakeEnv:
 // an extracted Conan binary is. What the machine lacks is named, not guessed
 // around: the user installs it.
 
+// D212: `with get` builds a package from source by default. A build it
+// cannot make (a requirement that is not a CMake project, a missing
+// prerequisite) is then no error: the reason is kept, the package is taken
+// as a prebuilt binary, and one line says so. `--binary` asks for the binary
+// outright.
+var g_conan_binary: bool = false
+var g_conan_source_optional: bool = false
+var g_conan_source_declined: str = ""
+
+fn conan_set_binary(enabled: bool):
+    g_conan_binary = enabled
+
 fn conan_source_fail(dep_dir: &str, message: &str) -> str:
-    runtime_eprint("error: " ++ message)
+    if g_conan_source_optional: g_conan_source_declined = message.to_owned()
+    else: runtime_eprint("error: " ++ message)
     if dep_dir.len() > 0:
         let _remove = runtime_remove_tree(dep_dir)
     ""
+
+// The per-user cache of source builds (D212): the installed tree of one
+// package with the contract drawn from that build. The key is what the
+// result depends on: the package's version, source and recipe, the target,
+// this compiler (its toolchain and its proofs), the CMake settings the user
+// gave, and the registry's facts. "" when this compiler has no identity to
+// key on (an unstamped development build), which builds every time.
+fn conan_source_cache_dir(name: &str, version: &str, fetched: &ConanFetchedRecipe, cmake_env_text: &str) -> str:
+    if not compiler_self_id_is_stamped() or runtime_getenv("WITH_NO_BUILD_CACHE").len() > 0: return ""
+    let root = with_user_cache_dir() ++ "/with/c-builds"
+    let scratch = root ++ "/.facts-" ++ f"{runtime_getpid()}"
+    if runtime_mkdir_p(scratch) != 0: return ""
+    let facts = conan_registry_facts(name, scratch)
+    let _gone = runtime_remove_tree(scratch)
+    let key = "v1|" ++ name ++ "|" ++ version ++ "|" ++ fetched.source.sha256 ++ "|" ++ conan_sha256_text(fetched.recipe ++ "\n" ++ fetched.data ++ "\n" ++ fetched.recipe_cmake) ++ "|" ++ conan_detect_os() ++ "/" ++ conan_detect_arch() ++ "|" ++ compiler_self_id() ++ "|" ++ cmake_env_text ++ "|" ++ facts.sha256 ++ "|" ++ facts.note
+    root ++ "/" ++ name ++ "-" ++ version ++ "-" ++ conan_sha256_text(key).slice(0, 16)
 
 // This executable, for the `cc` / `ar` / `ranlib` launchers.
 fn conan_self_exe() -> str:
@@ -1830,6 +1860,11 @@ fn conan_configure_source(name: &str, version: &str, project_root: &str, dep_dir
         configure = conan_argv_append(configure, "-DCMAKE_CXX_STANDARD_LIBRARIES=" ++ standard_libraries)
         configure = conan_argv_append(configure, "-DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_C_STANDARD_LIBRARIES;CMAKE_CXX_STANDARD_LIBRARIES")
     if prefix_path.len() > 0: configure = conan_argv_append(configure, "-DCMAKE_PREFIX_PATH=" ++ prefix_path)
+    // A source build finds its requirements and nothing a host package
+    // manager installed: what it links must be what the lock names.
+    configure = conan_argv_append(configure, "-DCMAKE_IGNORE_PREFIX_PATH=/opt/homebrew;/usr/local;/opt/local;/sw;/home/linuxbrew/.linuxbrew")
+    configure = conan_argv_append(configure, "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF")
+    configure = conan_argv_append(configure, "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF")
     // #1900: each requirement's CMake package config, as CMakeDeps writes it.
     for reference in resolved:
         let written = conan_write_cmake_package_config(project_root, reference, work ++ "/cmake-deps")
@@ -1841,7 +1876,21 @@ fn conan_configure_source(name: &str, version: &str, project_root: &str, dep_dir
         runtime_eprint("  " ++ cmake_env_name ++ ": " ++ define)
         configure = conan_argv_append(configure, define)
     runtime_eprint("  configuring...")
-    if conan_run_tool(configure, 900000) != 0:
+    // pkg-config answers from the requirements' own directories only: left
+    // to its default path it reports a host package manager's libraries,
+    // and the build links them.
+    var pkg_dirs = ""
+    for reference in resolved:
+        let root = conan_absolute(project_root ++ "/.with/deps/c/" ++ reference)
+        pkg_dirs = pkg_dirs ++ (if pkg_dirs.len() > 0: ":" else: "") ++ root ++ "/lib/pkgconfig:" ++ root ++ "/share/pkgconfig"
+    let saved_libdir = runtime_getenv("PKG_CONFIG_LIBDIR")
+    let saved_path = runtime_getenv("PKG_CONFIG_PATH")
+    let _libdir = runtime_setenv("PKG_CONFIG_LIBDIR", if pkg_dirs.len() > 0: pkg_dirs else: work ++ "/no-pkgconfig")
+    let _path = runtime_setenv("PKG_CONFIG_PATH", "")
+    let configured = conan_run_tool(configure, 900000)
+    let _libdir_back = runtime_setenv("PKG_CONFIG_LIBDIR", saved_libdir)
+    let _path_back = runtime_setenv("PKG_CONFIG_PATH", saved_path)
+    if configured != 0:
         for unknown in variables.unknown: runtime_eprint("  note: the recipe also sets " ++ unknown ++ ", which could not be evaluated")
         return "CMake could not configure " ++ name ++ "/" ++ version ++ " (its output is above)"
     ""
@@ -2374,8 +2423,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     let cmake_env = conan_package_cmake_env(name)
     if cmake_env.problem.len() > 0:
         return conan_source_fail("", cmake_env_name ++ " entry '" ++ cmake_env.problem ++ "' is not NAME=VALUE (entries are separated by `;`)")
-    let why = if g_conan_from_source: "--from-source" else: if cmake_env.defines.len() > 0: cmake_env_name ++ " is set" else: if conan_builds_from_source_only(): "on Windows every C package is built by the SDK's toolchain" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
-    runtime_eprint("  " ++ why ++ "; building " ++ name ++ "/" ++ version ++ " from source")
+    let why = if g_conan_from_source: "--from-source" else: if cmake_env.defines.len() > 0: cmake_env_name ++ " is set" else: if conan_builds_from_source_only(): "on Windows every C package is built by the SDK's toolchain" else: if not g_conan_binary: "" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
     let fetched = conan_fetch_recipe(name, version)
     if fetched.problem.len() > 0: return conan_source_fail("", fetched.problem)
     let recipe = fetched.recipe
@@ -2392,6 +2440,19 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
 
     let dep_dir = conan_absolute(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version)
     let _clean = runtime_remove_tree(dep_dir)
+    let cached = conan_source_cache_dir(name, version, fetched, runtime_getenv(cmake_env_name))
+    if cached.len() > 0 and runtime_file_exists(cached ++ "/.complete") != 0:
+        // The package's directory in a fresh project does not exist yet.
+        if runtime_mkdir_p(conan_absolute(project_root ++ "/.with/deps/c/" ++ name)) == 0 and with_fs_copy_tree(cached, dep_dir) == 0:
+            let _mark = runtime_remove_file(dep_dir ++ "/.complete")
+            let summary = runtime_read_file(dep_dir ++ "/contract-report.txt").split("\n")[0]
+            if summary.starts_with("facade "):
+                let explain = if summary.contains(", 0 raw"): "" else: "; `with contract report c." ++ name ++ "` says why each raw one is raw"
+                runtime_eprint("  " ++ summary ++ explain ++ " (.with/deps/c/" ++ name ++ "/" ++ version ++ "/contract-report.txt)")
+            runtime_eprint("  c." ++ name ++ "@" ++ version ++ ": built from source (this machine's build cache); its contract is drawn from that build (`with contract report c." ++ name ++ "`)")
+            return version.to_owned()
+        let _partial = runtime_remove_tree(dep_dir)
+    runtime_eprint("  " ++ (if why.len() > 0: why ++ "; " else: "") ++ "building " ++ name ++ "/" ++ version ++ " from source")
     let work = dep_dir ++ "/.build"
     let tree = conan_fetch_source_tree(name, version, fetched, work)
     if tree.problem.len() > 0: return conan_source_fail(dep_dir, tree.problem)
@@ -2425,6 +2486,17 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     conan_write_facade(name, version, dep_dir, source_dir, work ++ "/b")
     conan_refuse_contradicted_registry(name, dep_dir)
     conan_remove_build_tree(work)
+    // D212: one line per package, and the build kept for the next project.
+    runtime_eprint("  c." ++ name ++ "@" ++ version ++ ": built from source; its contract is drawn from this build (`with contract report c." ++ name ++ "`)")
+    if cached.len() > 0 and runtime_getenv("WITH_KEEP_BUILD").len() == 0:
+        let staging = cached ++ ".tmp-" ++ f"{runtime_getpid()}"
+        let _old = runtime_remove_tree(staging)
+        if runtime_mkdir_p(cached ++ "/..") == 0 and with_fs_copy_tree(dep_dir, staging) == 0 and runtime_write_file(staging ++ "/.complete", "ok\n") == 0:
+            let _prior = runtime_remove_tree(cached)
+            if runtime_rename(staging, cached) != 0:
+                let _left = runtime_remove_tree(staging)
+        else:
+            let _left = runtime_remove_tree(staging)
     version.to_owned()
 
 // A lock entry that was built from source: reuse the build, or build the same
@@ -2469,8 +2541,26 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
     let cmake_env = conan_package_cmake_env(name)
     if g_conan_from_source or conan_builds_from_source_only() or cmake_env.defines.len() > 0 or cmake_env.problem.len() > 0:
         return conan_install_from_source(name, version, project_root, depth)
+    if not g_conan_binary:
+        // D212: the package is built from source; only one that cannot be
+        // (not a CMake project, a prerequisite this machine lacks) is taken
+        // as a binary, and the line says which it was and why.
+        let outer = g_conan_source_optional
+        g_conan_source_optional = true
+        g_conan_source_declined = ""
+        let built = conan_install_from_source(name, version, project_root, depth)
+        let declined = g_conan_source_declined.to_owned()
+        g_conan_source_optional = outer
+        if built.len() > 0: return built
+        let fallback = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
+        if fallback.len() > 0:
+            runtime_eprint("  c." ++ name ++ "@" ++ version ++ ": a prebuilt binary, with no proofs; it was not built from source: " ++ declined ++ " (`with contract report c." ++ name ++ "`)")
+            return fallback
+        runtime_eprint("error: " ++ name ++ "/" ++ version ++ " was not built from source (" ++ declined ++ ") and Conan Center has no binary of it for this platform")
+        return ""
     let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
     if installed_binary.len() > 0:
+        runtime_eprint("  c." ++ name ++ "@" ++ version ++ ": a prebuilt binary, with no proofs (--binary) (`with contract report c." ++ name ++ "`)")
         return installed_binary
     conan_install_from_source(name, version, project_root, depth)
 

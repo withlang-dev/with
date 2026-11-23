@@ -1973,6 +1973,16 @@ fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
     if ip.problem.len() > 0: return RecipeRequirements { ok: false, problem: move ip.problem, notes: List.new(), requires: List.new(), tool_requires: List.new() }
     RecipeRequirements { ok: true, problem: "", notes: move ip.notes, requires: move ip.reqs, tool_requires: move ip.tool_reqs }
 
+// The recipe methods whose bodies construct a CMakeToolchain, by name.
+fn recipe_cmake_toolchain_methods(recipe: &str) -> List[str]:
+    let methods = []
+    var current = ""
+    for line in recipe.split("\n"):
+        let t = line.trim_start()
+        if t.starts_with("def ") and t.contains("("): current = t.slice(4, t.find("(")).trim().to_owned()
+        if current.len() > 0 and t.contains("CMakeToolchain(") and not t.starts_with("#") and not methods.contains(current): methods.push(current.to_owned())
+    methods
+
 // The variables `generate` sets on its CMakeToolchain, as CMake spells
 // their values; `unknown` names each one whose value could not be evaluated.
 type RecipeCMake { ok: bool, problem: str, notes: List[str], names: List[str], values: List[str], unknown: List[str] }
@@ -1989,6 +1999,20 @@ fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
     if ip.problem.len() > 0:
         out.problem = move ip.problem
         return out
+    // `with get` builds with the package's own CMake. A recipe may build
+    // another way on this platform (libcurl: autotools everywhere but
+    // Windows), so `generate` reaches no CMake toolchain and the options
+    // never became CMake variables: curl's CMake then found whatever the
+    // host had installed (brotli, zstd, libssh2 from a package manager) and
+    // linked it. The recipe still states its CMake settings, in the method
+    // that constructs its CMakeToolchain; that method is run.
+    if ip.toolchains.len() == 0:
+        for method in recipe_cmake_toolchain_methods(recipe):
+            if method == "generate": continue
+            let _m = ip.run_method(method)
+            if ip.problem.len() > 0:
+                out.problem = ip.problem
+                return out
     for ti in 0..ip.toolchains.len():
         let tc: i32 = ip.toolchains[ti]
         for attr in ["variables", "cache_variables"]:
