@@ -24711,6 +24711,16 @@ impl Sema:
                     self.drop_control_flow_depth = self.drop_control_flow_depth + 1
                 self.check_expr(guard)
                 self.drop_control_flow_depth = saved_drop_cf_guard
+            // #3548: a pattern binding's view ends at its last use, as a
+            // `let` view's does. A block retires the dead borrows of its own
+            // depth after each statement, and the arm's scope has no
+            // statements of its own: its bindings live exactly as long as
+            // its body, so a block body is given their borrows to retire.
+            // Left at the arm's depth, `tag` in `whole @ .Click(tag, n)`
+            // counted as viewing `whole` to the end of the arm, whatever
+            // came after its last read.
+            if self.ast.kind(arm_body) == NodeKind.NK_BLOCK:
+                self.give_pattern_borrows_to_body_block()
             let saved_drop_cf_arm = self.drop_control_flow_depth
             if self.current_drop_type_sym != 0:
                 self.drop_control_flow_depth = self.drop_control_flow_depth + 1
@@ -42937,6 +42947,22 @@ impl Sema:
             return
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             self.collect_capture_fields(self.ast.get_data0(node), sym)
+
+    // The borrows the arm's pattern bindings hold, moved to the depth of the
+    // arm's body block, which retires them as it retires its own. A borrow
+    // the subject expression made (`match &e:`) and a binding of this arm
+    // now names is one of them: the binding is its only user.
+    mut fn give_pattern_borrows_to_body_block():
+        let arm_depth = self.scope_starts.len()
+        let arm_start: i32 = self.scope_starts[arm_depth - 1]
+        var bi = 0
+        while bi < self.borrow_refs.len():
+            let ref_sym: i32 = self.borrow_refs[bi]
+            let depth: i32 = self.borrow_scope_depths[bi]
+            let bound_here = ref_sym != 0 and (self.scope_name_map.get(ref_sym) ?? -1) >= arm_start
+            if bound_here and depth as isize <= arm_depth:
+                self.borrow_scope_depths[bi] = arm_depth as i32 + 1
+            bi += 1
 
     mut fn expire_dead_borrows_in_block(block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
         self.validate_borrow_rows()

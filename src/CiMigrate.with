@@ -1853,7 +1853,7 @@ impl CiProject:
         var setter_evidence = ""
         for line in field_evidence.split("\n"):
             let f = line.split("\t")
-            if f.len() != 5 or f[0] != "fs" or f[3] == "null": continue
+            if f.len() != 5 or f[0] != "fs" or f[3] == "null" or f[3] == "same": continue
             let field = f[1] ++ "." ++ f[2]
             if not setter_evidence.contains("fieldstore:" ++ field ++ "\n"): setter_evidence = setter_evidence ++ "fieldstore:" ++ field ++ "\n"
             var source = "fieldstoreother:" ++ field ++ "\n"

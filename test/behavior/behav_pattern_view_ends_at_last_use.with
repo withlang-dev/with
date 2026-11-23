@@ -1,0 +1,37 @@
+//! expect-stdout: 10
+//! expect-stdout: 12
+//! expect-debug-alloc: leak count=0
+
+// #3548 (§21.1, §9.7): a pattern binding's view ends at its last use, as a
+// `let` view's does. In `whole @ .Click(tag, n)` the name `tag` views
+// `whole`; once the arm's block has read what it needs from `tag`, `whole`
+// may move. It was refused: the binding counted as viewing until the arm
+// ended.
+// A destructor makes Tag not Copy, so `tag` is a view; a Copy payload would
+// be copied with its own hold and could be read after the move.
+type Tag { name: str }
+impl Drop for Tag:
+    move fn drop(): {}
+
+enum Ev:
+    Click(tag: Tag, n: i32)
+
+fn take(e: Ev) -> i32:
+    match move e:
+        .Click(t, n) => n + t.name.len() as i32
+
+fn handle(e: Ev) -> i32:
+    match move e:
+        whole @ .Click(tag, n) =>
+            let k = tag.name.len() as i32
+            k - k + take(whole)
+
+fn peek(e: Ev) -> i32:
+    match &e:
+        .Click(tag, _) =>
+            let k = tag.name.len() as i32
+            k + take(e)
+
+fn main:
+    print(handle(.Click(Tag { name: "a" }, 9)))
+    print(peek(.Click(Tag { name: "ab" }, 8)))

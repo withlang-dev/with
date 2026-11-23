@@ -1,0 +1,25 @@
+//! expect-check-fail: 'whole' is moved while 'tag' still views it
+
+// #3548: the view ends at its last use, not before it. `tag` is read after
+// `whole` moves, so the move is refused.
+// A destructor makes Tag not Copy, so `tag` is a view; a Copy payload would
+// be copied with its own hold and could be read after the move.
+type Tag { name: str }
+impl Drop for Tag:
+    move fn drop(): {}
+
+enum Ev:
+    Click(tag: Tag, n: i32)
+
+fn take(e: Ev) -> i32:
+    match move e:
+        .Click(t, n) => n + t.name.len() as i32
+
+fn handle(e: Ev) -> i32:
+    match move e:
+        whole @ .Click(tag, n) =>
+            let got = take(whole)
+            got + tag.name.len() as i32
+
+fn main:
+    print(handle(.Click(Tag { name: "a" }, 9)))

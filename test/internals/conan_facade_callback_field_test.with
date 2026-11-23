@@ -78,6 +78,13 @@ fn main:
     if not (loaded_ok and misnamed_ok):
         print(loaded)
         print(misnamed)
+    // A store of the same field of another record fits the role: whatever
+    // that field holds, this one now holds (libcurl copies its debug
+    // callback from one handle's settings to another's).
+    let shared = draft("out/tmp/conan_facade_callback_field_test/shared", role, "void handle_share(handle *to, const handle *from) { to->trace = from->trace; }\n")
+    let shared_ok = shared.contains("    fn handle_run\n        lend") and not shared.contains("undecided")
+    if not shared_ok: print(shared)
+    assert(shared_ok)
     // libcurl's shape: the public setter is variadic and hands its
     // arguments to an internal function, which stores the next one. The
     // stored value is no parameter of the storing function, so the field is
