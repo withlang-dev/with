@@ -264,7 +264,7 @@ with migrate .reference/pcre2/src/ \
     -D HAVE_CONFIG_H=1
 ```
 
-Produces 32 `.w` files + `defs.with` shared definitions from 32 `.c`
+Produces 32 `.with` files + `defs.with` shared definitions from 32 `.c`
 files. 9 files are excluded (test harnesses, JIT compiler, fuzzer,
 POSIX wrapper, dftables).
 

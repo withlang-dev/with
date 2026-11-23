@@ -75,7 +75,7 @@ devkit client pairs and uploads and stops there.
 | Pairing with a Deck | One tap on the Deck through Valve's Devkit Service (`POST :32000/register`, RSA keys only); no password, no Desktop Mode, no BIOS |
 | Launching in Game Mode | From our own code over Steam's IPC pipe: `create-shortcut` answered in 0.5 s; launch 3.7 s the first time, **0.59 s** on relaunch |
 | Building for the Deck | On the Deck: 66.8 s clean, 65.5 s after one edit. On the Mac (M5 Max): 20.4 s and 18.1 s. Cross-building from the Mac is blocked only by `c_import` under `--target`; Valve publishes the steamrt4 SDK sysroot (1.12 GB) with every library WIPE links |
-| Debugging | DWARF on by default; at `-O0`, LLDB on the Mac through SteamOS's own `gdbserver` and an SSH forward stops at a `.w` line, prints locals and a backtrace. Nothing to install on the Deck |
+| Debugging | DWARF on by default; at `-O0`, LLDB on the Mac through SteamOS's own `gdbserver` and an SSH forward stops at a `.with` line, prints locals and a backtrace. Nothing to install on the Deck |
 | Seeing the screen | gamescope publishes its composited output as a PipeWire source; a 1080p screenshot in 0.48 s; live view at 60 fps as MJPEG (24 Mbit/s at 960×540) or hardware H.264 (10 Mbit/s at 1080p) |
 | Replay | An 18-minute recording replays in 0.08 s |
 | Editors | VS Code: `with-vscode` has language and grammar only. Visual Studio: Attach to Process over SSH with its GDB engine needs nothing from us but a working `with dev` on Windows. IDEA: a DAP run configuration through Red Hat's LSP4IJ, or CLion 2025.3's built-in DAP |

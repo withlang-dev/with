@@ -19,7 +19,7 @@ and the on-demand `cimport_stubs.o` archive when the unit reaches libc or
 c_import symbols. A runtime that is not the linking compiler's own generation
 (the bundle's `generation` line, or bytes equal to the embedded slot, D132)
 is never linked: that mixed-world link is #761's corruption class. The
-`.w`-derived runtime objects (`rt_core.o`, the platform object, panic,
+`.with`-derived runtime objects (`rt_core.o`, the platform object, panic,
 compat, fiber stubs, channel, fiber runtime, fiber core) no longer exist;
 `WITH_RT_IN_UNIT` is gone (the lane is the only path). The seed-built
 `out/bootstrap-lib` objects remain until a post-flip seed is cut: the pinned
@@ -137,7 +137,7 @@ never Python, bash, perl or awk. With IS a scripting language.
     `awk '…' f1 f2` → `with -n '…' f1 f2`, with `filename` and `fnr` bound
     (FILENAME, FNR) beside `nr` (D222)
   - Full matrix and open gaps: `docs/spec/toolchain/improve_oneliners.md`.
-- **Implicit main** — a `.w` file needs no `fn main`; top-level statements are
+- **Implicit main** — a `.with` file needs no `fn main`; top-level statements are
   the program, beside helper `fn`s:
   ```
   use std.process

@@ -610,7 +610,7 @@ prelude and the link joins the bundle whenever the unit's undefined symbols
 reach the runtime — and `WITH_RT_IN_UNIT` is read nowhere (the lane
 fixtures run as every test does; the test-verdict key dropped it; the lane
 sweep tool is gone). Link.with's three object-world branches are gone with the
-per-compile lane flag; the `.w`-derived runtime objects are no longer
+per-compile lane flag; the `.with`-derived runtime objects are no longer
 produced, embedded, installed or compared anywhere (build.with, the emit-C and
 selfhost C links, the stale-root fixture), and a runtime root's identity is
 its `rt.o` against the embedded `rt` slot plus `cimport_stubs.o` and

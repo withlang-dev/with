@@ -190,7 +190,7 @@ writing them is not editing the spec to match the code.
 ## Repository Layout
 
 ```
-src/        compiler source (.w)        lib/std/   standard library (.w)
+src/        compiler source (.with)     lib/std/   standard library (.with)
 rt/         runtime + platform backends  runtime/   platform assembly (fiber_asm_*.s)
 test/       test suite                   build.with    build system
 out/bin/    compiler binaries            out/lib/   compiled runtime objects

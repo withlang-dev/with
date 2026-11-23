@@ -10,7 +10,7 @@ compares tracked working-tree sources (including staged new files) against
 `origin/main`. Set `WITH_UNIT_RETURN_BASE` to the target branch or an explicit
 pre-change commit when reviewing a different stack boundary. Fetch the target
 branch before recording review evidence. A missing base fails the check.
-Untracked `.w` files fail the build gate until staged, so new source cannot
+Untracked `.with` files fail the build gate until staged, so new source cannot
 silently escape the diff.
 
 The lexer compares function declarations, including methods and externs.

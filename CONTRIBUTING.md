@@ -15,7 +15,7 @@ The rules agents and maintainers work by are in [CLAUDE.md](CLAUDE.md)
   same way.
 - No system LLVM. The toolchain builds its own static LLVM/Clang/lld SDK
   (`tools/build-static-llvm.sh`, under `.deps/`); the release binary embeds it.
-- A `with` compiler. The repo is 100% With: every tool and script is a `.w`
+- A `with` compiler. The repo is 100% With: every tool and script is a `.with`
   file (`with run tools/x.with`).
 
 ### The seed
@@ -491,7 +491,7 @@ sudo dseditgroup -o edit -a "$USER" -t user _developer
 
 Include:
 
-1. The minimal `.w` file that reproduces it, preferably reduced with `with reduce`.
+1. The minimal `.with` file that reproduces it, preferably reduced with `with reduce`.
 2. Which `--dump-*` flag or targeted MIR tool narrows it to a phase; include `--dump-drop-state`, `--trace-ownership`, or `--dump-drop-plan` for ownership/drop bugs.
 3. The LLDB backtrace if it crashes.
 4. The `--debug-alloc` verdict for drop/lifetime/double-free/leak bugs.
