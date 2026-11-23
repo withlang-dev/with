@@ -5,8 +5,8 @@ absence), 1 (one cited line per field, not a fact repeated on every function
 that can reach it).
 
 **Implemented 2026-11-22** (the facts reader, the draft's contradiction and
-setter checks); the spec words were brought to Eric as a diff the same day
-and are not in the spec until he blesses them.
+setter checks). The spec words are in v7.83 (§16.2b.15, §31), with the
+amendment below.
 
 **Amended 2026-11-22 (Eric).** The stores that fit the role are stated, not
 only the one that contradicts it: a null store, the parameter that the

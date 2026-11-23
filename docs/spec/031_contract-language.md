@@ -130,7 +130,7 @@ domain_kind     = "process" | "thread" | "resource" | "static"
 library_clause  = [ "override" ] ( "text" "utf8" | "runs" [ "no" ] "threads" | "preserves" "domain" name )
 adoption        = "use" "convention" dotted_name
 field_role      = [ "override" ] "field" name "of" c_name "is" role
-role            = "allocator" | "reallocator" | "deallocator" | "context"
+role            = "allocator" | "reallocator" | "deallocator" | "context" | "callback"
 
 resource_clause = [ "override" ] ( production | destruction | status | dependency
                 | capability | domain_use | presentation )
@@ -422,7 +422,7 @@ G = grants, R = restricts, P = presents.
 | `runs threads` | the library runs threads of its own; its globals are shared with them. Accepted and reported as redundant once absence grants nothing (6.2); it stays the way to say so on the record. | R | §16.3 |
 | `runs no threads` | the library's code runs, and its state is read or written, only on a thread on which the program has called into the library (§31.8.5), which is one half of what makes its C globals safe to touch (§31.4). A claim, stated or the registry's, until the closed-world proof of §31.8.5 exists; then also provenance `proof`. | G | §16.3 |
 | `use convention P` | the contract adopts profile `P`'s rules. | the rules' | §16.2b.12 |
-| `field F of R is role` | a call through function-pointer field `F` of record `R` is an allocation (returns a fresh allocation the caller owns), a reallocation (consumes its argument and returns one), a deallocation (destroys its argument), or `F` is the hooks' own data (passing it to a hook is not an escape; a function that installs it retains it). A role is never drawn from a field's name. | G | §16.2b.15 |
+| `field F of R is role` | a call through function-pointer field `F` of record `R` is an allocation (returns a fresh allocation the caller owns), a reallocation (consumes its argument and returns one), a deallocation (destroys its argument), or `F` is the hooks' own data (passing it to a hook is not an escape; a function that installs it retains it), or, for `callback`, `F` holds only callbacks the program registered through a presented operation (a call through it lends its arguments and keeps none). A role is never drawn from a field's name. | G | §16.2b.15 |
 
 **Hooks.** Hooks supplied when a resource is produced belong to that
 resource. A function that replaces hooks shared by live resources stays raw
