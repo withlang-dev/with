@@ -19499,12 +19499,169 @@ fn ci_fp_record_value_followed(session: i64, value: i32) -> bool:
 // = data->set.fdebug`): whatever that field holds, this one now holds.
 fn ci_fp_stored_source(session: i64, written: i32, target: i32) -> str:
     if ci_cursor_is_null_like(session, written): return "null"
+    // The next variadic argument: judged with its case and its callers.
+    if ci_va_arg_of(session, written) >= 0: return "va"
     let value = ci_peel_transparent_and_cstyle(session, written)
     if with_ci_cursor_kind(session, value) == CXK_MEMBER_REF and with_ci_cursor_spelling(session, value) == with_ci_cursor_spelling(session, target):
         let record = ci_fp_member_record(session, target)
         if record.len() > 0 and ci_fp_member_record(session, value) == record: return "same"
     if with_ci_cursor_kind(session, value) == CXK_DECL_REF and with_ci_cursor_references_parameter(session, value): return "param:" ++ with_ci_cursor_spelling(session, value)
     "other"
+
+// ── A variadic setter's store into a callback field (§16.2b.15, D213) ──
+//
+// libcurl's `setopt_func(data, option, va_list param)` stores the next
+// variadic argument under a `case` of a switch on the selector:
+//     case CURLOPT_DEBUGFUNCTION: s->fdebug = va_arg(param, curl_debug_callback);
+// One line per such store:
+//   `fv\tRecord\tfield\tlist\tselector\tcases\ttype\tfirst\tloc`
+// `list` and `selector` are the names the body reads (the `va_list` and the
+// switch's subject), `cases` the labels the store sits under (`,`-joined),
+// `type` is `same` when the argument is read at the field's own type, and
+// `first` is `first` when no variadic argument was read earlier under those
+// labels. The package-wide judgment decides whether the store fits.
+type CiVaScan { out: str, selector: str, cases: str, reads: i32, open: bool, switch_body: i32, params: List[str], lists_read: str }
+
+// The `va_arg` an expression is, under parentheses and casts, or -1.
+fn ci_va_arg_of(session: i64, expr: i32) -> i32:
+    var c = expr
+    var depth = 0
+    while depth < 16 and c >= 0:
+        let kind = with_ci_cursor_kind(session, c)
+        if kind == 100 and ci_unexposed_expr_is_va_arg(session, c):
+            // The innermost node with this source text is the read itself.
+            let nc = with_ci_num_children(session, c)
+            if nc == 1 and ci_unexposed_expr_is_va_arg(session, with_ci_child(session, c, 0)):
+                c = with_ci_child(session, c, 0)
+                depth += 1
+                continue
+            return c
+        if (kind == CXK_IMPLICIT_CAST or kind == CXK_PAREN_EXPR or kind == CXK_CSTYLE_CAST or kind == 100) and with_ci_num_children(session, c) >= 1:
+            c = with_ci_child(session, c, with_ci_num_children(session, c) - 1)
+            depth += 1
+            continue
+        return -1
+    -1
+
+impl CiVaScan:
+    mut fn walk(session: i64, cursor: i32, depth: i32):
+        if cursor < 0 or depth > 200 or ci_unevaluated(session, cursor): return
+        let kind = with_ci_cursor_kind(session, cursor)
+        let nc = with_ci_num_children(session, cursor)
+        if kind == CXK_SWITCH_STMT and nc == 2:
+            let saved = CiVaScan { out: "", selector: self.selector.to_owned(), cases: self.cases.to_owned(), reads: self.reads, open: self.open, switch_body: self.switch_body, params: [], lists_read: "" }
+            self.walk(session, with_ci_child(session, cursor, 0), depth + 1)
+            let subject = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+            self.selector = if with_ci_cursor_kind(session, subject) == CXK_DECL_REF: with_ci_cursor_spelling(session, subject) else: "?"
+            self.cases = ""
+            self.reads = 0
+            self.open = false
+            self.switch_body = with_ci_child(session, cursor, 1)
+            self.walk(session, with_ci_child(session, cursor, 1), depth + 1)
+            self.selector = saved.selector
+            self.cases = saved.cases
+            self.reads = saved.reads
+            self.open = saved.open
+            self.switch_body = saved.switch_body
+            return
+        if (kind == CXK_CASE_STMT and nc == 2) or (kind == CXK_DEFAULT_STMT and nc == 1):
+            var label = "default"
+            if kind == CXK_CASE_STMT:
+                let named = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+                label = if with_ci_cursor_kind(session, named) == CXK_DECL_REF: with_ci_cursor_spelling(session, named) else: "?"
+            // A label reached by falling through keeps what the labels
+            // above it read.
+            if self.open: self.cases = self.cases ++ "," ++ label
+            else:
+                self.cases = label
+                self.reads = 0
+            self.open = true
+            self.walk(session, with_ci_child(session, cursor, nc - 1), depth + 1)
+            return
+        if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
+            let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+            let read = ci_va_arg_of(session, with_ci_child(session, cursor, 1))
+            if read >= 0 and with_ci_cursor_kind(session, lhs) == CXK_MEMBER_REF and with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, lhs)):
+                let list = ci_va_arg_list_operand(session, read)
+                let same = with_ci_type_spelling(session, with_ci_type_canonical(session, with_ci_cursor_type(session, read))) == with_ci_type_spelling(session, with_ci_type_canonical(session, with_ci_cursor_type(session, lhs)))
+                self.out = self.out ++ "fv\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ (if list >= 0: with_ci_cursor_spelling(session, list) else: "?") ++ "\t" ++ self.selector ++ "\t" ++ self.cases ++ "\t" ++ (if same: "same" else: "other") ++ "\t" ++ (if self.reads == 0: "first" else: "later") ++ "\t" ++ with_ci_cursor_location(session, cursor) ++ "\n"
+        if kind == 100 and ci_unexposed_expr_is_va_arg(session, cursor) and not (nc == 1 and ci_unexposed_expr_is_va_arg(session, with_ci_child(session, cursor, 0))):
+            self.reads += 1
+            let list = ci_va_arg_list_operand(session, cursor)
+            if list >= 0: self.lists_read = self.lists_read ++ with_ci_cursor_spelling(session, list) ++ ","
+        if kind == CXK_CALL_EXPR and nc >= 1: self.out = self.out ++ self.call_lines(session, cursor)
+        // What a `return` reads does not reach the statements after it, nor
+        // does what a branch that ends in one reads.
+        let before = self.lists_read.to_owned()
+        for i in 0..nc:
+            let child = with_ci_child(session, cursor, i)
+            let child_before = self.lists_read.to_owned()
+            self.walk(session, child, depth + 1)
+            if kind == CXK_IF_STMT and i >= 1 and ci_stmt_ends_in_return(session, child): self.lists_read = child_before
+            // A `break` or `return` among the switch body's own statements
+            // ends the labels above it.
+            if cursor == self.switch_body and (with_ci_cursor_kind(session, child) == CXK_BREAK_STMT or with_ci_cursor_kind(session, child) == CXK_RETURN_STMT): self.open = false
+        if kind == CXK_RETURN_STMT: self.lists_read = before
+
+    // How an argument reads: `p<k>` for the function's own parameter k,
+    // `c:<NAME>` for a named constant, `?` for anything else.
+    fn arg_shape(session: i64, arg: i32) -> str:
+        let a = ci_peel_transparent_and_cstyle(session, arg)
+        if with_ci_cursor_kind(session, a) != CXK_DECL_REF: return "?"
+        let name = with_ci_cursor_spelling(session, a)
+        var k = 0
+        for p in self.params:
+            if p == name and with_ci_cursor_references_parameter(session, a): return f"p{k}"
+            k += 1
+        if with_ci_eval_int_valid(session, a): "c:" ++ name else: "?"
+
+    // `vc`: a call that hands on a `va_list`: `vc\tcallee\tlist index\tlist
+    // source\targs\tclean|read\tloc`. The source is `p<k>` (the caller's own
+    // parameter), `own` (a list the caller started), or `?`; `read` when a
+    // variadic argument of that list was read on a path that reaches the
+    // call. `vk`: a call of a variadic function: `vk\tcallee\tfixed
+    // count\targs\tfirst variadic argument\tloc`, that argument being
+    // `null`, `member:Record.field`, `fn:<name>` or `?`.
+    fn call_lines(session: i64, call: i32) -> str:
+        let nc = with_ci_num_children(session, call)
+        let callee = with_ci_cursor_spelling(session, call)
+        if callee.len() == 0: return ""
+        var lines = ""
+        var args = ""
+        for i in 1..nc: args = args ++ (if i > 1: "," else: "") ++ self.arg_shape(session, with_ci_child(session, call, i))
+        for i in 1..nc:
+            let arg = ci_peel_transparent(session, with_ci_child(session, call, i))
+            if with_ci_cursor_kind(session, arg) != CXK_DECL_REF or not with_ci_type_spelling(session, with_ci_cursor_type(session, arg)).contains("va_list"): continue
+            let name = with_ci_cursor_spelling(session, arg)
+            let shape = self.arg_shape(session, arg)
+            let source = if shape.starts_with("p"): shape else if with_ci_cursor_references_parameter(session, arg): "?" else: "own"
+            lines = lines ++ "vc\t" ++ callee ++ "\t" ++ f"{i - 1}" ++ "\t" ++ source ++ "\t" ++ args ++ "\t" ++ (if self.lists_read.contains(name ++ ","): "read" else: "clean") ++ "\t" ++ with_ci_cursor_location(session, call) ++ "\n"
+        let fn_ty = with_ci_type_pointee(session, with_ci_type_canonical(session, with_ci_cursor_type(session, with_ci_child(session, call, 0))))
+        if fn_ty >= 0 and with_ci_type_is_variadic(session, fn_ty) != 0:
+            let fixed = with_ci_type_arg_count(session, fn_ty)
+            var first = "none"
+            if fixed >= 0 and fixed + 1 < nc:
+                let v = with_ci_child(session, call, fixed + 1)
+                let peeled = ci_peel_transparent_and_cstyle(session, v)
+                let named = ci_fp_named_function(session, v)
+                first = if ci_cursor_is_null_like(session, v): "null" else if with_ci_cursor_kind(session, peeled) == CXK_MEMBER_REF and ci_fp_member_record(session, peeled).len() > 0: "member:" ++ ci_fp_member_record(session, peeled) ++ "." ++ with_ci_cursor_spelling(session, peeled) else if named != "?": "fn:" ++ named else: "?"
+            lines = lines ++ "vk\t" ++ callee ++ "\t" ++ f"{fixed}" ++ "\t" ++ args ++ "\t" ++ first ++ "\t" ++ with_ci_cursor_location(session, call) ++ "\n"
+        lines
+
+// The `fv`, `vc` and `vk` lines of one function definition.
+fn ci_va_store_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+    let scan = CiVaScan { out: "", selector: "", cases: "", reads: 0, open: false, switch_body: -1, params: [], lists_read: "" }
+    for name in params: scan.params.push(name.to_owned())
+    scan.walk(session, cursor, 0)
+    scan.out
+
+// Whether a statement's last step is a `return`: the statement itself, or
+// the last statement of a block.
+fn ci_stmt_ends_in_return(session: i64, stmt: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, stmt)
+    if kind == CXK_RETURN_STMT: return true
+    let nc = with_ci_num_children(session, stmt)
+    kind == 202 and nc > 0 and ci_stmt_ends_in_return(session, with_ci_child(session, stmt, nc - 1))
 
 // ── What a body does through a record's pointer field (§16.2b.8 `reads`) ──
 //

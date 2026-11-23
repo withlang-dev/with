@@ -1843,6 +1843,15 @@ impl CiProject:
         // D198: its writes of function-pointer fields and the records it lets escape.
         let field_evidence = ci_fnptr_field_evidence(session, cursor)
         self.fnptr_evidence = self.fnptr_evidence ++ field_evidence
+        // D213: the variadic lines, with the names a body reads turned into
+        // its own parameter indexes (`p<k>`, or `?`).
+        for line in ci_va_store_evidence(session, cursor, names).split("\n"):
+            if line.len() == 0: continue
+            var said = line.to_owned()
+            if line.starts_with("fv\t"):
+                let f = line.split("\t")
+                if f.len() == 9: said = "fv\t" ++ f[1] ++ "\t" ++ f[2] ++ "\t" ++ ci_param_shape(names, f[3]) ++ "\t" ++ ci_param_shape(names, f[4]) ++ "\t" ++ f[5] ++ "\t" ++ f[6] ++ "\t" ++ f[7] ++ "\t" ++ f[8]
+            self.va_evidence.push(self.symbols[symbol_id].name ++ "\t" ++ said)
         for line in ci_field_pointee_evidence(session, cursor, names).split("\n"):
             if line.len() > 0: self.pointee_evidence.push(self.symbols[symbol_id].name ++ "\t" ++ line)
         // D213: `fieldstore:<Record.field>` for each function-pointer field
@@ -1856,7 +1865,7 @@ impl CiProject:
             if f.len() != 5 or f[0] != "fs" or f[3] == "null" or f[3] == "same": continue
             let field = f[1] ++ "." ++ f[2]
             if not setter_evidence.contains("fieldstore:" ++ field ++ "\n"): setter_evidence = setter_evidence ++ "fieldstore:" ++ field ++ "\n"
-            var source = "fieldstoreother:" ++ field ++ "\n"
+            var source = (if f[3] == "va": "fieldstoreva:" else: "fieldstoreother:") ++ field ++ "\n"
             if f[3].starts_with("param:"):
                 var pj = 0
                 for name in names:
@@ -2195,7 +2204,14 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
                 // which store. A function that stores a parameter is a
                 // setter, and the facts describe a setter.
                 var unfit = if symbol.own_evidence.contains("fieldstoreother:" ++ field ++ "\n"): "a value that is not one of its parameters" else: ""
-                if unfit.len() == 0 and not symbol.registry_more.contains("callback:"):
+                // A store of the next variadic argument is judged with its
+                // case, its callers and the package's own calls.
+                if unfit.len() == 0 and symbol.own_evidence.contains("fieldstoreva:" ++ field ++ "\n"):
+                    let judged = ci_va_store_verdict(project, symbol.name, field)
+                    if judged.starts_with("w:"):
+                        return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered; DISAGREES: " ++ judged.slice(2, judged.len()))
+                    if judged.starts_with("u:"): unfit = "the next variadic argument, and " ++ judged.slice(2, judged.len())
+                if unfit.len() == 0 and symbol.own_evidence.contains("fieldstoreparam:" ++ field ++ ":") and not symbol.registry_more.contains("callback:"):
                     return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered through a presented operation; DISAGREES: `" ++ symbol.name ++ "` stores into it and the facts describe it with no `callback param N`")
                 for line in symbol.own_evidence.split("\n"):
                     if unfit.len() > 0: break
@@ -2204,7 +2220,7 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
                     if not ci_facts_text_names_callback(symbol.registry_more, pj): unfit = "param " ++ pj ++ ", which its callback clause does not name"
                 if unfit.len() > 0:
                     project.field_roles.remove(field)
-                    project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ ": undecided: `" ++ symbol.name ++ "` stores " ++ unfit ++ (if unfit.starts_with("param "): "," else: "") ++ " into it\n"
+                    project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ ": undecided: `" ++ symbol.name ++ "` stores " ++ (if unfit.starts_with("the next variadic argument, and "): "the next variadic argument into it: " ++ unfit.slice(32, unfit.len()) else: unfit ++ (if unfit.starts_with("param "): "," else: "") ++ " into it") ++ "\n"
 
     // §16.2b.8: `buffer field P remaining field N reads` takes effect only
     // where it was checked against the package's source and the check
@@ -2289,6 +2305,87 @@ fn ci_pointee_verdict(project: &CiProject, index: &HashMap[str, str], function: 
         else if not (parts[2] == "const" and ci_c_standard_reader(callee)):
             if undecided.len() == 0: undecided = "u:in `" ++ function ++ "` it is passed to `" ++ callee ++ "`, which the package does not define (" ++ f[4] ++ ")"
     undecided
+
+// `p<k>` for the parameter named `name`, or `?`.
+fn ci_param_shape(names: &List[str], name: &str) -> str:
+    var k = 0
+    for n in names:
+        if n == ci_escape_reserved(name): return f"p{k}"
+        k += 1
+    "?"
+
+// D213 (§16.2b.15): whether the stores of the next variadic argument that
+// `function` makes into `field` fit the role `callback`: "" when they do,
+// `u:<why>` when something is not proven, `w:<what>` when the package
+// passes one of its own functions. Each store is the first argument read
+// under `case K` of a switch on the selector, at the field's type; the
+// list and the selector reach the storing function unchanged from every
+// function that can reach it; each such entry is a variadic function the
+// package declares in a header, whose contract states case K as a callback;
+// and every call of an entry from inside the package with selector K
+// passes null or the same field of another record.
+fn ci_va_store_verdict(project: &CiProject, function: &str, field: &str) -> str:
+    let dot = field.find(".")
+    var verdict = ""
+    for line in project.va_evidence:
+        let f = line.split("\t")
+        if f.len() != 10 or f[0] != function or f[1] != "fv" or f[2] ++ "." ++ f[3] != field: continue
+        if f[7] != "same": return "u:`" ++ function ++ "` reads the variadic argument at another type than the field's (" ++ f[9] ++ ")"
+        if f[8] != "first": return "u:in `" ++ function ++ "` it is not the first variadic argument read under its case (" ++ f[9] ++ ")"
+        if not f[4].starts_with("p") or not f[5].starts_with("p") or f[6].len() == 0 or f[6].contains("?") or f[6].contains("default"): return "u:in `" ++ function ++ "` the store is not under a `case K` of a switch on a parameter (" ++ f[9] ++ ")"
+        let reached = ci_va_entries(project, function, f[4].slice(1, f[4].len()), f[5].slice(1, f[5].len()), 0)
+        if reached.starts_with("u:"): return reached
+        let entries = []
+        for entry in reached.split("\n"):
+            if entry.len() > 0 and not entries.contains(entry): entries.push(entry.to_owned())
+        if entries.len() == 0: return "u:nothing in the package passes `" ++ function ++ "` an argument list"
+        for case_name in f[6].split(","):
+            for entry in entries:
+                let bar = entry.find("|")
+                let name = entry.slice(0, bar)
+                let selector = entry.slice(bar + 1, entry.len())
+                let at = project.find_symbol(CiProjectSymbolKind.CIPS_FN, name)
+                if at < 0 or project.symbols[at].variadic == 0 or project.symbols[at].header_declared == 0: return "u:`" ++ name ++ "`, which starts the argument list, is not a variadic function a header declares"
+                var stated = false
+                for fact in project.symbols[at].registry_more.split("\n"):
+                    if facts_kind(fact).starts_with("case:" ++ case_name ++ ":callback "): stated = true
+                if not stated or not project.symbols[at].registry_more.contains("variadic:"): return "u:the facts for `" ++ name ++ "` state no `case " ++ case_name ++ ": callback …`"
+                for call in project.va_evidence:
+                    let c = call.split("\t")
+                    if c.len() != 7 or c[1] != "vk" or c[2] != name: continue
+                    let args = c[4].split(",")
+                    let si: isize = parse(selector)
+                    let passed = if si >= 0 and si < args.len(): args[si] else: "?"
+                    if passed.starts_with("c:") and passed != "c:" ++ case_name: continue
+                    if not passed.starts_with("c:"):
+                        if verdict.len() == 0: verdict = "u:`" ++ c[0] ++ "` calls `" ++ name ++ "` with a selector that is not a constant (" ++ c[6] ++ ")"
+                        continue
+                    if c[5].starts_with("fn:"): return "w:`" ++ c[0] ++ "` passes the package's own function `" ++ c[5].slice(3, c[5].len()) ++ "` to `" ++ name ++ "` for " ++ case_name ++ " (" ++ c[6] ++ ")"
+                    if c[5] != "null" and c[5] != "member:" ++ field and verdict.len() == 0: verdict = "u:`" ++ c[0] ++ "` passes `" ++ name ++ "` a value for " ++ case_name ++ " that is neither null nor the same field of another record (" ++ c[6] ++ ")"
+    verdict
+
+// The functions that start the argument list `function` reads at parameter
+// `list` with its selector at parameter `selector`, one `name|selector
+// index` per line; a result that starts `u:` is the reason the walk up the
+// callers stopped.
+fn ci_va_entries(project: &CiProject, function: &str, list: &str, selector: &str, depth: i32) -> str:
+    if depth > 16: return "u:the argument list of `" ++ function ++ "` is passed through too many functions to follow"
+    var found = ""
+    for line in project.va_evidence:
+        let f = line.split("\t")
+        if f.len() != 8 or f[1] != "vc" or f[2] != function or f[3] != list: continue
+        let args = f[5].split(",")
+        let si: isize = parse(selector)
+        let passed = if si >= 0 and si < args.len(): args[si] else: "?"
+        if f[6] != "clean": return "u:`" ++ f[0] ++ "` reads from the argument list before passing it to `" ++ function ++ "` (" ++ f[7] ++ ")"
+        if not passed.starts_with("p"): return "u:`" ++ f[0] ++ "` passes `" ++ function ++ "` a selector that is not its own parameter (" ++ f[7] ++ ")"
+        if f[4] == "own": found = found ++ f[0] ++ "|" ++ passed.slice(1, passed.len()) ++ "\n"
+        else if f[4].starts_with("p"):
+            let above = ci_va_entries(project, f[0], f[4].slice(1, f[4].len()), passed.slice(1, passed.len()), depth + 1)
+            if above.starts_with("u:"): return above
+            found = found ++ above
+        else: return "u:`" ++ f[0] ++ "` passes `" ++ function ++ "` an argument list the walk does not follow (" ++ f[7] ++ ")"
+    found
 
 // Whether a function's presentation facts carry `callback param <pj>`.
 fn ci_facts_text_names_callback(presentation: &str, pj: &str) -> bool:
