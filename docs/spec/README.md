@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.86
+# The With Programming Language — Specification v7.87
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.87:** (Eric, 2026-11-22/23.) §16.2b.15, §31: a facts file states how its package is configured when built from source. `build define NAME[=value]` reaches the library's build only and must not change what the installed headers declare beyond `const` (checked by preprocessing each header with and without it); `define NAME[=value]` reaches the build and the program's import. Each is set explicitly and is part of a cached build's key; a library not built with a setting does not get the facts that cite it. zlib is built with `ZLIB_CONST`. Implemented.
+
 **Changelog v7.86:** D231 amended (Eric, 2026-11-23). §16.2b.8: a callee outside the package does not write through the pointer when a facts file states `reads` for that parameter; the platform C library's facts file states it for the functions ISO C and POSIX specify as reading through a pointer. This replaces the sentence that named the C standard library, and the list of names the compiler carried for it. Implemented.
 
 **Changelog v7.85:** D231 (Eric, 2026-11-22; #3173). §16.2b.8, §31: `buffer field P remaining field N reads`. C only reads through `P`, so the slice is `[]u8` though the header does not declare `P` const. From a facts file it takes effect only where it was checked against the package's source and passed: the pointer is followed through copies, casts, arithmetic and the package's own functions; a C standard library function taking it as a pointer to const is trusted; anything else leaves it undecided and not applied, and the report says what stopped the check. Implemented.

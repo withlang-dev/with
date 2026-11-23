@@ -44,6 +44,9 @@ that:
 - **One line per package says which it was:** built from source, with
   its contract drawn from that build; or a prebuilt binary with no
   proofs, and why. Both point at `with contract report`.
+- **The registry's settings are applied.** A facts file's `build define`
+  and `define` lines are passed to the build, and a `define` also to the
+  program's import of the headers (§16.2b.15).
 - **`--binary` opts out** and takes Conan Center's binary where one
   links.
 
