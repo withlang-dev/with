@@ -1860,7 +1860,7 @@ fn conan_configure_source(name: &str, version: &str, project_root: &str, dep_dir
 // C unit, with the union of the include directories and defines the build
 // gives them (its generated headers among them). CMake's Ninja generator
 // writes one key per line and a "command" string; that is what is read.
-type ConanCorpus { units: List[str], include_paths: List[str], defines: List[str] }
+type ConanCorpus { units: List[str], outputs: List[str], include_paths: List[str], defines: List[str] }
 
 fn conan_json_unescape(text: &str) -> str:
     let out = StringBuilder.new()
@@ -1934,11 +1934,13 @@ fn conan_push_unique(items: &List[str], item: &str) -> bool: item.len() > 0 and 
 
 fn conan_compile_commands_corpus(path: &str) -> ConanCorpus:
     let units: List[str] = []
+    let outputs = []
     let include_paths: List[str] = []
     let defines: List[str] = []
     var directory = ""
     var file = ""
     var command = ""
+    var output = ""
     for line in runtime_read_file(path).split("\n"):
         let d = conan_json_line_string(line, "directory")
         if d.len() > 0: directory = d
@@ -1946,10 +1948,14 @@ fn conan_compile_commands_corpus(path: &str) -> ConanCorpus:
         if f.len() > 0: file = f
         let c = conan_json_line_string(line, "command")
         if c.len() > 0: command = c
+        let o = conan_json_line_string(line, "output")
+        if o.len() > 0: output = o
         if line.trim().starts_with("}"):
             if file.ends_with(".c") and command.len() > 0:
                 let unit = conan_corpus_absolute(directory, file)
-                if conan_push_unique(units, unit): units.push(unit)
+                if conan_push_unique(units, unit):
+                    units.push(unit)
+                    outputs.push(output.to_owned())
                 let words = conan_shell_words(command)
                 var wi = 0
                 while wi < words.len():
@@ -1974,7 +1980,79 @@ fn conan_compile_commands_corpus(path: &str) -> ConanCorpus:
             directory = ""
             file = ""
             command = ""
-    ConanCorpus { units, include_paths, defines }
+            output = ""
+    ConanCorpus { units, outputs, include_paths, defines }
+
+// The units of a corpus that feed the libraries the package installs, read
+// from the build's own graph: the `build <artifact>: <rule> <objects…>`
+// statement CMake's Ninja generator writes for each library, followed
+// through the static libraries it links. A package's build also compiles
+// its tools and its tests (libcurl: the `curl` command and five test
+// programs, six of whose units the build generates), and those are not the
+// library the facade describes: an unread unit among them voided proofs
+// about library functions. When the graph does not answer, `units` is
+// empty and `note` says why every unit is read instead.
+type ConanLibraryUnits { units: List[str], note: str }
+
+fn conan_ninja_statement_inputs(statement: &str) -> List[str]:
+    let inputs = []
+    let colon = conan_find_text(statement, ": ")
+    if colon < 0: return inputs
+    var seen_rule = false
+    for word in statement.slice(colon + 2, statement.len()).split(" "):
+        if word == "|" or word == "||" or word == "|@": break
+        if word.len() == 0: continue
+        if not seen_rule:
+            seen_rule = true
+            continue
+        inputs.push(word.to_owned())
+    inputs
+
+fn conan_library_units(build_dir: &str, libs: &List[str], corpus: &ConanCorpus) -> ConanLibraryUnits:
+    let graph = runtime_read_file(build_dir ++ "/build.ninja")
+    if graph.len() == 0 or libs.len() == 0: return ConanLibraryUnits { units: [], note: "the build has no build.ninja naming the units of its libraries, so every unit it compiles was read" }
+    // Each library's statement, by the artifact it builds.
+    let statements: HashMap[str, str] = HashMap.new()
+    for line in graph.split("\n"):
+        if not line.starts_with("build "): continue
+        let colon = conan_find_text(line, ": ")
+        if colon < 0: continue
+        for artifact in line.slice(6, colon).split(" "):
+            if artifact.len() > 0: statements.insert(artifact.to_owned(), line.to_owned())
+    let objects: HashMap[str, bool] = HashMap.new()
+    let pending = []
+    for lib in libs:
+        var found = false
+        for (artifact, _) in statements:
+            let slash = artifact.rfind("/")
+            let base = artifact.slice(slash + 1, artifact.len())
+            if base.starts_with("lib" ++ lib ++ ".") or base == lib ++ ".lib":
+                pending.push(artifact.to_owned())
+                found = true
+        if not found: return ConanLibraryUnits { units: [], note: "the build's graph names no artifact for the library `" ++ lib ++ "`, so every unit it compiles was read" }
+    let followed: HashMap[str, bool] = HashMap.new()
+    while pending.len() > 0:
+        let artifact = pending.pop() ?? ""
+        if followed.contains(artifact): continue
+        followed.insert(artifact.to_owned(), true)
+        for input in conan_ninja_statement_inputs(statements.get(artifact) ?? ""):
+            if statements.contains(input) and (input.ends_with(".a") or input.ends_with(".lib")): pending.push(input.to_owned())
+            else: objects.insert(input, true)
+    let units = []
+    var k = 0
+    for unit in corpus.units:
+        if corpus.outputs[k].len() == 0: return ConanLibraryUnits { units: [], note: "the build's compile commands name no object for a unit, so every unit it compiles was read" }
+        // The graph names an object relative to the build directory; the
+        // compile commands may name it by its absolute path.
+        var object = corpus.outputs[k].to_owned()
+        var fed = objects.contains(object)
+        while not fed and object.contains("/"):
+            object = object.slice(object.find("/") + 1, object.len()).to_owned()
+            fed = objects.contains(object)
+        if fed: units.push(unit.to_owned())
+        k += 1
+    if units.len() == 0: return ConanLibraryUnits { units: [], note: "no unit the build compiles feeds its libraries by the build's graph, so every unit it compiles was read" }
+    ConanLibraryUnits { units, note: "" }
 
 // The registry's facts file for a package (D136), at one commit of the
 // toolchain's repository: the commit a lock restore pinned, else the tip of
@@ -2135,7 +2213,11 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
     let report_path = dep_dir ++ "/contract-report.txt"
     migrate_parse_c_as_c_import()
-    let summary = migrate_c_facade_for_package(corpus.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/contract.with", report_path)
+    var library = conan_library_units(build_dir, libs, corpus)
+    if library.note.len() > 0: library.units = corpus.units
+    let summary = migrate_c_facade_for_package(library.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/contract.with", report_path)
+    if library.note.len() > 0 and runtime_file_exists(report_path) != 0:
+        let _noted = runtime_write_file(report_path, runtime_read_file(report_path) ++ "  " ++ library.note ++ "\n")
     if summary.len() == 0: return
     if summary.starts_with("contradicted: "):
         g_conan_facts_contradicted = g_conan_facts_contradicted ++ "\n  " ++ name ++ ": " ++ summary.slice(14, summary.len())

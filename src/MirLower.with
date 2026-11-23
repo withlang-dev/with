@@ -17769,6 +17769,12 @@ impl MirBuilder:
                     sema_ty = self.pipeline_iter_source_type
                 else if node == self.copy_out_arm_node:
                     sema_ty = self.contextual_copy_adjustment(self.copy_out_adjustment_node).exact_source_type
+                // A field arm of a join Sema made a view (`f(if c: t.a
+                // else: t.b)` into a `&T` parameter) is lowered at the view
+                // type Sema recorded for it; the audit read the field's own
+                // type and reported every such arm.
+                else if self.sema.join_field_view_arms.contains(node):
+                    sema_ty = self.concrete_type(self.sema.join_field_view_arms.get(node).unwrap())
                 else if self.sema.checked_narrowings.contains(node):
                     sema_ty = self.concrete_type(self.sema.checked_narrowings.get(node).unwrap())
                 else if self.sema.vector_splats.contains(node):
