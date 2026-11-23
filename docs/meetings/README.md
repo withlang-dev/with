@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D233 — Making a slot is a write of the collection it comes from: `slot`, `iter_place` and `get_disjoint` need a writable place](2026-11-23-D233-making-a-slot-is-a-write-of-its-collection.md)
 - [D232 — A facts file states how its package is built: `build define` (the library's build only, checked not to change the headers) and `define` (the build and the import); a library not built with a setting loses the facts that cite it (ruled)](2026-11-23-D232-a-facts-file-states-how-its-package-is-built.md)
 - [D231 — `buffer field P remaining field N reads`: C only reads through the pointer; from a facts file the claim takes effect only where it was checked against the package source and passed (ruled)](2026-11-22-D231-reads-on-a-buffer-field-takes-effect-only-where-it-was-checked.md)
 - [D230 — In `name @ pattern` the name binds the subject and the inner names observe it; a move of the name while an inner name is in scope is refused (ruled)](2026-11-22-D230-in-name-at-pattern-the-name-binds-the-subject-and-the-inner-names-observe-it.md)

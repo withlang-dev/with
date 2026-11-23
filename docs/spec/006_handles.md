@@ -25,13 +25,15 @@ type SlotMap[T]
 |--------|-----------|-------|
 | `insert` | `(mut self: Self, T) -> Handle[T]` | |
 | `get` | `(self: &Self, Handle[T]) -> Option[&T]` | Ephemeral return |
-| `slot` | Scoped via `with sm.slot(h) as mut s:` | Place-based mutation |
+| `slot` | `(mut self: Self, Handle[T])`, scoped via `with sm.slot(h) as mut s:` | Place-based mutation |
 | `remove` | `(mut self: Self, Handle[T]) -> Option[T]` | |
 | `replace` | `(mut self: Self, Handle[T], T) -> Option[T]` | |
 | `for_each` | `(self: &Self, fn(Handle[T], &T))` | |
-| `get_disjoint` | `with sm.get_disjoint(h1, h2) as mut (a, b):` | Panics if equal |
+| `get_disjoint` | `(mut self: Self, Handle[T], Handle[T])`, scoped via `with sm.get_disjoint(h1, h2) as mut (a, b):` | Panics if equal |
 | `contains` | `(&Self, Handle[T]) -> bool` | |
 | `len` | `(&Self) -> Int` | signed (D11) |
+
+Making a slot is a write of the collection it comes from: `slot`, `iter_place` and `get_disjoint` need a writable place, whether or not the slot is then written.
 
 ### 6.3 Performance Characteristics
 

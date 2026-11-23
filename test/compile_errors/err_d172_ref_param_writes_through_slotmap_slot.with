@@ -1,0 +1,15 @@
+//! expect-error: `sm` is a read-only view; to let `poke` mutate it, declare the parameter `mut sm: SlotMap[i32]`
+// D172 (1), §6: a `&T` parameter is read-only for every write through it. A
+// SlotMap's slot is the handle an element is written through, so making one
+// is the write, as a List's is.
+use std.collections.SlotMap
+
+fn poke(sm: &SlotMap[i32], h: Handle[i32]):
+    with sm.slot(h) as mut s:
+        s.set(9)
+
+fn main:
+    var sm: SlotMap[i32] = SlotMap.new()
+    let h = sm.insert(1)
+    poke(sm, h)
+    print(sm.get(h).unwrap())
