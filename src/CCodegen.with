@@ -11525,7 +11525,11 @@ impl CCodegen:
         if self.glue_done.contains(name):
             return name
         self.mark_glue_done(name)
-        let sig = "static void " ++ name ++ "(" ++ self.glue_param_c_type(resolved) ++ "* p)"
+        // A hold reads the record it is taken on (the holder count lives in
+        // the buffer, not the record), so copy glue takes a pointer to const
+        // and a copy out of a view needs no cast. Drop glue writes it.
+        let pointee = if kind == "copy": "const " else: ""
+        let sig = "static void " ++ name ++ "(" ++ pointee ++ self.glue_param_c_type(resolved) ++ "* p)"
         self.glue_protos.push(sig ++ ";\n")
         let lv = if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_ARRAY: "p" else: "(*p)"
         let text = if kind == "drop": self.drop_glue_body(lv, resolved) else: self.copy_glue_body(lv, resolved)
@@ -11746,11 +11750,7 @@ impl CCodegen:
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
         if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STR:
             return "with_str_retain(&(" ++ lv ++ "));"
-        // A hold reads the record it is taken on: the holder count lives in
-        // the buffer, not the record. A copy out of a view (`const T*`)
-        // therefore passes the record as the glue's `T*` by a cast.
-        let glue = self.ensure_glue("copy", resolved)
-        glue ++ "((" ++ self.glue_param_c_type(resolved) ++ "*)" ++ self.glue_arg(lv, resolved) ++ ");"
+        self.ensure_glue("copy", resolved) ++ "(" ++ self.glue_arg(lv, resolved) ++ ");"
 
     mut fn copy_glue_body(lv: &str, resolved: i32) -> str:
         let tk = self.sema.get_type_kind(resolved as TypeId)
