@@ -64,6 +64,30 @@ fn main:
     if not (setter_ok and setter_presented):
         print(stated)
         print(setter_refusal)
+    // The stores that fit the role are null, a whole-record copy, and the
+    // parameter the storing function's own callback clause names. A value
+    // the package loaded from somewhere else is none of them: nothing says
+    // the program registered it, so the field is undecided, the role is not
+    // applied, and the operation that calls through it stays raw.
+    let loaded = draft("out/tmp/conan_facade_callback_field_test/loaded", role, "static trace_fn saved;\nvoid handle_restore(handle *h) { h->trace = saved; }\n")
+    let loaded_ok = loaded.contains("c contract traced:") and loaded.contains("field trace of handle: undecided: `handle_restore` stores a value that is not one of its parameters into it") and loaded.contains("handle_run: raw: retains param 0")
+    // So is a parameter the clause does not name.
+    let two = "    fn handle_set_both\n        callback param 1    // traced.c: the first function is the trace\n        retains param 1 by param 0    // traced.c: stored in the handle\n        callback_thread registering    // traced.c: called from handle_run\n"
+    let misnamed = draft("out/tmp/conan_facade_callback_field_test/misnamed", role ++ two, "void handle_set_both(handle *h, trace_fn a, trace_fn b) { (void)a; h->trace = b; }\n")
+    let misnamed_ok = misnamed.contains("field trace of handle: undecided: `handle_set_both` stores param 2, which its callback clause does not name, into it") and misnamed.contains("handle_run: raw: retains param 0")
+    if not (loaded_ok and misnamed_ok):
+        print(loaded)
+        print(misnamed)
+    // libcurl's shape: the public setter is variadic and hands its
+    // arguments to an internal function, which stores the next one. The
+    // stored value is no parameter of the storing function, so the field is
+    // undecided until a rule says which variadic argument it is.
+    let variadic = draft("out/tmp/conan_facade_callback_field_test/variadic", role, "#include <stdarg.h>\nstatic void vset(handle *h, int opt, va_list ap) { if (opt == 1) h->trace = va_arg(ap, trace_fn); }\nvoid handle_setopt(handle *h, int opt, ...) { va_list ap; va_start(ap, opt); vset(h, opt, ap); va_end(ap); }\n")
+    let variadic_ok = variadic.contains("field trace of handle: undecided: `vset` stores a value that is not one of its parameters into it") and variadic.contains("handle_run: raw: retains param 0")
+    if not variadic_ok: print(variadic)
+    assert(variadic_ok)
+    assert(loaded_ok)
+    assert(misnamed_ok)
     assert(setter_ok)
     assert(setter_presented)
     assert(bare_ok)

@@ -301,6 +301,11 @@ assert(mkdir_p("out/battery") == 0)
 if not file_exists(seed()):
     eprint("battery: no pinned seed at " ++ seed() ++ "; run `with build :seed` first")
     exit_code(1)
+// A worktree whose seed.lock moved under an older src/main ran a whole
+// survey before its seed-driver lane said so.
+if not (read_file("seed.lock") ?? "").contains("=" ++ sha256_of_file(seed()) ++ "\n"):
+    eprint("battery: " ++ seed() ++ " is not the seed that seed.lock pins; run `with build :seed` first")
+    exit_code(1)
 if not tree_is_clean():
     eprint("battery: the worktree is not clean (out/battery/git-status.txt); commit first — a battery blesses committed sources")
     exit_code(1)

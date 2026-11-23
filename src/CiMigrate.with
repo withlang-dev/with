@@ -1844,11 +1844,23 @@ impl CiProject:
         let field_evidence = ci_fnptr_field_evidence(session, cursor)
         self.fnptr_evidence = self.fnptr_evidence ++ field_evidence
         // D213: `fieldstore:<Record.field>` for each function-pointer field
-        // the body stores a value it was handed into: it is a setter of it.
+        // the body stores a value that is not null into: it is a setter of
+        // it. With it, where the value came from: `fieldstoreparam:<Record.
+        // field>:<j>` for the function's own parameter j, and
+        // `fieldstoreother:<Record.field>` for anything else.
         var setter_evidence = ""
         for line in field_evidence.split("\n"):
             let f = line.split("\t")
-            if f.len() == 5 and f[0] == "fs" and f[3] == "value" and not setter_evidence.contains("fieldstore:" ++ f[1] ++ "." ++ f[2] ++ "\n"): setter_evidence = setter_evidence ++ "fieldstore:" ++ f[1] ++ "." ++ f[2] ++ "\n"
+            if f.len() != 5 or f[0] != "fs" or f[3] == "null": continue
+            let field = f[1] ++ "." ++ f[2]
+            if not setter_evidence.contains("fieldstore:" ++ field ++ "\n"): setter_evidence = setter_evidence ++ "fieldstore:" ++ field ++ "\n"
+            var source = "fieldstoreother:" ++ field ++ "\n"
+            if f[3].starts_with("param:"):
+                var pj = 0
+                for name in names:
+                    if name == ci_escape_reserved(f[3].slice(6, f[3].len())): source = f"fieldstoreparam:{field}:{pj}\n"
+                    pj += 1
+            if not setter_evidence.contains(source): setter_evidence = setter_evidence ++ source
         self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names) ++ ci_value_record_evidence(session, cursor, names) ++ setter_evidence)
         // D159: what the body proves about the pointers it is handed.
         self.symbols[symbol_id].contract_evidence = ci_ir_owned_text(ci_body_contract_evidence(session, cursor, names))
@@ -2174,10 +2186,31 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
             let dot = field.find(".")
             for symbol in project.symbols:
                 if symbol.kind != CiProjectSymbolKind.CIPS_FN or not symbol.own_evidence.contains("fieldstore:" ++ field ++ "\n"): continue
-                if not symbol.registry_more.contains("callback:"):
+                // The stores that fit the role are the parameter the
+                // function's own callback clause names (null and a whole-
+                // record copy are not setters). Any other leaves the field
+                // undecided: the role is not applied, and the report says
+                // which store. A function that stores a parameter is a
+                // setter, and the facts describe a setter.
+                var unfit = if symbol.own_evidence.contains("fieldstoreother:" ++ field ++ "\n"): "a value that is not one of its parameters" else: ""
+                if unfit.len() == 0 and not symbol.registry_more.contains("callback:"):
                     return Err("contradicted: registry: `field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is callback` says the field holds only callbacks the program registered through a presented operation; DISAGREES: `" ++ symbol.name ++ "` stores into it and the facts describe it with no `callback param N`")
+                for line in symbol.own_evidence.split("\n"):
+                    if unfit.len() > 0: break
+                    if not line.starts_with("fieldstoreparam:" ++ field ++ ":"): continue
+                    let pj = line.slice(line.rfind(":") + 1, line.len())
+                    if not ci_facts_text_names_callback(symbol.registry_more, pj): unfit = "param " ++ pj ++ ", which its callback clause does not name"
+                if unfit.len() > 0:
+                    project.field_roles.remove(field)
+                    project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ ": undecided: `" ++ symbol.name ++ "` stores " ++ unfit ++ (if unfit.starts_with("param "): "," else: "") ++ " into it\n"
     project.resolve_ownership()
     Ok(project)
+
+// Whether a function's presentation facts carry `callback param <pj>`.
+fn ci_facts_text_names_callback(presentation: &str, pj: &str) -> bool:
+    for line in presentation.split("\n"):
+        if line.starts_with("callback:" ++ pj ++ "|"): return true
+    false
 
 // The installed header through which `rel`, a header that does not compile
 // on its own, is imported: one that names it in an `#include`, compiles

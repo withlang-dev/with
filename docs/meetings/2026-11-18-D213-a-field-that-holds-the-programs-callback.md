@@ -8,6 +8,17 @@ that can reach it).
 setter checks); the spec words were brought to Eric as a diff the same day
 and are not in the spec until he blesses them.
 
+**Amended 2026-11-22 (Eric).** The stores that fit the role are stated, not
+only the one that contradicts it: a null store, the parameter that the
+storing function's own callback clause names, and a whole-record copy. Any
+other store (a value the package loaded, computed or was returned, or a
+parameter the clause does not name) leaves the field undecided: the role is
+not applied and the report names the store. Implemented the same day. Open
+beside it: a variadic setter that hands its arguments to an internal
+function, which stores the next one (libcurl's `curl_easy_setopt`), stores
+no parameter of the storing function, so its field is undecided until a rule
+says which variadic argument the store reads.
+
 **Date:** 2026-11-18. **Status:** ruled by Eric. The spec words are derived
 and come to him as a diff with the implementation.
 
