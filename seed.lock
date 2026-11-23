@@ -8,8 +8,8 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261122-44999614621-1-9096b55a07f7
-with-darwin-aarch64=a140f75de33574cf8f5e46ab5190d0d7f2bfb5ad5f4738eff9d98eb49a26435c
+version=nightly-20261122-45071765995-1-8a5befa0e423
+with-darwin-aarch64=220709e701dac0d551aa03f8517a23d925ea55a2aba346e1580f392a7afa7c5c
 # The four gating platforms are cut from main 26eb17e89 (2026-11-18) by the
 # release workflow (run 44393110516), each on its own runner to a
 # stage2 == stage3 fixpoint with the battery and the release UAT green. The
@@ -124,10 +124,10 @@ with-darwin-aarch64=a140f75de33574cf8f5e46ab5190d0d7f2bfb5ad5f4738eff9d98eb49a26
 # The linux and windows legs of nightly-20261023-local-1 wait for their
 # hosts (eric-5090 and win10 were unreachable on 2026-10-23); these four stay
 # on local-3 until the legs are cut (issue below).
-with-linux-x86_64=7d1e7c669eafcff479de88cfd605aa4d0be00e0343bc8e8bb269f5d2c16a75d2
+with-linux-x86_64=b35792d0196d11b69f487c9c20c95aa2d1c1c64c333957545bd240961f838245
 # linux-aarch64: the D155 builtins make c_char the target's u8 there; the lane
 # pool in the 7.7 GiB container needs WITH_BUILD_JOBS=3 (#2603).
-with-linux-aarch64=0263d88c518bcca351f9f2b7f29a4d6584d96fc502841131c0f127919b876ef9
+with-linux-aarch64=fe3c7b29ed0c077dbebf7071112423809407aef8152c941fe22666d8cf376b4a
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
@@ -139,6 +139,6 @@ with-linux-aarch64=0263d88c518bcca351f9f2b7f29a4d6584d96fc502841131c0f127919b876
 # against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies (before it: run 39288117180
 # from main 35afb3a7a).
-with-windows-x86_64.exe=d3524d21ee8a4d39a98ecfaa863261d47c3b493e4ce2af163ed0ad53fe8a433d
+with-windows-x86_64.exe=3f4f4c783bab8a7cdeb5c0083a075a114c943a2accea7a1988903687db551c41
 with-windows-aarch64.exe.version=seed-windows-aarch64
 with-windows-aarch64.exe=d748d4efb9ed01e113d90fd582fc05d153335cfb86f4bd3255e428063957621c
