@@ -482,7 +482,7 @@ impl Sema:
         for ci in 0..name.len():
             let lane = (lanes[ci] - '0') as i32
             if lane >= n:
-                let comp = name.slice(ci as i64, ci as i64 + 1)
+                let comp = name.slice(ci, ci as i64 + 1)
                 self.emit_error(f"swizzle component `{comp}` names lane {lane} of a {n}-lane vector (§4.3d)", node)
                 return 0
         self.vector_swizzles.insert(node, lanes)

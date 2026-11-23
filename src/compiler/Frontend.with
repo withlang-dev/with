@@ -278,7 +278,7 @@ fn c_import_str_contains(text: &str, needle: &str) -> bool:
     var i = 0
     let limit = text.len() - needle.len()
     while i <= limit:
-        if text.slice(i as i64, (i + needle.len()) as i64) == needle:
+        if text.slice(i, (i + needle.len())) == needle:
             return true
         i = i + 1
     false
@@ -1047,7 +1047,7 @@ fn cimport_deps_sorted_unique_paths(files: &str) -> List[str]:
         while line_end < total and files[line_end] != 10:
             line_end = line_end + 1
         if line_end > pos:
-            let path = files.slice(pos as i64, line_end as i64)
+            let path = files.slice(pos, line_end)
             var exists = false
             for out_item in out:
                 if out_item == path:
@@ -1091,7 +1091,7 @@ fn c_import_deps_manifest_entries_valid(manifest: &str) -> bool:
         while line_end < total and manifest[line_end] != 10:
             line_end = line_end + 1
         if line_end > pos:
-            let line = manifest.slice(pos as i64, line_end as i64)
+            let line = manifest.slice(pos, line_end)
             if not saw_header:
                 if line != CIMPORT_DEPS_MANIFEST_HEADER:
                     return false
@@ -1107,8 +1107,8 @@ fn c_import_deps_manifest_entries_valid(manifest: &str) -> bool:
                             sep2 = i
                 if sep1 <= 0 or sep2 <= sep1 or sep2 as i64 + 1 >= line.len():
                     return false
-                let want_len = line.slice(0, sep1 as i64)
-                let want_hash = line.slice(sep1 as i64 + 1, sep2 as i64)
+                let want_len = line.slice(0, sep1)
+                let want_hash = line.slice(sep1 as i64 + 1, sep2)
                 let path = line.slice(sep2 as i64 + 1, line.len())
                 let text = runtime_read_file(path)
                 if f"{text.len()}" != want_len:
@@ -1127,7 +1127,7 @@ fn c_import_deps_manifest_paths(manifest: &str) -> List[str]:
         while line_end < total and manifest[line_end] != 10:
             line_end = line_end + 1
         if line_end > pos:
-            let line = manifest.slice(pos as i64, line_end as i64)
+            let line = manifest.slice(pos, line_end)
             var sep2 = -1
             var seen = 0
             for i in 0..line.len():
@@ -1188,7 +1188,7 @@ fn c_import_declared_and_omitted(synthetic: &str) -> List[str]:
         if not c_import_starts_with(line, prefix): continue
         let rest = line.slice(prefix.len(), line.len())
         let sep = rest.find("|")
-        let name = if sep > 0: rest.slice(0, sep as i64) else: with_str_clone_ref(rest)
+        let name = if sep > 0: rest.slice(0, sep) else: with_str_clone_ref(rest)
         if name.len() == 0 or out.contains(name): continue
         let needle = "fn " ++ name ++ "("
         for decl_line in synthetic.split("\n"):
@@ -1197,7 +1197,7 @@ fn c_import_declared_and_omitted(synthetic: &str) -> List[str]:
             if at < 0: continue
             // A declaration starts the line (any `pub`/`unsafe`/`extern`
             // prefix), never a call inside a body.
-            let head = decl_line.slice(0, at as i64)
+            let head = decl_line.slice(0, at)
             if head.len() == 0 or head == "pub " or head == "unsafe " or head == "pub unsafe " or head == "extern " or head == "pub extern " or c_import_starts_with(head, "extern \"C\" ") or c_import_starts_with(head, "pub extern \"C\" "):
                 out.push(name)
                 break
@@ -1219,7 +1219,7 @@ impl Zcu:
             while line_end < total and synthetic[line_end] != 10:
                 line_end = line_end + 1
             if line_end > line_start:
-                let line = synthetic.slice(line_start as i64, line_end as i64)
+                let line = synthetic.slice(line_start, line_end)
                 if c_import_starts_with(line, prefix):
                     let rest = line.slice(prefix.len(), line.len())
                     var sep = -1
@@ -1228,8 +1228,8 @@ impl Zcu:
                             sep = ri as i32
                             break
                     if sep > 0:
-                        let name = rest.slice(0, sep as i64)
-                        let reason = rest.slice((sep + 1) as i64, rest.len())
+                        let name = rest.slice(0, sep)
+                        let reason = rest.slice((sep + 1), rest.len())
                         self.c_import_omitted_symbols.insert(name, reason)
                     else if rest.len() > 0:
                         self.c_import_omitted_symbols.insert(rest, "untranslated C construct")
@@ -1336,7 +1336,7 @@ fn frontend_name_selects(want: &str, dname: &str) -> bool:
         return true
     let wl = want.len()
     if dname.len() > wl and dname[wl] == 46:
-        return dname.slice(0, wl as i64) == want
+        return dname.slice(0, wl) == want
     false
 
 impl Zcu:
@@ -1376,7 +1376,7 @@ impl Zcu:
             while line_end < total and synthetic[line_end] != 10:
                 line_end = line_end + 1
             if line_end > line_start:
-                let line = synthetic.slice(line_start as i64, line_end as i64)
+                let line = synthetic.slice(line_start, line_end)
                 if c_import_starts_with(line, prefix):
                     let rest = line.slice(prefix.len(), line.len())
                     var sep = -1
@@ -1384,7 +1384,7 @@ impl Zcu:
                         if rest[ri] == 124:
                             sep = ri as i32
                             break
-                    let name = if sep > 0: rest.slice(0, sep as i64) else: rest
+                    let name = if sep > 0: rest.slice(0, sep) else: rest
                     if name.len() > 0 and not self.c_import_decl_allows_untranslated_frontend(pool, decl, name):
                         let span = Span { file: 0, start: pool.get_start(decl), end: pool.get_end(decl) }
                         self.diagnostics.emit(Diagnostic.err("c_import: strict import omitted '" ++ name ++ "'; add it to allow_untranslated to acknowledge omission, or drop strict", span))
@@ -1415,7 +1415,7 @@ impl Zcu:
             while i < total and names[i] != 124:
                 i = i + 1
             if i > start:
-                let name = names.slice(start as i64, i as i64)
+                let name = names.slice(start, i)
                 if not self.c_import_decl_allows_untranslated_frontend(pool, decl, name):
                     return name
         ""
@@ -1436,7 +1436,7 @@ impl Zcu:
         let total = header.len()
         while i <= total:
             if i == total or header[i] == 10:
-                let raw_line = header.slice(line_start as i64, i as i64)
+                let raw_line = header.slice(line_start, i)
                 let line = c_import_trim(raw_line)
                 if line.len() > 0:
                     if c_import_starts_with(line, "#include"):
@@ -1462,7 +1462,7 @@ impl Zcu:
         let body_len = body.len()
         while si <= body_len:
             if si == body_len or body[si] == 59:
-                let stmt = c_import_trim(body.slice(stmt_start as i64, si as i64))
+                let stmt = c_import_trim(body.slice(stmt_start, si))
                 if stmt.len() > 0:
                     let fn_decl = c_import_function_decl(stmt)
                     if fn_decl.len() == 0:
@@ -1579,11 +1579,11 @@ fn c_import_macro_decl(line: &str) -> str:
         i = i + 1
     if i <= 0:
         return ""
-    let name = rest.slice(0, i as i64)
+    let name = rest.slice(0, i)
     if i < rest.len() and rest[i] == 40:
         return ""
 
-    var value = c_import_trim(rest.slice(i as i64, rest.len()))
+    var value = c_import_trim(rest.slice(i, rest.len()))
     if value.len() == 0:
         return ""
     value = c_import_trim_outer_parens(value)
@@ -1609,7 +1609,7 @@ fn c_import_define_name(line: &str) -> str:
         i = i + 1
     if i <= 0:
         return ""
-    rest.slice(0, i as i64)
+    rest.slice(0, i)
 
 fn c_import_statement_name(stmt_raw: &str) -> str:
     let stmt = c_import_trim(stmt_raw)
@@ -1630,7 +1630,7 @@ fn c_import_statement_name(stmt_raw: &str) -> str:
             ns = ns - 1
         ns = ns + 1
         if ns <= ne:
-            return stmt.slice(ns as i64, (ne + 1) as i64)
+            return stmt.slice(ns, (ne + 1))
 
     var end = stmt.len() - 1
     while end >= 0 and not c_import_is_ident_char(stmt[end]):
@@ -1640,7 +1640,7 @@ fn c_import_statement_name(stmt_raw: &str) -> str:
     var start = end
     while start >= 0 and c_import_is_ident_char(stmt[start]):
         start = start - 1
-    stmt.slice((start + 1) as i64, (end + 1) as i64)
+    stmt.slice((start + 1), (end + 1))
 
 fn c_import_function_decl(stmt_raw: &str) -> str:
     let stmt = c_import_trim(stmt_raw)
@@ -1658,7 +1658,7 @@ fn c_import_function_decl(stmt_raw: &str) -> str:
     if open <= 0 or close <= open:
         return ""
 
-    let trailing = c_import_trim(stmt.slice((close + 1) as i64, stmt.len()))
+    let trailing = c_import_trim(stmt.slice((close + 1), stmt.len()))
     if trailing.len() > 0:
         return ""
 
@@ -1674,13 +1674,13 @@ fn c_import_function_decl(stmt_raw: &str) -> str:
     if ns > ne:
         return ""
 
-    let fn_name = stmt.slice(ns as i64, (ne + 1) as i64)
-    let ret_spec = c_import_trim(stmt.slice(0, ns as i64))
+    let fn_name = stmt.slice(ns, (ne + 1))
+    let ret_spec = c_import_trim(stmt.slice(0, ns))
     if ret_spec.len() == 0:
         return ""
     let ret_ty = c_import_map_c_type(ret_spec)
 
-    let params_text = c_import_trim(stmt.slice((open + 1) as i64, close as i64))
+    let params_text = c_import_trim(stmt.slice((open + 1), close))
     var params_out = ""
     var has_variadic = 0
     var param_index = 0
@@ -1690,7 +1690,7 @@ fn c_import_function_decl(stmt_raw: &str) -> str:
         let plen = params_text.len()
         while i <= plen:
             if i == plen or params_text[i] == 44:
-                let seg = c_import_trim(params_text.slice(seg_start as i64, i as i64))
+                let seg = c_import_trim(params_text.slice(seg_start, i))
                 if seg.len() > 0:
                     if seg == "...":
                         has_variadic = 1
@@ -1730,7 +1730,7 @@ fn c_import_param_type(param_raw: &str) -> str:
         var j = end
         while j >= 0 and c_import_is_ident_char(param[j]):
             j = j - 1
-        let prefix = c_import_trim(param.slice(0, (j + 1) as i64))
+        let prefix = c_import_trim(param.slice(0, (j + 1)))
         if prefix.len() > 0:
             type_spec = prefix
 
@@ -1835,7 +1835,7 @@ fn c_import_escape_with_string(value: &str) -> str:
         else if ch == 9:
             out = out ++ "\\t"
         else:
-            out = out ++ value.slice(i as i64, (i + 1) as i64)
+            out = out ++ value.slice(i, (i + 1))
     out
 
 fn c_import_is_int_literal(text_raw: &str) -> bool:
@@ -1880,7 +1880,7 @@ fn c_import_trim(s: &str) -> str:
         start = start + 1
     while end > start and c_import_is_space(s[(end - 1)]):
         end = end - 1
-    s.slice(start as i64, end as i64)
+    s.slice(start, end)
 
 fn c_import_starts_with(text: &str, prefix: &str) -> bool:
     if prefix.len() > text.len():
@@ -3063,12 +3063,12 @@ impl Zcu:
             let pd = prelude_ordered[oi]
             if merged_pool.kind(pd) == NodeKind.NK_FN_DECL and prelude_paths[oi].starts_with("<embedded-rt>/"):
                 embedded_rt_fn_names.push(merged_pool.get_data0(pd))
-        for ri in 0..root_ordered.len():
-            let rd = root_ordered[ri]
+        for root_ordered_item in root_ordered:
+            let rd = root_ordered_item
             if merged_pool.kind(rd) == NodeKind.NK_FN_DECL:
                 higher_bodied_fn_names.push(merged_pool.get_data0(rd))
-        for ui in 0..user_import_ordered.len():
-            let ud = user_import_ordered[ui]
+        for user_import_ordered_item in user_import_ordered:
+            let ud = user_import_ordered_item
             if merged_pool.kind(ud) == NodeKind.NK_FN_DECL:
                 higher_bodied_fn_names.push(merged_pool.get_data0(ud))
         // D29 scaffolding (#750): NON-GENERIC user type declarations shadow
@@ -3463,7 +3463,7 @@ fn frontend_parent_module_rel(module_rel: &str) -> str:
             last_slash = i as i32
     if last_slash <= 0:
         return ""
-    module_rel.slice(0, last_slash as i64)
+    module_rel.slice(0, last_slash)
 
 // The facade `with get` wrote for a fetched package (D121 step 5), by its
 // place: `.with/deps/c/<name>/<version>/facade.with`.
@@ -3671,7 +3671,7 @@ fn frontend_normalize_module_path(module_name: &str) -> str:
         if module_name[i] == 46: // '.'
             out = out ++ "/"
         else:
-            out = out ++ module_name.slice(i as i64, (i + 1) as i64)
+            out = out ++ module_name.slice(i, (i + 1))
     out
 
 fn frontend_dirname(path: &str) -> str:
@@ -3681,7 +3681,7 @@ fn frontend_dirname(path: &str) -> str:
             last_slash = i as i32
     if last_slash < 0:
         return "."
-    path.slice(0, last_slash as i64)
+    path.slice(0, last_slash)
 
 // D89: whether any field of the program takes its numeric type from its
 // uses (the parser marks such a field's type node).

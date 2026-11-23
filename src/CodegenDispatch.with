@@ -9441,7 +9441,7 @@ impl Codegen:
             if name[i] == 46:
                 dot = i as i32
         if dot >= 0 and dot + 1 < name.len():
-            return name.slice((dot + 1) as i64, name.len())
+            return name.slice((dot + 1), name.len())
         ""
 
     fn find_dyn_trait_for_type_and_current_method(type_sym: i32) -> i32:
@@ -9782,7 +9782,7 @@ impl Codegen:
             var bare = with_str_clone_ref(fn_text)
             for dot_i in 0..fn_text.len():
                 if fn_text[dot_i] == 46:
-                    bare = fn_text.slice((dot_i + 1) as i64, fn_text.len() as i64)
+                    bare = fn_text.slice((dot_i + 1), fn_text.len())
                     break
             if bare == method_name:
                 return decl as i32
@@ -14121,7 +14121,7 @@ impl Codegen:
                             let gc_method_text_sm = self.codegen_symbol_text(gc_callee_sym)
                             for gc_mn_i in 0..gc_method_text_sm.len():
                                 if gc_method_text_sm[gc_mn_i] == 46:
-                                    gc_method_name_sm = gc_method_text_sm.slice((gc_mn_i + 1) as i64, gc_method_text_sm.len() as i64)
+                                    gc_method_name_sm = gc_method_text_sm.slice((gc_mn_i + 1), gc_method_text_sm.len())
                                     break
                             if gc_method_name_sm.len() == 0 and self.pool.kind(gc_node) == NodeKind.NK_CALL:
                                 let gc_callee_node_sm = self.pool.get_data0(gc_node)
@@ -14213,7 +14213,7 @@ impl Codegen:
                             let gc_method_text = self.codegen_symbol_text(gc_callee_sym)
                             for gc_dot_i in 0..gc_method_text.len():
                                 if gc_method_text[gc_dot_i] == 46:
-                                    let gc_owner_name = gc_method_text.slice(0, gc_dot_i as i64)
+                                    let gc_owner_name = gc_method_text.slice(0, gc_dot_i)
                                     gc_ra_owner_sym = self.sema.pool_lookup_symbol(gc_owner_name)
                                     gc_ra_owner_ty = if gc_ra_owner_sym != 0: self.sema.lookup_named_type_visible(gc_ra_owner_sym) else: 0
                                     break
@@ -14289,7 +14289,7 @@ impl Codegen:
                         var gc_synth_method_name = with_str_clone_ref(gc_synth_callee_name)
                         for gc_synth_di in 0..gc_synth_callee_name.len():
                             if gc_synth_callee_name[gc_synth_di] == 46:
-                                gc_synth_method_name = gc_synth_callee_name.slice((gc_synth_di + 1) as i64, gc_synth_callee_name.len() as i64)
+                                gc_synth_method_name = gc_synth_callee_name.slice((gc_synth_di + 1), gc_synth_callee_name.len())
                         let gc_synth_pre_args = self.mir_eval_call_arg_range(body, args_id, 1, gc_synth_mir_count - 1, 1)
                         let gc_synth_recv_ptr = self.marshal_ref_addr(body, gc_synth_recv_op, gc_synth_recv_val)
                         let gc_synth_result = self.monomorphize_struct_method_core(gc_synth_owner_sym, gc_synth_method_name, gc_synth_method_decl.unwrap(), gc_synth_recv_val, gc_synth_recv_ptr, 0, gc_synth_recv_llvm_ty, 0, gc_synth_mir_count - 1, gc_node, body.call_sig_index(args_id), body.call_mono_sym(args_id), gc_synth_pre_args)
@@ -16779,8 +16779,8 @@ impl Codegen:
                         break
                 if canonical_tp_sym != 0:
                     var already_bound = false
-                    for bi in 0..bind_syms.len():
-                        if bind_syms[bi] == canonical_tp_sym:
+                    for bind_sym in bind_syms:
+                        if bind_sym == canonical_tp_sym:
                             already_bound = true
                             break
                     if not already_bound:
@@ -16816,8 +16816,8 @@ impl Codegen:
                                 break
                         if canonical_inner_sym != 0:
                             var already_bound = false
-                            for bi in 0..bind_syms.len():
-                                if bind_syms[bi] == canonical_inner_sym:
+                            for bind_sym in bind_syms:
+                                if bind_sym == canonical_inner_sym:
                                     already_bound = true
                                     break
                             if not already_bound:
@@ -16825,17 +16825,17 @@ impl Codegen:
                                 bind_tys.push(inner_llvm)
                                 bind_sema_tys.push(inner_sema)
 
-        for ti in 0..tp_syms.len():
-            if self.find_binding_type(bind_syms, bind_tys, tp_syms[ti]) == 0:
+        for tp_sym in tp_syms:
+            if self.find_binding_type(bind_syms, bind_tys, tp_sym) == 0:
                 return 0
 
         // #1647 (D65): the owner is the instance Sema created for the bound
         // arguments, laid out from Sema's record.
         let inst_args: List[i32] = []
-        for ti in 0..tp_syms.len():
+        for tp_sym in tp_syms:
             var arg_sema: i32 = 0
             for bi in 0..bind_syms.len():
-                if bind_syms[bi] == tp_syms[ti]:
+                if bind_syms[bi] == tp_sym:
                     arg_sema = bind_sema_tys[bi]
                     break
             if arg_sema <= 0:

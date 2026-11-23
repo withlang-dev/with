@@ -1926,7 +1926,7 @@ impl MirDropStateBlocks:
     // Reset, the state of a place a drop frees nothing from, so an arm is
     // not held to the payloads of a variant it did not match.
     mut fn load_edge(pred: i32, bb: i32):
-        var state = self.load_block(pred)
+        let state = self.load_block(pred)
         for i in self.switch_key_starts[pred]..self.switch_key_starts[pred + 1]:
             if self.switch_key_targets[i] != bb and state.get(self.keys, self.switch_keys[i]) == MirDropState.Init:
                 state.set(self.keys, self.switch_keys[i], MirDropState.Reset)
@@ -2043,7 +2043,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
             if variant < 0:
                 continue
             switch_keys.push(key)
-            switch_key_targets.push(mir_switch_target(body, bb, variant as i64))
+            switch_key_targets.push(mir_switch_target(body, bb, variant))
     switch_key_starts.push(switch_keys.len())
     MirDropStateBlocks { keys, rows, entry, scratch, computed, pred_starts, preds, succ_starts, succs, switch_key_starts, switch_keys, switch_key_targets, edge: [] }
 
@@ -3173,7 +3173,7 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
         // it is a leak: no path dropped or moved it.
         if body.term_kind(bb) == TermKind.TK_RETURN and blocks.computed[bb] != 0:
             for key_place in key_places:
-                let place_id: i32 = key_place
+                let place_id = key_place
                 if place_id < 0 or body.place_proj_counts[place_id] != 0:
                     continue
                 let local_id = body.place_locals[place_id]
@@ -3440,13 +3440,13 @@ fn mir_name_fn_syms(text: &str, pool: &InternPool) -> str:
     var i = 0
     let n = text.len()
     while i < n:
-        if i + 6 <= n and text.slice(i as i64, (i + 6) as i64) == "fn sym":
+        if i + 6 <= n and text.slice(i, (i + 6)) == "fn sym":
             var j = i + 6
             var sym: i32 = 0
             while j < n and text[j] >= '0' and text[j] <= '9':
                 sym = sym * 10 + (text[j] - '0') as i32
                 j += 1
-            out.push_str(text.slice(i as i64, j as i64))
+            out.push_str(text.slice(i, j))
             if j > i + 6:
                 out.push_str(f"({pool.resolve(sym)})")
             i = j

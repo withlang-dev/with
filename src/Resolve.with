@@ -1726,7 +1726,7 @@ fn resolve_dirname(path: &str) -> str:
         return "."
     if last == 0:
         return "/"
-    path.slice(0, last as i64)
+    path.slice(0, last)
 
 fn resolve_normalize_path(path: &str) -> str:
     if path.len() == 0:
@@ -1749,7 +1749,7 @@ fn resolve_normalize_path(path: &str) -> str:
             i = i + 2
             continue
 
-        out = out ++ path.slice(i as i64, (i + 1) as i64)
+        out = out ++ path.slice(i, (i + 1))
         i = i + 1
 
     if out.len() == 0:
@@ -1782,7 +1782,7 @@ fn resolve_canonical_module_key(path: &str) -> str:
                 // Flat decision (no inner chain ending in else-if): the seed
                 // compiler predates the #629 dangling-else fix and miscompiles
                 // that shape — the ordinary-segment push became dead code.
-                let part = p.slice(start as i64, i as i64)
+                let part = p.slice(start, i)
                 var keep = true
                 if part == ".":
                     keep = false

@@ -288,7 +288,7 @@ fn ci_migrate_shared_note_output_uses(output: &str):
             i = i + 1
             while i < n and ci_is_ident_char(output[i]):
                 i = i + 1
-            ci_migrate_shared_note_ident(output.slice(start as i64, i as i64))
+            ci_migrate_shared_note_ident(output.slice(start, i))
             continue
         i = i + 1
 
@@ -347,7 +347,7 @@ fn ci_migrate_insert_libc_use(output: &str) -> str:
         return with_str_clone_ref(output)
     let header_end = ci_find_str(output, "\n\n")
     if header_end >= 0:
-        output.slice(0, header_end as i64) ++ "\nuse std.libc" ++ output.slice(header_end as i64, output.len())
+        output.slice(0, header_end) ++ "\nuse std.libc" ++ output.slice(header_end, output.len())
     else:
         "use std.libc\n\n" ++ output
 
@@ -361,7 +361,7 @@ fn ci_migrate_insert_option_use(output: &str) -> str:
         return with_str_clone_ref(output)
     let header_end = ci_find_str(output, "\n\n")
     if header_end >= 0:
-        output.slice(0, header_end as i64) ++ "\nuse std.option" ++ output.slice(header_end as i64, output.len())
+        output.slice(0, header_end) ++ "\nuse std.option" ++ output.slice(header_end, output.len())
     else:
         "use std.option\n\n" ++ output
 
@@ -373,7 +373,7 @@ fn ci_migrate_insert_rt_use(output: &str) -> str:
         return with_str_clone_ref(output)
     let header_end = ci_find_str(output, "\n\n")
     if header_end >= 0:
-        output.slice(0, header_end as i64) ++ "\nuse rt.rt_core" ++ output.slice(header_end as i64, output.len())
+        output.slice(0, header_end) ++ "\nuse rt.rt_core" ++ output.slice(header_end, output.len())
     else:
         "use rt.rt_core\n\n" ++ output
 
@@ -386,7 +386,7 @@ fn ci_migrate_insert_collections_use(output: &str) -> str:
         return with_str_clone_ref(output)
     let header_end = ci_find_str(output, "\n\n")
     if header_end >= 0:
-        output.slice(0, header_end as i64) ++ "\nuse std.collections" ++ output.slice(header_end as i64, output.len())
+        output.slice(0, header_end) ++ "\nuse std.collections" ++ output.slice(header_end, output.len())
     else:
         "use std.collections\n\n" ++ output
 
@@ -403,7 +403,7 @@ fn ci_migrate_insert_atomic_support(output: &str) -> str:
         return text
     let header_end = ci_find_str(text, "\n\n")
     if header_end >= 0:
-        text.slice(0, header_end as i64) ++ "\nuse std.sync" ++ text.slice(header_end as i64, text.len())
+        text.slice(0, header_end) ++ "\nuse std.sync" ++ text.slice(header_end, text.len())
     else:
         "use std.sync\n\n" ++ text
 
@@ -567,7 +567,7 @@ fn ci_migrate_hygienic(text: &str) -> str:
         if ci_is_ident_start(ch):
             var end = i + 1
             while end < text.len() and ci_is_ident_char(text[end]): end += 1
-            let word = text.slice(i as i64, end as i64)
+            let word = text.slice(i, end)
             for local in CI_MIGRATE_HELPER_LOCALS:
                 if word == local:
                     out.push_str("__with_")
@@ -575,7 +575,7 @@ fn ci_migrate_hygienic(text: &str) -> str:
             out.push_str(word)
             i = end
         else:
-            out.push_str(text.slice(i as i64, (i + 1) as i64))
+            out.push_str(text.slice(i, (i + 1)))
             i += 1
     out.to_str()
 
@@ -716,7 +716,7 @@ fn ci_migrate_merge_usage_keys(keys: &str):
         while i < n and keys[i] != 124:
             i = i + 1
         if i > start:
-            ci_migrate_shared_note_ident(keys.slice(start as i64, i as i64))
+            ci_migrate_shared_note_ident(keys.slice(start, i))
         i = i + 1
 
 fn ci_migrate_merge_shared_fragment_text(text: &str):
@@ -726,27 +726,27 @@ fn ci_migrate_merge_shared_fragment_text(text: &str):
         var line_end = pos
         while line_end < n and text[line_end] != 10:
             line_end = line_end + 1
-        let line = text.slice(pos as i64, line_end as i64)
+        let line = text.slice(pos, line_end)
         let body_start = line_end + 1
-        let rest = text.slice(body_start as i64, text.len())
+        let rest = text.slice(body_start, text.len())
         let rel_end = ci_find_str(rest, "\n@@END\n")
         if rel_end < 0:
             return
         let body_end = body_start + rel_end
-        let body = text.slice(body_start as i64, body_end as i64)
+        let body = text.slice(body_start, body_end)
         if ci_starts_with(line, "@@DECL|"):
             let marker = line.slice(7, line.len())
             let sep = ci_find_str(marker, "|")
             if sep > 0:
-                let kind = marker.slice(0, sep as i64)
-                let name = marker.slice((sep + 1) as i64, marker.len())
+                let kind = marker.slice(0, sep)
+                let name = marker.slice((sep + 1), marker.len())
                 ci_migrate_shared_decl_add(kind, name, body)
         else if ci_starts_with(line, "@@PENDING|"):
             let marker = line.slice(10, line.len())
             let sep = ci_find_str(marker, "|")
             if sep > 0:
-                let kind = marker.slice(0, sep as i64)
-                let name = marker.slice((sep + 1) as i64, marker.len())
+                let kind = marker.slice(0, sep)
+                let name = marker.slice((sep + 1), marker.len())
                 ci_migrate_shared_ownerless_extern_add(kind, name, body)
         else if line == "@@USES":
             ci_migrate_merge_usage_keys(body)
@@ -898,8 +898,8 @@ fn migrate_add_define(define: &str) -> Unit:
     if ci_str_contains(define, "="):
         let eq_pos = ci_find_substr(define, "=")
         if eq_pos > 0:
-            let name = define.slice(0, eq_pos as i64)
-            let value = define.slice((eq_pos + 1) as i64, define.len())
+            let name = define.slice(0, eq_pos)
+            let value = define.slice((eq_pos + 1), define.len())
             g_migrate_defines = g_migrate_defines ++ "#define " ++ name ++ " " ++ value ++ "\n"
     else:
         // A bare `-DNAME` is `NAME=1` to a C compiler (C17 §6.10.1 as the
@@ -1019,7 +1019,7 @@ fn ci_migrate_prepare_include_path(input_path: &str):
     while dir_end > 0 and input_path[dir_end] != 47:  // '/'
         dir_end = dir_end - 1
     if dir_end > 0:
-        with_cimport_add_include_path(input_path.slice(0, dir_end as i64))
+        with_cimport_add_include_path(input_path.slice(0, dir_end))
     for g_migrate_include_path in g_migrate_include_paths:
         with_cimport_add_include_path(g_migrate_include_path)
     for g_migrate_macro_prefix_map in g_migrate_macro_prefix_maps:
@@ -1590,14 +1590,14 @@ fn ci_migrate_path_basename(path: &str) -> str:
     var start = end - 1
     while start >= 0 and path[start] != '/':
         start = start - 1
-    path.slice((start + 1) as i64, end as i64)
+    path.slice((start + 1), end)
 
 // `name.c` -> `name`; a name without a dot is its own stem.
 fn ci_migrate_path_stem(basename: &str) -> str:
     var end = basename.len()
     while end > 0 and basename[(end - 1)] != '.':
         end = end - 1
-    if end == 0: basename else: basename.slice(0, (end - 1) as i64)
+    if end == 0: basename else: basename.slice(0, (end - 1))
 
 // The file of a cursor location (`path:line:col`), "" when absent.
 // A definition's identity across units: the real path of its file and its
@@ -1615,7 +1615,7 @@ fn ci_migrate_location_file(location: &str) -> str:
     while end > 0 and colons < 2:
         end = end - 1
         if location[end] == ':': colons = colons + 1
-    if colons < 2: "" else: location.slice(0, end as i64)
+    if colons < 2: "" else: location.slice(0, end)
 
 fn ci_migrate_location_is_header(location: &str) -> bool:
     ci_migrate_location_file(location).ends_with(".h")
@@ -1722,7 +1722,7 @@ fn ci_migrate_ensure_parent_dir(path: &str):
     while dir_end > 0 and path[dir_end] != 47:
         dir_end = dir_end - 1
     if dir_end > 0:
-        with_fs_mkdir_p(path.slice(0, dir_end as i64))
+        with_fs_mkdir_p(path.slice(0, dir_end))
 
 fn ci_migrate_path_is_c_file(path: &str) -> bool:
     path.len() > 2 and path.slice(path.len() - 2, path.len()) == ".c"
@@ -1756,7 +1756,7 @@ fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> List[
         while line_end < n and listing[line_end] != 10:
             line_end = line_end + 1
         if line_end > pos:
-            let file_path = listing.slice(pos as i64, line_end as i64)
+            let file_path = listing.slice(pos, line_end)
             let base = ci_migrate_path_basename(file_path)
             if ci_migrate_path_is_c_file(file_path) and not ci_migrate_basename_is_hidden(file_path) and not ci_migrate_excludes_contains(exclude_basenames, base):
                 files = ci_migrate_sorted_insert(files, file_path)
@@ -2180,7 +2180,7 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
             if gir.names_drop(project.symbols[si].name): facts = facts ++ (if facts.len() > 0: ";" else: "") ++ "drop=1"
             project.symbols[si].gir = facts
     if facts_path.len() > 0:
-        var registry = match facts_read_file(ci_migrate_fs_path(facts_path)):
+        let registry = match facts_read_file(ci_migrate_fs_path(facts_path)):
             Ok(f) => f
             Err(message) => return Err("registry: " ++ message)
         for setting in g_migrate_unapplied_settings.split(","):
@@ -2260,7 +2260,7 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
     // the pairing stands without `reads`, so the slice is writable, and the
     // contract and the report say what stopped the check.
     if project.registry_value_text.contains(" reads    // registry: "):
-        let index: HashMap[str, str] = HashMap.new()
+        let index: HashMap[str, str] = [:]
         for seen in project.pointee_evidence:
             let f = seen.split("\t")
             if f.len() != 5: continue
@@ -2522,8 +2522,8 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     // The directories the installed package is imported from: what a
     // program's `c_import` of the header searches.
     ci_set_include_paths(import_dirs)
-    let header_alone: HashMap[str, bool] = HashMap.new()
-    let header_umbrella: HashMap[str, str] = HashMap.new()
+    let header_alone: HashMap[str, bool] = [:]
+    let header_umbrella: HashMap[str, str] = [:]
     var dependent_headers = ""
     var dependent_count = 0
     for si in 0..project.symbols.len():
@@ -2564,7 +2564,7 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     // D198 (§16.2b.5): a value record must be complete in a header the
     // package installs, or the facade's clause would name a record the
     // user's import does not have.
-    let file_installed: HashMap[str, bool] = HashMap.new()
+    let file_installed: HashMap[str, bool] = [:]
     let installed = []
     for (record, file) in project.complete_records:
         if not file_installed.contains(file): file_installed.insert(file.to_owned(), ci_facade_import_spelling(file, import_dirs).len() > 0)
@@ -2882,7 +2882,7 @@ fn ci_migrate_writes_note_path(path: &str):
         g_migrate_writes_paths.push(with_str_clone_ref(path))
 
 fn ci_migrate_token_text(text: &str, tokens: &TokenList, i: i32) -> str:
-    text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
+    text.slice(tokens.get_start(i), tokens.get_end(i))
 
 // The token after a place's projections from `k` (`.f`, `.F`, `[…]`).
 fn ci_migrate_skip_place_projections(tokens: &TokenList, k0: i32) -> i32:

@@ -253,7 +253,7 @@ fn conan_trim(text: &str) -> str:
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         end = end - 1
-    text.slice(start as i64, end as i64)
+    text.slice(start, end)
 
 fn conan_strip_quotes(value: &str) -> str:
     let t = conan_trim(value)
@@ -289,7 +289,7 @@ fn conan_path_basename(path: &str) -> str:
     for i in 0..path.len():
         if path[i] == 47:
             start = (i + 1) as i32
-    path.slice(start as i64, path.len())
+    path.slice(start, path.len())
 
 fn conan_path_dirname(path: &str) -> str:
     var slash = -1
@@ -298,7 +298,7 @@ fn conan_path_dirname(path: &str) -> str:
             slash = i as i32
     if slash < 0:
         return "."
-    path.slice(0, slash as i64)
+    path.slice(0, slash)
 
 fn conan_relative_path(base: &str, path: &str) -> str:
     if path == base:
@@ -317,7 +317,7 @@ fn conan_split_nonempty_lines(text: &str) -> List[str]:
         let at_end = i == n
         let ch = if at_end: 10 else: text[i]
         if ch == 10:
-            var line = text.slice(start as i64, i as i64)
+            var line = text.slice(start, i)
             if line.len() > 0 and line[line.len() - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             line = conan_trim(line)
@@ -357,7 +357,7 @@ fn json_extract_string(json: &str, key: &str) -> str:
                 else if ch == 34:
                     break
                 vi = vi + 1
-            return json.slice(start as i64, vi as i64)
+            return json.slice(start, vi)
         pos = pos + 1
     ""
 
@@ -394,7 +394,7 @@ fn json_extract_string_array(json: &str, key: &str) -> List[str]:
                             break
                         end = end + 1
                     if end > start:
-                        result.push(json.slice(start as i64, end as i64))
+                        result.push(json.slice(start, end))
                     ai = end + 1
                 else:
                     ai = ai + 1
@@ -444,13 +444,13 @@ fn conan_result_version_for_name(result: &str, name: &str) -> str:
     let slash = conan_find_char(result, 47)
     if slash <= 0:
         return ""
-    let got_name = result.slice(0, slash as i64)
+    let got_name = result.slice(0, slash)
     if got_name != name:
         return ""
     let at = conan_find_char(result, 64)
     if at <= slash:
         return ""
-    result.slice((slash + 1) as i64, at as i64)
+    result.slice((slash + 1), at)
 
 // Numeric order of two versions, component by component; a missing
 // component is 0, so `3` and `3.0.0` are the same version.
@@ -625,7 +625,7 @@ fn conan_pick_package(response: &str, target_os: &str, target_arch: &str) -> Con
         var id_end = id_start
         while id_end < json_len and response[id_end] != 34:
             id_end = id_end + 1
-        let pkg_id = response.slice(id_start as i64, id_end as i64)
+        let pkg_id = response.slice(id_start, id_end)
         pos = id_end + 1
         while pos < json_len and response[pos] != 123:
             pos = pos + 1
@@ -641,7 +641,7 @@ fn conan_pick_package(response: &str, target_os: &str, target_arch: &str) -> Con
             else if ch == 125:
                 depth = depth - 1
             pos = pos + 1
-        let block = response.slice(block_start as i64, pos as i64)
+        let block = response.slice(block_start, pos)
         if conan_block_is_linkable(block, target_os, target_arch):
             let shared = conan_block_shared(block)
             if not shared:
@@ -678,7 +678,7 @@ fn conan_ref_name(req: &str) -> str:
     let slash = conan_find_char(req, 47)
     if slash <= 0:
         return ""
-    req.slice(0, slash as i64)
+    req.slice(0, slash)
 
 // A requirement names `name/version`, optionally followed by `@user/channel`,
 // `#recipe_revision` and `:package_id` (pulseaudio pins
@@ -693,7 +693,7 @@ fn conan_ref_version(req: &str) -> str:
         if ch == 64 or ch == 35 or ch == 58:
             end = i
             break
-    req.slice((slash + 1) as i64, end as i64)
+    req.slice((slash + 1), end)
 
 fn conan_json_escape(value: &str) -> str:
     var out = ""
@@ -701,7 +701,7 @@ fn conan_json_escape(value: &str) -> str:
         let ch = value[i]
         if ch == 34 or ch == 92:
             out = out ++ "\\"
-        out = out ++ value.slice(i as i64, (i + 1) as i64)
+        out = out ++ value.slice(i, (i + 1))
     out
 
 fn conan_json_array(values: &List[str]) -> str:
@@ -799,9 +799,9 @@ fn conan_library_name_from_path(path: &str) -> str:
         let dylib = conan_find_text(base, ".dylib")
         let so = conan_find_text(base, ".so")
         if dylib > 0:
-            name = base.slice(0, dylib as i64)
+            name = base.slice(0, dylib)
         else if so > 0:
-            name = base.slice(0, so as i64)
+            name = base.slice(0, so)
     if name.starts_with("lib") and name.len() > 3:
         return name.slice(3, name.len())
     name
@@ -2137,14 +2137,14 @@ fn conan_library_units(build_dir: &str, libs: &List[str], corpus: &ConanCorpus) 
     let graph = runtime_read_file(build_dir ++ "/build.ninja")
     if graph.len() == 0 or libs.len() == 0: return ConanLibraryUnits { units: [], note: "the build has no build.ninja naming the units of its libraries, so every unit it compiles was read" }
     // Each library's statement, by the artifact it builds.
-    let statements: HashMap[str, str] = HashMap.new()
+    let statements: HashMap[str, str] = [:]
     for line in graph.split("\n"):
         if not line.starts_with("build "): continue
         let colon = conan_find_text(line, ": ")
         if colon < 0: continue
         for artifact in line.slice(6, colon).split(" "):
             if artifact.len() > 0: statements.insert(artifact.to_owned(), line.to_owned())
-    let objects: HashMap[str, bool] = HashMap.new()
+    let objects: HashMap[str, bool] = [:]
     let pending = []
     for lib in libs:
         var found = false
@@ -2155,7 +2155,7 @@ fn conan_library_units(build_dir: &str, libs: &List[str], corpus: &ConanCorpus) 
                 pending.push(artifact.to_owned())
                 found = true
         if not found: return ConanLibraryUnits { units: [], note: "the build's graph names no artifact for the library `" ++ lib ++ "`, so every unit it compiles was read" }
-    let followed: HashMap[str, bool] = HashMap.new()
+    let followed: HashMap[str, bool] = [:]
     while pending.len() > 0:
         let artifact = pending.pop() ?? ""
         if followed.contains(artifact): continue
@@ -2348,7 +2348,7 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     migrate_set_platform_facts(platform.path)
     let report_path = dep_dir ++ "/contract-report.txt"
     migrate_parse_c_as_c_import()
-    var library = conan_library_units(build_dir, libs, corpus)
+    let library = conan_library_units(build_dir, libs, corpus)
     if library.note.len() > 0: library.units = corpus.units
     let summary = migrate_c_facade_for_package(library.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/contract.with", report_path)
     if library.note.len() > 0 and runtime_file_exists(report_path) != 0:

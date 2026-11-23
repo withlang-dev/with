@@ -5660,7 +5660,7 @@ impl Codegen:
             return ""
         if end > self.source_text.len():
             return ""
-        self.source_text.slice(start as i64, end as i64)
+        self.source_text.slice(start, end)
 
     fn method_text_from_field_access(node: i32) -> str:
         if node == 0 or self.pool.kind(node) != NodeKind.NK_FIELD_ACCESS:
@@ -5674,7 +5674,7 @@ impl Codegen:
                 dot = i as i32
         if dot < 0 or dot + 1 >= text.len():
             return ""
-        text.slice((dot + 1) as i64, text.len())
+        text.slice((dot + 1), text.len())
 
     fn fn_decl_name_from_node(node: i32) -> str:
         let text = self.ident_text_from_node(node)
@@ -5701,7 +5701,7 @@ impl Codegen:
             break
         if i <= start:
             return ""
-        text.slice(start as i64, i as i64)
+        text.slice(start, i)
 
     fn let_binding_name_from_node(node: i32) -> str:
         let text = self.ident_text_from_node(node)
@@ -5732,7 +5732,7 @@ impl Codegen:
             break
         if i <= start:
             return ""
-        text.slice(start as i64, i as i64)
+        text.slice(start, i)
 
     mut fn declare_function(fn_node: i32):
         self.declare_function_at(fn_node, self.find_decl_index(fn_node))
@@ -5957,7 +5957,7 @@ impl Codegen:
                     wl_set_linkage(function, 5)  // LLVMWeakAnyLinkage
                 else:
                     wl_set_linkage(function, 0)
-                let export_name = cc_name.slice(9, cc_name.len() as i64)
+                let export_name = cc_name.slice(9, cc_name.len())
                 if export_name.len() > 0 and export_name != effective_name:
                     wl_set_value_name(function, export_name)
                 wl_set_call_conv(function, wl_cc_c())
@@ -6374,7 +6374,7 @@ impl Codegen:
                 dot = i as i32
         if dot <= 0:
             return -1
-        let owner_sym = self.intern.intern(name.slice(0, dot as i64))
+        let owner_sym = self.intern.intern(name.slice(0, dot))
         for di in 0..self.pool.decl_count():
             let decl = self.pool.get_decl(di)
             if self.pool.kind(decl) == NodeKind.NK_TYPE_DECL and self.pool.get_data0(decl) == owner_sym:
@@ -6432,7 +6432,7 @@ impl Codegen:
             return false
         for di in 0..name_str.len():
             if name_str[di] == 46:
-                let owner_sym = self.intern.intern(name_str.slice(0, di as i64))
+                let owner_sym = self.intern.intern(name_str.slice(0, di))
                 return self.generic_type_decl_node(owner_sym) != 0
         false
 
@@ -6985,7 +6985,7 @@ impl Codegen:
         // binding is renamed but still resolves to the real C symbol.
         var link_name = self.canonical_extern_name(name_str)
         if cc_name.len() > 10 and cc_name.slice(0, 10) == "link_name:":
-            link_name = cc_name.slice(10, cc_name.len() as i64)
+            link_name = cc_name.slice(10, cc_name.len())
 
         // Check if already declared. #839: an extern owns its C symbol — if a
         // With-BODIED fn occupies the name with a different type
@@ -7009,7 +7009,7 @@ impl Codegen:
         // `ns` under its own symbol name. Both string attributes must be on
         // the declaration or wasm-ld defaults the namespace to `env`.
         if cc_name.len() > 14 and cc_name.slice(0, 14) == "import_module:":
-            wl_add_fn_string_attr(self.context, function, "wasm-import-module", cc_name.slice(14, cc_name.len() as i64))
+            wl_add_fn_string_attr(self.context, function, "wasm-import-module", cc_name.slice(14, cc_name.len()))
             wl_add_fn_string_attr(self.context, function, "wasm-import-name", link_name)
 
         if has_sret:
@@ -7110,7 +7110,7 @@ impl Codegen:
                     break
                 j = j + 1
             if all_digits:
-                return name.slice(0, dot_pos as i64)
+                return name.slice(0, dot_pos)
         with_str_clone_ref(name)
 
     // ── Detect drop functions ─────────────────────────────────────────

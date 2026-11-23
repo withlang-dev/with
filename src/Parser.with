@@ -350,7 +350,7 @@ impl Parser:
             return ""
         let s = self.tokens.get_start(at)
         let e = self.tokens.get_end(at)
-        self.source.slice(s as i64, e as i64)
+        self.source.slice(s, e)
 
     fn has_top_level_main_decl() -> bool:
         var brace_depth = 0
@@ -554,14 +554,14 @@ impl Parser:
         if self.peek() != TokenKind.TK_INT_LIT:
             self.emit_error("after 'ok' write a status constant's name or an integer literal")
             return 0
-        let digits = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+        let digits = self.source.slice(self.current_start(), self.current_end())
         self.advance()
         self.intern.intern((if negative: "-" else: "") ++ digits)
 
     fn intern_current() -> i32:
         let s = self.current_start()
         let e = self.current_end()
-        let text = self.source.slice(s as i64, e as i64)
+        let text = self.source.slice(s, e)
         self.intern.intern(text)
 
     fn is_ident_named(name: &str) -> bool:
@@ -569,7 +569,7 @@ impl Parser:
             return false
         let s = self.current_start()
         let e = self.current_end()
-        self.source.slice(s as i64, e as i64) == name
+        self.source.slice(s, e) == name
 
     mut fn skip_newlines():
         while self.peek() == TokenKind.TK_NEWLINE:
@@ -648,7 +648,7 @@ impl Parser:
             return 0
         let es = self.current_start()
         let ee = self.current_end()
-        let ef_name = self.source.slice(es as i64, ee as i64)
+        let ef_name = self.source.slice(es, ee)
         let ef_bit = self.effect_name_bit(ef_name)
         if ef_bit == 0:
             self.emit_error("unknown effect '" ++ ef_name ++ "' in @[effect]; expected read, write, consume, escape_value, or escape_view")
@@ -789,7 +789,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_IDENT:
                 let attr_s = self.current_start()
                 let attr_e = self.current_end()
-                let attr_text = self.source.slice(attr_s as i64, attr_e as i64)
+                let attr_text = self.source.slice(attr_s, attr_e)
                 if attr_text == "suspends":
                     self.pending_suspends = 1
                 if attr_text == "must_use":
@@ -897,7 +897,7 @@ impl Parser:
                 if self.peek() == TokenKind.TK_L_PAREN:
                     self.advance()
                     if self.peek() == TokenKind.TK_STRING_LIT:
-                        let export_name = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                        let export_name = self.source.slice((self.current_start() + 1), (self.current_end() - 1))
                         if export_name.len() > 0:
                             self.pending_callconv = self.intern.intern("c_export:" ++ export_name)
                             named = true
@@ -916,7 +916,7 @@ impl Parser:
                 if self.peek() == TokenKind.TK_L_PAREN:
                     self.advance()
                     if self.peek() == TokenKind.TK_STRING_LIT:
-                        let im = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                        let im = self.source.slice((self.current_start() + 1), (self.current_end() - 1))
                         self.pending_callconv = self.intern.intern("import_module:" ++ im)
                         self.advance()
                     if self.peek() == TokenKind.TK_R_PAREN:
@@ -930,7 +930,7 @@ impl Parser:
                 if self.peek() == TokenKind.TK_L_PAREN:
                     self.advance()
                     if self.peek() == TokenKind.TK_STRING_LIT:
-                        let ln = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                        let ln = self.source.slice((self.current_start() + 1), (self.current_end() - 1))
                         self.pending_callconv = self.intern.intern("link_name:" ++ ln)
                         self.advance()
                     if self.peek() == TokenKind.TK_R_PAREN:
@@ -940,7 +940,7 @@ impl Parser:
                 if self.peek() == TokenKind.TK_L_PAREN:
                     self.advance()
                     if self.peek() == TokenKind.TK_STRING_LIT:
-                        let cc_name = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                        let cc_name = self.source.slice((self.current_start() + 1), (self.current_end() - 1))
                         self.pending_callconv = self.intern.intern(cc_name)
                         self.advance()
                     if self.peek() == TokenKind.TK_R_PAREN:
@@ -957,13 +957,13 @@ impl Parser:
                 else:
                     self.advance()
                     if self.peek() == TokenKind.TK_IDENT:
-                        let repr_text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                        let repr_text = self.source.slice(self.current_start(), self.current_end())
                         self.advance()
                         if repr_text == "packed" and self.peek() == TokenKind.TK_L_PAREN:
                             self.advance()
                             var cap: i32 = 0
                             if self.peek() == TokenKind.TK_INT_LIT:
-                                cap = parse_int(self.source.slice(self.current_start() as i64, self.current_end() as i64)) as i32
+                                cap = parse_int(self.source.slice(self.current_start(), self.current_end())) as i32
                                 self.advance()
                             if cap <= 0 or cap > 65536 or (cap & (cap - 1)) != 0:
                                 self.emit_error("@[repr(packed(N))] takes a power of two from 1 to 65536 (§16.4)")
@@ -993,7 +993,7 @@ impl Parser:
                     if self.peek() != TokenKind.TK_STRING_LIT:
                         self.emit_error("@[target(...)] requires a string literal architecture name, e.g. @[target(\"aarch64\")]")
                     else:
-                        let arch = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                        let arch = self.source.slice((self.current_start() + 1), (self.current_end() - 1))
                         if not parser_target_guard_arch_known(arch):
                             self.emit_error("unknown target architecture '" ++ arch ++ "'; expected \"aarch64\", \"x86_64\", \"wasm32\", or \"wasm64\"")
                         else:
@@ -1008,7 +1008,7 @@ impl Parser:
                     if self.peek() == TokenKind.TK_INT_LIT:
                         let val_s = self.current_start()
                         let val_e = self.current_end()
-                        let val_text = self.source.slice(val_s as i64, val_e as i64)
+                        let val_text = self.source.slice(val_s, val_e)
                         self.pending_stack_size = parse_int(val_text) as i32
                         self.advance()
                     if self.peek() == TokenKind.TK_R_PAREN:
@@ -1052,7 +1052,7 @@ impl Parser:
                     self.advance()
                     if self.peek() == TokenKind.TK_IDENT:
                         let phase_sym = self.intern_current()
-                        let phase_text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                        let phase_text = self.source.slice(self.current_start(), self.current_end())
                         if phase_text == "after_typecheck":
                             self.pending_compiler_hook_phase = phase_sym
                         else:
@@ -1433,15 +1433,15 @@ impl Parser:
                 self.emit_error(f"expected {what} in the `{word}` clause")
                 return out
             let segments: List[str] = []
-            segments.push(self.source.slice(self.current_start() as i64, self.current_end() as i64))
+            segments.push(self.source.slice(self.current_start(), self.current_end()))
             self.advance()
             while true:
                 if self.peek() == TokenKind.TK_DOT_IDENT:
-                    segments.push(self.source.slice((self.current_start() + 1) as i64, self.current_end() as i64))
+                    segments.push(self.source.slice((self.current_start() + 1), self.current_end()))
                     self.advance()
                 else if self.peek() == TokenKind.TK_DOT and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_IDENT:
                     self.advance()
-                    segments.push(self.source.slice(self.current_start() as i64, self.current_end() as i64))
+                    segments.push(self.source.slice(self.current_start(), self.current_end()))
                     self.advance()
                 else:
                     break
@@ -2355,7 +2355,7 @@ impl Parser:
                         if self.peek() == TokenKind.TK_L_PAREN:
                             self.advance()
                             if self.peek() == TokenKind.TK_INT_LIT:
-                                let atext = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                                let atext = self.source.slice(self.current_start(), self.current_end())
                                 field_align = parse_i64(atext) as i32
                                 self.advance()
                                 if self.peek() == TokenKind.TK_R_PAREN:
@@ -2424,7 +2424,7 @@ impl Parser:
                         if self.peek() == TokenKind.TK_L_PAREN:
                             self.advance()
                             if self.peek() == TokenKind.TK_INT_LIT:
-                                let atext = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                                let atext = self.source.slice(self.current_start(), self.current_end())
                                 field_align = parse_i64(atext) as i32
                                 self.advance()
                                 if self.peek() == TokenKind.TK_R_PAREN:
@@ -3005,7 +3005,7 @@ impl Parser:
             else if self.peek() == TokenKind.TK_DOT_IDENT:
                 let span_s = self.current_start()
                 let span_e = self.current_end()
-                let text = self.source.slice((span_s + 1) as i64, span_e as i64)
+                let text = self.source.slice((span_s + 1), span_e)
                 let sym = self.intern.intern(text)
                 self.pool.add_extra(sym)
                 path_count = path_count + 1
@@ -3049,7 +3049,7 @@ impl Parser:
             return self.poisoned_expr()
         let str_s = self.current_start()
         let str_e = self.current_end()
-        let raw = self.source.slice((str_s + 1) as i64, (str_e - 1) as i64)
+        let raw = self.source.slice((str_s + 1), (str_e - 1))
         let header_sym = self.intern.intern(raw)
         self.advance()
 
@@ -3069,7 +3069,7 @@ impl Parser:
             self.skip_newlines()
             var key = ""
             if self.peek() == TokenKind.TK_IDENT:
-                key = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                key = self.source.slice(self.current_start(), self.current_end())
                 self.advance()
             if self.expect(TokenKind.TK_COLON) == 0:
                 return self.poisoned_expr()
@@ -3078,7 +3078,7 @@ impl Parser:
                 while self.peek() == TokenKind.TK_STRING_LIT:
                     let ls = self.current_start()
                     let le = self.current_end()
-                    let lib = self.source.slice((ls + 1) as i64, (le - 1) as i64)
+                    let lib = self.source.slice((ls + 1), (le - 1))
                     links.push(self.intern.intern(lib))
                     self.advance()
                     self.skip_newlines()
@@ -3098,7 +3098,7 @@ impl Parser:
                         if self.peek() == TokenKind.TK_STRING_LIT:
                             let as_ = self.current_start()
                             let ae = self.current_end()
-                            allow_untranslated.push(self.intern.intern(self.source.slice((as_ + 1) as i64, (ae - 1) as i64)))
+                            allow_untranslated.push(self.intern.intern(self.source.slice((as_ + 1), (ae - 1))))
                             self.advance()
                         else:
                             self.emit_error("expected string literal in allow_untranslated")
@@ -3111,7 +3111,7 @@ impl Parser:
                 else if self.peek() == TokenKind.TK_STRING_LIT:
                     let as_ = self.current_start()
                     let ae = self.current_end()
-                    allow_untranslated.push(self.intern.intern(self.source.slice((as_ + 1) as i64, (ae - 1) as i64)))
+                    allow_untranslated.push(self.intern.intern(self.source.slice((as_ + 1), (ae - 1))))
                     self.advance()
                 else:
                     self.emit_error("expected string literal or string array for allow_untranslated")
@@ -3129,7 +3129,7 @@ impl Parser:
                         if self.peek() == TokenKind.TK_STRING_LIT:
                             let ns = self.current_start()
                             let ne = self.current_end()
-                            no_methods_types.push(self.intern.intern(self.source.slice((ns + 1) as i64, (ne - 1) as i64)))
+                            no_methods_types.push(self.intern.intern(self.source.slice((ns + 1), (ne - 1))))
                             self.advance()
                         else:
                             self.emit_error("expected string literal in no_methods")
@@ -3142,7 +3142,7 @@ impl Parser:
                 else if self.peek() == TokenKind.TK_STRING_LIT:
                     let ns = self.current_start()
                     let ne = self.current_end()
-                    no_methods_types.push(self.intern.intern(self.source.slice((ns + 1) as i64, (ne - 1) as i64)))
+                    no_methods_types.push(self.intern.intern(self.source.slice((ns + 1), (ne - 1))))
                     self.advance()
                 else:
                     self.emit_error("expected true, a string literal, or a string array for no_methods")
@@ -3156,7 +3156,7 @@ impl Parser:
                         if self.peek() == TokenKind.TK_STRING_LIT:
                             let os = self.current_start()
                             let oe = self.current_end()
-                            only_names.push(self.intern.intern(self.source.slice((os + 1) as i64, (oe - 1) as i64)))
+                            only_names.push(self.intern.intern(self.source.slice((os + 1), (oe - 1))))
                             self.advance()
                         else:
                             self.emit_error("expected string literal in only")
@@ -3169,7 +3169,7 @@ impl Parser:
                 else if self.peek() == TokenKind.TK_STRING_LIT:
                     let os = self.current_start()
                     let oe = self.current_end()
-                    only_names.push(self.intern.intern(self.source.slice((os + 1) as i64, (oe - 1) as i64)))
+                    only_names.push(self.intern.intern(self.source.slice((os + 1), (oe - 1))))
                     self.advance()
                 else:
                     self.emit_error("expected a string literal or a string array for only")
@@ -3206,7 +3206,7 @@ impl Parser:
                         if self.peek() == TokenKind.TK_STRING_LIT:
                             let obs = self.current_start()
                             let obe = self.current_end()
-                            let ob_sym = self.intern.intern(self.source.slice((obs + 1) as i64, (obe - 1) as i64))
+                            let ob_sym = self.intern.intern(self.source.slice((obs + 1), (obe - 1)))
                             if key == "owns":
                                 owns_entries.push(ob_sym)
                             else if key == "retains":
@@ -3225,7 +3225,7 @@ impl Parser:
                 else if self.peek() == TokenKind.TK_STRING_LIT:
                     let obs = self.current_start()
                     let obe = self.current_end()
-                    let ob_sym = self.intern.intern(self.source.slice((obs + 1) as i64, (obe - 1) as i64))
+                    let ob_sym = self.intern.intern(self.source.slice((obs + 1), (obe - 1)))
                     if key == "owns":
                         owns_entries.push(ob_sym)
                     else if key == "retains":
@@ -3576,7 +3576,7 @@ impl Parser:
             return DeclBody.Indented
         if bodyless_ok and (t == TokenKind.TK_NEWLINE or t == TokenKind.TK_EOF):
             let header = Span { file: self.file_id, start, end: self.prev_end() }
-            let header_text = self.source.slice(start as i64, self.prev_end() as i64)
+            let header_text = self.source.slice(start, self.prev_end())
             self.skip_newlines()
             if self.peek() != TokenKind.TK_EOF and column_of(self.source, self.current_start()) > hdr_indent:
                 let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
@@ -3600,7 +3600,7 @@ impl Parser:
         if column_of(self.source, self.current_start()) <= line_indent_of(self.source, start):
             return false
         if form == DeclBody.Inline and members == 1:
-            let header_text = self.source.slice(start as i64, introducer_end as i64)
+            let header_text = self.source.slice(start, introducer_end)
             let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
             let diag = Diagnostic.err("an inline " ++ construct ++ " body is a single member: it ended at the end of the header line, so this member is outside it (§29.13)", span)
             diag.add_label(Span { file: self.file_id, start: introducer_end - 1, end: introducer_end }, "inline body starts after this ':'")
@@ -4564,7 +4564,7 @@ impl Parser:
 
         // #1005: the lexer gives an unterminated string literal as an invalid
         // token that starts with its opening quote.
-        if t == TokenKind.TK_INVALID and lexed_text_opens_string(self.source.slice(self.current_start() as i64, self.current_end() as i64)):
+        if t == TokenKind.TK_INVALID and lexed_text_opens_string(self.source.slice(self.current_start(), self.current_end())):
             self.emit_error("unterminated string literal: nothing closes the quote that opens it here before the end of the file")
             self.advance()
             return self.poisoned_expr()
@@ -4581,7 +4581,7 @@ fn numeric_literal_suffix_start(text: &str, suffix: &str) -> i32:
     if len <= slen:
         return -1
     let direct_start = len - slen
-    if text.slice(direct_start as i64, len as i64) == suffix:
+    if text.slice(direct_start, len) == suffix:
         return direct_start as i32
     -1
 
@@ -4644,33 +4644,33 @@ fn numeric_literal_core(text: &str) -> str:
     if suffix == LiteralSuffix.None:
         return with_str_clone_ref(text)
     if suffix == LiteralSuffix.Usize:
-        return text.slice(0, numeric_literal_suffix_start(text, "usize") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "usize"))
     if suffix == LiteralSuffix.Isize:
-        return text.slice(0, numeric_literal_suffix_start(text, "isize") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "isize"))
     if suffix == LiteralSuffix.U128:
-        return text.slice(0, numeric_literal_suffix_start(text, "u128") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "u128"))
     if suffix == LiteralSuffix.I128:
-        return text.slice(0, numeric_literal_suffix_start(text, "i128") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "i128"))
     if suffix == LiteralSuffix.U64:
-        return text.slice(0, numeric_literal_suffix_start(text, "u64") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "u64"))
     if suffix == LiteralSuffix.I64:
-        return text.slice(0, numeric_literal_suffix_start(text, "i64") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "i64"))
     if suffix == LiteralSuffix.U32:
-        return text.slice(0, numeric_literal_suffix_start(text, "u32") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "u32"))
     if suffix == LiteralSuffix.I32:
-        return text.slice(0, numeric_literal_suffix_start(text, "i32") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "i32"))
     if suffix == LiteralSuffix.U16:
-        return text.slice(0, numeric_literal_suffix_start(text, "u16") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "u16"))
     if suffix == LiteralSuffix.I16:
-        return text.slice(0, numeric_literal_suffix_start(text, "i16") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "i16"))
     if suffix == LiteralSuffix.U8:
-        return text.slice(0, numeric_literal_suffix_start(text, "u8") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "u8"))
     if suffix == LiteralSuffix.I8:
-        return text.slice(0, numeric_literal_suffix_start(text, "i8") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "i8"))
     if suffix == LiteralSuffix.F64:
-        return text.slice(0, numeric_literal_suffix_start(text, "f64") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "f64"))
     if suffix == LiteralSuffix.F32:
-        return text.slice(0, numeric_literal_suffix_start(text, "f32") as i64)
+        return text.slice(0, numeric_literal_suffix_start(text, "f32"))
     with_str_clone_ref(text)
 
 fn int_literal_core_radix(core: &str) -> i32:
@@ -4728,14 +4728,14 @@ impl Parser:
     mut fn parse_int_literal() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice(start as i64, end as i64)
+        let text = self.source.slice(start, end)
         self.advance()
         self.build_int_literal_node(start, end, text)
 
     mut fn parse_float_literal() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice(start as i64, end as i64)
+        let text = self.source.slice(start, end)
         if numeric_literal_suffix_is_separated(text):
             self.emit_numeric_suffix_separator_error(start, end)
         let suffix = numeric_literal_suffix_code(text)
@@ -4767,7 +4767,7 @@ impl Parser:
     fn token_text_is(i: i32, text: &str) -> bool:
         if i >= self.tokens.len(): return false
         if self.tokens.get_tag(i) != TokenKind.TK_IDENT: return false
-        self.source.slice(self.tokens.get_start(i) as i64, self.tokens.get_end(i) as i64) == text
+        self.source.slice(self.tokens.get_start(i), self.tokens.get_end(i)) == text
 
     fn current_ident_is(text: &str) -> bool: self.token_text_is(self.pos, text)
 
@@ -4776,7 +4776,7 @@ impl Parser:
     // as a binding, field and parameter name.
     fn at_error_decl() -> bool: self.current_ident_is("error") and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_IDENT
 
-    fn current_text() -> str: self.source.slice(self.current_start() as i64, self.current_end() as i64)
+    fn current_text() -> str: self.source.slice(self.current_start(), self.current_end())
 
     mut fn parse_c_facade(start: i32) -> NodeId:
         self.advance()
@@ -5856,7 +5856,7 @@ impl Parser:
     mut fn parse_string_literal() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice(start as i64, end as i64)
+        let text = self.source.slice(start, end)
         var content = strip_string_token_text(text)
         if is_raw_string_token_text(text):
             content = "\x01raw\x01" ++ content
@@ -5919,14 +5919,14 @@ impl Parser:
     mut fn parse_regex_literal() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice(start as i64, end as i64)
+        let text = self.source.slice(start, end)
         let close_idx = regex_literal_close_slash(text)
         var pattern = ""
         var flags = ""
         if close_idx > 0:
-            pattern = regex_literal_escape_runtime(text.slice(1, close_idx as i64))
+            pattern = regex_literal_escape_runtime(text.slice(1, close_idx))
             if close_idx + 1 < text.len():
-                flags = text.slice((close_idx + 1) as i64, text.len() as i64)
+                flags = text.slice((close_idx + 1), text.len())
         let pat_sym = self.intern.intern(pattern)
         let flag_sym = self.intern.intern(flags)
         self.advance()
@@ -6049,7 +6049,7 @@ impl Parser:
                         colon_pos = j
                     if depth > 0: j = j + 1
                 var spec_node = 0 as NodeId
-                let hole_text = content.slice(expr_start_pos as i64, j as i64)
+                let hole_text = content.slice(expr_start_pos, j)
                 var expr_node = 0 as NodeId
                 if colon_pos > 0:
                     // Parse the full hole first. Only fall back to `{expr:spec}`
@@ -6062,9 +6062,9 @@ impl Parser:
                         expr_node = full_attempt.node
                         self.take_interpolated_it(full_attempt.saw_implicit_it, full_attempt.implicit_it_depth)
                     else:
-                        let expr_text = content.slice(expr_start_pos as i64, colon_pos as i64)
+                        let expr_text = content.slice(expr_start_pos, colon_pos)
                         expr_node = self.parse_interpolated_expr(expr_text, hole_source_start)
-                        let spec_text = content.slice((colon_pos + 1) as i64, j as i64)
+                        let spec_text = content.slice((colon_pos + 1), j)
                         spec_node = self.parse_format_spec_text(spec_text, start, end, start + 2 + colon_pos + 1)
                 else:
                     let hole_source_start = start + 2 + expr_start_pos
@@ -6137,27 +6137,27 @@ impl Parser:
             let ch = text[i]
             if in_char:
                 if ch == 92 and i + 1 < len:
-                    out = out ++ text.slice(i as i64, (i + 2) as i64)
+                    out = out ++ text.slice(i, (i + 2))
                     src.push(i)
                     src.push(i + 1)
                     i = i + 2
                     continue
                 if ch == 39:
                     in_char = false
-                out = out ++ text.slice(i as i64, (i + 1) as i64)
+                out = out ++ text.slice(i, (i + 1))
                 src.push(i)
                 i = i + 1
                 continue
             if in_raw_string:
                 if ch == 92 and i + 1 < len:
-                    out = out ++ text.slice(i as i64, (i + 2) as i64)
+                    out = out ++ text.slice(i, (i + 2))
                     src.push(i)
                     src.push(i + 1)
                     i = i + 2
                     continue
                 if ch == 34:
                     in_raw_string = false
-                out = out ++ text.slice(i as i64, (i + 1) as i64)
+                out = out ++ text.slice(i, (i + 1))
                 src.push(i)
                 i = i + 1
                 continue
@@ -6193,7 +6193,7 @@ impl Parser:
                         src.push(bs_start + 2 * e + 1)
                         e = e + 1
                     if n % 2 == 1 and i < len:
-                        out = out ++ text.slice(i as i64, (i + 1) as i64)
+                        out = out ++ text.slice(i, (i + 1))
                         src.push(i)
                         i = i + 1
                     continue
@@ -6206,23 +6206,23 @@ impl Parser:
                     b = b + 1
                 continue
             if in_esc_string:
-                out = out ++ text.slice(i as i64, (i + 1) as i64)
+                out = out ++ text.slice(i, (i + 1))
                 src.push(i)
                 i = i + 1
                 continue
             if ch == 34:
                 in_raw_string = true
-                out = out ++ text.slice(i as i64, (i + 1) as i64)
+                out = out ++ text.slice(i, (i + 1))
                 src.push(i)
                 i = i + 1
                 continue
             if ch == 39:
                 in_char = true
-                out = out ++ text.slice(i as i64, (i + 1) as i64)
+                out = out ++ text.slice(i, (i + 1))
                 src.push(i)
                 i = i + 1
                 continue
-            out = out ++ text.slice(i as i64, (i + 1) as i64)
+            out = out ++ text.slice(i, (i + 1))
             src.push(i)
             i = i + 1
         InterpNormalized { text: out, src }
@@ -6241,7 +6241,7 @@ impl Parser:
                 out = out ++ interp_brace_char(125)
                 i = i + 2
                 continue
-            out = out ++ content.slice(i as i64, (i + 1) as i64)
+            out = out ++ content.slice(i, (i + 1))
             i = i + 1
         out
 
@@ -6298,7 +6298,7 @@ impl Parser:
             mode = spec_text[at]
             at = at + 1
         if at < slen:
-            let rest = spec_text.slice(at as i64, slen as i64)
+            let rest = spec_text.slice(at, slen)
             self.emit_error_span(f"invalid format spec `{spec_text}`: `{rest}` is not part of [[fill]align][sign]['#']['0'][width]['.' precision][mode] (§15.4.1)", spec_start + at, (spec_start + slen) as i32)
         // Pack flags into d0: mode(-7), fill(8-15), align(16-17), sign_plus(18), alternate(19), zero_pad(20)
         let flags = mode | ((fill & 255) << 8) | ((align & 3) << 16) | ((sign_plus & 1) << 18) | ((alternate & 1) << 19) | ((zero_pad & 1) << 20)
@@ -6379,7 +6379,7 @@ impl Parser:
     mut fn parse_c_string_literal() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice(start as i64, end as i64)
+        let text = self.source.slice(start, end)
         var raw = ""
         if text.len() >= 3:
             raw = text.slice(2, text.len() as i64 - 1)
@@ -6404,7 +6404,7 @@ impl Parser:
     mut fn parse_char_literal() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let value64 = char_literal_value(self.source.slice(start as i64, end as i64)) as i64
+        let value64 = char_literal_value(self.source.slice(start, end)) as i64
         self.advance()
         self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value64), ast_int_part1(value64), ast_int_part2(value64))
 
@@ -6486,7 +6486,7 @@ fn strip_string_token_text(text: &str) -> str:
             while end_q >= content_start and text[end_q] == 35:
                 end_q = end_q - 1
             if end_q >= content_start and text[end_q] == 34:
-                return text.slice(content_start as i64, end_q as i64)
+                return text.slice(content_start, end_q)
 
     if text.len() >= 6 and text.slice(0, 3) == "\"\"\"":
         var content = text.slice(3, text.len() as i64 - 3)
@@ -6556,7 +6556,7 @@ fn dedent_multiline(text: &str) -> str:
             while cut > 0 and j < i and (text[j] == 32 or text[j] == 9):
                 j = j + 1
                 cut = cut - 1
-            out = out ++ text.slice(j as i64, i as i64)
+            out = out ++ text.slice(j, i)
             if i != len:
                 out = out ++ "\n"
             line_start = i + 1
@@ -6595,7 +6595,7 @@ impl Parser:
                 // Type.Variant — treat dot-ident as field access when postfix
                 let start = self.current_start()
                 let end = self.current_end()
-                let text = self.source.slice((start + 1) as i64, end as i64)
+                let text = self.source.slice((start + 1), end)
                 let field = self.intern.intern(text)
                 self.advance()
                 lhs = self.field_or_numeric_member(lhs, field, end)
@@ -7197,7 +7197,7 @@ impl Parser:
     mut fn parse_variant_shorthand() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice((start + 1) as i64, end as i64)
+        let text = self.source.slice((start + 1), end)
         let sym = self.intern.intern(text)
         self.advance()
         let args: List[i32] = []
@@ -7280,7 +7280,7 @@ impl Parser:
         self.advance()
         if self.peek() == TokenKind.TK_INT_LIT:
             let end = self.current_end()
-            let text = self.source.slice(start as i64 + 1, end as i64)
+            let text = self.source.slice(start as i64 + 1, end)
             if numeric_literal_suffix_code(text) == LiteralSuffix.None:
                 let fast = int_literal_fast_i64(text)
                 if fast.ok != 0:
@@ -7578,7 +7578,7 @@ impl Parser:
                     if j >= n:
                         self.emit_error("unterminated '{' in asm template")
                         return with_str_clone_ref(tmpl)
-                    let nm = tmpl.slice((i + 1) as i64, j as i64)
+                    let nm = tmpl.slice((i + 1), j)
                     let idx = self.asm_operand_index(names, self.intern.intern(nm))
                     if idx < 0:
                         self.emit_error("asm template references unknown binding '" ++ nm ++ "'")
@@ -7608,7 +7608,7 @@ impl Parser:
         var flags: i32 = 0
         // Check for 'volatile' identifier
         if self.peek() == TokenKind.TK_IDENT:
-            let vol_text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+            let vol_text = self.source.slice(self.current_start(), self.current_end())
             if vol_text == "volatile":
                 flags = flags | 1  // bit 0 = volatile
                 self.advance()
@@ -7617,7 +7617,7 @@ impl Parser:
         if self.peek() != TokenKind.TK_STRING_LIT:
             self.emit_error("expected assembly template string")
             return self.pool.add_node(NodeKind.NK_POISONED_EXPR, start, self.prev_end(), 0, 0, 0)
-        let tmpl_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+        let tmpl_raw = self.source.slice(self.current_start(), self.current_end())
         let tmpl_text = strip_string_token_text(tmpl_raw)
         self.advance()
         // Build LLVM constraint string and collect input expression nodes.
@@ -7644,7 +7644,7 @@ impl Parser:
                 if self.peek() == TokenKind.TK_L_PAREN:
                     self.advance()
                     if self.peek() == TokenKind.TK_STRING_LIT:
-                        let out_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                        let out_raw = self.source.slice(self.current_start(), self.current_end())
                         let out_reg = strip_string_token_text(out_raw)
                         if out_reg.len() > 1 and out_reg[0] == 43:  // '+' read-write
                             is_rw = true
@@ -7684,7 +7684,7 @@ impl Parser:
                     if self.peek() == TokenKind.TK_L_PAREN:
                         self.advance()
                         if self.peek() == TokenKind.TK_STRING_LIT:
-                            let in_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                            let in_raw = self.source.slice(self.current_start(), self.current_end())
                             let in_reg = strip_string_token_text(in_raw)
                             if not first_constraint:
                                 constraints_str = constraints_str ++ ","
@@ -7704,7 +7704,7 @@ impl Parser:
                 if self.peek() == TokenKind.TK_COLON:
                     self.advance()
                     while self.peek() == TokenKind.TK_STRING_LIT:
-                        let clob_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                        let clob_raw = self.source.slice(self.current_start(), self.current_end())
                         let clob = strip_string_token_text(clob_raw)
                         if not first_constraint:
                             constraints_str = constraints_str ++ ","
@@ -7970,7 +7970,7 @@ impl Parser:
 
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice(start as i64, end as i64)
+        let text = self.source.slice(start, end)
         if text == "_":
             return true
         if text.len() > 0:
@@ -8176,7 +8176,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_EOF or self.peek() == TokenKind.TK_DEDENT or self.peek() == TokenKind.TK_R_BRACE:
                 return self.poisoned_expr()
             return self.parse_expr()
-        let label_text = self.source.slice((start + 1) as i64, label_end as i64)
+        let label_text = self.source.slice((start + 1), label_end)
         let label_sym = self.intern.intern(label_text)
         self.advance()
         self.skip_separators()
@@ -8229,7 +8229,7 @@ impl Parser:
             return self.poisoned_expr()
         let ls = self.current_start()
         let le = self.current_end()
-        let label = self.intern.intern(self.source.slice((ls + 1) as i64, le as i64))
+        let label = self.intern.intern(self.source.slice((ls + 1), le))
         self.advance()
         self.pool.add_node(NodeKind.NK_GOTO, start, self.prev_end(), label, 0, 0)
 
@@ -8240,7 +8240,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_LABEL:
             let ls = self.current_start()
             let le = self.current_end()
-            label = self.intern.intern(self.source.slice((ls + 1) as i64, le as i64))
+            label = self.intern.intern(self.source.slice((ls + 1), le))
             self.advance()
         var value = 0 as NodeId
         let t = self.peek()
@@ -8255,7 +8255,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_LABEL:
             let ls = self.current_start()
             let le = self.current_end()
-            label = self.intern.intern(self.source.slice((ls + 1) as i64, le as i64))
+            label = self.intern.intern(self.source.slice((ls + 1), le))
             self.advance()
         self.pool.add_node(NodeKind.NK_CONTINUE, start, self.prev_end(), label, 0, 0)
 
@@ -8459,7 +8459,7 @@ impl Parser:
 
     // The value of the integer or char literal token at the cursor, consumed.
     mut fn pattern_int_value() -> i64:
-        let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+        let text = self.source.slice(self.current_start(), self.current_end())
         let is_char = self.peek() == TokenKind.TK_CHAR_LIT
         self.advance()
         if is_char: char_literal_value(text) else: parse_i64(text)
@@ -8507,19 +8507,19 @@ impl Parser:
             return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, pat_end, 0, 0, 0)
         if t == TokenKind.TK_STRING_LIT:
             let pat_end = self.current_end()
-            let raw = self.source.slice((start + 1) as i64, (pat_end - 1) as i64)
+            let raw = self.source.slice((start + 1), (pat_end - 1))
             let sym = self.intern.intern(raw)
             self.advance()
             return self.pool.add_node(NodeKind.NK_PAT_STRING, start, pat_end, sym, 0, 0)
         if t == TokenKind.TK_REGEX_LIT:
             let pat_end = self.current_end()
-            let text = self.source.slice(start as i64, pat_end as i64)
+            let text = self.source.slice(start, pat_end)
             let close_idx = regex_literal_close_slash(text)
             var pattern = ""
             var flags = ""
             if close_idx > 0:
-                pattern = regex_literal_escape_runtime(text.slice(1, close_idx as i64))
-                flags = text.slice((close_idx + 1) as i64, text.len())
+                pattern = regex_literal_escape_runtime(text.slice(1, close_idx))
+                flags = text.slice((close_idx + 1), text.len())
             let pat_sym = self.intern.intern(pattern)
             let flag_sym = self.intern.intern(flags)
             self.advance()
@@ -8528,7 +8528,7 @@ impl Parser:
             self.advance()
             let ns = self.current_start()
             let ne = self.current_end()
-            let text = self.source.slice(ns as i64, ne as i64)
+            let text = self.source.slice(ns, ne)
             self.expect(TokenKind.TK_INT_LIT)
             let val64_neg = 0 - parse_i64(text)
             let val = val64_neg as i32
@@ -8540,13 +8540,13 @@ impl Parser:
                     self.advance()
                     let es = self.current_start()
                     let ee = self.current_end()
-                    let etext = self.source.slice(es as i64, ee as i64)
+                    let etext = self.source.slice(es, ee)
                     self.expect(TokenKind.TK_INT_LIT)
                     eval = 0 - parse_int(etext)
                 else:
                     let es = self.current_start()
                     let ee = self.current_end()
-                    let etext = self.source.slice(es as i64, ee as i64)
+                    let etext = self.source.slice(es, ee)
                     self.expect(TokenKind.TK_INT_LIT)
                     eval = parse_int(etext)
                 return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
@@ -8567,7 +8567,7 @@ impl Parser:
                 else:
                     let dot_start = self.current_start()
                     let dot_end = self.current_end()
-                    let dot_text = self.source.slice((dot_start + 1) as i64, dot_end as i64)
+                    let dot_text = self.source.slice((dot_start + 1), dot_end)
                     variant_name = self.intern.intern(dot_text)
                     self.advance()
                 if self.peek() == TokenKind.TK_L_PAREN:
@@ -8632,7 +8632,7 @@ impl Parser:
 
         if t == TokenKind.TK_DOT_IDENT:
             let dot_end = self.current_end()
-            let text = self.source.slice((start + 1) as i64, dot_end as i64)
+            let text = self.source.slice((start + 1), dot_end)
             let name = self.intern.intern(text)
             self.advance()
             if self.peek() == TokenKind.TK_L_PAREN:
@@ -9493,7 +9493,7 @@ impl Parser:
         if self.peek() != TokenKind.TK_EOF and column_of(self.source, self.current_start()) > self.block_indent:
             return true
         self.pos = save
-        let intro = self.source.slice(intro_start as i64, intro_end as i64)
+        let intro = self.source.slice(intro_start, intro_end)
         let diag = Diagnostic.err("expected an indented block after '" ++ intro ++ "'", Span { file: self.file_id, start: intro_start, end: intro_end })
         diag.add_help("a '" ++ intro ++ "' that ends the line opens a body on the lines below it, indented deeper than the line that holds the '" ++ intro ++ "' (§29.13)")
         self.diags.emit(diag)
@@ -9725,7 +9725,7 @@ impl Parser:
                 if self.peek() != TokenKind.TK_STRING_LIT:
                     self.emit_error("expected ABI string in extern function pointer type, e.g. unsafe extern \"C\" fn(...) -> T")
                     return self.poisoned_expr()
-                let uabi = strip_string_token_text(self.source.slice(self.current_start() as i64, self.current_end() as i64))
+                let uabi = strip_string_token_text(self.source.slice(self.current_start(), self.current_end()))
                 if uabi != "C":
                     self.emit_error("only extern \"C\" function pointer types are supported")
                 self.advance()
@@ -9743,7 +9743,7 @@ impl Parser:
             if self.peek() != TokenKind.TK_STRING_LIT:
                 self.emit_error("expected ABI string in extern function pointer type, e.g. extern \"C\" fn(...) -> T")
                 return self.poisoned_expr()
-            let abi_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+            let abi_raw = self.source.slice(self.current_start(), self.current_end())
             let abi = strip_string_token_text(abi_raw)
             if abi != "C":
                 self.emit_error("only extern \"C\" function pointer types are supported")
@@ -9814,7 +9814,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_INT_LIT:
                 let ss = self.current_start()
                 let se = self.current_end()
-                let size_text = self.source.slice(ss as i64, se as i64)
+                let size_text = self.source.slice(ss, se)
                 let size = parse_int(size_text)
                 self.advance()
                 self.skip_newlines()
@@ -9839,7 +9839,7 @@ impl Parser:
                     if self.peek() == TokenKind.TK_INT_LIT:
                         let ss = self.current_start()
                         let se = self.current_end()
-                        sizes.push(parse_int(self.source.slice(ss as i64, se as i64)))
+                        sizes.push(parse_int(self.source.slice(ss, se)))
                         len_exprs.push(0)
                         self.advance()
                     else:
@@ -9896,7 +9896,7 @@ impl Parser:
                 // Self.Output — dot + uppercase ident combined by lexer
                 let dot_s = self.current_start()
                 let dot_e = self.current_end()
-                let assoc_text = self.source.slice((dot_s + 1) as i64, dot_e as i64)
+                let assoc_text = self.source.slice((dot_s + 1), dot_e)
                 let assoc_sym = self.intern.intern(assoc_text)
                 self.advance()
                 return self.pool.add_node(NodeKind.NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
@@ -9954,7 +9954,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_IDENT:
                 let attr_start = self.current_start()
                 let attr_end = self.current_end()
-                let attr_text = self.source.slice(attr_start as i64, attr_end as i64)
+                let attr_text = self.source.slice(attr_start, attr_end)
                 if attr_text == "noalias":
                     flags = flags + FN_PARAM_FLAG_NOALIAS
                 else:
@@ -9988,7 +9988,7 @@ impl Parser:
 
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice(start as i64, end as i64)
+        let text = self.source.slice(start, end)
         if text == "_":
             return true
         if text.len() > 0:
@@ -10066,7 +10066,7 @@ impl Parser:
                 keyword = "move fn"
                 typed = "move self: Self"
                 rk = rk + 1
-            let bare_self = rk < self.tokens.len() and self.tokens.get_tag(rk) == TokenKind.TK_IDENT and self.source.slice(self.tokens.get_start(rk) as i64, self.tokens.get_end(rk) as i64) == "self" and (rk + 1 >= self.tokens.len() or self.tokens.get_tag(rk + 1) != TokenKind.TK_COLON)
+            let bare_self = rk < self.tokens.len() and self.tokens.get_tag(rk) == TokenKind.TK_IDENT and self.source.slice(self.tokens.get_start(rk), self.tokens.get_end(rk)) == "self" and (rk + 1 >= self.tokens.len() or self.tokens.get_tag(rk + 1) != TokenKind.TK_COLON)
             if bare_self:
                 self.emit_error_span("a function outside a type has no receiver (§9.5), so this `self` needs its type: write `" ++ typed ++ "`, or declare the method inside `impl Type:` as `" ++ keyword ++ " name(…)`, where `self` is implicit", self.tokens.get_start(rk), self.tokens.get_end(rk))
                 self.pos = rk + 1
@@ -10088,7 +10088,7 @@ impl Parser:
                 pk = pk + 1
             var has_explicit_self = false
             if pk < self.tokens.len() and self.tokens.get_tag(pk) == TokenKind.TK_IDENT:
-                if self.source.slice(self.tokens.get_start(pk) as i64, self.tokens.get_end(pk) as i64) == "self":
+                if self.source.slice(self.tokens.get_start(pk), self.tokens.get_end(pk)) == "self":
                     has_explicit_self = true
             // #897: a written `self` with no type beside a receiver keyword
             // (`mut fn take_it(mut self)`) is the keyword's receiver, not the

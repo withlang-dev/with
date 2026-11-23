@@ -77,7 +77,7 @@ fn build_graph_dirname(path: &str) -> str:
         return "."
     // The root's parent is the root (POSIX dirname): `/` and `/a` (#1021).
     if last_slash == 0: return "/"
-    path.slice(0, last_slash as i64)
+    path.slice(0, last_slash)
 
 fn build_graph_path_basename(path: &str) -> str:
     // POSIX basename of the root is the root (#1021).
@@ -99,8 +99,8 @@ fn build_graph_single_star_pattern_matches(pattern: &str, name: &str) -> bool:
             star = i as i32
     if star < 0:
         return pattern == name
-    let prefix = pattern.slice(0, star as i64)
-    let suffix = pattern.slice((star + 1) as i64, pattern.len())
+    let prefix = pattern.slice(0, star)
+    let suffix = pattern.slice((star + 1), pattern.len())
     if name.len() < prefix.len() + suffix.len():
         return false
     if prefix.len() > 0 and name.slice(0, prefix.len()) != prefix:
@@ -361,7 +361,7 @@ fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
         if i < text_len:
             ch = text[i]
         if ch == 10:
-            var line = text.slice(start as i64, i as i64)
+            var line = text.slice(start, i)
             if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.len() > 0:

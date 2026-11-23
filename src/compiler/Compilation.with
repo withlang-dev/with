@@ -221,7 +221,7 @@ fn compilation_escape_with_string(value: &str) -> str:
         else if ch == 9:
             out = out ++ "\\t"
         else:
-            out = out ++ value.slice(i as i64, (i + 1) as i64)
+            out = out ++ value.slice(i, (i + 1))
     out
 
 fn compilation_split_escaped_fields(line: &str) -> List[str]:
@@ -238,7 +238,7 @@ fn compilation_split_escaped_fields(line: &str) -> List[str]:
             else if ch == 114:
                 cur = cur ++ "\r"
             else:
-                cur = cur ++ line.slice(i as i64, (i + 1) as i64)
+                cur = cur ++ line.slice(i, (i + 1))
             escaped = false
         else if ch == 92:
             escaped = true
@@ -246,7 +246,7 @@ fn compilation_split_escaped_fields(line: &str) -> List[str]:
             fields.push(cur)
             cur = ""
         else:
-            cur = cur ++ line.slice(i as i64, (i + 1) as i64)
+            cur = cur ++ line.slice(i, (i + 1))
     fields.push(cur)
     fields
 
@@ -256,10 +256,10 @@ fn compilation_split_nonempty_lines(text: &str) -> List[str]:
     for i in 0..text.len():
         if text[i] == 10:
             if i > start:
-                lines.push(text.slice(start as i64, i as i64))
+                lines.push(text.slice(start, i))
             start = (i + 1) as i32
     if start < text.len():
-        lines.push(text.slice(start as i64, text.len()))
+        lines.push(text.slice(start, text.len()))
     lines
 
 fn compilation_parse_i32(text: &str) -> i32:
@@ -301,7 +301,7 @@ fn compilation_module_import_name(root: &str, path: &str) -> str:
         if ch == 47:
             out = out ++ "."
         else:
-            out = out ++ rel.slice(i as i64, (i + 1) as i64)
+            out = out ++ rel.slice(i, (i + 1))
     out
 
 fn compilation_span_file_id_for_path(zcu: &Zcu, path: &str) -> i32:

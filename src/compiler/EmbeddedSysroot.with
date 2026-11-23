@@ -84,7 +84,7 @@ fn es_dirname(path: &str) -> str:
     for i in 0..path.len():
         if path[i] == '/':
             last = i as i32
-    if last <= 0: "" else: path.slice(0, last as i64)
+    if last <= 0: "" else: path.slice(0, last)
 
 // The user's cache directory for what this compiler materializes.
 fn with_user_cache_dir() -> str:
@@ -125,7 +125,7 @@ fn es_unpack(pack: &str, dir: &str) -> str:
         let eol = rest.find("\n")
         if eol < 0:
             return "a truncated entry header in an embedded pack"
-        let header = rest.slice(0, eol as i64)
+        let header = rest.slice(0, eol)
         at = at + eol as i64 + 1
         let fields = header.split(" ")
         if fields.len() != 3 or not es_path_ok(fields[1]):

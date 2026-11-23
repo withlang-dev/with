@@ -340,8 +340,8 @@ fn uat_platform_matches(value: &str) -> i32:
             break
         i = i + 1
     if dash > 0:
-        let os_part = value.slice(0, dash as i64)
-        let arch_part = value.slice((dash + 1) as i64, value.len())
+        let os_part = value.slice(0, dash)
+        let arch_part = value.slice((dash + 1), value.len())
         if uat_platform_is_os(os_part) and uat_platform_is_arch(arch_part):
             let m = uat_host_platform() == os_part and uat_platform_arch_matches(arch_part, target_spec_arch())
             return (m) as i32

@@ -34,9 +34,9 @@ fn ci_omitted_field(record: &str, idx: i32) -> str:
         // Not a structured record — whole string is the reason.
         if idx == 2: return with_str_clone_ref(record)
         return ""
-    if idx == 0: return record.slice(0, first as i64)
-    if idx == 1: return record.slice((first + 1) as i64, second as i64)
-    record.slice((second + 1) as i64, n as i64)
+    if idx == 0: return record.slice(0, first)
+    if idx == 1: return record.slice((first + 1), second)
+    record.slice((second + 1), n)
 
 
 fn d22_join_arm_kind_name(kind: i32) -> str:

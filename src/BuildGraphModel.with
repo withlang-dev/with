@@ -108,7 +108,7 @@ fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
         if i < text_len:
             ch = text[i]
         if ch == 10:
-            var line = text.slice(start as i64, i as i64)
+            var line = text.slice(start, i)
             if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.len() > 0:
@@ -131,7 +131,7 @@ fn build_graph_split_fields(line: &str) -> List[str]:
             else if ch == 114:
                 cur = cur ++ "\r"
             else:
-                cur = cur ++ line.slice(i as i64, (i + 1) as i64)
+                cur = cur ++ line.slice(i, (i + 1))
             escaped = false
         else if ch == 92:
             escaped = true
@@ -139,7 +139,7 @@ fn build_graph_split_fields(line: &str) -> List[str]:
             fields.push(cur)
             cur = ""
         else:
-            cur = cur ++ line.slice(i as i64, (i + 1) as i64)
+            cur = cur ++ line.slice(i, (i + 1))
     fields.push(cur)
     fields
 
@@ -156,7 +156,7 @@ fn build_graph_escape(value: &str) -> str:
         else if ch == 13:
             out = out ++ "\\r"
         else:
-            out = out ++ value.slice(i as i64, (i + 1) as i64)
+            out = out ++ value.slice(i, (i + 1))
     out
 
 fn build_graph_emit(graph: &BuildGraph) -> str:

@@ -24,7 +24,7 @@ fn ecr_dirname(path: &str) -> str:
             last = i as i32
     if last <= 0:
         return ""
-    path.slice(0, last as i64)
+    path.slice(0, last)
 
 // One line per embedded header: its path and the hash of its bytes.
 fn ecr_identity_text() -> str:
@@ -57,7 +57,7 @@ fn ensure_clang_resource_dir() -> str:
         let at_end = i == listing.len()
         if at_end or listing[i] == 10:
             if i > start:
-                let rel = listing.slice(start as i64, i as i64)
+                let rel = listing.slice(start, i)
                 let dest = include_dir ++ "/" ++ rel
                 let parent = ecr_dirname(dest)
                 if parent.len() > 0:

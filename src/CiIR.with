@@ -1107,7 +1107,7 @@ fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
     let ilen = items.len()
     let nlen = needle.len()
     while i <= ilen - nlen:
-        if items.slice(i as i64, (i + nlen) as i64) == needle:
+        if items.slice(i, (i + nlen)) == needle:
             return true
         i = i + 1
     false

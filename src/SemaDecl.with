@@ -2657,7 +2657,7 @@ impl Sema:
         let dot = sema_str_find_char(parsed, 46)
         if dot <= 0:
             return 0
-        self.pool_lookup_symbol(parsed.slice(0, dot as i64))
+        self.pool_lookup_symbol(parsed.slice(0, dot))
 
     fn method_decl_name_symbol(parsed_fn_sym: i32) -> i32:
         let parsed = self.pool_resolve(parsed_fn_sym)
@@ -2666,7 +2666,7 @@ impl Sema:
             return parsed_fn_sym
         if dot + 1 >= parsed.len():
             return 0
-        self.pool_lookup_symbol(parsed.slice((dot + 1) as i64, parsed.len()))
+        self.pool_lookup_symbol(parsed.slice((dot + 1), parsed.len()))
 
     // A method's base symbol: `Owner.method` for an impl method, the parsed
     // `Owner.method` for the dotted form, and `Owner$m$<path>.method` for
@@ -2916,7 +2916,7 @@ impl Sema:
                 if fn_name == method_name:
                     return true
             else:
-                let bare = fn_name.slice((dot + 1) as i64, fn_name.len() as i64)
+                let bare = fn_name.slice((dot + 1), fn_name.len())
                 if bare == method_name:
                     return true
         false

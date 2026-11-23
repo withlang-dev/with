@@ -68,9 +68,9 @@ impl Source:
         if line + 1 < self.line_offsets.len():
             end = self.line_offsets[(line + 1)]
 
-        let slice = self.text.slice(start as i64, end as i64)
+        let slice = self.text.slice(start, end)
         if slice.len() > 0 and slice[slice.len() - 1] == 10:
-            return slice.slice(0, (slice.len() - 1) as i64)
+            return slice.slice(0, (slice.len() - 1))
         slice
 
 fn source_compute_line_offsets(text: &str) -> List[i32]:

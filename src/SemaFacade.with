@@ -743,7 +743,7 @@ impl Sema:
         false
 
     mut fn facade_inherit_destroys(fname: &str, c: ForeignContract) -> ForeignContract:
-        var out = c
+        let out = c
         // Marked either way, so the resource's own check reports nothing twice.
         out.destroys = 1
         if out.lend != 0: self.emit_error_with_help(f"fn '{fname}': a resource names it as a destroyer, and the fn item says 'lend'; a destroying operation is not callable as a lend: delete the 'lend' (§31.8.2)", out.node, "delete the 'lend' line under this fn item")
@@ -2446,7 +2446,7 @@ impl Sema:
             else:
                 if space: out = out ++ " "
                 space = false
-                out = out ++ source.slice(i as i64, (i + 1) as i64)
+                out = out ++ source.slice(i, (i + 1))
         out
 
     mut fn facade_fn_sig(sym: i32, at: i32) -> i32:

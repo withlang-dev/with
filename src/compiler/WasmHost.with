@@ -25,7 +25,7 @@ fn wasm_host_basename(path: &str) -> str:
         if ch == 47 or ch == 92:
             break
         i = i - 1
-    path.slice(i as i64, path.len())
+    path.slice(i, path.len())
 
 fn wasm_host_emit(bin_path: &str) -> bool:
     let js_path = wasm_host_js_path(bin_path)

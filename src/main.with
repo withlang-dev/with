@@ -671,7 +671,7 @@ fn cli_escape_with_string(value: &str) -> str:
         else if ch == 9:
             out.push_str("\\t")
         else:
-            out.push_str(value.slice(i as i64, (i + 1) as i64))
+            out.push_str(value.slice(i, (i + 1)))
     out.to_str()
 
 fn cli_rewrite_semicolons(code: &str) -> str:
@@ -696,11 +696,11 @@ fn cli_rewrite_semicolons(code: &str) -> str:
         let start = tokens.get_start(i)
         let end = tokens.get_end(i)
         if start > cursor:
-            out.push_str(code.slice(cursor as i64, start as i64))
+            out.push_str(code.slice(cursor, start))
         out.push_str("\n")
         cursor = end
     if cursor < code.len():
-        out.push_str(code.slice(cursor as i64, code.len()))
+        out.push_str(code.slice(cursor, code.len()))
     out.to_str()
 
 // The byte length of the `use` declarations `code` opens with, through the
@@ -746,7 +746,7 @@ fn cli_blank_prefix(code: &str, n: isize) -> str:
     let out = StringBuilder.with_capacity(code.len())
     for i in 0..n:
         out.push_str(if code[i] == '\n': "\n" else: " ")
-    out.push_str(code.slice(n as i64, code.len()))
+    out.push_str(code.slice(n, code.len()))
     out.to_str()
 
 // §16.5: the C header path beside an artifact (libfoo.a -> libfoo.h).
@@ -758,7 +758,7 @@ fn c_header_path_for(artifact_path: &str) -> str:
         if c == 46: dot = i
         if c == 47: dot = -1
         i = i + 1
-    let stem = if dot < 0: with_str_clone_ref(artifact_path) else: artifact_path.slice(0, dot as i64)
+    let stem = if dot < 0: with_str_clone_ref(artifact_path) else: artifact_path.slice(0, dot)
     stem ++ ".h"
 
 // A valid, unique C include-guard derived from the header's basename.
@@ -878,7 +878,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
         let rewritten = cli_rewrite_semicolons(one.code_parts[i])
         let use_len = cli_leading_use_len(rewritten)
         if use_len > 0:
-            let uses = rewritten.slice(0, use_len as i64)
+            let uses = rewritten.slice(0, use_len)
             let start = source.len() as i32
             source.push_str(uses)
             source.push_str("\n")
@@ -1619,7 +1619,7 @@ fn reduce_split_lines_keep_empty(text: &str) -> List[str]:
             break
         let ch = if at_end: 10 else: text[i]
         if ch == 10:
-            var line = text.slice(start as i64, i as i64)
+            var line = text.slice(start, i)
             if line.len() > 0 and line[line.len() - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             lines.push(line)
@@ -1929,7 +1929,7 @@ fn build_action_safe_label(text: &str) -> str:
         let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
-            out = out ++ text.slice(i as i64, (i + 1) as i64)
+            out = out ++ text.slice(i, (i + 1))
         else:
             out = out ++ "_"
     if out.len() == 0:
@@ -2855,7 +2855,7 @@ fn build_graph_trim_trailing_line_endings(text: &str) -> str:
         if ch != 10 and ch != 13:
             break
         end = end - 1
-    text.slice(0, end as i64)
+    text.slice(0, end)
 
 fn build_graph_find_substr(text: &str, needle: &str) -> i32:
     if needle.len() == 0:
@@ -2877,7 +2877,7 @@ fn build_graph_replace_once(text: &str, needle: &str, replacement: &str) -> str:
     let at = build_graph_find_substr(text, needle)
     if at < 0:
         return ""
-    text.slice(0, at as i64) ++ replacement ++ text.slice((at + needle.len()) as i64, text.len())
+    text.slice(0, at) ++ replacement ++ text.slice((at + needle.len()), text.len())
 
 fn build_graph_run_tool_capture(root: &str, target: &BuildGraphTarget, tool_name: &str, argv: &str, timeout_ms: i32) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
@@ -2928,7 +2928,7 @@ fn build_graph_trim_space_and_newlines(text: &str) -> str:
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         end = end - 1
-    text.slice(start as i64, end as i64)
+    text.slice(start, end)
 
 fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target: &BuildGraphTarget) -> BuildCommandOptions:
     let options = build_command_options_clone(base)
@@ -3728,7 +3728,7 @@ fn repo_lock_owner_path() -> str:
 fn repo_lock_parse_pid(owner: &str) -> i32:
     var start = -1
     for i in 0..(owner.len() - 4):
-        if owner.slice(i as i64, (i + 4) as i64) == "pid=":
+        if owner.slice(i, (i + 4)) == "pid=":
             start = (i + 4) as i32
             break
     if start < 0:
@@ -4357,7 +4357,7 @@ fn dump_tokens(source_file: &str, deterministic: bool) -> i32:
             let tk = tokens.get_tag(i)
             let start = tokens.get_start(i)
             let end = tokens.get_end(i)
-            let text_slice = text.slice(start as i64, end as i64)
+            let text_slice = text.slice(start, end)
             let escaped = text_slice |> escape_dump_lexeme
             let tag_text = dump_tag_name(tk, text_slice)
             with_write(f"tok[{i}] tag={tag_text} span={start}..{end} lex=\"{escaped}\"\n")
@@ -4368,7 +4368,7 @@ fn dump_tokens(source_file: &str, deterministic: bool) -> i32:
         let tk = tokens.get_tag(i)
         let start = tokens.get_start(i)
         let end = tokens.get_end(i)
-        let text_slice = text.slice(start as i64, end as i64)
+        let text_slice = text.slice(start, end)
         let tag_text = dump_tag_name(tk, text_slice)
         with_write(tag_text ++ " |" ++ text_slice ++ "|\n")
     0
@@ -4752,8 +4752,8 @@ fn test_gate_matches(value: &str) -> i32:
             break
         gi = gi + 1
     if dash > 0:
-        let os_part = value.slice(0, dash as i64)
-        let arch_part = value.slice((dash + 1) as i64, value.len())
+        let os_part = value.slice(0, dash)
+        let arch_part = value.slice((dash + 1), value.len())
         if test_gate_value_is_os(os_part) and test_gate_value_is_arch(arch_part):
             let m = test_gate_os_matches(os_part) and test_arch_matches(arch_part, with_sysinfo_arch())
             return (m) as i32
@@ -4801,7 +4801,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
         if i < text_len:
             ch = text[i]
         if ch == 10:
-            var line = text.slice(start as i64, i as i64)
+            var line = text.slice(start, i)
             if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.starts_with(expect_stdout_prefix):
@@ -4952,7 +4952,7 @@ fn test_orphan_directive_error(text: &str, from: i32, line_no: i32) -> str:
     while i <= text_len:
         if i == text_len or text[i] == 10:
             if start < i:
-                var line = text.slice(start as i64, i as i64)
+                var line = text.slice(start, i)
                 if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                     line = line.slice(0, line.len() - 1)
                 if test_directive_line_is_known(line):
@@ -4974,7 +4974,7 @@ fn test_append_extra_args(argv: &str, extra_args: &str) -> str:
         let ch = if at_end: 32 else: extra_args[i]
         if ch == 32 or ch == 9:
             if i > start:
-                out = build_graph_argv_append(out, extra_args.slice(start as i64, i as i64))
+                out = build_graph_argv_append(out, extra_args.slice(start, i))
             start = i + 1
         i = i + 1
     out
@@ -5125,7 +5125,7 @@ fn test_extra_arg_present(args: &str, wanted: &str) -> bool:
         let at_end = i == args.len()
         let ch = if at_end: 32 else: args[i]
         if ch == 32 or ch == 9:
-            if i > start and args.slice(start as i64, i as i64) == wanted:
+            if i > start and args.slice(start, i) == wanted:
                 return true
             start = i + 1
         i = i + 1
@@ -5170,7 +5170,7 @@ fn split_nonempty_lines(text: &str) -> List[str]:
         if i < text_len:
             ch = text[i]
         if ch == 10:
-            var line = text.slice(start as i64, i as i64)
+            var line = text.slice(start, i)
             if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.len() > 0:
@@ -5324,10 +5324,10 @@ fn test_stdout_mismatch(expected: &List[str], actual: &List[str], stdout: &str) 
     for expected_item in expected:
         if expected_item.len() > 0 and test_line_count(actual, expected_item) == 0:
             return "expected line `" ++ expected_item ++ "` is printed only inside `" ++ test_line_containing(actual, expected_item) ++ "`"
-    for i in 0..expected.len():
-        let listed = test_line_count(expected, expected[i])
-        let printed = test_line_count(actual, expected[i])
-        if listed != printed: return "line `" ++ expected[i] ++ f"` is expected {listed} times and printed {printed} times"
+    for expected_item in expected:
+        let listed = test_line_count(expected, expected_item)
+        let printed = test_line_count(actual, expected_item)
+        if listed != printed: return "line `" ++ expected_item ++ f"` is expected {listed} times and printed {printed} times"
     if not test_lines_in_order(expected, actual): return "the expected lines print in a different order"
     "stdout has lines the expectations do not list"
 
@@ -5986,12 +5986,12 @@ fn doc_field(line: &str, key: &str) -> str:
     var i = 0
     while i + needle.len() <= line.len():
         let at_field = i == 0 or line[(i - 1)] == 32
-        if at_field and line.slice(i as i64, (i + needle.len()) as i64) == needle:
+        if at_field and line.slice(i, (i + needle.len())) == needle:
             let start = i + needle.len()
             var end = start
             while end < line.len() and line[end] != 32:
                 end = end + 1
-            return line.slice(start as i64, end as i64)
+            return line.slice(start, end)
         i = i + 1
     ""
 
@@ -6043,7 +6043,7 @@ fn doc_source_line_at(text: &str, offset: i32) -> str:
         end = start
     while end < text.len() and text[end] != 10:
         end = end + 1
-    text.slice(start as i64, end as i64).trim().to_owned()
+    text.slice(start, end).trim().to_owned()
 
 fn doc_extract_comment(text: &str, decl_start: i32) -> str:
     var pos = decl_start - 1
@@ -6054,7 +6054,7 @@ fn doc_extract_comment(text: &str, decl_start: i32) -> str:
         var line_start = pos
         while line_start > 0 and text[(line_start - 1)] != 10:
             line_start = line_start - 1
-        let line = text.slice(line_start as i64, (pos + 1) as i64).trim().to_owned()
+        let line = text.slice(line_start, (pos + 1)).trim().to_owned()
         if not line.starts_with("///"):
             break
         lines.push(line.slice(3, line.len()).trim().to_owned())
@@ -6975,7 +6975,7 @@ fn cli_trim_line(text: &str) -> str:
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         end = end - 1
-    text.slice(start as i64, end as i64)
+    text.slice(start, end)
 
 fn cli_dep_line_matches(line: &str, pkg_name: &str) -> bool:
     let trimmed = cli_trim_line(line)
@@ -6986,7 +6986,7 @@ fn cli_dep_line_matches(line: &str, pkg_name: &str) -> bool:
             break
     if eq < 0:
         return false
-    let key = cli_trim_line(trimmed.slice(0, eq as i64))
+    let key = cli_trim_line(trimmed.slice(0, eq))
     key == "c." ++ pkg_name
 
 fn cli_line_is_section(line: &str) -> bool:
@@ -7022,7 +7022,7 @@ fn cli_update_manifest_dep(toml: &str, pkg_name: &str, pkg_version: &str) -> str
         let at_end = i == n
         let ch = if at_end: 10 else: toml[i]
         if ch == 10:
-            let line = toml.slice(start as i64, i as i64)
+            let line = toml.slice(start, i)
             let trimmed = cli_trim_line(line)
             if cli_line_is_section(line) and in_deps and not found_dep:
                 out = out ++ dep_line ++ "\n"
@@ -7060,7 +7060,7 @@ fn cli_remove_manifest_dep(toml: &str, pkg_name: &str) -> CliManifestRemoveResul
         let at_end = i == n
         let ch = if at_end: 10 else: toml[i]
         if ch == 10:
-            let line = toml.slice(start as i64, i as i64)
+            let line = toml.slice(start, i)
             let trimmed = cli_trim_line(line)
             if trimmed == "[deps]":
                 in_deps = true
@@ -7086,7 +7086,7 @@ fn cli_manifest_c_deps(toml: &str) -> List[CliManifestDep]:
         let at_end = i == n
         let ch = if at_end: 10 else: toml[i]
         if ch == 10:
-            let line = toml.slice(start as i64, i as i64)
+            let line = toml.slice(start, i)
             let trimmed = cli_trim_line(line)
             if trimmed == "[deps]":
                 in_deps = true
@@ -7099,9 +7099,9 @@ fn cli_manifest_c_deps(toml: &str) -> List[CliManifestDep]:
                         eq = j as i32
                         break
                 if eq > 0:
-                    let key = cli_trim_line(trimmed.slice(0, eq as i64))
+                    let key = cli_trim_line(trimmed.slice(0, eq))
                     if key.starts_with("c.") and key.len() > 2:
-                        deps.push(CliManifestDep { name: key.slice(2, key.len()), constraint: cli_strip_quotes(trimmed.slice((eq + 1) as i64, trimmed.len())) })
+                        deps.push(CliManifestDep { name: key.slice(2, key.len()), constraint: cli_strip_quotes(trimmed.slice((eq + 1), trimmed.len())) })
             start = i + 1
         i = i + 1
     deps
@@ -7139,8 +7139,8 @@ fn cli_path_basename(path_raw: &str) -> str:
         i = i + 1
 
     if start >= end:
-        return path.slice(0, end as i64)
-    path.slice(start as i64, end as i64)
+        return path.slice(0, end)
+    path.slice(start, end)
 
 fn cli_init_default_name(target_dir: &str) -> str:
     if target_dir != ".":
@@ -7396,7 +7396,7 @@ fn get_command_with_pkg_name(spec: &str) -> str:
             return ""
     if name_end < spec.len() and name_end + 1 >= spec.len():
         return ""
-    spec.slice(0, name_end as i64)
+    spec.slice(0, name_end)
 
 fn parse_get_command_options(argc: i32) -> GetCommandOptions:
     var spec = ""
@@ -7453,8 +7453,8 @@ fn run_get_command(argc: i32) -> i32:
     var pkg_version = ""
     for i in 0..pkg_part.len():
         if pkg_part[i] == 64:
-            pkg_name = pkg_part.slice(0, i as i64)
-            pkg_version = pkg_part.slice((i + 1) as i64, pkg_part.len())
+            pkg_name = pkg_part.slice(0, i)
+            pkg_version = pkg_part.slice((i + 1), pkg_part.len())
             break
     if pkg_name.len() == 0:
         with_eprint("error: invalid package spec '" ++ spec ++ "'")

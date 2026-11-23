@@ -479,7 +479,7 @@ fn comptime_tool_path_dirname(path: &str) -> str:
         return "."
     if last_slash == 0:
         return "/"
-    path.slice(0, last_slash as i64)
+    path.slice(0, last_slash)
 
 fn comptime_tool_join(root: &str, path: &str) -> str:
     if root.len() == 0 or root == ".":
@@ -513,11 +513,11 @@ fn comptime_tool_path_normalize(path: &str) -> str:
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
-                let part = path.slice(start as i64, i as i64)
+                let part = path.slice(start, i)
                 parts = comptime_tool_path_push_part(parts, part, is_absolute, root_parts)
             start = (i + 1) as i32
     if start < path.len():
-        let part = path.slice(start as i64, path.len() as i64)
+        let part = path.slice(start, path.len())
         parts = comptime_tool_path_push_part(parts, part, is_absolute, root_parts)
     if parts.len() == 0:
         if is_absolute:
@@ -556,10 +556,10 @@ fn comptime_tool_split_nonempty_lines(text: &str) -> List[str]:
     for i in 0..text.len():
         if text[i] == 10:
             if i > start:
-                lines.push(text.slice(start as i64, i as i64))
+                lines.push(text.slice(start, i))
             start = (i + 1) as i32
     if start < text.len():
-        lines.push(text.slice(start as i64, text.len()))
+        lines.push(text.slice(start, text.len()))
     lines
 
 fn comptime_tar_zeroes(count: i64) -> str:
@@ -803,7 +803,7 @@ fn comptime_tar_trim_payload_name(text: &str) -> str:
         if ch != 0 and ch != 10 and ch != 13:
             break
         end = end - 1
-    text.slice(0, end as i64)
+    text.slice(0, end)
 
 fn comptime_pax_parse_decimal(text: &str, start: i32, end: i32) -> i32:
     if start >= end:
@@ -835,7 +835,7 @@ fn comptime_pax_value(text: &str, key: &str) -> str:
         while eq < record_end and text[eq] != 61:
             eq = eq + 1
         if eq < record_end:
-            let name = text.slice(record_start as i64, eq as i64)
+            let name = text.slice(record_start, eq)
             if name == key:
                 var value_end = record_end
                 while value_end > eq + 1:
@@ -843,7 +843,7 @@ fn comptime_pax_value(text: &str, key: &str) -> str:
                     if ch != 10 and ch != 13:
                         break
                     value_end = value_end - 1
-                return text.slice((eq + 1) as i64, value_end as i64)
+                return text.slice((eq + 1), value_end)
         pos = record_end
     ""
 
@@ -1026,10 +1026,10 @@ fn comptime_glob_split_by_slash(path: &str) -> List[str]:
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
-                parts.push(path.slice(start as i64, i as i64))
+                parts.push(path.slice(start, i))
             start = (i + 1) as i32
     if start < path.len():
-        parts.push(path.slice(start as i64, path.len()))
+        parts.push(path.slice(start, path.len()))
     parts
 
 fn comptime_glob_segment_matches(pattern: &str, name: &str) -> bool:
@@ -1041,8 +1041,8 @@ fn comptime_glob_segment_matches(pattern: &str, name: &str) -> bool:
             star = i as i32
     if star < 0:
         return pattern == name
-    let prefix = pattern.slice(0, star as i64)
-    let suffix = pattern.slice((star + 1) as i64, pattern.len())
+    let prefix = pattern.slice(0, star)
+    let suffix = pattern.slice((star + 1), pattern.len())
     if name.len() < prefix.len() + suffix.len():
         return false
     if prefix.len() > 0 and name.slice(0, prefix.len()) != prefix:
@@ -1165,7 +1165,7 @@ fn comptime_safe_label(text: &str) -> str:
         let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
-            out = out ++ text.slice(i as i64, (i + 1) as i64)
+            out = out ++ text.slice(i, (i + 1))
         else:
             out = out ++ "_"
     if out.len() == 0:
@@ -2109,7 +2109,7 @@ fn comptime_effect_escape(text: &str) -> str:
         else if ch == 13:
             out = out ++ "\\r"
         else:
-            out = out ++ text.slice(i as i64, (i + 1) as i64)
+            out = out ++ text.slice(i, (i + 1))
     out
 
 impl ComptimeEvaluator:
@@ -2156,7 +2156,7 @@ fn comptime_process_basename(path: &str) -> str:
         let ch = path[i]
         if ch == 47 or ch == 92:
             start = (i + 1) as i32
-    path.slice(start as i64, path.len())
+    path.slice(start, path.len())
 
 fn comptime_process_requires_network(exe: &str) -> bool:
     let name = comptime_process_basename(exe)
@@ -2210,7 +2210,7 @@ fn comptime_effect_resolve_executable(exe: &str) -> str:
     var i = 0
     while i <= path.len():
         if i == path.len() or path[i] == 58:
-            let dir = path.slice(start as i64, i as i64)
+            let dir = path.slice(start, i)
             let candidate = if dir.len() == 0: with_str_clone_ref(exe) else: dir ++ "/" ++ exe
             if with_fs_file_exists(candidate) != 0:
                 return candidate
@@ -3297,7 +3297,7 @@ impl ComptimeEvaluator:
         // 3].len()` in a `comptime` expression was refused as "not
         // comptime-evaluable yet" while the same call on a List worked.
         if arg_count == 0 and method == "len":
-            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_isize as i32), recv_value.extra_count as i64))
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_isize as i32), recv_value.extra_count))
         if arg_count == 0 and method == "is_empty":
             return comptime_control_value(comptime_value_bool(recv_value.extra_count == 0))
         if arg_count != 0 or (method != "first" and method != "last" and method != "rest"):
@@ -4346,7 +4346,7 @@ fn comptime_module_name_for_path(root: &str, path: &str) -> str:
         if ch == 47:
             out = out ++ "."
         else:
-            out = out ++ rel.slice(i as i64, (i + 1) as i64)
+            out = out ++ rel.slice(i, (i + 1))
     out
 
 fn comptime_line_column_for_offset(text: &str, offset: i32) -> ComptimeLineColumn:
@@ -5799,8 +5799,8 @@ impl ComptimeEvaluator:
                     last_clean_slash = gi as i32
             if not has_glob:
                 return self.fail(node, "glob pattern contains no wildcards: " ++ pattern)
-            let glob_base = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash as i64)
-            let glob_suffix = if last_clean_slash < 0: pattern else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
+            let glob_base = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash)
+            let glob_suffix = if last_clean_slash < 0: pattern else: pattern.slice((last_clean_slash + 1), pattern.len())
             let resolved_base = self.capability_resolve_project_path(record, glob_base, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
@@ -5929,8 +5929,8 @@ impl ComptimeEvaluator:
             if list_type == 0:
                 return self.fail(node, "ToolFs.host_list_files result type is unknown")
             let start = self.extra_values.len() as i32
-            for i in 0..raw_files.len():
-                self.extra_values.push(comptime_value_str(raw_files[i]))
+            for raw_file in raw_files:
+                self.extra_values.push(comptime_value_str(raw_file))
             return comptime_control_value(comptime_value_list(list_type, start, raw_files.len() as i32))
         if method == "write_text" or method == "copy_file" or method == "chmod" or method == "rename" or method == "copy_tree" or method == "symlink":
             let expected: i32 =
