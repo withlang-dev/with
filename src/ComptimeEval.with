@@ -2193,7 +2193,7 @@ impl ComptimeEvaluator:
         identity
 
 fn comptime_effect_contains_slash(text: &str) -> bool:
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 47:
             return true
     false
@@ -7832,7 +7832,7 @@ impl ComptimeEvaluator:
         if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE or iterable_signal.value.kind == ComptimeValueKind.CV_LIST or is_map:
             count = iterable_signal.value.extra_count
         else if iterable_signal.value.kind == ComptimeValueKind.CV_BYTES:
-            count = iterable_signal.value.text.len() as i32
+            count = iterable_signal.value.text.len()
         else if iterable_signal.value.kind == ComptimeValueKind.CV_RANGE:
             let start_value = iterable_signal.value.data0
             let end_value = iterable_signal.value.data1

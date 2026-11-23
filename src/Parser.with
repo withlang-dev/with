@@ -10222,7 +10222,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_R_PAREN or self.peek() == TokenKind.TK_DOT_DOT_DOT:
                 break
 
-        let count = (params.len() as i32 / (FN_PARAM_STRIDE as i64)) as i32
+        let count = (params.len() / (FN_PARAM_STRIDE as i64)) as i32
         let param_start = self.pool.extra_len()
         for param in params:
             self.pool.add_extra(param)

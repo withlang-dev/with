@@ -470,7 +470,7 @@ impl LspDocument:
         parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
         self.fast_pool = parser.parse_module()
         self.fast_intern = intern
-        self.fast_text_len = self.text.len() as i32
+        self.fast_text_len = self.text.len()
         self.fast_valid = true
 
     // Slow-tier: full compilation with PRELUDE_NONE. ~50-200ms.
@@ -534,7 +534,7 @@ impl LspDocument:
                 ti = ti + 1
             if methods.len() > 0:
                 self.cached_trait_methods.insert(with_str_clone_ref(type_name), methods)
-        self.cached_text_len = self.text.len() as i32
+        self.cached_text_len = self.text.len()
         self.cache_valid = true
 
     // Find the type of an expression at a byte offset using the slow tier.

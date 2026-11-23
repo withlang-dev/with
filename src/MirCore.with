@@ -644,7 +644,7 @@ impl MirBody:
 
 impl MirBody:
     mut fn new_block() -> BlockId:
-        let id = self.bb_stmt_starts.len() as i32
+        let id = self.bb_stmt_starts.len()
         self.bb_stmt_starts.push(self.stmt_kinds.len() as i32)
         self.bb_stmt_counts.push(0)
         self.bb_term_kinds.push(TermKind.TK_UNREACHABLE)

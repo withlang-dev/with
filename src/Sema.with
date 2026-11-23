@@ -11138,7 +11138,7 @@ impl Sema:
                     changed = 1
 
     mut fn finalize_receiver_requirements():
-        for si in 0..self.sig_receiver_modes.len() as i32:
+        for si in 0..self.sig_receiver_modes.len():
             if self.sig_receiver_mode(si) == ReceiverMode.None or self.sig_get_param_count(si) <= 0:
                 continue
             self.sig_receiver_required_effects[si] = self.sig_param_effect(si, 0) & EFF_DECLARED_MASK

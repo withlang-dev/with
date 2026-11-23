@@ -7117,7 +7117,7 @@ impl Sema:
             self.fn_label_scope_stack.pop()
 
     fn find_function_label(sym: i32) -> i32:
-        for i in 0..self.fn_label_syms.len() as i32:
+        for i in 0..self.fn_label_syms.len():
             if self.fn_label_syms[i] == sym:
                 return i as i32
         -1
@@ -7390,7 +7390,7 @@ impl Sema:
 
     mut fn push_label_frame(sym: i32, kind: i32, node: i32) -> Unit:
         if sym != 0:
-            var i = self.label_syms.len() as i32 - 1
+            var i = self.label_syms.len() - 1
             while i >= 0:
                 let frame_kind = self.label_kinds[i]
                 if frame_kind == LabelFrameKind.LFK_BOUNDARY:
@@ -44071,7 +44071,7 @@ fn sema_import_alias_matches(import_text: &str, alias: &str) -> bool:
     if import_text == alias:
         return true
     var start = 0
-    for i in 0..import_text.len() as i32:
+    for i in 0..import_text.len():
         let ch = import_text[i]
         if ch == 46 or ch == 47 or ch == 92:
             start = (i + 1) as i32

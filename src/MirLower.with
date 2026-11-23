@@ -798,7 +798,7 @@ impl MirBuilder:
     // Whether `local_id` currently has a scheduled value drop in this scope (an
     // owned local), without cancelling it. A share-place borrow (param) has none.
     fn local_has_scheduled_value_drop(local_id: i32) -> bool:
-        var i = self.drop_local_ids.len() as i32 - 1
+        var i = self.drop_local_ids.len() - 1
         while i >= 0:
             if self.drop_local_ids[i] == local_id and self.drop_kind_owns_value(self.drop_kinds[i]):
                 return true
@@ -893,7 +893,7 @@ impl MirBuilder:
         if base_local < 0:
             return
         let path_start: i32 = self.body.place_proj_starts[place]
-        for i in 0..self.moved_field_base_locals.len() as i32:
+        for i in 0..self.moved_field_base_locals.len():
             if self.moved_field_path_matches(i as i32, base_local, path_start, path_count):
                 return
         let stored_start = self.moved_field_path_syms.len() as i32
@@ -1011,7 +1011,7 @@ impl MirBuilder:
         // that destructor, just as for a moved variant payload above.
         if place >= 0 and place < self.body.place_locals.len():
             let base_local: i32 = self.body.place_locals[place]
-            for i in 0..self.pending_reset_field_places.len() as i32:
+            for i in 0..self.pending_reset_field_places.len():
                 let field_place: i32 = self.pending_reset_field_places[i]
                 if self.body.place_locals[field_place] == base_local:
                     let zero = self.body.gen_zero_operand(self.pending_reset_field_types[i])
@@ -4631,7 +4631,7 @@ impl MirBuilder:
         self.type_id_is_str(self.sema.get_type_d0(resolved))
 
     fn string_alias_index(local_id: i32) -> i32:
-        for i in 0..self.string_alias_local_ids.len() as i32:
+        for i in 0..self.string_alias_local_ids.len():
             if self.string_alias_local_ids[i] == local_id:
                 return i as i32
         -1

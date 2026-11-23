@@ -446,7 +446,7 @@ fn suspend_collect_guard_locals(sema: &Sema, body: &MirBody) -> List[i32]:
     out
 
 fn suspend_guard_index(guard_locals: &List[i32], guard_local: i32) -> i32:
-    for gi in 0..guard_locals.len() as i32:
+    for gi in 0..guard_locals.len():
         if guard_locals[gi] == guard_local:
             return gi as i32
     -1
@@ -454,7 +454,7 @@ fn suspend_guard_index(guard_locals: &List[i32], guard_local: i32) -> i32:
 fn suspend_guard_index_for_sym(body: &MirBody, guard_locals: &List[i32], sym: i32) -> i32:
     if sym == 0:
         return -1
-    for gi in 0..guard_locals.len() as i32:
+    for gi in 0..guard_locals.len():
         let local = guard_locals[gi]
         if local >= 0 and local < body.local_names.len():
             if body.local_names[local] == sym:
