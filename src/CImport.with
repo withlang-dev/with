@@ -19494,10 +19494,15 @@ fn ci_fp_record_value_followed(session: i64, value: i32) -> bool:
 // a store that names no function: `null`; `param:<name>`, a parameter of the
 // storing function, read directly or as the next variadic argument of its
 // `va_list`; or `other`, a value the function loaded, computed or was
-// returned, which nothing says the program registered.
-fn ci_fp_stored_source(session: i64, written: i32) -> str:
+// returned, which nothing says the program registered. `same` is the same
+// field of another record of the same type (libcurl's `second->set.fdebug
+// = data->set.fdebug`): whatever that field holds, this one now holds.
+fn ci_fp_stored_source(session: i64, written: i32, target: i32) -> str:
     if ci_cursor_is_null_like(session, written): return "null"
     let value = ci_peel_transparent_and_cstyle(session, written)
+    if with_ci_cursor_kind(session, value) == CXK_MEMBER_REF and with_ci_cursor_spelling(session, value) == with_ci_cursor_spelling(session, target):
+        let record = ci_fp_member_record(session, target)
+        if record.len() > 0 and ci_fp_member_record(session, value) == record: return "same"
     if with_ci_cursor_kind(session, value) == CXK_DECL_REF and with_ci_cursor_references_parameter(session, value): return "param:" ++ with_ci_cursor_spelling(session, value)
     "other"
 
@@ -19691,7 +19696,7 @@ fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
             // D213: a store that names no function is a null store or a
             // value the function was handed; the second makes the function
             // a setter of the field.
-            if named == "?": out = out ++ "fs\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ ci_fp_stored_source(session, written) ++ "\t" ++ loc ++ "\n"
+            if named == "?": out = out ++ "fs\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ ci_fp_stored_source(session, written, lhs) ++ "\t" ++ loc ++ "\n"
     // D211: a record assigned whole takes every function-pointer field from
     // its source, which no field write names. An initializer list or a
     // compound literal on the right is read field by field below.
