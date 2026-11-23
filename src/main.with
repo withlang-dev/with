@@ -289,7 +289,7 @@ fn cli_value_or_prefix(argc: i32, flag: &str, prefix: &str) -> str:
 // Every flag the driver reads, for any command (#2198). A flag is known by
 // its name, the part before any `=`.
 fn cli_known_flags() -> List[str]:
-    ["--abi-sha", "--alloc", "--baseline", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--contract", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-all", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-contracts", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--facade", "--facts", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--gir", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--macro-prefix-map", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-only", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
+    ["--abi-sha", "--alloc", "--baseline", "--binary", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--contract", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-all", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-contracts", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--facade", "--facts", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--gir", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--macro-prefix-map", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-only", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
 
 // The first argument that looks like a flag and names none the driver
 // knows, or "". A flag's value (`-o out`, `--target x`) is skipped.
@@ -7361,7 +7361,7 @@ type GetCommandOptions {
 }
 
 fn get_command_usage():
-    with_eprint("usage: with get [--force-reinstall] [--from-source] [c.<package>[@version] | <package>[@version]]")
+    with_eprint("usage: with get [--force-reinstall] [--binary] [--from-source] [c.<package>[@version] | <package>[@version]]")
     with_eprint("  c.<package>     C dependency via Conan Center")
     with_eprint("  <package>       With package (registry not yet available)")
     with_eprint("  (no arguments)  restore dependencies from lock file")
@@ -7408,6 +7408,8 @@ fn parse_get_command_options(argc: i32) -> GetCommandOptions:
             force_reinstall = true
         else if arg == "--from-source":
             conan_set_from_source(true)
+        else if arg == "--binary":
+            conan_set_binary(true)
         else if arg.starts_with("-"):
             with_eprint("error: unknown with get option '" ++ arg ++ "'")
             return GetCommandOptions { spec: "", force_reinstall }

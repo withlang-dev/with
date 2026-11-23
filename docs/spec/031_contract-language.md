@@ -767,9 +767,9 @@ library's code, not only this one:
 
 | How the library reaches the program | What the drafter knows | The result |
 |---|---|---|
-| Built from source by `with get` (CMake, Ninja and `with cc`) | everything: the units and the macros are the build's own `compile_commands.json`, and the library linked is that build's output | drawn |
+| Built from source by `with get` (CMake, Ninja and `with cc`): the default (D212) | everything: the units and the macros are the build's own `compile_commands.json`, and the library linked is that build's output | drawn |
 | A project's own C sources, compiled by its `build.with` | everything, when the project's build compiles every C unit of the library its contract describes: the units and flags are the build's compile targets | drawn at build time. `runs no threads` is then effective with provenance `proof` without being written, and `with analyze … contract` prints it. Where it does not hold, the program states the one-line claim |
-| A prebuilt binary (a Conan Center package) | the package states its settings (os, arch, compiler, build type) and its options in `conaninfo.txt`. It does not state the flags its builder's environment added | evidence, not proof: printed in the report with the configuration analyzed, granting nothing. Configuring the source with the settings and options the package records does not establish that the builds are the same |
+| A prebuilt binary (a Conan Center package): `with get --binary`, or a package that cannot be built from source | the package states its settings (os, arch, compiler, build type) and its options in `conaninfo.txt`. It does not state the flags its builder's environment added | evidence, not proof: printed in the report with the configuration analyzed, granting nothing. Configuring the source with the settings and options the package records does not establish that the builds are the same |
 | A system package (`c.<name> = "system"`) | nothing: there is no source | none |
 
 What `with get` does today is in the note in wcl-landing-order.md: it prints and

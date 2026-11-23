@@ -20,14 +20,34 @@ c.glib = "2.78"
 c.sqlite3 = "3.45"
 ```
 
-**`with get c.X`** resolves the package from Conan Center, downloads
-headers, prebuilt libraries, and transitive deps into
+**`with get c.X`** resolves the package from Conan Center, builds it
+from source, installs its headers, libraries and transitive deps into
 `.with/deps/c/<name>/<version>/`, and updates `with.toml`. Each
 package includes a `metadata.json` with include paths, library
 paths, library names, and transitive dependencies.
 
-When Conan Center has no binary this toolchain can link for the
-platform, `with get c.X` builds the package from source. The recipe
+**Source by default (D212).** A proof about a library's code holds only
+where the source analyzed and the library linked are the same build
+(§31.8.5), so `with get c.X` builds the package from source and draws
+its contract from the patched tree it compiled. Four things go with
+that:
+
+- **The build is cached per user.** The installed tree and its contract
+  are kept under the user's cache directory, keyed on the package's
+  version, source and recipe, the target, the compiler, the CMake
+  settings given, and the registry's facts. A second project on the
+  machine copies it.
+- **A requirement that cannot be built is taken as a binary.** A package
+  or requirement that is not a CMake project, or needs a tool this
+  machine lacks, is taken as Conan Center's prebuilt binary. Calls into
+  it are calls outside the package, which the proofs already handle.
+- **One line per package says which it was:** built from source, with
+  its contract drawn from that build; or a prebuilt binary with no
+  proofs, and why. Both point at `with contract report`.
+- **`--binary` opts out** and takes Conan Center's binary where one
+  links.
+
+The recipe
 Conan Center publishes is read as data and never executed: it names
 the source archive, its digest and patches, the requirements, and the
 CMake variables. The package's own CMake build runs with `with cc` as
