@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.83
+# The With Programming Language — Specification v7.84
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.84:** D213 (Eric, 2026-11-22; from libcurl 8.23.0's `setopt.c`, `http2.c` and `vdns/doh.c`). §16.2b.15: two more stores fit the role `callback`: the same field of another record of the same type, and the next variadic argument read under `case K` of a switch on the selector, at the field's type, when the list and the selector arrive unchanged from every public function that reaches it, each such function's contract states case K as a callback, and every call from inside the package with selector K passes null or the same field of another record. Not yet implemented.
+
 **Changelog v7.83:** D213 (Eric, ruled 2026-11-18, amended 2026-11-22). §16.2b.15, §31: the field role `callback`. The field holds only callbacks the program registered through a presented operation; a call through it lends its arguments. The stores that fit are a null store, the setter's named callback parameter and a whole-record copy; a package function stored there contradicts the role, and any other store leaves the field undecided. The thread of a call through it is what the setters' `callback_thread` clauses state. Implemented.
 
 **Changelog v7.82:** (Eric, 2026-11-22.) §9.7: in `name @ pattern` the name binds the subject and the names inside the pattern observe it (#3543; a move of the name while an inner name is in scope is refused). §31.8: the row for a fixed parameter names the three values §16.2b.11 allows. No words were needed for a pipeline over a field as a function's last line: §2.2 already refuses the implicit field move, and the compiler now does. Implemented.
