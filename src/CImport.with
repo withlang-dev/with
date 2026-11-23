@@ -19490,6 +19490,17 @@ fn ci_fp_record_value_followed(session: i64, value: i32) -> bool:
         return ci_fp_record_value_followed(session, with_ci_child(session, c, 1)) and ci_fp_record_value_followed(session, with_ci_child(session, c, 2))
     kind == CXK_DECL_REF and not with_ci_cursor_references_parameter(session, c)
 
+// D213: where the value stored into a function-pointer field came from, for
+// a store that names no function: `null`; `param:<name>`, a parameter of the
+// storing function, read directly or as the next variadic argument of its
+// `va_list`; or `other`, a value the function loaded, computed or was
+// returned, which nothing says the program registered.
+fn ci_fp_stored_source(session: i64, written: i32) -> str:
+    if ci_cursor_is_null_like(session, written): return "null"
+    let value = ci_peel_transparent_and_cstyle(session, written)
+    if with_ci_cursor_kind(session, value) == CXK_DECL_REF and with_ci_cursor_references_parameter(session, value): return "param:" ++ with_ci_cursor_spelling(session, value)
+    "other"
+
 fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
     if cursor < 0 or ci_unevaluated(session, cursor): return ""
     var out = ""
@@ -19505,7 +19516,7 @@ fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
             // D213: a store that names no function is a null store or a
             // value the function was handed; the second makes the function
             // a setter of the field.
-            if named == "?": out = out ++ "fs\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ (if ci_cursor_is_null_like(session, written): "null" else: "value") ++ "\t" ++ loc ++ "\n"
+            if named == "?": out = out ++ "fs\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ ci_fp_stored_source(session, written) ++ "\t" ++ loc ++ "\n"
     // D211: a record assigned whole takes every function-pointer field from
     // its source, which no field write names. An initializer list or a
     // compound literal on the right is read field by field below.
