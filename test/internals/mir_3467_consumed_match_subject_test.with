@@ -1,0 +1,8 @@
+//! expect-stdout: ok
+// #3467: the ownership validator holds each arm of a match that consumes
+// its subject to the payload of the variant it matched.
+use MirValidationTests
+
+fn main:
+    mir_test_consumed_match_subject()
+    print("ok")
