@@ -2060,6 +2060,9 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
 // while its MIR can still drop a moved place or read a released task handle;
 // only `check --validate-all` sees that. The lane judges each test's MIR and
 // runs none of them (`test --validate-only`).
+fn validate_all_tests_head(compiler: &str) -> List[str]:
+    [build_owned_text(compiler), "test", "--validate-only", "--quiet"]
+
 fn run_validate_all_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -2070,29 +2073,34 @@ fn run_validate_all_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("validate-all-tests: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, inputs[0])
-    var args: List[str] = List.new()
-    args.push(build_owned_text(compiler))
-    args.push("test")
-    args.push("--validate-only")
-    args.push("--quiet")
-    var dirs: List[str] = List.new()
-    dirs.push("test/behavior")
-    dirs.push("test/spec")
-    dirs.push("test/debug_alloc")
-    dirs.push("test/phase")
-    var count = 0
-    for di in 0..dirs.len():
-        let files = fs.list_files(dirs[di])
-        for fi in 0..files.len():
-            let p = files[fi]
-            if p.ends_with(".with") and not p.contains("/lib/"):
-                args.push(build_project_abs(root, p))
-                count = count + 1
     let vout = build_project_abs(root, build_project_join(out_dir, "validate.stdout"))
     let verr = build_project_abs(root, build_project_join(out_dir, "validate.stderr"))
-    let vr = ctx.process_runner().run_capture_cwd(args, vout, verr, 1800000, root)
-    if vr.rc != 0:
-        ctx.diagnostics().error(f"validate-all-tests: {count} files, rc={vr.rc}\n" ++ fs.read_text(build_project_join(out_dir, "validate.stderr")))
+    // One command per batch of files. Every file on one command line was
+    // some 225,000 characters: fine on macOS and Linux, refused on Windows
+    // (32767 UTF-16 units), where the lane had never run. The budget is
+    // the shortest a gating host allows, on every host, so the lane behaves
+    // the same everywhere.
+    let budget = 24000
+    var count = 0
+    var batch = validate_all_tests_head(compiler)
+    var used = 0
+    for dir in ["test/behavior", "test/spec", "test/debug_alloc", "test/phase"]:
+        for p in fs.list_files(dir):
+            if not p.ends_with(".with") or p.contains("/lib/"): continue
+            let abs = build_project_abs(root, p)
+            if used > 0 and used + abs.len() + 3 > budget:
+                let vr = ctx.process_runner().run_capture_cwd(batch, vout, verr, 1800000, root)
+                if vr.rc != 0:
+                    ctx.diagnostics().error(f"validate-all-tests: rc={vr.rc} in the batch ending before {p}\n" ++ fs.read_text(build_project_join(out_dir, "validate.stderr")))
+                batch = validate_all_tests_head(compiler)
+                used = 0
+            used = used + abs.len() + 3
+            batch.push(abs)
+            count = count + 1
+    if used > 0:
+        let vr = ctx.process_runner().run_capture_cwd(batch, vout, verr, 1800000, root)
+        if vr.rc != 0:
+            ctx.diagnostics().error(f"validate-all-tests: rc={vr.rc} in the last batch\n" ++ fs.read_text(build_project_join(out_dir, "validate.stderr")))
     print(f"validate-all-tests: {count} files ok")
     fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0

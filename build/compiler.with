@@ -3161,6 +3161,12 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         rsp = rsp ++ "--sysroot=" ++ sysroot ++ "\n"
         rsp = rsp ++ "-fuse-ld=lld\n--rtlib=compiler-rt\n--unwindlib=none\n-stdlib=libc++\n-static-libstdc++\n"
         rsp = rsp ++ "-L" ++ comp_rsp_path(llvm_lib_dir ++ "/" ++ triple) ++ "\n"
+        // The archive by name, as the direct link's record has it below:
+        // `-stdlib=libc++ -static-libstdc++` only reach a link the driver
+        // runs as C++. The emit-C lane links the C-built compiler as C, so
+        // nothing brought the C++ runtime in (`undefined symbol: operator
+        // new`, on Linux only, where the lane had never run).
+        rsp = rsp ++ comp_rsp_path(libcxx) ++ "\n"
         rsp = rsp ++ "-lpthread\n-ldl\n-lm\n"
         ld_rsp = ld_rsp ++ comp_rsp_path(libcxx) ++ "\n"
         ld_rsp = ld_rsp ++ "-lpthread\n-ldl\n-lm\n"
