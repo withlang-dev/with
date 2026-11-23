@@ -501,7 +501,7 @@ impl Lexer:
 
     mut fn lex_number() -> i32:
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
         var is_float = false
         var scanned_prefixed = false
 

@@ -282,7 +282,7 @@ impl Sema:
             var first: i32 = 0
             var first_ret: i32 = 0
             let readers: List[i32] = []
-            for ri in 0..self.facade_resources.len() as i32:
+            for ri in 0..self.facade_resources.len():
                 if self.facade_resources[ri].decl != di or self.facade_resources[ri].ok_consts.len() == 0:
                     continue
                 for pi in 0..self.facade_resources[ri].producers.len():
@@ -4631,7 +4631,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return false
         let name = self.safe_symbol_text(self.get_type_name(resolved))
-        for ci in 0..self.foreign_contracts.len() as i32:
+        for ci in 0..self.foreign_contracts.len():
             let rec = self.foreign_contracts[ci].returns_borrow_record
             if rec != 0 and self.pool_resolve(rec) == name:
                 return true
@@ -4837,7 +4837,7 @@ impl Sema:
         if self.diags.has_errors():
             return
         // The files each facade describes: its fn items and resource operations.
-        for ci in 0..self.foreign_contracts.len() as i32:
+        for ci in 0..self.foreign_contracts.len():
             self.facade_domain_note_file(self.foreign_contracts[ci].facade, self.facade_fn_file(self.foreign_contracts[ci].fn_sym))
         for ri in 0..self.facade_resources.len():
             let facade = self.facade_resources[ri].facade
@@ -5535,7 +5535,7 @@ impl Sema:
             name = self.get_generic_inst_base(r as i32)
         if name != 0:
             let tn = self.pool_resolve(name)
-            for ci in 0..self.foreign_contracts.len() as i32:
+            for ci in 0..self.foreign_contracts.len():
                 let res = self.foreign_contracts[ci].returns_borrow_resource
                 if res != 0 and facade_render_borrowed_name(self.pool_resolve(res)) == tn:
                     return ci as i32
@@ -5875,7 +5875,7 @@ impl Sema:
             let paired_cb = self.facade_contract_callback_param(ci)
             var nullable: i32 = 0
             var bad: i32 = -1
-            for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
+            for k in 0..self.foreign_contracts[ci].nullable_params.len():
                 let npi = self.foreign_contracts[ci].nullable_params[k]
                 if npi == paired_cb and paired_cb >= 0 and ud >= 0 and not self.facade_contract_userdata_retained(ci) and not self.facade_contract_userdata_consumed(ci): nullable = 1
                 // D102: an unpaired function-pointer parameter widens on its own.
@@ -5969,7 +5969,7 @@ impl Sema:
     // (§16.2b.9: "callbacks cannot run concurrently between the calls").
     mut fn facade_index_pair_ops():
         for ci in 0..self.foreign_contracts.len() as i32:
-            for si in 0..self.foreign_contracts[ci].variadic_slots.len() as i32:
+            for si in 0..self.foreign_contracts[ci].variadic_slots.len():
                 let ri = self.foreign_contracts[ci].variadic_slots[si].resource
                 if ri >= 0:
                     self.facade_pair_resources.insert(self.facade_resources[ri].name, ri)

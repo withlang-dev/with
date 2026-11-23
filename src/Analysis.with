@@ -489,7 +489,7 @@ fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_s
     let exact_source = sema.source_text_for_file_id(file)
     if exact_source.len() > 0:
         source = exact_source
-    for si in 0..sema.source_text_file_ids.len() as i32:
+    for si in 0..sema.source_text_file_ids.len():
         if sema.source_text_file_ids[si] == file:
             path = sema.source_text_names[si]
             break
@@ -997,7 +997,7 @@ fn analysis_collect_mir(mut report: AnalysisReport, mir_mod: &MirModule, sema: &
             place.name = with_str_clone_ref(body_fact.name)
             place.detail = mir_place_text(body, pi)
             report.add(place)
-        for ci in 0..body.call_arg_starts.len() as i32:
+        for ci in 0..body.call_arg_starts.len():
             analysis_collect_mir_call(report, mir_mod, body, sema, pool, ci as i32, source_path, source_text)
 
 fn analysis_audit_call_contracts(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule):

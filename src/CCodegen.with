@@ -762,7 +762,7 @@ fn cc_sanitize_ident(raw: &str) -> str:
     if raw.len() == 0:
         return "sym"
     var out = ""
-    for i in 0..raw.len() as i32:
+    for i in 0..raw.len():
         if with_interrupt_requested() != 0:
             return "__with_interrupted"
         let b = raw[i]
