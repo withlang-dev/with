@@ -88,7 +88,7 @@ void with_vec_shrink_to_fit_es(uint8_t *v, int64_t elem_size);
 void with_vec_free_buffer_at(void *p, int64_t cap, int64_t elem_size, int64_t start);
 int64_t with_vec_len(const with_vec *v);
 // D120: a List of values shares its buffer under a count (rt_core.with).
-void with_vec_retain(with_vec *v, int64_t elem_size);
+void with_vec_retain(const with_vec *v, int64_t elem_size);
 int64_t with_vec_release_last(with_vec *v, int64_t elem_size);
 int64_t with_vec_is_unique(with_vec *v, int64_t elem_size);
 int64_t with_vec_make_unique_bits(with_vec *v, int64_t elem_size);
