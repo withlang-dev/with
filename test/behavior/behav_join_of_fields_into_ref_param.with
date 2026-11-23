@@ -1,0 +1,18 @@
+//! expect-stdout: 1
+//! expect-stdout: 2
+
+// An `if` whose arms are fields, passed where a `&T` is taken, joins the
+// arms as views of their places. The lowering recorded each arm with the
+// field's own type beside the view it built, and the compiler's audit
+// (`with analyze … audit:all`) reported both arms: "an expression lowered
+// to an operand of another type (MIR &List[str], Sema List[str])".
+type Two { a: List[str], b: List[str] }
+
+fn count(items: &List[str]) -> isize: items.len()
+
+fn pick(t: &Two, first: bool) -> isize: count(if first: t.a else: t.b)
+
+fn main:
+    let t = Two { a: ["x".to_owned()], b: ["y".to_owned(), "z".to_owned()] }
+    print(pick(t, true))
+    print(pick(t, false))
