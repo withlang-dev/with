@@ -19897,7 +19897,12 @@ fn ci_fnptr_field_evidence(session: i64, cursor: i32) -> str:
         if with_ci_cursor_kind(session, lhs) == CXK_MEMBER_REF and with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, lhs)):
             let written = with_ci_child(session, cursor, 1)
             let named = ci_fp_named_function(session, written)
-            out = out ++ "fw\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ named ++ "\t" ++ loc ++ "\n"
+            // A null store writes no function: a call through the field
+            // reaches what the other writes name, and a null entry is one the
+            // caller tests for (libcurl's `if(Curl_ssl->set_engine_default)`).
+            // Counted as a write of an unknown function, one backend's `NULL`
+            // left a field no unit decides.
+            if not ci_cursor_is_null_like(session, written): out = out ++ "fw\t" ++ ci_fp_member_record(session, lhs) ++ "\t" ++ with_ci_cursor_spelling(session, lhs) ++ "\t" ++ named ++ "\t" ++ loc ++ "\n"
             // D213: a store that names no function is a null store or a
             // value the function was handed; the second makes the function
             // a setter of the field.
@@ -19989,7 +19994,7 @@ fn ci_fp_init_list_writes(session: i64, list: i32, record: &str, loc: &str) -> s
             value = with_ci_child(session, entry, with_ci_num_children(session, entry) - 1)
         if at < 0 or at >= names.len():
             return "fw\t" ++ record ++ "\t*\t?\t" ++ loc ++ "\n"
-        if fn_pointer[at]: out = out ++ "fw\t" ++ record ++ "\t" ++ names[at] ++ "\t" ++ ci_fp_named_function(session, value) ++ "\t" ++ with_ci_cursor_location(session, value) ++ "\n"
+        if fn_pointer[at] and not ci_cursor_is_null_like(session, value): out = out ++ "fw\t" ++ record ++ "\t" ++ names[at] ++ "\t" ++ ci_fp_named_function(session, value) ++ "\t" ++ with_ci_cursor_location(session, value) ++ "\n"
         next = at + 1
     out
 
