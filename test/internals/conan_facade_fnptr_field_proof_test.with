@@ -20,6 +20,11 @@
 //                proofs cannot read"
 //   cast_show    a pointer to the table converted to `char *`
 //   user_show    a field only the caller ever fills: "never writes it"
+//   nul_show     one table fills the field and another leaves it NULL
+//                (libcurl's TLS backends and `set_engine_default`): a
+//                null entry writes no function, so the set is the one
+//                function the other table names
+//   reset_show   the field is also cleared by an assignment of NULL
 use compiler.ConanClient
 use std.fs
 use std.process
@@ -34,7 +39,7 @@ fn main:
     assert(mkdir_p(build) == 0)
     var header = "typedef struct Thing Thing;\nThing *thing_new(void);\nvoid thing_free(Thing *t);\n"
     header = header ++ "struct UserOps { void (*show)(Thing *); };\n"
-    for name in ["one", "two", "zeroed", "cast", "keep", "chain", "copied", "fwd"]: header = header ++ "void " ++ name ++ "_show(Thing *t);\n"
+    for name in ["one", "two", "zeroed", "cast", "keep", "chain", "copied", "fwd", "nul", "reset"]: header = header ++ "void " ++ name ++ "_show(Thing *t);\n"
     header = header ++ "struct CopyOps { void (*show)(Thing *); };\nvoid copy_set(const struct CopyOps *user);\n"
     header = header ++ "void user_show(struct UserOps *ops, Thing *t);\n"
     assert(write_file(dep ++ "/include/thing.h", header) == 0)
@@ -65,6 +70,10 @@ fn main:
     unit = unit ++ "typedef struct FwdOps FwdOps;\nstruct FwdOps { int id; void (*show)(Thing *); };\nstatic FwdOps fwd_ops;\n"
     unit = unit ++ "static void fwd_connect(FwdOps *into) { const FwdOps table = { .id = 1, .show = show_a }; *into = table; }\n"
     unit = unit ++ "void fwd_show(Thing *t) { fwd_connect(&fwd_ops); fwd_ops.show(t); }\n"
+    unit = unit ++ "struct NulOps { void (*show)(Thing *); int id; };\nstatic const struct NulOps with_show = { show_a, 1 };\nstatic const struct NulOps without = { NULL, 2 };\n"
+    unit = unit ++ "void nul_show(Thing *t) { const struct NulOps *o = t->n ? &with_show : &without; if (o->show) o->show(t); }\n"
+    unit = unit ++ "struct ResetOps { void (*show)(Thing *); };\nstatic struct ResetOps reset_ops = { show_a };\n"
+    unit = unit ++ "void reset_show(Thing *t) { if (!t) reset_ops.show = NULL; else if (reset_ops.show) reset_ops.show(t); }\n"
     assert(write_file(src ++ "/thing.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c thing.c\",\n  \"file\": \"thing.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
@@ -78,6 +87,8 @@ fn main:
         "  keep_show: raw: retains param 0 (passed through the function pointer field show (only ever show_a or show_keep) to show_keep",
         "  chain_show: lend",
         "  fwd_show: lend",
+        "  nul_show: lend",
+        "  reset_show: lend",
         "  copied_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: the record is assigned whole",
         "  zeroed_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: a pointer to the record is passed to memset, which the proofs cannot read",
         "  cast_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: a pointer to the record is converted to another pointer type",
