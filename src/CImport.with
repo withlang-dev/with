@@ -13140,6 +13140,29 @@ impl CiStmtPool:
         let kind = with_ci_cursor_kind(session, cursor)
         let nc = with_ci_num_children(session, cursor)
 
+        // A GNU statement expression used as a value (`x = ({ T t = …; t; })`):
+        // its statements run first, in order, and its last expression is the
+        // value. The statements join the enclosing body, where a local they
+        // declare is renamed apart from another of its name, as a nested
+        // block's is.
+        if kind == CXK_STMT_EXPR and nc >= 1:
+            let compared = exprs.lower_c99_comparison_stmt_expr(session, cursor, types, scope)
+            if compared != 0: return ci_value_ir_plain(compared)
+            let stmt_body = with_ci_child(session, cursor, nc - 1)
+            let stmt_count = with_ci_num_children(session, stmt_body)
+            if stmt_count == 0: return ci_value_ir_invalid()
+            var stmt_setup: CiStmtId = 0
+            for si in 0..stmt_count - 1:
+                let lowered_stmt = self.lower_stmt_ir(session, with_ci_child(session, stmt_body, si), exprs, types, 0, scope)
+                if lowered_stmt == 0: return ci_value_ir_invalid()
+                stmt_setup = self.merge_ir(stmt_setup, lowered_stmt)
+            let stmt_value = self.lower_value_expr_ir(session, with_ci_child(session, stmt_body, stmt_count - 1), exprs, types, scope)
+            if not ci_value_ir_valid(stmt_value): return ci_value_ir_invalid()
+            return CiValueExprIR {
+                setup_stmt: self.merge_ir(stmt_setup, stmt_value.setup_stmt),
+                value_expr: stmt_value.value_expr,
+            }
+
         if kind == CXK_UNEXPOSED_STMT:
             let inner = ci_find_last_expr_child(session, cursor)
             if inner >= 0:
