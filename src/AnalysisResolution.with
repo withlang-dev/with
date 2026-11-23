@@ -774,7 +774,7 @@ fn resolution_audit_expr_operands(mut report: AnalysisReport, sema: &Sema, mir_m
     // #767: expressions that lowered to a value and have no type Sema
     // recorded (the lowering fell back to deriving one), by node kind.
     var unrecorded = 0
-    let unrecorded_kinds: HashMap[i32, i32] = HashMap.new()
+    let unrecorded_kinds: HashMap[i32, i32] = [:]
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue

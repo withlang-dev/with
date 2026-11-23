@@ -1485,7 +1485,7 @@ fn llvm_section_per_function(m: *mut u8):
         while f as i64 != 0:
             let named = LLVMGetSection(f)
             if LLVMIsDeclaration(f) == 0 and (named as i64 == 0 or *named == 0):
-                var len: u64 = 0
+                let len: u64 = 0
                 let name = LLVMGetValueName2(f, &raw mut len)
                 let section = with_alloc(len as i64 + 7)
                 with_memcpy(section, c".text.".ptr as *const u8, 6)

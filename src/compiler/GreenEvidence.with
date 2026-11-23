@@ -30,7 +30,7 @@ fn green_git_output(root: &str, args: &List[str], label: &str) -> str:
 
 fn green_first_line(text: &str) -> str:
     for i in 0..text.len():
-        if text[i] == '\n': return text.slice(0, i as i64)
+        if text[i] == '\n': return text.slice(0, i)
     text
 
 /// The battery's inputs, as the text `git hash-object` identifies (D50: key

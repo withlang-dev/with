@@ -1046,8 +1046,8 @@ impl AstPool:
             self.add_extra(has_args)
             if has_args != 0:
                 self.add_extra(arg_count)
-                for i in 0..arg_nodes.len():
-                    self.add_extra(arg_nodes[i])
+                for arg_node in arg_nodes:
+                    self.add_extra(arg_node)
             let base = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), base, self.get_data1(node), new_extra, self.literal_suffix(node))
 

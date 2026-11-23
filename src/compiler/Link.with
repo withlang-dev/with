@@ -104,7 +104,7 @@ fn link_stage_archive_macos_minos(data: &str) -> i64:
     var best: i64 = 0
     var offset: isize = 8
     while offset + 60 <= data.len():
-        let header: str = data.slice(offset, offset + 60)
+        let header = data.slice(offset, offset + 60)
         let size = host_lib_decimal(header.slice(48, 58).trim())
         if size < 0: break
         let body = offset + 60
@@ -185,7 +185,7 @@ fn link_stage_is_temp_archive_path(path: &str) -> bool:
         return false
     var i = 0
     while i + 3 < path.len():
-        if path.slice(i as i64, (i + 3) as i64) == ".o.":
+        if path.slice(i, (i + 3)) == ".o.":
             return link_stage_is_digit(path[(i + 3)])
         i = i + 1
     false
@@ -247,7 +247,7 @@ fn link_stage_basename(path: &str) -> str:
             last_slash = i as i32
     if last_slash < 0:
         return with_str_clone_ref(path)
-    path.slice((last_slash + 1) as i64, path.len())
+    path.slice((last_slash + 1), path.len())
 
 fn link_stage_owned_temp_archive(path: &str, pid_text: &str) -> bool:
     let name = link_stage_basename(path)
@@ -262,13 +262,13 @@ fn link_stage_cleanup_owned_temp_archives_in(dir: &str, pid_text: &str):
         let ch = listing[i]
         if ch == 10 or ch == 13:
             if i > start:
-                let path = listing.slice(start as i64, i as i64)
+                let path = listing.slice(start, i)
                 if link_stage_owned_temp_archive(path, pid_text):
                     let remove_path = if link_stage_str_contains(path, "/"): path else: dir ++ "/" ++ path
                     let _remove = runtime_remove_file(remove_path)
             start = (i + 1) as i32
     if start < listing.len():
-        let path = listing.slice(start as i64, listing.len())
+        let path = listing.slice(start, listing.len())
         if link_stage_owned_temp_archive(path, pid_text):
             let remove_path = if link_stage_str_contains(path, "/"): path else: dir ++ "/" ++ path
             let _remove = runtime_remove_file(remove_path)
@@ -1552,7 +1552,7 @@ fn link_stage_macho_undefined_symbols(path: &str) -> str:
                     var end = stroff + strx
                     while end < stroff + strsize and data[end] != 0:
                         end = end + 1
-                    out.push_str(data.slice((stroff + strx) as i64, end as i64))
+                    out.push_str(data.slice((stroff + strx), end))
                     out.push_str("\n")
             return out.to_str()
         offset = offset + cmdsize
@@ -1755,7 +1755,7 @@ fn link_stage_elf_undefined_symbols(path: &str) -> str:
                     var end = stroff + name
                     while end < stroff + strsize and data[end] != 0:
                         end = end + 1
-                    out.push_str(data.slice((stroff + name) as i64, end as i64))
+                    out.push_str(data.slice((stroff + name), end))
                     out.push_str("\n")
                 at = at + 24
             return out.to_str()
@@ -2289,7 +2289,7 @@ fn link_stage_read_file_trimmed(path: &str) -> str:
             end = end - 1
         else:
             break
-    content.slice(0, end as i64)
+    content.slice(0, end)
 
 fn link_stage_artifact_root() -> str:
     let env_root = runtime_getenv("WITH_OUT_DIR")
@@ -2412,7 +2412,7 @@ fn link_stage_dirname(path: &str) -> str:
             last_slash = i as i32
     if last_slash < 0:
         return "."
-    path.slice(0, last_slash as i64)
+    path.slice(0, last_slash)
 
 fn link_stage_source_stem(source_path: &str) -> str:
     var last_slash = -1
@@ -2420,7 +2420,7 @@ fn link_stage_source_stem(source_path: &str) -> str:
         if source_path[i] == 47 or source_path[i] == 92: // '/' or '\'
             last_slash = i as i32
     let base = if last_slash >= 0:
-        source_path.slice((last_slash + 1) as i64, source_path.len() as i64)
+        source_path.slice((last_slash + 1), source_path.len())
     else:
         with_str_clone_ref(source_path)
     // The name up to its last dot: `hello.potato` is `hello`, `a.b.with` is
@@ -2429,7 +2429,7 @@ fn link_stage_source_stem(source_path: &str) -> str:
     var last_dot = -1
     for i in 1..base.len():
         if base[i] == '.': last_dot = i as i32
-    if last_dot > 0: base.slice(0, last_dot as i64) else: base
+    if last_dot > 0: base.slice(0, last_dot) else: base
 
 fn link_stage_sanitize_relative_dir(path: &str) -> str:
     var out = ""
@@ -2440,7 +2440,7 @@ fn link_stage_sanitize_relative_dir(path: &str) -> str:
         let ch = if at_end: 47 else: path[i]
         if ch == 47 or ch == 92:
             if i > segment_start:
-                let segment = path.slice(segment_start as i64, i as i64)
+                let segment = path.slice(segment_start, i)
                 if segment != ".":
                     if out.len() > 0:
                         out = out ++ "/"

@@ -215,7 +215,7 @@ fn runtime_path_parent(path: &str) -> str:
     var last = -1
     for i in 0..path.len():
         if path[i] == '/' or path[i] == '\\': last = i as i32
-    if last <= 0: "" else: path.slice(0, last as i64)
+    if last <= 0: "" else: path.slice(0, last)
 
 fn runtime_own_tree_root() -> str:
     if g_own_tree_resolved: return with_str_clone_ref(g_own_tree)

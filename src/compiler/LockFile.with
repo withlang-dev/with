@@ -59,7 +59,7 @@ fn lock_json_escape(value: &str) -> str:
         let ch = value[i]
         if ch == 34 or ch == 92:
             out = out ++ "\\"
-        out = out ++ value.slice(i as i64, (i + 1) as i64)
+        out = out ++ value.slice(i, (i + 1))
     out
 
 fn lock_json_string(key: &str, value: &str, comma: bool) -> str:
@@ -114,7 +114,7 @@ fn lock_json_extract_string(json: &str, key: &str) -> str:
                 else if ch == 34:
                     break
                 vi = vi + 1
-            return json.slice(start as i64, vi as i64)
+            return json.slice(start, vi)
         pos = pos + 1
     ""
 
@@ -151,7 +151,7 @@ fn lock_json_extract_string_array(json: &str, key: &str) -> List[str]:
                             break
                         end = end + 1
                     if end > start:
-                        result.push(json.slice(start as i64, end as i64))
+                        result.push(json.slice(start, end))
                     ai = end + 1
                 else:
                     ai = ai + 1
@@ -168,7 +168,7 @@ fn lock_split_nonempty_lines(text: &str) -> List[str]:
         let at_end = i == n
         let ch = if at_end: 10 else: text[i]
         if ch == 10:
-            var line = text.slice(start as i64, i as i64)
+            var line = text.slice(start, i)
             if line.len() > 0 and line[line.len() - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.len() > 0:
@@ -194,7 +194,7 @@ fn lock_line_string_value(line: &str, key: &str) -> str:
     var end = start
     while end < n and line[end] != 34:
         end = end + 1
-    line.slice(start as i64, end as i64)
+    line.slice(start, end)
 
 fn lock_line_entry_name(line: &str) -> str:
     if lock_find_text(line, "\": {") < 0:
@@ -209,7 +209,7 @@ fn lock_line_entry_name(line: &str) -> str:
     var end = start
     while end < n and line[end] != 34:
         end = end + 1
-    let name = line.slice(start as i64, end as i64)
+    let name = line.slice(start, end)
     if name == "deps":
         return ""
     name
@@ -343,7 +343,7 @@ fn lock_ref_name(req: &str) -> str:
     let slash = lock_find_text(req, "/")
     if slash <= 0:
         return ""
-    req.slice(0, slash as i64)
+    req.slice(0, slash)
 
 fn lock_ref_version(req: &str) -> str:
     let slash = lock_find_text(req, "/")
@@ -353,7 +353,7 @@ fn lock_ref_version(req: &str) -> str:
     let at = lock_find_text(req, "@")
     if at > slash:
         end = at
-    req.slice((slash + 1) as i64, end as i64)
+    req.slice((slash + 1), end)
 
 fn lock_entry_from_installed_c_dep(project_root: &str, name: &str, version: &str) -> LockEntry:
     let dep_dir = lock_c_dep_dir(project_root, name, version)

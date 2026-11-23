@@ -11395,7 +11395,7 @@ impl MirBuilder:
                     self.switch_to(test_bb)
                     self.lower_pattern_match(scrutinee_place, self.ast.get_extra(p_start + pi), hit_bb, alt_fail)
                     self.switch_to(hit_bb)
-                    self.assign_operand_to_place(alt_place, self.int_const_operand(pi as i64, self.sema.ty_i32 as i32), self.ast.get_start(pat_node))
+                    self.assign_operand_to_place(alt_place, self.int_const_operand(pi, self.sema.ty_i32 as i32), self.ast.get_start(pat_node))
                     self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
                     test_bb = alt_fail
                 return
@@ -11767,7 +11767,7 @@ impl MirBuilder:
         let targets = []
         for row in self.or_alt_logs:
             if row.start >= start and row.alt_local == alt_local:
-                vals.push(row.alt as i64)
+                vals.push(row.alt)
                 targets.push(self.new_block() as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, self.place_for_local(alt_local)), table, join_bb, 0)
@@ -12305,7 +12305,7 @@ impl MirBuilder:
             let bb = self.new_block() as i32
             alt_bbs.push(bb)
             if pi > 0:
-                vals.push(pi as i64)
+                vals.push(pi)
                 targets.push(bb)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, self.place_for_local(alt_local)), table, alt_bbs[0] as BlockId, 0)
@@ -12576,8 +12576,8 @@ impl MirBuilder:
                 let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                 if inner_pat != 0:
                     let inner = self.lower_pattern(inner_pat, child_place)
-                    for i in 0..inner.len():
-                        out.push(inner[i])
+                    for inner_item in inner:
+                        out.push(inner_item)
                     continue
                 let bind_ty = self.place_local_type(child_place)
                 let local_id = self.body.new_local(bind_ty, self.pattern_bind_mut, raw, 1)
@@ -12626,8 +12626,8 @@ impl MirBuilder:
                 let field_place = self.body.new_tuple_index_place(tuple_subject_place, si, elem_ty)
                 let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                 let inner = self.lower_pattern(elem_pat, child_place)
-                for i in 0..inner.len():
-                    out.push(inner[i])
+                for inner_item in inner:
+                    out.push(inner_item)
             return out
 
         if pk == NodeKind.NK_PAT_STRUCT:
@@ -17938,7 +17938,7 @@ impl MirBuilder:
             if self.sema.text_cast_fns.contains(node):
                 let i32_ty = self.sema.ty_i32 as i32
                 let at = self.sema.source_location_for_file_id(self.sema.text_cast_file_ids.get(node).unwrap(), self.ast.get_start(node))
-                let args: List[i32] = [self.lower_expr(self.ast.get_data0(node)), self.lower_str_lit_as(self.sema.text_cast_names.get(node).unwrap(), 0), self.lower_str_lit_as(self.sema.text_cast_files.get(node).unwrap(), 0), self.int_const_operand((at.line + 1) as i64, i32_ty), self.int_const_operand((at.col + 1) as i64, i32_ty)]
+                let args: List[i32] = [self.lower_expr(self.ast.get_data0(node)), self.lower_str_lit_as(self.sema.text_cast_names.get(node).unwrap(), 0), self.lower_str_lit_as(self.sema.text_cast_files.get(node).unwrap(), 0), self.int_const_operand((at.line + 1), i32_ty), self.int_const_operand((at.col + 1), i32_ty)]
                 return self.lower_resolved_call_with_operand_args_contract(self.sema.text_cast_fns.get(node).unwrap(), args, cast_tid, node, self.sema.resolved_call_sigs.get(node).unwrap(), self.sema.resolved_call_mono_syms.get(node).unwrap())
             return self.lower_cast(self.ast.get_data0(node), cast_tid, node)
 
@@ -20790,7 +20790,7 @@ fn mir_unreached_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, m
         let value = ast_pool.get_data1(decl)
         let tid = sema.typed_binding_types.get(decl as i32) ?? 0
         if tid == 0 or mir_mod.global_init_body_syms.contains(value): continue
-        var builder = MirBuilder.init(sema, ast_pool, pool, pool.intern(f"__with_init_body_{decl as i32}"))
+        let builder = MirBuilder.init(sema, ast_pool, pool, pool.intern(f"__with_init_body_{decl as i32}"))
         builder.lower_global_initializer(value, tid)
         for named in mir_body_fn_refs(builder.body):
             if unreached.remove(named).is_some(): pending.push(named)
@@ -21470,8 +21470,8 @@ impl MirModule:
             for scc_item in scc:
                 let src_idx = scc_item
                 let src_body = &self.bodies[src_idx]
-                for ti2 in 0..scc_syms.len():
-                    let dst_sym = scc_syms[ti2]
+                for scc_sym in scc_syms:
+                    let dst_sym = scc_sym
                     if mir_body_has_non_tail_call_to(src_body, dst_sym):
                         bad_edge = 1
                         break

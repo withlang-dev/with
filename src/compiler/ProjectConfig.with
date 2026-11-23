@@ -166,7 +166,7 @@ fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
     let total = text.len()
     while i <= total:
         if i == total or text[i] == 10:
-            var line = text.slice(line_start as i64, i as i64)
+            var line = text.slice(line_start, i)
             line = project_config_trim(project_config_strip_comment(line))
             if line.len() > 0:
                 if pending_key.len() > 0:
@@ -182,8 +182,8 @@ fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
                 else:
                     let eq = project_config_find_char(line, 61)
                     if eq > 0:
-                        let key = project_config_trim(line.slice(0, eq as i64))
-                        let value = project_config_trim(line.slice((eq + 1) as i64, line.len()))
+                        let key = project_config_trim(line.slice(0, eq))
+                        let value = project_config_trim(line.slice((eq + 1), line.len()))
                         let forbidden = project_config_forbidden_entry(section, key)
                         if forbidden.len() > 0 and cfg.manifest_error.len() == 0:
                             cfg.manifest_error = forbidden
@@ -370,7 +370,7 @@ fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, k
 fn project_config_strip_quotes(value: &str) -> str:
     let len = value.len()
     if len >= 2 and value[0] == 34 and value[(len - 1)] == 34:
-        return value.slice(1, (len - 1) as i64)
+        return value.slice(1, (len - 1))
     with_str_clone_ref(value)
 
 fn project_config_parse_bool(value: &str) -> i32:
@@ -499,7 +499,7 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
             let colon = project_config_find_char(req, 58)
             let req_name = req.slice(0, slash)
             let req_version = req.slice(slash + 1, if colon > slash: colon else: req.len())
-            let req_component = if colon > slash: req.slice((colon + 1) as i64, req.len()) else: ""
+            let req_component = if colon > slash: req.slice((colon + 1), req.len()) else: ""
             out = project_config_load_dep_component(out, req_name, req_version, req_component, link)
     out
 
@@ -507,7 +507,7 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
 // names: a header by name, each `#include` of inline C text, and each
 // `#include` of a header of the project's own that those name.
 fn project_config_note_c_import(cfg: ProjectConfig, decl_dir: &str, header_spec: &str) -> ProjectConfig:
-    var out = cfg
+    let out = cfg
     let spec = project_config_trim(header_spec)
     if spec.len() == 0: return out
     if project_config_str_contains(spec, "\n") or project_config_str_contains(spec, ";") or spec[0] == 35:
@@ -535,7 +535,7 @@ fn project_config_note_includes(cfg: ProjectConfig, decl_dir: &str, text: &str, 
 // One header name: the fetched package whose include path holds it is
 // matched; a header of the project's own is read for what it includes.
 fn project_config_note_header(cfg: ProjectConfig, decl_dir: &str, header_name: &str, depth: i32) -> ProjectConfig:
-    var out = cfg
+    let out = cfg
     let deps_root = out.root_dir ++ "/.with/deps/c/"
     var in_package = false
     for path in out.c_import_include_paths:
@@ -589,7 +589,7 @@ fn project_config_json_str_array(json: &str, key: &str) -> List[str]:
                     while end < json_len and json[end] != 34:
                         end = end + 1
                     if end > start:
-                        result.push(json.slice(start as i64, end as i64))
+                        result.push(json.slice(start, end))
                     ai = end + 1
                 else:
                     ai = ai + 1
@@ -694,14 +694,14 @@ fn project_config_parse_string_array(value: &str) -> List[str]:
                     else if ch == 114:
                         entry = entry ++ "\r"
                     else:
-                        entry = entry ++ value.slice(i as i64, (i + 1) as i64)
+                        entry = entry ++ value.slice(i, (i + 1))
                     escaped = 0
                 else if ch == 92:
                     escaped = 1
                 else if ch == 34:
                     break
                 else:
-                    entry = entry ++ value.slice(i as i64, (i + 1) as i64)
+                    entry = entry ++ value.slice(i, (i + 1))
                 i = i + 1
             if entry.len() > 0:
                 out.push(entry)
@@ -865,7 +865,7 @@ fn project_config_strip_comment(line: &str) -> str:
             else:
                 in_string = 1
         else if ch == 35 and in_string == 0:
-            return line.slice(0, i as i64)
+            return line.slice(0, i)
         i = i + 1
     with_str_clone_ref(line)
 
@@ -876,7 +876,7 @@ fn project_config_trim(text: &str) -> str:
         start = start + 1
     while end > start and project_config_is_space(text[(end - 1)]):
         end = end - 1
-    text.slice(start as i64, end as i64)
+    text.slice(start, end)
 
 fn project_config_is_space(ch: i32) -> bool:
     ch == 32 or ch == 9 or ch == 10 or ch == 13
@@ -889,7 +889,7 @@ fn project_config_str_contains(text: &str, needle: &str) -> bool:
     var i = 0
     let limit = text.len() - needle.len()
     while i <= limit:
-        if text.slice(i as i64, (i + needle.len()) as i64) == needle:
+        if text.slice(i, (i + needle.len())) == needle:
             return true
         i = i + 1
     false

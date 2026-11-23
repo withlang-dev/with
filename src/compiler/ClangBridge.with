@@ -2137,7 +2137,7 @@ unsafe fn probe_enum_const_fits(cursor: CXCursor, parent: CXCursor, data: *mut u
         return CXChildVisit_Continue
     let probe = data as *mut EnumFitProbe
     var value = clang_getEnumConstantDeclValue(cursor)
-    if value < 0 and (*probe).unsigned_bits > 0 and (*probe).unsigned_bits < 64: value = value + ((1 as i64) << ((*probe).unsigned_bits as u32))
+    if value < 0 and (*probe).unsigned_bits > 0 and (*probe).unsigned_bits < 64: value = value + ((1 as i64) << (*probe).unsigned_bits)
     if value < -2147483648 or value > 2147483647:
         (*probe).fits = 0
     CXChildVisit_Continue
@@ -3083,12 +3083,12 @@ var g_attr_children_out: str = ""
 
 // Whether `loc` is text at the place it is used, not what a macro expanded to.
 unsafe fn location_is_written(loc: CXSourceLocation) -> bool:
-    var spelled_file = 0 as *mut u8
-    var used_file = 0 as *mut u8
-    var spelled_at: u32 = 0
-    var used_at: u32 = 0
-    var line: u32 = 0
-    var col: u32 = 0
+    let spelled_file = 0 as *mut u8
+    let used_file = 0 as *mut u8
+    let spelled_at: u32 = 0
+    let used_at: u32 = 0
+    let line: u32 = 0
+    let col: u32 = 0
     clang_getSpellingLocation(loc, &raw mut spelled_file, &raw mut line, &raw mut col, &raw mut spelled_at)
     clang_getExpansionLocation(loc, &raw mut used_file, &raw mut line, &raw mut col, &raw mut used_at)
     spelled_file as i64 == used_file as i64 and spelled_at == used_at
@@ -3106,12 +3106,12 @@ unsafe fn collect_attr_child(cursor: CXCursor, parent: CXCursor, data: *mut u8) 
 // wrote them), concatenated as the attribute scan writes an attribute
 // (`format(printf,1,2)`); "" when the two ends are not spelled in one file.
 unsafe fn cimport_spelled_text(s: *mut CImportSession, tu: *mut u8, range: CXSourceRange) -> str:
-    var start_file = 0 as *mut u8
-    var end_file = 0 as *mut u8
-    var line: u32 = 0
-    var col: u32 = 0
-    var start_offset: u32 = 0
-    var end_offset: u32 = 0
+    let start_file = 0 as *mut u8
+    let end_file = 0 as *mut u8
+    let line: u32 = 0
+    let col: u32 = 0
+    let start_offset: u32 = 0
+    let end_offset: u32 = 0
     clang_getSpellingLocation(clang_getRangeStart(range), &raw mut start_file, &raw mut line, &raw mut col, &raw mut start_offset)
     clang_getSpellingLocation(clang_getRangeEnd(range), &raw mut end_file, &raw mut line, &raw mut col, &raw mut end_offset)
     if start_file as i64 == 0 or end_file as i64 == 0 or clang_File_isEqual(start_file, end_file) == 0 or end_offset < start_offset: return ""
@@ -3850,12 +3850,12 @@ fn macro_source_is_define_line(source: &str) -> bool:
     var i = 0
     while i < source.len() and (source[i] == 32 or source[i] == 9):
         i = i + 1
-    if i >= source.len() or bridge_byte_at(source, i as i64) != 35:
+    if i >= source.len() or bridge_byte_at(source, i) != 35:
         return false
     i = i + 1
-    while i < source.len() and (bridge_byte_at(source, i as i64) == 32 or bridge_byte_at(source, i as i64) == 9):
+    while i < source.len() and (bridge_byte_at(source, i) == 32 or bridge_byte_at(source, i) == 9):
         i = i + 1
-    i + 6 <= source.len() and bridge_slice(source, i as i64, (i + 6) as i64) == "define"
+    i + 6 <= source.len() and bridge_slice(source, i, (i + 6)) == "define"
 
 unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, origin_flags: i32):
     if line_ptr as i64 == 0:
@@ -4050,7 +4050,7 @@ fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str,
             while pos < macro_names.len() and macro_names[pos] != 124:
                 pos = pos + 1
             if pos > start:
-                let name = bridge_slice(macro_names, start as i64, pos as i64)
+                let name = bridge_slice(macro_names, start, pos)
                 let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ ";\n"
                 let probe_ptr = *(&probe_line as *const *const u8)
                 rt_write(fd, probe_ptr, probe_line.len())

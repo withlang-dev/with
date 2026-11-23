@@ -223,7 +223,7 @@ fn build_cache_resolve_executable_path(argv0: &str) -> str:
         let at_end = i == search_path.len()
         let ch = if at_end: 58 else: search_path[i]
         if ch == 58:
-            let dir = search_path.slice(segment_start as i64, i as i64)
+            let dir = search_path.slice(segment_start, i)
             let candidate = if dir.len() == 0: "./" ++ argv0 else: dir ++ "/" ++ argv0
             if build_graph_rt_file_exists(candidate) != 0:
                 return candidate
@@ -359,7 +359,7 @@ fn build_cache_split_lines(text: &str) -> List[str]:
         if i < text_len:
             ch = text[i]
         if ch == 10:
-            var line = text.slice(start as i64, i as i64)
+            var line = text.slice(start, i)
             if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.len() > 0:
@@ -388,7 +388,7 @@ fn build_cache_str_compare(a: &str, b: &str) -> i32:
 // the build over eleven minutes to fingerprint.
 fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
     var sorted: List[str] = []
-    for i in 0..items.len(): sorted.push(with_str_clone_ref(items[i]))
+    for item in items: sorted.push(with_str_clone_ref(item))
     let count = sorted.len()
     var width: isize = 1
     while width < count:
@@ -445,8 +445,8 @@ fn build_cache_effect_env_state_line(effect_line: &str) -> str:
                 break
     if second_tab < 0 or third_tab < 0:
         return ""
-    let name = effect_line.slice((second_tab + 1) as i64, third_tab as i64)
-    let hash = effect_line.slice((third_tab + 1) as i64, effect_line.len())
+    let name = effect_line.slice((second_tab + 1), third_tab)
+    let hash = effect_line.slice((third_tab + 1), effect_line.len())
     "env:" ++ name ++ ":" ++ hash
 
 fn build_cache_effects_text(effects: &List[str]) -> str:
@@ -662,7 +662,7 @@ fn build_cache_test_surface_text(root: &str, test_path: &str) -> str:
     var slash = -1
     for i in 0..rel.len():
         if rel[i] == '/': slash = i as i32
-    let dir = if slash > 0: rel.slice(0, slash as i64) else: "."
+    let dir = if slash > 0: rel.slice(0, slash) else: "."
     "dir:" ++ dir ++ ":" ++ build_cache_tree_fingerprint(root, dir, false) ++ "\nsrc:" ++ build_cache_tree_fingerprint(root, "src", true) ++ "\nlib:" ++ build_cache_tree_fingerprint(root, "lib", true) ++ "\n"
 
 // The environment that changes what the compiler a test runs produces, set
@@ -695,7 +695,7 @@ fn build_cache_load_test_verdicts(root: &str, compiler_fp: &str, target_name: &s
     var i = 0
     while i <= text.len():
         if i == text.len() or text[i] == 10:
-            let line = text.slice(line_start as i64, i as i64)
+            let line = text.slice(line_start, i)
             if line.starts_with("pass:"):
                 let rest = line.slice(5, line.len())
                 var colon = -1
@@ -703,7 +703,7 @@ fn build_cache_load_test_verdicts(root: &str, compiler_fp: &str, target_name: &s
                     if rest[ci] == 58:
                         colon = ci as i32
                         break
-                let key = if colon >= 0: rest.slice(0, colon as i64) else: rest
+                let key = if colon >= 0: rest.slice(0, colon) else: rest
                 if key.len() > 0:
                     out.insert(key, 1)
             line_start = i + 1
@@ -890,7 +890,7 @@ fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebui
     while i < state_text.len():
         let byte = state_text[i]
         if byte == 10:
-            let line = state_text.slice(line_start as i64, i as i64)
+            let line = state_text.slice(line_start, i)
             if line == "v2":
                 saw_v2 = true
             else if line.starts_with("sig:"):
@@ -908,7 +908,7 @@ fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebui
             line_start = i + 1
         i = i + 1
     if line_start < state_text.len():
-        let line = state_text.slice(line_start as i64, state_text.len())
+        let line = state_text.slice(line_start, state_text.len())
         if line == "v2":
             saw_v2 = true
         else if line.starts_with("sig:"):
@@ -942,7 +942,7 @@ fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebui
         let split = build_cache_last_colon(stored)
         if split < 0:
             return "stale: malformed dependency state"
-        let stored_path = stored.slice(0, split as i64)
+        let stored_path = stored.slice(0, split)
         let path = build_cache_dep_path(root, stored_path)
         let current_hash = build_cache_fingerprint_file(path)
         let expected_entry = stored_path ++ ":" ++ current_hash
@@ -953,7 +953,7 @@ fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebui
         let split = build_cache_last_colon(stored)
         if split < 0:
             return "stale: malformed environment state"
-        let name = stored.slice(0, split as i64)
+        let name = stored.slice(0, split)
         let current_hash = build_cache_sha256_text(build_graph_rt_getenv(name))
         let expected_entry = name ++ ":" ++ current_hash
         if stored != expected_entry:
@@ -1170,7 +1170,7 @@ fn build_cache_store_dirname(path: &str) -> str:
     var last = -1
     for i in 0..path.len():
         if path[i] == '/': last = i as i32
-    if last <= 0: "." else: path.slice(0, last as i64)
+    if last <= 0: "." else: path.slice(0, last)
 
 fn build_cache_store_is_name_byte(b: u8) -> bool:
     (b >= 'a' and b <= 'z') or (b >= 'A' and b <= 'Z') or (b >= '0' and b <= '9') or b == '.' or b == '_' or b == '-'
@@ -1185,7 +1185,7 @@ fn build_cache_store_text_names_root(text: &str, root: &str) -> bool:
     let m = root.len()
     var i = 0
     while i + m <= n:
-        if text[i] == root[0] and text.slice(i as i64, (i + m) as i64) == root:
+        if text[i] == root[0] and text.slice(i, (i + m)) == root:
             if i + m == n or not build_cache_store_is_name_byte(text[i + m]): return true
         i = i + 1
     false
@@ -1341,18 +1341,18 @@ fn build_cache_store_record_mismatch(root: &str, state_text: &str) -> str:
             let entry = line.slice(if is_input: 3 else: 4, line.len())
             let split = build_cache_last_colon(entry)
             if split < 0: return "malformed record"
-            let stored_path = entry.slice(0, split as i64)
+            let stored_path = entry.slice(0, split)
             // An `in:` line names the path as the record joined it to the
             // root; a `dep:` line names it from the root, or absolutely.
             let current = if is_input: stored_path else: build_cache_dep_path(root, stored_path)
-            if build_cache_fingerprint_file(current) != entry.slice((split + 1) as i64, entry.len()):
+            if build_cache_fingerprint_file(current) != entry.slice((split + 1), entry.len()):
                 return "made from another " ++ build_cache_project_relative(root, stored_path)
         else if line.starts_with("env:"):
             let entry = line.slice(4, line.len())
             let split = build_cache_last_colon(entry)
             if split < 0: return "malformed record"
-            let name = entry.slice(0, split as i64)
-            if build_cache_sha256_text(build_graph_rt_getenv(name)) != entry.slice((split + 1) as i64, entry.len()):
+            let name = entry.slice(0, split)
+            if build_cache_sha256_text(build_graph_rt_getenv(name)) != entry.slice((split + 1), entry.len()):
                 return "made under another " ++ name
     ""
 

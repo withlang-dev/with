@@ -67,7 +67,7 @@ fn tracked_dirname(path: &str) -> str:
         return ""
     if last_slash == 0:
         return "/"
-    path.slice(0, last_slash as i64)
+    path.slice(0, last_slash)
 
 fn tracked_path_is_absolute(path: &str) -> bool: runtime_path_is_absolute(path)
 
@@ -118,7 +118,7 @@ fn tracked_normalize_path(path: &str) -> str:
                 // Flat decision (no inner chain ending in else-if): the seed
                 // compiler predates the #629 dangling-else fix and miscompiles
                 // that shape — the ordinary-segment push became dead code.
-                let part = path.slice(start as i64, i as i64)
+                let part = path.slice(start, i)
                 var keep = true
                 if part == ".":
                     keep = false

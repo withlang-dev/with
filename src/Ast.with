@@ -2104,7 +2104,7 @@ impl AstPool:
                 break
         if dot <= 0:
             return 0
-        let owner_sym = intern.lookup_symbol(name.slice(0, dot as i64))
+        let owner_sym = intern.lookup_symbol(name.slice(0, dot))
         let decl = struct_decls.get(ast_pair_key(self.file(fn_node) as i32, owner_sym)) ?? 0
         if decl == 0:
             return 0

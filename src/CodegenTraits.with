@@ -1227,7 +1227,7 @@ impl Codegen:
         if meta >= 0:
             let cc_name = self.fn_callconv_name(meta)
             if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
-                let export_name = cc_name.slice(9, cc_name.len() as i64)
+                let export_name = cc_name.slice(9, cc_name.len())
                 if export_name.len() > 0:
                     return export_name
         self.module_link_name_for_path(self.decl_source_path(decl_index), name)

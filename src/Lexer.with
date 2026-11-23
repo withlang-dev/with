@@ -648,7 +648,7 @@ impl Lexer:
         let start = self.token_start
         while self.pos < slen and is_ident_continue(src[(self.pos)]):
             self.pos = self.pos + 1
-        let text = src.slice(start as i64, self.pos as i64)
+        let text = src.slice(start, self.pos)
 
         // c"..." -> C-string literal
         if text == "c" and self.pos < slen and src[(self.pos)] == CharCode.Dquote:

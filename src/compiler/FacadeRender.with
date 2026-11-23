@@ -645,7 +645,7 @@ fn facade_render_produced_field(pool: &AstPool, intern: &InternPool, resource: i
 // line `fn <name>(` and runs to the next.
 fn facade_render_unshared_name_ops(ops: &str) -> str:
     let lines = ops.split("\n")
-    let seen: HashMap[str, i32] = HashMap.new()
+    let seen: HashMap[str, i32] = [:]
     for line in lines:
         if line.starts_with("fn "): seen.increment(line.slice(3, line.find("(")).to_owned())
     var out = ""
@@ -654,8 +654,8 @@ fn facade_render_unshared_name_ops(ops: &str) -> str:
     // whichever of those resources it is given. Its forwarders (each `fn
     // NAME(facade_self: R):` over one line that ends the value) become one
     // function over the resources that name it.
-    let enders: HashMap[str, str] = HashMap.new()
-    let mixed: HashMap[str, i32] = HashMap.new()
+    let enders: HashMap[str, str] = [:]
+    let mixed: HashMap[str, i32] = [:]
     var li = 0
     while li < lines.len():
         let line = lines[li]
@@ -668,7 +668,7 @@ fn facade_render_unshared_name_ops(ops: &str) -> str:
                 enders.insert(name, (enders.get(name) ?? &"") ++ resource ++ "\n")
             else: mixed.insert(name, 1)
         li += 1
-    let emitted: HashMap[str, i32] = HashMap.new()
+    let emitted: HashMap[str, i32] = [:]
     for line in lines:
         if line.starts_with("fn "):
             let name = line.slice(3, line.find("(")).to_owned()

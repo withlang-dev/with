@@ -275,7 +275,7 @@ fn analysis_kind_name(kind: AnalysisFactKind) -> str:
     if kind == AnalysisFactKind.Operator: return "operator"
     "unknown"
 
-fn analysis_slice(text: &str, start: i32, end: isize): text.slice(start as i64, end as i64)
+fn analysis_slice(text: &str, start: i32, end: isize): text.slice(start, end)
 
 fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
     let n = text.len()

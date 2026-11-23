@@ -417,7 +417,7 @@ fn format_source_styled(input: &str, style: i32) -> str:
         if tag == TokenKind.TK_L_BRACE:
             block_kw_active = false
 
-        let text = source.slice(start as i64, end as i64)
+        let text = source.slice(start, end)
         out = out ++ text
         prev_tag = tag
         i = i + 1

@@ -246,7 +246,7 @@ fn json_tok_str(js: &str, tokens: *mut JsonToken, idx: i32) -> str:
     unsafe:
         start = (*(tokens + idx as u64)).start
         end = (*(tokens + idx as u64)).end
-    json_unescape(js.slice(start as i64, end as i64))
+    json_unescape(js.slice(start, end))
 
 fn json_tok_int(js: &str, tokens: *mut JsonToken, idx: i32) -> i32:
     if idx < 0:
@@ -256,7 +256,7 @@ fn json_tok_int(js: &str, tokens: *mut JsonToken, idx: i32) -> i32:
     unsafe:
         start = (*(tokens + idx as u64)).start
         end = (*(tokens + idx as u64)).end
-    lsp_parse_int(js.slice(start as i64, end as i64))
+    lsp_parse_int(js.slice(start, end))
 
 fn json_find(js: &str, tokens: *mut JsonToken, parent: i32, key: &str) -> i32:
     if parent < 0:
@@ -276,7 +276,7 @@ fn json_find(js: &str, tokens: *mut JsonToken, parent: i32, key: &str) -> i32:
         unsafe:
             kstart = (*(tokens + idx as u64)).start
             kend = (*(tokens + idx as u64)).end
-        let k = js.slice(kstart as i64, kend as i64)
+        let k = js.slice(kstart, kend)
         if k == key:
             return idx + 1
         idx = json_skip(tokens, idx + 1)
@@ -326,10 +326,10 @@ fn json_unescape(s: &str) -> str:
             else if next == 92:
                 out = out ++ str_from_byte(92)
             else:
-                out = out ++ s.slice(i as i64, (i + 2) as i64)
+                out = out ++ s.slice(i, (i + 2))
             i = i + 2
         else:
-            out = out ++ s.slice(i as i64, (i + 1) as i64)
+            out = out ++ s.slice(i, (i + 1))
             i = i + 1
     out
 
@@ -348,7 +348,7 @@ fn json_escape(s: &str) -> str:
         else if ch == 9:
             out = out ++ "\\t"
         else:
-            out = out ++ s.slice(i as i64, (i + 1) as i64)
+            out = out ++ s.slice(i, (i + 1))
     out
 
 fn lsp_find_substr(haystack: &str, needle: &str) -> i32:
@@ -720,7 +720,7 @@ impl LspState:
         for i in 0..tokens.len():
             if offset >= tokens.get_start(i) and offset < tokens.get_end(i):
                 if tokens.get_tag(i) == TokenKind.TK_IDENT:
-                    token_text = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
+                    token_text = text.slice(tokens.get_start(i), tokens.get_end(i))
                 break
 
         if token_text.len() == 0:
@@ -796,7 +796,7 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
         var line_start = pos
         while line_start > 0 and text[(line_start - 1)] != 10:
             line_start = line_start - 1
-        let line = text.slice(line_start as i64, (pos + 1) as i64).trim().to_owned()
+        let line = text.slice(line_start, (pos + 1)).trim().to_owned()
         if line.starts_with("///"):
             let content = line.slice(3, line.len()).trim().to_owned()
             doc_lines.push(content)
@@ -826,7 +826,7 @@ impl LspState:
         for i in 0..tokens.len():
             if offset >= tokens.get_start(i) and offset < tokens.get_end(i):
                 if tokens.get_tag(i) == TokenKind.TK_IDENT:
-                    token_text = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
+                    token_text = text.slice(tokens.get_start(i), tokens.get_end(i))
                 break
 
         if token_text.len() == 0:
@@ -896,7 +896,7 @@ impl LspState:
         if recv_start >= recv_end:
             lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", "[]") ++ jobj_end()))
             return
-        let receiver = text.slice(recv_start as i64, recv_end as i64)
+        let receiver = text.slice(recv_start, recv_end)
 
         // Parse file to find receiver's type (cached)
         let parsed = self.get_parsed(uri, text)
@@ -919,7 +919,7 @@ impl LspState:
             for smi in 0..str_methods.len():
                 if str_methods[smi] == 44 or smi == str_methods.len() - 1:
                     let sm_end = if str_methods[smi] == 44: smi else: smi + 1
-                    let m = str_methods.slice(sm_start as i64, sm_end as i64)
+                    let m = str_methods.slice(sm_start, sm_end)
                     if not first: items = items ++ ","
                     first = false
                     items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
@@ -931,7 +931,7 @@ impl LspState:
             for vmi in 0..list_methods.len():
                 if list_methods[vmi] == 44 or vmi == list_methods.len() - 1:
                     let vm_end = if list_methods[vmi] == 44: vmi else: vmi + 1
-                    let m = list_methods.slice(vm_start as i64, vm_end as i64)
+                    let m = list_methods.slice(vm_start, vm_end)
                     if not first: items = items ++ ","
                     first = false
                     items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
@@ -943,7 +943,7 @@ impl LspState:
             for hmi in 0..hm_methods.len():
                 if hm_methods[hmi] == 44 or hmi == hm_methods.len() - 1:
                     let hm_end = if hm_methods[hmi] == 44: hmi else: hmi + 1
-                    let m = hm_methods.slice(hm_start as i64, hm_end as i64)
+                    let m = hm_methods.slice(hm_start, hm_end)
                     if not first: items = items ++ ","
                     first = false
                     items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
@@ -1134,7 +1134,7 @@ impl LspState:
         var line_start = offset
         while line_start > 0 and text[(line_start - 1)] != 10:
             line_start = line_start - 1
-        let line_text = text.slice(line_start as i64, offset as i64)
+        let line_text = text.slice(line_start, offset)
 
         var items = jarr_start()
         var first = true
@@ -1261,7 +1261,7 @@ fn lsp_append_csv_items(items: &str, csv: &str, kind: i32, first: bool) -> str:
     for i in 0..csv.len():
         if csv[i] == 44 or i == csv.len() - 1:
             let end = if csv[i] == 44: i else: i + 1
-            let name = csv.slice(start as i64, end as i64)
+            let name = csv.slice(start, end)
             if not f:
                 result = result ++ ","
             f = false
@@ -1381,8 +1381,8 @@ fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offs
                 result.push(with_str_clone_ref(inner_item))
         if tail != 0:
             let inner = lsp_collect_bindings_rec(pool, intern, tail, offset)
-            for ii in 0..inner.len():
-                result.push(with_str_clone_ref(inner[ii]))
+            for inner_item in inner:
+                result.push(with_str_clone_ref(inner_item))
         return result
 
     if kind == NodeKind.NK_IF_EXPR:
@@ -1391,8 +1391,8 @@ fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offs
         let result: List[str] = []
         if then_body != 0 and offset >= pool.get_start(then_body as NodeId) and offset <= pool.get_end(then_body as NodeId):
             let inner = lsp_collect_bindings_rec(pool, intern, then_body, offset)
-            for ii in 0..inner.len():
-                result.push(with_str_clone_ref(inner[ii]))
+            for inner_item in inner:
+                result.push(with_str_clone_ref(inner_item))
         if else_body != 0 and offset >= pool.get_start(else_body as NodeId) and offset <= pool.get_end(else_body as NodeId):
             let inner = lsp_collect_bindings_rec(pool, intern, else_body, offset)
             for ii in 0..inner.len():
@@ -1445,7 +1445,7 @@ fn lsp_list_embedded_modules(prefix: &str) -> List[str]:
         let at_end = i == listing.len()
         let ch = if at_end: 10 else: listing[i]
         if ch == 10:
-            let entry = listing.slice(start as i64, i as i64)
+            let entry = listing.slice(start, i)
             if entry.starts_with(prefix) and source_ext_is_source(entry):
                 // The module's name: the entry without the prefix and the
                 // source extension.
@@ -1534,7 +1534,7 @@ impl LspState:
             lsp_write_response(jrpc_result_null(id))
             return
 
-        let fn_name = text.slice(tokens.get_start(fn_name_tok) as i64, tokens.get_end(fn_name_tok) as i64)
+        let fn_name = text.slice(tokens.get_start(fn_name_tok), tokens.get_end(fn_name_tok))
 
         // Look up the function declaration in the parsed AST (cached)
         let parsed = self.get_parsed(uri, text)
@@ -1604,7 +1604,7 @@ impl LspState:
         for i in 0..tok0.len():
             if offset >= tok0.get_start(i) and offset < tok0.get_end(i):
                 if tok0.get_tag(i) == TokenKind.TK_IDENT:
-                    target = text.slice(tok0.get_start(i) as i64, tok0.get_end(i) as i64)
+                    target = text.slice(tok0.get_start(i), tok0.get_end(i))
                 break
 
         if target.len() == 0:
@@ -1650,7 +1650,7 @@ impl LspState:
             let tstart = toks1.get_start(ti)
             if not is_top_level and (tstart < scope_start or tstart >= scope_end):
                 continue
-            let tt = text.slice(tstart as i64, toks1.get_end(ti) as i64)
+            let tt = text.slice(tstart, toks1.get_end(ti))
             if tt != target:
                 continue
             let rl = lsp_offset_to_line(text, tstart)
@@ -1692,7 +1692,7 @@ impl LspState:
                 for ti2 in 0..toks2.len():
                     if toks2.get_tag(ti2) != TokenKind.TK_IDENT:
                         continue
-                    let tt2 = ft.slice(toks2.get_start(ti2) as i64, toks2.get_end(ti2) as i64)
+                    let tt2 = ft.slice(toks2.get_start(ti2), toks2.get_end(ti2))
                     if tt2 != target:
                         continue
                     let rl2 = lsp_offset_to_line(ft, toks2.get_start(ti2))
@@ -1783,7 +1783,7 @@ impl LspState:
         for i in 0..tok0.len():
             if offset >= tok0.get_start(i) and offset < tok0.get_end(i):
                 if tok0.get_tag(i) == TokenKind.TK_IDENT:
-                    target = text.slice(tok0.get_start(i) as i64, tok0.get_end(i) as i64)
+                    target = text.slice(tok0.get_start(i), tok0.get_end(i))
                 break
 
         if target.len() == 0 or new_name.len() == 0:
@@ -1807,7 +1807,7 @@ impl LspState:
         for ti in 0..toks1.len():
             if toks1.get_tag(ti) != TokenKind.TK_IDENT:
                 continue
-            let tt = text.slice(toks1.get_start(ti) as i64, toks1.get_end(ti) as i64)
+            let tt = text.slice(toks1.get_start(ti), toks1.get_end(ti))
             if tt != target:
                 continue
             let rl = lsp_offset_to_line(text, toks1.get_start(ti))
@@ -1848,7 +1848,7 @@ impl LspState:
                 for ti2 in 0..toks2.len():
                     if toks2.get_tag(ti2) != TokenKind.TK_IDENT:
                         continue
-                    let tt2 = ft.slice(toks2.get_start(ti2) as i64, toks2.get_end(ti2) as i64)
+                    let tt2 = ft.slice(toks2.get_start(ti2), toks2.get_end(ti2))
                     if tt2 != target:
                         continue
                     let rl2 = lsp_offset_to_line(ft, toks2.get_start(ti2))

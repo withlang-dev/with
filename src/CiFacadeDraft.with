@@ -147,10 +147,10 @@ impl CiProject:
     mut fn fd_draw_fnptr_verdicts():
         if self.fnptr_verdicts_drawn: return
         self.fnptr_verdicts_drawn = true
-        let seen: HashMap[str, i32] = HashMap.new()
+        let seen: HashMap[str, i32] = [:]
         // Every writer of a field, in order, without repeats; `?` for a
         // write that names no function.
-        let writers: HashMap[str, str] = HashMap.new()
+        let writers: HashMap[str, str] = [:]
         let fields = []
         // A record handed to a call: (record, callee, where).
         let handed = []
@@ -548,7 +548,7 @@ impl CiProject:
         // `name<TAB>global` and `caller<TAB>callee`, as the facts are written.
         let assigners = []
         let edges = []
-        let said: HashMap[str, i32] = HashMap.new()
+        let said: HashMap[str, i32] = [:]
         for symbol in self.symbols:
             if symbol.kind != CiProjectSymbolKind.CIPS_FN or symbol.has_definition == 0: continue
             for assigned in symbol.assigned_globals:
@@ -561,7 +561,7 @@ impl CiProject:
             for assigned in self.static_assigns[sti]: assigners.push(f"{name}\t{assigned}")
             for callee in self.static_callees[sti]: edges.push(f"{name}\t{callee}")
         if assigners.len() == 0: return out
-        let callers_index: HashMap[str, isize] = HashMap.new()
+        let callers_index: HashMap[str, isize] = [:]
         let callers: List[List[str]] = []
         for edge in edges:
             let caller = edge.split("\t")[0]
@@ -578,7 +578,7 @@ impl CiProject:
         for pair in assigners:
             let assigner = pair.split("\t")[0]
             let assigned = pair.split("\t")[1]
-            let seen: HashMap[str, i32] = HashMap.new()
+            let seen: HashMap[str, i32] = [:]
             seen.insert(assigner, 1)
             let stack = [assigner]
             while stack.len() > 0:
