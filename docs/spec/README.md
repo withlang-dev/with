@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.82
+# The With Programming Language — Specification v7.83
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.83:** D213 (Eric, ruled 2026-11-18, amended 2026-11-22). §16.2b.15, §31: the field role `callback`. The field holds only callbacks the program registered through a presented operation; a call through it lends its arguments. The stores that fit are a null store, the setter's named callback parameter and a whole-record copy; a package function stored there contradicts the role, and any other store leaves the field undecided. The thread of a call through it is what the setters' `callback_thread` clauses state. Implemented.
+
 **Changelog v7.82:** (Eric, 2026-11-22.) §9.7: in `name @ pattern` the name binds the subject and the names inside the pattern observe it (#3543; a move of the name while an inner name is in scope is refused). §31.8: the row for a fixed parameter names the three values §16.2b.11 allows. No words were needed for a pipeline over a field as a function's last line: §2.2 already refuses the implicit field move, and the compiler now does. Implemented.
 
 **Changelog v7.81:** #3521 (Eric, 2026-11-21). §16.2b.15: `use contracts.<name>` and a `c_import` of the library's header see the same types, functions, constants and globals; the sentence listed only types and functions, and through the contract route only the modeled resource was visible. Implemented.
