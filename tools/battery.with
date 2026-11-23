@@ -119,6 +119,14 @@ fn clear_build_runner_test_scratch():
         if file_exists(dir):
             print("battery: removing " ++ dir ++ " (the last run's build-runner test scratch)")
             remove_tree(dir)
+    // The drop audit's probes, a directory per run that failed or was
+    // stopped. 82 of them (152,000 files) in the lane's output directory
+    // took the build over eleven minutes to fingerprint after its tests
+    // were green.
+    for entry in list_dir_text("out/drop-audit").split("\n"):
+        if entry.starts_with("cells-"):
+            print("battery: removing out/drop-audit/" ++ entry ++ " (an earlier run's drop-audit probes)")
+            remove_tree("out/drop-audit/" ++ entry)
 
 // The same rule as build/retention.with's ret_worktree_is_clean: a tracked change
 // dirties the tree; an untracked path dirties it only if it could be a build

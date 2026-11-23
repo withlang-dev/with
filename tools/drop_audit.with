@@ -21,6 +21,7 @@
 // Run BEFORE and AFTER any change to drop scheduling, ownership lowering,
 // or receiver modes (CLAUDE.md gate).
 
+use std.fs
 use std.process
 use std.sys
 
@@ -1131,4 +1132,7 @@ fn main:
         if failures > 0:
             eprint("drop-audit: probes and diagnostics retained: " ++ dir)
             exit_code(1)
+    // A clean run keeps nothing: 1,857 probe files a run, left in the lane's
+    // output directory, were fingerprinted with it after every build.
+    remove_tree(dir)
     exit_code(0)

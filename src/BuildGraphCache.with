@@ -383,21 +383,32 @@ fn build_cache_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
+// A stable merge sort, bottom up. The insertion sort here rebuilt the whole
+// list for every item: a directory of 152,000 files (a lane's output) took
+// the build over eleven minutes to fingerprint.
 fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
     var sorted: List[str] = []
-    for i in 0..items.len():
-        let item = items[i]
-        var inserted = false
-        let out: List[str] = []
-        for sorted_item in sorted:
-            let existing = sorted_item
-            if not inserted and build_cache_str_compare(item, existing) < 0:
-                out.push(with_str_clone_ref(item))
-                inserted = true
-            out.push(with_str_clone_ref(existing))
-        if not inserted:
-            out.push(with_str_clone_ref(item))
-        sorted = out
+    for i in 0..items.len(): sorted.push(with_str_clone_ref(items[i]))
+    let count = sorted.len()
+    var width: isize = 1
+    while width < count:
+        let merged: List[str] = []
+        var lo: isize = 0
+        while lo < count:
+            let mid = if lo + width < count: lo + width else: count
+            let hi = if lo + 2 * width < count: lo + 2 * width else: count
+            var a = lo
+            var b = mid
+            while a < mid or b < hi:
+                if b >= hi or (a < mid and build_cache_str_compare(sorted[a], sorted[b]) <= 0):
+                    merged.push(with_str_clone_ref(sorted[a]))
+                    a += 1
+                else:
+                    merged.push(with_str_clone_ref(sorted[b]))
+                    b += 1
+            lo = hi
+        sorted = merged
+        width = width * 2
     sorted
 
 fn build_cache_sorted_unique_strings(items: &List[str]) -> List[str]:
