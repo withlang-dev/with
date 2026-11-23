@@ -107,6 +107,19 @@ fn clear_old_spelling_generated_modules():
             print("battery: removing " ++ path ++ " (generated before the rename to .with, D228)")
             let _gone = remove_file(path)
 
+// The build-runner behavior tests keep a project, a build store and their
+// captures per test process (test/behavior/lib/pre_d_build_runner), so two
+// lanes running one fixture do not delete each other's files. Nothing
+// removed them: a worktree gained about 300 directories a battery, 14 GB
+// after a week, and a battery over it took 46 minutes instead of 13. A
+// failed run's captures are read before the next battery, which starts
+// from none.
+fn clear_build_runner_test_scratch():
+    for dir in ["out/tmp/pre-d-p7", "out/tmp/pre-d-p7-store", "out/tmp/pre-d-p7-capture"]:
+        if file_exists(dir):
+            print("battery: removing " ++ dir ++ " (the last run's build-runner test scratch)")
+            remove_tree(dir)
+
 // The same rule as build/retention.with's ret_worktree_is_clean: a tracked change
 // dirties the tree; an untracked path dirties it only if it could be a build
 // input (docs/, examples/ and top-level *.md are not).
@@ -285,6 +298,7 @@ if not tree_is_clean():
     exit_code(1)
 clear_runtime_dirs_on_seed_change()
 clear_old_spelling_generated_modules()
+clear_build_runner_test_scratch()
 let head = output_line(&["git", "rev-parse", "--short", "HEAD"])
 assert(head.len() > 0)
 assert(write_file("out/battery/head.txt", head ++ "\n") == 0)
