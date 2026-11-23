@@ -12,7 +12,7 @@ machinery because `async fn` in traits just returns `Task[T]`, and
 trait objects with `Task[T]` return types need no boxing.
 
 > **Source code:** [`examples/service/src/`](../examples/service/src/)
-> All code lives in `.w` files there. This document is a reading companion, not a copy.
+> All code lives in `.with` files there. This document is a reading companion, not a copy.
 
 ---
 

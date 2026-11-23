@@ -303,7 +303,7 @@ Layout is still normalized (indentation, trailing whitespace) even inside `fmt:o
 
 ## 4. Interaction with `with migrate`
 
-`with migrate` should pipe its output through the idiom rewrite pass before writing `.w` files. This means migrated code is idiomatic by default. The `bool-wrap`, `nullstmt`, `redundant-parens`, and `goto-varname` rewrites are the critical ones for migration output quality.
+`with migrate` should pipe its output through the idiom rewrite pass before writing `.with` files. This means migrated code is idiomatic by default. The `bool-wrap`, `nullstmt`, `redundant-parens`, and `goto-varname` rewrites are the critical ones for migration output quality.
 
 A `--raw` flag on `with migrate` skips the cleanup pass for debugging.
 
@@ -332,7 +332,7 @@ with fmt --diff [files...]   # print unified diff of changes
 with fmt -                   # read stdin, write stdout
 ```
 
-When invoked with no arguments, formats all `.w` files in the current directory recursively (respecting `.withignore` if present).
+When invoked with no arguments, formats all `.with` files in the current directory recursively (respecting `.withignore` if present).
 
 ---
 

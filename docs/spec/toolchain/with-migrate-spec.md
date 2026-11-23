@@ -139,7 +139,7 @@ defines)`, the store or the undefined callee at the end of the chain, so a
 reviewer of a registry fact sees what the fact covers.
 
 **Modes:**
-- `write` (default) — write `.w` files
+- `write` (default) — write `.with` files
 - `check` — report what would change, exit nonzero if any
 - `diff` — print unified diff to stdout
 
@@ -488,7 +488,7 @@ A C project has multiple `.c` files that share headers.
 
 1. Parse each `.c` file independently with libclang (libclang
    resolves includes automatically)
-2. Each `.c` file becomes one `.w` file
+2. Each `.c` file becomes one `.with` file
 3. Shared declarations (from headers) are emitted in a common
    module (`_types.with` or similar) and imported by each file
 4. Deduplication: track which names have been emitted across files

@@ -199,7 +199,7 @@ A `.Test` target records each test file's pass in a machine-wide verdict
 store, `$WITH_TEST_VERDICT_DIR` or else `~/.local/with-test-verdicts`, beside
 the `.wo` bundle store (`~/.local/with-wo`). A pass is keyed on content, never
 on a path outside the project or a timestamp: the test compiler binary, the
-test file and its project-relative path, the test's directory and the `.w`
+test file and its project-relative path, the test's directory and the `.with`
 sources under `src/` and `lib/`, the target's arguments and harness command,
 and the `SDKROOT`, `DEVELOPER_DIR`, `CC`, `WITH_CLANG_RESOURCE_DIR` and
 `WITH_MEMORY_LIMIT_BYTES` environment. A file whose key matches a recorded

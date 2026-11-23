@@ -36,7 +36,7 @@ Paths are relative to the `with` repository unless they name WIPE.
 
 | Need | State | Where |
 |---|---|---|
-| Source-level debug info | **Emitted by default; nothing to pass (`-g0` or `--release` turns it off).** Verified on macOS arm64 (v0.15.3.0, 2026-10-18): `with build -O0` gives a `.dSYM`, line breakpoints in `.w` files, `frame variable` with parameters and locals, and a backtrace in With source. The default build optimizes, so small functions are inlined and a breakpoint on their lines has no location; a dev build is `-O0`. `--release` writes no `.dSYM`. | `docs/completed/debug.md`, `test/behavior/behav_debug_info_variables.with` |
+| Source-level debug info | **Emitted by default; nothing to pass (`-g0` or `--release` turns it off).** Verified on macOS arm64 (v0.15.3.0, 2026-10-18): `with build -O0` gives a `.dSYM`, line breakpoints in `.with` files, `frame variable` with parameters and locals, and a backtrace in With source. The default build optimizes, so small functions are inlined and a breakpoint on their lines has no location; a dev build is `-O0`. `--release` writes no `.dSYM`. | `docs/completed/debug.md`, `test/behavior/behav_debug_info_variables.with` |
 | Build for `linux_x86_64` from a Mac | **Not possible for a game yet.** `BuildTarget.linux_x86_64` exists, and the link stage already takes a Linux sysroot (`WITH_LINUX_SYSROOT`, `src/compiler/Link.with:385-412`) and the bundled `ld.lld`. What refuses is `c_import` under `--target` (`src/CImport.with:754`: it would parse the host's headers), and Conan selection uses the host OS. `with build :cross` fails loudly. | `src/CImport.with`, `src/compiler/Link.with`, `docs/spec/toolchain/with-build.md` §Cross-Platform Targets |
 | A Linux build that runs on the Deck | Proven by WIPE: built **on the Deck** with the Deck's own With install, `libsteam_api.so` beside the executable with an `$ORIGIN` rpath. This is the only deployment path used so far. | WIPE `build.with`, `docs/steam-and-steam-deck-support.md` §8 |
 | Shared-library output and a loader | None | — |
@@ -577,7 +577,7 @@ each a private backend implementing the same four verbs.
   PNG within a second; `with dev view deck` shows the Deck's screen at
   60 fps, and `--port` serves the same to an editor panel.
 - From VS Code, Visual Studio and IntelliJ IDEA, a developer can run the
-  game on the Deck, stop at a breakpoint in a `.w` file, and see the
+  game on the Deck, stop at a breakpoint in a `.with` file, and see the
   Deck's screen, each through `with dev`.
 - `with dev unpair deck` leaves nothing of the toolchain on the Deck.
 - A release package built by the same project contains no `game.dev`.

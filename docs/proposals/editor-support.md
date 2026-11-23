@@ -20,7 +20,7 @@ symlink the extension directory:
 ln -s "$(pwd)/with-vscode" ~/.vscode/extensions/with-lang
 ```
 
-Restart VSCode. Files with `.w` extension get syntax highlighting and LSP
+Restart VSCode. Files with `.with` extension get syntax highlighting and LSP
 features automatically. Configure the compiler path in settings if `with`
 is not on your PATH:
 

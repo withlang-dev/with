@@ -454,7 +454,7 @@ never corpus sources.
 **Interface (`.wi`) — D39.** A `.wi` is a compiler-recognized source
 flavor: ordinary With declaration syntax read in an interface-only parser
 mode, in which a function may omit its body and a storage-backed global
-may omit its initializer. Ordinary `.w` source never admits either, so
+may omit its initializer. Ordinary `.with` source never admits either, so
 the language does not acquire C-header forward declarations by accident.
 In the AST the state is typed, never implied by a missing node: a
 function declaration's body is `SourceBody | InterfaceBody`, a global's
@@ -901,7 +901,7 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
   wasm and the on-demand `cimport_stubs.o` archive when the unit reaches
   libc or c_import symbols. `WITH_RT_IN_UNIT` is read nowhere; a `--no-std`
   unit (no prelude) gets no runtime, as before.
-- **No `.w`-derived runtime object.** rt_core.o, the platform object,
+- **No `.with`-derived runtime object.** rt_core.o, the platform object,
   panic_runtime.o, compat_runtime.o, fiber_stubs.o, channel_runtime.o,
   fiber_runtime.o and fiber.o are not produced, embedded, installed or
   linked by anything: not the stages, the cross tags, wasm32, the emit-C

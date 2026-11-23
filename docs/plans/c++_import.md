@@ -209,7 +209,7 @@ imported prototypes name.
     nested `enum { k_iCallback = base + 2 }`;
   - `const int base = 1100;`.
 
-  The `.w` file exports the functions with `@[c_export]`, calls them
+  The `.with` file exports the functions with `@[c_export]`, calls them
   through the import, and prints the struct size and offsets, the callback
   ID, and the returned values.
 - **`test/compile_errors/`:**

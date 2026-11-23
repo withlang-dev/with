@@ -70,7 +70,7 @@ with migrate python src/ --stub-dir stubs/   # write stubs to specific directory
 ```
 
 **Modes:**
-- `write` (default) — write `.w` files and `*_stubs.with` stub files
+- `write` (default) — write `.with` files and `*_stubs.with` stub files
 - `check` — report what would change, exit nonzero if any
 - `diff` — print unified diff to stdout
 
@@ -1204,7 +1204,7 @@ fn module_constant_name() -> T:
 
 **Step 5: Import stubs in translated file.**
 
-At the top of each translated `.w` file, add:
+At the top of each translated `.with` file, add:
 ```
 import "<module>_stubs.with"
 ```

@@ -47,9 +47,9 @@ C — whose feature list is essentially this document: stack traces on alloc and
 double-free reporting all three traces (alloc, first free, second free), leak detection.
 
 The only option that is **constitutive** of the no-C goal rather than in tension with it is
-a **native debug allocator written entirely in `.w`** (plus inline asm / syscalls, exactly
+a **native debug allocator written entirely in `.with`** (plus inline asm / syscalls, exactly
 as the runtime already does). It is the same discipline as the runtime migration: replace a
-C capability with a With one we own. We adopt the Zig model in `.w`.
+C capability with a With one we own. We adopt the Zig model in `.with`.
 
 ## The no-C rule does NOT make ASan-compatibility impossible — only harder
 
@@ -70,7 +70,7 @@ this.
 
 ## Architecture: detection in-process, origin tags in reports
 
-All additive to `rt/rt_core.with`; pure `.w`.
+All additive to `rt/rt_core.with`; pure `.with`.
 
 > **Why no in-process backtraces.** The original design captured alloc/free backtraces by
 > walking the frame-pointer chain (read `x29` via inline asm, follow `*(fp)` / `*(fp+8)`).
@@ -79,7 +79,7 @@ All additive to `rt/rt_core.with`; pure `.w`.
 > framed, `@[noinline]` function). With's codegen does not maintain a walkable fp chain at
 > the opt levels `with run` uses. Rather than chase a codegen change (out of scope), the
 > first cut split the work: the **ledger does detection in-process** (cheap, robust, pure
-> `.w`), and **lldb resolves source sites out-of-process**, conditioned on the address the
+> `.with`), and **lldb resolves source sites out-of-process**, conditioned on the address the
 > ledger reports — lldb uses real DWARF/compact-unwind unwinding that actually works.
 > Compiler-emitted Drop sites now also carry MIR-origin tags directly into the free path,
 > so double-free reports name both drops without requiring unwinding.
@@ -131,7 +131,7 @@ All additive to `rt/rt_core.with`; pure `.w`.
 
 The mechanism is a single cached bool — **runtime-gated**, not a build variant (a build
 flag → comptime-define → conditional-compile path is bootstrap/fixpoint risk for no benefit
-that matters here; the cost it avoids is one cached branch and a few KB of inert `.w`).
+that matters here; the cost it avoids is one cached branch and a few KB of inert `.with`).
 Runtime gating also means the instrument works on *any* existing binary, including release,
 with no rebuild — the right shape for a tool whose purpose is to end the
 rebuild-and-characterize loop.
@@ -176,7 +176,7 @@ changes execution time.
 
 ## Harness driver
 
-`tools/debug_drop.with` (pure `.w`, no shell script): runs a repro or fixture corpus under the
+`tools/debug_drop.with` (pure `.with`, no shell script): runs a repro or fixture corpus under the
 debug allocator and parses the ledger/abort/leak output into a verdict. The
 `:debug-alloc-tests` target builds it to `out/debug-alloc-tests/debug_drop` and runs it in
 `check` mode over the committed corpus. For one-off repros:
