@@ -1,0 +1,28 @@
+//! expect-stdout: ok
+// A directory's fingerprint sorts its listing. The sort rebuilt its whole
+// list for every item, so a lane's output directory of 152,000 files took
+// the build over eleven minutes after its tests were green. The order is by
+// bytes, shorter first on a shared prefix, for every length of input,
+// powers of two and not.
+use BuildGraphCache
+
+fn sorted_ok(count: i32) -> bool:
+    let items: List[str] = []
+    var seed: i64 = 12345
+    for _ in 0..count:
+        seed = (seed * 1103515245 + 12345) % 2147483648
+        items.push(f"f{seed % 997}/x{seed % 13}")
+    let sorted = build_cache_sorted_strings(&items)
+    if sorted.len() != items.len(): return false
+    for i in 1..sorted.len():
+        if build_cache_str_compare(sorted[i - 1], sorted[i]) > 0: return false
+    true
+
+fn main:
+    for count in [0, 1, 2, 3, 7, 8, 9, 1000, 4097]:
+        assert(sorted_ok(count))
+    let few = build_cache_sorted_strings(&["b", "ab", "a", "b", ""])
+    assert(few.len() == 5 and few[0] == "" and few[1] == "a" and few[2] == "ab" and few[3] == "b" and few[4] == "b")
+    // 60,000 names: the old sort made 1.8 billion copies here.
+    assert(sorted_ok(60000))
+    print("ok")
