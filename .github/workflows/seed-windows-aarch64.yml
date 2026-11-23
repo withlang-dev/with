@@ -49,9 +49,9 @@ jobs:
       LLVM_VER: "22.1.6"
       # Native x86_64 host bootstrap seed (matches selfhost-linux CI).
       WITH_SEED_REPO: withlang-dev/with
-      WITH_SEED_VERSION: nightly-20261122-44999614621-1-9096b55a07f7
+      WITH_SEED_VERSION: nightly-20261122-45071765995-1-8a5befa0e423
       WITH_SEED_ASSET: with-linux-x86_64
-      WITH_SEED_SHA256: 7d1e7c669eafcff479de88cfd605aa4d0be00e0343bc8e8bb269f5d2c16a75d2
+      WITH_SEED_SHA256: b35792d0196d11b69f487c9c20c95aa2d1c1c64c333957545bd240961f838245
       # Native x86_64 host LLVM SDK (drives the host bootstrap link). The
       # canonical sdk.lock pin, as selfhost-linux CI fetches it: the v0.15.1
       # .tar.zst SDK predates the sysroot-carrying layout and has no
