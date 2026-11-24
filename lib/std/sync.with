@@ -181,7 +181,7 @@ impl[T] Scoped[&T] for MutexGuard[T]:
         unsafe { (*state).value as &T }
 
     // The guard's Drop releases the lock when the `with` ends.
-    fn with_exit() -> Unit: ()
+    fn with_exit(): ()
 
 impl[T] Scoped[&T] for MutexGuardMut[T]:
     fn with_enter() -> &T:
@@ -224,7 +224,7 @@ pub fn mutex_get(m: &Mutex[i64]) -> i64:
 impl[T] Mutex[T]:
     /// Set the value inside a Mutex.
     @[suspends]
-    pub fn set(value: T) -> Unit:
+    pub fn set(value: T):
         let state = self.ptr as *mut MutexState
         let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
         while (unsafe *locked).swap(1, .Acquire) != 0:
@@ -310,7 +310,7 @@ impl[T] Scoped[&T] for RwReadGuard[T]:
         unsafe { (*state).value as &T }
 
     // The guard's Drop releases the lock when the `with` ends.
-    fn with_exit() -> Unit: ()
+    fn with_exit(): ()
 
 impl[T] Scoped[&T] for RwWriteGuard[T]:
     fn with_enter() -> &T:
@@ -413,7 +413,7 @@ pub fn Condvar.new() -> Condvar:
 
 impl[T] Condvar[T]:
     @[suspends]
-    pub fn wait(lock: &Mutex[T]) -> Unit:
+    pub fn wait(lock: &Mutex[T]):
         let state = self.ptr as *mut CondvarState
         let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
         let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
