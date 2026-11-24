@@ -1,0 +1,34 @@
+//! expect-stdout: 7 1 7
+
+// D214 (#3122): one C function, two constructors. `Mime.from_easy(e)` is
+// tied to its parent; `Mime.new()` has none, and a value made that way is
+// returned and kept freely: dependency belongs to the value, not the type.
+use c_import("d214_mime.h")
+
+c contract m:
+    resource Easy wraps *mut easy
+        from easy_init
+        drop easy_cleanup
+    resource Mime wraps *mut mime
+        from mime_init
+        drop mime_free
+    fn mime_init
+        of Mime
+        rename from_easy
+    fn mime_init
+        rename new
+        param 0 fixed null    // d214_mime.h: a null parent makes an independent mime
+    fn mime_parts
+        lend
+    fn easy_count
+        lend
+    fn easy_init
+        rename new
+
+fn solo() -> Mime: Mime.new().unwrap()
+
+fn main:
+    let e = Easy.new().unwrap()
+    let tied = Mime.from_easy(e).unwrap()
+    let free = solo()
+    print(f"{tied.parts()} {free.parts()} {e.count()}")

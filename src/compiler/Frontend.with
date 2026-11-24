@@ -921,7 +921,12 @@ impl Zcu:
             // takes the import's origin: every rule that asks whether a
             // function is a c_import translation, and which library it
             // belongs to, answers for it as for the function it names.
-            let (aliases, origins) = facade_render_presentation_aliases(out, self.pool, decl as i32, self.decl_is_c_import)
+            let (aliases, origins, presented) = facade_render_presentation_aliases(out, self.pool, decl as i32, self.decl_is_c_import)
+            // D214: a second presentation of a producer is a producer too.
+            var pi = 0
+            while pi + 1 < presented.len():
+                out = facade_render_alias_producer(out, self.pool, decl as i32, presented[pi], presented[pi + 1])
+                pi = pi + 2
             if aliases.len() > 0:
                 let first = out.decl_count()
                 out = self.splice_facade_text_frontend(out, aliases, "<facade " ++ facade_name ++ " presentations>", i)

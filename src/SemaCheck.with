@@ -38233,7 +38233,16 @@ impl Sema:
             let intrinsic_recv: i32 = self.typed_expr_types.get(expr) ?? known_recv_ty
             if intrinsic_recv != 0 and self.builtin_method_intrinsic(intrinsic_recv, self.pool_resolve(field)) != MirIntrinsic.NONE:
                 if self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret):
-                    self.record_builtin_receiver_view_origins(node, expr)
+                    // A method that consumes its receiver and hands back a value
+                    // (`Option[Mime].unwrap()`) moves the payload out: it carries
+                    // what the carrier carried and views nothing of the carrier
+                    // itself, which is gone. Read as a view of the receiver, a
+                    // value with no origin at all (D214: a constructor with no
+                    // parent) was a view into the temporary Option.
+                    let recv_resolved = self.resolve_alias(intrinsic_recv as TypeId)
+                    let by_value = self.get_type_kind(recv_resolved) != TypeKind.TY_REF and self.get_type_kind(self.resolve_alias(ret as TypeId)) != TypeKind.TY_REF
+                    if by_value and self.builtin_method_requires_move_receiver(self.method_owner_symbol_for_type(recv_resolved as i32), field): self.record_transparent_view_origins(node, expr)
+                    else: self.record_builtin_receiver_view_origins(node, expr)
         let constructed = self.record_method_lowering(expr, field, arg_count, node, ret, known_recv_ty)
         if constructed != 0: constructed else: ret
 
