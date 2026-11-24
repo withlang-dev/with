@@ -1249,6 +1249,9 @@ type Sema {
     // The node of a path that disagreed in the first pass (reported after
     // it, naming the type the other paths decided), or 0.
     recursion_pass1_mismatch: i32,
+    // The body whose tail check_body_result found against its declared
+    // return; check_annotated_body_result reports it, once.
+    body_result_mismatch_pending: i32,
     // The operand an operator is checking against its other operand's type:
     // not a demand site (§4.9a), so no conversion fires on it.
     operator_operand_nodes: HashSet[i32, Minted],
@@ -4011,6 +4014,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         recursion_open_sym: 0,
         recursion_inferred_type: 0,
         recursion_pass1_mismatch: 0,
+        body_result_mismatch_pending: 0,
         operator_operand_nodes: [],
         type_tid_is_std: [:],
         generic_inst_templates: TidTable { slots: [] },

@@ -5838,12 +5838,16 @@ impl Sema:
             // tail under an `Option[T]` return is `Some(tail)`.
             let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
             if not tail_to_option and self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == false and body_materializes_copy == 0 and not tail_copies and not self.note_int_local_arg_demand(tail_demand, body_expected_ret as i32, body_ty as i32):
-                self.report_inferred_return_mismatch(body)
+                if has_ret_annotation:
+                    self.body_result_mismatch_pending = body
+                else:
+                    self.report_inferred_return_mismatch(body)
         body_materializes_copy
 
     // The declared return type against the tail's: the conventions of §4.9
     // (implicit `Ok`, falling off a `Result[Unit, E]`), §4.9a and §4.10.
     mut fn check_annotated_body_result(body: i32, body_ty: TypeId, body_expected_ret: TypeId, body_materializes_copy: bool, sig_idx: i32):
+        let errors_before = self.diags.count_by_severity(DiagSeverity.Error)
         if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
             let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
             // §4.9: falling off the end of a `Result[Unit, E]` body is `Ok(())`,
@@ -5888,6 +5892,12 @@ impl Sema:
                         self.implicit_ok_tail_sigs.insert(sig_idx, 1)
                     else if not tail_to_option and not self.note_int_local_arg_demand(tail_leaf, body_expected_ret as i32, body_ty as i32):
                         self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
+        // One report per mismatch: the tail check_body_result found against
+        // the declared return is reported here only when nothing above named it.
+        if self.body_result_mismatch_pending == body:
+            self.body_result_mismatch_pending = 0
+            if self.diags.count_by_severity(DiagSeverity.Error) == errors_before:
+                self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
 
     // #1827 (§2.4): a `return` drops every binding of its body, which begin
     // here. Returns the enclosing body's start, for the caller to restore.
@@ -6522,7 +6532,12 @@ impl Sema:
         // Check body — set expected type to return type for tail expression resolution.
         // For async functions, use the unwrapped body return type (T, not Task[T]).
         let body_expected_ret = self.current_return_type
-        let checked = self.check_body_under_return(body, body_expected_ret, ret_type, has_ret_annotation, self.fn_decl_is_entry_point(node) != 0, fn_name, saved_fn_bind_start)
+        // A trait impl's method written without a return type has the
+        // trait's: declared, as a written one is, for everything the body's
+        // result is checked against.
+        let contract_declares_ret = not has_ret_annotation and trait_contract.ok != 0 and trait_contract.ret_type != 0
+        let declared_ret = if contract_declares_ret: self.fn_signature_return_type(flags, trait_contract.ret_type as TypeId) as i32 else: ret_type
+        let checked = self.check_body_under_return(body, body_expected_ret, declared_ret, has_ret_annotation or contract_declares_ret, self.fn_decl_is_entry_point(node) != 0, fn_name, saved_fn_bind_start)
         let body_ty = checked.ty
         let body_materializes_copy = checked.materializes_copy
         if not has_ret_annotation:
@@ -6534,6 +6549,9 @@ impl Sema:
             if trait_contract.ok != 0 and trait_contract.ret_type != 0:
                 let contract_ret = self.fn_signature_return_type(flags, trait_contract.ret_type as TypeId)
                 self.set_sig_return_type(sig_idx, contract_ret as i32)
+                // The tail is checked and adjusted against the trait's
+                // return (a `&Self` tail copied out, an implicit `Ok`).
+                self.check_annotated_body_result(body, body_ty, body_expected_ret, body_materializes_copy, sig_idx)
             else:
                 let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty, self.fn_decl_is_entry_point(node))
                 let sig_ret = self.fn_signature_return_type(flags, inferred_ret as TypeId)

@@ -1,0 +1,11 @@
+//! expect-check-fail: return type mismatch: the function returns `str`, this value is `isize`
+// The trait declares the return; the impl method omits it and gives another.
+trait Named:
+    fn name(self: &Self) -> str
+
+impl Named for i64:
+    fn name(): 3
+
+fn main:
+    let z: i64 = 6
+    print(z.name())
