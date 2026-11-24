@@ -1198,6 +1198,9 @@ fn facade_render_receiver(pool: &AstPool, intern: &InternPool, decl: i32) -> i32
     let meta = pool.find_fn_meta(decl as NodeId)
     if meta < 0 or pool.fn_meta_param_count(meta) == 0:
         return 0
+    // D214: a first parameter the contract fixes is the facade's argument,
+    // not a receiver (a producer's absent parent, `param 0 fixed null`).
+    if facade_render_fixed_literal(pool, intern, decl, 0).len() > 0: return 0
     let p0 = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId)
     let res = facade_render_received(pool, intern, p0)
     if res <= 0 or facade_render_received_arg(pool, intern, res, p0, "self").len() == 0:
@@ -1881,6 +1884,9 @@ fn facade_render_deps(pool: &AstPool, intern: &InternPool, producers: &List[i32]
         for pi in firsts[oi]..pool.fn_meta_param_count(meta):
             if pi == skips[oi]:
                 continue
+            // D214: a parent the contract fixes to null is absent; the
+            // product depends on nothing through it.
+            if facade_render_fixed_literal(pool, intern, decl, pi).len() > 0: continue
             let res = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId))
             if res > 0:
                 deps.owners.push(owner)
@@ -1983,7 +1989,9 @@ fn facade_render_receives_any(pool: &AstPool, intern: &InternPool, decl: i32, fi
         return false
     let start = pool.fn_meta_param_start(meta)
     for pi in first..pool.fn_meta_param_count(meta):
-        if pi != skip and facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)) != 0:
+        // A fixed parameter is the facade's argument, received from nobody
+        // (D214: a parent fixed to null leaves the product independent).
+        if pi != skip and facade_render_fixed_literal(pool, intern, decl, pi).len() == 0 and facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)) != 0:
             return true
     false
 
