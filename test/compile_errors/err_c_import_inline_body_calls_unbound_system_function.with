@@ -1,0 +1,9 @@
+//! expect-check-fail: the call of `strdup` has no translation
+
+// An inline C body that assigns the result of a system function std.libc
+// does not bind is omitted, and the reason names the function. It said only
+// "unsupported assignment rhs in goto CFG (kind=103)".
+use c_import("#include <string.h>\nstatic inline char *dup_it(const char *s) { char *d; d = strdup(s); return d; }\n")
+
+fn main:
+    print(unsafe { dup_it(c"x".ptr) } as i64 != 0)

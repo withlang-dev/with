@@ -1,0 +1,13 @@
+//! expect-stdout: 7 9
+
+// `f(x)->field = v` in an inline C body: the pointer a call returns is no
+// place, so the field is written through its dereference. It was translated
+// as `f(x).field = v` and refused as an assignment to a non-place.
+use c_import("typedef struct node { int v; struct node *next; } node;\nstatic inline node *self_of(node *n) { return n; }\nstatic inline void set_via_call(node *n, int v) { self_of(n)->v = v; }\nstatic inline void bump_via_call(node *n) { (self_of(n))->v += 2; }\nstatic inline int get_via_call(node *n) { return self_of(n)->v; }\n")
+
+fn main:
+    var n = node { v: 1, next: null }
+    unsafe { set_via_call(&raw mut n, 7) }
+    let first = unsafe { get_via_call(&raw mut n) }
+    unsafe { bump_via_call(&raw mut n) }
+    print(f"{first} {n.v}")

@@ -11427,6 +11427,18 @@ fn ci_call_field_callee(session: i64, cursor: i32) -> str:
         return ""
     ""
 
+// What an untranslated operand is, for the bail message: a call names its
+// callee. "(kind=103)" alone hid that an inline body's `d = strdup(s)`
+// stopped at a system function std.libc does not bind.
+fn ci_bail_kind_text(session: i64, cursor: i32) -> str:
+    let peeled = ci_peel_transparent(session, cursor)
+    let kind = with_ci_cursor_kind(session, peeled)
+    // A call's own spelling is its callee's name, also where the callee's
+    // declaration is one the importer filtered out.
+    let named = if kind == CXK_CALL_EXPR: ci_call_callee_name(session, peeled) else: ""
+    let callee = if kind == CXK_CALL_EXPR and named.len() == 0: with_ci_cursor_spelling(session, peeled) else: named
+    if callee.len() > 0: f"(the call of `{callee}` has no translation: a system function std.libc does not bind is one such; kind={kind})" else: f"(kind={kind})"
+
 fn ci_call_callee_name(session: i64, cursor: i32) -> str:
     // Walk through transparent wrappers (IMPLICIT_CAST, PAREN_EXPR,
     // and libclang's kind-100 UnexposedExpr which is what CALL_EXPR
@@ -13036,6 +13048,12 @@ impl CiStmtPool:
             let base = self.lower_value_expr_ir(session, base_cursor, exprs, types, scope)
             if ci_value_ir_valid(base):
                 base.value_expr = ci_member_base_first_element(session, base_cursor, base.value_expr, exprs, types)
+            // `f(x)->field = v`: the pointer a call returns is no place, so
+            // the field is written through its dereference. A named pointer
+            // is one already (`p.field`), and `f(x).field = v` was refused
+            // as an assignment to a non-place (#3121's fixture).
+            if ci_value_ir_valid(base) and with_ci_member_is_arrow(session, cursor) and with_ci_cursor_kind(session, ci_peel_transparent(session, base_cursor)) == CXK_CALL_EXPR:
+                base.value_expr = exprs.add(CiExprKind.CIE_DEREF, base.value_expr as i32, 0, 0, 0)
             let field = with_ci_member_field_name(session, cursor)
             if ci_value_ir_valid(base) and field.len() > 0:
                 let field_idx = exprs.add_string(ci_escape_reserved(field))
@@ -13318,13 +13336,13 @@ impl CiStmtPool:
                     if g_ci_bail_message.len() == 0:
                         g_ci_bail_location = with_ci_cursor_location(session, lhs_cursor)
                         g_ci_bail_kind = with_ci_cursor_kind(session, lhs_cursor)
-                        g_ci_bail_message = f"unsupported assignment lhs in goto CFG (kind={g_ci_bail_kind})"
+                        g_ci_bail_message = "unsupported assignment lhs in goto CFG " ++ ci_bail_kind_text(session, lhs_cursor)
                     return ci_value_ir_invalid()
                 if not ci_value_ir_valid(rhs):
                     if g_ci_bail_message.len() == 0:
                         g_ci_bail_location = with_ci_cursor_location(session, rhs_cursor)
                         g_ci_bail_kind = with_ci_cursor_kind(session, rhs_cursor)
-                        g_ci_bail_message = f"unsupported assignment rhs in goto CFG (kind={g_ci_bail_kind})"
+                        g_ci_bail_message = "unsupported assignment rhs in goto CFG " ++ ci_bail_kind_text(session, rhs_cursor)
                     return ci_value_ir_invalid()
                 if ci_value_ir_valid(lhs) and ci_value_ir_valid(rhs):
                     var rhs_value = rhs.value_expr
