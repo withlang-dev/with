@@ -152,6 +152,13 @@ git status -sb
 git pull --ff-only
 ```
 
+No first-hour defect is open (`uat/first-hour/README.md`, #3133). An open
+`first-hour` issue blocks the release; this must print nothing:
+
+```sh
+gh issue list --state open --label first-hour
+```
+
 Set the release version explicitly for the rest of the flow:
 
 ```sh
