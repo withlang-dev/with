@@ -167,34 +167,37 @@ fn facade_render_shown_names(text: &str) -> str:
 // names the function in a `from` clause gets the same clause for the
 // presentation's declaration, so every rule that reads a resource's
 // producers reads both.
-fn facade_render_alias_producer(pool: &AstPool, intern: &InternPool, facade: i32, cname: &str, alias: &str):
-    let work = pool.clone()
-    let start = pool.get_data1(facade as NodeId)
-    for i in 0..pool.get_data2(facade as NodeId):
-        let res = pool.get_extra(start + i)
-        if pool.kind(res as NodeId) != NodeKind.NK_FACADE_RESOURCE:
+fn facade_render_alias_producer(work: AstPool, intern: &InternPool, facade: i32, cname: &str, alias: &str) -> AstPool:
+    let start = work.get_data1(facade as NodeId)
+    for i in 0..work.get_data2(facade as NodeId):
+        let res = work.get_extra(start + i)
+        if work.kind(res as NodeId) != NodeKind.NK_FACADE_RESOURCE:
             continue
-        let rstart = pool.get_data1(res as NodeId)
-        let count = pool.get_data2(res as NodeId)
+        let rstart = work.get_data1(res as NodeId)
+        let count = work.get_data2(res as NodeId)
         var from_clause = 0
         for k in 0..count:
-            let clause = pool.get_extra(rstart + 1 + k)
-            if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_FROM and intern.resolve(pool.get_extra(pool.get_data1(clause as NodeId))) == cname: from_clause = clause
+            let clause = work.get_extra(rstart + 1 + k)
+            if work.get_data0(clause as NodeId) == FACADE_CLAUSE_FROM and intern.resolve(work.get_extra(work.get_data1(clause as NodeId))) == cname: from_clause = clause
         if from_clause == 0:
             continue
         let ops = work.add_extra(intern.intern(alias))
-        work.add_extra(pool.get_extra(pool.get_data1(from_clause as NodeId) + 1))
-        let added = work.add_node(NodeKind.NK_FACADE_CLAUSE, pool.get_start(from_clause as NodeId), pool.get_end(from_clause as NodeId), FACADE_CLAUSE_FROM, ops, 2)
-        let clauses: List[i32] = []
-        for k in 0..count: clauses.push(pool.get_extra(rstart + 1 + k))
-        let moved = work.add_extra(pool.get_extra(rstart))
-        for clause in clauses: work.add_extra(clause)
+        work.add_extra(work.get_extra(work.get_data1(from_clause as NodeId) + 1))
+        let added = work.add_node(NodeKind.NK_FACADE_CLAUSE, work.get_start(from_clause as NodeId), work.get_end(from_clause as NodeId), FACADE_CLAUSE_FROM, ops, 2)
+        // Appending moves nothing: the old run is read while the new one grows.
+        let moved = work.add_extra(work.get_extra(rstart))
+        for k in 0..count: work.add_extra(work.get_extra(rstart + 1 + k))
         work.add_extra(added as i32)
-        pool.set_data1(res as NodeId, moved)
-        pool.set_data2(res as NodeId, count + 1)
+        work.set_data1(res as NodeId, moved)
+        work.set_data2(res as NodeId, count + 1)
+    work
 
-fn facade_render_presentation_aliases(pool: &AstPool, intern: &InternPool, facade: i32, ci: &List[i32]) -> (str, List[i32]):
+// Also returns, per declaration emitted, the C name and the presentation's
+// name: the caller owns the pool and makes each a producer where the
+// function is one (facade_render_alias_producer).
+fn facade_render_presentation_aliases(pool: &AstPool, intern: &InternPool, facade: i32, ci: &List[i32]) -> (str, List[i32], List[str]):
     var out = ""
+    let presented = []
     // Per declaration emitted, the index of the import's declaration it
     // is another name for.
     let origins: List[i32] = []
@@ -231,10 +234,11 @@ fn facade_render_presentation_aliases(pool: &AstPool, intern: &InternPool, facad
             let alias = facade_render_presentation_prefix() ++ renames[g] ++ "__of__" ++ cname
             out = out ++ "@[link_name(\"" ++ cname ++ "\")]\nextern fn " ++ alias ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ "\n"
             pool.set_data0(group[g] as NodeId, intern.intern(alias))
-            facade_render_alias_producer(pool, intern, facade, cname, alias)
+            presented.push(cname.to_owned())
+            presented.push(alias)
             for di in 0..pool.decl_count():
                 if pool.get_decl(di) as i32 == decl: origins.push(di)
-    (out, origins)
+    (out, origins, presented)
 
 // The `rename` an fn item itself states, or "".
 fn facade_render_item_rename_of(pool: &AstPool, intern: &InternPool, item: i32) -> str:
