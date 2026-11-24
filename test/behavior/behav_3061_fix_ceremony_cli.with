@@ -1,0 +1,31 @@
+//! expect-stdout: ok
+
+// `with fix-ceremony --help` prints the usage and exits 0; an option the
+// command does not have is refused by name. Both were read as the entry
+// file: "cannot open '--help'" (#3061).
+use std.fs
+use std.process
+
+fn main:
+    let compiler = env("WITH_TEST_COMPILER")
+    assert(compiler.len() > 0)
+    let dir = f"out/tmp/fix-ceremony-help-{pid()}"
+    assert(mkdir_p(dir) == 0)
+    let help = run_to_files(&[compiler, "fix-ceremony", "--help"], dir ++ "/help.out", dir ++ "/help.err", 600000)
+    assert(help.code == 0)
+    let text = read_file(dir ++ "/help.out").unwrap()
+    assert(text.contains("usage: with fix-ceremony") and text.contains("--apply") and text.contains("--std"))
+    let bad = run_to_files(&[compiler, "fix-ceremony", "--nope"], dir ++ "/bad.out", dir ++ "/bad.err", 600000)
+    assert(bad.code == 2)
+    assert(read_file(dir ++ "/bad.err").unwrap().contains("no option `--nope`"))
+    // Item 8: a run of numbered constants is reported, never rewritten.
+    let program = dir ++ "/kinds.with"
+    assert(write_file(program, "let KIND_A: i32 = 1\nlet KIND_B: i32 = 2\nlet KIND_C: i32 = 3\nlet OTHER: i32 = 9\n\nfn main:\n    print(KIND_A + KIND_B + KIND_C + OTHER)\n") == 0)
+    let report = run_to_files(&[compiler, "fix-ceremony", "--report", program], dir ++ "/report.out", dir ++ "/report.err", 600000)
+    assert(report.code == 0)
+    let listed = read_file(dir ++ "/report.out").unwrap()
+    if not listed.contains("3 numbered constants `KIND_A` .. `KIND_C`"): print(listed)
+    assert(listed.contains("3 numbered constants `KIND_A` .. `KIND_C`"))
+    assert(read_file(program).unwrap().contains("let KIND_B: i32 = 2"))
+    assert(remove_tree(dir) == 0)
+    print("ok")
