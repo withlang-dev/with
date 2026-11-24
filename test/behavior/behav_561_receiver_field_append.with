@@ -61,4 +61,13 @@ fn main:
     let t = s
     s = s ++ "t"
     print(f"{s} {t}")
+
+    // A str that has a second holder at every append: each append copies,
+    // and the capacity grows with the length, not on every copy (it
+    // doubled each time: 2^64 bytes asked for after sixty appends).
+    var grown = ""
+    for n in 0..500:
+        let before = grown
+        grown = grown ++ "x"
+        assert(before.len() == n and grown.len() == n + 1)
     print("ok")
