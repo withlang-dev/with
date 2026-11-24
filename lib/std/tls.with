@@ -66,7 +66,7 @@ fn tls_suite_is_ecdsa(suite: u16): suite == SUITE_ECDHE_ECDSA_AES128_GCM or suit
 // Send a TLS record. Returns bytes sent or -1 on error.
 unsafe fn tls_send_record(fd: i32, content_type: u8, data: *const u8, data_len: i32) -> i32:
     // Build header: type(1) + version(2) + length(2)
-    var hdr: [u8; 5] = [0u8; 5]
+    let hdr: [u8; 5] = [0u8; 5]
     hdr[0] = content_type
     hdr[1] = 0x03u8  // TLS 1.2
     hdr[2] = 0x03u8
@@ -76,7 +76,7 @@ unsafe fn tls_send_record(fd: i32, content_type: u8, data: *const u8, data_len: 
     // Send header
     // Construct a temporary str view for the record header.
     let hp = &hdr[0] as *const u8
-    var hdr_s: str = ""
+    var hdr_s = ""
     // Hack: set str ptr and len directly
     let sp = &raw mut hdr_s as *mut u8
     *(sp as *mut u64) = hp as u64
@@ -86,10 +86,10 @@ unsafe fn tls_send_record(fd: i32, content_type: u8, data: *const u8, data_len: 
         return -1
 
     // Send data
-    var data_s: str = ""
+    var data_s = ""
     let dp = &raw mut data_s as *mut u8
     *(dp as *mut u64) = data as u64
-    *((dp + 8u64) as *mut i64) = data_len as i64
+    *((dp + 8u64) as *mut i64) = data_len
     let sent2 = with_net_send(fd, data_s)
     if sent2 < 0i64:
         return -1
@@ -113,10 +113,10 @@ fn tls_trace(message: &str):
 unsafe fn tls_recv_record(fd: i32, content_type: *mut u8, buf: *mut u8, buf_cap: i32) -> i32:
 
     // Read 5-byte header
-    var hdr: [u8; 5] = [0u8; 5]
+    let hdr: [u8; 5] = [0u8; 5]
     var total_read = 0
     while total_read < 5:
-        let chunk = recv(fd, (5 - total_read) as i64)
+        let chunk = recv(fd, (5 - total_read))
         if chunk.len() == 0:
             return -1
         var ci = 0
@@ -138,7 +138,7 @@ unsafe fn tls_recv_record(fd: i32, content_type: *mut u8, buf: *mut u8, buf_cap:
     // Read record body
     total_read = 0
     while total_read < rec_len:
-        let chunk = recv(fd, (rec_len - total_read) as i64)
+        let chunk = recv(fd, (rec_len - total_read))
         if chunk.len() == 0:
             return -1
         var ci = 0
@@ -161,7 +161,7 @@ unsafe fn tls_prf_sha256(
 ):
     // seed_full = label + seed
     let seed_full_len = label_len + seed_len
-    var seed_full: [u8; 256] = [0u8; 256]
+    let seed_full: [u8; 256] = [0u8; 256]
     var i = 0
     while i < label_len:
         let v = *(label + i as u64)
@@ -181,7 +181,7 @@ unsafe fn tls_prf_sha256(
     var produced = 0
     while produced < output_len:
         // P_i = HMAC(secret, A(i) + seed_full)
-        var concat: [u8; 288] = [0u8; 288]
+        let concat: [u8; 288] = [0u8; 288]
         // Copy A(i)
         var j = 0
         while j < 32:
@@ -380,7 +380,7 @@ unsafe fn tls_decrypt_record(conn: *mut TlsConn, content_type: u8, enc_data: *co
         return -1
 
     // Build nonce: server_write_iv(4) + explicit_nonce(8)
-    var nonce: [u8; 12] = [0u8; 12]
+    let nonce: [u8; 12] = [0u8; 12]
     var ni = 0
     while ni < 4:
         nonce[ni] = conn.server_write_iv[ni]
@@ -457,7 +457,7 @@ unsafe fn tls_recv(conn: *mut TlsConn, buf: *mut u8, buf_cap: i32) -> i32:
 
 
 unsafe fn fill_random(buf: *mut u8, len: i32):
-    with_fill_random(buf, len as i64)
+    with_fill_random(buf, len)
 
 // ── TLS 1.2 Handshake ─────────────────────────────────────────────
 
@@ -466,7 +466,7 @@ unsafe fn tls_send_client_hello(conn: *mut TlsConn, hostname: *const u8, hostnam
     // Generate client random
     fill_random(&raw mut conn.client_random[0] as *mut u8, 32)
 
-    var buf: [u8; 512] = [0u8; 512]
+    let buf: [u8; 512] = [0u8; 512]
     var pos: i32 = 0
 
     // Handshake header (filled later with length)
@@ -810,8 +810,8 @@ unsafe fn tls_recv_server_handshake(
                     evidence.ske_params[pi] = *(body + pi as u64)
                     pi = pi + 1
                 evidence.ske_params_len = params_len
-                evidence.ske_hash_alg = *(body + params_len as u64) as i32
-                evidence.ske_sig_alg = *(body + (params_len + 1) as u64) as i32
+                evidence.ske_hash_alg = *(body + params_len as u64)
+                evidence.ske_sig_alg = *(body + (params_len + 1) as u64)
                 let sig_len = (((*(body + (params_len + 2) as u64) as u32) << 8u32) | (*(body + (params_len + 3) as u64) as u32)) as i32
                 if sig_len <= 0 or sig_len > 528 or params_len + 4 + sig_len > hs_len:
                     return -1
@@ -830,7 +830,7 @@ unsafe fn tls_recv_server_handshake(
 // Derive keys from pre-master secret.
 unsafe fn tls_derive_keys(conn: *mut TlsConn, premaster: *const u8, premaster_len: i32):
     // master_secret = PRF(premaster, "master secret", client_random + server_random)
-    var seed: [u8; 64] = [0u8; 64]
+    let seed: [u8; 64] = [0u8; 64]
     var si = 0
     while si < 32:
         seed[si] = conn.client_random[si]
@@ -838,7 +838,7 @@ unsafe fn tls_derive_keys(conn: *mut TlsConn, premaster: *const u8, premaster_le
         si = si + 1
 
     var master_secret: [u8; 48] = [0u8; 48]
-    var label_ms: [u8; 13] = [0x6Du8, 0x61u8, 0x73u8, 0x74u8, 0x65u8, 0x72u8, 0x20u8, 0x73u8, 0x65u8, 0x63u8, 0x72u8, 0x65u8, 0x74u8]
+    let label_ms: [u8; 13] = [0x6Du8, 0x61u8, 0x73u8, 0x74u8, 0x65u8, 0x72u8, 0x20u8, 0x73u8, 0x65u8, 0x63u8, 0x72u8, 0x65u8, 0x74u8]
     tls_prf_sha256(premaster, premaster_len, &label_ms[0] as *const u8, 13, &seed[0] as *const u8, 64, &raw mut master_secret[0] as *mut u8, 48)
 
     // key_block = PRF(master_secret, "key expansion", server_random + client_random)
@@ -854,7 +854,7 @@ unsafe fn tls_derive_keys(conn: *mut TlsConn, premaster: *const u8, premaster_le
     // ChaCha20-Poly1305 (88). The PRF's output is a stream, so the shorter
     // block is the longer one's first bytes.
     var key_block: [u8; 88] = [0u8; 88]
-    var label_ke: [u8; 13] = [0x6Bu8, 0x65u8, 0x79u8, 0x20u8, 0x65u8, 0x78u8, 0x70u8, 0x61u8, 0x6Eu8, 0x73u8, 0x69u8, 0x6Fu8, 0x6Eu8]
+    let label_ke: [u8; 13] = [0x6Bu8, 0x65u8, 0x79u8, 0x20u8, 0x65u8, 0x78u8, 0x70u8, 0x61u8, 0x6Eu8, 0x73u8, 0x69u8, 0x6Fu8, 0x6Eu8]
     tls_prf_sha256(&master_secret[0] as *const u8, 48, &label_ke[0] as *const u8, 13, &seed[0] as *const u8, 64, &raw mut key_block[0] as *mut u8, 88)
 
     // Distribute keys
@@ -897,7 +897,7 @@ unsafe fn tls_send_client_finish(conn: *mut TlsConn, server_ecdh_pub: *const u8,
         p256_ecdh(&ecdh_priv[0] as *const u8, server_ecdh_pub, &raw mut shared_secret[0] as *mut u8)
 
     // Send ClientKeyExchange
-    var cke: [u8; 102] = [0u8; 102]
+    let cke: [u8; 102] = [0u8; 102]
     cke[0] = HS_CLIENT_KEY_EXCHANGE
     cke[1] = 0u8
     cke[2] = 0u8
@@ -917,7 +917,7 @@ unsafe fn tls_send_client_finish(conn: *mut TlsConn, server_ecdh_pub: *const u8,
     tls_derive_keys(conn, &shared_secret[0] as *const u8, width)
 
     // Send ChangeCipherSpec
-    var ccs: [u8; 1] = [1u8]
+    let ccs: [u8; 1] = [1u8]
     let r2 = tls_send_record(conn.fd, TLS_CHANGE_CIPHER_SPEC, &ccs[0] as *const u8, 1)
     if r2 < 0:
         return -1
@@ -931,11 +931,11 @@ unsafe fn tls_send_client_finish(conn: *mut TlsConn, server_ecdh_pub: *const u8,
     tls_hs_hash_current(conn, &raw mut hs_hash[0] as *mut u8)
 
     var verify_data: [u8; 12] = [0u8; 12]
-    var label_cf: [u8; 15] = [0x63u8, 0x6Cu8, 0x69u8, 0x65u8, 0x6Eu8, 0x74u8, 0x20u8, 0x66u8, 0x69u8, 0x6Eu8, 0x69u8, 0x73u8, 0x68u8, 0x65u8, 0x64u8]
+    let label_cf: [u8; 15] = [0x63u8, 0x6Cu8, 0x69u8, 0x65u8, 0x6Eu8, 0x74u8, 0x20u8, 0x66u8, 0x69u8, 0x6Eu8, 0x69u8, 0x73u8, 0x68u8, 0x65u8, 0x64u8]
     tls_prf_sha256(&conn.master_secret[0] as *const u8, 48, &label_cf[0] as *const u8, 15, &hs_hash[0] as *const u8, 32, &raw mut verify_data[0] as *mut u8, 12)
 
     // Build Finished message: type(1) + length(3) + verify_data(12) = 16
-    var fin: [u8; 16] = [0u8; 16]
+    let fin: [u8; 16] = [0u8; 16]
     fin[0] = HS_FINISHED
     fin[1] = 0u8
     fin[2] = 0u8
@@ -981,7 +981,7 @@ unsafe fn tls_recv_server_finish(conn: *mut TlsConn) -> i32:
         var hs_hash: [u8; 32] = [0u8; 32]
         tls_hs_hash_current(conn, &raw mut hs_hash[0] as *mut u8)
         var expected: [u8; 12] = [0u8; 12]
-        var label_sf: [u8; 15] = [0x73u8, 0x65u8, 0x72u8, 0x76u8, 0x65u8, 0x72u8, 0x20u8, 0x66u8, 0x69u8, 0x6Eu8, 0x69u8, 0x73u8, 0x68u8, 0x65u8, 0x64u8]
+        let label_sf: [u8; 15] = [0x73u8, 0x65u8, 0x72u8, 0x76u8, 0x65u8, 0x72u8, 0x20u8, 0x66u8, 0x69u8, 0x6Eu8, 0x69u8, 0x73u8, 0x68u8, 0x65u8, 0x64u8]
         tls_prf_sha256(&conn.master_secret[0] as *const u8, 48, &label_sf[0] as *const u8, 15, &hs_hash[0] as *const u8, 32, &raw mut expected[0] as *mut u8, 12)
         var diff: u32 = 0
         var vi = 0
@@ -1093,7 +1093,7 @@ unsafe fn tls_verify_peer(
     let hash_alg = evidence.ske_hash_alg
     if hash_alg != 4 and hash_alg != 5 and hash_alg != 6:
         return -1
-    var signed: [u8; 165] = [0u8; 165]
+    let signed: [u8; 165] = [0u8; 165]
     var si = 0
     while si < 32:
         signed[si] = conn.client_random[si]

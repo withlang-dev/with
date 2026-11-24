@@ -172,12 +172,12 @@ const RSA4096_KAT_N: str = "ca861494e679985e6eb4b7ae65aaedeea0c671911ae8ba4aea52
 const RSA4096_KAT_SIG: str = "25001acd2360d59db14235cf07607c3e932634ae9522572511ffe9d74ae6e010ac47c3ffc01264377626b2f23ae83af6b26a75637ddce6b56df23525562eb9ebe2f7f3e6cdcbd8543c184b1c6337ab0d8a07fea7a054aa4be89d8ee979209172755ccc0c310c09d91a178a8252189a2fd35d5ba2aacc4d75a655103c24661aabe832d8e398d551f57705ec4d560ef3d524601eebb64d75c9074651f325218e51a9e717bbd7d3299f27fdb3e7cb6420710ce2aa4a3ec153b816cc6dbe03a42357af82abc371616d5a09c2d0390c5a03a9ec4be00c0925d04fe1430b8abc2e3c6b13f817c67c2276d2d64e113bf17d3d0eab59f09ef4f3f4536216f3b442a3ee5d5d1ad4836432ba5b3c49f255327f9e53acab4d222dd4f2cd04f025b4714bde6204cd228948e09e29e7a40d8f08397563fbe3a9aaa4b5d5dd34ea54c35c89123658f4b99327775ecd5d2f265f47447abeff807d9268ed9615c6c2844c2de5b9bbd694ba683613b2f174dc8a338092c90e8f21421d776751e88a62183e917038220f2946e182157981cde17703165ad631abcfdc32fbfc041a13c10524242f32ade21c6d87f535c66a83eec0b47bd2cda5ef2d6032aa233f5b5dcada2ec2eadf7337b5070276137035d72bf3df174753af0a4a5a3a946edea71b6ac2cb1800ed4845fbc32a9b428be5171d577fdaa1d1669bceeb154177a15b6bf139e6955aa414"
 
 fn rsa_kat_nibble(ch: u8) -> i32:
-    if ch >= '0' and ch <= '9': return (ch - '0') as i32
+    if ch >= '0' and ch <= '9': return (ch - '0')
     (ch - 'a') as i32 + 10
 
 pub fn rsa4096_pkcs1_sha256_kat() -> i32:
-    var n: [u8; 512] = [0u8; 512]
-    var sig: [u8; 512] = [0u8; 512]
+    let n: [u8; 512] = [0u8; 512]
+    let sig: [u8; 512] = [0u8; 512]
     for i in 0..512:
         n[i] = (rsa_kat_nibble(RSA4096_KAT_N[2 * i]) * 16 + rsa_kat_nibble(RSA4096_KAT_N[2 * i + 1])) as u8
         sig[i] = (rsa_kat_nibble(RSA4096_KAT_SIG[2 * i]) * 16 + rsa_kat_nibble(RSA4096_KAT_SIG[2 * i + 1])) as u8

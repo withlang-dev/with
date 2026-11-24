@@ -35,7 +35,7 @@ pub type ZipEntry {
 pub type ZipArchive { handle: *mut c_void }
 
 impl Drop for ZipArchive:
-    move fn drop() -> Unit:
+    move fn drop():
         if self.handle != null: unsafe { unzClose(self.handle) }
 
 pub fn ZipArchive.open(path: &str) -> Result[ZipArchive, ZipError]:
@@ -66,7 +66,7 @@ unsafe fn zip_current_entry(handle: *mut c_void) -> Result[ZipEntry, ZipError]:
 impl ZipArchive:
     /// Every member, in archive order.
     pub fn entries() -> Result[List[ZipEntry], ZipError]:
-        var out: List[ZipEntry] = List.new()
+        let out: List[ZipEntry] = []
         var rc = unsafe { unzGoToFirstFile(self.handle) }
         while rc == UNZ_OK:
             out.push(unsafe { zip_current_entry(self.handle) }?)
@@ -142,8 +142,8 @@ unsafe fn zip_write_current(handle: *mut c_void, target: &str) -> Result[Unit, Z
 unsafe fn zip_drain_current(handle: *mut c_void, stream: *mut c_void) -> Result[List[u8], ZipError]:
     let opened = unsafe { unzOpenCurrentFile(handle) }
     if opened != UNZ_OK: return Err(zip_error(opened, "cannot open an entry (an encrypted or unsupported method)"))
-    let buf = with_alloc(ZIP_CHUNK as i64) as *mut u8
-    var bytes: List[u8] = List.new()
+    let buf = with_alloc(ZIP_CHUNK) as *mut u8
+    let bytes: List[u8] = []
     var failure: i32 = 0
     var n = unsafe { unzReadCurrentFile(handle, buf as *mut c_void, ZIP_CHUNK as c_uint) }
     while n > 0 and failure == 0:

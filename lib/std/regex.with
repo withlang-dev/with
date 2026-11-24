@@ -76,7 +76,7 @@ fn regex_attach_global_state(r: Regex) -> Regex:
         *block = 0
         *((block as i64 + 8) as *mut i64) = 0
         *((block as i64 + 16) as *mut i64) = -1
-    var out = r
+    let out = r
     out.global_pos = block as *mut i32
     out.global_subject_ptr = (block as i64 + 8) as *mut i64
     out.global_subject_len = (block as i64 + 16) as *mut i64
@@ -199,7 +199,7 @@ unsafe fn regex_pattern_info_count(code: *const i8, what: c_int, label: &str) ->
 
 // The match ovector as [start, end] pairs; empty when nothing matched.
 unsafe fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -> List[i32]:
-    let spans: List[i32] = List.new()
+    let spans: List[i32] = []
     if code as i64 == 0 or start_offset < 0 or start_offset as i64 > text.len():
         return spans
     let gcontext = regex_general_context("Regex.captures_at")
@@ -252,10 +252,10 @@ fn regex_substitute(code: *const i8, text: &str, repl: &str, replace_all: bool) 
     let gcontext = regex_general_context("Regex.replace")
     let match_data = unsafe { regex_match_data(code, gcontext, "Regex.replace") }
     let c_repl = regex_cstr(repl)
-    var options: c_uint = PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH
+    var options = PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH
     if replace_all:
         options = options | PCRE2_SUBSTITUTE_GLOBAL
-    var out_len: u64 = (text.len() + repl.len() + 64) as u64
+    var out_len = (text.len() + repl.len() + 64) as u64
     var out_bytes = with_alloc(out_len as i64 + 1)
     var rc = unsafe { regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, out_bytes, &raw mut out_len) }
     if rc == PCRE2_ERROR_NOMEMORY:
@@ -435,7 +435,7 @@ impl Regex:
         number
 
     pub fn capture_names() -> List[str]:
-        let out: List[str] = List.new()
+        let out: List[str] = []
         if self.ptr as i64 == 0:
             return out
         let count = unsafe { regex_pattern_info_count(self.ptr, PCRE2_INFO_NAMECOUNT, "capture_names") }
@@ -509,7 +509,7 @@ impl Regex:
             None => None
 
     pub fn find_all(text: &str) -> List[Match]:
-        let out: List[Match] = List.new()
+        let out: List[Match] = []
         var cursor: i32 = 0
         while cursor <= text.len():
             match self.find_at(text, cursor):
@@ -530,7 +530,7 @@ impl Regex:
         out
 
     pub fn captures_all(text: &str) -> List[Captures]:
-        let out: List[Captures] = List.new()
+        let out: List[Captures] = []
         var cursor: i32 = 0
         while cursor <= text.len():
             match self.captures_at(text, cursor):
@@ -627,26 +627,26 @@ impl Regex:
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
-                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ regex_expand_replacement(captures, repl)
+                            out = out ++ with_str_slice_ref(text, cursor, found.start) ++ regex_expand_replacement(captures, repl)
                             if not replace_all:
-                                out = out ++ with_str_slice_ref(text, found.end as i64, text.len())
+                                out = out ++ with_str_slice_ref(text, found.end, text.len())
                                 break
                             if found.end == found.start:
                                 if found.end >= text.len():
                                     cursor = (text.len() + 1) as i32
                                 else:
-                                    out = out ++ with_str_slice_ref(text, found.start as i64, found.start as i64 + 1)
+                                    out = out ++ with_str_slice_ref(text, found.start, found.start as i64 + 1)
                                     cursor = found.start + 1
                             else:
                                 cursor = found.end
                         }
                         None => {
-                            out = out ++ with_str_slice_ref(text, cursor as i64, text.len())
+                            out = out ++ with_str_slice_ref(text, cursor, text.len())
                             break
                         }
                 }
                 None => {
-                    out = out ++ with_str_slice_ref(text, cursor as i64, text.len())
+                    out = out ++ with_str_slice_ref(text, cursor, text.len())
                     break
                 }
         out
@@ -659,14 +659,14 @@ impl Regex:
 
     pub fn replace_fn(text: &str, replacement_callback: fn(&Captures) -> str) -> str:
         var out = ""
-        var cursor: i32 = 0
+        let cursor: i32 = 0
         while cursor <= text.len():
             match self.captures_at(text, cursor):
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
-                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ replacement_callback(captures)
-                            out = out ++ with_str_slice_ref(text, found.end as i64, text.len())
+                            out = out ++ with_str_slice_ref(text, cursor, found.start) ++ replacement_callback(captures)
+                            out = out ++ with_str_slice_ref(text, found.end, text.len())
                             return out
                         }
                         None => break
@@ -682,23 +682,23 @@ impl Regex:
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
-                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ replacement_callback(captures)
+                            out = out ++ with_str_slice_ref(text, cursor, found.start) ++ replacement_callback(captures)
                             if found.end == found.start:
                                 if found.end >= text.len():
                                     cursor = (text.len() + 1) as i32
                                 else:
-                                    out = out ++ with_str_slice_ref(text, found.start as i64, found.start as i64 + 1)
+                                    out = out ++ with_str_slice_ref(text, found.start, found.start as i64 + 1)
                                     cursor = found.start + 1
                             else:
                                 cursor = found.end
                         }
                         None => {
-                            out = out ++ with_str_slice_ref(text, cursor as i64, text.len())
+                            out = out ++ with_str_slice_ref(text, cursor, text.len())
                             return out
                         }
                 }
                 None => {
-                    out = out ++ with_str_slice_ref(text, cursor as i64, text.len())
+                    out = out ++ with_str_slice_ref(text, cursor, text.len())
                     return out
                 }
         out
@@ -707,15 +707,15 @@ impl Regex:
         self.splitn(text, 0)
 
     pub fn splitn(text: &str, n: i32) -> List[str]:
-        let out: List[str] = List.new()
+        let out: List[str] = []
         var cursor: i32 = 0
         while cursor <= text.len():
             if n > 0 and out.len() >= n - 1:
-                out.push(with_str_slice_ref(text, cursor as i64, text.len()))
+                out.push(with_str_slice_ref(text, cursor, text.len()))
                 return out
             match self.find_at(text, cursor):
                 Some(found) => {
-                    out.push(with_str_slice_ref(text, cursor as i64, found.start as i64))
+                    out.push(with_str_slice_ref(text, cursor, found.start))
                     if found.end == found.start:
                         if found.end >= text.len():
                             cursor = (text.len() + 1) as i32
@@ -725,7 +725,7 @@ impl Regex:
                         cursor = found.end
                 }
                 None => {
-                    out.push(with_str_slice_ref(text, cursor as i64, text.len()))
+                    out.push(with_str_slice_ref(text, cursor, text.len()))
                     break
                 }
         out
@@ -740,7 +740,7 @@ impl Captures:
         if start < 0 or end < 0:
             return None
         Match {
-            text: with_str_slice_ref(self.subject, start as i64, end as i64),
+            text: with_str_slice_ref(self.subject, start, end),
             start: start,
             end: end,
         }

@@ -20,7 +20,7 @@ pub enum AeadError:
 /// ciphertext, then its 16-byte tag. A nonce is never reused under one key.
 pub fn chacha20_poly1305_seal(key: &List[u8], nonce: &List[u8], aad: &List[u8], plaintext: List[u8]) -> Result[List[u8], AeadError]:
     aead_check_lengths(key, nonce)?
-    var sealed = plaintext
+    let sealed = plaintext
     unsafe { chacha20_crypt(aead_bytes(key), aead_bytes(nonce), 1 as u32, sealed.ptr as *mut u8, sealed.len()) }
     let tag = aead_tag(key, nonce, aad, aead_bytes(sealed), sealed.len())
     for b in tag: sealed.push(b)
@@ -32,7 +32,7 @@ pub fn chacha20_poly1305_seal(key: &List[u8], nonce: &List[u8], aad: &List[u8], 
 pub fn chacha20_poly1305_open(key: &List[u8], nonce: &List[u8], aad: &List[u8], sealed: List[u8]) -> Result[List[u8], AeadError]:
     aead_check_lengths(key, nonce)?
     if sealed.len() < 16: return Err(.Forged)
-    var opened = sealed
+    let opened = sealed
     let ct_len = opened.len() - 16
     let tag = aead_tag(key, nonce, aad, aead_bytes(opened), ct_len)
     // Constant time: every byte is compared whatever the first difference.
@@ -78,6 +78,6 @@ unsafe fn aead_mac_padded(mp: *mut Poly1305, bytes: *const u8, len: isize):
     let full = len - len % 16
     if full > 0: poly1305_update(mp, bytes, full)
     if full < len:
-        var tail: [u8; 16] = [0 as u8; 16]
+        let tail: [u8; 16] = [0 as u8; 16]
         for i in full..len: tail[i - full] = *(bytes + i as u64)
         poly1305_update(mp, &tail[0] as *const u8, 16)

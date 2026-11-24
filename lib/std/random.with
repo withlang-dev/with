@@ -75,45 +75,45 @@ fn unsigned_in(lo: u64, hi: u64) -> u64:
 fn unit() -> f64: (bits() >> 11) as f64 / 9007199254740992.0
 
 impl Random for i8:
-    fn random_any() -> i8: (bits() >> 56) as i8
-    fn random_in(lo: i8, hi: i8) -> i8: signed_in(lo, hi) as i8
+    fn random_any(): (bits() >> 56) as i8
+    fn random_in(lo: i8, hi: i8): signed_in(lo, hi) as i8
 impl Random for i16:
-    fn random_any() -> i16: (bits() >> 48) as i16
-    fn random_in(lo: i16, hi: i16) -> i16: signed_in(lo, hi) as i16
+    fn random_any(): (bits() >> 48) as i16
+    fn random_in(lo: i16, hi: i16): signed_in(lo, hi) as i16
 impl Random for i32:
-    fn random_any() -> i32: (bits() >> 32) as i32
-    fn random_in(lo: i32, hi: i32) -> i32: signed_in(lo, hi) as i32
+    fn random_any(): (bits() >> 32) as i32
+    fn random_in(lo: i32, hi: i32): signed_in(lo, hi) as i32
 impl Random for i64:
-    fn random_any() -> i64: bits() as i64
-    fn random_in(lo: i64, hi: i64) -> i64: signed_in(lo, hi)
+    fn random_any(): bits() as i64
+    fn random_in(lo: i64, hi: i64): signed_in(lo, hi)
 impl Random for isize:
-    fn random_any() -> isize: bits() as isize
-    fn random_in(lo: isize, hi: isize) -> isize: signed_in(lo, hi) as isize
+    fn random_any(): bits() as isize
+    fn random_in(lo: isize, hi: isize): signed_in(lo, hi)
 impl Random for u8:
-    fn random_any() -> u8: (bits() >> 56) as u8
-    fn random_in(lo: u8, hi: u8) -> u8: unsigned_in(lo, hi) as u8
+    fn random_any(): (bits() >> 56) as u8
+    fn random_in(lo: u8, hi: u8): unsigned_in(lo, hi) as u8
 impl Random for u16:
-    fn random_any() -> u16: (bits() >> 48) as u16
-    fn random_in(lo: u16, hi: u16) -> u16: unsigned_in(lo, hi) as u16
+    fn random_any(): (bits() >> 48) as u16
+    fn random_in(lo: u16, hi: u16): unsigned_in(lo, hi) as u16
 impl Random for u32:
-    fn random_any() -> u32: (bits() >> 32) as u32
-    fn random_in(lo: u32, hi: u32) -> u32: unsigned_in(lo, hi) as u32
+    fn random_any(): (bits() >> 32) as u32
+    fn random_in(lo: u32, hi: u32): unsigned_in(lo, hi) as u32
 impl Random for u64:
-    fn random_any() -> u64: bits()
-    fn random_in(lo: u64, hi: u64) -> u64: unsigned_in(lo, hi)
+    fn random_any(): bits()
+    fn random_in(lo: u64, hi: u64): unsigned_in(lo, hi)
 impl Random for usize:
-    fn random_any() -> usize: bits() as usize
-    fn random_in(lo: usize, hi: usize) -> usize: unsigned_in(lo, hi) as usize
+    fn random_any(): bits()
+    fn random_in(lo: usize, hi: usize): unsigned_in(lo, hi)
 impl Random for f64:
-    fn random_any() -> f64: unit()
-    fn random_in(lo: f64, hi: f64) -> f64:
+    fn random_any(): unit()
+    fn random_in(lo: f64, hi: f64):
         if not (hi > lo): return lo
         let v = lo + (hi - lo) * unit()
         // Rounding can land on `hi`; the interval is half-open.
         if v < hi: v else: lo
 impl Random for f32:
-    fn random_any() -> f32: (bits() >> 40) as f32 / 16777216.0
-    fn random_in(lo: f32, hi: f32) -> f32:
+    fn random_any(): (bits() >> 40) as f32 / 16777216.0
+    fn random_in(lo: f32, hi: f32):
         if not (hi > lo): return lo
         let u: f32 = next()
         let v = lo + (hi - lo) * u

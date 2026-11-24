@@ -46,7 +46,7 @@ pub fn stc_slot_unordered(a: *const u8, b: *const u8) -> i32: 0
 /// The prefix every slot of a facade carries: the engine's callbacks are
 /// the two trampolines, the With functions are the facade's.
 pub fn stc_slot_prefix(compare: fn(*const u8, *const u8) -> i32, hash: fn(*const u8) -> u64) -> StcSlotPrefix:
-    StcSlotPrefix { head: stc_slot_head { cmp: Some(stc_slot_compare), hash: Some(stc_slot_hash) }, compare: compare, hash: hash }
+    StcSlotPrefix { head: stc_slot_head { cmp: stc_slot_compare, hash: stc_slot_hash }, compare: compare, hash: hash }
 
 // The slot's lifetime, in three safe steps the facades share: `stc_slot_new`
 // moves a value into a fresh slot (the engine is then handed the slot's

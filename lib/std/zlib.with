@@ -36,7 +36,7 @@ fn zlib_list_data(bytes: &List[u8]) -> *const u8:
     bytes.ptr as *const u8
 
 fn zlib_copy_from_raw(ptr: *const u8, len: i64) -> List[u8]:
-    let out: List[u8] = List.new()
+    let out: List[u8] = []
     var i: i64 = 0
     while i < len:
         out.push(unsafe *((ptr as i64 + i) as *const u8))
@@ -113,7 +113,7 @@ pub fn decompress_gzip_with_limit(data: &List[u8], max_output_len: i64) -> Resul
 fn decompress_window_bits(data: &List[u8], max_output_len: i64, window_bits: i32) -> Result[List[u8], ZlibError]:
     if max_output_len < 0:
         return Err(zlib_error(Z_STREAM_ERROR, "zlib maximum output length must be non-negative"))
-    var cap: i64 = (data.len() * 3) as i64
+    var cap: i64 = (data.len() * 3)
     if cap < 1024:
         cap = 1024
     if cap > max_output_len:

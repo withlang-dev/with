@@ -21,7 +21,7 @@ global _facts: Mutex[Option[SysFacts]] = Mutex.new(None)
 
 fn facts() -> SysFacts:
     with _facts.enter_mut() as mut cached:
-        if cached.is_none(): cached = Some(measure_facts())
+        if cached.is_none(): cached = measure_facts()
         cached.unwrap()
 
 fn measure_facts() -> SysFacts:

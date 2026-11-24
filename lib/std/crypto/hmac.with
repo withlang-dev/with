@@ -10,7 +10,7 @@ type HmacSha256  {
 }
 
 unsafe fn HmacSha256.new(key: *const u8, key_len: i32) -> HmacSha256:
-    var padded_key: [u8; 64] = [0 as u8; 64]
+    let padded_key: [u8; 64] = [0 as u8; 64]
     if key_len > 64:
         var key_hash: [u8; 32] = [0 as u8; 32]
         sha256_hash(key, key_len, &raw mut key_hash[0] as *mut u8)
@@ -20,8 +20,8 @@ unsafe fn HmacSha256.new(key: *const u8, key_len: i32) -> HmacSha256:
         for i in 0..key_len:
             padded_key[i] = *(key + i as u64)
 
-    var ipad_key: [u8; 64] = [0 as u8; 64]
-    var outer_key: [u8; 64] = [0 as u8; 64]
+    let ipad_key: [u8; 64] = [0 as u8; 64]
+    let outer_key: [u8; 64] = [0 as u8; 64]
     for i in 0..64:
         ipad_key[i] = padded_key[i] ^ (0x36 as u8)
         outer_key[i] = padded_key[i] ^ (0x5C as u8)
@@ -48,7 +48,7 @@ unsafe fn hmac_finish(ctx: *mut HmacSha256, out: *mut u8):
     sha256_finish(ip, idp)
 
     // Copy outer_key to stack
-    var ok: [u8; 64] = [0 as u8; 64]
+    let ok: [u8; 64] = [0 as u8; 64]
     for i in 0..64:
         ok[i] = ctx.outer_key[i]
 

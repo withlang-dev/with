@@ -51,7 +51,7 @@ fn base32hex_validate(text: &str) -> Result[i64, DecodeError]:
 
 /// Encode bytes as canonical uppercase, padded RFC 4648 Base32hex.
 pub fn base32hex_encode(data: []u8) -> str:
-    var out = StringBuilder.with_capacity(base32hex_encoded_len(data.len()))
+    let out = StringBuilder.with_capacity(base32hex_encoded_len(data.len()))
     var offset: i64 = 0
     while offset < data.len():
         let remaining = data.len() - offset
