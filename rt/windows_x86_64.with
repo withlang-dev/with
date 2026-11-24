@@ -31,6 +31,7 @@ extern fn CreateProcessW(app: *const u16, cmd: *mut u16, proc_attrs: *mut u8, th
 extern fn CreateJobObjectW(attrs: *mut u8, name: *const u16) -> i64
 extern fn AssignProcessToJobObject(job: i64, process: i64) -> i32
 extern fn TerminateJobObject(job: i64, code: u32) -> i32
+extern fn QueryInformationJobObject(job: i64, info_class: i32, info: *mut u8, len: u32, returned: *mut u32) -> i32
 extern fn ResumeThread(thread: i64) -> u32
 extern fn GetEnvironmentVariableW(name: *const u16, buf: *mut u16, size: u32) -> u32
 extern fn SetEnvironmentVariableW(name: *const u16, value: *const u16) -> i32
@@ -1682,6 +1683,25 @@ fn win_process_peak_rss(process: i64) -> i64:
         return 0
     unsafe *((base as i64 + 8) as *const i64)
 
+// The peak reported for a child is its tree's (#3456). A child that only
+// starts the real work (the build's runner starting a compile) peaks at a
+// few hundred megabytes while its own child takes eight gigabytes; POSIX
+// gets the tree from wait4, whose usage covers the waited-for descendants.
+// Here the child's job records the most any one process in it committed
+// (JOBOBJECT_EXTENDED_LIMIT_INFORMATION.PeakProcessMemoryUsed, class 9,
+// at byte 128 of 144). The direct child's peak working set stands when it
+// has no job or the job cannot be read.
+fn win_child_peak_memory(slot: i32, process: i64) -> i64:
+    let own = win_process_peak_rss(process)
+    let job = process_jobs[slot]
+    if job == 0: return own
+    var info: [144]u8 = [0 as u8; 144]
+    let base = (&raw mut info) as *mut [144]u8 as *mut u8
+    var returned: u32 = 0 as u32
+    if QueryInformationJobObject(job, 9, base, 144 as u32, &raw mut returned) == 0: return own
+    let tree = unsafe *((base as i64 + 128) as *const i64)
+    if tree > own: tree else: own
+
 fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     if slot <= 0 or slot >= 256:
         return -1
@@ -1694,7 +1714,7 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
         let job = process_jobs[slot]
         let _term = if job != 0: TerminateJobObject(job, CAPTURE_TIMEOUT_RC as u32) else: TerminateProcess(h, CAPTURE_TIMEOUT_RC as u32)
         let _wait = WaitForSingleObject(h, INFINITE)
-        win_last_child_maxrss = win_process_peak_rss(h)
+        win_last_child_maxrss = win_child_peak_memory(slot, h)
         let child_cpu = win_process_cpu_ns(h)
         if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
         if consume: win_process_release(slot)
@@ -1703,7 +1723,7 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
         return win_neg_error()
     var code: u32 = 1 as u32
     GetExitCodeProcess(h, &raw mut code)
-    win_last_child_maxrss = win_process_peak_rss(h)
+    win_last_child_maxrss = win_child_peak_memory(slot, h)
     let child_cpu = win_process_cpu_ns(h)
     if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
     if consume: win_process_release(slot)
@@ -2022,13 +2042,13 @@ pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
         return win_neg_error()
     var code: u32 = 1 as u32
     GetExitCodeProcess(h, &raw mut code)
-    win_last_child_maxrss = win_process_peak_rss(h)
+    win_last_child_maxrss = win_child_peak_memory(pid, h)
     let child_cpu = win_process_cpu_ns(h)
     if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
     win_process_release(pid)
     code as i32
 
-// #679/#702 stubs: RSS accounting is POSIX-only for now (#807-adjacent).
+// #679/#702: the most recently reaped child's peak, its descendants included.
 pub fn rt_compat_exec_child_maxrss() -> i64: win_last_child_maxrss
 
 pub fn rt_compat_self_maxrss() -> i64: win_process_peak_rss(GetCurrentProcess())
@@ -2374,6 +2394,7 @@ c contract win32:
     fn CreateJobObjectW
     fn AssignProcessToJobObject
     fn TerminateJobObject
+    fn QueryInformationJobObject
     fn ResumeThread
     fn GetEnvironmentVariableW
     fn SetEnvironmentVariableW

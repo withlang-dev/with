@@ -1,0 +1,29 @@
+//! expect-stdout: ok
+// #3456: the peak memory reported for a child is its tree's. This program
+// starts itself as a go-between that only starts a third copy, and the third
+// fills a quarter of a gigabyte. On Windows the report was the go-between's
+// own few megabytes: the build printed 773 MB for a compile at 8 GB.
+use std.fs
+use std.process
+
+fn main:
+    let argv = args()
+    let role = if argv.len() > 1: argv[1] else: "top"
+    let dir = if argv.len() > 2: argv[2] else: f"out/tmp/child-peak-{pid()}"
+    if role == "leaf":
+        var filled: List[i64] = []
+        for i in 0..32000000: filled.push(i as i64)
+        assert(filled[31999999] == 31999999)
+        return 0
+    if role == "between":
+        let leaf = run_to_files(&[argv[0], "leaf", dir], dir ++ "/leaf.out", dir ++ "/leaf.err", 1800000)
+        return leaf.code
+    assert(mkdir_p(dir) == 0)
+    let between = run_to_files(&[argv[0], "between", dir], dir ++ "/between.out", dir ++ "/between.err", 1800000)
+    assert(not between.timed_out)
+    assert(between.code == 0)
+    if between.peak_rss < 200 * 1024 * 1024:
+        print(f"peak reported for the go-between's tree: {between.peak_rss} bytes")
+    assert(between.peak_rss >= 200 * 1024 * 1024)
+    assert(remove_tree(dir) == 0)
+    print("ok")
