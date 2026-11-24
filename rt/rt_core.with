@@ -1303,13 +1303,17 @@ fn free_small_block(block: i64, idx: i32):
 // did not finish in 99 minutes). A freed entry stays until its address is
 // reused: it is what a second free of that address is judged against.
 let DBG_CAP_INITIAL: i64 = 65536
-let DBG_ENTRY_WORDS: i64 = 23       // addr, size, freed, alloc_origin, first_drop_ptr, first_drop_len, root_flag, root_reason_ptr, root_reason_len, then the two sites
+let DBG_ENTRY_WORDS: i64 = 29       // addr, size, freed, alloc_origin, first_drop_ptr, first_drop_len, root_flag, root_reason_ptr, root_reason_len, then the two sites
 // #1014: the return addresses of the first free and of the allocation
 // (innermost first, 0 ends a list), so a DOUBLE FREE names both free sites
 // and a LEAK names where the block was made, with no debugger.
 let DBG_SITE_FRAMES: i64 = 8
 let DBG_SITE_OFFSET: i64 = 72
-let DBG_ALLOC_SITE_FRAMES: i64 = 6
+// Twelve: the innermost three or four are the runtime's own (the ledger,
+// the allocator, the collection that grew), and a site is only useful once
+// it reaches the code that asked (#618: six ended at the function that
+// built the table, never at who called it).
+let DBG_ALLOC_SITE_FRAMES: i64 = 12
 let DBG_ALLOC_SITE_OFFSET: i64 = 136
 // A leak report names the allocation site of its first blocks only: a
 // program that leaks in a loop leaks thousands from one site.
@@ -1734,6 +1738,103 @@ fn dbg_account_free(size: i64, origin: i64):
     let b = dbg_size_bucket(size)
     dbg_live_hist[b] = dbg_live_hist[b] - 1
 
+// #618: which code holds the memory. Every tracked block keeps the chain
+// that allocated it (#1014), and the peak report says at which allocation
+// the peak was (`at allocation=N`). `WITH_DEBUG_ALLOC_SITES_AT=N` groups
+// the blocks live at allocation N by that chain and prints the sites
+// holding the most, so two runs of a deterministic program name the code
+// behind its peak: the first for N, the second for the sites.
+var dbg_sites_at_state: i32 = 0    // 0=unread, 1=off, 2=on
+var dbg_sites_at_v: i64 = 0
+let DBG_SITE_TABLE_CAP: i64 = 65536
+let DBG_SITE_ROW_BYTES: i64 = 32   // chain hash, bytes, blocks, one entry of the site
+let DBG_SITES_SHOWN: i64 = 24
+
+fn dbg_sites_at() -> i64:
+    if dbg_sites_at_state == 0:
+        let parsed = rt_parse_limit_cstr(rt_getenv(c"WITH_DEBUG_ALLOC_SITES_AT".ptr))
+        if parsed > 0:
+            dbg_sites_at_v = parsed
+            dbg_sites_at_state = 2
+        else:
+            dbg_sites_at_state = 1
+    if dbg_sites_at_state == 2:
+        return dbg_sites_at_v
+    0
+
+// Runs under the allocator lock, at the allocation asked for; its table is
+// mapped and unmapped here, never taken from the allocator it reports on.
+fn dbg_report_sites():
+    let table_bytes = DBG_SITE_TABLE_CAP * DBG_SITE_ROW_BYTES
+    let table = rt_mmap(table_bytes) as i64
+    if table == 0:
+        return
+    var sites: i64 = 0
+    var slot: i64 = 0
+    while slot < dbg_cap:
+        let e = dbg_entry_addr(slot)
+        slot = slot + 1
+        if (unsafe *(e as *const i64)) == 0 or (unsafe *((e + 16) as *const i64)) != 0:
+            continue
+        var h: i64 = 1469598103
+        for k in 0..DBG_ALLOC_SITE_FRAMES:
+            h = (h ^ (unsafe *((e + DBG_ALLOC_SITE_OFFSET + k * 8) as *const i64))) *% 1099511628211
+        if h == 0: h = 1
+        var t = (h >> 7) & (DBG_SITE_TABLE_CAP - 1)
+        var probes: i64 = 0
+        // A table this size never fills on real programs; one that did
+        // would fold the overflow into no row, and the header's totals,
+        // which come from the live counters, would show the gap.
+        while probes < DBG_SITE_TABLE_CAP:
+            let row = table + t * DBG_SITE_ROW_BYTES
+            let key = unsafe *(row as *const i64)
+            if key == 0 or key == h:
+                if key == 0: sites = sites + 1
+                unsafe *(row as *mut i64) = h
+                unsafe *((row + 8) as *mut i64) = (unsafe *((row + 8) as *const i64)) + (unsafe *((e + 8) as *const i64))
+                unsafe *((row + 16) as *mut i64) = (unsafe *((row + 16) as *const i64)) + 1
+                unsafe *((row + 24) as *mut i64) = e
+                break
+            t = (t + 1) & (DBG_SITE_TABLE_CAP - 1)
+            probes = probes + 1
+    dbg_puts("debug-alloc: at allocation=")
+    dbg_put_i64(dbg_alloc_total)
+    dbg_puts(" live bytes=")
+    dbg_put_i64(dbg_live_bytes)
+    dbg_puts(" blocks=")
+    dbg_put_i64(dbg_live_blocks)
+    dbg_puts(" from ")
+    dbg_put_i64(sites)
+    dbg_puts(" allocation sites; the largest:\n")
+    var rank: i64 = 0
+    while rank < DBG_SITES_SHOWN:
+        var best: i64 = 0
+        var best_bytes: i64 = 0
+        var r: i64 = 0
+        while r < DBG_SITE_TABLE_CAP:
+            let row = table + r * DBG_SITE_ROW_BYTES
+            let bytes = unsafe *((row + 8) as *const i64)
+            if bytes > best_bytes:
+                best_bytes = bytes
+                best = row
+            r = r + 1
+        if best == 0:
+            break
+        rank = rank + 1
+        dbg_puts("debug-alloc: site ")
+        dbg_put_i64(rank)
+        dbg_puts(": ")
+        dbg_put_i64(best_bytes)
+        dbg_puts(" bytes in ")
+        dbg_put_i64(unsafe *((best + 16) as *const i64))
+        dbg_puts(" blocks, allocated at\n")
+        let entry = unsafe *((best + 24) as *const i64)
+        let n = dbg_site_len(entry + DBG_ALLOC_SITE_OFFSET, DBG_ALLOC_SITE_FRAMES)
+        if n == 0: dbg_puts("  (this host records no call chain)\n")
+        else: rt_backtrace_print_frames((entry + DBG_ALLOC_SITE_OFFSET) as *const i64, n)
+        unsafe *((best + 8) as *mut i64) = 0
+    rt_munmap(table as *mut u8, table_bytes)
+
 fn dbg_report_peak():
     dbg_puts("debug-alloc: peak live bytes=")
     dbg_put_i64(dbg_peak_bytes)
@@ -1808,6 +1909,7 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
             unsafe *((e + 64) as *mut i64) = 0
             unsafe *((e + DBG_SITE_OFFSET) as *mut i64) = 0
             dbg_capture_site(e + DBG_ALLOC_SITE_OFFSET, DBG_ALLOC_SITE_FRAMES)
+            if dbg_sites_at() == dbg_alloc_total: dbg_report_sites()
             return
         slot = (slot + 1) & (dbg_cap - 1)
         probes = probes + 1
@@ -1819,8 +1921,8 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
 // Frame 0 is this function; the rest of the runtime's own frames stay,
 // since inlining decides how many there are.
 fn dbg_capture_site(at: i64, count: i64):
-    var frames: [9]i64 = [0 as i64; 9]
-    let n = rt_backtrace_capture(&raw mut frames as *mut [9]i64 as *mut i64, 9)
+    var frames: [14]i64 = [0 as i64; 14]
+    let n = rt_backtrace_capture(&raw mut frames as *mut [14]i64 as *mut i64, 14)
     for k in 0..count:
         unsafe *((at + k * 8) as *mut i64) = if k + 1 < n: frames[k + 1] else: 0
 
