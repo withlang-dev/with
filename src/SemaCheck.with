@@ -41198,7 +41198,7 @@ impl Sema:
         // was a phantom "future use" that moved with any upstream edit: four
         // lines added to Sema.with put types_identical's `count` (Sema.with:5338)
         // inside the window of MirLower.with's `for i in 0..count`, and `with
-        // check src/main.with` refused update_string_fields_after_aggregate. The
+        // check src/main.with` refused the function holding that loop. The
         // subtree prune below still skips the scan when root lacks the symbol.
         if self.expr_uses_symbol(root, sym) == 0:
             return 0
