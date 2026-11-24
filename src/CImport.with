@@ -16021,6 +16021,31 @@ fn ci_take_body_tail_unit() -> bool:
     g_ci_body_tail_unit = false
     taken
 
+// C reads and writes an `_Atomic` object atomically wherever it is named
+// (C11 6.2.6.1, 6.5.16.2): `g++` is an atomic increment, `x = g` an atomic
+// load. Its type is imported as the value type, so a body that named one
+// was translated to plain reads and writes and lost its atomicity with no
+// word (`static _Atomic int g; g++;` became `g = g + 1`). Taking its
+// address, for an atomic builtin, is the one ordinary use. Until `_Atomic T`
+// is imported as `Atomic[T]`, a body that names one any other way is
+// refused, by name.
+fn ci_body_names_atomic_object(session: i64, cursor: i32, under_address_of: bool) -> bool:
+    if ci_unevaluated(session, cursor): return false
+    let kind = with_ci_cursor_kind(session, cursor)
+    if (kind == CXK_DECL_REF or kind == CXK_MEMBER_REF or kind == CXK_MEMBER_REFERENCE) and not under_address_of and with_ci_type_is_atomic(session, with_ci_cursor_type(session, cursor)) != 0:
+        if g_ci_bail_message.len() == 0:
+            g_ci_bail_message = "`" ++ ci_trim(with_ci_cursor_source_text(session, cursor)) ++ "` is an `_Atomic` object: C reads and writes it atomically, and that has no translation yet (only its address, for an atomic builtin, has)"
+            g_ci_bail_location = with_ci_cursor_location(session, cursor)
+            g_ci_bail_kind = kind
+        return true
+    // The address-of reaches its operand through parentheses and implicit
+    // wrappers; anything else between them is a use of the value.
+    let transparent = kind == CXK_PAREN_EXPR or kind == 100
+    let below = if kind == CXK_UNARY_OP and with_ci_unary_op(session, cursor) == UO_ADDROF: true else: under_address_of and transparent
+    for i in 0..with_ci_num_children(session, cursor):
+        if ci_body_names_atomic_object(session, with_ci_child(session, cursor, i), below): return true
+    false
+
 fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -> str:
     // A record left by a body that bailed elsewhere must not be charged to
     // this one: every caller takes the records right after this returns.
@@ -16051,6 +16076,9 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
         i = i + 1
 
     if body_cursor < 0:
+        return ""
+
+    if ci_body_names_atomic_object(session, body_cursor, false):
         return ""
 
     // D75: the lists this body starts; each declaration moves to its start.
