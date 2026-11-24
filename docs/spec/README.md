@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.88
+# The With Programming Language — Specification v7.89
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.89:** D234 (delegated, D98; 2026-11-24). §10.2: a `main` that declares `-> Result[T, E]` and returns an `Err` ends the program as `?` in main does (the error's `Debug` form on stderr, exit status 1, after the return's defers and drops); an `Ok` exits with status 0. It was accepted and its `Err` discarded (exit status 0), and a `Result` returned through a slot failed in code generation.
+
 **Changelog v7.88:** D233 (Eric, 2026-11-23). §6.2: making a slot is a write of the collection it comes from. `slot`, `iter_place` and `get_disjoint` need a writable place, whether or not the slot is then written; the table states the receiver mode of `slot` and `get_disjoint`. Implemented for `List` and `SlotMap`.
 
 **Changelog v7.87:** (Eric, 2026-11-22/23.) §16.2b.15, §31: a facts file states how its package is configured when built from source. `build define NAME[=value]` reaches the library's build only and must not change what the installed headers declare beyond `const` (checked by preprocessing each header with and without it); `define NAME[=value]` reaches the build and the program's import. Each is set explicitly and is part of a cached build's key; a library not built with a setting does not get the facts that cite it. zlib is built with `ZLIB_CONST`. Implemented.

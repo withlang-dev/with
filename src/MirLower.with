@@ -10599,6 +10599,7 @@ impl MirBuilder:
                 self.gen_loop_used_codes = self.gen_loop_used_codes + gen_loop_code_bit(code)
             self.assign_int_to_local(self.gen_loop_flag_local, code, self.sema.ty_i32 as i32)
             self.assign_bool_to_local(0, false)
+        self.emit_main_result_return_check()
         self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
 
     mut fn assign_int_to_local(local_id: i32, value: i32, ty: i32):
@@ -14774,6 +14775,26 @@ impl MirBuilder:
             self.emit_handle_call(cancel_op, MirIntrinsic.FIBER_CANCEL, node)
             self.lower_cleanup_await(task_op, node)
             ci = ci + 1
+
+    // A `main` that declares `-> Result[T, E]` and returns an Err ends the
+    // program as `?` in main does (§10.2, D190): the error's Debug form on
+    // stderr, exit status 1. It returned the Err to the entry wrapper, which
+    // discarded it: `fn main -> Result[Unit, i32]: Err(3)` exited 0. Placed
+    // before the return itself, so defers and drops have run.
+    mut fn emit_main_result_return_check():
+        if not self.sema.sym_is_program_main(self.sema_symbol_for_ast_symbol(self.body.fn_sym)): return
+        let ret_ty = self.fn_return_type()
+        let err_ty = self.generic_inst_arg_type(ret_ty, self.sema.syms.result, 1)
+        if err_ty == 0: return
+        let ret_place = self.fn_return_place()
+        let pass_bb = self.new_block()
+        let fail_bb = self.new_block()
+        let disc = self.lower_enum_discriminant(ret_place)
+        let table = self.body.new_switch_table([self.success_variant_tag(ret_place)], [pass_bb as i32])
+        self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
+        self.switch_to(fail_bb)
+        self.emit_main_error_exit(ret_place, ret_ty, err_ty, self.cur_node)
+        self.switch_to(pass_bb)
 
     // §10.2 (D190): `?` in main meets an Err: the error's Debug form on
     // stderr, exit status 1. The process ends here, so no cleanup or return
@@ -19796,6 +19817,7 @@ fn lower_fn_shape(builder: MirBuilder, sig_idx: i32, shape: FnLowerShape) -> Low
     builder.finish_stmt_temp_frame(body_frame)
     builder.emit_defers_for_return()
     builder.pop_scope_inline()
+    builder.emit_main_result_return_check()
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
 
     // Self-tail-call optimization for @[tailrec] functions.

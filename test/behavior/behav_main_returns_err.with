@@ -1,0 +1,17 @@
+//! expect-exit: 1
+//! expect-stdout: cleanup
+//! expect-stderr: error: "too many"
+// A `main` that declares `-> Result[T, E]` and returns an Err ends the
+// program as `?` in main does (§10.2, D190): the error's Debug form after
+// `error: ` on stderr, exit status 1, after its defers have run. The Err
+// was returned to the entry wrapper and discarded (exit status 0), and a
+// Result too large for registers failed in code generation.
+fn pick(n: i32) -> Result[i32, str]:
+    if n > 1: return Err("too many")
+    Ok(n)
+
+fn main -> Result[Unit, str]:
+    defer: print("cleanup")
+    let v = pick(2)?
+    print(v)
+    Ok(())

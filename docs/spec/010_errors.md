@@ -55,6 +55,11 @@ nothing after the `?` runs, and no backtrace is printed (D190). A `?`
 inside a closure in main is the closure's. `?` on an `Option` in main
 follows the ordinary rule.
 
+A `main` that declares `-> Result[T, E]` and returns an `Err` ends the
+program the same way: the error's `Debug` form after `error: ` on stderr,
+exit status 1, after the defers and drops of the return have run. An `Ok`
+exits with status 0 (D234).
+
 ```
 use std.fs
 let text = read_file("README.md")?     // Err: `error: ...` on stderr, exit 1

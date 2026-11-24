@@ -33088,6 +33088,9 @@ impl Sema:
     // lowering asks Sema; it never compares a name itself, D65).
     fn fn_decl_is_main(decl: i32) -> bool: self.pool_resolve(self.ast.get_data0(decl)) == "main"
 
+    // Whether `sym` is the program's `main` (MIR asks; it reads no names, D65).
+    fn sym_is_program_main(sym: i32) -> bool: sym != 0 and sym == self.pool_lookup_symbol("main")
+
     // #3343: the symbol of a method of an impl, its own or one it inherits
     // from its trait: the owner key (§18.1) and the method's name.
     fn impl_method_symbol_text(impl_node: i32, method_sym: i32) -> str: self.pool_resolve(self.impl_owner_key_symbol(impl_node)) ++ "." ++ self.pool_resolve(method_sym)
