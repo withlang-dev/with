@@ -2355,8 +2355,9 @@ impl ComptimeEvaluator:
         let idx = self.lookup_slot_index(base_sym)
         if idx < 0:
             return self.fail(node, "comptime field assignment target is not available")
-        if self.slot_muts[idx] == 0:
-            return self.fail(node, "cannot assign to field of immutable value")
+        // A `let` forbids rebinding its name, not a store into a field of its
+        // value (as `xs.push(…)` on a `let` already evaluates). Which places a
+        // field store may reach is Sema's answer (D65); it is not re-derived.
         let base_value = comptime_value_clone(self.slot_values[idx])
         if base_value.kind != ComptimeValueKind.CV_STRUCT:
             return self.fail(node, "comptime field assignment requires a struct value")
