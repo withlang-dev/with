@@ -152,7 +152,7 @@ fn uat_stem(path: &str) -> str:
     path.slice(start, end)
 
 fn uat_parse(path: &str, text: &str) -> UatScenario:
-    let sc = UatScenario { name: uat_stem(path), path: path, title: "", requires: List.new(), platforms: List.new(), steps: List.new(), problem: "" }
+    let sc = UatScenario { name: uat_stem(path), path: path, title: "", requires: [], platforms: [], steps: [], problem: "" }
     let lines: List[str] = []
     for raw in text.split("\n"):
         lines.push(uat_trim_trailing_line_endings(raw))

@@ -351,7 +351,7 @@ fn xz_bytes_to_str(v: &List[u8]) -> str:
 // The decompressed contents of the .xz file `data`; "" and the reason in
 // the second element on failure. Concatenated streams are read in turn.
 fn xz_decompress(data: &str) -> List[str]:
-    let dec = XzLzma { data: data.to_owned(), at: 0, end: 0, range: 0, code: 0, probs: List.new(), lc: 0, lp: 0, pb: 0, state: 0, rep0: 0, rep1: 0, rep2: 0, rep3: 0, out: List.new(), dict_start: 0, problem: "" }
+    let dec = XzLzma { data: data.to_owned(), at: 0, end: 0, range: 0, code: 0, probs: [], lc: 0, lp: 0, pb: 0, state: 0, rep0: 0, rep1: 0, rep2: 0, rep3: 0, out: [], dict_start: 0, problem: "" }
     let result: List[str] = []
     var at: i64 = 0
     var streams = 0
@@ -396,7 +396,7 @@ fn xz_decompress(data: &str) -> List[str]:
             at = block_start + header_size
             let block_out_start = dec.out.len()
             dec.dict_start = dec.out.len()
-            dec.probs = List.new()
+            dec.probs = []
             at = dec.lzma2(at)
             if at < 0:
                 result.push("")

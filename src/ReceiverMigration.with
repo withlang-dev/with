@@ -123,7 +123,7 @@ fn local_source_path(path: &str) -> str:
 
 fn compiler_relocation_facts(entry: &str) -> RelocationFacts:
     let result = compiler_analyze_file(entry, "select:kind=declaration")
-    let facts = RelocationFacts { paths: List.new(), starts: List.new(), ends: List.new(), modes: List.new(), matched: List.new() }
+    let facts = RelocationFacts { paths: [], starts: [], ends: [], modes: [], matched: [] }
     for i in 0..result.report.facts.len():
         let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration: continue

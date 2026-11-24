@@ -369,9 +369,9 @@ type TokenList {
 
 fn TokenList.new -> TokenList:
     TokenList {
-        tags: List.new(),
-        starts: List.new(),
-        ends: List.new(),
+        tags: [],
+        starts: [],
+        ends: [],
     }
 
 // No-op: reserved for future manual memory management.

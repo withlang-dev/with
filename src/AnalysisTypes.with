@@ -168,7 +168,7 @@ type AnalysisBackendResult {
 }
 
 fn AnalysisReport.init -> AnalysisReport:
-    AnalysisReport { facts: List.new(), violations: List.new(), notes: List.new() }
+    AnalysisReport { facts: [], violations: [], notes: [] }
 
 fn AnalysisFact.new(stage: AnalysisStage, kind: AnalysisFactKind) -> AnalysisFact:
     AnalysisFact {

@@ -1148,7 +1148,7 @@ fn last_use_build_view_edges(sema: &Sema, body: &MirBody) -> List[List[i32]]:
     let edges: List[List[i32]] = []
     let ref_target: List[i32] = []
     for _ in 0..local_count:
-        edges.push(List.new())
+        edges.push([])
         ref_target.push(-1)
     for bb in 0..body.block_count():
         for si in 0..body.bb_stmt_counts[bb]:
@@ -1326,7 +1326,7 @@ fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
             may_have_views[b_root] = 1
     let local_sites: List[List[i32]] = []
     for _ in 0..local_count:
-        local_sites.push(List.new())
+        local_sites.push([])
     var any_site = false
     for bb in 0..out.block_count():
         for si in 0..out.bb_stmt_counts[bb] + 1:
@@ -1371,7 +1371,7 @@ fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
     let trace = with_getenv_str("WITH_TRACE_COW").len() > 0
     let live_in_cache: List[List[i32]] = []
     for _ in 0..local_count:
-        live_in_cache.push(List.new())
+        live_in_cache.push([])
     var view_edges_built = false
     var view_edges: List[List[i32]] = []
     for local in 1..local_count:

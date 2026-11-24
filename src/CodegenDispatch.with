@@ -558,7 +558,7 @@ impl Copy for MirBlockStack
 fn MirBlockStack.new -> MirBlockStack:
     // One List header; allocate generously like the other handle states.
     let ptr = with_alloc(64) as *mut MirBlockStackState
-    unsafe *ptr = MirBlockStackState { xs: List.new() }
+    unsafe *ptr = MirBlockStackState { xs: [] }
     MirBlockStack { state: ptr }
 
 impl MirBlockStack:
@@ -18822,7 +18822,7 @@ impl Codegen:
             let env_sema_types: List[i32] = []
             for ci in 0..capture_count:
                 env_sema_types.push(ab_body.local_type_ids[ci + 1])
-            cap_struct_type = self.closure_env_llvm_type(cap_types, env_sema_types, &List.new())
+            cap_struct_type = self.closure_env_llvm_type(cap_types, env_sema_types, &[])
 
         let ret_sema_ty_id = ab_body.local_type_ids[0]
         let ret_ty = self.sema_type_to_llvm(ret_sema_ty_id)
@@ -18858,9 +18858,9 @@ impl Codegen:
         // 5. Fresh context for trampoline body
         self.current_function = tramp_fn
         self.current_ret_type = ret_ty
-        self.local_allocas = HashMap.new()
-        self.local_types = HashMap.new()
-        self.local_muts = HashMap.new()
+        self.local_allocas = [:]
+        self.local_types = [:]
+        self.local_muts = [:]
 
         let entry_bb = wl_append_bb(ctx, tramp_fn, "entry")
         wl_position_at_end(self.builder, entry_bb)
@@ -18901,12 +18901,12 @@ impl Codegen:
         // slot — alloca of void is invalid LLVM and traps in DataLayout.
         let ab_ret_store_ty = if ret_ty != wl_void_type(ctx): ret_ty else: i32_ty
         let ret_alloca = self.create_entry_alloca(ab_ret_store_ty)
-        self.mir_local_ptrs = HashMap.new()
-        self.mir_local_values = HashMap.new()
-        self.mir_memory_locals = HashMap.new()
-        self.mir_local_types = HashMap.new()
-        self.mir_indirect_value_local_types = HashMap.new()
-        self.mir_ref_capture_local_types = HashMap.new()
+        self.mir_local_ptrs = [:]
+        self.mir_local_values = [:]
+        self.mir_memory_locals = [:]
+        self.mir_local_types = [:]
+        self.mir_indirect_value_local_types = [:]
+        self.mir_ref_capture_local_types = [:]
         // Map capture MIR locals
         for ci in 0..capture_count:
             let sym = captures[ci]
@@ -18921,7 +18921,7 @@ impl Codegen:
         self.mir_scan_memory_locals(ab_body)
 
         // Create LLVM BBs for MIR blocks
-        self.mir_bb_values = List.new()
+        self.mir_bb_values = []
         let bb_count = ab_body.block_count()
         for bi in 0..bb_count:
             let bb = wl_append_bb(ctx, tramp_fn, "bb")

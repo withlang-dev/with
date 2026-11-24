@@ -64,16 +64,16 @@ fn ci_migrate_is_width_family_name(name: &str) -> bool:
 //   2. Redirects duplicated top-level declarations to a shared buffer
 //   3. After all files, emits a defs.with containing preamble + shared decls
 var g_migrate_shared_defs_prefix: str = ""
-var g_migrate_shared_decl_buf: List[str] = List.new()
+var g_migrate_shared_decl_buf: List[str] = []
 var g_migrate_shared_decl_keys: str = ""
-var g_migrate_shared_decl_records: List[str] = List.new()
+var g_migrate_shared_decl_records: List[str] = []
 var g_migrate_directory_one_basename: str = ""
 var g_migrate_shared_fragment_path: str = ""
-var g_migrate_include_paths: List[str] = List.new()
-var g_migrate_forced_includes: List[str] = List.new()
+var g_migrate_include_paths: List[str] = []
+var g_migrate_forced_includes: List[str] = []
 // `--macro-prefix-map OLD=NEW`: clang's -fmacro-prefix-map, so a `__FILE__`
 // a migration bakes (an assertion's, ctest's) names no staging directory.
-var g_migrate_macro_prefix_maps: List[str] = List.new()
+var g_migrate_macro_prefix_maps: List[str] = []
 var g_migrate_directory_input_dir: str = ""
 
 type CiMigratePendingSharedExternVar {
@@ -82,7 +82,7 @@ type CiMigratePendingSharedExternVar {
     rendered: str = "",
 }
 
-var g_migrate_shared_pending_extern_vars: List[CiMigratePendingSharedExternVar] = List.new()
+var g_migrate_shared_pending_extern_vars: List[CiMigratePendingSharedExternVar] = []
 var g_migrate_shared_usage_idents: str = ""
 var g_migrate_libc_symbols_used: str = ""
 // D29 (#750): discriminates migrate translation from in-place c_import. The
@@ -155,9 +155,9 @@ fn migrate_reset_options():
     ci_migrate_shared_defs_reset()
     g_migrate_directory_one_basename = ""
     g_migrate_shared_fragment_path = ""
-    g_migrate_include_paths = List.new()
-    g_migrate_forced_includes = List.new()
-    g_migrate_macro_prefix_maps = List.new()
+    g_migrate_include_paths = []
+    g_migrate_forced_includes = []
+    g_migrate_macro_prefix_maps = []
     g_migrate_directory_input_dir = ""
     g_migrate_defines = ""
     g_migrate_file_error = ""
@@ -186,10 +186,10 @@ fn ci_migrate_shared_defs_targets_std_zone() -> bool:
     ci_starts_with(g_migrate_shared_defs_prefix, "std.")
 
 fn ci_migrate_shared_defs_reset:
-    g_migrate_shared_decl_buf = List.new()
+    g_migrate_shared_decl_buf = []
     g_migrate_shared_decl_keys = ""
-    g_migrate_shared_decl_records = List.new()
-    g_migrate_shared_pending_extern_vars = List.new()
+    g_migrate_shared_decl_records = []
+    g_migrate_shared_pending_extern_vars = []
     g_migrate_shared_usage_idents = ""
 
 fn ci_migrate_shared_decl_key(kind: &str, name: &str) -> str:
@@ -927,12 +927,12 @@ fn migrate_host_compat_preamble() -> str:
 // an object-like macro's body as a use of it parses: `leaf` (one token),
 // `paren` (one parenthesized expression), `other`. A one-token body that
 // names another macro has that macro's shape.
-var g_migrate_system_object_macros: HashMap[str, i32] = HashMap.new()
+var g_migrate_system_object_macros: HashMap[str, i32] = [:]
 // Each object-like macro's last definition: the one a use after the
 // includes expands. A header may define a name twice (clang's <limits.h>
 // redefines ULONG_MAX after including the libc's), and the first is not
 // the one in effect.
-var g_migrate_macro_last_values: HashMap[str, str] = HashMap.new()
+var g_migrate_macro_last_values: HashMap[str, str] = [:]
 
 fn ci_migrate_system_object_macro(name: &str) -> bool: g_migrate_system_object_macros.contains(name)
 
@@ -967,10 +967,10 @@ fn ci_migrate_object_macro_shape(name: &str, depth: i32) -> str:
     "other"
 
 fn ci_capture_macro_values(session: i64):
-    g_migrate_macro_values = HashMap.new()
-    g_migrate_system_object_macros = HashMap.new()
-    g_migrate_macro_last_values = HashMap.new()
-    g_migrate_macro_miss_names = HashMap.new()
+    g_migrate_macro_values = [:]
+    g_migrate_system_object_macros = [:]
+    g_migrate_macro_last_values = [:]
+    g_migrate_macro_miss_names = [:]
     let count = with_cimport_macro_count(session)
     var i: i32 = 0
     while i < count:
@@ -1369,8 +1369,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     ci_prepare_clang_resource_dir()
 
     g_migrate_file_error = ""
-    g_migrate_macro_values = HashMap.new()
-    g_migrate_macro_miss_names = HashMap.new()
+    g_migrate_macro_values = [:]
+    g_migrate_macro_miss_names = [:]
     g_migrate_macro_session = 0
     ci_migrate_reset_fn_counts()
     ci_migrate_libc_reset()
@@ -1502,8 +1502,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
         with_cimport_dispose(session)
         if macro_session != 0:
             with_cimport_dispose_macros(macro_session)
-        g_migrate_macro_values = HashMap.new()
-        g_migrate_macro_miss_names = HashMap.new()
+        g_migrate_macro_values = [:]
+        g_migrate_macro_miss_names = [:]
         g_migrate_macro_session = 0
         g_migrate_raw_source = ""
         g_migrate_current_input_path = ""
@@ -1519,8 +1519,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
         output_parts.push(ci_translate_macros(macro_session, session, macro_include))
         with_cimport_dispose_macros(macro_session)
     with_cimport_dispose(session)
-    g_migrate_macro_values = HashMap.new()
-    g_migrate_macro_miss_names = HashMap.new()
+    g_migrate_macro_values = [:]
+    g_migrate_macro_miss_names = [:]
     g_migrate_macro_session = 0
     g_migrate_raw_source = ""
     g_migrate_current_input_path = ""
@@ -1543,8 +1543,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
         ci_migrate_writes_note_path(output_path)
     if write_result != 0:
         eprint("migrate: failed to write " ++ output_path)
-        g_migrate_macro_values = HashMap.new()
-        g_migrate_macro_miss_names = HashMap.new()
+        g_migrate_macro_values = [:]
+        g_migrate_macro_miss_names = [:]
         g_migrate_macro_session = 0
         g_migrate_raw_source = ""
         g_migrate_current_input_path = ""
@@ -1769,9 +1769,9 @@ fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> List[
 // CImport: one entry per corpus function, `bits` holding one char per
 // parameter ('1' Option, '0' non-null, '?' not a function pointer) and
 // `reasons` the one-line reason per parameter, `|`-separated.
-var g_migrate_fn_nullable_names: List[str] = List.new()
-var g_migrate_fn_nullable_bits: List[str] = List.new()
-var g_migrate_fn_nullable_reasons: List[str] = List.new()
+var g_migrate_fn_nullable_names: List[str] = []
+var g_migrate_fn_nullable_bits: List[str] = []
+var g_migrate_fn_nullable_reasons: List[str] = []
 
 fn ci_migrate_fn_nullable_index(name: &str) -> i32:
     for i in 0..g_migrate_fn_nullable_names.len():
@@ -2010,7 +2010,7 @@ impl CiProject:
             let count = self.symbols[si].param_fn_ptr.len()
             for pi in 0..count:
                 if self.symbols[si].param_fn_ptr[pi] == 0 or self.symbols[si].param_nullable[pi] != 0: continue
-                self.sink_seen = HashMap.new()
+                self.sink_seen = [:]
                 if self.sink_chain_reaches(si as i32, pi as i32, si as i32, pi as i32, 0):
                     self.symbols[si].param_nullable[pi] = 1
                     self.symbols[si].param_reason[pi] = "Option: part of a cycle of forwarded parameters"
@@ -2044,9 +2044,9 @@ impl CiProject:
 
     // Export the verdicts for CImport and say each one once.
     fn export_fn_ptr_nullability(verbose: bool):
-        g_migrate_fn_nullable_names = List.new()
-        g_migrate_fn_nullable_bits = List.new()
-        g_migrate_fn_nullable_reasons = List.new()
+        g_migrate_fn_nullable_names = []
+        g_migrate_fn_nullable_bits = []
+        g_migrate_fn_nullable_reasons = []
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             var bits = ""
@@ -2740,9 +2740,9 @@ fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basena
 // no local shadows a global. A write the scan misses is no hazard: the
 // bundle build refuses the function with the literal fix-it. A
 // one-file migration (migrate_one) sees only that file's callees.
-var g_migrate_writes_fn_names: List[str] = List.new()
-var g_migrate_writes_fn_bodies: List[str] = List.new()
-var g_migrate_writes_paths: List[str] = List.new()
+var g_migrate_writes_fn_names: List[str] = []
+var g_migrate_writes_fn_bodies: List[str] = []
+var g_migrate_writes_paths: List[str] = []
 
 // D159: `--emit-contracts FILE` writes the contracts artifact
 // (CiContracts.with contracts_tsv) once the whole corpus is scanned; "" writes
@@ -2777,12 +2777,12 @@ fn ci_migrate_write_contracts(project: &CiProject) -> i32:
 // The impl blocks of this unit: one per record whose proved functions it
 // defines, the methods in definition order, the blocks sorted by record at
 // the end of the unit (ci_migrate_take_impl_blocks).
-var g_migrate_impl_records: List[str] = List.new()
-var g_migrate_impl_texts: List[str] = List.new()
+var g_migrate_impl_records: List[str] = []
+var g_migrate_impl_texts: List[str] = []
 
 fn ci_migrate_impl_reset():
-    g_migrate_impl_records = List.new()
-    g_migrate_impl_texts = List.new()
+    g_migrate_impl_records = []
+    g_migrate_impl_texts = []
 
 fn ci_migrate_impl_add(record: &str, text: &str):
     for i in 0..g_migrate_impl_records.len():
@@ -2873,9 +2873,9 @@ fn ci_migrate_contract_note(project_active: bool, project: &CiProject, name: &st
 fn ci_migrate_writes_mark(name: &str) -> str: "@@with-writes:" ++ name ++ "@@"
 
 fn ci_migrate_writes_reset():
-    g_migrate_writes_fn_names = List.new()
-    g_migrate_writes_fn_bodies = List.new()
-    g_migrate_writes_paths = List.new()
+    g_migrate_writes_fn_names = []
+    g_migrate_writes_fn_bodies = []
+    g_migrate_writes_paths = []
 
 fn ci_migrate_writes_note_path(path: &str):
     if not g_migrate_writes_paths.contains(path):

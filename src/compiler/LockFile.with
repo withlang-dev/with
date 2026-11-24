@@ -36,7 +36,7 @@ fn lock_file_path(project_root: &str) -> str:
     project_root ++ "/.with/lock.json"
 
 fn lock_empty -> LockFile:
-    LockFile { entries: List.new() }
+    LockFile { entries: [] }
 
 fn lock_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
@@ -395,7 +395,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
     out.seen.push(key)
     let entry = lock_entry_from_installed_c_dep(project_root, name, version)
     if entry.name.len() == 0:
-        out.lock = LockFile { entries: List.new() }
+        out.lock = LockFile { entries: [] }
         return out
     out.lock = lock_upsert(move out.lock, entry)
     let meta = runtime_read_file(lock_c_dep_dir(project_root, name, version) ++ "/metadata.json")
@@ -406,7 +406,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
         let req_version = lock_ref_version(req)
         if req_name.len() == 0 or req_version.len() == 0:
             runtime_eprint("error: unsupported locked Conan requirement reference: " ++ req)
-            out.lock = LockFile { entries: List.new() }
+            out.lock = LockFile { entries: [] }
             return out
         out = lock_upsert_installed_c_dep_tree_seen(out, project_root, req_name, req_version)
         if out.lock.entries.len() == 0:
@@ -414,7 +414,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
     out
 
 fn lock_upsert_installed_c_dep_tree(lock: LockFile, project_root: &str, name: &str, version: &str) -> LockFile:
-    let walk = LockDepWalk { lock, seen: List.new() }
+    let walk = LockDepWalk { lock, seen: [] }
     var done = lock_upsert_installed_c_dep_tree_seen(walk, project_root, name, version)
     return move done.lock
 

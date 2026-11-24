@@ -60,8 +60,8 @@ fn empty_build_graph -> BuildGraph:
         package_name: "",
         package_version: "",
         default_target: "",
-        targets: List.new(),
-        generated_sources: List.new(),
+        targets: [],
+        generated_sources: [],
     }
 
 fn build_graph_generated_source_new(path: &str, contents: &str) -> BuildGraphGeneratedSource:
@@ -75,24 +75,24 @@ fn build_graph_target_new(kind: i32, name: &str, entry: &str, target_kind: i32, 
         output: with_str_clone_ref(output),
         target_kind,
         optimize_mode,
-        system_libs: List.new(),
-        library_paths: List.new(),
-        rpaths: List.new(),
-        include_paths: List.new(),
-        defines: List.new(),
-        inputs: List.new(),
-        extra_outputs: List.new(),
-        write_scopes: List.new(),
-        deps: List.new(),
-        args: List.new(),
+        system_libs: [],
+        library_paths: [],
+        rpaths: [],
+        include_paths: [],
+        defines: [],
+        inputs: [],
+        extra_outputs: [],
+        write_scopes: [],
+        deps: [],
+        args: [],
         action_fn: 0,
         timeout_ms: 0,
         rss_limit_bytes: 0,
         cwd: "",
-        env: List.new(),
+        env: [],
         network: 0,
         parallel: 0,
-        action_source_paths: List.new(),
+        action_source_paths: [],
     }
 
 fn empty_build_graph_target -> BuildGraphTarget:
@@ -575,9 +575,9 @@ fn build_graph_selected_targets_new -> BuildGraphSelectedTargets:
     BuildGraphSelectedTargets {
         ok: true,
         error_msg: "",
-        targets: List.new(),
-        selected_names: List.new(),
-        visiting_names: List.new(),
+        targets: [],
+        selected_names: [],
+        visiting_names: [],
     }
 
 fn build_graph_name_list_contains(names: &List[str], name: &str) -> bool:

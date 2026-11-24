@@ -159,9 +159,9 @@ fn Zcu.init -> Zcu:
         prelude_prefix_decls: 0,
         prelude_prefix_non_use: 0,
         decl_source_paths: zcu_new_list_str(),
-        decl_source_file_ids: List.new(),
-        decl_is_c_import: List.new(),
-        c_import_omitted_symbols: HashMap.new(),
+        decl_source_file_ids: [],
+        decl_is_c_import: [],
+        c_import_omitted_symbols: [:],
         c_import_cache_keys: zcu_new_list_str(),
         c_import_cache_values: zcu_new_list_str(),
         source_dir: ".",
@@ -170,7 +170,7 @@ fn Zcu.init -> Zcu:
         current_source_text: "",
         extra_source_names: zcu_new_list_str(),
         extra_source_texts: zcu_new_list_str(),
-        source_text_file_ids: List.new(),
+        source_text_file_ids: [],
         source_text_names: zcu_new_list_str(),
         source_texts: zcu_new_list_str(),
         tool_mode_entry_path: "",
@@ -192,10 +192,10 @@ fn Zcu.init -> Zcu:
         bundle_corpus: "",
         interface_eager: false,
         refused_runtime_sources: zcu_new_list_str(),
-        iface_mentioned: HashMap.new(),
+        iface_mentioned: [:],
         pending_iface_paths: zcu_new_list_str(),
         pending_iface_texts: zcu_new_list_str(),
-        import_path_memo: HashMap.new(),
+        import_path_memo: [:],
         last_bundle_unlowered_globals: zcu_new_list_str(),
         last_bundle_carried_paths: zcu_new_list_str(),
         project_config: project_config_default(),
@@ -203,8 +203,8 @@ fn Zcu.init -> Zcu:
         analysis_partial_semantics: 0,
         frontend_sema_completed: 0,
         prelude_mode: PRELUDE_FULL(),
-        cli_diag_gen_starts: List.new(),
-        cli_diag_gen_ends: List.new(),
+        cli_diag_gen_starts: [],
+        cli_diag_gen_ends: [],
         cli_diag_source_names: zcu_new_list_str(),
         cli_diag_source_texts: zcu_new_list_str(),
     }
@@ -223,9 +223,9 @@ impl Zcu:
         self.imported_std_files = zcu_new_list_str()
         self.import_conflicts = zcu_new_list_str()
         self.decl_source_paths = zcu_new_list_str()
-        self.decl_source_file_ids = List.new()
-        self.decl_is_c_import = List.new()
-        self.c_import_omitted_symbols = HashMap.new()
+        self.decl_source_file_ids = []
+        self.decl_is_c_import = []
+        self.c_import_omitted_symbols = [:]
         self.next_file_id = 1
 
     // #592: import dedup compares CANONICAL keys, so different spellings of the
@@ -275,9 +275,9 @@ impl Zcu:
         out
 
     mut fn seed_decl_source_paths(new_pool: &AstPool, path: &str, file_id: i32):
-        self.decl_source_paths = List.new()
-        self.decl_source_file_ids = List.new()
-        self.decl_is_c_import = List.new()
+        self.decl_source_paths = []
+        self.decl_source_file_ids = []
+        self.decl_is_c_import = []
         for _ in 0..new_pool.decl_count():
             self.decl_source_paths.push(zcu_owned_text(path))
             self.decl_source_file_ids.push(file_id)
@@ -342,10 +342,10 @@ impl Zcu:
         self.prelude_mode = compilation_normalize_prelude_mode(mode)
 
     mut fn clear_cli_diag_mappings():
-        self.cli_diag_gen_starts = List.new()
-        self.cli_diag_gen_ends = List.new()
-        self.cli_diag_source_names = List.new()
-        self.cli_diag_source_texts = List.new()
+        self.cli_diag_gen_starts = []
+        self.cli_diag_gen_ends = []
+        self.cli_diag_source_names = []
+        self.cli_diag_source_texts = []
 
     mut fn add_cli_diag_mapping(gen_start: i32, gen_end: i32, source_name: &str, source_text: &str) -> Unit:
         self.cli_diag_gen_starts.push(gen_start)
@@ -508,17 +508,17 @@ impl Zcu:
         self.last_async_mir_module = AsyncMirModule.init()
         self.last_async_mir_dump = ""
         self.reset_last_link_lib_names()
-        self.tracked_input_paths = List.new()
+        self.tracked_input_paths = []
         self.trace_c_import_cache = false
-        self.source_text_file_ids = List.new()
-        self.source_text_names = List.new()
-        self.source_texts = List.new()
+        self.source_text_file_ids = []
+        self.source_text_names = []
+        self.source_texts = []
 
     mut fn reset_for_new_invocation(dir: &str, path: &str, text: &str):
         self.set_current_source(dir, path, text)
         self.frontend_sema_completed = 0
-        self.extra_source_names = List.new()
-        self.extra_source_texts = List.new()
+        self.extra_source_names = []
+        self.extra_source_texts = []
         self.reset_import_state()
         self.reset_pending_warnings()
         self.clear_stage_outputs()

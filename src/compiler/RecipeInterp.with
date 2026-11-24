@@ -341,7 +341,7 @@ impl PyParser:
         self.nodes.push(PyNode { kind, a, b, c, s: s.to_owned(), kids, line })
         (self.nodes.len() - 1) as i32
 
-    mut fn leaf(kind: i32, s: &str) -> i32: self.mk(kind, -1, -1, -1, s, List.new(), self.line())
+    mut fn leaf(kind: i32, s: &str) -> i32: self.mk(kind, -1, -1, -1, s, [], self.line())
 
     // ── Expressions ──
 
@@ -358,7 +358,7 @@ impl PyParser:
             self.fail("expected 'else' in a conditional expression")
             return value
         let other = self.expression()
-        self.mk(N_COND, cond, value, other, "", List.new(), line)
+        self.mk(N_COND, cond, value, other, "", [], line)
 
     mut fn or_test() -> i32:
         var left = self.and_test()
@@ -366,7 +366,7 @@ impl PyParser:
             let line = self.line()
             self.advance()
             let right = self.and_test()
-            left = self.mk(N_OR, left, right, -1, "", List.new(), line)
+            left = self.mk(N_OR, left, right, -1, "", [], line)
         left
 
     mut fn and_test() -> i32:
@@ -375,7 +375,7 @@ impl PyParser:
             let line = self.line()
             self.advance()
             let right = self.not_test()
-            left = self.mk(N_AND, left, right, -1, "", List.new(), line)
+            left = self.mk(N_AND, left, right, -1, "", [], line)
         left
 
     mut fn not_test() -> i32:
@@ -383,7 +383,7 @@ impl PyParser:
             let line = self.line()
             self.advance()
             let inner = self.not_test()
-            return self.mk(N_NOT, inner, -1, -1, "", List.new(), line)
+            return self.mk(N_NOT, inner, -1, -1, "", [], line)
         self.comparison()
 
     mut fn comparison() -> i32:
@@ -406,7 +406,7 @@ impl PyParser:
                 op = if self.accept_word("not"): "!=" else: "=="
             else: break
             let right = self.arith()
-            left = self.mk(N_CMP, left, right, -1, op, List.new(), line)
+            left = self.mk(N_CMP, left, right, -1, op, [], line)
         left
 
     mut fn arith() -> i32:
@@ -416,7 +416,7 @@ impl PyParser:
             let op = self.text()
             self.advance()
             let right = self.term()
-            left = self.mk(N_BIN, left, right, -1, op, List.new(), line)
+            left = self.mk(N_BIN, left, right, -1, op, [], line)
         left
 
     mut fn term() -> i32:
@@ -426,7 +426,7 @@ impl PyParser:
             let op = self.text()
             self.advance()
             let right = self.unary()
-            left = self.mk(N_BIN, left, right, -1, op, List.new(), line)
+            left = self.mk(N_BIN, left, right, -1, op, [], line)
         left
 
     mut fn unary() -> i32:
@@ -434,7 +434,7 @@ impl PyParser:
             let line = self.line()
             self.advance()
             let inner = self.unary()
-            return self.mk(N_NEG, inner, -1, -1, "", List.new(), line)
+            return self.mk(N_NEG, inner, -1, -1, "", [], line)
         if self.is_op("+"):
             self.advance()
             return self.unary()
@@ -483,7 +483,7 @@ impl PyParser:
                 self.advance()
                 self.advance()
                 let value = self.expression()
-                args.push(self.mk(N_KW, value, -1, -1, name, List.new(), line))
+                args.push(self.mk(N_KW, value, -1, -1, name, [], line))
             else:
                 let value = self.expression()
                 if self.is_word("for"): args.push(self.comprehension(value))
@@ -502,7 +502,7 @@ impl PyParser:
                     self.fail("expected an attribute name")
                     break
                 self.advance()
-                node = self.mk(N_ATTR, node, -1, -1, name, List.new(), line)
+                node = self.mk(N_ATTR, node, -1, -1, name, [], line)
             else if self.accept_op("("):
                 let args = self.call_args()
                 node = self.mk(N_CALL, node, -1, -1, "", args, line)
@@ -520,7 +520,7 @@ impl PyParser:
                     node = self.leaf(N_UNSUPPORTED, "slice")
                     continue
                 self.expect_op("]")
-                node = self.mk(N_SUB, node, index, -1, "", List.new(), line)
+                node = self.mk(N_SUB, node, index, -1, "", [], line)
             else: break
         node
 
@@ -530,12 +530,12 @@ impl PyParser:
         if k == PT_NAME:
             let name = self.text()
             self.advance()
-            if name == "True" or name == "False" or name == "None": return self.mk(N_CONST, -1, -1, -1, name, List.new(), line)
-            return self.mk(N_NAME, -1, -1, -1, name, List.new(), line)
+            if name == "True" or name == "False" or name == "None": return self.mk(N_CONST, -1, -1, -1, name, [], line)
+            return self.mk(N_NAME, -1, -1, -1, name, [], line)
         if k == PT_NUM:
             let text = self.text()
             self.advance()
-            return self.mk(N_NUM, -1, -1, -1, text, List.new(), line)
+            return self.mk(N_NUM, -1, -1, -1, text, [], line)
         if k == PT_STR or self.is_op("fstr["):
             // Adjacent literals are one string.
             let parts: List[i32] = []
@@ -594,7 +594,7 @@ impl PyParser:
                     let spread_line = self.line()
                     self.advance()
                     let inner = self.expression()
-                    let spread = self.mk(N_SPREAD, inner, -1, -1, "", List.new(), spread_line)
+                    let spread = self.mk(N_SPREAD, inner, -1, -1, "", [], spread_line)
                     items.push(spread)
                     items.push(spread)
                 else:
@@ -718,8 +718,8 @@ impl PyParser:
                 self.expression()
             if self.accept_op("="):
                 let default = self.expression()
-                params.push(self.mk(N_KW, default, -1, -1, pname, List.new(), pline))
-            else: params.push(self.mk(N_NAME, -1, -1, -1, pname, List.new(), pline))
+                params.push(self.mk(N_KW, default, -1, -1, pname, [], pline))
+            else: params.push(self.mk(N_NAME, -1, -1, -1, pname, [], pline))
             if not self.accept_op(","): break
         self.expect_op(")")
         if self.accept_op("->"):
@@ -740,7 +740,7 @@ impl PyParser:
         let plist = self.mk(N_LIST, -1, -1, -1, "", params, line)
         let why = if unreadable == 1: self.err else: ""
         if unreadable == 1: self.err = ""
-        let node = self.mk(N_DEF, plist, (is_property) as i32, unreadable, name, if unreadable == 1: List.new() else: body, line)
+        let node = self.mk(N_DEF, plist, (is_property) as i32, unreadable, name, if unreadable == 1: [] else: body, line)
         if unreadable == 1: self.nodes[node].s = name ++ "\n" ++ why
         node
 
@@ -806,7 +806,7 @@ impl PyParser:
             let body = self.block()
             if is_while:
                 let unsupported = self.leaf(N_UNSUPPORTED, "while")
-                return self.mk(N_EXPR, unsupported, -1, -1, "", List.new(), line)
+                return self.mk(N_EXPR, unsupported, -1, -1, "", [], line)
             return self.mk(N_BLOCK, -1, -1, -1, "", body, line)
         if self.is_word("import") or self.is_word("from") or self.is_word("assert") or self.is_word("global") or self.is_word("nonlocal"):
             self.skip_line()
@@ -814,35 +814,35 @@ impl PyParser:
         var node: i32 = -1
         if self.accept_word("return"):
             let value = if self.kind() == PT_NEWLINE or self.kind() == PT_EOF: -1 else: self.expression_list()
-            node = self.mk(N_RETURN, value, -1, -1, "", List.new(), line)
-        else if self.accept_word("pass"): node = self.mk(N_PASS, -1, -1, -1, "", List.new(), line)
-        else if self.accept_word("break"): node = self.mk(N_BREAK, -1, -1, -1, "", List.new(), line)
-        else if self.accept_word("continue"): node = self.mk(N_CONTINUE, -1, -1, -1, "", List.new(), line)
+            node = self.mk(N_RETURN, value, -1, -1, "", [], line)
+        else if self.accept_word("pass"): node = self.mk(N_PASS, -1, -1, -1, "", [], line)
+        else if self.accept_word("break"): node = self.mk(N_BREAK, -1, -1, -1, "", [], line)
+        else if self.accept_word("continue"): node = self.mk(N_CONTINUE, -1, -1, -1, "", [], line)
         else if self.accept_word("raise"):
             while self.kind() != PT_NEWLINE and self.kind() != PT_EOF: self.advance()
-            node = self.mk(N_RAISE, -1, -1, -1, "", List.new(), line)
+            node = self.mk(N_RAISE, -1, -1, -1, "", [], line)
         else if self.accept_word("del"):
             let target = self.expression_list()
-            node = self.mk(N_DEL, target, -1, -1, "", List.new(), line)
+            node = self.mk(N_DEL, target, -1, -1, "", [], line)
         else:
             let target = self.expression_list()
             if self.accept_op("="):
                 var value = self.expression_list()
                 // `a = b = c` assigns the last value to the first target.
                 while self.accept_op("="): value = self.expression_list()
-                node = self.mk(N_ASSIGN, target, value, -1, "", List.new(), line)
+                node = self.mk(N_ASSIGN, target, value, -1, "", [], line)
             else if self.is_op("+=") or self.is_op("-=") or self.is_op("*=") or self.is_op("|="):
                 let op = self.text().slice(0, 1).to_owned()
                 self.advance()
                 let value = self.expression_list()
-                node = self.mk(N_AUG, target, value, -1, op, List.new(), line)
+                node = self.mk(N_AUG, target, value, -1, op, [], line)
             else if self.accept_op(":"):
                 // An annotation, with or without a value.
                 self.expression()
                 if self.accept_op("="):
                     let value = self.expression_list()
-                    node = self.mk(N_ASSIGN, target, value, -1, "", List.new(), line)
-            else: node = self.mk(N_EXPR, target, -1, -1, "", List.new(), line)
+                    node = self.mk(N_ASSIGN, target, value, -1, "", [], line)
+            else: node = self.mk(N_EXPR, target, -1, -1, "", [], line)
         if self.accept_op(";"): return node
         if self.kind() == PT_NEWLINE: self.advance()
         else if self.kind() != PT_EOF and self.kind() != PT_DEDENT: self.fail("unexpected '" ++ self.text() ++ "'")
@@ -853,7 +853,7 @@ impl PyParser:
 type PyModule { nodes: List[PyNode], top: List[i32], problem: str }
 
 fn py_parse(src: &str) -> PyModule:
-    var p = PyParser { toks: py_lex(src), at: 0, nodes: List.new(), err: "" }
+    var p = PyParser { toks: py_lex(src), at: 0, nodes: [], err: "" }
     let top: List[i32] = []
     while p.kind() != PT_EOF and p.err.len() == 0:
         if p.kind() == PT_INDENT or p.kind() == PT_DEDENT:
@@ -976,12 +976,12 @@ impl PyInterp:
         self.new_list(out)
 
     mut fn new_dict() -> PyVal:
-        self.dkeys.push(PyList { items: List.new() })
-        self.dvals.push(PyList { items: List.new() })
+        self.dkeys.push(PyList { items: [] })
+        self.dvals.push(PyList { items: [] })
         pv(V_DICT, self.dkeys.len() as i64 - 1, "")
 
     mut fn new_obj(cls: &str) -> i32:
-        self.objs.push(PyObj { cls: cls.to_owned(), names: List.new(), vals: List.new() })
+        self.objs.push(PyObj { cls: cls.to_owned(), names: [], vals: [] })
         (self.objs.len() - 1) as i32
 
     fn obj_find(obj: i32, name: &str) -> i32:
@@ -1160,7 +1160,7 @@ impl PyInterp:
         for i in 0..self.method_names.len():
             if self.method_names[i] != name: continue
             let node: i32 = self.method_nodes[i]
-            if self.nodes[node].b == 1: return self.call_def(node, List.new(), line)
+            if self.nodes[node].b == 1: return self.call_def(node, [], line)
             return pv(V_FUNC, node, name)
         for i in 0..self.attr_names.len():
             if self.attr_names[i] == name: return pv_copy(self.attr_vals[i])
@@ -1399,9 +1399,9 @@ impl PyInterp:
             if arg0.k == V_DICT: return pv(V_INT, self.dkeys[arg0.n as i32].items.len(), "")
             return pv_unknown()
         if name == "list" or name == "tuple" or name == "sorted" or name == "set":
-            if args.len() == 0: return self.new_list(List.new())
+            if args.len() == 0: return self.new_list([])
             if arg0.k != V_LIST: return pv_unknown()
-            return self.call_method(arg0, "copy", &List.new(), line)
+            return self.call_method(arg0, "copy", &[], line)
         if name == "any" or name == "all":
             if arg0.k != V_LIST: return pv_unknown()
             var unknown = false
@@ -1789,9 +1789,9 @@ fn py_one(value: PyVal) -> List[PyVal]:
 
 // ── The recipe ───────────────────────────────────────────────────────
 
-fn recipe_empty_component(name: &str): RecipeComponent { name: name.to_owned(), libs: List.new(), system_libs: List.new(), frameworks: List.new(), libdirs: List.new(), includedirs: List.new(), defines: List.new(), exelinkflags: List.new(), requires: List.new() }
+fn recipe_empty_component(name: &str): RecipeComponent { name: name.to_owned(), libs: [], system_libs: [], frameworks: [], libdirs: [], includedirs: [], defines: [], exelinkflags: [], requires: [] }
 
-fn recipe_failed(problem: &str): RecipePackageInfo { ok: false, problem: problem.to_owned(), notes: List.new(), root: recipe_empty_component(""), components: List.new() }
+fn recipe_failed(problem: &str): RecipePackageInfo { ok: false, problem: problem.to_owned(), notes: [], root: recipe_empty_component(""), components: [] }
 
 impl PyInterp:
     mut fn setting(value: &str) -> PyVal:
@@ -1817,7 +1817,7 @@ impl PyInterp:
     mut fn run_method(name: &str) -> bool:
         for i in 0..self.method_names.len():
             if self.method_names[i] != name: continue
-            self.call_def(self.method_nodes[i], List.new(), self.nodes[self.method_nodes[i]].line)
+            self.call_def(self.method_nodes[i], [], self.nodes[self.method_nodes[i]].line)
             return true
         false
 
@@ -1834,12 +1834,12 @@ fn recipe_class(tree: &PyModule) -> i32:
 
 fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     var tree = py_parse(recipe)
-    let ip = PyInterp { nodes: List.new(), lists: List.new(), dkeys: List.new(), dvals: List.new(), objs: List.new(), recv: List.new(), frame_names: List.new(), frame_vals: List.new(), method_names: List.new(), method_nodes: List.new(), attr_names: List.new(), attr_vals: List.new(), func_names: List.new(), func_nodes: List.new(), self_obj: 0, env: RecipeEnv { os: env.os, arch: env.arch, compiler: env.compiler, compiler_version: env.compiler_version, build_type: env.build_type, version: env.version, package_folder: env.package_folder, source_folder: env.source_folder, options: List.new(), options_known: env.options_known }, notes: List.new(), ret: pv_none(), steps: 0, depth: 0, problem: "", reqs: List.new(), tool_reqs: List.new(), toolchains: List.new() }
+    let ip = PyInterp { nodes: [], lists: [], dkeys: [], dvals: [], objs: [], recv: [], frame_names: [], frame_vals: [], method_names: [], method_nodes: [], attr_names: [], attr_vals: [], func_names: [], func_nodes: [], self_obj: 0, env: RecipeEnv { os: env.os, arch: env.arch, compiler: env.compiler, compiler_version: env.compiler_version, build_type: env.build_type, version: env.version, package_folder: env.package_folder, source_folder: env.source_folder, options: [], options_known: env.options_known }, notes: [], ret: pv_none(), steps: 0, depth: 0, problem: "", reqs: [], tool_reqs: [], toolchains: [] }
     if tree.problem.len() > 0: return (ip, "the recipe could not be read: " ++ tree.problem)
     let cls_node = recipe_class(tree)
     if cls_node < 0: return (ip, "the recipe defines no class")
-    ip.frame_names.push(PyNames { items: List.new() })
-    ip.frame_vals.push(PyList { items: List.new() })
+    ip.frame_names.push(PyNames { items: [] })
+    ip.frame_vals.push(PyList { items: [] })
     for t in tree.top:
         if tree.nodes[t].kind == N_DEF:
             ip.func_names.push(tree.nodes[t].s.split("\n")[0].to_owned())
@@ -1859,8 +1859,8 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     // The class body is statements too (`default_options = {…}` then
     // `default_options["fPIC"] = True`): run in order, and what they bind
     // is what `self.<name>` finds.
-    ip.frame_names.push(PyNames { items: List.new() })
-    ip.frame_vals.push(PyList { items: List.new() })
+    ip.frame_names.push(PyNames { items: [] })
+    ip.frame_vals.push(PyList { items: [] })
     for k in class_body:
         ip.exec(k)
     let class_frame = (ip.frame_names.len() - 1) as i32
@@ -1933,7 +1933,7 @@ fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
     let (ip0, problem) = recipe_interp(recipe, env)
     if problem.len() > 0: return recipe_failed(problem)
     var ip = ip0
-    ip.notes = List.new()
+    ip.notes = []
     if not ip.run_method("package_info"): return recipe_failed("the recipe defines no package_info")
     if ip.problem.len() > 0: return recipe_failed(ip.problem)
     let self_obj = ip.self_obj
@@ -1958,9 +1958,9 @@ type RecipeRequirements { ok: bool, problem: str, notes: List[str], requires: Li
 
 fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
     let (ip0, problem) = recipe_interp(recipe, env)
-    if problem.len() > 0: return RecipeRequirements { ok: false, problem, notes: List.new(), requires: List.new(), tool_requires: List.new() }
+    if problem.len() > 0: return RecipeRequirements { ok: false, problem, notes: [], requires: [], tool_requires: [] }
     var ip = ip0
-    ip.notes = List.new()
+    ip.notes = []
     // The class may state its requirements as an attribute instead.
     let stated = ip.self_attr("requires", 0)
     if stated.k == V_STR: ip.reqs.push(stated.s)
@@ -1970,7 +1970,7 @@ fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
             if reference.k == V_STR: ip.reqs.push(reference.s)
     let _r = ip.run_method("requirements")
     let _b = ip.run_method("build_requirements")
-    if ip.problem.len() > 0: return RecipeRequirements { ok: false, problem: move ip.problem, notes: List.new(), requires: List.new(), tool_requires: List.new() }
+    if ip.problem.len() > 0: return RecipeRequirements { ok: false, problem: move ip.problem, notes: [], requires: [], tool_requires: [] }
     RecipeRequirements { ok: true, problem: "", notes: move ip.notes, requires: move ip.reqs, tool_requires: move ip.tool_reqs }
 
 // The recipe methods whose bodies construct a CMakeToolchain, by name.
@@ -1988,13 +1988,13 @@ fn recipe_cmake_toolchain_methods(recipe: &str) -> List[str]:
 type RecipeCMake { ok: bool, problem: str, notes: List[str], names: List[str], values: List[str], unknown: List[str] }
 
 fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
-    let out = RecipeCMake { ok: false, problem: "", notes: List.new(), names: List.new(), values: List.new(), unknown: List.new() }
+    let out = RecipeCMake { ok: false, problem: "", notes: [], names: [], values: [], unknown: [] }
     let (ip0, problem) = recipe_interp(recipe, env)
     if problem.len() > 0:
         out.problem = problem
         return out
     var ip = ip0
-    ip.notes = List.new()
+    ip.notes = []
     let _g = ip.run_method("generate")
     if ip.problem.len() > 0:
         out.problem = move ip.problem

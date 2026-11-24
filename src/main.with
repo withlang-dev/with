@@ -187,19 +187,19 @@ type BenchDiscovery {
 }
 
 fn empty_test_discovery -> TestDiscovery:
-    TestDiscovery { parse_ok: false, has_main: false, test_names: List.new() }
+    TestDiscovery { parse_ok: false, has_main: false, test_names: [] }
 
 fn empty_test_directives -> TestDirectives:
     TestDirectives {
-        expect_stdout: List.new(),
-        expect_stdout_contains: List.new(),
-        expect_stderr: List.new(),
-        expect_check_stdout: List.new(),
-        expect_check_stdout_not: List.new(),
+        expect_stdout: [],
+        expect_stdout_contains: [],
+        expect_stderr: [],
+        expect_check_stdout: [],
+        expect_check_stdout_not: [],
         expect_check_fail: "",
-        expect_check_fail_not: List.new(),
+        expect_check_fail_not: [],
         expect_build_fail: "",
-        expect_build_stderr: List.new(),
+        expect_build_stderr: [],
         expect_build_stderr_not: [],
         has_expect_exit: false,
         expect_exit: 0,
@@ -209,7 +209,7 @@ fn empty_test_directives -> TestDirectives:
         directive_error: "",
         extra_args: "",
         known_issue: "",
-        env_pairs: List.new(),
+        env_pairs: [],
     }
 
 fn cli_options_default -> CliOptions:
@@ -522,12 +522,12 @@ fn cli_one_liner_default(argc: i32) -> CliOneLiner:
         ok: true,
         mode: CliOneLinerMode.None,
         error_msg: "",
-        code_parts: List.new(),
+        code_parts: [],
         pre_parts: [],
         post_parts: [],
         files: [],
         in_place: false,
-        args: List.new(),
+        args: [],
         opt_level: cli_default_opt_level(argc),
     }
 
@@ -811,10 +811,10 @@ fn cli_build_args_binding(args: &List[str]) -> str:
 fn cli_synthetic_source_new -> CliSyntheticSource:
     CliSyntheticSource {
         source: "",
-        gen_starts: List.new(),
-        gen_ends: List.new(),
-        source_names: List.new(),
-        source_texts: List.new(),
+        gen_starts: [],
+        gen_ends: [],
+        source_names: [],
+        source_texts: [],
     }
 
 fn cli_synthetic_add_mapping(syn: CliSyntheticSource, start: i32, text: &str, source_name: &str) -> CliSyntheticSource:
@@ -1918,7 +1918,7 @@ type BuildActionRunResult {
 }
 
 fn build_action_run_result(rc: i32) -> BuildActionRunResult:
-    BuildActionRunResult { rc: rc, effects: List.new() }
+    BuildActionRunResult { rc: rc, effects: [] }
 
 fn build_action_run_result_with_effects(rc: i32, effects: List[str]) -> BuildActionRunResult:
     BuildActionRunResult { rc: rc, effects: effects }
@@ -2534,7 +2534,7 @@ type PoolState {
 }
 
 fn PoolState.new() -> Self:
-    PoolState { names: List.new(), pids: List.new(), t0s: List.new(), outs: List.new(), errs: List.new(), timeouts: List.new(), via_runner: List.new(), effects_paths: List.new(), done: List.new(), done_rcs: List.new(), done_ats: List.new(), done_rsss: List.new(), retired: List.new(), slots: List.new(), oldest: 0 }
+    PoolState { names: [], pids: [], t0s: [], outs: [], errs: [], timeouts: [], via_runner: [], effects_paths: [], done: [], done_rcs: [], done_ats: [], done_rsss: [], retired: [], slots: [], oldest: 0 }
 
 // The lanes are the pool's children: they end with its scope. The graph loop
 // returns early on many paths (a refused target, an install whose source an

@@ -219,7 +219,7 @@ impl Zcu:
         for si in 0..sc:
             let member = self.pool.resolve(pool.get_extra(ps + pc + si))
             let path = self.resolve_module_path_frontend(base ++ "/" ++ member, dir)
-            if path.len() == 0: return List.new()
+            if path.len() == 0: return []
             out.push(path)
         out
 
@@ -337,8 +337,8 @@ impl Sema:
         self.ns_fulls = sema_new_list_str()
         self.ns_targets = sema_new_list_i32()
         self.ns_offsets = sema_new_list_i32()
-        self.module_index_by_path = HashMap.new()
-        self.global_visible_module_paths = HashMap.new()
+        self.module_index_by_path = [:]
+        self.global_visible_module_paths = [:]
         self.module_visibility_cache = Memo.new()
 
         for mi in 0..resolved.modules.len():
@@ -2475,7 +2475,7 @@ impl Zcu:
         var out = pool
         let base = out.decl_count()
         let t_start = runtime_clock_nanos()
-        self.iface_mentioned = HashMap.new()
+        self.iface_mentioned = [:]
         self.note_interface_mentions(out, 0, out.node_count())
         // A call the compiler emits on its own, which no source mentions:
         // main's `?` exit (§10.2, D190). Seeded here so its interface line
@@ -3392,7 +3392,7 @@ impl Copy for DepOrderAccum
 fn DepOrderAccum.new() -> DepOrderAccum:
     let ptr = with_alloc(64) as *mut DepOrderAccumState
     unsafe:
-        *ptr = DepOrderAccumState { order: List.new(), seen: HashMap.new() }
+        *ptr = DepOrderAccumState { order: [], seen: [:] }
     DepOrderAccum { state: ptr }
 
 type ReorderedTier {

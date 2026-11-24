@@ -57,9 +57,9 @@ fn diagnostic_error(message: &str, primary: Span) -> Diagnostic:
         origin_line: 0,
         origin_node: 0,
         primary,
-        labels: List.new(),
-        notes: List.new(),
-        helps: List.new(),
+        labels: [],
+        notes: [],
+        helps: [],
     }
 
 fn diagnostic_warning(message: &str, primary: Span) -> Diagnostic:
@@ -72,9 +72,9 @@ fn diagnostic_warning(message: &str, primary: Span) -> Diagnostic:
         origin_line: 0,
         origin_node: 0,
         primary,
-        labels: List.new(),
-        notes: List.new(),
-        helps: List.new(),
+        labels: [],
+        notes: [],
+        helps: [],
     }
 
 fn Diagnostic.err(message: &str, span: Span) -> Diagnostic:
@@ -168,7 +168,7 @@ type DiagnosticList {
 
 fn DiagnosticList.init -> DiagnosticList:
     DiagnosticList {
-        items: List.new(),
+        items: [],
     }
 
 // No-op: reserved for future manual memory management.

@@ -111,7 +111,7 @@ fn fs_dirname(path: &str) -> str:
     if last <= 0: "/" else: path.slice(0, last)
 
 fn fs_cache_error(message: &str) -> DscCache:
-    DscCache { fds: List.new(), mappings: List.new(), images: List.new(), problem: message.to_owned() }
+    DscCache { fds: [], mappings: [], images: [], problem: message.to_owned() }
 
 // Opens the main cache file and every sub-cache beside it, and reads their
 // mappings and the image list.
@@ -128,7 +128,7 @@ fn fs_open_cache() -> DscCache:
         // .atlas side files, and not the local-symbols file.
         if name.starts_with(base ++ ".") and not name.ends_with(".map") and not name.ends_with(".atlas") and not name.ends_with(".symbols"):
             files.push(fs_dirname(main_path) ++ "/" ++ name)
-    let cache = DscCache { fds: List.new(), mappings: List.new(), images: List.new(), problem: "" }
+    let cache = DscCache { fds: [], mappings: [], images: [], problem: "" }
     for f in 0..files.len():
         let fd = fs_open(files[f])
         if fd < 0:
@@ -211,7 +211,7 @@ fn fs_uleb(data: &str, at: i64) -> FsUleb:
     FsUleb { value: -1, next: data.len() }
 
 fn fs_library_error(install_name: &str, message: &str) -> DscLibrary:
-    DscLibrary { install_name: install_name.to_owned(), current_version: "", compatibility_version: "", reexports: List.new(), symbols: List.new(), weak_symbols: List.new(), tls_symbols: List.new(), problem: message.to_owned() }
+    DscLibrary { install_name: install_name.to_owned(), current_version: "", compatibility_version: "", reexports: [], symbols: [], weak_symbols: [], tls_symbols: [], problem: message.to_owned() }
 
 // The exports of the image `install_name`: its load commands for the
 // identity and re-exports, its exports trie for the symbols.
@@ -224,7 +224,7 @@ fn fs_read_library(cache: &DscCache, install_name: &str) -> DscLibrary:
         return fs_library_error(install_name, "no 64-bit Mach-O header for " ++ install_name)
     let ncmds = fs_u32(head, 16)
     let cmds = fs_read_vm(cache, address, 32 + fs_u32(head, 20))
-    let library = DscLibrary { install_name: install_name.to_owned(), current_version: "1", compatibility_version: "1", reexports: List.new(), symbols: List.new(), weak_symbols: List.new(), tls_symbols: List.new(), problem: "" }
+    let library = DscLibrary { install_name: install_name.to_owned(), current_version: "1", compatibility_version: "1", reexports: [], symbols: [], weak_symbols: [], tls_symbols: [], problem: "" }
     var linkedit_vm: i64 = -1
     var linkedit_file: i64 = 0
     var trie_off: i64 = -1

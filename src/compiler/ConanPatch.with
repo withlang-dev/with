@@ -95,14 +95,14 @@ fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: fn(&
             creates = cp_header_path(line) == "/dev/null"
             path = cp_header_path(lines[i + 1])
             if path == "/dev/null": return "patch deletes " ++ cp_header_path(line) ++ "; deleting a file is not supported"
-            hunks = List.new()
+            hunks = []
             in_hunk = false
             i = i + 2
             continue
         if line.starts_with("@@ "):
             let start = cp_hunk_old_start(line)
             if start < 0: return "malformed hunk header: " ++ line
-            hunks.push(CpHunk { old_start: start, old: List.new(), new: List.new() })
+            hunks.push(CpHunk { old_start: start, old: [], new: [] })
             in_hunk = true
         else if in_hunk and hunks.len() > 0 and not line.starts_with("\\"):
             let last = hunks.len() - 1

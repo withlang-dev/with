@@ -17,8 +17,8 @@ use std.crypto.sha256
 use rt.rt_core
 use FnAbi
 
-var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
-var g_bundle_interface_packages: HashMap[str, str] = HashMap.new()
+var g_bundle_interface_texts: HashMap[str, str] = [:]
+var g_bundle_interface_packages: HashMap[str, str] = [:]
 var g_bundle_registering_package = ""
 
 // sha256 hex of a text — the manifest's `interface-sha` (the .wi bytes) and

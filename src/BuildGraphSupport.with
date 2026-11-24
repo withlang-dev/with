@@ -405,7 +405,7 @@ fn build_graph_sorted_strings(items: &List[str]) -> List[str]:
 fn collect_test_files(target_dir: &str) -> List[str]:
     let listing = build_graph_rt_list_files(target_dir)
     if listing.len() == 0:
-        return List.new()
+        return []
     let all_files = build_graph_split_nonempty_lines(listing)
     let w_files: List[str] = []
     for all_file in all_files:

@@ -29,24 +29,24 @@ var build_cache_compiler_fingerprint: str = ""
 // execution-free window; build_cache_forget_fingerprints clears it whenever a
 // target actually runs (coarse, provably safe — fully-cached runs keep the
 // entire win).
-var build_cache_fp_memo: HashMap[str, str] = HashMap.new()
+var build_cache_fp_memo: HashMap[str, str] = [:]
 
 // A regular file's fingerprint keyed on its path, mode and stamp (size and
 // mtime): valid across targets that run, since a rewrite changes the key.
 // Clearing the path memo after every executed target (below) made each
 // pooled lane's dispatch rehash the 170 MB stage compiler it takes as an
 // input — two seconds of serial driver time per lane, a minute per gate.
-var build_cache_stamp_memo: HashMap[str, str] = HashMap.new()
+var build_cache_stamp_memo: HashMap[str, str] = [:]
 
 fn build_cache_forget_fingerprints() -> Unit:
-    build_cache_fp_memo = HashMap.new()
-    build_cache_tree_fp_memo = HashMap.new()
+    build_cache_fp_memo = [:]
+    build_cache_tree_fp_memo = [:]
 
 // #1654: what each running target's inputs looked like when it was
 // dispatched (target name → "path:hash" lines). A record made after the run
 // compares against this: an input edited while the action ran was never
 // seen by the action, so the output must not be recorded as fresh for it.
-var build_cache_prerun_inputs: HashMap[str, str] = HashMap.new()
+var build_cache_prerun_inputs: HashMap[str, str] = [:]
 
 fn build_cache_snapshot_inputs(root: &str, target: &BuildGraphTarget):
     let input_paths = build_cache_collect_input_paths(root, target)
@@ -340,7 +340,7 @@ fn build_cache_list_w_files(root: &str, dir: &str) -> List[str]:
     let full_dir = root ++ "/" ++ dir
     let listing = build_graph_rt_list_files(full_dir)
     if listing.len() == 0:
-        return List.new()
+        return []
     let all_files = build_cache_split_lines(listing)
     let w_files: List[str] = []
     for all_file in all_files:
@@ -638,7 +638,7 @@ fn build_cache_test_compiler_fingerprint(compiler_path: &str) -> str:
     build_cache_fingerprint_file(compiler_path)
 
 // Per-run memo of tree fingerprints (dir + filter → hash).
-var build_cache_tree_fp_memo: HashMap[str, str] = HashMap.new()
+var build_cache_tree_fp_memo: HashMap[str, str] = [:]
 
 // Every file under `dir` (recursively; only `.w` files when `w_only`) by
 // project-relative path and content fingerprint.
@@ -1314,7 +1314,7 @@ fn build_cache_forget_restored_fingerprints(root: &str, rels: &List[str]):
             let files = build_cache_split_lines(build_graph_rt_list_files(path))
             for file in files:
                 build_cache_fp_memo.remove(file)
-    build_cache_tree_fp_memo = HashMap.new()
+    build_cache_tree_fp_memo = [:]
 
 fn build_cache_store_repin_signature(state_text: &str, target: &BuildGraphTarget, root: &str) -> str:
     var out = ""
