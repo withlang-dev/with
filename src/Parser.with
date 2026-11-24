@@ -4585,7 +4585,14 @@ impl Parser:
             self.emit_error("unterminated string literal: nothing closes the quote that opens it here before the end of the file")
             self.advance()
             return self.poisoned_expr()
-        self.emit_error("expected expression")
+        // A reserved word where a value is expected: say that it is one. A C
+        // function named `select` or `spawn` is imported as `select_`,
+        // `spawn_`, and "expected expression" told nobody.
+        let word = self.source.slice(self.current_start(), self.current_end())
+        if t != TokenKind.TK_IDENT and word.len() > 0 and ((word.byte_at(0) >= 97 and word.byte_at(0) <= 122) or word.byte_at(0) == 95):
+            self.emit_help_error(f"expected expression: `{word}` is a reserved word and cannot name a value", f"a C declaration named `{word}` is imported as `{word}_` (§29.11 lists the reserved words)")
+        else:
+            self.emit_error("expected expression")
         // Skip to next statement boundary for recovery
         self.recover_to_statement()
         self.poisoned_expr()

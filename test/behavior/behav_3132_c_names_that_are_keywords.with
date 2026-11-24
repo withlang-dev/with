@@ -1,0 +1,9 @@
+//! expect-stdout: 10 2 5
+
+// C names that are With keywords are reached with a trailing underscore:
+// fields (`type_`) and functions (`select_`, `spawn_`) alike (#3132).
+use c_import("struct ev { int type; int module; int select; int gen; };\nstatic inline struct ev ev_make(void) { struct ev e = {1, 2, 3, 4}; return e; }\nstatic inline int spawn(int x) { return x + 1; }\nstatic inline int select(int x) { return x + 4; }\n")
+
+fn main:
+    let e = ev_make()
+    print(f"{e.type_ + e.module_ + e.select_ + e.gen_} {spawn_(1)} {select_(1)}")

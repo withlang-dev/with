@@ -23247,7 +23247,11 @@ impl Sema:
             if field_ty == 0:
                 let unknown = "unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'"
                 let meant = self.suggest_field_name(field_base as i32, self.pool_resolve(field))
-                if meant.len() > 0: self.emit_error_with_help(unknown, node, f"did you mean `{meant}`?")
+                // A C field whose name is a With keyword is imported with a
+                // trailing underscore (`type` as `type_`); nothing said so.
+                let escaped = self.pool_lookup_symbol(self.pool_resolve(field) ++ "_")
+                if escaped != 0 and self.struct_field_type(field_base as i32, escaped) != 0: self.emit_error_with_help(unknown, node, f"`{self.pool_resolve(field)}` is a With keyword, so the C field of that name is imported as `{self.pool_resolve(escaped)}`")
+                else if meant.len() > 0: self.emit_error_with_help(unknown, node, f"did you mean `{meant}`?")
                 else: self.emit_error(unknown, node)
             self.note_view_field_projection(node, obj_type as i32, field_ty)
             self.note_field_access_decl(node, field_base as i32, field)
