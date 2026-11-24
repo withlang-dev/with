@@ -5702,6 +5702,25 @@ impl Sema:
             else if self_tid != 0:
                 self.named_types.remove(self.syms.self_type)
 
+    // #3061 / #2519: a trait impl method's written return type that is the
+    // trait's own. Unwritten, the method has the same return (the contract
+    // is published before any body is checked), so the words can go. Only
+    // where that publication applies: no type parameters on the method or
+    // its owner, and a plain function (an `async` or `gen` signature wraps
+    // its written type).
+    mut fn note_contract_restated_return(node: i32, meta: i32, sig_idx: i32, contract: &SemaTraitImplMethodContract):
+        if meta < 0 or sig_idx < 0 or contract.ok == 0 or contract.ret_type == 0: return
+        let ret_node = self.ast.fn_meta_ret(meta)
+        if ret_node == 0 or self.ast.fn_meta_tp_count(meta) != 0: return
+        let flags = self.ast.get_data2(node)
+        if (flags / FnFlags.ASYNC) % 2 == 1 or (flags / FnFlags.GEN) % 2 == 1: return
+        let owner_sym = self.method_decl_owner_symbol(node, self.ast.get_data0(node))
+        if owner_sym == 0 or self.type_decl_type_param_count(owner_sym) != 0: return
+        let written = self.resolve_alias(self.sig_return_type(sig_idx) as TypeId)
+        if written == 0 or written != self.resolve_alias(contract.ret_type as TypeId): return
+        self.ceremony_contract_rets.insert(ret_node, node)
+        self.ceremony_let_paths.insert(ret_node, self.ceremony_node_path(ret_node))
+
     mut fn check_trait_impl_method_signature_contract(node: i32, sig_idx: i32, contract: &SemaTraitImplMethodContract, has_ret_annotation: bool):
         if contract.ok == 0 or sig_idx < 0:
             return
@@ -6389,6 +6408,7 @@ impl Sema:
         let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
         let trait_contract = self.trait_impl_method_contract(node, fn_name)
         self.check_trait_impl_method_signature_contract(node, sig_idx, trait_contract, has_ret_annotation)
+        self.note_contract_restated_return(node, meta, sig_idx, trait_contract)
         let saved_implicit_binding_len = self.implicit_binding_syms.len()
         if meta >= 0:
             let param_start = self.ast.fn_meta_param_start(meta)
