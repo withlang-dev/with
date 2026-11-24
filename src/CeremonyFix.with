@@ -149,6 +149,13 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
             if wrapped: edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: cast_start - 1, end: cast_start, replacement: "", what: with_str_clone_ref(what) })
             edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_end(src), end: if wrapped: cast_end + 1 else: cast_end, replacement: "", what: what })
             continue
+        // The same constructor where a field, an argument, an assignment
+        // or a return demands its type.
+        if sema.ceremony_demanded_news.contains(node):
+            let name = sema.pool_resolve(pool.get_data0(pool.get_data0(pool.get_data0(node))))
+            let literal = if name == "HashMap": "[:]" else: "[]"
+            edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_start(node), end: pool.get_end(node), replacement: literal, what: "`" ++ name ++ ".new()` where its type is demanded is `" ++ literal ++ "` (D93)" })
+            continue
         // `List.new()` / `HashMap.new()` / `HashSet.new()` as a let's
         // initializer with its type written: the empty literal (D93).
         if sema.ceremony_list_news.contains(node):
@@ -275,7 +282,7 @@ fn cf_rewrite(text: &str, edits: &List[CeremonyEdit]) -> str:
         out = out.slice(0, e.start) ++ e.replacement ++ out.slice(e.end, out.len())
     out
 
-fn cf_usage() -> str: "usage: with fix-ceremony [--report|--apply] [--std] [--exclude path ...] [--check-with compiler] <entry.with>\n  --report      list every rewrite Sema proves safe, by file and line (the default)\n  --apply       write them; a file that no longer checks is restored\n  --std         rewrite lib/std too (never a migrated corpus)\n  --exclude p   leave files under p alone\n  --check-with c  re-check with compiler c after applying\nrewrites: a redundant binding annotation, a `var` never rebound, a widening cast, `List.new()` where a literal is typed by use, an index loop over one list, `.clone()` on a str, `&x` at a `&T` parameter, `Some(x)` where an Option is demanded"
+fn cf_usage() -> str: "usage: with fix-ceremony [--report|--apply] [--std] [--exclude path ...] [--check-with compiler] <entry.with>\n  --report      list every rewrite Sema proves safe, by file and line (the default)\n  --apply       write them; a file that no longer checks is restored\n  --std         rewrite lib/std too (never a migrated corpus)\n  --exclude p   leave files under p alone\n  --check-with c  re-check with compiler c after applying\nrewrites: a redundant binding annotation, a `var` never rebound, a widening cast, `List.new()` / `HashMap.new()` where its type is demanded, an index loop over one list, `.clone()` on a str, `&x` at a `&T` parameter, `Some(x)` where an Option is demanded"
 
 fn run_ceremony_fix() -> i32:
     let argv = args()

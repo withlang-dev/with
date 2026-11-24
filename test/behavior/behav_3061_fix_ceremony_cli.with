@@ -27,5 +27,17 @@ fn main:
     if not listed.contains("3 numbered constants `KIND_A` .. `KIND_C`"): print(listed)
     assert(listed.contains("3 numbered constants `KIND_A` .. `KIND_C`"))
     assert(read_file(program).unwrap().contains("let KIND_B: i32 = 2"))
+    // Item 5: `List.new()` / `HashMap.new()` where a field, an assignment
+    // or an argument demands its type becomes the empty literal, and the
+    // program still runs.
+    let bag = dir ++ "/bag.with"
+    assert(write_file(bag, "use std.collections.HashMap\n\ntype Bag {\n    items: List[i32],\n    index: HashMap[str, i32],\n}\n\nfn total(xs: List[i32]) -> i32:\n    var s = 0\n    for x in xs: s = s + x\n    s\n\nfn main:\n    var b = Bag { items: List.new(), index: HashMap.new() }\n    b.items = List.new()\n    b.items.push(3)\n    b.index.insert(\"a\", 1)\n    print(total(List.new()) + total(b.items))\n") == 0)
+    let applied = run_to_files(&[compiler, "fix-ceremony", "--apply", bag], dir ++ "/apply.out", dir ++ "/apply.err", 600000)
+    assert(applied.code == 0)
+    let after = read_file(bag).unwrap()
+    if after.contains(".new()"): print(after)
+    assert(after.contains("Bag { items: [], index: [:] }") and after.contains("b.items = []") and after.contains("total([])") and not after.contains(".new()"))
+    let ran = run_to_files(&[compiler, "run", bag], dir ++ "/run.out", dir ++ "/run.err", 600000)
+    assert(ran.code == 0 and read_file(dir ++ "/run.out").unwrap() == "3\n")
     assert(remove_tree(dir) == 0)
     print("ok")
