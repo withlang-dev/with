@@ -5,6 +5,20 @@
 //   TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256  (0xC02B)
 //   TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256    (0xCCA8, RFC 7905)
 //   TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256  (0xCCA9, RFC 7905)
+//
+// Review status (#3134). This is With's own implementation, over
+// std.crypto, and it has had no security review from outside the project.
+// What it does: a TLS 1.2 client with the four suites above (ephemeral
+// ECDH, AEAD); the peer's certificate chain checked to the operating
+// system's trust store, the host name checked against the leaf, and the
+// server's key-exchange signature checked.
+// What it does not do: TLS 1.3, a server, session resumption, or any
+// revocation check (no OCSP, no CRL). Nothing here or in std.crypto has
+// been analysed for timing side channels, and none of it claims to run in
+// constant time.
+// A program that sends credentials or money over the network should weigh
+// that. The alternative today is a C library fetched with `with get`
+// (libcurl with its own TLS backend).
 
 use std.crypto.sha256
 use std.crypto.sha512

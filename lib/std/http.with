@@ -1,6 +1,10 @@
 // HTTP/1.1 client over TLS.
 //
 // This is intentionally small: HTTPS GET, response parsing, and redirects.
+//
+// Review status (#3134): every connection runs on std.tls, With's own TLS
+// 1.2 client, which has had no outside security review. See the head of
+// std/tls.with for what it checks and what it does not.
 
 use std.string
 use std.tls
