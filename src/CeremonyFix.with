@@ -98,6 +98,10 @@ fn cf_rewritable(path: &str, excludes: &List[str], std_too: bool) -> bool:
 fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[CeremonyEdit]:
     let edits = []
     let texts: HashMap[str, str] = [:]
+    // The initializers of the lets whose written type makes the literal.
+    let let_news: HashMap[i32, i32] = [:]
+    for (let_node, _) in sema.ceremony_list_news:
+        let_news.insert(sema.ceremony_let_values.get(let_node) ?? 0, 1)
     for (node, path) in sema.ceremony_let_paths:
         if not cf_rewritable(path, excludes, std_too): continue
         if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
@@ -152,6 +156,8 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
         // The same constructor where a field, an argument, an assignment
         // or a return demands its type.
         if sema.ceremony_demanded_news.contains(node):
+            // The initializer of a let with its type written is that let's edit.
+            if let_news.contains(node): continue
             let name = sema.pool_resolve(pool.get_data0(pool.get_data0(pool.get_data0(node))))
             let literal = if name == "HashMap": "[:]" else: "[]"
             edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_start(node), end: pool.get_end(node), replacement: literal, what: "`" ++ name ++ ".new()` where its type is demanded is `" ++ literal ++ "` (D93)" })

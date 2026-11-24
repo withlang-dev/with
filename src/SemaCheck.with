@@ -18437,9 +18437,7 @@ impl Sema:
                             let owner = self.ast.get_data0(callee)
                             if self.ast.kind(owner) == NodeKind.NK_IDENT:
                                 let owner_sym = self.canonical_symbol_by_text(self.ast.get_data0(owner))
-                                if owner_sym == self.syms.list or owner_sym == self.syms.hashmap or owner_sym == self.syms.hashset:
-                                    self.ceremony_list_news.insert(node, 1)
-                                    self.ceremony_demanded_news.remove(value)
+                                if owner_sym == self.syms.list or owner_sym == self.syms.hashmap or owner_sym == self.syms.hashset: self.ceremony_list_news.insert(node, 1)
 
         // D93: no annotation, an element-form literal, and uses that
         // demanded a collection: the binding has that type.
@@ -31528,8 +31526,8 @@ impl Sema:
     // #3061 (item 5): `List.new()` / `HashMap.new()` / `HashSet.new()` where
     // the site demands that very type (a struct-literal field, an argument,
     // an assignment, a return) is the empty literal the demand types (D93).
-    // The let with a written type is recorded with its binding instead
-    // (ceremony_list_news), which takes this entry back.
+    // A let with a written type is recorded with its binding too
+    // (ceremony_list_news); the rewriter makes that one edit, not two.
     mut fn note_demanded_empty_new(node: i32, expected: TypeId, actual: TypeId):
         if expected == 0 or actual != expected or self.ast.kind(node) != NodeKind.NK_CALL or self.ast.get_data2(node) != 0: return
         let callee = self.ast.get_data0(node)
