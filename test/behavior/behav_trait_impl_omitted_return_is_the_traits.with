@@ -1,0 +1,40 @@
+//! expect-stdout: 6 1 int 6 -9 6 6
+//! expect-stdout: 3 2 p 3 -1 4
+// A trait impl method written without a return type has the return the
+// trait declares, and its tail is checked and adjusted against it as under
+// a written one: a `&Self` tail is copied out, an integer literal meets
+// `f64`, a bare value meets `Result` and `Option`.
+trait Shape:
+    fn size(self: &Self) -> i64
+    fn half(self: &Self) -> f64
+    fn name(self: &Self) -> str
+    fn checked(self: &Self) -> Result[i64, str]
+    fn maybe(self: &Self) -> Option[i64]
+    fn same(self: &Self) -> Self
+
+impl Shape for i64:
+    fn size(): self
+    fn half(): 1
+    fn name(): "int"
+    fn checked():
+        if self < 0: return Err("negative")
+        self
+    fn maybe(): Some(*self)
+    fn same(): self
+
+type P { n: i64 }
+
+impl Shape for P:
+    fn size(): self.n
+    fn half(): 2
+    fn name(): "p"
+    fn checked(): self.n
+    fn maybe(): None
+    fn same(): P { n: self.n + 1 }
+
+fn main:
+    let z: i64 = 6
+    let neg: i64 = -1
+    print(f"{z.size()} {z.half()} {z.name()} {z.checked() ?? -9} {neg.checked() ?? -9} {z.maybe() ?? -1} {z.same()}")
+    let p = P { n: 3 }
+    print(f"{p.size()} {p.half()} {p.name()} {p.checked() ?? -9} {p.maybe() ?? -1} {p.same().n}")
