@@ -1134,7 +1134,7 @@ test (details in `debug-allocator.md`):
 | `WITH_ALLOC_SYSTEM=1` | allocate through the system malloc, so tools that walk malloc zones (`leaks`, `MallocScribble`) see the heap; the payload-start check stands down |
 | `WITH_DEBUG_ALLOC_TRAP_FREE=<addr>` | print every alloc and free of one payload address, with drop origins |
 | `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` / `WITH_DEBUG_ALLOC_TRAP_ALLOC_HIT=<n>` | panic on the n-th free / alloc of that address |
-| `WITH_DEBUG_ALLOC_SITES_AT=<n>` | with the debug allocator on: at the n-th allocation, the blocks live then, grouped by the call chain that allocated them, largest first. `n` is the `at allocation=` number of a first run's peak report, so two runs name the code behind a program's peak (#618); call chains are recorded on darwin-aarch64 |
+| `WITH_DEBUG_ALLOC_SITES_AT=<n>` (`WITH_DEBUG_ALLOC_SITES_SHOWN=<m>` prints the m largest, default 24) | with the debug allocator on: at the n-th allocation, the blocks live then, grouped by the call chain that allocated them, largest first. `n` is the `at allocation=` number of a first run's peak report, so two runs name the code behind a program's peak (#618); call chains are recorded on darwin-aarch64 |
 | `WITH_MEMORY_LIMIT_BYTES=<n>` | a committed-memory ceiling: a runaway allocation fails loudly |
 
 ## Trace and Dump Switches

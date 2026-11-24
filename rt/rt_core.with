@@ -1743,12 +1743,14 @@ fn dbg_account_free(size: i64, origin: i64):
 // the peak was (`at allocation=N`). `WITH_DEBUG_ALLOC_SITES_AT=N` groups
 // the blocks live at allocation N by that chain and prints the sites
 // holding the most, so two runs of a deterministic program name the code
-// behind its peak: the first for N, the second for the sites.
+// behind its peak: the first for N, the second for the sites. The 24
+// largest are printed; `WITH_DEBUG_ALLOC_SITES_SHOWN=<n>` prints more, for
+// adding them up by owner.
 var dbg_sites_at_state: i32 = 0    // 0=unread, 1=off, 2=on
 var dbg_sites_at_v: i64 = 0
 let DBG_SITE_TABLE_CAP: i64 = 65536
 let DBG_SITE_ROW_BYTES: i64 = 32   // chain hash, bytes, blocks, one entry of the site
-let DBG_SITES_SHOWN: i64 = 24
+let DBG_SITES_SHOWN: i64 = 24     // or WITH_DEBUG_ALLOC_SITES_SHOWN
 
 fn dbg_sites_at() -> i64:
     if dbg_sites_at_state == 0:
@@ -1806,8 +1808,10 @@ fn dbg_report_sites():
     dbg_puts(" from ")
     dbg_put_i64(sites)
     dbg_puts(" allocation sites; the largest:\n")
+    let asked = rt_parse_limit_cstr(rt_getenv(c"WITH_DEBUG_ALLOC_SITES_SHOWN".ptr))
+    let shown = if asked > 0: asked else: DBG_SITES_SHOWN
     var rank: i64 = 0
-    while rank < DBG_SITES_SHOWN:
+    while rank < shown:
         var best: i64 = 0
         var best_bytes: i64 = 0
         var r: i64 = 0
