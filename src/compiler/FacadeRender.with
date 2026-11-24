@@ -1570,7 +1570,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // `Deref` to the record; nothing is assigned through it, and the record
     // itself is `.repr`, under the raw C rules.
     if facade_render_is_record(pool, intern, repr_text):
-        out = out ++ "impl Deref[" ++ repr_text ++ "] for " ++ name ++ ":\n    fn deref(self: &Self) -> &" ++ repr_text ++ ": " ++ (if pinned: "self.repr.as_ref()" else: "&self.repr") ++ "\n"
+        out = out ++ "impl Deref[" ++ repr_text ++ "] for " ++ name ++ ":\n    fn deref() -> &" ++ repr_text ++ ": " ++ (if pinned: "self.repr.as_ref()" else: "&self.repr") ++ "\n"
     // A destroyer through a global takes the pointer the resource is.
     if destroy_globals.len() > 0 and (pinned or not repr_text.starts_with("*")): return ("", facade_render_no_error_use())
     if destroyers.len() > 0 or destroy_globals.len() > 0 or methods.len() > 0:

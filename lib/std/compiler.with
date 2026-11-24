@@ -92,30 +92,32 @@ pub fn SourceEmitter.__driver_new(token: str, output_path: str) -> SourceEmitter
     compiler_capability_require(token, "SourceEmitter")
     SourceEmitter { token, output_path }
 
-pub fn Diagnostics.error(self: &Self, location: &SourceLocation, message: str):
-    compiler_capability_require(self.token, "Diagnostics")
-    if self.output_path.len() == 0:
-        with_eprint("error: Diagnostics.error called without a driver diagnostic output")
-        exit(1)
-    let old = with_fs_read_file(self.output_path)
-    let line = "error\t" ++
-        compiler_hook_escape(location.file) ++ "\t" ++
-        f"{location.start}" ++ "\t" ++
-        f"{location.end}" ++ "\t" ++
-        compiler_hook_escape(message) ++ "\n"
-    if with_fs_write_file(self.output_path, old ++ line) != 0:
-        with_eprint("error: failed to write compiler hook diagnostic")
-        exit(1)
+impl Diagnostics:
+    pub fn error(location: &SourceLocation, message: str):
+        compiler_capability_require(self.token, "Diagnostics")
+        if self.output_path.len() == 0:
+            with_eprint("error: Diagnostics.error called without a driver diagnostic output")
+            exit(1)
+        let old = with_fs_read_file(self.output_path)
+        let line = "error\t" ++
+            compiler_hook_escape(location.file) ++ "\t" ++
+            f"{location.start}" ++ "\t" ++
+            f"{location.end}" ++ "\t" ++
+            compiler_hook_escape(message) ++ "\n"
+        if with_fs_write_file(self.output_path, old ++ line) != 0:
+            with_eprint("error: failed to write compiler hook diagnostic")
+            exit(1)
 
-pub fn SourceEmitter.emit_source(self: &Self, source: str):
-    compiler_capability_require(self.token, "SourceEmitter")
-    if self.output_path.len() == 0:
-        with_eprint("error: SourceEmitter.emit_source called without a driver emitted-source output")
-        exit(1)
-    let old = with_fs_read_file(self.output_path)
-    if with_fs_write_file(self.output_path, old ++ "\n" ++ source ++ "\n") != 0:
-        with_eprint("error: failed to write compiler hook emitted source")
-        exit(1)
+impl SourceEmitter:
+    pub fn emit_source(source: str):
+        compiler_capability_require(self.token, "SourceEmitter")
+        if self.output_path.len() == 0:
+            with_eprint("error: SourceEmitter.emit_source called without a driver emitted-source output")
+            exit(1)
+        let old = with_fs_read_file(self.output_path)
+        if with_fs_write_file(self.output_path, old ++ "\n" ++ source ++ "\n") != 0:
+            with_eprint("error: failed to write compiler hook emitted source")
+            exit(1)
 
 pub fn SourceLocation.new(file: str, start: i32, end: i32) -> SourceLocation:
     SourceLocation { file, start, end }
@@ -131,26 +133,28 @@ pub fn ModuleInfo.new(name: str, path: str) -> ModuleInfo:
 pub fn FunctionInfo.new(module_name: str, name: str, public_value: bool, docs_value: bool, param_count: i32, return_type: str, source_location: SourceLocation) -> FunctionInfo:
     FunctionInfo { module_name, name, public_value, docs_value, param_count, return_type, source_location }
 
-pub fn FunctionInfo.is_pub(self: &Self) -> bool:
-    self.public_value
+impl FunctionInfo:
+    pub fn is_pub() -> bool:
+        self.public_value
 
-pub fn FunctionInfo.has_docs(self: &Self) -> bool:
-    self.docs_value
+    pub fn has_docs() -> bool:
+        self.docs_value
 
-pub fn FunctionInfo.location(self: &Self) -> &SourceLocation:
-    self.source_location
+    pub fn location() -> &SourceLocation:
+        self.source_location
 
 pub fn TypeInfo.new(module_name: str, name: str, public_value: bool, docs_value: bool, kind: str, source_location: SourceLocation) -> TypeInfo:
     TypeInfo { module_name, name, public_value, docs_value, kind, source_location }
 
-pub fn TypeInfo.is_pub(self: &Self) -> bool:
-    self.public_value
+impl TypeInfo:
+    pub fn is_pub() -> bool:
+        self.public_value
 
-pub fn TypeInfo.has_docs(self: &Self) -> bool:
-    self.docs_value
+    pub fn has_docs() -> bool:
+        self.docs_value
 
-pub fn TypeInfo.location(self: &Self) -> &SourceLocation:
-    self.source_location
+    pub fn location() -> &SourceLocation:
+        self.source_location
 
 pub fn ProjectInfo.new() -> ProjectInfo:
     ProjectInfo {
@@ -175,11 +179,11 @@ impl ProjectInfo:
         out.type_items.push(type_info)
         out
 
-pub fn ProjectInfo.modules(self: &Self) -> &List[ModuleInfo]:
-    &self.module_items
+    pub fn modules() -> &List[ModuleInfo]:
+        &self.module_items
 
-pub fn ProjectInfo.functions(self: &Self) -> &List[FunctionInfo]:
-    &self.function_items
+    pub fn functions() -> &List[FunctionInfo]:
+        &self.function_items
 
-pub fn ProjectInfo.types(self: &Self) -> &List[TypeInfo]:
-    &self.type_items
+    pub fn types() -> &List[TypeInfo]:
+        &self.type_items

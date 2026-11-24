@@ -107,7 +107,7 @@ impl[T] Deque[T]:
 /// `d[i]` observes the value at `index` (D27's element view, #2560); panics
 /// out of range. `d.get(i)` is the same method by name.
 impl[T] IndexGet[isize, &T] for Deque[T]:
-    fn get(self: &Self, index: isize) -> &T from self:
+    fn get(index: isize) -> &T from self:
         assert(index >= 0 and index < self.len(), "Deque index out of bounds")
         unsafe { &*self.place(index) }
 

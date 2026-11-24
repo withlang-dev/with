@@ -1,0 +1,13 @@
+//! expect-error: E0702
+
+// `Once.call_once` may suspend (it waits for the first caller to finish);
+// nothing checked that its declaration still said so (#727).
+use std.sync
+
+fn first:
+    print("once")
+
+fn main:
+    let once = Once.new()
+    no_suspend:
+        once.call_once(first)

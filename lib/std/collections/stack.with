@@ -82,7 +82,7 @@ impl[T] Stack[T]:
 /// `s[i]` observes the value at `index` from the bottom (D27's element
 /// view, #2560); panics out of range. `s.get(i)` is the same method by name.
 impl[T] IndexGet[isize, &T] for Stack[T]:
-    fn get(self: &Self, index: isize) -> &T from self:
+    fn get(index: isize) -> &T from self:
         assert(index >= 0 and index < self.len(), "Stack index out of bounds")
         unsafe { &*self.place(index) }
 

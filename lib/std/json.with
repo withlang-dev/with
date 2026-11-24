@@ -110,23 +110,23 @@ impl JsonWriter:
         self.value_raw(if value: "true" else: "false")
 
 impl Serialize for str:
-    fn serialize(self: &str, out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter) -> JsonWriter:
         out.value_str(self)
 
 impl Serialize for i32:
-    fn serialize(self: &i32, out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter) -> JsonWriter:
         out.value_i32(*self)
 
 impl Serialize for i64:
-    fn serialize(self: &i64, out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter) -> JsonWriter:
         out.value_i64(*self)
 
 impl Serialize for isize:
-    fn serialize(self: &isize, out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter) -> JsonWriter:
         out.value_i64(*self)
 
 impl Serialize for bool:
-    fn serialize(self: &bool, out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter) -> JsonWriter:
         out.value_bool(*self)
 
 /// Token type: undefined/uninitialized.

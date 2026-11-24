@@ -1,0 +1,15 @@
+//! expect-error: E0702
+
+// `@[suspends]` above a method in an impl block is the method's, as above a
+// function: a call of it inside `no_suspend` is refused. The attribute was
+// read and dropped for impl-block methods (#727), so this was accepted.
+type Gate { n: i32 }
+
+impl Gate:
+    @[suspends]
+    fn pass() -> i32: self.n
+
+fn main:
+    let g = Gate { n: 1 }
+    no_suspend:
+        print(g.pass())
