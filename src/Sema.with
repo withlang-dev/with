@@ -4859,9 +4859,12 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         reachable_visiting: sema_new_map_i32_i32(),
         reachable_decl_indices: sema_new_map_i32_i32(),
     }
-    s.rebuild_decl_index()
     return s
 
+// A Sema that stands in for one that is elsewhere (the evaluator has it, or
+// none exists yet). It answers nothing, so it builds no declaration index:
+// built here, every compile-time evaluation indexed the whole AST for a Sema
+// nobody asks (#2407: 520 KB each, 290 MB at the peak of a self-check).
 fn Sema.placeholder(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     return sema_empty_state(pool, diags, ast)
 
@@ -4951,6 +4954,7 @@ impl Sema:
 
 fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     let s = sema_empty_state(pool, diags, ast)
+    s.rebuild_decl_index()
 
     // Index 0 = error type (sentinel).
     s.add_type(TypeKind.TY_ERR, 0, 0, 0)
