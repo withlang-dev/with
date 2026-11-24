@@ -1648,6 +1648,15 @@ fn dbg_ledger_init():
     dbg_base = p as i64             // MAP_ANON is zero-filled; no memset needed
     dbg_cap = DBG_CAP_INITIAL
 
+// Where `addr` starts probing in a table of `cap` slots. The address is
+// mixed first: block addresses are regular (a slab's are 32 or 64 bytes
+// apart, mappings sit at round distances), and taken as they are they fell
+// into the same runs of slots, so a probe walked thousands of entries and
+// a check of the compiler under the debug allocator did not finish (#685).
+fn dbg_slot_of(addr: i64, cap: i64) -> i64:
+    let mixed = (addr >> 4) *% -7046029254386353131
+    ((mixed >> 29) ^ mixed) & (cap - 1)
+
 // Doubles the table and moves every entry to its slot in the new one. Runs
 // under the allocator lock and takes its memory from rt_mmap, never from
 // the allocator it watches. When the mapping fails the table stays as it
@@ -1662,7 +1671,7 @@ fn dbg_ledger_grow():
         let from = dbg_base + old * entry_bytes
         let addr = unsafe *(from as *const i64)
         if addr == 0: continue
-        var slot = (addr >> 4) & (new_cap - 1)
+        var slot = dbg_slot_of(addr, new_cap)
         while (unsafe *((new_base + slot * entry_bytes) as *const i64)) != 0: slot = (slot + 1) & (new_cap - 1)
         let to = new_base + slot * entry_bytes
         for w in 0..DBG_ENTRY_WORDS:
@@ -1891,7 +1900,7 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
     // #703: the table stays at most half full, so a probe is short however
     // many addresses a run uses.
     if (dbg_count + 1) * 2 > dbg_cap: dbg_ledger_grow()
-    var slot = (addr >> 4) & (dbg_cap - 1)
+    var slot = dbg_slot_of(addr, dbg_cap)
     var probes: i64 = 0
     while probes < dbg_cap:
         let e = dbg_entry_addr(slot)
@@ -1939,7 +1948,7 @@ fn dbg_site_len(at: i64, count: i64) -> i32:
 // The ledger entry of `addr`, or 0.
 fn dbg_ledger_entry(addr: i64) -> i64:
     if dbg_base == 0: return 0
-    var slot = (addr >> 4) & (dbg_cap - 1)
+    var slot = dbg_slot_of(addr, dbg_cap)
     var probes: i64 = 0
     while probes < dbg_cap:
         let e = dbg_entry_addr(slot)
