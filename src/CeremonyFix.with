@@ -75,6 +75,16 @@ fn cf_colon_before(text: &str, at: i32) -> i32:
     while i >= 0 and (text[i] == ' ' or text[i] == '\t'): i = i - 1
     if i >= 0 and text[i] == ':': i else: -1
 
+// Where the ` ->` before a return type starts: the first blank before the
+// arrow, so the signature closes up. -1 when the type is not after an arrow.
+fn cf_arrow_before(text: &str, at: i32) -> i32:
+    var i = at - 1
+    while i >= 0 and (text[i] == ' ' or text[i] == '\t'): i = i - 1
+    if i < 1 or text[i] != '>' or text[i - 1] != '-': return -1
+    i = i - 2
+    while i >= 0 and (text[i] == ' ' or text[i] == '\t'): i = i - 1
+    i + 1
+
 fn cf_line_of(text: &str, at: i32) -> i32:
     var line = 1
     for i in 0..at:
@@ -152,6 +162,13 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
             let what = "`as " ++ sema.type_name(sema.typed_expr_types.get(node) ?? 0) ++ "` widens where the context already does (§4.2.6)"
             if wrapped: edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: cast_start - 1, end: cast_start, replacement: "", what: with_str_clone_ref(what) })
             edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_end(src), end: if wrapped: cast_end + 1 else: cast_end, replacement: "", what: what })
+            continue
+        // A trait impl method's return type that restates the trait's: the
+        // arrow and the type go.
+        if sema.ceremony_contract_rets.contains(node):
+            let arrow = cf_arrow_before(text, pool.get_start(node))
+            if arrow >= 0:
+                edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: arrow, end: pool.get_end(node), replacement: "", what: "return type `-> " ++ text.slice(pool.get_start(node), pool.get_end(node)) ++ "` restates the trait's" })
             continue
         // The same constructor where a field, an argument, an assignment
         // or a return demands its type.
