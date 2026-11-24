@@ -1,0 +1,5 @@
+//! expect-exit: 1
+//! expect-stderr: error: 3
+// The Result that fits in registers: the Err is reported all the same.
+fn main -> Result[Unit, i32]:
+    Err(3)

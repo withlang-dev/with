@@ -1,0 +1,5 @@
+//! expect-exit: 1
+//! expect-stderr: error: "async failed"
+// An async main that returns an Err reports it too.
+async fn main -> Result[Unit, str]:
+    Err("async failed")

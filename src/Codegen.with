@@ -6861,6 +6861,12 @@ impl Codegen:
         if index < 0: return .None
         .Some((self.fn_abis[index].ret.pass == PM_INDIRECT) as i32)
 
+    // The type main returns through a caller-provided slot, or 0.
+    fn main_sret_type() -> i64:
+        let by_name = self.fn_abi_sret_type(self.intern.intern("main"))
+        if by_name.is_some(): return by_name.unwrap()
+        self.fn_abi_sret_type(self.sema.pool_lookup_symbol("main")) ?? 0
+
     fn fn_abi_sret_type(sym: i32) -> Option[i64]:
         let index = self.fn_abi_symbols.get(sym) ?? -1
         if index < 0 or self.fn_abis[index].ret.pass != PM_INDIRECT: return .None
@@ -8223,6 +8229,15 @@ impl Codegen:
             main_args.push(self.coerce_value_to_type(argc_val, wl_get_fn_param_type(main_ft, 0)))
             main_args.push(self.coerce_value_to_type(argv_val, wl_get_fn_param_type(main_ft, 1)))
             main_call = wl_build_call(self.builder, main_ft, main_fn, list_data_i64(main_args), 2)
+        else if main_param_count == 1 and self.main_sret_type() != 0:
+            // A main that returns a value too large for registers
+            // (`-> Result[Unit, str]`) writes it through a slot the caller
+            // provides. The wrapper provided none, counted the slot as a
+            // parameter and reported the wrong error over invalid LLVM. An
+            // Err it holds has ended the program before main returns.
+            let slot = wl_build_alloca(self.builder, self.main_sret_type())
+            let sret_args: List[i64] = [slot]
+            main_call = wl_build_call(self.builder, main_ft, main_fn, list_data_i64(sret_args), 1)
         else:
             with_eprint("error: main must take either zero parameters or argc/argv")
             self.had_error = 1

@@ -1,0 +1,13 @@
+//! expect-stdout: 1
+//! expect-stdout: done
+// A `main` that declares `-> Result[T, E]` and returns Ok exits with
+// status 0, whatever the size of the Result.
+fn pick(n: i32) -> Result[i32, str]:
+    if n > 1: return Err("too many")
+    Ok(n)
+
+fn main -> Result[Unit, str]:
+    let v = pick(1)?
+    print(v)
+    print("done")
+    Ok(())
