@@ -1,0 +1,30 @@
+//! expect-check-fail: may outlive its origin 'e'
+
+// D214: dependency belongs to a value's origin. The same type has a
+// constructor with a parent and one without; the value made from a parent
+// still cannot outlive it.
+use c_import("../behavior/d214_mime.h")
+
+c contract m:
+    resource Easy wraps *mut easy
+        from easy_init
+        drop easy_cleanup
+    resource Mime wraps *mut mime
+        from mime_init
+        drop mime_free
+    fn mime_init
+        of Mime
+        rename from_easy
+    fn mime_init
+        rename new
+        param 0 fixed null    // d214_mime.h: a null parent makes an independent mime
+    fn easy_init
+        rename new
+
+fn tied() -> Mime:
+    let e = Easy.new().unwrap()
+    Mime.from_easy(e).unwrap()
+
+fn main:
+    let m = tied()
+    print("unreachable")
