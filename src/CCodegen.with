@@ -410,63 +410,63 @@ fn c_emit_module(mir_mod: MirModule, ast: &AstPool, intern: &InternPool, sema: S
         line_file_id: -1,
         line_file_path: "",
         last_line_directive: 0,
-        body_fn_map: HashMap.new(),
-        body_fn_name_map: HashMap.new(),
-        canonical_body_cache: HashMap.new(),
-        fn_pointer_param_cache: HashMap.new(),
-        sig_idx_cache: HashMap.new(),
+        body_fn_map: [:],
+        body_fn_name_map: [:],
+        canonical_body_cache: [:],
+        fn_pointer_param_cache: [:],
+        sig_idx_cache: [:],
         infer_local_depth: 0,
-        active_local_body_fns: List.new(),
-        active_local_ids: List.new(),
-        active_method_syms: List.new(),
-        active_method_args: List.new(),
-        active_method_dests: List.new(),
-        active_direct_args: List.new(),
-        active_direct_dests: List.new(),
-        call_infer_cache: HashMap.new(),
-        field_cache_struct_tids: List.new(),
-        field_cache_syms: List.new(),
-        field_cache_tids: List.new(),
+        active_local_body_fns: [],
+        active_local_ids: [],
+        active_method_syms: [],
+        active_method_args: [],
+        active_method_dests: [],
+        active_direct_args: [],
+        active_direct_dests: [],
+        call_infer_cache: [:],
+        field_cache_struct_tids: [],
+        field_cache_syms: [],
+        field_cache_tids: [],
         field_cache_ready: 0,
         in_field_cache_build: 0,
-        local_infer_cache: HashMap.new(),
-        local_usage_hint_cache: HashMap.new(),
-        local_call_ret_cache: HashMap.new(),
-        local_copied_payload_cache: HashMap.new(),
-        local_downcast_option_cache: HashMap.new(),
-        local_effective_cache: HashMap.new(),
-        local_ref_target_cache: HashMap.new(),
+        local_infer_cache: [:],
+        local_usage_hint_cache: [:],
+        local_call_ret_cache: [:],
+        local_copied_payload_cache: [:],
+        local_downcast_option_cache: [:],
+        local_effective_cache: [:],
+        local_ref_target_cache: [:],
         assign_index_sym: -1,
         assign_index_len: -1,
-        assign_starts: List.new(),
-        assign_stmts: List.new(),
-        local_value_use_cache: HashMap.new(),
-        place_kind_cache: HashMap.new(),
-        callee_hint_cache: HashMap.new(),
-        fat_thunk_syms: List.new(),
-        fat_thunk_tids: List.new(),
-        fat_thunk_keys: HashMap.new(),
+        assign_starts: [],
+        assign_stmts: [],
+        local_value_use_cache: [:],
+        place_kind_cache: [:],
+        callee_hint_cache: [:],
+        fat_thunk_syms: [],
+        fat_thunk_tids: [],
+        fat_thunk_keys: [:],
         callee_is_str_builtin_ref: 0,
-        global_init_syms: List.new(),
-        global_init_decl_indices: List.new(),
-        global_init_fn_syms: List.new(),
-        call_lends: List.new(),
-        closure_syms: List.new(),
-        closure_parents: List.new(),
-        closure_nodes: List.new(),
-        closure_in_loop: List.new(),
-        closure_env_kinds: List.new(),
-        closure_index_by_sym: HashMap.new(),
-        glue_done: HashMap.new(),
-        glue_protos: List.new(),
-        glue_defs: List.new(),
-        drop_body_by_owner: HashMap.new(),
+        global_init_syms: [],
+        global_init_decl_indices: [],
+        global_init_fn_syms: [],
+        call_lends: [],
+        closure_syms: [],
+        closure_parents: [],
+        closure_nodes: [],
+        closure_in_loop: [],
+        closure_env_kinds: [],
+        closure_index_by_sym: [:],
+        glue_done: [:],
+        glue_protos: [],
+        glue_defs: [],
+        drop_body_by_owner: [:],
         drop_receivers_ready: false,
         hold_active: false,
         hold_pre: "",
-        hold_texts: HashMap.new(),
+        hold_texts: [:],
         hold_counter: 0,
-        extern_link_names: HashMap.new(),
+        extern_link_names: [:],
     }
     for i in 0..cg.mir_mod.body_fn_syms.len():
         let sym: i32 = cg.mir_mod.body_fn_syms[i]
@@ -5181,7 +5181,7 @@ fn CReach.new(n: isize) -> CReach:
     for _ in 0..n:
         marked.push(false)
         done.push(false)
-    CReach { by_name: HashMap.new(), marked, done, waiting: 0 }
+    CReach { by_name: [:], marked, done, waiting: 0 }
 
 impl CReach:
     mut fn name(c_name: str, body: i32): self.by_name.insert(c_name, body)
@@ -9194,7 +9194,7 @@ impl CCodegen:
             let ret_tid = self.call_return_tid(body, bb, d0, d1, d2)
             if callee == "/*unresolved_call*/" or callee == "/*ambiguous_call*/" or callee == "/*ambiguous_method*/":
                 return "    abort();"
-            self.call_lends = List.new()
+            self.call_lends = []
             var args = if self.callee_is_str_builtin_ref != 0: self.builtin_method_ref_args_text(body, d1) else: self.call_args_text(body, d1, d0)
             // #1817 (array_out_param): the leading arguments in the one
             // order every signature declares them — the fat pair's context
@@ -9242,7 +9242,7 @@ type CollectStructTypes {
 }
 
 fn CollectStructTypes.new -> CollectStructTypes:
-    CollectStructTypes { out: List.new(), seen_names: HashMap.new(), seen_c_names: HashMap.new() }
+    CollectStructTypes { out: [], seen_names: [:], seen_c_names: [:] }
 
 type CollectFnTypes {
     out: List[i32],
@@ -9251,7 +9251,7 @@ type CollectFnTypes {
 }
 
 fn CollectFnTypes.new -> CollectFnTypes:
-    CollectFnTypes { out: List.new(), seen_names: HashMap.new(), seen_types: HashMap.new() }
+    CollectFnTypes { out: [], seen_names: [:], seen_types: [:] }
 
 impl CCodegen:
     mut fn collect_struct_types_from_tid(acc: CollectStructTypes, tid: i32) -> CollectStructTypes:
@@ -11886,7 +11886,7 @@ impl CCodegen:
     mut fn begin_holds():
         self.hold_active = true
         self.hold_pre = ""
-        self.hold_texts = HashMap.new()
+        self.hold_texts = [:]
 
 // ── Map keys (§11.7, D96, #2180) ─────────────────────────────────────
 //

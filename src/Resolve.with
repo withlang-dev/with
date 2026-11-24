@@ -138,13 +138,13 @@ type ResolveResult {
 
 fn ResolveResult.init -> ResolveResult:
     ResolveResult {
-        modules: List.new(),
-        imports: List.new(),
-        defs: List.new(),
-        scopes: List.new(),
-        bindings: List.new(),
-        uses: List.new(),
-        link_libs: List.new(),
+        modules: [],
+        imports: [],
+        defs: [],
+        scopes: [],
+        bindings: [],
+        uses: [],
+        link_libs: [],
     }
 
 type ResolveArtifacts {
@@ -289,15 +289,15 @@ fn ResolveState.init(pool: &InternPool, diags: DiagnosticList, emit_resolve_diag
         result: ResolveResult.init(),
         module_paths: resolve_new_list_str(),
         module_dirs: resolve_new_list_str(),
-        module_file_ids: List.new(),
-        module_decl_counts: List.new(),
-        module_import_starts: List.new(),
-        module_import_counts: List.new(),
-        module_scope_ids: List.new(),
-        module_processed: List.new(),
-        module_map: HashMap.new(),
-        link_lib_set: HashMap.new(),
-        binding_map: HashMap.new(),
+        module_file_ids: [],
+        module_decl_counts: [],
+        module_import_starts: [],
+        module_import_counts: [],
+        module_scope_ids: [],
+        module_processed: [],
+        module_map: [:],
+        link_lib_set: [:],
+        binding_map: [:],
         root_source_dir: ".",
         next_file_id: 1,
         emit_resolve_diags,
@@ -1952,7 +1952,7 @@ fn dump_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str) -> 
 // extern rules. A path with some other `src` directory in it is not one
 // (#2613): a user project's `src/main.with`, or a checkout kept under `~/src`,
 // whose `tools/with-sha256.with` was judged compiler source by its `/src/`.
-var resolve_compiler_root_memo: HashMap[str, bool] = HashMap.new()
+var resolve_compiler_root_memo: HashMap[str, bool] = [:]
 
 fn resolve_dir_is_compiler_checkout(dir: &str) -> bool:
     if resolve_compiler_root_memo.contains(dir):

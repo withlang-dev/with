@@ -82,7 +82,7 @@ fn host_lib_push_trusted(dirs: List[str], root: &str, arch: &str) -> List[str]:
 
 /// The loader's trusted directories that exist under `root` ("" for the
 /// running host): where the C library itself lives, whatever the layout.
-fn host_library_trusted_dirs(root: &str, arch: &str): host_lib_push_trusted(List.new(), root, arch)
+fn host_library_trusted_dirs(root: &str, arch: &str): host_lib_push_trusted([], root, arch)
 
 /// The directories a link searches for a library the program names, in
 /// order, each existing once. `root` is "" for the running host, else a

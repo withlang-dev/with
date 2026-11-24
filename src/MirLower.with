@@ -355,87 +355,87 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
     let entry = body.new_block()
     MirBuilder {
         body,
-        anonymous_bodies: List.new(),
+        anonymous_bodies: [],
         cur_bb: entry,
-        drop_local_ids: List.new(),
-        drop_kinds: List.new(),
-        drop_scope_starts: List.new(),
-        moved_value_local_ids: List.new(),
-        moved_field_base_locals: List.new(),
-        moved_field_path_starts: List.new(),
-        moved_field_path_counts: List.new(),
-        moved_field_path_kinds: List.new(),
-        moved_field_path_syms: List.new(),
-        stmt_temp_locals: List.new(),
-        stmt_temp_drop_depths: List.new(),
-        stmt_temp_starts: List.new(),
-        pending_reset_locals: List.new(),
-        pending_reset_operands: List.new(),
-        pending_reset_temp_cancelled: List.new(),
-        pending_reset_stmt_marks: List.new(),
-        pending_reset_bb_marks: List.new(),
-        pending_reset_cur_bbs: List.new(),
-        stmt_frame_stmt_starts: List.new(),
-        stmt_frame_bb_starts: List.new(),
-        stmt_frame_cur_bbs: List.new(),
-        unwind_drop_stmt_ids: HashSet.new(),
-        stmt_reset_starts: List.new(),
-        stmt_reset_field_starts: List.new(),
-        stmt_reset_temp_starts: List.new(),
-        pending_reset_field_places: List.new(),
-        pending_reset_field_types: List.new(),
-        pending_payload_reset_places: List.new(),
-        pending_payload_reset_types: List.new(),
-        pending_payload_reset_blocks: List.new(),
-        pending_move_temp_locals: List.new(),
+        drop_local_ids: [],
+        drop_kinds: [],
+        drop_scope_starts: [],
+        moved_value_local_ids: [],
+        moved_field_base_locals: [],
+        moved_field_path_starts: [],
+        moved_field_path_counts: [],
+        moved_field_path_kinds: [],
+        moved_field_path_syms: [],
+        stmt_temp_locals: [],
+        stmt_temp_drop_depths: [],
+        stmt_temp_starts: [],
+        pending_reset_locals: [],
+        pending_reset_operands: [],
+        pending_reset_temp_cancelled: [],
+        pending_reset_stmt_marks: [],
+        pending_reset_bb_marks: [],
+        pending_reset_cur_bbs: [],
+        stmt_frame_stmt_starts: [],
+        stmt_frame_bb_starts: [],
+        stmt_frame_cur_bbs: [],
+        unwind_drop_stmt_ids: [],
+        stmt_reset_starts: [],
+        stmt_reset_field_starts: [],
+        stmt_reset_temp_starts: [],
+        pending_reset_field_places: [],
+        pending_reset_field_types: [],
+        pending_payload_reset_places: [],
+        pending_payload_reset_types: [],
+        pending_payload_reset_blocks: [],
+        pending_move_temp_locals: [],
         field_move_in_branch: 0,
         pattern_subject_observed: 0,
         never_call_node: 0,
         pattern_bind_mut: 0,
-        pattern_move_log: List.new(),
+        pattern_move_log: [],
         or_alt_nodes: [],
         or_alt_locals: [],
         or_alt_logs: [],
         or_alias_refs: [],
-        pattern_take_log: List.new(),
-        take_log_marks: List.new(),
-        with_cleanup_guard_locals: List.new(),
-        with_cleanup_payload_locals: List.new(),
-        with_cleanup_method_syms: List.new(),
-        with_cleanup_sigs: List.new(),
-        with_cleanup_mono_syms: List.new(),
-        bind_syms: List.new(),
+        pattern_take_log: [],
+        take_log_marks: [],
+        with_cleanup_guard_locals: [],
+        with_cleanup_payload_locals: [],
+        with_cleanup_method_syms: [],
+        with_cleanup_sigs: [],
+        with_cleanup_mono_syms: [],
+        bind_syms: [],
         global_proxy_syms: [],
         global_proxy_locals: [],
-        bind_local_ids: List.new(),
-        bind_scope_starts: List.new(),
-        alias_syms: List.new(),
-        alias_places: List.new(),
-        alias_types: List.new(),
-        alias_scope_starts: List.new(),
-        defer_nodes: List.new(),
-        defer_scope_starts: List.new(),
-        errdefer_nodes: List.new(),
-        errdefer_scope_starts: List.new(),
-        loop_continue_bbs: List.new(),
-        loop_break_bbs: List.new(),
-        loop_result_places: List.new(),
-        loop_break_drop_depths: List.new(),
-        loop_break_defer_depths: List.new(),
-        loop_break_scope_depths: List.new(),
-        loop_labels: List.new(),
-        loop_target_kinds: List.new(),
-        goto_label_syms: List.new(),
-        goto_label_bbs: List.new(),
-        goto_label_scope_depths: List.new(),
-        goto_label_drop_depths: List.new(),
-        goto_label_defer_depths: List.new(),
-        goto_label_defined: List.new(),
-        goto_label_jumped: List.new(),
+        bind_local_ids: [],
+        bind_scope_starts: [],
+        alias_syms: [],
+        alias_places: [],
+        alias_types: [],
+        alias_scope_starts: [],
+        defer_nodes: [],
+        defer_scope_starts: [],
+        errdefer_nodes: [],
+        errdefer_scope_starts: [],
+        loop_continue_bbs: [],
+        loop_break_bbs: [],
+        loop_result_places: [],
+        loop_break_drop_depths: [],
+        loop_break_defer_depths: [],
+        loop_break_scope_depths: [],
+        loop_labels: [],
+        loop_target_kinds: [],
+        goto_label_syms: [],
+        goto_label_bbs: [],
+        goto_label_scope_depths: [],
+        goto_label_drop_depths: [],
+        goto_label_defer_depths: [],
+        goto_label_defined: [],
+        goto_label_jumped: [],
         next_temp: 0,
         cur_node: 0,
         expected_type: 0,
-        untyped_override_nodes: List.new(),
+        untyped_override_nodes: [],
         untyped_override_type: 0,
         untyped_override_depth: 0,
         contextual_copy_raw_node: 0,
@@ -453,14 +453,14 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         gen_loop_flag_local: -1,
         gen_loop_ret_local: -1,
         gen_loop_ret_ty: 0,
-        gen_loop_exit_labels: List.new(),
-        gen_loop_exit_kinds: List.new(),
+        gen_loop_exit_labels: [],
+        gen_loop_exit_kinds: [],
         gen_loop_used_codes: 0,
-        regex_capture_pat_nodes: List.new(),
-        regex_capture_opt_places: List.new(),
+        regex_capture_pat_nodes: [],
+        regex_capture_opt_places: [],
         last_if_result_view: 0,
         observing_str_read: 0,
-        no_suspend_nodes: List.new(),
+        no_suspend_nodes: [],
         sema,
         ast: ast.clone(),
         pool: pool.clone(),
@@ -3310,11 +3310,11 @@ impl MirBuilder:
         let saved_alias_syms = move self.alias_syms
         let saved_alias_places = move self.alias_places
         let saved_alias_types = move self.alias_types
-        self.bind_syms = List.new()
-        self.bind_local_ids = List.new()
-        self.alias_syms = List.new()
-        self.alias_places = List.new()
-        self.alias_types = List.new()
+        self.bind_syms = []
+        self.bind_local_ids = []
+        self.alias_syms = []
+        self.alias_places = []
+        self.alias_types = []
         let value = self.lower_call_arg(default_node, sig_idx, callable_fn_tid, param_idx)
         self.bind_syms = saved_bind_syms
         self.bind_local_ids = saved_bind_local_ids
@@ -4336,13 +4336,13 @@ impl MirBuilder:
     // D88 (§4.2.1): a use of a constant with no numeric type of its own is
     // its initializer, lowered at the type Sema gave this use.
     mut fn lower_untyped_const_use(init: i32, use_ty: i32) -> i32:
-        let path = self.sema.untyped_const_value_path(init, List.new())
+        let path = self.sema.untyped_const_value_path(init, [])
         for n in path: self.untyped_override_nodes.push(n)
         self.untyped_override_type = use_ty
         self.untyped_override_depth = self.untyped_override_depth + 1
         let op = self.lower_expr(init)
         self.untyped_override_depth = self.untyped_override_depth - 1
-        if self.untyped_override_depth == 0: self.untyped_override_nodes = List.new()
+        if self.untyped_override_depth == 0: self.untyped_override_nodes = []
         op
 
     mut fn lower_var(sym: i32, type_id: i32, node_id: i32) -> i32:
@@ -12286,8 +12286,8 @@ impl MirBuilder:
                 let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                 if field_pat != 0:
                     let inner = self.lower_pattern(field_pat, child_place)
-                    for i in 0..inner.len():
-                        out.push(inner[i])
+                    for inner_item in inner:
+                        out.push(inner_item)
                 else:
                     let bind_ty = self.place_local_type(child_place)
                     let local_id = self.body.new_local(bind_ty, self.pattern_bind_mut, field_name, 1)
@@ -18970,7 +18970,7 @@ fn cow_compute_reachable_and_preds(body: &MirBody) -> (List[i32], List[List[i32]
     let preds: List[List[i32]] = []
     for _ in 0..bb_count:
         reachable.push(0)
-        preds.push(List.new())
+        preds.push([])
     if bb_count == 0:
         return (reachable, preds)
     let work: List[i32] = [0]
@@ -19109,7 +19109,7 @@ fn cow_natural_loop_for_header(body: &MirBody, reachable: &List[i32], preds: &Li
             if vis[b] != 0:
                 in_loop[b] = 1
     if not any_back:
-        return List.new()
+        return []
     in_loop
 
 fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
@@ -20256,8 +20256,8 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: &AstPool, pool: &InternPo
     let saved_subst_types = sema_clone_i32_list(sema.generic_subst_type_ids)
     let saved_named: List[i32] = []
     let saved_named_had: List[i32] = []
-    sema.generic_subst_param_syms = List.new()
-    sema.generic_subst_type_ids = List.new()
+    sema.generic_subst_param_syms = []
+    sema.generic_subst_type_ids = []
     for i in 0..subst_count:
         let sym = subst_syms[i]
         let tid = subst_types[i]

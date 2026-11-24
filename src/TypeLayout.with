@@ -383,7 +383,7 @@ impl Sema:
             let name_sym: i32 = self.type_extra[pos]
             let payload_count: i32 = self.type_extra[(pos + 1)]
             if payload_count > 0:
-                let payload_types: List[i32] = if generic: self.resolve_generic_enum_payload(resolved as i32, self.get_generic_inst_base(resolved as i32), name_sym, payload_count) else: List.new()
+                let payload_types: List[i32] = if generic: self.resolve_generic_enum_payload(resolved as i32, self.get_generic_inst_base(resolved as i32), name_sym, payload_count) else: []
                 var payload_size: i64 = 0
                 var payload_align: i64 = 1
                 for pi in 0..payload_count:

@@ -3187,9 +3187,9 @@ impl Sema:
         // transform's, a lazily loaded module's) get slots; a body already
         // checked keeps its state, so re-preparing never checks it twice.
         let prior_state = move self.body_order_state
-        self.body_order_state = List.new()
-        self.body_order_lower = List.new()
-        self.body_typed_next = List.new()
+        self.body_order_state = []
+        self.body_order_lower = []
+        self.body_typed_next = []
         self.body_typed_decls = sema_new_map_i32_i32()
         for di in 0..count:
             let decl = self.ast.get_decl(di)
@@ -4131,7 +4131,7 @@ impl Sema:
     // global — the same diagnostic a view of the global itself gets.
     mut fn judge_placeholder_writes():
         let pending = move self.ret_view_placeholder_diags
-        self.ret_view_placeholder_diags = List.new()
+        self.ret_view_placeholder_diags = []
         // Popped from the back, then emitted front first.
         let kept: List[Diagnostic] = []
         var di = pending.len() - 1
@@ -6250,7 +6250,7 @@ impl Sema:
             return
         // §16.4 union last-written tracking is per-function-body.
         self.union_last_written = sema_new_map_i32_i32()
-        self.union_tracked_syms = List.new()
+        self.union_tracked_syms = []
         self.union_in_assign_target = 0
         let saved_body_file_id = self.local_file_id
         // #747 instance C: capture by move, not view. update_decl_source_context
@@ -6282,8 +6282,8 @@ impl Sema:
         let saved_unsafe_scope_used = move self.unsafe_scope_used
         let saved_unsafe_scope_nodes = move self.unsafe_scope_nodes
         self.in_unsafe = 0
-        self.unsafe_scope_used = List.new()
-        self.unsafe_scope_nodes = List.new()
+        self.unsafe_scope_used = []
+        self.unsafe_scope_nodes = []
         self.current_fn_may_alloc = 0
         self.current_fn_symbol = fn_name
         self.ceremony_fn_elem_syms = sema_new_map_i32_i32()   // #3061: this body's chosen element names; a nested body check saves and restores them
@@ -6312,17 +6312,17 @@ impl Sema:
         let saved_for_view_binding_syms = move self.for_view_binding_syms
         let saved_for_view_binding_depths = move self.for_view_binding_depths
         let saved_for_view_binding_gen_loops = move self.for_view_binding_gen_loops
-        self.borrow_kinds = List.new()
-        self.borrow_places = List.new()
-        self.borrow_fields = List.new()
-        self.borrow_refs = List.new()
-        self.borrow_path_starts = List.new()
-        self.borrow_path_counts = List.new()
-        self.borrow_scope_depths = List.new()
-        self.borrow_creation_nodes = List.new()
-        self.for_view_binding_syms = List.new()
-        self.for_view_binding_depths = List.new()
-        self.for_view_binding_gen_loops = List.new()
+        self.borrow_kinds = []
+        self.borrow_places = []
+        self.borrow_fields = []
+        self.borrow_refs = []
+        self.borrow_path_starts = []
+        self.borrow_path_counts = []
+        self.borrow_scope_depths = []
+        self.borrow_creation_nodes = []
+        self.for_view_binding_syms = []
+        self.for_view_binding_depths = []
+        self.for_view_binding_gen_loops = []
 
         // D184 (§29.15): a script helper sees the script's bindings as
         // captures: level-0 entries (never a local of the helper, so a
@@ -6939,8 +6939,8 @@ impl Sema:
         if impl_type_tid != 0:
             self.named_types.insert(self.syms.self_type, impl_type_tid)
         self.assoc_type_bindings = fresh_assoc
-        self.generic_subst_param_syms = List.new()
-        self.generic_subst_type_ids = List.new()
+        self.generic_subst_param_syms = []
+        self.generic_subst_type_ids = []
         self.install_trait_default_type_args(self.ast.get_data2(impl_node), impl_node, saved_subst_syms, saved_subst_tys)
         let impl_ex = self.ast.get_data1(impl_node)
         let impl_ac = self.ast.get_extra(impl_ex)
@@ -7074,19 +7074,19 @@ impl Sema:
         self.fn_label_order_counter = owned.order_counter
 
     mut fn reset_label_registry() -> Unit:
-        self.fn_label_syms = List.new()
-        self.fn_label_nodes = List.new()
-        self.fn_label_paths = List.new()
-        self.fn_label_orders = List.new()
-        self.fn_label_used = List.new()
-        self.fn_goto_syms = List.new()
-        self.fn_goto_nodes = List.new()
-        self.fn_goto_paths = List.new()
-        self.fn_goto_orders = List.new()
-        self.fn_init_nodes = List.new()
-        self.fn_init_paths = List.new()
-        self.fn_init_orders = List.new()
-        self.fn_label_scope_stack = List.new()
+        self.fn_label_syms = []
+        self.fn_label_nodes = []
+        self.fn_label_paths = []
+        self.fn_label_orders = []
+        self.fn_label_used = []
+        self.fn_goto_syms = []
+        self.fn_goto_nodes = []
+        self.fn_goto_paths = []
+        self.fn_goto_orders = []
+        self.fn_init_nodes = []
+        self.fn_init_paths = []
+        self.fn_init_orders = []
+        self.fn_label_scope_stack = []
         self.fn_label_next_scope_id = 1
         self.fn_label_order_counter = 0
         self.fn_label_scope_stack.push(1)
@@ -8255,29 +8255,29 @@ impl Sema:
             pending_soft_use_nodes: move self.pending_soft_use_nodes,
             pending_soft_debug_nodes: move self.pending_soft_debug_nodes,
         }
-        self.bind_names = List.new()
+        self.bind_names = []
         self.script_capture_indices = sema_new_map_i32_i32()
-        self.bind_types = List.new()
-        self.bind_muts = List.new()
-        self.bind_states = List.new()
-        self.bind_is_task = List.new()
-        self.bind_task_used = List.new()
-        self.bind_is_scoped_task = List.new()
-        self.bind_is_view_bound = List.new()
-        self.moved_field_base_syms = List.new()
-        self.moved_field_path_starts = List.new()
-        self.moved_field_path_counts = List.new()
-        self.moved_field_path_syms = List.new()
-        self.bind_provenance = List.new()
-        self.scope_starts = List.new()
+        self.bind_types = []
+        self.bind_muts = []
+        self.bind_states = []
+        self.bind_is_task = []
+        self.bind_task_used = []
+        self.bind_is_scoped_task = []
+        self.bind_is_view_bound = []
+        self.moved_field_base_syms = []
+        self.moved_field_path_starts = []
+        self.moved_field_path_counts = []
+        self.moved_field_path_syms = []
+        self.bind_provenance = []
+        self.scope_starts = []
         self.scope_starts.push(0)
         self.scope_name_map = SymTable { slots: [] }
-        self.pending_generic_binding_base = HashMap.new()
-        self.pending_generic_binding_call = HashMap.new()
-        self.pending_generic_binding_decl = HashMap.new()
-        self.pending_soft_use_syms = List.new()
-        self.pending_soft_use_nodes = List.new()
-        self.pending_soft_debug_nodes = List.new()
+        self.pending_generic_binding_base = [:]
+        self.pending_generic_binding_call = [:]
+        self.pending_generic_binding_decl = [:]
+        self.pending_soft_use_syms = []
+        self.pending_soft_use_nodes = []
+        self.pending_soft_debug_nodes = []
         let module_scope_len = if caller.scope_starts.len() > 1: caller.scope_starts[1] else: caller.bind_names.len()
         for gi in 0..module_scope_len:
             let gsym = caller.bind_names[gi]
@@ -8371,8 +8371,8 @@ impl Sema:
         let saved_generic_subst_type_ids = move self.generic_subst_type_ids
         let saved_types_frozen = self.types_frozen
         self.types_frozen = 0
-        self.generic_subst_param_syms = List.new()
-        self.generic_subst_type_ids = List.new()
+        self.generic_subst_param_syms = []
+        self.generic_subst_type_ids = []
 
         // Save named_types entries for type params and install concrete types
         let saved_named: List[i32] = []
@@ -15124,7 +15124,7 @@ type SemaImplTargetMatch {
 }
 
 fn sema_impl_target_no_match -> SemaImplTargetMatch:
-    SemaImplTargetMatch { 0, List.new(), List.new() }
+    SemaImplTargetMatch { 0, [], [] }
 
 impl Sema:
     mut fn impl_target_match(impl_node: i32, carrier_ty: i32) -> SemaImplTargetMatch:
@@ -18153,15 +18153,15 @@ impl Sema:
             out.push(self.get_type_d1(tid as TypeId))
             out.push(self.get_type_d2(tid as TypeId))
             let inner = self.literal_type_encode(self.get_type_d0(tid as TypeId))
-            if inner.len() == 0: return List.new()
+            if inner.len() == 0: return []
             for code in inner: out.push(code)
             return out
         else:
-            return List.new()
+            return []
         out.push(parts.len() as i32)
         for part in parts:
             let inner = self.literal_type_encode(part)
-            if inner.len() == 0: return List.new()
+            if inner.len() == 0: return []
             for code in inner: out.push(code)
         out
 
@@ -25468,7 +25468,7 @@ impl Sema:
                 all.push("_")
             return SemaPatMissing { missing: true, witness: all }
         if width == 0:
-            return SemaPatMissing { missing: false, witness: List.new() }
+            return SemaPatMissing { missing: false, witness: [] }
         let ty = self.exh_shape_type(tys[0])
         let cls = self.exh_class(ty)
         // Column 0's heads, one per or-alternative, and the row each came from.
@@ -25533,7 +25533,7 @@ impl Sema:
                         for ci in arity..sub_width:
                             w.push(sub.witness[ci])
                         return SemaPatMissing { missing: true, witness: w }
-                return SemaPatMissing { missing: false, witness: List.new() }
+                return SemaPatMissing { missing: false, witness: [] }
             let dflt = self.exh_default_rows(m, heads, origins, width)
             let sub = self.exh_missing(dflt, rest_tys)
             if not sub.missing:
@@ -25615,7 +25615,7 @@ impl Sema:
                 for ci in 0..sub.witness.len():
                     w.push(sub.witness[ci])
                 return SemaPatMissing { missing: true, witness: w }
-        SemaPatMissing { missing: false, witness: List.new() }
+        SemaPatMissing { missing: false, witness: [] }
 
     // The rows whose column-0 head is a catch-all, without that column.
     fn exh_default_rows(m: &SemaPatRows, heads: &List[i32], origins: &List[i32], width: isize) -> SemaPatRows:
@@ -25712,7 +25712,7 @@ impl Sema:
                 for ci in 0..sub.witness.len():
                     w.push(sub.witness[ci])
                 return SemaPatMissing { missing: true, witness: w }
-        SemaPatMissing { missing: false, witness: List.new() }
+        SemaPatMissing { missing: false, witness: [] }
 
     // A value of `subject_type` that no unguarded arm of the match
     // matches, or "" when the arms are exhaustive.
@@ -25941,10 +25941,10 @@ type ErrorConversionChain {
 }
 
 fn error_conversion_chain_not_found -> ErrorConversionChain:
-    ErrorConversionChain { 0, 0, 0, 0, List.new(), List.new() }
+    ErrorConversionChain { 0, 0, 0, 0, [], [] }
 
 fn error_conversion_chain_empty -> ErrorConversionChain:
-    ErrorConversionChain { 1, 0, 0, 0, List.new(), List.new() }
+    ErrorConversionChain { 1, 0, 0, 0, [], [] }
 
 impl Sema:
     fn error_conversion_type_matches(left: i32, right: i32) -> bool:
@@ -34722,7 +34722,7 @@ impl Sema:
 // List parameter would consume them (pre-#691 handle-copy aliasing is gone).
 type ConcreteSubst { names: List[i32], types: List[i32] }
 
-fn ConcreteSubst.init() -> ConcreteSubst: ConcreteSubst { names: List.new(), types: List.new() }
+fn ConcreteSubst.init() -> ConcreteSubst: ConcreteSubst { names: [], types: [] }
 
 impl ConcreteSubst:
     mut fn push(sym: i32, tid: i32):
@@ -39158,7 +39158,7 @@ impl Sema:
                 let recv_args: List[i32] = []
                 for ai in 0..arg_count:
                     recv_args.push(self.ast.get_extra(extra_start + ai))
-                self.check_call_activation(List.new(), expr, recv_args, node)
+                self.check_call_activation([], expr, recv_args, node)
 
         // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
         if mc_is_static_enum_variant:

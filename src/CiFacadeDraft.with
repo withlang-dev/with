@@ -1706,7 +1706,7 @@ impl CiProject:
         // D198: which records have identity, before any parameter is judged.
         self.fd_draw_identity_records()
         let modeled = self.fd_modeled_records()
-        self.presented = List.new()
+        self.presented = []
         var text = "// Facade draft for " ++ name ++ ", proven from the package's own source (§16.2b.15, D121).\n// Every clause records its proof; a project may override any single fact.\n"
         // §16.2b.15: the roles the registry states for function-pointer
         // fields; a proof below that says "a fresh allocation" or "frees"

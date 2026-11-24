@@ -33,7 +33,7 @@ type GirFacts {
     pub drops: List[str],
 }
 
-fn GirFacts.new() -> GirFacts: GirFacts { fns: List.new(), drops: List.new() }
+fn GirFacts.new() -> GirFacts: GirFacts { fns: [], drops: [] }
 
 impl GirFacts:
     /// The facts for the C function named `c_name`, or "".

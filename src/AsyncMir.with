@@ -44,15 +44,15 @@ fn AsyncMirBody.init(fn_sym: i32, flavor: i32) -> AsyncMirBody:
         fn_sym,
         flavor,
         state_count: 1,
-        suspend_kinds: List.new(),
-        suspend_span_starts: List.new(),
-        suspend_span_ends: List.new(),
-        suspend_resume_bbs: List.new(),
-        suspend_state_from: List.new(),
-        suspend_state_to: List.new(),
-        suspend_live_locals: List.new(),
-        suspend_storage_dead: List.new(),
-        suspend_drop_counts: List.new(),
+        suspend_kinds: [],
+        suspend_span_starts: [],
+        suspend_span_ends: [],
+        suspend_resume_bbs: [],
+        suspend_state_from: [],
+        suspend_state_to: [],
+        suspend_live_locals: [],
+        suspend_storage_dead: [],
+        suspend_drop_counts: [],
     }
 
 impl AsyncMirBody:
@@ -82,8 +82,8 @@ impl AsyncMirBody:
 
 fn AsyncMirModule.init -> AsyncMirModule:
     AsyncMirModule {
-        bodies: List.new(),
-        body_fn_syms: List.new(),
+        bodies: [],
+        body_fn_syms: [],
     }
 
 // No-op: reserved for future manual memory management.

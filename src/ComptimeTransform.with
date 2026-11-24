@@ -3594,7 +3594,7 @@ impl Sema:
             let owner = if out.kind(decl) == NodeKind.NK_IMPL_DECL: decl as i32 else: ct_enclosing_impl(out, impl_decls, decl as i32)
             transform_sema.ct_type_param_syms = ct_type_params_in_scope(out, owner, decl as i32)
             transform_sema.ct_transform_decl(out, intern, decl as i32)
-            transform_sema.ct_type_param_syms = List.new()
+            transform_sema.ct_type_param_syms = []
         self.diags = move transform_sema.diags
         self.merge_tracked_inputs(transform_sema.tracked_input_paths)
         out

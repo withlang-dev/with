@@ -661,7 +661,7 @@ impl Codegen:
         // The save above moves the map out (blank handle); the body reads it
         // via sema_type_of_node, so a fresh map must be installed like every
         // other saved container (the _ext twin already does).
-        self.local_sema_types = HashMap.new()
+        self.local_sema_types = [:]
         self.scope_local_syms = fresh_scope_syms
         self.scope_local_allocas = fresh_scope_allocas
         self.scope_local_types = fresh_scope_types
@@ -708,15 +708,15 @@ impl Codegen:
         // its facts (see emit_module_runtime_init_fn).
         let saved_mir_indirect_locals = move self.mir_indirect_value_local_types
         let saved_mir_ref_capture_locals = move self.mir_ref_capture_local_types
-        self.mir_indirect_value_local_types = HashMap.new()
-        self.mir_ref_capture_local_types = HashMap.new()
+        self.mir_indirect_value_local_types = [:]
+        self.mir_ref_capture_local_types = [:]
         let dtm_fresh_mir_locals: HashMap[i32, i64, Minted] = [:]
         let dtm_fresh_mir_types: HashMap[i32, i64, Minted] = [:]
         let dtm_fresh_mir_bbs: List[i64] = []
         let dtm_fresh_mir_unr: List[i64] = []
         self.mir_local_ptrs = dtm_fresh_mir_locals
         self.mir_local_types = dtm_fresh_mir_types
-        self.mir_memory_locals = HashMap.new()
+        self.mir_memory_locals = [:]
         self.mir_bb_values = dtm_fresh_mir_bbs
         self.mir_default_unreachable_bbs = dtm_fresh_mir_unr
 
@@ -1559,7 +1559,7 @@ impl Codegen:
         self.scope_local_count = 0
         self.defer_stack = fresh_defer_stack
         self.errdefer_stack = fresh_errdefer_stack
-        self.local_sema_types = HashMap.new()
+        self.local_sema_types = [:]
         self.expected_type = ret_ty
         self.expected_type_node = 0
         self.current_result_err_symbol = 0
@@ -1585,14 +1585,14 @@ impl Codegen:
         // been read through the address it does not hold.
         let saved_mir_indirect_locals = move self.mir_indirect_value_local_types
         let saved_mir_ref_capture_locals = move self.mir_ref_capture_local_types
-        self.mir_indirect_value_local_types = HashMap.new()
-        self.mir_ref_capture_local_types = HashMap.new()
-        self.mir_local_ptrs = HashMap.new()
-        self.mir_local_values = HashMap.new()
-        self.mir_memory_locals = HashMap.new()
-        self.mir_local_types = HashMap.new()
-        self.mir_bb_values = List.new()
-        self.mir_default_unreachable_bbs = List.new()
+        self.mir_indirect_value_local_types = [:]
+        self.mir_ref_capture_local_types = [:]
+        self.mir_local_ptrs = [:]
+        self.mir_local_values = [:]
+        self.mir_memory_locals = [:]
+        self.mir_local_types = [:]
+        self.mir_bb_values = []
+        self.mir_default_unreachable_bbs = []
 
         let init_sym = self.intern.intern(init_name)
         // This function is declared with a direct value return (no sret param),

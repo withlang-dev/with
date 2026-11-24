@@ -1722,8 +1722,8 @@ impl Sema:
         // Instead, accumulate edges directly. For each field type, call
         // collect_value_type_deps which pushes to self.cycle_dep_syms/nodes,
         // then read them back.
-        self.cycle_dep_syms = List.new()
-        self.cycle_dep_nodes = List.new()
+        self.cycle_dep_syms = []
+        self.cycle_dep_nodes = []
 
         // Phase 1: collect all edges. Each edge is 3 consecutive entries:
         // cycle_dep_syms: [from_sym, to_sym, from_sym, to_sym, ...]
@@ -3019,8 +3019,8 @@ impl Sema:
         let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
         let saved_subst_syms = move self.generic_subst_param_syms
         let saved_subst_tys = move self.generic_subst_type_ids
-        self.generic_subst_param_syms = List.new()
-        self.generic_subst_type_ids = List.new()
+        self.generic_subst_param_syms = []
+        self.generic_subst_type_ids = []
         if impl_type_tid != 0:
             self.named_types.insert(self.syms.self_type, impl_type_tid)
         self.install_trait_default_type_args(trait_sym, impl_node, saved_subst_syms, saved_subst_tys)

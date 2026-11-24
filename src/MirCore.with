@@ -420,34 +420,34 @@ impl Copy for MirCallableClass
 
 fn MirModule.init -> MirModule:
     MirModule {
-        bodies: List.new(),
-        body_fn_syms: List.new(),
-        body_index_by_fn_sym: HashMap.new(),
-        global_init_body_syms: HashMap.new(),
-        unreached_fns: HashMap.new(),
-        sema_type_kinds: List.new(),
-        sema_type_d0: List.new(),
-        sema_type_d1: List.new(),
-        sema_type_d2: List.new(),
-        sema_type_extra: List.new(),
-        sema_bitpacked_types: HashMap.new(),
-        sema_disc_repr_types: HashMap.new(),
-        sema_distinct_type_names: HashMap.new(),
-        sema_c_void_like_types: HashMap.new(),
+        bodies: [],
+        body_fn_syms: [],
+        body_index_by_fn_sym: [:],
+        global_init_body_syms: [:],
+        unreached_fns: [:],
+        sema_type_kinds: [],
+        sema_type_d0: [],
+        sema_type_d1: [],
+        sema_type_d2: [],
+        sema_type_extra: [],
+        sema_bitpacked_types: [:],
+        sema_disc_repr_types: [:],
+        sema_distinct_type_names: [:],
+        sema_c_void_like_types: [:],
         sema_box_sym: 0,
         sema_option_sym: 0,
         sema_result_sym: 0,
         sema_task_sym: 0,
         sema_scoped_task_sym: 0,
-        sema_moved_drop_types: HashMap.new(),
-        sema_dropped_types: HashMap.new(),
-        sema_storage_dead_drop_types: HashMap.new(),
-        sema_non_copy_fill_types: HashMap.new(),
-        sema_uninstantiated_generic_types: HashMap.new(),
-        sema_callable_syms: HashMap.new(),
-        sema_sig_param_starts: HashMap.new(),
-        sema_sig_param_data: List.new(),
-        sema_never_returning_syms: HashMap.new(),
+        sema_moved_drop_types: [:],
+        sema_dropped_types: [:],
+        sema_storage_dead_drop_types: [:],
+        sema_non_copy_fill_types: [:],
+        sema_uninstantiated_generic_types: [:],
+        sema_callable_syms: [:],
+        sema_sig_param_starts: [:],
+        sema_sig_param_data: [],
+        sema_never_returning_syms: [:],
     }
 
 impl MirModule:
@@ -533,89 +533,89 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         lowering_failed: 0,
         anonymous_type: 0,
         anonymous_capture_count: 0,
-        anonymous_capture_sources: List.new(),
-        anonymous_capture_kinds: List.new(),
-        local_type_ids: List.new(),
-        local_mutables: List.new(),
-        local_names: List.new(),
-        local_is_user_var: List.new(),
-        local_is_global: List.new(),
-        local_is_caller_place: List.new(),
-        owned_cleanup_locals: List.new(),
+        anonymous_capture_sources: [],
+        anonymous_capture_kinds: [],
+        local_type_ids: [],
+        local_mutables: [],
+        local_names: [],
+        local_is_user_var: [],
+        local_is_global: [],
+        local_is_caller_place: [],
+        owned_cleanup_locals: [],
         consumed_match_subjects: [],
         n_params: 0,
-        mutual_tail_bbs: List.new(),
-        bb_stmt_starts: List.new(),
-        bb_stmt_counts: List.new(),
-        bb_term_kinds: List.new(),
-        bb_term_d0: List.new(),
-        bb_term_d1: List.new(),
-        bb_term_d2: List.new(),
-        bb_term_d3: List.new(),
-        bb_is_cleanup: List.new(),
-        bb_term_spans: List.new(),
-        bb_no_suspend_nodes: List.new(),
-        stmt_kinds: List.new(),
-        stmt_d0: List.new(),
-        stmt_d1: List.new(),
-        stmt_spans: List.new(),
-        place_locals: List.new(),
-        place_sema_types: List.new(),
-        place_proj_starts: List.new(),
-        place_proj_counts: List.new(),
-        proj_kinds: List.new(),
-        proj_d0: List.new(),
-        proj_decl: List.new(),
-        rval_kinds: List.new(),
-        rval_d0: List.new(),
-        rval_d1: List.new(),
-        rval_d2: List.new(),
-        operand_kinds: List.new(),
-        operand_d0: List.new(),
-        const_kinds: List.new(),
-        const_d0: List.new(),
-        const_d1: List.new(),
-        const_d2: List.new(),
-        const_types: List.new(),
-        switch_table_starts: List.new(),
-        switch_table_counts: List.new(),
-        switch_table_vals: List.new(),
-        switch_table_targets: List.new(),
-        agg_field_starts: List.new(),
-        agg_field_counts: List.new(),
-        agg_field_operands: List.new(),
-        agg_field_name_syms: List.new(),
-        call_arg_starts: List.new(),
-        call_arg_counts: List.new(),
-        call_arg_operands: List.new(),
-        call_intrinsic_kinds: List.new(),
-        operand_holds: HashMap.new(),
-        stack_literal_calls: HashMap.new(),
-        static_const_locals: HashMap.new(),
-        call_math_fn_ids: List.new(),
-        call_ast_nodes: List.new(),
-        call_sig_indices: List.new(),
-        call_mono_syms: List.new(),
-        call_contract_required: List.new(),
-        unwritten_at_return_bbs: List.new(),
-        unwritten_at_return_locals: List.new(),
-        call_pipeline_receiver_places: List.new(),
-        call_machinery_dispatch: List.new(),
-        elided_call_nodes: List.new(),
-        field_place_nodes: List.new(),
-        field_place_places: List.new(),
-        field_place_bases: List.new(),
-        let_binding_nodes: List.new(),
-        expr_operand_nodes: List.new(),
-        expr_operand_sema_types: List.new(),
-        expr_operand_mir_types: List.new(),
-        let_binding_aliases: List.new(),
-        let_binding_places: List.new(),
-        index_place_nodes: List.new(),
-        index_place_places: List.new(),
-        index_place_bases: List.new(),
+        mutual_tail_bbs: [],
+        bb_stmt_starts: [],
+        bb_stmt_counts: [],
+        bb_term_kinds: [],
+        bb_term_d0: [],
+        bb_term_d1: [],
+        bb_term_d2: [],
+        bb_term_d3: [],
+        bb_is_cleanup: [],
+        bb_term_spans: [],
+        bb_no_suspend_nodes: [],
+        stmt_kinds: [],
+        stmt_d0: [],
+        stmt_d1: [],
+        stmt_spans: [],
+        place_locals: [],
+        place_sema_types: [],
+        place_proj_starts: [],
+        place_proj_counts: [],
+        proj_kinds: [],
+        proj_d0: [],
+        proj_decl: [],
+        rval_kinds: [],
+        rval_d0: [],
+        rval_d1: [],
+        rval_d2: [],
+        operand_kinds: [],
+        operand_d0: [],
+        const_kinds: [],
+        const_d0: [],
+        const_d1: [],
+        const_d2: [],
+        const_types: [],
+        switch_table_starts: [],
+        switch_table_counts: [],
+        switch_table_vals: [],
+        switch_table_targets: [],
+        agg_field_starts: [],
+        agg_field_counts: [],
+        agg_field_operands: [],
+        agg_field_name_syms: [],
+        call_arg_starts: [],
+        call_arg_counts: [],
+        call_arg_operands: [],
+        call_intrinsic_kinds: [],
+        operand_holds: [:],
+        stack_literal_calls: [:],
+        static_const_locals: [:],
+        call_math_fn_ids: [],
+        call_ast_nodes: [],
+        call_sig_indices: [],
+        call_mono_syms: [],
+        call_contract_required: [],
+        unwritten_at_return_bbs: [],
+        unwritten_at_return_locals: [],
+        call_pipeline_receiver_places: [],
+        call_machinery_dispatch: [],
+        elided_call_nodes: [],
+        field_place_nodes: [],
+        field_place_places: [],
+        field_place_bases: [],
+        let_binding_nodes: [],
+        expr_operand_nodes: [],
+        expr_operand_sema_types: [],
+        expr_operand_mir_types: [],
+        let_binding_aliases: [],
+        let_binding_places: [],
+        index_place_nodes: [],
+        index_place_places: [],
+        index_place_bases: [],
         instance_sym: 0,
-        ever_moved_locals: List.new(),
+        ever_moved_locals: [],
     }
 
     // Local 0 is always the return place.
@@ -1344,7 +1344,7 @@ fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
         fill[base] = slot + 1
     let key_count = names.len() as i32
     let chunk = if key_count >= MIR_DROP_STATE_CHUNK: MIR_DROP_STATE_CHUNK else if key_count > 0: key_count else: 1
-    MirDropStateKeys { names, owned_cleanup, base_local, child_starts, children, place_key, index, chunk, chunk_data: List.new(), chunk_heads: HashMap.new(), chunk_next: List.new(), chunk_joins: HashMap.new() }
+    MirDropStateKeys { names, owned_cleanup, base_local, child_starts, children, place_key, index, chunk, chunk_data: [], chunk_heads: [:], chunk_next: [], chunk_joins: [:] }
 
 // One chunk ref per chunk of keys: `id >= 0` is a stored chunk of the key
 // table, `-(slot + 1)` a chunk private to this map in `own`. The first write
@@ -1627,7 +1627,7 @@ fn mir_drop_state_name(state: i32) -> str:
 // Memoized: "_{local_id}" is a pure function of local_id (body-independent), so
 // cache it globally to avoid reconstructing the same key string on every body.
 // Pure memo of a deterministic function → no effect on compiler output/fixpoint.
-var mir_local_key_cache: List[str] = List.new()
+var mir_local_key_cache: List[str] = []
 var mir_local_key_cache_lock: Atomic[i32]
 
 fn mir_drop_state_local_key(local_id: i32) -> str:
@@ -1872,7 +1872,7 @@ impl MirDropStateBlocks:
         let base = bb * self.width()
         for c in 0..self.width():
             refs.push(self.rows[base + c])
-        MirDropStateMap { refs, own: List.new() }
+        MirDropStateMap { refs, own: [] }
 
     // Whether `bb` has an input this sweep: the entry block always does; any
     // other block needs at least one computed predecessor. Feeding an
@@ -1937,7 +1937,7 @@ impl MirDropStateBlocks:
     // The input state of `bb` (see load_input), sharing the stored chunks.
     mut fn input(bb: i32) -> MirDropStateMap:
         self.load_input(bb)
-        MirDropStateMap { refs: self.scratch.refs.clone(), own: List.new() }
+        MirDropStateMap { refs: self.scratch.refs.clone(), own: [] }
 
     // Recompute the out-state of `bb` in `scratch`; store it and return true
     // when it differs from the stored one (or none was stored yet).
@@ -2026,7 +2026,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
             let slot: i32 = fill[s]
             preds[slot] = bb
             fill[s] = slot + 1
-    let scratch = MirDropStateMap { refs: entry.clone(), own: List.new() }
+    let scratch = MirDropStateMap { refs: entry.clone(), own: [] }
     let switch_key_starts = []
     let switch_keys = []
     let switch_key_targets = []

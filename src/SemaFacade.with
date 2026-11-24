@@ -1139,7 +1139,7 @@ impl Sema:
         facades.push(self.current_facade_sym)
         let blocks: List[i32] = []
         blocks.push(self.current_facade_node)
-        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: List.new(), writers, any_writer })
+        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: [], writers, any_writer })
 
     // ── resources ────────────────────────────────────────────────────────
 
@@ -1155,7 +1155,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: List.new(), out_params: List.new(), init: 0, inits: [], init_ok: [], preinit: 0, drop: 0, destroyers: List.new(), ok_consts: List.new(), ok_node: 0, borrows: List.new(), borrows_owner: List.new(), borrows_nodes: List.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: [], out_params: [], init: 0, inits: [], init_ok: [], preinit: 0, drop: 0, destroyers: [], ok_consts: [], ok_node: 0, borrows: [], borrows_owner: [], borrows_nodes: [], last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, r, clause)
@@ -1457,7 +1457,7 @@ impl Sema:
                 return
             self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: List.new(), bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], field_buffer_reads: [], callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), value_records: [], value_record_words: [], text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: [], consumes_destroyed_by: [], retains: [], retains_by: [], returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: [], preserves_domains: [], of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: [], bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], field_buffer_reads: [], callback_userdata_cb: [], callback_userdata_of: [], valid_on_failed: 0, nullable_params: [], value_records: [], value_record_words: [], text_params: [], text_return_free: 0, bridged: 0, buffer_ptr: [], buffer_len: [], buffer_inout: [], buffer_elements: [], fixed_params: [], fixed_literals: [], ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: [], variadic_case_values: [], variadic_case_tids: [], variadic_case_kinds: [], variadic_slots: [], returns_borrow_record: 0, argv_cb: [], argv_index: [], argc_index: [], argv_handle: [], argv_nodes: [], user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -5065,7 +5065,7 @@ impl Sema:
         self.facade_call_effect_index.insert(sig, self.facade_call_effects.len() as i32)
         // D187: a presented call's second origin (`from params N, M`).
         let borrow_param2 = if borrow_param >= 0 and ci >= 0: self.foreign_contracts[ci].returns_borrow_from2 else: -1
-        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param, borrow_param2, param_sources: List.new() })
+        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param, borrow_param2, param_sources: [] })
 
     // The parameters of `fn_sym` (from `first`) that receive one modeled
     // resource and are not preserved by its fn item, as origin bits.

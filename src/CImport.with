@@ -19,18 +19,18 @@ use MathBuiltins
 use rt.rt_core
 
 
-var g_ci_realpath_cache_paths: List[str] = List.new()
-var g_ci_realpath_cache_values: List[str] = List.new()
+var g_ci_realpath_cache_paths: List[str] = []
+var g_ci_realpath_cache_values: List[str] = []
 var g_cimport_last_error: str = ""
 var g_cimport_warnings: str = ""
 var g_cimport_untranslated_macros: str = ""
-var g_cimport_omitted_symbol_names: List[str] = List.new()
-var g_cimport_omitted_symbol_reasons: List[str] = List.new()
+var g_cimport_omitted_symbol_names: List[str] = []
+var g_cimport_omitted_symbol_reasons: List[str] = []
 // §16.2: each omission also records a source location (when libclang gives
 // one) and a directional category: "raw-modelable" (ABI-expressible, usable
 // via a manual extern under unsafe) or "inexpressible" (no With representation).
-var g_cimport_omitted_symbol_locations: List[str] = List.new()
-var g_cimport_omitted_symbol_categories: List[str] = List.new()
+var g_cimport_omitted_symbol_locations: List[str] = []
+var g_cimport_omitted_symbol_categories: List[str] = []
 var g_cimport_included_files: str = ""
 var g_cimport_raw_function_names: str = ""
 // #1831: `|name|` for each declaration without a prototype this
@@ -44,7 +44,7 @@ var g_ci_migrating: bool = false
 fn ci_set_migrating(on: bool): g_ci_migrating = on
 // §16.2a no_methods opt-out. Set per-import before translation.
 var g_cimport_no_methods_all: i32 = 0
-var g_cimport_no_methods_types: List[str] = List.new()
+var g_cimport_no_methods_types: List[str] = []
 // #1753: the object-like macro constants ("|NAME|…") the earlier c_imports of
 // this compilation defined, and the ones the current translation defines. A
 // later header's constant of the same name is its own value, not a
@@ -98,7 +98,7 @@ fn ci_migrate_set_unsafe_function_body_context(enabled: bool) -> Unit:
 // translated): the function's With name ->
 // `record|method|out|out_ty|view|status|ret`. A call to one is printed as a
 // method call (lower_method_call_ir).
-var g_ci_migrate_method_shapes: HashMap[str, str] = HashMap.new()
+var g_ci_migrate_method_shapes: HashMap[str, str] = [:]
 
 fn ci_migrate_set_method_shapes(shapes: HashMap[str, str]):
     g_ci_migrate_method_shapes = shapes
@@ -164,7 +164,7 @@ fn ci_set_no_methods(all_flag: i32, types: List[str]):
 
 fn ci_clear_no_methods():
     g_cimport_no_methods_all = 0
-    g_cimport_no_methods_types = List.new()
+    g_cimport_no_methods_types = []
 
 // True when auto-method/constructor generation is suppressed for `name`.
 fn ci_no_methods_for_type(name: &str) -> bool:
@@ -417,10 +417,10 @@ fn c_import_untranslated_macros() -> str:
     g_cimport_untranslated_macros ++ ""
 
 fn c_import_omitted_symbols_clear():
-    g_cimport_omitted_symbol_names = List.new()
-    g_cimport_omitted_symbol_reasons = List.new()
-    g_cimport_omitted_symbol_locations = List.new()
-    g_cimport_omitted_symbol_categories = List.new()
+    g_cimport_omitted_symbol_names = []
+    g_cimport_omitted_symbol_reasons = []
+    g_cimport_omitted_symbol_locations = []
+    g_cimport_omitted_symbol_categories = []
     return
 
 fn c_import_omitted_symbols() -> str:
@@ -449,7 +449,7 @@ fn c_import_included_files() -> str:
 // preamble defines every width; a header import defines each one it names,
 // once, in its own translation — a name nothing defines is a dangling
 // reference, never emitted.
-var g_ci_overflow_helpers_needed: List[str] = List.new()
+var g_ci_overflow_helpers_needed: List[str] = []
 
 fn ci_note_overflow_helper_needed(helper: &str, op: &str, ty: &str):
     let entry = helper ++ "|" ++ op ++ "|" ++ ty
@@ -504,7 +504,7 @@ fn ci_render_overflow_helpers_needed() -> str:
             with_cimport_mark_name_emitted(shared)
             out = out ++ ci_migrate_render_u128_mul_would_overflow(shared)
         out = out ++ ci_migrate_render_overflow_helper_for(op, ty)
-    g_ci_overflow_helpers_needed = List.new()
+    g_ci_overflow_helpers_needed = []
     out
 
 fn ci_record_raw_function_name(name: &str):
@@ -751,7 +751,7 @@ fn ci_model_name(triple: &str) -> str:
 // function whose lowering changed between two migrations. One line per
 // site, `rule<TAB>function<TAB>detail`; a directory migration writes them
 // as `rules.tsv` beside its output (never promoted into a corpus).
-var g_ci_rule_sites: List[str] = List.new()
+var g_ci_rule_sites: List[str] = []
 var g_ci_rule_fn: str = ""
 
 fn ci_set_rule_fn(name: &str): g_ci_rule_fn = with_str_clone_ref(name)
@@ -767,7 +767,7 @@ fn ci_note_rule_for(fn_name: &str, rule: &str, detail: &str):
 fn ci_take_rule_sites() -> str:
     var out = ""
     for line in g_ci_rule_sites: out = out ++ line ++ "\n"
-    g_ci_rule_sites = List.new()
+    g_ci_rule_sites = []
     out
 
 fn ci_record_omitted_symbol_cat(name: &str, location: &str, category: &str, reason: &str):
@@ -974,7 +974,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
         return ""
     g_cimport_raw_function_names = ""
     g_cimport_unprototyped_names = ""
-    g_ci_overflow_helpers_needed = List.new()
+    g_ci_overflow_helpers_needed = []
     g_ci_libc_allocator_needed = ""
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
@@ -1088,7 +1088,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
     let macro_session = with_cimport_parse_macros(include_text, cxx)
     if macro_session != 0:
         g_migrate_macro_values = ci_collect_object_macro_values(macro_session)
-        g_migrate_macro_miss_names = HashMap.new()
+        g_migrate_macro_miss_names = [:]
 
     // Pre-scan: collect all opaque-demoted types (bitfield, forward decl, unsupported)
     // then cascade through field references until fixpoint
@@ -1154,8 +1154,8 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
     ci_fn_decl_index_reset()
     g_macro_type_names = ""
     g_macro_type_aliases = ""
-    g_migrate_macro_values = HashMap.new()
-    g_migrate_macro_miss_names = HashMap.new()
+    g_migrate_macro_values = [:]
+    g_migrate_macro_miss_names = [:]
 
     let rendered = output.to_str()
     ci_omitted_manifest_comments() ++ ci_unprototyped_manifest_comments() ++ rendered
@@ -1281,7 +1281,7 @@ const CI_NAME_TYPEDEF = 4          // a typedef, raw spelling
 const CI_NAME_STRUCT_DEF = 8       // a struct with a body, raw spelling
 const CI_NAME_UNION_DEF = 16       // a union with a body, raw spelling
 
-var g_ci_decl_name_flags: HashMap[str, i32] = HashMap.new()
+var g_ci_decl_name_flags: HashMap[str, i32] = [:]
 var g_ci_decl_name_index_session: i64 = 0
 var g_ci_decl_name_index_generation: i64 = 0
 
@@ -1660,7 +1660,7 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
     if ci_record_decl_directly_demoted_cursor(session, decl_cursor):
         return "type " ++ safe_synth ++ " = opaque\n"
 
-    let bit_plan = if ci_translate_in_migrate_mode() and ci_record_cursor_has_bitfield(session, decl_cursor): ci_bitfield_plan_cursor(session, decl_cursor, synth_name) else: CiBitPlan { units: List.new(), members: List.new(), refusal: "" }
+    let bit_plan = if ci_translate_in_migrate_mode() and ci_record_cursor_has_bitfield(session, decl_cursor): ci_bitfield_plan_cursor(session, decl_cursor, synth_name) else: CiBitPlan { units: [], members: [], refusal: "" }
     if bit_plan.refusal.len() > 0:
         g_ci_refused_records = g_ci_refused_records ++ "migrate: untranslatable record '" ++ synth_name ++ "': " ++ bit_plan.refusal ++ "\n"
         return "type " ++ safe_synth ++ " = opaque\n"
@@ -2791,8 +2791,8 @@ type CiBitUnit {
 }
 
 type CiBitPlan {
-    units: List[CiBitUnit] = List.new(),
-    members: List[CiBitMember] = List.new(),
+    units: List[CiBitUnit] = [],
+    members: List[CiBitMember] = [],
     refusal: str = "",
 }
 
@@ -2919,7 +2919,7 @@ fn ci_bitfield_abi_divergence_cursor(session: i64, decl_cursor: i32, field_curso
 // The storage-unit plan of `decl_cursor` (named `name`), or a plan whose
 // `refusal` says why there is none.
 fn ci_bitfield_plan_cursor(session: i64, decl_cursor: i32, name: &str) -> CiBitPlan:
-    let plan = CiBitPlan { units: List.new(), members: List.new(), refusal: "" }
+    let plan = CiBitPlan { units: [], members: [], refusal: "" }
     let field_cursors = ci_record_field_cursors(session, decl_cursor)
     for fi in 0..field_cursors.len():
         let field_cursor = field_cursors[fi]
@@ -3134,7 +3134,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     // `#pragma pack(N)` (§16.4, #1421): the cap alone places every field.
     let pack_cap = if is_really_packed or is_union: 0 else: ci_record_pack_cap(session, idx, field_count)
     // D147: a bitfield record's storage units; "" refusal means none.
-    let bit_plan = if ci_translate_in_migrate_mode() and ci_record_has_bitfields(session, idx): ci_bitfield_plan(session, idx) else: CiBitPlan { units: List.new(), members: List.new(), refusal: "" }
+    let bit_plan = if ci_translate_in_migrate_mode() and ci_record_has_bitfields(session, idx): ci_bitfield_plan(session, idx) else: CiBitPlan { units: [], members: [], refusal: "" }
     if bit_plan.refusal.len() > 0:
         g_ci_refused_records = g_ci_refused_records ++ "migrate: untranslatable record '" ++ name ++ "': " ++ bit_plan.refusal ++ "\n"
         return ""
@@ -4147,7 +4147,7 @@ fn ci_macro_value_delims_balanced(value: &str) -> bool:
 // it, probed by ONE parse on first use. A parse per macro is macros x header.
 type CiMacroProbes { opened: bool, session: i64, errors: str, order: HashMap[str, i32], decls: HashMap[str, i32] }
 
-fn CiMacroProbes.new(): CiMacroProbes { opened: false, session: 0, errors: "", order: HashMap.new(), decls: HashMap.new() }
+fn CiMacroProbes.new(): CiMacroProbes { opened: false, session: 0, errors: "", order: [:], decls: [:] }
 
 impl CiMacroProbes:
 
@@ -7335,28 +7335,28 @@ fn CiScope.new(return_type: &str) -> CiScope:
     let ptr = with_alloc(sizeof[CiScopeState]()) as *mut CiScopeState
     unsafe:
         *ptr = CiScopeState {
-            names: HashMap.new(),
-            types: HashMap.new(),
-            name_log_keys: List.new(),
-            name_log_values: List.new(),
-            name_log_had: List.new(),
-            type_log_keys: List.new(),
-            type_log_values: List.new(),
-            type_log_had: List.new(),
+            names: [:],
+            types: [:],
+            name_log_keys: [],
+            name_log_values: [],
+            name_log_had: [],
+            type_log_keys: [],
+            type_log_values: [],
+            type_log_had: [],
             return_type: with_str_clone_ref(return_type),
         }
     CiScope { ptr }
 
 fn CiScopeState.empty() -> CiScopeState:
     CiScopeState {
-        names: HashMap.new(),
-        types: HashMap.new(),
-        name_log_keys: List.new(),
-        name_log_values: List.new(),
-        name_log_had: List.new(),
-        type_log_keys: List.new(),
-        type_log_values: List.new(),
-        type_log_had: List.new(),
+        names: [:],
+        types: [:],
+        name_log_keys: [],
+        name_log_values: [],
+        name_log_had: [],
+        type_log_keys: [],
+        type_log_values: [],
+        type_log_had: [],
         return_type: "",
     }
 
@@ -9006,18 +9006,18 @@ fn ci_record_type_field_cxtype(session: i64, ty: i32, field_idx: i32) -> i32:
         return -1
     with_ci_cursor_type(session, field)
 
-var g_ci_record_count_cache_keys: List[str] = List.new()
-var g_ci_record_count_cache_values: List[i32] = List.new()
-var g_ci_record_field_cache_keys: List[str] = List.new()
-var g_ci_record_field_name_cache_values: List[str] = List.new()
-var g_ci_record_field_type_cache_values: List[str] = List.new()
+var g_ci_record_count_cache_keys: List[str] = []
+var g_ci_record_count_cache_values: List[i32] = []
+var g_ci_record_field_cache_keys: List[str] = []
+var g_ci_record_field_name_cache_values: List[str] = []
+var g_ci_record_field_type_cache_values: List[str] = []
 
 fn ci_record_field_caches_clear():
-    g_ci_record_count_cache_keys = List.new()
-    g_ci_record_count_cache_values = List.new()
-    g_ci_record_field_cache_keys = List.new()
-    g_ci_record_field_name_cache_values = List.new()
-    g_ci_record_field_type_cache_values = List.new()
+    g_ci_record_count_cache_keys = []
+    g_ci_record_count_cache_values = []
+    g_ci_record_field_cache_keys = []
+    g_ci_record_field_name_cache_values = []
+    g_ci_record_field_type_cache_values = []
 
 fn ci_record_cache_type_text(session: i64, ty_text: &str, ty: i32) -> str:
     if ty_text.len() > 0:
@@ -11240,8 +11240,8 @@ impl CiExprPool:
 // pass builds owned-copy name indexes; the maps rebuild on session change
 // and are cleared at migration teardown so a recycled session address can
 // never see a stale index.
-var g_ci_fn_decl_by_escaped: HashMap[str, i32] = HashMap.new()
-var g_ci_fn_decl_by_raw: HashMap[str, i32] = HashMap.new()
+var g_ci_fn_decl_by_escaped: HashMap[str, i32] = [:]
+var g_ci_fn_decl_by_raw: HashMap[str, i32] = [:]
 var g_ci_fn_decl_index_session: i64 = 0
 var g_ci_fn_decl_index_generation: i64 = 0
 
@@ -11268,11 +11268,11 @@ fn ci_fn_decl_index_ensure(session: i64):
     g_ci_fn_decl_index_generation = with_cimport_parse_generation()
 
 fn ci_fn_decl_index_reset:
-    g_ci_decl_name_flags = HashMap.new()
+    g_ci_decl_name_flags = [:]
     g_ci_decl_name_index_session = 0
     g_ci_decl_name_index_generation = 0
-    g_ci_fn_decl_by_escaped = HashMap.new()
-    g_ci_fn_decl_by_raw = HashMap.new()
+    g_ci_fn_decl_by_escaped = [:]
+    g_ci_fn_decl_by_raw = [:]
     g_ci_fn_decl_index_session = 0
     g_ci_fn_decl_index_generation = 0
     ci_record_index_reset()
@@ -11285,8 +11285,8 @@ fn ci_fn_decl_index_reset:
 // FIRST struct/union-with-fields and FIRST typedef per name, under raw and
 // escaped keys to reproduce ci_decl_name_matches_type; queries replay the
 // scan-order branch logic against those two decls only.
-var g_ci_record_struct_by_name: HashMap[str, i32] = HashMap.new()
-var g_ci_record_typedef_by_name: HashMap[str, i32] = HashMap.new()
+var g_ci_record_struct_by_name: HashMap[str, i32] = [:]
+var g_ci_record_typedef_by_name: HashMap[str, i32] = [:]
 var g_ci_record_index_session: i64 = 0
 var g_ci_record_index_generation: i64 = 0
 
@@ -11323,8 +11323,8 @@ fn ci_record_index_ensure(session: i64):
     g_ci_record_index_generation = with_cimport_parse_generation()
 
 fn ci_record_index_reset:
-    g_ci_record_struct_by_name = HashMap.new()
-    g_ci_record_typedef_by_name = HashMap.new()
+    g_ci_record_struct_by_name = [:]
+    g_ci_record_typedef_by_name = [:]
     g_ci_record_index_session = 0
     g_ci_record_index_generation = 0
 
@@ -15089,7 +15089,7 @@ fn ci_str_compare(a: &str, b: &str) -> i32:
 // what 750 did; windows.h timed the bzip2 and libcurl UATs out). Rebuilt on
 // session or parse-generation change like the #744 indexes below, and cleared
 // with them at migration teardown.
-var g_ci_decl_location_cursor: HashMap[str, i32] = HashMap.new()
+var g_ci_decl_location_cursor: HashMap[str, i32] = [:]
 var g_ci_decl_location_session: i64 = 0
 var g_ci_decl_location_generation: i64 = 0
 
@@ -15109,7 +15109,7 @@ fn ci_decl_location_index_ensure(session: i64):
     g_ci_decl_location_generation = with_cimport_parse_generation()
 
 fn ci_decl_location_index_reset:
-    g_ci_decl_location_cursor = HashMap.new()
+    g_ci_decl_location_cursor = [:]
     g_ci_decl_location_session = 0
     g_ci_decl_location_generation = 0
 
@@ -15456,8 +15456,8 @@ fn ci_goto_decl_suffix_from_location(loc: &str, fallback_id: i32) -> str:
 // names: declared beside the function (g_ci_body_hoisted_decls) under
 // `__static_<function>_<name>`, and the body's name for it maps there. Two
 // blocks of one function that each declare the name get two objects.
-var g_ci_static_local_by_cursor: HashMap[i32, str] = HashMap.new()
-var g_ci_static_local_by_name: HashMap[str, i32] = HashMap.new()
+var g_ci_static_local_by_cursor: HashMap[i32, str] = [:]
+var g_ci_static_local_by_name: HashMap[str, i32] = [:]
 
 fn ci_static_local_name(session: i64, var_cursor: i32) -> str:
     if g_ci_static_local_by_cursor.contains(var_cursor): return g_ci_static_local_by_cursor.get(var_cursor).unwrap()
@@ -15991,8 +15991,8 @@ var g_ci_body_hoisted_decls: str = ""
 // (hoist_init_list_element_setups): the element's cursor reads as that
 // temporary while the initializer is lowered. Parallel lists, scoped by
 // length.
-var g_ci_expr_substitution_cursors: List[i32] = List.new()
-var g_ci_expr_substitution_exprs: List[i32] = List.new()
+var g_ci_expr_substitution_cursors: List[i32] = []
+var g_ci_expr_substitution_exprs: List[i32] = []
 
 fn ci_expr_substitution_for(cursor: i32) -> i32:
     for i in 0..g_ci_expr_substitution_cursors.len():
@@ -16390,9 +16390,9 @@ fn ci_int_type_rank(t: &str) -> i32:
 // unsuffixed literal, a macro parameter) takes its context's type.
 //
 // The With type of each emitted integer macro constant, by C name.
-var g_ci_int_const_types: HashMap[str, str] = HashMap.new()
+var g_ci_int_const_types: HashMap[str, str] = [:]
 // The With type of each translated operator expression, by its text.
-var g_ci_translated_int_types: HashMap[str, str] = HashMap.new()
+var g_ci_translated_int_types: HashMap[str, str] = [:]
 
 fn ci_record_int_const_type(name: &str, ty: &str):
     if ci_c_int_type_width(ty) > 0:
@@ -18749,8 +18749,8 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, targ
 //  during D3 cleanup. Only globals used by shared CImport code remain
 //  here, along with the macro type globals that aren't migrate-specific.)
 
-var g_migrate_macro_values: HashMap[str, str] = HashMap.new()
-var g_migrate_macro_miss_names: HashMap[str, bool] = HashMap.new()
+var g_migrate_macro_values: HashMap[str, str] = [:]
+var g_migrate_macro_miss_names: HashMap[str, bool] = [:]
 var g_migrate_macro_session: i64 = 0
 // #348: raw source of the file being migrated; macro expansion happens
 // on demand via ci_expand_macros_in_text (no cc -E dump).
@@ -18764,8 +18764,8 @@ var g_macro_type_aliases: str = ""
 // memoization map keeps the assigned id stable per cursor so
 // re-entry returns the same name. Reset at the start of every
 // ci_migrate_translate_function call.
-var g_ci_temp_cursors: List[i32] = List.new()
-var g_ci_temp_ids: List[i32] = List.new()
+var g_ci_temp_cursors: List[i32] = []
+var g_ci_temp_ids: List[i32] = []
 var g_ci_temp_next: i32 = 0
 
 // Per-function var-name registry. The string holds `|name|`
@@ -18941,8 +18941,8 @@ fn ci_fn_var_names_unique(base: &str) -> str:
     base ++ "_99"
 
 fn ci_temp_reset():
-    g_ci_temp_cursors = List.new()
-    g_ci_temp_ids = List.new()
+    g_ci_temp_cursors = []
+    g_ci_temp_ids = []
     g_ci_temp_next = 0
     g_ci_fn_var_names = ""
 
@@ -18968,8 +18968,8 @@ fn ci_temp_id_for_cursor(cursor: i32) -> i32:
 // When the flag is off, ci_record_raw_{expr,stmt}_kind is a no-op
 // and the aggregators at end of migration never fire.
 var g_ci_raw_stats_enabled_cache: i32 = -1
-var g_ci_raw_expr_kinds: List[i32] = List.new()
-var g_ci_raw_stmt_kinds: List[i32] = List.new()
+var g_ci_raw_expr_kinds: List[i32] = []
+var g_ci_raw_stmt_kinds: List[i32] = []
 
 fn ci_raw_stats_enabled() -> bool:
     if g_ci_raw_stats_enabled_cache == -1:
@@ -20816,19 +20816,19 @@ fn ci_goto_cfg_new(entry_desc: &str) -> CiGotoCfgContext:
         *ptr = CiGotoCfgContextState {
             cfg: CiGotoCfg {
                 graph,
-                stmt_blocks: List.new(),
-                stmt_ids: List.new(),
-                noreturn_blocks: List.new(),
+                stmt_blocks: [],
+                stmt_ids: [],
+                noreturn_blocks: [],
             },
             current: entry,
             ok: true,
             message: "",
             location: "",
-            label_names: List.new(),
-            label_blocks: List.new(),
-            label_defined: List.new(),
-            break_targets: List.new(),
-            continue_targets: List.new(),
+            label_names: [],
+            label_blocks: [],
+            label_defined: [],
+            break_targets: [],
+            continue_targets: [],
             switch_cases: CiGotoSwitchCase { state: 0 as *mut CiGotoSwitchCaseState },
         }
     CiGotoCfgContext { state: ptr }
@@ -21267,8 +21267,8 @@ fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
     let ptr = with_alloc(sizeof[CiGotoSwitchCaseState]()) as *mut CiGotoSwitchCaseState
     unsafe:
         *ptr = CiGotoSwitchCaseState {
-            values: List.new(),
-            blocks: List.new(),
+            values: [],
+            blocks: [],
             has_default: false,
             default_block: -1,
         }
@@ -21647,7 +21647,7 @@ impl CiStackEmitContext:
             self.push_frame(CI_STACK_FRAME_BLOCK, label_sym)
             let body = self.children(tree, node.first_child_start, node.first_child_count, stmts, exprs, types)
             self.pop_frame()
-            let ids: List[i32] = if body != 0: ci_stmt_collect_flat_ids(stmts, body) else: List.new()
+            let ids: List[i32] = if body != 0: ci_stmt_collect_flat_ids(stmts, body) else: []
             let start = stmts.extra_len()
             var i: i64 = 0
             while i < ids.len():
@@ -21690,7 +21690,7 @@ impl CiStmtPool:
     fn stack_emit_tree(tree: &StackifyTree, cfg: CiGotoCfg, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
         let ctx = CiStackEmitContext {
             cfg,
-            frames: List.new(),
+            frames: [],
             ok: true,
             message: "",
         }
@@ -22200,11 +22200,11 @@ fn ci_generic_body(text: &str) -> str:
 // The canonical type key of typedef `name` in the session, "" when no
 // typedef declares it (a builtin spelling, a record tag). Cached: a format
 // selection names twenty types at every use.
-var g_ci_typedef_key_cache: HashMap[str, str] = HashMap.new()
+var g_ci_typedef_key_cache: HashMap[str, str] = [:]
 var g_ci_typedef_key_cache_session: i64 = 0
 fn ci_typedef_canonical_key(session: i64, name: &str) -> str:
     if g_ci_typedef_key_cache_session != session:
-        g_ci_typedef_key_cache = HashMap.new()
+        g_ci_typedef_key_cache = [:]
         g_ci_typedef_key_cache_session = session
     let cached = g_ci_typedef_key_cache.get(name)
     if cached.is_some(): return with_str_clone_ref(cached.unwrap())

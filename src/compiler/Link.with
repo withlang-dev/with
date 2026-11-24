@@ -48,12 +48,12 @@ type LinkStagePlan {
 fn link_stage_empty_command() -> LinkStageCommand:
     LinkStageCommand {
         linker: "",
-        args: List.new(),
+        args: [],
         cwd: "",
-        env: List.new(),
-        inputs: List.new(),
-        outputs: List.new(),
-        cleanup_files: List.new(),
+        env: [],
+        inputs: [],
+        outputs: [],
+        cleanup_files: [],
     }
 
 fn link_stage_result_fail() -> LinkStageResult:
@@ -660,7 +660,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
                 with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
             else:
                 with_eprint("error: link: no linux sysroot for " ++ target_spec_name() ++ " at " ++ link_stage_runtime_variant_dir() ++ "/sysroot (build the cross runtime, which puts it there), and WITH_LINUX_SYSROOT names none")
-            return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+            return LinkStageCommand { linker: "", args: [], cwd: "", env: [], inputs: [], outputs: [], cleanup_files: [] }
         return link_stage_make_linux_own_sysroot_command(llvm_ld, own, obj_path, bin_path, extras, link_libs, link_args, true)
     let args: List[str] = []
     let env: List[LinkStageEnvVar] = []
@@ -679,7 +679,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
             with_eprint("error: could not locate Linux " ++ link_stage_linux_arch() ++ " crt/linker files for direct ld.lld link")
         else:
             with_eprint("error: linking a Linux " ++ link_stage_linux_arch() ++ " binary from this host needs a Linux sysroot (crt1.o, libc, libgcc); set WITH_LINUX_SYSROOT=<dir>")
-        return LinkStageCommand { linker: "", args, cwd: "", env, inputs, outputs, cleanup_files: List.new() }
+        return LinkStageCommand { linker: "", args, cwd: "", env, inputs, outputs, cleanup_files: [] }
 
     args.push("-m")
     args.push(link_stage_linux_emulation())
@@ -1168,7 +1168,7 @@ fn link_stage_make_wasm_llvm_link_command(wasm_ld: &str, obj_path: &str, bin_pat
     for link_arg in link_args:
         args.push(with_str_clone_ref(link_arg))
     if wasm_host_emit(bin_path):
-        return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+        return LinkStageCommand { linker: "", args: [], cwd: "", env: [], inputs: [], outputs: [], cleanup_files: [] }
     outputs.push(wasm_host_js_path(bin_path))
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: with_str_clone_ref(wasm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
@@ -1205,22 +1205,22 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
             let elf_ld = link_stage_elf_lld_for(llvm_ld)
             if elf_ld.len() == 0:
                 with_eprint("error: cross link needs the ELF lld driver (ld.lld) next to " ++ llvm_ld)
-                return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+                return LinkStageCommand { linker: "", args: [], cwd: "", env: [], inputs: [], outputs: [], cleanup_files: [] }
             return link_stage_make_linux_llvm_link_command(elf_ld, obj_path, bin_path, extras, link_libs, link_args)
         if target_spec_active_kind() == 5 or target_spec_active_kind() == 6:
             let coff_ld = link_stage_coff_lld_for(llvm_ld)
             if coff_ld.len() == 0:
                 with_eprint("error: cross link needs the COFF lld driver (lld-link) next to " ++ llvm_ld)
-                return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+                return LinkStageCommand { linker: "", args: [], cwd: "", env: [], inputs: [], outputs: [], cleanup_files: [] }
             return link_stage_make_windows_llvm_link_command(coff_ld, link_stage_sdk_dir_of(coff_ld), obj_path, bin_path, extras, link_libs, link_args)
         if target_spec_is_wasm():
             let wasm_ld = link_stage_wasm_lld_for(llvm_ld)
             if wasm_ld.len() == 0:
                 with_eprint("error: cross link needs the WebAssembly lld driver (wasm-ld) next to " ++ llvm_ld)
-                return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+                return LinkStageCommand { linker: "", args: [], cwd: "", env: [], inputs: [], outputs: [], cleanup_files: [] }
             return link_stage_make_wasm_llvm_link_command(wasm_ld, obj_path, bin_path, extras, link_libs, link_args)
         with_eprint("error: unsupported cross link target: " ++ target_spec_name())
-        return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+        return LinkStageCommand { linker: "", args: [], cwd: "", env: [], inputs: [], outputs: [], cleanup_files: [] }
     let os = runtime_sysinfo_os()
     let arch = runtime_sysinfo_arch()
     if os == "Linux" and arch == "x86_64":
@@ -1234,7 +1234,7 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
     if os == "Windows" and (arch == "armv8" or arch == "aarch64"):
         return link_stage_make_windows_llvm_link_command(llvm_ld, link_stage_sdk_dir_of(llvm_ld), obj_path, bin_path, extras, link_libs, link_args)
     with_eprint("error: unsupported host LLVM linker platform: " ++ os ++ "/" ++ arch)
-    LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
+    LinkStageCommand { linker: "", args: [], cwd: "", env: [], inputs: [], outputs: [], cleanup_files: [] }
 
 fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
     if ptr as i64 == 0 or len <= 0:
@@ -1916,7 +1916,7 @@ fn LINK_BUNDLE_FAILED -> str: "<bundle-failed>"
 // Module prefixes of the bundles `--link-bundle` already put on the link
 // (Compilation.load_link_bundles): an embedded copy of the same modules
 // must not join too.
-var link_stage_explicit_bundle_prefixes: List[str] = List.new()
+var link_stage_explicit_bundle_prefixes: List[str] = []
 
 fn link_stage_add_explicit_bundle_prefixes(prefixes: &List[str]):
     for prefixe in prefixes:

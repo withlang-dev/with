@@ -331,24 +331,24 @@ fn ComptimeEvaluator.init(sema: Sema, ast: &AstPool, pool: &InternPool, require_
         sema,
         ast: ast.clone(),
         pool: pool.clone(),
-        slot_syms: List.new(),
-        slot_values: List.new(),
-        slot_muts: List.new(),
-        scope_starts: List.new(),
-        loop_labels: List.new(),
-        extra_values: List.new(),
-        active_global_syms: List.new(),
-        active_fn_syms: List.new(),
-        capability_records: List.new(),
+        slot_syms: [],
+        slot_values: [],
+        slot_muts: [],
+        scope_starts: [],
+        loop_labels: [],
+        extra_values: [],
+        active_global_syms: [],
+        active_fn_syms: [],
+        capability_records: [],
         decl_index_by_node,
-        workspace_records: List.new(),
+        workspace_records: [],
         current_workspace_id: -1,
         next_capability_generation: 1,
         steps: 0,
         step_budget: COMPTIME_STEP_LIMIT,
         string_bytes_allocated: 0,
         string_byte_budget: comptime_configured_string_budget(COMPTIME_STRING_BYTE_BUDGET),
-        builders: List.new(),
+        builders: [],
         source_text_cache_path: "",
         source_text_cache: "",
         recursion_limit: COMPTIME_RECURSION_LIMIT,
@@ -358,16 +358,16 @@ fn ComptimeEvaluator.init(sema: Sema, ast: &AstPool, pool: &InternPool, require_
         last_error_msg: "",
         runtime_exit_code: 0,
         runtime_stderr: "",
-        runtime_env_names: List.new(),
-        runtime_env_values: List.new(),
-        effect_records: List.new(),
-        tool_identity_paths: List.new(),
-        tool_identity_values: List.new(),
+        runtime_env_names: [],
+        runtime_env_values: [],
+        effect_records: [],
+        tool_identity_paths: [],
+        tool_identity_values: [],
         strict_effects: 0,
         pipeline_receiver_carrier_depth: 0,
-        body_fn_nodes: List.new(),
-        expected_types: List.new(),
-        pipeline_receiver_carrier_roots: HashMap.new(),
+        body_fn_nodes: [],
+        expected_types: [],
+        pipeline_receiver_carrier_roots: [:],
         last_call_has_mut_receiver: 0,
         last_call_mut_receiver: comptime_value_invalid(),
         suppress_toolfs_writes: 0,
@@ -1105,11 +1105,11 @@ fn comptime_glob_sort(items: &List[str]) -> List[str]:
 fn comptime_eval_result_invalid() -> ComptimeEvalResult:
     ComptimeEvalResult {
         value: comptime_value_invalid(),
-        extras: List.new(),
+        extras: [],
         error_msg: "",
         runtime_exit_code: 0,
         runtime_stderr: "",
-        effect_records: List.new(),
+        effect_records: [],
     }
 
 // Consumes the evaluator: this drains its owned state (extras, effect
@@ -1151,15 +1151,15 @@ fn comptime_capability_record(kind: i32, package_name: &str, package_version: &s
         project_root: with_str_clone_ref(project_root),
         workspace_id: -1,
         target_name: "",
-        inputs: List.new(),
-        outputs: List.new(),
-        args: List.new(),
-        write_scope: List.new(),
+        inputs: [],
+        outputs: [],
+        args: [],
+        write_scope: [],
         write_scoped: 0,
         scratch_path: "",
         timeout_ms: 0,
         cwd: "",
-        env: List.new(),
+        env: [],
         network: 0,
     }
 
@@ -2003,16 +2003,16 @@ impl ComptimeEvaluator:
     mut fn new_workspace_record(name: &str, node: i32) -> ComptimeWorkspaceRecord:
         ComptimeWorkspaceRecord {
             name: with_str_clone_ref(name),
-            files: List.new(),
-            string_names: List.new(),
-            string_sources: List.new(),
+            files: [],
+            string_names: [],
+            string_sources: [],
             options: self.default_build_options_value(node),
             migrate_options: self.default_migrate_options_value(node),
             intercept_active: 0,
             intercept_terminal: 0,
             generation: 0,
             intercept_phase: -1,
-            messages: List.new(),
+            messages: [],
             message_cursor: 0,
             intercept_started: 0,
             pending_link_active: 0,
@@ -3728,7 +3728,7 @@ impl ComptimeEvaluator:
 
         var fn_sym = self.sema.lookup_generic_method_fn(owner, method)
         var concrete_sig: i32 = -1
-        var type_args = ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
+        var type_args = ComptimeGenericResolvedArgs { ok: 1, tp_syms: [], tp_tys: [] }
         if fn_sym != 0:
             let ret_ty = self.sema.check_generic_method_call(owner, resolved_recv as i32, fn_sym, 0, recv_node, arg_types, extra_start, arg_count, node)
             let resolved_sig = self.sema.resolved_call_sigs.get(node)
@@ -4683,7 +4683,7 @@ impl ComptimeEvaluator:
         let env = self.link_command_env_field(value, node)
         let inputs = self.link_command_str_list_field(value, "inputs", node)
         let outputs = self.link_command_str_list_field(value, "outputs", node)
-        LinkStageCommand { linker, args, cwd, env, inputs, outputs, cleanup_files: List.new() }
+        LinkStageCommand { linker, args, cwd, env, inputs, outputs, cleanup_files: [] }
 
 fn link_command_outputs_superset(replacement: &LinkStageCommand, original: &LinkStageCommand) -> bool:
     for oi in 0..original.outputs.len():
@@ -4799,12 +4799,12 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
         absolute_output: "",
         output_kind: 0,
         has_strings: 0,
-        source_paths: List.new(),
-        source_texts: List.new(),
+        source_paths: [],
+        source_texts: [],
         absolute_source: "",
-        include_paths: List.new(),
-        defines: List.new(),
-        link_libs: List.new(),
+        include_paths: [],
+        defines: [],
+        link_libs: [],
         opt_level: 0,
         no_std: false,
         alloc_mode: false,
@@ -4815,9 +4815,9 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
         overflow_mode: -1,
         migrate_is_dir: 0,
         migrate_source: "",
-        migrate_include_paths: List.new(),
-        migrate_forced_includes: List.new(),
-        migrate_defines: List.new(),
+        migrate_include_paths: [],
+        migrate_forced_includes: [],
+        migrate_defines: [],
         migrate_exclude_basenames: "",
         migrate_no_c_export: false,
         migrate_c_export_functions: false,
@@ -4911,12 +4911,12 @@ impl ComptimeEvaluator:
                 absolute_output: absolute_migrate_output,
                 output_kind: 0,
                 has_strings: 0,
-                source_paths: List.new(),
-                source_texts: List.new(),
+                source_paths: [],
+                source_texts: [],
                 absolute_source: "",
-                include_paths: List.new(),
-                defines: List.new(),
-                link_libs: List.new(),
+                include_paths: [],
+                defines: [],
+                link_libs: [],
                 opt_level: 0,
                 no_std: false,
                 alloc_mode: false,
@@ -5010,9 +5010,9 @@ impl ComptimeEvaluator:
             overflow_mode: self.workspace_i32_option(options, "overflow_mode", -1),
             migrate_is_dir: 0,
             migrate_source: "",
-            migrate_include_paths: List.new(),
-            migrate_forced_includes: List.new(),
-            migrate_defines: List.new(),
+            migrate_include_paths: [],
+            migrate_forced_includes: [],
+            migrate_defines: [],
             migrate_exclude_basenames: "",
             migrate_no_c_export: false,
             migrate_c_export_functions: false,
@@ -6403,7 +6403,7 @@ impl ComptimeEvaluator:
                 if record.intercept_phase == 3:
                     record.generation = record.generation + 1
                     record.intercept_phase = -1
-                    record.messages = List.new()
+                    record.messages = []
                     record.message_cursor = 0
                     record.intercept_started = 0
                     record.pending_link_active = 0
@@ -6448,7 +6448,7 @@ impl ComptimeEvaluator:
             if record.generation <= 0:
                 record.generation = 1
             record.intercept_phase = -1
-            record.messages = List.new()
+            record.messages = []
             record.message_cursor = 0
             self.store_workspace_record(workspace_id, record)
             return comptime_control_value(comptime_value_void(0))
@@ -7887,7 +7887,7 @@ impl ComptimeEvaluator:
     // expression once per binding of its clauses that passes the filter, in
     // clause order. The result is the collection Sema typed the node as.
     mut fn eval_array_comprehension(node: i32) -> ComptimeControl:
-        let start_state = ComptimeComprehension { signal: comptime_control_value(comptime_value_void(self.sema.ty_void as i32)), elems: List.new() }
+        let start_state = ComptimeComprehension { signal: comptime_control_value(comptime_value_void(self.sema.ty_void as i32)), elems: [] }
         var done = self.eval_comprehension_clause(node, 0, start_state)
         if done.signal.kind != ComptimeControlKind.CTL_VALUE:
             return move done.signal
@@ -8009,8 +8009,8 @@ impl ComptimeEvaluator:
         let snapshot_tp_syms: List[i32] = []
         let saved_subst_syms = move self.sema.generic_subst_param_syms
         let saved_subst_tys = move self.sema.generic_subst_type_ids
-        self.sema.generic_subst_param_syms = List.new()
-        self.sema.generic_subst_type_ids = List.new()
+        self.sema.generic_subst_param_syms = []
+        self.sema.generic_subst_type_ids = []
         for i in 0..tp_syms.len():
             let tp_sym = tp_syms[i]
             snapshot_tp_syms.push(tp_sym)
@@ -8464,10 +8464,10 @@ impl ComptimeEvaluator:
     mut fn inferred_generic_type_args(fn_sym: i32, arg_values: &List[ComptimeValue], node: i32) -> ComptimeGenericResolvedArgs:
         let fn_node = self.find_fn_decl_node(fn_sym)
         if fn_node == 0:
-            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
+            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: [], tp_tys: [] }
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0 or self.ast.fn_meta_tp_count(meta) == 0:
-            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
+            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: [], tp_tys: [] }
         var concrete_sig: i32 = -1
         let recorded = self.sema.resolved_call_sigs.get(node)
         if recorded.is_some():
@@ -8485,7 +8485,7 @@ impl ComptimeEvaluator:
                 concrete_sig = checked.unwrap()
         if concrete_sig < 0:
             self.fail(node, "generic comptime function '" ++ self.pool.resolve(fn_sym) ++ "' has no type arguments inferred for this call")
-            return ComptimeGenericResolvedArgs { ok: 0, tp_syms: List.new(), tp_tys: List.new() }
+            return ComptimeGenericResolvedArgs { ok: 0, tp_syms: [], tp_tys: [] }
         self.concrete_method_comptime_type_args(fn_sym, concrete_sig, node)
 
     mut fn eval_fn_symbol_call_values_with_resolved_type_args(fn_sym: i32, arg_values: &List[ComptimeValue], node: i32, tp_syms: &List[i32], tp_tys: &List[i32]) -> ComptimeControl:
@@ -8628,11 +8628,11 @@ impl ComptimeEvaluator:
                 self.install_generic_substitutions(tp_syms, tp_tys, node)
             else:
                 ComptimeGenericSubstSnapshot {
-                    tp_syms: List.new(),
-                    saved_named_had: List.new(),
-                    saved_named_tys: List.new(),
-                    saved_subst_syms: List.new(),
-                    saved_subst_tys: List.new(),
+                    tp_syms: [],
+                    saved_named_had: [],
+                    saved_named_tys: [],
+                    saved_subst_syms: [],
+                    saved_subst_tys: [],
                 }
         // #679: same-file calls (the hot case in interpreted loops) skip the
         // context switch — decl_path clones a str per call otherwise.

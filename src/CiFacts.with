@@ -158,7 +158,7 @@ fn facts_read_file(path: &str) -> Result[Facts, str]:
     facts_read(path, source)
 
 fn facts_read(path: &str, source: str) -> Result[Facts, str]:
-    let facts = Facts { package: "", entries: List.new(), utf8_cite: "", threads_cite: "", value_text: "", value_fns: [], value_resources: [], field_roles: [], settings: [] }
+    let facts = Facts { package: "", entries: [], utf8_cite: "", threads_cite: "", value_text: "", value_fns: [], value_resources: [], field_roles: [], settings: [] }
     var in_value = false
     var current_fn = ""
     var in_resource = false

@@ -1090,7 +1090,7 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
 // translator) takes the record and refuses the declaration loudly. The
 // placeholder text is what a reader sees only if that refusal is missing;
 // it once reached a generated corpus with exit status 0.
-var g_ci_print_unknowns: List[str] = List.new()
+var g_ci_print_unknowns: List[str] = []
 
 fn ci_print_note_unknown(detail: &str):
     g_ci_print_unknowns.push(detail)

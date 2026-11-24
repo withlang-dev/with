@@ -212,11 +212,11 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_callconv: 0,
         pending_stack_size: 0,
         pending_target: 0,
-        pending_effect_params: List.new(),
-        pending_effect_bits: List.new(),
+        pending_effect_params: [],
+        pending_effect_bits: [],
         pending_compiler_hook_phase: 0,
-        pending_comptime_with_names: List.new(),
-        pending_comptime_with_types: List.new(),
+        pending_comptime_with_names: [],
+        pending_comptime_with_types: [],
         pending_receiver_mode: 0,
         free_fn_params: false,
         synth_recv_type: 0,
@@ -232,11 +232,11 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         last_where_count: 0,
         if_chain_form: 0,
         suppress_fat_arrow_closure: 0,
-        pending_post_decls: List.new(),
+        pending_post_decls: [],
         implicit_main_mode: 0,
         implicit_main_has_main_hint: false,
         implicit_main_has_exec_stmt: false,
-        top_level_stmts: List.new(),
+        top_level_stmts: [],
         explicit_main_decl: 0,
         module_label: "",
         interface_mode: 0,
@@ -771,8 +771,8 @@ impl Parser:
         self.pending_callconv = 0
         self.pending_stack_size = 0
         self.pending_target = 0
-        self.pending_effect_params = List.new()
-        self.pending_effect_bits = List.new()
+        self.pending_effect_params = []
+        self.pending_effect_bits = []
         self.pending_iter_of_self = 0
         self.pending_compiler_hook_phase = 0
         let derive_syms: List[i32] = []
@@ -1084,7 +1084,7 @@ impl Parser:
 
     mut fn parse_module() -> AstPool:
         self.skip_separators()
-        self.top_level_stmts = List.new()
+        self.top_level_stmts = []
         self.explicit_main_decl = 0
 
         // The optional module declaration: its last segment is the module's
@@ -1384,7 +1384,7 @@ impl Parser:
             self.parse_top_level_item()
         if not taken:
             self.pool.truncate_decls(decl_start)
-            self.pending_post_decls = List.new()
+            self.pending_post_decls = []
             self.explicit_main_decl = main_before
             while self.top_level_stmts.len() > stmts_before: self.top_level_stmts.pop()
 
@@ -1393,8 +1393,8 @@ impl Parser:
     mut fn attach_pending_effect_pins(fn_node: NodeId):
         for i in 0..self.pending_effect_params.len():
             self.pool.add_fn_effect_pin(fn_node, self.pending_effect_params[i], self.pending_effect_bits[i])
-        self.pending_effect_params = List.new()
-        self.pending_effect_bits = List.new()
+        self.pending_effect_params = []
+        self.pending_effect_bits = []
 
     // §21.1 rule 1 (D39, Eric 2026-09-29): `writes COUNTER, other.TOTAL`,
     // a function's declared global write set — a checked contract, the same
@@ -1497,8 +1497,8 @@ impl Parser:
            t != TokenKind.TK_KW_FN and t != TokenKind.TK_KW_UNSAFE and t != TokenKind.TK_KW_COMPTIME and
            t != TokenKind.TK_KW_ASYNC and t != TokenKind.TK_KW_GEN and t != TokenKind.TK_KW_EXTERN:
             self.emit_error("effect attribute can only be used on functions and extern functions")
-            self.pending_effect_params = List.new()
-            self.pending_effect_bits = List.new()
+            self.pending_effect_params = []
+            self.pending_effect_bits = []
         if t == TokenKind.TK_KW_FN:
             return self.parse_fn_decl(is_pub, start, 0, 0, 0)
         if t == TokenKind.TK_KW_UNSAFE:
@@ -1599,8 +1599,8 @@ impl Parser:
         false
 
     mut fn clear_pending_comptime_with_params():
-        self.pending_comptime_with_names = List.new()
-        self.pending_comptime_with_types = List.new()
+        self.pending_comptime_with_names = []
+        self.pending_comptime_with_types = []
 
     mut fn parse_comptime_with_clause() -> i32:
         if self.expect(TokenKind.TK_KW_WITH) == 0:
@@ -1663,7 +1663,7 @@ impl Parser:
     mut fn flush_pending_post_decls():
         for i in 0..self.pending_post_decls.len():
             self.pool.add_decl((self.pending_post_decls[i]) as NodeId)
-        self.pending_post_decls = List.new()
+        self.pending_post_decls = []
 
     mut fn mark_decl_comptime(decl: NodeId):
         if decl == 0:
@@ -1928,8 +1928,8 @@ impl Parser:
             let ev_type = self.parse_type_expr()
             if self.pending_effect_params.len() > 0:
                 self.emit_error("effect attribute can only be used on functions and extern functions")
-                self.pending_effect_params = List.new()
-                self.pending_effect_bits = List.new()
+                self.pending_effect_params = []
+                self.pending_effect_bits = []
             // d2: bit 0 mutable (`extern var`), bit 1 thread-local.
             let ev_node = self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut + 2 * self.pending_threadlocal)
             self.pending_threadlocal = 0
