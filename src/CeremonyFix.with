@@ -207,6 +207,57 @@ fn cf_len_cast_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too:
     notes.push(f"fix-ceremony: {demanded + setting} length cast(s): {demanded} demanded by a declaration, {setting} that set a width nothing asks for")
     notes
 
+// Numbered constants (#3061, item 8): module-level bindings in a row whose
+// names share their first word and whose values count up by one. A closed
+// set of kinds is an enum, and the enum needs a name only a person can
+// give, so this is reported and never rewritten. One line per run of three
+// or more.
+fn cf_numbered_const_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[str]:
+    let notes = []
+    let texts: HashMap[str, str] = [:]
+    var run_path = ""
+    var run_prefix = ""
+    var run_first = ""
+    var run_last = ""
+    var run_node = 0
+    var run_len = 0
+    var prev: i64 = -2
+    for di in 0..pool.decl_count() + 1:
+        var path = ""
+        var name = ""
+        var value: i64 = -2
+        var node = 0
+        if di < pool.decl_count():
+            node = pool.get_decl(di) as i32
+            let init = if pool.kind(node as NodeId) == NodeKind.NK_LET_DECL: pool.get_data1(node as NodeId) else: 0
+            if init != 0 and pool.kind(init as NodeId) == NodeKind.NK_INT_LIT:
+                path = sema.decl_source_path_for_index(di as i32)
+                name = sema.pool_resolve(pool.get_data0(node as NodeId))
+                value = pool.int_lit_value(init as NodeId)
+        let cut = name.find("_")
+        let prefix = if cut > 0: name.slice(0, cut + 1) else: ""
+        let continues = run_len > 0 and prefix.len() > 0 and path == run_path and prefix == run_prefix and value == prev + 1
+        if continues:
+            run_len = run_len + 1
+            run_last = name
+        else:
+            // The line is read from the file only for a run that is reported:
+            // a declaration of the embedded standard library has no file here.
+            if run_len >= 3 and cf_rewritable(run_path, excludes, std_too):
+                if not texts.contains(run_path): texts.insert(with_str_clone_ref(run_path), with_fs_read_file(run_path))
+                let run_line = cf_line_of(texts.get(run_path).unwrap(), pool.get_start(run_node as NodeId))
+                notes.push(f"{run_path}:{run_line}: {run_len} numbered constants `{run_first}` .. `{run_last}`: a closed set of kinds is an enum; it needs a name (reported, never rewritten)")
+            run_len = 0
+            if prefix.len() > 0:
+                run_path = path
+                run_prefix = prefix
+                run_first = name
+                run_last = name
+                run_node = node
+                run_len = 1
+        prev = value
+    notes
+
 // Apply a file's edits from the end back, so earlier offsets stay valid.
 fn cf_rewrite(text: &str, edits: &List[CeremonyEdit]) -> str:
     let order = [i for i in 0..edits.len()]
@@ -223,6 +274,8 @@ fn cf_rewrite(text: &str, edits: &List[CeremonyEdit]) -> str:
         let e = &edits[i]
         out = out.slice(0, e.start) ++ e.replacement ++ out.slice(e.end, out.len())
     out
+
+fn cf_usage() -> str: "usage: with fix-ceremony [--report|--apply] [--std] [--exclude path ...] [--check-with compiler] <entry.with>\n  --report      list every rewrite Sema proves safe, by file and line (the default)\n  --apply       write them; a file that no longer checks is restored\n  --std         rewrite lib/std too (never a migrated corpus)\n  --exclude p   leave files under p alone\n  --check-with c  re-check with compiler c after applying\nrewrites: a redundant binding annotation, a `var` never rebound, a widening cast, `List.new()` where a literal is typed by use, an index loop over one list, `.clone()` on a str, `&x` at a `&T` parameter, `Some(x)` where an Option is demanded"
 
 fn run_ceremony_fix() -> i32:
     let argv = args()
@@ -242,10 +295,18 @@ fn run_ceremony_fix() -> i32:
         else if argv[i] == "--exclude" and i + 1 < argv.len():
             i = i + 1
             excludes.push(argv[i])
+        else if argv[i] == "--help" or argv[i] == "-h":
+            print(cf_usage())
+            return 0
+        // An option this command does not have is not the entry file: it was
+        // read as one ("cannot open '--help'").
+        else if argv[i].starts_with("-"):
+            eprint(f"fix-ceremony: no option `{argv[i]}`\n" ++ cf_usage())
+            return 2
         else: entry = argv[i]
         i = i + 1
     if entry.len() == 0:
-        print("usage: with fix-ceremony [--report|--apply] [--exclude path ...] [--check-with compiler] <entry.with>")
+        print(cf_usage())
         return 2
     let comp = Compilation.init()
     let pool = comp.compile_entry_file(entry)
@@ -263,6 +324,7 @@ fn run_ceremony_fix() -> i32:
     print(f"fix-ceremony: {edits.len()} rewrite(s) in {paths.len()} file(s)")
     if not apply:
         for note in cf_len_cast_notes(comp.zcu.last_sema, pool, excludes, std_too): print(note)
+        for note in cf_numbered_const_notes(comp.zcu.last_sema, pool, excludes, std_too): print(note)
     if not apply or edits.len() == 0: return 0
     let originals: HashMap[str, str] = [:]
     for path in paths:
