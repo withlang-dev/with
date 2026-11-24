@@ -49,3 +49,5 @@ lib/std/build.with	fn set_link_command ( command : LinkCommand ) -> Unit	a stub 
 lib/std/sync.with	fn call_once ( init : fn ( ) -> Unit ) -> Unit	an effect: the body is a `while true` left only by return, which has no Unit tail of its own (#727 moved it into an impl block)
 lib/std/sync.with	fn notify_one ( ) -> Unit	an effect: the body ends in fetch_add, whose previous count is discarded; without -> Unit D43 would return it (#727)
 lib/std/sync.with	fn notify_all ( ) -> Unit	an effect: the body ends in fetch_add, whose previous count is discarded; without -> Unit D43 would return it (#727)
+lib/std/alloc.with	fn reset_to ( mark : i64 ) -> Unit	an effect: the body ends in the assignment `self.capacity = 0`, whose value D43 would return (measured: without it `let u: Unit = a.reset_to(0)` is a type mismatch) (#727 moved it into an impl block)
+lib/std/alloc.with	fn reset ( ) -> Unit	an effect: three of the four bodies end in an assignment (`self.offset = 0`, `self.allocations = 0`, `*self.head = 0`), whose value D43 would return (#727)

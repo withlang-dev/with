@@ -411,9 +411,9 @@ pub fn Condvar.new() -> Condvar:
     (unsafe *state).signals = 0
     Condvar { ptr: state as *mut u8 }
 
-impl[T] Condvar[T]:
+impl Condvar:
     @[suspends]
-    pub fn wait(lock: &Mutex[T]):
+    pub fn wait[T](lock: &Mutex[T]):
         let state = self.ptr as *mut CondvarState
         let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
         let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
@@ -429,7 +429,6 @@ impl[T] Condvar[T]:
         (unsafe *waiters).fetch_sub(1, .AcqRel)
         unsafe { sync_mutex_lock_state(lock.ptr as *mut MutexState) }
 
-impl Condvar:
     pub fn notify_one() -> Unit:
         let state = self.ptr as *mut CondvarState
         let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]

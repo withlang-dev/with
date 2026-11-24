@@ -4098,6 +4098,16 @@ impl Parser:
             if m_gen != 0:
                 flags = flags + FnFlags.GEN
             if m_comptime: flags = flags + FnFlags.COMPTIME
+            // The attributes above a method are the method's, as above a
+            // function. They were read and dropped here: `@[suspends]` on an
+            // impl-block method stated nothing, and a `no_suspend` block
+            // accepted the call (#727 found it moving std.sync's methods
+            // into impl blocks).
+            if self.pending_tailrec != 0: flags = flags + FnFlags.TAILREC
+            if self.pending_suspends != 0: flags = flags + FnFlags.SUSPENDS
+            if self.pending_must_use != 0: flags = flags + FnFlags.MUST_USE
+            if self.pending_inline != 0: flags = flags + FnFlags.INLINE
+            if self.pending_noinline != 0: flags = flags + FnFlags.NOINLINE
 
             var final_method_body = body
             if m_unsafe != 0:
@@ -4110,6 +4120,9 @@ impl Parser:
             // left pending and attached to the next function declared
             // outside the block.
             self.attach_pending_effect_pins(fn_node)
+            if self.pending_no_alloc != 0:
+                self.pool.mark_no_alloc_fn(fn_node)
+                self.pending_no_alloc = 0
             self.attach_global_writes(fn_node, method_global_writes)
             self.attach_view_origins(fn_node, method_view_origins)
             if self.pending_iter_of_self != 0:

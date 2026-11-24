@@ -169,7 +169,7 @@ impl Arena:
             return 0
         block_index * alloc_mark_unit() + self.offset as i64
 
-    pub mut fn reset_to(mark: i64):
+    pub mut fn reset_to(mark: i64) -> Unit:
         let block_index = mark / alloc_mark_unit()
         let mark_offset = (mark - block_index * alloc_mark_unit()) as i32
         let n = self.blocks.len()
@@ -202,7 +202,7 @@ impl Arena:
         self.reset_to(mark)
 
 impl FrameArena:
-    pub mut fn reset():
+    pub mut fn reset() -> Unit:
         if self.blocks.len() == 0:
             return
         let first: i64 = self.blocks[0]
@@ -263,7 +263,7 @@ impl ArenaScope:
         self.allocations = self.allocations + 1
         ptr
 
-    pub mut fn reset():
+    pub mut fn reset() -> Unit:
         self.arena.reset_to(self.mark)
         self.allocations = 0
 
@@ -294,7 +294,7 @@ impl TempArena:
     pub fn alloc_zeroed(count: i32, size: i32) -> *i8:
         unsafe { temp_arena_link(self.head, alloc_zeroed(1, count * size + 16)) }
 
-    pub mut fn reset():
+    pub mut fn reset() -> Unit:
         var block = unsafe *self.head
         while block != 0:
             let next = unsafe *(block as *mut i64)
