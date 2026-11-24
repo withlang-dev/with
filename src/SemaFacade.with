@@ -4684,11 +4684,16 @@ impl Sema:
                 let rt = self.type_name(self.sig_return_type(msig))
                 self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' was rendered as '{mtext}' returning {rt}, not Option[&{rn}] — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 return
+            // A record view `&T` points at C memory its record's origin
+            // owns, so a result borrowed through one views what that view
+            // views, never the parameter's own binding: the receiver and a
+            // second origin (D187) alike, as D85's parent borrow is
+            // declared. (#3020: the receiver was declared "of storage", a
+            // second declaration for the same meaning.) The method a
+            // resource hosts, below, stays "of storage": there the
+            // parameter is the owner itself.
             if from >= 0:
-                self.facade_declare_view_of_param(msig, 0)
-            // D187: the result views the second origin too — what that
-            // `&T` view views (its record's origin), never the argument's
-            // own binding, as D85's parent borrow is declared.
+                self.facade_declare_view_through_param(msig, 0)
             if self.foreign_contracts[ci].returns_borrow_from2 >= 0:
                 self.facade_declare_view_through_param(msig, self.foreign_contracts[ci].returns_borrow_from2)
             return

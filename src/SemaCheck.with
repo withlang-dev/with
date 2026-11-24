@@ -6107,7 +6107,6 @@ impl Sema:
                     tid = self.ty_isize as i32
             if tid == 0: continue
             let is_mut = self.ast.get_data2(binding) % 2
-            if with_getenv_str("WITH_TRACE_D184").len() > 0: with_eprint(f"[d184] inject `{self.pool_resolve(sym)}` ty={tid} into helper `{self.pool_resolve(self.ast.get_data0(helper_decl))}` ({helper_decl}) scope_starts={self.scope_starts.len()} binds={self.bind_names.len()}\n")
             self.script_capture_indices.insert(self.scope_insert_at(sym, tid, is_mut), 1)
             count = count + 1
         count

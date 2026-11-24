@@ -3107,6 +3107,12 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // binding (#2187 took two hours of trace prints without it).
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_2187_view_through_match_binding.with"), out_dir, "analyze-explain-origin", "explain:origin:at_match", "only through what it views") != 0:
         return 1
+    // #3020: a method a record view hosts declares its result as viewing what
+    // the view views; the resource's own method, the resource's storage.
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_d122_borrow_through_borrow.with"), out_dir, "analyze-record-view-through", "explain:origin:xnode.first_child", "only through what it views") != 0:
+        return 1
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_d122_borrow_through_borrow.with"), out_dir, "analyze-record-view-owner", "explain:origin:Document.root", "from its own storage") != 0:
+        return 1
     // D65 phase 2 (#1647): the codegen mode-provenance lane runs and every
     // site's owner fact agrees with the LLVM representation. The &fn
     // marshalling fixture passes a function item, a callable binding and a
