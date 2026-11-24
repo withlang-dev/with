@@ -17269,6 +17269,10 @@ impl Sema:
                 let raw_mut = (op == UnaryOp.UOP_RAW_REF_MUT) as i32
                 if raw_mut != 0:
                     self.record_global_place_write(operand_node, node)
+                    // #3061: a place whose address is taken to be written
+                    // through keeps its `var` (§15.14).
+                    let pointed = self.binding_decl_node(self.place_root_sym(operand_node))
+                    if pointed != 0: self.ceremony_rebound_lets.insert(pointed, 1)
                 // §13/§3.8 — a raw pointer to a by-value non-Copy parameter can
                 // smuggle the value out invisibly (memcpy into storage is how
                 // Box.new stores its payload). The effect system cannot see
