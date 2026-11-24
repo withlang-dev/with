@@ -73,8 +73,8 @@ pub type ArenaList[T] ephemeral {
 pub fn arena_new(block_size: i32) -> Arena:
     Arena {
         block_size: alloc_default_block_size(block_size),
-        blocks: List.new(),
-        block_sizes: List.new(),
+        blocks: [],
+        block_sizes: [],
         current: 0 as *i8,
         offset: 0,
         capacity: 0,
@@ -84,8 +84,8 @@ pub fn arena_new(block_size: i32) -> Arena:
 pub fn frame_arena_new(block_size: i32) -> FrameArena:
     FrameArena {
         block_size: alloc_default_block_size(block_size),
-        blocks: List.new(),
-        block_sizes: List.new(),
+        blocks: [],
+        block_sizes: [],
         current: 0 as *i8,
         offset: 0,
         capacity: 0,
@@ -173,8 +173,8 @@ impl Arena:
         let block_index = mark / alloc_mark_unit()
         let mark_offset = (mark - block_index * alloc_mark_unit()) as i32
         let n = self.blocks.len()
-        var new_blocks: List[i64] = List.new()
-        var new_sizes: List[i32] = List.new()
+        let new_blocks: List[i64] = []
+        let new_sizes: List[i32] = []
         for i in 0..n:
             let raw = self.blocks[i]
             let size = self.block_sizes[i]
@@ -211,8 +211,8 @@ impl FrameArena:
             let raw = self.blocks[i]
             if raw != 0:
                 unsafe { free_mem(raw as *i8) }
-        let new_blocks: List[i64] = List.new()
-        let new_sizes: List[i32] = List.new()
+        let new_blocks: List[i64] = []
+        let new_sizes: List[i32] = []
         new_blocks.push(first)
         new_sizes.push(first_size)
         self.blocks = new_blocks
@@ -222,23 +222,23 @@ impl FrameArena:
         self.offset = 0
 
 impl Drop for Arena:
-    move fn drop() -> Unit:
+    move fn drop():
         for raw in self.blocks:
             if raw != 0:
                 unsafe { free_mem(raw as *i8) }
-        self.blocks = List.new()
-        self.block_sizes = List.new()
+        self.blocks = []
+        self.block_sizes = []
         self.current = 0 as *i8
         self.offset = 0
         self.capacity = 0
 
 impl Drop for FrameArena:
-    move fn drop() -> Unit:
+    move fn drop():
         for raw in self.blocks:
             if raw != 0:
                 unsafe { free_mem(raw as *i8) }
-        self.blocks = List.new()
-        self.block_sizes = List.new()
+        self.blocks = []
+        self.block_sizes = []
         self.current = 0 as *i8
         self.offset = 0
         self.capacity = 0
@@ -268,7 +268,7 @@ impl ArenaScope:
         self.allocations = 0
 
 impl Drop for ArenaScope:
-    move fn drop() -> Unit:
+    move fn drop():
         // The owned `arena` field drops transitively (Arena: Drop); an
         // explicit self.arena.drop() here would double-free it.
         ()
@@ -303,7 +303,7 @@ impl TempArena:
         unsafe *self.head = 0
 
 impl Drop for TempArena:
-    move fn drop() -> Unit:
+    move fn drop():
         self.reset()
         unsafe { free_mem(self.head as *i8) }
 
@@ -321,11 +321,11 @@ impl Pool:
             self.free_list.push((slab as i64 + (i * self.item_size) as i64))
 
 pub fn pool_new(item_size: i32, capacity: i32) -> Pool:
-    var pool = Pool {
+    let pool = Pool {
         item_size: pool_effective_item_size(item_size),
         slab_capacity: if capacity > 0: capacity else: 1,
-        slabs: List.new(),
-        free_list: List.new(),
+        slabs: [],
+        free_list: [],
     }
     pool.add_slab()
     pool
@@ -347,12 +347,12 @@ impl Pool:
             self.free_list.push(ptr as i64)
 
 impl Drop for Pool:
-    move fn drop() -> Unit:
+    move fn drop():
         for raw in self.slabs:
             if raw != 0:
                 unsafe { free_mem(raw as *i8) }
-        self.slabs = List.new()
-        self.free_list = List.new()
+        self.slabs = []
+        self.free_list = []
 
 impl PoolAllocator:
     pub mut fn alloc() -> *i8:
@@ -362,7 +362,7 @@ impl PoolAllocator:
         self.pool.free(ptr)
 
 impl Drop for PoolAllocator:
-    move fn drop() -> Unit:
+    move fn drop():
         // The owned `pool` field drops transitively (Pool: Drop); an explicit
         // self.pool.drop() here would double-free it.
         ()

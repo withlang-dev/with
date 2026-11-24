@@ -14,38 +14,38 @@ use std.engines.stc.facade_shapes
 pub type BitSet { bits: cbits }
 
 pub fn BitSet.new(len: isize) -> BitSet:
-    BitSet { bits: cbits_with_size(len as c_long, false) }
+    BitSet { bits: cbits_with_size(len, false) }
 
 pub fn BitSet.with_value(len: isize, value: bool) -> BitSet:
-    BitSet { bits: cbits_with_size(len as c_long, value) }
+    BitSet { bits: cbits_with_size(len, value) }
 
 impl BitSet:
-    pub fn len() -> isize: self.bits.size() as isize
+    pub fn len() -> isize: self.bits.size()
     fn check(i: isize): assert(i >= 0 and i < self.len(), "BitSet index out of bounds")
 
     pub fn test(i: isize) -> bool:
         self.check(i)
-        self.bits.test(i as c_long)
+        self.bits.test(i)
 
     pub mut fn set(i: isize):
         self.check(i)
-        self.bits.set(i as c_long)
+        self.bits.set(i)
 
     pub mut fn clear(i: isize):
         self.check(i)
-        self.bits.reset(i as c_long)
+        self.bits.reset(i)
 
     pub mut fn flip(i: isize):
         self.check(i)
-        self.bits.flip(i as c_long)
+        self.bits.flip(i)
 
     pub mut fn set_all(value: bool): unsafe { cbits_set_all(&raw mut self.bits, value) }
 
     /// Grows or shrinks to `len` bits; new bits take `value`.
-    pub mut fn resize(len: isize, value: bool): assert(self.bits.resize(len as c_long, value))
+    pub mut fn resize(len: isize, value: bool): assert(self.bits.resize(len, value))
 
     /// The number of set bits.
-    pub fn count() -> isize: unsafe { cbits_count(&raw const self.bits) } as isize
+    pub fn count() -> isize: unsafe { cbits_count(&raw const self.bits) }
 
     /// The indices of the set bits, ascending.
     pub fn iter() -> BitSetIter:
@@ -61,5 +61,5 @@ impl BitSetIter:
         while self.index < self.len:
             let i = self.index
             self.index = i + 1
-            if unsafe { (*(self.bits as *const cbits)).test(i as c_long) }: return Some(i)
+            if unsafe { (*(self.bits as *const cbits)).test(i) }: return i
         None

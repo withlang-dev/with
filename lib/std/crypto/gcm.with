@@ -16,25 +16,25 @@ type AesGcm  {
 
 // GHASH: multiply in GF(2^128)
 unsafe fn ghash_mult(x: *const u8, y: *const u8, out: *mut u8):
-    var z: [u8; 16] = [0 as u8; 16]
-    var v: [u8; 16] = [0 as u8; 16]
+    let z: [u8; 16] = [0 as u8; 16]
+    let v: [u8; 16] = [0 as u8; 16]
     for i in 0..16:
         v[i] = *(y + i as u64)
 
     for i in 0..128:
         let byte_idx = i / 8
         let bit_idx = 7 - (i % 8)
-        if ((*(x + byte_idx as u64)) as u32 >> bit_idx as u32) & 1 as u32 != 0 as u32:
+        if ((*(x + byte_idx as u64)) as u32 >> bit_idx) & 1 as u32 != 0 as u32:
             for j in 0..16:
                 z[j] = z[j] ^ v[j]
         let lsb = (v[15] as u32) & 1 as u32
-        var carry: u32 = 0 as u32
+        var carry = 0 as u32
         for j in 0..16:
             // `old` must be the value as an owned u32: binding the bare
             // element `v[j]` yields a live view, so a later read after the
             // write below would observe the NEW byte and corrupt the carry.
             let old = v[j] as u32
-            v[j] = (carry | (old >> 1 as u32)) as u8
+            v[j] = (carry | (old >> 1)) as u8
             carry = if (old & 1 as u32) != 0 as u32: 0x80 as u32 else: 0 as u32
         if lsb != 0 as u32:
             v[0] = v[0] ^ (0xe1 as u8)
@@ -66,7 +66,7 @@ unsafe fn AesGcm.new(key: *const u8, iv: *const u8, iv_len: i32) -> AesGcm:
     let hp = &raw mut h[0] as *mut u8
     Aes128.encrypt_block(&aes_ctx as *const Aes128, hp)
 
-    var j0: [u8; 16] = [0 as u8; 16]
+    let j0: [u8; 16] = [0 as u8; 16]
     if iv_len == 12:
         for i in 0..12:
             j0[i] = *(iv + i as u64)
@@ -86,7 +86,7 @@ unsafe fn AesGcm.new(key: *const u8, iv: *const u8, iv_len: i32) -> AesGcm:
 unsafe fn aesgcm_aad(ctx: *mut AesGcm, data: *const u8, len: i32):
     ctx.aad_len = ctx.aad_len + len as u64
     var gs: [u8; 16] = [0 as u8; 16]
-    var hh: [u8; 16] = [0 as u8; 16]
+    let hh: [u8; 16] = [0 as u8; 16]
     for i in 0..16:
         gs[i] = ctx.ghash_state[i]
         hh[i] = ctx.h[i]
@@ -112,7 +112,7 @@ unsafe fn aesgcm_encrypt(ctx: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32)
     ctx.ct_len = ctx.ct_len + len as u64
     var ctr: [u8; 16] = [0 as u8; 16]
     var gs: [u8; 16] = [0 as u8; 16]
-    var hh: [u8; 16] = [0 as u8; 16]
+    let hh: [u8; 16] = [0 as u8; 16]
     for i in 0..16:
         ctr[i] = ctx.counter[i]
         gs[i] = ctx.ghash_state[i]
@@ -120,7 +120,7 @@ unsafe fn aesgcm_encrypt(ctx: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32)
     let ctrp = &raw mut ctr[0] as *mut u8
     let gsp = &raw mut gs[0] as *mut u8
     let hhp = &hh[0] as *const u8
-    var aes_copy = ctx.aes
+    let aes_copy = ctx.aes
 
     var off = 0
     while off < len:
@@ -132,7 +132,7 @@ unsafe fn aesgcm_encrypt(ctx: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32)
         increment_counter(ctrp)
         let remaining = len - off
         let chunk = if remaining < 16: remaining else: 16
-        var ct_block: [u8; 16] = [0 as u8; 16]
+        let ct_block: [u8; 16] = [0 as u8; 16]
         for i in 0..chunk:
             let ct_byte = *(pt + (off + i) as u64) ^ ks[i]
             *(ct + (off + i) as u64) = ct_byte
@@ -152,7 +152,7 @@ unsafe fn aesgcm_decrypt(ctx: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, le
     ctx.ct_len = ctx.ct_len + len as u64
     var ctr: [u8; 16] = [0 as u8; 16]
     var gs: [u8; 16] = [0 as u8; 16]
-    var hh: [u8; 16] = [0 as u8; 16]
+    let hh: [u8; 16] = [0 as u8; 16]
     for i in 0..16:
         ctr[i] = ctx.counter[i]
         gs[i] = ctx.ghash_state[i]
@@ -160,12 +160,12 @@ unsafe fn aesgcm_decrypt(ctx: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, le
     let ctrp = &raw mut ctr[0] as *mut u8
     let gsp = &raw mut gs[0] as *mut u8
     let hhp = &hh[0] as *const u8
-    var aes_copy = ctx.aes
+    let aes_copy = ctx.aes
 
     var off = 0
     while off < len:
         // GHASH the ciphertext BEFORE decryption
-        var ct_block: [u8; 16] = [0 as u8; 16]
+        let ct_block: [u8; 16] = [0 as u8; 16]
         let remaining = len - off
         let chunk = if remaining < 16: remaining else: 16
         for i in 0..chunk:
@@ -194,8 +194,8 @@ unsafe fn AesGcm.decrypt(ctx: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, le
 
 unsafe fn aesgcm_tag(ctx: *mut AesGcm, out: *mut u8):
     var gs: [u8; 16] = [0 as u8; 16]
-    var hh: [u8; 16] = [0 as u8; 16]
-    var j0: [u8; 16] = [0 as u8; 16]
+    let hh: [u8; 16] = [0 as u8; 16]
+    let j0: [u8; 16] = [0 as u8; 16]
     for i in 0..16:
         gs[i] = ctx.ghash_state[i]
         hh[i] = ctx.h[i]
@@ -209,7 +209,7 @@ unsafe fn aesgcm_tag(ctx: *mut AesGcm, out: *mut u8):
     u64_to_be(lbp, 8, ctx.ct_len * 8 as u64)
     ghash_update(gsp, hhp, lbp as *const u8)
 
-    var aes_copy = ctx.aes
+    let aes_copy = ctx.aes
     var j0_enc: [u8; 16] = [0 as u8; 16]
     let jp = &raw mut j0_enc[0] as *mut u8
     for i in 0..16:
@@ -228,9 +228,9 @@ unsafe fn AesGcm.tag(ctx: *mut AesGcm, out: *mut u8):
 // Guards #883 (the GHASH GF(2^128) multiply): a regression there fails here
 // long before it reaches the TLS record layer.
 pub fn aes128_gcm_kat() -> i32:
-    var key: [u8; 16] = [0u8; 16]
-    var iv: [u8; 12] = [0u8; 12]
-    var pt: [u8; 16] = [0u8; 16]
+    let key: [u8; 16] = [0u8; 16]
+    let iv: [u8; 12] = [0u8; 12]
+    let pt: [u8; 16] = [0u8; 16]
     var ct: [u8; 16] = [0u8; 16]
     var tag: [u8; 16] = [0u8; 16]
     var g = unsafe { AesGcm.new(&key[0] as *const u8, &iv[0] as *const u8, 12) }

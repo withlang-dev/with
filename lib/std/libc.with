@@ -235,10 +235,10 @@ pub extern fn abort() -> Never
 pub fn __assert_rtn(function: *const c_char, file: *const c_char, line: i32, expression: *const c_char) -> Never:
     libc_assert_failed(expression, function, file, line)
 pub fn __assert_fail(expression: *const c_char, file: *const c_char, line: u32, function: *const c_char) -> Never:
-    libc_assert_failed(expression, function, file, line as i64)
+    libc_assert_failed(expression, function, file, line)
 // mingw-w64's reporter names no function.
 pub fn _assert(expression: *const c_char, file: *const c_char, line: u32) -> Never:
-    libc_assert_failed(expression, c"".ptr, file, line as i64)
+    libc_assert_failed(expression, c"".ptr, file, line)
 fn libc_assert_failed(expression: *const c_char, function: *const c_char, file: *const c_char, line: i64) -> Never:
     let function_name = with_str_from_cstr(function)
     let site = if function_name.len() > 0: ", function " ++ function_name else: ""

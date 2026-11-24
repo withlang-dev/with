@@ -45,8 +45,8 @@ pub fn set_env(name: &str, value: &str) -> i32:
 
 fn argv_blob(items: &List[str]) -> str:
     var out = ""
-    for i in 0..items.len():
-        out = out ++ items[i] ++ "\0"
+    for item in items:
+        out = out ++ item ++ "\0"
     out
 
 /// Execute an argument vector. The first item is the program name.
@@ -110,14 +110,14 @@ pub type Command  {
 
 /// Create a Command from a program path or name.
 pub fn command(program: str) -> Command:
-    var argv: List[str] = List.new()
+    let argv: List[str] = []
     argv.push(program)
     Command { args: argv }
 
 /// Append one argument and return the updated command.
 impl Command:
     pub fn arg(arg: str) -> Command:
-        var argv: List[str] = List.new()
+        let argv: List[str] = []
         for i in 0..self.args.len():
             argv.push(with_str_clone_ref(self.args[i]))
         argv.push(arg)

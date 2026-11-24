@@ -105,17 +105,81 @@ fn cf_rewritable(path: &str, excludes: &List[str], std_too: bool) -> bool:
     if not std_too and (path.starts_with("lib/std/") or path.contains("/lib/std/")): return false
     path.len() > 0 and not path.starts_with("<") and not cf_excluded(path, excludes) and with_fs_read_file(path).len() > 0
 
+// A line's indentation, in bytes.
+fn cf_indent_at(text: &str, line_start: i32) -> i32:
+    var i = line_start
+    while i < text.len() and (text[i] == ' ' or text[i] == '\t'): i = i + 1
+    i - line_start
+
+// The byte ranges this target did not check: a `comptime if` or `comptime
+// match` line, the lines indented under it, and the `else` arms that follow
+// at its indentation. The transform keeps one arm and Sema never sees the
+// others, so a fact of the form "nothing else uses this name" does not
+// cover them: another platform's arm may. Each range is [start, end).
+fn cf_unchecked_ranges(text: &str) -> List[i32]:
+    let ranges = []
+    var at = 0
+    while at < text.len():
+        var eol = at
+        while eol < text.len() and text[eol] != '\n': eol = eol + 1
+        let line = text.slice(at, eol)
+        if line.contains("comptime if ") or line.contains("comptime match "):
+            let indent = cf_indent_at(text, at)
+            var end = if eol < text.len(): eol + 1 else: eol
+            while end < text.len():
+                var next_eol = end
+                while next_eol < text.len() and text[next_eol] != '\n': next_eol = next_eol + 1
+                let next = text.slice(end, next_eol)
+                let blank = next.trim().len() == 0
+                let next_indent = cf_indent_at(text, end)
+                if not blank and next_indent <= indent and not (next_indent == indent and next.trim().starts_with("else")): break
+                end = if next_eol < text.len(): next_eol + 1 else: next_eol
+            ranges.push(at)
+            ranges.push(end)
+            at = end
+        else:
+            at = if eol < text.len(): eol + 1 else: eol
+    ranges
+
+fn cf_is_name_byte(c: u8) -> bool: (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_'
+
+// Whether `name` is written, as a whole word, in code the target did not check.
+fn cf_named_unchecked(text: &str, ranges: &List[i32], name: &str) -> bool:
+    if name.len() == 0: return false
+    let n = name.len()
+    var r = 0
+    while r + 1 < ranges.len():
+        var i: isize = ranges[r]
+        let stop: isize = ranges[r + 1]
+        while i + n <= stop:
+            if text.slice(i, i + n) == name and (i == 0 or not cf_is_name_byte(text[i - 1])) and (i + n >= text.len() or not cf_is_name_byte(text[i + n])): return true
+            i = i + 1
+        r = r + 2
+    false
+
+// Whether any unchecked code lies inside [start, end).
+fn cf_spans_unchecked(ranges: &List[i32], start: i32, end: i32) -> bool:
+    var r = 0
+    while r + 1 < ranges.len():
+        if ranges[r] < end and ranges[r + 1] > start: return true
+        r = r + 2
+    false
+
 fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[CeremonyEdit]:
     let edits = []
     let texts: HashMap[str, str] = [:]
+    let unchecked: HashMap[str, List[i32]] = [:]
     // The initializers of the lets whose written type makes the literal.
     let let_news: HashMap[i32, i32] = [:]
     for (let_node, _) in sema.ceremony_list_news:
         let_news.insert(sema.ceremony_let_values.get(let_node) ?? 0, 1)
     for (node, path) in sema.ceremony_let_paths:
         if not cf_rewritable(path, excludes, std_too): continue
-        if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
+        if not texts.contains(path):
+            texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
+            unchecked.insert(with_str_clone_ref(path), cf_unchecked_ranges(texts.get(path).unwrap()))
         let text = texts.get(path).unwrap()
+        let ranges = unchecked.get(path).unwrap()
         // The census's typed patterns (SemaDiag.with): `.clone()` on a str
         // (D111: a str is a value), an explicit `&x` at a `&T` parameter
         // (§3.8 auto-references), `Some(x)` where an Option is demanded
@@ -138,7 +202,7 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
         if sema.ceremony_index_loop_bases.contains(node):
             let uses = sema.ceremony_loop_uses.get(node) ?? 0
             let index_uses = sema.ceremony_loop_index_uses.get(node) ?? 0
-            if uses > 0 and uses == index_uses and not sema.ceremony_loop_written.contains(node):
+            if uses > 0 and uses == index_uses and not sema.ceremony_loop_written.contains(node) and not cf_spans_unchecked(ranges, pool.get_start(node), pool.get_end(node)):
                 let base = sema.ceremony_index_loop_bases.get(node).unwrap()
                 let list_name = sema.pool_resolve(pool.get_data0(base))
                 let elem = sema.pool_resolve(sema.ceremony_loop_elem_syms.get(node).unwrap())
@@ -203,7 +267,7 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
                 if colon >= 0:
                     edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: colon, end: pool.get_end(type_node), replacement: "", what: "annotation `: " ++ sema.type_name(ann) ++ "` restates the initializer's type" })
         // `var` never rebound: the keyword at the statement's start.
-        if flags % 2 == 1 and not sema.ceremony_rebound_lets.contains(node):
+        if flags % 2 == 1 and not sema.ceremony_rebound_lets.contains(node) and not cf_named_unchecked(text, ranges, sema.pool_resolve(pool.get_data0(node))):
             let start = pool.get_start(node)
             if start + 3 <= text.len() and text.slice(start, start + 3) == "var":
                 edits.push(CeremonyEdit { path: with_str_clone_ref(path), start, end: start + 3, replacement: "let", what: "`var` is never rebound: `let`" })

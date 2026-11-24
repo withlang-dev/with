@@ -32,13 +32,13 @@ fn http_failed(reason: str) -> HttpResponse:
     HttpResponse { status: -1, headers: "", body: "", location: "", reason }
 
 fn http_parse_url(url: &str) -> HttpUrl:
-    var host: str = ""
-    var path: str = "/"
+    var host = ""
+    var path = "/"
     let port: i32 = 443
     if not url.starts_with("https://"):
         return HttpUrl { host, path, port }
 
-    var start = 8
+    let start = 8
     let url_len = url.len()
     var host_end = start
     while host_end < url_len:
@@ -46,9 +46,9 @@ fn http_parse_url(url: &str) -> HttpUrl:
             break
         host_end = host_end + 1
 
-    host = url.slice(start as i64, host_end as i64)
+    host = url.slice(start, host_end)
     if host_end < url_len:
-        path = url.slice(host_end as i64, url_len as i64)
+        path = url.slice(host_end, url_len)
     // #2648: `host:port`, and `[v6]:port` (RFC 3986 authority); a port
     // outside 1..65535 refuses the URL.
     let colon = if host.starts_with("["): (if host.find("]:") >= 0: host.find("]:") + 1 else: -1) else: host.find(":")
@@ -128,7 +128,7 @@ fn http_trim_header_value(value: &str) -> str:
         if ch != 32 and ch != 9 and ch != 13 and ch != 10:
             break
         end = end - 1
-    value.slice(start as i64, end as i64)
+    value.slice(start, end)
 
 fn http_header_value(headers: &str, name: &str) -> str:
     var line_start = 0
@@ -136,11 +136,11 @@ fn http_header_value(headers: &str, name: &str) -> str:
     while i <= headers.len():
         let at_end = i == headers.len()
         if at_end or headers[i] == 10:
-            var line = headers.slice(line_start as i64, i as i64)
+            var line = headers.slice(line_start, i)
             if line.len() > 0 and line[line.len() - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if http_name_matches(line, name):
-                return http_trim_header_value(line.slice((name.len() + 1) as i64, line.len()))
+                return http_trim_header_value(line.slice((name.len() + 1), line.len()))
             line_start = i + 1
         i = i + 1
     ""
@@ -150,7 +150,7 @@ fn http_is_chunked(headers: &str) -> bool:
     value.contains("chunked") or value.contains("Chunked")
 
 fn http_decode_chunked(data: &str) -> str:
-    var result = StringBuilder.new()
+    let result = StringBuilder.new()
     let dlen = data.len()
     var pos = 0
     while pos < dlen:
@@ -173,7 +173,7 @@ fn http_decode_chunked(data: &str) -> str:
         if chunk_size == 0:
             break
         let end = if pos + chunk_size > dlen: dlen else: pos + chunk_size
-        result.push_str(data.slice(pos as i64, end as i64))
+        result.push_str(data.slice(pos, end))
         pos = end
         if pos < dlen and data[pos] == 13:
             pos = pos + 1
@@ -226,7 +226,7 @@ fn https_get_once(url: &str, connect_ms: i32, idle_ms: i32) -> HttpResponse:
         socket_close(conn.fd)
         return http_failed(f"the request to {parsed.host} was not sent (TLS write failed)")
 
-    var response = StringBuilder.new()
+    let response = StringBuilder.new()
     var done = false
     while not done:
         var buf: [u8; 16640] = [0u8; 16640]
@@ -250,9 +250,9 @@ fn https_get_once(url: &str, connect_ms: i32, idle_ms: i32) -> HttpResponse:
     if hdr_end < 0:
         return http_failed(f"{parsed.host} closed the connection after {raw.len()} byte(s), before the response headers ended")
 
-    let headers = raw.slice(0, hdr_end as i64)
+    let headers = raw.slice(0, hdr_end)
     let status = http_status(headers)
-    var body = raw.slice(hdr_end as i64, raw.len())
+    var body = raw.slice(hdr_end, raw.len())
     if http_is_chunked(headers):
         body = http_decode_chunked(body)
     else:

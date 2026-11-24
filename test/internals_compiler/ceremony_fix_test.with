@@ -51,6 +51,14 @@ let SAMPLE_CONTRACT = "trait Uno:\n    fn one() -> Self\n    fn size(self: &Self
 
 let EXPECTED_CONTRACT = "trait Uno:\n    fn one() -> Self\n    fn size(self: &Self) -> i64\n    fn name(self: &Self) -> str\n    fn checked(self: &Self) -> Result[i64, str]\n\ntype Num = i64\n\ntype P \{ n: i64 }\n\nimpl Uno for f64:\n    fn one(): 1.0\n    fn size(): 8\n    fn name(): \"f64\"\n    fn checked(): 8\n\nimpl Uno for P:\n    fn one(): P \{ n: 1 }\n    fn size():\n        self.n\n    fn name(): \"p\"\n    fn checked():\n        if self.n < 0: return Err(\"negative\")\n        self.n\n\ntype Box2[T] \{ v: T }\n\nimpl[T] Uno for Box2[T]:\n    fn one() -> Box2[T]: panic(\"none\")\n    fn size() -> i64: 1\n    fn name() -> str: \"box\"\n    fn checked() -> Result[i64, str]: 1\n\nfn free() -> i64: 3\n\nfn main:\n    let p = P.one()\n    let f = f64.one()\n    print(f\"\{p.size()} \{p.name()} \{p.checked() ?? -1} \{f.size()} \{f.name()} \{f.checked() ?? -1} \{free()}\")\n"
 
+// What this target did not check is not evidence: a `var` assigned only in
+// another platform's `comptime if` arm keeps its `var`, and a loop whose
+// counter is used there keeps its counter. A `var` written through
+// `&raw mut` keeps its `var` too. Only `kept` becomes a `let`.
+let SAMPLE_UNCHECKED = "use std.os.Target\n\nfn main:\n    var x = 1\n    var kept = 3\n    var n: i32 = 0\n    let p = &raw mut n\n    unsafe \{ *p = 7 }\n    let xs = [10, 20, 30]\n    var total = 0\n    for i in 0..xs.len():\n        total += xs[i]\n        comptime if Target.os == .Windows:\n            total += i\n    comptime if Target.os == .Windows:\n        x = 5\n    print(f\"\{x} \{kept} \{n} \{total}\")\n"
+
+let EXPECTED_UNCHECKED = "use std.os.Target\n\nfn main:\n    var x = 1\n    let kept = 3\n    var n: i32 = 0\n    let p = &raw mut n\n    unsafe \{ *p = 7 }\n    let xs = [10, 20, 30]\n    var total = 0\n    for i in 0..xs.len():\n        total += xs[i]\n        comptime if Target.os == .Windows:\n            total += i\n    comptime if Target.os == .Windows:\n        x = 5\n    print(f\"\{x} \{kept} \{n} \{total}\")\n"
+
 fn fixes(path: str, sample: str, expected: str, count: isize):
     assert(write_file(path, sample) == 0)
     var comp = Compilation.init()
@@ -93,4 +101,5 @@ fn main:
     fixes("out/ceremony_fix_casts_sample.with", SAMPLE_CASTS, EXPECTED_CASTS, 6)
     fixes("out/ceremony_fix_typed_sample.with", SAMPLE_TYPED, EXPECTED_TYPED, 4)
     fixes("out/ceremony_fix_contract_sample.with", SAMPLE_CONTRACT, EXPECTED_CONTRACT, 8)
+    fixes("out/ceremony_fix_unchecked_sample.with", SAMPLE_UNCHECKED, EXPECTED_UNCHECKED, 1)
     print("ok")

@@ -72,7 +72,7 @@ fn compiler_hook_escape(value: &str) -> str:
         else if ch == 13:
             out = out ++ "\\r"
         else:
-            out = out ++ value.slice(i as i64, (i + 1) as i64)
+            out = out ++ value.slice(i, (i + 1))
     out
 
 fn compiler_capability_valid(token: &str) -> bool:
@@ -158,24 +158,24 @@ impl TypeInfo:
 
 pub fn ProjectInfo.new() -> ProjectInfo:
     ProjectInfo {
-        module_items: List.new(),
-        function_items: List.new(),
-        type_items: List.new(),
+        module_items: [],
+        function_items: [],
+        type_items: [],
     }
 
 impl ProjectInfo:
     pub move fn add_module(module_info: ModuleInfo) -> ProjectInfo:
-        var out = self
+        let out = self
         out.module_items.push(module_info)
         out
 
     pub move fn add_function(function: FunctionInfo) -> ProjectInfo:
-        var out = self
+        let out = self
         out.function_items.push(function)
         out
 
     pub move fn add_type(type_info: TypeInfo) -> ProjectInfo:
-        var out = self
+        let out = self
         out.type_items.push(type_info)
         out
 

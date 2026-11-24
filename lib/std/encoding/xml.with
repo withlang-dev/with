@@ -66,7 +66,7 @@ impl XmlElement:
 
 /// Parses the document in `source`.
 pub fn XmlDocument.parse(source: str) -> Result[XmlDocument, XmlError]:
-    var p = XmlParser { src: source, pos: 0, line: 1 }
+    let p = XmlParser { src: source, pos: 0, line: 1 }
     p.skip_prolog()?
     if p.at_end(): return Err(xml_error(p.line, "no root element"))
     let root = p.parse_element()?
@@ -94,7 +94,7 @@ fn xml_is_name_char(c: i32) -> bool:
     xml_is_name_start(c) or is_digit(c) or c == '-' or c == '.'
 
 fn xml_push_utf8(sb: StringBuilder, cp: i32) -> StringBuilder:
-    var out = sb
+    let out = sb
     if cp < 0x80:
         out.push_char(cp)
     else if cp < 0x800:
@@ -233,8 +233,8 @@ impl XmlParser:
         let open_line = self.line
         self.advance(1)
         let name = self.parse_name()?
-        var attrs: List[XmlAttr] = List.new()
-        var children: List[XmlElement] = List.new()
+        let attrs: List[XmlAttr] = []
+        let children: List[XmlElement] = []
         var sb = StringBuilder.new()
         while true:
             self.skip_space()

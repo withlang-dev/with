@@ -57,14 +57,14 @@ fn sigma1(x: u32) -> u32:
     x.rotate_right(6) ^ x.rotate_right(11) ^ x.rotate_right(25)
 
 fn ssig0(x: u32) -> u32:
-    x.rotate_right(7) ^ x.rotate_right(18) ^ (x >> 3 as u32)
+    x.rotate_right(7) ^ x.rotate_right(18) ^ (x >> 3)
 
 fn ssig1(x: u32) -> u32:
-    x.rotate_right(17) ^ x.rotate_right(19) ^ (x >> 10 as u32)
+    x.rotate_right(17) ^ x.rotate_right(19) ^ (x >> 10)
 
 // Process one 64-byte block
 unsafe fn sha256_compress(ctx: *mut Sha256):
-    var w: [u32; 64] = [0 as u32; 64]
+    let w: [u32; 64] = [0 as u32; 64]
     for i in 0..16:
         w[i] = u32_from_be(&ctx.buf[0] as *const u8, i * 4)
     for i in 16..64:
@@ -118,7 +118,7 @@ unsafe fn sha256_finish(ctx: *mut Sha256, out: *mut u8):
     let total_bits = ctx.count * 8 as u64
 
     // Padding: append 0x80 byte
-    var pad: [u8; 1] = [0x80 as u8]
+    let pad: [u8; 1] = [0x80 as u8]
     sha256_update(ctx, &pad[0] as *const u8, 1)
 
     // Pad with zeros until 56 mod 64
@@ -175,5 +175,5 @@ pub fn sha256_hex(digest: *const u8) -> str:
         let b = (unsafe *(digest + i as u64)) as i32
         let hi = (b >> 4) & 0x0F
         let lo = b & 0x0F
-        result = result ++ hex_chars.slice(hi as i64, (hi + 1) as i64) ++ hex_chars.slice(lo as i64, (lo + 1) as i64)
+        result = result ++ hex_chars.slice(hi, (hi + 1)) ++ hex_chars.slice(lo, (lo + 1))
     result

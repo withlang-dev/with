@@ -1,0 +1,23 @@
+//! expect-stdout: 5 5 6 6
+// A field store into a `let` binding evaluates at compile time as it runs:
+// `let` forbids rebinding the name, not writing a field of its value. The
+// evaluator refused it ("cannot assign to field of immutable value") after
+// Sema had accepted it.
+type P { n: i64, tags: List[str] }
+
+fn make() -> P:
+    let p = P { n: 1, tags: [] }
+    p.n = 5
+    p.tags.push("a")
+    p
+
+fn bumped(p: P) -> P:
+    let q = p
+    q.n = q.n + 1
+    q
+
+const C = comptime make().n
+const D = comptime bumped(make()).n
+
+fn main:
+    print(f"{make().n} {C} {D} {bumped(make()).n}")

@@ -48,7 +48,7 @@ fn aes_rcon(i: isize) -> u8:
     rc[i]
 
 fn xtime(x: u8) -> u8:
-    let shifted = ((x as u32) << 1 as u32) as u8
+    let shifted = ((x as u32) << 1) as u8
     let mask = if (x & (0x80 as u8)) != (0 as u8): 0x1b as u8 else: 0x00 as u8
     shifted ^ mask
 
@@ -60,10 +60,10 @@ unsafe fn aes128_init(ctx: *mut Aes128, key: *const u8):
     for i in 1..11:
         let prev_off = (i - 1) * 16
         let cur_off = i * 16
-        let r0 = aes_sbox((*(rk + (prev_off + 13) as u64)) as i32) ^ aes_rcon(i - 1)
-        let r1 = aes_sbox((*(rk + (prev_off + 14) as u64)) as i32)
-        let r2 = aes_sbox((*(rk + (prev_off + 15) as u64)) as i32)
-        let r3 = aes_sbox((*(rk + (prev_off + 12) as u64)) as i32)
+        let r0 = aes_sbox((*(rk + (prev_off + 13) as u64))) ^ aes_rcon(i - 1)
+        let r1 = aes_sbox((*(rk + (prev_off + 14) as u64)))
+        let r2 = aes_sbox((*(rk + (prev_off + 15) as u64)))
+        let r3 = aes_sbox((*(rk + (prev_off + 12) as u64)))
         *(rk + (cur_off + 0) as u64) = *(rk + (prev_off + 0) as u64) ^ r0
         *(rk + (cur_off + 1) as u64) = *(rk + (prev_off + 1) as u64) ^ r1
         *(rk + (cur_off + 2) as u64) = *(rk + (prev_off + 2) as u64) ^ r2
@@ -83,7 +83,7 @@ unsafe fn aes_add_round_key(s: *mut u8, rk: *const u8, off: isize):
 
 unsafe fn aes_sub_bytes(s: *mut u8):
     for i in 0..16:
-        *(s + i as u64) = aes_sbox((*(s + i as u64)) as i32)
+        *(s + i as u64) = aes_sbox((*(s + i as u64)))
 
 unsafe fn aes_shift_rows(s: *mut u8):
     let t = *(s + 1 as u64)

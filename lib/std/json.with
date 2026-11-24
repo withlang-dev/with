@@ -110,23 +110,23 @@ impl JsonWriter:
         self.value_raw(if value: "true" else: "false")
 
 impl Serialize for str:
-    fn serialize(out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter):
         out.value_str(self)
 
 impl Serialize for i32:
-    fn serialize(out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter):
         out.value_i32(*self)
 
 impl Serialize for i64:
-    fn serialize(out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter):
         out.value_i64(*self)
 
 impl Serialize for isize:
-    fn serialize(out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter):
         out.value_i64(*self)
 
 impl Serialize for bool:
-    fn serialize(out: JsonWriter) -> JsonWriter:
+    fn serialize(out: JsonWriter):
         out.value_bool(*self)
 
 /// Token type: undefined/uninitialized.
@@ -444,7 +444,7 @@ impl JsonView:
     pub fn keys() -> List[str]:
         if self.token_type() != JSON_OBJECT:
             json_panic("expected JSON object")
-        var out: List[str] = List.new()
+        let out: List[str] = []
         var idx = self.index + 1
         for _ in 0..self.token_size():
             out.push(json_unescape_string(json_str(self.source, self.tokens, idx)))
@@ -470,13 +470,13 @@ impl JsonView:
 pub type JsonItems ephemeral { source: &str, tokens: *const JsonToken, next_index: i32, remaining: i32 }
 
 impl Iter[JsonView] for JsonItems:
-    mut fn next() -> Option[JsonView]:
+    mut fn next():
         if self.remaining <= 0:
             return None
         let v = JsonView { source: self.source, tokens: self.tokens, index: self.next_index }
         self.next_index = unsafe { json_skip(self.tokens, self.next_index) }
         self.remaining -= 1
-        Some(v)
+        v
 
 type JsonRendered { text: str, next: i32 }
 
@@ -521,7 +521,7 @@ pub fn json_str(js: &str, tokens: *const JsonToken, idx: i32) -> str:
     unsafe:
         start = (*(tokens + idx as u64)).start
         end = (*(tokens + idx as u64)).end
-    js.slice(start as i64, end as i64)
+    js.slice(start, end)
 
 /// Find the value token for a key in a JSON object.
 /// Returns the token index of the value, or -1 if not found.
@@ -605,7 +605,7 @@ fn json_unescape_string(value: str) -> str:
     while i < value.len():
         let ch = value[i] as i32
         if ch != 92:
-            out = out ++ value.slice(i as i64, (i + 1) as i64)
+            out = out ++ value.slice(i, (i + 1))
         else:
             i = i + 1
             if i >= value.len():
@@ -630,10 +630,10 @@ fn json_unescape_string(value: str) -> str:
             else if esc == 117:
                 if i + 4 >= value.len():
                     json_panic("invalid JSON unicode escape")
-                let h0 = json_hex_value(value[(i + 1)] as i32)
-                let h1 = json_hex_value(value[(i + 2)] as i32)
-                let h2 = json_hex_value(value[(i + 3)] as i32)
-                let h3 = json_hex_value(value[(i + 4)] as i32)
+                let h0 = json_hex_value(value[(i + 1)])
+                let h1 = json_hex_value(value[(i + 2)])
+                let h2 = json_hex_value(value[(i + 3)])
+                let h3 = json_hex_value(value[(i + 4)])
                 if h0 < 0 or h1 < 0 or h2 < 0 or h3 < 0:
                     json_panic("invalid JSON unicode escape")
                 let code = ((h0 * 4096) + (h1 * 256) + (h2 * 16) + h3)
@@ -648,19 +648,19 @@ fn json_unescape_string(value: str) -> str:
     out
 
 impl Deserialize for str:
-    fn deserialize(input: JsonView) -> str:
+    fn deserialize(input: JsonView):
         if input.token_type() != JSON_STRING:
             json_panic("expected JSON string")
         json_unescape_string(input.raw())
 
 impl Deserialize for i32:
-    fn deserialize(input: JsonView) -> i32:
+    fn deserialize(input: JsonView):
         if input.token_type() != JSON_PRIMITIVE:
             json_panic("expected JSON integer")
         json_int(input.source, input.tokens, input.index)
 
 impl Deserialize for i64:
-    fn deserialize(input: JsonView) -> i64:
+    fn deserialize(input: JsonView):
         if input.token_type() != JSON_PRIMITIVE:
             json_panic("expected JSON integer")
         json_i64(input.source, input.tokens, input.index)
@@ -668,16 +668,16 @@ impl Deserialize for i64:
 // D114: a value an isize cannot hold (a 32-bit target) is refused, never
 // truncated.
 impl Deserialize for isize:
-    fn deserialize(input: JsonView) -> isize:
+    fn deserialize(input: JsonView):
         if input.token_type() != JSON_PRIMITIVE:
             json_panic("expected JSON integer")
         let wide = json_i64(input.source, input.tokens, input.index)
         if wide as isize as i64 != wide:
             json_panic("JSON integer does not fit isize")
-        wide as isize
+        wide
 
 impl Deserialize for bool:
-    fn deserialize(input: JsonView) -> bool:
+    fn deserialize(input: JsonView):
         if input.token_type() != JSON_PRIMITIVE:
             json_panic("expected JSON bool")
         let raw = input.raw()

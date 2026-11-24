@@ -81,7 +81,7 @@ unsafe fn i31_decode_reduce(x: *mut u32, src: *const u8, len: i32, m: *const u32
     var si = 0
     while si < len:
         let raw = *(src + si as u64)
-        var acc: u64 = raw as u64
+        var acc: u64 = raw
         var j = 1
         while j <= mlen:
             let cur = *(x + j as u64)
