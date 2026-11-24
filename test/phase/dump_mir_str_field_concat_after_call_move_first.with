@@ -1,0 +1,20 @@
+//! args: --dump-mir
+//! expect-check-stdout: _1.buf = str_concat_n([move _1.buf
+//! expect-check-stdout-not: = str_concat_n([copy _1.buf
+
+// A call that could have kept a copy of the field no longer forces the
+// copying append (#561): a copy is a counted holder (D111), and the append
+// writes in place only as the sole holder. That such a copy keeps its bytes
+// is behav_561_receiver_field_append's to show.
+type Acc { buf: str, name: str }
+
+fn touch(a: &Acc) -> i32:
+    if a.buf.len() > 100:
+        return 1
+    0
+
+fn call_taints_base -> str:
+    var a = Acc { buf: "", name: "n" }
+    let _ = touch(a)
+    a.buf = a.buf ++ "x"
+    a.buf
