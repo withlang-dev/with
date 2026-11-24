@@ -31523,6 +31523,22 @@ impl Sema:
             return 0
         self.if_chain_contains_node(else_body, needle)
 
+    // #3061 (item 5): `List.new()` / `HashMap.new()` / `HashSet.new()` where
+    // the site demands that very type (a struct-literal field, an argument,
+    // an assignment, a return) is the empty literal the demand types (D93).
+    // A let with a written type is recorded with its binding too
+    // (ceremony_list_news); the rewriter makes that one edit, not two.
+    mut fn note_demanded_empty_new(node: i32, expected: TypeId, actual: TypeId):
+        if expected == 0 or actual != expected or self.ast.kind(node) != NodeKind.NK_CALL or self.ast.get_data2(node) != 0: return
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS or self.pool_resolve(self.ast.get_data1(callee)) != "new": return
+        let owner = self.ast.get_data0(callee)
+        if self.ast.kind(owner) != NodeKind.NK_IDENT: return
+        let owner_sym = self.canonical_symbol_by_text(self.ast.get_data0(owner))
+        if owner_sym != self.syms.list and owner_sym != self.syms.hashmap and owner_sym != self.syms.hashset: return
+        self.ceremony_demanded_news.insert(node, 1)
+        self.ceremony_let_paths.insert(node, self.ceremony_node_path(node))
+
     mut fn check_expr_with_expected(node: i32, expected: TypeId) -> TypeId:
         let saved_expected = self.expected_expr_type
         let saved_has = self.has_expected_type
@@ -31552,6 +31568,7 @@ impl Sema:
         // default (a List, D113) already meets too, so two that disagree are
         // an error at the second.
         self.note_literal_demand(node, expected as i32, node)
+        self.note_demanded_empty_new(node, expected, out)
         self.stmt_pos_depth = saved_stmt_depth
         self.match_in_stmt_pos = saved_match_stmt
         self.current_value_expr_root = saved_value_root
