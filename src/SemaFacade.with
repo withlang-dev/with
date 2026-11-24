@@ -2259,7 +2259,11 @@ impl Sema:
             else:
                 self.emit_error_with_help(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true', 'false', a constant the header defines or 'sizeof(T)' (§16.2b.11)", clause, "'param N fixed 0', 'param N fixed null' or 'param N fixed true'; a value the caller chooses stays a parameter")
                 return c
-            if self.facade_param_receives(fn_sym, pi).len() > 0:
+            // D214: on a producer, a parent fixed to null is the absent parent:
+            // the constructor takes none and its value depends on nothing.
+            // That NULL is accepted there is the contract's stated claim.
+            let absent_parent = lk == NodeKind.NK_NULL_LIT and self.facade_resource_produced_by(fn_sym).len() > 0
+            if not absent_parent and self.facade_param_receives(fn_sym, pi).len() > 0:
                 self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds {shown}, which receives a modeled resource; a resource is passed by the value that owns it, never fixed (§16.2b.11)", clause, f"delete 'param {pi} fixed …': the presented operation takes the resource itself, as its receiver when it is the first parameter")
                 return c
             for k in 0..c.fixed_params.len():
@@ -3379,6 +3383,10 @@ impl Sema:
         if ci >= 0:
             for k in 0..self.foreign_contracts[ci].buffer_ptr.len():
                 if self.foreign_contracts[ci].buffer_ptr[k] == pi: return out
+            // A parameter the contract fixes is passed by the facade, not
+            // received from the caller (D214: a producer's absent parent).
+            for k in 0..self.foreign_contracts[ci].fixed_params.len():
+                if self.foreign_contracts[ci].fixed_params[k] == pi: return out
         let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
         let pointee = if self.get_type_kind(p) == TypeKind.TY_PTR: self.get_type_d0(p) else: 0
         for i in 0..self.facade_resources.len():

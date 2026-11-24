@@ -1,0 +1,33 @@
+//! expect-stdout: 1 7
+//! expect-stdout: ok
+
+// D214 (#3122): on a producer, `param N fixed null` on the parameter that
+// would receive its parent is the absent parent. The constructor takes
+// none (`Mime.new()`), lands on the produced type, and does not collide
+// with the parent's own `new`.
+use c_import("d214_mime.h")
+
+c contract m:
+    resource Easy wraps *mut easy
+        from easy_init
+        drop easy_cleanup
+    resource Mime wraps *mut mime
+        from mime_init
+        drop mime_free
+    fn mime_init
+        rename new
+        param 0 fixed null    // d214_mime.h: a null parent makes an independent mime
+    fn mime_parts
+        lend
+    fn easy_count
+        lend
+    fn easy_init
+        rename new
+
+fn solo() -> Mime: Mime.new().unwrap()
+
+fn main:
+    let e = Easy.new().unwrap()
+    let m = solo()
+    print(f"{m.parts()} {e.count()}")
+    print("ok")
