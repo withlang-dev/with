@@ -119,11 +119,13 @@ fn emitc_push_host_c_flags(argv: List[str]) -> List[str]:
 
 fn emitc_push_system_libs(argv: List[str]) -> List[str]:
     if os() == "Windows":
-        // rt.o's platform surface: winsock, dbghelp (backtraces), crypt32
-        // (trust store), as bs_emit_c_cc_args links it.
-        argv |> push("-lws2_32")
-        argv |> push("-ldbghelp")
-        argv |> push("-lcrypt32")
+        // The import libraries the real link joins (Link.with
+        // link_stage_windows_system_libs): rt.o's platform surface (winsock,
+        // dbghelp for backtraces, crypt32 for the trust store) and what
+        // LLVM's own libraries call when the whole compiler is linked
+        // (COM and the shell's folder GUIDs, version resources, ntdll).
+        for name in ["kernel32", "ntdll", "advapi32", "bcrypt", "crypt32", "ws2_32", "dbghelp", "shell32", "user32", "ole32", "oleaut32", "version", "psapi", "uuid"]:
+            argv |> push("-l" ++ name)
     else if os() == "Linux":
         argv |> push("-lm")
     argv
