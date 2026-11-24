@@ -119,11 +119,13 @@ fn emitc_push_host_c_flags(argv: List[str]) -> List[str]:
 
 fn emitc_push_system_libs(argv: List[str]) -> List[str]:
     if os() == "Windows":
-        // rt.o's platform surface: winsock, dbghelp (backtraces), crypt32
-        // (trust store), as bs_emit_c_cc_args links it.
-        argv |> push("-lws2_32")
-        argv |> push("-ldbghelp")
-        argv |> push("-lcrypt32")
+        // The import libraries the real link joins (Link.with
+        // link_stage_windows_system_libs): rt.o's platform surface (winsock,
+        // dbghelp for backtraces, crypt32 for the trust store) and what
+        // LLVM's own libraries call when the whole compiler is linked
+        // (COM and the shell's folder GUIDs, version resources, ntdll).
+        for name in ["kernel32", "ntdll", "advapi32", "bcrypt", "crypt32", "ws2_32", "dbghelp", "shell32", "user32", "ole32", "oleaut32", "version", "psapi", "uuid"]:
+            argv |> push("-l" ++ name)
     else if os() == "Linux":
         argv |> push("-lm")
     argv
@@ -573,6 +575,9 @@ fn emitc_compile_c_compiler(ctx: &ActionCtx, compiler_path: &str, main_c: &str, 
     argv |> push("-include")
     argv |> push(emitc_abs(root, emitc_decls_beside(main_c)))
     argv |> push("@" ++ emitc_abs(root, llvm_rsp))
+    // After the objects that need them: the linker resolves a library
+    // against what it has already read.
+    argv = emitc_push_system_libs(argv)
     emitc_run_capture(ctx, "compile-with-from-c", argv, 600000)
 
 fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_path: &str) -> i32:
@@ -597,6 +602,9 @@ fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_p
     argv |> push("-include")
     argv |> push(emitc_abs(root, emitc_decls_beside(main_c)))
     argv |> push("@" ++ emitc_abs(root, "out/lib/llvm_link.rsp"))
+    // After the objects that need them: the linker resolves a library
+    // against what it has already read.
+    argv = emitc_push_system_libs(argv)
     emitc_run_capture(ctx, "compile-with-from-c-full", argv, 900000)
 
 fn emitc_migrate_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str, output_w: &str) -> i32:
