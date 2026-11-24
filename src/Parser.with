@@ -3842,6 +3842,10 @@ impl Parser:
         self.pool.add_node(NodeKind.NK_TYPE_GENERIC, start, self.prev_end(), type_name, extra_start, args.len() as i32)
 
     mut fn parse_impl_block(vis: i32):
+        // A function attribute above the block belongs to no function: it
+        // was dropped without a word (#727).
+        if self.pending_suspends != 0 or self.pending_must_use != 0 or self.pending_tailrec != 0 or self.pending_inline != 0 or self.pending_noinline != 0 or self.pending_no_alloc != 0:
+            self.emit_error("this attribute applies to a function: write it above the method inside the impl block, not above the block")
         let start = self.current_start()
         if self.peek() == TokenKind.TK_KW_PUB:
             self.advance()

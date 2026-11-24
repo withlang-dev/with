@@ -377,8 +377,8 @@ pub fn Once.new() -> Once:
     (unsafe *state).state = 0
     Once { ptr: state as *mut u8 }
 
-@[suspends]
 impl Once:
+    @[suspends]
     pub fn call_once(init: fn() -> Unit) -> Unit:
         let state = self.ptr as *mut OnceState
         let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
@@ -456,8 +456,8 @@ pub fn Barrier.new(parties: i32) -> Barrier:
     (unsafe *state).locked = 0
     Barrier { ptr: state as *mut u8 }
 
-@[suspends]
 impl Barrier:
+    @[suspends]
     pub fn wait() -> bool:
         let state = self.ptr as *mut BarrierState
         unsafe { sync_barrier_lock(state) }

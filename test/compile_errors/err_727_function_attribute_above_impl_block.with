@@ -1,0 +1,12 @@
+//! expect-check-fail: this attribute applies to a function: write it above the method inside the impl block, not above the block
+
+// A function attribute above an impl block was dropped without a word, so
+// the method it was meant for carried nothing (#727).
+type Gate { n: i32 }
+
+@[suspends]
+impl Gate:
+    fn pass() -> i32: self.n
+
+fn main:
+    print(Gate { n: 1 }.pass())
