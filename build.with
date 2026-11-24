@@ -2063,6 +2063,11 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
 fn validate_all_tests_head(compiler: &str) -> List[str]:
     [build_owned_text(compiler), "test", "--validate-only", "--quiet"]
 
+// A batch that never spawns writes no stderr: read it as an optional file
+// (#953) instead of panicking on the missing path.
+fn validate_all_tests_stderr(fs: &ToolFs, out_dir: &str) -> str:
+    fs.read_text_opt(build_project_join(out_dir, "validate.stderr")).unwrap_or("(the test run never started; validate.stderr was not written)")
+
 fn run_validate_all_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -2091,7 +2096,7 @@ fn run_validate_all_tests_action(ctx: ActionCtx) -> i32:
             if used > 0 and used + abs.len() + 3 > budget:
                 let vr = ctx.process_runner().run_capture_cwd(batch, vout, verr, 1800000, root)
                 if vr.rc != 0:
-                    ctx.diagnostics().error(f"validate-all-tests: rc={vr.rc} in the batch ending before {p}\n" ++ fs.read_text(build_project_join(out_dir, "validate.stderr")))
+                    ctx.diagnostics().error(f"validate-all-tests: rc={vr.rc} in the batch ending before {p}\n" ++ validate_all_tests_stderr(fs, out_dir))
                 batch = validate_all_tests_head(compiler)
                 used = 0
             used = used + abs.len() + 3
@@ -2100,7 +2105,7 @@ fn run_validate_all_tests_action(ctx: ActionCtx) -> i32:
     if used > 0:
         let vr = ctx.process_runner().run_capture_cwd(batch, vout, verr, 1800000, root)
         if vr.rc != 0:
-            ctx.diagnostics().error(f"validate-all-tests: rc={vr.rc} in the last batch\n" ++ fs.read_text(build_project_join(out_dir, "validate.stderr")))
+            ctx.diagnostics().error(f"validate-all-tests: rc={vr.rc} in the last batch\n" ++ validate_all_tests_stderr(fs, out_dir))
     print(f"validate-all-tests: {count} files ok")
     fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
