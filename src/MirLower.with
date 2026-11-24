@@ -5285,16 +5285,31 @@ impl MirBuilder:
             // the rewrite stays off — a silent 0 here was a wrong move.
             1
 
+    // Fields and tuple elements, through the receiver's dereference or not:
+    // a place one assignment names whole.
+    fn place_is_field_path(place: i32) -> bool:
+        let start = self.body.place_proj_starts[place]
+        let count = self.body.place_proj_counts[place]
+        var fields = 0
+        for i in 0..count:
+            let kind = self.body.proj_kinds[start + i]
+            if kind == ProjKind.PK_FIELD or kind == ProjKind.PK_TUPLE_INDEX: fields = fields + 1
+            else if kind != ProjKind.PK_DEREF: return false
+        fields > 0
+
     fn string_move_first_place_eligible(place: i32) -> bool:
         if self.place_type_is_str(place) == false:
             return false
         let direct = self.direct_place_local(place)
         if direct >= 0:
             return true
-        if self.place_field_projection_count(place) <= 0:
+        if not self.place_is_field_path(place):
             return false
+        // A field of a parameter (a receiver's `self.buf`) is eligible too:
+        // the caller may hold a copy of the str, but copies are counted
+        // (D111) and the runtime writes in place only as the sole holder.
         let base_local = self.place_base_local(place)
-        if base_local <= 0 or base_local <= self.body.n_params:
+        if base_local <= 0:
             return false
         if base_local < self.body.local_names.len() and self.body.local_names[base_local] == 0:
             return false
@@ -5326,7 +5341,7 @@ impl MirBuilder:
             return -1
 
         let dest_place = self.lower_expr_place(place_expr)
-        if self.string_move_first_place_eligible(dest_place) == false or self.string_place_may_alias(dest_place) != 0:
+        if self.string_move_first_place_eligible(dest_place) == false:
             return -1
         let root_sym = self.place_expr_root_symbol(place_expr)
         if self.symbol_is_module_storage(root_sym):

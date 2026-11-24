@@ -3315,12 +3315,18 @@ pub fn with_str_concat_n_move_first(parts: *const str, count: i64) -> str:
     // exact reallocation here would copy the whole string on every append.
     // Only this loop-shaped self-append path over-allocates; one-shot concats
     // (with_str_concat_n) stay exact.
+    // The capacity doubles only when the result outgrows it. A first part
+    // that fits but has another holder is copied into a buffer of the same
+    // capacity: doubling there too doubled on every append of a str that
+    // stays shared (one lent to C each time round a loop), 16 bytes to 2^64
+    // in sixty appends (#561).
     var new_size = total + 1
     if first_owned != 0:
-        let doubled = (first_cap + 1) * 2
-        if doubled > new_size:
-            new_size = doubled
-    let out = rt_alloc(new_size)
+        let held = first_cap + 1
+        let grown = if new_size > held: held * 2 else: held
+        if grown > new_size:
+            new_size = grown
+    let out = rt_alloc_with_origin(new_size, DBG_ORIGIN_STR)
     var offset: i64 = 0
     for i in 0..count:
         let part_len = str_concat_part_len(parts, i)

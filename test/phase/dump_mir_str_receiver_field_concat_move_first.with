@@ -1,0 +1,15 @@
+//! args: --dump-mir
+//! expect-check-stdout: _1.buf = str_concat_n([move _1.buf, copy _3.*])
+//! expect-check-stdout-not: = str_concat_n([copy _1.buf
+
+// #561: a str field of the receiver, and of a parameter taken by value,
+// appends in place as a local does.
+type Acc { buf: str, name: str }
+
+impl Acc:
+    mut fn add(x: &str):
+        self.buf = self.buf ++ x
+
+fn append_owned(a: Acc, x: &str) -> Acc:
+    a.buf = a.buf ++ x
+    a

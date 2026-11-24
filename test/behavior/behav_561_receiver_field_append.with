@@ -1,0 +1,73 @@
+//! expect-stdout: 2000000 prior
+//! expect-stdout: ab a ac
+//! expect-stdout: kept=seed now=seed+
+//! expect-stdout: by-value!
+//! expect-stdout: st s
+//! expect-stdout: ok
+// #561: `self.buf = self.buf ++ x` appends in place when this str is the
+// buffer's sole holder, for a field of the receiver or of a parameter as it
+// always did for a local. Every other holder is counted (D111), so a copy
+// taken before the call, a second extender of the same buffer, and a copy
+// the callee's caller kept all keep their bytes.
+
+type Acc {
+    buf: str,
+    n: i32,
+}
+
+impl Acc:
+    mut fn add(x: &str):
+        self.buf = self.buf ++ x
+        self.n = self.n + 1
+
+fn append_owned(a: Acc, x: &str) -> Acc:
+    a.buf = a.buf ++ x
+    a
+
+fn peek(a: &Acc) -> str: a.buf
+
+fn main:
+    // 200,000 appends through the receiver; a copy taken before the last
+    // one keeps the earlier bytes.
+    var a = Acc { buf: "", n: 0 }
+    for _ in 0..200000:
+        a.add("0123456789")
+    let prior = a.buf
+    a.add("tail")
+    assert(a.buf.len() == 2000004 and a.buf.ends_with("9tail") and a.n == 200001)
+    assert(prior.ends_with("0123456789"))
+    print(f"{prior.len()} prior")
+
+    // Two extenders of one shared buffer.
+    var left = Acc { buf: "a", n: 0 }
+    let shared = left.buf
+    var right = Acc { buf: shared, n: 0 }
+    left.add("b")
+    right.add("c")
+    print(f"{left.buf} {shared} {right.buf}")
+
+    // A copy handed out by a callee, then an append.
+    var c = Acc { buf: "se" ++ "ed", n: 0 }
+    let kept = peek(c)
+    c.add("+")
+    print(f"kept={kept} now={c.buf}")
+
+    // A field of a parameter taken by value.
+    let d = append_owned(Acc { buf: "by-" ++ "value", n: 0 }, "!")
+    print(d.buf)
+
+    // A local with a second holder.
+    var s = "s" ++ ""
+    let t = s
+    s = s ++ "t"
+    print(f"{s} {t}")
+
+    // A str that has a second holder at every append: each append copies,
+    // and the capacity grows with the length, not on every copy (it
+    // doubled each time: 2^64 bytes asked for after sixty appends).
+    var grown = ""
+    for n in 0..500:
+        let before = grown
+        grown = grown ++ "x"
+        assert(before.len() == n and grown.len() == n + 1)
+    print("ok")
