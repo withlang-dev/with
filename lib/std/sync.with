@@ -146,49 +146,52 @@ pub fn Mutex.new[T](value: T) -> Mutex[T]:
 pub fn mutex_new(value: i64) -> Mutex[i64]:
     Mutex.new(value)
 
-/// Acquire the mutex (`with m.lock() as data:` or `with m.lock() as mut data:`).
-@[suspends]
-pub fn Mutex.lock[T](self: &Self) -> MutexGuardMut[T]: self.enter_mut()
+impl[T] Mutex[T]:
+    /// Acquire the mutex (`with m.lock() as data:` or `with m.lock() as mut data:`).
+    @[suspends]
+    pub fn lock() -> MutexGuardMut[T]: self.enter_mut()
 
-/// Acquire the mutex for reading.
-@[suspends]
-pub fn Mutex.enter[T](self: &Self) -> MutexGuard[T]:
-    unsafe { sync_mutex_lock_state(self.ptr as *mut MutexState) }
-    MutexGuard { ptr: self.ptr }
+    /// Acquire the mutex for reading.
+    @[suspends]
+    pub fn enter() -> MutexGuard[T]:
+        unsafe { sync_mutex_lock_state(self.ptr as *mut MutexState) }
+        MutexGuard { ptr: self.ptr }
 
-/// Acquire the mutex for writing.
-@[suspends]
-pub fn Mutex.enter_mut[T](self: &Self) -> MutexGuardMut[T]:
-    unsafe { sync_mutex_lock_state(self.ptr as *mut MutexState) }
-    MutexGuardMut { ptr: self.ptr }
+    /// Acquire the mutex for writing.
+    @[suspends]
+    pub fn enter_mut() -> MutexGuardMut[T]:
+        unsafe { sync_mutex_lock_state(self.ptr as *mut MutexState) }
+        MutexGuardMut { ptr: self.ptr }
 
-/// Release the read guard, returning a Copy snapshot of the current value.
-pub fn MutexGuard.exit[T: Copy](move self: Self) -> T:
-    let state = self.ptr as *mut MutexState
-    unsafe { *((*state).value as *mut T) }
+impl[T: Copy] MutexGuard[T]:
+    /// Release the read guard, returning a Copy snapshot of the current value.
+    pub move fn exit() -> T:
+        let state = self.ptr as *mut MutexState
+        unsafe { *((*state).value as *mut T) }
 
-/// Release the write guard, returning a Copy snapshot of the current value.
-pub fn MutexGuardMut.exit[T: Copy](move self: Self) -> T:
-    let state = self.ptr as *mut MutexState
-    unsafe { *((*state).value as *mut T) }
+impl[T: Copy] MutexGuardMut[T]:
+    /// Release the write guard, returning a Copy snapshot of the current value.
+    pub move fn exit() -> T:
+        let state = self.ptr as *mut MutexState
+        unsafe { *((*state).value as *mut T) }
 
 impl[T] Scoped[&T] for MutexGuard[T]:
-    fn with_enter(self: &Self) -> &T:
+    fn with_enter() -> &T:
         let state = self.ptr as *mut MutexState
         unsafe { (*state).value as &T }
 
     // The guard's Drop releases the lock when the `with` ends.
-    fn with_exit(self: &Self) -> Unit: ()
+    fn with_exit() -> Unit: ()
 
 impl[T] Scoped[&T] for MutexGuardMut[T]:
-    fn with_enter(self: &Self) -> &T:
+    fn with_enter() -> &T:
         let state = self.ptr as *mut MutexState
         unsafe { (*state).value as &T }
 
-    fn with_exit(self: &Self): ()
+    fn with_exit(): ()
 
 impl[T] ScopedMut[T] for MutexGuardMut[T]:
-    fn with_enter_mut(self: &Self) -> T:
+    fn with_enter_mut() -> T:
         let state = self.ptr as *mut MutexState
         unsafe { *((*state).value as *mut T) }
 
@@ -218,18 +221,19 @@ pub fn mutex_get(m: &Mutex[i64]) -> i64:
     let guard = m.enter()
     guard.exit()
 
-/// Set the value inside a Mutex.
-@[suspends]
-pub fn Mutex.set[T](self: &Self, value: T) -> Unit:
-    let state = self.ptr as *mut MutexState
-    let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
-    while (unsafe *locked).swap(1, .Acquire) != 0:
-        sync_wait_for_progress()
-    let value_ptr = (unsafe *state).value as *mut T
-    let old = unsafe *value_ptr
-    drop(old)
-    unsafe { *value_ptr = value }
-    (unsafe *locked).store(0, .Release)
+impl[T] Mutex[T]:
+    /// Set the value inside a Mutex.
+    @[suspends]
+    pub fn set(value: T) -> Unit:
+        let state = self.ptr as *mut MutexState
+        let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
+        while (unsafe *locked).swap(1, .Acquire) != 0:
+            sync_wait_for_progress()
+        let value_ptr = (unsafe *state).value as *mut T
+        let old = unsafe *value_ptr
+        drop(old)
+        unsafe { *value_ptr = value }
+        (unsafe *locked).store(0, .Release)
 
 impl[T] Drop for Mutex[T]:
     move fn drop():
@@ -253,67 +257,70 @@ pub fn RwLock.new[T](value: T) -> RwLock[T]:
 pub fn rwlock_new(value: i64) -> RwLock[i64]:
     RwLock.new(value)
 
-/// Acquire for reading (`with rw.read() as data:`).
-@[suspends]
-pub fn RwLock.read[T](self: &Self) -> RwReadGuard[T]: self.enter()
+impl[T] RwLock[T]:
+    /// Acquire for reading (`with rw.read() as data:`).
+    @[suspends]
+    pub fn read() -> RwReadGuard[T]: self.enter()
 
-/// Acquire for writing (`with rw.write() as mut data:` or `with rw.write() as data:`).
-@[suspends]
-pub fn RwLock.write[T](self: &Self) -> RwWriteGuard[T]: self.enter_mut()
+    /// Acquire for writing (`with rw.write() as mut data:` or `with rw.write() as data:`).
+    @[suspends]
+    pub fn write() -> RwWriteGuard[T]: self.enter_mut()
 
-/// Acquire for reading.
-@[suspends]
-pub fn RwLock.enter[T](self: &Self) -> RwReadGuard[T]:
-    let state = self.ptr as *mut RwLockState
-    let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
-    while true:
-        let old = (unsafe *word).load(.Acquire)
-        if old >= 0:
-            match (unsafe *word).compare_exchange(old, old + 1, .Acquire, .Relaxed):
-                Ok(_) => return RwReadGuard { ptr: self.ptr }
+    /// Acquire for reading.
+    @[suspends]
+    pub fn enter() -> RwReadGuard[T]:
+        let state = self.ptr as *mut RwLockState
+        let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
+        while true:
+            let old = (unsafe *word).load(.Acquire)
+            if old >= 0:
+                match (unsafe *word).compare_exchange(old, old + 1, .Acquire, .Relaxed):
+                    Ok(_) => return RwReadGuard { ptr: self.ptr }
+                    Err(_) => ()
+            sync_wait_for_progress()
+        RwReadGuard { ptr: self.ptr }
+
+    /// Acquire for writing.
+    @[suspends]
+    pub fn enter_mut() -> RwWriteGuard[T]:
+        let state = self.ptr as *mut RwLockState
+        let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
+        while true:
+            match (unsafe *word).compare_exchange(0, -1, .Acquire, .Relaxed):
+                Ok(_) => return RwWriteGuard { ptr: self.ptr }
                 Err(_) => ()
-        sync_wait_for_progress()
-    RwReadGuard { ptr: self.ptr }
+            sync_wait_for_progress()
+        RwWriteGuard { ptr: self.ptr }
 
-/// Acquire for writing.
-@[suspends]
-pub fn RwLock.enter_mut[T](self: &Self) -> RwWriteGuard[T]:
-    let state = self.ptr as *mut RwLockState
-    let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
-    while true:
-        match (unsafe *word).compare_exchange(0, -1, .Acquire, .Relaxed):
-            Ok(_) => return RwWriteGuard { ptr: self.ptr }
-            Err(_) => ()
-        sync_wait_for_progress()
-    RwWriteGuard { ptr: self.ptr }
+impl[T: Copy] RwReadGuard[T]:
+    /// Release read guard, returning a Copy snapshot of the current value.
+    pub move fn exit() -> T:
+        let state = self.ptr as *mut RwLockState
+        unsafe { *((*state).value as *mut T) }
 
-/// Release read guard, returning a Copy snapshot of the current value.
-pub fn RwReadGuard.exit[T: Copy](move self: Self) -> T:
-    let state = self.ptr as *mut RwLockState
-    unsafe { *((*state).value as *mut T) }
-
-/// Release write guard, returning a Copy snapshot of the current value.
-pub fn RwWriteGuard.exit[T: Copy](move self: Self) -> T:
-    let state = self.ptr as *mut RwLockState
-    unsafe { *((*state).value as *mut T) }
+impl[T: Copy] RwWriteGuard[T]:
+    /// Release write guard, returning a Copy snapshot of the current value.
+    pub move fn exit() -> T:
+        let state = self.ptr as *mut RwLockState
+        unsafe { *((*state).value as *mut T) }
 
 impl[T] Scoped[&T] for RwReadGuard[T]:
-    fn with_enter(self: &Self) -> &T:
+    fn with_enter() -> &T:
         let state = self.ptr as *mut RwLockState
         unsafe { (*state).value as &T }
 
     // The guard's Drop releases the lock when the `with` ends.
-    fn with_exit(self: &Self) -> Unit: ()
+    fn with_exit() -> Unit: ()
 
 impl[T] Scoped[&T] for RwWriteGuard[T]:
-    fn with_enter(self: &Self) -> &T:
+    fn with_enter() -> &T:
         let state = self.ptr as *mut RwLockState
         unsafe { (*state).value as &T }
 
-    fn with_exit(self: &Self): ()
+    fn with_exit(): ()
 
 impl[T] ScopedMut[T] for RwWriteGuard[T]:
-    fn with_enter_mut(self: &Self) -> T:
+    fn with_enter_mut() -> T:
         let state = self.ptr as *mut RwLockState
         unsafe { *((*state).value as *mut T) }
 
@@ -339,21 +346,22 @@ pub fn rwlock_read(rw: &RwLock[i64]) -> i64:
     let guard = rw.enter()
     guard.exit()
 
-/// Set a new value inside a RwLock.
-@[suspends]
-pub fn RwLock.set[T](self: &Self, value: T):
-    let state = self.ptr as *mut RwLockState
-    let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
-    while true:
-        match (unsafe *word).compare_exchange(0, -1, .Acquire, .Relaxed):
-            Ok(_) => break
-            Err(_) => ()
-        sync_wait_for_progress()
-    let value_ptr = (unsafe *state).value as *mut T
-    let old = unsafe *value_ptr
-    drop(old)
-    unsafe { *value_ptr = value }
-    (unsafe *word).store(0, .Release)
+impl[T] RwLock[T]:
+    /// Set a new value inside a RwLock.
+    @[suspends]
+    pub fn set(value: T):
+        let state = self.ptr as *mut RwLockState
+        let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
+        while true:
+            match (unsafe *word).compare_exchange(0, -1, .Acquire, .Relaxed):
+                Ok(_) => break
+                Err(_) => ()
+            sync_wait_for_progress()
+        let value_ptr = (unsafe *state).value as *mut T
+        let old = unsafe *value_ptr
+        drop(old)
+        unsafe { *value_ptr = value }
+        (unsafe *word).store(0, .Release)
 
 impl[T] Drop for RwLock[T]:
     move fn drop():
@@ -370,27 +378,28 @@ pub fn Once.new() -> Once:
     Once { ptr: state as *mut u8 }
 
 @[suspends]
-pub fn Once.call_once(self: &Self, init: fn() -> Unit) -> Unit:
-    let state = self.ptr as *mut OnceState
-    let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
-    while true:
-        let current = (unsafe *word).load(.Acquire)
-        if current == 2:
-            return
-        if current == 0:
-            match (unsafe *word).compare_exchange(0, 1, .Acquire, .Relaxed):
-                Ok(_) => {
-                    var completed = false
-                    defer:
-                        if not completed:
-                            (unsafe *word).store(0, .Release)
-                    init()
-                    completed = true
-                    (unsafe *word).store(2, .Release)
-                    return
-                }
-                Err(_) => ()
-        sync_wait_for_progress()
+impl Once:
+    pub fn call_once(init: fn() -> Unit) -> Unit:
+        let state = self.ptr as *mut OnceState
+        let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
+        while true:
+            let current = (unsafe *word).load(.Acquire)
+            if current == 2:
+                return
+            if current == 0:
+                match (unsafe *word).compare_exchange(0, 1, .Acquire, .Relaxed):
+                    Ok(_) => {
+                        var completed = false
+                        defer:
+                            if not completed:
+                                (unsafe *word).store(0, .Release)
+                        init()
+                        completed = true
+                        (unsafe *word).store(2, .Release)
+                        return
+                    }
+                    Err(_) => ()
+            sync_wait_for_progress()
 
 impl Drop for Once:
     move fn drop():
@@ -402,37 +411,39 @@ pub fn Condvar.new() -> Condvar:
     (unsafe *state).signals = 0
     Condvar { ptr: state as *mut u8 }
 
-@[suspends]
-pub fn Condvar.wait[T](self: &Self, lock: &Mutex[T]) -> Unit:
-    let state = self.ptr as *mut CondvarState
-    let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
-    let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
-    (unsafe *waiters).fetch_add(1, .AcqRel)
-    unsafe { sync_mutex_unlock_state(lock.ptr as *mut MutexState) }
-    while true:
-        let available = (unsafe *signals).load(.Acquire)
-        if available > 0:
-            match (unsafe *signals).compare_exchange(available, available - 1, .AcqRel, .Relaxed):
-                Ok(_) => break
-                Err(_) => ()
-        sync_wait_for_progress()
-    (unsafe *waiters).fetch_sub(1, .AcqRel)
-    unsafe { sync_mutex_lock_state(lock.ptr as *mut MutexState) }
+impl[T] Condvar[T]:
+    @[suspends]
+    pub fn wait(lock: &Mutex[T]) -> Unit:
+        let state = self.ptr as *mut CondvarState
+        let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
+        let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
+        (unsafe *waiters).fetch_add(1, .AcqRel)
+        unsafe { sync_mutex_unlock_state(lock.ptr as *mut MutexState) }
+        while true:
+            let available = (unsafe *signals).load(.Acquire)
+            if available > 0:
+                match (unsafe *signals).compare_exchange(available, available - 1, .AcqRel, .Relaxed):
+                    Ok(_) => break
+                    Err(_) => ()
+            sync_wait_for_progress()
+        (unsafe *waiters).fetch_sub(1, .AcqRel)
+        unsafe { sync_mutex_lock_state(lock.ptr as *mut MutexState) }
 
-pub fn Condvar.notify_one(self: &Self) -> Unit:
-    let state = self.ptr as *mut CondvarState
-    let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
-    let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
-    if (unsafe *waiters).load(.Acquire) > 0:
-        (unsafe *signals).fetch_add(1, .Release)
+impl Condvar:
+    pub fn notify_one() -> Unit:
+        let state = self.ptr as *mut CondvarState
+        let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
+        let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
+        if (unsafe *waiters).load(.Acquire) > 0:
+            (unsafe *signals).fetch_add(1, .Release)
 
-pub fn Condvar.notify_all(self: &Self) -> Unit:
-    let state = self.ptr as *mut CondvarState
-    let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
-    let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
-    let count = (unsafe *waiters).load(.Acquire)
-    if count > 0:
-        (unsafe *signals).fetch_add(count, .Release)
+    pub fn notify_all() -> Unit:
+        let state = self.ptr as *mut CondvarState
+        let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
+        let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
+        let count = (unsafe *waiters).load(.Acquire)
+        if count > 0:
+            (unsafe *signals).fetch_add(count, .Release)
 
 impl Drop for Condvar:
     move fn drop():
@@ -447,27 +458,28 @@ pub fn Barrier.new(parties: i32) -> Barrier:
     Barrier { ptr: state as *mut u8 }
 
 @[suspends]
-pub fn Barrier.wait(self: &Self) -> bool:
-    let state = self.ptr as *mut BarrierState
-    unsafe { sync_barrier_lock(state) }
-    let generation = (unsafe *state).generation
-    let arrived = (unsafe *state).arrived + 1
-    if arrived >= (unsafe *state).parties:
-        (unsafe *state).arrived = 0
-        (unsafe *state).generation = generation + 1
-        unsafe { sync_barrier_unlock(state) }
-        return true
-    (unsafe *state).arrived = arrived
-    unsafe { sync_barrier_unlock(state) }
-
-    while true:
+impl Barrier:
+    pub fn wait() -> bool:
+        let state = self.ptr as *mut BarrierState
         unsafe { sync_barrier_lock(state) }
-        let done = (unsafe *state).generation != generation
+        let generation = (unsafe *state).generation
+        let arrived = (unsafe *state).arrived + 1
+        if arrived >= (unsafe *state).parties:
+            (unsafe *state).arrived = 0
+            (unsafe *state).generation = generation + 1
+            unsafe { sync_barrier_unlock(state) }
+            return true
+        (unsafe *state).arrived = arrived
         unsafe { sync_barrier_unlock(state) }
-        if done:
-            return false
-        sync_wait_for_progress()
-    false
+
+        while true:
+            unsafe { sync_barrier_lock(state) }
+            let done = (unsafe *state).generation != generation
+            unsafe { sync_barrier_unlock(state) }
+            if done:
+                return false
+            sync_wait_for_progress()
+        false
 
 impl Drop for Barrier:
     move fn drop():
@@ -484,6 +496,7 @@ pub fn atomic_new(value: i64) -> AtomicI64:
 pub fn atomic_load(a: &AtomicI64) -> i64:
     a.load(.SeqCst)
 
-/// Add `delta` atomically and return the new value.
-pub fn Atomic.add(mut self: Atomic[i64], delta: i64) -> i64:
-    self.fetch_add(delta, .SeqCst) + delta
+impl Atomic[i64]:
+    /// Add `delta` atomically and return the new value.
+    pub mut fn add(delta: i64) -> i64:
+        self.fetch_add(delta, .SeqCst) + delta

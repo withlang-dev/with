@@ -356,38 +356,39 @@ pub fn process_spec(executable: str) -> ProcessSpec:
         capture_stderr: true,
     }
 
-// D32 (§2.2): builder steps rebind the consumed receiver to a `var` and
-// mutate in place — no field leaves the value, so nothing vacates.
-pub fn ProcessSpec.arg(move self: Self, value: str) -> ProcessSpec:
-    var owned = self
-    owned.args.push(value)
-    owned
+impl ProcessSpec:
+    // D32 (§2.2): builder steps rebind the consumed receiver to a `var` and
+    // mutate in place — no field leaves the value, so nothing vacates.
+    pub move fn arg(value: str) -> ProcessSpec:
+        var owned = self
+        owned.args.push(value)
+        owned
 
-pub fn ProcessSpec.working_dir(move self: Self, path: str) -> ProcessSpec:
-    var owned = self
-    owned.cwd = path
-    owned
+    pub move fn working_dir(path: str) -> ProcessSpec:
+        var owned = self
+        owned.cwd = path
+        owned
 
-pub fn ProcessSpec.timeout(move self: Self, ms: i32) -> ProcessSpec:
-    var owned = self
-    owned.timeout_ms = ms
-    owned
+    pub move fn timeout(ms: i32) -> ProcessSpec:
+        var owned = self
+        owned.timeout_ms = ms
+        owned
 
-pub fn ProcessSpec.stdin(move self: Self, path: str) -> ProcessSpec:
-    var owned = self
-    owned.stdin_path = path
-    owned
+    pub move fn stdin(path: str) -> ProcessSpec:
+        var owned = self
+        owned.stdin_path = path
+        owned
 
-pub fn ProcessSpec.env_var(move self: Self, name: str, value: str) -> ProcessSpec:
-    var owned = self
-    owned.env = (move owned.env).set(name, value)
-    owned
+    pub move fn env_var(name: str, value: str) -> ProcessSpec:
+        var owned = self
+        owned.env = (move owned.env).set(name, value)
+        owned
 
-pub fn ProcessSpec.capture(move self: Self, stdout: bool, stderr: bool) -> ProcessSpec:
-    var owned = self
-    owned.capture_stdout = stdout
-    owned.capture_stderr = stderr
-    owned
+    pub move fn capture(stdout: bool, stderr: bool) -> ProcessSpec:
+        var owned = self
+        owned.capture_stdout = stdout
+        owned.capture_stderr = stderr
+        owned
 
 pub type ToolProcessResult {
     pub rc: i32,
@@ -507,128 +508,131 @@ pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCt
         process_runner: ProcessRunner { token, root, target_name: "", write_scope: List.new(), write_scoped: false, network: false },
     }
 
-pub fn BuildCtx.project_info(self: &Self) -> &ProjectInfo:
-    tool_capability_require(self.token, "BuildCtx")
-    &self.project
+impl BuildCtx:
+    pub fn project_info() -> &ProjectInfo:
+        tool_capability_require(self.token, "BuildCtx")
+        &self.project
 
-pub fn BuildCtx.new_build(self: &Self) -> Build:
-    tool_capability_require(self.token, "BuildCtx")
-    new_build(Package { name: with_str_clone_ref(self.project.package.name), version: with_str_clone_ref(self.project.package.version) })
+    pub fn new_build() -> Build:
+        tool_capability_require(self.token, "BuildCtx")
+        new_build(Package { name: with_str_clone_ref(self.project.package.name), version: with_str_clone_ref(self.project.package.version) })
 
-pub fn BuildCtx.diagnostics(self: &Self) -> &Diagnostics:
-    tool_capability_require(self.token, "Diagnostics")
-    self.diagnostics
+    pub fn diagnostics() -> &Diagnostics:
+        tool_capability_require(self.token, "Diagnostics")
+        self.diagnostics
 
-pub fn BuildCtx.source_emitter(self: &Self) -> &SourceEmitter:
-    tool_capability_require(self.token, "SourceEmitter")
-    self.source_emitter
+    pub fn source_emitter() -> &SourceEmitter:
+        tool_capability_require(self.token, "SourceEmitter")
+        self.source_emitter
 
-pub fn BuildCtx.fs(self: &Self) -> &ToolFs:
-    tool_capability_require(self.token, "ToolFs")
-    self.fs
+    pub fn fs() -> &ToolFs:
+        tool_capability_require(self.token, "ToolFs")
+        self.fs
 
-pub fn BuildCtx.process_runner(self: &Self) -> &ProcessRunner:
-    tool_capability_require(self.token, "ProcessRunner")
-    self.process_runner
+    pub fn process_runner() -> &ProcessRunner:
+        tool_capability_require(self.token, "ProcessRunner")
+        self.process_runner
 
-/// The environment variable `name` ("" when unset), read as a declared
-/// input of the build graph (§17.1a): the value is recorded, and a later
-/// build whose value differs builds the graph again. A build file reads the
-/// environment only this way; `env()` and a raw read are refused at comptime.
-///
-///     let jobs = ctx.env_input("MY_JOBS")
-pub fn BuildCtx.env_input(self: &Self, name: &str) -> str:
-    tool_capability_require(self.token, "BuildCtx")
-    tool_effect_record_env("", name)
-    with_getenv_str(name)
+    /// The environment variable `name` ("" when unset), read as a declared
+    /// input of the build graph (§17.1a): the value is recorded, and a later
+    /// build whose value differs builds the graph again. A build file reads the
+    /// environment only this way; `env()` and a raw read are refused at comptime.
+    ///
+    ///     let jobs = ctx.env_input("MY_JOBS")
+    pub fn env_input(name: &str) -> str:
+        tool_capability_require(self.token, "BuildCtx")
+        tool_effect_record_env("", name)
+        with_getenv_str(name)
 
-// #921: the Workspace surface drives an in-process Compilation and exists
-// only under the compiler driver's comptime evaluation. In a natively
-// compiled build runner these stubs exit 97 — a reserved code the driver
-// maps to "re-run this action through the comptime evaluator", never a
-// build failure.
-pub fn BuildCtx.create_workspace(self: &Self, name: &str) -> Workspace:
-    tool_capability_require(self.token, "Workspace")
-    with_eprint("error: BuildCtx.create_workspace requires compiler driver comptime evaluation\n")
-    exit(97)
+    // #921: the Workspace surface drives an in-process Compilation and exists
+    // only under the compiler driver's comptime evaluation. In a natively
+    // compiled build runner these stubs exit 97 — a reserved code the driver
+    // maps to "re-run this action through the comptime evaluator", never a
+    // build failure.
+    pub fn create_workspace(name: &str) -> Workspace:
+        tool_capability_require(self.token, "Workspace")
+        with_eprint("error: BuildCtx.create_workspace requires compiler driver comptime evaluation\n")
+        exit(97)
 
-pub fn BuildCtx.current_workspace(self: &Self) -> Workspace:
-    tool_capability_require(self.token, "Workspace")
-    with_eprint("error: BuildCtx.current_workspace requires compiler driver comptime evaluation\n")
-    exit(97)
+    pub fn current_workspace() -> Workspace:
+        tool_capability_require(self.token, "Workspace")
+        with_eprint("error: BuildCtx.current_workspace requires compiler driver comptime evaluation\n")
+        exit(97)
 
-pub fn ActionCtx.create_workspace(self: &Self, name: &str) -> Workspace:
-    tool_capability_require(self.token, "Workspace")
-    Workspace { token: self.token, id: ws_alloc_id(name) }
+impl ActionCtx:
+    pub fn create_workspace(name: &str) -> Workspace:
+        tool_capability_require(self.token, "Workspace")
+        Workspace { token: self.token, id: ws_alloc_id(name) }
 
-pub fn ActionCtx.current_workspace(self: &Self) -> Workspace:
-    tool_capability_require(self.token, "Workspace")
-    with_eprint("error: ActionCtx.current_workspace requires compiler driver comptime evaluation\n")
-    exit(97)
+    pub fn current_workspace() -> Workspace:
+        tool_capability_require(self.token, "Workspace")
+        with_eprint("error: ActionCtx.current_workspace requires compiler driver comptime evaluation\n")
+        exit(97)
 
-pub fn Workspace.name(self: &Self) -> str:
-    tool_capability_require(self.token, "Workspace")
-    var loaded = ws_state_load(self.id)
-    move loaded.name
+impl Workspace:
+    pub fn name() -> str:
+        tool_capability_require(self.token, "Workspace")
+        var loaded = ws_state_load(self.id)
+        move loaded.name
 
-pub fn Workspace.add_file(self: &Self, path: &str):
-    tool_capability_require(self.token, "Workspace")
-    var s = ws_state_load(self.id)
-    s.files.push(with_str_clone_ref(path))
-    ws_state_store(self.id, &s)
+    pub fn add_file(path: &str):
+        tool_capability_require(self.token, "Workspace")
+        var s = ws_state_load(self.id)
+        s.files.push(with_str_clone_ref(path))
+        ws_state_store(self.id, &s)
 
-pub fn Workspace.add_string(self: &Self, name: &str, source: &str):
-    tool_capability_require(self.token, "Workspace")
-    var s = ws_state_load(self.id)
-    s.string_names.push(with_str_clone_ref(name))
-    s.string_texts.push(with_str_clone_ref(source))
-    ws_state_store(self.id, &s)
+    pub fn add_string(name: &str, source: &str):
+        tool_capability_require(self.token, "Workspace")
+        var s = ws_state_load(self.id)
+        s.string_names.push(with_str_clone_ref(name))
+        s.string_texts.push(with_str_clone_ref(source))
+        ws_state_store(self.id, &s)
 
-pub fn Workspace.options(self: &Self) -> BuildOptions:
-    tool_capability_require(self.token, "Workspace")
-    var loaded = ws_state_load(self.id)
-    move loaded.options
+    pub fn options() -> BuildOptions:
+        tool_capability_require(self.token, "Workspace")
+        var loaded = ws_state_load(self.id)
+        move loaded.options
 
-pub fn Workspace.set_options(self: &Self, options: BuildOptions):
-    tool_capability_require(self.token, "Workspace")
-    var s = ws_state_load(self.id)
-    s.options = options
-    s.has_options = true
-    ws_state_store(self.id, &s)
+    pub fn set_options(options: BuildOptions):
+        tool_capability_require(self.token, "Workspace")
+        var s = ws_state_load(self.id)
+        s.options = options
+        s.has_options = true
+        ws_state_store(self.id, &s)
 
-// These driver-interpreted operations return Unit at comptime. The native
-// unsupported-operation exit is not their return contract; inferring Never
-// from that fallback would make valid comptime continuation unreachable.
-pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions) -> Unit:
-    tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.set_migrate_options requires compiler driver comptime evaluation\n")
-    exit(97)
+    // These driver-interpreted operations return Unit at comptime. The native
+    // unsupported-operation exit is not their return contract; inferring Never
+    // from that fallback would make valid comptime continuation unreachable.
+    pub fn set_migrate_options(options: MigrateOptions) -> Unit:
+        tool_capability_require(self.token, "Workspace")
+        with_eprint("error: Workspace.set_migrate_options requires compiler driver comptime evaluation\n")
+        exit(97)
 
-pub fn Workspace.compile(self: &Self) -> BuildResult:
-    tool_capability_require(self.token, "Workspace")
-    let s = ws_state_load(self.id)
-    let plan = ws_build_plan(&s, with_getenv_str("WITH_BUILD_RUNNER_ROOT"))
-    ws_run_compile_child(self.id, &plan)
+    pub fn compile() -> BuildResult:
+        tool_capability_require(self.token, "Workspace")
+        let s = ws_state_load(self.id)
+        let plan = ws_build_plan(&s, with_getenv_str("WITH_BUILD_RUNNER_ROOT"))
+        ws_run_compile_child(self.id, &plan)
 
-pub fn Workspace.begin_intercept(self: &Self) -> Unit:
-    tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.begin_intercept requires compiler driver comptime evaluation\n")
-    exit(97)
+    pub fn begin_intercept() -> Unit:
+        tool_capability_require(self.token, "Workspace")
+        with_eprint("error: Workspace.begin_intercept requires compiler driver comptime evaluation\n")
+        exit(97)
 
-pub fn Workspace.wait_for_message(self: &Self) -> CompilerMessageEnvelope:
-    tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.wait_for_message requires compiler driver comptime evaluation\n")
-    exit(97)
+    pub fn wait_for_message() -> CompilerMessageEnvelope:
+        tool_capability_require(self.token, "Workspace")
+        with_eprint("error: Workspace.wait_for_message requires compiler driver comptime evaluation\n")
+        exit(97)
 
-pub fn Workspace.end_intercept(self: &Self) -> Unit:
-    tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.end_intercept requires compiler driver comptime evaluation\n")
-    exit(97)
+    pub fn end_intercept() -> Unit:
+        tool_capability_require(self.token, "Workspace")
+        with_eprint("error: Workspace.end_intercept requires compiler driver comptime evaluation\n")
+        exit(97)
 
-pub fn Workspace.set_link_command(self: &Self, command: LinkCommand) -> Unit:
-    tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.set_link_command requires compiler driver comptime evaluation\n")
-    exit(97)
+    pub fn set_link_command(command: LinkCommand) -> Unit:
+        tool_capability_require(self.token, "Workspace")
+        with_eprint("error: Workspace.set_link_command requires compiler driver comptime evaluation\n")
+        exit(97)
 
 pub fn parallel(workspaces: List[Workspace]) -> List[BuildResult]:
     with_eprint("error: parallel requires compiler driver comptime evaluation\n")
@@ -637,28 +641,31 @@ pub fn parallel(workspaces: List[Workspace]) -> List[BuildResult]:
 pub fn process_env() -> ProcessEnv:
     ProcessEnv { vars: List.new() }
 
-pub fn ProcessEnv.set(move self: Self, name: str, value: str) -> ProcessEnv:
-    var owned = self
-    owned.vars.push(ProcessEnvVar { name, value })
-    owned
+impl ProcessEnv:
+    pub move fn set(name: str, value: str) -> ProcessEnv:
+        var owned = self
+        owned.vars.push(ProcessEnvVar { name, value })
+        owned
 
-pub fn ProjectInfo.package_name(self: &Self) -> &str:
-    self.package.name
+impl ProjectInfo:
+    pub fn package_name() -> &str:
+        self.package.name
 
-pub fn ProjectInfo.package_version(self: &Self) -> &str:
-    self.package.version
+    pub fn package_version() -> &str:
+        self.package.version
 
-pub fn ProjectInfo.project_root(self: &Self) -> &str:
-    self.root
+    pub fn project_root() -> &str:
+        self.root
 
-pub fn Diagnostics.warn(self: &Self, message: &str):
-    tool_capability_require(self.token, "Diagnostics")
-    with_eprint("warning: " ++ message ++ "\n")
+impl Diagnostics:
+    pub fn warn(message: &str):
+        tool_capability_require(self.token, "Diagnostics")
+        with_eprint("warning: " ++ message ++ "\n")
 
-pub fn Diagnostics.error(self: &Self, message: str):
-    tool_capability_require(self.token, "Diagnostics")
-    with_eprint("error: " ++ message ++ "\n")
-    exit(1)
+    pub fn error(message: str):
+        tool_capability_require(self.token, "Diagnostics")
+        with_eprint("error: " ++ message ++ "\n")
+        exit(1)
 
 fn tool_path_is_project_relative(path: &str):
     if path.len() == 0:
@@ -815,15 +822,16 @@ fn tool_glob_sort(items: List[str]) -> List[str]:
         sorted = out
     sorted
 
-fn ToolFs.resolve_path(self: &Self, path: &str):
-    tool_capability_require(self.token, "ToolFs")
-    let rel = self.project_relative_path(path)
-    tool_path_require_project_relative(rel)
-    if self.root.len() == 0 or self.root == ".":
-        return rel
-    if self.root.ends_with("/"):
-        return self.root ++ rel
-    self.root ++ "/" ++ rel
+impl ToolFs:
+    fn resolve_path(path: &str):
+        tool_capability_require(self.token, "ToolFs")
+        let rel = self.project_relative_path(path)
+        tool_path_require_project_relative(rel)
+        if self.root.len() == 0 or self.root == ".":
+            return rel
+        if self.root.ends_with("/"):
+            return self.root ++ rel
+        self.root ++ "/" ++ rel
 
 fn tool_path_is_same_or_child(path: &str, root: &str) -> bool:
     if path == root:
@@ -837,36 +845,37 @@ fn tool_path_is_parent_of(parent: &str, child: &str) -> bool:
         return false
     child.starts_with(parent) and child[parent.len()] == 47
 
-fn ToolFs.write_file_allowed(self: &Self, path: &str) -> bool:
-    if not self.write_scoped:
-        return true
-    for i in 0..self.write_scope.len():
-        if tool_path_is_same_or_child(path, self.write_scope[i]):
+impl ToolFs:
+    fn write_file_allowed(path: &str) -> bool:
+        if not self.write_scoped:
             return true
-    false
+        for i in 0..self.write_scope.len():
+            if tool_path_is_same_or_child(path, self.write_scope[i]):
+                return true
+        false
 
-fn ToolFs.mkdir_allowed(self: &Self, path: &str) -> bool:
-    if not self.write_scoped:
-        return true
-    for i in 0..self.write_scope.len():
-        let allowed = self.write_scope[i]
-        if tool_path_is_same_or_child(path, allowed) or tool_path_is_parent_of(path, allowed):
+    fn mkdir_allowed(path: &str) -> bool:
+        if not self.write_scoped:
             return true
-    false
+        for i in 0..self.write_scope.len():
+            let allowed = self.write_scope[i]
+            if tool_path_is_same_or_child(path, allowed) or tool_path_is_parent_of(path, allowed):
+                return true
+        false
 
-fn ToolFs.require_write_file_allowed(self: &Self, path: &str):
-    let rel = self.project_relative_path(path)
-    tool_path_require_project_relative(rel)
-    if not self.write_file_allowed(rel):
-        with_eprint("error: ToolFs write path is not a declared action output: " ++ path ++ "\n")
-        exit(1)
+    fn require_write_file_allowed(path: &str):
+        let rel = self.project_relative_path(path)
+        tool_path_require_project_relative(rel)
+        if not self.write_file_allowed(rel):
+            with_eprint("error: ToolFs write path is not a declared action output: " ++ path ++ "\n")
+            exit(1)
 
-fn ToolFs.require_mkdir_allowed(self: &Self, path: &str):
-    let rel = self.project_relative_path(path)
-    tool_path_require_project_relative(rel)
-    if not self.mkdir_allowed(rel):
-        with_eprint("error: ToolFs mkdir path is not a declared action output: " ++ path ++ "\n")
-        exit(1)
+    fn require_mkdir_allowed(path: &str):
+        let rel = self.project_relative_path(path)
+        tool_path_require_project_relative(rel)
+        if not self.mkdir_allowed(rel):
+            with_eprint("error: ToolFs mkdir path is not a declared action output: " ++ path ++ "\n")
+            exit(1)
 
 fn tool_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
@@ -880,67 +889,69 @@ fn tool_split_nonempty_lines(text: &str) -> List[str]:
         lines.push(text.slice(start as i64, text.len()))
     lines
 
-fn ToolFs.project_relative_path(self: &Self, path: &str) -> str:
-    let normalized = tool_path_normalize(path)
-    if self.root.len() == 0 or self.root == ".":
-        return normalized
-    let root_path = tool_path_normalize(self.root)
-    let prefix = if root_path.ends_with("/"): root_path else: root_path ++ "/"
-    if normalized.starts_with(prefix):
-        return normalized.slice(prefix.len(), normalized.len())
-    normalized
+impl ToolFs:
+    fn project_relative_path(path: &str) -> str:
+        let normalized = tool_path_normalize(path)
+        if self.root.len() == 0 or self.root == ".":
+            return normalized
+        let root_path = tool_path_normalize(self.root)
+        let prefix = if root_path.ends_with("/"): root_path else: root_path ++ "/"
+        if normalized.starts_with(prefix):
+            return normalized.slice(prefix.len(), normalized.len())
+        normalized
 
-// #1899: a path an action reads through ToolFs is an input of what it makes,
-// declared or not. The driver keys the action's cache record on it, so
-// neither this worktree's state nor the machine-wide build store calls the
-// action fresh once that path's bytes, kind or absence differ. A read inside
-// the action's own write scope is of what it wrote; build(ctx)'s reads (no
-// write scope, or the runner's graph reconstruction with writes suppressed)
-// are the graph's, not the action's. One file per path, named by its hash,
-// beside the effect log, so recording stays constant-time however many
-// reads an action makes. Evaluator twin: ComptimeEvaluator.record_read_effect.
-fn ToolFs.record_read(self: &Self, resolved: &str):
-    if not self.write_scoped or tool_fs_writes_suppressed(): return
-    let out_path = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
-    if out_path.len() == 0 or self.write_file_allowed(self.project_relative_path(resolved)): return
-    let dir = out_path ++ ".reads"
-    let _mk = with_fs_mkdir_p(dir)
-    let _w = with_fs_write_file(dir ++ "/" ++ tool_sha256_text(resolved), resolved)
+    // #1899: a path an action reads through ToolFs is an input of what it makes,
+    // declared or not. The driver keys the action's cache record on it, so
+    // neither this worktree's state nor the machine-wide build store calls the
+    // action fresh once that path's bytes, kind or absence differ. A read inside
+    // the action's own write scope is of what it wrote; build(ctx)'s reads (no
+    // write scope, or the runner's graph reconstruction with writes suppressed)
+    // are the graph's, not the action's. One file per path, named by its hash,
+    // beside the effect log, so recording stays constant-time however many
+    // reads an action makes. Evaluator twin: ComptimeEvaluator.record_read_effect.
+    fn record_read(resolved: &str):
+        if not self.write_scoped or tool_fs_writes_suppressed(): return
+        let out_path = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
+        if out_path.len() == 0 or self.write_file_allowed(self.project_relative_path(resolved)): return
+        let dir = out_path ++ ".reads"
+        let _mk = with_fs_mkdir_p(dir)
+        let _w = with_fs_write_file(dir ++ "/" ++ tool_sha256_text(resolved), resolved)
 
-pub fn ToolFs.exists(self: &Self, path: &str) -> bool:
-    let resolved = self.resolve_path(path)
-    self.record_read(resolved)
-    with_fs_file_exists(resolved) != 0
+    pub fn exists(path: &str) -> bool:
+        let resolved = self.resolve_path(path)
+        self.record_read(resolved)
+        with_fs_file_exists(resolved) != 0
 
-pub fn ToolFs.host_exists(self: &Self, path: &str) -> bool:
-    tool_capability_require(self.token, "ToolFs")
-    self.record_read(path)
-    with_fs_file_exists(path) != 0
+    pub fn host_exists(path: &str) -> bool:
+        tool_capability_require(self.token, "ToolFs")
+        self.record_read(path)
+        with_fs_file_exists(path) != 0
 
-pub fn ToolFs.host_read_text(self: &Self, path: &str) -> str:
-    tool_capability_require(self.token, "ToolFs")
-    self.record_read(path)
-    with_fs_read_file(path)
+    pub fn host_read_text(path: &str) -> str:
+        tool_capability_require(self.token, "ToolFs")
+        self.record_read(path)
+        with_fs_read_file(path)
 
 fn tool_sha256_text(data: &str) -> str:
     var digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
 
-pub fn ToolFs.sha256_file(self: &Self, path: &str) -> str:
-    if not self.exists(path):
-        return ""
-    tool_sha256_text(self.read_text(path))
+impl ToolFs:
+    pub fn sha256_file(path: &str) -> str:
+        if not self.exists(path):
+            return ""
+        tool_sha256_text(self.read_text(path))
 
-pub fn ToolFs.host_list_files(self: &Self, path: &str) -> List[str]:
-    tool_capability_require(self.token, "ToolFs")
-    self.record_read(path)
-    tool_split_nonempty_lines(with_fs_list_files(path))
+    pub fn host_list_files(path: &str) -> List[str]:
+        tool_capability_require(self.token, "ToolFs")
+        self.record_read(path)
+        tool_split_nonempty_lines(with_fs_list_files(path))
 
-pub fn ToolFs.is_dir(self: &Self, path: &str) -> bool:
-    let resolved = self.resolve_path(path)
-    self.record_read(resolved)
-    with_fs_is_dir(resolved) != 0
+    pub fn is_dir(path: &str) -> bool:
+        let resolved = self.resolve_path(path)
+        self.record_read(resolved)
+        with_fs_is_dir(resolved) != 0
 
 // #921: the runner re-executes build(ctx) natively to reconstruct the
 // graph; the driver already ran build(ctx)'s side effects during graph
@@ -951,99 +962,100 @@ pub fn ToolFs.is_dir(self: &Self, path: &str) -> bool:
 fn tool_fs_writes_suppressed() -> bool:
     with_getenv_str("WITH_BUILD_TOOLFS_SUPPRESS").len() > 0
 
-pub fn ToolFs.mkdir_all(self: &Self, path: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_mkdir_allowed(path)
-    with_fs_mkdir_p(self.resolve_path(path))
+impl ToolFs:
+    pub fn mkdir_all(path: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_mkdir_allowed(path)
+        with_fs_mkdir_p(self.resolve_path(path))
 
-/// Read a project file. A file that cannot be read — missing, a directory, a
-/// permission failure, a short read — is a build-tool defect and panics with
-/// the OS error; an empty file is "". Probe an optional file with
-/// `read_text_opt` (#953: "" used to mean all four at once).
-pub fn ToolFs.read_text(self: &Self, path: &str) -> str:
-    let resolved = self.resolve_path(path)
-    self.record_read(resolved)
-    var status: i32 = 0
-    let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
-    if status != 0:
-        let site = "read_text: " ++ resolved ++ ": "
-        let err: IoError = .Os(0 - status, resolved)
-        panic(site ++ err.message())
-    text
+    /// Read a project file. A file that cannot be read — missing, a directory, a
+    /// permission failure, a short read — is a build-tool defect and panics with
+    /// the OS error; an empty file is "". Probe an optional file with
+    /// `read_text_opt` (#953: "" used to mean all four at once).
+    pub fn read_text(path: &str) -> str:
+        let resolved = self.resolve_path(path)
+        self.record_read(resolved)
+        var status: i32 = 0
+        let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
+        if status != 0:
+            let site = "read_text: " ++ resolved ++ ": "
+            let err: IoError = .Os(0 - status, resolved)
+            panic(site ++ err.message())
+        text
 
-/// The file's text, or None when it cannot be read (the optional-file probe).
-pub fn ToolFs.read_text_opt(self: &Self, path: &str) -> Option[str]:
-    let resolved = self.resolve_path(path)
-    self.record_read(resolved)
-    var status: i32 = 0
-    let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
-    if status != 0: None else: Some(text)
+    /// The file's text, or None when it cannot be read (the optional-file probe).
+    pub fn read_text_opt(path: &str) -> Option[str]:
+        let resolved = self.resolve_path(path)
+        self.record_read(resolved)
+        var status: i32 = 0
+        let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
+        if status != 0: None else: Some(text)
 
-pub fn ToolFs.read_binary(self: &Self, path: &str) -> List[u8]:
-    let resolved = self.resolve_path(path)
-    self.record_read(resolved)
-    var status: i32 = 0
-    let data = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
-    if status != 0:
-        let site = "read_binary: " ++ resolved ++ ": "
-        let err: IoError = .Os(0 - status, resolved)
-        panic(site ++ err.message())
-    let result: List[u8] = List.new()
-    for i in 0..data.len():
-        result.push(data[i] as u8)
-    result
+    pub fn read_binary(path: &str) -> List[u8]:
+        let resolved = self.resolve_path(path)
+        self.record_read(resolved)
+        var status: i32 = 0
+        let data = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
+        if status != 0:
+            let site = "read_binary: " ++ resolved ++ ": "
+            let err: IoError = .Os(0 - status, resolved)
+            panic(site ++ err.message())
+        let result: List[u8] = List.new()
+        for i in 0..data.len():
+            result.push(data[i] as u8)
+        result
 
-pub fn ToolFs.list_files(self: &Self, path: &str) -> List[str]:
-    let resolved = self.resolve_path(path)
-    self.record_read(resolved)
-    let raw_files = tool_split_nonempty_lines(with_fs_list_files(resolved))
-    let files: List[str] = List.new()
-    for i in 0..raw_files.len():
-        files.push(self.project_relative_path(raw_files[i]))
-    files
+    pub fn list_files(path: &str) -> List[str]:
+        let resolved = self.resolve_path(path)
+        self.record_read(resolved)
+        let raw_files = tool_split_nonempty_lines(with_fs_list_files(resolved))
+        let files: List[str] = List.new()
+        for i in 0..raw_files.len():
+            files.push(self.project_relative_path(raw_files[i]))
+        files
 
-pub fn ToolFs.glob(self: &Self, pattern: &str) -> List[str]:
-    var last_clean_slash = -1
-    var has_glob = false
-    for i in 0..pattern.len():
-        let c = pattern[i]
-        if c == 42:
-            has_glob = true
-            break
-        if c == 47:
-            last_clean_slash = i
-    if not has_glob:
-        with_eprint("error: glob pattern contains no wildcards: " ++ pattern ++ "\n")
-        exit(1)
-    let base_dir = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash as i64)
-    let glob_suffix = if last_clean_slash < 0: with_str_clone_ref(pattern) else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
-    let all_files = self.list_files(base_dir)
-    let pat_segs = tool_split_by_slash(glob_suffix)
-    let results: List[str] = List.new()
-    let prefix = if base_dir == ".": "" else: base_dir ++ "/"
-    for i in 0..all_files.len():
-        let file = all_files[i]
-        let rel = if prefix.len() > 0 and file.starts_with(prefix): file.slice(prefix.len(), file.len()) else: with_str_clone_ref(file)
-        let file_segs = tool_split_by_slash(rel)
-        if tool_glob_segments_match(pat_segs, 0, file_segs, 0):
-            results.push(with_str_clone_ref(file))
-    if results.len() == 0:
-        with_eprint("error: glob pattern matched no files: " ++ pattern ++ "\n")
-        exit(1)
-    tool_glob_sort(results)
+    pub fn glob(pattern: &str) -> List[str]:
+        var last_clean_slash = -1
+        var has_glob = false
+        for i in 0..pattern.len():
+            let c = pattern[i]
+            if c == 42:
+                has_glob = true
+                break
+            if c == 47:
+                last_clean_slash = i
+        if not has_glob:
+            with_eprint("error: glob pattern contains no wildcards: " ++ pattern ++ "\n")
+            exit(1)
+        let base_dir = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash as i64)
+        let glob_suffix = if last_clean_slash < 0: with_str_clone_ref(pattern) else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
+        let all_files = self.list_files(base_dir)
+        let pat_segs = tool_split_by_slash(glob_suffix)
+        let results: List[str] = List.new()
+        let prefix = if base_dir == ".": "" else: base_dir ++ "/"
+        for i in 0..all_files.len():
+            let file = all_files[i]
+            let rel = if prefix.len() > 0 and file.starts_with(prefix): file.slice(prefix.len(), file.len()) else: with_str_clone_ref(file)
+            let file_segs = tool_split_by_slash(rel)
+            if tool_glob_segments_match(pat_segs, 0, file_segs, 0):
+                results.push(with_str_clone_ref(file))
+        if results.len() == 0:
+            with_eprint("error: glob pattern matched no files: " ++ pattern ++ "\n")
+            exit(1)
+        tool_glob_sort(results)
 
-pub fn ToolFs.write_text(self: &Self, path: &str, contents: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(path)
-    with_fs_write_file(self.resolve_path(path), contents)
+    pub fn write_text(path: &str, contents: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(path)
+        with_fs_write_file(self.resolve_path(path), contents)
 
-pub fn ToolFs.write_binary(self: &Self, path: &str, bytes: List[u8]) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(path)
-    var out = StringBuilder.with_capacity(bytes.len())
-    for i in 0..bytes.len():
-        out.push_byte(bytes[i])
-    with_fs_write_file(self.resolve_path(path), out.to_str())
+    pub fn write_binary(path: &str, bytes: List[u8]) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(path)
+        var out = StringBuilder.with_capacity(bytes.len())
+        for i in 0..bytes.len():
+            out.push_byte(bytes[i])
+        with_fs_write_file(self.resolve_path(path), out.to_str())
 
 fn tool_tar_append_zeroes(out: List[u8], count: i64) -> List[u8]:
     var i: i64 = 0
@@ -1206,38 +1218,39 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
         return List.new()
     header
 
-fn ToolFs.tar_bytes(self: &Self, entries: &List[ArchiveEntry]) -> List[u8]:
-    var out: List[u8] = List.new()
-    for i in 0..entries.len():
-        let entry = entries[i]
-        if entry.kind == ArchiveEntryKind.Directory:
-            let name = tool_tar_entry_name(entry.archive_path, true)
-            let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Directory, "")
-            if header.len() == 0:
-                return List.new()
-            out = tool_tar_append_bytes(out, &header)
-        else if entry.kind == ArchiveEntryKind.Symlink:
-            let name = tool_tar_entry_name(entry.archive_path, false)
-            let link_name = tool_tar_link_name(entry.source_path)
-            let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Symlink, link_name)
-            if header.len() == 0:
-                return List.new()
-            out = tool_tar_append_bytes(out, &header)
-        else:
-            if entry.source_path.len() == 0:
-                return List.new()
-            tool_path_require_project_relative(entry.source_path)
-            let name = tool_tar_entry_name(entry.archive_path, false)
-            let contents = self.read_binary(entry.source_path)
-            let header = tool_tar_build_header(name, entry.mode, contents.len(), ArchiveEntryKind.File, "")
-            if header.len() == 0:
-                return List.new()
-            out = tool_tar_append_bytes(out, &header)
-            out = tool_tar_append_bytes(out, &contents)
-            let padding = (512 - (contents.len() % 512)) % 512
-            out = tool_tar_append_zeroes(out, padding)
-    out = tool_tar_append_zeroes(out, 1024)
-    out
+impl ToolFs:
+    fn tar_bytes(entries: &List[ArchiveEntry]) -> List[u8]:
+        var out: List[u8] = List.new()
+        for i in 0..entries.len():
+            let entry = entries[i]
+            if entry.kind == ArchiveEntryKind.Directory:
+                let name = tool_tar_entry_name(entry.archive_path, true)
+                let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Directory, "")
+                if header.len() == 0:
+                    return List.new()
+                out = tool_tar_append_bytes(out, &header)
+            else if entry.kind == ArchiveEntryKind.Symlink:
+                let name = tool_tar_entry_name(entry.archive_path, false)
+                let link_name = tool_tar_link_name(entry.source_path)
+                let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Symlink, link_name)
+                if header.len() == 0:
+                    return List.new()
+                out = tool_tar_append_bytes(out, &header)
+            else:
+                if entry.source_path.len() == 0:
+                    return List.new()
+                tool_path_require_project_relative(entry.source_path)
+                let name = tool_tar_entry_name(entry.archive_path, false)
+                let contents = self.read_binary(entry.source_path)
+                let header = tool_tar_build_header(name, entry.mode, contents.len(), ArchiveEntryKind.File, "")
+                if header.len() == 0:
+                    return List.new()
+                out = tool_tar_append_bytes(out, &header)
+                out = tool_tar_append_bytes(out, &contents)
+                let padding = (512 - (contents.len() % 512)) % 512
+                out = tool_tar_append_zeroes(out, padding)
+        out = tool_tar_append_zeroes(out, 1024)
+        out
 
 fn tool_gzip_append_u16_le(out: List[u8], value: i32) -> List[u8]:
     out.push((value & 0xff) as u8)
@@ -1295,66 +1308,67 @@ fn tool_gzip_stored(bytes: &List[u8]) -> List[u8]:
     out = tool_gzip_append_u32_le(out, bytes.len() as u32)
     out
 
-pub fn ToolFs.write_tar(self: &Self, output_path: &str, entries: &List[ArchiveEntry]) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(output_path)
-    let out = self.tar_bytes(entries)
-    if out.len() == 0:
-        return 1
-    self.write_binary(output_path, out)
+impl ToolFs:
+    pub fn write_tar(output_path: &str, entries: &List[ArchiveEntry]) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(output_path)
+        let out = self.tar_bytes(entries)
+        if out.len() == 0:
+            return 1
+        self.write_binary(output_path, out)
 
-pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &List[ArchiveEntry]) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(output_path)
-    var file = tool_archive_open(self.resolve_path(output_path), c"wb".ptr)
-    if file.handle == null: return 1
-    // A single compressed gzip member. Do not hold
-    // the tar, gzip and write_binary copies of a multi-GB SDK in memory.
-    // This is With's translated zlib, not a host compression program or dylib.
-    var state: z_stream_s
-    let init_rc = unsafe { deflateInit2_(&raw mut state, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
-    if init_rc != Z_OK: return 1
-    defer: unsafe { deflateEnd(&raw mut state) }
-    var compressed = List[u8].with_capacity(65536)
-    for _ in 0..65536: compressed.push(0)
-    // state never moves while zlib retains its address.
-    var writer = ToolGzipStream { file: file, state: &raw mut state, buffer: compressed }
-    var buffer = List[u8].with_capacity(65535)
-    for _ in 0..65535: buffer.push(0)
-    for i in 0..entries.len():
-        let entry = entries[i]
-        if entry.kind == ArchiveEntryKind.Directory or entry.kind == ArchiveEntryKind.Symlink:
-            let name = tool_tar_entry_name(entry.archive_path, entry.kind == ArchiveEntryKind.Directory)
-            let link_name = if entry.kind == ArchiveEntryKind.Symlink: tool_tar_link_name(entry.source_path) else: ""
-            let kind = if entry.kind == ArchiveEntryKind.Directory: ArchiveEntryKind.Directory else: ArchiveEntryKind.Symlink
-            let block = tool_tar_build_header(name, entry.mode, 0, kind, link_name)
-            if block.len() == 0 or not writer.append(block, block.len()): return 1
-        else:
-            if entry.source_path.len() == 0: return 1
-            tool_path_require_project_relative(entry.source_path)
-            let input_path = self.resolve_path(entry.source_path)
-            self.record_read(input_path)
-            let size = tool_archive_size(input_path)
-            if size < 0: return 1
-            var input = tool_archive_open(input_path, c"rb".ptr)
-            if input.handle == null: return 1
-            let name = tool_tar_entry_name(entry.archive_path, false)
-            let block = tool_tar_build_header(name, entry.mode, size, ArchiveEntryKind.File, "")
-            if block.len() == 0 or not writer.append(block, block.len()): return 1
-            var remaining = size
-            while remaining > 0:
-                let count = if remaining > buffer.len(): buffer.len() as i64 else: remaining
-                let got = fread(&raw mut buffer[0] as *mut c_void, 1, count as u64, input.handle)
-                if got == 0: return 1
-                if not writer.append(buffer, got as i64): return 1
-                remaining = remaining - got as i64
-            if input.close() != 0: return 1
-            let padding = tool_tar_append_zeroes(List.new(), (512 - (size % 512)) % 512)
-            if not writer.append(padding, padding.len()): return 1
-    let end = tool_tar_append_zeroes(List.new(), 1024)
-    if not writer.append(end, end.len()): return 1
-    if not writer.finish(): return 1
-    writer.file.close()
+    pub fn write_tar_gz(output_path: &str, entries: &List[ArchiveEntry]) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(output_path)
+        var file = tool_archive_open(self.resolve_path(output_path), c"wb".ptr)
+        if file.handle == null: return 1
+        // A single compressed gzip member. Do not hold
+        // the tar, gzip and write_binary copies of a multi-GB SDK in memory.
+        // This is With's translated zlib, not a host compression program or dylib.
+        var state: z_stream_s
+        let init_rc = unsafe { deflateInit2_(&raw mut state, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
+        if init_rc != Z_OK: return 1
+        defer: unsafe { deflateEnd(&raw mut state) }
+        var compressed = List[u8].with_capacity(65536)
+        for _ in 0..65536: compressed.push(0)
+        // state never moves while zlib retains its address.
+        var writer = ToolGzipStream { file: file, state: &raw mut state, buffer: compressed }
+        var buffer = List[u8].with_capacity(65535)
+        for _ in 0..65535: buffer.push(0)
+        for i in 0..entries.len():
+            let entry = entries[i]
+            if entry.kind == ArchiveEntryKind.Directory or entry.kind == ArchiveEntryKind.Symlink:
+                let name = tool_tar_entry_name(entry.archive_path, entry.kind == ArchiveEntryKind.Directory)
+                let link_name = if entry.kind == ArchiveEntryKind.Symlink: tool_tar_link_name(entry.source_path) else: ""
+                let kind = if entry.kind == ArchiveEntryKind.Directory: ArchiveEntryKind.Directory else: ArchiveEntryKind.Symlink
+                let block = tool_tar_build_header(name, entry.mode, 0, kind, link_name)
+                if block.len() == 0 or not writer.append(block, block.len()): return 1
+            else:
+                if entry.source_path.len() == 0: return 1
+                tool_path_require_project_relative(entry.source_path)
+                let input_path = self.resolve_path(entry.source_path)
+                self.record_read(input_path)
+                let size = tool_archive_size(input_path)
+                if size < 0: return 1
+                var input = tool_archive_open(input_path, c"rb".ptr)
+                if input.handle == null: return 1
+                let name = tool_tar_entry_name(entry.archive_path, false)
+                let block = tool_tar_build_header(name, entry.mode, size, ArchiveEntryKind.File, "")
+                if block.len() == 0 or not writer.append(block, block.len()): return 1
+                var remaining = size
+                while remaining > 0:
+                    let count = if remaining > buffer.len(): buffer.len() as i64 else: remaining
+                    let got = fread(&raw mut buffer[0] as *mut c_void, 1, count as u64, input.handle)
+                    if got == 0: return 1
+                    if not writer.append(buffer, got as i64): return 1
+                    remaining = remaining - got as i64
+                if input.close() != 0: return 1
+                let padding = tool_tar_append_zeroes(List.new(), (512 - (size % 512)) % 512)
+                if not writer.append(padding, padding.len()): return 1
+        let end = tool_tar_append_zeroes(List.new(), 1024)
+        if not writer.append(end, end.len()): return 1
+        if not writer.finish(): return 1
+        writer.file.close()
 
 type ToolArchiveFile { handle: *mut c_void }
 
@@ -1581,196 +1595,198 @@ fn tool_pax_value(text: &str, key: &str) -> str:
         pos = record_end
     ""
 
-pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    tool_path_require_project_relative(archive_path)
-    if self.mkdir_all(output_dir) != 0:
-        return tool_tar_extract_fail("could not create output directory: " ++ output_dir)
-    let input_path = self.resolve_path(archive_path)
-    self.record_read(input_path)
-    let archive_len = tool_archive_size(input_path)
-    if archive_len < 0: return tool_tar_extract_fail("could not read archive size: " ++ archive_path)
-    var input = tool_archive_open(input_path, c"rb".ptr)
-    if input.handle == null: return tool_tar_extract_fail("could not open " ++ archive_path)
-    var archive = List[u8].with_capacity(512)
-    for _ in 0..512: archive.push(0)
-    var buffer = List[u8].with_capacity(65536)
-    for _ in 0..65536: buffer.push(0)
-    var offset: i64 = 0
-    var pending_path = ""
-    var pending_link = ""
-    while offset + 512 <= archive_len:
-        if not tool_archive_read(input, &raw mut archive[0], 512):
-            return tool_tar_extract_fail(f"truncated header at offset {offset}")
-        if tool_tar_block_is_zero(&archive, 0):
-            return 0
-        if not tool_tar_magic_ok(&archive, 0):
-            return tool_tar_extract_fail(f"invalid tar magic at offset {offset}")
-        let stored_checksum = tool_tar_parse_octal(&archive, 148, 8)
-        if stored_checksum < 0 or stored_checksum != tool_tar_header_checksum(&archive, 0):
-            return tool_tar_extract_fail(f"invalid header checksum at offset {offset}")
-        let mode = tool_tar_parse_octal(&archive, 100, 8)
-        let size = tool_tar_parse_octal(&archive, 124, 12)
-        if mode < 0 or size < 0:
-            return tool_tar_extract_fail(f"invalid numeric field at offset {offset}")
-        let typeflag = archive[156]
-        let content_start = offset + 512
-        if size > archive_len - content_start:
-            return tool_tar_extract_fail(f"entry payload extends past archive at offset {offset}")
-        let padded = ((size + 511) / 512) * 512
-        var metadata: List[u8] = List.new()
-        if typeflag == 120 as u8 or typeflag == 76 as u8:
-            for _ in 0..size: metadata.push(0)
-            if size > 0 and not tool_archive_read(input, &raw mut metadata[0], size):
-                return tool_tar_extract_fail(f"truncated metadata at offset {offset}")
-            if not tool_archive_skip(input, padded - size):
-                return tool_tar_extract_fail(f"truncated padding at offset {offset}")
-        if typeflag == 120 as u8:
-            let pax = tool_tar_payload_text(&metadata, 0, size)
-            let pax_path = tool_pax_value(pax, "path")
-            let pax_link = tool_pax_value(pax, "linkpath")
-            if pax_path.len() > 0:
-                pending_path = pax_path
-            if pax_link.len() > 0:
-                pending_link = pax_link
-            offset = offset + 512 + padded
-            continue
-        if typeflag == 103 as u8:
-            if not tool_archive_skip(input, padded):
-                return tool_tar_extract_fail(f"truncated global metadata at offset {offset}")
-            offset = offset + 512 + padded
-            continue
-        if typeflag == 76 as u8:
-            pending_path = tool_tar_trim_payload_name(tool_tar_payload_text(&metadata, 0, size))
-            offset = offset + 512 + padded
-            continue
-        let raw_name = if pending_path.len() > 0: pending_path else: tool_tar_header_name(&archive, 0)
-        pending_path = ""
-        if not tool_tar_archive_name_safe(raw_name):
-            return tool_tar_extract_fail("unsafe archive path: " ++ raw_name)
-        let name = tool_path_normalize(raw_name)
-        let output_path = self.join(output_dir, name)
-        if typeflag == 53 as u8:
-            if self.mkdir_all(output_path) != 0:
-                return tool_tar_extract_fail("could not create directory entry: " ++ output_path)
-            if mode > 0:
-                self.chmod(output_path, mode as i32)
-        else if typeflag == 50 as u8:
-            let link_name = if pending_link.len() > 0: pending_link else: tool_tar_field_str(&archive, 157, 100)
-            pending_link = ""
-            if not tool_tar_link_target_safe(output_dir, output_path, link_name):
-                return tool_tar_extract_fail("unsafe symlink target for " ++ output_path ++ ": " ++ link_name)
-            let output_parent = tool_path_dirname(output_path)
-            if output_parent != "." and self.mkdir_all(output_parent) != 0:
-                return tool_tar_extract_fail("could not create parent directory for symlink: " ++ output_parent)
-            if not self.write_file_allowed(output_path):
-                return tool_tar_extract_fail("symlink path is outside declared write scope: " ++ output_path)
-            if with_fs_symlink(link_name, self.resolve_path(output_path)) != 0:
-                return tool_tar_extract_fail("could not create symlink: " ++ output_path)
-        else if typeflag == 48 as u8 or typeflag == 0 as u8:
-            let output_parent = tool_path_dirname(output_path)
-            if output_parent != "." and self.mkdir_all(output_parent) != 0:
-                return tool_tar_extract_fail("could not create parent directory for file: " ++ output_parent)
-            self.require_write_file_allowed(output_path)
-            var output = tool_archive_open(self.resolve_path(output_path), c"wb".ptr)
-            if output.handle == null:
-                return tool_tar_extract_fail("could not open file entry: " ++ output_path)
-            var remaining = size
-            while remaining > 0:
-                let chunk = if remaining > buffer.len(): buffer.len() as i64 else: remaining
-                if not tool_archive_read(input, &raw mut buffer[0], chunk):
-                    return tool_tar_extract_fail("truncated file entry: " ++ output_path)
-                if not tool_archive_write(output, buffer, 0, chunk):
+impl ToolFs:
+    pub fn extract_tar(archive_path: &str, output_dir: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        tool_path_require_project_relative(archive_path)
+        if self.mkdir_all(output_dir) != 0:
+            return tool_tar_extract_fail("could not create output directory: " ++ output_dir)
+        let input_path = self.resolve_path(archive_path)
+        self.record_read(input_path)
+        let archive_len = tool_archive_size(input_path)
+        if archive_len < 0: return tool_tar_extract_fail("could not read archive size: " ++ archive_path)
+        var input = tool_archive_open(input_path, c"rb".ptr)
+        if input.handle == null: return tool_tar_extract_fail("could not open " ++ archive_path)
+        var archive = List[u8].with_capacity(512)
+        for _ in 0..512: archive.push(0)
+        var buffer = List[u8].with_capacity(65536)
+        for _ in 0..65536: buffer.push(0)
+        var offset: i64 = 0
+        var pending_path = ""
+        var pending_link = ""
+        while offset + 512 <= archive_len:
+            if not tool_archive_read(input, &raw mut archive[0], 512):
+                return tool_tar_extract_fail(f"truncated header at offset {offset}")
+            if tool_tar_block_is_zero(&archive, 0):
+                return 0
+            if not tool_tar_magic_ok(&archive, 0):
+                return tool_tar_extract_fail(f"invalid tar magic at offset {offset}")
+            let stored_checksum = tool_tar_parse_octal(&archive, 148, 8)
+            if stored_checksum < 0 or stored_checksum != tool_tar_header_checksum(&archive, 0):
+                return tool_tar_extract_fail(f"invalid header checksum at offset {offset}")
+            let mode = tool_tar_parse_octal(&archive, 100, 8)
+            let size = tool_tar_parse_octal(&archive, 124, 12)
+            if mode < 0 or size < 0:
+                return tool_tar_extract_fail(f"invalid numeric field at offset {offset}")
+            let typeflag = archive[156]
+            let content_start = offset + 512
+            if size > archive_len - content_start:
+                return tool_tar_extract_fail(f"entry payload extends past archive at offset {offset}")
+            let padded = ((size + 511) / 512) * 512
+            var metadata: List[u8] = List.new()
+            if typeflag == 120 as u8 or typeflag == 76 as u8:
+                for _ in 0..size: metadata.push(0)
+                if size > 0 and not tool_archive_read(input, &raw mut metadata[0], size):
+                    return tool_tar_extract_fail(f"truncated metadata at offset {offset}")
+                if not tool_archive_skip(input, padded - size):
+                    return tool_tar_extract_fail(f"truncated padding at offset {offset}")
+            if typeflag == 120 as u8:
+                let pax = tool_tar_payload_text(&metadata, 0, size)
+                let pax_path = tool_pax_value(pax, "path")
+                let pax_link = tool_pax_value(pax, "linkpath")
+                if pax_path.len() > 0:
+                    pending_path = pax_path
+                if pax_link.len() > 0:
+                    pending_link = pax_link
+                offset = offset + 512 + padded
+                continue
+            if typeflag == 103 as u8:
+                if not tool_archive_skip(input, padded):
+                    return tool_tar_extract_fail(f"truncated global metadata at offset {offset}")
+                offset = offset + 512 + padded
+                continue
+            if typeflag == 76 as u8:
+                pending_path = tool_tar_trim_payload_name(tool_tar_payload_text(&metadata, 0, size))
+                offset = offset + 512 + padded
+                continue
+            let raw_name = if pending_path.len() > 0: pending_path else: tool_tar_header_name(&archive, 0)
+            pending_path = ""
+            if not tool_tar_archive_name_safe(raw_name):
+                return tool_tar_extract_fail("unsafe archive path: " ++ raw_name)
+            let name = tool_path_normalize(raw_name)
+            let output_path = self.join(output_dir, name)
+            if typeflag == 53 as u8:
+                if self.mkdir_all(output_path) != 0:
+                    return tool_tar_extract_fail("could not create directory entry: " ++ output_path)
+                if mode > 0:
+                    self.chmod(output_path, mode as i32)
+            else if typeflag == 50 as u8:
+                let link_name = if pending_link.len() > 0: pending_link else: tool_tar_field_str(&archive, 157, 100)
+                pending_link = ""
+                if not tool_tar_link_target_safe(output_dir, output_path, link_name):
+                    return tool_tar_extract_fail("unsafe symlink target for " ++ output_path ++ ": " ++ link_name)
+                let output_parent = tool_path_dirname(output_path)
+                if output_parent != "." and self.mkdir_all(output_parent) != 0:
+                    return tool_tar_extract_fail("could not create parent directory for symlink: " ++ output_parent)
+                if not self.write_file_allowed(output_path):
+                    return tool_tar_extract_fail("symlink path is outside declared write scope: " ++ output_path)
+                if with_fs_symlink(link_name, self.resolve_path(output_path)) != 0:
+                    return tool_tar_extract_fail("could not create symlink: " ++ output_path)
+            else if typeflag == 48 as u8 or typeflag == 0 as u8:
+                let output_parent = tool_path_dirname(output_path)
+                if output_parent != "." and self.mkdir_all(output_parent) != 0:
+                    return tool_tar_extract_fail("could not create parent directory for file: " ++ output_parent)
+                self.require_write_file_allowed(output_path)
+                var output = tool_archive_open(self.resolve_path(output_path), c"wb".ptr)
+                if output.handle == null:
+                    return tool_tar_extract_fail("could not open file entry: " ++ output_path)
+                var remaining = size
+                while remaining > 0:
+                    let chunk = if remaining > buffer.len(): buffer.len() as i64 else: remaining
+                    if not tool_archive_read(input, &raw mut buffer[0], chunk):
+                        return tool_tar_extract_fail("truncated file entry: " ++ output_path)
+                    if not tool_archive_write(output, buffer, 0, chunk):
+                        return tool_tar_extract_fail("could not write file entry: " ++ output_path)
+                    remaining = remaining - chunk
+                if output.close() != 0:
                     return tool_tar_extract_fail("could not write file entry: " ++ output_path)
-                remaining = remaining - chunk
-            if output.close() != 0:
-                return tool_tar_extract_fail("could not write file entry: " ++ output_path)
-            if mode > 0:
-                self.chmod(output_path, mode as i32)
+                if mode > 0:
+                    self.chmod(output_path, mode as i32)
+            else:
+                return tool_tar_extract_fail(f"unsupported tar entry type {typeflag as i32} for " ++ raw_name)
+            let consumed = if typeflag == 48 as u8 or typeflag == 0 as u8: size else: 0
+            if not tool_archive_skip(input, padded - consumed):
+                return tool_tar_extract_fail(f"truncated padding at offset {offset}")
+            offset = offset + 512 + padded
+        tool_tar_extract_fail("archive ended without two zero blocks")
+
+    pub fn copy_file(src: &str, dst: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(dst)
+        let source_path = self.resolve_path(src)
+        self.record_read(source_path)
+        var status: i32 = 0
+        let contents = with_fs_read_file_status(source_path, &raw mut status as *mut i32)
+        if status != 0:
+            let site = "error: copy_file: " ++ source_path ++ ": "
+            let err: IoError = .Os(0 - status, source_path)
+            with_eprint(site ++ err.message())
+            return status
+        let dst_dir = tool_path_dirname(dst)
+        if dst_dir != ".":
+            self.require_mkdir_allowed(dst_dir)
+            let mkdir_rc = with_fs_mkdir_p(self.resolve_path(dst_dir))
+            if mkdir_rc != 0:
+                return mkdir_rc
+        with_fs_write_file(self.resolve_path(dst), contents)
+
+    pub fn chmod(path: &str, mode: i32) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(path)
+        with_fs_chmod(self.resolve_path(path), mode)
+
+    pub fn rename(old_path: &str, new_path: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(old_path)
+        self.require_write_file_allowed(new_path)
+        with_fs_rename_file(self.resolve_path(old_path), self.resolve_path(new_path))
+
+    pub fn remove_file(path: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(path)
+        with_fs_remove_file(self.resolve_path(path))
+
+    pub fn remove_tree(path: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(path)
+        with_fs_remove_tree(self.resolve_path(path))
+
+    pub fn copy_tree(src: &str, dst: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(dst)
+        let source_path = self.resolve_path(src)
+        self.record_read(source_path)
+        with_fs_copy_tree(source_path, self.resolve_path(dst))
+
+    pub fn symlink(target: &str, link_path: &str) -> i32:
+        if tool_fs_writes_suppressed(): return 0
+        self.require_write_file_allowed(link_path)
+        with_fs_symlink(self.resolve_path(target), self.resolve_path(link_path))
+
+    pub fn normalize(path: &str) -> str:
+        tool_path_normalize(path)
+
+    pub fn join(base: &str, child: &str) -> str:
+        if base.len() == 0:
+            return with_str_clone_ref(child)
+        if child.len() == 0:
+            return with_str_clone_ref(base)
+        if base.ends_with("/"):
+            base ++ child
         else:
-            return tool_tar_extract_fail(f"unsupported tar entry type {typeflag as i32} for " ++ raw_name)
-        let consumed = if typeflag == 48 as u8 or typeflag == 0 as u8: size else: 0
-        if not tool_archive_skip(input, padded - consumed):
-            return tool_tar_extract_fail(f"truncated padding at offset {offset}")
-        offset = offset + 512 + padded
-    tool_tar_extract_fail("archive ended without two zero blocks")
+            base ++ "/" ++ child
 
-pub fn ToolFs.copy_file(self: &Self, src: &str, dst: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(dst)
-    let source_path = self.resolve_path(src)
-    self.record_read(source_path)
-    var status: i32 = 0
-    let contents = with_fs_read_file_status(source_path, &raw mut status as *mut i32)
-    if status != 0:
-        let site = "error: copy_file: " ++ source_path ++ ": "
-        let err: IoError = .Os(0 - status, source_path)
-        with_eprint(site ++ err.message())
-        return status
-    let dst_dir = tool_path_dirname(dst)
-    if dst_dir != ".":
-        self.require_mkdir_allowed(dst_dir)
-        let mkdir_rc = with_fs_mkdir_p(self.resolve_path(dst_dir))
-        if mkdir_rc != 0:
-            return mkdir_rc
-    with_fs_write_file(self.resolve_path(dst), contents)
+    pub fn scratch_dir() -> &str:
+        tool_capability_require(self.token, "ToolFs")
+        if self.scratch_path.len() == 0:
+            with_eprint("error: ToolFs.scratch_dir is only available inside an action\n")
+            exit(1)
+        self.scratch_path
 
-pub fn ToolFs.chmod(self: &Self, path: &str, mode: i32) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(path)
-    with_fs_chmod(self.resolve_path(path), mode)
-
-pub fn ToolFs.rename(self: &Self, old_path: &str, new_path: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(old_path)
-    self.require_write_file_allowed(new_path)
-    with_fs_rename_file(self.resolve_path(old_path), self.resolve_path(new_path))
-
-pub fn ToolFs.remove_file(self: &Self, path: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(path)
-    with_fs_remove_file(self.resolve_path(path))
-
-pub fn ToolFs.remove_tree(self: &Self, path: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(path)
-    with_fs_remove_tree(self.resolve_path(path))
-
-pub fn ToolFs.copy_tree(self: &Self, src: &str, dst: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(dst)
-    let source_path = self.resolve_path(src)
-    self.record_read(source_path)
-    with_fs_copy_tree(source_path, self.resolve_path(dst))
-
-pub fn ToolFs.symlink(self: &Self, target: &str, link_path: &str) -> i32:
-    if tool_fs_writes_suppressed(): return 0
-    self.require_write_file_allowed(link_path)
-    with_fs_symlink(self.resolve_path(target), self.resolve_path(link_path))
-
-pub fn ToolFs.normalize(self: &Self, path: &str) -> str:
-    tool_path_normalize(path)
-
-pub fn ToolFs.join(self: &Self, base: &str, child: &str) -> str:
-    if base.len() == 0:
-        return with_str_clone_ref(child)
-    if child.len() == 0:
-        return with_str_clone_ref(base)
-    if base.ends_with("/"):
-        base ++ child
-    else:
-        base ++ "/" ++ child
-
-pub fn ToolFs.scratch_dir(self: &Self) -> &str:
-    tool_capability_require(self.token, "ToolFs")
-    if self.scratch_path.len() == 0:
-        with_eprint("error: ToolFs.scratch_dir is only available inside an action\n")
-        exit(1)
-    self.scratch_path
-
-pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> GeneratedSource:
-    tool_capability_require(self.token, "SourceEmitter")
-    GeneratedSource { path, contents }
+impl SourceEmitter:
+    pub fn generated_source(path: str, contents: str) -> GeneratedSource:
+        tool_capability_require(self.token, "SourceEmitter")
+        GeneratedSource { path, contents }
 
 fn tool_process_argv(args: &List[str]) -> str:
     var out = StringBuilder.new()
@@ -1947,133 +1963,134 @@ fn tool_compile_provenance(target: &str, parts: &List[str]):
     for i in 1..parts.len(): argv = argv ++ " " ++ parts[i]
     print("[compile] " ++ target ++ " ran " ++ digest[0..12] ++ " " ++ exe ++ argv)
 
-fn ProcessRunner.record_process_effect(self: &Self, method: &str, parts: &List[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
-    tool_compile_provenance(if self.target_name.len() > 0: self.target_name.clone() else: "<build>".to_owned(), parts)
-    if with_getenv_str("WITH_BUILD_EFFECTS_OUT").len() == 0:
-        return
-    let target = if self.target_name.len() > 0: self.target_name.clone() else: "<build>"
-    var line = StringBuilder.new()
-    line.push_str("process\ttarget=")
-    line.push_str(tool_effect_escape(target))
-    line.push_str("\tmethod=")
-    line.push_str(tool_effect_escape(method))
-    line.push_str("\targv=")
-    line.push_str(tool_effect_join_argv(parts))
-    line.push_str("\tcwd=")
-    line.push_str(tool_effect_escape(cwd))
-    line.push_str("\ttimeout=")
-    line.push_str(f"{timeout_ms}")
-    line.push_str("\tstdin=")
-    line.push_str(tool_effect_escape(stdin_path))
-    line.push_str("\tstdout=")
-    line.push_str(tool_effect_escape(stdout_path))
-    line.push_str("\tstderr=")
-    line.push_str(tool_effect_escape(stderr_path))
-    line.push_str("\tenv=")
-    line.push_str(env_text)
-    line.push_str("\ttool=")
-    line.push_str(tool_effect_tool_identity(parts))
-    tool_effect_record(line.to_str())
+impl ProcessRunner:
+    fn record_process_effect(method: &str, parts: &List[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
+        tool_compile_provenance(if self.target_name.len() > 0: self.target_name.clone() else: "<build>".to_owned(), parts)
+        if with_getenv_str("WITH_BUILD_EFFECTS_OUT").len() == 0:
+            return
+        let target = if self.target_name.len() > 0: self.target_name.clone() else: "<build>"
+        var line = StringBuilder.new()
+        line.push_str("process\ttarget=")
+        line.push_str(tool_effect_escape(target))
+        line.push_str("\tmethod=")
+        line.push_str(tool_effect_escape(method))
+        line.push_str("\targv=")
+        line.push_str(tool_effect_join_argv(parts))
+        line.push_str("\tcwd=")
+        line.push_str(tool_effect_escape(cwd))
+        line.push_str("\ttimeout=")
+        line.push_str(f"{timeout_ms}")
+        line.push_str("\tstdin=")
+        line.push_str(tool_effect_escape(stdin_path))
+        line.push_str("\tstdout=")
+        line.push_str(tool_effect_escape(stdout_path))
+        line.push_str("\tstderr=")
+        line.push_str(tool_effect_escape(stderr_path))
+        line.push_str("\tenv=")
+        line.push_str(env_text)
+        line.push_str("\ttool=")
+        line.push_str(tool_effect_tool_identity(parts))
+        tool_effect_record(line.to_str())
 
-pub fn ProcessRunner.run_capture(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> ToolProcessResult:
-    tool_capability_require(self.token, "ProcessRunner")
-    self.require_network_allowed(args, "run_capture")
-    self.require_capture_allowed(stdout_path, stderr_path, "run_capture")
-    let env = tool_process_clear_driver_env()
-    let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
-    tool_process_restore_driver_env(env)
-    self.record_process_effect("run_capture", args, "", timeout_ms, "", stdout_path, stderr_path, "")
-    ToolProcessResult {
-        rc,
-        stdout: with_fs_read_file(stdout_path),
-        stderr: with_fs_read_file(stderr_path),
-        timed_out: rc == 124,
-    }
+    pub fn run_capture(args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> ToolProcessResult:
+        tool_capability_require(self.token, "ProcessRunner")
+        self.require_network_allowed(args, "run_capture")
+        self.require_capture_allowed(stdout_path, stderr_path, "run_capture")
+        let env = tool_process_clear_driver_env()
+        let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
+        tool_process_restore_driver_env(env)
+        self.record_process_effect("run_capture", args, "", timeout_ms, "", stdout_path, stderr_path, "")
+        ToolProcessResult {
+            rc,
+            stdout: with_fs_read_file(stdout_path),
+            stderr: with_fs_read_file(stderr_path),
+            timed_out: rc == 124,
+        }
 
-pub fn ProcessRunner.run(self: &Self, args: &List[str]) -> i32:
-    tool_capability_require(self.token, "ProcessRunner")
-    self.require_network_allowed(args, "run")
-    let env = tool_process_clear_driver_env()
-    let rc = with_exec_argv(tool_process_argv(args))
-    tool_process_restore_driver_env(env)
-    self.record_process_effect("run", args, "", 0, "", "", "", "")
-    rc
+    pub fn run(args: &List[str]) -> i32:
+        tool_capability_require(self.token, "ProcessRunner")
+        self.require_network_allowed(args, "run")
+        let env = tool_process_clear_driver_env()
+        let rc = with_exec_argv(tool_process_argv(args))
+        tool_process_restore_driver_env(env)
+        self.record_process_effect("run", args, "", 0, "", "", "", "")
+        rc
 
-pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
-    tool_capability_require(self.token, "ProcessRunner")
-    self.require_network_allowed(args, "run_capture_with_env")
-    self.require_capture_allowed(stdout_path, stderr_path, "run_capture_with_env")
-    let env_text = tool_effect_env_text(&process_env)
-    let env = tool_process_apply_env(process_env)
-    let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
-    tool_process_restore_env(env)
-    self.record_process_effect("run_capture_with_env", args, "", timeout_ms, "", stdout_path, stderr_path, env_text)
-    ToolProcessResult {
-        rc,
-        stdout: with_fs_read_file(stdout_path),
-        stderr: with_fs_read_file(stderr_path),
-        timed_out: rc == 124,
-    }
+    pub fn run_capture_with_env(args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
+        tool_capability_require(self.token, "ProcessRunner")
+        self.require_network_allowed(args, "run_capture_with_env")
+        self.require_capture_allowed(stdout_path, stderr_path, "run_capture_with_env")
+        let env_text = tool_effect_env_text(&process_env)
+        let env = tool_process_apply_env(process_env)
+        let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
+        tool_process_restore_env(env)
+        self.record_process_effect("run_capture_with_env", args, "", timeout_ms, "", stdout_path, stderr_path, env_text)
+        ToolProcessResult {
+            rc,
+            stdout: with_fs_read_file(stdout_path),
+            stderr: with_fs_read_file(stderr_path),
+            timed_out: rc == 124,
+        }
 
-pub fn ProcessRunner.run_capture_cwd(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> ToolProcessResult:
-    tool_capability_require(self.token, "ProcessRunner")
-    self.require_network_allowed(args, "run_capture_cwd")
-    self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd")
-    let env = tool_process_clear_driver_env()
-    let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
-    tool_process_restore_driver_env(env)
-    self.record_process_effect("run_capture_cwd", args, cwd, timeout_ms, "", stdout_path, stderr_path, "")
-    ToolProcessResult {
-        rc,
-        stdout: with_fs_read_file(stdout_path),
-        stderr: with_fs_read_file(stderr_path),
-        timed_out: rc == 124,
-    }
+    pub fn run_capture_cwd(args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> ToolProcessResult:
+        tool_capability_require(self.token, "ProcessRunner")
+        self.require_network_allowed(args, "run_capture_cwd")
+        self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd")
+        let env = tool_process_clear_driver_env()
+        let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
+        tool_process_restore_driver_env(env)
+        self.record_process_effect("run_capture_cwd", args, cwd, timeout_ms, "", stdout_path, stderr_path, "")
+        ToolProcessResult {
+            rc,
+            stdout: with_fs_read_file(stdout_path),
+            stderr: with_fs_read_file(stderr_path),
+            timed_out: rc == 124,
+        }
 
-pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str, process_env: ProcessEnv) -> ToolProcessResult:
-    tool_capability_require(self.token, "ProcessRunner")
-    self.require_network_allowed(args, "run_capture_cwd_with_env")
-    self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd_with_env")
-    let env_text = tool_effect_env_text(&process_env)
-    let env = tool_process_apply_env(process_env)
-    let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
-    tool_process_restore_env(env)
-    self.record_process_effect("run_capture_cwd_with_env", args, cwd, timeout_ms, "", stdout_path, stderr_path, env_text)
-    ToolProcessResult {
-        rc,
-        stdout: with_fs_read_file(stdout_path),
-        stderr: with_fs_read_file(stderr_path),
-        timed_out: rc == 124,
-    }
+    pub fn run_capture_cwd_with_env(args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str, process_env: ProcessEnv) -> ToolProcessResult:
+        tool_capability_require(self.token, "ProcessRunner")
+        self.require_network_allowed(args, "run_capture_cwd_with_env")
+        self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd_with_env")
+        let env_text = tool_effect_env_text(&process_env)
+        let env = tool_process_apply_env(process_env)
+        let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
+        tool_process_restore_env(env)
+        self.record_process_effect("run_capture_cwd_with_env", args, cwd, timeout_ms, "", stdout_path, stderr_path, env_text)
+        ToolProcessResult {
+            rc,
+            stdout: with_fs_read_file(stdout_path),
+            stderr: with_fs_read_file(stderr_path),
+            timed_out: rc == 124,
+        }
 
-pub fn ProcessRunner.run_capture_input(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> ToolProcessResult:
-    tool_capability_require(self.token, "ProcessRunner")
-    self.require_network_allowed(args, "run_capture_input")
-    self.require_capture_allowed(stdout_path, stderr_path, "run_capture_input")
-    let env = tool_process_clear_driver_env()
-    let rc = with_exec_argv_capture_input(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, stdin_path)
-    tool_process_restore_driver_env(env)
-    self.record_process_effect("run_capture_input", args, "", timeout_ms, stdin_path, stdout_path, stderr_path, "")
-    ToolProcessResult {
-        rc,
-        stdout: with_fs_read_file(stdout_path),
-        stderr: with_fs_read_file(stderr_path),
-        timed_out: rc == 124,
-    }
+    pub fn run_capture_input(args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> ToolProcessResult:
+        tool_capability_require(self.token, "ProcessRunner")
+        self.require_network_allowed(args, "run_capture_input")
+        self.require_capture_allowed(stdout_path, stderr_path, "run_capture_input")
+        let env = tool_process_clear_driver_env()
+        let rc = with_exec_argv_capture_input(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, stdin_path)
+        tool_process_restore_driver_env(env)
+        self.record_process_effect("run_capture_input", args, "", timeout_ms, stdin_path, stdout_path, stderr_path, "")
+        ToolProcessResult {
+            rc,
+            stdout: with_fs_read_file(stdout_path),
+            stderr: with_fs_read_file(stderr_path),
+            timed_out: rc == 124,
+        }
 
-pub fn ProcessRunner.spawn_capture(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str) -> i32:
-    tool_capability_require(self.token, "ProcessRunner")
-    self.require_network_allowed(args, "spawn_capture")
-    self.require_capture_allowed(stdout_path, stderr_path, "spawn_capture")
-    let env = tool_process_clear_driver_env()
-    let pid = with_exec_argv_capture_spawn(tool_process_argv(args), stdout_path, stderr_path)
-    tool_process_restore_driver_env(env)
-    self.record_process_effect("spawn_capture", args, "", 0, "", stdout_path, stderr_path, "")
-    pid
+    pub fn spawn_capture(args: &List[str], stdout_path: &str, stderr_path: &str) -> i32:
+        tool_capability_require(self.token, "ProcessRunner")
+        self.require_network_allowed(args, "spawn_capture")
+        self.require_capture_allowed(stdout_path, stderr_path, "spawn_capture")
+        let env = tool_process_clear_driver_env()
+        let pid = with_exec_argv_capture_spawn(tool_process_argv(args), stdout_path, stderr_path)
+        tool_process_restore_driver_env(env)
+        self.record_process_effect("spawn_capture", args, "", 0, "", stdout_path, stderr_path, "")
+        pid
 
-pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
-    tool_capability_require(self.token, "ProcessRunner")
-    with_exec_wait(pid, timeout_ms)
+    pub fn wait(pid: i32, timeout_ms: i32) -> i32:
+        tool_capability_require(self.token, "ProcessRunner")
+        with_exec_wait(pid, timeout_ms)
 
 fn tool_process_basename(path: &str) -> str:
     var start = 0
@@ -2089,48 +2106,49 @@ fn tool_process_requires_network(args: &List[str]) -> bool:
     let name = tool_process_basename(args[0])
     name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe" or name == "https_fetch" or name == "https_fetch.exe"
 
-fn ProcessRunner.project_relative_path(self: &Self, path: &str) -> str:
-    let normalized = tool_path_normalize(path)
-    if self.root.len() == 0 or self.root == ".":
-        return normalized
-    let root_path = tool_path_normalize(self.root)
-    let prefix = if root_path.ends_with("/"): root_path else: root_path ++ "/"
-    if normalized.starts_with(prefix):
-        return normalized.slice(prefix.len(), normalized.len())
-    normalized
+impl ProcessRunner:
+    fn project_relative_path(path: &str) -> str:
+        let normalized = tool_path_normalize(path)
+        if self.root.len() == 0 or self.root == ".":
+            return normalized
+        let root_path = tool_path_normalize(self.root)
+        let prefix = if root_path.ends_with("/"): root_path else: root_path ++ "/"
+        if normalized.starts_with(prefix):
+            return normalized.slice(prefix.len(), normalized.len())
+        normalized
 
-fn ProcessRunner.write_path_allowed(self: &Self, path: &str) -> bool:
-    if not self.write_scoped:
-        return true
-    for i in 0..self.write_scope.len():
-        if tool_path_is_same_or_child(path, self.write_scope[i]):
+    fn write_path_allowed(path: &str) -> bool:
+        if not self.write_scoped:
             return true
-    false
+        for i in 0..self.write_scope.len():
+            if tool_path_is_same_or_child(path, self.write_scope[i]):
+                return true
+        false
 
-fn ProcessRunner.require_network_allowed(self: &Self, args: &List[str], method: &str):
-    if not tool_process_requires_network(args):
-        return
-    if self.network:
-        return
-    let target = if self.target_name.len() > 0: self.target_name.clone() else: "<build>"
-    let tool = tool_process_basename(args[0])
-    with_eprint("error: ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()\n")
-    exit(1)
-
-fn ProcessRunner.require_capture_path_allowed(self: &Self, path: &str, method: &str):
-    if path.len() == 0:
-        return
-    let rel = self.project_relative_path(path)
-    if not tool_path_is_project_relative(rel):
-        with_eprint("error: ProcessRunner." ++ method ++ " capture path escapes project root: " ++ path ++ "\n")
-        exit(1)
-    if not self.write_path_allowed(rel):
-        with_eprint("error: ProcessRunner." ++ method ++ " capture path is not a declared action output: " ++ rel ++ "\n")
+    fn require_network_allowed(args: &List[str], method: &str):
+        if not tool_process_requires_network(args):
+            return
+        if self.network:
+            return
+        let target = if self.target_name.len() > 0: self.target_name.clone() else: "<build>"
+        let tool = tool_process_basename(args[0])
+        with_eprint("error: ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()\n")
         exit(1)
 
-fn ProcessRunner.require_capture_allowed(self: &Self, stdout_path: &str, stderr_path: &str, method: &str):
-    self.require_capture_path_allowed(stdout_path, method)
-    self.require_capture_path_allowed(stderr_path, method)
+    fn require_capture_path_allowed(path: &str, method: &str):
+        if path.len() == 0:
+            return
+        let rel = self.project_relative_path(path)
+        if not tool_path_is_project_relative(rel):
+            with_eprint("error: ProcessRunner." ++ method ++ " capture path escapes project root: " ++ path ++ "\n")
+            exit(1)
+        if not self.write_path_allowed(rel):
+            with_eprint("error: ProcessRunner." ++ method ++ " capture path is not a declared action output: " ++ rel ++ "\n")
+            exit(1)
+
+    fn require_capture_allowed(stdout_path: &str, stderr_path: &str, method: &str):
+        self.require_capture_path_allowed(stdout_path, method)
+        self.require_capture_path_allowed(stderr_path, method)
 
 fn tool_process_spec_fail(message: &str):
     with_eprint("error: ProcessRunner.run_spec: " ++ message ++ "\n")
@@ -2146,92 +2164,94 @@ fn tool_process_spec_validate(spec: &ProcessSpec, stdout_path: &str, stderr_path
     if spec.stdin_path.len() > 0 and (spec.cwd.len() > 0 or spec.env.vars.len() > 0):
         tool_process_spec_fail("stdin cannot yet be combined with cwd or env")
 
-pub fn ProcessRunner.run_spec(self: &Self, spec: ProcessSpec, stdout_path: &str, stderr_path: &str) -> ToolProcessResult:
-    tool_capability_require(self.token, "ProcessRunner")
-    tool_process_spec_validate(spec, stdout_path, stderr_path)
-    let full_args: List[str] = List.new()
-    full_args.push(with_str_clone_ref(spec.executable))
-    for i in 0..spec.args.len():
-        full_args.push(with_str_clone_ref(spec.args[i]))
-    let timeout = if spec.timeout_ms > 0: spec.timeout_ms else: 0
-    // The spec is this call's to consume: its env transfers to the runner
-    // by an explicit vacate (§2.2, D32), never an implicit field move.
-    var owned = spec
-    if owned.env.vars.len() > 0:
-        let env = move owned.env
+impl ProcessRunner:
+    pub fn run_spec(spec: ProcessSpec, stdout_path: &str, stderr_path: &str) -> ToolProcessResult:
+        tool_capability_require(self.token, "ProcessRunner")
+        tool_process_spec_validate(spec, stdout_path, stderr_path)
+        let full_args: List[str] = List.new()
+        full_args.push(with_str_clone_ref(spec.executable))
+        for i in 0..spec.args.len():
+            full_args.push(with_str_clone_ref(spec.args[i]))
+        let timeout = if spec.timeout_ms > 0: spec.timeout_ms else: 0
+        // The spec is this call's to consume: its env transfers to the runner
+        // by an explicit vacate (§2.2, D32), never an implicit field move.
+        var owned = spec
+        if owned.env.vars.len() > 0:
+            let env = move owned.env
+            if owned.cwd.len() > 0:
+                return self.run_capture_cwd_with_env(full_args, stdout_path, stderr_path, timeout, owned.cwd, env)
+            return self.run_capture_with_env(full_args, stdout_path, stderr_path, timeout, env)
         if owned.cwd.len() > 0:
-            return self.run_capture_cwd_with_env(full_args, stdout_path, stderr_path, timeout, owned.cwd, env)
-        return self.run_capture_with_env(full_args, stdout_path, stderr_path, timeout, env)
-    if owned.cwd.len() > 0:
-        return self.run_capture_cwd(full_args, stdout_path, stderr_path, timeout, owned.cwd)
-    if owned.stdin_path.len() > 0:
-        return self.run_capture_input(full_args, stdout_path, stderr_path, timeout, owned.stdin_path)
-    self.run_capture(full_args, stdout_path, stderr_path, timeout)
+            return self.run_capture_cwd(full_args, stdout_path, stderr_path, timeout, owned.cwd)
+        if owned.stdin_path.len() > 0:
+            return self.run_capture_input(full_args, stdout_path, stderr_path, timeout, owned.stdin_path)
+        self.run_capture(full_args, stdout_path, stderr_path, timeout)
 
-pub fn ActionCtx.target_name(self: &Self) -> &str:
-    tool_capability_require(self.token, "ActionCtx")
-    self.target_name_value
+impl ActionCtx:
+    pub fn target_name() -> &str:
+        tool_capability_require(self.token, "ActionCtx")
+        self.target_name_value
 
-pub fn ActionCtx.project_info(self: &Self) -> &ProjectInfo:
-    tool_capability_require(self.token, "ActionCtx")
-    self.project
+    pub fn project_info() -> &ProjectInfo:
+        tool_capability_require(self.token, "ActionCtx")
+        self.project
 
-pub fn ActionCtx.diagnostics(self: &Self) -> &Diagnostics:
-    tool_capability_require(self.token, "ActionCtx")
-    self.diagnostics_value
+    pub fn diagnostics() -> &Diagnostics:
+        tool_capability_require(self.token, "ActionCtx")
+        self.diagnostics_value
 
-pub fn ActionCtx.fs(self: &Self) -> &ToolFs:
-    tool_capability_require(self.token, "ActionCtx")
-    self.fs_value
+    pub fn fs() -> &ToolFs:
+        tool_capability_require(self.token, "ActionCtx")
+        self.fs_value
 
-pub fn ActionCtx.process_runner(self: &Self) -> &ProcessRunner:
-    tool_capability_require(self.token, "ActionCtx")
-    self.process_runner_value
+    pub fn process_runner() -> &ProcessRunner:
+        tool_capability_require(self.token, "ActionCtx")
+        self.process_runner_value
 
-pub fn ActionCtx.inputs(self: &Self) -> &List[str]:
-    tool_capability_require(self.token, "ActionCtx")
-    self.inputs_value
+    pub fn inputs() -> &List[str]:
+        tool_capability_require(self.token, "ActionCtx")
+        self.inputs_value
 
-pub fn ActionCtx.outputs(self: &Self) -> &List[str]:
-    tool_capability_require(self.token, "ActionCtx")
-    self.outputs_value
+    pub fn outputs() -> &List[str]:
+        tool_capability_require(self.token, "ActionCtx")
+        self.outputs_value
 
-pub fn ActionCtx.args(self: &Self) -> &List[str]:
-    tool_capability_require(self.token, "ActionCtx")
-    self.args_value
+    pub fn args() -> &List[str]:
+        tool_capability_require(self.token, "ActionCtx")
+        self.args_value
 
-pub fn ActionCtx.output(self: &Self) -> &str:
-    tool_capability_require(self.token, "ActionCtx")
-    if self.outputs_value.len() == 0:
-        return ""
-    self.outputs_value[0]
+    pub fn output() -> &str:
+        tool_capability_require(self.token, "ActionCtx")
+        if self.outputs_value.len() == 0:
+            return ""
+        self.outputs_value[0]
 
-pub fn ActionCtx.timeout(self: &Self) -> i32:
-    tool_capability_require(self.token, "ActionCtx")
-    self.timeout_ms_value
+    pub fn timeout() -> i32:
+        tool_capability_require(self.token, "ActionCtx")
+        self.timeout_ms_value
 
-pub fn ActionCtx.working_dir(self: &Self) -> &str:
-    tool_capability_require(self.token, "ActionCtx")
-    self.cwd_value
+    pub fn working_dir() -> &str:
+        tool_capability_require(self.token, "ActionCtx")
+        self.cwd_value
 
-pub fn ActionCtx.env(self: &Self) -> &List[str]:
-    tool_capability_require(self.token, "ActionCtx")
-    self.env_value
+    pub fn env() -> &List[str]:
+        tool_capability_require(self.token, "ActionCtx")
+        self.env_value
 
-pub fn ActionCtx.network(self: &Self) -> bool:
-    tool_capability_require(self.token, "ActionCtx")
-    self.network_value
+    pub fn network() -> bool:
+        tool_capability_require(self.token, "ActionCtx")
+        self.network_value
 
-/// The environment variable `name` ("" when unset), read as a declared
-/// input of this action's target (§17.1a): the value is recorded with the
-/// target, and a run whose value differs reruns the target instead of
-/// reusing its cached output.
-///
-///     if ctx.env_input("WITH_TEST_NETWORK") == "1": run_network_case(ctx)
-pub fn ActionCtx.env_input(self: &Self, name: &str) -> str:
-    tool_capability_require(self.token, "ActionCtx")
-    tool_effect_record_env(self.target_name_value, name)
-    with_getenv_str(name)
+    /// The environment variable `name` ("" when unset), read as a declared
+    /// input of this action's target (§17.1a): the value is recorded with the
+    /// target, and a run whose value differs reruns the target instead of
+    /// reusing its cached output.
+    ///
+    ///     if ctx.env_input("WITH_TEST_NETWORK") == "1": run_network_case(ctx)
+    pub fn env_input(name: &str) -> str:
+        tool_capability_require(self.token, "ActionCtx")
+        tool_effect_record_env(self.target_name_value, name)
+        with_getenv_str(name)
 
 fn build_graph_escape(value: &str) -> str:
     var out = StringBuilder.with_capacity(value.len())
@@ -2257,10 +2277,11 @@ pub fn new_build(package: Package) -> Build:
         generated_sources: List.new(),
     }
 
-pub fn Build.default(move self: Build, target_name: str) -> Build:
-    var out = self
-    out.default_target = target_name
-    out
+impl Build:
+    pub move fn default(target_name: str) -> Build:
+        var out = self
+        out.default_target = target_name
+        out
 
 pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
     Target {
@@ -2288,161 +2309,163 @@ pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
         parallel: false,
     }
 
-pub fn Target.timeout(move self: Target, ms: i32) -> Target:
-    var out = self
-    out.timeout_ms = ms
-    out
+impl Target:
+    pub move fn timeout(ms: i32) -> Target:
+        var out = self
+        out.timeout_ms = ms
+        out
 
-pub fn Target.working_dir(move self: Target, path: str) -> Target:
-    var out = self
-    out.cwd = path
-    out
+    pub move fn working_dir(path: str) -> Target:
+        var out = self
+        out.cwd = path
+        out
 
-pub fn Target.with_env(move self: Target, key: &str, value: &str) -> Target:
-    var out = self
-    out.env.push(key ++ "=" ++ value)
-    out
+    pub move fn with_env(key: &str, value: &str) -> Target:
+        var out = self
+        out.env.push(key ++ "=" ++ value)
+        out
 
-pub fn Target.allow_network(move self: Target) -> Target:
-    var out = self
-    out.network = true
-    out
+    pub move fn allow_network() -> Target:
+        var out = self
+        out.network = true
+        out
 
-// Declares this action a pure function of its declared inputs: no reads of
-// undeclared state, no effect-ordering against other targets. The executor
-// may run it concurrently with other allow_parallel targets.
-pub fn Target.allow_parallel(move self: Target) -> Target:
-    var out = self
-    out.parallel = true
-    out
+    // Declares this action a pure function of its declared inputs: no reads of
+    // undeclared state, no effect-ordering against other targets. The executor
+    // may run it concurrently with other allow_parallel targets.
+    pub move fn allow_parallel() -> Target:
+        var out = self
+        out.parallel = true
+        out
 
-pub fn Build.add_target(move self: Build, target: Target) -> Build:
-    var out = self
-    out.targets.push(target)
-    out
+impl Build:
+    pub move fn add_target(target: Target) -> Build:
+        var out = self
+        out.targets.push(target)
+        out
 
-pub fn Build.generated_source(move self: Build, path: str, contents: str) -> Build:
-    var out = self
-    out.generated_sources.push(GeneratedSource { path, contents })
-    out
+    pub move fn generated_source(path: str, contents: str) -> Build:
+        var out = self
+        out.generated_sources.push(GeneratedSource { path, contents })
+        out
 
-pub fn Build.add_generated_source(move self: Build, source: GeneratedSource) -> Build:
-    var out = self
-    out.generated_sources.push(source)
-    out
+    pub move fn add_generated_source(source: GeneratedSource) -> Build:
+        var out = self
+        out.generated_sources.push(source)
+        out
 
-pub fn Build.executable(move self: Self, name: str, entry: str) -> Build:
-    let target = target_new(.Executable, name, entry)
-    var out = self
-    out.add_target(target)
+    pub move fn executable(name: str, entry: str) -> Build:
+        let target = target_new(.Executable, name, entry)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.library(move self: Self, name: str, entry: str) -> Build:
-    let target = target_new(.Library, name, entry)
-    var out = self
-    out.add_target(target)
+    pub move fn library(name: str, entry: str) -> Build:
+        let target = target_new(.Library, name, entry)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.test(move self: Self, name: str, entry: str) -> Build:
-    let target = target_new(.Test, name, entry)
-    var out = self
-    out.add_target(target)
+    pub move fn test(name: str, entry: str) -> Build:
+        let target = target_new(.Test, name, entry)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.object(move self: Self, name: str, entry: str) -> Build:
-    let target = target_new(.Object, name, entry)
-    var out = self
-    out.add_target(target)
+    pub move fn object(name: str, entry: str) -> Build:
+        let target = target_new(.Object, name, entry)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.archive(move self: Self, name: str, entry: str) -> Build:
-    let target = target_new(.Archive, name, entry)
-    var out = self
-    out.add_target(target)
+    pub move fn archive(name: str, entry: str) -> Build:
+        let target = target_new(.Archive, name, entry)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.action(move self: Self, name: str, action: fn(ActionCtx) -> i32) -> Build:
-    var target = target_new(.Action, name, "")
-    target.action = action
-    var out = self
-    out.add_target(target)
+    pub move fn action(name: str, action: fn(ActionCtx) -> i32) -> Build:
+        var target = target_new(.Action, name, "")
+        target.action = action
+        var out = self
+        out.add_target(target)
 
-pub fn Build.command(move self: Self, name: str, runner: str) -> Build:
-    let target = target_new(.Command, name, runner)
-    var out = self
-    out.add_target(target)
+    pub move fn command(name: str, runner: str) -> Build:
+        let target = target_new(.Command, name, runner)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.install(move self: Self, name: str, source: str, dest: str) -> Build:
-    let target = target_new(.Install, name, source).output(dest)
-    var out = self
-    out.add_target(target)
+    pub move fn install(name: str, source: str, dest: str) -> Build:
+        let target = target_new(.Install, name, source).output(dest)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.group(move self: Self, name: str) -> Build:
-    let target = target_new(.Group, name, "")
-    var out = self
-    out.add_target(target)
+    pub move fn group(name: str) -> Build:
+        let target = target_new(.Group, name, "")
+        var out = self
+        out.add_target(target)
 
-pub fn Build.binary_compare(move self: Self, name: str, left: str, right: str) -> Build:
-    var target = target_new(.BinaryCompare, name, left)
-    target = target.arg(right)
-    var out = self
-    out.add_target(target)
+    pub move fn binary_compare(name: str, left: str, right: str) -> Build:
+        var target = target_new(.BinaryCompare, name, left)
+        target = target.arg(right)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.fixpoint_compare(move self: Self, name: str, left: str, right: str) -> Build:
-    var target = target_new(.FixpointCompare, name, left)
-    target = target.arg(right)
-    var out = self
-    out.add_target(target)
+    pub move fn fixpoint_compare(name: str, left: str, right: str) -> Build:
+        var target = target_new(.FixpointCompare, name, left)
+        target = target.arg(right)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.compile_c_object(move self: Self, name: str, source: str, output: str) -> Build:
-    let target = target_new(.CompileCObject, name, source).output(output)
-    var out = self
-    out.add_target(target)
+    pub move fn compile_c_object(name: str, source: str, output: str) -> Build:
+        let target = target_new(.CompileCObject, name, source).output(output)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.compile_asm_object(move self: Self, name: str, source: str, output: str) -> Build:
-    let target = target_new(.CompileAsmObject, name, source).output(output)
-    var out = self
-    out.add_target(target)
+    pub move fn compile_asm_object(name: str, source: str, output: str) -> Build:
+        let target = target_new(.CompileAsmObject, name, source).output(output)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.compile_llvm_ir_object(move self: Self, name: str, source: str, output: str) -> Build:
-    let target = target_new(.CompileLlvmIrObject, name, source).output(output)
-    var out = self
-    out.add_target(target)
+    pub move fn compile_llvm_ir_object(name: str, source: str, output: str) -> Build:
+        let target = target_new(.CompileLlvmIrObject, name, source).output(output)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.create_static_archive(move self: Self, name: str, output: str) -> Build:
-    let target = target_new(.CreateStaticArchive, name, "").output(output)
-    var out = self
-    out.add_target(target)
+    pub move fn create_static_archive(name: str, output: str) -> Build:
+        let target = target_new(.CreateStaticArchive, name, "").output(output)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.generate_response_file(move self: Self, name: str, output: str) -> Build:
-    let target = target_new(.GenerateResponseFile, name, "").output(output)
-    var out = self
-    out.add_target(target)
+    pub move fn generate_response_file(name: str, output: str) -> Build:
+        let target = target_new(.GenerateResponseFile, name, "").output(output)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.embed_object_files(move self: Self, name: str, output: str) -> Build:
-    let target = target_new(.EmbedObjectFiles, name, "").output(output)
-    var out = self
-    out.add_target(target)
+    pub move fn embed_object_files(name: str, output: str) -> Build:
+        let target = target_new(.EmbedObjectFiles, name, "").output(output)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.copy_tree(move self: Self, name: str, source_dir: str, output_dir: str) -> Build:
-    let target = target_new(.CopyTree, name, source_dir).output(output_dir)
-    var out = self
-    out.add_target(target)
+    pub move fn copy_tree(name: str, source_dir: str, output_dir: str) -> Build:
+        let target = target_new(.CopyTree, name, source_dir).output(output_dir)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.copy_file(move self: Self, name: str, source: str, dest: str) -> Build:
-    let target = target_new(.CopyFile, name, source).output(dest)
-    var out = self
-    out.add_target(target)
+    pub move fn copy_file(name: str, source: str, dest: str) -> Build:
+        let target = target_new(.CopyFile, name, source).output(dest)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.clean(move self: Self, name: str) -> Build:
-    let target = target_new(.Clean, name, "")
-    var out = self
-    out.add_target(target)
+    pub move fn clean(name: str) -> Build:
+        let target = target_new(.Clean, name, "")
+        var out = self
+        out.add_target(target)
 
-pub fn Build.run_corpus_test(move self: Self, name: str, runner: str) -> Build:
-    let target = target_new(.RunCorpusTest, name, runner)
-    var out = self
-    out.add_target(target)
+    pub move fn run_corpus_test(name: str, runner: str) -> Build:
+        let target = target_new(.RunCorpusTest, name, runner)
+        var out = self
+        out.add_target(target)
 
-pub fn Build.promote_tree_if_verified(move self: Self, name: str, source_dir: str, output_dir: str) -> Build:
-    let target = target_new(.PromoteTreeIfVerified, name, source_dir).output(output_dir)
-    var out = self
-    out.add_target(target)
+    pub move fn promote_tree_if_verified(name: str, source_dir: str, output_dir: str) -> Build:
+        let target = target_new(.PromoteTreeIfVerified, name, source_dir).output(output_dir)
+        var out = self
+        out.add_target(target)
 
 pub type Download {
     pub url: str,
@@ -2450,25 +2473,26 @@ pub type Download {
     pub output_path: str,
 }
 
-pub fn Build.download(move self: Self, name: str, spec: Download) -> Build:
-    var target = target_new(.Action, with_str_clone_ref(name), "").output(with_str_clone_ref(spec.output_path))
-    target.action = build_download_action
-    target = target.allow_network()
-    target = target.write_scope(build_path_dirname(spec.output_path))
-    target = target.write_scope("out/command/" ++ name)
-    target = target.arg(with_str_clone_ref(spec.url))
-    target = target.arg(with_str_clone_ref(spec.sha256))
-    var out = self
-    out.add_target(target)
+impl Build:
+    pub move fn download(name: str, spec: Download) -> Build:
+        var target = target_new(.Action, with_str_clone_ref(name), "").output(with_str_clone_ref(spec.output_path))
+        target.action = build_download_action
+        target = target.allow_network()
+        target = target.write_scope(build_path_dirname(spec.output_path))
+        target = target.write_scope("out/command/" ++ name)
+        target = target.arg(with_str_clone_ref(spec.url))
+        target = target.arg(with_str_clone_ref(spec.sha256))
+        var out = self
+        out.add_target(target)
 
-pub fn Build.extract_tar_gz(move self: Self, name: str, archive: str, output_dir: str) -> Build:
-    var target = target_new(.Action, with_str_clone_ref(name), "").output(with_str_clone_ref(output_dir))
-    target.action = build_extract_tar_gz_action
-    target = target.input(archive)
-    target = target.write_scope(output_dir)
-    target = target.write_scope("out/command/" ++ name)
-    var out = self
-    out.add_target(target)
+    pub move fn extract_tar_gz(name: str, archive: str, output_dir: str) -> Build:
+        var target = target_new(.Action, with_str_clone_ref(name), "").output(with_str_clone_ref(output_dir))
+        target.action = build_extract_tar_gz_action
+        target = target.input(archive)
+        target = target.write_scope(output_dir)
+        target = target.write_scope("out/command/" ++ name)
+        var out = self
+        out.add_target(target)
 
 fn build_path_dirname(path: &str) -> str:
     var last_slash = -1
@@ -2623,99 +2647,100 @@ fn build_fetch_last_line(text: &str) -> str:
         if line.len() > 0 and line != "\r": last = line ++ ""
     last
 
-// Runs the fetch program on one https URL into `part`. "" when it wrote the
-// file, else why it did not.
-fn ActionCtx.fetch_url(self: &Self, cmd_dir: &str, url: &str, part: &str, download_ms: i32) -> str:
-    let fs = self.fs()
-    let helper = cmd_dir ++ "/https_fetch" ++ build_host_exe_suffix()
-    if not fs.exists(helper):
-        let ws = self.create_workspace(self.target_name() ++ "-https_fetch")
-        ws.add_string(cmd_dir ++ "/https_fetch.with", build_https_fetch_source())
-        var opts = ws.options()
-        opts.output_path = with_str_clone_ref(helper)
-        opts.debug_info = false
-        ws.set_options(opts)
-        let compiled = ws.compile()
-        if compiled.status != BuildStatus.ok or compiled.rc != 0:
-            return "could not compile the https_fetch helper"
-    let argv: List[str] = List.new()
-    argv.push(with_str_clone_ref(helper))
-    argv.push(with_str_clone_ref(url))
-    argv.push(with_str_clone_ref(part))
-    argv.push(f"{BUILD_FETCH_CONNECT_MS}")
-    argv.push(f"{BUILD_FETCH_IDLE_MS}")
-    argv.push(f"{download_ms}")
-    let result = self.process_runner().run_capture(argv, cmd_dir ++ "/https_fetch.stdout", cmd_dir ++ "/https_fetch.stderr", download_ms)
-    if result.timed_out:
-        return f"no complete response within {download_ms / 1000} s"
-    if result.rc != 0:
-        let said = build_fetch_last_line(result.stdout ++ result.stderr)
-        return if said.len() > 0: said else: f"the download failed (exit {result.rc})"
-    ""
+impl ActionCtx:
+    // Runs the fetch program on one https URL into `part`. "" when it wrote the
+    // file, else why it did not.
+    fn fetch_url(cmd_dir: &str, url: &str, part: &str, download_ms: i32) -> str:
+        let fs = self.fs()
+        let helper = cmd_dir ++ "/https_fetch" ++ build_host_exe_suffix()
+        if not fs.exists(helper):
+            let ws = self.create_workspace(self.target_name() ++ "-https_fetch")
+            ws.add_string(cmd_dir ++ "/https_fetch.with", build_https_fetch_source())
+            var opts = ws.options()
+            opts.output_path = with_str_clone_ref(helper)
+            opts.debug_info = false
+            ws.set_options(opts)
+            let compiled = ws.compile()
+            if compiled.status != BuildStatus.ok or compiled.rc != 0:
+                return "could not compile the https_fetch helper"
+        let argv: List[str] = List.new()
+        argv.push(with_str_clone_ref(helper))
+        argv.push(with_str_clone_ref(url))
+        argv.push(with_str_clone_ref(part))
+        argv.push(f"{BUILD_FETCH_CONNECT_MS}")
+        argv.push(f"{BUILD_FETCH_IDLE_MS}")
+        argv.push(f"{download_ms}")
+        let result = self.process_runner().run_capture(argv, cmd_dir ++ "/https_fetch.stdout", cmd_dir ++ "/https_fetch.stderr", download_ms)
+        if result.timed_out:
+            return f"no complete response within {download_ms / 1000} s"
+        if result.rc != 0:
+            let said = build_fetch_last_line(result.stdout ++ result.stderr)
+            return if said.len() > 0: said else: f"the download failed (exit {result.rc})"
+        ""
 
-/// Puts the archive whose sha256 is `sha256` at `output` (a declared output
-/// of this action). The machine's source cache is read first; otherwise each
-/// of `sources` (an https URL, or a file in the project) is tried in order
-/// under `download_ms`, and the first that delivers the pinned bytes is kept
-/// in the cache for every other worktree. An https source needs
-/// `target.allow_network()`; a cache hit does not.
-pub fn ActionCtx.fetch_source(self: &Self, sources: &List[str], sha256: &str, output: &str, download_ms: i32) -> FetchedSource:
-    let fs = self.fs()
-    let name = tool_process_basename(output)
-    if not build_fetch_is_sha256(sha256):
-        return FetchedSource { rc: 1, report: "a source archive is fetched by its pinned sha256 (64 lowercase hex digits); " ++ name ++ " has '" ++ sha256 ++ "'", from_cache: false }
-    fs.require_write_file_allowed(output)
-    let resolved = fs.resolve_path(output)
-    let out_dir = build_path_dirname(output)
-    if out_dir != "." and fs.mkdir_all(out_dir) != 0:
-        return FetchedSource { rc: 1, report: "could not create " ++ out_dir, from_cache: false }
-    tool_effect_record("source\tsha256=" ++ sha256)
-    let cache_dir = build_source_cache_dir()
-    let cached = if cache_dir.len() > 0: cache_dir ++ "/" ++ sha256 else: ""
-    if cached.len() > 0 and with_fs_file_exists(cached) != 0:
-        let bytes = with_fs_read_file(cached)
-        if tool_sha256_text(bytes) == sha256:
-            if with_fs_write_file(resolved, bytes) != 0:
-                return FetchedSource { rc: 1, report: "could not write " ++ output, from_cache: false }
-            return FetchedSource { rc: 0, report: "  " ++ cached ++ ": the machine's source cache\n", from_cache: true }
-        // Not the pinned bytes (a torn write, a disk fault): never served.
-        let _bad = with_fs_remove_file(cached)
-    if sources.len() == 0:
-        return FetchedSource { rc: 1, report: name ++ " (pinned sha256 " ++ sha256 ++ ") has no source to fetch it from", from_cache: false }
-    let cmd_dir = "out/command/" ++ self.target_name()
-    if fs.mkdir_all(cmd_dir) != 0:
-        return FetchedSource { rc: 1, report: "could not create " ++ cmd_dir, from_cache: false }
-    let part = output ++ ".part"
-    var tried = ""
-    for i in 0..sources.len():
-        let source = sources[i]
-        let _stale = fs.remove_file(part)
-        var why = ""
-        if source.starts_with("https://"):
-            why = self.fetch_url(cmd_dir, source, part, download_ms)
-        else if not fs.exists(source):
-            why = "no such file"
-        else if fs.copy_file(source, part) != 0:
-            why = "could not copy it"
-        if why.len() == 0:
-            let bytes = with_fs_read_file(fs.resolve_path(part))
-            let actual = tool_sha256_text(bytes)
-            if actual == sha256:
-                if fs.rename(part, output) != 0:
-                    return FetchedSource { rc: 1, report: "could not move " ++ part ++ " to " ++ output, from_cache: false }
-                // Kept for every other worktree; a cache that cannot be
-                // written costs the next one a fetch, nothing else.
-                if cached.len() > 0 and with_fs_mkdir_p(cache_dir) == 0:
-                    let tmp = cached ++ ".tmp"
-                    if with_fs_write_file(tmp, bytes) != 0 or with_fs_rename_file(tmp, cached) != 0:
-                        let _rm = with_fs_remove_file(tmp)
-                return FetchedSource { rc: 0, report: tried ++ "  " ++ source ++ ": fetched\n", from_cache: false }
-            why = "its sha256 is " ++ actual ++ ", not the pin"
-        let _bad = fs.remove_file(part)
-        tried = tried ++ "  " ++ source ++ ": " ++ why ++ "\n"
-    let count = sources.len()
-    let plural = if count == 1: "its source" else: f"any of its {count} sources"
-    FetchedSource { rc: 1, report: "could not fetch " ++ name ++ " (pinned sha256 " ++ sha256 ++ ") from " ++ plural ++ ":\n" ++ tried, from_cache: false }
+    /// Puts the archive whose sha256 is `sha256` at `output` (a declared output
+    /// of this action). The machine's source cache is read first; otherwise each
+    /// of `sources` (an https URL, or a file in the project) is tried in order
+    /// under `download_ms`, and the first that delivers the pinned bytes is kept
+    /// in the cache for every other worktree. An https source needs
+    /// `target.allow_network()`; a cache hit does not.
+    pub fn fetch_source(sources: &List[str], sha256: &str, output: &str, download_ms: i32) -> FetchedSource:
+        let fs = self.fs()
+        let name = tool_process_basename(output)
+        if not build_fetch_is_sha256(sha256):
+            return FetchedSource { rc: 1, report: "a source archive is fetched by its pinned sha256 (64 lowercase hex digits); " ++ name ++ " has '" ++ sha256 ++ "'", from_cache: false }
+        fs.require_write_file_allowed(output)
+        let resolved = fs.resolve_path(output)
+        let out_dir = build_path_dirname(output)
+        if out_dir != "." and fs.mkdir_all(out_dir) != 0:
+            return FetchedSource { rc: 1, report: "could not create " ++ out_dir, from_cache: false }
+        tool_effect_record("source\tsha256=" ++ sha256)
+        let cache_dir = build_source_cache_dir()
+        let cached = if cache_dir.len() > 0: cache_dir ++ "/" ++ sha256 else: ""
+        if cached.len() > 0 and with_fs_file_exists(cached) != 0:
+            let bytes = with_fs_read_file(cached)
+            if tool_sha256_text(bytes) == sha256:
+                if with_fs_write_file(resolved, bytes) != 0:
+                    return FetchedSource { rc: 1, report: "could not write " ++ output, from_cache: false }
+                return FetchedSource { rc: 0, report: "  " ++ cached ++ ": the machine's source cache\n", from_cache: true }
+            // Not the pinned bytes (a torn write, a disk fault): never served.
+            let _bad = with_fs_remove_file(cached)
+        if sources.len() == 0:
+            return FetchedSource { rc: 1, report: name ++ " (pinned sha256 " ++ sha256 ++ ") has no source to fetch it from", from_cache: false }
+        let cmd_dir = "out/command/" ++ self.target_name()
+        if fs.mkdir_all(cmd_dir) != 0:
+            return FetchedSource { rc: 1, report: "could not create " ++ cmd_dir, from_cache: false }
+        let part = output ++ ".part"
+        var tried = ""
+        for i in 0..sources.len():
+            let source = sources[i]
+            let _stale = fs.remove_file(part)
+            var why = ""
+            if source.starts_with("https://"):
+                why = self.fetch_url(cmd_dir, source, part, download_ms)
+            else if not fs.exists(source):
+                why = "no such file"
+            else if fs.copy_file(source, part) != 0:
+                why = "could not copy it"
+            if why.len() == 0:
+                let bytes = with_fs_read_file(fs.resolve_path(part))
+                let actual = tool_sha256_text(bytes)
+                if actual == sha256:
+                    if fs.rename(part, output) != 0:
+                        return FetchedSource { rc: 1, report: "could not move " ++ part ++ " to " ++ output, from_cache: false }
+                    // Kept for every other worktree; a cache that cannot be
+                    // written costs the next one a fetch, nothing else.
+                    if cached.len() > 0 and with_fs_mkdir_p(cache_dir) == 0:
+                        let tmp = cached ++ ".tmp"
+                        if with_fs_write_file(tmp, bytes) != 0 or with_fs_rename_file(tmp, cached) != 0:
+                            let _rm = with_fs_remove_file(tmp)
+                    return FetchedSource { rc: 0, report: tried ++ "  " ++ source ++ ": fetched\n", from_cache: false }
+                why = "its sha256 is " ++ actual ++ ", not the pin"
+            let _bad = fs.remove_file(part)
+            tried = tried ++ "  " ++ source ++ ": " ++ why ++ "\n"
+        let count = sources.len()
+        let plural = if count == 1: "its source" else: f"any of its {count} sources"
+        FetchedSource { rc: 1, report: "could not fetch " ++ name ++ " (pinned sha256 " ++ sha256 ++ ") from " ++ plural ++ ":\n" ++ tried, from_cache: false }
 
 fn build_zlib_gunzip_source() -> str:
     "use std.fs\n" ++
@@ -2834,82 +2859,83 @@ fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error(ctx.target_name() ++ ": tar extraction failed for " ++ tar_path)
     0
 
-pub fn Target.target(move self: Self, target: BuildTarget) -> Target:
-    var out = self
-    out.target_kind = target
-    out
+impl Target:
+    pub move fn target(target: BuildTarget) -> Target:
+        var out = self
+        out.target_kind = target
+        out
 
-pub fn Target.optimize(move self: Self, mode: OptimizeMode) -> Target:
-    var out = self
-    out.optimize_mode = mode
-    out
+    pub move fn optimize(mode: OptimizeMode) -> Target:
+        var out = self
+        out.optimize_mode = mode
+        out
 
-pub fn Target.link_system_lib(move self: Target, lib: str) -> Target:
-    var out = self
-    out.system_libs.push(lib)
-    out
+    pub move fn link_system_lib(lib: str) -> Target:
+        var out = self
+        out.system_libs.push(lib)
+        out
 
-pub fn Target.include_path(move self: Target, path: str) -> Target:
-    var out = self
-    out.include_paths.push(path)
-    out
+    pub move fn include_path(path: str) -> Target:
+        var out = self
+        out.include_paths.push(path)
+        out
 
-// Library paths resolve from the project root; runtime paths belong to the
-// loader and retain literal tokens such as $ORIGIN and @executable_path.
-pub fn Target.library_path(move self: Target, path: str) -> Target:
-    var out = self
-    out.library_paths.push(path)
-    out
+    // Library paths resolve from the project root; runtime paths belong to the
+    // loader and retain literal tokens such as $ORIGIN and @executable_path.
+    pub move fn library_path(path: str) -> Target:
+        var out = self
+        out.library_paths.push(path)
+        out
 
-pub fn Target.rpath(move self: Target, path: str) -> Target:
-    var out = self
-    out.rpaths.push(path)
-    out
+    pub move fn rpath(path: str) -> Target:
+        var out = self
+        out.rpaths.push(path)
+        out
 
-pub fn Target.define(move self: Target, define: str) -> Target:
-    var out = self
-    out.defines.push(define)
-    out
+    pub move fn define(define: str) -> Target:
+        var out = self
+        out.defines.push(define)
+        out
 
-pub fn Target.output(move self: Self, path: str) -> Target:
-    var out = self
-    out.output = path
-    out
+    pub move fn output(path: str) -> Target:
+        var out = self
+        out.output = path
+        out
 
-pub fn Target.input(move self: Target, input: str) -> Target:
-    var out = self
-    out.inputs.push(input)
-    out
+    pub move fn input(input: str) -> Target:
+        var out = self
+        out.inputs.push(input)
+        out
 
-pub fn Target.extra_output(move self: Target, path: str) -> Target:
-    var out = self
-    out.extra_outputs.push(path)
-    out
+    pub move fn extra_output(path: str) -> Target:
+        var out = self
+        out.extra_outputs.push(path)
+        out
 
-pub fn Target.write_scope(move self: Target, path: str) -> Target:
-    var out = self
-    out.write_scopes.push(path)
-    out
+    pub move fn write_scope(path: str) -> Target:
+        var out = self
+        out.write_scopes.push(path)
+        out
 
-pub fn Target.dep(move self: Target, dep: str) -> Target:
-    var out = self
-    out.deps.push(dep)
-    out
+    pub move fn dep(dep: str) -> Target:
+        var out = self
+        out.deps.push(dep)
+        out
 
-pub fn Target.arg(move self: Target, arg: str) -> Target:
-    var out = self
-    out.args.push(arg)
-    out
+    pub move fn arg(arg: str) -> Target:
+        var out = self
+        out.args.push(arg)
+        out
 
-// Positive bytes; omitted means report RSS without enforcing a budget.
-// The driver validates and consumes the policy before target dispatch.
-pub fn Target.rss_limit(move self: Target, bytes: i64) -> Target:
-    self.arg(f"rss-limit-bytes={bytes}")
+    // Positive bytes; omitted means report RSS without enforcing a budget.
+    // The driver validates and consumes the policy before target dispatch.
+    pub move fn rss_limit(bytes: i64) -> Target:
+        self.arg(f"rss-limit-bytes={bytes}")
 
-pub fn Target.compiler(move self: Target, compiler: &str) -> Target:
-    var out = self
-    out.args.push("compiler=" ++ compiler)
-    out
+    pub move fn compiler(compiler: &str) -> Target:
+        var out = self
+        out.args.push("compiler=" ++ compiler)
+        out
 
 // ── D24/#921: workspace compile plan wire format ───────────────────────
 // The one home for the plan that crosses to a `with __workspace-compile`
@@ -3423,44 +3449,45 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
         network_value: target.network,
     }
 
-pub fn Build.__driver_run_action(self: &Self, ctx: BuildCtx, action_name: &str) -> i32:
-    tool_capability_require(ctx.token, "ActionCtx")
-    for i in 0..self.targets.len():
-        let target = &self.targets[i]
-        if target.name == action_name:
-            if target.kind != .Action:
-                with_eprint("error: build action target '" ++ action_name ++ "' is not an Action target\n")
-                return 1
-            let scratch_path = tool_action_scratch_dir(target.name)
-            let scratch_abs = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
-                scratch_path.clone()
-            else if ctx.fs.root.ends_with("/"):
-                ctx.fs.root ++ scratch_path
-            else:
-                ctx.fs.root ++ "/" ++ scratch_path
-            let _remove_scratch = with_fs_remove_tree(scratch_abs)
-            if with_fs_mkdir_p(scratch_abs) != 0:
-                with_eprint("error: build action target '" ++ action_name ++ "' could not create scratch directory: " ++ scratch_path ++ "\n")
-                return 1
-            // The driver's evaluator path pre-creates each declared output's
-            // directory before running an action; the native runner must
-            // match, or the first ctx.fs().write_text(ctx.output(), ...)
-            // fails on a missing parent (behav_capability_token_mismatch).
-            let outputs = build_action_outputs(target)
-            for oi in 0..outputs.len():
-                let out_dir = tool_path_dirname(outputs[oi])
-                if out_dir.len() > 0:
-                    let resolved_dir = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
-                        with_str_clone_ref(out_dir)
-                    else if ctx.fs.root.ends_with("/"):
-                        ctx.fs.root ++ out_dir
-                    else:
-                        ctx.fs.root ++ "/" ++ out_dir
-                    let _mk = with_fs_mkdir_p(resolved_dir)
-            let action_ctx = build_action_ctx(ctx, target)
-            return target.action(action_ctx)
-    with_eprint("error: build action target not found: " ++ action_name ++ "\n")
-    1
+impl Build:
+    pub fn __driver_run_action(ctx: BuildCtx, action_name: &str) -> i32:
+        tool_capability_require(ctx.token, "ActionCtx")
+        for i in 0..self.targets.len():
+            let target = &self.targets[i]
+            if target.name == action_name:
+                if target.kind != .Action:
+                    with_eprint("error: build action target '" ++ action_name ++ "' is not an Action target\n")
+                    return 1
+                let scratch_path = tool_action_scratch_dir(target.name)
+                let scratch_abs = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
+                    scratch_path.clone()
+                else if ctx.fs.root.ends_with("/"):
+                    ctx.fs.root ++ scratch_path
+                else:
+                    ctx.fs.root ++ "/" ++ scratch_path
+                let _remove_scratch = with_fs_remove_tree(scratch_abs)
+                if with_fs_mkdir_p(scratch_abs) != 0:
+                    with_eprint("error: build action target '" ++ action_name ++ "' could not create scratch directory: " ++ scratch_path ++ "\n")
+                    return 1
+                // The driver's evaluator path pre-creates each declared output's
+                // directory before running an action; the native runner must
+                // match, or the first ctx.fs().write_text(ctx.output(), ...)
+                // fails on a missing parent (behav_capability_token_mismatch).
+                let outputs = build_action_outputs(target)
+                for oi in 0..outputs.len():
+                    let out_dir = tool_path_dirname(outputs[oi])
+                    if out_dir.len() > 0:
+                        let resolved_dir = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
+                            with_str_clone_ref(out_dir)
+                        else if ctx.fs.root.ends_with("/"):
+                            ctx.fs.root ++ out_dir
+                        else:
+                            ctx.fs.root ++ "/" ++ out_dir
+                        let _mk = with_fs_mkdir_p(resolved_dir)
+                let action_ctx = build_action_ctx(ctx, target)
+                return target.action(action_ctx)
+        with_eprint("error: build action target not found: " ++ action_name ++ "\n")
+        1
 
 pub fn __driver_action_name() -> str:
     with_getenv_str("WITH_BUILD_ACTION_NAME")
@@ -3468,80 +3495,81 @@ pub fn __driver_action_name() -> str:
 pub fn __driver_exit(code: i32):
     exit(code)
 
-pub fn Build.emit_graph(self: &Self) -> str:
-    var out = StringBuilder.new()
-    out.push_str("WITH_BUILD_GRAPH\t2\n")
-    out.push_str("package\t")
-    out.push_str(build_graph_escape(self.package.name))
-    out.push_str("\t")
-    out.push_str(build_graph_escape(self.package.version))
-    out.push_str("\n")
-    if self.default_target.len() > 0:
-        out.push_str("default_target\t")
-        out.push_str(build_graph_escape(self.default_target))
-        out.push_str("\n")
-    for gi in 0..self.generated_sources.len():
-        let generated = self.generated_sources[gi]
-        out.push_str("generated_source\t")
-        out.push_str(build_graph_escape(generated.path))
+impl Build:
+    pub fn emit_graph() -> str:
+        var out = StringBuilder.new()
+        out.push_str("WITH_BUILD_GRAPH\t2\n")
+        out.push_str("package\t")
+        out.push_str(build_graph_escape(self.package.name))
         out.push_str("\t")
-        out.push_str(build_graph_escape(generated.contents))
+        out.push_str(build_graph_escape(self.package.version))
         out.push_str("\n")
-    for ti in 0..self.targets.len():
-        let target = &self.targets[ti]
-        out.push_str("target\t")
-        out.push_str(f"{target.kind as i32}\t")
-        out.push_str(build_graph_escape(target.name))
-        out.push_str("\t")
-        out.push_str(build_graph_escape(target.entry))
-        out.push_str("\t")
-        out.push_str(f"{target.target_kind as i32}\t")
-        out.push_str(f"{target.optimize_mode as i32}\t")
-        out.push_str(build_graph_escape(target.output))
-        out.push_str("\n")
-        for li in 0..target.system_libs.len():
-            out.push_str("system_lib\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.system_libs[li]))
+        if self.default_target.len() > 0:
+            out.push_str("default_target\t")
+            out.push_str(build_graph_escape(self.default_target))
             out.push_str("\n")
-        for ii in 0..target.include_paths.len():
-            out.push_str("include_path\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.include_paths[ii]))
+        for gi in 0..self.generated_sources.len():
+            let generated = self.generated_sources[gi]
+            out.push_str("generated_source\t")
+            out.push_str(build_graph_escape(generated.path))
+            out.push_str("\t")
+            out.push_str(build_graph_escape(generated.contents))
             out.push_str("\n")
-        for pi in 0..target.library_paths.len():
-            out.push_str("library_path\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.library_paths[pi]))
+        for ti in 0..self.targets.len():
+            let target = &self.targets[ti]
+            out.push_str("target\t")
+            out.push_str(f"{target.kind as i32}\t")
+            out.push_str(build_graph_escape(target.name))
+            out.push_str("\t")
+            out.push_str(build_graph_escape(target.entry))
+            out.push_str("\t")
+            out.push_str(f"{target.target_kind as i32}\t")
+            out.push_str(f"{target.optimize_mode as i32}\t")
+            out.push_str(build_graph_escape(target.output))
             out.push_str("\n")
-        for ri in 0..target.rpaths.len():
-            out.push_str("rpath\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.rpaths[ri]))
-            out.push_str("\n")
-        for di in 0..target.defines.len():
-            out.push_str("define\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.defines[di]))
-            out.push_str("\n")
-        for ini in 0..target.inputs.len():
-            out.push_str("input\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.inputs[ini]))
-            out.push_str("\n")
-        for outi in 0..target.extra_outputs.len():
-            out.push_str("extra_output\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.extra_outputs[outi]))
-            out.push_str("\n")
-        for depi in 0..target.deps.len():
-            out.push_str("dep\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.deps[depi]))
-            out.push_str("\n")
-        for ai in 0..target.args.len():
-            out.push_str("arg\t")
-            out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.args[ai]))
-            out.push_str("\n")
-    out.to_str()
+            for li in 0..target.system_libs.len():
+                out.push_str("system_lib\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.system_libs[li]))
+                out.push_str("\n")
+            for ii in 0..target.include_paths.len():
+                out.push_str("include_path\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.include_paths[ii]))
+                out.push_str("\n")
+            for pi in 0..target.library_paths.len():
+                out.push_str("library_path\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.library_paths[pi]))
+                out.push_str("\n")
+            for ri in 0..target.rpaths.len():
+                out.push_str("rpath\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.rpaths[ri]))
+                out.push_str("\n")
+            for di in 0..target.defines.len():
+                out.push_str("define\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.defines[di]))
+                out.push_str("\n")
+            for ini in 0..target.inputs.len():
+                out.push_str("input\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.inputs[ini]))
+                out.push_str("\n")
+            for outi in 0..target.extra_outputs.len():
+                out.push_str("extra_output\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.extra_outputs[outi]))
+                out.push_str("\n")
+            for depi in 0..target.deps.len():
+                out.push_str("dep\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.deps[depi]))
+                out.push_str("\n")
+            for ai in 0..target.args.len():
+                out.push_str("arg\t")
+                out.push_str(f"{ti}\t")
+                out.push_str(build_graph_escape(target.args[ai]))
+                out.push_str("\n")
+        out.to_str()
