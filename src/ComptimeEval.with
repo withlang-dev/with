@@ -1126,6 +1126,10 @@ unsafe fn comptime_eval_finish(sema_ptr: *mut Sema, evaluator: ComptimeEvaluator
     let runtime_stderr = move owned.runtime_stderr
     let effect_records = move owned.effect_records
     let synced_sema = move owned.sema
+    // A store through a raw pointer releases nothing. The blank Sema that
+    // comptime_take_sema left there is taken out first, so it is released
+    // here; overwritten in place, every evaluation leaked one (#2407).
+    let blank = *sema_ptr
     *sema_ptr = synced_sema
     if has_pending_diag != 0:
         sema_ptr.diags.emit(pending_diag)

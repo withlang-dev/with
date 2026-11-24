@@ -1,0 +1,41 @@
+//! expect-stdout: ok
+// #2407: while the evaluator holds the Sema, a blank one stands in its place.
+// Handing the Sema back overwrote the blank through a raw pointer, which
+// releases nothing, so every compile-time evaluation leaked one; and each
+// blank had indexed every declaration of the program. 400 evaluations in a
+// program of 3,400 declarations needed more than 128 MB to check (290 MB of
+// the 933 MB a check of the compiler held at its peak). The limit here is on
+// the allocator's committed bytes, not on the host's resident size.
+use std.fs
+use std.process
+
+fn main:
+    let compiler = env("WITH_TEST_COMPILER")
+    assert(compiler.len() > 0)
+    let dir = f"out/tmp/comptime-blank-sema-{pid()}"
+    assert(mkdir_p(dir) == 0)
+    var src = "comptime fn twice(n: i32) -> i32: n + n\n\n"
+    for i in 0..3000:
+        src = src ++ f"fn filler_{i}(x: i32) -> i32: x + {i}\n"
+    for i in 0..400:
+        src = src ++ f"const C_{i}: i32 = comptime twice({i})\n"
+    src = src ++ "assert(C_399 == 798)\nassert(filler_7(1) == 8)\nprint(\"ok\")\n"
+    let program = dir ++ "/many_evals.with"
+    assert(write_file(program, src) == 0)
+    let stdout_path = dir ++ "/stdout"
+    let stderr_path = dir ++ "/stderr"
+    let saved_limit = env("WITH_MEMORY_LIMIT_BYTES")
+    assert(set_env("WITH_MEMORY_LIMIT_BYTES", "67108864") == 0)
+    // The time ceiling is a hang guard, not a budget (#2902).
+    let checked = run_to_files(&[compiler, "check", program], stdout_path, stderr_path, 1800000)
+    assert(set_env("WITH_MEMORY_LIMIT_BYTES", saved_limit) == 0)
+    if checked.code != 0:
+        print(read_file(stderr_path).unwrap())
+    assert(not checked.timed_out)
+    assert(checked.code == 0)
+    let ran = run_to_files(&[compiler, "run", program], stdout_path, stderr_path, 1800000)
+    assert(not ran.timed_out)
+    assert(ran.code == 0)
+    assert(read_file(stdout_path).unwrap() == "ok\n")
+    assert(remove_tree(dir) == 0)
+    print("ok")
