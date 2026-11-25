@@ -914,7 +914,7 @@ impl Sema:
                 let mex = self.ast.get_data1(item)
                 for mk in 0..self.ast.get_data2(item):
                     let mline = self.ast.get_extra(mex + 1 + mk)
-                    if self.ast.get_data0(mline) != FACADE_CLAUSE_MESSAGE_CASE: continue
+                    if self.ast.get_data0(mline) != FacadeMessageLine.Case: continue
                     let mops = self.ast.get_data1(mline)
                     // A range's ends are named; what lies between has no name to compare with.
                     for which in 1..3:
@@ -3732,19 +3732,19 @@ impl Sema:
             let line = self.ast.get_extra(ex + 1 + k)
             let kind = self.ast.get_data0(line)
             var again = ""
-            if kind == FACADE_CLAUSE_MESSAGE_FROM:
+            if kind == FacadeMessageLine.From:
                 if from_line != 0: again = "from"
                 from_line = line
-            else if kind == FACADE_CLAUSE_MESSAGE_TAG:
+            else if kind == FacadeMessageLine.Tag:
                 if tag_line != 0: again = "tag"
                 tag_line = line
-            else if kind == FACADE_CLAUSE_MESSAGE_PAYLOAD:
+            else if kind == FacadeMessageLine.Payload:
                 if payload_line != 0: again = "payload"
                 payload_line = line
-            else if kind == FACADE_CLAUSE_MESSAGE_RELEASE:
+            else if kind == FacadeMessageLine.Release:
                 if release_line != 0: again = "release"
                 release_line = line
-            else if kind == FACADE_CLAUSE_MESSAGE_CASE: cases.push(line)
+            else if kind == FacadeMessageLine.Case: cases.push(line)
             if again.len() > 0: self.emit_error_with_help(f"message '{mname}': '{again}' is stated twice (D216)", line, "delete one of the two lines")
         if from_line == 0 or tag_line == 0 or cases.len() == 0:
             let missing = if from_line == 0: "'from f(out param N)', the call that fills the record" else if tag_line == 0: "'tag F', the field that says which case holds" else: "a 'case Name when CONST' line"
@@ -3828,20 +3828,22 @@ impl Sema:
                     self.emit_error_with_help(f"message '{mname}': case '{shown}' states the range {self.pool_resolve(low_sym)}..{self.pool_resolve(high_sym)}, whose end ({high_value}) is below its start ({low}) (D216)", line, "write the smaller constant first")
                     continue
                 high = high_value
-            var clash = -1
-            for i in 0..names.len():
-                if low <= highs[i] and lows[i] <= high: clash = i
-            if clash >= 0:
-                self.emit_error_with_help(f"message '{mname}': case '{shown}' claims a tag value that case '{self.pool_resolve(names[clash])}' already has (D216)", line, "each tag value belongs to one case")
+            var clash = 0
+            var at = 0
+            for other in names:
+                if low <= highs[at] and lows[at] <= high: clash = other
+                at += 1
+            if clash != 0:
+                self.emit_error_with_help(f"message '{mname}': case '{shown}' claims a tag value that case '{self.pool_resolve(clash)}' already has (D216)", line, "each tag value belongs to one case")
                 continue
-            if form == FACADE_MESSAGE_CASE_FIELD:
+            if form == FacadeMessageCase.Member:
                 if payload_line != 0:
                     self.emit_error_with_help(f"message '{mname}': case '{shown}' carries 'field {self.pool_resolve(carried)}', a member of the record, and the message is the pointer form ('payload'); its cases say ': Type' (D216)", line, "after the constant write ': T', the record the payload points to")
                     continue
                 if self.facade_message_field(record, carried) == 0:
                     self.emit_error_with_help(f"message '{mname}': case '{shown}' carries 'field {self.pool_resolve(carried)}', which is no member of {self.type_name(record)} (D216)", line, "after 'field' name the member that is active under this tag")
                     continue
-            else if form == FACADE_MESSAGE_CASE_TYPE:
+            else if form == FacadeMessageCase.Payload:
                 if payload_line == 0:
                     self.emit_error_with_help(f"message '{mname}': case '{shown}' carries a payload type, and the message states no 'payload P size N' to read it through (D216)", line, "state the payload's pointer and size fields, or write 'field f' for a member of the record")
                     continue

@@ -303,15 +303,21 @@ fn facade_clause_bridges(kind: i32) -> bool:
     kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_BUFFER_FIELD or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_DISCARDED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD or kind == FACADE_CLAUSE_TEXT_RETURN
 pub const FACADE_CLAUSE_BUFFER_FIELD: i32 = 46     // [pointer_field_sym, count_field_sym]  (`buffer field P remaining field N`: a slice carried by two fields of the resource's record, D210 §16.2b.8)
 pub const FACADE_CLAUSE_DISCARDED: i32 = 48        // [param_ref]  (`param N discarded`: an out-pointer the wrapper hands scratch storage, D209 §16.2b.11)
-// D216, the lines of a `message` item.
-pub const FACADE_CLAUSE_MESSAGE_FROM: i32 = 50     // [producer_sym, filled param_ref]  (`from f(out param N)`)
-pub const FACADE_CLAUSE_MESSAGE_TAG: i32 = 51      // [field_sym]  (`tag F`)
-pub const FACADE_CLAUSE_MESSAGE_CASE: i32 = 52     // [name_sym, low_const_sym, high_const_sym|0, FACADE_MESSAGE_CASE_*, field_sym|type(node)|0]
-pub const FACADE_CLAUSE_MESSAGE_PAYLOAD: i32 = 53  // [pointer_field_sym, size_field_sym]  (`payload P size N`)
-pub const FACADE_CLAUSE_MESSAGE_RELEASE: i32 = 54  // [releaser_sym]  (`release f`)
-pub const FACADE_MESSAGE_CASE_BARE: i32 = 0        // the case carries nothing
-pub const FACADE_MESSAGE_CASE_FIELD: i32 = 1       // `field f`: a member of the record
-pub const FACADE_MESSAGE_CASE_TYPE: i32 = 2        // `: T`: the record the payload pointer points to
+// D216: the lines of a `message` item, as the d0 of their clause nodes
+// (numbered beside FACADE_CLAUSE_*, which they share a node kind with).
+enum FacadeMessageLine: i32:
+    From = 50      // [producer_sym, filled param_ref]  (`from f(out param N)`)
+    Tag = 51       // [field_sym]  (`tag F`)
+    Case = 52      // [name_sym, low_const_sym, high_const_sym|0, FacadeMessageCase, field_sym|type(node)|0]
+    Payload = 53   // [pointer_field_sym, size_field_sym]  (`payload P size N`)
+    Release = 54   // [releaser_sym]  (`release f`)
+
+// What a message case carries.
+enum FacadeMessageCase: i32:
+    Bare = 0       // nothing
+    Member = 1     // `field f`: a member of the record
+    Payload = 2    // `: T`: the record the payload pointer points to
+
 pub const FACADE_CLAUSE_HANDLE: i32 = 30           // [] the parser's marker on the NK_FACADE_RESOURCE a `handle Name wraps *mut T` item makes: a callback-scope handle (§16.2b.9), never written as a clause
 pub const FACADE_CLAUSE_CALLBACK_ARGV: i32 = 31    // [callback_ref, argv_ref, argc_ref, type(node)]  (`callback param N argv param A paired with argc param C as &[H]`: A and C index the callback's own parameters, §16.2b.9, D76)
 pub const FACADE_CLAUSE_USER_DATA: i32 = 32        // [accessor_sym, type(node)]  (`user_data from <fn> as &U`: the registered userdata the facade boxed, read back through <fn>, §16.2b.9, D76)
