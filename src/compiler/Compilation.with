@@ -1990,7 +1990,10 @@ impl Compilation:
         self.zcu.last_sema.ceremony_census_text()
 
 fn analysis_request_is_semantic_snapshot(request: &str) -> bool:
-    if request == "audit:receivers" or request == "audit:receiver-surface" or request == "audit:effects" or request == "audit:storage": return true
+    // audit:effects is not one: it reads the copy-ness table, which is
+    // complete only once MIR's types are registered, and it judges the
+    // effects code generation reads, after the specialization rechecks.
+    if request == "audit:receivers" or request == "audit:receiver-surface" or request == "audit:storage": return true
     if request == "audit:methods": return true
     // D51 stage 10: the contract view reads Sema's facade facts, which exist
     // when a facade clause was refused too — the audit names the refusal.

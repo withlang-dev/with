@@ -926,6 +926,10 @@ type Sema {
     // param the callee actually escapes/consumes). See decisions.md D5.
     effect_flow_edges: List[i32],
     effect_flow_projections: List[i32],
+    // Set once the fixpoint over those edges has run: from then on a
+    // parameter's effects are complete, and a body checked again (MirLower
+    // rechecks each concrete specialization) adds to them, never replaces them.
+    effect_flow_settled: bool,
 
     // #D5/P1 share-place: recorded plain (non-move/copy) non-Copy value arguments,
     // flattened as 3-tuples [arg_node, callee_sig, callee_pi]. A plain argument is
@@ -3887,6 +3891,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         sig_receiver_required_effects: [],
         effect_flow_edges: [],
         effect_flow_projections: [],
+        effect_flow_settled: false,
         consume_call_sites: [],
         binding_use_seq: 0,
         binding_use_epoch: 0,
@@ -11786,6 +11791,7 @@ impl Sema:
         let symbols_before = self.pool.state.symbol_texts.len()
         let sigs_before = self.sig_names.len()
         let diags_start = self.diags.items.len()
+        self.effect_flow_settled = false
         self.check_bodies()
         self.check_interface_carried_bodies()
         if profile:
@@ -11798,6 +11804,7 @@ impl Sema:
         // Complete transitive effects before any deferred acceptance verdict
         // reads a callee's parameter contract.
         self.fixpoint_effect_flow()
+        self.effect_flow_settled = true
         self.enforce_raw_pointer_contracts()
         // D63: a callable parameter passed on is invoked as often as the
         // parameter it reaches; settled before closure arguments are judged.
