@@ -1131,7 +1131,8 @@ impl Compilation:
             return false
         if not self.ensure_codegen_mir(prepared_pool):
             return false
-        self.zcu.emit_ir_backend(self.active_pool(prepared_pool), self.config.opt_level)
+        self.require_active_pool(prepared_pool)
+        self.zcu.emit_ir_backend(prepared_pool, self.config.opt_level)
 
 // #650 codegen units: sibling unit objects (<obj>.u1.o ..) follow the
 // canonical object's lifetime. The env cap bounds the sweep; removals are
@@ -1302,7 +1303,8 @@ impl Compilation:
             runtime_eprint("error: " ++ source_path ++ " has no `fn main` and no top-level statement to run: a top-level `let`/`var` alone is a module global (§18.5b). Add `fn main`, or a statement for the program to run.")
             compilation_cleanup_build_products(obj_path, bin_path)
             return compilation_binary_link_plan_fail()
-        let active_pool = self.active_pool(prepared_pool)
+        self.require_active_pool(prepared_pool)
+        let active_pool = prepared_pool
         let opt_level = self.config.opt_level
         let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
         compilation_debug_pool_flow("build_binary_to_path:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
@@ -1438,7 +1440,8 @@ impl Compilation:
             return ""
         if not self.ensure_codegen_mir(prepared_pool):
             return ""
-        let active_pool = self.active_pool(prepared_pool)
+        self.require_active_pool(prepared_pool)
+        let active_pool = prepared_pool
         let opt_level = self.config.opt_level
         let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, self.config.release, true)
         if backend_rc != 0:
@@ -1662,7 +1665,8 @@ impl Compilation:
             return ""
         if not self.ensure_codegen_mir(pool):
             return ""
-        let active_pool = self.active_pool(pool)
+        self.require_active_pool(pool)
+        let active_pool = pool
         let opt_level = self.config.opt_level
         let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, self.config.release, true)
         if backend_rc != 0:
@@ -1797,7 +1801,8 @@ impl Compilation:
         if not self.ensure_codegen_mir(prepared_pool):
             runtime_eprint("error: C emission failed during MIR lowering")
             return ""
-        let typed_pool = self.active_pool(prepared_pool)
+        self.require_active_pool(prepared_pool)
+        let typed_pool = prepared_pool
 
         var final_output = with_str_clone_ref(output_path)
         if final_output.len() == 0:
@@ -2039,7 +2044,8 @@ impl Compilation:
             if inner_request.starts_with("select:") and self.zcu.last_sema.ast.decl_count() > 0:
                 return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
             return CompilerAnalysisResult { text: "error: analysis compilation failed\n", status: 1, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
-        let active = self.active_pool(pool)
+        self.require_active_pool(pool)
+        let active = pool
         self.run_mir_lower(active)
         if self.zcu.last_mir_module.body_count() == 0:
             if after_mir and self.zcu.last_sema.ast.decl_count() > 0:
@@ -2047,7 +2053,7 @@ impl Compilation:
             return CompilerAnalysisResult { text: "error: analysis produced no MIR\n", status: 1, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
         let result = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
         if result.needs_codegen:
-            let backend = self.zcu.analyze_codegen_backend(self.active_pool(active), self.config.opt_level, result.codegen_query)
+            let backend = self.zcu.analyze_codegen_backend(active, self.config.opt_level, result.codegen_query)
             result.report.merge(backend.report)
             result.text = compiler_analysis_render(result.report, inner_request)
             if backend.status != 0:
@@ -2128,11 +2134,12 @@ impl Compilation:
             out.push(with_str_clone_ref(self.zcu.tracked_input_paths[i]))
         out
 
-    fn active_pool(pool: &AstPool) -> AstPool:
+    // The tree the stages after the check read: the caller's, which is the
+    // one the check typed (#2523: one tree per compilation; the snapshot is
+    // kept only to say so here).
+    fn require_active_pool(pool: &AstPool):
         if self.zcu.typed_pool_cache.decl_count() > 0:
             self.zcu.typed_pool_cache.require_same_storage(pool, "Compilation.active_pool")
-            return self.zcu.typed_pool_cache.clone()
-        pool.clone()
 
     mut fn run_mir_lower(pool: &AstPool):
         let do_profile = profile_enabled()
