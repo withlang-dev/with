@@ -1,0 +1,41 @@
+name: SDK source archives
+
+on:
+  # Weekly, and on request: every listed source of every pinned archive
+  # (our copy on the `sdk-sources` release and its maker's server) still
+  # serves the pinned bytes. Our copy is tried first by a build, so a maker's
+  # dead URL, or a pin moved without a new upload, would otherwise go unseen
+  # until the other source failed too (#3616). Nothing is built.
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Every source serves its pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WITH_SEED_REPO: withlang-dev/with
+      WITH_SEED_ASSET: with-linux-x86_64
+      WITH_SEED_VERSION: nightly-20261122-45071765995-1-8a5befa0e423
+      WITH_SEED_SHA256: b35792d0196d11b69f487c9c20c95aa2d1c1c64c333957545bd240961f838245
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap seed
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o with-seed \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
+          chmod +x with-seed
+          ./with-seed version
+
+      - name: Ask every source for its archive
+        env:
+          WITH: ${{ github.workspace }}/with-seed
+        run: ./with-seed build :sdk-sources-check
