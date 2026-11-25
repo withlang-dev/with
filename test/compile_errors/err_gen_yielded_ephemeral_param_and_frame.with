@@ -1,0 +1,23 @@
+//! expect-check-fail: returned ephemeral value may outlive its origin 'e'
+// The generator is declared after its consumer, takes a parameter, and
+// yields its own local among values of the caller's list: one yield of the
+// frame is enough.
+type K { code: i64 }
+type V ephemeral { k: &K }
+enum E ephemeral:
+    Key(&K)
+    Other(i64)
+
+fn first(xs: &List[K]) -> V:
+    for e in each(xs):
+        return e
+    panic("none")
+
+gen fn each(xs: &List[K]) -> V:
+    var k = K { code: 1 }
+    for x in xs: yield V { k: x }
+    yield V { k: &k }
+
+fn main:
+    let xs = [K { code: 3 }]
+    print(first(xs).k.code)

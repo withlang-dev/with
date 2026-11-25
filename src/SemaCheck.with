@@ -21677,7 +21677,7 @@ impl Sema:
         if yields_views and binding != 0:
             self.scope_set_is_view_bound(binding)
         if binding != 0 and not self.ast.for_binding_is_pattern(node) and self.type_is_ephemeral_value(elem_type):
-            self.record_for_binding_view_origins(binding, iterable)
+            self.record_for_binding_view_origins(binding, iterable, gen_elem != 0 and self.gen_yields_views_of_its_frame(iter_type as i32))
             self.register_for_binding_borrow(binding, iterable)
         let for_meta = self.ast.find_for_meta(node)
         var label: i32 = 0
@@ -22224,14 +22224,32 @@ impl Sema:
     // record_view_producer_origins records them for the spelled call: the
     // parameter mask, the collected deps, else the iterated place's root (a
     // local collection, so `&x.field` cannot escape).
-    mut fn record_for_binding_view_origins(sym: i32, iterable: i32):
+    // `of_frame`: the value also views the generator's own frame, which the
+    // loop holds only while it runs. The binding is then an origin itself, a
+    // local of the body, so the value cannot be returned, assigned outward
+    // or kept (D69, §13.4: a yielded view is borrowed for the body's call).
+    mut fn record_for_binding_view_origins(sym: i32, iterable: i32, of_frame: bool):
         let param_mask = self.compute_expr_view_origin_mask(iterable)
         var deps: List[i32] = []
         deps = self.collect_expr_view_deps(iterable, deps)
+        if of_frame: deps = self.push_unique_i32(deps, sym)
         if deps.len() == 0 and param_mask == 0:
             deps = self.push_unique_i32(deps, self.place_root_sym(iterable))
         self.set_binding_view_deps(sym, param_mask, deps)
         self.note_view_fact(sym, iterable, 3)
+
+    // Whether the generator of type `iter_type` yields a view of its own
+    // locals (note_generator_local_view_yield records it while the body is
+    // checked, so the body is checked first when it has not been). A
+    // generator whose function is not known says no.
+    mut fn gen_yields_views_of_its_frame(iter_type: i32) -> bool:
+        let gen_ty = self.resolve_alias(iter_type as TypeId) as i32
+        if not self.generator_state_fns.contains(gen_ty): return false
+        let gen_fn: i32 = self.generator_state_fns.get(gen_ty).unwrap()
+        let di: i32 = self.body_decl_by_fn.get(gen_fn) ?? -1
+        if di >= 0 and di < self.body_order_state.len() and self.body_order_state[di] == 0 and gen_fn != self.current_fn_symbol:
+            self.check_decl_body_from_use(di)
+        self.generator_local_view_yields.contains(gen_fn)
 
     // #1317 / §21.1 rule 1, §15.8, D44: the loop binding is a live view into
     // the iterated place for the whole loop (the compiler-inserted iterator

@@ -1,0 +1,30 @@
+//! expect-stdout: 1 0 3
+// What stays accepted: using a yielded ephemeral value in the body, and
+// returning one that views only the caller's own list.
+type K { code: i64 }
+type V ephemeral { k: &K }
+enum E ephemeral:
+    Key(&K)
+    Other(i64)
+
+gen fn each() -> E:
+    var k = K { code: 1 }
+    yield E.Key(&k)
+
+gen fn items(xs: &List[K]) -> V:
+    for x in xs: yield V { k: x }
+
+fn first(xs: &List[K]) -> V:
+    for e in items(xs):
+        return e
+    panic("none")
+
+fn main:
+    var seen = 0
+    var other = 0
+    for e in each():
+        match e:
+            .Key(k) => { seen = seen + k.code }
+            .Other(n) => { other = other + n }
+    let xs = [K { code: 3 }]
+    print(f"{seen} {other} {first(xs).k.code}")
