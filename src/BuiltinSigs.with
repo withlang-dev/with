@@ -28,8 +28,6 @@ fn builtin_sig_table() -> List[BuiltinSigRow]:
     t.push(sig("array", "split_at_mut", "mid: i64"))
     t.push(sig("int", "rotate_left", "n: u32"))
     t.push(sig("int", "rotate_right", "n: u32"))
-    t.push(sig("int", "min", "other: Self"))
-    t.push(sig("int", "max", "other: Self"))
     t.push(sig("float", "min", "other: Self"))
     t.push(sig("float", "max", "other: Self"))
     t.push(sig("float", "mul_add", "a: Self, b: Self"))

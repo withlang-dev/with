@@ -12774,19 +12774,9 @@ impl Codegen:
                     mm_args.push(mm_b)
                     result = wl_build_call(self.builder, mm_fnt, mm_func, list_data_i64(mm_args), 2)
             else:
-                // Integer min/max: icmp + select. Use unsigned comparison for
-                // unsigned operands so e.g. u32.min(1) is 1, not the value whose
-                // signed reading is smaller (#511).
-                let mm_start = body.call_arg_starts[args_id]
-                let mm_op0 = body.call_arg_operands[mm_start]
-                let mm_unsigned = self.mir_operand_is_unsigned(body, mm_op0)
-                let mm_is_min = intrinsic == MirIntrinsic.MIN
-                let mm_pred = if mm_is_min:
-                    if mm_unsigned: wl_int_ult() else: wl_int_slt()
-                else:
-                    if mm_unsigned: wl_int_ugt() else: wl_int_sgt()
-                let mm_cmp = wl_build_icmp(self.builder, mm_pred, mm_a, mm_b)
-                result = wl_build_select(self.builder, mm_cmp, mm_a, mm_b)
+                // Integer `min` and `max` are library methods (std.traits
+                // MinMax, #3483); only a float reaches this intrinsic.
+                return false
 
         else if intrinsic == MirIntrinsic.ABS:
             let abs_val = self.mir_intrinsic_arg(body, args_id, 0)
