@@ -227,6 +227,9 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
             if wrapped: edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: cast_start - 1, end: cast_start, replacement: "", what: with_str_clone_ref(what) })
             edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: pool.get_end(src), end: if wrapped: cast_end + 1 else: cast_end, replacement: "", what: what })
             continue
+        // A private function's return type is cf_collect_fn_rets's: it is
+        // kept only if the function then infers the same type.
+        if sema.ceremony_fn_rets.contains(node): continue
         // A trait impl method's return type that restates the trait's: the
         // arrow and the type go.
         if sema.ceremony_contract_rets.contains(node):
@@ -369,6 +372,54 @@ fn cf_rewrite(text: &str, edits: &List[CeremonyEdit]) -> str:
         out = out.slice(0, e.start) ++ e.replacement ++ out.slice(e.end, out.len())
     out
 
+// #3061 item 1: a private function's written return type that its body
+// already has. The edit, the function's name and the declared type's name:
+// after the edit is applied the function must infer exactly that type, or the
+// annotation is put back (run_ceremony_fix).
+type CeremonyFnRet {
+    edit: CeremonyEdit,
+    fn_name: str,
+    type_name: str,
+}
+
+// Whether `word` occurs in `text` as a whole name.
+fn cf_has_word(text: &str, word: &str) -> bool:
+    if word.len() == 0: return false
+    var at = text.find(word)
+    while at >= 0:
+        let end = at + word.len()
+        if (at == 0 or not cf_is_name_byte(text[at - 1])) and (end >= text.len() or not cf_is_name_byte(text[end])): return true
+        at = text.find(word, at + 1)
+    false
+
+// The candidates Sema recorded (note_restated_fn_return), narrowed to the
+// ones this tool can show: the tail's type does not come from the
+// annotation (cf_demand_free), the body has one result (no `return`), and
+// the function does not call itself (an unannotated function's type is its
+// body's, and a body that calls itself has none until D143 joins it).
+fn cf_collect_fn_rets(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[CeremonyFnRet]:
+    let found = []
+    for (node, tail) in sema.ceremony_fn_rets:
+        let path = sema.ceremony_let_paths.get(node) ?? ""
+        if not cf_rewritable(path, excludes, std_too) or not cf_demand_free(sema, pool, tail): continue
+        let text = with_fs_read_file(path)
+        let arrow = cf_arrow_before(text, pool.get_start(node))
+        if arrow < 0: continue
+        let fn_name = sema.pool_resolve(sema.ceremony_fn_ret_names.get(node) ?? 0)
+        let parts = fn_name.split(".")
+        let bare = parts[parts.len() - 1]
+        let body = text.slice(pool.get_end(node), pool.get_end(tail))
+        if cf_has_word(body, "return") or cf_has_word(body, bare): continue
+        let written = text.slice(pool.get_start(node), pool.get_end(node))
+        found.push(CeremonyFnRet { edit: CeremonyEdit { path: with_str_clone_ref(path), start: arrow, end: pool.get_end(node), replacement: "", what: "return type `-> " ++ written ++ "` restates the body's type" }, fn_name: with_str_clone_ref(fn_name), type_name: sema.type_name(sema.typed_expr_types.get(tail) ?? 0) })
+    found
+
+// The return type the function named `fn_name` has in `sema`, by name; ""
+// when the program has no such function.
+fn cf_inferred_return(sema: &Sema, fn_name: &str) -> str:
+    let sig = sema.get_sig(sema.pool_lookup_symbol(fn_name))
+    if sig < 0: "" else: sema.type_name(sema.sig_return_type(sig))
+
 fn cf_usage() -> str: "usage: with fix-ceremony [--report|--apply] [--std] [--exclude path ...] [--check-with compiler] <entry.with>\n  --report      list every rewrite Sema proves safe, by file and line (the default)\n  --apply       write them; a file that no longer checks is restored\n  --std         rewrite lib/std too (never a migrated corpus)\n  --exclude p   leave files under p alone\n  --check-with c  re-check with compiler c after applying\nrewrites: a redundant binding annotation, a `var` never rebound, a widening cast, `List.new()` / `HashMap.new()` where its type is demanded, an index loop over one list, `.clone()` on a str, `&x` at a `&T` parameter, `Some(x)` where an Option is demanded"
 
 fn run_ceremony_fix() -> i32:
@@ -407,7 +458,9 @@ fn run_ceremony_fix() -> i32:
     if pool.decl_count() == 0 or comp.zcu.diagnostics.has_errors():
         eprint(f"fix-ceremony: {entry} does not check; fix it first")
         return 1
-    let edits = cf_collect(comp.zcu.last_sema, pool, excludes, std_too)
+    var edits = cf_collect(comp.zcu.last_sema, pool, excludes, std_too)
+    var fn_rets = cf_collect_fn_rets(comp.zcu.last_sema, pool, excludes, std_too)
+    for fr in fn_rets: edits.push(fr.edit)
     let paths = []
     for e in edits:
         if not paths.contains(e.path): paths.push(with_str_clone_ref(e.path))
@@ -430,9 +483,32 @@ fn run_ceremony_fix() -> i32:
             return 1
     // The proof: the entry still checks with every rewrite in. If not, every
     // rewritten file is restored; the report above says what was tried.
-    let again = Compilation.init()
-    let pool2 = again.compile_entry_file(entry)
-    if pool2.decl_count() == 0 or again.zcu.diagnostics.has_errors():
+    var again = Compilation.init()
+    var pool2 = again.compile_entry_file(entry)
+    var rechecks = pool2.decl_count() > 0 and not again.zcu.diagnostics.has_errors()
+    // A removed return type is kept only if the function then infers the
+    // type it declared. One that does not (or, when the program no longer
+    // checks, every one: unannotated functions that call each other have no
+    // type to give, D43) is put back, and the rest is checked again.
+    if fn_rets.len() > 0:
+        let put_back = []
+        for fr in fn_rets:
+            let inferred = if rechecks: cf_inferred_return(again.zcu.last_sema, fr.fn_name) else: ""
+            if inferred == fr.type_name: continue
+            put_back.push(fr.edit.start)
+            let line = cf_line_of(originals.get(fr.edit.path).unwrap(), fr.edit.start)
+            if rechecks: print(f"{fr.edit.path}:{line}: kept as written: without it `{fr.fn_name}` returns `{inferred}`, not `{fr.type_name}`")
+            else: print(f"{fr.edit.path}:{line}: kept as written: the program does not check without the return types removed in this run")
+        if put_back.len() > 0:
+            edits = [e for e in edits if not (e.what.contains("restates the body's type") and put_back.contains(e.start))]
+            for path in paths:
+                let mine = [e for e in edits if e.path == path]
+                with_fs_write_file(path, cf_rewrite(originals.get(path).unwrap(), mine))
+            again = Compilation.init()
+            pool2 = again.compile_entry_file(entry)
+            rechecks = pool2.decl_count() > 0 and not again.zcu.diagnostics.has_errors()
+            print(f"fix-ceremony: {put_back.len()} return type(s) kept as written")
+    if not rechecks:
         for (path, text) in originals: with_fs_write_file(path, text)
         eprint(f"fix-ceremony: {entry} no longer checks with the rewrites applied; every file restored (a fact the rewriter relied on is wrong — file it)")
         return 1

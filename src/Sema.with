@@ -1333,6 +1333,8 @@ type Sema {
     ceremony_widening_casts: HashMap[i32, i32, Minted],   // a widening `as` under a demand of its target (node → its source expression)
     ceremony_list_news: HashMap[i32, i32, Minted],        // a `List.new()` / `HashMap.new()` whose binding's type is written (node → 1)
     ceremony_demanded_news: HashMap[i32, i32, Minted],    // the same call where any other site demands its type: a struct-literal field, an argument, an assignment, a return (call node → 1)
+    ceremony_fn_rets: HashMap[i32, i32, Minted],          // a private function's written return type that its body's tail already has (type node → tail expression)
+    ceremony_fn_ret_names: HashMap[i32, i32, Minted],     // the same type node → the function's symbol
     ceremony_contract_rets: HashMap[i32, i32, Minted],    // a trait impl method's written return type that is the trait's own (type node → fn decl)
     // #3061 index loops: the active `for i in 0..xs.len()` loops by their
     // counter (sym → for node), each loop's list ident, every use of the
@@ -3735,6 +3737,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let ceremony_list_news = sema_new_map_i32_i32()
     let ceremony_demanded_news = sema_new_map_i32_i32()
     let ceremony_contract_rets = sema_new_map_i32_i32()
+    let ceremony_fn_rets = sema_new_map_i32_i32()
+    let ceremony_fn_ret_names = sema_new_map_i32_i32()
     let ceremony_active_index_loops = sema_new_map_i32_i32()
     let ceremony_index_loop_bases = sema_new_map_i32_i32()
     let ceremony_loop_uses = sema_new_map_i32_i32()
@@ -4064,6 +4068,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         ceremony_list_news,
         ceremony_demanded_news,
         ceremony_contract_rets,
+        ceremony_fn_rets,
+        ceremony_fn_ret_names,
         ceremony_active_index_loops,
         ceremony_index_loop_bases,
         ceremony_loop_uses,

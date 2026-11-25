@@ -39,5 +39,29 @@ fn main:
     assert(after.contains("Bag { items: [], index: [:] }") and after.contains("b.items = []") and after.contains("total([])") and not after.contains(".new()"))
     let ran = run_to_files(&[compiler, "run", bag], dir ++ "/run.out", dir ++ "/run.err", 600000)
     assert(ran.code == 0 and read_file(dir ++ "/run.out").unwrap() == "3\n")
+    // Item 1: a private function's return type that its body already has
+    // goes, and only where the function then infers the same type. A
+    // literal tail, a widening, an `Option` demand, an early `return`, a
+    // function that calls itself and a `pub` signature keep theirs.
+    let rets = dir ++ "/rets.with"
+    assert(write_file(rets, "pub type P \{ n: i64, name: str, items: List[i64] }\n\nfn area(w: i64, h: i64) -> i64: w * h\n\nfn label(p: &P) -> str: p.name\n\nfn lit() -> i64: 1\n\nfn widened(x: i32) -> i64: x\n\nfn maybe(flag: bool) -> Option[i64]:\n    if flag: 1 else: None\n\nfn both(flag: bool, a: i64) -> i64:\n    if flag: return a\n    a + a\n\nfn fact(n: i64) -> i64:\n    if n <= 1: 1 else: n * fact(n - 1)\n\npub fn shown(w: i64) -> i64: w + w\n\nfn items_of(p: &P) -> List[i64]: p.items\n\nfn count(p: &P) -> isize: p.items.len()\n\nimpl P:\n    fn twice() -> i64: self.n + self.n\n    pub fn open() -> i64: self.n\n\nfn main:\n    let p = P \{ n: 3, name: \"p\", items: [1, 2] }\n    print(f\"\{area(2, 3)} \{label(p)} \{lit()} \{widened(4)} \{maybe(true) ?? 0} \{both(true, 5)} \{fact(4)} \{shown(2)} \{items_of(p).len()} \{count(p)} \{p.twice()} \{p.open()}\")\n") == 0)
+    let rets_run = run_to_files(&[compiler, "fix-ceremony", "--apply", rets], dir ++ "/rets.out", dir ++ "/rets.err", 600000)
+    assert(rets_run.code == 0)
+    let rets_after = read_file(rets).unwrap()
+    if not rets_after.contains("fn area(w: i64, h: i64): w * h"): print(rets_after)
+    assert(rets_after.contains("fn area(w: i64, h: i64): w * h") and rets_after.contains("fn label(p: &P): p.name") and rets_after.contains("fn items_of(p: &P): p.items"))
+    for kept in ["fn lit() -> i64: 1", "fn widened(x: i32) -> i64: x", "fn maybe(flag: bool) -> Option[i64]:", "fn both(flag: bool, a: i64) -> i64:", "fn fact(n: i64) -> i64:", "pub fn shown(w: i64) -> i64: w + w"]: assert(rets_after.contains(kept))
+    let rets_ran = run_to_files(&[compiler, "run", rets], dir ++ "/rets-run.out", dir ++ "/rets-run.err", 600000)
+    assert(rets_ran.code == 0 and read_file(dir ++ "/rets-run.out").unwrap() == "6 p 1 4 1 5 24 4 2 2 6 3\n")
+    // Two functions that call each other cannot both lose their return
+    // type (D143): the program stops checking, so every one removed in the
+    // run is put back and the file is as it was.
+    let cycle = dir ++ "/cycle.with"
+    let cycle_text = "fn ping(n: i64) -> i64: pong(n)\n\nfn pong(n: i64) -> i64: ping(n)\n\nfn area(w: i64, h: i64) -> i64: w * h\n\nfn main:\n    var keep = 0\n    keep = keep + area(2, 3)\n    if keep < 0: print(ping(1))\n    print(keep)\n"
+    assert(write_file(cycle, cycle_text) == 0)
+    let cycle_run = run_to_files(&[compiler, "fix-ceremony", "--apply", cycle], dir ++ "/cycle.out", dir ++ "/cycle.err", 600000)
+    assert(cycle_run.code == 0)
+    assert(read_file(cycle).unwrap() == cycle_text)
+    assert(read_file(dir ++ "/cycle.out").unwrap().contains("3 return type(s) kept as written"))
     assert(remove_tree(dir) == 0)
     print("ok")
