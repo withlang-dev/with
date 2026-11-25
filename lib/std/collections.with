@@ -721,7 +721,7 @@ impl[T] SlotMap[T]:
         var slot = with_slotmap_get_ptr(self.ptr as *mut u8, h.index, h.generation) as *mut T
         if slot == null: return None
         let value: T = unsafe { *slot }
-        let _ = with_slotmap_remove(self.ptr as *mut u8, h.index, h.generation, null)
+        with_slotmap_remove(self.ptr as *mut u8, h.index, h.generation, null)
         Some(value)
 
     /// Puts `value` where `h` names and returns what was there, or `None`
