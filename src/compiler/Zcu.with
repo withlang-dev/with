@@ -51,7 +51,6 @@ fn zcu_debug_pool_flow_enabled() -> bool:
 // diagnostics, and source/import context.
 type Zcu {
     pool: InternPool,
-    frontend_pool: InternPool,
     diagnostics: DiagnosticList,
     imported_paths: List[str],
     imported_std_identities: List[str],
@@ -147,8 +146,7 @@ fn Zcu.init -> Zcu:
     let sema_seed = Sema.placeholder(pool, DiagnosticList.init(), AstPool.new())
     zcu_debug_init("Zcu.init:sema_seed")
     Zcu {
-        pool: pool.clone(),
-        frontend_pool: pool,
+        pool,
         // Zcu owns the active diagnostic list. The placeholder snapshot has an
         // independent empty list so neither field aliases or moves from the other.
         diagnostics,
@@ -527,19 +525,12 @@ impl Zcu:
     mut fn set_pending_warnings(warnings: List[str]):
         self.pending_warnings = warnings
 
-    mut fn set_pool(new_pool: &InternPool):
-        self.pool = new_pool.clone()
-
-    // The frontend keeps its own copy of this Zcu's pool. It reads the field
-    // itself: passing `self.pool` to a `mut` method on `self` is an argument
-    // retaining access to the receiver (D172, §3.2).
-    mut fn sync_frontend_pool():
-        self.frontend_pool = self.pool.clone()
-
     mut fn sync_from_sema(sema: Sema):
         if zcu_debug_pool_flow_enabled():
             runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_count()} sema.pool={sema.pool.symbol_count()} sema.ast.decls={sema.ast.decl_count()}")
-        self.pool = sema.pool.clone()
+        // Sema interned into this compilation's own pool (#2523): there is
+        // nothing to take back.
+        self.pool.require_same_storage(sema.pool, "Zcu.sync_from_sema")
         let tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, sema.tracked_input_paths)
         // Callers move sema.diags into Zcu.diagnostics before syncing. The moved
