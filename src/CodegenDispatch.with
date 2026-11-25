@@ -10839,45 +10839,6 @@ impl Codegen:
             let sms_1 = wl_build_insert_value(self.builder, sms_0, sm_idx, 1)
             result = wl_build_insert_value(self.builder, sms_1, sm_gen, 2)
 
-        else if intrinsic == MirIntrinsic.SLOTMAP_CONTAINS:
-            let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
-            let sm_h = self.mir_intrinsic_arg(body, args_id, 1)
-            let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
-            let sm_gen = wl_build_extract_value(self.builder, sm_h, 1)
-            let sm_contains_fn = self.ensure_c_fn("with_slotmap_contains", i32_ty, 3)
-            let sm_contains_params: List[i64] = []
-            sm_contains_params.push(ptr_ty)
-            sm_contains_params.push(i32_ty)
-            sm_contains_params.push(i32_ty)
-            let sm_contains_ty = wl_function_type(i32_ty, list_data_i64(sm_contains_params), 3, 0)
-            let sm_contains_args: List[i64] = []
-            sm_contains_args.push(sm_map)
-            sm_contains_args.push(sm_idx)
-            sm_contains_args.push(sm_gen)
-            let sm_raw = wl_build_call(self.builder, sm_contains_ty, sm_contains_fn, list_data_i64(sm_contains_args), 3)
-            result = wl_build_icmp(self.builder, wl_int_ne(), sm_raw, wl_const_int(i32_ty, 0, 0))
-
-        else if intrinsic == MirIntrinsic.SLOTMAP_LEN:
-            let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
-            let sm_len_fn = self.ensure_c_fn("with_slotmap_len", i64_ty, 1)
-            let sm_len_params: List[i64] = []
-            sm_len_params.push(ptr_ty)
-            let sm_len_ty = wl_function_type(i64_ty, list_data_i64(sm_len_params), 1, 0)
-            let sm_len_args: List[i64] = []
-            sm_len_args.push(sm_map)
-            result = wl_build_call(self.builder, sm_len_ty, sm_len_fn, list_data_i64(sm_len_args), 1)
-
-        else if intrinsic == MirIntrinsic.SLOTMAP_LEN32 or intrinsic == MirIntrinsic.SLOTMAP_LEN64 or intrinsic == MirIntrinsic.SLOTMAP_ULEN32:
-            let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
-            let sm_len_fn = self.ensure_c_fn("with_slotmap_len", i64_ty, 1)
-            let sm_len_params: List[i64] = []
-            sm_len_params.push(ptr_ty)
-            let sm_len_ty = wl_function_type(i64_ty, list_data_i64(sm_len_params), 1, 0)
-            let sm_len_args: List[i64] = []
-            sm_len_args.push(sm_map)
-            let raw_len = wl_build_call(self.builder, sm_len_ty, sm_len_fn, list_data_i64(sm_len_args), 1)
-            result = self.mir_convert_len_method_result(raw_len, intrinsic)
-
         else if intrinsic == MirIntrinsic.SLOTMAP_REMOVE or intrinsic == MirIntrinsic.SLOTMAP_REPLACE:
             let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
             let sm_h = self.mir_intrinsic_arg(body, args_id, 1)

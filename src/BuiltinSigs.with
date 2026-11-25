@@ -73,7 +73,6 @@ fn builtin_sig_table() -> List[BuiltinSigRow]:
     t.push(sig("SlotMap", "slot", "h: Handle[T]"))
     t.push(sig("SlotMap", "remove", "h: Handle[T]"))
     t.push(sig("SlotMap", "replace", "h: Handle[T], value: T"))
-    t.push(sig("SlotMap", "contains", "h: Handle[T]"))
     t.push(sig("SlotMap", "get_disjoint", "a: Handle[T], b: Handle[T]"))
     t.push(sig("SlotMapSlot", "set", "value: T"))
     t.push(sig("ListRange", "get", "index: i32"))
