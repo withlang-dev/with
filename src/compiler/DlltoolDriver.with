@@ -18,9 +18,9 @@ type DlltoolArgs { data: *const *mut u8, len: i64 }
 
 extern fn with_dlltool_main(args: DlltoolArgs) -> i32
 
-fn with_dlltool_available() -> bool: embedded_dlltool_linked()
+fn with_dlltool_available(): embedded_dlltool_linked()
 
-unsafe fn dt_c_string(s: &str) -> *mut u8:
+unsafe fn dt_c_string(s: &str):
     let out = with_alloc(s.len() + 1)
     if s.len() > 0:
         with_memcpy(out, *(s as *const str as *const *const u8), s.len())

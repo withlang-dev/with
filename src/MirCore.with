@@ -25,10 +25,10 @@ impl Copy for BlockId
 impl Copy for TermKind
 
 
-fn lbrace -> str:
+fn lbrace:
     str_from_byte(123)
 
-fn rbrace -> str:
+fn rbrace:
     str_from_byte(125)
 
 // ── Statement kinds ──────────────────────────────────────────────
@@ -95,13 +95,13 @@ enum ConstKind: i32:
     CK_ZEROED = 12
 
 
-fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic) -> bool:
+fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic):
     intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.VECRANGE_LEN32
 
-fn mir_intrinsic_is_len64(intrinsic: MirIntrinsic) -> bool:
+fn mir_intrinsic_is_len64(intrinsic: MirIntrinsic):
     intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.VECRANGE_LEN64
 
-fn mir_intrinsic_is_ulen32(intrinsic: MirIntrinsic) -> bool:
+fn mir_intrinsic_is_ulen32(intrinsic: MirIntrinsic):
     intrinsic == MirIntrinsic.LIST_ULEN32 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.STR_ULEN32 or intrinsic == MirIntrinsic.ARR_ULEN32 or intrinsic == MirIntrinsic.VECRANGE_ULEN32
 
 // ── Projection kinds ─────────────────────────────────────────────
@@ -808,7 +808,7 @@ impl MirBody:
         self.const_types.push(type_id)
         id
 
-fn mir_const_int_value(body: &MirBody, const_id: i32) -> i64:
+fn mir_const_int_value(body: &MirBody, const_id: i32):
     ast_int_from_parts(
         body.const_d0[const_id],
         body.const_d1[const_id],
@@ -1806,7 +1806,7 @@ fn mir_drop_state_threaded_target(body: &MirBody, bb: i32) -> i32:
 
 // Every block a terminator names as a successor: which data slot holds a
 // block is the terminator kind's (a call's d2 is its destination place).
-fn mir_term_successors(body: &MirBody, bb: i32) -> List[i32]:
+fn mir_term_successors(body: &MirBody, bb: i32):
     let out: List[i32] = []
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
@@ -2057,7 +2057,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
 fn mir_drop_state_sweep_bound(local_count: i32, block_count: i32) -> i64:
     3 * (local_count as i64 + 1) * (block_count as i64 + 1) + 2
 
-fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
+fn mir_drop_state_compute_blocks(body: &MirBody):
     let bb_count = body.block_count()
     let blocks = mir_drop_state_blocks_new(body)
     let sweep_bound = mir_drop_state_sweep_bound(body.local_count(), bb_count)
@@ -2093,7 +2093,7 @@ fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
                 dirty[blocks.succs[i]] = 1
     blocks
 
-fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
+fn dump_drop_state_body(body: &MirBody, pool: &InternPool):
     let out = StringBuilder.new()
     let fn_name = if body.fn_sym != 0:
         f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
@@ -2296,7 +2296,7 @@ fn mir_place_projection_debug_list(mir_mod: &MirModule, body: &MirBody, place_id
         current_ty = mir_projection_next_type(mir_mod, current_ty, pk, pd)
     out ++ "]"
 
-fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPool) -> str:
+fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPool):
     var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
     for place_id in 0..body.place_locals.len():
         let local_id = body.place_locals[place_id]
@@ -2355,7 +2355,7 @@ fn mir_drop_state_moved_rank(state: i32) -> i32:
     -1
 
 // The first MIR place naming each drop-state key, -1 for none.
-fn mir_drop_state_key_places(keys: &MirDropStateKeys) -> List[i32]:
+fn mir_drop_state_key_places(keys: &MirDropStateKeys):
     let out: List[i32] = []
     for _ in 0..keys.len():
         out.push(-1)
@@ -2397,7 +2397,7 @@ fn mir_drop_vacated_subplace(mir_mod: &MirModule, body: &MirBody, keys: &MirDrop
             return child
     -1
 
-fn mir_drop_vacated_message(keys: &MirDropStateKeys, state: &MirDropStateMap, body: &MirBody, place_id: i32, child: i32) -> str:
+fn mir_drop_vacated_message(keys: &MirDropStateKeys, state: &MirDropStateMap, body: &MirBody, place_id: i32, child: i32):
     let child_state = mir_drop_state_name(state.get(keys, child))
     "drop of " ++ mir_place_text(body, place_id) ++ " frees " ++ keys.names[child] ++ f", which a path reaching it moved out ({child_state}) and nothing reset (§2.5.1)"
 
@@ -2427,7 +2427,7 @@ fn mir_drop_redropped_subplace(mir_mod: &MirModule, body: &MirBody, keys: &MirDr
             return child
     -1
 
-fn mir_drop_redropped_message(keys: &MirDropStateKeys, state: &MirDropStateMap, body: &MirBody, place_id: i32, child: i32) -> str:
+fn mir_drop_redropped_message(keys: &MirDropStateKeys, state: &MirDropStateMap, body: &MirBody, place_id: i32, child: i32):
     let child_state = mir_drop_state_name(state.get(keys, child))
     "drop of " ++ mir_place_text(body, place_id) ++ " frees " ++ keys.names[child] ++ f" again: a path reaching it dropped that part and nothing wrote it since ({child_state}) (§2.5.1)"
 
@@ -2483,7 +2483,7 @@ fn mir_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
     ops
 
 // The operands a terminator reads, decoded as transfer_term does.
-fn mir_term_operands(body: &MirBody, bb: i32) -> List[i32]:
+fn mir_term_operands(body: &MirBody, bb: i32):
     let tk = body.term_kind(bb)
     let term_ops: List[i32] = []
     if tk == TermKind.TK_SWITCH_INT:
@@ -3430,12 +3430,12 @@ fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
                     killed_bb[dst] = if is_blank != 0: bb else: -1
     ""
 
-fn validate_use_after_kill(body: &MirBody, pool: &InternPool) -> str:
+fn validate_use_after_kill(body: &MirBody, pool: &InternPool):
     validate_use_after_kill_body(body, pool)
 
 // A validator verdict names bodies `fn sym<N>`; the reader needs the
 // function. Each `fn sym<N>` gains its name, as --dump-mir prints it.
-fn mir_name_fn_syms(text: &str, pool: &InternPool) -> str:
+fn mir_name_fn_syms(text: &str, pool: &InternPool):
     let out = StringBuilder.new()
     var i = 0
     let n = text.len()
@@ -3903,10 +3903,10 @@ fn mir_validate_find_int_type(mir_mod: &MirModule, bits: i32, signed: i32) -> i3
             return ti as i32
     0
 
-fn mir_validate_get_generic_inst_arg_count(mir_mod: &MirModule, tid: i32) -> i32:
+fn mir_validate_get_generic_inst_arg_count(mir_mod: &MirModule, tid: i32):
     mir_mod.mir_get_type_d2(tid)
 
-fn mir_validate_get_generic_inst_arg(mir_mod: &MirModule, tid: i32, index: i32) -> i32:
+fn mir_validate_get_generic_inst_arg(mir_mod: &MirModule, tid: i32, index: i32):
     let extra_start = mir_mod.mir_get_type_d1(tid)
     mir_mod.mir_get_type_extra(extra_start + index)
 
@@ -4235,7 +4235,7 @@ fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -
 
 // The type a place's projections yield from its local's type, ignoring the
 // type the lowering declared for it; 0 when the walk cannot resolve one.
-fn mir_validate_place_derived_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> i32:
+fn mir_validate_place_derived_type(mir_mod: &MirModule, body: &MirBody, place_id: i32):
     mir_validate_place_prefix_type(mir_mod, body, place_id, 0)
 
 // The same walk stopped `trailing` projections short of the place's end.
@@ -4454,7 +4454,7 @@ fn mir_validate_aggregate_scalar_mismatch(mir_mod: &MirModule, body: &MirBody, e
         if mir_mod.mir_get_type_d0(arg_resolved) != mir_mod.mir_get_type_d0(payload_ty) or mir_mod.mir_get_type_d1(arg_resolved) != mir_mod.mir_get_type_d1(payload_ty): return fi
     -1
 
-fn mir_validate_type_is_scalar(mir_mod: &MirModule, resolved: i32) -> bool:
+fn mir_validate_type_is_scalar(mir_mod: &MirModule, resolved: i32):
     let kind = mir_mod.mir_get_type_kind(resolved)
     kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT or kind == TypeKind.TY_BOOL
 
@@ -4705,7 +4705,7 @@ fn mir_validate_indirect_call_arity(mir_mod: &MirModule, body: &MirBody, callee_
     if body.call_arg_counts[call_id] == declared: return -1
     declared
 
-fn mir_validate_is_compare_op(op: i32) -> bool:
+fn mir_validate_is_compare_op(op: i32):
     op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
 
 fn mir_validate_compare_sensitive_type(mir_mod: &MirModule, tid: i32) -> bool:

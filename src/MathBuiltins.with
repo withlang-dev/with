@@ -24,7 +24,7 @@ type MathFnRow { name: str, arity: i32, llvm: str, libm: str }
 fn math_row(name: str, arity: i32, llvm: str, libm: str) -> MathFnRow:
     MathFnRow { name, arity, llvm, libm }
 
-fn math_fn_table() -> List[MathFnRow]:
+fn math_fn_table():
     let t: List[MathFnRow] = []
     // Unary, LLVM intrinsic.
     t.push(math_row("sqrt", 1, "llvm.sqrt", "sqrt"))
@@ -74,23 +74,23 @@ fn math_fn_lookup(name: &str) -> i32:
     -1
 
 /// The number of rows: ids are 0..math_fn_count().
-fn math_fn_count() -> i32: math_fn_table().len() as i32
+fn math_fn_count(): math_fn_table().len() as i32
 
 /// Operand count: 1 or 2. Every operand shares the argument's float type.
-fn math_fn_arity(id: i32) -> i32:
+fn math_fn_arity(id: i32):
     let t = math_fn_table()
     t[id].arity
 
-fn math_fn_name(id: i32) -> str:
+fn math_fn_name(id: i32):
     let t = math_fn_table()
     t[id].name
 
 /// LLVM intrinsic base name (`llvm.cos`), or "" when the function is libm-only.
-fn math_fn_llvm(id: i32) -> str:
+fn math_fn_llvm(id: i32):
     let t = math_fn_table()
     t[id].llvm
 
 /// libm base symbol; the f32 spelling appends `f` (`cos` -> `cosf`).
-fn math_fn_libm(id: i32) -> str:
+fn math_fn_libm(id: i32):
     let t = math_fn_table()
     t[id].libm

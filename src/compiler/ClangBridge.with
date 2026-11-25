@@ -16,13 +16,13 @@ use std.libc.strtod
 fn bridge_starts_with(s: &str, prefix: &str) -> bool: with_str_starts_with_ref(s, prefix) != 0
 fn bridge_ends_with(s: &str, suffix: &str) -> bool: with_str_ends_with_ref(s, suffix) != 0
 fn bridge_contains(s: &str, needle: &str) -> bool: with_str_contains_ref(s, needle) != 0
-fn bridge_replace(s: &str, from: &str, to: &str) -> str: with_str_replace_ref(s, from, to)
-fn bridge_byte_at(s: &str, index: i64) -> i32: with_str_byte_at_ref(s, index)
-fn bridge_slice(s: &str, start: i64, end: i64) -> str: with_str_slice_ref(s, start, end)
+fn bridge_replace(s: &str, from: &str, to: &str): with_str_replace_ref(s, from, to)
+fn bridge_byte_at(s: &str, index: i64): with_str_byte_at_ref(s, index)
+fn bridge_slice(s: &str, start: i64, end: i64): with_str_slice_ref(s, start, end)
 // Where the piece of `s` that starts at `start` ends: at the next `sep`
 // byte, or at the end of the text. The pieces of a text are walked with
 // this, since a list of them is a library type.
-fn bridge_piece_end(s: &str, sep: i32, start: i64) -> i64:
+fn bridge_piece_end(s: &str, sep: i32, start: i64):
     var end = start
     while end < s.len() and with_str_byte_at_ref(s, end) != sep: end += 1
     end
@@ -30,8 +30,8 @@ fn bridge_piece_end(s: &str, sep: i32, start: i64) -> i64:
 // ── libSystem extern fns ────────────────────────────────────────
 // mkstemp and realpath are the runtime's with_libc_* seams (one body per
 // backend; Windows has neither name), never the host's symbols.
-unsafe fn mkstemp(template_path: *mut c_char) -> i32: with_libc_mkstemp(template_path)
-unsafe fn realpath(path: *const c_char, resolved_name: *mut c_char) -> *mut c_char:
+unsafe fn mkstemp(template_path: *mut c_char): with_libc_mkstemp(template_path)
+unsafe fn realpath(path: *const c_char, resolved_name: *mut c_char):
     with_libc_realpath(path, resolved_name)
 // unlink(2) under its own name here: the pinned seed predates #1919, so an
 // `extern fn unlink` in this module still collides with std.libc's `pub fn
@@ -611,7 +611,7 @@ unsafe fn make_path_str(p: *const u8) -> str:
     let sp = &raw as *const str
     *sp
 
-unsafe fn clang_path_to_with(cxs: CXString) -> str:
+unsafe fn clang_path_to_with(cxs: CXString):
     let r = make_path_str(clang_getCString(cxs))
     clang_disposeString(cxs)
     r
@@ -641,10 +641,10 @@ unsafe fn session_strdup(s: *mut CImportSession, p: *const u8) -> *mut u8:
 // session_strdup tracking remains for raw C-string session consumers only.
 // (The seed-era leak note retired with the 2026-08-17 reseed — the flip
 // seed drops owned strs, so the copy is properly owned everywhere.)
-unsafe fn session_make_str(s: *mut CImportSession, p: *const u8) -> str:
+unsafe fn session_make_str(s: *mut CImportSession, p: *const u8):
     make_str(p)
 
-unsafe fn clang_str_to_with(s: *mut CImportSession, cxs: CXString) -> str:
+unsafe fn clang_str_to_with(s: *mut CImportSession, cxs: CXString):
     let cstr = clang_getCString(cxs)
     let r = session_make_str(s, cstr)
     clang_disposeString(cxs)
@@ -820,7 +820,7 @@ unsafe fn copy_first_line_to_buf(text: &str, dst: *mut u8, cap: i64) -> i32:
     *((dst as i64 + i) as *mut u8) = 0
     (i > 0) as i32
 
-unsafe fn c_path_to_str(path: *const u8) -> str:
+unsafe fn c_path_to_str(path: *const u8):
     make_str(path)
 
 // linux-x86_64 (#1915): libc's headers are the sysroot's, and a library the
@@ -858,7 +858,7 @@ unsafe fn get_sdk_path() -> *const u8:
     0 as *const u8
 
 // Never an installed Apple SDK (#1915): only what the caller resolved.
-unsafe fn resolve_target_sdk_path() -> str: with_str_clone_ref(g_cimport_sdk_path)
+unsafe fn resolve_target_sdk_path(): with_str_clone_ref(g_cimport_sdk_path)
 
 // 1 when this is macOS and no target SDK could be resolved — used to add a
 // directional hint to a c_import header-parse failure (§16.1).
@@ -949,7 +949,7 @@ unsafe fn strip_qualifiers(s: *mut CImportSession, spelling: *const u8) -> *mut 
     with_free(buf)
     result
 
-unsafe fn get_type_spelling(s: *mut CImportSession, ty: CXType) -> str:
+unsafe fn get_type_spelling(s: *mut CImportSession, ty: CXType):
     let canonical = clang_getCanonicalType(ty)
     let cxs = clang_getTypeSpelling(canonical)
     let cstr = clang_getCString(cxs)
@@ -1010,7 +1010,7 @@ unsafe fn translate_parameter_type(s: *mut CImportSession, ty: CXType, depth: i3
 /// True when clang spells `ty` with MSVC's `__unaligned` qualifier. libclang
 /// reports only const, volatile and restrict as qualifier predicates, and
 /// prints `__unaligned` among the leading qualifier words.
-unsafe fn type_is_unaligned_qualified(ty: CXType) -> bool:
+unsafe fn type_is_unaligned_qualified(ty: CXType):
     let spelling = clang_getTypeSpelling(ty)
     let words = make_str(clang_getCString(spelling))
     clang_disposeString(spelling)
@@ -1362,10 +1362,10 @@ unsafe fn record_is_reserved_system(canonical: CXType) -> bool:
     if not reserved: return false
     macro_location_is_system_from_cursor(clang_getTypeDeclaration(canonical))
 
-unsafe fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
+unsafe fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32):
     translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 0)
 
-unsafe fn translate_storage_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
+unsafe fn translate_storage_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32):
     translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 1)
 
 unsafe fn cimport_path_to_cstr(path: &str) -> *mut u8:
@@ -1626,7 +1626,7 @@ unsafe fn collect_undefined_record_type(s: *mut CImportSession, ty: CXType, dept
             session_append_decl(s, decl)
 
 @[callconv("c")]
-unsafe fn collect_member_record_types(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+unsafe fn collect_member_record_types(cursor: CXCursor, parent: CXCursor, data: *mut u8):
     if clang_getCursorKind(cursor) == CXCursor_FieldDecl:
         collect_undefined_record_type(data as *mut CImportSession, clang_getCursorType(cursor), 0)
     CXChildVisit_Continue
@@ -1671,7 +1671,7 @@ unsafe fn collect_undefined_records(s: *mut CImportSession):
 // A declaration cursor's identity is its Decl (data[0]); the parent and
 // first-in-group words differ between a visited cursor and the one
 // clang_getTypeDeclaration returns, which clang_equalCursors ignores too.
-unsafe fn anon_record_hash(decl: CXCursor) -> i64:
+unsafe fn anon_record_hash(decl: CXCursor):
     ci_node_hash(0, decl.data[0], 0, 0)
 
 unsafe fn session_anon_record_slot(s: *mut CImportSession, decl: CXCursor) -> i32:
@@ -1692,7 +1692,7 @@ unsafe fn anon_hash_insert(tbl: *mut i32, cap: i64, decl: CXCursor, slot: i32):
         at = (at + 1) & (cap - 1)
     *((tbl as i64 + at * 4) as *mut i32) = slot
 
-unsafe fn session_anon_record_append(s: *mut CImportSession, decl: CXCursor) -> i32:
+unsafe fn session_anon_record_append(s: *mut CImportSession, decl: CXCursor):
     if ((*s).anon_record_count as i64 + 1) * 10 >= (*s).anon_hash_cap * 7:
         let new_cap = if (*s).anon_hash_cap > 0: (*s).anon_hash_cap * 2 else: 64
         let tbl = with_alloc(new_cap * 4)
@@ -1855,7 +1855,7 @@ unsafe fn anon_record_behind_indirection(ty: CXType, through: bool, pointers: bo
     if modified.kind == CXType_Invalid: return false
     anon_record_behind_indirection(modified, through, pointers, found, depth + 1)
 
-unsafe fn anon_join(parent: *const u8, sep: *const u8, tail: *const u8, n: i64) -> *mut u8:
+unsafe fn anon_join(parent: *const u8, sep: *const u8, tail: *const u8, n: i64):
     let buf: [1024]u8 = [0 as u8; 1024]
     let pos: i64 = 0
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, parent)
@@ -2405,7 +2405,7 @@ fn cimport_has_c_model() -> bool:
 // Appends the target and sysroot (when set) to a parse's argv: the Windows
 // libc as --sysroot=, a named C model as -isysroot (where a Darwin target
 // also reads its SDK version) and --sysroot= (every other target's search).
-unsafe fn cimport_push_target_args(args: *mut *const u8, nargs: i32) -> i32:
+unsafe fn cimport_push_target_args(args: *mut *const u8, nargs: i32):
     var n = nargs
     if g_cimport_target_buf[0] != 0:
         *((args as i64 + n as i64 * 8) as *mut *const u8) = "-target\0" as *const u8
@@ -2560,7 +2560,7 @@ fn with_cimport_session_is_migration(session: i64) -> i32:
         let s = session as *mut CImportSession
         if s as i64 == 0: 0 else: (*s).migration
 
-fn with_cimport_parse_generation() -> i64:
+fn with_cimport_parse_generation():
     g_cimport_parse_counter
 
 fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
@@ -3082,7 +3082,7 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
 var g_attr_children_out: str = ""
 
 // Whether `loc` is text at the place it is used, not what a macro expanded to.
-unsafe fn location_is_written(loc: CXSourceLocation) -> bool:
+unsafe fn location_is_written(loc: CXSourceLocation):
     let spelled_file = 0 as *mut u8
     let used_file = 0 as *mut u8
     let spelled_at: u32 = 0
@@ -4143,7 +4143,7 @@ fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx: boo
         s as i64
 
 // The probe file is the header, a newline, then one probe per line.
-fn with_cimport_macro_probe_first_line(header_code: &str) -> i32:
+fn with_cimport_macro_probe_first_line(header_code: &str):
     var lines: i32 = 2
     for i in 0..header_code.len():
         if header_code[i] == '\n': lines = lines + 1
@@ -4335,7 +4335,7 @@ fn with_cimport_typedef_anon_is_union(session: i64, idx: i32) -> bool:
 
 // FNV-1a over the identity words of a node handle (rt's fnv_hash is private
 // to the runtime module). Word-granular mixing is enough for pointer keys.
-fn ci_node_hash(w0: i64, w1: i64, w2: i64, w3: i64) -> i64:
+fn ci_node_hash(w0: i64, w1: i64, w2: i64, w3: i64):
     var h: u64 = 14695981039346656037
     h = (h ^ (w0 as u64)) *% 1099511628211
     h = (h ^ (w1 as u64)) *% 1099511628211
@@ -4343,12 +4343,12 @@ fn ci_node_hash(w0: i64, w1: i64, w2: i64, w3: i64) -> i64:
     h = (h ^ (w3 as u64)) *% 1099511628211
     (h & 0x7fffffffffffffff) as i64
 
-unsafe fn cursor_hash_of(cursor: CXCursor) -> i64:
+unsafe fn cursor_hash_of(cursor: CXCursor):
     ci_node_hash((cursor.kind as u32 as i64) | ((cursor.xdata as u32 as i64) << 32), cursor.data[0], cursor.data[1], cursor.data[2])
 
 // pad0 is C struct padding (undefined bytes in a by-value CXType) — hash and
 // compare only kind + data so identical types always collide into one entry.
-unsafe fn type_hash_of(ty: CXType) -> i64:
+unsafe fn type_hash_of(ty: CXType):
     ci_node_hash(ty.kind as u32, ty.data[0], ty.data[1], 0)
 
 unsafe fn cursor_hash_insert(tbl: *mut i32, cap: i64, h: i64, idx: i32):
@@ -4440,7 +4440,7 @@ unsafe fn store_type(s: *mut CImportSession, ty: CXType) -> i32:
     idx
 
 @[callconv("c")]
-unsafe fn collect_child_cursor(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+unsafe fn collect_child_cursor(cursor: CXCursor, parent: CXCursor, data: *mut u8):
     let cc = data as *mut ChildCollector
     if (*cc).count >= (*cc).cap:
         (*cc).cap = if (*cc).cap > 0: (*cc).cap * 2 else: 64
@@ -5270,7 +5270,7 @@ fn with_ci_cursor_expansion_location(session: i64, cursor_idx: i32) -> str:
         clang_disposeString(fname)
         session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
-unsafe fn define_skip_blank(contents: *const u8, from: i64, end: i64) -> i64:
+unsafe fn define_skip_blank(contents: *const u8, from: i64, end: i64):
     var p = from
     while p < end:
         let c = contents[p]
@@ -6080,16 +6080,16 @@ fn with_cimport_struct_field_anon_field_count(session: i64, idx: i32, field: i32
     // TODO: implement full anonymous record field enumeration
     0
 
-fn with_cimport_struct_field_anon_field_name(session: i64, idx: i32, field: i32, sub_field: i32) -> str:
+fn with_cimport_struct_field_anon_field_name(session: i64, idx: i32, field: i32, sub_field: i32):
     ""
 
-fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32) -> str:
+fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32):
     ""
 
-fn with_cimport_typedef_anon_field_name(session: i64, idx: i32, field: i32) -> str:
+fn with_cimport_typedef_anon_field_name(session: i64, idx: i32, field: i32):
     ""
 
-fn with_cimport_typedef_anon_field_type(session: i64, idx: i32, field: i32) -> str:
+fn with_cimport_typedef_anon_field_type(session: i64, idx: i32, field: i32):
     ""
 
 fn with_cimport_typedef_anon_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32:

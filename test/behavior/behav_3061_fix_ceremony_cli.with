@@ -54,14 +54,15 @@ fn main:
     let rets_ran = run_to_files(&[compiler, "run", rets], dir ++ "/rets-run.out", dir ++ "/rets-run.err", 600000)
     assert(rets_ran.code == 0 and read_file(dir ++ "/rets-run.out").unwrap() == "6 p 1 4 1 5 24 4 2 2 6 3\n")
     // Two functions that call each other cannot both lose their return
-    // type (D143): the program stops checking, so every one removed in the
-    // run is put back and the file is as it was.
+    // type (D143): the program stops checking, so those two are put back,
+    // and a function beside them that needs none still loses its own.
     let cycle = dir ++ "/cycle.with"
     let cycle_text = "fn ping(n: i64) -> i64: pong(n)\n\nfn pong(n: i64) -> i64: ping(n)\n\nfn area(w: i64, h: i64) -> i64: w * h\n\nfn main:\n    var keep = 0\n    keep = keep + area(2, 3)\n    if keep < 0: print(ping(1))\n    print(keep)\n"
     assert(write_file(cycle, cycle_text) == 0)
     let cycle_run = run_to_files(&[compiler, "fix-ceremony", "--apply", cycle], dir ++ "/cycle.out", dir ++ "/cycle.err", 600000)
     assert(cycle_run.code == 0)
-    assert(read_file(cycle).unwrap() == cycle_text)
-    assert(read_file(dir ++ "/cycle.out").unwrap().contains("3 return type(s) kept as written"))
+    assert(read_file(cycle).unwrap() == cycle_text.replace("fn area(w: i64, h: i64) -> i64: w * h", "fn area(w: i64, h: i64): w * h"))
+    let cycle_said = read_file(dir ++ "/cycle.out").unwrap()
+    assert(cycle_said.contains("2 return type(s) kept as written") and cycle_said.contains("`ping`") and cycle_said.contains("`pong`"))
     assert(remove_tree(dir) == 0)
     print("ok")

@@ -47,7 +47,7 @@ use std.algorithms
 use std.string.parse
 use rt.rt_core
 
-fn ct_is_pointer(ty: &str) -> bool: ty.trim().starts_with("*")
+fn ct_is_pointer(ty: &str): ty.trim().starts_with("*")
 
 // `R` for `*mut R` / `*const R` when R is a record name; "" for a pointer
 // to a pointer, to a scalar, to `c_void`, a function pointer, an array.
@@ -61,7 +61,7 @@ fn ct_record_pointee(ty: &str) -> str:
     if ct_is_scalar(rest): return ""
     rest
 
-fn ct_is_scalar(name: &str) -> bool:
+fn ct_is_scalar(name: &str):
     name.starts_with("c_") or name == "u8" or name == "i8" or name == "u16" or name == "i16" or name == "u32" or name == "i32" or name == "u64" or name == "i64" or name == "f32" or name == "f64" or name == "bool" or name == "isize" or name == "usize"
 
 // The pointee of `*mut T`, "" when `ty` is not a single-level pointer.
@@ -79,14 +79,14 @@ fn ct_has_line(evidence: &str, line: &str) -> bool:
 // Functions outside the corpus that read their pointer arguments and write
 // nothing (Amendment 2): an explicit list, never a name's guess. `memset`
 // and `memcpy` write; `free` destroys; `printf` is not here either.
-fn ct_is_pure_reader(name: &str) -> bool:
+fn ct_is_pure_reader(name: &str):
     name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp"
 
 // The method name for C function `c_name` on `record`: the C name less the
 // record's prefix (`stc_word_stack_push` on `stc_word_stack` is `push`,
 // `GHashTable`'s `g_hash_table_` prefix the same way), the whole C name
 // when it has no such prefix; reserved words escape as everywhere else.
-fn ct_method_name(c_name: &str, record: &str) -> str:
+fn ct_method_name(c_name: &str, record: &str):
     var method = ci_strip_snake_prefix(c_name, record ++ "_")
     if method.len() == 0: method = ci_strip_snake_prefix(c_name, ci_compute_snake_prefix(record))
     // An iterator record's functions carry the collection's prefix

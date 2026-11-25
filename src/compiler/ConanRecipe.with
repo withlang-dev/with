@@ -13,13 +13,13 @@ fn cr_unquote(text: &str) -> str:
     if t.len() >= 2 and (t[0] == '"' or t[0] == '\'') and t[t.len() - 1] == t[0]: return t.slice(1, t.len() - 1).to_owned()
     t.to_owned()
 
-fn cr_is_version_key(line: &str, version: &str) -> bool:
+fn cr_is_version_key(line: &str, version: &str):
     line == "\"" ++ version ++ "\":" or line == version ++ ":" or line == "'" ++ version ++ "':"
 
 // The lines of `section:`'s block for `version`, trimmed. conandata.yml is
 // regular enough to read by line: a version block ends at the next line that
 // is itself a key with nothing after the colon, other than `url:`.
-fn cr_version_block(data: &str, section: &str, version: &str) -> List[str]:
+fn cr_version_block(data: &str, section: &str, version: &str):
     let out: List[str] = []
     var in_section = false
     var in_version = false
@@ -88,7 +88,7 @@ fn conan_data_patch_problem(data: &str, version: &str) -> str:
     ""
 
 // Paths of the version's patch files, relative to the recipe folder, in order.
-fn conan_data_patches(data: &str, version: &str) -> List[str]:
+fn conan_data_patches(data: &str, version: &str):
     let out: List[str] = []
     for line in cr_version_block(data, "patches", version):
         let at = line.find("patch_file:")

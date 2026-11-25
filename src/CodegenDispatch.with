@@ -333,7 +333,7 @@ impl Codegen:
 // `offset` rounded up to `align` (a power of two), TypeLayout's rule.
 fn closure_align_up(offset: i64, align: i64): if align <= 1: offset else: (offset + align - 1) / align * align
 
-fn codegen_regex_flag_options(flags: &str) -> i32:
+fn codegen_regex_flag_options(flags: &str):
     var options: i32 = 0
     var i: i64 = 0
     while i < flags.len():
@@ -353,7 +353,7 @@ fn codegen_regex_flag_options(flags: &str) -> i32:
         i = i + 1
     options
 
-fn codegen_regex_state_flags(flags: &str) -> i32:
+fn codegen_regex_state_flags(flags: &str):
     var state_flags: i32 = 0
     var i: i64 = 0
     while i < flags.len():
@@ -536,7 +536,7 @@ impl Codegen:
             out.push(value)
         out
 
-fn mir_scan_list_fill(count: i32, value: i32) -> List[i32]:
+fn mir_scan_list_fill(count: i32, value: i32):
     let out: List[i32] = []
     for _ in 0..count:
         out.push(value)

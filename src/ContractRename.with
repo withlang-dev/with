@@ -22,11 +22,11 @@ use rt.rt_core
 
 type ContractEdit { start: i32, end: i32, text: str }
 
-fn cr_token_is(source: &str, tokens: &TokenList, index: i32, text: &str) -> bool:
+fn cr_token_is(source: &str, tokens: &TokenList, index: i32, text: &str):
     index < tokens.len() and tokens.get_tag(index) == TokenKind.TK_IDENT and source.slice(tokens.get_start(index), tokens.get_end(index)) == text
 
 /// The respellings one source needs, in source order.
-fn contract_rename_edits(source: &str) -> List[ContractEdit]:
+fn contract_rename_edits(source: &str):
     let lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize()
     let edits = []
@@ -43,7 +43,7 @@ fn contract_rename_edits(source: &str) -> List[ContractEdit]:
     edits
 
 /// `source` with `edits` applied.
-fn contract_rename_apply(source: &str, edits: &List[ContractEdit]) -> str:
+fn contract_rename_apply(source: &str, edits: &List[ContractEdit]):
     var out = ""
     var from: i32 = 0
     for edit in edits:
@@ -51,7 +51,7 @@ fn contract_rename_apply(source: &str, edits: &List[ContractEdit]) -> str:
         from = edit.end
     out ++ source.slice(from, source.len())
 
-fn cr_line_of(source: &str, at: i32) -> i32:
+fn cr_line_of(source: &str, at: i32):
     var line: i32 = 1
     for byte in source.slice(0, at).bytes():
         if byte == '\n': line += 1

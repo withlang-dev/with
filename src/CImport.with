@@ -103,7 +103,7 @@ var g_ci_migrate_method_shapes: HashMap[str, str] = [:]
 fn ci_migrate_set_method_shapes(shapes: HashMap[str, str]):
     g_ci_migrate_method_shapes = shapes
 
-fn ci_migrate_method_shape(name: &str) -> str:
+fn ci_migrate_method_shape(name: &str):
     (g_ci_migrate_method_shapes.get(name) ?? "").to_owned()
 
 // Whether the body just translated (ci_trans_stmt_ir) ends in a return,
@@ -111,7 +111,7 @@ fn ci_migrate_method_shape(name: &str) -> str:
 // adds `return __ci_out` only where the body can fall off its end.
 var g_ci_body_ends_with_terminator = false
 
-fn ci_body_ends_with_terminator() -> bool: g_ci_body_ends_with_terminator
+fn ci_body_ends_with_terminator(): g_ci_body_ends_with_terminator
 
 impl CiStmtPool:
     // D159 step 2: `f(p, a, o)` where f is printed as the method `m` of p's
@@ -358,7 +358,7 @@ fn ci_add_windows_system_includes():
 fn ci_set_sdk_path(path: &str):
     darwin_sdk_set_configured(path)
 
-fn ci_darwin_sdk_is_embedded() -> bool:
+fn ci_darwin_sdk_is_embedded():
     darwin_sdk_is_embedded()
 
 // The header a clang "file not found" detail names (`'sqlite3.h' file not
@@ -372,7 +372,7 @@ fn ci_missing_header_name(detail: &str) -> str:
     if open < 0: return ""
     detail.slice(open + 1, at)
 
-fn ci_build_define_prefix(defines: &List[str]) -> str:
+fn ci_build_define_prefix(defines: &List[str]):
     let out = StringBuilder.new()
     for i in 0..defines.len():
         let define = defines[i]
@@ -407,13 +407,13 @@ fn ci_warn(message: &str):
     g_cimport_warnings = g_cimport_warnings ++ message ++ "\n"
 
 // What the last translation printed to stderr ("" or newline-terminated).
-fn c_import_warnings() -> str: g_cimport_warnings ++ ""
+fn c_import_warnings(): g_cimport_warnings ++ ""
 
 fn c_import_untranslated_macros_clear():
     g_cimport_untranslated_macros = ""
     return
 
-fn c_import_untranslated_macros() -> str:
+fn c_import_untranslated_macros():
     g_cimport_untranslated_macros ++ ""
 
 fn c_import_omitted_symbols_clear():
@@ -423,7 +423,7 @@ fn c_import_omitted_symbols_clear():
     g_cimport_omitted_symbol_categories = []
     return
 
-fn c_import_omitted_symbols() -> str:
+fn c_import_omitted_symbols():
     let out = StringBuilder.new()
     let count = g_cimport_omitted_symbol_names.len()
     for i in 0..count:
@@ -441,7 +441,7 @@ fn c_import_included_files_clear():
 /// Newline-joined absolute paths of every header file the last successful
 /// libclang parse read. Consumed by the frontend cache to build and validate
 /// the dependency manifest stored beside each cached translation (#553).
-fn c_import_included_files() -> str:
+fn c_import_included_files():
     g_cimport_included_files ++ ""
 
 // #1877: the `__with_builtin_<op>_overflow_<ty>` helpers this import's
@@ -463,7 +463,7 @@ fn ci_note_overflow_helper_needed(helper: &str, op: &str, ty: &str):
 // The names needed, each followed by a space.
 var g_ci_libc_allocator_needed = ""
 
-fn ci_render_libc_allocator_needed() -> str:
+fn ci_render_libc_allocator_needed():
     var out = ""
     for name in g_ci_libc_allocator_needed.fields():
         if with_cimport_is_name_emitted("__with_ci_libc_" ++ name) != 0: continue
@@ -490,7 +490,7 @@ fn ci_render_atomic_helpers_needed() -> str:
     with_cimport_mark_name_emitted(helper)
     "unsafe fn __ci_atomic_cas[T](place: *mut Atomic[T], expected: *mut T, desired: T, success: Order, failure: Order) -> bool:\n    match (*place).compare_exchange(*expected, desired, success, failure):\n        Ok(_) => true\n        Err(found) =>\n            *expected = found\n            false\n"
 
-fn ci_render_overflow_helpers_needed() -> str:
+fn ci_render_overflow_helpers_needed():
     var out = ""
     for g_ci_overflow_helpers_needed_item in g_ci_overflow_helpers_needed:
         let parts = g_ci_overflow_helpers_needed_item.split("|")
@@ -716,7 +716,7 @@ fn ci_record_omitted_symbol(name: &str, reason: &str):
 // declaration that needs it is omitted with that reason (ci_type_is_known).
 // D155: the aliases are the compiler's builtins (Sema registers them from
 // the target spec); no import or migration emits a concrete value for one.
-fn ci_c_long_double_representable(triple: &str) -> bool:
+fn ci_c_long_double_representable(triple: &str):
     c_long_double_is_double(ci_model_os(triple), ci_model_arch(triple))
 
 // The parsed C model's OS and architecture: the triple's when the parse
@@ -764,7 +764,7 @@ fn ci_note_rule_for(fn_name: &str, rule: &str, detail: &str):
     let line = rule ++ "\t" ++ fn_name ++ "\t" ++ detail
     if not g_ci_rule_sites.contains(line): g_ci_rule_sites.push(line)
 
-fn ci_take_rule_sites() -> str:
+fn ci_take_rule_sites():
     var out = ""
     for line in g_ci_rule_sites: out = out ++ line ++ "\n"
     g_ci_rule_sites = []
@@ -783,7 +783,7 @@ fn ci_record_omitted_symbol_cat(name: &str, location: &str, category: &str, reas
 
 // If `reason` names an already-omitted symbol, append the originating
 // reason chain (§16.2 dependent bindings carry the same reason chain).
-fn ci_omitted_chain_reason(reason: &str) -> str:
+fn ci_omitted_chain_reason(reason: &str):
     var out = with_str_clone_ref(reason)
     for i in 0..g_cimport_omitted_symbol_names.len():
         let dep = g_cimport_omitted_symbol_names[i]
@@ -822,7 +822,7 @@ fn ci_omitted_manifest_comments() -> str:
 // without a prototype. The generated text states the fact, the Frontend
 // sets it on the parsed NK_EXTERN_FN (flag bit 1), and Sema reads it there:
 // no source a person writes can spell it.
-fn ci_unprototyped_manifest_comments() -> str:
+fn ci_unprototyped_manifest_comments():
     let out = StringBuilder.new()
     for name in g_cimport_unprototyped_names.split("|"):
         if name.len() > 0:
@@ -831,7 +831,7 @@ fn ci_unprototyped_manifest_comments() -> str:
 
 // `|name|` for each unprototyped-declaration manifest line of c_import's
 // generated `text` (fresh or cached).
-fn c_import_unprototyped_names(text: &str) -> str:
+fn c_import_unprototyped_names(text: &str):
     let prefix = "// @with-cimport-unprototyped|"
     var out = ""
     for line in text.split("\n"):
@@ -884,7 +884,7 @@ fn ci_is_implicit_compiler_macro(name: &str) -> bool:
     if name == "__va_copy": return true
     false
 
-fn ci_compound_literal_type_name(raw_type: &str) -> str:
+fn ci_compound_literal_type_name(raw_type: &str):
     var t = ci_trim(raw_type)
     if ci_starts_with(t, "struct "):
         t = ci_trim(t.slice(7, t.len()))
@@ -954,7 +954,7 @@ fn ci_try_translate_compound_literal_macro(session: i64, value: &str) -> str:
         return ""
     ci_translate_c_initializer_for_type(session, t.slice(brace, t.len()), ty)
 
-fn process_c_import(header_spec: &str) -> str:
+fn process_c_import(header_spec: &str):
     let defines: List[str] = []
     process_c_import_with_defines(header_spec, defines)
 
@@ -1208,7 +1208,7 @@ fn ci_mark_cached_names(text: &str):
 
 // Escape a string for use inside single quotes in a shell command.
 // Replaces ' with '\'' (end quote, escaped quote, start quote).
-fn ci_shell_escape(s: &str) -> str:
+fn ci_shell_escape(s: &str):
     var result = ""
     var i = 0
     while i as i64 < s.len():
@@ -1219,7 +1219,7 @@ fn ci_shell_escape(s: &str) -> str:
         i = i + 1
     result
 
-fn ci_extract_ident(s: &str) -> str:
+fn ci_extract_ident(s: &str):
     var end = 0
     while end as i64 < s.len():
         let c = s[end]
@@ -1313,7 +1313,7 @@ fn ci_decl_name_has(session: i64, name: &str, bits: i32) -> bool:
     let have: i32 = g_ci_decl_name_flags.get(name) ?? 0
     (have & bits) != 0
 
-fn ci_prepopulate_names(session: i64, count: i32) -> str:
+fn ci_prepopulate_names(session: i64, count: i32):
     // For the common C pattern: typedef struct Foo { ... } Foo;
     // The struct "Foo" should be skipped so the typedef "Foo" wins.
     var shadowed = ""
@@ -1325,11 +1325,11 @@ fn ci_prepopulate_names(session: i64, count: i32) -> str:
             shadowed = shadowed ++ "|" ++ name ++ "|"
     shadowed
 
-fn ci_record_definition_exists(session: i64, name: &str, is_union: bool) -> bool:
+fn ci_record_definition_exists(session: i64, name: &str, is_union: bool):
     ci_decl_name_has(session, name, if is_union: CI_NAME_UNION_DEF else: CI_NAME_STRUCT_DEF)
 
 
-fn ci_type_emitted_key(name: &str) -> str:
+fn ci_type_emitted_key(name: &str):
     "__cimport_type:" ++ name
 
 fn ci_type_name_is_emitted(name: &str) -> bool:
@@ -1350,7 +1350,7 @@ fn ci_forget_filtered_name(name: &str):
             cimport_forget_emitted_name(raw_name)
             cimport_forget_emitted_name(ci_type_emitted_key(raw_name))
 
-fn ci_type_decl_name_exists(session: i64, name: &str) -> bool: ci_decl_name_has(session, name, CI_NAME_TYPE)
+fn ci_type_decl_name_exists(session: i64, name: &str): ci_decl_name_has(session, name, CI_NAME_TYPE)
 
 fn ci_translated_builtin_type_name(name: &str) -> bool:
     if name == "c_void": return true
@@ -1407,7 +1407,7 @@ fn ci_missing_pointer_opaque_add(session: i64, count: i32, names: &str, translat
         return with_str_clone_ref(names)
     names ++ "|" ++ name ++ "|"
 
-fn ci_collect_missing_pointer_opaques(session: i64, count: i32) -> str:
+fn ci_collect_missing_pointer_opaques(session: i64, count: i32):
     var names = ""
     var i: i32 = 0
     while i < count:
@@ -1737,7 +1737,7 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
 // fixpoint. Follows Zig's approach where any struct embedding an opaque
 // type is itself demoted to opaque.
 
-fn ci_collect_demoted_types(session: i64, count: i32) -> str:
+fn ci_collect_demoted_types(session: i64, count: i32):
     // Pass 1: collect directly demoted structs/unions. A leading underscore
     // is a tag like any other: ci_translate_struct emits `_DCB` (winbase.h,
     // bitfields) and `_SCOPE_TABLE_AMD64`, so they are demoted by the same
@@ -2730,7 +2730,7 @@ fn ci_cimport_type_is_raw_abi(ty: &str) -> bool:
         return true
     false
 
-fn ci_cimport_type_is_const_c_string_input(ty: &str) -> bool:
+fn ci_cimport_type_is_const_c_string_input(ty: &str):
     let t = ci_trim(ty)
     t == "*const i8" or t == "*const c_char"
 
@@ -2800,7 +2800,7 @@ type CiBitPlan {
 // (ci_take_refused_records): a refused record fails the migration loudly.
 var g_ci_refused_records: str = ""
 
-fn ci_take_refused_records() -> str:
+fn ci_take_refused_records():
     let taken = g_ci_refused_records
     g_ci_refused_records = ""
     taken
@@ -2979,7 +2979,7 @@ fn ci_bitfield_plan_cursor(session: i64, decl_cursor: i32, name: &str) -> CiBitP
 
 // The storage-unit plan of record `idx`, or a plan whose `refusal` says why
 // there is none.
-fn ci_bitfield_plan(session: i64, idx: i32) -> CiBitPlan:
+fn ci_bitfield_plan(session: i64, idx: i32):
     ci_bitfield_plan_cursor(session, with_cimport_decl_cursor(session, idx), with_cimport_decl_name(session, idx))
 
 // The unit a bitfield field starts, or -1 (a later member of a unit renders
@@ -3035,7 +3035,7 @@ fn ci_render_bitfield_accessors_sized(safe_name: &str, size: i64, plan: &CiBitPl
     out = out ++ "const __ci_layout_" ++ safe_name ++ "_check: Unit = __ci_layout_" ++ safe_name ++ "()\n"
     out
 
-fn ci_render_bitfield_accessors(session: i64, idx: i32, safe_name: &str, plan: &CiBitPlan) -> str:
+fn ci_render_bitfield_accessors(session: i64, idx: i32, safe_name: &str, plan: &CiBitPlan):
     ci_render_bitfield_accessors_sized(safe_name, with_cimport_struct_size(session, idx), plan)
 
 fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &str, demoted_types: &str, count: i32) -> str:
@@ -3447,7 +3447,7 @@ fn ci_array_list_fill_text(session: i64, ty: &str) -> str:
 
 // ── Enum translation ────────────────────────────────────────
 
-fn ci_int_type_is_unsigned(ty: &str) -> bool: ci_starts_with(ty, "c_u") or ci_starts_with(ty, "u")
+fn ci_int_type_is_unsigned(ty: &str): ci_starts_with(ty, "c_u") or ci_starts_with(ty, "u")
 
 // libclang reports an enumerator's value sign-extended from the enum's
 // width (clang_getEnumConstantDeclValue), so `0x80000000u` in an
@@ -3809,7 +3809,7 @@ fn ci_collect_object_macro_type_map(session: i64, macro_source: &str, cxx: bool 
     ci_prepare_clang_resource_dir()
     with_cimport_collect_object_macro_types(macro_source, names.to_str(), cxx)
 
-fn ci_collect_object_macro_values(session: i64) -> HashMap[str, str]:
+fn ci_collect_object_macro_values(session: i64):
     let count = with_cimport_macro_count(session)
     let values: HashMap[str, str] = [:]
     for i in 0..count:
@@ -4073,7 +4073,7 @@ fn ci_try_translate_offsetof_expr(session: i64, expr: &str) -> str:
         type_arg = expanded
     ci_offsetof_spelling(session, type_arg, args[1])
 
-fn ci_strip_c_type_qualifier_prefixes(raw: &str) -> str:
+fn ci_strip_c_type_qualifier_prefixes(raw: &str):
     var t = ci_trim(raw)
     var changed = true
     while changed:
@@ -4089,7 +4089,7 @@ fn ci_strip_c_type_qualifier_prefixes(raw: &str) -> str:
             changed = true
     t
 
-fn ci_strip_c_pointer_suffix(raw: &str) -> str:
+fn ci_strip_c_pointer_suffix(raw: &str):
     var t = ci_trim(raw)
     while t.len() > 0 and t[t.len() - 1] == 42:
         t = ci_trim(t.slice(0, t.len() - 1))
@@ -4371,7 +4371,7 @@ fn ci_macro_expands_empty(session: i64, indices: &HashMap[str, i32], index: i32,
 // one is the unit's own, emitted after them (§9.1c), never the shared defs'
 // (pcre2test's `cmdlistcount` is `sizeof(cmdlist) / sizeof(cmdstruct)`,
 // D119's `cmdlist.len()`, and `cmdlist` is static).
-fn ci_unit_var_names(type_session: i64) -> List[str]:
+fn ci_unit_var_names(type_session: i64):
     let names: List[str] = []
     for i in 0..with_cimport_decl_count(type_session):
         if with_cimport_decl_kind(type_session, i) != CK_VAR: continue
@@ -4914,7 +4914,7 @@ var g_ci_expr_scanned: i64 = 0
 // The macro whose body is being translated, so a spent budget names it.
 var g_ci_expr_subject = ""
 
-fn ci_expr_budget_spent(s: &str) -> bool:
+fn ci_expr_budget_spent(s: &str):
     g_ci_expr_scanned = g_ci_expr_scanned + s.len()
     g_ci_expr_scanned > CI_EXPR_SCAN_BUDGET
 
@@ -5416,7 +5416,7 @@ fn ci_find_char_op_at_depth0(s: &str, ch: i32) -> isize:
     -1
 
 // Scan identifier length at start of string. Returns 0 if no ident.
-fn ci_scan_ident(s: &str) -> isize:
+fn ci_scan_ident(s: &str):
     var i = 0
     while i < s.len():
         let c = s[i]
@@ -5979,10 +5979,10 @@ fn ci_type_is_unsigned_small_int(ty_str: &str) -> bool:
     if ty_str == "PCRE2_UCHAR8": return true
     false
 
-fn ci_shift_lhs_needs_integer_promotion(lhs_ty_str: &str, lhs_peeled_ty: &str, lhs_expr_ty_str: &str) -> bool:
+fn ci_shift_lhs_needs_integer_promotion(lhs_ty_str: &str, lhs_peeled_ty: &str, lhs_expr_ty_str: &str):
     ci_type_is_small_int(lhs_ty_str) or ci_type_is_small_int(lhs_peeled_ty) or ci_type_is_small_int(lhs_expr_ty_str)
 
-fn ci_binary_op_uses_c_integer_promotions(op: i32) -> bool:
+fn ci_binary_op_uses_c_integer_promotions(op: i32):
     op == BO_ADD or op == BO_SUB or op == BO_MUL or op == BO_DIV or op == BO_REM or op == BO_AND or op == BO_OR or op == BO_XOR
 
 fn ci_type_is_integer_shift_anchor(ty_str: &str) -> bool:
@@ -6405,7 +6405,7 @@ fn ci_map_c_op(op: &str) -> str:
     if op == ">>": return ">>"
     ""
 
-fn ci_is_comparison_op(op: &str) -> bool:
+fn ci_is_comparison_op(op: &str):
     op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">=" or op == "and" or op == "or"
 
 fn ci_map_sizeof_type(c_type: &str) -> str:
@@ -6467,7 +6467,7 @@ fn ci_render_sizeof_type(c_type: &str) -> str:
 
 // ── Constant expression evaluator ────────────────────────────
 
-fn ci_eval_const_expr(s: &str) -> str:
+fn ci_eval_const_expr(s: &str):
     ci_eval_const_expr_ctx(s, "")
 
 fn ci_decimal_digit(d: i64) -> str:
@@ -6486,7 +6486,7 @@ fn ci_trim_float_literal_zeros(raw: &str) -> str:
         end = end + 1
     with_str_clone_ref(raw.slice(0, end))
 
-fn ci_f64_decimal_literal(value: f64) -> str:
+fn ci_f64_decimal_literal(value: f64):
     var v = value
     var prefix = ""
     if v < 0.0:
@@ -6822,7 +6822,7 @@ fn ci_translate_comma_block(s: &str, params: &str, known: &str) -> str:
     // The last expression is the value of the block
     "{ " ++ exprs ++ " }"
 
-fn ci_find_last_comma_at_depth0(s: &str) -> isize:
+fn ci_find_last_comma_at_depth0(s: &str):
     var depth = 0
     var last_comma = -1
     var i = 0
@@ -7024,7 +7024,7 @@ fn ci_parse_i64(s: &str) -> i64:
         j = j + 1
     if is_neg: 0 -% n else: n
 
-fn ci_shl(a: i32, b: i32) -> i32:
+fn ci_shl(a: i32, b: i32):
     var result = a
     var count = b
     while count > 0:
@@ -7032,7 +7032,7 @@ fn ci_shl(a: i32, b: i32) -> i32:
         count = count - 1
     result
 
-fn ci_shr(a: i32, b: i32) -> i32:
+fn ci_shr(a: i32, b: i32):
     var result = a
     var count = b
     while count > 0:
@@ -7040,7 +7040,7 @@ fn ci_shr(a: i32, b: i32) -> i32:
         count = count - 1
     result
 
-fn ci_bitor(a: i32, b: i32) -> i32:
+fn ci_bitor(a: i32, b: i32):
     // Bit-by-bit OR using arithmetic
     var result: i32 = 0
     var aa = a
@@ -7058,7 +7058,7 @@ fn ci_bitor(a: i32, b: i32) -> i32:
         count = count + 1
     result
 
-fn ci_bitand(a: i32, b: i32) -> i32:
+fn ci_bitand(a: i32, b: i32):
     var result: i32 = 0
     var aa = a
     var bb = b
@@ -7075,7 +7075,7 @@ fn ci_bitand(a: i32, b: i32) -> i32:
         count = count + 1
     result
 
-fn ci_bitxor(a: i32, b: i32) -> i32:
+fn ci_bitxor(a: i32, b: i32):
     var result: i32 = 0
     var aa = a
     var bb = b
@@ -7094,7 +7094,7 @@ fn ci_bitxor(a: i32, b: i32) -> i32:
 
 // ── Type mapping ────────────────────────────────────────────
 
-fn ci_map_c_type(spelling: &str) -> str:
+fn ci_map_c_type(spelling: &str):
     ci_map_c_type_ctx(spelling, "")
 
 fn ci_map_c_type_ctx(spelling: &str, known_structs: &str) -> str:
@@ -7377,7 +7377,7 @@ type CiHoistedVarDecl {
     default_text: str = "",
 }
 
-fn ci_expr_temp_name(session: i64, cursor: i32, tag: &str) -> str:
+fn ci_expr_temp_name(session: i64, cursor: i32, tag: &str):
     let id = ci_temp_id_for_cursor(cursor)
     "__ci_expr_" ++ tag ++ "_" ++ i64_to_string(id)
 
@@ -7936,7 +7936,7 @@ fn ci_cursor_is_void_cstyle_cast(session: i64, cursor: i32) -> bool:
     ty == "void" or ty == "unit" or ty == "Unit"
 
 // The C expression at `cursor` has type `void` (a call of a void function).
-fn ci_cursor_value_is_void(session: i64, cursor: i32) -> bool:
+fn ci_cursor_value_is_void(session: i64, cursor: i32):
     let ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
     ty == "void" or ty == "unit" or ty == "Unit"
 
@@ -8396,10 +8396,10 @@ let CXT_Elaborated: i32 = 119
 let CXT_FunctionNoProto: i32 = 110
 let CXT_FunctionProto: i32 = 111
 
-fn ci_cxtype_kind_is_int(kind: i32) -> bool:
+fn ci_cxtype_kind_is_int(kind: i32):
     kind == CXT_Char_U or kind == CXT_UChar or kind == CXT_UShort or kind == CXT_UInt or kind == CXT_ULong or kind == CXT_ULongLong or kind == CXT_UInt128 or kind == CXT_Char_S or kind == CXT_SChar or kind == CXT_Short or kind == CXT_Int or kind == CXT_Long or kind == CXT_LongLong or kind == CXT_Int128
 
-fn ci_cxtype_kind_is_float(kind: i32) -> bool:
+fn ci_cxtype_kind_is_float(kind: i32):
     kind == CXT_Float or kind == CXT_Double or kind == CXT_LongDouble or kind == CXT_Float128 or kind == CXT_Half or kind == CXT_Float16
 
 // ci_type_from_libclang — walks a libclang CXType tree into
@@ -8665,7 +8665,7 @@ fn ci_type_text_is_fn_ptr(text: &str) -> bool:
     ci_starts_with(text, "fn(") or ci_starts_with(text, "unsafe fn(") or ci_starts_with(text, "extern \"C\" fn(") or ci_starts_with(text, "unsafe extern \"C\" fn(")
 
 // D102: `Option[<fn pointer>]` as a CiIR named type.
-fn ci_nullable_fn_type(types: CiTypePool, fnptr: CiTypeId) -> CiTypeId:
+fn ci_nullable_fn_type(types: CiTypePool, fnptr: CiTypeId):
     types.ty_named(types.add_string("Option[" ++ ci_print_type(types, fnptr) ++ "]"))
 
 // D102: the non-null type inside a nullable function-pointer type's text,
@@ -9033,10 +9033,10 @@ fn ci_record_cache_type_text(session: i64, ty_text: &str, ty: i32) -> str:
                 return canonical_translated
     f"#tyid:{ty}"
 
-fn ci_record_count_cache_key(session: i64, ty_key: &str) -> str:
+fn ci_record_count_cache_key(session: i64, ty_key: &str):
     f"{session}:{ty_key}"
 
-fn ci_record_field_cache_key(session: i64, ty_key: &str, field_idx: i32) -> str:
+fn ci_record_field_cache_key(session: i64, ty_key: &str, field_idx: i32):
     f"{session}:{ty_key}:{field_idx}"
 
 fn ci_record_count_cache_lookup(key: &str) -> i32:
@@ -10392,7 +10392,7 @@ fn ci_cursor_is_array_type(session: i64, cursor: i32) -> bool:
         return false
     ci_type_kind_is_array(with_ci_type_kind(session, with_ci_type_canonical(session, ty)))
 
-fn ci_type_kind_is_array(k: i32) -> bool:
+fn ci_type_kind_is_array(k: i32):
     k == CXT_ConstantArray or k == CXT_IncompleteArray or k == CXT_VariableArray or k == CXT_DependentSizedArray
 
 // Return the array element type as a With type string, or ""
@@ -10439,7 +10439,7 @@ fn ci_peel_transparent(session: i64, cursor: i32) -> i32:
         depth = depth + 1
     c
 
-fn ci_peel_transparent_and_cstyle(session: i64, cursor: i32) -> i32:
+fn ci_peel_transparent_and_cstyle(session: i64, cursor: i32):
     var c = ci_peel_transparent(session, cursor)
     var depth = 0
     while depth < 16 and with_ci_cursor_kind(session, c) == CXK_CSTYLE_CAST and with_ci_num_children(session, c) == 1:
@@ -14964,7 +14964,7 @@ fn ci_location_path(loc: &str) -> str:
 fn ci_array_elem_type(ty: &str): ci_array_text_elem(ty)
 
 
-fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
+fn ci_try_eval_var_init(session: i64, idx: i32):
     ci_try_eval_var_init_for_type(session, idx, "")
 
 fn ci_initializer_text_has_macro_reference(session: i64, text: &str) -> bool:
@@ -15017,7 +15017,7 @@ fn ci_option_fn_init_fixup(text: &str, ty: &str) -> str:
         return out ++ "]"
     with_str_clone_ref(text)
 
-fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: &str) -> str:
+fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: &str):
     // Evaluate a variable initializer using the actual declaration cursor,
     // not a name-based re-lookup that may bind a forward declaration.
     ci_eval_var_init_at(session, with_cimport_decl_cursor(session, idx), target_type)
@@ -15356,7 +15356,7 @@ fn ci_scope_restore(scope: CiScope, mark: CiScopeMark) -> CiScope:
                 (*scope.ptr).types.remove(key)
     scope
 
-fn ci_scope_add(scope: CiScope, name: &str) -> CiScope:
+fn ci_scope_add(scope: CiScope, name: &str):
     if name.len() > 0:
         ci_scope_note_name(scope, name)
         unsafe:
@@ -15435,7 +15435,7 @@ fn ci_realpath_cached(path: &str) -> str:
     g_ci_realpath_cache_values.push(with_str_clone_ref(resolved))
     resolved
 
-fn ci_goto_decl_suffix(session: i64, var_cursor: i32) -> str:
+fn ci_goto_decl_suffix(session: i64, var_cursor: i32):
     ci_goto_decl_suffix_from_location(with_ci_cursor_location(session, var_cursor), var_cursor)
 
 fn ci_goto_decl_suffix_from_location(loc: &str, fallback_id: i32) -> str:
@@ -15476,7 +15476,7 @@ fn ci_file_scope_var_is_declared(session: i64, name: &str) -> bool:
         if with_cimport_decl_kind(session, i) == CK_VAR and with_cimport_decl_name(session, i) == name: return true
     false
 
-fn ci_var_decl_is_static_local(session: i64, cursor: i32) -> bool:
+fn ci_var_decl_is_static_local(session: i64, cursor: i32):
     with_ci_cursor_kind(session, cursor) == CXK_VAR_DECL and with_ci_cursor_storage_class(session, cursor) == CX_SC_STATIC
 
 fn ci_goto_hoisted_var_name(session: i64, var_cursor: i32) -> str:
@@ -15979,7 +15979,7 @@ fn ci_fn_definition_cursor(session: i64, decl_idx: i32) -> i32:
         return -1
     found_cursor
 
-fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
+fn ci_try_translate_fn_body(session: i64, decl_idx: i32):
     ci_try_translate_fn_body_at(session, decl_idx, ci_fn_definition_cursor(session, decl_idx))
 
 // #1878: the module-level declarations a body's locals need (the record
@@ -16025,7 +16025,7 @@ fn ci_hoist_compound_literal_record(session: i64, literal_cursor: i32) -> bool:
         g_ci_body_hoisted_decls = g_ci_body_hoisted_decls ++ rendered
     true
 
-fn ci_take_body_hoisted_decls() -> str:
+fn ci_take_body_hoisted_decls():
     let taken = g_ci_body_hoisted_decls
     g_ci_body_hoisted_decls = ""
     taken
@@ -16034,7 +16034,7 @@ fn ci_take_body_hoisted_decls() -> str:
 // function may be rendered without `-> Unit` (ci_def_ret_suffix).
 var g_ci_body_tail_unit = false
 
-fn ci_take_body_tail_unit() -> bool:
+fn ci_take_body_tail_unit():
     let taken = g_ci_body_tail_unit
     g_ci_body_tail_unit = false
     taken
@@ -16179,7 +16179,7 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
 
 // ── String helpers ──────────────────────────────────────────
 
-fn ci_trim(s: &str) -> str:
+fn ci_trim(s: &str):
     var start = 0
     var end = s.len()
     while start < end and ci_is_space(s[start]):
@@ -16191,7 +16191,7 @@ fn ci_trim(s: &str) -> str:
 fn ci_is_space(c: i32) -> bool:
     c == 32 or c == 9 or c == 10 or c == 13
 
-fn ci_starts_with(s: &str, prefix: &str) -> bool:
+fn ci_starts_with(s: &str, prefix: &str):
     ci_str_matches_at(s, 0, prefix)
 
 fn ci_str_matches_at(text: &str, pos: i32, needle: &str) -> bool:
@@ -16413,7 +16413,7 @@ fn ci_c_int_type_width(t: &str) -> i32:
     if t == "i64" or t == "u64" or t == "isize" or t == "usize" or t == "c_long" or t == "c_ulong" or t == "c_longlong" or t == "c_ulonglong": return 64
     0
 
-fn ci_c_int_type_is_unsigned(t: &str) -> bool:
+fn ci_c_int_type_is_unsigned(t: &str):
     t == "u8" or t == "u16" or t == "u32" or t == "u64" or t == "usize" or t == "c_uchar" or t == "c_ushort" or t == "c_uint" or t == "c_ulong" or t == "c_ulonglong"
 
 // The integer type of a translated operand, or "" when it has none of its own.
@@ -16441,7 +16441,7 @@ fn ci_translated_int_type(text: &str) -> str:
 
 // `lhs op rhs` with C's operand conversions. An arithmetic or bitwise
 // operator's result has the common type; a comparison's is a bool.
-fn ci_c_binary(lhs: &str, op: &str, rhs: &str) -> str:
+fn ci_c_binary(lhs: &str, op: &str, rhs: &str):
     let lt = ci_translated_int_type(lhs)
     let rt = ci_translated_int_type(rhs)
     var l = with_str_clone_ref(lhs)
@@ -16542,7 +16542,7 @@ fn ci_int_literal_exceeds_i64(digits: &str) -> bool:
         return true
     digits.slice(j, digits.len()) > "9223372036854775807"
 
-fn ci_strip_int_suffix(s: &str) -> str:
+fn ci_strip_int_suffix(s: &str):
     var end = s.len()
     while end > 0:
         let c = s[(end - 1)]
@@ -16552,7 +16552,7 @@ fn ci_strip_int_suffix(s: &str) -> str:
             break
     s.slice(0, end)
 
-fn ci_strip_parens(s: &str) -> str:
+fn ci_strip_parens(s: &str):
     var result = with_str_clone_ref(s)
     while result.len() >= 2 and result[0] == 40 and result[result.len() - 1] == 41:
         // Verify the outer parens actually match (not just first/last chars)
@@ -16780,7 +16780,7 @@ fn ci_char_to_int(s: &str) -> str:
 
 // ── String concatenation support ────────────────────────────
 
-fn ci_strip_c_comments(s: &str) -> str:
+fn ci_strip_c_comments(s: &str):
     let parts: List[str] = []
     var i = 0
     var segment_start = 0
@@ -16921,13 +16921,13 @@ fn ci_concat_is_pure_literals(s: &str) -> bool:
         i = end
     saw
 
-fn ci_byte_to_hex_escape(value: i32) -> str:
+fn ci_byte_to_hex_escape(value: i32):
     let hex = "0123456789abcdef"
     let hi = (value >> 4) & 15
     let lo = value & 15
     "\\x" ++ hex.slice(hi, (hi + 1)) ++ hex.slice(lo, (lo + 1))
 
-fn ci_quote_evaluated_c_string(s: &str) -> str:
+fn ci_quote_evaluated_c_string(s: &str):
     var result = "\""
     var i = 0
     while i < s.len():
@@ -16949,7 +16949,7 @@ fn ci_quote_evaluated_c_string(s: &str) -> str:
         i = i + 1
     result ++ "\""
 
-fn ci_is_byte_array_element_type(elem_ty: &str) -> bool:
+fn ci_is_byte_array_element_type(elem_ty: &str):
     let t = ci_trim(elem_ty)
     t == "u8" or t == "i8" or t == "c_char" or t == "c_schar" or t == "c_uchar"
 
@@ -17135,7 +17135,7 @@ fn ci_text_before_top_comma(s: &str) -> str:
         i = i + 1
     with_str_clone_ref(s)
 
-fn ci_concat_strings(s: &str) -> str:
+fn ci_concat_strings(s: &str):
     // Concatenate adjacent string literals "foo" "bar" -> "foobar"
     var result = "\""
     var i = 0
@@ -17297,7 +17297,7 @@ fn ci_source_has_pp_directive(src: &str) -> bool:
         i = i + 1
     false
 
-fn ci_pp_digit(v: i32) -> str: "01234567".slice(v, (v + 1))
+fn ci_pp_digit(v: i32): "01234567".slice(v, (v + 1))
 fn ci_pp_dec(c: i32) -> i32: c - 48
 
 // #889: resolve #if/#ifdef/#ifndef/#elif/#else/#endif inside an initializer's
@@ -17435,7 +17435,7 @@ fn ci_macro_is_fn_like_name(session: i64, name: &str) -> i32:
 // callers surface their existing not-recoverable handling loudly (stringify
 // chains have their own dedicated path). Depth-capped against
 // self-referential macros.
-fn ci_expand_macros_in_text(session: i64, text: &str) -> str:
+fn ci_expand_macros_in_text(session: i64, text: &str):
     ci_expand_macros_in_text_depth(session, text, 0)
 
 fn ci_expand_macros_in_text_depth(session: i64, text: &str, depth: i32) -> str:
@@ -17780,7 +17780,7 @@ fn ci_preprocessed_string_sequence_for_cursor(session: i64, cursor: i32, raw_src
 
 // Expand inner macro references in a stringify argument.
 // For each identifier token, if it's a non-fn macro, substitute its value.
-fn ci_expand_stringify_args(session: i64, args: &str) -> str:
+fn ci_expand_stringify_args(session: i64, args: &str):
     var result = ""
     var pos = 0
     let alen = args.len()
@@ -17848,7 +17848,7 @@ fn ci_expand_string_macro_token(session: i64, token: &str, depth: i32) -> str:
         return ci_expand_string_macro_sequence_depth(session, macro_value, depth + 1)
     ""
 
-fn ci_expand_string_macro_sequence(session: i64, s: &str) -> str:
+fn ci_expand_string_macro_sequence(session: i64, s: &str):
     ci_expand_string_macro_sequence_depth(session, s, 0)
 
 fn ci_expand_string_macro_sequence_depth(session: i64, s: &str, depth: i32) -> str:
@@ -17973,7 +17973,7 @@ fn ci_array_length_from_type(ty: &str) -> i32:
         return -1
     ci_parse_i64(len_text) as i32
 
-fn ci_split_top_level_items(s: &str) -> List[str]:
+fn ci_split_top_level_items(s: &str):
     let parts: List[str] = []
     var paren_depth = 0
     var bracket_depth = 0
@@ -18014,10 +18014,10 @@ fn ci_split_top_level_items(s: &str) -> List[str]:
         i = i + 1
     parts
 
-fn ci_translate_c_initializer_for_type(session: i64, init_src: &str, ty: &str) -> str:
+fn ci_translate_c_initializer_for_type(session: i64, init_src: &str, ty: &str):
     ci_translate_c_initializer_for_cursor_type(session, init_src, ty, -1, -1)
 
-fn ci_c_initializer_cast_type_is_void_ptr(cast_type: &str) -> bool:
+fn ci_c_initializer_cast_type_is_void_ptr(cast_type: &str):
     var compact = ""
     var i = 0
     while i < cast_type.len():
@@ -18549,7 +18549,7 @@ fn ci_macro_body_initializer_param_from_cursor(session: i64, var_cursor: i32) ->
         return init
     ""
 
-fn ci_var_init_expr_from_decl_source(session: i64, var_cursor: i32) -> str:
+fn ci_var_init_expr_from_decl_source(session: i64, var_cursor: i32):
     ci_var_init_expr_from_decl_source_for_type(session, var_cursor, "")
 
 fn ci_var_init_expr_from_preprocessed_cursor_for_type(session: i64, var_cursor: i32, target_type: &str) -> str:
@@ -18684,7 +18684,7 @@ fn ci_var_init_translation_is_valid(vty_str: &str, init_expr: &str) -> bool:
             return false
     true
 
-fn ci_var_init_expr(session: i64, var_cursor: i32, scope: CiScope) -> str:
+fn ci_var_init_expr(session: i64, var_cursor: i32, scope: CiScope):
     ci_var_init_expr_for_type(session, var_cursor, scope, "")
 
 fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, target_type: &str) -> str:
@@ -18907,13 +18907,13 @@ fn ci_collect_va_started_decls(session: i64, cursor: i32) -> bool:
         i = i + 1
     true
 
-fn ci_get_bail_location() -> str:
+fn ci_get_bail_location():
     g_ci_bail_location
 
-fn ci_get_bail_kind() -> i32:
+fn ci_get_bail_kind():
     g_ci_bail_kind
 
-fn ci_get_bail_message() -> str:
+fn ci_get_bail_message():
     g_ci_bail_message
 
 fn ci_clear_bail_location():
@@ -18922,7 +18922,7 @@ fn ci_clear_bail_location():
     g_ci_bail_message = ""
     return
 
-fn ci_fn_var_names_contains(name: &str) -> bool:
+fn ci_fn_var_names_contains(name: &str):
     let needle = "|" ++ name ++ "|"
     ci_str_contains(g_ci_fn_var_names, needle)
 
@@ -19094,7 +19094,7 @@ fn ci_cursor_is_null_like(session: i64, cursor: i32) -> bool:
 
 // Whether `cursor`, through parentheses and implicit casts, is a reference
 // spelled `name`.
-fn ci_cursor_names(session: i64, cursor: i32, name: &str) -> bool: ci_lvalue_names(session, ci_peel_transparent(session, cursor), name)
+fn ci_cursor_names(session: i64, cursor: i32, name: &str): ci_lvalue_names(session, ci_peel_transparent(session, cursor), name)
 
 // Calls whose return the program never sees: a NULL branch that ends in one
 // is a contract violation, not a handled case (D107: `assert(p)`).
@@ -19230,14 +19230,14 @@ fn ci_param_only_called(session: i64, cursor: i32, name: &str, as_test: bool) ->
 //   `assign:<name>`                the global `name` assigned (§31.8.6)
 //   `calls:<callee>`               a function called by name
 // `params` are the enclosing definition's parameter names.
-fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]):
     ci_body_call_evidence_walk(session, cursor, params, ci_own_collect_locals(session, cursor), ci_frame_records(session, cursor, params))
 
 // The names a store into whose field stays in the frame: the frame's locals
 // and the parameters, less every one the body uses as a whole value (the
 // record assigned somewhere, returned, or passed by value: a copy that can
 // outlive the call). Its address taken is not such a use.
-fn ci_frame_records(session: i64, cursor: i32, params: &List[str]) -> List[str]:
+fn ci_frame_records(session: i64, cursor: i32, params: &List[str]):
     let copied = ci_whole_value_uses(session, cursor)
     let frame = []
     for name in ci_frame_locals(session, cursor):
@@ -19392,7 +19392,7 @@ fn ci_body_call_evidence_walk(session: i64, cursor: i32, params: &List[str], loc
 // Through parentheses, implicit casts and C-style casts. A C-style cast to
 // a named type has two children, the type reference and the operand (last);
 // ci_peel_transparent_and_cstyle peels only the one-child form.
-fn ci_own_peel(session: i64, cursor: i32) -> i32:
+fn ci_own_peel(session: i64, cursor: i32):
     var c = ci_peel_transparent(session, cursor)
     var depth = 0
     while depth < 16 and with_ci_cursor_kind(session, c) == CXK_CSTYLE_CAST and with_ci_num_children(session, c) >= 1:
@@ -19424,7 +19424,7 @@ fn ci_own_place_root(session: i64, cursor: i32, params: &List[str], locals: &Lis
         if op == BO_ADD or op == BO_SUB: return ci_own_place_root(session, with_ci_child(session, c, 0), params, locals)
     "mixed"
 
-fn ci_own_root_is_value(root: &str) -> bool: root.starts_with("param:") or root.starts_with("local:")
+fn ci_own_root_is_value(root: &str): root.starts_with("param:") or root.starts_with("local:")
 
 // The <src> of a value expression.
 fn ci_own_source(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
@@ -19910,7 +19910,7 @@ impl CiVaScan:
         lines
 
 // The `fv`, `vc` and `vk` lines of one function definition.
-fn ci_va_store_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+fn ci_va_store_evidence(session: i64, cursor: i32, params: &List[str]):
     let scan = CiVaScan { out: "", selector: "", cases: "", reads: 0, open: false, switch_body: -1, params: [], lists_read: "" }
     for name in params: scan.params.push(name.to_owned())
     scan.walk(session, cursor, 0)
@@ -20088,7 +20088,7 @@ fn ci_pf_events(session: i64, cursor: i32, scan: &CiPointeeScan, params: &List[s
 // function was handed is followed like a field's: its source is `@<i>`, the
 // parameter's index, so a caller that passes a field's pointer here reads
 // this function's lines for that parameter.
-fn ci_field_pointee_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+fn ci_field_pointee_evidence(session: i64, cursor: i32, params: &List[str]):
     let scan = CiPointeeScan { names: [], sources: [], locals: [] }
     var pi = 0
     for name in params:
@@ -20225,7 +20225,7 @@ fn ci_fp_init_list_writes(session: i64, list: i32, record: &str, loc: &str) -> s
 //                        pointer: an index, pointer arithmetic, the address
 //                        of a part (`&p->f`), the parameter stored,
 //                        returned, cast, or copied to a local
-fn ci_value_record_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+fn ci_value_record_evidence(session: i64, cursor: i32, params: &List[str]):
     ci_value_record_walk(session, cursor, params, 0)
 
 // The parameter a bare reference names, or -1.
@@ -20302,7 +20302,7 @@ fn ci_value_record_walk(session: i64, cursor: i32, params: &List[str], mode: i32
         i = i + 1
     out
 
-fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]):
     let locals = ci_own_collect_locals(session, cursor)
     ci_own_walk(session, cursor, params, locals, ci_frame_records(session, cursor, params)) ++ ci_init_shape_evidence(session, cursor, params)
 
@@ -20593,15 +20593,15 @@ fn ci_var_initializer_alias(session: i64, cursor: i32) -> str:
     if ci_own_is_libc_allocator(name) or ci_own_is_libc_free(name): name else: ""
 
 // C's allocators: a pointer they return is fresh and owned by the caller.
-fn ci_own_is_libc_allocator(name: &str) -> bool:
+fn ci_own_is_libc_allocator(name: &str):
     name == "malloc" or name == "calloc" or name == "realloc" or name == "strdup" or name == "strndup" or name == "aligned_alloc" or name == "valloc" or name == "reallocarray"
 
-fn ci_own_is_libc_free(name: &str) -> bool: name == "free"
+fn ci_own_is_libc_free(name: &str): name == "free"
 
 // Library functions that read their pointer arguments and keep nothing: a
 // value passed to one is not retained. Everything else outside the corpus
 // is taken to retain what it is handed (the asymmetry rule, §16.2b.2).
-fn ci_own_is_libc_observer(name: &str) -> bool:
+fn ci_own_is_libc_observer(name: &str):
     name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "sscanf" or name == "fscanf" or name == "ungetc" or name == "strcoll" or name == "strspn" or name == "strcspn" or name == "strpbrk" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
 
 // Whether the body at `cursor` assigns a file-scope variable whose type is
@@ -20644,7 +20644,7 @@ fn ci_body_assigns_to(session: i64, cursor: i32, name: &str) -> bool:
 // whose callee resolves to a member of the setjmp/longjmp family. The
 // macro forms (`setjmp`, `sigsetjmp`) expand to the underscore/builtin
 // spellings after preprocessing, so all of them are matched.
-fn ci_is_setjmp_longjmp_name(name: &str) -> bool:
+fn ci_is_setjmp_longjmp_name(name: &str):
     name == "setjmp" or name == "_setjmp" or name == "sigsetjmp" or name == "__sigsetjmp" or name == "longjmp" or name == "_longjmp" or name == "siglongjmp" or name == "__builtin_setjmp" or name == "__builtin_longjmp"
 
 // Find the first setjmp/longjmp-family call cursor in a subtree, or -1.
@@ -21706,7 +21706,7 @@ impl CiStmtPool:
             return 0
         self.stack_emit_stmt_block(ids)
 
-fn ci_native_goto_fail(msg: &str) -> CiStmtId:
+fn ci_native_goto_fail(msg: &str):
     g_ci_bail_kind = CXK_GOTO_STMT
     g_ci_bail_message = with_str_clone_ref(msg)
     0 as CiStmtId
@@ -21720,7 +21720,7 @@ impl CiStmtPool:
             block = block + 1
         labels
 
-fn ci_native_goto_collect_leaf_ids(cfg: &CiGotoCfg, block: i32) -> List[i32]:
+fn ci_native_goto_collect_leaf_ids(cfg: &CiGotoCfg, block: i32):
     let out: List[i32] = []
     var i: i64 = 0
     while i < cfg.stmt_ids.len():
@@ -22152,7 +22152,7 @@ fn ci_generic_type_key(text: &str) -> str:
     out
 
 // The segments of a parenthesized list at depth 0, split at `sep`.
-fn ci_split_top_level(text: &str, sep: u8) -> List[str]:
+fn ci_split_top_level(text: &str, sep: u8):
     let parts: List[str] = []
     var depth = 0
     var start = 0
@@ -22231,7 +22231,7 @@ fn ci_generic_key_is_bare_name(key: &str) -> bool:
     ci_is_ident_start(key[0])
 
 // C's one-word builtin type names.
-fn ci_generic_key_is_builtin(key: &str) -> bool:
+fn ci_generic_key_is_builtin(key: &str):
     key == "int" or key == "char" or key == "short" or key == "long" or key == "float" or key == "double" or key == "void" or key == "_Bool" or key == "bool"
 
 fn ci_generic_selection_selected(session: i64, cursor: i32) -> i32:
@@ -22377,7 +22377,7 @@ fn ci_fold_int_ok(session: i64, cursor: i32) -> bool:
         return false
     not ci_source_names_offsetof(session, with_ci_cursor_source_text(session, cursor)) and not ci_subtree_has_member_addr(session, cursor) and not ci_subtree_has_sizeof_ratio(session, cursor)
 
-fn ci_source_names_offsetof(session: i64, src: &str) -> bool:
+fn ci_source_names_offsetof(session: i64, src: &str):
     src.contains("offsetof") or ci_source_names_offsetof_macro(session, src)
 
 // `offsetof(T, f)` / `__builtin_offsetof(T, f)` spelled at this cursor
@@ -22399,7 +22399,7 @@ fn ci_expr_children_need_rvalue_lowering(session: i64, cursor: i32) -> bool:
         i = i + 1
     false
 
-fn ci_decl_name_matches_type(decl_name: &str, ty_name: &str) -> bool:
+fn ci_decl_name_matches_type(decl_name: &str, ty_name: &str):
     decl_name == ty_name or ci_escape_reserved(decl_name) == ty_name
 
 fn ci_struct_field_emitted_name(session: i64, idx: i32, fi: i32) -> str:
@@ -22610,7 +22610,7 @@ fn ci_get_nth_pipe_entry(entries: &str, n: i32) -> str:
     ""
 
 // Check if a source location path is a system header.
-fn ci_is_system_path(loc: &str) -> bool: cimport_path_is_system(loc)
+fn ci_is_system_path(loc: &str): cimport_path_is_system(loc)
 
 pub let CI_LIBC_KIND_FN: i32 = 1
 pub let CI_LIBC_KIND_VAR: i32 = 2
@@ -22733,7 +22733,7 @@ fn ci_is_libm_fn(name: &str) -> bool: math_fn_lookup(name) >= 0
 
 // C99 <math.h> functions std.libc binds by name (#2680): the ones outside
 // the builtin table, each with its `f` form.
-fn ci_is_libc_math_fn(name: &str) -> bool:
+fn ci_is_libc_math_fn(name: &str):
     let base = if name.ends_with("f") and name != "modf": name.slice(0, name.len() - 1) else: name
     base == "fma" or base == "fmin" or base == "fmax" or base == "fdim" or base == "nextafter" or base == "remainder" or
         base == "ldexp" or base == "scalbn" or base == "frexp" or base == "modf" or base == "logb" or base == "ilogb" or

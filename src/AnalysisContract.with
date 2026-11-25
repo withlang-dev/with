@@ -60,14 +60,14 @@ fn contract_site(sema: &Sema, decl: i32, source_path: &str, source_text: &str) -
         source: if source.len() > 0: source else: with_str_clone_ref(source_text),
     }
 
-fn contract_line(source: &str, offset: i32) -> i32:
+fn contract_line(source: &str, offset: i32):
     var line: i32 = 1
     let stop = if offset < source.len() as i32: offset else: source.len() as i32
     for i in 0..stop:
         if source[i] == '\n': line = line + 1
     line
 
-fn contract_column(source: &str, offset: i32) -> i32:
+fn contract_column(source: &str, offset: i32):
     var start: i32 = if offset - 1 < source.len(): offset - 1 else: (source.len() - 1) as i32
     while start >= 0 and source[start] != '\n':
         start = start - 1
@@ -199,7 +199,7 @@ fn contract_site_analyzed(site: &ContractSite) -> str:
         if not line.starts_with("//"): break
     ""
 
-fn contract_rule_at(sema: &Sema, rule: i32) -> str:
+fn contract_rule_at(sema: &Sema, rule: i32):
     let di = sema.facade_rule_profile_decl(rule)
     let site = contract_site(sema, di, "", "")
     f"profile:{sema.facade_rule_profile_name(rule)}:{sema.facade_rule_name(rule)}@{site.path}:{contract_node_line(sema, site, rule)}"
@@ -210,7 +210,7 @@ fn contract_item_profile_rule(sema: &Sema, item: i32) -> i32:
     if sema.ast.kind(item) != NodeKind.NK_FACADE_FN or sema.ast.get_data2(item) == 0: return 0
     facade_clause_profile_rule(sema.ast, sema.ast.get_extra(sema.ast.get_data1(item)))
 
-fn contract_item_at(sema: &Sema, site: &ContractSite, what: &str, item: i32) -> str:
+fn contract_item_at(sema: &Sema, site: &ContractSite, what: &str, item: i32):
     f"clause:{what}@{site.path}:{contract_node_line(sema, site, item)}"
 
 // The provenance a fact row ends with: what stands between its last `  [`
@@ -259,9 +259,9 @@ fn contract_clause(sema: &Sema, item: i32, kind: i32, nth: i32) -> i32:
 
 // The `from` clause naming producer `p`, by its position among the `from`
 // clauses (parallel to FacadeResource.producers).
-fn contract_from_clause(sema: &Sema, item: i32, pi: i32) -> i32: contract_clause(sema, item, FACADE_CLAUSE_FROM, pi)
+fn contract_from_clause(sema: &Sema, item: i32, pi: i32): contract_clause(sema, item, FACADE_CLAUSE_FROM, pi)
 
-fn contract_fact(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, flags: i32, node: i32, symbol: i32, owner: i32, index: i32, name: &str, detail: &str) -> i32:
+fn contract_fact(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, flags: i32, node: i32, symbol: i32, owner: i32, index: i32, name: &str, detail: &str):
     let fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.ForeignContract)
     fact.id = report.facts.len() as i32
     fact.parent = parent
@@ -284,11 +284,11 @@ fn contract_fact(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, p
 
 // A fact row: `key: value  [provenance]`, flagged CONTRACT_DEFAULT when the
 // provenance is a conservative default rather than a clause.
-fn contract_row(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, class: i32, node: i32, symbol: i32, owner: i32, index: i32, key: &str, value: &str, provenance: &str) -> i32:
+fn contract_row(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, class: i32, node: i32, symbol: i32, owner: i32, index: i32, key: &str, value: &str, provenance: &str):
     let flags = class | CONTRACT_FACT | (if provenance.starts_with("default:"): CONTRACT_DEFAULT else: 0)
     contract_fact(report, sema, site, parent, flags, node, symbol, owner, index, key, key ++ ": " ++ value ++ "  [" ++ provenance ++ "]")
 
-fn contract_join(parts: &List[str], sep: &str) -> str:
+fn contract_join(parts: &List[str], sep: &str):
     var out = ""
     for i in 0..parts.len():
         out = out ++ (if i > 0: with_str_clone_ref(sep) else: "") ++ parts[i]
@@ -304,7 +304,7 @@ fn contract_push_unique(xs0: List[str], x: &str) -> List[str]:
 // A list of operations for the view. Compiler runtime seams (`with_*`, which
 // no user program calls) are counted, not named, so a library's own
 // operations stay readable.
-fn contract_list(names: &List[str], empty: &str) -> str:
+fn contract_list(names: &List[str], empty: &str):
     let shown: List[str] = []
     var seams = 0
     for name in names:
@@ -320,10 +320,10 @@ fn contract_param(sema: &Sema, fn_sym: i32, pi: i32) -> str:
     if sig < 0 or pi < 0 or pi >= sema.sig_get_param_count(sig): return f"param {pi}"
     sema.facade_param_display(fn_sym, sig, pi)
 
-fn contract_resource_name(sema: &Sema, ri: isize) -> str: sema.safe_symbol_text(sema.facade_resources[ri].name)
+fn contract_resource_name(sema: &Sema, ri: isize): sema.safe_symbol_text(sema.facade_resources[ri].name)
 
 // The resources a parameter receives, as `Database` / `Database|Statement`.
-fn contract_received(sema: &Sema, fn_sym: i32, pi: i32) -> str:
+fn contract_received(sema: &Sema, fn_sym: i32, pi: i32):
     let recv = sema.facade_param_receives(fn_sym, pi)
     let names: List[str] = []
     for recv_item in recv: names.push(contract_resource_name(sema, recv_item))
@@ -802,7 +802,7 @@ fn analysis_collect_foreign_contracts(mut report: AnalysisReport, sema: &Sema, s
 // are unchanged — and an explicit `lend` records the author's review and
 // silences it.
 
-fn contract_destroy_words() -> List[str]:
+fn contract_destroy_words():
     let words: List[str] = []
     for w in ["close", "free", "destroy", "release", "finalize", "delete", "unref", "dispose", "dealloc", "shutdown", "terminate", "term", "fini", "deinit", "teardown", "cleanup", "kill", "end", "finish", "exit"]:
         words.push(with_str_clone_ref(w))
@@ -826,7 +826,7 @@ fn contract_name_resembles_destroyer(name: &str) -> str:
         i = i + 1
     ""
 
-fn contract_where(site: &ContractSite, sema: &Sema, node: i32) -> str: f"{site.path}:{contract_node_line(sema, site, node)}"
+fn contract_where(site: &ContractSite, sema: &Sema, node: i32): f"{site.path}:{contract_node_line(sema, site, node)}"
 
 fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     var advisories = 0
@@ -1057,7 +1057,7 @@ fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path:
 // its fact rows indented beneath it. What a reader sees is exactly the row
 // text a `select:kind=foreign-contract` query returns.
 
-fn contract_view_render(report: &AnalysisReport) -> str:
+fn contract_view_render(report: &AnalysisReport):
     let lines: List[str] = []
     lines.push("foreign-contract view\tv1\n")
     var subjects = 0

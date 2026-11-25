@@ -14293,7 +14293,7 @@ fn sema_regex_hex_digit_value(ch: i32) -> i32:
         return ch - 55
     -1
 
-fn sema_regex_decode_literal_escapes(text: &str) -> str:
+fn sema_regex_decode_literal_escapes(text: &str):
     var out = ""
     let len = text.len()
     var i = 0
@@ -15520,7 +15520,7 @@ fn sema_operator_primitive_name(op: i32) -> str:
     ""
 
 // §4.2.2/§4.2.3: the arithmetic operators, checked, wrapping and saturating.
-fn sema_binary_op_is_arithmetic(op: i32) -> bool:
+fn sema_binary_op_is_arithmetic(op: i32):
     op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD or
         op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP or
         op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT
@@ -26312,7 +26312,7 @@ fn sema_accessor_char_lower(ch: i32) -> str:
         return str_from_byte(ch + 32)
     str_from_byte(ch)
 
-fn sema_accessor_snake_name(name: &str) -> str:
+fn sema_accessor_snake_name(name: &str):
     var result = ""
     var prev_lower = false
     var prev_upper = false
@@ -42560,10 +42560,10 @@ enum PlaceMut: i32:
 fn pack_place(kind: i32, mut_state: i32) -> i64:
     (kind as i64) * 4294967296 + (mut_state as i64)
 
-fn unpack_place_kind(packed: i64) -> i32:
+fn unpack_place_kind(packed: i64):
     (packed / 4294967296) as i32
 
-fn unpack_place_mut(packed: i64) -> i32:
+fn unpack_place_mut(packed: i64):
     (packed % 4294967296) as i32
 
 impl Sema:
@@ -44082,7 +44082,7 @@ impl Sema:
             return self.method_lookup.fn_lookup.get(key).unwrap()
         self.unique_visible_extension_fn(type_sym, method_sym)
 
-fn sema_module_display_name(path: &str) -> str:
+fn sema_module_display_name(path: &str):
     var start = 0
     for i in 0..path.len():
         let ch = path[i]
@@ -44831,7 +44831,7 @@ impl Sema:
 
 // §13.3 (#1746): the operations std.traits defines over any Iter[T], by
 // their method names.
-fn sema_iter_adapter_name(name: &str) -> bool:
+fn sema_iter_adapter_name(name: &str):
     name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "skip" or name == "take_while" or name == "skip_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position" or name == "sum" or name == "product" or name == "min" or name == "max" or name == "min_by" or name == "max_by" or name == "reduce" or name == "partition" or name == "unzip" or name == "flat_map" or name == "zip_with" or name == "chunks" or name == "windows" or name == "dedup" or name == "unique" or name == "intersperse" or name == "scan" or name == "flatten" or name == "peekable" or name == "sorted" or name == "sorted_by" or name == "group_by"
 
 impl Sema:

@@ -43,7 +43,7 @@ fn lsp_write_response(json: &str):
     with_write_stdout(json)
     with_flush_stdout()
 
-fn lsp_parse_int(s: &str) -> i32:
+fn lsp_parse_int(s: &str):
     var result: i32 = 0
     var started = false
     for i in 0..s.len():
@@ -333,7 +333,7 @@ fn json_unescape(s: &str) -> str:
             i = i + 1
     out
 
-fn json_escape(s: &str) -> str:
+fn json_escape(s: &str):
     var out = ""
     for i in 0..s.len():
         let ch = s[i]
@@ -368,49 +368,49 @@ fn lsp_find_substr(haystack: &str, needle: &str) -> i32:
 
 // ── JSON builders (avoid f-string brace complexity) ──────────
 
-fn jobj_start() -> str:
+fn jobj_start():
     str_from_byte(123)
 
-fn jobj_end() -> str:
+fn jobj_end():
     str_from_byte(125)
 
-fn jarr_start() -> str:
+fn jarr_start():
     "["
 
-fn jarr_end() -> str:
+fn jarr_end():
     "]"
 
-fn jkv_str(key: &str, val: &str) -> str:
+fn jkv_str(key: &str, val: &str):
     "\"" ++ key ++ "\":\"" ++ json_escape(val) ++ "\""
 
-fn jkv_int(key: &str, val: i32) -> str:
+fn jkv_int(key: &str, val: i32):
     "\"" ++ key ++ "\":" ++ int_to_string(val)
 
-fn jkv_raw(key: &str, val: &str) -> str:
+fn jkv_raw(key: &str, val: &str):
     "\"" ++ key ++ "\":" ++ val
 
-fn jkv_null(key: &str) -> str:
+fn jkv_null(key: &str):
     "\"" ++ key ++ "\":null"
 
 fn jkv_bool(key: &str, val: bool) -> str:
     "\"" ++ key ++ "\":" ++ (if val: "true" else: "false")
 
-fn jpos(line: i32, col: i32) -> str:
+fn jpos(line: i32, col: i32):
     jobj_start() ++ jkv_int("line", line) ++ "," ++ jkv_int("character", col) ++ jobj_end()
 
-fn jrange(sl: i32, sc: i32, el: i32, ec: i32) -> str:
+fn jrange(sl: i32, sc: i32, el: i32, ec: i32):
     jobj_start() ++ jkv_raw("start", jpos(sl, sc)) ++ "," ++ jkv_raw("end", jpos(el, ec)) ++ jobj_end()
 
-fn jrpc_result(id: i32, result: &str) -> str:
+fn jrpc_result(id: i32, result: &str):
     jobj_start() ++ jkv_str("jsonrpc", "2.0") ++ "," ++ jkv_int("id", id) ++ "," ++ jkv_raw("result", result) ++ jobj_end()
 
-fn jrpc_result_null(id: i32) -> str:
+fn jrpc_result_null(id: i32):
     jobj_start() ++ jkv_str("jsonrpc", "2.0") ++ "," ++ jkv_int("id", id) ++ "," ++ jkv_null("result") ++ jobj_end()
 
-fn jrpc_notification(method: &str, params: &str) -> str:
+fn jrpc_notification(method: &str, params: &str):
     jobj_start() ++ jkv_str("jsonrpc", "2.0") ++ "," ++ jkv_str("method", method) ++ "," ++ jkv_raw("params", params) ++ jobj_end()
 
-fn jrpc_error(id: i32, code: i32, message: &str) -> str:
+fn jrpc_error(id: i32, code: i32, message: &str):
     let err = jobj_start() ++ jkv_int("code", code) ++ "," ++ jkv_str("message", message) ++ jobj_end()
     jobj_start() ++ jkv_str("jsonrpc", "2.0") ++ "," ++ jkv_int("id", id) ++ "," ++ jkv_raw("error", err) ++ jobj_end()
 
@@ -634,7 +634,7 @@ fn uri_to_path(uri: &str) -> str:
 
 // ── Line/column utilities ────────────────────────────────────
 
-fn lsp_offset_to_line(text: &str, offset: isize) -> i32:
+fn lsp_offset_to_line(text: &str, offset: isize):
     var line: i32 = 0
     var i = 0
     while i < offset and i < text.len():
@@ -643,7 +643,7 @@ fn lsp_offset_to_line(text: &str, offset: isize) -> i32:
         i = i + 1
     line
 
-fn lsp_offset_to_col(text: &str, offset: i32) -> i32:
+fn lsp_offset_to_col(text: &str, offset: i32):
     var col: i32 = 0
     var i = 0
     while i < offset and i < text.len():
@@ -783,7 +783,7 @@ impl LspState:
 // ── Hover ────────────────────────────────────────────────────
 
 // Extract /// doc comment lines above a declaration at the given byte offset.
-fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
+fn lsp_extract_doc_comment(text: &str, decl_start: i32):
     // Walk backward from decl_start to find preceding /// comment lines.
     var pos = decl_start - 1
     // Skip whitespace/newlines before the declaration
@@ -1254,7 +1254,7 @@ impl LspState:
         items = items ++ jarr_end()
         lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
 
-fn lsp_append_csv_items(items: &str, csv: &str, kind: i32, first: bool) -> str:
+fn lsp_append_csv_items(items: &str, csv: &str, kind: i32, first: bool):
     var result = with_str_clone_ref(items)
     var f = first
     var start = 0
@@ -1286,7 +1286,7 @@ fn lsp_parse_file(text: &str) -> LspParseResult:
     let pool = parser.parse_module()
     LspParseResult { pool, intern }
 
-fn lsp_find_enclosing_fn(pool: &AstPool, offset: i32) -> NodeId:
+fn lsp_find_enclosing_fn(pool: &AstPool, offset: i32):
     // Find the function whose span contains the cursor. Use the start of
     // the NEXT declaration as the upper bound, not get_end — the parser's
     // end span may not cover trailing blank lines inside the function.
@@ -1873,7 +1873,7 @@ impl LspState:
 
 // ── Main loop ────────────────────────────────────────────────
 
-fn lsp_extract_uri(msg: &str, tokens: *mut JsonToken, params_idx: i32) -> str:
+fn lsp_extract_uri(msg: &str, tokens: *mut JsonToken, params_idx: i32):
     let td = json_find(msg, tokens, params_idx, "textDocument")
     json_tok_str(msg, tokens, json_find(msg, tokens, td, "uri"))
 

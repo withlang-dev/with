@@ -45,7 +45,7 @@ fn green_first_line(text: &str) -> str:
 /// ls-tree HEAD:benchmarks`) with the goose entry left out.
 /// build/retention.with applies the same rule; the two must agree byte for
 /// byte.
-fn green_identity_inputs(top_level: &str, bench_level: &str) -> str:
+fn green_identity_inputs(top_level: &str, bench_level: &str):
     var kept = ""
     for line in top_level.split("\n"):
         if line.len() == 0: continue

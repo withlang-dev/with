@@ -36,7 +36,7 @@ impl BzBits:
     mut fn align():
         self.count = self.count - self.count % 8
 
-fn bz_crc_table() -> List[i64]:
+fn bz_crc_table():
     let table: List[i64] = []
     for i in 0..256:
         var c = (i as i64) << 24

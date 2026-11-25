@@ -452,7 +452,7 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_FSTRING_SPEC: return "fstring_spec"
     "unknown"
 
-fn typed_indent(indent: i32) -> str:
+fn typed_indent(indent: i32):
     var out = ""
     for i in 0..indent:
         out = out ++ "  "

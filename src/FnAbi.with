@@ -80,13 +80,13 @@ fn fn_abi_return_pass(convention: i32, has_value: bool, platform_indirect: bool)
     if convention == FN_ABI_CLOSURE or convention == FN_ABI_ASYNC: return PM_DIRECT
     if platform_indirect: PM_INDIRECT else: PM_DIRECT
 
-fn fn_abi_argument_pass(place: i32, convention: i32, platform_indirect: bool) -> i32:
+fn fn_abi_argument_pass(place: i32, convention: i32, platform_indirect: bool):
     fn_abi_pass_mode(place, convention != FN_ABI_ASYNC and platform_indirect)
 
 // Destruction owns the value in its existing storage. The body and the
 // compiler's subsequent field cleanup must observe the same moved fields.
 // This is owned Indirect, without byval copying; it is never a borrow.
-fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
+fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool):
     drop_receiver and aggregate
 
 // A struct or array larger than two words is passed as a pointer to a
@@ -100,7 +100,7 @@ fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
 // one (SysV x86_64, `target_byval`); under With's own conventions it is a
 // plain pointer to the caller's copy on every target, as windows-x86_64's
 // has always been.
-fn fn_abi_indirect_uses_byval(convention: i32, target_byval: bool) -> bool:
+fn fn_abi_indirect_uses_byval(convention: i32, target_byval: bool):
     convention == FN_ABI_C and target_byval
 
 fn fn_abi_platform_aggregate_indirect(windows_x86_64: bool, is_aggregate: bool, size: i64) -> bool:
@@ -123,7 +123,7 @@ fn fn_abi_c_vector_return_indirect(arch: &str, size: i64) -> bool:
 // ordinary aggregate ABI (including the caller-allocated copy at a foreign
 // C call), and Darwin arm64, Windows and WebAssembly represent va_list as a
 // pointer value.
-fn fn_abi_c_va_list_uses_caller_place(os: &str, arch: &str) -> bool:
+fn fn_abi_c_va_list_uses_caller_place(os: &str, arch: &str):
     arch == "x86_64" and os != "Windows"
 
 // D75 (§16.2b.5): a function defined with a trailing `...` has the C
@@ -136,7 +136,7 @@ fn fn_abi_definition_convention(c_callconv: bool, variadic: bool) -> i32:
 // ── Symbols ─────────────────────────────────────────────────────────────
 
 // A function whose symbol has no text (synthesized) links as __fn_<sym>.
-fn fn_abi_anonymous_symbol(sym: i32) -> str: f"__fn_{sym}"
+fn fn_abi_anonymous_symbol(sym: i32): f"__fn_{sym}"
 
 fn codegen_hash_name_component(value: i64) -> str:
     if value < 0:
@@ -203,7 +203,7 @@ fn codegen_canonical_module_path(path: &str) -> str:
         return resolve_normalize_path(path)
     fn_abi_file_prefix_mapped(resolve_join(cwd, path))
 
-fn codegen_is_runtime_source_file(source_path: &str) -> bool:
+fn codegen_is_runtime_source_file(source_path: &str):
     source_path.starts_with("rt/") or source_path.contains("/rt/") or
         source_path.starts_with("rt\\") or source_path.contains("\\rt\\") or
         source_path == "out/gen/compat_runtime.with" or
@@ -223,7 +223,7 @@ fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
 // externs call them by. Link-name preservation only — an extern of the same
 // name elsewhere (a c_import of memset) keeps the C ABI, so this is kept out
 // of codegen_is_runtime_abi_symbol.
-fn codegen_is_wasm_libc_provider_symbol(base_name: &str) -> bool:
+fn codegen_is_wasm_libc_provider_symbol(base_name: &str):
     base_name == "_exit" or base_name == "abort" or
         base_name == "malloc" or base_name == "free" or
         base_name == "memcpy" or base_name == "memmove" or base_name == "memset" or

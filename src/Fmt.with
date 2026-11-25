@@ -57,10 +57,10 @@ fn is_assign_op(tag: i32) -> bool:
     if tag == TokenKind.TK_DOT_EQ: return true
     false
 
-fn is_open_delim(tag: i32) -> bool:
+fn is_open_delim(tag: i32):
     tag == TokenKind.TK_L_PAREN or tag == TokenKind.TK_L_BRACKET or tag == TokenKind.TK_L_BRACE
 
-fn is_close_delim(tag: i32) -> bool:
+fn is_close_delim(tag: i32):
     tag == TokenKind.TK_R_PAREN or tag == TokenKind.TK_R_BRACKET or tag == TokenKind.TK_R_BRACE
 
 // Whether this token is a unary-only prefix (not also binary).
@@ -147,7 +147,7 @@ fn inline_colon_body_convertible(tokens: &TokenList, pos: i32, count: i32) -> bo
         j = j + 1
     seen_any
 
-fn emit_indent(indent: i32) -> str:
+fn emit_indent(indent: i32):
     var s = ""
     for sp in 0..indent:
         s = s ++ " "
@@ -169,7 +169,7 @@ fn flatten_nested_arrays(source: &str) -> str:
     text
 
 // The source text from token `a` through token `b`.
-fn token_span(source: &str, tokens: &TokenList, a: isize, b: isize) -> str:
+fn token_span(source: &str, tokens: &TokenList, a: isize, b: isize):
     source.slice(tokens.get_start(a), tokens.get_end(b))
 
 fn flatten_nested_arrays_once(source: &str) -> str:
@@ -219,7 +219,7 @@ fn flatten_nested_arrays_once(source: &str) -> str:
         return source.slice(0, tokens.get_start(i)) ++ flat ++ source.slice(tokens.get_end(outer_close), source.len())
     source
 
-fn format_source_styled(input: &str, style: i32) -> str:
+fn format_source_styled(input: &str, style: i32):
     let source = flatten_nested_arrays(input)
     let lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
@@ -440,7 +440,7 @@ fn format_source_styled(input: &str, style: i32) -> str:
         out = out ++ "\n"
     out
 
-fn format_source(source: &str) -> str:
+fn format_source(source: &str):
     format_source_styled(source, 0)
 
 // Decide whether to emit a space before `cur` given `prev`.

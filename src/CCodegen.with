@@ -39,14 +39,14 @@ impl COut:
     fn finish() -> str:
         with_fmt_buf_finish(self.buf)
 
-fn cc_intern_resolve(intern: &InternPool, sym: i32) -> str:
+fn cc_intern_resolve(intern: &InternPool, sym: i32):
     with_str_clone_ref(intern.resolve_symbol(sym))
 
 
-fn cc_lbrace -> str:
+fn cc_lbrace:
     str_from_byte(123)
 
-fn cc_rbrace -> str:
+fn cc_rbrace:
     str_from_byte(125)
 
 const CC_PSEUDO_TID_LIST = 1900001
@@ -216,7 +216,7 @@ enum CcLenMode: i32:
 
 impl Copy for CcLenMode
 
-fn cc_is_len_method(method: &str) -> bool:
+fn cc_is_len_method(method: &str):
     method == "len" or method == "len32" or method == "len64" or method == "ulen32"
 
 fn cc_len_method_builtin(base: CcBuiltin, method: &str) -> CcBuiltin:
@@ -257,16 +257,16 @@ fn cc_len_result_c_type(mode: CcLenMode) -> str:
         return "uint32_t"
     "uint64_t"
 
-fn cc_builtin_is_map_len(kind: CcBuiltin) -> bool:
+fn cc_builtin_is_map_len(kind: CcBuiltin):
     kind == CcBuiltin.MAP_LEN or kind == CcBuiltin.MAP_LEN32 or kind == CcBuiltin.MAP_LEN64 or kind == CcBuiltin.MAP_ULEN32
 
-fn cc_builtin_is_list_len(kind: CcBuiltin) -> bool:
+fn cc_builtin_is_list_len(kind: CcBuiltin):
     kind == CcBuiltin.LIST_LEN or kind == CcBuiltin.LIST_LEN32 or kind == CcBuiltin.LIST_LEN64 or kind == CcBuiltin.LIST_ULEN32
 
-fn cc_builtin_is_str_len(kind: CcBuiltin) -> bool:
+fn cc_builtin_is_str_len(kind: CcBuiltin):
     kind == CcBuiltin.STR_LEN or kind == CcBuiltin.STR_LEN32 or kind == CcBuiltin.STR_LEN64 or kind == CcBuiltin.STR_ULEN32
 
-fn cc_builtin_is_arr_len(kind: CcBuiltin) -> bool:
+fn cc_builtin_is_arr_len(kind: CcBuiltin):
     kind == CcBuiltin.ARR_LEN or kind == CcBuiltin.ARR_LEN32 or kind == CcBuiltin.ARR_LEN64 or kind == CcBuiltin.ARR_ULEN32
 
 type CEmitResult {
@@ -525,7 +525,7 @@ fn cc_hex_digit(v: i32) -> str:
     if v == 14: return "E"
     "F"
 
-fn cc_escape_c_string(text: &str) -> str:
+fn cc_escape_c_string(text: &str):
     let out = StringBuilder.with_capacity(text.len())
     for i in 0..text.len():
         let b = text[i]
@@ -569,7 +569,7 @@ fn cc_hex_digit_value(ch: i32) -> i32:
         return ch - 55
     -1
 
-fn cc_decode_with_string_escapes(text: &str) -> str:
+fn cc_decode_with_string_escapes(text: &str):
     let out = StringBuilder.with_capacity(text.len())
     var i = 0
     while i < text.len():
@@ -729,13 +729,13 @@ impl CCodegen:
                 return cc_c_string_token_payload(text)
         cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(expr)))
 
-fn cc_cstr_literal_data_name(text: &str) -> str:
+fn cc_cstr_literal_data_name(text: &str):
     f"__with_cstr_{cc_hash_name_component(with_str_hash(text) as i64)}_{text.len()}"
 
-fn cc_cstr_literal_view_name(text: &str) -> str:
+fn cc_cstr_literal_view_name(text: &str):
     f"__with_cstr_view_{cc_hash_name_component(with_str_hash(text) as i64)}_{text.len()}"
 
-fn cc_cstr_literal_bytes_initializer(text: &str) -> str:
+fn cc_cstr_literal_bytes_initializer(text: &str):
     var out = cc_lbrace()
     for i in 0..text.len():
         if i > 0:
@@ -1089,7 +1089,7 @@ impl CCodegen:
     fn decl_source_text(decl: NodeId) -> str:
         self.source_text_for_path(self.decl_source_path(decl))
 
-fn cc_path_with_slashes(path: &str) -> str:
+fn cc_path_with_slashes(path: &str):
     let out = StringBuilder.with_capacity(path.len())
     for i in 0..path.len():
         let ch = path[i]
@@ -1512,7 +1512,7 @@ fn cc_member(name: str) -> str:
 // A field of a multi-field variant's payload struct (#2017).
 fn cc_payload_struct_field(field_idx: i32): f"field{field_idx}"
 
-fn cc_str_concat_expr(left: &str, right: &str) -> str:
+fn cc_str_concat_expr(left: &str, right: &str):
     "with_str_concat_ref(" ++ left ++ ", " ++ right ++ ")"
 
 impl CCodegen:
@@ -2993,7 +2993,7 @@ impl CCodegen:
         self.local_downcast_option_cache.insert(cache_key, out)
         out
 
-fn cc_zero_i32_list(count: i32) -> List[i32]:
+fn cc_zero_i32_list(count: i32):
     let out: List[i32] = []
     for i in 0..count:
         out.push(0)
@@ -3495,7 +3495,7 @@ impl CCodegen:
             self.fail(f"unsupported place projection kind {pk}")
         out
 
-fn cc_hex_u64(value: i64) -> str:
+fn cc_hex_u64(value: i64):
     var out = ""
     var shift: i32 = 60
     var started = 0
@@ -5117,7 +5117,7 @@ impl CCodegen:
         self.active_direct_args.pop()
         self.active_direct_dests.pop()
 
-fn cc_call_infer_cache_key(kind: &str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32) -> str:
+fn cc_call_infer_cache_key(kind: &str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32):
     kind ++ ":" ++ f"{body_fn_sym}" ++ ":" ++ f"{callee_sym}" ++ ":" ++ f"{args_id}" ++ ":" ++ f"{dest_place}"
 
 impl CCodegen:

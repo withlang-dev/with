@@ -3,7 +3,7 @@
 // context and removed lines match exactly — at the stated line, or the nearest
 // place they do — and anything else is an error naming the file and hunk.
 
-fn cp_lines(text: &str) -> List[str]:
+fn cp_lines(text: &str):
     let out: List[str] = []
     for raw in text.split("\n"): out.push(if raw.ends_with("\r"): raw.slice(0, raw.len() - 1).to_owned() else: raw.to_owned())
     out

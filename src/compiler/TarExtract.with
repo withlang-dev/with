@@ -21,7 +21,7 @@ fn te_octal(data: &str, at: i64, width: i64) -> i64:
         value = value * 8 + (b - '0') as i64
     value
 
-fn te_field(data: &str, at: i64, width: i64) -> str:
+fn te_field(data: &str, at: i64, width: i64):
     var end = at
     while end < at + width and data[end] != 0:
         end = end + 1
@@ -70,7 +70,7 @@ fn te_dirname(path: &str) -> str:
 
 // Unpacks the tar image `data` into `dest`, dropping the first `strip`
 // components of every name. "" on success, else why not.
-fn tar_extract_text(data: &str, dest: &str, strip: i32) -> str:
+fn tar_extract_text(data: &str, dest: &str, strip: i32):
     let all: List[str] = []
     tar_extract_text_keep(data, dest, strip, all)
 
@@ -149,13 +149,13 @@ fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &List[str]) -
         // Device, fifo and other entries have no place in a package.
     ""
 
-fn te_bytes(text: &str) -> List[u8]:
+fn te_bytes(text: &str):
     let out: List[u8] = List.with_capacity(text.len())
     for i in 0..text.len(): out.push(text[i])
     out
 
 // Unpacks the gzip-compressed tar `archive` into `dest`. "" or why not.
-fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
+fn tar_gz_extract(archive: &str, dest: &str, strip: i32):
     let all: List[str] = []
     tar_gz_extract_keep(archive, dest, strip, all)
 

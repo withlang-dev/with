@@ -46,7 +46,7 @@ impl BuildGraphOutputOwners:
 // command selects: two targets that declare one output make its bytes depend
 // on which ran last, whether or not this command runs both (#2014). Every
 // shared output is named, not only the first.
-fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str) -> i32:
+fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str):
     let seen = BuildGraphOutputOwners { paths: [], owners: [] }
     var shared = 0
     for gi in 0..graph.generated_sources.len():

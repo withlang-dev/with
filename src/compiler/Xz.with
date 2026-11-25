@@ -11,7 +11,7 @@ use rt.rt_core
 
 let XZ_MASK32: i64 = 4294967295
 
-fn xz_crc32_table() -> List[i64]:
+fn xz_crc32_table():
     let table: List[i64] = []
     for n in 0..256:
         var c = n as i64
@@ -20,7 +20,7 @@ fn xz_crc32_table() -> List[i64]:
         table.push(c)
     table
 
-fn xz_crc32(data: &str, start: i64, end: i64) -> i64:
+fn xz_crc32(data: &str, start: i64, end: i64):
     let table = xz_crc32_table()
     var crc = XZ_MASK32
     for i in start..end:
@@ -331,7 +331,7 @@ fn xz_check_size(kind: i32) -> i64:
     if kind <= 12: return 32
     64
 
-fn xz_vli(data: &str, at: i64) -> List[i64]:
+fn xz_vli(data: &str, at: i64):
     var value: i64 = 0
     var i: i64 = 0
     while i < 9:

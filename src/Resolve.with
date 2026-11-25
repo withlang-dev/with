@@ -27,7 +27,7 @@ fn resolve_owned_text(text: &str) -> str:
         return ""
     runtime_str_clone(text)
 
-fn resolve_new_list_str -> List[str]:
+fn resolve_new_list_str:
     let out: List[str] = []
     out
 
@@ -182,7 +182,7 @@ type ResolveState {
     root_prefix_skip: i32,
 }
 
-fn resolve_normalize_source_text(text: &str) -> str:
+fn resolve_normalize_source_text(text: &str):
     let out = StringBuilder.with_capacity(text.len())
     var i = 0
     while i < text.len():
@@ -196,7 +196,7 @@ fn resolve_normalize_source_text(text: &str) -> str:
         i = i + 1
     out.to_str()
 
-fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, root_pool: &AstPool, pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveArtifacts:
+fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, root_pool: &AstPool, pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool):
     resolve_from_root_pool_with_prefix(root_path, root_text, root_file_id, root_pool, pool, diags, emit_resolve_diags, 0, 1, "")
 
 // `first_file_id` is the caller's next unused file id: imported modules are
@@ -274,7 +274,7 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
         },
     }
 
-fn resolve_interface_use_lines(text: &str) -> str:
+fn resolve_interface_use_lines(text: &str):
     var out = ""
     let lines = text.split("\n")
     for line in lines:
@@ -1444,10 +1444,10 @@ fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
         return ""
     last
 
-fn resolve_is_prelude_path(dotted: &str) -> bool:
+fn resolve_is_prelude_path(dotted: &str):
     dotted == "std.prelude" or dotted == "std.prelude_core" or dotted == "std.prelude_alloc"
 
-fn resolve_last_segment(dotted: &str) -> str:
+fn resolve_last_segment(dotted: &str):
     var start = 0
     for i in 0..dotted.len():
         if dotted[i] == '.': start = (i + 1) as i32
@@ -1515,7 +1515,7 @@ fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &str) -
     let owner = if target_std: "the standard library" else: "'" ++ parent ++ "'"
     f"module '{dotted}' is internal to {owner} (§18.3): only modules inside that tree may import it"
 
-fn resolve_path_is_std(path: &str) -> bool: path.starts_with("<embedded-std>/") or path.starts_with("lib/std/") or path.contains("/lib/std/")
+fn resolve_path_is_std(path: &str): path.starts_with("<embedded-std>/") or path.starts_with("lib/std/") or path.contains("/lib/std/")
 
 // A path of the runtime's own: the embedded tree, the repo's rt/, or the
 // build's generated roots under out/gen (the runtime bundle's root, the
@@ -1526,7 +1526,7 @@ fn resolve_path_is_std(path: &str) -> bool: path.starts_with("<embedded-std>/") 
 // `/rt/` anywhere in the path made every file under a folder called `rt`
 // the runtime (a build.with there could not call its own `with_*` helper at
 // compile time, and a program there could import `rt.*`).
-fn resolve_path_is_runtime(path: &str) -> bool:
+fn resolve_path_is_runtime(path: &str):
     path.starts_with("<embedded-rt>/") or resolve_path_is_under_checkout_dir(path, "rt") or resolve_path_is_under_checkout_dir(path, "out/gen")
 
 /// Whether `path` lies under `dir` (a `/`-spelled relative directory) of a
@@ -1906,7 +1906,7 @@ fn print_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str):
             line = line ++ pool.resolve(result.link_libs[li])
         with_write(line ++ "\n")
 
-fn dump_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str) -> str:
+fn dump_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str):
     var out = ""
     out = out ++ f"resolved root={root_path} modules={result.modules.len()} defs={result.defs.len()}\n"
 

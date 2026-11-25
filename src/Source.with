@@ -27,7 +27,7 @@ fn Source.from_string(path: &str, text: &str, file_id: i32) -> Source:
         file_id,
     }
 
-fn Source.from_file(path: &str, file_id: i32) -> Source:
+fn Source.from_file(path: &str, file_id: i32):
     let text = with_fs_read_file(path)
     Source.from_string(path, text, file_id)
 
@@ -73,7 +73,7 @@ impl Source:
             return slice.slice(0, (slice.len() - 1))
         slice
 
-fn source_compute_line_offsets(text: &str) -> List[i32]:
+fn source_compute_line_offsets(text: &str):
     let offsets: List[i32] = []
     offsets.push(0)
     for i in 0..text.len():

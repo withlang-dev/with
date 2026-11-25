@@ -27,7 +27,7 @@ fn ecr_dirname(path: &str) -> str:
     path.slice(0, last)
 
 // One line per embedded header: its path and the hash of its bytes.
-fn ecr_identity_text() -> str:
+fn ecr_identity_text():
     let listing = embedded_clang_resource_list()
     var content = "version:" ++ embedded_clang_resource_version() ++ "\n"
     content = content ++ "listing:" ++ f"{with_str_hash(listing) as i64}" ++ "\n"
@@ -35,7 +35,7 @@ fn ecr_identity_text() -> str:
         if rel.len() > 0: content = content ++ rel ++ ":" ++ f"{with_str_hash(embedded_clang_resource_data(rel)) as i64}" ++ "\n"
     content
 
-fn ecr_cache_root() -> str:
+fn ecr_cache_root():
     var base = with_getenv_str("XDG_CACHE_HOME")
     if base.len() == 0:
         let home = with_getenv_str("HOME")

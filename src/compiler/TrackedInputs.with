@@ -47,7 +47,7 @@ fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
         out.push(with_str_clone_ref(path))
     out
 
-fn tracked_input_merge_unique(left: List[str], right: &List[str]) -> List[str]:
+fn tracked_input_merge_unique(left: List[str], right: &List[str]):
     var out = left
     for right_item in right:
         out = tracked_input_insert_unique(out, right_item)
@@ -69,9 +69,9 @@ fn tracked_dirname(path: &str) -> str:
         return "/"
     path.slice(0, last_slash)
 
-fn tracked_path_is_absolute(path: &str) -> bool: runtime_path_is_absolute(path)
+fn tracked_path_is_absolute(path: &str): runtime_path_is_absolute(path)
 
-fn tracked_path_has_parent_segment(path: &str) -> bool:
+fn tracked_path_has_parent_segment(path: &str):
     path == ".." or path.starts_with("../") or path.starts_with("..\\") or
         path.ends_with("/..") or path.ends_with("\\..") or
         path.contains("/../") or path.contains("\\..\\") or
@@ -150,7 +150,7 @@ fn tracked_authorized_root(source_path: &str, package_root: &str) -> str:
         return ""
     dir
 
-fn tracked_embed_resolve(source_path: &str, raw_path: &str) -> str:
+fn tracked_embed_resolve(source_path: &str, raw_path: &str):
     tracked_resolve_source_relative(source_path, raw_path)
 
 fn tracked_embed_read(source_path: &str, raw_path: &str, package_root: &str) -> TrackedReadResult:

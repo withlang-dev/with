@@ -60,7 +60,7 @@ fn fs_cstr(data: &str, at: i64) -> str:
         end = end + 1
     data.slice(at, end)
 
-unsafe fn fs_c_path(s: &str) -> *mut u8:
+unsafe fn fs_c_path(s: &str):
     let out = with_alloc(s.len() + 1)
     if s.len() > 0:
         with_memcpy(out, *(s as *const str as *const *const u8), s.len())
@@ -98,7 +98,7 @@ fn fs_cache_path() -> str:
     if runtime_file_exists(system) != 0: return system
     ""
 
-fn fs_basename(path: &str) -> str:
+fn fs_basename(path: &str):
     var start = 0
     for i in 0..path.len():
         if path[i] == '/': start = (i + 1) as i32
@@ -344,7 +344,7 @@ fn fs_yaml_list(out: &str, key: &str, items: &List[str]) -> str:
     text.push_str(" ]\n")
     text.to_str()
 
-fn fs_tbd_document(library: &DscLibrary) -> str:
+fn fs_tbd_document(library: &DscLibrary):
     // The cache's architecture: arm64e serves arm64 and arm64e links.
     let targets = if runtime_sysinfo_arch() == "x86_64": "[ x86_64-macos ]" else: "[ arm64-macos, arm64e-macos ]"
     var out = "--- !tapi-tbd\ntbd-version:     4\ntargets:         " ++ targets ++ "\n"
@@ -414,7 +414,7 @@ fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
 // The framework names of `-framework <Name>` and `-weak_framework <Name>`
 // pairs in a package's link arguments: a weakly linked framework needs its
 // stub at link time as any other does.
-fn framework_names_in_link_args(link_args: &List[str]) -> List[str]:
+fn framework_names_in_link_args(link_args: &List[str]):
     let out: List[str] = []
     for i in 0..link_args.len():
         if (link_args[i] == "-framework" or link_args[i] == "-weak_framework") and i + 1 < link_args.len():

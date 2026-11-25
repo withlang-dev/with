@@ -8,54 +8,54 @@ use rt.compat_runtime
 fn runtime_eprint(s: &str):
     with_eprint(s)
 
-fn runtime_exec_binary(path: &str) -> i32:
+fn runtime_exec_binary(path: &str):
     with_exec_binary(path)
 
-fn runtime_exec_argv(args: &str) -> i32:
+fn runtime_exec_argv(args: &str):
     with_exec_argv(args)
 
-fn runtime_exec_argv_cwd(args: &str, cwd: &str) -> i32:
+fn runtime_exec_argv_cwd(args: &str, cwd: &str):
     with_exec_argv_cwd(args, cwd)
 
-fn runtime_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
+fn runtime_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32):
     with_exec_argv_capture(args, stdout_path, stderr_path, timeout_ms)
 
-fn runtime_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32:
+fn runtime_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str):
     with_exec_argv_capture_cwd(args, stdout_path, stderr_path, timeout_ms, cwd)
 
-fn runtime_arg_at(idx: i32) -> str:
+fn runtime_arg_at(idx: i32):
     with_arg_at(idx)
 
-fn runtime_write_file(path: &str, data: &str) -> i32:
+fn runtime_write_file(path: &str, data: &str):
     with_fs_write_file(path, data)
 
-fn runtime_read_file(path: &str) -> str:
+fn runtime_read_file(path: &str):
     with_fs_read_file(path)
 
-fn runtime_file_exists(path: &str) -> i32:
+fn runtime_file_exists(path: &str):
     with_fs_file_exists(path)
 
-fn runtime_is_dir(path: &str) -> i32:
+fn runtime_is_dir(path: &str):
     with_fs_is_dir(path)
 
-fn runtime_list_files(path: &str) -> str:
+fn runtime_list_files(path: &str):
     with_fs_list_files(path)
 
-fn runtime_remove_file(path: &str) -> i32:
+fn runtime_remove_file(path: &str):
     with_fs_remove_file(path)
 
-fn runtime_remove_dir(path: &str) -> i32:
+fn runtime_remove_dir(path: &str):
     with_fs_remove_dir(path)
 
-fn runtime_remove_tree(path: &str) -> i32:
+fn runtime_remove_tree(path: &str):
     with_fs_remove_tree(path)
 
-fn runtime_mkdir_p(path: &str) -> i32:
+fn runtime_mkdir_p(path: &str):
     with_fs_mkdir_p(path)
 
 // Atomic on all platforms: POSIX rename replaces the target; the Windows
 // backend uses MoveFileExW with MOVEFILE_REPLACE_EXISTING.
-fn runtime_rename(old_path: &str, new_path: &str) -> i32:
+fn runtime_rename(old_path: &str, new_path: &str):
     with_fs_rename_file(old_path, new_path)
 
 // The working directory: $PWD, which keeps the path the user typed, while
@@ -108,17 +108,17 @@ fn runtime_getcwd() -> str:
         with_free(buf)
         out
 
-fn runtime_getenv(name: &str) -> str:
+fn runtime_getenv(name: &str):
     with_getenv_str(name)
 
-fn runtime_setenv(name: &str, value: &str) -> i32:
+fn runtime_setenv(name: &str, value: &str):
     with_setenv_str(name, value)
 
 /// The directory for scratch files, without a trailing slash: TMP, then
 /// TEMP on Windows ("" when neither is set); elsewhere TMPDIR, else /tmp.
 /// TMPDIR is a macOS login's, not a Linux one's: a path built from it
 /// alone was `/with-…` at the filesystem root under ssh on Linux.
-fn runtime_temp_dir() -> str:
+fn runtime_temp_dir():
     var dir = if runtime_sysinfo_os() == "Windows":
         let tmp = runtime_getenv("TMP")
         if tmp.len() > 0: tmp else: runtime_getenv("TEMP")
@@ -128,25 +128,25 @@ fn runtime_temp_dir() -> str:
     while dir.len() > 1 and (dir.ends_with("/") or dir.ends_with("\\")): dir = dir.slice(0, dir.len() - 1)
     dir
 
-fn runtime_clock_nanos() -> i64:
+fn runtime_clock_nanos():
     with_clock_nanos()
 
-fn runtime_getpid() -> i32:
+fn runtime_getpid():
     with_getpid()
 
-fn runtime_str_clone(s: &str) -> str:
+fn runtime_str_clone(s: &str):
     with_str_clone_ref(s)
 
-fn runtime_str_hash(s: &str) -> i64:
+fn runtime_str_hash(s: &str):
     with_str_hash(s) as i64
 
-fn runtime_nanosleep(ns: i64) -> i32:
+fn runtime_nanosleep(ns: i64):
     with_nanosleep(ns)
 
-fn runtime_sysinfo_os() -> str:
+fn runtime_sysinfo_os():
     with_sysinfo_os()
 
-fn runtime_sysinfo_arch() -> str:
+fn runtime_sysinfo_arch():
     with_sysinfo_arch()
 
 // A POSIX root (`/`), a UNC path (`\server\share`), or a Windows drive

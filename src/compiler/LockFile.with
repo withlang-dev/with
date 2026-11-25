@@ -32,7 +32,7 @@ type LockFile {
     entries: List[LockEntry],
 }
 
-fn lock_file_path(project_root: &str) -> str:
+fn lock_file_path(project_root: &str):
     project_root ++ "/.with/lock.json"
 
 fn lock_empty -> LockFile:
@@ -53,7 +53,7 @@ fn lock_str_compare(a: &str, b: &str) -> i32:
         return 1
     0
 
-fn lock_json_escape(value: &str) -> str:
+fn lock_json_escape(value: &str):
     var out = ""
     for i in 0..value.len():
         let ch = value[i]
@@ -62,7 +62,7 @@ fn lock_json_escape(value: &str) -> str:
         out = out ++ value.slice(i, (i + 1))
     out
 
-fn lock_json_string(key: &str, value: &str, comma: bool) -> str:
+fn lock_json_string(key: &str, value: &str, comma: bool):
     let q = "\x22"
     let suffix = if comma: "," else: ""
     "      " ++ q ++ key ++ q ++ ": " ++ q ++ lock_json_escape(value) ++ q ++ suffix ++ "\n"
@@ -159,7 +159,7 @@ fn lock_json_extract_string_array(json: &str, key: &str) -> List[str]:
         pos = pos + 1
     result
 
-fn lock_split_nonempty_lines(text: &str) -> List[str]:
+fn lock_split_nonempty_lines(text: &str):
     let lines: List[str] = []
     let n = text.len()
     var start = 0
@@ -326,7 +326,7 @@ fn lock_write(project_root: &str, lock: &LockFile) -> i32:
     text = text ++ "}\n"
     runtime_write_file(lock_file_path(project_root), text)
 
-fn lock_sha256_text(data: &str) -> str:
+fn lock_sha256_text(data: &str):
     let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
@@ -336,7 +336,7 @@ fn lock_sha256_file(path: &str) -> str:
         return ""
     lock_sha256_text(runtime_read_file(path))
 
-fn lock_c_dep_dir(project_root: &str, name: &str, version: &str) -> str:
+fn lock_c_dep_dir(project_root: &str, name: &str, version: &str):
     project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
 
 fn lock_ref_name(req: &str) -> str:

@@ -620,7 +620,7 @@ type LoopState {
 
 // ── Codegen lifecycle ─────────────────────────────────────────────
 
-fn Codegen.init(module_name: &str) -> Codegen:
+fn Codegen.init(module_name: &str):
     Codegen.init_with_opt(module_name, 0)
 
 // D17/#697 phase take-and-return (the lower_module pattern): codegen OWNS the
@@ -633,7 +633,7 @@ impl Codegen:
         self.sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
         s
 
-fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: InternPool, sema: Sema) -> Codegen:
+fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: InternPool, sema: Sema):
     let cg = Codegen.init_with_opt(module_name, opt_level)
     let overflow_mode = sema.overflow_mode
     cg.intern = intern
@@ -3080,20 +3080,20 @@ impl Codegen:
             wl_set_alignment(slot, declared)
         slot
 
-fn list_data_i64(v: &List[i64]) -> i64:
+fn list_data_i64(v: &List[i64]):
     // D120: a List of values is Copy, so `v as i64` would copy the list
     // (D22 §6.2); the address is the reference relabeled (§16.11).
     wl_list_data_ptr((v as *const List[i64]) as i64)
 
 // Element-wise copy so a caller can hand an owned vector to a consuming
 // sink (e.g. record_c_abi_transform) more than once under spec §3.8.
-fn list_copy_i64(src: &List[i64]) -> List[i64]:
+fn list_copy_i64(src: &List[i64]):
     let out: List[i64] = []
     for src_item in src:
         out.push(src_item)
     out
 
-fn list_zeros_i64(n: i32) -> List[i64]:
+fn list_zeros_i64(n: i32):
     let out: List[i64] = []
     for _i in 0..n:
         out.push(0)
@@ -6555,15 +6555,15 @@ fn codegen_c_abi_needs_byval_attr() -> bool:
 
 // AAPCS64 and Apple's arm64 variant agree on how a struct of at most 16 bytes
 // (or a homogeneous float aggregate) crosses a non-variadic C call.
-fn codegen_c_abi_aarch64() -> bool: target_spec_arch() == "aarch64"
+fn codegen_c_abi_aarch64(): target_spec_arch() == "aarch64"
 
 // System V x86_64 (Linux, macOS): §3.2.3 eightbyte classification.
-fn codegen_c_abi_sysv_x86_64() -> bool: target_spec_arch() == "x86_64" and target_spec_os() != "Windows"
+fn codegen_c_abi_sysv_x86_64(): target_spec_arch() == "x86_64" and target_spec_os() != "Windows"
 
 // c_abi_sysv_classify's verdict for a struct with an unaligned field.
 const CODEGEN_SYSV_MEMORY: i32 = -2
 
-fn codegen_windows_x86_64() -> bool:
+fn codegen_windows_x86_64():
     let os = target_spec_os()
     let arch = target_spec_arch()
     os == "Windows" and arch == "x86_64"

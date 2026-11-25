@@ -67,7 +67,7 @@ type Facts {
 
 /// Whether `kind` is a presentation fact (a parameter's or a return's
 /// shape) rather than an ownership fact.
-fn facts_is_presentation(kind: &str) -> bool:
+fn facts_is_presentation(kind: &str):
     kind.starts_with("nullable:") or kind.starts_with("text_param:") or kind.starts_with("text_return:") or kind.starts_with("callback:") or kind.starts_with("retains_by:") or kind.starts_with("callback_thread:") or kind.starts_with("variadic:") or kind.starts_with("case:")
 
 impl Facts:
@@ -136,10 +136,10 @@ fn facts_cite(fact: &str) -> str:
     let parts = fact.split("|")
     if parts.len() < 3: "" else: parts[2]
 
-fn facts_error(path: &str, line: isize, message: &str) -> str: path ++ f":{line}: " ++ message
+fn facts_error(path: &str, line: isize, message: &str): path ++ f":{line}: " ++ message
 
 // `text` split at its `//`: the clause and the citation, trimmed.
-fn facts_split_cite(text: &str) -> List[str]:
+fn facts_split_cite(text: &str):
     let at = text.find("//")
     let out: List[str] = []
     if at < 0:

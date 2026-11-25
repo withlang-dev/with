@@ -709,7 +709,7 @@ impl[T, I: Iter[T]] Iter[(i64, T)] for Enumerated[T, I]:
         match self.inner.next():
             None => None
             Some(x) =>
-                let i: i64 = self.index
+                let i = self.index
                 self.index += 1
                 Some((i, x))
 

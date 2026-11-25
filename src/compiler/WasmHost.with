@@ -18,7 +18,7 @@ fn wasm_host_js_path(bin_path: &str) -> str:
         return bin_path.slice(0, bin_path.len() - 5) ++ ".js"
     bin_path ++ ".js"
 
-fn wasm_host_basename(path: &str) -> str:
+fn wasm_host_basename(path: &str):
     var i = path.len()
     while i > 0:
         let ch = path[(i - 1)]

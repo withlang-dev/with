@@ -24,7 +24,7 @@ fn host_lib_push_dir(dirs: List[str], dir: &str) -> List[str]:
     out.push(dir)
     out
 
-fn host_lib_sorted(xs: List[str]) -> List[str]:
+fn host_lib_sorted(xs: List[str]):
     let out: List[str] = []
     for x in xs:
         var i = out.len()
@@ -73,7 +73,7 @@ fn host_lib_read_conf(root: &str, conf: &str, depth: i32, dirs: List[str]) -> Li
                 if d.starts_with("/"): out = host_lib_push_dir(out, root ++ d)
     out
 
-fn host_lib_push_trusted(dirs: List[str], root: &str, arch: &str) -> List[str]:
+fn host_lib_push_trusted(dirs: List[str], root: &str, arch: &str):
     var out = dirs
     let multiarch = host_lib_multiarch(arch)
     for dir in ["/usr/lib/" ++ multiarch, "/lib/" ++ multiarch, "/usr/lib64", "/lib64", "/usr/lib", "/lib"]:
@@ -87,7 +87,7 @@ fn host_library_trusted_dirs(root: &str, arch: &str): host_lib_push_trusted([], 
 /// The directories a link searches for a library the program names, in
 /// order, each existing once. `root` is "" for the running host, else a
 /// sysroot; LIBRARY_PATH is the running host's alone.
-fn host_library_dirs(root: &str, arch: &str) -> List[str]:
+fn host_library_dirs(root: &str, arch: &str):
     var dirs: List[str] = []
     if root.len() == 0:
         for dir in runtime_getenv("LIBRARY_PATH").split(":"):

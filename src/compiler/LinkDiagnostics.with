@@ -6,7 +6,7 @@ fn link_diagnostic_name_byte(ch: i32):
 
 // Read the linker's verdict instead of duplicating its search algorithm.
 // This preserves -L, sysroots, linker scripts, and static/shared selection.
-fn link_missing_libraries(diagnostics: &str) -> List[str]:
+fn link_missing_libraries(diagnostics: &str):
     let missing: List[str] = []
     for line in diagnostics.split("\n"):
         for marker in ["unable to find library -l", "cannot find -l"]:

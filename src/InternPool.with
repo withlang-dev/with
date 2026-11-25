@@ -47,7 +47,7 @@ type InternStringArena {
     offset: i64,
 }
 
-fn InternStringArena.new() -> InternStringArena:
+fn InternStringArena.new():
     let first = with_alloc(INTERN_PAGE_SIZE)
     let arena = InternStringArena { pages: [], offset: INTERN_PAGE_LEAD }
     arena.pages.push(first)
@@ -96,7 +96,7 @@ type InternPool {
     state: *mut InternPoolState,
 }
 
-fn intern_new_map_str_i32 -> HashMap[str, i32]:
+fn intern_new_map_str_i32:
     let map: HashMap[str, i32] = [:]
     map
 
@@ -120,7 +120,7 @@ fn InternPool.init -> InternPool:
     intern_debug_init("InternPool.init:done")
     InternPool { state: ptr }
 
-fn InternPool.new -> InternPool:
+fn InternPool.new:
     InternPool.init()
 
 impl Drop for InternPool:

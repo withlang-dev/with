@@ -269,7 +269,7 @@ fn comptime_value_is_intlike(value: &ComptimeValue) -> bool:
         return true
     false
 
-fn comptime_value_intlike(value: &ComptimeValue) -> i64:
+fn comptime_value_intlike(value: &ComptimeValue):
     value.data0
 
 fn comptime_value_truthy(value: &ComptimeValue) -> i32:
@@ -475,5 +475,5 @@ fn comptime_value_clone(v: &ComptimeValue) -> ComptimeValue:
 // Read-path share: the same copy (#3032 retired the side count that told
 // the two apart). Persistent arena snapshots share too: they retain managed
 // ComptimeValues.
-fn comptime_value_share(v: &ComptimeValue) -> ComptimeValue:
+fn comptime_value_share(v: &ComptimeValue):
     comptime_value_clone(v)

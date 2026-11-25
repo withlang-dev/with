@@ -56,13 +56,13 @@ fn build_graph_resolve_project_path(root: &str, path: &str) -> str:
         return with_str_clone_ref(path)
     resolve_join(root, path)
 
-fn build_graph_resolve_paths(root: &str, paths: &List[str]) -> List[str]:
+fn build_graph_resolve_paths(root: &str, paths: &List[str]):
     let out: List[str] = []
     for path in paths:
         out.push(build_graph_resolve_project_path(root, path))
     out
 
-fn build_graph_clone_strings(values: &List[str]) -> List[str]:
+fn build_graph_clone_strings(values: &List[str]):
     let out: List[str] = []
     for value in values:
         out.push(runtime_str_clone(value))
@@ -87,7 +87,7 @@ fn build_graph_path_basename(path: &str) -> str:
         return with_str_clone_ref(path)
     path.slice(if dir == "/": 1 else: dir.len() + 1, path.len())
 
-fn build_graph_path_has_glob(path: &str) -> bool:
+fn build_graph_path_has_glob(path: &str):
     path.contains("*")
 
 fn build_graph_single_star_pattern_matches(pattern: &str, name: &str) -> bool:
@@ -233,12 +233,12 @@ fn build_graph_env_or_default(name: &str, default_value: &str) -> str:
         return value
     with_str_clone_ref(default_value)
 
-fn build_graph_install_bindir() -> str:
+fn build_graph_install_bindir():
     let prefix = build_graph_env_or_default("PREFIX", "/usr/local")
     let bindir = build_graph_env_or_default("BINDIR", resolve_join(prefix, "bin"))
     build_graph_rt_getenv("DESTDIR") ++ bindir
 
-fn build_graph_install_libdir() -> str:
+fn build_graph_install_libdir():
     resolve_join(build_graph_install_bindir(), "runtime")
 
 // `path`, absolute, relative to `root` when it lies beneath it: "." for the
@@ -260,7 +260,7 @@ fn build_graph_path_under_root(root: &str, path: &str) -> str:
         return norm_path.slice(norm_root.len() + 1, norm_path.len())
     ""
 
-fn build_graph_path_is_install_dest(path: &str) -> bool:
+fn build_graph_path_is_install_dest(path: &str):
     path.starts_with("$HOME/") or path.starts_with("$INSTALL_BINDIR/") or path.starts_with("$INSTALL_LIBDIR/")
 
 fn build_graph_validate_target_containment(root: &str, target: &BuildGraphTarget) -> i32:
@@ -298,7 +298,7 @@ fn build_graph_validate_target_containment(root: &str, target: &BuildGraphTarget
             return 1
     0
 
-fn build_graph_argv_append(argv_blob: &str, arg: &str) -> str:
+fn build_graph_argv_append(argv_blob: &str, arg: &str):
     argv_blob ++ arg ++ "\0"
 
 fn build_graph_exec_argv(target: &BuildGraphTarget, operation_name: &str, argv_blob: &str) -> i32:
@@ -312,7 +312,7 @@ fn build_graph_exec_argv(target: &BuildGraphTarget, operation_name: &str, argv_b
 // and put back after: returns the NAME=old pairs to restore. Every target
 // kind that runs a child reads it (actions in main.with; #965: command and
 // corpus targets, which dropped it).
-fn build_graph_apply_target_env(target: &BuildGraphTarget) -> List[str]:
+fn build_graph_apply_target_env(target: &BuildGraphTarget):
     let saved: List[str] = []
     for i in 0..target.env.len():
         let entry = target.env[i]
@@ -351,7 +351,7 @@ fn build_graph_validate_process_args(target: &BuildGraphTarget) -> i32:
             return 1
     0
 
-fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
+fn build_graph_split_nonempty_lines(text: &str):
     let lines: List[str] = []
     let text_len = text.len()
     var start = 0
@@ -385,7 +385,7 @@ fn build_graph_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-fn build_graph_sorted_strings(items: &List[str]) -> List[str]:
+fn build_graph_sorted_strings(items: &List[str]):
     var sorted: List[str] = []
     for i in 0..items.len():
         let item = items[i]
@@ -414,7 +414,7 @@ fn collect_test_files(target_dir: &str) -> List[str]:
             w_files.push(with_str_clone_ref(path))
     build_graph_sorted_strings(w_files)
 
-fn build_graph_time_fmt(ns: i64) -> str:
+fn build_graph_time_fmt(ns: i64):
     let tenths = ns / 100000000
     f"{tenths / 10}.{tenths % 10}s"
 
@@ -458,7 +458,7 @@ fn build_graph_rss_budget_error(graph: &BuildGraph, name: &str, peak: i64) -> st
 // peaks near 1.5 GB.
 fn build_graph_rss_budget_judged(in_process: bool, runner_fell_back: bool) -> bool: not (in_process and runner_fell_back)
 
-fn build_graph_rss_unjudged_note(name: &str, peak: i64) -> str:
+fn build_graph_rss_unjudged_note(name: &str, peak: i64):
     "the memory budget of '" ++ name ++ f"' is not judged in this run: the build runner did not compile and the driver evaluated the build's actions itself, so the {peak} bytes measured are the driver's"
 
 fn build_graph_times_report(root: &str, names: &List[str], ns_list: &List[i64], rss_list: &List[i64], total_ns: i64):
