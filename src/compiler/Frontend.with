@@ -2213,7 +2213,6 @@ impl Zcu:
             let cimport_ns = runtime_clock_nanos() - t_cimport
             runtime_eprint(f"[profile] frontend.c_import  {cimport_ns / 1000000}.{(cimport_ns % 1000000) / 1000} ms")
         pool.set_local_decl_count(root_local_decl_count)
-        self.sync_frontend_pool()
         frontend_dump_type_decl_names("post-imports", pool, self.pool)
 
         if self.diagnostics.has_errors():
@@ -2271,7 +2270,7 @@ impl Zcu:
             // The comptime transform must run against the same intern pool that
             // pre-sema prepared, otherwise cloned AST symbol ids may be resolved
             // against a stale symbol table in the transform pass.
-            self.pool = pre_sema.pool.clone()
+            self.pool.require_same_storage(pre_sema.pool, "Frontend comptime transform")
             let t_transform = runtime_clock_nanos()
             pool = pre_sema.comptime_transform_module(pool, self.pool)
             if profile_comptime:

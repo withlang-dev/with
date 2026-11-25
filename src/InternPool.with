@@ -146,6 +146,14 @@ impl InternPool:
     fn holders() -> i64:
         self.state.holders
 
+    // #2523: one pool per compilation. A phase handed this compilation's
+    // pool hands the same one back; a different one would lose every symbol
+    // interned since.
+    fn require_same_storage(other: &InternPool, context: &str):
+        if self.state != other.state:
+            with_eprint("BUG: mismatched InternPool storage at " ++ context)
+            abort()
+
     fn intern_str(s: &str) -> Symbol:
         let st = self.state
         let existing = st.symbol_map.get(s)
