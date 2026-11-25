@@ -6660,25 +6660,25 @@ impl ComptimeEvaluator:
         let extra_start = self.ast.get_data0(node)
         let held = []
         for pi in 0..self.ast.get_data1(node) * 2:
-            var signal = self.eval_expr(self.ast.get_extra(extra_start + pi))
+            let signal = self.eval_expr(self.ast.get_extra(extra_start + pi))
             if signal.kind != ComptimeControlKind.CTL_VALUE:
                 return signal
-            held.push(move signal.value)
-        let start = self.extra_values.len() as i32
-        var count = 0
+            held.push(signal)
+        let start = self.extra_values.len()
+        var count: i32 = 0
         var hi = 0
         while hi + 1 < held.len():
             var replaced = false
             for ki in 0..count:
-                if comptime_values_equal(self.extra_value_at(start + ki * 2), held[hi], self.extra_values):
-                    self.extra_values[start + ki * 2 + 1] = comptime_value_clone(held[hi + 1])
+                if comptime_values_equal(self.extra_values[start + ki * 2], held[hi].value, self.extra_values):
+                    self.extra_values[start + ki * 2 + 1] = comptime_value_clone(held[hi + 1].value)
                     replaced = true
             if not replaced:
-                self.extra_values.push(comptime_value_clone(held[hi]))
-                self.extra_values.push(comptime_value_clone(held[hi + 1]))
+                self.extra_values.push(comptime_value_clone(held[hi].value))
+                self.extra_values.push(comptime_value_clone(held[hi + 1].value))
                 count += 1
             hi += 2
-        comptime_control_value(comptime_value_map(map_type, start, count))
+        comptime_control_value(comptime_value_map(map_type, start as i32, count))
 
     mut fn eval_array(node: i32) -> ComptimeControl:
         let extra_start = self.ast.get_data0(node)
