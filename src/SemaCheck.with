@@ -6665,6 +6665,10 @@ impl Sema:
                 // against what the body derived (the direct effects).
                 let clause_bit = if self.from_clause_names_param(node, pi): sema_param_origin_bit(pi) else: 0
                 if clause_bit != 0: eff = eff | EFF_ESCAPE_VIEW
+                // The effects a callee gives a parameter reach it through the
+                // fixpoint, not through this body's own notes. A body checked
+                // again after the fixpoint keeps them.
+                if self.effect_flow_settled: eff = eff | (self.sig_param_effect(sig_idx, pi) & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_RAW_PTR_VALIDITY))
                 self.set_sig_param_effect(sig_idx, pi, eff)
                 self.set_sig_param_direct_effect(sig_idx, pi, direct_eff)
                 let declared_origin = (if facade_declared: self.sig_param_view_origin(sig_idx, pi) else: 0) | clause_bit
@@ -8497,6 +8501,11 @@ impl Sema:
             let saved_vra_count = self.sig_get_param_count(sig_idx)
             for svi in 0..saved_vra_count:
                 saved_vra.push(self.sig_param_uses_value_ref_abi(sig_idx, svi))
+            // The same holds for the effects the fixpoint completed: they
+            // come from the call graph, and the body checked again notes
+            // only its own. The new slots start from them.
+            let settled = (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_RAW_PTR_VALIDITY)
+            let settled_effs = [if self.effect_flow_settled: self.sig_param_effect(sig_idx, spi) & settled else: 0 for spi in 0..saved_vra_count]
             self.sig_type_ids[sig_idx] = 0
             self.sig_ret_types[sig_idx] = ret_tid as i32
             self.sig_param_starts[sig_idx] = ps
@@ -8504,7 +8513,7 @@ impl Sema:
             self.sig_variadic[sig_idx] = 0
             self.sig_param_eff_starts[sig_idx] = self.sig_param_effects.len() as i32
             for cpi in 0..param_count:
-                self.sig_param_effects.push(0)
+                self.sig_param_effects.push(if cpi < settled_effs.len(): settled_effs[cpi] else: 0)
                 self.sig_param_direct_effects.push(0)
                 self.sig_param_view_origins.push(0)
                 self.sig_param_view_through.push(0)

@@ -1082,7 +1082,7 @@ fn analysis_audit_effects(mut report: AnalysisReport, sema: &Sema):
         let propagated = sema.effect_edge_transfer(caller_sig, caller_pi, callee_sig, callee_pi, projection, callee_is_copy)
         let caller = sema.sig_param_effect(caller_sig, caller_pi)
         if (caller & propagated) != propagated:
-            report.fail(f"effect edge sig {caller_sig}:{caller_pi} -> {callee_sig}:{callee_pi} is not at fixpoint; missing={propagated & ~caller}")
+            report.fail(f"effect edge {sema.pool_resolve(sema.sig_names[caller_sig])} param {caller_pi} -> {sema.pool_resolve(sema.sig_names[callee_sig])} param {callee_pi} is not at fixpoint: the caller has {caller}, the callee gives {propagated} (sig {caller_sig} -> {callee_sig}, projection {projection})")
 
 // audit:pool — structural integrity of the parser/pool tier: parallel SoA
 // columns, stride tables, map/vec mirrors, and the cross-module positional

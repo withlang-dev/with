@@ -1,0 +1,32 @@
+//! expect-stdout: ok
+
+// A parameter's effects are complete after the effect fixpoint, and a body
+// checked again after it keeps them. `List.sort_by` passes its comparison to
+// `by_compare`, where it escapes into the returned closure; MIR lowering
+// checks each concrete specialization again, and that second check wrote the
+// body's direct effects over the completed ones. `analyze audit:all` then
+// reported "effect edge … is not at fixpoint" for every program that sorts
+// with a closure. `audit:effects` by itself aborted before it could say so:
+// it ran before the copy-ness table it reads was complete.
+use pre_d_build_runner
+
+fn program_text -> str:
+    "type Entry { start: i32, name: str }\n" ++
+        "fn main:\n" ++
+        "    var entries = [Entry { start: 3, name: \"c\" }, Entry { start: 9, name: \"z\" }, Entry { start: 5, name: \"m\" }]\n" ++
+        "    entries.sort_by((a, b) => b.start - a.start)\n" ++
+        "    for e in entries: print(e.name)\n"
+
+fn main:
+    let case_dir = p7_prepare_case("effects_survive_specialization_recheck", "effects_survive_specialization_recheck")
+    p7_write(case_dir, "src/main.with", program_text())
+    let ran = p7_run(case_dir, "sort_run", "run\0src/main.with\0")
+    p7_assert_success(ran, "a sort with a closure runs")
+    assert(ran.stdout.contains("z\nm\nc"))
+    let all = p7_run(case_dir, "sort_audit_all", "analyze\0src/main.with\0audit:all\0")
+    p7_assert_success(all, "audit:all over a sort with a closure")
+    assert(all.stdout.contains("violations=0"))
+    let effects = p7_run(case_dir, "sort_audit_effects", "analyze\0src/main.with\0audit:effects\0")
+    p7_assert_success(effects, "audit:effects by itself over a sort with a closure")
+    assert(effects.stdout.contains("violations=0"))
+    print("ok")
