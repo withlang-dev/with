@@ -106,6 +106,9 @@ fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci: &Li
         if facade_item_is_handle(pool, item):
             out = out ++ facade_render_handle(pool, intern, ci, item)
             continue
+        if pool.kind(item as NodeId) == NodeKind.NK_FACADE_MESSAGE:
+            out = out ++ facade_render_message(pool, intern, ci, item)
+            continue
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
             let text_view = facade_render_text_view(pool, intern, item)
             out = out ++ facade_render_hosted_fn_errors(pool, intern, ci, item)
@@ -131,6 +134,94 @@ fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci: &Li
     // buffer pairing or a fixed argument and hosted by no resource.
     out = out ++ facade_render_free_ops(pool, intern, ci, facade)
     facade_render_public(out)
+
+// ── D216: a polled tagged message ───────────────────────────────────
+//
+// `message Event wraps Ev` with `from ev_poll(out param 0)`, `tag type` and
+// its cases renders the open sum and the poll:
+//
+//     enum Event ephemeral:
+//         Key(&KeyEv)
+//         Window
+//         Other(u32)
+//     gen fn Event.poll() -> Event:
+//         var raw: Ev
+//         while unsafe { ev_poll(&raw mut raw) }:
+//             let tag = raw.type_
+//             if tag as i64 == EV_KEY as i64: yield Event.Key(&raw.key)
+//             else if tag as i64 >= EV_A as i64 and tag as i64 <= EV_B as i64: yield Event.Window
+//             else: yield Event.Other(tag)
+//
+// The record lives in the generator, so a case's view of it is valid for
+// the loop body that receives it and no longer; the sum is ephemeral, so it
+// cannot be kept past that. Only the shape this function can express is
+// rendered (facade_render_message_presentable); Sema names the others.
+
+// The line of kind `kind` in a message item, or 0.
+fn facade_render_message_line(pool: &AstPool, item: i32, kind: i32) -> i32:
+    let ex = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let line = pool.get_extra(ex + 1 + k)
+        if pool.get_data0(line as NodeId) == kind: return line
+    0
+
+// A record field under C's own name: as written, or with the trailing
+// underscore a With keyword takes on import. (imported name, type text);
+// both "" when the record has no such field.
+fn facade_render_message_field(pool: &AstPool, intern: &InternPool, record: &str, cname: &str) -> (str, str):
+    let direct = facade_render_record_field_type(pool, intern, record, cname)
+    if direct.len() > 0: return (with_str_clone_ref(cname), direct)
+    let escaped = facade_render_record_field_type(pool, intern, record, cname ++ "_")
+    if escaped.len() > 0: return (cname ++ "_", escaped)
+    ("", "")
+
+// Whether this renderer presents the message: the union shape, filled by a
+// producer whose one parameter is the record. The pointer form (`payload`,
+// `release`) and a producer that takes more are not rendered yet (#2425).
+fn facade_render_message_presentable(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> bool:
+    if facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_PAYLOAD) != 0 or facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_RELEASE) != 0: return false
+    let from_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_FROM)
+    if from_line == 0 or facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_TAG) == 0: return false
+    let decl = facade_render_find_fn(pool, intern, ci, pool.get_extra(pool.get_data1(from_line as NodeId)))
+    if decl == 0: return false
+    let meta = pool.find_fn_meta(decl as NodeId)
+    meta >= 0 and pool.fn_meta_param_count(meta) == 1
+
+fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> str:
+    if not facade_render_message_presentable(pool, intern, ci, item): return ""
+    let name = intern.resolve(pool.get_data0(item as NodeId))
+    let ex = pool.get_data1(item as NodeId)
+    let record = render_type_expr(pool, intern, pool.get_extra(ex) as NodeId)
+    let from_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_FROM)
+    let producer = intern.resolve(pool.get_extra(pool.get_data1(from_line as NodeId)))
+    let tag_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_TAG)
+    let (tag_field, tag_type) = facade_render_message_field(pool, intern, record, intern.resolve(pool.get_extra(pool.get_data1(tag_line as NodeId))))
+    if tag_field.len() == 0: return ""
+    var cases = ""
+    var arms = ""
+    for k in 0..pool.get_data2(item as NodeId):
+        let line = pool.get_extra(ex + 1 + k)
+        if pool.get_data0(line as NodeId) != FACADE_CLAUSE_MESSAGE_CASE: continue
+        let ops = pool.get_data1(line as NodeId)
+        let cname = intern.resolve(pool.get_extra(ops))
+        let low = intern.resolve(pool.get_extra(ops + 1))
+        let high_sym = pool.get_extra(ops + 2)
+        let form = pool.get_extra(ops + 3)
+        var carried = ""
+        var value = ""
+        if form == FACADE_MESSAGE_CASE_FIELD:
+            let (member, member_type) = facade_render_message_field(pool, intern, record, intern.resolve(pool.get_extra(ops + 4)))
+            if member.len() == 0: return ""
+            carried = "(&" ++ member_type ++ ")"
+            value = "(&raw." ++ member ++ ")"
+        else if form != FACADE_MESSAGE_CASE_BARE: return ""
+        cases = cases ++ "    " ++ cname ++ carried ++ "\n"
+        let test = if high_sym == 0: "tag as i64 == " ++ low ++ " as i64" else: "tag as i64 >= " ++ low ++ " as i64 and tag as i64 <= " ++ intern.resolve(high_sym) ++ " as i64"
+        arms = arms ++ "        " ++ (if arms.len() == 0: "if " else: "else if ") ++ test ++ ": yield " ++ name ++ "." ++ cname ++ value ++ "\n"
+    if arms.len() == 0: return ""
+    var out = "enum " ++ name ++ " ephemeral:\n" ++ cases ++ "    Other(" ++ tag_type ++ ")\n"
+    out = out ++ "gen fn " ++ name ++ ".poll() -> " ++ name ++ ":\n    var raw: " ++ record ++ "\n    while unsafe { " ++ producer ++ "(&raw mut raw) }:\n        let tag = raw." ++ tag_field ++ "\n" ++ arms ++ "        else: yield " ++ name ++ ".Other(tag)\n"
+    out
 
 // Two presentations of one function (ruling Amendment 3, §16.2b.11): "An fn
 // item may be written more than once when each states a distinct `rename`.

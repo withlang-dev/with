@@ -906,11 +906,8 @@ impl Sema:
             if kind == NodeKind.NK_FACADE_DOMAIN:
                 self.collect_facade_domain(item, self.source_name_for_file_id(self.decl_source_file_id_for_index(di)).starts_with("<toolchain facade "))
             else if kind == NodeKind.NK_FACADE_MESSAGE:
-                // D216 (#2425, in progress on this branch): verified in
-                // verify_facade_polled_messages; not yet presented, so it is
-                // refused by name until it is.
+                // D216: verified in verify_facade_polled_messages.
                 self.facade_message_nodes.push(item)
-                self.emit_error(f"message '{self.pool_resolve(self.ast.get_data0(item))}': the `message` item (D216) is verified but not yet presented (#2425)", item)
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
@@ -3846,7 +3843,13 @@ impl Sema:
             names.push(cname)
             lows.push(low)
             highs.push(high)
-        let _ready = payload_ok
+        // What FacadeRender presents today (facade_render_message_presentable):
+        // the union shape, filled by a producer whose one parameter is the
+        // record. Anything else is refused by name, never left unpresented.
+        if not payload_ok: return
+        if payload_line != 0 or release_line != 0 or self.sig_get_param_count(sig) != 1:
+            let what = if payload_line != 0: "the pointer form ('payload', 'release')" else: f"a producer that takes more than the record ('{pname}' has {self.sig_get_param_count(sig)} parameters)"
+            self.emit_error(f"message '{mname}': {what} is verified but not yet presented (#2425)", item)
 
     // D210 (§16.2b.8): `buffer field P remaining field N` pairs two fields
     // of the record the operation's resource wraps: P a pointer to bytes, N
