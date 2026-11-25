@@ -1,0 +1,13 @@
+//! expect-check-fail: case 'In' claims a tag value that case 'Win' already has
+// D216 (#2425): a range claims every value in it.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Win when EV_A..EV_B
+        case In when EV_A
+
+fn main:
+    print("x")

@@ -1,0 +1,18 @@
+//! expect-check-fail: view 'keep' may outlive its origin 'cb'
+// D216 (#2425): a payload's view ends before its release.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Msg
+        from msg_next(out param 0)
+        tag tag
+        case K when EV_KEY : KeyEv
+        payload data size size
+
+fn main:
+    var keep: Option[&KeyEv] = None
+    for cb in Event.poll():
+        match cb:
+            .K(k) => { keep = Some(k) }
+            _ => {}
+    print(keep.is_some())

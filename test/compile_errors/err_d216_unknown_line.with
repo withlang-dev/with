@@ -1,0 +1,12 @@
+//! expect-check-fail: a message states 'from f(out param N)', 'tag F', 'case Name when CONST', 'payload P size N' or 'release f'
+// D216 (#2425): the item's lines.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tagg type
+        case Key when EV_KEY field key
+
+fn main:
+    print("x")

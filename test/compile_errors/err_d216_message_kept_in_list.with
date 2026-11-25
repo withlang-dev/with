@@ -1,0 +1,16 @@
+//! expect-check-fail: view `kept` may originate from `ev`, which no longer lives here
+// D216 (#2425): a message cannot be kept past the body.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Key when EV_KEY field key
+        case Motion when EV_MOVE field motion
+
+fn main:
+    let kept = []
+    for ev in Event.poll():
+        kept.push(ev)
+    print(kept.len())

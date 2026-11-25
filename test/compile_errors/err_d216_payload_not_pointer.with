@@ -1,0 +1,13 @@
+//! expect-check-fail: 'payload tag' names a field of type i32, not a pointer
+// D216 (#2425): the payload field is a pointer.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Msg
+        from msg_next(out param 0)
+        tag tag
+        case K when EV_KEY : KeyEv
+        payload tag size size
+
+fn main:
+    print("x")

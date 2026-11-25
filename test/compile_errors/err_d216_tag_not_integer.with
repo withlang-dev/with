@@ -1,0 +1,12 @@
+//! expect-check-fail: 'tag f' names a field of type f32, not an integer
+// D216 (#2425): the tag is an integer.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag f
+        case Key when EV_KEY field key
+
+fn main:
+    print("x")

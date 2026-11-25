@@ -1,0 +1,12 @@
+//! expect-check-fail: carries a payload type, and the message states no 'payload P size N'
+// D216 (#2425): a typed case needs the pointer form.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Key when EV_KEY : KeyEv
+
+fn main:
+    print("x")
