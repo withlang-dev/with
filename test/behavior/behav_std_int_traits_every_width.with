@@ -1,0 +1,21 @@
+//! expect-stdout: 9 9 9 9 9 true 0 0 0 0 0
+// Every integer width implements Eq, Ord and Default, so a generic function
+// bounded by one of them takes any of them. i8, i16, u16, u32 and u64 had
+// none: "type 'u64' does not implement trait 'Ord' required by bound".
+fn larger[T: Ord](a: T, b: T) -> T: if a.cmp(&b) > 0: a else: b
+fn same[T: Eq](a: T, b: T) -> bool: a.eq(&b)
+fn zero[T: Default]() -> T: T.default()
+
+fn main:
+    let a: i8 = larger(3, 9)
+    let b: i16 = larger(3, 9)
+    let c: u16 = larger(3, 9)
+    let d: u32 = larger(3, 9)
+    let e: u64 = larger(3, 9)
+    let all = same(a, 9) and same(b, 9) and same(c, 9) and same(d, 9) and same(e, 9)
+    let za: i8 = zero()
+    let zb: i16 = zero()
+    let zc: u16 = zero()
+    let zd: u32 = zero()
+    let ze: u64 = zero()
+    print(f"{a} {b} {c} {d} {e} {all} {za} {zb} {zc} {zd} {ze}")

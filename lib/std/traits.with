@@ -206,9 +206,19 @@ pub trait ScopedMut[T]:
 impl Eq for i32: fn eq(other: &i32): *self == *other
 impl Eq for bool: fn eq(other: &bool): *self == *other
 impl Eq for u8: fn eq(other: &u8): *self == *other
+impl Eq for i8: fn eq(other: &i8): *self == *other
+impl Eq for i16: fn eq(other: &i16): *self == *other
+impl Eq for u16: fn eq(other: &u16): *self == *other
+impl Eq for u32: fn eq(other: &u32): *self == *other
+impl Eq for u64: fn eq(other: &u64): *self == *other
 impl Default for i32: fn default(): 0
 impl Default for i64: fn default(): 0
 impl Default for u8: fn default(): 0
+impl Default for i8: fn default(): 0
+impl Default for i16: fn default(): 0
+impl Default for u16: fn default(): 0
+impl Default for u32: fn default(): 0
+impl Default for u64: fn default(): 0
 impl Default for bool: fn default(): false
 impl Default for str: fn default(): ""
 
@@ -293,6 +303,36 @@ impl Ord for u128:
 
 impl Ord for u8:
     fn cmp(other: &u8) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
+        0
+
+impl Ord for i8:
+    fn cmp(other: &i8) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
+        0
+
+impl Ord for i16:
+    fn cmp(other: &i16) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
+        0
+
+impl Ord for u16:
+    fn cmp(other: &u16) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
+        0
+
+impl Ord for u32:
+    fn cmp(other: &u32) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
+        0
+
+impl Ord for u64:
+    fn cmp(other: &u64) -> i32:
         if *self < *other: return -1
         if *self > *other: return 1
         0
