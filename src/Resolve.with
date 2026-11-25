@@ -1646,6 +1646,17 @@ fn resolve_facade_report_line(report: &str, name: &str) -> str:
 
 type FetchedPackage { name: str, dir: str }
 
+// Whether release `a` of a package comes before release `b`: their dotted
+// parts compared as numbers, a missing part as 0 (`7.9` is before `7.87.0`).
+fn resolve_release_before(a: &str, b: &str) -> bool:
+    let left = a.split(".")
+    let right = b.split(".")
+    for (i, part) in right.enumerate():
+        let have: i64 = if i < left.len(): left[i].parse() ?? 0 else: 0
+        let want: i64 = part.parse() ?? 0
+        if have != want: return have < want
+    false
+
 // The `c.<name> = "<version>"` packages of the project that holds
 // `module_dir`, each with its directory under `.with/deps/c`.
 fn resolve_fetched_packages(module_dir: &str) -> List[FetchedPackage]:

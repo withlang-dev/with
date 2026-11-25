@@ -1623,13 +1623,14 @@ impl Sema:
     // release V of the package. A project that pins an older release is
     // refused; where no release is pinned there is nothing to compare, and
     // the claim stands as the contract states it.
-    mut fn facade_check_release_floor(fname: &str, facade: i32, pi: i32, floor: &str, clause: i32):
+    mut fn facade_check_release_floor(fname: &str, facade: i32, pi: i32, floor_sym: i32, clause: i32):
+        let floor = self.pool_resolve(floor_sym)
         let package = self.pool_resolve(facade)
         for fetched in resolve_fetched_packages(resolve_dirname(self.current_module_path)):
             if fetched.name != package: continue
             let parts = fetched.dir.split("/")
             let pinned = parts[parts.len() - 1]
-            if conan_version_compare(pinned, floor) < 0:
+            if resolve_release_before(pinned, floor):
                 self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed … since {floor}' holds from {package} {floor}, and this project pins {package} {pinned} (§16.2b.11)", clause, f"pin {package} {floor} or later in with.toml, or drop the presentation that needs it")
 
     mut fn collect_fn_clause(fname: &str, c0: ForeignContract, sig: i32, clause: i32) -> ForeignContract:
@@ -2208,7 +2209,7 @@ impl Sema:
             if pi < 0:
                 return c
             let lit = self.ast.get_extra(ops + 1)
-            if self.ast.get_data2(clause) > 2: self.facade_check_release_floor(fname, c.facade, pi, self.pool_resolve(self.ast.get_extra(ops + 2)), clause)
+            if self.ast.get_data2(clause) > 2: self.facade_check_release_floor(fname, c.facade, pi, self.ast.get_extra(ops + 2), clause)
             let ptype = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
             let shown = self.facade_param_display(fn_sym, sig, pi)
             let lk = self.ast.kind(lit)
