@@ -1,0 +1,21 @@
+//! expect-check-fail: view 'last' may outlive its origin 'e'
+// A generator may yield an ephemeral value that views its own locals: the
+// loop holds the frame only while it runs (D69, §13.4), so the loop binding
+// is a local of the body and the value cannot leave it.
+type K { code: i64 }
+type V ephemeral { k: &K }
+enum E ephemeral:
+    Key(&K)
+    Other(i64)
+
+gen fn each() -> E:
+    var k = K { code: 1 }
+    yield E.Key(&k)
+
+fn main:
+    var last = E.Other(0)
+    for e in each():
+        last = e
+    match last:
+        .Key(k) => print(k.code)
+        _ => print(0)
