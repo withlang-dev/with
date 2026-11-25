@@ -30,7 +30,7 @@ impl Zcu:
             let env_units0 = codegen_units_env_count()
             let unit_count0 = if env_units0 > 0: env_units0 else: codegen_units_default_count(self.last_mir_module.body_count())
             if unit_count0 > 1:
-                let backend_pool0 = if self.last_sema.ast.decl_count() > 0: self.last_sema.ast.clone() else: pool.clone()
+                let backend_pool0 = self.backend_ast(pool)
                 return self.compile_units_generated(backend_pool0, opt_level, output_path, debug_info, release, unit_count0)
         // D17/#697: codegen OWNS the sema for the emission (take-and-return,
         // the lower_module pattern) and every exit path hands it back —
@@ -38,8 +38,8 @@ impl Zcu:
         // from are further holders of the sema's (or the zcu's) pools (#2449).
         let sema_decls = self.last_sema.ast.decl_count()
         let sema_symbols = self.last_sema.pool.symbol_count()
-        let backend_pool = if sema_decls > 0: self.last_sema.ast.clone() else: pool.clone()
-        let backend_intern = if sema_symbols > 0: self.last_sema.pool.clone() else: self.pool.clone()
+        let backend_pool = self.backend_ast(pool)
+        let backend_intern = self.backend_intern()
         let cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         // Cloned, never moved (here and at the other Codegen seams): the root
@@ -139,7 +139,7 @@ impl Zcu:
         while k < unit_count:
             // D17/#697: per-round take-and-return — each round's Codegen owns
             // the sema and hands it back before deinit or any early return.
-            let backend_intern = if self.last_sema.pool.symbol_count() > 0: self.last_sema.pool.clone() else: self.pool.clone()
+            let backend_intern = self.backend_intern()
             let cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, backend_intern, move self.last_sema)
             cg.source_file = with_str_clone_ref(self.current_source_path)
             cg.source_text = with_str_clone_ref(self.current_source_text)
@@ -207,8 +207,8 @@ impl Zcu:
         // further holders (#2449).
         let sema_decls = self.last_sema.ast.decl_count()
         let sema_symbols = self.last_sema.pool.symbol_count()
-        let backend_pool = if sema_decls > 0: self.last_sema.ast.clone() else: pool.clone()
-        let backend_intern = if sema_symbols > 0: self.last_sema.pool.clone() else: self.pool.clone()
+        let backend_pool = self.backend_ast(pool)
+        let backend_intern = self.backend_intern()
         let cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
@@ -251,7 +251,7 @@ impl Zcu:
         // further holders; nothing is lent, so nothing is restored after
         // take_sema.
         let use_sema_ast = self.last_sema.ast.decl_count() > 0
-        let backend_intern = if self.last_sema.pool.symbol_count() > 0: self.last_sema.pool.clone() else: self.pool.clone()
+        let backend_intern = self.backend_intern()
         var cg = Codegen.init_with_opt_and_intern("with_analysis", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
