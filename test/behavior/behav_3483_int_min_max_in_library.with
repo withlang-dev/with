@@ -1,0 +1,15 @@
+//! expect-stdout: 3 7 1 4294967295 -128 127 9223372036854775807 5 2.5 5
+// #3483: integer `min` and `max` are library methods (the MinMax trait's
+// default bodies). Unsigned operands compare unsigned (#511), a literal
+// takes the receiver's width, the type constants `i64.max` and `i8.min`
+// are still the constants, a method value works, and float `min` is the
+// built-in it was.
+fn main:
+    let a: i32 = 7
+    let big: u32 = 4294967295
+    let lo: i8 = -128
+    let hi: i8 = 127
+    let wide: i64 = 5
+    let f: f64 = 2.5
+    let smaller = i64.min
+    print(f"{a.min(3)} {a.max(3)} {big.min(1)} {big.max(1)} {lo.min(hi)} {lo.max(hi)} {i64.max} {wide.min(i64.max)} {f.min(9.0)} {wide.max(-3)}")

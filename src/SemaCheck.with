@@ -10072,8 +10072,6 @@ impl Sema:
             if method_name == "clz": return MirIntrinsic.CLZ
             if method_name == "ctz": return MirIntrinsic.CTZ
             if method_name == "bitreverse": return MirIntrinsic.BITREVERSE
-            if method_name == "min": return MirIntrinsic.MIN
-            if method_name == "max": return MirIntrinsic.MAX
             if method_name == "abs": return MirIntrinsic.ABS
         if tk == TypeKind.TY_FLOAT:
             if method_name == "min": return MirIntrinsic.MIN
@@ -36910,7 +36908,7 @@ impl Sema:
             if len_method_ret != 0:
                 return len_method_ret
         if tk == TypeKind.TY_INT:
-            if method_name == "rotate_left" or method_name == "rotate_right" or method_name == "swap_bytes" or method_name == "bitreverse" or method_name == "min" or method_name == "max":
+            if method_name == "rotate_left" or method_name == "rotate_right" or method_name == "swap_bytes" or method_name == "bitreverse":
                 return recv_type
             if method_name == "popcount" or method_name == "clz" or method_name == "ctz":
                 return self.ty_i32 as i32

@@ -201,6 +201,25 @@ pub trait ScopedMut[T]:
     fn with_enter_mut(self: &Self) -> T
     mut fn with_exit_mut(value: T) -> Unit
 
+/// The smaller and the larger of two integers. Declared here, as D110 asks
+/// of every built-in method (#3483); each compiles to a compare and a select.
+pub trait MinMax:
+    fn min(self: &Self, other: Self) -> Self: if other < *self: other else: *self
+    fn max(self: &Self, other: Self) -> Self: if other > *self: other else: *self
+
+impl MinMax for i8
+impl MinMax for i16
+impl MinMax for i32
+impl MinMax for i64
+impl MinMax for i128
+impl MinMax for isize
+impl MinMax for u8
+impl MinMax for u16
+impl MinMax for u32
+impl MinMax for u64
+impl MinMax for u128
+impl MinMax for usize
+
 // Core trait impls for primitive types
 
 impl Eq for i32: fn eq(other: &i32): *self == *other
