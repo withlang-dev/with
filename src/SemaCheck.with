@@ -9990,10 +9990,7 @@ impl Sema:
             return self.builtin_sig_index.get((owner, 0)) ?? &-1
         match self.builtin_sig_index.get((owner, method)):
             Some(row) => row
-            None =>
-                // `FixedString[N]` instances are named `FixedString__N`.
-                let fixed = self.pool_lookup_symbol("FixedString")
-                if self.builtin_sig_index.contains((fixed, method)) and self.pool_resolve(named).starts_with("FixedString"): self.builtin_sig_index.get((fixed, method)) ?? &-1 else: -1
+            None => -1
 
     // D110: resolve builtin call `node` to its declared signature once, when
     // Sema checks it; MIR lowering reads the row from the node.
@@ -10126,16 +10123,6 @@ impl Sema:
             return MirIntrinsic.NONE
         if type_name == "FixedString" or type_name.starts_with("FixedString__"):
             if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
-            if method_name == "len": return MirIntrinsic.FIXED_STRING_LEN
-            if method_name == "len_i32": return MirIntrinsic.FIXED_STRING_LEN32
-            if method_name == "len_i64": return MirIntrinsic.FIXED_STRING_LEN64
-            if method_name == "capacity": return MirIntrinsic.FIXED_STRING_CAPACITY
-            if method_name == "is_empty": return MirIntrinsic.FIXED_STRING_IS_EMPTY
-            if method_name == "clear": return MirIntrinsic.FIXED_STRING_CLEAR
-            if method_name == "push_byte": return MirIntrinsic.FIXED_STRING_PUSH_BYTE
-            if method_name == "push_str": return MirIntrinsic.FIXED_STRING_PUSH_STR
-            if method_name == "as_view": return MirIntrinsic.FIXED_STRING_AS_VIEW
-            if method_name == "equals": return MirIntrinsic.FIXED_STRING_EQUALS
             return MirIntrinsic.NONE
         if type_name == "ListSlot":
             if method_name == "get": return MirIntrinsic.VECSLOT_GET
@@ -37998,10 +37985,6 @@ impl Sema:
         if type_name_sym == self.syms.hashset:
             if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
                 return ReceiverMode.Mut
-        if type_name_sym == self.syms.fixed_string:
-            let method_name = self.pool_resolve(field)
-            if method_name == "clear" or method_name == "push_byte" or method_name == "push_str":
-                return ReceiverMode.Mut
         let method_name = self.pool_resolve(field)
         if type_name_sym == self.syms.option:
             if method_name == "unwrap" or method_name == "expect" or method_name == "unwrap_or" or method_name == "unwrap_or_else" or method_name == "map" or method_name == "and_then" or method_name == "or_else" or method_name == "filter" or method_name == "zip" or method_name == "unzip" or method_name == "flatten" or method_name == "inspect" or method_name == "transpose":
@@ -39612,41 +39595,11 @@ impl Sema:
                     let set_arg_ty = arg_types[0]
                     if slot_elem_ty != 0 and set_arg_ty != 0:
                         self.check_builtin_method_call_arg(mc_call_name, 0, slot_elem_ty, set_arg_ty, self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.fixed_string:
-                if mc_method_name_raw == "push_byte":
-                    if arg_count != 1:
-                        self.emit_error("FixedString.push_byte() expects exactly one argument", node)
-                    else:
-                        let fs_byte_ty = arg_types[0]
-                        self.check_builtin_method_call_arg(mc_call_name, 0, self.ty_u8 as i32, fs_byte_ty, self.ast.get_extra(extra_start))
-                else if mc_method_name_raw == "push_str" or mc_method_name_raw == "equals":
-                    if arg_count != 1:
-                        self.emit_error("FixedString." ++ mc_method_name_raw ++ "() expects exactly one argument", node)
-                    else:
-                        let fs_str_ty = arg_types[0]
-                        self.check_builtin_method_call_arg(mc_call_name, 0, self.ty_str_view as i32, fs_str_ty, self.ast.get_extra(extra_start))
-                else if mc_method_name_raw == "clear" or mc_method_name_raw == "is_empty" or mc_method_name_raw == "as_view" or mc_method_name_raw == "capacity" or mc_method_name_raw == "len_i32" or mc_method_name_raw == "len_i64" or self.is_collection_len_method(field):
-                    if arg_count != 0:
-                        self.emit_error("FixedString." ++ mc_method_name_raw ++ "() expects no arguments", node)
             // Return types for builtin generic methods
             let generic_len_ret = self.collection_len_method_return_type(mc_method_name_raw)
             if type_name_sym == self.syms.fixed_string:
                 if field == self.syms.new:
                     return recv_type as i32
-                if generic_len_ret != 0:
-                    return generic_len_ret
-                if mc_method_name_raw == "len_i32":
-                    return self.ty_i32 as i32
-                if mc_method_name_raw == "len_i64":
-                    return self.ty_i64 as i32
-                if mc_method_name_raw == "capacity":
-                    return self.ty_isize as i32
-                if mc_method_name_raw == "is_empty" or mc_method_name_raw == "push_byte" or mc_method_name_raw == "push_str" or mc_method_name_raw == "equals":
-                    return self.ty_bool as i32
-                if mc_method_name_raw == "clear":
-                    return self.ty_void as i32
-                if mc_method_name_raw == "as_view":
-                    return self.ty_str as i32
             if type_name_sym == self.syms.list:
                 if field == self.syms.push:
                     return self.ty_void as i32

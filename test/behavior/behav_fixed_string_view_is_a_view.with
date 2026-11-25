@@ -1,0 +1,25 @@
+//! expect-stdout: first gone 4 abcd true false false
+// #3483: FixedString's methods are declared in the library. `as_view` is a
+// view of the value (`-> &str from self`): a binding of it is its own copy
+// (D111), so rewriting the buffer does not change it, and text returned from
+// the function that owns the buffer is a copy. Built in, the binding read
+// the rewritten bytes and the returned text was dead stack memory.
+use std.fixed_string.FixedString
+
+fn label() -> str:
+    var s = FixedString[8].new()
+    let _ = s.push_str("gone")
+    s.as_view()
+
+fn count(s: &str) -> isize: s.len()
+
+fn main:
+    var s = FixedString[8].new()
+    let _ = s.push_str("first")
+    let kept = s.as_view()
+    s.clear()
+    let _ = s.push_str("SECOND")
+    var t = FixedString[8].new()
+    assert(t.push_str("abc") and t.push_byte(100 as u8))
+    assert(not t.push_str("12345"))
+    print(f"{kept} {label()} {count(t.as_view())} {t.as_view()} {t.equals("abcd")} {t.equals("abcx")} {t.equals("abc")}")
