@@ -65,6 +65,12 @@ fn main -> i32:
     if argv[1] == "--probe": return probe(argv[2])
     let url = argv[1] ++ ""
     let output = argv[2] ++ ""
+    // The pause doubles: 5, 10, 20, 40 s. A server that answers 503 while it
+    // restarts is back within a minute far more often than within the
+    // 20 s the old 2, 4, 6, 8 s pauses covered (the nightly of 2026-11-25:
+    // gitlab.gnome.org, five 503s in 20 s). Five attempts of at most 30 s
+    // and 75 s of pauses stay inside the caller's 300 s deadline.
+    var pause = 5
     for attempt in 1i32..ATTEMPTS + 1:
         // Each failed attempt says what it got (#3083). Seed-bound: this
         // program is compiled by the pinned seed, whose std has no
@@ -78,6 +84,7 @@ fn main -> i32:
             print(f"HTTPS download failed (attempt {attempt} of {ATTEMPTS}): no response (a connection, TLS, redirect or short-body failure)")
         else:
             print(f"HTTPS download failed (attempt {attempt} of {ATTEMPTS}): HTTP {response.status}")
-        if attempt < ATTEMPTS: sleep_secs(2 * attempt)
+        if attempt < ATTEMPTS: sleep_secs(pause)
+        pause = pause * 2
     print(f"HTTPS download failed after {ATTEMPTS} attempts: " ++ url)
     1
