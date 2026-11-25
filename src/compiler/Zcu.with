@@ -525,6 +525,17 @@ impl Zcu:
     mut fn set_pending_warnings(warnings: List[str]):
         self.pending_warnings = warnings
 
+    // #2523: the pools a backend run holds are this compilation's. A Sema
+    // that has checked the program interned into the same pool and typed
+    // the same tree; a blank one (between a take and its return) holds none.
+    fn backend_intern() -> InternPool:
+        if self.last_sema.pool.symbol_count() > 0: self.pool.require_same_storage(self.last_sema.pool, "Zcu.backend_intern")
+        self.pool.clone()
+
+    fn backend_ast(tree: &AstPool) -> AstPool:
+        if self.last_sema.ast.decl_count() > 0: self.last_sema.ast.require_same_storage(tree, "Zcu.backend_ast")
+        tree.clone()
+
     mut fn sync_from_sema(sema: Sema):
         if zcu_debug_pool_flow_enabled():
             runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_count()} sema.pool={sema.pool.symbol_count()} sema.ast.decls={sema.ast.decl_count()}")
