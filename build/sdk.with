@@ -2868,11 +2868,162 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     sdk_write_linux_sysroot_pack(ctx, tree, pack_path)
 
+// ── The floor stubs (#3603) ──────────────────────────────────────────
+//
+// usr/lib/floor: the same stub libraries with one difference. In usr/lib a
+// symbol that exists only above the pin is the default version, so that a
+// prebuilt archive compiled against a newer glibc links. A build system's
+// probe is an unversioned reference too: CMake asked whether memset_explicit
+// (glibc 2.43) exists, the stub answered, curl called it, and the program
+// could not start on the machine that built it. Under usr/lib/floor such a
+// symbol is there only by its versioned name, so the probe's link fails and
+// the library takes its fallback. `with cc` searches it first; a With
+// program's own link reads usr/lib as before.
+//
+// The names a compile reaches without asking for them stay default: a newer
+// glibc's headers turn `stat` into a call of the real function and C23
+// turns `strtol` into `__isoc23_strtol`, and an archive built there has no
+// other spelling to offer.
+fn sdk_floor_keeps(name: &str) -> bool:
+    if name.starts_with("__isoc23_"): return true
+    for kept in ["stat", "fstat", "lstat", "fstatat", "stat64", "fstat64", "lstat64", "fstatat64", "mknod", "mknodat", "__libc_single_threaded", "_dl_find_object"]:
+        if name == kept: return true
+    false
+
+// Little-endian, `n` bytes at `at`.
+fn sdk_elf_le(bytes: &List[u8], at: i64, n: i64) -> i64:
+    var v: i64 = 0
+    var i = n - 1
+    while i >= 0:
+        v = v * 256 + bytes[(at + i) as i32] as i64
+        i = i - 1
+    v
+
+fn sdk_elf_cstr(bytes: &List[u8], at: i64) -> str:
+    var out = StringBuilder.with_capacity(32)
+    var i = at
+    while i < bytes.len() as i64 and bytes[i as i32] != 0:
+        out.push_byte(bytes[i as i32])
+        i = i + 1
+    out.to_str()
+
+// "GLIBC_2.43" is 43 and "GLIBC_2.2.5" is 2; a name of another shape
+// (GLIBC_PRIVATE, the library's own base version) is -1.
+fn sdk_glibc_minor_of(name: &str) -> i64:
+    if not name.starts_with("GLIBC_2."): return -1
+    var minor: i64 = 0
+    var i = 8
+    var any = false
+    while i < name.len() and name[i] >= '0' and name[i] <= '9':
+        minor = minor * 10 + (name[i] - '0') as i64
+        any = true
+        i = i + 1
+    if any: minor else: -1
+
+// One stub library with every default symbol whose version is above the pin
+// made non-default (the hidden bit of its .gnu.version entry), the kept
+// names aside. An empty vector is a file that is not such an ELF64 object.
+pub fn sdk_elf_floor_stub(bytes: &List[u8], pin_minor: i32) -> List[u8]:
+    var out: List[u8] = List.new()
+    let len = bytes.len() as i64
+    if len < 64 or bytes[0] != 127 or bytes[1] != 'E' or bytes[2] != 'L' or bytes[3] != 'F' or bytes[4] != 2 or bytes[5] != 1: return out
+    let shoff = sdk_elf_le(bytes, 40, 8)
+    let shentsize = sdk_elf_le(bytes, 58, 2)
+    let shnum = sdk_elf_le(bytes, 60, 2)
+    if shentsize != 64 or shoff <= 0 or shoff + shnum * 64 > len: return out
+    var dynsym_off: i64 = 0
+    var dynsym_size: i64 = 0
+    var dynstr_off: i64 = 0
+    var versym_off: i64 = 0
+    var versym_size: i64 = 0
+    var verdef_off: i64 = 0
+    var verdef_str: i64 = 0
+    for s in 0..shnum:
+        let sh = shoff + s * 64
+        let kind = sdk_elf_le(bytes, sh + 4, 4)
+        let link = sdk_elf_le(bytes, sh + 40, 4)
+        let link_off = if link < shnum: sdk_elf_le(bytes, shoff + link * 64 + 24, 8) else: 0
+        if kind == 11:
+            dynsym_off = sdk_elf_le(bytes, sh + 24, 8)
+            dynsym_size = sdk_elf_le(bytes, sh + 32, 8)
+            dynstr_off = link_off
+        else if kind == 0x6fffffff:
+            versym_off = sdk_elf_le(bytes, sh + 24, 8)
+            versym_size = sdk_elf_le(bytes, sh + 32, 8)
+        else if kind == 0x6ffffffd:
+            verdef_off = sdk_elf_le(bytes, sh + 24, 8)
+            verdef_str = link_off
+    if dynsym_off == 0 or versym_off == 0 or verdef_off == 0 or dynstr_off == 0 or verdef_str == 0: return out
+    if dynsym_off + dynsym_size > len or versym_off + versym_size > len or versym_size * 12 != dynsym_size: return out
+    // The version indices above the pin.
+    var above: List[i64] = List.new()
+    var vd = verdef_off
+    while vd + 20 <= len:
+        let ndx = sdk_elf_le(bytes, vd + 4, 2) & 0x7fff
+        let aux = vd + sdk_elf_le(bytes, vd + 12, 4)
+        if aux + 8 > len: return out
+        let minor = sdk_glibc_minor_of(sdk_elf_cstr(bytes, verdef_str + sdk_elf_le(bytes, aux, 4)))
+        if minor > pin_minor as i64: above.push(ndx)
+        let next = sdk_elf_le(bytes, vd + 16, 4)
+        if next == 0: break
+        vd = vd + next
+    // Each dynamic symbol: whether its version entry takes the hidden bit.
+    var hide: List[bool] = List.new()
+    let count = versym_size / 2
+    for i in 0..count:
+        let entry = sdk_elf_le(bytes, versym_off + i * 2, 2)
+        let sym = dynsym_off + i * 24
+        var is_above = false
+        for a in above:
+            if a == (entry & 0x7fff): is_above = true
+        let defined = sdk_elf_le(bytes, sym + 6, 2) != 0
+        let is_default = (entry & 0x8000) == 0
+        hide.push(is_above and defined and is_default and not sdk_floor_keeps(sdk_elf_cstr(bytes, dynstr_off + sdk_elf_le(bytes, sym, 4))))
+    for i in 0..len:
+        let b = bytes[i as i32]
+        let rel = i - versym_off
+        if rel >= 0 and rel < versym_size and rel % 2 == 1 and hide[(rel / 2) as i32]: out.push(b | 128)
+        else: out.push(b)
+    out
+
+// usr/lib/floor under `tree`: every stub library through sdk_elf_floor_stub,
+// and beside them the linker scripts and the objects those name, so that a
+// script found there resolves there.
+fn sdk_write_floor_stubs(ctx: &ActionCtx, tree: &str) -> i32:
+    let fs = ctx.fs()
+    let lib = sdk_join(tree, "usr/lib")
+    let floor = sdk_join(lib, "floor")
+    let _old = fs.remove_tree(floor)
+    if fs.mkdir_all(floor) != 0:
+        return sdk_fail(ctx, "could not create " ++ floor)
+    let files = sdk_merge_sort_strings(fs.list_files(lib))
+    var stubs = 0
+    for i in 0..files.len():
+        let rel = sdk_rel_path(lib, sdk_normalize(files[i]))
+        if rel.contains("/") or not (rel.starts_with("lib") or rel.starts_with("ld-")): continue
+        let bytes = fs.read_binary(files[i])
+        if rel.contains(".so."):
+            let patched = sdk_elf_floor_stub(&bytes, SDK_LINUX_GLIBC_MINOR)
+            if patched.len() != bytes.len():
+                return sdk_fail(ctx, "the stub library " ++ files[i] ++ " is not an ELF64 object with version definitions; its floor copy cannot be made")
+            if fs.write_binary(sdk_join(floor, rel), patched) != 0:
+                return sdk_fail(ctx, "could not write " ++ sdk_join(floor, rel))
+            stubs = stubs + 1
+        else if fs.write_binary(sdk_join(floor, rel), bytes) != 0:
+            return sdk_fail(ctx, "could not write " ++ sdk_join(floor, rel))
+    if stubs == 0:
+        return sdk_fail(ctx, "no stub library under " ++ lib)
+    0
+
 // The pack of a linux sysroot tree: "F <path> <size>\n<bytes>" per file in
 // sorted order, as the darwin pack. One writer for a tree just generated and
 // for one copied out of the SDK, so the two are the same bytes.
 fn sdk_write_linux_sysroot_pack(ctx: &ActionCtx, tree: &str, pack_path: &str) -> i32:
     let fs = ctx.fs()
+    // #3603: made here, for a tree just generated and for one copied out of
+    // an SDK built before the floor stubs existed.
+    let floor_rc = sdk_write_floor_stubs(ctx, tree)
+    if floor_rc != 0: return floor_rc
     let files = sdk_merge_sort_strings(fs.list_files(tree))
     var pack = StringBuilder.with_capacity(24000000)
     pack.push_str("WITH-SYSROOT 1\n")
