@@ -6946,11 +6946,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.VECSLOT_GET: return CcBuiltin.VECSLOT_GET
     if intrinsic == MirIntrinsic.VECSLOT_SET: return CcBuiltin.VECSLOT_SET
     if intrinsic == MirIntrinsic.SLOTMAP_NEW: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.SLOTMAP_INSERT: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.SLOTMAP_GET: return CcBuiltin.SLOTMAP
     if intrinsic == MirIntrinsic.SLOTMAP_SLOT: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.SLOTMAP_REMOVE: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.SLOTMAP_REPLACE: return CcBuiltin.SLOTMAP
     if intrinsic == MirIntrinsic.SLOTMAP_GET_DISJOINT: return CcBuiltin.SLOTMAP
     if intrinsic == MirIntrinsic.SLOTMAPSLOT_GET: return CcBuiltin.SLOTMAP
     if intrinsic == MirIntrinsic.SLOTMAPSLOT_SET: return CcBuiltin.SLOTMAP

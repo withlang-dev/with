@@ -10128,11 +10128,7 @@ impl Sema:
             return MirIntrinsic.NONE
         if type_name == "SlotMap":
             if method_name == "new": return MirIntrinsic.SLOTMAP_NEW
-            if method_name == "insert": return MirIntrinsic.SLOTMAP_INSERT
-            if method_name == "get": return MirIntrinsic.SLOTMAP_GET
             if method_name == "slot": return MirIntrinsic.SLOTMAP_SLOT
-            if method_name == "remove": return MirIntrinsic.SLOTMAP_REMOVE
-            if method_name == "replace": return MirIntrinsic.SLOTMAP_REPLACE
             if method_name == "get_disjoint": return MirIntrinsic.SLOTMAP_GET_DISJOINT
             return MirIntrinsic.NONE
         if type_name == "SlotMapSlot":
@@ -28875,11 +28871,7 @@ impl Sema:
             if set_slot != MirIntrinsic.NONE and set_slot != MirIntrinsic.MAP_VALUE_AT and set_slot != MirIntrinsic.MAP_TAKE_AT:
                 return true
         if owner_sym == self.syms.slotmap:
-            if field == self.syms.new or field == self.syms.insert or field == self.syms.get:
-                return true
-            if field == self.syms.slot or field == self.syms.get_disjoint:
-                return true
-            if field == self.syms.remove or field == self.syms.replace:
+            if field == self.syms.new or field == self.syms.slot or field == self.syms.get_disjoint:
                 return true
         if owner_sym == self.syms.slotmapslot:
             if field == self.syms.get or self.pool_resolve(field) == "set":
@@ -36835,10 +36827,6 @@ impl Sema:
                 return recv_type
             if tk == TypeKind.TY_GENERIC_INST:
                 let elem_ty = self.get_generic_inst_arg(resolved as i32, 0)
-                if field == self.syms.insert:
-                    return self.ensure_handle_type_for(elem_ty)
-                if field == self.syms.get:
-                    return self.ensure_option_ref_type_for(elem_ty)
                 if field == self.syms.slot:
                     return self.ensure_slotmapslot_type_for(elem_ty)
                 if field == self.syms.get_disjoint:
@@ -36847,8 +36835,6 @@ impl Sema:
                     elems.push(slot_ty)
                     elems.push(slot_ty)
                     return self.ensure_tuple_type(elems, 2) as i32
-                if field == self.syms.remove or field == self.syms.replace:
-                    return self.ensure_option_type_for(elem_ty)
         if owner_sym == self.syms.slotmapslot:
             if tk == TypeKind.TY_GENERIC_INST:
                 if field == self.syms.get:
@@ -37113,9 +37099,6 @@ impl Sema:
         if owner_sym == self.syms.hashmapentry:
             if (method_name == "set" or method_name == "or_insert") and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 1)
-        if owner_sym == self.syms.slotmap:
-            if field == self.syms.insert and arg_index == 0:
-                return self.get_generic_inst_arg(resolved as i32, 0)
         if owner_sym == self.syms.fixed_string:
             if method_name == "push_byte" and arg_index == 0:
                 return self.ty_u8 as i32
@@ -39553,25 +39536,11 @@ impl Sema:
             else if type_name_sym == self.syms.slotmap:
                 let sm_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                 let sm_handle_ty = self.ensure_handle_type_for(sm_elem_ty)
-                if field == self.syms.insert:
-                    if arg_count >= 1:
-                        let a0_ty = arg_types[0]
-                        if sm_elem_ty != 0 and a0_ty != 0:
-                            self.check_builtin_method_call_arg(mc_call_name, 0, sm_elem_ty, a0_ty, self.ast.get_extra(extra_start))
-                else if field == self.syms.get or field == self.syms.slot or field == self.syms.remove or field == self.syms.contains:
+                if field == self.syms.slot:
                     if arg_count >= 1:
                         let h_ty = arg_types[0]
                         if sm_handle_ty != 0 and h_ty != 0:
                             self.check_builtin_method_call_arg(mc_call_name, 0, sm_handle_ty, h_ty, self.ast.get_extra(extra_start))
-                else if field == self.syms.replace:
-                    if arg_count >= 1:
-                        let h_ty2 = arg_types[0]
-                        if sm_handle_ty != 0 and h_ty2 != 0:
-                            self.check_builtin_method_call_arg(mc_call_name, 0, sm_handle_ty, h_ty2, self.ast.get_extra(extra_start))
-                    if arg_count >= 2:
-                        let v_ty = arg_types[1]
-                        if sm_elem_ty != 0 and v_ty != 0:
-                            self.check_builtin_method_call_arg(mc_call_name, 1, sm_elem_ty, v_ty, self.ast.get_extra(extra_start + 1))
                 else if field == self.syms.get_disjoint:
                     for sm_hi in 0..2:
                         if arg_count > sm_hi:
@@ -39721,11 +39690,6 @@ impl Sema:
                     return generic_len_ret
             if type_name_sym == self.syms.slotmap:
                 let sm_elem_ret_ty = self.get_generic_inst_arg(recv_type, 0)
-                if field == self.syms.insert:
-                    return self.ensure_handle_type_for(sm_elem_ret_ty)
-                if field == self.syms.get:
-                    self.record_builtin_receiver_view_origins(node, expr)
-                    return self.ensure_option_ref_type_for(sm_elem_ret_ty)
                 if field == self.syms.slot:
                     return self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
                 if field == self.syms.get_disjoint:
@@ -39734,12 +39698,6 @@ impl Sema:
                     sm_tuple_elems.push(sm_slot_ty)
                     sm_tuple_elems.push(sm_slot_ty)
                     return self.ensure_tuple_type(sm_tuple_elems, 2) as i32
-                if field == self.syms.remove or field == self.syms.replace:
-                    return self.ensure_option_type_for(sm_elem_ret_ty)
-                if field == self.syms.contains:
-                    return self.ty_bool as i32
-                if generic_len_ret != 0:
-                    return generic_len_ret
             if type_name_sym == self.syms.slotmapslot:
                 if field == self.syms.get:
                     return self.check_slot_get_copy("SlotMapSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
@@ -39970,7 +39928,7 @@ impl Sema:
             // Builtin eliminators must transfer semantic origin sets exactly as
             // their non-builtin equivalents; no intrinsic may become an origin
             // erasure boundary.
-            if field == self.syms.get and (type_name_sym == self.syms.hashmap or type_name_sym == self.syms.slotmap):
+            if field == self.syms.get and type_name_sym == self.syms.hashmap:
                 self.record_builtin_receiver_view_origins(node, expr)
             self.typed_expr_types.insert(node, builtin_ret)
             return builtin_ret
