@@ -1619,6 +1619,20 @@ impl Sema:
         c.user_data_node = clause
         c
 
+    // D235 (§16.2b.11): `param N fixed L since V` is a claim that holds from
+    // release V of the package. A project that pins an older release is
+    // refused; where no release is pinned there is nothing to compare, and
+    // the claim stands as the contract states it.
+    mut fn facade_check_release_floor(fname: &str, facade: i32, pi: i32, floor_sym: i32, clause: i32):
+        let floor = self.pool_resolve(floor_sym)
+        let package = self.pool_resolve(facade)
+        for fetched in resolve_fetched_packages(resolve_dirname(self.current_module_path)):
+            if fetched.name != package: continue
+            let parts = fetched.dir.split("/")
+            let pinned = parts[parts.len() - 1]
+            if resolve_release_before(pinned, floor):
+                self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed … since {floor}' holds from {package} {floor}, and this project pins {package} {pinned} (§16.2b.11)", clause, f"pin {package} {floor} or later in with.toml, or drop the presentation that needs it")
+
     mut fn collect_fn_clause(fname: &str, c0: ForeignContract, sig: i32, clause: i32) -> ForeignContract:
         if self.ast.get_data0(clause) == FACADE_CLAUSE_CALLBACK_ARGV:
             return self.collect_argv_clause(fname, c0, sig, clause)
@@ -2195,6 +2209,7 @@ impl Sema:
             if pi < 0:
                 return c
             let lit = self.ast.get_extra(ops + 1)
+            if self.ast.get_data2(clause) > 2: self.facade_check_release_floor(fname, c.facade, pi, self.ast.get_extra(ops + 2), clause)
             let ptype = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
             let shown = self.facade_param_display(fn_sym, sig, pi)
             let lk = self.ast.kind(lit)
