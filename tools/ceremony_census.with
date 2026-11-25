@@ -19,6 +19,8 @@
 //                    annotation restates what the use decides
 //   index-loop       `for i in 0..xs.len():` — a loop over a list iterates
 //                    the list (`for x in xs`)
+//   index-comprehension  `[f(xs[i]) for i in 0..xs.len()]` — the same loop
+//                    inside a comprehension (`[f(x) for x in xs]`)
 //   numbered-kind-const  `const KIND_A: i32 = 1` / `const KIND_B: i32 = 2` …
 //                    consecutive numbered constants: a closed set of kinds
 //                    is an enum (counted per member of a run)
@@ -206,12 +208,21 @@ impl Census:
             else if tag == TokenKind.TK_KW_FOR and i + 4 < n and tokens.get_tag(i + 1) == TokenKind.TK_IDENT and tokens.get_tag(i + 2) == TokenKind.TK_KW_IN and word(i + 3) == "0" and tokens.get_tag(i + 4) == TokenKind.TK_DOT_DOT:
                 // `for i in 0..xs.len():` (with or without `as T`): a loop over
                 // a list iterates the list.
+                // The range ends at the loop's colon, or, in a comprehension,
+                // at its `if` or its closing bracket.
                 var j = i + 5
-                while j < n and tokens.get_tag(j) != TokenKind.TK_COLON and tokens.get_tag(j) != TokenKind.TK_NEWLINE: j = j + 1
+                var open = 0
+                while j < n and tokens.get_tag(j) != TokenKind.TK_COLON and tokens.get_tag(j) != TokenKind.TK_NEWLINE and tokens.get_tag(j) != TokenKind.TK_KW_IF:
+                    if tokens.get_tag(j) == TokenKind.TK_L_BRACKET: open = open + 1
+                    if tokens.get_tag(j) == TokenKind.TK_R_BRACKET:
+                        if open == 0: break
+                        open = open - 1
+                    j = j + 1
+                let statement = j < n and tokens.get_tag(j) == TokenKind.TK_COLON
                 var k = j - 1
                 if k >= 2 and tokens.get_tag(k - 1) == TokenKind.TK_KW_AS: k = k - 2
                 if k >= 3 and tokens.get_tag(k) == TokenKind.TK_R_PAREN and tokens.get_tag(k - 1) == TokenKind.TK_L_PAREN and word(k - 2) == "len" and tokens.get_tag(k - 3) == TokenKind.TK_DOT:
-                    self.bump(f"index-loop\t{area}")
+                    self.bump(if statement: f"index-loop\t{area}" else: f"index-comprehension\t{area}")
             else if tag == TokenKind.TK_KW_CONST and i + 5 < n and tokens.get_tag(i + 1) == TokenKind.TK_IDENT and tokens.get_tag(i + 2) == TokenKind.TK_COLON and tokens.get_tag(i + 4) == TokenKind.TK_EQ and tokens.get_tag(i + 5) == TokenKind.TK_INT_LIT:
                 // `const KIND_A: i32 = 1` followed by `const KIND_B: i32 = 2`:
                 // a numbered closed set of kinds is an enum. Each member of a
@@ -320,20 +331,22 @@ fn main:
             exit_code(2)
         i = i + 1
     if diff_rev.len() > 0:
-        var before = Census { counts: BTreeMap.new() }
-        var after = Census { counts: BTreeMap.new() }
+        // File by file: a pattern removed from one file does not pay for
+        // one added to another. A file new at this revision starts from zero.
         let files = changed_counted_files(diff_rev)
+        var rose = 0
         for path in files:
+            var before = Census { counts: BTreeMap.new() }
+            var after = Census { counts: BTreeMap.new() }
             before.count_lexical_text(text_at_rev(diff_rev, path), area_of(path))
             after.count_lexical(path)
-        var rose = 0
-        for (key, now) in after.counts:
-            let was = before.counts.get(key) ?? 0
-            if now > was:
-                rose = rose + 1
-                eprint(f"ceremony-census: {key.replace("\t", " in ")} rose {was} -> {now} in the files changed vs {diff_rev}; remove the new ceremony (typed patterns are covered by the full run)")
-            else if now < was:
-                print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> {now} in the files changed vs {diff_rev}")
+            for (key, now) in after.counts:
+                let was = before.counts.get(key) ?? 0
+                let pattern = key.split("\t")[0]
+                if now > was:
+                    rose = rose + 1
+                    eprint(f"ceremony-census: {path}: {pattern} rose {was} -> {now} vs {diff_rev}; remove the new ceremony (typed patterns are covered by the full run)")
+                else if now < was: print(f"ceremony-census: {path}: {pattern} fell {was} -> {now} vs {diff_rev}")
         if rose > 0: exit_code(1)
         print(f"ceremony-census: diff ok ({files.len()} counted files changed vs {diff_rev}; lexical patterns only)")
         return
