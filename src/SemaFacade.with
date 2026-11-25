@@ -904,6 +904,10 @@ impl Sema:
             let kind = self.ast.kind(item)
             if kind == NodeKind.NK_FACADE_DOMAIN:
                 self.collect_facade_domain(item, self.source_name_for_file_id(self.decl_source_file_id_for_index(di)).starts_with("<toolchain facade "))
+            else if kind == NodeKind.NK_FACADE_MESSAGE:
+                // D216, in progress on this branch (#2425): parsed, not yet
+                // verified or rendered. Refused by name until it is.
+                self.emit_error(f"message '{self.pool_resolve(self.ast.get_data0(item))}': the `message` item (D216) is parsed but not yet verified or presented (#2425)", item)
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
