@@ -5702,6 +5702,30 @@ impl Sema:
             else if self_tid != 0:
                 self.named_types.remove(self.syms.self_type)
 
+    // #3061 item 1: a private function's written return type that is the
+    // type its body's tail has. A candidate only: whether the tail has that
+    // type without the annotation's demand, and whether the function then
+    // infers the same type, is the rewriter's to show (CeremonyFix). A `pub`
+    // signature is a declared guarantee and stays written (D172); a generic
+    // function, an `async`, `gen`, `comptime` or `@[tailrec]` one, an entry
+    // point and a trait impl's method are left alone.
+    mut fn note_restated_fn_return(node: i32, meta: i32, flags: i32, body: i32, body_ty: TypeId, ret_type: i32, copies: bool, fn_name: i32):
+        if meta < 0 or copies: return
+        let ret_node = self.ast.fn_meta_ret(meta)
+        if ret_node == 0 or self.ast.fn_meta_tp_count(meta) != 0: return
+        if (flags / FnFlags.PUB) % 2 == 1 or (flags / FnFlags.ASYNC) % 2 == 1 or (flags / FnFlags.GEN) % 2 == 1 or (flags / FnFlags.COMPTIME) % 2 == 1 or (flags / FnFlags.TAILREC) % 2 == 1: return
+        if self.fn_decl_is_entry_point(node) != 0 or self.method_impl_nodes.contains(fn_name): return
+        let owner_sym = self.method_decl_owner_symbol(node, self.ast.get_data0(node))
+        if owner_sym != 0 and self.type_decl_type_param_count(owner_sym) != 0: return
+        let declared = self.resolve_alias(ret_type as TypeId)
+        if declared == 0 or declared == self.ty_void or declared == self.ty_never or self.resolve_alias(body_ty) != declared: return
+        let inner = self.fn_body_inner(body)
+        let tail = if self.ast.kind(inner) == NodeKind.NK_BLOCK: self.ast.get_data2(inner) else: inner
+        if tail == 0: return
+        self.ceremony_fn_rets.insert(ret_node, tail)
+        self.ceremony_fn_ret_names.insert(ret_node, fn_name)
+        self.ceremony_let_paths.insert(ret_node, self.ceremony_node_path(ret_node))
+
     // #3061 / #2519: a trait impl method's written return type that is the
     // trait's own. Unwritten, the method has the same return (the contract
     // is published before any body is checked), so the words can go. Only
@@ -6579,6 +6603,7 @@ impl Sema:
             self.body_typed_sigs.insert(sig_idx, 1)
         else:
             self.check_annotated_body_result(body, body_ty, body_expected_ret, body_materializes_copy, sig_idx)
+            if trait_contract.ok == 0: self.note_restated_fn_return(node, meta, flags, body, body_ty, ret_type, body_materializes_copy, fn_name)
 
         // @[tailrec] enforcement: verify all recursive calls are in tail position
         if (flags / FnFlags.TAILREC) % 2 == 1:
