@@ -2276,6 +2276,8 @@ type Sema {
     facade_layout_msgs: List[str],
     facade_convention_nodes: List[i32],
     facade_message_nodes: List[i32],                      // D216: the `message` items, verified once every import is typed
+    facade_message_sums: List[str],                       // D216: the names of the open sums those items present
+    facade_message_case_consts: List[str],                // D216: "<Sum>\t<CONST>\t<Case>" for each constant a named case claims
     // §31.7: the overriding clauses a recorded proof contradicts, and the
     // proof each stands against (parallel).
     facade_override_against: List[i32],
@@ -4491,6 +4493,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         facade_layout_msgs: [],
         facade_convention_nodes: [],
         facade_message_nodes: [],
+        facade_message_sums: [],
+        facade_message_case_consts: [],
         facade_override_against: [],
         facade_override_proofs: [],
         facade_callback_methods: [],

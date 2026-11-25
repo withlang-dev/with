@@ -906,8 +906,20 @@ impl Sema:
             if kind == NodeKind.NK_FACADE_DOMAIN:
                 self.collect_facade_domain(item, self.source_name_for_file_id(self.decl_source_file_id_for_index(di)).starts_with("<toolchain facade "))
             else if kind == NodeKind.NK_FACADE_MESSAGE:
-                // D216: verified in verify_facade_polled_messages.
+                // D216: verified in verify_facade_polled_messages. What a
+                // `match` on its sum is held to is known from the item alone.
                 self.facade_message_nodes.push(item)
+                let sum = self.pool_resolve(self.ast.get_data0(item))
+                self.facade_message_sums.push(sum)
+                let mex = self.ast.get_data1(item)
+                for mk in 0..self.ast.get_data2(item):
+                    let mline = self.ast.get_extra(mex + 1 + mk)
+                    if self.ast.get_data0(mline) != FACADE_CLAUSE_MESSAGE_CASE: continue
+                    let mops = self.ast.get_data1(mline)
+                    // A range's ends are named; what lies between has no name to compare with.
+                    for which in 1..3:
+                        let csym = self.ast.get_extra(mops + which)
+                        if csym != 0: self.facade_message_case_consts.push(sum ++ "\t" ++ self.pool_resolve(csym) ++ "\t" ++ self.pool_resolve(self.ast.get_extra(mops)))
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
