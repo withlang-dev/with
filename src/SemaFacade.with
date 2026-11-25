@@ -3762,7 +3762,6 @@ impl Sema:
         if self.resolve_alias(self.sig_return_type(sig) as TypeId) != self.ty_bool:
             self.emit_error_with_help(f"message '{mname}': '{pname}' returns {self.type_name(self.sig_return_type(sig))}; a message's producer returns bool, true when it produced one (D216)", from_line, "a poll that reports another way is not yet a message producer")
         // The payload pair, when the message is the pointer form.
-        var payload_ok = payload_line == 0
         if payload_line != 0:
             let pops = self.ast.get_data1(payload_line)
             let ptr_c = self.ast.get_extra(pops)
@@ -3779,7 +3778,6 @@ impl Sema:
                     self.emit_error_with_help(f"message '{mname}': 'payload {self.pool_resolve(ptr_c)}' names a field of type {self.type_name(pt as i32)}, not a pointer (D216)", payload_line, "after 'payload' name the field that points at the payload")
                 else if self.get_type_kind(self.resolve_alias(self.numeric_operand_type(st) as TypeId)) != TypeKind.TY_INT:
                     self.emit_error_with_help(f"message '{mname}': 'size {self.pool_resolve(size_c)}' names a field of type {self.type_name(st)}, not an integer (D216)", payload_line, "after 'size' name the field holding the payload's size in bytes")
-                else: payload_ok = true
         if release_line != 0:
             let releaser = self.ast.get_extra(self.ast.get_data1(release_line))
             let rsig = self.facade_fn_sig(releaser, release_line)
@@ -3843,13 +3841,20 @@ impl Sema:
             names.push(cname)
             lows.push(low)
             highs.push(high)
-        // What FacadeRender presents today (facade_render_message_presentable):
-        // the union shape, filled by a producer whose one parameter is the
-        // record. Anything else is refused by name, never left unpresented.
-        if not payload_ok: return
-        if payload_line != 0 or release_line != 0 or self.sig_get_param_count(sig) != 1:
-            let what = if payload_line != 0: "the pointer form ('payload', 'release')" else: f"a producer that takes more than the record ('{pname}' has {self.sig_get_param_count(sig)} parameters)"
-            self.emit_error(f"message '{mname}': {what} is verified but not yet presented (#2425)", item)
+        // `release f` runs after each body with what the producer was given,
+        // the record aside: it takes exactly those parameters, in order.
+        if release_line != 0 and payload_line != 0:
+            let releaser = self.ast.get_extra(self.ast.get_data1(release_line))
+            let rsig = self.get_sig(releaser)
+            if rsig >= 0:
+                var same = self.sig_get_param_count(rsig) == self.sig_get_param_count(sig) - 1
+                var ri = 0
+                for pi in 0..self.sig_get_param_count(sig):
+                    if pi == filled or not same: continue
+                    if self.resolve_alias(self.sig_param_type(rsig, ri) as TypeId) != self.resolve_alias(self.sig_param_type(sig, pi) as TypeId): same = false
+                    ri += 1
+                if not same:
+                    self.emit_error_with_help(f"message '{mname}': 'release {self.pool_resolve(releaser)}' is called with what '{pname}' was given besides the record, and its parameters are not those (D216)", release_line, "a release takes the producer's other parameters, in order")
 
     // D210 (§16.2b.8): `buffer field P remaining field N` pairs two fields
     // of the record the operation's resource wraps: P a pointer to bytes, N

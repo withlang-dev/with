@@ -175,17 +175,31 @@ fn facade_render_message_field(pool: &AstPool, intern: &InternPool, record: &str
     if escaped.len() > 0: return (cname ++ "_", escaped)
     ("", "")
 
-// Whether this renderer presents the message: the union shape, filled by a
-// producer whose one parameter is the record. The pointer form (`payload`,
-// `release`) and a producer that takes more are not rendered yet (#2425).
+// Whether this renderer presents the message, which Sema's verification
+// mirrors (verify_facade_polled_message): its producer is declared, and a
+// `release` takes exactly what the producer takes besides the record.
 fn facade_render_message_presentable(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> bool:
-    if facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_PAYLOAD) != 0 or facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_RELEASE) != 0: return false
     let from_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_FROM)
     if from_line == 0 or facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_TAG) == 0: return false
-    let decl = facade_render_find_fn(pool, intern, ci, pool.get_extra(pool.get_data1(from_line as NodeId)))
+    let ops = pool.get_data1(from_line as NodeId)
+    let decl = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
     if decl == 0: return false
+    let filled = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
     let meta = pool.find_fn_meta(decl as NodeId)
-    meta >= 0 and pool.fn_meta_param_count(meta) == 1
+    if meta < 0 or filled < 0 or filled >= pool.fn_meta_param_count(meta): return false
+    let release_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_RELEASE)
+    if release_line == 0: return true
+    if facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_PAYLOAD) == 0: return false
+    let releaser = facade_render_find_fn(pool, intern, ci, pool.get_extra(pool.get_data1(release_line as NodeId)))
+    if releaser == 0: return false
+    let rmeta = pool.find_fn_meta(releaser as NodeId)
+    if rmeta < 0 or pool.fn_meta_param_count(rmeta) != pool.fn_meta_param_count(meta) - 1: return false
+    var ri = 0
+    for pi in 0..pool.fn_meta_param_count(meta):
+        if pi == filled: continue
+        if facade_render_param_type(pool, intern, releaser, ri) != facade_render_param_type(pool, intern, decl, pi): return false
+        ri += 1
+    true
 
 fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> str:
     if not facade_render_message_presentable(pool, intern, ci, item): return ""
@@ -193,12 +207,43 @@ fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], it
     let ex = pool.get_data1(item as NodeId)
     let record = render_type_expr(pool, intern, pool.get_extra(ex) as NodeId)
     let from_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_FROM)
-    let producer = intern.resolve(pool.get_extra(pool.get_data1(from_line as NodeId)))
+    let from_ops = pool.get_data1(from_line as NodeId)
+    let decl = facade_render_find_fn(pool, intern, ci, pool.get_extra(from_ops))
+    let producer = intern.resolve(pool.get_extra(from_ops))
+    let filled = facade_render_param_ref(pool, intern, decl, pool.get_extra(from_ops + 1))
     let tag_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_TAG)
     let (tag_field, tag_type) = facade_render_message_field(pool, intern, record, intern.resolve(pool.get_extra(pool.get_data1(tag_line as NodeId))))
     if tag_field.len() == 0: return ""
+    // The poll's parameters are the producer's, the record aside; `release`
+    // takes the same ones.
+    var params = ""
+    var call_args = ""
+    var passed = ""
+    var raw_pointer_passed = false
+    for pi in 0..pool.fn_meta_param_count(pool.find_fn_meta(decl as NodeId)):
+        if call_args.len() > 0: call_args = call_args ++ ", "
+        if pi == filled:
+            call_args = call_args ++ "&raw mut raw"
+            continue
+        let ptype = facade_render_param_type(pool, intern, decl, pi)
+        if ptype.starts_with("*"): raw_pointer_passed = true
+        params = params ++ (if params.len() > 0: ", " else: "") ++ f"p{pi}: " ++ ptype
+        passed = passed ++ (if passed.len() > 0: ", " else: "") ++ f"p{pi}"
+        call_args = call_args ++ f"p{pi}"
+    // The pointer form: the payload's two fields.
+    let payload_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_PAYLOAD)
+    var ptr_field = ""
+    var size_field = ""
+    if payload_line != 0:
+        let pops = pool.get_data1(payload_line as NodeId)
+        let (pf, _) = facade_render_message_field(pool, intern, record, intern.resolve(pool.get_extra(pops)))
+        let (sf, _) = facade_render_message_field(pool, intern, record, intern.resolve(pool.get_extra(pops + 1)))
+        if pf.len() == 0 or sf.len() == 0: return ""
+        ptr_field = pf
+        size_field = sf
     var cases = ""
     var arms = ""
+    var viewers = ""
     for k in 0..pool.get_data2(item as NodeId):
         let line = pool.get_extra(ex + 1 + k)
         if pool.get_data0(line as NodeId) != FACADE_CLAUSE_MESSAGE_CASE: continue
@@ -209,18 +254,39 @@ fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], it
         let form = pool.get_extra(ops + 3)
         var carried = ""
         var value = ""
+        var test = if high_sym == 0: "tag as i64 == " ++ low ++ " as i64" else: "tag as i64 >= " ++ low ++ " as i64 and tag as i64 <= " ++ intern.resolve(high_sym) ++ " as i64"
         if form == FACADE_MESSAGE_CASE_FIELD:
             let (member, member_type) = facade_render_message_field(pool, intern, record, intern.resolve(pool.get_extra(ops + 4)))
             if member.len() == 0: return ""
             carried = "(&" ++ member_type ++ ")"
             value = "(&raw." ++ member ++ ")"
-        else if form != FACADE_MESSAGE_CASE_BARE: return ""
+        else if form == FACADE_MESSAGE_CASE_TYPE:
+            if ptr_field.len() == 0: return ""
+            // A typed case only when the pointer is non-null, the payload is
+            // large enough and the pointer is aligned for the type (D216);
+            // anything else is `Other(tag)`.
+            let payload_type = render_type_expr(pool, intern, pool.get_extra(ops + 4) as NodeId)
+            carried = "(&" ++ payload_type ++ ")"
+            test = test ++ " and raw." ++ ptr_field ++ " != null and raw." ++ size_field ++ " as i64 >= sizeof[" ++ payload_type ++ "]() as i64 and (raw." ++ ptr_field ++ " as i64) % (alignof[" ++ payload_type ++ "]() as i64) == 0"
+            // The view is taken through a function of the record, so that
+            // it is a view of the record: it then ends with the loop body,
+            // before the release. Read straight off the raw pointer it would
+            // view nothing the checker knows.
+            let viewer = "__with_message_" ++ name ++ "_" ++ cname
+            viewers = viewers ++ "fn " ++ viewer ++ "(record: &" ++ record ++ ") -> &" ++ payload_type ++ ": unsafe { &*(record." ++ ptr_field ++ " as *const " ++ payload_type ++ ") }\n"
+            value = "(" ++ viewer ++ "(&raw))"
         cases = cases ++ "    " ++ cname ++ carried ++ "\n"
-        let test = if high_sym == 0: "tag as i64 == " ++ low ++ " as i64" else: "tag as i64 >= " ++ low ++ " as i64 and tag as i64 <= " ++ intern.resolve(high_sym) ++ " as i64"
         arms = arms ++ "        " ++ (if arms.len() == 0: "if " else: "else if ") ++ test ++ ": yield " ++ name ++ "." ++ cname ++ value ++ "\n"
     if arms.len() == 0: return ""
-    var out = "enum " ++ name ++ " ephemeral:\n" ++ cases ++ "    Other(" ++ tag_type ++ ")\n"
-    out = out ++ "gen fn " ++ name ++ ".poll() -> " ++ name ++ ":\n    var raw: " ++ record ++ "\n    while unsafe { " ++ producer ++ "(&raw mut raw) }:\n        let tag = raw." ++ tag_field ++ "\n" ++ arms ++ "        else: yield " ++ name ++ ".Other(tag)\n"
+    // `release f`: after the body returns, however it leaves (a `break`
+    // included), before the next poll.
+    var release = ""
+    let release_line = facade_render_message_line(pool, item, FACADE_CLAUSE_MESSAGE_RELEASE)
+    if release_line != 0:
+        let call = intern.resolve(pool.get_extra(pool.get_data1(release_line as NodeId))) ++ "(" ++ passed ++ ")"
+        release = "        defer: " ++ (if raw_pointer_passed: "unsafe { " ++ call ++ " }" else: call) ++ "\n"
+    var out = "enum " ++ name ++ " ephemeral:\n" ++ cases ++ "    Other(" ++ tag_type ++ ")\n" ++ viewers
+    out = out ++ "gen fn " ++ name ++ ".poll(" ++ params ++ ") -> " ++ name ++ ":\n    var raw: " ++ record ++ "\n    while unsafe { " ++ producer ++ "(" ++ call_args ++ ") }:\n" ++ release ++ "        let tag = raw." ++ tag_field ++ "\n" ++ arms ++ "        else: yield " ++ name ++ ".Other(tag)\n"
     out
 
 // Two presentations of one function (ruling Amendment 3, §16.2b.11): "An fn
