@@ -220,6 +220,7 @@ fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], it
     var call_args = ""
     var passed = ""
     var raw_pointer_passed = false
+    var resource_passed = false
     for pi in 0..pool.fn_meta_param_count(pool.find_fn_meta(decl as NodeId)):
         if call_args.len() > 0: call_args = call_args ++ ", "
         if pi == filled:
@@ -227,6 +228,7 @@ fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], it
             continue
         let ptype = facade_render_param_type(pool, intern, decl, pi)
         if ptype.starts_with("*"): raw_pointer_passed = true
+        if facade_render_resources_wrapping(pool, intern, facade_render_unalias(pool, intern, ptype)) > 0: resource_passed = true
         params = params ++ (if params.len() > 0: ", " else: "") ++ f"p{pi}: " ++ ptype
         passed = passed ++ (if passed.len() > 0: ", " else: "") ++ f"p{pi}"
         call_args = call_args ++ f"p{pi}"
@@ -285,8 +287,18 @@ fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], it
     if release_line != 0:
         let call = intern.resolve(pool.get_extra(pool.get_data1(release_line as NodeId))) ++ "(" ++ passed ++ ")"
         release = "        defer: " ++ (if raw_pointer_passed: "unsafe { " ++ call ++ " }" else: call) ++ "\n"
-    var out = "enum " ++ name ++ " ephemeral:\n" ++ cases ++ "    Other(" ++ tag_type ++ ")\n" ++ viewers
-    out = out ++ "gen fn " ++ name ++ ".poll(" ++ params ++ ") -> " ++ name ++ ":\n    var raw: " ++ record ++ "\n    while unsafe { " ++ producer ++ "(" ++ call_args ++ ") }:\n" ++ release ++ "        let tag = raw." ++ tag_field ++ "\n" ++ arms ++ "        else: yield " ++ name ++ ".Other(tag)\n"
+    // A message with `release` whose producer receives no resource has
+    // nothing a poll could borrow, and a poll begun inside the body of
+    // another would release the payload the outer body still views. One
+    // flag per message: the second poll panics (D216, Eric 2026-11-25).
+    var guard_decl = ""
+    var guard = ""
+    if release_line != 0 and not resource_passed:
+        let flag = "__with_message_" ++ name ++ "_polling"
+        guard_decl = "global var " ++ flag ++ " = false\n"
+        guard = "    if " ++ flag ++ ": panic(\"" ++ name ++ ".poll: a poll of this message is already running, and its release would end the payload that loop is reading\")\n    " ++ flag ++ " = true\n    defer: " ++ flag ++ " = false\n"
+    var out = "enum " ++ name ++ " ephemeral:\n" ++ cases ++ "    Other(" ++ tag_type ++ ")\n" ++ viewers ++ guard_decl
+    out = out ++ "gen fn " ++ name ++ ".poll(" ++ params ++ ") -> " ++ name ++ ":\n" ++ guard ++ "    var raw: " ++ record ++ "\n    while unsafe { " ++ producer ++ "(" ++ call_args ++ ") }:\n" ++ release ++ "        let tag = raw." ++ tag_field ++ "\n" ++ arms ++ "        else: yield " ++ name ++ ".Other(tag)\n"
     out
 
 // Two presentations of one function (ruling Amendment 3, §16.2b.11): "An fn
