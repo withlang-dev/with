@@ -10135,9 +10135,6 @@ impl Sema:
             if method_name == "slot": return MirIntrinsic.SLOTMAP_SLOT
             if method_name == "remove": return MirIntrinsic.SLOTMAP_REMOVE
             if method_name == "replace": return MirIntrinsic.SLOTMAP_REPLACE
-            if method_name == "contains": return MirIntrinsic.SLOTMAP_CONTAINS
-            let slotmap_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.SLOTMAP_LEN, method_name)
-            if slotmap_len_intrinsic != MirIntrinsic.NONE: return slotmap_len_intrinsic
             if method_name == "get_disjoint": return MirIntrinsic.SLOTMAP_GET_DISJOINT
             return MirIntrinsic.NONE
         if type_name == "SlotMapSlot":
@@ -28886,8 +28883,6 @@ impl Sema:
                 return true
             if field == self.syms.remove or field == self.syms.replace:
                 return true
-            if field == self.syms.contains or self.is_collection_len_method(field):
-                return true
         if owner_sym == self.syms.slotmapslot:
             if field == self.syms.get or self.pool_resolve(field) == "set":
                 return true
@@ -36856,10 +36851,6 @@ impl Sema:
                     return self.ensure_tuple_type(elems, 2) as i32
                 if field == self.syms.remove or field == self.syms.replace:
                     return self.ensure_option_type_for(elem_ty)
-                if field == self.syms.contains:
-                    return self.ty_bool as i32
-                if len_method_ret != 0:
-                    return len_method_ret
         if owner_sym == self.syms.slotmapslot:
             if tk == TypeKind.TY_GENERIC_INST:
                 if field == self.syms.get:

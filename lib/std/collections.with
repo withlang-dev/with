@@ -688,6 +688,18 @@ pub type SlotMap[T] {
     ptr: *const i8,
 }
 
+// Declared here, as D110 asks of every built-in method (#3483).
+impl[T] SlotMap[T]:
+    /// Whether `h` still names a live value: a removed slot's handle does not.
+    pub fn contains(h: Handle[T]) -> bool: with_slotmap_contains(self.ptr as *mut u8, h.index, h.generation) != 0
+
+    /// The number of live values.
+    pub fn len() -> isize: with_slotmap_len(self.ptr as *mut u8) as isize
+    pub fn len32() -> i32: with_slotmap_len(self.ptr as *mut u8) as i32
+    pub fn len64() -> i64: with_slotmap_len(self.ptr as *mut u8)
+    pub fn ulen32() -> u32: with_slotmap_len(self.ptr as *mut u8) as u32
+    pub fn is_empty() -> bool: self.len() == 0
+
 /// Scoped mutable slot handle returned by SlotMap.slot/get_disjoint.
 /// Use `.get()` / `.set(value)` inside the `with` block, matching ListSlot.
 pub type SlotMapSlot[T] ephemeral {
