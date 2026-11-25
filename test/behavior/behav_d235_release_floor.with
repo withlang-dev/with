@@ -1,0 +1,24 @@
+//! expect-stdout: ok
+
+use pre_d_build_runner
+
+// D235 (#3122, §16.2b.11): `param N fixed null since V` is a claim that holds
+// from release V of the package. A project that pins an older release is
+// refused, naming both releases; one that pins V or later builds. And the
+// name after `rename` may be a keyword, as a member name may: `rename with`.
+fn release_floor_project(dir: &str, pinned: &str):
+    p7_write(dir, "with.toml", "[package]\nname = \"release_floor\"\nversion = \"0.1.0\"\n\n[deps]\nc.mimelib = \"" ++ pinned ++ "\"\n")
+    p7_write(dir, ".with/deps/c/mimelib/" ++ pinned ++ "/metadata.json", "{\n  \"name\": \"mimelib\",\n  \"version\": \"" ++ pinned ++ "\",\n  \"include_paths\": [\"include\"],\n  \"lib_paths\": [],\n  \"libs\": [],\n  \"defines\": [],\n  \"link_args\": [],\n  \"components\": []\n}\n")
+    p7_write(dir, ".with/deps/c/mimelib/" ++ pinned ++ "/include/mime.h", "typedef struct easy { int count; } easy;\ntypedef struct mime { int parts; } mime;\nstatic inline easy *easy_init(void) { static easy e; e.count = 7; return &e; }\nstatic inline void easy_cleanup(easy *e) { (void)e; }\nstatic inline int easy_count(easy *e) { return e->count; }\nstatic inline mime *mime_init(easy *e) { static mime m; m.parts = e ? 2 : 1; return &m; }\nstatic inline void mime_free(mime *m) { (void)m; }\nstatic inline int mime_parts(mime *m) { return m->parts; }\n")
+    p7_write(dir, "src/contracts/mimelib.with", "use c_import(\"mime.h\")\n\nc contract mimelib:\n    resource Easy wraps *mut easy\n        from easy_init\n        drop easy_cleanup\n    resource Mime wraps *mut mime\n        from mime_init\n        drop mime_free\n    fn mime_init\n        rename new\n        param 0 fixed null since 7.87.0    // mime.h: a null parent is accepted from 7.87.0\n    fn mime_parts\n        lend\n    fn easy_count\n        rename with\n        lend\n    fn easy_init\n        rename new\n")
+    p7_write(dir, "src/main.with", "use contracts.mimelib\nuse c_import(\"mime.h\")\n\nfn solo() -> Mime: Mime.new().unwrap()\n\nfn main:\n    let e = Easy.new().unwrap()\n    let m = solo()\n    print(f\"{m.parts()} {e.with()}\")\n")
+    p7_write(dir, "build.with", "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let out = ctx.new_build().executable(\"release_floor\", \"src/main.with\")\n    out.default(\"release_floor\")\n")
+
+fn main:
+    let old = p7_prepare_case("d235_release_floor_old", "release_floor")
+    release_floor_project(old, "7.80.0")
+    p7_assert_failure_contains(p7_run(old, "build", p7_build_args()), "holds from mimelib 7.87.0, and this project pins mimelib 7.80.0", "a claim with a floor is refused against an older pinned release")
+    let new = p7_prepare_case("d235_release_floor_new", "release_floor")
+    release_floor_project(new, "7.90.1")
+    p7_assert_success(p7_run(new, "build", p7_build_args()), "a release at or past the floor builds")
+    print("ok")

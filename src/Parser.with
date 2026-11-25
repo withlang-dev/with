@@ -5243,6 +5243,19 @@ impl Parser:
     // The literal a fixed argument binds (§16.2b.11): an integer literal,
     // negated or not, `null`, `true` or `false` — a value whose C type Sema
     // can check against the parameter's, never an expression.
+    // A release of a package as its maker writes it (`7.87.0`): the digits
+    // and dots up to the next blank, as one name.
+    mut fn parse_facade_release() -> i32:
+        let start = self.current_start()
+        var end = start
+        while (self.peek() == TokenKind.TK_INT_LIT or self.peek() == TokenKind.TK_FLOAT_LIT or self.peek() == TokenKind.TK_DOT) and (end == start or self.current_start() == end):
+            end = self.current_end()
+            self.advance()
+        if end == start:
+            self.emit_error("'since' names the release the claim holds from: 'param 0 fixed null since 7.87.0' (§16.2b.11)")
+            return 0
+        self.intern.intern(self.source.slice(start, end))
+
     mut fn parse_facade_fixed_literal() -> i32:
         let t = self.peek()
         if t == TokenKind.TK_MINUS: return self.parse_unary_negate() as i32
@@ -5508,7 +5521,9 @@ impl Parser:
             ops.push(res)
         else if word == "rename":
             kind = FACADE_CLAUSE_RENAME
-            let n = self.expect_ident()
+            // The presented name is a member name, and a member name may be a
+            // keyword (D235): `rename with`.
+            let n = self.expect_ident_or_keyword()
             if n == 0: return 0
             ops.push(n)
         else if word == "valid":
@@ -5870,6 +5885,12 @@ impl Parser:
             if lit == 0: return 0
             ops.push(r)
             ops.push(lit)
+            // `since V` (D235): the release of the package the claim holds from.
+            if self.current_ident_is("since"):
+                self.advance()
+                let floor = self.parse_facade_release()
+                if floor == 0: return 0
+                ops.push(floor)
         else:
             self.emit_error("unknown facade clause '" ++ word ++ "' (§16.2b)")
             return 0
