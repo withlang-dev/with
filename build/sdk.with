@@ -1977,7 +1977,37 @@ fn sdk_libxml2_xmlversion(template: &str) -> str:
 fn sdk_declared_source_dir(scratch: &str, name: &str, top: &str) -> str:
     sdk_join(sdk_join(scratch, name), top)
 
-fn sdk_materialize_declared_source(ctx: &ActionCtx, scratch: &str, name: &str, url: &str, sha256: &str, top: &str) -> i32:
+// A pinned source archive of the darwin sysroot: its name, its sha256, the
+// directory it unpacks to and where its maker publishes it.
+type SdkPinnedSource {
+    name: str,
+    sha256: str,
+    top: str,
+    upstream: str,
+}
+
+fn sdk_declared_sources() -> List[SdkPinnedSource]:
+    [
+        SdkPinnedSource { name: "sqlite3", sha256: SDK_SQLITE3_TAR_GZ_SHA256, top: "sqlite-autoconf-3320200", upstream: "https://www.sqlite.org/2020/sqlite-autoconf-3320200.tar.gz" },
+        SdkPinnedSource { name: "bzip2", sha256: SDK_BZIP2_TAR_GZ_SHA256, top: "bzip2-" ++ SDK_BZIP2_VERSION, upstream: "https://sourceware.org/pub/bzip2/bzip2-" ++ SDK_BZIP2_VERSION ++ ".tar.gz" },
+        SdkPinnedSource { name: "libxml2", sha256: SDK_LIBXML2_TAR_GZ_SHA256, top: "libxml2-v" ++ SDK_LIBXML2_VERSION, upstream: "https://gitlab.gnome.org/GNOME/libxml2/-/archive/v" ++ SDK_LIBXML2_VERSION ++ "/libxml2-v" ++ SDK_LIBXML2_VERSION ++ ".tar.gz" },
+        SdkPinnedSource { name: "curl", sha256: SDK_CURL_TAR_GZ_SHA256, top: "curl-curl-7_64_1", upstream: "https://github.com/curl/curl/archive/refs/tags/curl-7_64_1.tar.gz" },
+    ]
+
+// Our own copy of a pinned archive: an asset of the `sdk-sources` release,
+// named by the archive's sha256.
+fn sdk_source_mirror_url(sha256: &str): "https://github.com/withlang-dev/with/releases/download/sdk-sources/" ++ sha256 ++ ".tar.gz"
+
+// Where a declared source is fetched from, in order: our copy, then its
+// maker's. The pin decides what is accepted, so the order is about which
+// servers a build depends on: the copy is on the host the build's own seed
+// and SDK come from, and the four makers' servers are then touched only when
+// it is missing (#3616: gitlab.gnome.org answered 503 and a nightly failed).
+fn sdk_declared_source_urls(source: &SdkPinnedSource): [sdk_source_mirror_url(source.sha256), sdk_owned_text(source.upstream)]
+
+fn sdk_materialize_declared_source(ctx: &ActionCtx, scratch: &str, source: &SdkPinnedSource) -> i32:
+    let name = source.name
+    let top = source.top
     let fs = ctx.fs()
     let root = sdk_join(scratch, name)
     let dir = sdk_declared_source_dir(scratch, name, top)
@@ -1985,7 +2015,33 @@ fn sdk_materialize_declared_source(ctx: &ActionCtx, scratch: &str, name: &str, u
     if fs.exists(marker):
         return 0
     let _partial = fs.remove_tree(root)
-    sdk_materialize_source_tar_gz(ctx, scratch, &sdk_one_source(sdk_owned_text(url)), sdk_owned_text(sha256), sdk_join(scratch, name ++ ".tar.gz"), root, dir, marker, 300000)
+    sdk_materialize_source_tar_gz(ctx, scratch, &sdk_declared_source_urls(source), sdk_owned_text(source.sha256), sdk_join(scratch, name ++ ".tar.gz"), root, dir, marker, 300000)
+
+// `:sdk-sources-check`: every listed source of every pinned archive still
+// serves the pinned bytes, each asked by itself. With our copy first, a
+// maker's dead URL or a pin moved without a new upload would otherwise go
+// unseen until the other source failed too. Run when a pin changes, and
+// weekly (.github/workflows/sdk-sources.yml).
+pub fn run_sdk_sources_check_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let scratch = sdk_join("out/command", ctx.target_name() ++ "/scratch")
+    let _clean = fs.remove_tree(scratch)
+    if fs.mkdir_all(scratch) != 0: return sdk_fail(ctx, "could not create " ++ scratch)
+    var failed = ""
+    var asked = 0
+    for source in sdk_declared_sources():
+        for url in sdk_declared_source_urls(source):
+            asked = asked + 1
+            let fetched = source_fetch_pinned(&ctx, scratch, f"{source.name}-{asked}", &sdk_one_source(url), source.sha256, sdk_join(scratch, f"{source.name}-{asked}.tar.gz"), SOURCE_FETCH_CONNECT_MS, 300000)
+            if fetched.rc != 0: failed = failed ++ f"  {source.name}: {url}\n{fetched.report}\n"
+    for url in sdk_zig_source_urls():
+        asked = asked + 1
+        let fetched = source_fetch_pinned(&ctx, scratch, f"zig-{asked}", &sdk_one_source(url), SDK_ZIG_TAR_GZ_SHA256, sdk_join(scratch, f"zig-{asked}.tar.gz"), SOURCE_FETCH_CONNECT_MS, 600000)
+        if fetched.rc != 0: failed = failed ++ f"  zig: {url}\n{fetched.report}\n"
+    let _done = fs.remove_tree(scratch)
+    if failed.len() > 0: return sdk_fail(ctx, "sdk-sources-check: a listed source does not serve its pinned archive:\n" ++ failed)
+    if fs.write_text(ctx.output(), f"{asked} sources serve their pinned archives\n") != 0: return sdk_fail(ctx, "could not write " ++ ctx.output())
+    0
 
 type SdkSysrootFiles {
     paths: List[str],
@@ -2011,18 +2067,9 @@ fn sdk_darwin_declared_libraries(ctx: &ActionCtx, scratch: &str, include_root: &
     let fs = ctx.fs()
     if fs.mkdir_all(scratch) != 0:
         return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sdk_fail(ctx, "could not create " ++ scratch) }
-    let sqlite_rc = sdk_materialize_declared_source(ctx, scratch, "sqlite3", "https://www.sqlite.org/2020/sqlite-autoconf-3320200.tar.gz", SDK_SQLITE3_TAR_GZ_SHA256, "sqlite-autoconf-3320200")
-    if sqlite_rc != 0:
-        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sqlite_rc }
-    let bzip2_rc = sdk_materialize_declared_source(ctx, scratch, "bzip2", "https://sourceware.org/pub/bzip2/bzip2-" ++ SDK_BZIP2_VERSION ++ ".tar.gz", SDK_BZIP2_TAR_GZ_SHA256, "bzip2-" ++ SDK_BZIP2_VERSION)
-    if bzip2_rc != 0:
-        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: bzip2_rc }
-    let libxml2_rc = sdk_materialize_declared_source(ctx, scratch, "libxml2", "https://gitlab.gnome.org/GNOME/libxml2/-/archive/v" ++ SDK_LIBXML2_VERSION ++ "/libxml2-v" ++ SDK_LIBXML2_VERSION ++ ".tar.gz", SDK_LIBXML2_TAR_GZ_SHA256, "libxml2-v" ++ SDK_LIBXML2_VERSION)
-    if libxml2_rc != 0:
-        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: libxml2_rc }
-    let curl_rc = sdk_materialize_declared_source(ctx, scratch, "curl", "https://github.com/curl/curl/archive/refs/tags/curl-7_64_1.tar.gz", SDK_CURL_TAR_GZ_SHA256, "curl-curl-7_64_1")
-    if curl_rc != 0:
-        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: curl_rc }
+    for source in sdk_declared_sources():
+        let source_rc = sdk_materialize_declared_source(ctx, scratch, source)
+        if source_rc != 0: return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: source_rc }
     let sqlite_dir = sdk_declared_source_dir(scratch, "sqlite3", "sqlite-autoconf-3320200")
     let sqlite_h = fs.read_text(sdk_join(sqlite_dir, "sqlite3.h"))
     let sqlite_ext_h = fs.read_text(sdk_join(sqlite_dir, "sqlite3ext.h"))

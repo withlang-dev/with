@@ -3679,6 +3679,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     source_fetch_tests = source_fetch_tests.write_scope("out/command/source-fetch-tests")
     source_fetch_tests = source_fetch_tests.allow_network()
     out = out.add_target(source_fetch_tests.timeout(300000))
+    var sdk_sources_check = target_new(.Action, "sdk-sources-check", "").output("out/.build-state/sdk-sources-check.txt")
+    sdk_sources_check.action = run_sdk_sources_check_action
+    sdk_sources_check = sdk_sources_check.input("build/sdk.with")
+    sdk_sources_check = sdk_sources_check.input("build/source_fetch.with")
+    sdk_sources_check = sdk_sources_check.input("build/https_fetch.with")
+    sdk_sources_check = sdk_sources_check.write_scope("out/.build-state")
+    sdk_sources_check = sdk_sources_check.write_scope("out/command/sdk-sources-check")
+    sdk_sources_check = sdk_sources_check.allow_network()
+    out = out.add_target(sdk_sources_check.timeout(900000))
 
     // #2062: std.build's ActionCtx.fetch_source and the machine-wide source
     // cache, driven by the fresh release compiler: a second worktree whose
