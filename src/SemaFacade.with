@@ -41,6 +41,7 @@ impl Sema:
         self.verify_facade_failed_state_items()
         self.verify_facade_nullable_items()
         self.verify_facade_buffers()
+        self.verify_facade_polled_messages()
         self.verify_facade_variadic_items()
         self.verify_facade_abandon()
         self.verify_facade_messages()
@@ -905,9 +906,11 @@ impl Sema:
             if kind == NodeKind.NK_FACADE_DOMAIN:
                 self.collect_facade_domain(item, self.source_name_for_file_id(self.decl_source_file_id_for_index(di)).starts_with("<toolchain facade "))
             else if kind == NodeKind.NK_FACADE_MESSAGE:
-                // D216, in progress on this branch (#2425): parsed, not yet
-                // verified or rendered. Refused by name until it is.
-                self.emit_error(f"message '{self.pool_resolve(self.ast.get_data0(item))}': the `message` item (D216) is parsed but not yet verified or presented (#2425)", item)
+                // D216 (#2425, in progress on this branch): verified in
+                // verify_facade_polled_messages; not yet presented, so it is
+                // refused by name until it is.
+                self.facade_message_nodes.push(item)
+                self.emit_error(f"message '{self.pool_resolve(self.ast.get_data0(item))}': the `message` item (D216) is verified but not yet presented (#2425)", item)
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
                 self.warn_facade_profile_ambiguities(item)
@@ -3681,6 +3684,169 @@ impl Sema:
         for ci in 0..self.foreign_contracts.len():
             self.verify_facade_buffer_item(ci as i32)
             self.verify_facade_field_buffers(ci as i32)
+
+    // ── D216: polled tagged messages ────────────────────────────────
+
+    // A record field under C's own name: imported as written, or with a
+    // trailing underscore when the name is a With keyword (SDL's `type`).
+    // The imported symbol, or 0 when the record has no such field.
+    fn facade_message_field(record: i32, cname: i32) -> i32:
+        if self.struct_field_type_frozen(record, cname) != 0: return cname
+        let escaped = self.pool_lookup_symbol(self.pool_resolve(cname) ++ "_")
+        if escaped != 0 and self.struct_field_type_frozen(record, escaped) != 0: escaped else: 0
+
+    // The value of the imported integer constant a case names: (found, value).
+    fn facade_message_tag_value(sym: i32) -> (bool, i64):
+        let decl = self.facade_const_decl(sym)
+        if decl == 0: return (false, 0)
+        (true, self.facade_const_int_value(self.ast.get_data1(decl)))
+
+    mut fn verify_facade_polled_messages():
+        for item in self.facade_message_nodes: self.verify_facade_polled_message(item)
+
+    // A `message` item against the import (D216): the record and its tag,
+    // the producer that fills it, each case's constant and what it carries,
+    // the payload pair, and that no tag value is claimed twice. Every line
+    // that does not hold is an error naming it; nothing is presented from a
+    // message that has one.
+    mut fn verify_facade_polled_message(item: i32):
+        let mname = self.pool_resolve(self.ast.get_data0(item))
+        let ex = self.ast.get_data1(item)
+        let record = self.resolve_alias(self.resolve_type_expr(self.ast.get_extra(ex))) as i32
+        if record == 0: return
+        var from_line = 0
+        var tag_line = 0
+        var payload_line = 0
+        var release_line = 0
+        let cases = []
+        for k in 0..self.ast.get_data2(item):
+            let line = self.ast.get_extra(ex + 1 + k)
+            let kind = self.ast.get_data0(line)
+            var again = ""
+            if kind == FACADE_CLAUSE_MESSAGE_FROM:
+                if from_line != 0: again = "from"
+                from_line = line
+            else if kind == FACADE_CLAUSE_MESSAGE_TAG:
+                if tag_line != 0: again = "tag"
+                tag_line = line
+            else if kind == FACADE_CLAUSE_MESSAGE_PAYLOAD:
+                if payload_line != 0: again = "payload"
+                payload_line = line
+            else if kind == FACADE_CLAUSE_MESSAGE_RELEASE:
+                if release_line != 0: again = "release"
+                release_line = line
+            else if kind == FACADE_CLAUSE_MESSAGE_CASE: cases.push(line)
+            if again.len() > 0: self.emit_error_with_help(f"message '{mname}': '{again}' is stated twice (D216)", line, "delete one of the two lines")
+        if from_line == 0 or tag_line == 0 or cases.len() == 0:
+            let missing = if from_line == 0: "'from f(out param N)', the call that fills the record" else if tag_line == 0: "'tag F', the field that says which case holds" else: "a 'case Name when CONST' line"
+            self.emit_error_with_help(f"message '{mname}' states no {missing} (D216)", item, "a message states its producer, its tag and at least one case")
+            return
+        // The tag: an integer field of the record.
+        let tag_c = self.ast.get_extra(self.ast.get_data1(tag_line))
+        let tag_field = self.facade_message_field(record, tag_c)
+        if tag_field == 0:
+            self.emit_error_with_help(f"message '{mname}': 'tag {self.pool_resolve(tag_c)}' names no field of {self.type_name(record)} (D216)", tag_line, "after 'tag' name the record's field that says which case holds")
+            return
+        let tag_ty = self.struct_field_type_frozen(record, tag_field)
+        if self.get_type_kind(self.resolve_alias(self.numeric_operand_type(tag_ty) as TypeId)) != TypeKind.TY_INT:
+            self.emit_error_with_help(f"message '{mname}': 'tag {self.pool_resolve(tag_c)}' names a field of type {self.type_name(tag_ty)}, not an integer (D216)", tag_line, "a tag is an integer or a C enum")
+        // The producer: it fills a pointer to the record and says `bool`.
+        let from_ops = self.ast.get_data1(from_line)
+        let producer = self.ast.get_extra(from_ops)
+        let pname = self.pool_resolve(producer)
+        let sig = self.facade_fn_sig(producer, from_line)
+        if sig < 0: return
+        let filled = self.facade_resolve_param(self.ast.get_extra(from_ops + 1), producer, sig)
+        if filled < 0: return
+        let filled_ty = self.resolve_alias(self.sig_param_type(sig, filled) as TypeId)
+        let fills_record = self.get_type_kind(filled_ty) == TypeKind.TY_PTR and self.get_type_d1(filled_ty as i32) != 0 and self.resolve_alias(self.get_type_d0(filled_ty as i32) as TypeId) as i32 == record
+        if not fills_record:
+            self.emit_error_with_help(f"message '{mname}': 'from {pname}(out param {filled})' names {self.facade_param_display(producer, sig, filled)}, which is not a writable pointer to {self.type_name(record)} (D216)", from_line, "name the parameter the call fills with the message")
+        if self.resolve_alias(self.sig_return_type(sig) as TypeId) != self.ty_bool:
+            self.emit_error_with_help(f"message '{mname}': '{pname}' returns {self.type_name(self.sig_return_type(sig))}; a message's producer returns bool, true when it produced one (D216)", from_line, "a poll that reports another way is not yet a message producer")
+        // The payload pair, when the message is the pointer form.
+        var payload_ok = payload_line == 0
+        if payload_line != 0:
+            let pops = self.ast.get_data1(payload_line)
+            let ptr_c = self.ast.get_extra(pops)
+            let size_c = self.ast.get_extra(pops + 1)
+            let ptr_field = self.facade_message_field(record, ptr_c)
+            let size_field = self.facade_message_field(record, size_c)
+            if ptr_field == 0 or size_field == 0:
+                let missing = if ptr_field == 0: self.pool_resolve(ptr_c) else: self.pool_resolve(size_c)
+                self.emit_error_with_help(f"message '{mname}': 'payload {self.pool_resolve(ptr_c)} size {self.pool_resolve(size_c)}' names '{missing}', which is no field of {self.type_name(record)} (D216)", payload_line, "name the pointer field, then the field holding the payload's size in bytes")
+            else:
+                let pt = self.resolve_alias(self.struct_field_type_frozen(record, ptr_field) as TypeId)
+                let st = self.struct_field_type_frozen(record, size_field)
+                if self.get_type_kind(pt) != TypeKind.TY_PTR:
+                    self.emit_error_with_help(f"message '{mname}': 'payload {self.pool_resolve(ptr_c)}' names a field of type {self.type_name(pt as i32)}, not a pointer (D216)", payload_line, "after 'payload' name the field that points at the payload")
+                else if self.get_type_kind(self.resolve_alias(self.numeric_operand_type(st) as TypeId)) != TypeKind.TY_INT:
+                    self.emit_error_with_help(f"message '{mname}': 'size {self.pool_resolve(size_c)}' names a field of type {self.type_name(st)}, not an integer (D216)", payload_line, "after 'size' name the field holding the payload's size in bytes")
+                else: payload_ok = true
+        if release_line != 0:
+            let releaser = self.ast.get_extra(self.ast.get_data1(release_line))
+            let rsig = self.facade_fn_sig(releaser, release_line)
+            if rsig >= 0 and payload_line == 0:
+                self.emit_error_with_help(f"message '{mname}': 'release {self.pool_resolve(releaser)}' ends the life of a payload, and the message states none (D216)", release_line, "state 'payload P size N', or delete 'release'")
+        // The cases: a constant each (or a range of two), what each carries,
+        // and no tag value under two names.
+        let names = []
+        let lows = []
+        let highs = []
+        for line in cases:
+            let ops = self.ast.get_data1(line)
+            let cname = self.ast.get_extra(ops)
+            let shown = self.pool_resolve(cname)
+            let low_sym = self.ast.get_extra(ops + 1)
+            let high_sym = self.ast.get_extra(ops + 2)
+            let form = self.ast.get_extra(ops + 3)
+            let carried = self.ast.get_extra(ops + 4)
+            if shown == "Other":
+                self.emit_error_with_help(f"message '{mname}': 'Other' is the case every message has for a tag no line names; a contract does not state it (D216)", line, "give the case another name")
+                continue
+            if names.contains(cname):
+                self.emit_error_with_help(f"message '{mname}': case '{shown}' is stated twice (D216)", line, "one line per case; several tags for one member are several named cases, or a range")
+                continue
+            let (low_found, low) = self.facade_message_tag_value(low_sym)
+            if not low_found:
+                self.emit_error_with_help(f"message '{mname}': case '{shown}' names '{self.pool_resolve(low_sym)}', which is no integer constant of the import (D216)", line, "after 'when' name the constant the tag equals")
+                continue
+            var high = low
+            if high_sym != 0:
+                let (high_found, high_value) = self.facade_message_tag_value(high_sym)
+                if not high_found:
+                    self.emit_error_with_help(f"message '{mname}': case '{shown}' names '{self.pool_resolve(high_sym)}', which is no integer constant of the import (D216)", line, "a range is two constants: 'when A..B'")
+                    continue
+                if high_value < low:
+                    self.emit_error_with_help(f"message '{mname}': case '{shown}' states the range {self.pool_resolve(low_sym)}..{self.pool_resolve(high_sym)}, whose end ({high_value}) is below its start ({low}) (D216)", line, "write the smaller constant first")
+                    continue
+                high = high_value
+            var clash = -1
+            for i in 0..names.len():
+                if low <= highs[i] and lows[i] <= high: clash = i
+            if clash >= 0:
+                self.emit_error_with_help(f"message '{mname}': case '{shown}' claims a tag value that case '{self.pool_resolve(names[clash])}' already has (D216)", line, "each tag value belongs to one case")
+                continue
+            if form == FACADE_MESSAGE_CASE_FIELD:
+                if payload_line != 0:
+                    self.emit_error_with_help(f"message '{mname}': case '{shown}' carries 'field {self.pool_resolve(carried)}', a member of the record, and the message is the pointer form ('payload'); its cases say ': Type' (D216)", line, "after the constant write ': T', the record the payload points to")
+                    continue
+                if self.facade_message_field(record, carried) == 0:
+                    self.emit_error_with_help(f"message '{mname}': case '{shown}' carries 'field {self.pool_resolve(carried)}', which is no member of {self.type_name(record)} (D216)", line, "after 'field' name the member that is active under this tag")
+                    continue
+            else if form == FACADE_MESSAGE_CASE_TYPE:
+                if payload_line == 0:
+                    self.emit_error_with_help(f"message '{mname}': case '{shown}' carries a payload type, and the message states no 'payload P size N' to read it through (D216)", line, "state the payload's pointer and size fields, or write 'field f' for a member of the record")
+                    continue
+                let carried_ty = self.resolve_alias(self.resolve_type_expr(carried)) as i32
+                if carried_ty == 0: continue
+                if self.get_type_kind(carried_ty as TypeId) != TypeKind.TY_STRUCT:
+                    self.emit_error_with_help(f"message '{mname}': case '{shown}' carries {self.type_name(carried_ty)}, which is not a record of the import (D216)", line, "after ':' name the C struct the payload points to")
+                    continue
+            names.push(cname)
+            lows.push(low)
+            highs.push(high)
+        let _ready = payload_ok
 
     // D210 (§16.2b.8): `buffer field P remaining field N` pairs two fields
     // of the record the operation's resource wraps: P a pointer to bytes, N
