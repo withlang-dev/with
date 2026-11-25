@@ -1,0 +1,12 @@
+//! expect-check-fail: returned view may outlive its origin 's'
+// #3483: `as_view` is a view of the FixedString it is called on; it cannot
+// be returned from the function that owns the buffer.
+use std.fixed_string.FixedString
+
+fn label() -> &str:
+    var s = FixedString[8].new()
+    let _ = s.push_str("gone")
+    s.as_view()
+
+fn main:
+    print(label())

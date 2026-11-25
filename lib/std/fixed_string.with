@@ -8,3 +8,64 @@ pub type FixedString[Storage] {
 }
 
 impl[Storage] Copy for FixedString[Storage]
+
+// The methods are declared here, as D110 asks of every built-in method
+// (#3483). `Storage` is the byte array `[u8; N]` Sema gives `FixedString[N]`.
+impl[Storage] FixedString[Storage]:
+    /// The number of bytes held.
+    pub fn len() -> isize: self.len_value as isize
+    pub fn len_i32() -> i32: self.len_value as i32
+    pub fn len_i64() -> i64: self.len_value as i64
+
+    /// The number of bytes the storage holds at most.
+    pub fn capacity() -> isize: sizeof[Storage]() as isize
+
+    pub fn is_empty() -> bool: self.len_value == 0
+
+    /// Forgets the bytes held; the storage is untouched.
+    pub mut fn clear(): self.len_value = 0
+
+    /// Appends one byte; `false`, and nothing appended, when it is full.
+    pub mut fn push_byte(b: u8) -> bool:
+        if self.len() >= self.capacity(): return false
+        unsafe { *fixed_string_at(&raw mut self.buf as *mut u8, self.len()) = b }
+        self.len_value += 1
+        true
+
+    /// Appends the bytes of `s`; `false`, and nothing appended, when they
+    /// do not all fit.
+    pub mut fn push_str(s: &str) -> bool:
+        let count = s.len()
+        if self.len() + count > self.capacity(): return false
+        let from = fixed_string_bytes(s)
+        let to = &raw mut self.buf as *mut u8
+        var i = 0
+        while i < count:
+            unsafe { *fixed_string_at(to, self.len() + i) = *fixed_string_at(from as *mut u8, i) }
+            i += 1
+        self.len_value += count as usize
+        true
+
+    /// The bytes held, as text. A view of this value: it cannot outlive it,
+    /// and a binding of it is its own copy (D111).
+    pub fn as_view() -> &str from self:
+        let raw: [2]i64 = [&raw const self.buf as i64, self.len_value as i64]
+        unsafe { *(&raw const raw as *const &str) }
+
+    /// Whether the bytes held are exactly those of `other`.
+    pub fn equals(other: &str) -> bool:
+        if self.len() != other.len(): return false
+        let mine = &raw const self.buf as *mut u8
+        let theirs = fixed_string_bytes(other) as *mut u8
+        var i = 0
+        while i < self.len():
+            if unsafe { *fixed_string_at(mine, i) != *fixed_string_at(theirs, i) }: return false
+            i += 1
+        true
+
+// Byte `i` of the storage at `base`. No bounds are checked here: each caller
+// has compared against the length or the capacity.
+unsafe fn fixed_string_at(base: *mut u8, i: isize) -> *mut u8: (base as i64 + i as i64) as *mut u8
+
+// Where a text's bytes are: the first word of its value.
+fn fixed_string_bytes(s: &str) -> *const u8: unsafe { *(s as *const str as *const *const u8) }
