@@ -11,3 +11,14 @@ if git diff --cached --name-only | grep -q '^bootstrap/'; then
     echo "       do not override this freeze unless the selfhost binary is catastrophically lost"
     exit 1
 fi
+
+# No new ceremony in a commit (Eric, 2026-11-25): the census counts the known
+# patterns in each changed file against HEAD and refuses a rise. The same check
+# runs on every pull request (.github/workflows/ceremony-census.yml).
+if git diff --cached --name-only | grep -q '\.with$'; then
+    if ! command -v with >/dev/null 2>&1; then
+        echo "error: no \`with\` on PATH to run the ceremony census"
+        exit 1
+    fi
+    with run tools/ceremony_census.with --diff HEAD || exit 1
+fi
