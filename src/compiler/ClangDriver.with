@@ -199,6 +199,12 @@ fn with_cc_main() -> i32:
         // libc++ (the sysroot's, libc++abi and libunwind in it) uses
         // pthreads and dl, separate libraries in glibc 2.28; only a link that
         // needs them records them.
+        // #3603: C compiled here stays at the glibc floor. The floor
+        // stubs hold a function newer than the pin only by its versioned
+        // name, so a build system's probe for one fails to link and the
+        // library takes its fallback (build/sdk.with, "The floor stubs").
+        let floor = host_c_sysroot() ++ "/usr/lib/floor"
+        if with_fs_file_exists(floor ++ "/libc.so.6") != 0: args.push("-L" ++ floor)
         for a in ["-Wl,--as-needed", "-lpthread", "-ldl", "-Wl,--no-as-needed"]: args.push(a.to_owned())
     // Linux C++ is the sysroot's libc++, never the host's libstdc++.
     var names_stdlib = false
