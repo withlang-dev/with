@@ -700,6 +700,39 @@ impl[T] SlotMap[T]:
     pub fn ulen32() -> u32: with_slotmap_len(self.ptr as *mut u8) as u32
     pub fn is_empty() -> bool: self.len() == 0
 
+    /// The value `h` names, or `None` when it has been removed.
+    pub fn get(h: Handle[T]) -> Option[&T] from self:
+        let slot = with_slotmap_get_ptr(self.ptr as *mut u8, h.index, h.generation)
+        if slot == null: return None
+        Some(unsafe { &*(slot as *const T) })
+
+    /// Stores `value` and returns the handle that names it.
+    pub mut fn insert(value: T) -> Handle[T]:
+        var h: Handle[T] = Handle { index: 0, generation: 0 }
+        // The runtime claims a slot and copies the value's bytes into it;
+        // the store below is what moves the value there, over that image.
+        with_slotmap_insert_out(self.ptr as *mut u8, &raw const value as *const u8, &raw mut h as *mut u8)
+        unsafe { *(with_slotmap_value_ptr_at(self.ptr as *mut u8, h.index as i64) as *mut T) = value }
+        h
+
+    /// Takes the value `h` names out, or `None` when it is already gone.
+    /// The handle, and every copy of it, names nothing afterwards.
+    pub mut fn remove(h: Handle[T]) -> Option[T]:
+        var slot = with_slotmap_get_ptr(self.ptr as *mut u8, h.index, h.generation) as *mut T
+        if slot == null: return None
+        let value: T = unsafe { *slot }
+        let _ = with_slotmap_remove(self.ptr as *mut u8, h.index, h.generation, null)
+        Some(value)
+
+    /// Puts `value` where `h` names and returns what was there, or `None`
+    /// (and `value` is dropped) when `h` names nothing.
+    pub mut fn replace(h: Handle[T], value: T) -> Option[T]:
+        var slot = with_slotmap_get_ptr(self.ptr as *mut u8, h.index, h.generation) as *mut T
+        if slot == null: return None
+        let old: T = unsafe { *slot }
+        unsafe { *slot = value }
+        Some(old)
+
 /// Scoped mutable slot handle returned by SlotMap.slot/get_disjoint.
 /// Use `.get()` / `.set(value)` inside the `with` block, matching ListSlot.
 pub type SlotMapSlot[T] ephemeral {

@@ -1,0 +1,40 @@
+//! expect-stdout: len 3 get 2
+//! expect-stdout: removed b
+//! expect-stdout: drop b
+//! expect-stdout: again false stale false len 2
+//! expect-stdout: replaced a
+//! expect-stdout: drop a
+//! expect-stdout: drop lost
+//! expect-stdout: miss false
+//! expect-stdout: reused slot false new generation false a 10 c 3
+//! expect-stdout: end
+//! expect-stdout: drop a2
+//! expect-stdout: drop c
+//! expect-stdout: drop d
+// #3483: SlotMap's get, insert, remove and replace are library methods.
+// Every value is dropped exactly once; a `replace` through a stale handle
+// drops the value it was given (built in, that value leaked).
+use std.collections.SlotMap
+
+type Tracked { name: str, id: i64 }
+
+impl Drop for Tracked:
+    move fn drop(): print(f"drop {self.name}")
+
+fn main:
+    var m: SlotMap[Tracked] = SlotMap.new()
+    let a = m.insert(Tracked { name: "a".to_owned(), id: 1 })
+    let b = m.insert(Tracked { name: "b".to_owned(), id: 2 })
+    let c = m.insert(Tracked { name: "c".to_owned(), id: 3 })
+    print(f"len {m.len()} get {m.get(b).map(it.id) ?? -1}")
+    match m.remove(b):
+        Some(t) => print(f"removed {t.name}")
+        None => print("none")
+    print(f"again {m.remove(b).is_some()} stale {m.get(b).is_some()} len {m.len()}")
+    match m.replace(a, Tracked { name: "a2".to_owned(), id: 10 }):
+        Some(old) => print(f"replaced {old.name}")
+        None => print("none")
+    print(f"miss {m.replace(b, Tracked { name: "lost".to_owned(), id: 0 }).is_some()}")
+    let d = m.insert(Tracked { name: "d".to_owned(), id: 4 })
+    print(f"reused slot {d.index == b.index} new generation {d.generation != b.generation} a {m.get(a).map(it.id) ?? -1} c {m.get(c).map(it.id) ?? -1}")
+    print("end")

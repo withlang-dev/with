@@ -10777,51 +10777,6 @@ impl Codegen:
                 sm_ty = self.get_or_create_slotmap_type(0, sm_elem_ty)
             result = wl_build_insert_value(self.builder, self.build_default_value(sm_ty), sm_handle, 0)
 
-        else if intrinsic == MirIntrinsic.SLOTMAP_INSERT:
-            let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
-            let sm_val_raw = self.mir_intrinsic_arg(body, args_id, 1)
-            let sm_elem_ty = self.mir_slotmap_elem_type_from_recv(body, args_id)
-            let sm_val = self.mir_intrinsic_value_as(body, args_id, 1, sm_val_raw, sm_elem_ty)
-            let sm_val_alloca = self.create_entry_alloca(wl_type_of(sm_val))
-            wl_build_store(self.builder, sm_val, sm_val_alloca)
-            var sm_h_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
-            if sm_h_ty == 0:
-                let sm_h_fields: List[i64] = []
-                sm_h_fields.push(i32_ty)
-                sm_h_fields.push(i32_ty)
-                sm_h_ty = wl_struct_type(self.context, list_data_i64(sm_h_fields), 2, 0)
-            let sm_out = self.create_entry_alloca(sm_h_ty)
-            let sm_insert_fn = self.ensure_c_fn("with_slotmap_insert_out", void_ty, 3)
-            let sm_insert_params: List[i64] = []
-            sm_insert_params.push(ptr_ty)
-            sm_insert_params.push(ptr_ty)
-            sm_insert_params.push(ptr_ty)
-            let sm_insert_ty = wl_function_type(void_ty, list_data_i64(sm_insert_params), 3, 0)
-            let sm_insert_args: List[i64] = []
-            sm_insert_args.push(sm_map)
-            sm_insert_args.push(sm_val_alloca)
-            sm_insert_args.push(sm_out)
-            wl_build_call(self.builder, sm_insert_ty, sm_insert_fn, list_data_i64(sm_insert_args), 3)
-            result = wl_build_load(self.builder, sm_h_ty, sm_out)
-
-        else if intrinsic == MirIntrinsic.SLOTMAP_GET:
-            let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
-            let sm_h = self.mir_intrinsic_arg(body, args_id, 1)
-            let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
-            let sm_gen = wl_build_extract_value(self.builder, sm_h, 1)
-            let sm_get_fn = self.ensure_c_fn("with_slotmap_get_ptr", ptr_ty, 3)
-            let sm_get_params: List[i64] = []
-            sm_get_params.push(ptr_ty)
-            sm_get_params.push(i32_ty)
-            sm_get_params.push(i32_ty)
-            let sm_get_ty = wl_function_type(ptr_ty, list_data_i64(sm_get_params), 3, 0)
-            let sm_get_args: List[i64] = []
-            sm_get_args.push(sm_map)
-            sm_get_args.push(sm_idx)
-            sm_get_args.push(sm_gen)
-            let sm_ptr = wl_build_call(self.builder, sm_get_ty, sm_get_fn, list_data_i64(sm_get_args), 3)
-            result = self.mir_option_ref_from_slot_ptr(sm_ptr, self.mir_intrinsic_dest_sema_type(body, dest_place))
-
         else if intrinsic == MirIntrinsic.SLOTMAP_SLOT:
             let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
             let sm_h = self.mir_intrinsic_arg(body, args_id, 1)
@@ -10838,55 +10793,6 @@ impl Codegen:
             let sms_0 = wl_build_insert_value(self.builder, self.build_default_value(sms_ty), sms_map_i64, 0)
             let sms_1 = wl_build_insert_value(self.builder, sms_0, sm_idx, 1)
             result = wl_build_insert_value(self.builder, sms_1, sm_gen, 2)
-
-        else if intrinsic == MirIntrinsic.SLOTMAP_REMOVE or intrinsic == MirIntrinsic.SLOTMAP_REPLACE:
-            let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
-            let sm_h = self.mir_intrinsic_arg(body, args_id, 1)
-            let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
-            let sm_gen = wl_build_extract_value(self.builder, sm_h, 1)
-            let sm_elem_ty = self.mir_slotmap_elem_type_from_recv(body, args_id)
-            let sm_out = self.create_entry_alloca(sm_elem_ty)
-            var sm_found: i64 = 0
-            if intrinsic == MirIntrinsic.SLOTMAP_REMOVE:
-                let sm_remove_fn = self.ensure_c_fn("with_slotmap_remove", i32_ty, 4)
-                let sm_remove_params: List[i64] = []
-                sm_remove_params.push(ptr_ty)
-                sm_remove_params.push(i32_ty)
-                sm_remove_params.push(i32_ty)
-                sm_remove_params.push(ptr_ty)
-                let sm_remove_ty = wl_function_type(i32_ty, list_data_i64(sm_remove_params), 4, 0)
-                let sm_remove_args: List[i64] = []
-                sm_remove_args.push(sm_map)
-                sm_remove_args.push(sm_idx)
-                sm_remove_args.push(sm_gen)
-                sm_remove_args.push(sm_out)
-                sm_found = wl_build_call(self.builder, sm_remove_ty, sm_remove_fn, list_data_i64(sm_remove_args), 4)
-            else:
-                let sm_val_raw = self.mir_intrinsic_arg(body, args_id, 2)
-                let sm_val = self.mir_intrinsic_value_as(body, args_id, 2, sm_val_raw, sm_elem_ty)
-                let sm_val_alloca = self.create_entry_alloca(sm_elem_ty)
-                wl_build_store(self.builder, sm_val, sm_val_alloca)
-                let sm_replace_fn = self.ensure_c_fn("with_slotmap_replace", i32_ty, 5)
-                let sm_replace_params: List[i64] = []
-                sm_replace_params.push(ptr_ty)
-                sm_replace_params.push(i32_ty)
-                sm_replace_params.push(i32_ty)
-                sm_replace_params.push(ptr_ty)
-                sm_replace_params.push(ptr_ty)
-                let sm_replace_ty = wl_function_type(i32_ty, list_data_i64(sm_replace_params), 5, 0)
-                let sm_replace_args: List[i64] = []
-                sm_replace_args.push(sm_map)
-                sm_replace_args.push(sm_idx)
-                sm_replace_args.push(sm_gen)
-                sm_replace_args.push(sm_val_alloca)
-                sm_replace_args.push(sm_out)
-                sm_found = wl_build_call(self.builder, sm_replace_ty, sm_replace_fn, list_data_i64(sm_replace_args), 5)
-            let sm_val = wl_build_load(self.builder, sm_elem_ty, sm_out)
-            let sm_opt_ty = self.get_or_create_option_type(0, sm_elem_ty)
-            let sm_is_found = wl_build_icmp(self.builder, wl_int_ne(), sm_found, wl_const_int(i32_ty, 0, 0))
-            let sm_some = self.build_option_some(sm_val, sm_opt_ty)
-            let sm_none = self.build_option_none(sm_opt_ty)
-            result = wl_build_select(self.builder, sm_is_found, sm_some, sm_none)
 
         else if intrinsic == MirIntrinsic.SLOTMAP_GET_DISJOINT:
             let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
