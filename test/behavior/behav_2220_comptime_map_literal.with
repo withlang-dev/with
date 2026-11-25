@@ -1,0 +1,30 @@
+//! expect-stdout: 3 2 9 0 2
+// #2220: a map literal evaluates at compile time, empty (`[:]`) or with
+// pairs; a later pair replaces an earlier one with an equal key, as at run
+// time. It was "expression kind 128 is not comptime-evaluable yet".
+use std.collections.HashMap
+
+comptime fn count_words(text: str) -> i32:
+    let counts: HashMap[str, i32] = [:]
+    for w in text.split(" "):
+        counts.insert(w, (counts.get(w) ?? 0) + 1)
+    counts.get("a") ?? 0
+
+comptime fn from_pairs(key: str) -> i32:
+    let prices: HashMap[str, i32] = ["tea": 2, "cake": 5, "cake": 9]
+    prices.get(key) ?? 0
+
+comptime fn pair_count() -> isize:
+    let prices: HashMap[str, i32] = ["tea": 2, "cake": 5, "cake": 9]
+    prices.len()
+
+const WORDS = comptime count_words("a b a c a")
+const TEA = comptime from_pairs("tea")
+const CAKE = comptime from_pairs("cake")
+const NONE = comptime from_pairs("pie")
+const PAIRS = comptime pair_count()
+
+fn main:
+    let run_time: HashMap[str, i32] = ["tea": 2, "cake": 5, "cake": 9]
+    assert(run_time.get("cake") ?? 0 == CAKE and run_time.len() == PAIRS)
+    print(f"{WORDS} {TEA} {CAKE} {NONE} {PAIRS}")

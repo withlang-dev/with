@@ -6649,6 +6649,37 @@ impl ComptimeEvaluator:
             return self.fail(node, read_result.error_msg)
         comptime_control_value(comptime_value_str(read_result.contents))
 
+    // A map literal, `[:]` or `[k: v, …]` (#2220): its pairs in order, a
+    // later pair replacing an earlier one with an equal key, as `insert`
+    // does. Every pair is evaluated before the map is laid out, since an
+    // element's own evaluation appends to the same arena.
+    mut fn eval_map_lit(node: i32) -> ComptimeControl:
+        let map_type = self.node_type_or(node, 0)
+        if map_type == 0:
+            return self.fail(node, "this map literal's type is not known where it is evaluated at compile time; give its binding a type")
+        let extra_start = self.ast.get_data0(node)
+        let held = []
+        for pi in 0..self.ast.get_data1(node) * 2:
+            let signal = self.eval_expr(self.ast.get_extra(extra_start + pi))
+            if signal.kind != ComptimeControlKind.CTL_VALUE:
+                return signal
+            held.push(signal)
+        let start = self.extra_values.len()
+        var count: i32 = 0
+        var hi = 0
+        while hi + 1 < held.len():
+            var replaced = false
+            for ki in 0..count:
+                if comptime_values_equal(self.extra_values[start + ki * 2], held[hi].value, self.extra_values):
+                    self.extra_values[start + ki * 2 + 1] = comptime_value_clone(held[hi + 1].value)
+                    replaced = true
+            if not replaced:
+                self.extra_values.push(comptime_value_clone(held[hi].value))
+                self.extra_values.push(comptime_value_clone(held[hi + 1].value))
+                count += 1
+            hi += 2
+        comptime_control_value(comptime_value_map(map_type, start as i32, count))
+
     mut fn eval_array(node: i32) -> ComptimeControl:
         let extra_start = self.ast.get_data0(node)
         var count = self.ast.get_data1(node)
@@ -8997,6 +9028,8 @@ impl ComptimeEvaluator:
             return self.eval_continue(node)
         if kind == NodeKind.NK_ARRAY_LIT:
             return self.eval_array(node)
+        if kind == NodeKind.NK_MAP_LIT:
+            return self.eval_map_lit(node)
         if kind == NodeKind.NK_TUPLE:
             return self.eval_tuple(node)
         if kind == NodeKind.NK_STRUCT_LIT:
