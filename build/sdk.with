@@ -2902,7 +2902,8 @@ fn sdk_elf_le(bytes: &List[u8], at: i64, n: i64) -> i64:
 fn sdk_elf_cstr(bytes: &List[u8], at: i64) -> str:
     var out = StringBuilder.with_capacity(32)
     var i = at
-    while i < bytes.len() as i64 and bytes[i as i32] != 0:
+    let end: i64 = bytes.len()
+    while i < end and bytes[i as i32] != 0:
         out.push_byte(bytes[i as i32])
         i = i + 1
     out.to_str()
@@ -2924,8 +2925,8 @@ fn sdk_glibc_minor_of(name: &str) -> i64:
 // made non-default (the hidden bit of its .gnu.version entry), the kept
 // names aside. An empty vector is a file that is not such an ELF64 object.
 pub fn sdk_elf_floor_stub(bytes: &List[u8], pin_minor: i32) -> List[u8]:
-    var out: List[u8] = List.new()
-    let len = bytes.len() as i64
+    let out = []
+    let len: i64 = bytes.len()
     if len < 64 or bytes[0] != 127 or bytes[1] != 'E' or bytes[2] != 'L' or bytes[3] != 'F' or bytes[4] != 2 or bytes[5] != 1: return out
     let shoff = sdk_elf_le(bytes, 40, 8)
     let shentsize = sdk_elf_le(bytes, 58, 2)
@@ -2956,7 +2957,7 @@ pub fn sdk_elf_floor_stub(bytes: &List[u8], pin_minor: i32) -> List[u8]:
     if dynsym_off == 0 or versym_off == 0 or verdef_off == 0 or dynstr_off == 0 or verdef_str == 0: return out
     if dynsym_off + dynsym_size > len or versym_off + versym_size > len or versym_size * 12 != dynsym_size: return out
     // The version indices above the pin.
-    var above: List[i64] = List.new()
+    let above = []
     var vd = verdef_off
     while vd + 20 <= len:
         let ndx = sdk_elf_le(bytes, vd + 4, 2) & 0x7fff
@@ -2968,7 +2969,7 @@ pub fn sdk_elf_floor_stub(bytes: &List[u8], pin_minor: i32) -> List[u8]:
         if next == 0: break
         vd = vd + next
     // Each dynamic symbol: whether its version entry takes the hidden bit.
-    var hide: List[bool] = List.new()
+    let hide = []
     let count = versym_size / 2
     for i in 0..count:
         let entry = sdk_elf_le(bytes, versym_off + i * 2, 2)
@@ -2998,14 +2999,14 @@ fn sdk_write_floor_stubs(ctx: &ActionCtx, tree: &str) -> i32:
         return sdk_fail(ctx, "could not create " ++ floor)
     let files = sdk_merge_sort_strings(fs.list_files(lib))
     var stubs = 0
-    for i in 0..files.len():
-        let rel = sdk_rel_path(lib, sdk_normalize(files[i]))
+    for file in files:
+        let rel = sdk_rel_path(lib, sdk_normalize(file))
         if rel.contains("/") or not (rel.starts_with("lib") or rel.starts_with("ld-")): continue
-        let bytes = fs.read_binary(files[i])
+        let bytes = fs.read_binary(file)
         if rel.contains(".so."):
             let patched = sdk_elf_floor_stub(&bytes, SDK_LINUX_GLIBC_MINOR)
             if patched.len() != bytes.len():
-                return sdk_fail(ctx, "the stub library " ++ files[i] ++ " is not an ELF64 object with version definitions; its floor copy cannot be made")
+                return sdk_fail(ctx, "the stub library " ++ file ++ " is not an ELF64 object with version definitions; its floor copy cannot be made")
             if fs.write_binary(sdk_join(floor, rel), patched) != 0:
                 return sdk_fail(ctx, "could not write " ++ sdk_join(floor, rel))
             stubs = stubs + 1
