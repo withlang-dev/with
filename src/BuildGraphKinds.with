@@ -20,7 +20,7 @@ fn build_graph_kind_is_project(kind: i32) -> bool:
 fn build_graph_kind_removed(kind: i32) -> bool:
     kind == 5 or kind == 6 or kind == 1000 or kind == 1001 or kind == 1002 or kind == 1003 or kind == 1004 or kind == 1005 or kind == 1006 or kind == 1007 or kind == 1008 or kind == 1009 or kind == 1010 or kind == 1011 or kind == 1012 or kind == 1013 or kind == 1014 or kind == 1015 or kind == 1016 or kind == 1017 or kind == 1018 or kind == 1019 or kind == 1020 or kind == 1021 or kind == 1022 or kind == 1023 or kind == 1024 or kind == 1025 or kind == 1026 or kind == 1027
 
-fn build_graph_kind_valid(kind: i32) -> bool:
+fn build_graph_kind_valid(kind: i32):
     build_graph_kind_is_standard(kind) or build_graph_kind_is_project(kind)
 
 fn build_graph_kind_name(kind: i32) -> str:
@@ -86,7 +86,7 @@ fn build_graph_kind_implemented(kind: i32) -> bool:
         return true
     false
 
-fn build_graph_target_valid(kind: i32) -> bool:
+fn build_graph_target_valid(kind: i32):
     kind >= BUILD_GRAPH_TARGET_MIN and kind <= BUILD_GRAPH_TARGET_MAX
 
 fn build_graph_target_name(kind: i32) -> str:

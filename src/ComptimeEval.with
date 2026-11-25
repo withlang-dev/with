@@ -312,7 +312,7 @@ fn comptime_control_break(value: ComptimeValue, label: i32) -> ComptimeControl:
 fn comptime_control_continue(label: i32) -> ComptimeControl:
     ComptimeControl { kind: ComptimeControlKind.CTL_CONTINUE, value: comptime_value_void(0), label }
 
-fn comptime_decl_index_map(ast: &AstPool) -> HashMap[i32, i32, Minted]:
+fn comptime_decl_index_map(ast: &AstPool):
     let map: HashMap[i32, i32, Minted] = [:]
     for di in 0..ast.decl_count():
         map.insert(ast.get_decl(di), di)
@@ -547,10 +547,10 @@ fn comptime_tool_path_is_parent_of(parent: &str, child: &str) -> bool:
 // the pinned seed's runtime, which has no with_os_error_text yet, so a
 // Win32 code is still read as an errno here; the next seed pin calls
 // with_os_error_text, as IoError.message does.
-fn comptime_os_error_message(code: i32) -> str:
+fn comptime_os_error_message(code: i32):
     with_str_from_cstr(strerror(code)) ++ f" (os error {code})"
 
-fn comptime_tool_split_nonempty_lines(text: &str) -> List[str]:
+fn comptime_tool_split_nonempty_lines(text: &str):
     let lines: List[str] = []
     var start = 0
     for i in 0..text.len():
@@ -562,7 +562,7 @@ fn comptime_tool_split_nonempty_lines(text: &str) -> List[str]:
         lines.push(text.slice(start, text.len()))
     lines
 
-fn comptime_tar_zeroes(count: i64) -> str:
+fn comptime_tar_zeroes(count: i64):
     let out = StringBuilder.with_capacity(count)
     var i: i64 = 0
     while i < count:
@@ -629,7 +629,7 @@ fn comptime_tar_checksum_field(checksum: i64) -> str:
     out.push_byte(32 as u8)
     out.to_str()
 
-fn comptime_tar_sum(data: &str) -> i64:
+fn comptime_tar_sum(data: &str):
     var sum: i64 = 0
     for i in 0..data.len():
         sum = sum + data[i] as i64
@@ -758,7 +758,7 @@ fn comptime_tar_parse_octal(data: &str, offset: i64, width: i64) -> i64:
         i = i + 1
     value
 
-fn comptime_tar_header_checksum(data: &str, offset: i64) -> i64:
+fn comptime_tar_header_checksum(data: &str, offset: i64):
     var sum: i64 = 0
     var i: i64 = 0
     while i < 512:
@@ -796,7 +796,7 @@ fn comptime_tar_header_name(data: &str, offset: i64) -> str:
         return name
     prefix ++ "/" ++ name
 
-fn comptime_tar_trim_payload_name(text: &str) -> str:
+fn comptime_tar_trim_payload_name(text: &str):
     var end = text.len()
     while end > 0:
         let ch = text[(end - 1)]
@@ -939,7 +939,7 @@ unsafe fn comptime_tar_ptr_parse_octal(ptr: *const u8, offset: i64, width: i64) 
         i = i + 1
     value
 
-unsafe fn comptime_tar_ptr_header_checksum(ptr: *const u8) -> i64:
+unsafe fn comptime_tar_ptr_header_checksum(ptr: *const u8):
     var sum: i64 = 0
     var i: i64 = 0
     while i < 512:
@@ -1019,7 +1019,7 @@ unsafe fn comptime_tar_extract_file_payload(fd: i32, resolved_file: &str, output
         return comptime_tar_extract_fail("could not close file entry: " ++ output_path)
     0
 
-fn comptime_glob_split_by_slash(path: &str) -> List[str]:
+fn comptime_glob_split_by_slash(path: &str):
     let parts: List[str] = []
     var start = 0
     for i in 0..path.len():
@@ -1085,7 +1085,7 @@ fn comptime_glob_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-fn comptime_glob_sort(items: &List[str]) -> List[str]:
+fn comptime_glob_sort(items: &List[str]):
     var sorted: List[str] = []
     for i in 0..items.len():
         let item = items[i]
@@ -1176,10 +1176,10 @@ fn comptime_safe_label(text: &str) -> str:
         return "unknown"
     out
 
-fn comptime_action_scratch_dir(target_name: &str) -> str:
+fn comptime_action_scratch_dir(target_name: &str):
     "out/tmp/action-scratch/" ++ comptime_safe_label(target_name)
 
-fn ce_clone_str_list(values: &List[str]) -> List[str]:
+fn ce_clone_str_list(values: &List[str]):
     let out: List[str] = []
     for value in values:
         out.push(with_str_clone_ref(value))
@@ -1209,13 +1209,13 @@ fn ce_clone_capability_record(r: &ComptimeCapabilityRecord) -> ComptimeCapabilit
         network: r.network,
     }
 
-fn ce_clone_value_list(values: &List[ComptimeValue]) -> List[ComptimeValue]:
+fn ce_clone_value_list(values: &List[ComptimeValue]):
     let out: List[ComptimeValue] = []
     for value in values:
         out.push(comptime_value_clone(value))
     out
 
-fn ce_clone_link_env_list(values: &List[LinkStageEnvVar]) -> List[LinkStageEnvVar]:
+fn ce_clone_link_env_list(values: &List[LinkStageEnvVar]):
     let out: List[LinkStageEnvVar] = []
     for value in values:
         let e = &value
@@ -1323,11 +1323,11 @@ fn comptime_parse_i32_default(text: &str, default_value: i32) -> i32:
         return default_value
     v * sign
 
-fn cpp_put_int(out: &str, v: i32) -> str: out ++ f"{v}\n"
+fn cpp_put_int(out: &str, v: i32): out ++ f"{v}\n"
 
-fn cpp_put_str(out: &str, s: &str) -> str: out ++ f"{s.len()}\n" ++ s ++ "\n"
+fn cpp_put_str(out: &str, s: &str): out ++ f"{s.len()}\n" ++ s ++ "\n"
 
-fn cpp_put_list(out: &str, v: &List[str]) -> str:
+fn cpp_put_list(out: &str, v: &List[str]):
     var acc = out ++ f"{v.len()}\n"
     for v_item in v:
         acc = cpp_put_str(acc, v_item)
@@ -1338,7 +1338,7 @@ fn cpp_put_bool(out: &str, b: bool) -> str: out ++ (if b: "1\n" else: "0\n")
 // Process-isolated workspace compiles (D24, #729): the parallel() plan
 // crosses to a child `with __workspace-compile` process as this
 // length-prefixed text; independent builds never share an address space.
-fn comptime_plan_serialize(p: &ComptimeWorkspaceCompilePlan) -> str:
+fn comptime_plan_serialize(p: &ComptimeWorkspaceCompilePlan):
     var out = ""
     out = cpp_put_int(out, p.valid)
     out = cpp_put_str(out, p.name)
@@ -1520,7 +1520,7 @@ fn comptime_workspace_compile_subprocess(plan_path: &str, result_path: &str) -> 
         return 1
     0
 
-fn comptime_action_outputs(output: &str, extra_outputs: &List[str]) -> List[str]:
+fn comptime_action_outputs(output: &str, extra_outputs: &List[str]):
     let outputs: List[str] = []
     if output.len() > 0:
         outputs.push(with_str_clone_ref(output))
@@ -1528,7 +1528,7 @@ fn comptime_action_outputs(output: &str, extra_outputs: &List[str]) -> List[str]
         outputs.push(with_str_clone_ref(extra_output))
     outputs
 
-fn comptime_action_write_scope(output: &str, extra_outputs: &List[str], write_scopes: &List[str], scratch_path: &str) -> List[str]:
+fn comptime_action_write_scope(output: &str, extra_outputs: &List[str], write_scopes: &List[str], scratch_path: &str):
     let scopes = comptime_action_outputs(output, extra_outputs)
     for write_scope in write_scopes:
         scopes.push(with_str_clone_ref(write_scope))
@@ -1615,20 +1615,20 @@ impl ComptimeEvaluator:
 // 1 MB arena page each time (behav_1944's 32 MB limit).
 // The evaluator works on `ast`, the pool of the node it evaluates (a further
 // holder); the blank keeps the taken Sema's own.
-unsafe fn comptime_take_sema(sema_ptr: *mut Sema, ast: &AstPool) -> Sema:
+unsafe fn comptime_take_sema(sema_ptr: *mut Sema, ast: &AstPool):
     let taken = *sema_ptr
     *sema_ptr = Sema.placeholder(taken.pool, DiagnosticList.init(), taken.ast)
     taken.ast = ast.clone()
     taken
 
-unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
+unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32):
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     let evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
+unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32):
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     let evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
@@ -2100,7 +2100,7 @@ impl ComptimeEvaluator:
         for i in 0..self.runtime_env_names.len():
             let _restore = with_setenv_str(self.runtime_env_names[i], self.runtime_env_values[i])
 
-fn comptime_effect_escape(text: &str) -> str:
+fn comptime_effect_escape(text: &str):
     var out = ""
     for i in 0..text.len():
         let ch = text[i]
@@ -2146,7 +2146,7 @@ impl ComptimeEvaluator:
         if record.write_scoped != 0: return
         self.record_effect("list\t" ++ resolved)
 
-fn comptime_effect_join_argv_parts(parts: &List[str]) -> str:
+fn comptime_effect_join_argv_parts(parts: &List[str]):
     var out = ""
     for i in 0..parts.len():
         if i > 0:
@@ -2154,7 +2154,7 @@ fn comptime_effect_join_argv_parts(parts: &List[str]) -> str:
         out = out ++ comptime_effect_escape(parts[i])
     out
 
-fn comptime_process_basename(path: &str) -> str:
+fn comptime_process_basename(path: &str):
     var start = 0
     for i in 0..path.len():
         let ch = path[i]
@@ -2162,7 +2162,7 @@ fn comptime_process_basename(path: &str) -> str:
             start = (i + 1) as i32
     path.slice(start, path.len())
 
-fn comptime_process_requires_network(exe: &str) -> bool:
+fn comptime_process_requires_network(exe: &str):
     let name = comptime_process_basename(exe)
     name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe" or name == "https_fetch" or name == "https_fetch.exe"
 
@@ -2671,7 +2671,7 @@ impl ComptimeEvaluator:
 // (mirrors SemaCheck.fn_symbol_is_builtin_vec_comptime_allowed, plus the
 // map surface eval_map_method_call handles). Unknown methods still fail
 // inside the handlers with a named diagnostic.
-fn comptime_pipeline_builtin_method(name: &str) -> i32:
+fn comptime_pipeline_builtin_method(name: &str):
     (name == "push" or name == "pop" or name == "get" or name == "set" or name == "clear" or name == "len" or name == "is_empty" or name == "capacity" or name == "contains" or name == "insert" or name == "remove" or name == "clone" or name == "first" or name == "last" or name == "rest" or name == "join" or name == "iter" or name == "iter_ref" or name == "into_iter" or name == "enumerate" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "skip" or name == "take_while" or name == "skip_while" or name == "fold" or name == "reduce" or name == "any" or name == "all" or name == "none" or name == "count" or name == "sum" or name == "product" or name == "find" or name == "position" or name == "for_each" or name == "collect" or name == "keys" or name == "into_keys" or name == "values" or name == "into_values" or name == "drain" or name == "increment" or name == "decrement") as i32
 
 fn comptime_string_builder_constructor_method(name: &str) -> str:
@@ -2848,13 +2848,13 @@ fn comptime_positive_mod(value: i64, divisor: i32) -> i32:
         out = out + divisor
     out
 
-fn comptime_bit_pattern(value: i64, width: i32) -> i64:
+fn comptime_bit_pattern(value: i64, width: i32):
     int_truncate_to_width(value, width, true)
 
-fn comptime_bit_result(value: i64, width: i32, is_unsigned: bool) -> i64:
+fn comptime_bit_result(value: i64, width: i32, is_unsigned: bool):
     int_truncate_to_width(value, width, is_unsigned)
 
-fn comptime_count_ones(value: i64, width: i32) -> i32:
+fn comptime_count_ones(value: i64, width: i32):
     let raw = comptime_bit_pattern(value, width)
     var count: i32 = 0
     for bit in 0..width:
@@ -2903,7 +2903,7 @@ fn comptime_swap_bytes_bits(value: i64, width: i32) -> i64:
         out = out | exact_int_shl_word(byte, (byte_count - 1 - bi) * 8)
     out & exact_int_low_mask(width)
 
-fn comptime_reverse_bits(value: i64, width: i32) -> i64:
+fn comptime_reverse_bits(value: i64, width: i32):
     let raw = comptime_bit_pattern(value, width)
     var out: i64 = 0
     for bit in 0..width:
@@ -4101,7 +4101,7 @@ impl ComptimeEvaluator:
             return normalized.slice(prefix.len(), normalized.len())
         normalized
 
-fn comptime_sha256_text(data: &str) -> str:
+fn comptime_sha256_text(data: &str):
     let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
@@ -4334,11 +4334,11 @@ impl ComptimeEvaluator:
 fn comptime_workspace_compile_result(result: ComptimeValue, messages: List[ComptimeValue]) -> ComptimeWorkspaceCompileResult:
     ComptimeWorkspaceCompileResult { result, messages }
 
-fn comptime_workspace_compile_invalid() -> ComptimeWorkspaceCompileResult:
+fn comptime_workspace_compile_invalid():
     let messages: List[ComptimeValue] = []
     comptime_workspace_compile_result(comptime_value_invalid(), messages)
 
-fn comptime_module_name_for_path(root: &str, path: &str) -> str:
+fn comptime_module_name_for_path(root: &str, path: &str):
     var rel = with_str_clone_ref(path)
     let prefix = if root.ends_with("/"): with_str_clone_ref(root) else: root ++ "/"
     if root.len() > 0 and path.starts_with(prefix):
@@ -5735,7 +5735,7 @@ impl ComptimeEvaluator:
 // Worker-mode build(ctx) re-evaluation skips these; read/query/path methods
 // (exists, read_text, list_files, join, normalize, ...) are not listed and run
 // normally so the reconstructed graph still observes the parent's outputs.
-fn comptime_toolfs_method_is_mutating(method: &str) -> bool:
+fn comptime_toolfs_method_is_mutating(method: &str):
     method == "write_text" or method == "write_binary" or method == "copy_file" or method == "chmod" or method == "rename" or method == "copy_tree" or method == "symlink" or method == "write_tar" or method == "write_tar_gz" or method == "extract_tar" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree"
 
 impl ComptimeEvaluator:

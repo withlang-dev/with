@@ -11,10 +11,10 @@ fn OVERFLOW_MODE_PANIC -> i32: 0
 fn OVERFLOW_MODE_WRAP -> i32: 1
 fn OVERFLOW_MODE_SATURATE -> i32: 2
 
-fn overflow_mode_default -> i32:
+fn overflow_mode_default:
     OVERFLOW_MODE_PANIC()
 
-fn overflow_mode_valid(mode: i32) -> bool:
+fn overflow_mode_valid(mode: i32):
     mode == OVERFLOW_MODE_PANIC() or mode == OVERFLOW_MODE_WRAP() or mode == OVERFLOW_MODE_SATURATE()
 
 fn overflow_mode_name(mode: i32) -> str:

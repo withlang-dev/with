@@ -24,7 +24,7 @@ fn zcu_owned_text(text: &str) -> str:
         return ""
     runtime_str_clone(text)
 
-fn zcu_new_list_str -> List[str]:
+fn zcu_new_list_str:
     let out: List[str] = []
     out
 

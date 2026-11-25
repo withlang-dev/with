@@ -462,7 +462,7 @@ fn cstr_thread_id() -> i64:
         return tid
     1
 
-fn cstr_slot_for_current_thread() -> isize:
+fn cstr_slot_for_current_thread():
     let tid = cstr_thread_id()
     var slot = -1
     cstr_lock()
@@ -482,7 +482,7 @@ fn cstr_slot_for_current_thread() -> isize:
     cstr_unlock()
     slot
 
-fn to_cstr(s: &str) -> *const u8:
+fn to_cstr(s: &str):
     let slot = cstr_slot_for_current_thread()
     if slot < 0:
         rt_write(2, "error: LLVM bridge exhausted thread-local cstr slots\n" as *const u8, 53)
@@ -502,7 +502,7 @@ fn c_strlen(s: *const u8) -> i64:
         i = i + 1
     i
 
-fn empty_cstr() -> *const u8:
+fn empty_cstr():
     "\0" as *const u8
 
 // ── Lifecycle ───────────────────────────────────────────────────
@@ -730,16 +730,16 @@ fn wl_get_allocated_type(v: i64) -> i64:
         LLVMGetAllocatedType(value) as i64
 
 // Type kind constants
-fn wl_void_type_kind() -> i32: LLVM_VoidTypeKind
-fn wl_float_type_kind() -> i32: LLVM_FloatTypeKind
-fn wl_double_type_kind() -> i32: LLVM_DoubleTypeKind
-fn wl_integer_type_kind() -> i32: LLVM_IntegerTypeKind
-fn wl_function_type_kind() -> i32: LLVM_FunctionTypeKind
-fn wl_struct_type_kind() -> i32: LLVM_StructTypeKind
-fn wl_array_type_kind() -> i32: LLVM_ArrayTypeKind
-fn wl_pointer_type_kind() -> i32: LLVM_PointerTypeKind
-fn wl_vector_type_kind() -> i32: LLVM_VectorTypeKind
-fn wl_function_value_kind() -> i32: LLVM_FunctionValueKind
+fn wl_void_type_kind(): LLVM_VoidTypeKind
+fn wl_float_type_kind(): LLVM_FloatTypeKind
+fn wl_double_type_kind(): LLVM_DoubleTypeKind
+fn wl_integer_type_kind(): LLVM_IntegerTypeKind
+fn wl_function_type_kind(): LLVM_FunctionTypeKind
+fn wl_struct_type_kind(): LLVM_StructTypeKind
+fn wl_array_type_kind(): LLVM_ArrayTypeKind
+fn wl_pointer_type_kind(): LLVM_PointerTypeKind
+fn wl_vector_type_kind(): LLVM_VectorTypeKind
+fn wl_function_value_kind(): LLVM_FunctionValueKind
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -789,25 +789,25 @@ fn wl_size_of(ty: i64) -> i64: unsafe { LLVMSizeOf(ty as *mut u8) as i64 }
 
 // ── ICmp predicates ─────────────────────────────────────────────
 
-fn wl_int_eq() -> i32: LLVM_IntEQ
-fn wl_int_ne() -> i32: LLVM_IntNE
-fn wl_int_slt() -> i32: LLVM_IntSLT
-fn wl_int_sgt() -> i32: LLVM_IntSGT
-fn wl_int_sle() -> i32: LLVM_IntSLE
-fn wl_int_sge() -> i32: LLVM_IntSGE
-fn wl_int_ult() -> i32: LLVM_IntULT
-fn wl_int_ule() -> i32: LLVM_IntULE
-fn wl_int_uge() -> i32: LLVM_IntUGE
-fn wl_int_ugt() -> i32: LLVM_IntUGT
+fn wl_int_eq(): LLVM_IntEQ
+fn wl_int_ne(): LLVM_IntNE
+fn wl_int_slt(): LLVM_IntSLT
+fn wl_int_sgt(): LLVM_IntSGT
+fn wl_int_sle(): LLVM_IntSLE
+fn wl_int_sge(): LLVM_IntSGE
+fn wl_int_ult(): LLVM_IntULT
+fn wl_int_ule(): LLVM_IntULE
+fn wl_int_uge(): LLVM_IntUGE
+fn wl_int_ugt(): LLVM_IntUGT
 
 // ── FCmp predicates ─────────────────────────────────────────────
 
-fn wl_real_oeq() -> i32: LLVM_RealOEQ
-fn wl_real_une() -> i32: LLVM_RealUNE
-fn wl_real_olt() -> i32: LLVM_RealOLT
-fn wl_real_ogt() -> i32: LLVM_RealOGT
-fn wl_real_ole() -> i32: LLVM_RealOLE
-fn wl_real_oge() -> i32: LLVM_RealOGE
+fn wl_real_oeq(): LLVM_RealOEQ
+fn wl_real_une(): LLVM_RealUNE
+fn wl_real_olt(): LLVM_RealOLT
+fn wl_real_ogt(): LLVM_RealOGT
+fn wl_real_ole(): LLVM_RealOLE
+fn wl_real_oge(): LLVM_RealOGE
 
 // ── Functions ───────────────────────────────────────────────────
 
@@ -1055,17 +1055,17 @@ fn wl_set_linkage(g: i64, link: i32): unsafe { LLVMSetLinkage(g as *mut u8, link
 fn wl_set_thread_local(g: i64): unsafe { LLVMSetThreadLocal(g as *mut u8, 1) }
 fn wl_set_call_conv(fn_val: i64, cc: i32): unsafe { LLVMSetFunctionCallConv(fn_val as *mut u8, cc as u32) }
 
-fn wl_cc_c() -> i32: LLVM_CCallConv
-fn wl_cc_fast() -> i32: LLVM_FastCallConv
-fn wl_cc_x86_stdcall() -> i32: LLVM_X86StdcallCallConv
-fn wl_cc_x86_fastcall() -> i32: LLVM_X86FastcallCallConv
-fn wl_cc_x86_thiscall() -> i32: LLVM_X86ThiscallCallConv
-fn wl_cc_win64() -> i32: LLVM_Win64CallConv
-fn wl_cc_x86_vectorcall() -> i32: LLVM_X86VectorcallCallConv
-fn wl_cc_aarch64_vfabi() -> i32: LLVM_AArch64VectorCallConv
-fn wl_internal_linkage() -> i32: LLVM_InternalLinkage
-fn wl_private_linkage() -> i32: LLVM_PrivateLinkage
-fn wl_external_linkage() -> i32: LLVM_ExternalLinkage
+fn wl_cc_c(): LLVM_CCallConv
+fn wl_cc_fast(): LLVM_FastCallConv
+fn wl_cc_x86_stdcall(): LLVM_X86StdcallCallConv
+fn wl_cc_x86_fastcall(): LLVM_X86FastcallCallConv
+fn wl_cc_x86_thiscall(): LLVM_X86ThiscallCallConv
+fn wl_cc_win64(): LLVM_Win64CallConv
+fn wl_cc_x86_vectorcall(): LLVM_X86VectorcallCallConv
+fn wl_cc_aarch64_vfabi(): LLVM_AArch64VectorCallConv
+fn wl_internal_linkage(): LLVM_InternalLinkage
+fn wl_private_linkage(): LLVM_PrivateLinkage
+fn wl_external_linkage(): LLVM_ExternalLinkage
 let LLVM_AppendingLinkage: i32 = 7
 
 // ── Codegen-unit splitting primitives (#650) ─────────────────────
@@ -1102,7 +1102,7 @@ fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
 fn wl_fn_is_declaration(f: i64) -> i32: unsafe { LLVMIsDeclaration(f as *mut u8) }
 fn wl_fn_block_count(f: i64) -> i32: unsafe { LLVMCountBasicBlocks(f as *mut u8) as i32 }
 
-fn wl_fn_instruction_count(f: i64) -> isize:
+fn wl_fn_instruction_count(f: i64):
     var count = 0
     unsafe:
         var bb = LLVMGetFirstBasicBlock(f as *mut u8)
@@ -1123,7 +1123,7 @@ fn wl_fn_instruction_count(f: i64) -> isize:
 // is guaranteed: the target emits an unaligned access ("The compiler emits
 // unaligned loads/stores"). Runs before the per-function cleanup passes;
 // returns the number of accesses relaxed.
-fn wl_relax_packed_access_alignment(f: i64) -> isize:
+fn wl_relax_packed_access_alignment(f: i64):
     var relaxed = 0
     unsafe:
         var bb = LLVMGetFirstBasicBlock(f as *mut u8)
@@ -1172,7 +1172,7 @@ fn wl_address_through_packed_struct(addr: i64) -> bool:
 // destination may be the same place), a store of a zero aggregate becomes
 // `llvm.memset`, and a load left without uses is erased. Runs before the
 // per-function cleanup passes; returns the number of stores rewritten.
-fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> isize:
+fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64):
     var rewritten = 0
     unsafe:
         let builder = LLVMCreateBuilderInContext(ctx as *mut u8)
@@ -1277,7 +1277,7 @@ fn wl_get_next_global(g: i64) -> i64: unsafe { LLVMGetNextGlobal(g as *mut u8) a
 fn wl_global_has_initializer(g: i64) -> bool:
     unsafe { if LLVMGetInitializer(g as *mut u8) as i64 != 0: true else: false }
 fn wl_get_linkage(v: i64) -> i32: unsafe { LLVMGetLinkage(v as *mut u8) }
-fn wl_appending_linkage() -> i32: LLVM_AppendingLinkage
+fn wl_appending_linkage(): LLVM_AppendingLinkage
 fn wl_delete_global(g: i64) -> Unit: unsafe { LLVMDeleteGlobal(g as *mut u8) }
 fn wl_clear_initializer(g: i64) -> Unit:
     unsafe { LLVMSetInitializer(g as *mut u8, 0 as *mut u8) }
@@ -1694,9 +1694,9 @@ fn wl_di_set_subprogram(function: i64, subprogram: i64):
     unsafe:
         LLVMSetSubprogram(function as *mut u8, subprogram as *mut u8)
 
-fn wl_di_get_subprogram(function: i64) -> i64: unsafe { LLVMGetSubprogram(function as *mut u8) } as i64
+fn wl_di_get_subprogram(function: i64): unsafe { LLVMGetSubprogram(function as *mut u8) } as i64
 
-fn wl_di_subprogram_line(subprogram: i64) -> i32: unsafe { LLVMDISubprogramGetLine(subprogram as *mut u8) } as i32
+fn wl_di_subprogram_line(subprogram: i64): unsafe { LLVMDISubprogramGetLine(subprogram as *mut u8) } as i32
 
 fn wl_di_create_debug_location(context: i64, line: i32, col: i32, scope: i64) -> i64:
     unsafe:
@@ -1710,9 +1710,9 @@ fn wl_di_clear_current_location(builder: i64):
     unsafe:
         LLVMSetCurrentDebugLocation2(builder as *mut u8, 0 as *mut u8)
 
-fn wl_di_flag_zero() -> i32: LLVM_DIFlagZero
-fn wl_dwarf_lang_c() -> i32: LLVM_DWARFSourceLanguageC
-fn wl_dwarf_lang_with() -> i32: LLVM_DWARFSourceLanguageC
+fn wl_di_flag_zero(): LLVM_DIFlagZero
+fn wl_dwarf_lang_c(): LLVM_DWARFSourceLanguageC
+fn wl_dwarf_lang_with(): LLVM_DWARFSourceLanguageC
 
 // DW_ATE encoding constants
 fn wl_dwarf_ate_boolean() -> i32: 2
@@ -1781,7 +1781,7 @@ fn wl_is_argument(v: i64) -> bool: v != 0 and unsafe { LLVMIsAArgument(v as *mut
 
 fn wl_is_alloca(v: i64) -> bool: v != 0 and unsafe { LLVMIsAAllocaInst(v as *mut u8) } as i64 != 0
 
-fn wl_di_current_location(builder: i64) -> i64: unsafe { LLVMGetCurrentDebugLocation2(builder as *mut u8) } as i64
+fn wl_di_current_location(builder: i64): unsafe { LLVMGetCurrentDebugLocation2(builder as *mut u8) } as i64
 
 fn wl_di_create_lexical_block(builder: i64, scope: i64, file: i64, line: i32, col: i32) -> i64:
     unsafe:
@@ -1857,14 +1857,14 @@ fn wl_get_inline_asm(fn_ty: i64, asm_str: &str, constraints: &str, has_side_effe
 
 // ── Standalone file compilation ─────────────────────────────────
 
-fn path_to_cstr(path: &str, buf: *mut u8) -> *const u8:
+fn path_to_cstr(path: &str, buf: *mut u8):
     let n = if path.len() < 4095: path.len() else: 4095
     let src = unsafe *(path as *const str as *const *const u8)
     with_memcpy(buf, src, n)
     unsafe *((buf as i64 + n) as *mut u8) = 0
     buf as *const u8
 
-fn wl_assemble_to_object(source_path: &str, output_path: &str) -> i32:
+fn wl_assemble_to_object(source_path: &str, output_path: &str):
     wl_assemble_to_object_for_triple(source_path, output_path, "")
 
 // Assemble a .s file for an explicit target triple ("" = the active/

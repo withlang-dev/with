@@ -49,7 +49,7 @@ fn gir_attr_or(el: &XmlElement, name: &str, fallback: &str) -> str:
         Some(v) => v
         None => fallback
 
-fn gir_transfer(el: &XmlElement) -> str: gir_attr_or(el, "transfer-ownership", "-")
+fn gir_transfer(el: &XmlElement): gir_attr_or(el, "transfer-ownership", "-")
 
 fn gir_fn_facts(el: &XmlElement) -> str:
     var ret = "-"

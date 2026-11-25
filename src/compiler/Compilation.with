@@ -44,7 +44,7 @@ extern fn wl_set_active_target_triple(triple: &str) -> Unit
 fn profile_enabled() -> bool:
     runtime_getenv("WITH_PROFILE").len() > 0
 
-fn profile_now() -> i64:
+fn profile_now():
     runtime_clock_nanos()
 
 fn profile_emit(name: &str, start: i64, counters: &str):
@@ -102,7 +102,7 @@ fn compilation_remove_dsym_best_effort(bin_path: &str):
         return
     compilation_remove_tree_best_effort(bin_path ++ ".dSYM")
 
-fn compilation_argv_append(argv: &str, arg: &str) -> str:
+fn compilation_argv_append(argv: &str, arg: &str):
     argv ++ arg ++ "\0"
 
 // #1915: this compiler's own dsymutil (`with __dsymutil`, compiler.
@@ -198,7 +198,7 @@ fn compilation_mir_span_range(zcu: &Zcu, pool: &AstPool, fn_sym: i32, start: i32
 fn compilation_bool_digit(value: bool) -> str:
     if value: "1" else: "0"
 
-fn compilation_join_strings(values: &List[str], separator: &str) -> str:
+fn compilation_join_strings(values: &List[str], separator: &str):
     var out = ""
     for i in 0..values.len():
         if i > 0:
@@ -206,7 +206,7 @@ fn compilation_join_strings(values: &List[str], separator: &str) -> str:
         out = out ++ values[i]
     out
 
-fn compilation_escape_with_string(value: &str) -> str:
+fn compilation_escape_with_string(value: &str):
     var out = ""
     for i in 0..value.len():
         let ch = value[i]
@@ -224,7 +224,7 @@ fn compilation_escape_with_string(value: &str) -> str:
             out = out ++ value.slice(i, (i + 1))
     out
 
-fn compilation_split_escaped_fields(line: &str) -> List[str]:
+fn compilation_split_escaped_fields(line: &str):
     let fields: List[str] = []
     var cur = ""
     var escaped = false
@@ -250,7 +250,7 @@ fn compilation_split_escaped_fields(line: &str) -> List[str]:
     fields.push(cur)
     fields
 
-fn compilation_split_nonempty_lines(text: &str) -> List[str]:
+fn compilation_split_nonempty_lines(text: &str):
     let lines: List[str] = []
     var start = 0
     for i in 0..text.len():
@@ -262,7 +262,7 @@ fn compilation_split_nonempty_lines(text: &str) -> List[str]:
         lines.push(text.slice(start, text.len()))
     lines
 
-fn compilation_parse_i32(text: &str) -> i32:
+fn compilation_parse_i32(text: &str):
     var sign: i32 = 1
     var i = 0
     if text.len() > 0 and text[0] == 45:
@@ -291,7 +291,7 @@ fn compilation_relative_source_path(root: &str, path: &str) -> str:
         return path.slice(prefix.len(), path.len())
     with_str_clone_ref(path)
 
-fn compilation_module_import_name(root: &str, path: &str) -> str:
+fn compilation_module_import_name(root: &str, path: &str):
     var rel = compilation_relative_source_path(root, path)
     if source_ext_is_source(rel):
         rel = rel.slice(0, rel.len() - source_ext_len(rel))
@@ -2065,7 +2065,7 @@ impl Compilation:
 
 // Public one-shot entry for compiler-integrated tools. Compilation remains an
 // orchestration implementation detail; tools consume the shared analysis schema.
-fn compiler_analyze_file(source_path: &str, request: &str) -> CompilerAnalysisResult:
+fn compiler_analyze_file(source_path: &str, request: &str):
     let comp = Compilation.init()
     comp.analyze_file(source_path, request)
 

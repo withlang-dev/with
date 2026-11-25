@@ -307,7 +307,7 @@ fn analysis_parse_i32(text: &str) -> i32:
         i = i + 1
     value * sign
 
-fn analysis_escape(text: &str) -> str:
+fn analysis_escape(text: &str):
     let parts: List[str] = []
     var start: i32 = 0
     for i in 0..text.len():

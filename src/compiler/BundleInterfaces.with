@@ -23,7 +23,7 @@ var g_bundle_registering_package = ""
 
 // sha256 hex of a text — the manifest's `interface-sha` (the .wi bytes) and
 // the fingerprint (the canonical declaration rows).
-fn bundle_text_sha256(text: &str) -> str:
+fn bundle_text_sha256(text: &str):
     let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(text, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
@@ -50,7 +50,7 @@ fn bundle_corpus_base(corpus: &str) -> str:
 // on demand: a program names it with `--link-bundle`, so the program knows
 // at compile time that it links it, and runs its initializer before its own
 // (a migrated corpus's object runs none, D38 Level 0).
-fn bundle_corpus_is_tree(corpus: &str) -> bool: corpus.starts_with("tree:")
+fn bundle_corpus_is_tree(corpus: &str): corpus.starts_with("tree:")
 
 // The initializers of the tree bundles this compile links (`init <symbol>`
 // in each manifest), in `--link-bundle` order.
@@ -74,7 +74,7 @@ fn bundle_name_without_module_identity(name: &str) -> str:
 
 // #3351: the initializer a tree bundle's object defines, named from the
 // corpus directory as a module's functions are from its path.
-fn bundle_init_symbol(corpus: &str) -> str: fn_abi_module_link_prefix(bundle_corpus_base(corpus)) ++ "bundle_init"
+fn bundle_init_symbol(corpus: &str): fn_abi_module_link_prefix(bundle_corpus_base(corpus)) ++ "bundle_init"
 
 // `<embedded-std>/std/engines/pcre2/defs.with` → `std.engines.pcre2.defs`, `<embedded-rt>/rt/rt_core.with`
 // → `rt.rt_core`; "" for any other path.
@@ -97,7 +97,7 @@ fn bundle_tree_module_dotted_name(corpus: &str, canonical_path: &str) -> str:
     ""
 
 // The `module <path>` section paths of an interface file, in file order.
-fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
+fn bundle_interface_section_paths(wi_text: &str):
     let out: List[str] = []
     var start: i64 = 0
     while start < wi_text.len():
@@ -131,7 +131,7 @@ fn bundle_interface_key(path: &str) -> str:
 fn bundle_interface_registered(path: &str) -> bool:
     g_bundle_interface_texts.contains(bundle_interface_key(path))
 
-fn bundle_interface_trim(s: &str) -> str:
+fn bundle_interface_trim(s: &str):
     var a: i64 = 0
     var b = s.len()
     while a < b and (s[a] == ' ' or s[a] == '\t'):
@@ -147,7 +147,7 @@ fn bundle_interfaces_register_section(path: &str, text: &str):
 
 // A package bundle's modules are one package: the bundle's. The source of
 // a bundled package need not exist, so its `with.toml` cannot say so.
-fn bundle_interfaces_register_package_wi(package: &str, wi_text: &str) -> isize:
+fn bundle_interfaces_register_package_wi(package: &str, wi_text: &str):
     g_bundle_registering_package = with_str_clone_ref(package)
     let count = bundle_interfaces_register_wi(wi_text)
     g_bundle_registering_package = ""
@@ -160,7 +160,7 @@ fn bundle_interface_package(path: &str) -> str:
 
 // Register every `module <path>` section of an interface file. Returns the
 // section count so a file with none is a loud error at the caller.
-fn bundle_interfaces_register_wi(wi_text: &str) -> isize:
+fn bundle_interfaces_register_wi(wi_text: &str):
     var count = 0
     var section_path = ""
     var section_start: i64 = 0

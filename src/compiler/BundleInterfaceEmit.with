@@ -200,7 +200,7 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
 fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
 
 // `text` with the indentation of its first line removed from every line.
-fn bx_dedent(text: &str) -> str:
+fn bx_dedent(text: &str):
     var indent = 0
     while indent < text.len() and (text[indent] == ' ' or text[indent] == '\t'): indent += 1
     var out = ""
@@ -237,7 +237,7 @@ fn bx_effect_pins_text(sema: &Sema, node: i32) -> str:
     out ++ ")]\n"
 
 // Insertion-sorted copy (bytewise); the model is small.
-fn bx_sorted_strings(items: &List[str]) -> List[str]:
+fn bx_sorted_strings(items: &List[str]):
     var sorted: List[str] = []
     for i in 0..items.len():
         let item = items[i]
@@ -263,7 +263,7 @@ fn bx_string_escape_byte(b: i32) -> str:
     if b == 0: return "\\0"
     ""
 
-fn bx_node_kind_name(kind: i32) -> str: f"node kind {kind}"
+fn bx_node_kind_name(kind: i32): f"node kind {kind}"
 
 impl BundleEmitter:
     // The text of a declaration as its source wrote it, from the first
@@ -1580,7 +1580,7 @@ fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &List[st
     }
 
 // The export indices of one module in canonical order: kind, then name.
-fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> List[i32]:
+fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str):
     let order: List[i32] = []
     for kind in 0..7:
         let names: List[str] = []

@@ -77,7 +77,7 @@ fn link_stage_result_for_plan(plan: LinkStagePlan) -> LinkStageResult:
     var owned_plan = plan
     link_stage_result_for_command(move owned_plan.command)
 
-fn link_stage_argv_append(argv: &str, arg: &str) -> str:
+fn link_stage_argv_append(argv: &str, arg: &str):
     argv ++ arg ++ "\0"
 
 fn link_stage_is_digit(ch: i32) -> bool:
@@ -100,7 +100,7 @@ fn link_stage_macho_macos_minos(path: &str) -> i64:
 
 // An ar archive's members: a 60-byte header (name, decimal size at 48), the
 // body padded to even length; a BSD name `#1/<n>` puts n name bytes first.
-fn link_stage_archive_macos_minos(data: &str) -> i64:
+fn link_stage_archive_macos_minos(data: &str):
     var best: i64 = 0
     var offset: isize = 8
     while offset + 60 <= data.len():
@@ -154,7 +154,7 @@ fn link_stage_darwin_version_string(encoded: i64) -> str:
 // The link's deployment target: 11.0, or the newest macOS an input was
 // built for — the program's objects, its extra inputs, and the archives its
 // `-l` names resolve to — so no input is newer than the program.
-fn link_stage_darwin_platform_version(obj_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> str:
+fn link_stage_darwin_platform_version(obj_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]):
     var best: i64 = 11 * 65536
     let inputs: List[str] = []
     inputs.push(obj_path.to_owned())
@@ -228,7 +228,7 @@ fn link_stage_archive_group_marker(is_elf: i32, via_driver: i32, open: i32) -> s
     let flag = if open != 0: "--start-group" else: "--end-group"
     if via_driver != 0: "-Wl," ++ flag else: flag
 
-fn link_stage_collect_cleanup_files(extras: &List[str]) -> List[str]:
+fn link_stage_collect_cleanup_files(extras: &List[str]):
     let cleanup: List[str] = []
     for i in 0..extras.len():
         let extra = extras[i]
@@ -304,7 +304,7 @@ fn link_stage_restore_env(saved: &LinkStageSavedEnv):
 // WITH_LINK_VERBOSE=1 prints every link's argv before it runs, and asks a
 // COFF link for lld-link's /verbose (each input it reads, each member it
 // loads): the evidence of what a link reads, for a toolchain audit (#1915).
-fn link_stage_verbose() -> bool: runtime_getenv("WITH_LINK_VERBOSE") == "1"
+fn link_stage_verbose(): runtime_getenv("WITH_LINK_VERBOSE") == "1"
 
 impl LinkStageCommand:
     fn run() -> i32:
@@ -422,7 +422,7 @@ fn link_stage_linux_crt_object(sysroot: &str, name: &str) -> str:
 // gcc's own directory, `<libdir>/gcc/<triple>/<version>`: the triple is the
 // distribution's (x86_64-linux-gnu, x86_64-pc-linux-gnu, x86_64-redhat-linux),
 // so any naming this arch, at the highest major version with crtbegin.o.
-fn link_stage_linux_gcc_dir(sysroot: &str) -> str:
+fn link_stage_linux_gcc_dir(sysroot: &str):
     let arch = link_stage_linux_arch()
     var best = ""
     var best_major: i64 = -1
@@ -454,7 +454,7 @@ fn link_stage_linux_dir_carries(dir: &str, name: &str) -> bool:
 
 // The directories a link names itself, `-L<dir>` or `-L <dir>`, in order:
 // a package's own (`with get`), the sysroot's, the program's.
-fn link_stage_explicit_search_dirs(extras: &List[str], link_args: &List[str], sysroot_lib: &str) -> List[str]:
+fn link_stage_explicit_search_dirs(extras: &List[str], link_args: &List[str], sysroot_lib: &str):
     let dirs: List[str] = []
     if sysroot_lib.len() > 0: dirs.push(sysroot_lib)
     for args in [extras, link_args]:
@@ -645,7 +645,7 @@ fn link_stage_linux_native_link_plan(obj_path: &str, bin_path: &str, extras: &Li
 
 // The driver spellings a program's link arguments use on Linux, for lld:
 // `-Wl,` unwrapped as on macOS, and `-pthread` (a driver flag) its library.
-fn link_stage_linux_driver_args_for_ld(link_args: &List[str]) -> List[str]:
+fn link_stage_linux_driver_args_for_ld(link_args: &List[str]):
     let unwrapped = link_stage_driver_args_for_ld(link_args)
     let out: List[str] = []
     for unwrapped_item in unwrapped:
@@ -765,7 +765,7 @@ fn link_stage_windows_is_compiler_link(extras: &List[str]) -> bool:
             return true
     false
 
-fn link_stage_is_llvm_bridge_rsp(extra: &str) -> bool:
+fn link_stage_is_llvm_bridge_rsp(extra: &str):
     extra.starts_with("@") and extra.ends_with("/llvm_ld.rsp")
 
 // The SDK whose archives a compiler link reads is the one its llvm_ld.rsp
@@ -798,7 +798,7 @@ fn link_stage_windows_arch() -> str:
 
 // The LLVM SDK a link reads: the directory above the bin/ holding the lld it
 // runs (.deps/llvm-<ver>-<host>/bin/lld-link.exe).
-fn link_stage_sdk_dir_of(llvm_ld: &str) -> str: link_stage_dirname(link_stage_dirname(llvm_ld))
+fn link_stage_sdk_dir_of(llvm_ld: &str): link_stage_dirname(link_stage_dirname(llvm_ld))
 
 // The SDK's Windows C runtime (#1915; build/sdk.with
 // run_sdk_windows_libc_action), the sysroot of the SDK's clang for a
@@ -812,13 +812,13 @@ fn link_stage_windows_libc_root_in(sdk_dir: &str) -> str:
         return explicit ++ ""
     sdk_dir ++ "/libc/windows"
 
-fn link_stage_windows_libc_dir(sdk_dir: &str, arch: &str) -> str:
+fn link_stage_windows_libc_dir(sdk_dir: &str, arch: &str):
     link_stage_windows_libc_root_in(sdk_dir) ++ "/" ++ arch ++ "-w64-mingw32/lib"
 
 // The C target a Windows c_import parses for: mingw-w64's headers are
 // written for the GNU environment, the environment With's own Windows
 // objects target too (TargetSpec).
-fn link_stage_windows_c_target() -> str: link_stage_windows_arch() ++ "-w64-windows-gnu"
+fn link_stage_windows_c_target(): link_stage_windows_arch() ++ "-w64-windows-gnu"
 
 // Whether a Windows compilation reads the SDK's libc, the same one its
 // link reads. x86_64 always did (#1915); aarch64 does when the SDK
@@ -833,7 +833,7 @@ fn link_stage_windows_uses_sdk_libc_for(windows: bool, arch: &str, sdk_dir: &str
     if sdk_dir.len() == 0: return false
     link_stage_file_exists(link_stage_windows_libc_dir(sdk_dir, arch) ++ "/crt2.o")
 
-fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
+fn link_stage_windows_c_target_uses_sdk_libc():
     let windows = if target_spec_is_native(): runtime_sysinfo_os() == "Windows" else: target_spec_active_kind() == 5 or target_spec_active_kind() == 6
     link_stage_windows_uses_sdk_libc_for(windows, link_stage_windows_arch(), link_stage_windows_sdk_dir())
 
@@ -899,7 +899,7 @@ fn link_stage_project_root_of(root: &str) -> str:
 // The lld a link runs, as link_stage_link_with_extras_libs_args_plan
 // resolves it: the build's recorded llvm_ld, else (a native Windows link
 // before the metadata exists) the environment's. "" when there is none.
-fn link_stage_llvm_ld_path() -> str:
+fn link_stage_llvm_ld_path():
     let root = link_stage_resolve_runtime_root()
     var ld_path = link_stage_recorded_path(root, link_stage_read_file_trimmed(root ++ "/llvm_ld"))
     if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native():
@@ -908,12 +908,12 @@ fn link_stage_llvm_ld_path() -> str:
 
 // compiler-rt's builtins for the target, in the SDK's clang resource dir: the
 // mingw-w64 runtime's ___chkstk_ms and its 128-bit and soft-float helpers.
-fn link_stage_windows_builtins(sdk_dir: &str, arch: &str) -> str:
+fn link_stage_windows_builtins(sdk_dir: &str, arch: &str):
     sdk_dir ++ "/lib/clang/" ++ embedded_clang_resource_version() ++ "/lib/windows/libclang_rt.builtins-" ++ arch ++ ".a"
 
 // The in-box DLLs every program links, and uuid's GUIDs (their libraries ship
 // in the SDK's libc; build/sdk.with sdk_windows_import_libs names the DLLs).
-fn link_stage_windows_system_libs() -> List[str]:
+fn link_stage_windows_system_libs():
     let names: List[str] = []
     names.push("kernel32.lib")
     names.push("ntdll.lib")
@@ -1094,7 +1094,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
 // the PDB was given, so one tool linked in two directories differed (#2016).
 // The link runs from the root with root-relative paths, and /pdbsourcepath
 // names the root as the map's <to>: the -oso_prefix of a Mach-O link.
-fn link_stage_windows_root_relative_args(args: &List[str], root: &str) -> List[str]:
+fn link_stage_windows_root_relative_args(args: &List[str], root: &str):
     let out: List[str] = []
     for arg in args: out.push(link_stage_root_relative_arg(arg, root))
     let mapping = runtime_getenv("WITH_FILE_PREFIX_MAP")
@@ -1287,22 +1287,22 @@ fn link_stage_extract_runtime_obj(name: &str, path: &str) -> bool:
         return true
     false
 
-fn link_stage_link(obj_path: &str, bin_path: &str) -> bool:
+fn link_stage_link(obj_path: &str, bin_path: &str):
     let extras: List[str] = []
     let link_libs: List[str] = []
     link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
 
-fn link_stage_link_with_extras(obj_path: &str, bin_path: &str, extras: List[str]) -> bool:
+fn link_stage_link_with_extras(obj_path: &str, bin_path: &str, extras: List[str]):
     let link_libs: List[str] = []
     link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
 
-fn link_stage_link_with_extras_and_libs(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]) -> bool:
+fn link_stage_link_with_extras_and_libs(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]):
     link_stage_link_with_extras_and_libs_result(obj_path, bin_path, extras, link_libs).ok
 
-fn link_stage_link_with_extras_and_libs_result(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]) -> LinkStageResult:
+fn link_stage_link_with_extras_and_libs_result(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]):
     link_stage_result_for_plan(link_stage_link_with_extras_and_libs_plan(obj_path, bin_path, extras, link_libs))
 
-fn link_stage_link_with_extras_and_libs_plan(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]) -> LinkStagePlan:
+fn link_stage_link_with_extras_and_libs_plan(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str]):
     let link_args: List[str] = []
     link_stage_link_with_extras_libs_args_plan(obj_path, bin_path, extras, link_libs, link_args)
 
@@ -1423,7 +1423,7 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &L
 // to the linker. The native macOS link is lld itself now (#1915), so the
 // driver's wrapper is unwrapped here; every other argument passes as written
 // and lld names one it does not know.
-fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
+fn link_stage_driver_args_for_ld(link_args: &List[str]):
     let out: List[str] = []
     var i = 0
     while i < link_args.len():
@@ -1468,13 +1468,13 @@ fn link_stage_windows_lld_from_env() -> str:
         return prefix ++ "/bin/lld-link.exe"
     ""
 
-fn link_stage_link_with_llvm(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str], llvm_ld: &str) -> bool:
+fn link_stage_link_with_llvm(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str], llvm_ld: &str):
     link_stage_link_with_llvm_result(obj_path, bin_path, extras, link_libs, llvm_ld).ok
 
-fn link_stage_link_with_llvm_result(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str], llvm_ld: &str) -> LinkStageResult:
+fn link_stage_link_with_llvm_result(obj_path: &str, bin_path: &str, extras: List[str], link_libs: List[str], llvm_ld: &str):
     link_stage_result_for_plan(link_stage_link_with_llvm_plan(obj_path, bin_path, extras, link_libs, llvm_ld))
 
-fn link_stage_link_with_llvm_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], llvm_ld: &str) -> LinkStagePlan:
+fn link_stage_link_with_llvm_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], llvm_ld: &str):
     let link_args: List[str] = []
     link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, link_args, llvm_ld)
 
@@ -1911,7 +1911,7 @@ fn link_stage_extract_blob(data: &str, path: &str) -> bool:
 // whose interface is not its manifest's, or that cannot be extracted, yields
 // the single marker LINK_BUNDLE_FAILED (already reported) so the caller
 // fails the plan.
-fn LINK_BUNDLE_FAILED -> str: "<bundle-failed>"
+fn LINK_BUNDLE_FAILED: "<bundle-failed>"
 
 // Module prefixes of the bundles `--link-bundle` already put on the link
 // (Compilation.load_link_bundles): an embedded copy of the same modules
@@ -2162,7 +2162,7 @@ fn link_stage_resolve_runtime_root() -> str:
 // refuses (#1899: the runner named a seed-compiled out/bootstrap-lib whose
 // rt_core.o matched, before its .producer existed, and every action of the
 // run fell back to comptime evaluation).
-fn link_stage_named_runtime_root_is_this_generation(dir: &str) -> bool:
+fn link_stage_named_runtime_root_is_this_generation(dir: &str):
     not compiler_generation_is_stamped() or link_stage_runtime_dir_producer(dir) == compiler_generation() or link_stage_runtime_dir_matches_embedded(dir)
 
 // A runtime directory whose objects are byte for byte the ones this compiler
@@ -2206,7 +2206,7 @@ fn link_stage_runtime_dir_embedded_mismatch(dir: &str) -> str:
 
 // The generation that compiled a runtime object set, as the build recorded it
 // (build/compiler.with run_write_runtime_producer_action); "" when none is.
-fn link_stage_runtime_dir_producer(dir: &str) -> str:
+fn link_stage_runtime_dir_producer(dir: &str):
     link_stage_read_file_trimmed(dir ++ "/.producer")
 
 // A directory is this compiler's runtime when its .producer names this
@@ -2223,7 +2223,7 @@ fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
     let on_disk = runtime_read_file(dir ++ "/cimport_stubs.o")
     on_disk.len() == embedded.len() and on_disk == embedded
 
-fn link_stage_embedded_runtime_is_this_generation() -> bool:
+fn link_stage_embedded_runtime_is_this_generation():
     not compiler_generation_is_stamped() or compiler_runtime_generation() == compiler_generation()
 
 // Why a link has no runtime root of this compiler's generation (#1815).
@@ -2252,7 +2252,7 @@ fn link_stage_runtime_variant_dir() -> str:
 // embedded runtime matched the seed's out/bootstrap-lib byte for byte was
 // handed that root and then refused its bridge ("missing LLVM static
 // bridge"), and every action fell back to comptime evaluation.
-fn link_stage_runtime_root_links_bridge(dir: &str) -> bool:
+fn link_stage_runtime_root_links_bridge(dir: &str):
     not compiler_generation_is_stamped() or link_stage_runtime_dir_producer(dir) == compiler_generation()
 
 fn link_stage_find_llvm_static_bridge() -> str:
@@ -2400,7 +2400,7 @@ fn link_stage_should_use_rt_core_from_undef(undef: &str) -> bool:
         return true
     false
 
-fn link_stage_undefined_symbols_need_llvm_bridge(undef: &str) -> bool:
+fn link_stage_undefined_symbols_need_llvm_bridge(undef: &str):
     link_stage_undef_contains_symbol(undef, "wl_") or
         link_stage_undef_contains_symbol(undef, "LLVM") or
         link_stage_undef_contains_symbol(undef, "clang_")
@@ -2431,7 +2431,7 @@ fn link_stage_source_stem(source_path: &str) -> str:
         if base[i] == '.': last_dot = i as i32
     if last_dot > 0: base.slice(0, last_dot) else: base
 
-fn link_stage_sanitize_relative_dir(path: &str) -> str:
+fn link_stage_sanitize_relative_dir(path: &str):
     var out = ""
     var segment_start = 0
     var i = 0
@@ -2473,15 +2473,15 @@ fn link_stage_output_path_for_source(source_path: &str) -> str:
         return base ++ ".exe"
     base
 
-fn link_stage_link_object_to_binary(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], needs_async_runtime: bool) -> bool:
+fn link_stage_link_object_to_binary(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], needs_async_runtime: bool):
     let link_args: List[str] = []
     link_stage_link_object_to_binary_result(obj_path, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime).ok
 
-fn link_stage_link_object_to_binary_result(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStageResult:
+fn link_stage_link_object_to_binary_result(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool):
     let no_extra_objects: List[str] = []
     link_stage_result_for_plan(link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime))
 
-fn link_stage_link_object_to_binary_plan(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
+fn link_stage_link_object_to_binary_plan(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool):
     let no_extra_objects: List[str] = []
     link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime)
 

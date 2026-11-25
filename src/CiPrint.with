@@ -21,7 +21,7 @@ use rt.rt_core
 
 // ── Helpers ────────────────────────────────────────────────────
 
-fn ci_make_indent(n: i32) -> str:
+fn ci_make_indent(n: i32):
     var out = ""
     var i: i32 = 0
     while i < n:
@@ -305,7 +305,7 @@ fn ci_wrap_unsafe(inner: &str) -> str:
 // The operand of a wrapped expression: whatever `unsafe` it needs, the wrapper
 // supplies, so its own raw operations print without a prefix. A prefix inside
 // a prefix was the last "redundant unsafe prefix inside unsafe context".
-fn ci_print_wrapped_operand(exprs: CiExprPool, types: CiTypePool, id: CiExprId, depth: i32, wants_ptr: i32) -> str:
+fn ci_print_wrapped_operand(exprs: CiExprPool, types: CiTypePool, id: CiExprId, depth: i32, wants_ptr: i32):
     let saved = g_ci_print_in_unsafe_fn
     g_ci_print_in_unsafe_fn = true
     let text = ci_print_expr(exprs, types, id, depth, wants_ptr)
@@ -536,7 +536,7 @@ fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
 
 // A place expression: a name, a field, an element, a dereference. Anything
 // else is a value and has no address to take.
-fn ci_expr_is_place(exprs: CiExprPool, id: CiExprId) -> bool:
+fn ci_expr_is_place(exprs: CiExprPool, id: CiExprId):
     let kind = exprs.kind(id)
     kind == CiExprKind.CIE_IDENT or kind == CiExprKind.CIE_FIELD or kind == CiExprKind.CIE_INDEX or kind == CiExprKind.CIE_DEREF
 
@@ -647,7 +647,7 @@ fn ci_print_return_stmt(exprs: CiExprPool, types: CiTypePool, e: CiExprId, inden
 // the translation's own extern, a raw call (#3218); in `with migrate` output
 // it is the runtime's safe definition, where a wrapper would be vacuous
 // (R4c). ci_migrate_wrap_call_if_needed knows which.
-fn ci_print_memcpy_stmt(indent: &str, call: &str) -> str:
+fn ci_print_memcpy_stmt(indent: &str, call: &str):
     indent ++ ci_migrate_wrap_call_if_needed("with_memcpy", call) ++ "\n"
 
 // D147: a designated-init pair of a bitfield member is a setter pair,
@@ -667,7 +667,7 @@ fn ci_bitfield_accessor_call(exprs: CiExprPool, id: CiExprId) -> bool:
     let callee = (exprs.get_d0(id)) as CiExprId
     exprs.kind(callee) == CiExprKind.CIE_FIELD and exprs.get_d2(callee) == 3
 
-fn ci_print_bitfield_setter(exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs_str: &str) -> str:
+fn ci_print_bitfield_setter(exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs_str: &str):
     let callee = (exprs.get_d0(lhs)) as CiExprId
     let member = exprs.get_string(exprs.get_d1(callee))
     let getter = ci_print_expr(exprs, types, callee, 0, 0)
@@ -728,7 +728,7 @@ fn ci_print_sizeof_type_text(text: &str) -> str:
         return ci_array_text(ci_print_sizeof_type_text(elem), ci_array_text_count(text))
     with_str_clone_ref(text)
 
-fn i32_to_string(n: i32) -> str:
+fn i32_to_string(n: i32):
     i64_to_string(n)
 
 
@@ -1098,14 +1098,14 @@ fn ci_print_note_unknown(detail: &str):
 /// A type's text for a caller that reads it and prints no type when it is
 /// unsupported (an initializer list, which then has no type prefix): what
 /// ci_print_type notes of an unsupported type is not this caller's.
-fn ci_print_type_unnoted(types: CiTypePool, id: CiTypeId) -> str:
+fn ci_print_type_unnoted(types: CiTypePool, id: CiTypeId):
     let before = g_ci_print_unknowns.len()
     let text = ci_print_type(types, id)
     while g_ci_print_unknowns.len() > before: g_ci_print_unknowns.pop()
     text
 
 /// The printer's unrenderable-node records since the last take; taking clears.
-fn ci_print_take_unknowns() -> List[str]:
+fn ci_print_take_unknowns():
     let taken: List[str] = []
     for g_ci_print_unknown in g_ci_print_unknowns:
         taken.push(g_ci_print_unknown)
@@ -1431,7 +1431,7 @@ fn ci_expect_eq(label: &str, actual: &str, expected: &str) -> i32:
     with_eprint("  actual:   " ++ actual ++ "\n")
     1
 
-fn ci_roundtrip_types -> i32:
+fn ci_roundtrip_types:
     let types = CiTypePool.new()
     let i32_ty = types.ty_int(32, 0)
     let u8_ty = types.ty_int(8, 1)
@@ -1448,7 +1448,7 @@ fn ci_roundtrip_types -> i32:
     fails = fails + ci_expect_eq("ty_array_open_u8", ci_print_type(types, arr_open_u8), "[]u8")
     fails
 
-fn ci_roundtrip_exprs -> i32:
+fn ci_roundtrip_exprs:
     let types = CiTypePool.new()
     let exprs = CiExprPool.new()
     let i32_ty = types.ty_int(32, 0)

@@ -95,10 +95,10 @@ fn build_graph_target_new(kind: i32, name: &str, entry: &str, target_kind: i32, 
         action_source_paths: [],
     }
 
-fn empty_build_graph_target -> BuildGraphTarget:
+fn empty_build_graph_target:
     build_graph_target_new(-1, "", "", 0, 0, "")
 
-fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
+fn build_graph_split_nonempty_lines(text: &str):
     let lines: List[str] = []
     let text_len = text.len()
     var start = 0
@@ -117,7 +117,7 @@ fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
         i = i + 1
     lines
 
-fn build_graph_split_fields(line: &str) -> List[str]:
+fn build_graph_split_fields(line: &str):
     let fields: List[str] = []
     var cur = ""
     var escaped = false
@@ -143,7 +143,7 @@ fn build_graph_split_fields(line: &str) -> List[str]:
     fields.push(cur)
     fields
 
-fn build_graph_escape(value: &str) -> str:
+fn build_graph_escape(value: &str):
     var out = ""
     for i in 0..value.len():
         let ch = value[i]
@@ -159,7 +159,7 @@ fn build_graph_escape(value: &str) -> str:
             out = out ++ value.slice(i, (i + 1))
     out
 
-fn build_graph_emit(graph: &BuildGraph) -> str:
+fn build_graph_emit(graph: &BuildGraph):
     var out = "WITH_BUILD_GRAPH\t2\n"
     out = out ++ "package\t" ++ build_graph_escape(graph.package_name) ++ "\t" ++ build_graph_escape(graph.package_version) ++ "\n"
     if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
@@ -212,7 +212,7 @@ fn build_graph_emit(graph: &BuildGraph) -> str:
             out = out ++ "parallel\t" ++ f"{ti}\t1\n"
     out
 
-fn build_graph_parse_i32(text: &str) -> i32:
+fn build_graph_parse_i32(text: &str):
     var sign: i32 = 1
     var i = 0
     if text.len() > 0 and text[0] == 45:
@@ -398,7 +398,7 @@ fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
         out.targets[ti].args = args
     out
 
-fn bg_clone_str_list(values: &List[str]) -> List[str]:
+fn bg_clone_str_list(values: &List[str]):
     let out: List[str] = []
     for value in values:
         out.push(with_str_clone_ref(value))
@@ -452,7 +452,7 @@ fn build_graph_output_index(paths: &List[str], path: &str) -> i64:
 // ordering-only edge stays the author's to declare. Runs once, before the
 // graph is emitted, so cached graph text and every filtered subgraph carry
 // the completed edges.
-fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
+fn build_graph_complete_edges(graph: BuildGraph):
     let out = graph
     let out_paths: List[str] = []
     let out_owners: List[str] = []
@@ -486,7 +486,7 @@ fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
             out.targets[i].deps.push(with_str_clone_ref(to_add_item))
     out
 
-fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
+fn build_graph_filter_target(graph: &BuildGraph, target_name: &str):
     let names: List[str] = []
     if target_name.len() > 0: names.push(with_str_clone_ref(target_name))
     build_graph_filter_targets(graph, names)
@@ -643,7 +643,7 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
     out.targets.push(build_graph_target_deep_copy(target))
     out
 
-fn build_graph_select_target_closure(graph: &BuildGraph, target_name: &str) -> BuildGraphSelectedTargets:
+fn build_graph_select_target_closure(graph: &BuildGraph, target_name: &str):
     let selected = build_graph_selected_targets_new()
     build_graph_selected_targets_add(selected, graph, target_name)
 

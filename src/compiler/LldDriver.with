@@ -62,7 +62,7 @@ fn lld_gnu_is_mingw(args: &List[str]) -> bool:
     false
 
 // A NUL-terminated copy that lives for the rest of the process, as argv does.
-unsafe fn ld_c_string(s: &str) -> *mut u8:
+unsafe fn ld_c_string(s: &str):
     let out = with_alloc(s.len() + 1)
     if s.len() > 0:
         with_memcpy(out, *(s as *const str as *const *const u8), s.len())
@@ -126,7 +126,7 @@ fn lld_flavor_for_tool_name(argv0: &str) -> str:
     if base == "ld64.lld": "macho" else if base == "ld.lld" or base == "ld.lld.exe": "elf" else if base == "lld-link" or base == "lld-link.exe": "coff" else if base == "wasm-ld": "wasm" else: ""
 
 // argv[0] is the tool name; every other argument is lld's.
-fn with_ld_tool_main(flavor: &str) -> i32:
+fn with_ld_tool_main(flavor: &str):
     let args: List[str] = []
     args.push(lld_tool_name(flavor))
     for i in 1..with_arg_count(): args.push(with_arg_at(i))

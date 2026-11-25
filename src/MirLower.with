@@ -54,7 +54,7 @@ type MirLazyArmFrame {
     temp_frame: i32,
 }
 
-fn mir_clone_i32_list(values: &List[i32]) -> List[i32]:
+fn mir_clone_i32_list(values: &List[i32]):
     let out: List[i32] = []
     for value in values:
         out.push(value)
@@ -90,7 +90,7 @@ const GEN_EXIT_BREAK: i32 = 0
 const GEN_EXIT_CONTINUE: i32 = 1
 const GEN_EXIT_GOTO: i32 = 2
 
-fn gen_loop_code_bit(code: i32) -> i32:
+fn gen_loop_code_bit(code: i32):
     var bit: i32 = 1
     for _ in 0..code:
         bit = bit * 2
@@ -18839,11 +18839,11 @@ type LoweredFunction {
 
 // §4.3c (D119): the List intrinsics that read a list or write an element in
 // place. A literal they alone touch keeps its elements where they were built.
-fn stack_literal_reads(kind: MirIntrinsic) -> bool:
+fn stack_literal_reads(kind: MirIntrinsic):
     kind == MirIntrinsic.LIST_GET or kind == MirIntrinsic.LIST_LEN or kind == MirIntrinsic.LIST_LEN32 or kind == MirIntrinsic.LIST_LEN64 or kind == MirIntrinsic.LIST_ULEN32 or kind == MirIntrinsic.LIST_SET or kind == MirIntrinsic.LIST_CLEAR or kind == MirIntrinsic.LIST_ITER_PLACE or kind == MirIntrinsic.LIST_CONTAINS or kind == MirIntrinsic.LIST_SLOT or kind == MirIntrinsic.LIST_GET_DISJOINT or kind == MirIntrinsic.LIST_RANGE or kind == MirIntrinsic.LIST_GET_REF
 
 // The local holding what `local` was moved into, through every move.
-fn stack_literal_final(fwd: &List[i32], local: i32) -> i32:
+fn stack_literal_final(fwd: &List[i32], local: i32):
     var at = local
     while fwd[at] >= 0: at = fwd[at]
     at
@@ -18855,7 +18855,7 @@ fn cow_collection_of_sema(sema: &Sema, ty: i32) -> StdGeneric:
     if sema.is_copy_frozen(ty as TypeId) == 0: return StdGeneric.None
     g
 
-fn cow_intrinsic_creates_unique(kind: MirIntrinsic) -> bool:
+fn cow_intrinsic_creates_unique(kind: MirIntrinsic):
     kind == MirIntrinsic.LIST_NEW or kind == MirIntrinsic.LIST_WITH_CAPACITY or kind == MirIntrinsic.MAP_NEW or kind == MirIntrinsic.COLLECTION_LITERAL or kind == MirIntrinsic.MAP_LITERAL or kind == MirIntrinsic.LIST_CONCAT
 
 fn cow_local_of_operand(body: &MirBody, ref_root: &List[i32], op: i32) -> i32:
@@ -19258,7 +19258,7 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
             out.set_terminator(bb, TermKind.TK_GOTO as i32, next_bb, 0, 0, 0, 0)
     out
 
-fn cow_unwrap_ref_place(body: &MirBody, place_id: i32) -> i32:
+fn cow_unwrap_ref_place(body: &MirBody, place_id: i32):
     var cur = place_id
     var steps = 0
     while cur >= 0 and cur < body.place_locals.len() and steps < 8:
@@ -19621,7 +19621,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
 // parameter (a leak), ran no defer at return and wrapped no implicit Ok.
 type FnLowerShape { flags: i32, body: i32, has_params: bool, param_start: i32, param_count: i32, drop_body: bool, pattern_node: i32, start: i32, end: i32 }
 
-fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> LoweredFunction:
+fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32):
     if builder.ast.fn_decl_body_is_interface(fn_node):
         sema_phase_bug("BUG: interface body reached MIR lowering (D39: lower_module skips interface declarations)")
     let meta = builder.ast.find_fn_meta(fn_node)
@@ -20083,14 +20083,14 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: &AstPool, pool: &InternPoo
 // then the constructor and `each`.
 // The builder of a specialization's body: Sema's per-instance facts are
 // keyed by its symbol.
-fn specialization_builder(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mono_sym: i32) -> MirBuilder:
+fn specialization_builder(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mono_sym: i32):
     let builder = MirBuilder.init(sema, ast_pool, pool, mono_sym)
     builder.body.instance_sym = mono_sym
     builder
 
 // `instance_sym`: the specialization a generic gen fn's producer belongs to
 // (0 for a non-generic one).
-fn lower_generator_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32, instance_sym: i32) -> LoweredFunction:
+fn lower_generator_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32, instance_sym: i32):
     let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
     let producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
     producer_builder.body.instance_sym = instance_sym
@@ -20139,7 +20139,7 @@ fn lower_generator_each_body(sema: &Sema, ast_pool: &AstPool, pool: &InternPool,
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
-fn mir_fn_is_generic_template(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32) -> bool:
+fn mir_fn_is_generic_template(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32):
     mir_fn_is_generic_template_at(sema, ast_pool, pool, fn_node, -1)
 
 fn mir_fn_is_generic_template_at(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, decl_index: i32) -> bool:
@@ -20338,7 +20338,7 @@ fn global_initializer_creates_bodies(sema: &Sema, ast_pool: &AstPool, di: i32) -
         n = n + 1
     false
 
-fn mir_body_fn_refs(body: &MirBody) -> List[i32]:
+fn mir_body_fn_refs(body: &MirBody):
     let out = []
     var ci = 0
     for kind in body.const_kinds:
@@ -20417,7 +20417,7 @@ fn mir_unreached_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, m
 // it creates joins the module, and the functions it names are known before
 // codegen. Codegen built this body itself, after every check had run.
 // The set is Sema's (check_trait_default_method_bodies), in its order.
-fn lower_default_trait_method_bodies(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mir_mod: &MirModule) -> List[LoweredFunction]:
+fn lower_default_trait_method_bodies(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mir_mod: &MirModule):
     let out = []
     let seen = sema_new_map_i32_i32()
     for di in 0..ast_pool.decl_count():
@@ -20554,7 +20554,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
 
     MirLowerResult { sema, mir_module: mir_mod }
 
-fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: &AstPool, pool: &InternPool) -> List[i32]:
+fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: &AstPool, pool: &InternPool):
     let tailrec_syms: List[i32] = []
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)

@@ -2,18 +2,18 @@ use compiler.EmbeddedStdlibData
 use compiler.BundleInterfaces
 use rt.rt_core
 
-fn EMBEDDED_STD_PREFIX -> str: "<embedded-std>/"
+fn EMBEDDED_STD_PREFIX: "<embedded-std>/"
 
-fn embedded_std_is_module_rel(rel_path: &str) -> bool:
+fn embedded_std_is_module_rel(rel_path: &str):
     rel_path.starts_with("std/")
 
-fn embedded_std_source(rel_path: &str) -> str:
+fn embedded_std_source(rel_path: &str):
     embedded_std_source_data(rel_path)
 
-fn embedded_std_list_modules() -> str:
+fn embedded_std_list_modules():
     embedded_std_list_modules_data()
 
-fn embedded_std_display_path(rel_path: &str) -> str:
+fn embedded_std_display_path(rel_path: &str):
     EMBEDDED_STD_PREFIX() ++ rel_path
 
 // The canonical `<embedded-std>/<rel>` path when the module is embedded or a

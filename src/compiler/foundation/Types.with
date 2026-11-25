@@ -112,13 +112,13 @@ fn type_key_result2(ok_ty: TypeId, err_ty: TypeId) -> TypeKey:
         flags: 0,
     }
 
-fn type_key_pack1(a: TypeId) -> str:
+fn type_key_pack1(a: TypeId):
     f"{type_id_raw(a)}"
 
-fn type_key_pack2(a: TypeId, b: TypeId) -> str:
+fn type_key_pack2(a: TypeId, b: TypeId):
     f"{type_id_raw(a)},{type_id_raw(b)}"
 
-fn type_key_pack3(a: TypeId, b: TypeId, c: TypeId) -> str:
+fn type_key_pack3(a: TypeId, b: TypeId, c: TypeId):
     f"{type_id_raw(a)},{type_id_raw(b)},{type_id_raw(c)}"
 
 fn type_key_tuplen(elem_pack: &str, count: i32) -> TypeKey:

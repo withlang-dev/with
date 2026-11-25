@@ -14,7 +14,7 @@ fn source_ext_len(path: &str) -> isize:
 fn source_ext_is_source(path: &str) -> bool: source_ext_len(path) > 0
 
 /// `path` without its source extension.
-fn source_ext_stem(path: &str) -> str: path.slice(0, path.len() - source_ext_len(path))
+fn source_ext_stem(path: &str): path.slice(0, path.len() - source_ext_len(path))
 
 /// The file the toolchain finds for `path`, a name spelled `.with`: that
 /// file when it exists; else, while the extension changes, the `.w` file

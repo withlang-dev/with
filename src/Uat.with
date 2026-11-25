@@ -70,13 +70,13 @@ type UatRun {
 
 // ── parsing ──────────────────────────────────────────────────────────────
 
-fn uat_trim_trailing_line_endings(text: &str) -> str:
+fn uat_trim_trailing_line_endings(text: &str):
     var end = text.len()
     while end > 0 and (text[end - 1] == '\n' or text[end - 1] == '\r'):
         end = end - 1
     text.slice(0, end)
 
-fn uat_split_list(text: &str) -> List[str]:
+fn uat_split_list(text: &str):
     let out: List[str] = []
     for part in text.split(","):
         let t = part.trim()
@@ -127,7 +127,7 @@ fn uat_parse_int(text: &str) -> (bool, i64):
         i = i + 1
     (true, if neg: 0 - value else: value)
 
-fn uat_sort_strings(items: List[str]) -> List[str]:
+fn uat_sort_strings(items: List[str]):
     let sorted = items
     for i in 1..sorted.len():
         var j = i
@@ -138,12 +138,12 @@ fn uat_sort_strings(items: List[str]) -> List[str]:
             j = j - 1
     sorted
 
-fn uat_error(sc: UatScenario, line: isize, message: &str) -> UatScenario:
+fn uat_error(sc: UatScenario, line: isize, message: &str):
     let out = sc
     out.problem = f"{out.path}:{line}: {message}"
     out
 
-fn uat_stem(path: &str) -> str:
+fn uat_stem(path: &str):
     var start = 0
     for i in 0..path.len():
         if path[i] == '/': start = (i + 1) as i32
@@ -261,7 +261,7 @@ fn uat_parse(path: &str, text: &str) -> UatScenario:
 
 // A command line into argv: whitespace-separated, single or double quotes
 // group, a backslash escapes the next character inside double quotes.
-fn uat_split_command(text: &str) -> List[str]:
+fn uat_split_command(text: &str):
     let out: List[str] = []
     var cur = ""
     var have = false
@@ -292,7 +292,7 @@ fn uat_split_command(text: &str) -> List[str]:
     if have: out.push(cur)
     out
 
-fn uat_argv_blob(items: &List[str]) -> str:
+fn uat_argv_blob(items: &List[str]):
     var out = ""
     for item in items:
         out = out ++ item ++ "\0"
@@ -312,10 +312,10 @@ fn uat_host_platform() -> str:
 // the test gates' forms (#795), so a scenario can say the one host
 // combination it cannot run on without giving up the OS everywhere.
 // 1 = host matches, 0 = host does not match, -1 = unknown value.
-fn uat_platform_is_os(value: &str) -> bool:
+fn uat_platform_is_os(value: &str):
     value == "windows" or value == "linux" or value == "darwin"
 
-fn uat_platform_is_arch(value: &str) -> bool:
+fn uat_platform_is_arch(value: &str):
     value == "aarch64" or value == "arm64" or value == "x86_64" or value == "amd64" or value == "x64"
 
 fn uat_platform_arch_matches(required: &str, host: &str) -> bool:
@@ -347,7 +347,7 @@ fn uat_platform_matches(value: &str) -> i32:
             return (m) as i32
     -1
 
-fn uat_probe_capture(argv: &List[str], scratch: &str) -> i32:
+fn uat_probe_capture(argv: &List[str], scratch: &str):
     with_fs_mkdir_p(scratch)
     with_exec_argv_capture_cwd(uat_argv_blob(argv), scratch ++ "/probe.stdout", scratch ++ "/probe.stderr", 20000, ".")
 
@@ -439,11 +439,11 @@ fn uat_dirname(path: &str) -> str:
         if path[i] == '/': cut = i as i32
     if cut <= 0: "." else: path.slice(0, cut)
 
-fn uat_write_text(path: &str, text: &str) -> i32:
+fn uat_write_text(path: &str, text: &str):
     with_fs_mkdir_p(uat_dirname(path))
     with_fs_write_file(path, text)
 
-fn uat_read_text(path: &str) -> str: with_fs_read_file(path)
+fn uat_read_text(path: &str): with_fs_read_file(path)
 
 fn uat_fail(steps: isize, step: &UatStep, what: &str, stderr_path: &str, human: List[str]) -> UatOutcome:
     UatOutcome { verdict: "FAIL", detail: f"step {steps} (line {step.line}): {what}", stderr_path: stderr_path, steps, human }
@@ -460,7 +460,7 @@ fn uat_toolchain(self_path: &str) -> str:
 // the project itself. What it created there is removed when it ends (unless
 // `--keep`): a run leaves the project as it found it. A file that was there
 // before the run is the project's and stays.
-fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
+fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool):
     let created: List[str] = []
     for si in 0..sc.steps.len():
         let verb = sc.steps[si].verb
@@ -569,7 +569,7 @@ fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> U
 
 // ── the command ──────────────────────────────────────────────────────────
 
-fn uat_dots(name: &str) -> str:
+fn uat_dots(name: &str):
     var out = "uat: " ++ name ++ " "
     while out.len() < 50: out = out ++ "."
     out ++ " "
@@ -584,12 +584,12 @@ fn uat_abs(path: &str) -> str:
     if pwd.len() == 0: return path
     if path == ".": pwd else: pwd ++ "/" ++ path
 
-fn uat_project_root() -> str:
+fn uat_project_root():
     // The project is the current directory (as `with test` and `with init`
     // take it); scenarios live in its `uat/`.
     uat_abs(".")
 
-fn uat_list_scenarios(root: &str) -> List[str]:
+fn uat_list_scenarios(root: &str):
     let out: List[str] = []
     let listing = with_fs_list_files(uat_join(root, "uat"))
     for line in listing.split("\n"):

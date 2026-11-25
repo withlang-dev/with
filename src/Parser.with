@@ -16,7 +16,7 @@ use rt.rt_core
 // Canonical active target architecture for @[target("arch")] guards.
 // Resolved from the driver-selected --target (§18.5); native builds
 // resolve to the host arch as before.
-fn parser_is_integer_type_name(name: &str) -> bool:
+fn parser_is_integer_type_name(name: &str):
     name == "i8" or name == "i16" or name == "i32" or name == "i64" or name == "i128" or name == "isize" or name == "u8" or name == "u16" or name == "u32" or name == "u64" or name == "u128" or name == "usize"
 
 fn parser_active_arch() -> str:
@@ -30,7 +30,7 @@ fn parser_target_enum(field: &str): if field == "os": "OsKind" else: "ArchKind"
 fn parser_target_variant_list(field: &str): [f".{v}" for v in parser_target_variants(field)].join(", ")
 fn parser_active_target(field: &str): if field == "os": target_spec_os() else: target_spec_arch_kind()
 
-fn parser_target_guard_arch_known(arch: &str) -> bool:
+fn parser_target_guard_arch_known(arch: &str):
     arch == "aarch64" or arch == "x86_64" or arch == "wasm32" or arch == "wasm64"
 
 // The §29.13 body form of a trait, impl or extend declaration.
@@ -162,7 +162,7 @@ type InterpolatedExprParseAttempt {
     implicit_it_depth: i32,
 }
 
-fn Parser.init(tokens: TokenList, source: &str, file_id: i32, intern: &InternPool, diags: DiagnosticList) -> Parser:
+fn Parser.init(tokens: TokenList, source: &str, file_id: i32, intern: &InternPool, diags: DiagnosticList):
     Parser.init_with_pool(tokens, source, file_id, intern, diags, AstPool.new())
 
 // The parser owns the node pool it fills (the caller takes it back from
@@ -4712,7 +4712,7 @@ fn int_literal_core_digit_start(core: &str) -> i32:
         return 0
     2
 
-fn normalize_int_literal_digits(core: &str) -> str:
+fn normalize_int_literal_digits(core: &str):
     let len = core.len()
     let start = int_literal_core_digit_start(core)
     var digits = ""
@@ -4724,7 +4724,7 @@ fn normalize_int_literal_digits(core: &str) -> str:
         i = i + 1
     digits
 
-fn int_literal_fast_i64(core: &str) -> ExactIntI64:
+fn int_literal_fast_i64(core: &str):
     let digits = normalize_int_literal_digits(core)
     exact_int_try_i64(exact_int_parse_digits(digits, int_literal_core_radix(core)))
 
@@ -5927,7 +5927,7 @@ fn regex_literal_close_slash(text: &str) -> isize:
         i = i + 1
     -1
 
-fn regex_literal_escape_runtime(text: &str) -> str:
+fn regex_literal_escape_runtime(text: &str):
     var out = ""
     var i: i64 = 0
     while i < text.len():
@@ -6133,7 +6133,7 @@ impl Parser:
         let node = self.pool.add_node(NodeKind.NK_FSTRING, start, end, seg_count, extra_start, 0)
         self.parse_postfix(node)
 
-fn interp_brace_char(code: i32) -> str:
+fn interp_brace_char(code: i32):
     str_from_byte(code)
 
 fn interp_quote_source_backslash_count(raw_backslashes: isize) -> isize:
@@ -6457,7 +6457,7 @@ fn char_literal_value(text: str) -> i32:
 fn string_escape_chars(): "ntr0\\\"'{}x"
 
 // The diagnostic's "supported:" list, rendered from the set so it can't drift.
-fn string_escape_help() -> str:
+fn string_escape_help():
     let chars = string_escape_chars()
     var out = ""
     for i in 0..chars.len():
@@ -6524,7 +6524,7 @@ fn strip_string_token_text(text: &str) -> str:
         return text.slice(1, text.len() as i64 - 1)
     ""
 
-fn lexed_text_opens_string(text: &str) -> bool:
+fn lexed_text_opens_string(text: &str):
     text.starts_with("\"") or text.starts_with("f\"") or text.starts_with("c\"") or text.starts_with("r\"") or text.starts_with("r#")
 
 fn is_fstring_token_text(text: &str) -> bool:

@@ -16,15 +16,15 @@ use compiler.EmbeddedBundlesData
 use TargetSpec
 use rt.rt_core
 
-fn embedded_bundle_count() -> i32:
+fn embedded_bundle_count():
     embedded_bundles_count_data()
 
-fn embedded_bundle_name(index: i32) -> str:
+fn embedded_bundle_name(index: i32):
     embedded_bundles_name_data(index)
 // The target a slot's bundle was built for: "" is this compiler's own, a
 // platform name (`wasm32`) is a second target this binary carries beside
 // it (#2131). A bundle is consulted only for the target being compiled.
-fn embedded_bundle_target(index: i32) -> str:
+fn embedded_bundle_target(index: i32):
     embedded_bundles_target_data(index)
 // A native build reads the native slots and a cross build its tag's. A host
 // that is also a cross tag (windows_x86_64, linux_x86_64) carries its
@@ -50,10 +50,10 @@ fn embedded_blob_view(start: i64, end: i64) -> str:
         *((sp + 8u64) as *mut i64) = len
     out
 
-fn embedded_bundle_manifest_text(index: i32) -> str:
+fn embedded_bundle_manifest_text(index: i32):
     embedded_blob_view(embedded_bundles_manifest_start_data(index), embedded_bundles_manifest_end_data(index))
 
-fn embedded_bundle_interface_text(index: i32) -> str:
+fn embedded_bundle_interface_text(index: i32):
     embedded_blob_view(embedded_bundles_interface_start_data(index), embedded_bundles_interface_end_data(index))
 
 // A named slot this binary fills: its manifest blob has content.
@@ -64,7 +64,7 @@ fn embedded_bundle_present(index: i32) -> bool:
 // its `prefix <p> <path>` lines. Codegen emits declarations only for
 // functions whose module carries one of these; the link stage selects the
 // bundle when an undefined symbol does.
-fn bundle_manifest_prefixes(manifest: &str) -> List[str]:
+fn bundle_manifest_prefixes(manifest: &str):
     let out: List[str] = []
     var start: i64 = 0
     while start < manifest.len():
@@ -84,7 +84,7 @@ fn bundle_manifest_prefixes(manifest: &str) -> List[str]:
 
 // The canonical module paths a manifest lists — the `<path>` of its
 // `prefix <p> <path>` lines.
-fn bundle_manifest_paths(manifest: &str) -> List[str]:
+fn bundle_manifest_paths(manifest: &str):
     let out: List[str] = []
     var start: i64 = 0
     while start < manifest.len():
@@ -103,7 +103,7 @@ fn bundle_manifest_paths(manifest: &str) -> List[str]:
     out
 
 // Every prefix any embedded bundle for the active target provides.
-fn embedded_bundle_prefixes() -> List[str]:
+fn embedded_bundle_prefixes():
     let out: List[str] = []
     for bi in 0..embedded_bundle_count():
         if not embedded_bundle_present(bi):
@@ -116,16 +116,16 @@ fn embedded_bundle_prefixes() -> List[str]:
     out
 
 // Blob address pairs; the link stage turns them into byte slices.
-fn embedded_bundle_manifest_start(index: i32) -> i64:
+fn embedded_bundle_manifest_start(index: i32):
     embedded_bundles_manifest_start_data(index)
 
-fn embedded_bundle_manifest_end(index: i32) -> i64:
+fn embedded_bundle_manifest_end(index: i32):
     embedded_bundles_manifest_end_data(index)
 
-fn embedded_bundle_object_start(index: i32) -> i64:
+fn embedded_bundle_object_start(index: i32):
     embedded_bundles_object_start_data(index)
 
-fn embedded_bundle_object_end(index: i32) -> i64:
+fn embedded_bundle_object_end(index: i32):
     embedded_bundles_object_end_data(index)
 
 // ── Import contracts (durable .wo, D138) ───────────────────────────────
@@ -135,7 +135,7 @@ fn embedded_bundle_object_end(index: i32) -> i64:
 // `provides\t<symbol>\t<contract>` (the contract text:
 // BundleInterfaceEmit.bundle_symbol_contract). The rows of one key, each
 // without the key and its tab.
-fn bundle_manifest_rows(manifest: &str, key: &str) -> List[str]:
+fn bundle_manifest_rows(manifest: &str, key: &str):
     let out: List[str] = []
     let want = key ++ "\t"
     var start: i64 = 0

@@ -319,7 +319,7 @@ fn cli_nearest_flag(arg: &str) -> str:
             best = flag
     if best_len * 2 > arg.len(): best else: ""
 
-fn cli_option_takes_value(arg: &str) -> bool:
+fn cli_option_takes_value(arg: &str):
     arg == "-o" or arg == "--output" or arg == "--target" or
     arg == "--trace-place" or arg == "--explain-mir-origin" or
     arg == "--trace-ownership" or arg == "--trace-cleanup-edge" or
@@ -337,7 +337,7 @@ fn cli_default_opt_level(argc: i32) -> i32:
             return CLI_DEFAULT_BUILD_OPT_LEVEL
     CLI_DEFAULT_DEBUG_OPT_LEVEL
 
-fn cli_opt_level(argc: i32) -> i32:
+fn cli_opt_level(argc: i32):
     var level = cli_default_opt_level(argc)
     var i = 2
     while i < argc:
@@ -356,13 +356,13 @@ fn cli_opt_level(argc: i32) -> i32:
         i = i + 1
     level
 
-fn cli_test_verbose(argc: i32) -> bool:
+fn cli_test_verbose(argc: i32):
     cli_has_flag(argc, "-v") or cli_has_flag(argc, "--verbose")
 
-fn cli_test_quiet(argc: i32) -> bool:
+fn cli_test_quiet(argc: i32):
     cli_has_flag(argc, "-q") or cli_has_flag(argc, "--quiet")
 
-fn cli_test_keep_binary(argc: i32) -> bool:
+fn cli_test_keep_binary(argc: i32):
     cli_has_flag(argc, "--keep-binary")
 
 fn cli_is_build_target_selector(arg: &str) -> bool:
@@ -415,7 +415,7 @@ fn cli_prelude_mode(argc: i32) -> i32:
         i = i + 1
     mode
 
-fn cli_runtime_available(argc: i32) -> bool:
+fn cli_runtime_available(argc: i32):
     not cli_has_flag(argc, "--no-runtime") and not cli_has_flag(argc, "--freestanding")
 
 // #3117: `with contract report c.<package> [function]`. What the package's
@@ -423,7 +423,7 @@ fn cli_runtime_available(argc: i32) -> bool:
 // (one set of facts, one rendering); what it leaves raw, and why, is in the
 // report `with get` wrote beside it. With a function: its contract lines,
 // or its raw reason.
-fn contract_report_lines_of(view: &str, function: &str) -> str:
+fn contract_report_lines_of(view: &str, function: &str):
     var out = ""
     var subject = ""
     var subject_shown = false
@@ -490,7 +490,7 @@ fn cli_analysis_request(argc: i32, source: &str) -> str:
         i = i + 1
     "facts"
 
-fn parse_cli_options(argc: i32) -> CliOptions:
+fn parse_cli_options(argc: i32):
     let opts = cli_options_default()
     opts.command = cli_command(argc)
     opts.source_file = find_source_arg(argc)
@@ -549,7 +549,7 @@ fn cli_one_liner_mode_name(mode: i32) -> str:
         return "-p"
     ""
 
-fn cli_one_liner_known_value_option(arg: &str) -> bool:
+fn cli_one_liner_known_value_option(arg: &str):
     arg == "-o" or arg == "--output" or arg == "--target"
 
 fn cli_one_liner_known_flag(arg: &str):
@@ -656,7 +656,7 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
         result.error_msg = "error: -i writes each input file back: it takes -p and at least one file (to drop a line under -p, `continue`)"
     result
 
-fn cli_escape_with_string(value: &str) -> str:
+fn cli_escape_with_string(value: &str):
     let out = StringBuilder.with_capacity(value.len())
     for i in 0..value.len():
         let ch = value[i]
@@ -674,7 +674,7 @@ fn cli_escape_with_string(value: &str) -> str:
             out.push_str(value.slice(i, (i + 1)))
     out.to_str()
 
-fn cli_rewrite_semicolons(code: &str) -> str:
+fn cli_rewrite_semicolons(code: &str):
     let lexer = Lexer.init(code, 0)
     let tokens = lexer.tokenize()
     let out = StringBuilder.with_capacity(code.len())
@@ -750,7 +750,7 @@ fn cli_blank_prefix(code: &str, n: isize) -> str:
     out.to_str()
 
 // §16.5: the C header path beside an artifact (libfoo.a -> libfoo.h).
-fn c_header_path_for(artifact_path: &str) -> str:
+fn c_header_path_for(artifact_path: &str):
     var dot = -1
     var i = 0
     while i < artifact_path.len():
@@ -762,7 +762,7 @@ fn c_header_path_for(artifact_path: &str) -> str:
     stem ++ ".h"
 
 // A valid, unique C include-guard derived from the header's basename.
-fn c_header_guard_for(h_path: &str) -> str:
+fn c_header_guard_for(h_path: &str):
     var start = 0
     var i = 0
     while i < h_path.len():
@@ -798,7 +798,7 @@ fn cli_one_liner_source_name(mode: i32, count: isize) -> str:
         return "<cli " ++ name ++ " #1>"
     "<cli " ++ name ++ ">"
 
-fn cli_build_args_binding(args: &List[str]) -> str:
+fn cli_build_args_binding(args: &List[str]):
     let out = StringBuilder.new()
     out.push_str("let args: List[str] = List.new()\n")
     for arg in args:
@@ -817,7 +817,7 @@ fn cli_synthetic_source_new -> CliSyntheticSource:
         source_texts: [],
     }
 
-fn cli_synthetic_add_mapping(syn: CliSyntheticSource, start: i32, text: &str, source_name: &str) -> CliSyntheticSource:
+fn cli_synthetic_add_mapping(syn: CliSyntheticSource, start: i32, text: &str, source_name: &str):
     syn.gen_starts.push(start)
     syn.gen_ends.push((start + text.len() + 1) as i32)
     syn.source_names.push(with_str_clone_ref(source_name))
@@ -826,7 +826,7 @@ fn cli_synthetic_add_mapping(syn: CliSyntheticSource, start: i32, text: &str, so
 
 // One code part on a line of its own, mapped back to the argument it came
 // from so a diagnostic points at the user's text (§18.5b.7).
-fn cli_append_mapped(syn: CliSyntheticSource, mut source: StringBuilder, text: &str, name: &str) -> CliSyntheticSource:
+fn cli_append_mapped(syn: CliSyntheticSource, mut source: StringBuilder, text: &str, name: &str):
     let start = source.len() as i32
     source.push_str(text)
     source.push_str("\n")
@@ -963,7 +963,7 @@ fn cli_code_names(code: &str, word: &str) -> bool:
 
 fn cli_ident_byte(b: u8) -> bool: (b >= 'a' and b <= 'z') or (b >= 'A' and b <= 'Z') or (b >= '0' and b <= '9') or b == '_'
 
-fn cli_one_liner_bin_path -> str:
+fn cli_one_liner_bin_path:
     // The host exe suffix on Windows: CreateProcessW appends ".exe" to a
     // RELATIVE program name that has no extension and then finds nothing
     // (std.process.run probe: "out/tmp/x" rc=-2, "out/tmp/x.exe" rc=0,
@@ -976,7 +976,7 @@ fn cli_one_liner_bin_path -> str:
 // #2354: a one-liner is a grep or a sed; it leaves nothing in the directory
 // it runs in. Its binary and every link artifact (WITH_OUT_DIR, which
 // link_stage_artifact_root reads) go under the user's cache, not `out/`.
-fn cli_one_liner_out_dir -> str:
+fn cli_one_liner_out_dir:
     with_user_cache_dir() ++ "/with/one-liners"
 
 fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
@@ -1036,7 +1036,7 @@ fn cli_driver_argc(argc: i32) -> i32:
 
 // `--release` among the driver's own arguments (run_cli's argc, never the
 // program's): the build leaves bounds unchecked (§4.3a, #2268).
-fn cli_release_flag() -> bool: cli_has_flag(cli_driver_argc(with_arg_count()), "--release")
+fn cli_release_flag(): cli_has_flag(cli_driver_argc(with_arg_count()), "--release")
 
 fn run_cli(full_argc: i32) -> i32:
     let argc = cli_driver_argc(full_argc)
@@ -1458,7 +1458,7 @@ fn main -> Unit:
 
 // ── Command implementations ──────────────────────────────────────
 
-fn str_eq_text(a: &str, b: &str) -> bool:
+fn str_eq_text(a: &str, b: &str):
     a == b
 
 fn has_output_prefix(arg: &str) -> bool:
@@ -1472,7 +1472,7 @@ fn has_output_prefix(arg: &str) -> bool:
 // The source is where the driver's arguments end (cli_driver_argc): the
 // implicit `with tool.with a b` has it at argv[1], which a scan from argv[2]
 // never found, so it forwarded nothing.
-fn run_program_args(argc: i32) -> str:
+fn run_program_args(argc: i32):
     // NUL-terminated argv blob (the format with_exec_argv expects).
     var result = ""
     for i in cli_driver_argc(argc)..argc: result = result ++ with_arg_at(i) ++ "\0"
@@ -1564,7 +1564,7 @@ fn finish_test_binary(bin_path: &str, keep: bool, rerun_tests: &List[str], quiet
     for rerun_test in rerun_tests:
         with_eprint("rerun: " ++ test_child_env_prefix(rerun_test, quiet) ++ kept)
 
-fn single_run_reruns(rc: i32) -> List[str]:
+fn single_run_reruns(rc: i32):
     let reruns: List[str] = []
     if rc != 0:
         reruns.push("")
@@ -1608,7 +1608,7 @@ fn reduce_exit_want(argc: i32) -> i32:
         return 0
     test_parse_i32(v)
 
-fn reduce_split_lines_keep_empty(text: &str) -> List[str]:
+fn reduce_split_lines_keep_empty(text: &str):
     let lines: List[str] = []
     var start = 0
     var i = 0
@@ -1627,7 +1627,7 @@ fn reduce_split_lines_keep_empty(text: &str) -> List[str]:
         i = i + 1
     lines
 
-fn reduce_join_lines(lines: &List[str], skip_idx: i32) -> str:
+fn reduce_join_lines(lines: &List[str], skip_idx: i32):
     var out = ""
     for i in 0..lines.len():
         if i == skip_idx:
@@ -1835,10 +1835,10 @@ fn run_reduce_command(argc: i32) -> i32:
     with_write("reduce: wrote " ++ output ++ f" ({lines.len()} lines)\n")
     0
 
-fn fixpoint_default_left() -> str:
+fn fixpoint_default_left():
     "out/stage/bin/with-stage2-fixpoint.o"
 
-fn fixpoint_default_right() -> str:
+fn fixpoint_default_right():
     "out/stage/bin/with-stage3-fixpoint.o"
 
 fn fixpoint_arg(argc: i32, index: i32, fallback: &str) -> str:
@@ -1901,7 +1901,7 @@ fn test_unique_binary_path(source_file: &str) -> str:
     let base = link_stage_output_path_for_source(source_file)
     f"{base}.test.{with_getpid()}.{with_clock_nanos()}"
 
-fn build_tool_eval_entry_source() -> str:
+fn build_tool_eval_entry_source():
     "use std.build\n" ++
     "use build\n\n" ++
     "fn __with_build_eval_entry(ctx: BuildCtx) -> Build:\n" ++
@@ -1936,7 +1936,7 @@ fn build_action_safe_label(text: &str) -> str:
         return "unknown"
     out
 
-fn build_action_scratch_dir(target_name: &str) -> str:
+fn build_action_scratch_dir(target_name: &str):
     "out/tmp/action-scratch/" ++ build_action_safe_label(target_name)
 
 // ── #921: native build runner ───────────────────────────────────────────
@@ -1951,7 +1951,7 @@ fn build_action_scratch_dir(target_name: &str) -> str:
 // them through an evaluator worker, recording the target name in
 // out/.build-state/runner-fallback.list so later runs skip the retry.
 
-fn build_runner_entry_source() -> str:
+fn build_runner_entry_source():
     "use std.build\n" ++
     "use std.process\n" ++
     "use build\n\n" ++
@@ -2092,10 +2092,10 @@ fn build_runner_explain_no_root(root: &str, target_name: &str, skipped_root_prep
     with_eprint("[build] " ++ message ++ "; actions evaluate in the driver's comptime evaluator")
     0
 
-fn build_runner_fallback_list_path(root: &str) -> str:
+fn build_runner_fallback_list_path(root: &str):
     resolve_join(root, "out/.build-state/runner-fallback.list")
 
-fn build_runner_load_fallback(root: &str) -> List[str]:
+fn build_runner_load_fallback(root: &str):
     let out: List[str] = []
     let text = with_fs_read_file(build_runner_fallback_list_path(root))
     let lines = text.split("\n")
@@ -2119,7 +2119,7 @@ fn build_runner_target_eligible(target: &BuildGraphTarget, options: &BuildComman
             return false
     true
 
-fn build_runner_effects_path(root: &str, target_name: &str) -> str:
+fn build_runner_effects_path(root: &str, target_name: &str):
     let dir = resolve_join(root, "out/command/" ++ build_action_safe_label(target_name))
     let _mk = with_fs_mkdir_p(dir)
     resolve_join(dir, "worker.effects")
@@ -2127,7 +2127,7 @@ fn build_runner_effects_path(root: &str, target_name: &str) -> str:
 // The runner's effect records: the log's lines, and (#1899) one `read` record
 // per path the action read through ToolFs, each kept in its own file beside
 // the log (ToolFs.record_read).
-fn build_runner_read_effects(path: &str) -> List[str]:
+fn build_runner_read_effects(path: &str):
     let out: List[str] = []
     let text = with_fs_read_file(path)
     let lines = text.split("\n")
@@ -2160,7 +2160,7 @@ fn build_runner_validate_outputs(root: &str, target: &BuildGraphTarget) -> i32:
     0
 
 // Serial runner worker: inherit stdio like the evaluator worker path.
-fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget, effects_path: &str) -> i32:
+fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget, effects_path: &str):
     let old_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
     let old_effects = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
     let _sn = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
@@ -2227,7 +2227,7 @@ fn build_action_worker_env_enabled() -> bool:
 fn build_action_force_env_enabled() -> bool:
     with_getenv_str("WITH_BUILD_ACTION_FORCE").len() > 0
 
-fn build_target_worker_argv(target: &BuildGraphTarget, options: &BuildCommandOptions) -> str:
+fn build_target_worker_argv(target: &BuildGraphTarget, options: &BuildCommandOptions):
     var argv = ""
     argv = build_graph_argv_append(argv, with_arg_at(0))
     argv = build_graph_argv_append(argv, "build")
@@ -2246,7 +2246,7 @@ fn build_action_clear_worker_env_for_children():
 fn build_test_worker_env_enabled() -> bool:
     with_getenv_str("WITH_BUILD_TEST_WORKER").len() > 0
 
-fn run_build_test_worker_process(target: &BuildGraphTarget, options: &BuildCommandOptions) -> i32:
+fn run_build_test_worker_process(target: &BuildGraphTarget, options: &BuildCommandOptions):
     let old_worker = with_getenv_str("WITH_BUILD_TEST_WORKER")
     let old_force = with_getenv_str("WITH_BUILD_ACTION_FORCE")
     let _set_worker = with_setenv_str("WITH_BUILD_TEST_WORKER", target.name)
@@ -2266,7 +2266,7 @@ fn build_test_clear_worker_env_for_children():
 // retains every action's comptime interpreter state, and one action can
 // spike gigabytes — the battery's parent must stay under the 8GB budget, so
 // the action's memory has to die with a child process. Revisit after #691.
-fn run_build_action_worker_process(target: &BuildGraphTarget, options: &BuildCommandOptions) -> i32:
+fn run_build_action_worker_process(target: &BuildGraphTarget, options: &BuildCommandOptions):
     let old_worker = with_getenv_str("WITH_BUILD_ACTION_WORKER")
     let old_force = with_getenv_str("WITH_BUILD_ACTION_FORCE")
     let _set_worker = with_setenv_str("WITH_BUILD_ACTION_WORKER", target.name)
@@ -2283,7 +2283,7 @@ fn run_build_action_worker_process(target: &BuildGraphTarget, options: &BuildCom
         with_eprint("error: build.with target '" ++ target.name ++ f"' failed with exit code {rc}")
     rc
 
-fn build_pool_parse_jobs(value: &str) -> i32:
+fn build_pool_parse_jobs(value: &str):
     var out: i32 = 0
     for i in 0..value.len():
         let ch = value[i]
@@ -2349,7 +2349,7 @@ fn build_graph_lane_left(graph: &BuildGraph, pool: &PoolState, priority: &List[i
 
 // The longest remaining path among the targets not started and the lanes
 // still running.
-fn build_graph_longest_remaining(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, priority: &List[i64]) -> i64:
+fn build_graph_longest_remaining(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, priority: &List[i64]):
     var longest: i64 = 0
     for remaining_item in remaining:
         if priority[remaining_item] > longest: longest = priority[remaining_item]
@@ -2365,7 +2365,7 @@ fn build_graph_longest_remaining(graph: &BuildGraph, remaining: &List[i32], pool
 // which widen without slots while their lane is listed. A flat budget
 // starved the battery's long pole (2026-10-14: emit-c-smoke, one child at a
 // time behind 18 slot-holding lanes, 498 s).
-fn build_graph_critical_lanes(graph: &BuildGraph, pool: &PoolState, priority: &List[i64], longest: i64) -> str:
+fn build_graph_critical_lanes(graph: &BuildGraph, pool: &PoolState, priority: &List[i64], longest: i64):
     var out = ""
     let now = with_clock_nanos()
     for pi in pool.oldest as isize..pool.names.len():
@@ -2378,7 +2378,7 @@ fn build_graph_critical_lanes(graph: &BuildGraph, pool: &PoolState, priority: &L
 // once it starts, on a machine wide enough. Measured times come from the
 // battery's ledger (this tree's, else the machine's last battery in the
 // green store); a target never measured counts 0.
-fn build_graph_priorities(root: &str, graph: &BuildGraph) -> List[i64]:
+fn build_graph_priorities(root: &str, graph: &BuildGraph):
     var ledger = with_fs_read_file(resolve_join(root, "out/.build-state/battery-times.tsv"))
     if ledger.len() == 0: ledger = with_fs_read_file(green_store_dir() ++ "/battery-times.tsv")
     let own: List[i64] = []
@@ -2423,7 +2423,7 @@ fn build_graph_target_poolable(t: &BuildGraphTarget, top_level: bool) -> bool:
     t.kind == 23 or t.kind == 2 or t.kind == 19
 
 // Every target `name` depends on, transitively, by name.
-fn build_graph_transitive_deps(graph: &BuildGraph, name: &str) -> List[str]:
+fn build_graph_transitive_deps(graph: &BuildGraph, name: &str):
     let out: List[str] = []
     let frontier: List[str] = []
     frontier.push(name.to_owned())
@@ -2454,7 +2454,7 @@ fn build_pool_width() -> i32:
 // Spawn an allow_parallel action target's worker without blocking; the env
 // dance mirrors run_build_test_worker_process (single-threaded driver, so
 // set-then-spawn-then-restore is race-free). Returns the child pid.
-fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, stdout_path: &str, stderr_path: &str, running: isize, background: bool) -> i32:
+fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, stdout_path: &str, stderr_path: &str, running: isize, background: bool):
     let old_worker = with_getenv_str("WITH_BUILD_ACTION_WORKER")
     let old_force = with_getenv_str("WITH_BUILD_ACTION_FORCE")
     let _set_worker = with_setenv_str("WITH_BUILD_ACTION_WORKER", target.name)
@@ -2494,7 +2494,7 @@ fn build_pool_nice_prefix(background: bool) -> str:
     if not background or build_graph_rt_file_exists("/usr/bin/nice") == 0: return ""
     build_graph_argv_append(build_graph_argv_append(build_graph_argv_append("", "/usr/bin/nice"), "-n"), "10")
 
-fn build_pool_spawn_runner(runner_path: &str, target: &BuildGraphTarget, effects_path: &str, stdout_path: &str, stderr_path: &str, background: bool) -> i32:
+fn build_pool_spawn_runner(runner_path: &str, target: &BuildGraphTarget, effects_path: &str, stdout_path: &str, stderr_path: &str, background: bool):
     let old_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
     let old_effects = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
     let _sn = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
@@ -2845,10 +2845,10 @@ fn build_graph_find_build_root(start_dir: &str) -> str:
         cur = parent
     ""
 
-fn build_graph_restore_env(name: &str, old_value: &str) -> i32:
+fn build_graph_restore_env(name: &str, old_value: &str):
     with_setenv_str(name, old_value)
 
-fn build_graph_trim_trailing_line_endings(text: &str) -> str:
+fn build_graph_trim_trailing_line_endings(text: &str):
     var end = text.len()
     while end > 0:
         let ch = text[(end - 1)]
@@ -2915,7 +2915,7 @@ fn build_graph_run_cli_capture(root: &str, target: &BuildGraphTarget, compiler_p
         let _remove_stderr = with_fs_remove_file(stderr_path)
     TestRunResult { rc, stdout: out_text, stderr: err_text }
 
-fn build_graph_trim_space_and_newlines(text: &str) -> str:
+fn build_graph_trim_space_and_newlines(text: &str):
     var start = 0
     var end = text.len()
     while start < end:
@@ -2930,7 +2930,7 @@ fn build_graph_trim_space_and_newlines(text: &str) -> str:
         end = end - 1
     text.slice(start, end)
 
-fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target: &BuildGraphTarget) -> BuildCommandOptions:
+fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target: &BuildGraphTarget):
     let options = build_command_options_clone(base)
     if target.optimize_mode == 1 and options.opt_level < 2:
         options.opt_level = 2
@@ -3701,7 +3701,7 @@ fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
         return 1
     0
 
-fn run_graph_target_command(target_name: &str) -> i32:
+fn run_graph_target_command(target_name: &str):
     let build_options = build_command_options_default()
     let graph_options = build_graph_command_options_default()
     graph_options.selected_target = with_str_clone_ref(target_name)
@@ -3717,12 +3717,12 @@ fn build_graph_find_target_index_by_name(graph: &BuildGraph, target_name: &str) 
             return i as i32
     -1
 
-fn repo_lock_path() -> str:
+fn repo_lock_path():
     let out_dir = with_getenv_str("WITH_OUT_DIR")
     let base = if out_dir.len() > 0: out_dir else: "out"
     base ++ "/tmp/repo-serial.lock"
 
-fn repo_lock_owner_path() -> str:
+fn repo_lock_owner_path():
     repo_lock_path() ++ "/owner"
 
 fn repo_lock_parse_pid(owner: &str) -> i32:
@@ -3785,7 +3785,7 @@ fn repo_lock_release():
         if owner_pid == with_getpid():
             with_fs_remove_tree(lock_dir)
 
-fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg: &ProjectConfig) -> BuildCommandOptions:
+fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg: &ProjectConfig):
     let out = options
     if not out.target_explicit and cfg.target_default.len() > 0:
         out.target_kind = driver_target_triple_kind(cfg.target_default)
@@ -4271,7 +4271,7 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
 // A wasm program runs through its emitted JS host under node (WITH_NODE
 // names the interpreter; default `node` from PATH): the NUL-terminated
 // argv prefix `node <prog>.js` that stands in for the native binary path.
-fn wasm_program_exec_argv(bin_path: &str) -> str:
+fn wasm_program_exec_argv(bin_path: &str):
     let node_env = build_graph_rt_getenv("WITH_NODE")
     let node: str = if node_env.len() > 0: node_env ++ "" else: "node"
     build_graph_argv_append(build_graph_argv_append("", node), wasm_host_js_path(bin_path))
@@ -4387,7 +4387,7 @@ fn dump_resolved_artifact(source_file: &str, no_std: bool, alloc_mode: bool, run
 // A check-tier Compilation for the `check` dump/trace artifacts. D39
 // `--link-bundle` prefixes apply to every command that compiles, so a dump
 // of a consumer sees the bundle's interface exactly as a build does.
-fn cli_check_compilation(no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> Compilation:
+fn cli_check_compilation(no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32):
     let comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
@@ -4470,7 +4470,7 @@ fn dump_drop_plan_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
 
 // CLAUDE.md ceremony census: the typed ceremony sites of one compilation,
 // one `pattern<TAB>path<TAB>line` per site (tools/ceremony_census.with totals them).
-fn ceremony_census_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+fn ceremony_census_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32):
     let comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     with_write(comp.ceremony_census_file(source_file))
     (comp.has_errors()) as i32
@@ -4533,7 +4533,7 @@ fn dump_async_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
     with_write(async_mir_text)
     0
 
-fn escape_dump_lexeme(text: &str) -> str:
+fn escape_dump_lexeme(text: &str):
     let out = StringBuilder.with_capacity(text.len())
     var run_start: i64 = 0
     for i in 0..text.len():
@@ -4628,7 +4628,7 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
                 bench_names.push(with_str_clone_ref(fn_name))
     BenchDiscovery { parse_ok: true, has_main, bench_names }
 
-fn synthesize_bench_main_source(text: &str, bench_names: &List[str]) -> str:
+fn synthesize_bench_main_source(text: &str, bench_names: &List[str]):
     let out = StringBuilder.with_capacity(text.len())
     out.push_str(text)
     if text.len() > 0 and text[text.len() - 1] != 10:
@@ -4930,7 +4930,7 @@ fn test_header_error(unknown_line: &str, line_no: i32, directives: &TestDirectiv
 fn test_directives_present(d: &TestDirectives) -> bool:
     d.expect_stdout.len() > 0 or d.expect_stdout_contains.len() > 0 or d.expect_stderr.len() > 0 or d.has_expect_exit or d.expect_check_stdout.len() > 0 or d.expect_check_stdout_not.len() > 0 or d.expect_check_fail.len() > 0 or d.expect_check_fail_not.len() > 0 or d.expect_build_fail.len() > 0 or d.expect_build_stderr.len() > 0 or d.expect_build_stderr_not.len() > 0 or d.check_only or d.extra_args.len() > 0 or d.env_pairs.len() > 0 or d.known_issue.len() > 0
 
-fn nr_of_offset(text: &str, offset: i32) -> i32:
+fn nr_of_offset(text: &str, offset: i32):
     var n: i32 = 1
     for k in 0..offset:
         if text[k] == 10: n = n + 1
@@ -5160,7 +5160,7 @@ fn test_effective_prelude_mode(default_mode: i32, args: &str) -> i32:
         return PreludeMode.FullMode as i32
     default_mode
 
-fn split_nonempty_lines(text: &str) -> List[str]:
+fn split_nonempty_lines(text: &str):
     let lines: List[str] = []
     let text_len = text.len()
     var start = 0
@@ -5563,7 +5563,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     print_test_summary(target, 0, 1, run_quiet)
     run_rc
 
-fn run_test_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str) -> i32:
+fn run_test_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str):
     let include_paths: List[str] = []
     let defines: List[str] = []
     let link_libs: List[str] = []
@@ -6030,7 +6030,7 @@ fn doc_path_is_project_source(path: &str, root: &str, requested: &str) -> bool:
     let prefix = if root.ends_with("/"): with_str_clone_ref(root) else: root ++ "/"
     path.starts_with(prefix)
 
-fn doc_source_line_at(text: &str, offset: i32) -> str:
+fn doc_source_line_at(text: &str, offset: i32):
     var start = offset
     if start < 0:
         start = 0
@@ -6045,7 +6045,7 @@ fn doc_source_line_at(text: &str, offset: i32) -> str:
         end = end + 1
     text.slice(start, end).trim().to_owned()
 
-fn doc_extract_comment(text: &str, decl_start: i32) -> str:
+fn doc_extract_comment(text: &str, decl_start: i32):
     var pos = decl_start - 1
     while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
         pos = pos - 1
@@ -6070,7 +6070,7 @@ fn doc_extract_comment(text: &str, decl_start: i32) -> str:
         i = i - 1
     out
 
-fn doc_markdown_entry(kind: &str, path: &str, name: &str, detail: &str, source_text: &str, span_start: i32) -> str:
+fn doc_markdown_entry(kind: &str, path: &str, name: &str, detail: &str, source_text: &str, span_start: i32):
     var out = "### " ++ name ++ "\n\n"
     out = out ++ "Module: `" ++ path ++ "`\n\n"
     let docs = doc_extract_comment(source_text, span_start)
@@ -6093,7 +6093,7 @@ fn doc_project_root(info: &str) -> str:
             return doc_field(line, "root")
     ""
 
-fn doc_collect_modules(info: &str, root: &str, source_path: &str) -> str:
+fn doc_collect_modules(info: &str, root: &str, source_path: &str):
     let lines = split_nonempty_lines(info)
     var out = ""
     for i in 0..lines.len():
@@ -6112,7 +6112,7 @@ fn doc_path_seen(paths: &List[str], path: &str) -> bool:
             return true
     false
 
-fn doc_module_paths(info: &str, root: &str, source_path: &str) -> List[str]:
+fn doc_module_paths(info: &str, root: &str, source_path: &str):
     let paths: List[str] = []
     let lines = split_nonempty_lines(info)
     for i in 0..lines.len():
@@ -6236,7 +6236,7 @@ fn run_doc_command(argc: i32, source: &str, output: &str, no_std: bool, alloc_mo
 
 let REPL_TURN_SENTINEL: str = "__WITH_REPL_TURN_8f4a2b__"
 
-fn repl_default_imports() -> str:
+fn repl_default_imports():
     "use std.io\n" ++
     "use std.str\n" ++
     "use std.regex\n" ++
@@ -6244,19 +6244,19 @@ fn repl_default_imports() -> str:
     "use std.collections\n" ++
     "use std.builtins\n"
 
-fn repl_line_is_import(text: &str) -> bool:
+fn repl_line_is_import(text: &str):
     text.starts_with("use ") or text.starts_with("pub use ")
 
-fn repl_line_is_decl(text: &str) -> bool:
+fn repl_line_is_decl(text: &str):
     var s = text
     if s.starts_with("pub "):
         s = s.slice(4, s.len()).trim()
     s.starts_with("fn ") or s.starts_with("async fn ") or s.starts_with("unsafe fn ") or s.starts_with("comptime fn ") or s.starts_with("type ") or s.starts_with("enum ") or s.starts_with("trait ") or s.starts_with("impl ") or s.starts_with("impl[") or s.starts_with("extend ") or s.starts_with("extend[") or s.starts_with("extern ") or s.starts_with("const ") or s.starts_with("@[")
 
-fn repl_line_is_transient_print(text: &str) -> bool:
+fn repl_line_is_transient_print(text: &str):
     text.starts_with("print(") or text.starts_with("eprint(") or text.starts_with("builtins.print(") or text.starts_with("builtins.eprint(")
 
-fn repl_unclosed_delims(text: &str) -> i32:
+fn repl_unclosed_delims(text: &str):
     var depth: i32 = 0
     var in_str = false
     var in_char = false
@@ -6311,7 +6311,7 @@ fn repl_strip_line_comment(line: &str) -> str:
         i += 1
     line.trim()
 
-fn repl_build_unit(imports: &List[str], decls: &List[str], stmts: &List[str], current: &str, with_sentinel: bool) -> str:
+fn repl_build_unit(imports: &List[str], decls: &List[str], stmts: &List[str], current: &str, with_sentinel: bool):
     var out = repl_default_imports()
     for imp in imports:
         out = out ++ imp ++ "\n"
@@ -6326,7 +6326,7 @@ fn repl_build_unit(imports: &List[str], decls: &List[str], stmts: &List[str], cu
         out = out ++ current ++ "\n"
     out
 
-fn repl_bin_path -> str:
+fn repl_bin_path:
     // Same host exe suffix as cli_one_liner_bin_path (#1081): an
     // extensionless relative binary does not launch on Windows, so
     // every repl line exited -2 there (#809).
@@ -6918,7 +6918,7 @@ fn print_help_attributes:
 
 // ── Package management commands ─────────────────────────────────
 
-fn cli_parse_small_int(s: &str) -> i32:
+fn cli_parse_small_int(s: &str):
     var result: i32 = 0
     var i = 0
     let len = s.len()
@@ -6962,7 +6962,7 @@ fn cli_configure_build_memory_limit() -> i32:
     with_set_memory_limit_bytes(limit)
     0
 
-fn cli_trim_line(text: &str) -> str:
+fn cli_trim_line(text: &str):
     var start = 0
     var end = text.len()
     while start < end:
@@ -7076,7 +7076,7 @@ fn cli_remove_manifest_dep(toml: &str, pkg_name: &str) -> CliManifestRemoveResul
         i = i + 1
     CliManifestRemoveResult { ok: removed, text: out }
 
-fn cli_manifest_c_deps(toml: &str) -> List[CliManifestDep]:
+fn cli_manifest_c_deps(toml: &str):
     let deps: List[CliManifestDep] = []
     var in_deps = false
     var start = 0
@@ -7168,12 +7168,12 @@ fn cli_init_write_new_file(path: &str, contents: &str) -> i32:
         return 1
     0
 
-fn cli_init_manifest_template(name: &str) -> str:
+fn cli_init_manifest_template(name: &str):
     "[package]\n" ++
     "name = \"" ++ name ++ "\"\n" ++
     "version = \"0.1.0\"\n"
 
-fn cli_init_build_template(name: &str, is_lib: bool) -> str:
+fn cli_init_build_template(name: &str, is_lib: bool):
     let product_kind = if is_lib: "library" else: "executable"
     let entry = if is_lib: "src/lib.with" else: "src/main.with"
     "use std.build\n\n" ++
@@ -7183,7 +7183,7 @@ fn cli_init_build_template(name: &str, is_lib: bool) -> str:
     "    out = out.test(\"test\", \"test/*.with\")\n" ++
     "    out.default(\"" ++ name ++ "\")\n"
 
-fn cli_init_readme_template(name: &str, is_lib: bool) -> str:
+fn cli_init_readme_template(name: &str, is_lib: bool):
     let run_line = if is_lib: "with build" else: "with run"
     "# " ++ name ++ "\n\n" ++
     "## Build\n\n" ++
@@ -7199,18 +7199,18 @@ fn cli_init_readme_template(name: &str, is_lib: bool) -> str:
     run_line ++ "\n" ++
     "```\n"
 
-fn cli_init_gitignore_template() -> str:
+fn cli_init_gitignore_template():
     "out/\n.with/\n!.with/lock.json\n"
 
-fn cli_init_main_template(name: &str) -> str:
+fn cli_init_main_template(name: &str):
     "fn main:\n" ++
     "    print(\"hello from " ++ name ++ "\")\n"
 
-fn cli_init_lib_template(name: &str) -> str:
+fn cli_init_lib_template(name: &str):
     "pub fn hello -> str:\n" ++
     "    \"hello from " ++ name ++ "\"\n"
 
-fn cli_init_test_template() -> str:
+fn cli_init_test_template():
     "//! expect-stdout: ok\n\n" ++
     "fn main:\n" ++
     "    print(\"ok\")\n"
@@ -7348,11 +7348,11 @@ fn run_init_command(argc: i32) -> i32:
 
 // The scenario every new application starts with (§18.5d): build it, run
 // it, expect its greeting — what `with init`'s main.with prints.
-fn cli_init_uat_template(name: &str) -> str:
+fn cli_init_uat_template(name: &str):
     "scenario: the program prints its greeting\n\nrun: with build\nrun: ./out/bin/" ++ name ++ "\nexpect exit: 0\nexpect stdout: hello from " ++ name ++ "\n"
 
 // The verbs, one page (uat-plan.md §3), with three worked examples.
-fn cli_init_uat_readme_template(name: &str) -> str:
+fn cli_init_uat_readme_template(name: &str):
     "# Acceptance scenarios (`with uat`)\n\nA scenario is what a person does at a terminal and what they expect to\nsee, one step per line, in `uat/<name>.uat`. `with uat` runs every scenario\nthat applies on this host; `with uat <name>` runs one; `with uat --list`\nshows them; `with uat --keep` keeps the temporary directories of passing\nscenarios. Captures land in `out/uat/<name>/`.\n\n```\nscenario: the program prints its greeting\n\nrun: with build\nrun: ./out/bin/" ++ name ++ "\nexpect exit: 0\nexpect stdout: hello from " ++ name ++ "\n```\n\n## The verbs\n\n```\nscenario: <title>                       # first line\nrequires: network, display, opengl, lib <name>, tool <name>, env <NAME>\nplatforms: darwin, linux, windows       # where the scenario runs at all\n\nnew directory                           # a fresh temporary directory becomes the cwd\nrun: <command>                          # exit 0 expected\nrun (fails): <command>                  # a non-zero exit expected\nwrite <path> from <fixture>             # copy uat/fixtures/<fixture> to <path>\nwrite <path>:                           # the indented lines below become the file\n    <text>\ncopy <path> to <path>                   # a project file into the scenario's cwd\ncopy $NAME to <path>                    # the file the environment variable names\nenv <NAME>=<value>                      # for the rest of the scenario\nstdin:                                  # for the next run:\n    <text>\nexpect exit: <int>\nexpect stdout: <text>                   # exact, trailing line endings trimmed\nexpect stdout contains: <text>\nexpect stderr contains: <text>\nexpect file <path> exists\nexpect file <path> contains: <text>\nexpect (human): <text>                  # recorded and printed, never executed\n```\n\n`with` at the head of a `run:` line is the toolchain running the scenario\n(`WITH_UAT_WITH=<path>` overrides it). An `expect` applies to the most\nrecent `run:`. An unmet `requires:` skips the scenario with the reason;\nskips do not fail the suite.\n\n## With input\n\n```\nscenario: the program echoes its input\n\nstdin:\n    hello\nrun: with -n 'print(line)'\nexpect stdout: hello\n```\n\n## With a check a person makes\n\n```\nscenario: the window shows the spiral\nrequires: display\n\nrun: with run -- --frames 60\nexpect exit: 0\nexpect (human): colored balls moving on a field of black\n```\n"
 
 type GetCommandOptions {
@@ -7474,7 +7474,7 @@ fn run_get_command(argc: i32) -> i32:
 // pin it in with.toml.
 // This compiler's version, `v0.16.0`: the build writes it over the slot
 // (build/compiler.with), so the slot is spelled once.
-fn compiler_version_text() -> str: with_str_from_cstr(c"WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
+fn compiler_version_text(): with_str_from_cstr(c"WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
 
 fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinstall: bool) -> i32:
     conan_set_compiler_version(compiler_version_text())

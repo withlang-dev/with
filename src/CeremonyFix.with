@@ -21,6 +21,7 @@ use std.process
 use std.collections.HashMap
 use std.builtins.eprint
 use compiler.Compilation
+use Diagnostic
 use Ast
 use Sema
 use SemaTypes
@@ -66,7 +67,7 @@ fn cf_paren_is_grouping(text: &str, open: i32) -> bool:
 // The names a diagnostic quotes in backticks.
 fn cf_quoted_names(message: &str) -> List[str]:
     let parts = message.split("`")
-    [with_str_clone_ref(parts[i]) for i in 0..parts.len() if i % 2 == 1 and parts[i].len() > 0]
+    [p for (i, p) in parts.enumerate() if i % 2 == 1 and p.len() > 0]
 
 // The byte just before `at` that is a colon, skipping blanks: where a
 // `let x: T` annotation begins.
@@ -106,7 +107,7 @@ fn cf_rewritable(path: &str, excludes: &List[str], std_too: bool) -> bool:
     path.len() > 0 and not path.starts_with("<") and not cf_excluded(path, excludes) and with_fs_read_file(path).len() > 0
 
 // A line's indentation, in bytes.
-fn cf_indent_at(text: &str, line_start: i32) -> i32:
+fn cf_indent_at(text: &str, line_start: i32):
     var i = line_start
     while i < text.len() and (text[i] == ' ' or text[i] == '\t'): i = i + 1
     i - line_start
@@ -284,7 +285,7 @@ fn cf_collect(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) 
 // declaration is what to move to the length's width), or nothing does (the
 // cast alone gives its binding or loop variable that width).
 // One line per cast, then the summary line.
-fn cf_len_cast_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[str]:
+fn cf_len_cast_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool):
     let notes = []
     let texts: HashMap[str, str] = [:]
     var demanded = 0
@@ -309,7 +310,7 @@ fn cf_len_cast_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too:
 // set of kinds is an enum, and the enum needs a name only a person can
 // give, so this is reported and never rewritten. One line per run of three
 // or more.
-fn cf_numbered_const_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[str]:
+fn cf_numbered_const_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool):
     let notes = []
     let texts: HashMap[str, str] = [:]
     var run_path = ""
@@ -356,20 +357,11 @@ fn cf_numbered_const_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], st
     notes
 
 // Apply a file's edits from the end back, so earlier offsets stay valid.
-fn cf_rewrite(text: &str, edits: &List[CeremonyEdit]) -> str:
-    let order = [i for i in 0..edits.len()]
-    // Insertion sort by start, descending: a file has few edits.
-    for a in 1..order.len():
-        var b = a
-        while b > 0 and edits[order[b - 1]].start < edits[order[b]].start:
-            let t = order[b - 1]
-            order[b - 1] = order[b]
-            order[b] = t
-            b = b - 1
+fn cf_rewrite(text: &str, edits: &List[CeremonyEdit]):
+    let last_first = [e for e in edits]
+    last_first.sort_by((a, b) => b.start - a.start)
     var out = with_str_clone_ref(text)
-    for i in order:
-        let e = &edits[i]
-        out = out.slice(0, e.start) ++ e.replacement ++ out.slice(e.end, out.len())
+    for e in last_first: out = out.slice(0, e.start) ++ e.replacement ++ out.slice(e.end, out.len())
     out
 
 // #3061 item 1: a private function's written return type that its body
@@ -380,7 +372,45 @@ type CeremonyFnRet {
     edit: CeremonyEdit,
     fn_name: str,
     type_name: str,
+    // The line of the function's header in the file as read.
+    first_line: i32,
 }
+
+// An edit's line in the file as read: what a second compiler's refusal is
+// matched against.
+type CeremonyPlace {
+    path: str,
+    line: i32,
+    key: str,
+    what: str,
+}
+
+// What names an edit among a run's edits: its file and where it starts.
+fn cf_edit_key(e: &CeremonyEdit): f"{e.path}:{e.start}"
+
+// The last part of a dotted name: `Type.method` is `method`.
+fn cf_bare_name(name: &str):
+    let parts = name.split(".")
+    with_str_clone_ref(parts[parts.len() - 1])
+
+// One round of the search for the removed return types a program does not
+// check without: those of the functions that now infer another type than the
+// one they declared, and those of the functions an error names, in its
+// message or a label (a caller of a function with no type is refused at the
+// call, D43). The keys of the ones not already in `back`.
+fn cf_refused_rets(sema: &Sema, diagnostics: &DiagnosticList, rets: &List[CeremonyFnRet], back: &List[str]):
+    var said = ""
+    for d in diagnostics.items:
+        if d.severity != DiagSeverity.Error: continue
+        said = said ++ d.message ++ "\n"
+        for label in d.labels: said = said ++ label.message ++ "\n"
+    let found = []
+    for r in rets:
+        let key = cf_edit_key(r.edit)
+        if back.contains(key): continue
+        let inferred = cf_inferred_return(sema, r.fn_name)
+        if (inferred.len() > 0 and inferred != r.type_name) or cf_has_word(said, cf_bare_name(r.fn_name)): found.push(key)
+    found
 
 // Whether `word` occurs in `text` as a whole name.
 fn cf_has_word(text: &str, word: &str) -> bool:
@@ -411,7 +441,7 @@ fn cf_collect_fn_rets(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too
         let body = text.slice(pool.get_end(node), pool.get_end(tail))
         if cf_has_word(body, "return") or cf_has_word(body, bare): continue
         let written = text.slice(pool.get_start(node), pool.get_end(node))
-        found.push(CeremonyFnRet { edit: CeremonyEdit { path: with_str_clone_ref(path), start: arrow, end: pool.get_end(node), replacement: "", what: "return type `-> " ++ written ++ "` restates the body's type" }, fn_name: with_str_clone_ref(fn_name), type_name: sema.type_name(sema.typed_expr_types.get(tail) ?? 0) })
+        found.push(CeremonyFnRet { edit: CeremonyEdit { path: with_str_clone_ref(path), start: arrow, end: pool.get_end(node), replacement: "", what: "return type `-> " ++ written ++ "` restates the body's type" }, fn_name: with_str_clone_ref(fn_name), type_name: sema.type_name(sema.typed_expr_types.get(tail) ?? 0), first_line: cf_line_of(text, arrow) })
     found
 
 // The return type the function named `fn_name` has in `sema`, by name; ""
@@ -420,7 +450,7 @@ fn cf_inferred_return(sema: &Sema, fn_name: &str) -> str:
     let sig = sema.get_sig(sema.pool_lookup_symbol(fn_name))
     if sig < 0: "" else: sema.type_name(sema.sig_return_type(sig))
 
-fn cf_usage() -> str: "usage: with fix-ceremony [--report|--apply] [--std] [--exclude path ...] [--check-with compiler] <entry.with>\n  --report      list every rewrite Sema proves safe, by file and line (the default)\n  --apply       write them; a file that no longer checks is restored\n  --std         rewrite lib/std too (never a migrated corpus)\n  --exclude p   leave files under p alone\n  --check-with c  re-check with compiler c after applying\nrewrites: a redundant binding annotation, a `var` never rebound, a widening cast, `List.new()` / `HashMap.new()` where its type is demanded, an index loop over one list, `.clone()` on a str, `&x` at a `&T` parameter, `Some(x)` where an Option is demanded"
+fn cf_usage(): "usage: with fix-ceremony [--report|--apply] [--std] [--exclude path ...] [--check-with compiler] <entry.with>\n  --report      list every rewrite Sema proves safe, by file and line (the default)\n  --apply       write them; a file that no longer checks is restored\n  --std         rewrite lib/std too (never a migrated corpus)\n  --exclude p   leave files under p alone\n  --check-with c  re-check with compiler c after applying\nrewrites: a redundant binding annotation, a `var` never rebound, a widening cast, `List.new()` / `HashMap.new()` where its type is demanded, an index loop over one list, `.clone()` on a str, `&x` at a `&T` parameter, `Some(x)` where an Option is demanded"
 
 fn run_ceremony_fix() -> i32:
     let argv = args()
@@ -459,7 +489,7 @@ fn run_ceremony_fix() -> i32:
         eprint(f"fix-ceremony: {entry} does not check; fix it first")
         return 1
     var edits = cf_collect(comp.zcu.last_sema, pool, excludes, std_too)
-    var fn_rets = cf_collect_fn_rets(comp.zcu.last_sema, pool, excludes, std_too)
+    let fn_rets = cf_collect_fn_rets(comp.zcu.last_sema, pool, excludes, std_too)
     for fr in fn_rets: edits.push(fr.edit)
     let paths = []
     for e in edits:
@@ -487,20 +517,40 @@ fn run_ceremony_fix() -> i32:
     var pool2 = again.compile_entry_file(entry)
     var rechecks = pool2.decl_count() > 0 and not again.zcu.diagnostics.has_errors()
     // A removed return type is kept only if the function then infers the
-    // type it declared. One that does not (or, when the program no longer
-    // checks, every one: unannotated functions that call each other have no
-    // type to give, D43) is put back, and the rest is checked again.
+    // type it declared. Where the program no longer checks (unannotated
+    // functions that call each other have no type to give, D43), the types
+    // its refusals point at are put back, round by round, until it checks;
+    // then one whose function infers another type is put back too.
     if fn_rets.len() > 0:
+        // The removed types the program does not check without, by key.
+        let refused = []
+        if not rechecks:
+            var named = true
+            while named and not rechecks:
+                // Errors that point at no removed type: every one goes back.
+                let more = cf_refused_rets(again.zcu.last_sema, again.zcu.diagnostics, fn_rets, refused)
+                named = more.len() > 0
+                for key in more: refused.push(key)
+                if not named:
+                    for r in fn_rets: refused.push(cf_edit_key(r.edit))
+                for path in paths:
+                    let mine = [e for e in edits if e.path == path and not refused.contains(cf_edit_key(e))]
+                    with_fs_write_file(path, cf_rewrite(originals.get(path).unwrap(), mine))
+                again = Compilation.init()
+                pool2 = again.compile_entry_file(entry)
+                rechecks = pool2.decl_count() > 0 and not again.zcu.diagnostics.has_errors()
         let put_back = []
-        for fr in fn_rets:
-            let inferred = if rechecks: cf_inferred_return(again.zcu.last_sema, fr.fn_name) else: ""
-            if inferred == fr.type_name: continue
-            put_back.push(fr.edit.start)
-            let line = cf_line_of(originals.get(fr.edit.path).unwrap(), fr.edit.start)
-            if rechecks: print(f"{fr.edit.path}:{line}: kept as written: without it `{fr.fn_name}` returns `{inferred}`, not `{fr.type_name}`")
-            else: print(f"{fr.edit.path}:{line}: kept as written: the program does not check without the return types removed in this run")
+        for r in fn_rets:
+            let key = cf_edit_key(r.edit)
+            let was_refused = refused.contains(key)
+            let inferred = if rechecks and not was_refused: cf_inferred_return(again.zcu.last_sema, r.fn_name) else: ""
+            if inferred == r.type_name: continue
+            put_back.push(key)
+            if was_refused: print(f"{r.edit.path}:{r.first_line}: kept as written: without it `{r.fn_name}` infers another type, or a caller no longer checks")
+            else if rechecks: print(f"{r.edit.path}:{r.first_line}: kept as written: without it `{r.fn_name}` returns `{inferred}`, not `{r.type_name}`")
+            else: print(f"{r.edit.path}:{r.first_line}: kept as written: the program does not check without the return types removed in this run")
         if put_back.len() > 0:
-            edits = [e for e in edits if not (e.what.contains("restates the body's type") and put_back.contains(e.start))]
+            edits = [e for e in edits if not put_back.contains(cf_edit_key(e))]
             for path in paths:
                 let mine = [e for e in edits if e.path == path]
                 with_fs_write_file(path, cf_rewrite(originals.get(path).unwrap(), mine))
@@ -517,8 +567,8 @@ fn run_ceremony_fix() -> i32:
     // written and reported, line by line, until it checks; a refusal at a
     // line no rewrite touched restores everything.
     if check_with.len() > 0:
-        let edit_lines = [cf_line_of(originals.get(e.path).unwrap(), e.start) for e in edits]
-        let dropped = [false for e in edits]
+        let places = [CeremonyPlace { path: e.path, line: cf_line_of(originals.get(e.path).unwrap(), e.start), key: cf_edit_key(e), what: e.what } for e in edits]
+        let refused = []
         let out_path = "out/fix-ceremony-check.out"
         let err_path = "out/fix-ceremony-check.err"
         while true:
@@ -539,39 +589,31 @@ fn run_ceremony_fix() -> i32:
                 // that mentions the name; otherwise the nearest within a few lines.
                 let names = cf_quoted_names(last_message)
                 let source_lines = originals.get(epath).unwrap().split("\n")
-                var best = -1
-                for ei in 0..edits.len():
-                    let e = &edits[ei]
-                    if dropped[ei] or e.path != epath or edit_lines[ei] > eline + 1: continue
-                    let text_at = source_lines[edit_lines[ei] - 1]
+                var best_line = 0
+                for p in places:
+                    if p.path != epath or p.line > eline + 1 or p.line <= best_line or refused.contains(p.key): continue
+                    let text_at = source_lines[p.line - 1]
                     var mentions = false
                     for name in names:
                         if text_at.contains(name): mentions = true
-                    let near = edit_lines[ei] >= eline - 12
-                    if (mentions or (names.len() == 0 and near)) and (best < 0 or edit_lines[ei] > edit_lines[best]): best = ei
-                if best < 0 and names.len() > 0:
-                    for ei in 0..edits.len():
-                        if dropped[ei] or edits[ei].path != epath or edit_lines[ei] > eline + 1 or edit_lines[ei] < eline - 12: continue
-                        if best < 0 or edit_lines[ei] > edit_lines[best]: best = ei
-                if best < 0: continue
-                for ei in 0..edits.len():
-                    let e = &edits[ei]
-                    if not dropped[ei] and e.path == epath and edit_lines[ei] == edit_lines[best]:
-                        dropped[ei] = true
+                    if mentions or (names.len() == 0 and p.line >= eline - 12): best_line = p.line
+                if best_line == 0 and names.len() > 0:
+                    for p in places:
+                        if p.path == epath and p.line <= eline + 1 and p.line >= eline - 12 and p.line > best_line and not refused.contains(p.key): best_line = p.line
+                if best_line == 0: continue
+                for p in places:
+                    if p.path == epath and p.line == best_line and not refused.contains(p.key):
+                        refused.push(p.key)
                         progress = true
             if not progress:
                 for (path, text) in originals: with_fs_write_file(path, text)
                 eprint(f"fix-ceremony: {check_with} refuses {entry} at lines no rewrite touched (see {err_path}); every file restored")
                 return 1
             for path in paths:
-                let mine = [edits[ei] for ei in 0..edits.len() if edits[ei].path == path and not dropped[ei]]
+                let mine = [e for e in edits if e.path == path and not refused.contains(cf_edit_key(e))]
                 with_fs_write_file(path, cf_rewrite(originals.get(path).unwrap(), mine))
-        var kept_count = 0
-        for ei in 0..edits.len():
-            let e = &edits[ei]
-            if dropped[ei]:
-                kept_count = kept_count + 1
-                print(f"{e.path}:{edit_lines[ei]}: kept as written, {check_with} refuses it: {e.what}")
-        if kept_count > 0: print(f"fix-ceremony: {kept_count} rewrite(s) kept as written for {check_with}")
+        for p in places:
+            if refused.contains(p.key): print(f"{p.path}:{p.line}: kept as written, {check_with} refuses it: {p.what}")
+        if refused.len() > 0: print(f"fix-ceremony: {refused.len()} rewrite(s) kept as written for {check_with}")
     print(f"fix-ceremony: applied; {entry} checks")
     0

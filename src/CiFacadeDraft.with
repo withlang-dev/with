@@ -74,13 +74,13 @@ fn fd_argmap_at(argmap: &str, pos: i32) -> str:
         if p == pos: return entry.slice(eq + 1, entry.len()).to_owned()
     ""
 
-fn fd_i32(text: &str) -> i32:
+fn fd_i32(text: &str):
     let v = parse(text)
     v
 
 // D187 (§16.2b.6): the parameters a "borrow:<i>" / "borrow:<i>,<j>"
 // verdict names, in order.
-fn fd_borrow_members(verdict: &str) -> List[i32]:
+fn fd_borrow_members(verdict: &str):
     let out: List[i32] = []
     for part in verdict.slice(7, verdict.len()).split(","):
         if part.len() > 0: out.push(fd_i32(part))
@@ -102,7 +102,7 @@ fn fd_borrow_union(a: &str, b: &str) -> str:
 
 // A pointer to a C character type in the engine's spelling (`char`,
 // `unsigned char` such as libxml2's `xmlChar`, any constness).
-fn fd_is_char_pointer(ty: &str) -> bool:
+fn fd_is_char_pointer(ty: &str):
     ty == "*mut u8" or ty == "*const u8" or ty == "*mut i8" or ty == "*const i8" or ty == "*mut c_char" or ty == "*const c_char"
 
 impl CiProject:
@@ -1961,7 +1961,7 @@ impl CiProject:
 type HandedRecord { record: str, callee: str, place: str }
 
 // The contract line of a `case:<K>:<what the argument is>` fact.
-fn fd_case_clause(kind: &str) -> str:
+fn fd_case_clause(kind: &str):
     let rest = kind.slice(5, kind.len())
     let colon = rest.find(":")
     "    case " ++ rest.slice(0, colon) ++ ": " ++ rest.slice(colon + 1, rest.len())

@@ -44,7 +44,7 @@ fn diagnostic_sorts_before(a: &Diagnostic, b: &Diagnostic) -> bool:
     if a.primary.start != b.primary.start: return a.primary.start < b.primary.start
     a.message < b.message
 
-fn diagnostic_owned_text(text: &str) -> str:
+fn diagnostic_owned_text(text: &str):
     with_str_clone_ref(text)
 
 fn diagnostic_error(message: &str, primary: Span) -> Diagnostic:
@@ -77,10 +77,10 @@ fn diagnostic_warning(message: &str, primary: Span) -> Diagnostic:
         helps: [],
     }
 
-fn Diagnostic.err(message: &str, span: Span) -> Diagnostic:
+fn Diagnostic.err(message: &str, span: Span):
     diagnostic_error(message, span)
 
-fn Diagnostic.warn(message: &str, span: Span) -> Diagnostic:
+fn Diagnostic.warn(message: &str, span: Span):
     diagnostic_warning(message, span)
 
 impl Diagnostic:

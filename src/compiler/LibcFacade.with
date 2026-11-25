@@ -45,7 +45,7 @@ use Ast
 use InternPool
 use compiler.FacadeRender
 
-fn libc_facade_source() -> str:
+fn libc_facade_source():
     "c contract libc:
     // POSIX strdup(3) and strndup(3): each returns a new string obtained from
     // malloc, which the caller releases with free (C11 7.22.3.3).

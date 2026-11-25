@@ -6569,7 +6569,7 @@ impl Sema:
 // The resource a deprecated `owns: ["ctor -> dtor"]` c_import entry spells
 // (compiler/Frontend.with project_owned_annotations_frontend): the producer's
 // name in UpperCamelCase — `getcwd` → `Getcwd`, `my_buf_new` → `MyBufNew`.
-fn facade_owns_resource_name(ctor: &str) -> str:
+fn facade_owns_resource_name(ctor: &str):
     var out = ""
     var upper = true
     for i in 0..ctor.len():

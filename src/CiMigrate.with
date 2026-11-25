@@ -182,7 +182,7 @@ fn ci_migrate_output_is_prelude_free() -> bool:
 // Sema classifies extern declarations in every lib/std module as compiler
 // implementation bindings (sema_extern_is_compiler_implementation). Match
 // that declaration policy for every corpus, without a library-name exception.
-fn ci_migrate_shared_defs_targets_std_zone() -> bool:
+fn ci_migrate_shared_defs_targets_std_zone():
     ci_starts_with(g_migrate_shared_defs_prefix, "std.")
 
 fn ci_migrate_shared_defs_reset:
@@ -192,10 +192,10 @@ fn ci_migrate_shared_defs_reset:
     g_migrate_shared_pending_extern_vars = []
     g_migrate_shared_usage_idents = ""
 
-fn ci_migrate_shared_decl_key(kind: &str, name: &str) -> str:
+fn ci_migrate_shared_decl_key(kind: &str, name: &str):
     "|" ++ kind ++ ":" ++ name ++ "|"
 
-fn ci_migrate_type_render_has_concrete_body(name: &str, rendered: &str) -> bool:
+fn ci_migrate_type_render_has_concrete_body(name: &str, rendered: &str):
     let safe_name = ci_escape_reserved(name)
     ci_str_contains(rendered, "type " ++ safe_name ++ " {") or ci_str_contains(rendered, "type " ++ safe_name ++ " = union {")
 
@@ -324,7 +324,7 @@ fn ci_migrate_extern_fn_call_requires_unsafe(name: &str) -> bool:
         return false
     ci_find_str(g_migrate_unsafe_extern_fn_names, "|" ++ name ++ "|") >= 0
 
-fn ci_migrate_type_is_raw_pointer(ty: &str) -> bool:
+fn ci_migrate_type_is_raw_pointer(ty: &str):
     let t = ci_trim(ci_pointer_type_explicit_mut(ty))
     ci_starts_with(t, "*")
 
@@ -414,7 +414,7 @@ fn ci_migrate_shared_module_prefix() -> str:
 
 // Physical output paths and imports must use the same identifier spelling.
 // A C filename may contain punctuation that is not valid in a With module.
-fn ci_migrate_module_relative_path(input_dir: &str, path: &str) -> str:
+fn ci_migrate_module_relative_path(input_dir: &str, path: &str):
     var rel = path
     if input_dir.len() > 0 and ci_starts_with(path, input_dir):
         rel = path.slice(input_dir.len(), path.len())
@@ -495,7 +495,7 @@ fn ci_replace_sparse(text: &str, needle: &str, replacement: &str) -> str:
         start = abs_idx + nlen
     result
 
-fn ci_comment_prefix_lines(text: &str) -> str:
+fn ci_comment_prefix_lines(text: &str):
     var result = ""
     var start: i64 = 0
     let tlen = text.len()
@@ -534,7 +534,7 @@ fn ci_migrate_publicize_line(line: &str, types_only: bool) -> str:
         return "pub " ++ line
     with_str_clone_ref(line)
 
-fn ci_migrate_publicize_lines(text: &str, types_only: bool) -> str:
+fn ci_migrate_publicize_lines(text: &str, types_only: bool):
     var out = ""
     var start: i64 = 0
     let n = text.len()
@@ -549,9 +549,9 @@ fn ci_migrate_publicize_lines(text: &str, types_only: bool) -> str:
         start = end
     out
 
-fn ci_migrate_publicize_shared_defs(text: &str) -> str: ci_migrate_publicize_lines(text, false)
+fn ci_migrate_publicize_shared_defs(text: &str): ci_migrate_publicize_lines(text, false)
 
-fn ci_migrate_publicize_types(text: &str) -> str: ci_migrate_publicize_lines(text, true)
+fn ci_migrate_publicize_types(text: &str): ci_migrate_publicize_lines(text, true)
 
 // The migrator's own helpers share a module with the C program's globals,
 // and a global named `a`, `b`, `c` or `out` made every helper parameter of
@@ -559,7 +559,7 @@ fn ci_migrate_publicize_types(text: &str) -> str: ci_migrate_publicize_lines(tex
 // reserved `__with_` prefix, which C code does not spell.
 const CI_MIGRATE_HELPER_LOCALS: [15]str = ["a", "b", "c", "out", "result", "a_hi", "b_hi", "a_lo", "b_lo", "cross", "low", "neg", "ua", "ub", "limit"]
 
-fn ci_migrate_hygienic(text: &str) -> str:
+fn ci_migrate_hygienic(text: &str):
     let out = StringBuilder.new()
     var i = 0
     while i < text.len():
@@ -691,7 +691,7 @@ fn ci_migrate_write_shared_fragment(path: &str):
     if with_fs_write_file(path, fragment) != 0:
         eprint(f"migrate: failed to write shared fragment: {path}")
 
-fn ci_migrate_shared_fragment_text() -> str:
+fn ci_migrate_shared_fragment_text():
     let fragment = StringBuilder.new()
     for g_migrate_shared_decl_record in g_migrate_shared_decl_records:
         fragment.push_str(g_migrate_shared_decl_record)
@@ -765,12 +765,12 @@ fn ci_migrate_merge_shared_fragment_texts(output_dir: &str, fragments: &List[str
 // ONE source for the preamble decls, the structural IR lowering, the text
 // mapper, and CiPrint's struct init/copy — a second derivation anywhere is
 // #880's bug (and #761's corruption class: one symbol, two contracts).
-fn ci_rt_ptr_mut() -> str: "*mut u8"
-fn ci_rt_ptr_const() -> str: "*const u8"
+fn ci_rt_ptr_mut(): "*mut u8"
+fn ci_rt_ptr_const(): "*const u8"
 
 // Generate the self-contained preamble that every migrated file needs.
 // In shared-defs mode this goes into defs.with; otherwise into each file.
-fn ci_migrate_preamble_text() -> str:
+fn ci_migrate_preamble_text():
     var p = ""
     // Inline ctype helpers (pure functions, no dependencies).
     p = p ++ ci_migrate_render_preamble_fn("fn is_alpha(c: i32) -> bool", "(c >= 65 and c <= 90) or (c >= 97 and c <= 122)", "(c >= 65 and c <= 90) or (c >= 97 and c <= 122)")
@@ -855,7 +855,7 @@ fn ci_migrate_preamble_text() -> str:
 // ci_migrate_insert_rt_use, D30 step 3). A C prototype for one of these
 // names is a redeclaration of the same flat-namespace symbol — the runtime's
 // spelling is the one every migrator-generated call matches.
-fn ci_migrate_preamble_declares_runtime_extern(name: &str) -> bool:
+fn ci_migrate_preamble_declares_runtime_extern(name: &str):
     name == "with_clz" or name == "with_ctz" or name == "with_popcount" or
     name == "with_bswap16" or name == "with_bswap32" or name == "with_bswap64" or
     name == "with_clzl" or name == "with_clzll" or name == "with_ctzl" or
@@ -919,7 +919,7 @@ fn migrate_add_define(define: &str) -> Unit:
 //   - `HAVE_UNISTD_H`: migrate often sees a config.h template instead of a
 //     configured header, so the one probe a unit most often gates on is
 //     answered by asking the target's headers.
-fn migrate_host_compat_preamble() -> str:
+fn migrate_host_compat_preamble():
     "#if !defined(_FORTIFY_SOURCE)\n#define _FORTIFY_SOURCE 0\n#endif\n" ++
     "#if !defined(HAVE_UNISTD_H)\n#ifdef __has_include\n#if __has_include(<unistd.h>)\n#define HAVE_UNISTD_H 1\n#endif\n#endif\n#endif\n"
 
@@ -987,7 +987,7 @@ fn ci_capture_macro_values(session: i64):
                 if with_cimport_macro_is_system(session, i) != 0: g_migrate_system_object_macros.insert(ci_ir_owned_text(name), 1)
         i = i + 1
 
-fn ci_collect_macro_type_names(session: i64) -> str:
+fn ci_collect_macro_type_names(session: i64):
     let count = with_cimport_decl_count(session)
     var names = ""
     var i = 0
@@ -1000,7 +1000,7 @@ fn ci_collect_macro_type_names(session: i64) -> str:
         i = i + 1
     names
 
-fn ci_collect_macro_type_aliases(session: i64) -> str:
+fn ci_collect_macro_type_aliases(session: i64):
     let count = with_cimport_decl_count(session)
     var aliases = ""
     var i: i32 = 0
@@ -1034,7 +1034,7 @@ fn ci_migrate_prepare_include_path(input_path: &str):
 // `#undef` of an undefined macro is a legal no-op, so this block is uniform and
 // architecture-agnostic. Emitted before the file's #line directive, so it never
 // shifts source line numbers.
-fn ci_migrate_portable_baseline_preamble() -> str:
+fn ci_migrate_portable_baseline_preamble():
     "#undef __ARM_FEATURE_CRC32\n" ++
     "#undef __ARM_FEATURE_CRYPTO\n" ++
     "#undef __ARM_FEATURE_AES\n" ++
@@ -1053,7 +1053,7 @@ fn ci_migrate_portable_baseline_preamble() -> str:
     "#undef __PCLMUL__\n" ++
     "#undef __VPCLMULQDQ__\n"
 
-fn ci_migrate_source_prefix() -> str:
+fn ci_migrate_source_prefix():
     let compat_preamble = migrate_host_compat_preamble()
     var prefix = ci_migrate_portable_baseline_preamble() ++ g_migrate_defines ++ compat_preamble
     for g_migrate_forced_include in g_migrate_forced_includes:
@@ -1354,7 +1354,7 @@ fn ci_migrate_decl_is_filtered(session: i64, idx: i32, name: &str):
 // the flag; migrate_c_directory (the build-driven pcre2/zlib migrations) ran
 // every mode-gated rule with it off — e.g. the c_import-only #799 callee
 // filter then killed zlib on its static adler32_combine_.
-fn ci_migrate_file_inner(input_path: &str, output_path: &str, project_active: bool, mut project: CiProject) -> i32:
+fn ci_migrate_file_inner(input_path: &str, output_path: &str, project_active: bool, mut project: CiProject):
     g_ci_translate_migrate_mode = 1
     let rc = ci_migrate_file_body(input_path, output_path, project_active, project)
     g_ci_translate_migrate_mode = 0
@@ -1581,9 +1581,9 @@ fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
 // the runtime's directory listing joins with `/`, and the CLI paths are
 // rewritten once at entry (ci_migrate_fs_path). No helper here looks for
 // `\`.
-fn ci_migrate_fs_path(path: &str) -> str: path.replace("\\", "/")
+fn ci_migrate_fs_path(path: &str): path.replace("\\", "/")
 
-fn ci_migrate_path_basename(path: &str) -> str:
+fn ci_migrate_path_basename(path: &str):
     var end = path.len()
     while end > 0 and path[(end - 1)] == '/':
         end = end - 1
@@ -1617,7 +1617,7 @@ fn ci_migrate_location_file(location: &str) -> str:
         if location[end] == ':': colons = colons + 1
     if colons < 2: "" else: location.slice(0, end)
 
-fn ci_migrate_location_is_header(location: &str) -> bool:
+fn ci_migrate_location_is_header(location: &str):
     ci_migrate_location_file(location).ends_with(".h")
 
 // The file stem of a cursor location (`path:line:col`), "" when absent.
@@ -1676,7 +1676,7 @@ fn ci_migrate_file_before(a: &str, b: &str) -> bool:
         return arank < brank
     ci_str_compare(abase, bbase) < 0
 
-fn ci_migrate_sorted_files(files: &List[str]) -> List[str]:
+fn ci_migrate_sorted_files(files: &List[str]):
     let sorted: List[str] = []
     var rank = 10
     while rank <= 320:
@@ -1731,7 +1731,7 @@ fn ci_migrate_basename_is_hidden(path: &str) -> bool:
     let base = ci_migrate_path_basename(path)
     base.len() > 0 and base[0] == 46
 
-fn ci_migrate_sorted_insert(files: &List[str], path: &str) -> List[str]:
+fn ci_migrate_sorted_insert(files: &List[str], path: &str):
     let sorted: List[str] = []
     var inserted = false
     var i = 0
@@ -1746,7 +1746,7 @@ fn ci_migrate_sorted_insert(files: &List[str], path: &str) -> List[str]:
         sorted.push(with_str_clone_ref(path))
     sorted
 
-fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> List[str]:
+fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str):
     var files: List[str] = []
     let listing = with_fs_list_files(input_dir)
     var pos = 0
@@ -2120,7 +2120,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
 // (CiFacadeDraft.with resolve_ownership), the facade draft goes to stdout (or
 // `-o FILE`) and the report, one line per function, to stderr.
 // Every `*.gir` under `input_dir`, sorted.
-fn ci_migrate_collect_gir_files(input_dir: &str) -> List[str]:
+fn ci_migrate_collect_gir_files(input_dir: &str):
     var files: List[str] = []
     for line in with_fs_list_files(input_dir).split("\n"):
         if line.ends_with(".gir") and not ci_migrate_basename_is_hidden(line): files = ci_migrate_sorted_insert(files, line)
@@ -2792,7 +2792,7 @@ fn ci_migrate_impl_add(record: &str, text: &str):
     g_migrate_impl_records.push(record.to_owned())
     g_migrate_impl_texts.push(text.to_owned())
 
-fn ci_migrate_take_impl_blocks() -> str:
+fn ci_migrate_take_impl_blocks():
     let names: List[str] = []
     for g_migrate_impl_record in g_migrate_impl_records: names.push(g_migrate_impl_record)
     names.sort()
@@ -2816,7 +2816,7 @@ fn ci_migrate_method_shapes_for(project_active: bool, project: &CiProject) -> Ha
         shapes.insert(ci_migrate_c_function_name(project.symbols[si].name), project.symbols[si].method_record ++ "|" ++ project.symbols[si].method_name ++ f"|{project.symbols[si].method_out}|" ++ project.symbols[si].method_out_ty ++ f"|{project.symbols[si].method_view}|" ++ status ++ "|" ++ ret ++ f"|{project.symbols[si].method_mut}")
     shapes
 
-fn ci_migrate_indent_lines(text: &str) -> str:
+fn ci_migrate_indent_lines(text: &str):
     let lines = text.split("\n")
     var out = ""
     for i in 0..lines.len():
@@ -2870,7 +2870,7 @@ fn ci_migrate_contract_note(project_active: bool, project: &CiProject, name: &st
     let stored = if contract.contains("stored-unknown:") or contract.contains("owned:"): " — stores an argument; ownership not modeled" else: ""
     "// contract: " ++ contract ++ stored ++ "\n"
 
-fn ci_migrate_writes_mark(name: &str) -> str: "@@with-writes:" ++ name ++ "@@"
+fn ci_migrate_writes_mark(name: &str): "@@with-writes:" ++ name ++ "@@"
 
 fn ci_migrate_writes_reset():
     g_migrate_writes_fn_names = []
@@ -2881,11 +2881,11 @@ fn ci_migrate_writes_note_path(path: &str):
     if not g_migrate_writes_paths.contains(path):
         g_migrate_writes_paths.push(with_str_clone_ref(path))
 
-fn ci_migrate_token_text(text: &str, tokens: &TokenList, i: i32) -> str:
+fn ci_migrate_token_text(text: &str, tokens: &TokenList, i: i32):
     text.slice(tokens.get_start(i), tokens.get_end(i))
 
 // The token after a place's projections from `k` (`.f`, `.F`, `[…]`).
-fn ci_migrate_skip_place_projections(tokens: &TokenList, k0: i32) -> i32:
+fn ci_migrate_skip_place_projections(tokens: &TokenList, k0: i32):
     var k = k0
     let n = tokens.len()
     while k < n:
@@ -3280,15 +3280,15 @@ fn ci_migrate_set_error(msg: &str):
     if g_migrate_file_error.len() == 0:
         g_migrate_file_error = with_str_clone_ref(msg)
 
-fn ci_migrate_fail_function(msg: &str) -> str:
+fn ci_migrate_fail_function(msg: &str):
     eprint(with_str_clone_ref(msg))
     ci_migrate_set_error(msg)
     ""
 
-fn ci_migrate_var_definition_kind(session: i64, idx: i32) -> i32:
+fn ci_migrate_var_definition_kind(session: i64, idx: i32):
     with_cimport_var_definition_kind(session, idx)
 
-fn ci_migrate_var_is_definition(session: i64, idx: i32) -> bool:
+fn ci_migrate_var_is_definition(session: i64, idx: i32):
     ci_migrate_var_definition_kind(session, idx) != CI_VAR_DECL_ONLY
 
 fn ci_migrate_project_var_symbol(project_active: bool, project: &CiProject, name: &str) -> i32:
@@ -3421,7 +3421,7 @@ fn ci_migrate_var_priority(session: i64, idx: i32, primary_path: &str) -> i32:
         return 2
     1
 
-fn ci_migrate_find_best_var_decl(session: i64, count: i32, name: &str, primary_path: &str) -> i32:
+fn ci_migrate_find_best_var_decl(session: i64, count: i32, name: &str, primary_path: &str):
     var best: i32 = -1
     var best_priority = -1
     var i: i32 = 0
@@ -3599,7 +3599,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
             return ""
     rendered
 
-fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: &str, project_active: bool, project: &CiProject) -> str:
+fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: &str, project_active: bool, project: &CiProject):
     let output = StringBuilder.new()
     var i: i32 = 0
     while i < count:
@@ -3729,7 +3729,7 @@ fn ci_cursor_kind_name(kind: i32) -> str:
 // is not one record to the callee: `FT_Outline_Get_CBox(const FT_Outline
 // *)` follows `outline->points`, and whoever builds the record chooses
 // where that points.
-fn ci_decl_is_complete_record(session: i64, idx: i32, decl_kind: i32, cursor: i32) -> bool:
+fn ci_decl_is_complete_record(session: i64, idx: i32, decl_kind: i32, cursor: i32):
     ci_decl_is_defined_record(session, idx, decl_kind, cursor) and ci_type_is_flat(session, with_ci_type_canonical(session, with_ci_cursor_type(session, cursor)), 0)
 
 // Whether the declaration is a record with a definition, or a typedef of one.

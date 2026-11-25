@@ -93,7 +93,7 @@ fn interface_line_name(line: &str, kind: i32) -> str:
     ""
 
 // The dotted identifier starting at `start`.
-fn interface_name_token(line: &str, start: i64) -> str:
+fn interface_name_token(line: &str, start: i64):
     var end = start
     while end < line.len():
         let ch = line[end]
@@ -103,11 +103,11 @@ fn interface_name_token(line: &str, start: i64) -> str:
         end = end + 1
     frontend_owned_text(line.slice(start, end))
 
-fn frontend_new_list_str -> List[str]:
+fn frontend_new_list_str:
     let out: List[str] = []
     out
 
-fn frontend_normalize_source_text(text: &str) -> str:
+fn frontend_normalize_source_text(text: &str):
     let out = StringBuilder.with_capacity(text.len())
     var i = 0
     while i < text.len():
@@ -169,7 +169,7 @@ impl Zcu:
         let paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_insert_unique(paths, path)
 
-fn count_non_use_decls_frontend(pool: &AstPool) -> i32:
+fn count_non_use_decls_frontend(pool: &AstPool):
     var count: i32 = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
@@ -1043,7 +1043,7 @@ fn cimport_deps_str_compare(a: &str, b: &str) -> i32:
         i = i + 1
     (al - bl) as i32
 
-fn cimport_deps_sorted_unique_paths(files: &str) -> List[str]:
+fn cimport_deps_sorted_unique_paths(files: &str):
     var out = frontend_new_list_str()
     var pos = 0
     let total = files.len()
@@ -1078,7 +1078,7 @@ fn cimport_deps_sorted_unique_paths(files: &str) -> List[str]:
 // content hash, and lookup re-validates them. Any mismatch is a cache miss.
 let CIMPORT_DEPS_MANIFEST_HEADER: str = "cimport-deps-v1"
 
-fn c_import_build_deps_manifest(files: &str) -> str:
+fn c_import_build_deps_manifest(files: &str):
     var manifest = CIMPORT_DEPS_MANIFEST_HEADER ++ "\n"
     let paths = cimport_deps_sorted_unique_paths(files)
     for i in 0..paths.len():
@@ -1123,7 +1123,7 @@ fn c_import_deps_manifest_entries_valid(manifest: &str) -> bool:
         pos = line_end + 1
     saw_header
 
-fn c_import_deps_manifest_paths(manifest: &str) -> List[str]:
+fn c_import_deps_manifest_paths(manifest: &str):
     let out = frontend_new_list_str()
     var pos = 0
     let total = manifest.len()
@@ -1186,7 +1186,7 @@ fn c_import_fs_cache_store(cache_key: &str, value: &str, warnings: &str):
 // `unsafe fn name(`, `extern fn name(`, with or without `pub`). A declared
 // omission is a stub: the body was given up on, yet a declaration binds the
 // name and a call reaches nothing.
-fn c_import_declared_and_omitted(synthetic: &str) -> List[str]:
+fn c_import_declared_and_omitted(synthetic: &str):
     let out: List[str] = []
     let prefix = "// @with-cimport-omitted|"
     for line in synthetic.split("\n"):
@@ -1796,7 +1796,7 @@ fn c_import_map_c_type(spec_raw: &str) -> str:
         out = "*const " ++ out
     out
 
-fn c_import_decode_escapes(raw: &str) -> str:
+fn c_import_decode_escapes(raw: &str):
     let out = StringBuilder.with_capacity(raw.len())
     var i = 0
     let len = raw.len()
@@ -1819,13 +1819,13 @@ fn c_import_decode_escapes(raw: &str) -> str:
         i = i + 2
     out.to_str()
 
-fn c_import_trim_outer_parens(value_raw: &str) -> str:
+fn c_import_trim_outer_parens(value_raw: &str):
     var v = c_import_trim(value_raw)
     while v.len() >= 2 and v[0] == 40 and v[v.len() as i64 - 1] == 41:
         v = c_import_trim(v.slice(1, v.len() - 1))
     v
 
-fn c_import_escape_with_string(value: &str) -> str:
+fn c_import_escape_with_string(value: &str):
     var out = ""
     for i in 0..value.len():
         let ch = value[i]
@@ -1878,7 +1878,7 @@ fn c_import_is_int_literal(text_raw: &str) -> bool:
 fn c_import_is_space(ch: i32) -> bool:
     ch == 32 or ch == 9 or ch == 10 or ch == 13
 
-fn c_import_trim(s: &str) -> str:
+fn c_import_trim(s: &str):
     var start = 0
     var end = s.len()
     while start < end and c_import_is_space(s[start]):
@@ -3279,10 +3279,10 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool,
 
 // A definition from the in-unit runtime of a symbol the compiler calls by
 // its flat name (FnAbi.codegen_is_runtime_abi_symbol).
-fn frontend_is_runtime_abi_def(path: &str, intern: &InternPool, name: i32) -> bool:
+fn frontend_is_runtime_abi_def(path: &str, intern: &InternPool, name: i32):
     path.starts_with("<embedded-rt>/") and codegen_is_runtime_abi_symbol(intern.resolve(name))
 
-fn frontend_fn_decl_is_displaceable(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
+fn frontend_fn_decl_is_displaceable(pool: &AstPool, intern: &InternPool, decl: i32):
     pool.kind(decl) == NodeKind.NK_FN_DECL and not pool.fn_decl_body_is_interface(decl as NodeId) and not frontend_fn_decl_is_c_export(pool, intern, decl)
 
 fn frontend_fn_decl_is_c_export(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
@@ -3471,7 +3471,7 @@ fn frontend_parent_module_rel(module_rel: &str) -> str:
 
 // The facade `with get` wrote for a fetched package (D121 step 5), by its
 // place: `.with/deps/c/<name>/<version>/facade.with`.
-fn frontend_path_is_fetched_facade(path: &str) -> bool:
+fn frontend_path_is_fetched_facade(path: &str):
     let p = path.replace("\\", "/")
     ("/" ++ p).contains("/.with/deps/c/") and p.ends_with("/contract.with")
 
@@ -3669,7 +3669,7 @@ impl Zcu:
         self.append_decl_source_paths(merged_pool.decl_count() - before, path, file_id)
         merged_pool
 
-fn frontend_normalize_module_path(module_name: &str) -> str:
+fn frontend_normalize_module_path(module_name: &str):
     var out = ""
     for i in 0..module_name.len():
         if module_name[i] == 46: // '.'

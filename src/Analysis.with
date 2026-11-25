@@ -50,7 +50,7 @@ fn analysis_line_slot(source: &str, offset: i32) -> isize:
         if g_analysis_line_starts[mid] <= at: lo = mid + 1 else: hi = mid
     lo - 1
 
-fn analysis_line_for_offset(source: &str, offset: i32) -> i32: (analysis_line_slot(source, offset) + 1) as i32
+fn analysis_line_for_offset(source: &str, offset: i32): (analysis_line_slot(source, offset) + 1) as i32
 
 fn analysis_column_for_offset(source: &str, offset: i32) -> i32: offset - g_analysis_line_starts[analysis_line_slot(source, offset)] + 1
 
@@ -479,7 +479,7 @@ fn analysis_ast_child_role(sema: &Sema, node: i32, child_index: i32) -> str:
     if kind == NodeKind.NK_TYPE_TYPEOF: return "expression"
     f"child[{child_index}]"
 
-fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_source: &str) -> List[str]:
+fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_source: &str):
     let result: List[str] = []
     var path = fallback_path
     var source = with_str_clone_ref(fallback_source)
@@ -642,7 +642,7 @@ fn analysis_collect_effect_edges(mut report: AnalysisReport, sema: &Sema):
         at = at + 4
         edge = edge + 1
 
-fn analysis_global_location(fact: AnalysisFact, sema: &Sema, node: i32, source_path: &str, source_text: &str) -> AnalysisFact:
+fn analysis_global_location(fact: AnalysisFact, sema: &Sema, node: i32, source_path: &str, source_text: &str):
     let subject = analysis_node_subject(sema, node, source_path, source_text)
     let located = analysis_with_node_location(fact, sema, node, subject[0], subject[1])
     if node > 0 and node < sema.ast.node_count():
@@ -1179,7 +1179,7 @@ fn analysis_audit_type_table(mut report: AnalysisReport, sema: &Sema, node_count
 // The generic instances of a type table whose argument vector is not one:
 // a range that leaves `extra`, or an argument that is no type id. The
 // columns are the table's (kind, d1 = the vector's start, d2 = its length).
-fn analysis_generic_instance_violations(kinds: &List[i32], starts: &List[i32], counts: &List[i32], extra: &List[i32]) -> List[str]:
+fn analysis_generic_instance_violations(kinds: &List[i32], starts: &List[i32], counts: &List[i32], extra: &List[i32]):
     let found = []
     let types = kinds.len()
     for tid in 1..types:
@@ -1322,7 +1322,7 @@ fn analysis_audit_method_registrations(mut report: AnalysisReport, sema: &Sema):
             report.fail(message)
     report.note(f"method-registration: methods={methods} inherent={inherent} extensions={extensions} generic={generic} missing={missing}")
 
-fn analysis_is_frozen_consumer(path: &str) -> bool:
+fn analysis_is_frozen_consumer(path: &str):
     path.contains("/Codegen.with") or path.contains("/CodegenDispatch.with") or
         path.contains("/CodegenTraits.with") or path.contains("/CCodegen.with") or
         path.contains("/AsyncMir.with") or path.contains("/MirSuspendCheck.with")
@@ -1360,7 +1360,7 @@ fn analysis_audit_frozen_calls(mut report: AnalysisReport, sema: &Sema, mir_mod:
 // #692: a MIR local's type is a type of the table. An error type (0) that
 // reaches a lowered body, or a slot read as a type id that is none, is a
 // type Sema never gave: the garbage class, which shows as a range.
-fn analysis_mir_local_type_violations(label: &str, local_types: &List[i32], types: isize) -> List[str]:
+fn analysis_mir_local_type_violations(label: &str, local_types: &List[i32], types: isize):
     let found = []
     var li = 0
     for tid in local_types:
@@ -1618,7 +1618,7 @@ fn analysis_call_callee_sym(body: &MirBody, sema: &Sema, bb: i32) -> i32:
     if sig >= 0 and sig < sema.sig_names.len(): return sema.sig_names[sig]
     0
 
-fn analysis_operand_list_locals(body: &MirBody, start: i32, count: i32, operands: &List[i32]) -> List[i32]:
+fn analysis_operand_list_locals(body: &MirBody, start: i32, count: i32, operands: &List[i32]):
     let out: List[i32] = []
     for i in 0..count:
         let opi = start + i
@@ -1669,7 +1669,7 @@ fn analysis_term_read_locals(body: &MirBody, bb: i32) -> List[i32]:
             return analysis_operand_list_locals(body, body.call_arg_starts[args_id], body.call_arg_counts[args_id], body.call_arg_operands)
     out
 
-fn analysis_term_successors(body: &MirBody, bb: i32) -> List[i32]:
+fn analysis_term_successors(body: &MirBody, bb: i32):
     let out: List[i32] = []
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_GOTO:
@@ -1737,7 +1737,7 @@ fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i3
 // The pool fields a body grows directly: it mutates a place ending in the
 // field in place (receiver of a `mut fn`/`move fn`, or a mutating container
 // intrinsic) or assigns the whole field.
-fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32, i32, Minted]) -> List[i32]:
+fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32, i32, Minted]):
     let grown: List[i32] = []
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL: continue
@@ -1923,7 +1923,7 @@ fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &
     if producers.len() == 0:
         report.note("pool-views: no body returns a reference into a field-held container; nothing to audit")
 
-fn analysis_pool_view_hit(sema: &Sema, body: &MirBody, fn_name: &str, fn_path: &str, fn_source: &str, li: i32, origin: i32, use_kind: &str, span: i32, poisoner: i32, grower: i32) -> str:
+fn analysis_pool_view_hit(sema: &Sema, body: &MirBody, fn_name: &str, fn_path: &str, fn_source: &str, li: i32, origin: i32, use_kind: &str, span: i32, poisoner: i32, grower: i32):
     let from = if origin > 0: " from " ++ sema.pool_resolve(origin) else: " (direct element ref)"
     "pool-view: " ++ fn_name ++ ": " ++ analysis_local_label(body, sema, li) ++ from ++ " is " ++ use_kind ++ " at " ++ fn_path ++
         f":{analysis_line_for_offset(fn_source, span)} after a call to " ++ sema.pool_resolve(poisoner) ++ ", which reaches " ++
@@ -1946,7 +1946,7 @@ fn analysis_move_site_shape(sema: &Sema, node: i32) -> str:
     if k == NodeKind.NK_FIELD_ACCESS: return "field"
     "other"
 
-fn analysis_move_sites(sema: &Sema, source_path: &str) -> str:
+fn analysis_move_sites(sema: &Sema, source_path: &str):
     var out = "file:line:col\troot\tshape\tspellable\tliveness\tloop\tcallee\tparam\n"
     var total = 0
     var design = 0
@@ -2212,7 +2212,7 @@ fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path
             rows.push(path ++ f"\t{span}\t{fn_name}\tretained-unowned-copy\t{retained_by}\t_{want}\t" ++ sema.type_name(candidate_types[ci]) ++ "\n")
     rows
 
-fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
+fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str):
     var out = "path\toffset\tfn\tclass\ttier\tcontext\tplace\ttype\n"
     let report_lines: List[str] = []
     let counts: List[i32] = []
@@ -2374,7 +2374,7 @@ fn analysis_explain_effect_chain(sema: &Sema, sig: isize, pi: i32, bit_idx: i32,
         cur_pi = b
     out ++ "    (chain depth limit reached)\n"
 
-fn analysis_explain_effect(sema: &Sema, target: &str, source_path: &str) -> str:
+fn analysis_explain_effect(sema: &Sema, target: &str, source_path: &str):
     var fn_name = with_str_clone_ref(target)
     var want_pi = 0 - 1
     let colon = analysis_find_from(target, ":", 0)
@@ -2417,7 +2417,7 @@ fn analysis_explain_effect(sema: &Sema, target: &str, source_path: &str) -> str:
     out
 
 // `fn` names the function or any of its specializations (`f__sema__…`).
-fn analysis_origin_fn_matches(sema: &Sema, sym: i32, fn_name: &str) -> bool:
+fn analysis_origin_fn_matches(sema: &Sema, sym: i32, fn_name: &str):
     let name = sema.pool_resolve(sym)
     name == fn_name or name.starts_with(fn_name ++ "__sema__")
 
@@ -2431,7 +2431,7 @@ fn analysis_origin_where(sema: &Sema, file: i32, node: i32, source_path: &str) -
 // from its own storage, with the node that first made each so; per view
 // binding, each time its origins were set or merged (bind, store, loop)
 // with its parameter origins, storage origins and local dependencies.
-fn analysis_explain_origin(sema: &Sema, target: &str, source_path: &str) -> str:
+fn analysis_explain_origin(sema: &Sema, target: &str, source_path: &str):
     var fn_name = with_str_clone_ref(target)
     var want = ""
     let colon = analysis_find_from(target, ":", 0)
@@ -2502,7 +2502,7 @@ fn analysis_explain_request(request: &str) -> str:
     let wanted = analysis_slice(rest, second + 1, rest.len())
     analysis_fact_explain_query(kind, wanted)
 
-fn analysis_lldb_recipe(report: &AnalysisReport, query: &str) -> str:
+fn analysis_lldb_recipe(report: &AnalysisReport, query: &str):
     let lines: List[str] = []
     lines.push("# Generated from live compiler-analysis facts.\n")
     var hits = 0
@@ -2612,7 +2612,7 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
         lines.push("\n")
     lines.join("")
 
-fn analysis_cow_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
+fn analysis_cow_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str):
     var out = ""
     var total = 0
     var through_field = 0
@@ -2661,7 +2661,7 @@ fn analysis_cow_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sourc
             out = out ++ f"{fn_path}:{line}:{col}\t{fn_name}\t{place_text}\t{reason}\n"
     out ++ f"cow: {total} checks — {through_field} through a field, {through_param} through a parameter, {in_loop} copied in the loop, {before_mut} copied before mutation\n"
 
-fn analysis_help() -> str:
+fn analysis_help():
     "with analyze <file.with> <request>\n" ++
         "  facts | snapshot                         stable TSV facts from Sema + MIR\n" ++
         "  select:<query>                          filter facts (=, !=, ~, numeric bitmask &=)\n" ++

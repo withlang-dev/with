@@ -71,10 +71,10 @@ fn build_cache_input_moved_during_run(root: &str, target: &BuildGraphTarget) -> 
             return build_cache_project_relative(root, path)
     ""
 
-fn build_cache_state_dir(root: &str) -> str:
+fn build_cache_state_dir(root: &str):
     root ++ "/out/.build-state"
 
-fn build_cache_state_path(root: &str, target_name: &str) -> str:
+fn build_cache_state_path(root: &str, target_name: &str):
     build_cache_state_dir(root) ++ "/" ++ target_name ++ ".state"
 
 fn build_cache_invalidate_target(root: &str, target_name: &str) -> i32:
@@ -82,13 +82,13 @@ fn build_cache_invalidate_target(root: &str, target_name: &str) -> i32:
     if build_graph_rt_file_exists(path) == 0: return 0
     build_graph_rt_remove_file(path)
 
-fn build_cache_effects_path(root: &str, target_name: &str) -> str:
+fn build_cache_effects_path(root: &str, target_name: &str):
     build_cache_state_dir(root) ++ "/" ++ target_name ++ ".effects"
 
-fn build_cache_build_effects_path(root: &str) -> str:
+fn build_cache_build_effects_path(root: &str):
     build_cache_state_dir(root) ++ "/build.with.effects"
 
-fn build_cache_test_success_path(root: &str, target_name: &str) -> str:
+fn build_cache_test_success_path(root: &str, target_name: &str):
     build_cache_state_dir(root) ++ "/" ++ target_name ++ ".test-pass"
 
 fn build_cache_project_relative(root: &str, path: &str) -> str:
@@ -122,7 +122,7 @@ fn build_cache_is_cacheable(kind: i32) -> bool:
     if kind == 23: return true
     false
 
-fn build_cache_sha256_text(data: &str) -> str:
+fn build_cache_sha256_text(data: &str):
     let digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
@@ -133,7 +133,7 @@ fn build_cache_sha256_text(data: &str) -> str:
 // these files once per target check. One explicit alloc/free instead;
 // implemented on sha256's single-shot API because compiler source compiles
 // against the seed's embedded stdlib and cannot use a same-change stdlib fn.
-fn build_cache_sha256_framed(framing: &str, payload: &str) -> str:
+fn build_cache_sha256_framed(framing: &str, payload: &str):
     let digest: [32]u8 = [0 as u8; 32]
     unsafe:
         let total = framing.len() + payload.len()
@@ -150,13 +150,13 @@ fn build_cache_sha256_framed(framing: &str, payload: &str) -> str:
         with_free(buf)
     sha256_hex(&digest[0] as *const u8)
 
-fn build_cache_fingerprint_regular_file(path: &str, mode: i32) -> str:
+fn build_cache_fingerprint_regular_file(path: &str, mode: i32):
     let exec = if (mode & 0o111) != 0: "x" else: "-"
     build_cache_sha256_framed("file\nmode:" ++ f"{mode & 0o777}" ++ "\nexec:" ++ exec ++ "\ncontent:", build_graph_rt_read_file(path))
 
 // Entries are named relative to the directory: the fingerprint is the tree's
 // content, the same in every worktree (D50; the machine-wide store keys on it).
-fn build_cache_fingerprint_directory(path: &str, mode: i32) -> str:
+fn build_cache_fingerprint_directory(path: &str, mode: i32):
     let listing = build_graph_rt_list_files(path)
     let files = build_cache_sorted_strings(build_cache_split_lines(listing))
     var combined = "dir\nmode:" ++ f"{mode & 0o777}" ++ "\n"
@@ -165,7 +165,7 @@ fn build_cache_fingerprint_directory(path: &str, mode: i32) -> str:
         combined = combined ++ build_cache_project_relative(path, file) ++ ":" ++ build_cache_fingerprint_file(file) ++ "\n"
     build_cache_sha256_text(combined)
 
-fn build_cache_fingerprint_symlink(path: &str, mode: i32) -> str:
+fn build_cache_fingerprint_symlink(path: &str, mode: i32):
     build_cache_sha256_text("symlink\nmode:" ++ f"{mode & 0o777}" ++ "\ntarget:" ++ build_graph_rt_readlink(path))
 
 fn build_cache_fingerprint_file(path: &str) -> str:
@@ -349,7 +349,7 @@ fn build_cache_list_w_files(root: &str, dir: &str) -> List[str]:
             w_files.push(with_str_clone_ref(path))
     build_cache_sorted_strings(w_files)
 
-fn build_cache_split_lines(text: &str) -> List[str]:
+fn build_cache_split_lines(text: &str):
     let lines: List[str] = []
     let text_len = text.len()
     var start = 0
@@ -386,7 +386,7 @@ fn build_cache_str_compare(a: &str, b: &str) -> i32:
 // A stable merge sort, bottom up. The insertion sort here rebuilt the whole
 // list for every item: a directory of 152,000 files (a lane's output) took
 // the build over eleven minutes to fingerprint.
-fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
+fn build_cache_sorted_strings(items: &List[str]):
     var sorted: List[str] = []
     for item in items: sorted.push(with_str_clone_ref(item))
     let count = sorted.len()
@@ -411,13 +411,13 @@ fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
         width = width * 2
     sorted
 
-fn build_cache_sorted_unique_strings(items: &List[str]) -> List[str]:
+fn build_cache_sorted_unique_strings(items: &List[str]):
     var sorted: List[str] = []
     for item in items:
         sorted = tracked_input_insert_unique(sorted, item)
     sorted
 
-fn build_cache_last_colon(text: &str) -> isize:
+fn build_cache_last_colon(text: &str):
     var last = -1
     for i in 0..text.len():
         if text[i] == 58:
@@ -449,14 +449,14 @@ fn build_cache_effect_env_state_line(effect_line: &str) -> str:
     let hash = effect_line.slice((third_tab + 1), effect_line.len())
     "env:" ++ name ++ ":" ++ hash
 
-fn build_cache_effects_text(effects: &List[str]) -> str:
+fn build_cache_effects_text(effects: &List[str]):
     let sorted = build_cache_sorted_unique_strings(effects)
     var out = ""
     for sorted_item in sorted:
         out = out ++ sorted_item ++ "\n"
     out
 
-fn build_cache_hash_directory_w_files(root: &str, dir: &str) -> str:
+fn build_cache_hash_directory_w_files(root: &str, dir: &str):
     let files = build_cache_list_w_files(root, dir)
     var combined = ""
     for file in files:
@@ -475,7 +475,7 @@ fn build_cache_action_source_disk_path(root: &str, path: &str) -> str:
         return with_str_clone_ref(path)
     root ++ "/" ++ path
 
-fn build_cache_hash_action_sources(root: &str, paths: &List[str]) -> str:
+fn build_cache_hash_action_sources(root: &str, paths: &List[str]):
     let unsorted: List[str] = []
     for path in paths:
         unsorted.push(with_str_clone_ref(path))
@@ -493,7 +493,7 @@ fn build_cache_hash_action_sources(root: &str, paths: &List[str]) -> str:
             combined = combined ++ named ++ ":missing\n"
     build_cache_sha256_text(combined)
 
-fn build_cache_hash_build_graph_sources(root: &str) -> str:
+fn build_cache_hash_build_graph_sources(root: &str):
     var combined = "build.with:" ++ build_cache_fingerprint_file(source_ext_found(root ++ "/build.with")) ++ "\n"
     combined = combined ++ "build:" ++ build_cache_hash_directory_w_files(root, "build") ++ "\n"
     combined = combined ++ "std.build:" ++ build_cache_fingerprint_file(source_ext_found(root ++ "/lib/std/build.with")) ++ "\n"
@@ -501,10 +501,10 @@ fn build_cache_hash_build_graph_sources(root: &str) -> str:
 
 // Plain content hash (no mode/exec framing) so external evidence checkers
 // (build/retention.with's sha256-tool flow) can reproduce manifest entries.
-fn build_cache_sha256_file_content(path: &str) -> str:
+fn build_cache_sha256_file_content(path: &str):
     build_cache_sha256_framed("", build_graph_rt_read_file(path))
 
-fn build_cache_test_success_manifest(root: &str, target: &BuildGraphTarget, test_files: &List[str], test_compiler: &str) -> str:
+fn build_cache_test_success_manifest(root: &str, target: &BuildGraphTarget, test_files: &List[str], test_compiler: &str):
     // v2: the test compiler and every test file are keyed by CONTENT hash.
     // v1 recorded the compiler by PATH only, so :test-green evidence
     // survived compiler rebuilds — the reference toolchains all key test
@@ -600,13 +600,13 @@ fn build_cache_runner_store_path(key: &str) -> str:
 
 // Environment the test compile, c_import and link read: a pass under one
 // SDK or C compiler is not a pass under another.
-fn build_cache_test_env_sig_text() -> str:
+fn build_cache_test_env_sig_text():
     var sig = ""
     for name in ["WITH_MEMORY_LIMIT_BYTES", "SDKROOT", "DEVELOPER_DIR", "CC", "WITH_CLANG_RESOURCE_DIR"]:
         sig = sig ++ "env:" ++ name ++ "=" ++ build_graph_rt_getenv(name) ++ "\n"
     sig
 
-fn build_cache_test_target_sig_text(target: &BuildGraphTarget) -> str:
+fn build_cache_test_target_sig_text(target: &BuildGraphTarget):
     var sig = f"opt:{target.optimize_mode}\n"
     for i in 0..target.args.len():
         sig = sig ++ "arg:" ++ target.args[i] ++ "\n"
@@ -657,7 +657,7 @@ fn build_cache_tree_fingerprint(root: &str, dir: &str, w_only: bool) -> str:
     fp
 
 // What a test can read from the tree besides itself.
-fn build_cache_test_surface_text(root: &str, test_path: &str) -> str:
+fn build_cache_test_surface_text(root: &str, test_path: &str):
     let rel = build_cache_project_relative(root, test_path)
     var slash = -1
     for i in 0..rel.len():
@@ -671,7 +671,7 @@ fn build_cache_test_surface_text(root: &str, test_path: &str) -> str:
 // runs without it: 1367 of a sweep's 1695 files passed from cache (D30 R2c).
 const BUILD_CACHE_TEST_ENV_KEYS: [str; 8] = ["WITH_CODEGEN_UNITS", "WITH_DEBUG_PERMUTE_TAGS", "WITH_FILE_PREFIX_MAP", "WITH_RUNTIME_ROOT", "WITH_LINUX_SYSROOT", "WITH_WINDOWS_LIBC_DIR", "WITH_LLVM_LD", "WITH_WASM_STACK_SIZE"]
 
-fn build_cache_test_env_text() -> str:
+fn build_cache_test_env_text():
     var out = ""
     for name in BUILD_CACHE_TEST_ENV_KEYS:
         let value = build_graph_rt_getenv(name)
@@ -679,7 +679,7 @@ fn build_cache_test_env_text() -> str:
     out
 
 // `argv_shape` is the harness argv without the compiler and test paths.
-fn build_cache_test_verdict_key(root: &str, target: &BuildGraphTarget, compiler_fp: &str, argv_shape: &str, test_path: &str) -> str:
+fn build_cache_test_verdict_key(root: &str, target: &BuildGraphTarget, compiler_fp: &str, argv_shape: &str, test_path: &str):
     // The relative path is part of the key: content-identical files are
     // *almost* behavior-identical, but tests resolve siblings (c_import
     // headers) relative to their own location.
@@ -723,7 +723,7 @@ fn build_cache_write_test_verdicts(root: &str, compiler_fp: &str, target_name: &
     if build_graph_rt_write_file(tmp, text) != 0: return
     let _rename = build_graph_rt_rename_file(tmp, path)
 
-fn build_cache_project_relative_path(root: &str, path: &str) -> str:
+fn build_cache_project_relative_path(root: &str, path: &str):
     build_cache_project_relative(root, path)
 
 // One named component of a target's signature. The signature is the sha256
@@ -731,7 +731,7 @@ fn build_cache_project_relative_path(root: &str, path: &str) -> str:
 // hash, so a stale verdict can say WHICH component changed.
 type BuildCacheSigPart { name: str, text: str }
 
-fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> List[BuildCacheSigPart]:
+fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str):
     let parts: List[BuildCacheSigPart] = []
     var shape = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
     shape = shape ++ f":{target.optimize_mode}:{target.target_kind}"
@@ -778,7 +778,7 @@ fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> List[Bu
             parts.push(BuildCacheSigPart { name: "compiler", text: ":COMPILER:" ++ build_cache_fingerprint_file(compiler_path) })
     parts
 
-fn build_cache_compute_signature(target: &BuildGraphTarget, root: &str) -> str:
+fn build_cache_compute_signature(target: &BuildGraphTarget, root: &str):
     var sig = ""
     // WITH_BUILD_CACHE_TRACE=<target>: print that target's signature
     // components, for telling two drivers' views of one target apart.
@@ -789,7 +789,7 @@ fn build_cache_compute_signature(target: &BuildGraphTarget, root: &str) -> str:
     build_cache_sha256_text(sig)
 
 // `sigpart:<name>:<sha256 of the component>` lines, for the state file.
-fn build_cache_signature_part_lines(target: &BuildGraphTarget, root: &str) -> str:
+fn build_cache_signature_part_lines(target: &BuildGraphTarget, root: &str):
     var lines = ""
     for part in build_cache_signature_parts(target, root):
         lines = lines ++ "sigpart:" ++ part.name ++ ":" ++ build_cache_sha256_text(part.text) ++ "\n"
@@ -806,7 +806,7 @@ fn build_cache_changed_signature_parts(target: &BuildGraphTarget, root: &str, st
             changed = if changed.len() == 0: part.name else: changed ++ ", " ++ part.name
     if changed.len() == 0: "" else: " (" ++ changed ++ ")"
 
-fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget) -> List[str]:
+fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget):
     let paths: List[str] = []
     if target.entry.len() > 0:
         paths.push(root ++ "/" ++ target.entry)
@@ -819,7 +819,7 @@ fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget) -> Lis
 fn build_cache_output_path(root: &str, output: &str) -> str:
     if build_graph_path_is_install_dest(output): build_graph_expand_install_path(root, output) else: root ++ "/" ++ output
 
-fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget) -> List[str]:
+fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget):
     let paths: List[str] = []
     // An executable declares no output and still makes one (out/bin/<name>):
     // a missing binary must make it stale, or `with run` finds no program.
@@ -978,7 +978,7 @@ fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebui
             return "stale: output changed: " ++ build_cache_project_relative(root, path)
     "fresh"
 
-fn build_cache_check_fresh(root: &str, target: &BuildGraphTarget, dep_rebuilt: bool) -> bool:
+fn build_cache_check_fresh(root: &str, target: &BuildGraphTarget, dep_rebuilt: bool):
     build_cache_freshness_reason(root, target, dep_rebuilt) == "fresh"
 
 fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &List[str], effects: &List[str]):
@@ -1090,7 +1090,7 @@ fn build_cache_store_dir() -> str:
     if home.len() == 0: return ""
     home ++ "/.local/with-build-cache"
 
-fn build_cache_store_path_is_under_out(path: &str) -> bool:
+fn build_cache_store_path_is_under_out(path: &str):
     path.starts_with("out/") and not path.contains("/../") and not path.contains("/./") and not path.ends_with("/..")
 
 fn build_cache_store_eligible(target: &BuildGraphTarget) -> bool:
@@ -1122,13 +1122,13 @@ fn build_cache_store_tree_has_symlink(path: &str) -> bool:
 // naming a path in the tree (`llvm-prefix=<root>/.deps/...`) is the same
 // argument in every worktree. What the action makes of it is checked on
 // the outputs (build_cache_store_names_root).
-fn build_cache_store_signature(target: &BuildGraphTarget, root: &str) -> str:
+fn build_cache_store_signature(target: &BuildGraphTarget, root: &str):
     var sig = ""
     for part in build_cache_signature_parts(target, root):
         sig = sig ++ part.text
     build_cache_sha256_text(build_cache_store_portable(root, sig))
 
-fn build_cache_store_key(root: &str, target: &BuildGraphTarget) -> str:
+fn build_cache_store_key(root: &str, target: &BuildGraphTarget):
     var text = "build-store v2\nsig:" ++ build_cache_store_signature(target, root) ++ "\ndriver:" ++ build_cache_current_compiler_fingerprint() ++ "\n"
     let compiler_path = build_cache_target_compiler_path(root, target)
     if compiler_path.len() > 0:
@@ -1155,11 +1155,11 @@ fn build_cache_store_portable(root: &str, text: &str) -> str:
         rest = rest.slice(end, rest.len())
     out ++ rest
 
-fn build_cache_store_localize(root: &str, text: &str) -> str: text.replace("<root>", root)
+fn build_cache_store_localize(root: &str, text: &str): text.replace("<root>", root)
 
 // The relative output paths, as the record lists them (the capture directory
 // included: it is a declared output, and the freshness check wants it).
-fn build_cache_store_output_rel_paths(target: &BuildGraphTarget) -> List[str]:
+fn build_cache_store_output_rel_paths(target: &BuildGraphTarget):
     let rels: List[str] = []
     rels.push(with_str_clone_ref(target.output))
     for i in 0..target.extra_outputs.len():
@@ -1280,7 +1280,7 @@ fn build_cache_store_prune(dir: &str):
         names[oldest] = ""
         remaining = remaining - 1
 
-fn build_cache_parse_i64(text: &str) -> i64:
+fn build_cache_parse_i64(text: &str):
     var value: i64 = 0
     for i in 0..text.len():
         let c = text[i]
@@ -1299,7 +1299,7 @@ fn build_cache_parse_i32(text: &str, fallback: i32) -> i32:
     if seen: value else: fallback
 
 // The state record with its `effects:` line naming `hash`.
-fn build_cache_store_repin_effects(state_text: &str, hash: &str) -> str:
+fn build_cache_store_repin_effects(state_text: &str, hash: &str):
     var out = ""
     for line in state_text.split("\n"):
         if line.len() == 0: continue
@@ -1316,7 +1316,7 @@ fn build_cache_forget_restored_fingerprints(root: &str, rels: &List[str]):
                 build_cache_fp_memo.remove(file)
     build_cache_tree_fp_memo = [:]
 
-fn build_cache_store_repin_signature(state_text: &str, target: &BuildGraphTarget, root: &str) -> str:
+fn build_cache_store_repin_signature(state_text: &str, target: &BuildGraphTarget, root: &str):
     var out = ""
     var pinned = false
     for line in state_text.split("\n"):
@@ -1469,10 +1469,10 @@ fn build_cache_print_effects(root: &str, graph: &BuildGraph, target_filter: &str
 // NOT load from this cache: evaluating an action needs the live Sema the
 // real load produces. Length-prefixed strings survive arbitrary bytes.
 
-fn build_cache_graph_path(root: &str) -> str:
+fn build_cache_graph_path(root: &str):
     build_cache_state_dir(root) ++ "/build-graph.cache"
 
-fn build_cache_graph_key(root: &str, target_kind: i32, strict_effects: i32) -> str:
+fn build_cache_graph_key(root: &str, target_kind: i32, strict_effects: i32):
     build_cache_hash_build_graph_sources(root) ++ ":" ++ build_cache_current_compiler_fingerprint() ++ ":" ++ build_cache_fingerprint_file(root ++ "/with.toml") ++ f":{target_kind}:{strict_effects}:" ++ build_cache_graph_env_fingerprint(root)
 
 // The environment build(ctx) read (BuildCtx.env_input), as it is now: every
@@ -1505,10 +1505,10 @@ fn build_cache_graph_env_fingerprint(root: &str) -> str:
         reads = reads ++ fields[2] ++ "=" ++ build_cache_sha256_text(with_getenv_str(fields[2])) ++ "\n"
     build_cache_sha256_text(reads)
 
-fn bcg_put_str(out: &str, s: &str) -> str:
+fn bcg_put_str(out: &str, s: &str):
     out ++ f"s{s.len()}\n" ++ s ++ "\n"
 
-fn bcg_put_list(out: &str, items: &List[str]) -> str:
+fn bcg_put_list(out: &str, items: &List[str]):
     var acc = out ++ f"l{items.len()}\n"
     for item in items:
         acc = bcg_put_str(acc, item)

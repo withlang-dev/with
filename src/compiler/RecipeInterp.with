@@ -35,7 +35,7 @@ type PyTok { kind: i32, text: str, line: i32 }
 
 fn py_is_name_start(c: u8) -> bool: (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_'
 fn py_is_digit(c: u8) -> bool: c >= '0' and c <= '9'
-fn py_is_name_char(c: u8) -> bool: py_is_name_start(c) or py_is_digit(c)
+fn py_is_name_char(c: u8): py_is_name_start(c) or py_is_digit(c)
 
 fn py_tok(kind: i32, text: &str, line: i32): PyTok { kind, text: text.to_owned(), line }
 
@@ -1782,7 +1782,7 @@ impl PyInterp:
             return PY_NORMAL
         PY_NORMAL
 
-fn py_one(value: PyVal) -> List[PyVal]:
+fn py_one(value: PyVal):
     let out: List[PyVal] = []
     out.push(value)
     out
@@ -1974,7 +1974,7 @@ fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
     RecipeRequirements { ok: true, problem: "", notes: move ip.notes, requires: move ip.reqs, tool_requires: move ip.tool_reqs }
 
 // The recipe methods whose bodies construct a CMakeToolchain, by name.
-fn recipe_cmake_toolchain_methods(recipe: &str) -> List[str]:
+fn recipe_cmake_toolchain_methods(recipe: &str):
     let methods = []
     var current = ""
     for line in recipe.split("\n"):

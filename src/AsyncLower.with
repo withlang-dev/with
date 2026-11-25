@@ -38,25 +38,25 @@ type AsyncLower ephemeral {
     cur_body: AsyncMirBody,
 }
 
-fn async_ast_get_data0(ast: &AstPool, node: i32) -> i32:
+fn async_ast_get_data0(ast: &AstPool, node: i32):
     ast.get_data0(node)
 
-fn async_ast_get_data1(ast: &AstPool, node: i32) -> i32:
+fn async_ast_get_data1(ast: &AstPool, node: i32):
     ast.get_data1(node)
 
-fn async_ast_get_data2(ast: &AstPool, node: i32) -> i32:
+fn async_ast_get_data2(ast: &AstPool, node: i32):
     ast.get_data2(node)
 
-fn async_ast_get_end(ast: &AstPool, node: i32) -> i32:
+fn async_ast_get_end(ast: &AstPool, node: i32):
     ast.get_end(node)
 
-fn async_ast_get_start(ast: &AstPool, node: i32) -> i32:
+fn async_ast_get_start(ast: &AstPool, node: i32):
     ast.get_start(node)
 
-fn async_ast_kind(ast: &AstPool, node: i32) -> i32:
+fn async_ast_kind(ast: &AstPool, node: i32):
     ast.kind(node)
 
-fn async_body_suspend_count(body: &AsyncMirBody) -> i32:
+fn async_body_suspend_count(body: &AsyncMirBody):
     body.suspend_count()
 
 fn lower_async_module(mir_mod: &MirModule, ast: &AstPool, pool: &InternPool, sema: &Sema, diags: DiagnosticList) -> AsyncLowerResult:

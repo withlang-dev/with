@@ -36,7 +36,7 @@ fn codegen_units_env_count() -> i32:
     if n < 1: 1 else: if n > 64: 64 else: n
 
 // Partition compiler-sized inputs independently of the available workers.
-fn codegen_units_default_count(mir_body_count: i32) -> i32: codegen_units_count_for(mir_body_count)
+fn codegen_units_default_count(mir_body_count: i32): codegen_units_count_for(mir_body_count)
 
 // Emit-phase concurrency width (#681 windowing) — policy in
 // compiler.CodegenUnitsPolicy; this wrapper reads the env override and
@@ -236,7 +236,7 @@ impl CodegenUnitPipeline:
             runtime_eprint(f"error: codegen-units generated emit failed with exit code {self.rc}")
         self.rc
 
-fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> List[str]:
+fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32):
     let extras: List[str] = []
     var k: i32 = 1
     while k < unit_count:

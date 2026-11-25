@@ -13,10 +13,10 @@ enum CapabilityKind: i32:
     CK_COMPILER_DIAGNOSTICS = 9
     CK_COMPILER_SOURCE_EMITTER = 10
 
-fn capability_registry_is_std_build_path(path: &str) -> bool:
+fn capability_registry_is_std_build_path(path: &str):
     path == "<embedded-std>/std/build.with" or path == "lib/std/build.with" or path.ends_with("/lib/std/build.with")
 
-fn capability_registry_is_std_compiler_path(path: &str) -> bool:
+fn capability_registry_is_std_compiler_path(path: &str):
     path == "<embedded-std>/std/compiler.with" or path == "lib/std/compiler.with" or path.ends_with("/lib/std/compiler.with")
 
 fn capability_registry_lookup_std_build(name: &str) -> i32:
@@ -42,7 +42,7 @@ fn capability_registry_lookup(module_path: &str, type_name: &str) -> i32:
         return capability_registry_lookup_std_compiler(type_name)
     CapabilityKind.CK_NONE
 
-fn capability_registry_is_capability(kind: i32) -> bool:
+fn capability_registry_is_capability(kind: i32):
     kind != CapabilityKind.CK_NONE
 
 fn capability_registry_kind_name(kind: i32) -> str:

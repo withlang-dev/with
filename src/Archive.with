@@ -2,10 +2,10 @@
 
 use rt.rt_core
 
-fn ar_u32_le(v: i32) -> str:
+fn ar_u32_le(v: i32):
     str_from_byte(v & 0xFF) ++ str_from_byte((v >> 8) & 0xFF) ++ str_from_byte((v >> 16) & 0xFF) ++ str_from_byte((v >> 24) & 0xFF)
 
-fn ar_u32_be(v: i32) -> str:
+fn ar_u32_be(v: i32):
     str_from_byte((v >> 24) & 0xFF) ++ str_from_byte((v >> 16) & 0xFF) ++ str_from_byte((v >> 8) & 0xFF) ++ str_from_byte(v & 0xFF)
 
 fn ar_read_u16_le(data: &str, offset: i64) -> i32:
@@ -35,7 +35,7 @@ fn ar_basename(path: &str) -> str:
         return path.slice(last_sep + 1, path.len())
     with_str_clone_ref(path)
 
-fn ar_pad_right(s: &str, width: i32, pad_byte: i32) -> str:
+fn ar_pad_right(s: &str, width: i32, pad_byte: i32):
     var out = with_str_clone_ref(s)
     while out.len() < width as i64:
         out = out ++ str_from_byte(pad_byte)
@@ -55,7 +55,7 @@ fn ar_bsd_name_pad_len(name_len: i64) -> i64:
     let rem = name_len % 8
     if rem <= 4: name_len + 4 - rem else: name_len + 12 - rem
 
-fn ar_member_header(name: &str, content_size: i64) -> str:
+fn ar_member_header(name: &str, content_size: i64):
     let padded_name_len = ar_bsd_name_pad_len(name.len())
     let name_field = ar_pad_right("#1/" ++ ar_format_decimal(padded_name_len), 16, 32)
     let mtime_field = ar_pad_right("0", 12, 32)
@@ -67,7 +67,7 @@ fn ar_member_header(name: &str, content_size: i64) -> str:
     let fmag = "`\n"
     name_field ++ mtime_field ++ uid_field ++ gid_field ++ mode_field ++ size_field ++ fmag
 
-fn ar_gnu_member_header(name: &str, content_size: i64) -> str:
+fn ar_gnu_member_header(name: &str, content_size: i64):
     let name_field = ar_pad_right(name, 16, 32)
     let mtime_field = ar_pad_right("0", 12, 32)
     let uid_field = ar_pad_right("0", 6, 32)
@@ -116,7 +116,7 @@ fn ar_str_compare(a: &str, b: &str) -> i32:
         return 1
     0
 
-fn ar_sort_symbols(items: List[ArSymbol]) -> List[ArSymbol]:
+fn ar_sort_symbols(items: List[ArSymbol]):
     let result: List[ArSymbol] = []
     while items.len() > 0:
         let item = items.remove(0)
@@ -277,7 +277,7 @@ fn extract_coff_symbols(data: &str) -> List[str]:
     result
 
 // An 8-byte COFF symbol name, NUL-padded.
-fn ar_coff_short_name(data: &str, at: i64) -> str:
+fn ar_coff_short_name(data: &str, at: i64):
     var end = at
     while end < at + 8 and data[end] != 0:
         end = end + 1
@@ -347,7 +347,7 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &List[str], membe
 // on Windows a backslash is a path character and escapes only a double
 // quote; elsewhere (GNU) it escapes the next character and single quotes
 // quote too.
-fn ar_tokenize_response(text: &str, windows_quoting: bool) -> List[str]:
+fn ar_tokenize_response(text: &str, windows_quoting: bool):
     let out: List[str] = []
     var token = ""
     var started = false

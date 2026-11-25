@@ -336,7 +336,7 @@ type SemaMethodLookup {
 
 // #2520: (owner, trait_idx + 2, method) in one key; trait_idx -1 encodes
 // the inherent row, matching sema_exact_type_hash's FNV fold.
-fn sema_trait_method_key(owner: i32, trait_idx: i32, method: i32) -> i64:
+fn sema_trait_method_key(owner: i32, trait_idx: i32, method: i32):
     var h: u64 = 14695981039346656037
     h = (h ^ owner as u64) *% 1099511628211
     h = (h ^ (trait_idx + 2) as u64) *% 1099511628211
@@ -3061,7 +3061,7 @@ fn sema_tier_path_is_std_implementation(path: &str) -> bool:
     false
 
 // The last segment of a path, by either separator.
-fn sema_path_last_segment(path: &str) -> str:
+fn sema_path_last_segment(path: &str):
     var cut = -1
     var i = 0
     for b in path.bytes():
@@ -3172,7 +3172,7 @@ fn sema_path_is_std_rc_module(path: &str) -> bool:
         return true
     false
 
-fn sema_path_is_std_memo_module(path: &str) -> bool:
+fn sema_path_is_std_memo_module(path: &str):
     path == "lib/std/memo.with" or path == "<embedded-std>/std/memo.with" or path.ends_with("/lib/std/memo.with") or path.ends_with("\\lib\\std\\memo.with")
 
 impl Sema:
@@ -3380,11 +3380,11 @@ fn sema_new_map_str_i32 -> HashMap[str, i32]:
 fn sema_new_map_i64_i32 -> HashMap[i64, i32, Minted]:
     HashMap.new()
 
-fn sema_new_list_str -> List[str]:
+fn sema_new_list_str:
     let out: List[str] = []
     out
 
-fn sema_new_list_i32 -> List[i32]:
+fn sema_new_list_i32:
     let out: List[i32] = []
     out
 
@@ -3399,7 +3399,7 @@ fn sema_owned_text(text: &str) -> str:
 // the compiler's own (#685).
 fn sema_clone_str_list(values: &List[str]) -> List[str]: values
 
-fn sema_clone_i32_list(values: &List[i32]) -> List[i32]:
+fn sema_clone_i32_list(values: &List[i32]):
     let out: List[i32] = []
     for value in values:
         out.push(value)
@@ -3410,7 +3410,7 @@ fn sema_clone_i32_list(values: &List[i32]) -> List[i32]:
 // map header, leaving both maps pointing at one buffer — two owners that
 // double-free at teardown (Zcu.c_import_omitted_symbols aliased into the round's
 // Sema was exactly this bug). Mirrors sema_clone_str_vec's owned-text policy.
-fn sema_clone_str_str_hashmap(src: &HashMap[str, str]) -> HashMap[str, str]:
+fn sema_clone_str_str_hashmap(src: &HashMap[str, str]):
     let out: HashMap[str, str] = [:]
     for (k, v) in src: out.insert(sema_owned_text(k), sema_owned_text(v))
     out
@@ -3451,7 +3451,7 @@ fn sema_codegen_named_fns() -> List[str]: ["Regex.__literal_code", "Regex.__capt
 fn sema_pair_key(a: isize, b: isize) -> i64:
     (a as i64) * 4294967296 + (b as i64)
 
-fn sema_exact_type_hash(kind: i32, d0: i32, d1: isize, d2: i32) -> i64:
+fn sema_exact_type_hash(kind: i32, d0: i32, d1: isize, d2: i32):
     var h: u64 = 14695981039346656037
     h = (h ^ kind as u64) *% 1099511628211
     h = (h ^ d0 as u64) *% 1099511628211
@@ -3682,7 +3682,7 @@ fn sema_method_lookup_new -> SemaMethodLookup:
         amb_next_fn: sema_new_map_i32_i32(),
     }
 
-fn sema_visibility_cache_key(from_path: &str, to_path: &str) -> str:
+fn sema_visibility_cache_key(from_path: &str, to_path: &str):
     from_path ++ "->" ++ to_path
 
 fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
@@ -4973,7 +4973,7 @@ impl Sema:
         for i in 0..retains_count:
             self.register_retains_entry(self.ast.get_extra(ep + i))
 
-fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
+fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool):
     let s = sema_empty_state(pool, diags, ast)
     s.rebuild_decl_index()
 
@@ -7322,7 +7322,7 @@ impl Sema:
             return self.types_identical(self.get_type_d2(ar as TypeId), self.get_type_d2(br as TypeId))
         false
 
-fn sema_generic_inst_hash(base_sym: i32, args: &List[i32], arg_count: isize) -> i64:
+fn sema_generic_inst_hash(base_sym: i32, args: &List[i32], arg_count: isize):
     var h: i64 = base_sym
     for ai in 0..arg_count:
         h = (h *% 31) +% (args[ai] as i64)
@@ -11848,7 +11848,7 @@ impl Sema:
 // ── Utility functions ────────────────────────────────────────────
 
 // §18.2: the standard library's prelude module, std.builtins.
-fn sema_path_is_std_builtins(path: &str) -> bool:
+fn sema_path_is_std_builtins(path: &str):
     path == "lib/std/builtins.with" or path == "<embedded-std>/std/builtins.with" or path.ends_with("/lib/std/builtins.with")
 
 // §18.1: a module without a `module` header names itself by its file's

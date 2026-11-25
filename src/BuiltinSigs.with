@@ -21,7 +21,7 @@ type BuiltinSigRow { owner: str, method: str, params: str }
 
 fn sig(owner: str, method: str, params: str) -> BuiltinSigRow: BuiltinSigRow { owner, method, params }
 
-fn builtin_sig_table() -> List[BuiltinSigRow]:
+fn builtin_sig_table():
     let t: List[BuiltinSigRow] = []
     // str.contains, starts_with and ends_with are declared in std (#3483).
     t.push(sig("array", "split_at", "mid: i64"))

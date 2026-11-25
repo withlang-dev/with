@@ -30,10 +30,10 @@ extern fn with_clang_main(argc: i32, argv: *mut *mut u8, ctx: *const ClangToolCo
 // False when this compiler was linked against an SDK published before `with
 // cc`: the link then aliases with_clang_main to a stand-in (build/compiler.with),
 // which must never be called.
-fn with_cc_available() -> bool: embedded_clang_driver_linked()
+fn with_cc_available(): embedded_clang_driver_linked()
 
 // A NUL-terminated copy that lives for the rest of the process, as argv does.
-unsafe fn cc_c_string(s: &str) -> *mut u8:
+unsafe fn cc_c_string(s: &str):
     let out = with_alloc(s.len() + 1)
     if s.len() > 0:
         with_memcpy(out, *(s as *const str as *const *const u8), s.len())

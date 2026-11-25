@@ -121,7 +121,7 @@ fn local_source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
     if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len(), path.len()) else: with_str_clone_ref(path)
 
-fn compiler_relocation_facts(entry: &str) -> RelocationFacts:
+fn compiler_relocation_facts(entry: &str):
     let result = compiler_analyze_file(entry, "select:kind=declaration")
     let facts = RelocationFacts { paths: [], starts: [], ends: [], modes: [], matched: [] }
     for i in 0..result.report.facts.len():
@@ -422,7 +422,7 @@ fn path_excluded(path: &str, excludes: &List[str]) -> bool:
         if path == excluded or path.starts_with(excluded ++ "/"): return true
     false
 
-fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]) -> List[str]:
+fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]):
     let paths: List[str] = []
     for i in 0..facts.paths.len():
         let path = facts.paths[i]
@@ -435,7 +435,7 @@ fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]) -> Lis
         if not seen: paths.push(with_str_clone_ref(path))
     paths
 
-fn count_selected(facts: &RelocationFacts, excludes: &List[str]) -> isize:
+fn count_selected(facts: &RelocationFacts, excludes: &List[str]):
     var count = 0
     for i in 0..facts.paths.len():
         if not path_excluded(facts.paths[i], excludes): count = count + 1

@@ -2716,7 +2716,7 @@ impl Sema:
         // the 0 at whole-program cost.
         0
 
-fn sema_extension_path_hash(path: &str) -> i64:
+fn sema_extension_path_hash(path: &str):
     var h: i64 = 17
     for i in 0..path.len():
         h = (h * 131 + path[i] as i64) % 2147483647

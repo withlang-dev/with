@@ -108,7 +108,7 @@ fn build_graph_response_arg_valid(arg: &str) -> bool:
             return false
     true
 
-fn build_graph_quote_response_arg(arg: &str) -> str:
+fn build_graph_quote_response_arg(arg: &str):
     var out = "\""
     for i in 0..arg.len():
         let ch = arg[i]
@@ -145,7 +145,7 @@ fn build_graph_write_response_file(root: &str, target: &BuildGraphTarget) -> i32
         return 1
     0
 
-fn build_graph_append_common_compile_args(root: &str, target: &BuildGraphTarget, argv_blob: &str) -> str:
+fn build_graph_append_common_compile_args(root: &str, target: &BuildGraphTarget, argv_blob: &str):
     var out = with_str_clone_ref(argv_blob)
     for ii in 0..target.include_paths.len():
         out = build_graph_argv_append(out, "-I" ++ build_graph_resolve_project_path(root, target.include_paths[ii]))
@@ -235,7 +235,7 @@ fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> i32:
 
 // `text` with every relative `.incbin`/`.include` operand resolved against
 // the project root.
-fn build_graph_asm_resolve_operands(root: &str, text: &str) -> str:
+fn build_graph_asm_resolve_operands(root: &str, text: &str):
     let out = StringBuilder.new()
     var start: i64 = 0
     while start < text.len():
@@ -359,7 +359,7 @@ fn build_graph_create_archive(root: &str, target: &BuildGraphTarget) -> i32:
         return 1
     0
 
-fn build_graph_asm_quote_path(path: &str) -> str:
+fn build_graph_asm_quote_path(path: &str):
     var out = "\""
     for i in 0..path.len():
         let ch = path[i]
@@ -382,7 +382,7 @@ fn build_graph_symbol_name_valid(sym: &str) -> bool:
             return false
     true
 
-fn build_graph_emit_embedded_blob(sym: &str, input_path: &str) -> str:
+fn build_graph_emit_embedded_blob(sym: &str, input_path: &str):
     ".globl _with_embedded_" ++ sym ++ "_start\n" ++
     ".globl with_embedded_" ++ sym ++ "_start\n" ++
     ".globl _with_embedded_" ++ sym ++ "_end\n" ++
@@ -394,7 +394,7 @@ fn build_graph_emit_embedded_blob(sym: &str, input_path: &str) -> str:
     "_with_embedded_" ++ sym ++ "_end:\n" ++
     "with_embedded_" ++ sym ++ "_end:\n\n"
 
-fn build_graph_emit_empty_embedded_blob(sym: &str) -> str:
+fn build_graph_emit_empty_embedded_blob(sym: &str):
     ".globl _with_embedded_" ++ sym ++ "_start\n" ++
     ".globl with_embedded_" ++ sym ++ "_start\n" ++
     ".globl _with_embedded_" ++ sym ++ "_end\n" ++
@@ -630,7 +630,7 @@ fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32:
 // it: its timeout, its working directory (`working_dir`) and its
 // environment (`with_env`); all three were dropped (a 300 s timeout, the
 // project root, the parent's environment).
-fn build_graph_exec_target_capture(root: &str, target: &BuildGraphTarget, argv: &str, stdout_path: &str, stderr_path: &str) -> i32:
+fn build_graph_exec_target_capture(root: &str, target: &BuildGraphTarget, argv: &str, stdout_path: &str, stderr_path: &str):
     let timeout_ms = build_graph_target_timeout_ms(target)
     let saved_env = build_graph_apply_target_env(target)
     let rc = if target.cwd.len() > 0: build_graph_rt_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, build_graph_resolve_project_path(root, target.cwd)) else: build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
