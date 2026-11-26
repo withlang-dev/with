@@ -1,0 +1,26 @@
+//! expect-check-fail: pipe
+// D216 (#2425): while a `release` message's poll runs, the resource its
+// producer receives is the loop's. Another operation on it in the body is
+// refused.
+use c_import("../behavior/behav_d216_pipe.h")
+
+c contract piped:
+    resource Pipe wraps *mut pipe_t
+        from pipe_open
+        drop pipe_close
+    fn pipe_open
+        rename new
+    fn pipe_depth
+        lend
+    message Note wraps Msg
+        from pipe_next(out param 1)
+        tag tag
+        case OverlayActivated when CB_OVERLAY : Overlay
+        payload data size size
+        release pipe_free
+
+fn main:
+    var pipe = Pipe.new().unwrap()
+    for n in Note.poll(mut pipe):
+        match n:
+            _ => print(pipe.depth())

@@ -221,14 +221,24 @@ fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], it
     var passed = ""
     var raw_pointer_passed = false
     var resource_passed = false
+    let release_line = facade_render_message_line(pool, item, FacadeMessageLine.Release)
     for pi in 0..pool.fn_meta_param_count(pool.find_fn_meta(decl as NodeId)):
         if call_args.len() > 0: call_args = call_args ++ ", "
         if pi == filled:
             call_args = call_args ++ "&raw mut raw"
             continue
         let ptype = facade_render_param_type(pool, intern, decl, pi)
+        // A message with `release` takes the resource its producer
+        // receives `mut`: no other operation on it, a second poll included,
+        // runs while the loop does (D216). The C call gets its handle.
+        let resource = if release_line != 0: facade_render_resource_wrapping(pool, intern, facade_render_unalias(pool, intern, ptype)) else: ""
+        if resource.len() > 0:
+            resource_passed = true
+            params = params ++ (if params.len() > 0: ", " else: "") ++ f"mut p{pi}: " ++ resource
+            passed = passed ++ (if passed.len() > 0: ", " else: "") ++ f"p{pi}.repr"
+            call_args = call_args ++ f"p{pi}.repr"
+            continue
         if ptype.starts_with("*"): raw_pointer_passed = true
-        if facade_render_resources_wrapping(pool, intern, facade_render_unalias(pool, intern, ptype)) > 0: resource_passed = true
         params = params ++ (if params.len() > 0: ", " else: "") ++ f"p{pi}: " ++ ptype
         passed = passed ++ (if passed.len() > 0: ", " else: "") ++ f"p{pi}"
         call_args = call_args ++ f"p{pi}"
@@ -283,10 +293,9 @@ fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], it
     // `release f`: after the body returns, however it leaves (a `break`
     // included), before the next poll.
     var release = ""
-    let release_line = facade_render_message_line(pool, item, FacadeMessageLine.Release)
     if release_line != 0:
         let call = intern.resolve(pool.get_extra(pool.get_data1(release_line as NodeId))) ++ "(" ++ passed ++ ")"
-        release = "        defer: " ++ (if raw_pointer_passed: "unsafe { " ++ call ++ " }" else: call) ++ "\n"
+        release = "        defer: " ++ (if raw_pointer_passed or resource_passed: "unsafe { " ++ call ++ " }" else: call) ++ "\n"
     // A message with `release` whose producer receives no resource has
     // nothing a poll could borrow, and a poll begun inside the body of
     // another would release the payload the outer body still views. One
@@ -1102,6 +1111,17 @@ fn facade_render_detach_methods(pool: &AstPool, intern: &InternPool, ci: &List[i
     out
 
 fn facade_render_borrowed_name(name: &str): "Borrowed" ++ name
+
+// The one resource whose representation is `repr`; "" when none wraps it
+// or several do (the type then names no single resource).
+fn facade_render_resource_wrapping(pool: &AstPool, intern: &InternPool, repr: &str) -> str:
+    var found = ""
+    var n = 0
+    for item in facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE):
+        if facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(item as NodeId)) as NodeId)) != repr: continue
+        n = n + 1
+        found = with_str_clone_ref(intern.resolve(pool.get_data0(item as NodeId)))
+    if n == 1: found else: ""
 
 fn facade_render_resources_wrapping(pool: &AstPool, intern: &InternPool, repr: &str):
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)

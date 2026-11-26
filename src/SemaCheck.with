@@ -44853,6 +44853,10 @@ impl Sema:
         if pc == 0:
             return false
         let ps = self.ast.fn_meta_param_start(meta)
+        // The mode is the receiver's only when parameter 0 is the receiver:
+        // a function called on the type (`Tag.bump(mut b)`) has none, and
+        // its first parameter's `mut` is that parameter's own (D172).
+        if self.pool_resolve(self.ast.fn_param_name(ps, 0)) != "self": return false
         let pflags = self.ast.fn_param_flags(ps, 0)
         fn_param_is_mut_self(pflags) != 0
 
@@ -44877,6 +44881,7 @@ impl Sema:
         if pc == 0:
             return 0
         let ps = self.ast.fn_meta_param_start(meta)
+        if self.pool_resolve(self.ast.fn_param_name(ps, 0)) != "self": return 0
         let pflags = self.ast.fn_param_flags(ps, 0)
         fn_param_is_move_self(pflags)
 

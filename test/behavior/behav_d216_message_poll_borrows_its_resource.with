@@ -1,0 +1,33 @@
+//! expect-stdout: overlay 1
+//! expect-stdout: overlay 1
+//! expect-stdout: freed 2
+
+// D216 (#2425): a message with `release` whose producer receives a facade
+// resource polls it `mut`: the loop holds the pipe, and when it ends the
+// pipe is the program's again.
+use c_import("behav_d216_pipe.h")
+
+c contract piped:
+    resource Pipe wraps *mut pipe_t
+        from pipe_open
+        drop pipe_close
+    fn pipe_open
+        rename new
+    fn pipe_freed
+        lend
+    fn pipe_depth
+        lend
+    message Note wraps Msg
+        from pipe_next(out param 1)
+        tag tag
+        case OverlayActivated when CB_OVERLAY : Overlay
+        payload data size size
+        release pipe_free
+
+fn main:
+    var pipe = Pipe.new().unwrap()
+    for n in Note.poll(mut pipe):
+        match n:
+            .OverlayActivated(o) => print(f"overlay {o.active}")
+            _ => {}
+    print(f"freed {pipe.freed()}")
