@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D241 — Consuming same-type pointer producer (`consumes param N` + `null status CONST`) (delegated; #3121)](2026-11-26-D241-consuming-same-type-pointer-producer.md)
 - [D240 — Retained variadic case naming a pointer-wrapping facade resource `&R` (delegated; #3120)](2026-11-26-D240-retained-variadic-resource-borrow.md)
 - [D239 — A reserved word may name a record field; imported C fields keep their names (delegated; #3629)](2026-11-26-D239-reserved-word-field-names.md)
 - [D238 — Law 13: meaning belongs to the compiler; presentation belongs to the formatter (ruled; #2519)](2026-11-26-D238-law-13-meaning-and-presentation.md)

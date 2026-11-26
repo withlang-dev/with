@@ -1,0 +1,50 @@
+//! expect-stdout: len 2
+//! expect-stdout: oom 27 intact 2
+//! expect-stdout: after 3
+//! expect-stdout: live 0
+
+// #3121 (D235, spec §16.2b.4): `consumes param N` on a direct-return
+// pointer producer of the same resource with `null status CONST` presents
+// `move fn <name>(...) -> Result[R, E]`. When C returns NULL, the input
+// resource is returned intact in `FailedWithResource` in a good state so the
+// caller can keep using it and destroy it once.
+use c_import("behav_3121_consumes_same_producer.h")
+
+c contract slist_lib:
+    resource HeaderList wraps *mut slist_node
+        from slist_create
+        from slist_append
+        drop slist_free_all
+    fn slist_create
+        rename new
+        text param 0
+    fn slist_append
+        rename append
+        consumes param 0
+        text param 1
+        null status SLIST_OUT_OF_MEMORY
+    fn slist_len
+        rename len
+        lend
+    fn slist_live_count
+        lend
+
+fn run():
+    let list = HeaderList.new("Accept: */*").unwrap()
+    let list = match list.append("Host: example.com"):
+        Ok(next) => next
+        Err(HeaderListError.FailedWithResource(_, old)) => old
+    print(f"len {list.len()}")
+    let recovered = match list.append("FAIL_OOM"):
+        Ok(next) => next
+        Err(HeaderListError.FailedWithResource(status, old)) =>
+            print(f"oom {status} intact {old.len()}")
+            old
+    let final_list = match recovered.append("X-After: ok"):
+        Ok(next) => next
+        Err(HeaderListError.FailedWithResource(_, old)) => old
+    print(f"after {final_list.len()}")
+
+fn main:
+    run()
+    print(f"live {slist_live_count()}")

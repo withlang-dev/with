@@ -1,0 +1,18 @@
+//! expect-check-fail: consumes param 0
+//! expect-check-fail: null status
+
+// #3121 (D235, spec §16.2b.4): a consuming same-type pointer producer must
+// state `null status CONST`; the facade never invents a status value.
+use c_import("typedef struct slist slist;\nslist *slist_new(void);\nslist *slist_append(slist *l, const char *s);\nvoid slist_free(slist *l);\n")
+
+c contract slist_lib:
+    resource HeaderList wraps *mut slist
+        from slist_new
+        from slist_append
+        drop slist_free
+    fn slist_append
+        rename append
+        consumes param 0
+
+fn main:
+    let _ = HeaderList.new()

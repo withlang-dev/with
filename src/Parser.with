@@ -5436,10 +5436,10 @@ impl Parser:
 
     mut fn parse_facade_clause(in_resource: bool) -> i32:
         let start = self.current_start()
-        if self.peek() != TokenKind.TK_IDENT:
+        if self.peek() != TokenKind.TK_IDENT and self.peek() != TokenKind.TK_KW_NULL:
             self.emit_error("expected a facade clause (§16.2b)")
             return 0
-        let word = self.current_text()
+        let word = if self.peek() == TokenKind.TK_KW_NULL: "null" else: self.current_text()
         self.advance()
         let ops: List[i32] = []
         var kind: i32 = 0
@@ -5524,6 +5524,18 @@ impl Parser:
                 let more = self.parse_facade_status()
                 if more == 0: return 0
                 ops.push(more)
+        else if word == "null":
+            // `null status CONST` (#3121, §16.2b.4, §31.5): failure status
+            // carried by `FailedWithResource` when a consuming same-type
+            // pointer producer returns NULL.
+            if not self.current_ident_is("status"):
+                self.emit_error("'null' in a contract clause is written 'null status <CONST>' (§16.2b.4, §31.5)")
+                return 0
+            self.advance()
+            kind = FacadeStatusClause.NullStatus as i32
+            let c = self.parse_facade_status()
+            if c == 0: return 0
+            ops.push(c)
         else if word == "borrows":
             kind = FACADE_CLAUSE_BORROWS
             let r = self.parse_facade_param_ref()

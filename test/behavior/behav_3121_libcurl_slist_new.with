@@ -1,0 +1,19 @@
+//! expect-stdout: ok
+//! skip-on: windows issue #800: action/capability/net/process/fs OS-surface fails on native Windows
+
+// #3121 (D214 + D235): creating a libcurl `curl_slist` from NULL via
+// `param 0 fixed null` on the producer `curl_slist_append`.
+use c_import("curl/curl.h", link: "curl")
+
+c contract curl_slist_create:
+    resource HeaderList wraps *mut curl_slist
+        from curl_slist_append
+        drop curl_slist_free_all
+    fn curl_slist_append
+        rename new
+        param 0 fixed null
+        text param 1
+
+fn main:
+    let _headers = HeaderList.new("Accept: */*").unwrap()
+    print("ok")

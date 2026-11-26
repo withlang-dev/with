@@ -140,7 +140,9 @@ production      = "from" c_name [ "(" "out" param_ref ")" ] [ "," ( field_check 
                 | "preinit" c_name [ "(" "self" ")" ]
 field_check     = ( "nullable" | "nonnull" ) "field" field_path
 destruction     = ( "drop" | "destroys" | "abandon" ) c_name [ "(" param_ref ")" ]
-status          = "ok" status_value { "," status_value } | "message" c_name
+status          = "ok" status_value { "," status_value }
+                | "null" "status" status_value
+                | "message" c_name
 status_value    = CONST | [ "-" ] INT
 dependency      = "borrows" param_ref | "independent"
 capability      = "movable" | "thread" thread_cap { thread_cap }
@@ -521,6 +523,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `ends domain D` | after the call, `D` is not established. | R | | §16.2b.7 |
 | `requires domain D` | the operation needs `D` established. | R | | §16.2b.7 |
 | `ok C` | this operation's status convention. | G | none | §16.2b.4 |
+| `null status C` | status carried in `FailedWithResource` when a consuming same-type pointer producer returns `NULL` (returning the input resource intact in a good state). Required with `consumes param N` on such a producer; the facade never invents a status. | G | none | §16.2b.4 |
 | `valid on failed` | the operation may be called on a resource whose production failed. | G | an operation needs a produced resource | §16.2b.4 |
 | `of R` | the operation is presented on resource `R`. Required when its resource parameter's representation is wrapped by more than one resource. | P | the one resource that wraps the representation | §16.2b.3 |
 | `rename n` | the With name of the operation. | P | the convention's shortening of the C name | §16.2b.11 |

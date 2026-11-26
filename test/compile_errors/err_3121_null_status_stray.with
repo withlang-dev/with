@@ -1,0 +1,16 @@
+//! expect-check-fail: 'null status' applies only to a direct-return pointer producer
+
+// #3121 (spec §16.2b.4): `null status` is rejected on an operation that is
+// not a consuming same-type pointer producer.
+use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nint h_ping(h *x);\n#define H_ERR 1\n")
+
+c contract hlib:
+    resource Handle wraps *mut h
+        from h_new
+        drop h_free
+    fn h_ping
+        lend
+        null status H_ERR
+
+fn main:
+    let _ = Handle.new()
