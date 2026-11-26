@@ -1,0 +1,49 @@
+//! expect-stdout: 55 3 7 1 2 9 4 6 8 5 11
+//! expect-stdout: walk 0 1
+//! expect-stdout: kept
+
+// #3132 (§29.11, D235): ten words are keywords only where their construct
+// can begin (`gen fn`, `where T:`, `dyn Trait`, `type T union`, `module m`,
+// `global g`, `extend T`, `use c_import(`), and names everywhere else: a
+// binding, a field, a parameter, a method. `spawn` has no construct.
+type Words { gen: i32, where: i32, dyn: i32, opaque: i32, union: i32, ephemeral: i32, module: i32, global: i32, extend: i32, c_import: i32, spawn: i32 }
+
+type Bag { items: List[i32] }
+
+impl Bag:
+    mut fn extend(more: &List[i32]):
+        for m in more: self.items.push(m)
+    fn union(other: &Bag) -> i32: self.items.len() as i32 + other.items.len() as i32
+
+trait Named:
+    fn name(self: &Self) -> str
+
+type Kept { n: i32 }
+impl Named for Kept:
+    fn name() -> str: "kept"
+
+gen fn walk(n: i32) -> i32:
+    var gen = 0
+    while gen < n:
+        yield gen
+        gen = gen + 1
+
+fn total[T](where: &List[T]) -> i32 where T: Copy: where.len() as i32
+
+fn show(dyn: &dyn Named) -> str: dyn.name()
+
+global counted: i32 = 11
+
+fn main:
+    let w = Words { gen: 55, where: 3, dyn: 7, opaque: 1, union: 2, ephemeral: 9, module: 4, global: 6, extend: 8, c_import: 5, spawn: counted }
+    let module = w.module
+    let global = w.global
+    let spawn = w.spawn
+    print(f"{w.gen} {w.where} {w.dyn} {w.opaque} {w.union} {w.ephemeral} {module} {global} {w.extend} {w.c_import} {spawn}")
+    var bag = Bag { items: [1] }
+    bag.extend([2, 3])
+    let opaque = bag.union(bag)
+    var seen = "walk"
+    for x in walk(total([opaque, 1])): seen = seen ++ f" {x}"
+    print(seen)
+    print(show(Kept { n: 1 }))
