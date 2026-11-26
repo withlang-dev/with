@@ -7,7 +7,7 @@ small mistakes corrupt the stage chain, so strict discipline is required.
 
 ## Mission
 
-(Summary; canonical: `docs/mission.md`.)
+(Summary only; the 12 Laws and their tests live in `docs/mission.md`. Never write a Mission fit section from this summary.)
 
 With is an ergonomics-first systems language: close to the machine, native by
 default, exactly as safe as Rust, built to remove the suffering. Every
@@ -40,7 +40,7 @@ read the annex file for the situation you are in **before** you act in it.
 | call something done, or change a check, test or example | `docs/agents/conduct.md` |
 | touch `rt/`, `lib/std`, C interop, a text transform or a script | `docs/agents/runtime-and-toolchain.md` |
 | build, run a battery, reseed, release, or use another host | `docs/agents/build-seed-release.md` |
-| change the spec, bring a decision, or file a bug | `docs/agents/spec-and-decisions.md` |
+| change the spec, bring a decision, or file a bug | `docs/mission.md` and `docs/agents/spec-and-decisions.md` |
 | edit, commit, stack, or work as an agent in a worktree | `docs/agents/workflow.md` |
 
 ## The test before any brief
@@ -52,9 +52,11 @@ work and say so in one line.
 
 A question stops for Eric only when it changes what safe code may do,
 touches a contract program (UAT fixture, example, published code), or needs
-normative spec words. It arrives as a finished brief (what the others do,
-what the spec says, mission fit, one committed prediction) while other work
-continues. A question that is not C interop, ownership or safety, is easy
+normative spec words. Before writing a brief, read `docs/mission.md`. It
+arrives as a finished brief (what the others do, what the spec says, mission
+fit citing the governing Law(s) by number and answering each Law's *Test*
+question verbatim, and one committed prediction) while other work continues.
+A brief without cited Law numbers and *Test* answers is incomplete. A question that is not C interop, ownership or safety, is easy
 to reverse, and has a prediction of 75% or higher is delegated (D98):
 implement it, spec words included, and record it in the decision log as
 delegated. That is the one case in which an agent lands normative words;

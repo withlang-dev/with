@@ -27,8 +27,11 @@ all four in one brief, then wait for the ruling:
    mojo, rust, swift, Vale, zig, plus any that fit), verified in their trees.
 2. **What the spec currently says.** Quote it. Check whether the spec already
    rules the question and whether the proposal duplicates an existing rule.
-3. **Mission fit.** Relate the choice to `docs/mission.md` and
-   `docs/meetings/README.md`; say which option is most with-y.
+3. **Mission fit.** Read `docs/mission.md` first (not the `CLAUDE.md` summary).
+   Cite the governing Law(s) by number (Laws 1–12), quote each Law's *Test*
+   question verbatim, and answer it for each option; cross-check
+   `docs/meetings/README.md` and say which option is most with-y. A brief
+   without cited Law numbers and *Test* answers is incomplete.
 4. **Predict what Eric would say.** A committed BDFL prediction with
    confidence, derived from his decision record — falsifiable, not a menu.
 
