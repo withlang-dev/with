@@ -103,18 +103,19 @@ fn Lexer.init(source: &str, file_id: i32) -> Lexer:
 //   where, dyn, extend   before a name
 //   global     before a name or `var`
 //   module     at the start of a line, before a name
-//   opaque, union, ephemeral   after a type's name or its `]`
+//   opaque, union, ephemeral   in a `type` or `enum` declaration's line,
+//                              after the type's name, its `]` or its `=`
 //   c_import   between `use` and `(`
 // Two names side by side are never an expression, so no program that used
 // the word as a keyword reads differently. `spawn` has no construct and is a
 // name. The parser sees a keyword token only where the word is one.
-fn lexer_word_is_keyword_here(tag: i32, prev: i32, next: i32) -> bool:
+fn lexer_word_is_keyword_here(tag: i32, prev: i32, next: i32, in_type_decl: bool) -> bool:
     let before_name = next == TokenKind.TK_IDENT
     if tag == TokenKind.TK_KW_GEN: return next == TokenKind.TK_KW_FN
     if tag == TokenKind.TK_KW_WHERE or tag == TokenKind.TK_KW_DYN or tag == TokenKind.TK_KW_EXTEND: return before_name
     if tag == TokenKind.TK_KW_GLOBAL: return before_name or next == TokenKind.TK_KW_VAR
     if tag == TokenKind.TK_KW_MODULE: return before_name and (prev == TokenKind.TK_EOF or prev == TokenKind.TK_NEWLINE or prev == TokenKind.TK_COMMENT)
-    if tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_EPHEMERAL: return prev == TokenKind.TK_IDENT or prev == TokenKind.TK_R_BRACKET
+    if tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_EPHEMERAL: return in_type_decl and (prev == TokenKind.TK_IDENT or prev == TokenKind.TK_R_BRACKET or prev == TokenKind.TK_EQ)
     if tag == TokenKind.TK_KW_C_IMPORT: return prev == TokenKind.TK_KW_USE and next == TokenKind.TK_L_PAREN
     tag != TokenKind.TK_KW_SPAWN
 
@@ -124,9 +125,13 @@ fn lexer_contextual_words(mut tokens: TokenList):
     var prev = TokenKind.TK_EOF
     var held = TokenKind.TK_EOF
     var holding = false
+    // Whether `type` or `enum` was seen on the line being walked.
+    var in_type_decl = false
     for next in tokens.tags:
         if holding:
-            decided.push(if lexer_word_is_keyword_here(held, prev, next): held else: TokenKind.TK_IDENT)
+            decided.push(if lexer_word_is_keyword_here(held, prev, next, in_type_decl): held else: TokenKind.TK_IDENT)
+            if held == TokenKind.TK_KW_TYPE or held == TokenKind.TK_KW_ENUM: in_type_decl = true
+            if held == TokenKind.TK_NEWLINE: in_type_decl = false
             prev = held
         held = next
         holding = true
