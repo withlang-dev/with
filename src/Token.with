@@ -51,7 +51,7 @@ enum TokenKind: i32:
     TK_KW_PUB = 37
     TK_KW_ASYNC = 38
     TK_KW_AWAIT = 39
-    TK_KW_SPAWN = 40
+    // 40 was `spawn`, which had no construct (§29.11, D235).
     TK_KW_UNSAFE = 41
     TK_KW_COMPTIME = 42
     TK_KW_GEN = 43
@@ -185,22 +185,15 @@ fn tag_from_keyword(s: &str) -> i32:
     if s == "type": return TokenKind.TK_KW_TYPE
     if s == "trait": return TokenKind.TK_KW_TRAIT
     if s == "impl": return TokenKind.TK_KW_IMPL
-    if s == "extend": return TokenKind.TK_KW_EXTEND
-    if s == "dyn": return TokenKind.TK_KW_DYN
     if s == "use": return TokenKind.TK_KW_USE
-    if s == "module": return TokenKind.TK_KW_MODULE
     if s == "pub": return TokenKind.TK_KW_PUB
     if s == "async": return TokenKind.TK_KW_ASYNC
     if s == "await": return TokenKind.TK_KW_AWAIT
-    if s == "spawn": return TokenKind.TK_KW_SPAWN
     if s == "unsafe": return TokenKind.TK_KW_UNSAFE
     if s == "comptime": return TokenKind.TK_KW_COMPTIME
-    if s == "gen": return TokenKind.TK_KW_GEN
     if s == "yield": return TokenKind.TK_KW_YIELD
     if s == "defer": return TokenKind.TK_KW_DEFER
     if s == "extern": return TokenKind.TK_KW_EXTERN
-    if s == "c_import": return TokenKind.TK_KW_C_IMPORT
-    if s == "ephemeral": return TokenKind.TK_KW_EPHEMERAL
     if s == "select": return TokenKind.TK_KW_SELECT
     if s == "true": return TokenKind.TK_TRUE
     if s == "false": return TokenKind.TK_FALSE
@@ -211,17 +204,29 @@ fn tag_from_keyword(s: &str) -> i32:
     if s == "it": return TokenKind.TK_KW_IT
     if s == "errdefer": return TokenKind.TK_KW_ERRDEFER
     if s == "move": return TokenKind.TK_KW_MOVE
-    if s == "where": return TokenKind.TK_KW_WHERE
-    if s == "opaque": return TokenKind.TK_KW_OPAQUE
     if s == "null": return TokenKind.TK_KW_NULL
-    if s == "union": return TokenKind.TK_KW_UNION
     if s == "enum": return TokenKind.TK_KW_ENUM
     if s == "asm": return TokenKind.TK_KW_ASM
     if s == "goto": return TokenKind.TK_KW_GOTO
-    if s == "global": return TokenKind.TK_KW_GLOBAL
     if s == "copy": return TokenKind.TK_KW_COPY
     if s == "do": return TokenKind.TK_KW_DO
     if s == "no_suspend": return TokenKind.TK_KW_NO_SUSPEND
+    contextual_keyword(s)
+
+// §29.11: the words that are keywords only where their construct can begin.
+// The lexer gives each its keyword token and then keeps it only there
+// (lexer_contextual_words); everywhere else the word is an identifier.
+fn contextual_keyword(word: &str) -> i32:
+    if word == "extend": return TokenKind.TK_KW_EXTEND
+    if word == "dyn": return TokenKind.TK_KW_DYN
+    if word == "module": return TokenKind.TK_KW_MODULE
+    if word == "gen": return TokenKind.TK_KW_GEN
+    if word == "c_import": return TokenKind.TK_KW_C_IMPORT
+    if word == "ephemeral": return TokenKind.TK_KW_EPHEMERAL
+    if word == "where": return TokenKind.TK_KW_WHERE
+    if word == "opaque": return TokenKind.TK_KW_OPAQUE
+    if word == "union": return TokenKind.TK_KW_UNION
+    if word == "global": return TokenKind.TK_KW_GLOBAL
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
@@ -266,7 +271,6 @@ fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_KW_PUB: return "'pub'"
     if tag == TokenKind.TK_KW_ASYNC: return "'async'"
     if tag == TokenKind.TK_KW_AWAIT: return "'await'"
-    if tag == TokenKind.TK_KW_SPAWN: return "'spawn'"
     if tag == TokenKind.TK_KW_UNSAFE: return "'unsafe'"
     if tag == TokenKind.TK_KW_COMPTIME: return "'comptime'"
     if tag == TokenKind.TK_KW_GEN: return "'gen'"

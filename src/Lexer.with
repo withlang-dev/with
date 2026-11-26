@@ -107,8 +107,8 @@ fn Lexer.init(source: &str, file_id: i32) -> Lexer:
 //                              after the type's name, its `]` or its `=`
 //   c_import   between `use` and `(`
 // Two names side by side are never an expression, so no program that used
-// the word as a keyword reads differently. `spawn` has no construct and is a
-// name. The parser sees a keyword token only where the word is one.
+// the word as a keyword reads differently. The parser sees a keyword token
+// only where the word is one.
 fn lexer_word_is_keyword_here(tag: i32, prev: i32, next: i32, in_type_decl: bool) -> bool:
     let before_name = next == TokenKind.TK_IDENT
     if tag == TokenKind.TK_KW_GEN: return next == TokenKind.TK_KW_FN
@@ -117,7 +117,7 @@ fn lexer_word_is_keyword_here(tag: i32, prev: i32, next: i32, in_type_decl: bool
     if tag == TokenKind.TK_KW_MODULE: return before_name and (prev == TokenKind.TK_EOF or prev == TokenKind.TK_NEWLINE or prev == TokenKind.TK_COMMENT)
     if tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_EPHEMERAL: return in_type_decl and (prev == TokenKind.TK_IDENT or prev == TokenKind.TK_R_BRACKET or prev == TokenKind.TK_EQ)
     if tag == TokenKind.TK_KW_C_IMPORT: return prev == TokenKind.TK_KW_USE and next == TokenKind.TK_L_PAREN
-    tag != TokenKind.TK_KW_SPAWN
+    true
 
 // One walk, each word judged when the token after it is seen.
 fn lexer_contextual_words(mut tokens: TokenList):

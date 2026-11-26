@@ -183,6 +183,14 @@ trait     true      type      unsafe    use       var
 while     with      yield
 ```
 
+Ten more words are **contextual**: each is a keyword only where its
+construct can begin, and an ordinary identifier everywhere else:
+
+```
+c_import  dyn       ephemeral extend    gen
+global    module    opaque    union     where
+```
+
 Notes:
 
 - `then` is not a reserved keyword and is not an `if` body
@@ -194,10 +202,8 @@ Notes:
 - `error` is **contextual**: before a name it opens an error
   declaration (§10.8) or states a facade's error type (§16.2b.4),
   and it remains usable as an ordinary identifier elsewhere.
-- Ten words are **contextual**: each is a keyword only where its
-  construct can begin, and an ordinary identifier everywhere else.
-  Two names side by side are never an expression, so the position
-  decides:
+- The ten contextual declaration words: two names side by side are
+  never an expression, so the position decides:
   - `gen` before `fn`;
   - `where`, `dyn` and `extend` before a name;
   - `global` before a name or `var`;
