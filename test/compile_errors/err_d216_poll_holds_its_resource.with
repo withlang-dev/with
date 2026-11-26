@@ -1,4 +1,4 @@
-//! expect-check-fail: pipe
+//! expect-check-fail: cannot read `pipe` while `Note.poll(…)` holds it `mut`
 // D216 (#2425): while a `release` message's poll runs, the resource its
 // producer receives is the loop's. Another operation on it in the body is
 // refused.
