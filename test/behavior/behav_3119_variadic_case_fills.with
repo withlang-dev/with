@@ -27,7 +27,6 @@ c contract probes:
             case INFO_SPAN: fills span_t
             case INFO_MISSING: fills c_long
     fn limit_get
-        rename limit
         ok PROBE_OK
         variadic param 1 selected by param info:
             case INFO_CODE: fills c_long
@@ -41,5 +40,5 @@ fn main:
     match p.getinfo(INFO_MISSING):
         Ok(v) => print(f"unexpected {v}")
         Err(GetinfoError.Failed(status)) => print(f"missing {status}")
-    print(f"limit {limit(INFO_CODE).unwrap()}")
+    print(f"limit {limit_get(INFO_CODE).unwrap()}")
     print(f"asked {p.asked()}")

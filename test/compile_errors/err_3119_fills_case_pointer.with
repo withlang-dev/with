@@ -4,7 +4,6 @@ use c_import("../behavior/behav_3119_variadic_case_fills.h")
 
 c contract probes:
     fn limit_get
-        rename limit
         ok PROBE_OK
         variadic param 1 selected by param info:
             case INFO_CODE: fills *const c_char

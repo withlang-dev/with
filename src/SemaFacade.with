@@ -4222,6 +4222,9 @@ impl Sema:
         // `ok` contract or `nullable param N` (D102, §16.2b.8).
         if hosted or self.foreign_contracts[ci].bridged == 0:
             return
+        // A variadic contract is rendered one function per case, and its own
+        // check names a case that was not (verify_facade_variadics).
+        if self.foreign_contracts[ci].variadic_node != 0: return
         // A free operation passed every check: its rendering must exist, or
         // the presented call would silently be the raw one.
         let rendered_name = if self.foreign_contracts[ci].rename != 0: presented_name else: facade_render_bridge_name(fname)

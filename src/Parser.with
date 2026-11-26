@@ -5937,7 +5937,8 @@ impl Parser:
                     self.advance()
                 // `case K: fills T` (D235, §16.2b.5): the argument is a pointer
                 // to one `T` the callee writes; the case presents the value.
-                let fills = callback_ref == 0 and self.current_ident_is("fills") and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_IDENT
+                let after_fills = self.tokens.get_tag(self.pos + 1)
+                let fills = callback_ref == 0 and self.current_ident_is("fills") and after_fills != TokenKind.TK_NEWLINE and after_fills != TokenKind.TK_EOF and after_fills != TokenKind.TK_COMMENT
                 if fills: self.advance()
                 let ty = self.parse_type_expr()
                 if ty == 0: return 0
