@@ -1,0 +1,34 @@
+//! expect-stdout: 1
+//! expect-stdout: 1
+//! expect-stdout: a
+//! expect-stdout: b
+//! expect-stdout: 4
+
+// A generator that takes a value `mut` and yields views of it: the loop
+// body reads through what it was handed. #3627 made the generator's hold
+// exclusive and refused these reads too ("already mutably borrowed").
+type Bag { items: List[str], taken: i32 }
+
+impl Bag:
+    gen mut fn drain_views() -> &str:
+        for s in self.items:
+            self.taken = self.taken + 1
+            yield s
+
+enum Tok ephemeral:
+    Word(&str)
+    End
+
+gen fn toks(mut b: Bag) -> Tok:
+    for s in b.items:
+        b.taken = b.taken + 1
+        yield Tok.Word(s)
+
+fn main:
+    var b = Bag { items: ["a", "b"], taken: 0 }
+    for s in b.drain_views(): print(s.len())
+    for t in toks(mut b):
+        match t:
+            .Word(w) => print(w)
+            _ => {}
+    print(b.taken)
