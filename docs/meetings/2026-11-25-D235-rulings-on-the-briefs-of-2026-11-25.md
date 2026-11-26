@@ -104,6 +104,8 @@ Option 3 rejected: the result would depend on whether Perl happens to be install
 
 **Fold only a plain one-expression body, only when the folded line fits `with fmt`'s existing width (no new number), on by default.** The rule is symmetric: a folded line that no longer fits is unfolded, so the output does not depend on history. A body that carries a comment is not folded. Label removed; this is mine.
 
+*(Amended 2026-11-26 by D238 / Law 13: `with fmt` had no prior width; line width is strictly a configurable `with fmt` concern — default 100 columns, `--max-width N` / `[fmt] max_width` in `with.toml`, CLI overriding `with.toml` — never enforced by the compiler.)*
+
 ## #2458
 
 **Port `mssql-tds`, module by module; start the value types (`std.decimal`, `std.time`, `std.guid`) now.** TDS runs its TLS handshake inside its own packets, so the security and connection modules depend on #3134's answer (a migrated TLS engine); message, token and datatype modules do not. Entra ID waits until SQL login works. Label removed.

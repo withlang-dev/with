@@ -414,13 +414,23 @@ Semicolons inside `[…]` retain their existing meaning (array fill
 and for-comprehension monadic chaining) and are not affected by
 this rule.
 
-**Style guidance:** Hand-written code typically uses colon form.
-Generated code (code generators, derive macros, comptime expansions)
+**Style and presentation (Law 13):** All three body forms and any line
+width are semantically equivalent to the compiler, which enforces no
+style or line-length rules. Hand-written code typically uses colon form;
+generated code (code generators, derive macros, comptime expansions)
 should use brace form to avoid indentation-sensitivity issues.
 
-**Formatter behavior:**
+**`with fmt` (presentation only; Law 13):**
 
-- `with fmt` (default): preserves the author's chosen form.
+- `with fmt` (default): preserves the author's chosen block delimiter
+  form (colon or brace). Line width is not enforced by the compiler.
+  `with fmt` defaults to 100 columns and is configurable. A block body
+  holding a single plain expression with no comments is folded onto the
+  header line when the folded line fits within the configured width, and
+  an inline single-expression body that exceeds the configured width is
+  unfolded into a multi-line body. The width is configured with
+  `--max-width N` or `max_width` under `[fmt]` in `with.toml` (CLI
+  overrides `with.toml`).
 - `with fmt --prefer-brace`: converts inline colon to inline brace.
   `fn f: expr` becomes `fn f { expr }`. Multi-line colon becomes
   multi-line brace. Lossless.

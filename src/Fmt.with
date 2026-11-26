@@ -219,7 +219,7 @@ fn flatten_nested_arrays_once(source: &str) -> str:
         return source.slice(0, tokens.get_start(i)) ++ flat ++ source.slice(tokens.get_end(outer_close), source.len())
     source
 
-fn format_source_styled(input: &str, style: i32):
+fn format_source_styled_tokens(input: &str, style: i32):
     let source = flatten_nested_arrays(input)
     let lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
@@ -440,8 +440,225 @@ fn format_source_styled(input: &str, style: i32):
         out = out ++ "\n"
     out
 
+fn fmt_line_columns(s: &str) -> i32:
+    var cols: i32 = 0
+    for b in s.bytes():
+        if (b & 0xC0) != 0x80: cols = cols + 1
+    cols
+
+fn fmt_is_fold_header_kw(tag: i32) -> bool:
+    tag == TokenKind.TK_KW_FN or tag == TokenKind.TK_KW_IF or tag == TokenKind.TK_KW_ELSE or tag == TokenKind.TK_KW_WHILE or tag == TokenKind.TK_KW_FOR or tag == TokenKind.TK_KW_LOOP or tag == TokenKind.TK_KW_DEFER or tag == TokenKind.TK_KW_ERRDEFER
+
+fn fmt_is_non_fold_header_kw(tag: i32) -> bool:
+    tag == TokenKind.TK_KW_TYPE or tag == TokenKind.TK_KW_ENUM or tag == TokenKind.TK_KW_TRAIT or tag == TokenKind.TK_KW_IMPL or tag == TokenKind.TK_KW_EXTEND or tag == TokenKind.TK_KW_MATCH or tag == TokenKind.TK_KW_WITH
+
+fn fmt_is_plain_expr_forbidden_first(tag: i32) -> bool:
+    if tag == TokenKind.TK_KW_LET or tag == TokenKind.TK_KW_VAR or tag == TokenKind.TK_KW_CONST: return true
+    if tag == TokenKind.TK_KW_TYPE or tag == TokenKind.TK_KW_ENUM or tag == TokenKind.TK_KW_TRAIT: return true
+    if tag == TokenKind.TK_KW_IMPL or tag == TokenKind.TK_KW_EXTEND or tag == TokenKind.TK_KW_USE: return true
+    if tag == TokenKind.TK_KW_FN or tag == TokenKind.TK_KW_PUB or tag == TokenKind.TK_KW_EXTERN: return true
+    if tag == TokenKind.TK_KW_IF or tag == TokenKind.TK_KW_ELSE or tag == TokenKind.TK_KW_MATCH: return true
+    if tag == TokenKind.TK_KW_WHILE or tag == TokenKind.TK_KW_FOR or tag == TokenKind.TK_KW_LOOP: return true
+    if tag == TokenKind.TK_KW_WITH or tag == TokenKind.TK_KW_DEFER or tag == TokenKind.TK_KW_ERRDEFER: return true
+    if tag == TokenKind.TK_KW_UNSAFE or tag == TokenKind.TK_KW_RETURN or tag == TokenKind.TK_KW_BREAK: return true
+    if tag == TokenKind.TK_KW_CONTINUE or tag == TokenKind.TK_KW_GOTO or tag == TokenKind.TK_KW_YIELD: return true
+    tag == TokenKind.TK_KW_COMPTIME or tag == TokenKind.TK_KW_GLOBAL or tag == TokenKind.TK_KW_MODULE
+
+fn fmt_tokens_are_plain_expr(tokens: &TokenList, a: i32, b: i32) -> bool:
+    if a >= b: return false
+    if fmt_is_plain_expr_forbidden_first(tokens.get_tag(a)): return false
+    var group_depth = 0
+    var brace_depth = 0
+    var j = a
+    while j < b:
+        let t = tokens.get_tag(j)
+        if t == TokenKind.TK_COMMENT: return false
+        if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACKET:
+            group_depth = group_depth + 1
+        else if t == TokenKind.TK_R_PAREN or t == TokenKind.TK_R_BRACKET:
+            group_depth = group_depth - 1
+            if group_depth < 0: return false
+        else if t == TokenKind.TK_L_BRACE:
+            brace_depth = brace_depth + 1
+        else if t == TokenKind.TK_R_BRACE:
+            brace_depth = brace_depth - 1
+            if brace_depth < 0: return false
+        else if group_depth == 0 and brace_depth == 0:
+            if t == TokenKind.TK_SEMICOLON or t == TokenKind.TK_COLON or t == TokenKind.TK_FAT_ARROW: return false
+            if t == TokenKind.TK_KW_IF or t == TokenKind.TK_KW_ELSE or t == TokenKind.TK_KW_MATCH: return false
+            if t == TokenKind.TK_KW_WHILE or t == TokenKind.TK_KW_FOR or t == TokenKind.TK_KW_LOOP: return false
+            if t == TokenKind.TK_KW_WITH or t == TokenKind.TK_KW_UNSAFE or t == TokenKind.TK_KW_FN: return false
+            if t == TokenKind.TK_KW_DEFER or t == TokenKind.TK_KW_ERRDEFER: return false
+        j = j + 1
+    group_depth == 0 and brace_depth == 0
+
+fn fmt_range_has_comment(tokens: &TokenList, a: i32, b: i32) -> bool:
+    var j = a
+    while j < b:
+        if tokens.get_tag(j) == TokenKind.TK_COMMENT: return true
+        j = j + 1
+    false
+
+fn fmt_has_later_top_colon(tokens: &TokenList, from: i32, b: i32) -> bool:
+    var group_depth = 0
+    var brace_depth = 0
+    var j = from
+    while j < b:
+        let t = tokens.get_tag(j)
+        if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACKET: group_depth = group_depth + 1
+        else if t == TokenKind.TK_R_PAREN or t == TokenKind.TK_R_BRACKET:
+            group_depth = group_depth - 1
+            if group_depth < 0: return false
+        else if t == TokenKind.TK_L_BRACE: brace_depth = brace_depth + 1
+        else if t == TokenKind.TK_R_BRACE:
+            brace_depth = brace_depth - 1
+            if brace_depth < 0: return false
+        else if group_depth == 0 and brace_depth == 0 and t == TokenKind.TK_COLON:
+            return true
+        j = j + 1
+    false
+
+// Token index of the block-introducing `:` on a single-line foldable header,
+// or -1 when the line is not one (e.g. `unsafe:`, `type`, `match`, `impl`).
+fn fmt_header_body_colon(tokens: &TokenList, a: i32, b: i32) -> i32:
+    if a >= b: return -1
+    let first = tokens.get_tag(a)
+    if fmt_is_non_fold_header_kw(first): return -1
+    if first == TokenKind.TK_KW_PUB and a + 1 < b and fmt_is_non_fold_header_kw(tokens.get_tag(a + 1)): return -1
+    var group_depth = 0
+    var brace_depth = 0
+    var has_header = false
+    var has_fn = false
+    var has_unsafe = false
+    var in_where = false
+    var j = a
+    while j < b:
+        let t = tokens.get_tag(j)
+        if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACKET:
+            group_depth = group_depth + 1
+        else if t == TokenKind.TK_R_PAREN or t == TokenKind.TK_R_BRACKET:
+            group_depth = group_depth - 1
+            if group_depth < 0: return -1
+        else if t == TokenKind.TK_L_BRACE:
+            brace_depth = brace_depth + 1
+        else if t == TokenKind.TK_R_BRACE:
+            brace_depth = brace_depth - 1
+            if brace_depth < 0: return -1
+        else if group_depth == 0 and brace_depth == 0:
+            if t == TokenKind.TK_KW_FN:
+                has_fn = true
+                has_header = true
+            else if t == TokenKind.TK_KW_UNSAFE:
+                has_unsafe = true
+            else if fmt_is_fold_header_kw(t):
+                has_header = true
+            else if fmt_is_non_fold_header_kw(t):
+                return -1
+            else if t == TokenKind.TK_KW_WHERE:
+                in_where = true
+            else if t == TokenKind.TK_COLON:
+                if in_where and fmt_has_later_top_colon(tokens, j + 1, b):
+                    j = j + 1
+                    continue
+                if has_unsafe and not has_fn: return -1
+                if has_header: return j
+                return -1
+        j = j + 1
+    -1
+
+type FmtLine {
+    start_tok: i32,
+    end_tok: i32,
+    byte_start: isize,
+    text: str,
+    indent: i32,
+}
+
+// §29.13 (#2519): symmetric folding of comment-free single-expression bodies
+// against `max_width` (strictly a `with fmt` layout concern, never enforced
+// by the compiler).
+fn fmt_apply_single_expr_width(source: &str, max_width: i32) -> str:
+    if source.len() == 0 or max_width <= 0: return with_str_clone_ref(source)
+    let lexer = Lexer.init(source, 0)
+    let tokens = lexer.tokenize_with_comments()
+    let count = tokens.len()
+    let lines = []
+    var tok: i32 = 0
+    var byte_pos: isize = 0
+    while byte_pos < source.len():
+        var nl = byte_pos
+        while nl < source.len() and source[nl] != 10:
+            nl = nl + 1
+        let line_text = source.slice(byte_pos, nl)
+        while tok < count and tokens.get_tag(tok) == TokenKind.TK_NEWLINE and tokens.get_start(tok) < byte_pos:
+            tok = tok + 1
+        let start_tok = tok
+        while tok < count and tokens.get_tag(tok) != TokenKind.TK_EOF and tokens.get_tag(tok) != TokenKind.TK_NEWLINE and tokens.get_start(tok) < nl:
+            tok = tok + 1
+        let end_tok = tok
+        if tok < count and tokens.get_tag(tok) == TokenKind.TK_NEWLINE:
+            tok = tok + 1
+        let indent = if end_tok > start_tok: column_of(source, tokens.get_start(start_tok)) else: 0
+        lines.push(FmtLine { start_tok, end_tok, byte_start: byte_pos, text: line_text, indent })
+        byte_pos = if nl < source.len(): nl + 1 else: source.len()
+
+    let out_lines = []
+    var li: isize = 0
+    while li < lines.len():
+        let line = lines[li]
+        // Unfold an over-width inline single-expression body (preserving any
+        // trailing comment on the body line so a second run stays idempotent).
+        if line.end_tok > line.start_tok and fmt_line_columns(line.text) > max_width:
+            let colon = fmt_header_body_colon(tokens, line.start_tok, line.end_tok)
+            if colon >= 0 and colon + 1 < line.end_tok:
+                let last_tok = line.end_tok - 1
+                let body_end = if tokens.get_tag(last_tok) == TokenKind.TK_COMMENT: last_tok else: line.end_tok
+                if fmt_tokens_are_plain_expr(tokens, colon + 1, body_end):
+                    let header_part = source.slice(line.byte_start, tokens.get_end(colon))
+                    let body_part = source.slice(tokens.get_start(colon + 1), tokens.get_end(last_tok))
+                    out_lines.push(header_part)
+                    out_lines.push(emit_indent(line.indent + 4) ++ body_part)
+                    li = li + 1
+                    continue
+        // Fold a comment-free single plain-expression block body when the
+        // full rendered line fits within `max_width`.
+        if line.end_tok > line.start_tok and li + 1 < lines.len() and not fmt_range_has_comment(tokens, line.start_tok, line.end_tok):
+            let colon = fmt_header_body_colon(tokens, line.start_tok, line.end_tok)
+            if colon == line.end_tok - 1:
+                let body = lines[li + 1]
+                if body.end_tok > body.start_tok and body.indent > line.indent and fmt_tokens_are_plain_expr(tokens, body.start_tok, body.end_tok):
+                    var single_line_block = true
+                    var nk = li + 2
+                    while nk < lines.len():
+                        if lines[nk].end_tok > lines[nk].start_tok:
+                            if lines[nk].indent > line.indent: single_line_block = false
+                            break
+                        nk = nk + 1
+                    if single_line_block:
+                        let body_trimmed = source.slice(tokens.get_start(body.start_tok), tokens.get_end(body.end_tok - 1))
+                        let candidate = line.text ++ " " ++ body_trimmed
+                        if fmt_line_columns(candidate) <= max_width:
+                            out_lines.push(candidate)
+                            li = li + 2
+                            continue
+        out_lines.push(line.text)
+        li = li + 1
+
+    var out = ""
+    for ol in out_lines:
+        out = out ++ ol ++ "\n"
+    out
+
+fn format_source_with_options(input: &str, style: i32, max_width: i32) -> str:
+    let formatted = format_source_styled_tokens(input, style)
+    if style == 2: return formatted
+    fmt_apply_single_expr_width(formatted, max_width)
+
+fn format_source_styled(input: &str, style: i32):
+    format_source_with_options(input, style, 100)
+
 fn format_source(source: &str):
-    format_source_styled(source, 0)
+    format_source_with_options(source, 0, 100)
 
 // Decide whether to emit a space before `cur` given `prev`.
 fn needs_space_before(cur: i32, prev: i32) -> bool:

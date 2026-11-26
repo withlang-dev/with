@@ -1,48 +1,30 @@
 # `with fmt` — Specification
 
-> **Status (2026-09-19): design recovered, not implemented, not reviewed against
-> the current language.** Written 2026-04-12 and never committed; this is the
-> text as written, unchanged below this note. `src/Fmt.with` today does layout only
-> and implements none of the idiom rewrites in §2.
->
-> Known to need a review pass before implementation — the language moved since:
->
-> - **§2.12 `if-to-then`** targets `if COND then STMT`, which is not With
->   today. The inline form is `if COND: STMT`.
-> - **§2.4 `unit-return`, §2.5 `obvious-return-type`** follow §9.1 for public
->   and private functions alike. The parser's former public-return annotation
->   requirement had no basis in the specification. D43 now defines exactly
->   when an unannotated function has a type (it inherits its
->   tail; a missing arm means `Unit`; mixed written arms do not infer), so
->   §2.5 can be wider than "a single literal" but must follow D43, and must
->   leave entry points and tests alone.
-> - **§2.14 `chain-to-pipeline`** must respect D21's place-threading rule for
->   `mut fn` receivers.
-> - **Rewrites the project rules now call for, which this design predates:**
->   the legacy index and cast idioms (`v.get(i as i64)` → `v[i]`,
->   `s.byte_at(i)` → `s[i]`, `x as i64` where the target already widens —
->   CLAUDE.md "Unnecessary casts and `unsafe` are defects"), a redundant
->   call-site `move` into a consuming parameter (§3.8, D5), and a `let _ =`
->   that discards a value whose discard has no effect.
-> - Ownership-era semantics in general (D22, D27, D32, D44, D45): a rewrite
->   must never turn a view into an owner or the reverse; §2.6 `implicit-it`
->   and §2.10 `concat-to-fstring` want checking against them.
->
-> Decisions this design would need from Eric before it is normative: whether
-> idiom rewrites are always on (§Overview says yes, no flag), and whether
-> `with migrate` pipes through them by default (§4).
-
+> **Status (2026-11-26, Law 13 / D238):** Updated to follow **Law 13**
+> (*Meaning belongs to the compiler; presentation belongs to the formatter*).
+> `with fmt` owns layout and presentation only — configurable, idempotent,
+> and strictly semantics-preserving. Semantic and Sema-backed rewrites
+> (removing proven-redundant return types, annotations, widening casts, etc.)
+> belong in `with fix-ceremony` (#3061), never in `with fmt`. Line width is
+> strictly a `with fmt` setting (default 100 columns, configurable via
+> `--max-width N` and `[fmt] max_width` in `with.toml`), never enforced by
+> the compiler (#2519).
 
 ## Overview
 
-`with fmt` is a source-to-source tool that takes syntactically valid With code and rewrites it to be idiomatic. It performs two categories of transformation:
+`with fmt` is a source-to-source formatter that normalizes the **presentation**
+of valid With source (Law 13):
 
-1. **Layout** — whitespace, indentation, line breaks, alignment
-2. **Idiom rewrites** — semantic AST transformations that simplify code without changing behavior
-
-Both categories are always applied together. There is no flag to separate them. The output of `with fmt` is always a fixpoint: running it twice produces the same result as running it once.
-
-`with fmt` never changes program semantics. Every rewrite preserves observable behavior. If a rewrite would change semantics (e.g., removing a side effect), it is not applied.
+- **Layout and presentation only** — whitespace, indentation, blank lines,
+  operator spacing, delimiter style (`--prefer-colon` / `--prefer-brace`),
+  and width-governed folding/unfolding of single-expression bodies.
+- **Strictly semantics-preserving** — `with fmt` never alters what a program
+  means, never requires type checking, and never runs semantic rewrites
+  (those live in `with fix-ceremony`).
+- **Configurable and idempotent** — running `with fmt` twice produces the
+  exact same output as running it once.
+- **Never enforced by the compiler** — the compiler accepts every valid
+  spelling and any line width without opinion (Law 13).
 
 ---
 
@@ -70,7 +52,12 @@ Every file ends with exactly one newline.
 
 ### 1.5 Line length
 
-Soft limit: 100 columns. `with fmt` does not break lines that are already under 100. It does not join lines that are already broken. It breaks lines that exceed 100 at natural break points (after `,`, before `|>`, before binary operators, after `(`).
+Line width is strictly a `with fmt` concern, never enforced by the compiler (Law 13).
+
+- **Default:** 100 columns.
+- **Configurable:** via `--max-width N` on the command line or `max_width = N`
+  under `[fmt]` in `with.toml` (CLI overrides `with.toml`).
+- Used symmetrically for single-expression body folding and unfolding (§1.8).
 
 ### 1.6 Spaces around operators
 
@@ -78,7 +65,7 @@ Soft limit: 100 columns. `with fmt` does not break lines that are already under 
 - Unary prefix operators: no space (`-x`, `not valid`, `&mut v`).
 - Commas: no space before, one space after.
 - Colons in type annotations: no space before, one space after (`x: i32`).
-- Colons opening blocks: one space before when inline (`fn f: expr`), newline after when starting indented block.
+- Colons opening blocks: no space before, one space after when inline (`fn f: expr`), newline after when starting indented block.
 - `=>` in match arms: one space each side.
 - `|>` pipeline: one space each side, or at start of continuation line.
 
@@ -87,17 +74,20 @@ Soft limit: 100 columns. `with fmt` does not break lines that are already under 
 No spaces inside parentheses: `f(x, y)` not `f( x, y )`.
 No spaces inside brackets: `a[i]` not `a[ i ]`.
 
-### 1.8 One-liner vs block
+### 1.8 One-liner vs block (symmetric folding)
 
-If a body is a single expression and the whole construct fits within the line length limit, keep it on one line:
+A comment-free block body holding a single plain (single-line, non-block)
+expression is folded onto the header line when the full rendered line
+(including leading indentation) is at most the configured width:
 
 ```
 fn double(x: i32) -> i32: x * 2
-if not valid then return Err(.Invalid)
-trait Neg[Output]: fn neg(self: Self) -> Output
 ```
 
-If it doesn't fit, break into an indented block.
+Symmetrically, an inline single-expression body whose rendered line exceeds
+the configured width is unfolded into a multi-line body (preserving any
+trailing comment and remaining idempotent). Bodies carrying comments are not
+folded.
 
 ### 1.9 Trailing commas
 
@@ -109,9 +99,13 @@ Comments are not reformatted. Their indentation is adjusted to match the block t
 
 ---
 
-## 2. Idiom Rewrites
+## 2. Historical Appendix — Idiom Rewrites (moved out of `with fmt` under Law 13)
 
-Each rewrite is identified by a short name (for diagnostics and `// fmt:skip` overrides). Rewrites are listed in order of application.
+> **Not part of `with fmt` (Law 13, #3061).** The April 2026 draft below
+> proposed running semantic AST rewrites inside `with fmt`. Under Law 13,
+> `with fmt` handles presentation only; Sema-proven ceremony removals live in
+> `with fix-ceremony` (#3061), and C-migration cleanups belong to
+> `with migrate`. Kept below for historical reference only.
 
 ### 2.1 `bool-wrap` — Remove C-style boolean wrapping
 
@@ -326,10 +320,13 @@ A `--raw` flag on `with migrate` skips the cleanup pass for debugging.
 ## 6. CLI
 
 ```
-with fmt [files...]          # format in place
-with fmt --check [files...]  # exit 1 if any file would change (for CI)
-with fmt --diff [files...]   # print unified diff of changes
-with fmt -                   # read stdin, write stdout
+with fmt [files...]                  # format (stdout)
+with fmt -w [files...]               # format in place
+with fmt --check [files...]          # exit 1 if any file would change
+with fmt -l [files...]               # list files that would change
+with fmt --max-width N [files...]    # override configured line width (default 100, or [fmt] max_width in with.toml)
+with fmt --prefer-colon [files...]   # convert braced bodies to colon form
+with fmt --prefer-brace [files...]   # convert colon bodies to brace form
 ```
 
 When invoked with no arguments, formats all `.with` files in the current directory recursively (respecting `.withignore` if present).

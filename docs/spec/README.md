@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.94
+# The With Programming Language — Specification v7.95
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+
+**Changelog v7.95:** D238 / Law 13 (Eric, 2026-11-26, #2519). §29.13: line width is not enforced by the compiler; `with fmt` defaults to 100 columns and is configurable (`--max-width N` and `[fmt] max_width` in `with.toml`, CLI overriding `with.toml`); a comment-free block body holding a single plain expression folds onto the header line when the folded line fits within the configured width, and an over-width inline single-expression body unfolds into a multi-line body (preserving any trailing comment and staying idempotent). Proposal `docs/proposals/with-fmt.md` and D235 note revised to follow Law 13. Implemented.
 
 **Changelog v7.94:** D239 (delegated, D237/D98; 2026-11-26, #3629). §29.11: a reserved word may name a record field (`type: T`, `Ev { type: 3 }`, `Ev { type: t }`, `e.type`, `offsetof[Ev](type)`), with `:` deciding in declarations, literals and patterns and member position deciding after `.` and in `offsetof`; imported C fields keep their C names without a trailing underscore. Implemented.
 

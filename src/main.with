@@ -289,7 +289,7 @@ fn cli_value_or_prefix(argc: i32, flag: &str, prefix: &str) -> str:
 // Every flag the driver reads, for any command (#2198). A flag is known by
 // its name, the part before any `=`.
 fn cli_known_flags() -> List[str]:
-    ["--abi-sha", "--alloc", "--baseline", "--binary", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--contract", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-all", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-contracts", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--facade", "--facts", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--gir", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--macro-prefix-map", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-only", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
+    ["--abi-sha", "--alloc", "--baseline", "--binary", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--contract", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-all", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-contracts", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--facade", "--facts", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--gir", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--macro-prefix-map", "--max-width", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-only", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
 
 // The first argument that looks like a flag and names none the driver
 // knows, or "". A flag's value (`-o out`, `--target x`) is skipped.
@@ -324,7 +324,7 @@ fn cli_option_takes_value(arg: &str):
     arg == "--trace-place" or arg == "--explain-mir-origin" or
     arg == "--trace-ownership" or arg == "--trace-cleanup-edge" or
     arg == "--contains" or arg == "--baseline" or arg == "--exit-code" or arg == "--test" or
-    arg == "--debug-alloc-filter" or arg == "--out" or
+    arg == "--debug-alloc-filter" or arg == "--out" or arg == "--max-width" or
     arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest" or
     arg == "--emit-bundle-interface" or arg == "--bundle-fingerprint" or arg == "--bundle-corpus"
 
@@ -6478,11 +6478,31 @@ fn run_fmt_command(argc: i32) -> i32:
     var fmt_style: i32 = 0
     if prefer_brace: fmt_style = 2
     if prefer_colon: fmt_style = 1
+    var cli_max_width: i32 = 0
     let files: List[str] = []
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
         if arg == "-w" or arg == "-l" or arg == "--check" or arg == "--prefer-brace" or arg == "--prefer-colon":
+            i = i + 1
+            continue
+        if arg == "--max-width":
+            if i + 1 >= argc:
+                eprint("error: --max-width requires a positive integer")
+                return 1
+            let parsed = project_config_parse_positive_i64(with_arg_at(i + 1))
+            if parsed <= 0 or parsed > 2147483647:
+                eprint("error: --max-width must be a positive integer")
+                return 1
+            cli_max_width = parsed as i32
+            i = i + 2
+            continue
+        if arg.starts_with("--max-width="):
+            let parsed = project_config_parse_positive_i64(arg.slice(12, arg.len()))
+            if parsed <= 0 or parsed > 2147483647:
+                eprint("error: --max-width must be a positive integer")
+                return 1
+            cli_max_width = parsed as i32
             i = i + 1
             continue
         if arg.starts_with("-"):
@@ -6491,16 +6511,24 @@ fn run_fmt_command(argc: i32) -> i32:
         files.push(arg)
         i = i + 1
     if files.len() == 0:
+        let cfg = project_config_load_for_source("./stdin.with")
+        if cfg.manifest_error.len() > 0:
+            eprint("error: " ++ cfg.manifest_error)
+            return 1
+        let max_width = if cli_max_width > 0: cli_max_width else: cfg.fmt_max_width
         let source = cli_read_all_stdin()
-        let formatted = format_source_styled(source, fmt_style)
+        let formatted = format_source_with_options(source, fmt_style, max_width)
         with_write(formatted)
         return 0
     var any_changed = false
-    var fi = 0
-    while fi < files.len():
-        let path = files[fi]
+    for path in files:
+        let cfg = project_config_load_for_source(path)
+        if cfg.manifest_error.len() > 0:
+            eprint("error: " ++ cfg.manifest_error)
+            return 1
+        let max_width = if cli_max_width > 0: cli_max_width else: cfg.fmt_max_width
         let source = with_fs_read_file(path)
-        let formatted = format_source_styled(source, fmt_style)
+        let formatted = format_source_with_options(source, fmt_style, max_width)
         if formatted != source:
             any_changed = true
             if list_mode:
@@ -6509,7 +6537,6 @@ fn run_fmt_command(argc: i32) -> i32:
                 with_fs_write_file(path, formatted)
         if not write_mode and not list_mode and not check_mode:
             with_write(formatted)
-        fi = fi + 1
     if check_mode and any_changed:
         return 1
     0
