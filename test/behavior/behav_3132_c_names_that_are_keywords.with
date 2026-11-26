@@ -1,10 +1,11 @@
 //! expect-stdout: 10 2 5
 
-// C names that are With keywords are reached with a trailing underscore:
-// fields (`type_`) and functions (`select_`) alike. A contextual word is
-// not one: `module`, `gen` and `spawn` keep their C names (#3132, D235).
+// C functions named by reserved words are reached with a trailing underscore
+// (`select_`). C fields keep their C names, reserved words included (`type`,
+// `select`), and contextual words (`module`, `gen`) and `spawn` keep theirs
+// (#3132, #3629, D235, D239).
 use c_import("struct ev { int type; int module; int select; int gen; };\nstatic inline struct ev ev_make(void) { struct ev e = {1, 2, 3, 4}; return e; }\nstatic inline int spawn(int x) { return x + 1; }\nstatic inline int select(int x) { return x + 4; }\n")
 
 fn main:
     let e = ev_make()
-    print(f"{e.type_ + e.module + e.select_ + e.gen} {spawn(1)} {select_(1)}")
+    print(f"{e.type + e.module + e.select + e.gen} {spawn(1)} {select_(1)}")

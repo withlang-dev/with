@@ -1,0 +1,32 @@
+//! expect-stdout: 3 4 5
+//! expect-stdout: 10 20 30
+//! expect-stdout: 10 20 30
+//! expect-stdout: 0 4
+
+// §29.11 (#3629, D239): a reserved word may name a record field (declaration,
+// struct literal, member access, pattern, offsetof) and C fields keep their
+// C names without a trailing underscore.
+use c_import("struct c_ev { int type; int match; int fn; };\nstatic inline struct c_ev c_ev_make(void) { struct c_ev e = { .type = 3, .match = 4, .fn = 5 }; return e; }\n")
+
+type BracedEv { type: i32, match: i32, fn: i32 }
+
+type BlockEv:
+    type: i32
+    match: i32
+    fn: i32
+
+fn main:
+    let c = c_ev_make()
+    print(f"{c.type} {c.match} {c.fn}")
+
+    let b = BracedEv { type: 10, match: 20, fn: 30 }
+    print(f"{b.type} {b.match} {b.fn}")
+
+    let blk = BlockEv:
+        type: 10
+        match: 20
+        fn: 30
+    match blk:
+        BlockEv { type: t, match: m, fn: f } => print(f"{t} {m} {f}")
+
+    print(f"{offsetof[c_ev](type)} {offsetof[c_ev](match)}")

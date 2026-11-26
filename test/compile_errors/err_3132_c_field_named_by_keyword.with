@@ -1,9 +1,10 @@
-//! expect-check-fail: `type` is a With keyword, so the C field of that name is imported as `type_`
+//! expect-check-fail: the field is `type`, as C names it: a field may be named by a reserved word (§29.11)
 
-// A C field whose name is a With keyword is imported with a trailing
-// underscore. The error for the C spelling said only "unknown field" (#3132).
+// A C field keeps its C name even when that name is a reserved word (#3629).
+// A program still writing the old trailing-underscore spelling (`type_`) is
+// told the field's real name.
 use c_import("struct ev { int type; int n; };\nstatic inline struct ev ev_make(void) { struct ev e = {1, 2}; return e; }\n")
 
 fn main:
     let e = ev_make()
-    print(e.type + e.n)
+    print(e.type_ + e.n)

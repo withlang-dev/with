@@ -15,6 +15,6 @@ type Pair { left: i64, right: u8 }
 
 fn main:
     let r = rec.zeroed()
-    print(f"{r.count} {r.scale} {r.data == null} {r.m} {r.tag[3]} {r.in_.depth}")
+    print(f"{r.count} {r.scale} {r.data == null} {r.m} {r.tag[3]} {r.in.depth}")
     let p = Pair.zeroed()
     print(f"{p.left} {p.right}")
