@@ -204,8 +204,9 @@ Notes:
   and it remains usable as an ordinary identifier elsewhere.
 - The ten contextual declaration words: two names side by side are
   never an expression, so the position decides:
-  - `gen` before `fn`;
-  - `where`, `dyn` and `extend` before a name;
+  - `gen` before `fn` or a word that modifies one (`gen mut fn`);
+  - `where` and `dyn` before a name;
+  - `extend` before a name, or before type parameters and a name;
   - `global` before a name or `var`;
   - `module` at the start of a line, before a name;
   - `opaque`, `union` and `ephemeral` in a `type` or `enum`
