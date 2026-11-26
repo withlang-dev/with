@@ -938,9 +938,16 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
         if kind == FACADE_CLAUSE_FROM and pool.get_extra(ops + 1) == 0:
             let producer = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
             if producer == 0: continue
+            let cname = intern.resolve(pool.get_data0(producer as NodeId))
+            let (cidx, nstat) = facade_render_consuming_same_producer(pool, intern, resource, producer)
+            if cidx >= 0 and nstat != 0:
+                let cbridge = facade_render_bridge(pool, intern, producer, 0, cidx, "facade_self.repr")
+                if not cbridge.ok: continue
+                let head = if cbridge.params.len() > 0: "facade_self: " ++ name ++ ", " ++ cbridge.params else: "facade_self: " ++ name
+                out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ head ++ "):\n    facade_self." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(cbridge.params) ++ ")\n"
+                continue
             let bridge = facade_render_bridge(pool, intern, producer, 0, -1, "")
             if not bridge.ok: continue
-            let cname = intern.resolve(pool.get_data0(producer as NodeId))
             let made = if facade_render_produced_field(pool, intern, resource, cname).0 == "nullable": "Option[" ++ name ++ "]" else: with_str_clone_ref(name)
             // A pointer resource's constructor states its own result (an
             // Option for a nullable producer, a Result for a failing one):
@@ -1842,6 +1849,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // Amendment 3): one error type, one shape.
     var status_type = ""
     var failed_state = false
+    var init_has_ok = false
     var with_message = true
     if ok_syms.len() > 0:
         for pi in 0..producers.len():
@@ -1859,9 +1867,27 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
         if status_init == 0 or (ok_syms.len() == 0 and pool.get_data2(init_clauses[status_k] as NodeId) < 2): continue
         let ret = facade_render_return(pool, intern, status_init)
         if ret.len() > 0:
+            init_has_ok = true
             status_type = ret.slice(4, ret.len())
             with_message = false
     if not failed_state: with_message = false
+    // #3121 (§16.2b.4): a consuming same-type pointer producer with
+    // `null status CONST` returns `Result[R, E]` whose `FailedWithResource`
+    // carries `R` back in a good state.
+    var consuming_good = false
+    var consuming_status_type = ""
+    if facade_render_unalias(pool, intern, repr_text).starts_with("*"):
+        var pi: isize = -1
+        for prod in producers:
+            pi += 1
+            if prod == 0 or out_refs[pi] != 0: continue
+            let (cidx, nstat) = facade_render_consuming_same_producer(pool, intern, item, prod)
+            if cidx >= 0 and nstat != 0:
+                consuming_good = true
+                if consuming_status_type.len() == 0:
+                    consuming_status_type = facade_render_status_const_type(pool, intern, nstat)
+    if status_type.len() == 0 and consuming_good:
+        status_type = consuming_status_type
     // The generated error never owns a dependent child (ruling §18: the
     // error "may" own the failure-state resource "where required" — an
     // error escapes scopes, a dependent value cannot). A dependent
@@ -1869,8 +1895,9 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // constructor (facade_render_out_producer) and its error carries no
     // `FailedWithResource`.
     let dependent = deps.slot_res.len() > 0
+    let good_in_error = consuming_good and not failed_state and not dependent
     if status_type.len() > 0:
-        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn, drop_global, failed_methods, with_message, shared.len() > 0)
+        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, good_in_error, failed_state or init_has_ok, drop_fn, drop_global, failed_methods, with_message, shared.len() > 0)
     // Borrowed returns of this resource (ruling §26): `Borrowed<R>`.
     out = out ++ facade_render_borrowed_type(pool, intern, ci, item, repr_text, plain_methods)
     for pi in 0..producers.len():
@@ -1901,6 +1928,25 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
         let call = facade_render_call(pool, intern, producer, args)
         var result = name
         if facade_render_unalias(pool, intern, repr_text).starts_with("*"):
+            let (cidx, nstat) = facade_render_consuming_same_producer(pool, intern, item, producer)
+            if cidx >= 0 and nstat != 0:
+                // #3121 (§16.2b.4): a consuming same-type pointer producer
+                // presents `move fn <name>(...) -> Result[R, E]`, returning
+                // the input intact in `FailedWithResource` when C returns NULL.
+                let taken = facade_render_param_names(pool, intern, producer)
+                let prev_var = facade_render_fresh("prev", taken)
+                let next_var = facade_render_fresh("next", taken)
+                let cbridge = facade_render_bridge(pool, intern, producer, 0, cidx, prev_var)
+                let cpro = facade_render_indent(cbridge.prologue, "        ")
+                let ccall = facade_render_call(pool, intern, producer, cbridge.args)
+                let err = if failed_state: facade_render_fn_error_name(pname) else if shared.len() > 0: shared else: facade_render_error_name(name)
+                let variant = if failed_state: "FailedWithResource" else: facade_render_failed_with_name(name, shared.len() > 0)
+                if failed_state:
+                    let st = facade_render_status_const_type(pool, intern, nstat)
+                    out = out ++ "error " ++ err ++ " =\n    | FailedWithResource(status: " ++ st ++ ", resource: " ++ name ++ ")\n"
+                let const_text = intern.resolve(nstat)
+                out = out ++ "impl " ++ name ++ ":\n    move fn " ++ pname ++ "(" ++ cbridge.params ++ ") -> Result[" ++ name ++ ", " ++ err ++ "]:\n" ++ cpro ++ "        let " ++ prev_var ++ " = self.repr\n        self.live = false\n        let " ++ next_var ++ " = " ++ ccall ++ "\n        if " ++ next_var ++ " == null: return Err(" ++ err ++ "." ++ variant ++ "(" ++ const_text ++ ", " ++ name ++ " { " ++ keep_init ++ "repr: " ++ prev_var ++ ", live: true }))\n        Ok(" ++ name ++ " { " ++ keep_init ++ "repr: " ++ next_var ++ ", live: true })\n"
+                continue
             // Unknown nullability is nullable, never silently non-null
             // (§16.2b.8): a pointer producer yields `Option[R]`, and a NULL
             // produced nothing — no Drop is armed over it (§16.2b.4). The
@@ -1951,7 +1997,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // An out-parameter producer under `ok` (failed_state) can report
     // `NothingProduced`, a dependent one too; only an owner's failure keeps
     // the resource.
-    (out, FacadeErrorUse { status_type: status_type, failed_with: failed_state and not dependent, nothing_produced: failed_state })
+    (out, FacadeErrorUse { status_type: status_type, failed_with: failed_state and not dependent, failed_with_good: good_in_error, nothing_produced: failed_state })
 
 // ── stage 6: dependency (ruling §26-§30, spec §16.2b.6) ─────────────────
 //
@@ -2036,7 +2082,7 @@ fn facade_render_item_deps(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
             inits.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
         else if kind == FACADE_CLAUSE_PREINIT:
             preinit_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
-    facade_render_deps(pool, intern, producers, out_refs, inits, preinit_fn, borrow_refs, borrow_owners, independent)
+    facade_render_deps(pool, intern, item, producers, out_refs, inits, preinit_fn, borrow_refs, borrow_owners, independent)
 
 // D85 (§16.2b.6): the field of resource `item` that holds its parent named
 // `parent` — the one view a parent borrow is read from. "" unless exactly
@@ -2056,7 +2102,45 @@ fn facade_render_parent_field(pool: &AstPool, intern: &InternPool, ci: &List[i32
         return ""
     facade_render_slot_field(deps, found)
 
-fn facade_render_deps(pool: &AstPool, intern: &InternPool, producers: &List[i32], out_refs: &List[i32], inits: &List[i32], preinit_fn: i32, borrow_refs: &List[i32], borrow_owners: &List[i32], independent: bool) -> FacadeDeps:
+// #3121 (§16.2b.4): when `producer` is a direct-return producer whose fn
+// item states `consumes param N` (without `destroyed_by`) for a parameter
+// receiving resource `item`, returns `(N, null_status_sym)`; else `(-1, 0)`.
+fn facade_render_consuming_same_producer(pool: &AstPool, intern: &InternPool, item: i32, producer: i32) -> (i32, i32):
+    let fn_item = facade_render_fn_item(pool, intern, producer)
+    if fn_item == 0: return (-1, 0)
+    let meta = pool.find_fn_meta(producer as NodeId)
+    if meta < 0: return (-1, 0)
+    let start = pool.fn_meta_param_start(meta)
+    var consume_idx: i32 = -1
+    var null_status: i32 = 0
+    let cstart = pool.get_data1(fn_item as NodeId)
+    for k in 0..pool.get_data2(fn_item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        let kind = pool.get_data0(clause as NodeId)
+        let ops = pool.get_data1(clause as NodeId)
+        if kind == FACADE_CLAUSE_CONSUMES and pool.get_extra(ops + 1) == 0:
+            let pi = facade_render_param_ref(pool, intern, producer, pool.get_extra(ops))
+            if pi >= 0 and pi < pool.fn_meta_param_count(meta):
+                let ptext = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
+                if facade_render_received(pool, intern, ptext) == item:
+                    consume_idx = pi
+        else if kind == FacadeStatusClause.NullStatus as i32:
+            null_status = pool.get_extra(ops)
+    (consume_idx, null_status)
+
+// The declared With type of an imported status constant, or `c_int` for an
+// untyped constant or integer literal.
+fn facade_render_status_const_type(pool: &AstPool, intern: &InternPool, sym: i32) -> str:
+    let want = intern.resolve(sym)
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let type_node = facade_render_global_type_node(pool, decl as i32)
+        if type_node != 0 and intern.resolve(pool.get_data0(decl)) == want:
+            let ty = render_type_expr(pool, intern, type_node as NodeId)
+            if ty.len() > 0: return ty
+    "c_int"
+
+fn facade_render_deps(pool: &AstPool, intern: &InternPool, item: i32, producers: &List[i32], out_refs: &List[i32], inits: &List[i32], preinit_fn: i32, borrow_refs: &List[i32], borrow_owners: &List[i32], independent: bool) -> FacadeDeps:
     let deps = FacadeDeps { ok: true, owners: [], params: [], resources: [], slots: [], slot_res: [], slot_optional: [] }
     // Every owner: each `from`, then the `init`.
     let owners: List[i32] = []
@@ -2120,6 +2204,9 @@ fn facade_render_deps(pool: &AstPool, intern: &InternPool, producers: &List[i32]
         for pi in firsts[oi]..pool.fn_meta_param_count(meta):
             if pi == skips[oi]:
                 continue
+            // #3121: a consumed same-type parameter transfers ownership,
+            // never a parent borrow.
+            if skips[oi] < 0 and facade_render_consuming_same_producer(pool, intern, item, decl).0 == pi: continue
             // D214: a parent the contract fixes to null is absent; the
             // product depends on nothing through it.
             if facade_render_fixed_literal(pool, intern, decl, pi).len() > 0: continue
@@ -2506,10 +2593,11 @@ fn facade_render_op_error(pool: &AstPool, intern: &InternPool, decl: i32, presen
 type FacadeErrorUse {
     status_type: str,
     failed_with: bool,
+    failed_with_good: bool,
     nothing_produced: bool,
 }
 
-fn facade_render_no_error_use() -> FacadeErrorUse: FacadeErrorUse { status_type: "", failed_with: false, nothing_produced: false }
+fn facade_render_no_error_use() -> FacadeErrorUse: FacadeErrorUse { status_type: "", failed_with: false, failed_with_good: false, nothing_produced: false }
 
 // The shared error's declaration: the variants the facade's resources ask
 // for, over the status type every `ok` reads (Sema refuses two). "" when
@@ -2537,6 +2625,8 @@ fn facade_render_shared_error_type(pool: &AstPool, intern: &InternPool, ci: &Lis
     for k in 0..uses.len():
         if uses[k].failed_with:
             out = out ++ "    | " ++ facade_render_failed_with_name(names[k], true) ++ "(status: " ++ status_type ++ ", resource: " ++ facade_render_failed_name(names[k]) ++ ")\n"
+        else if uses[k].failed_with_good:
+            out = out ++ "    | " ++ facade_render_failed_with_name(names[k], true) ++ "(status: " ++ status_type ++ ", resource: " ++ names[k] ++ ")\n"
     if nothing_produced:
         out = out ++ "    | NothingProduced(status: " ++ status_type ++ ")\n"
     out
@@ -2574,7 +2664,7 @@ fn facade_render_shared_error_type(pool: &AstPool, intern: &InternPool, ci: &Lis
 //         fn errmsg() -> Option[CStr]: …                 // `valid on failed`
 // Under the facade's one error type (`shared`) only `Failed<R>` is
 // rendered here; the error is the block's (facade_render_shared_error_type).
-fn facade_render_error_type(pool: &AstPool, intern: &InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, drop_fn: i32, drop_global: i32, failed_methods: &str, with_message: bool, shared: bool) -> str:
+fn facade_render_error_type(pool: &AstPool, intern: &InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, failed_good: bool, has_failed: bool, drop_fn: i32, drop_global: i32, failed_methods: &str, with_message: bool, shared: bool) -> str:
     let err = facade_render_error_name(name)
     var out = ""
     if failed_state:
@@ -2583,9 +2673,13 @@ fn facade_render_error_type(pool: &AstPool, intern: &InternPool, name: &str, rep
         if failed_methods.len() > 0:
             out = out ++ "impl " ++ failed ++ ":\n" ++ failed_methods
     if shared: return out
-    out = out ++ "error " ++ err ++ " =\n    | Failed(status: " ++ status_type ++ (if with_message: ", message: str" else: "") ++ ")\n"
+    out = out ++ "error " ++ err ++ " =\n"
+    if has_failed:
+        out = out ++ "    | Failed(status: " ++ status_type ++ (if with_message: ", message: str" else: "") ++ ")\n"
     if failed_state:
         out = out ++ "    | FailedWithResource(status: " ++ status_type ++ ", resource: " ++ facade_render_failed_name(name) ++ ")\n"
+    else if failed_good:
+        out = out ++ "    | FailedWithResource(status: " ++ status_type ++ ", resource: " ++ name ++ ")\n"
     if out_param:
         out = out ++ "    | NothingProduced(status: " ++ status_type ++ ")\n"
     out

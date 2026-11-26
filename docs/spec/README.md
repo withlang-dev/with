@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.96
+# The With Programming Language — Specification v7.97
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+
+**Changelog v7.97:** D241 (delegated, D237/D98; direction ruled in D235, 2026-11-26, #3121). §16.2b.4, §31.5, §31.8.3: a direct-return pointer producer stating `consumes param N` for its own resource `R` requires `null status CONST` and presents `move fn <name>(...) -> Result[R, E]`, returning the consumed input intact in `FailedWithResource(status, resource: R)` in a good state on `NULL`. Implemented.
 
 **Changelog v7.96:** D240 (delegated, D237/D98; direction ruled in D235, 2026-11-26, #3120). §16.2b.5: a retained variadic case may name `&R`, a shared borrow of a pointer-wrapping facade resource (for example `case CURLOPT_HTTPHEADER: &HeaderList retains by param 0 until curl_easy_reset`); the call passes the borrowed resource's representation, two handles may share the same resource, and while held the borrowed resource cannot be dropped, moved, or passed to a consuming or non-`preserves` operation. Implemented.
 

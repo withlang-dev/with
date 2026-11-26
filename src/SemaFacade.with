@@ -46,6 +46,7 @@ impl Sema:
         self.verify_facade_abandon()
         self.verify_facade_messages()
         self.verify_facade_shared_errors()
+        self.verify_facade_null_status()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
@@ -306,6 +307,27 @@ impl Sema:
                     let rt = self.type_name(ret)
                     self.emit_error_with_help(f"facade states one error type '{err}', whose status is one type, but '{fnm}' returns {ft} and '{pn}' returns {rt} (§16.2b.4)", decl as i32, f"delete 'error {err}' so each operation keeps its own generated error type, or describe the functions of the other status type in a contract of their own")
                     break
+
+    // #3121 (§16.2b.4): `null status CONST` applies only to a direct-return
+    // pointer producer that consumes one of its own resource (`consumes param N`).
+    mut fn verify_facade_null_status():
+        for contract in self.foreign_contracts:
+            if contract.null_status_const == 0: continue
+            let fn_sym = contract.fn_sym
+            let fname = self.pool_resolve(fn_sym)
+            let node = contract.null_status_node
+            var ok = false
+            var ri: isize = -1
+            for r in self.facade_resources:
+                ri += 1
+                var pi: isize = -1
+                for prod in r.producers:
+                    pi += 1
+                    if self.facade_same_fn(prod, fn_sym) and r.out_params[pi] < 0 and self.facade_producer_consumes_self_param(ri, fn_sym) >= 0:
+                        ok = true
+            if not ok:
+                self.update_decl_source_context(contract.decl)
+                self.emit_error_with_help(f"fn '{fname}': 'null status' applies only to a direct-return pointer producer that consumes one of its own resource ('consumes param N') (§16.2b.4)", node, "delete 'null status', or pair it with 'consumes param N' on a producer of that resource")
 
     mut fn verify_facade_ok_producers(ri: isize) -> bool:
         let rname = self.pool_resolve(self.facade_resources[ri].name)
@@ -1473,7 +1495,7 @@ impl Sema:
                 return
             self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: [], consumes_destroyed_by: [], retains: [], retains_by: [], returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: [], preserves_domains: [], of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: [], bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], field_buffer_reads: [], callback_userdata_cb: [], callback_userdata_of: [], valid_on_failed: 0, nullable_params: [], value_records: [], value_record_words: [], text_params: [], text_return_free: 0, bridged: 0, buffer_ptr: [], buffer_len: [], buffer_inout: [], buffer_elements: [], fixed_params: [], fixed_literals: [], ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: [], variadic_case_values: [], variadic_case_tids: [], variadic_case_kinds: [], variadic_slots: [], returns_borrow_record: 0, argv_cb: [], argv_index: [], argc_index: [], argv_handle: [], argv_nodes: [], user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: [], consumes_destroyed_by: [], retains: [], retains_by: [], returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: [], preserves_domains: [], of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: [], bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], field_buffer_reads: [], callback_userdata_cb: [], callback_userdata_of: [], valid_on_failed: 0, nullable_params: [], value_records: [], value_record_words: [], text_params: [], text_return_free: 0, bridged: 0, buffer_ptr: [], buffer_len: [], buffer_inout: [], buffer_elements: [], fixed_params: [], fixed_literals: [], ok_const: 0, ok_count: 0, null_status_const: 0, null_status_node: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: [], variadic_case_values: [], variadic_case_tids: [], variadic_case_kinds: [], variadic_slots: [], returns_borrow_record: 0, argv_cb: [], argv_index: [], argc_index: [], argv_handle: [], argv_nodes: [], user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -2485,6 +2507,22 @@ impl Sema:
             c.ok_const = const_sym
             c.ok_count = self.ast.get_data2(clause)
             return c
+        if kind == FacadeStatusClause.NullStatus as i32:
+            // `null status CONST` (#3121, §16.2b.4): status value carried in
+            // `FailedWithResource` when a consuming same-type pointer producer
+            // returns NULL. The contract states the status; the facade never
+            // invents one.
+            let const_sym = self.ast.get_extra(ops)
+            if not self.facade_status_constant_ok(const_sym):
+                let ln = self.pool_resolve(const_sym)
+                self.emit_error_with_help(f"fn '{fname}': 'null status {ln}' names no imported integer constant; a status is a compile-time constant the header declares or an integer literal (§16.2b.4)", clause, "after 'null status' write the status constant as the header names it: 'null status CURLE_OUT_OF_MEMORY'")
+                return c
+            if c.null_status_const != 0:
+                self.emit_error_with_help(f"fn '{fname}': 'null status' is stated twice (§16.2b.4)", clause, "delete one of the two 'null status' lines")
+                return c
+            c.null_status_const = const_sym
+            c.null_status_node = clause
+            return c
         let cname = facade_clause_name(kind)
         self.emit_error_with_help(f"fn '{fname}': clause '{cname}' applies to a resource, not an fn item (§16.2b)", clause, f"move '{cname}' under the 'resource <Name>' item it describes")
         c
@@ -3187,6 +3225,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_DROP: return "drop"
     if kind == FACADE_CLAUSE_DESTROYS: return "destroys"
     if kind == FACADE_CLAUSE_OK: return "ok"
+    if kind == FacadeStatusClause.NullStatus as i32: return "null status"
     if kind == FACADE_CLAUSE_BORROWS: return "borrows"
     if kind == FACADE_CLAUSE_INDEPENDENT: return "independent"
     if kind == FACADE_CLAUSE_MOVABLE: return "movable"
@@ -4259,9 +4298,27 @@ impl Sema:
     // or the storage `init` initializes.
     fn facade_owner_skip(ri: isize, owner: i32) -> i32: if facade_dep_is_init(owner): 0 else: self.facade_resources[ri].out_params[owner]
 
+    // #3121 (§16.2b.4): when `fn_sym` is a direct-return pointer producer of
+    // resource `ri` whose fn item states `consumes param N` (without
+    // `destroyed_by`) for a parameter receiving `ri`, returns `N`; else -1.
+    fn facade_producer_consumes_self_param(ri: isize, fn_sym: i32) -> i32:
+        if self.get_type_kind(self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)) != TypeKind.TY_PTR:
+            return -1
+        let ci = self.facade_contract_for(fn_sym)
+        if ci < 0: return -1
+        var k: isize = -1
+        for pi in self.foreign_contracts[ci].consumes:
+            k += 1
+            if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0: continue
+            let recv = self.facade_param_receives(fn_sym, pi)
+            if recv.len() == 1 and recv[0] == ri:
+                return pi
+        -1
+
     // The parameters producer `owner`'s result depends on (spec §16.2b.6):
     // none under `independent`, the ones its `borrows` clauses name, and
-    // otherwise every parameter receiving a resource.
+    // otherwise every parameter receiving a resource (excluding a consumed
+    // same-type parameter, #3121).
     fn facade_producer_parents(ri: isize, owner: i32) -> List[i32]:
         let out: List[i32] = []
         if self.facade_resources[ri].independent != 0:
@@ -4278,8 +4335,9 @@ impl Sema:
         if sig < 0:
             return out
         let skip = self.facade_owner_skip(ri, owner)
+        let consumed_self = if skip < 0: self.facade_producer_consumes_self_param(ri, f) else: -1
         for pi in 0..self.sig_get_param_count(sig):
-            if pi != skip and self.facade_param_receives(f, pi).len() > 0:
+            if pi != skip and pi != consumed_self and self.facade_param_receives(f, pi).len() > 0:
                 out.push(pi)
         out
 
@@ -4342,6 +4400,22 @@ impl Sema:
                         names = names ++ (if k > 0: ", " else: "") ++ f"'{cn}'"
                     self.emit_error_with_help(f"resource '{rname}': producer '{pn}' receives {shown}, a representation several resources wrap ({names}); the constructor cannot tell which resource it borrows (§16.2b.3)", node, f"state which one under 'fn {pn}': 'of <Resource>' for that parameter")
                     return false
+                // #3121 (§16.2b.4): a direct-return pointer producer that
+                // consumes one of its own resource (`consumes param N`, e.g.
+                // `curl_slist_append`) transfers ownership and returns the
+                // input intact inside `FailedWithResource` on NULL. The
+                // contract must state `null status CONST` — the facade never
+                // invents a status — and the resource must not be dependent
+                // (an ephemeral value cannot live inside an error).
+                if recv[0] == ri and skip < 0 and self.facade_producer_consumes_self_param(ri, f) == pi:
+                    let ci = self.facade_contract_for(f)
+                    if ci < 0 or self.foreign_contracts[ci].null_status_const == 0:
+                        self.emit_error_with_help(f"fn '{pn}': consumes {shown} while producing '{rname}', so a NULL return carries '{rname}' back in 'FailedWithResource' and needs a status value; the facade does not invent one (§16.2b.4)", if ci >= 0: self.foreign_contracts[ci].node else: node, "add 'null status <CONST>' naming the library's failure status constant (for example 'null status CURLE_OUT_OF_MEMORY')")
+                        return false
+                    if self.facade_resource_dependent(ri):
+                        self.emit_error_with_help(f"fn '{pn}': consumes {shown} while producing dependent resource '{rname}'; a dependent resource is ephemeral and cannot be carried back in 'FailedWithResource' (§16.2b.4, §16.2b.6)", if ci >= 0: self.foreign_contracts[ci].node else: node, f"state 'independent' on '{rname}' when the C API guarantees it depends on nothing, or leave '{pn}' raw")
+                        return false
+                    continue
                 // A producer handed one of its own resource (a copy: `dup`)
                 // would make the resource depend on its own type, a layout
                 // the renderer has no struct for; the checker reported the
