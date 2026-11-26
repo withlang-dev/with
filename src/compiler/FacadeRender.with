@@ -503,6 +503,12 @@ fn facade_render_hosted_fn_errors(pool: &AstPool, intern: &InternPool, ci: &List
         if not bridge.ok or facade_render_fn_oks(pool, intern, li.decl).len() == 0:
             continue
         out = out ++ facade_render_fn_error_type(pool, intern, li.decl, facade_render_present(pool, intern, ci, resource, fname), facade_render_message_call(pool, intern, ci, resource).len() > 0)
+    // A variadic operation hosted here with a `fills` case (D235): its cases
+    // that fill present a `Result`.
+    for item in items:
+        let li = facade_render_lend_item(pool, intern, ci, item)
+        if li.variadic == 0 or li.decl == 0 or not facade_render_lend_hosted(pool, intern, li, resource, repr) or not facade_render_variadic_fills(pool, li.variadic): continue
+        out = out ++ facade_render_fn_error_type(pool, intern, li.decl, facade_render_present(pool, intern, ci, resource, intern.resolve(pool.get_data0(li.decl as NodeId))), false)
     // A callback operation hosted here (`db.exec(sql, callback, userdata)`).
     for item in items:
         let cbi = facade_render_callback_item(pool, intern, ci, item)
@@ -728,7 +734,7 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
             // A variadic contract (D66, §16.2b.5): one method per case,
             // `<name>__<CONST>`; Sema retargets the presented call to the
             // case its selector picks (facade_render_variadic_cases).
-            out = out ++ facade_render_variadic_cases(pool, intern, decl, li.variadic, head, mname, repr_arg, 1, "        ")
+            out = out ++ facade_render_variadic_cases(pool, intern, decl, li.variadic, head, mname, mname, repr_arg, 1, "        ")
             continue
         if li.record_view:
             // `returns borrow T from …` for an imported record T (D66,
@@ -3499,7 +3505,8 @@ fn facade_render_free_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], f
             // One function per case (D66, §16.2b.5), `<base>__<CONST>`;
             // a call to the presented name is retargeted to the case
             // (SemaFacade.with facade_variadic_redirect_free).
-            out = out ++ facade_render_variadic_cases(pool, intern, decl, li.variadic, "fn ", base, "", 0, "    ")
+            if facade_render_variadic_fills(pool, li.variadic): out = out ++ facade_render_fn_error_type(pool, intern, decl, presented, false)
+            out = out ++ facade_render_variadic_cases(pool, intern, decl, li.variadic, "fn ", base, presented, "", 0, "    ")
             continue
         if li.record_view:
             let view = facade_render_record_view_type(pool, intern, decl)
@@ -3550,7 +3557,15 @@ fn facade_render_variadic_case_name(base: &str, sel: &str): base ++ "__" ++ sel
 //             Ok(c) => c
 //             Err(_) => panic("…")
 //         unsafe { curl_easy_setopt(self.repr, option, value_c.as_cstr().ptr()) }
-fn facade_render_variadic_cases(pool: &AstPool, intern: &InternPool, decl: i32, clause: i32, head: &str, base: &str, repr_arg: &str, skip: i32, indent: &str) -> str:
+// Whether a variadic contract states a `fills` case (D235): its function
+// then presents a `Result`, and its error type is rendered.
+fn facade_render_variadic_fills(pool: &AstPool, clause: i32) -> bool:
+    let cops = pool.get_data1(clause as NodeId)
+    for k in 0..pool.get_data2(clause as NodeId) - 2:
+        if pool.get_extra(pool.get_data1(pool.get_extra(cops + 2 + k) as NodeId) + 7) != 0: return true
+    false
+
+fn facade_render_variadic_cases(pool: &AstPool, intern: &InternPool, decl: i32, clause: i32, head: &str, base: &str, presented: &str, repr_arg: &str, skip: i32, indent: &str) -> str:
     var out = ""
     let cops = pool.get_data1(clause as NodeId)
     let case_count = pool.get_data2(clause as NodeId) - 2
@@ -3570,6 +3585,24 @@ fn facade_render_variadic_cases(pool: &AstPool, intern: &InternPool, decl: i32, 
         var args = bridge.args
         if args.len() > 0: args = args ++ ", "
         var pro = bridge.prologue
+        if pool.get_extra(ops + 7) != 0:
+            // `case K: fills T` (D235, §16.2b.5): With passes the address of
+            // a zeroed `T` and presents the value, under the function's
+            // `ok` (Sema requires it):
+            //
+            //     fn getinfo__CURLINFO_RESPONSE_CODE(info: CURLINFO) -> Result[c_long, GetinfoError]:
+            //         var value: c_long = 0 as c_long
+            //         let status = unsafe { curl_easy_getinfo(self.repr, info, &raw mut value) }
+            //         if status != CURLE_OK: return Err(GetinfoError.Failed(status))
+            //         value
+            let ok = facade_render_fn_ok(pool, intern, decl)
+            if ok == 0: continue
+            let (err, empty_message) = facade_render_op_error(pool, intern, decl, presented)
+            let zero = if facade_render_is_record(pool, intern, ty): ty ++ ".zeroed()" else: "0 as " ++ ty
+            let status = facade_render_fresh("status", taken)
+            let filled = (if repr_arg.len() > 0: repr_arg ++ ", " else: "") ++ args ++ "&raw mut " ++ value
+            out = out ++ head ++ facade_render_variadic_case_name(base, sel) ++ "(" ++ bridge.params ++ ") -> Result[" ++ ty ++ ", " ++ err ++ "]:\n" ++ facade_render_indent(pro, indent) ++ indent ++ "var " ++ value ++ ": " ++ ty ++ " = " ++ zero ++ "\n" ++ indent ++ "let " ++ status ++ " = " ++ facade_render_call(pool, intern, decl, filled) ++ "\n" ++ facade_render_failed(err, status, status ++ " != " ++ intern.resolve(ok), "", taken, indent, empty_message) ++ indent ++ value ++ "\n"
+            continue
         if pool.get_extra(ops + 2) != 0:
             // A callback case (D66 §16.2b.5, §16.2b.9): the callback's C
             // type is the case's explicit `as T`, presented with its one

@@ -2398,6 +2398,17 @@ impl Sema:
                     if slot.resource < 0: return c
                     c.variadic_slots.push(slot)
                     ckind = if callback_ref != 0: .Callback else: .Retained
+                else if self.ast.get_extra(cops + 7) != 0:
+                    // D235 (§16.2b.5): `T` obeys the rule for `fills` on a fixed
+                    // parameter: an integer, a float, or a record whose
+                    // all-zero bytes are a value.
+                    let fk = self.get_type_kind(self.numeric_operand_type(rt as i32))
+                    let culprit = if fk == TypeKind.TY_INT or fk == TypeKind.TY_FLOAT: "" else if self.type_is_c_record(rt as i32): self.zero_invalid_part(rt as i32, "") else: "it"
+                    if culprit.len() > 0:
+                        let tn = self.source_spelling(self.ast.get_extra(cops + 1))
+                        self.emit_error_with_help(f"fn '{fname}': 'case {sn}: fills {tn}' — a filled value is an integer, a float or a C record whose all-zero bytes are a value; {culprit} has none (§16.2b.5)", case_node, "a case that hands back a pointer the library owns is not 'fills': leave it out of the contract, and the raw call stays available")
+                        return c
+                    ckind = .Fills
                 else if rt == self.ty_str: ckind = .Str
                 else if self.get_type_kind(self.numeric_operand_type(rt as i32)) == TypeKind.TY_INT: ckind = .Scalar
                 let Some(case_kind) = ckind else:
@@ -2824,7 +2835,7 @@ impl Sema:
                 if result.length_value == self.facade_const_int_value(self.ast.get_data1(selector_decl)):
                     self.emit_error_with_help("a retained case and its length option need distinct selector values (§16.2b.5)", node, "name the option that sets the length, which differs from the one that sets the pointer")
                     return result
-            for ui in 7..self.ast.get_data2(node): result.until_syms.push(self.ast.get_extra(ops + ui))
+            for ui in 8..self.ast.get_data2(node): result.until_syms.push(self.ast.get_extra(ops + ui))
         let resources = self.facade_param_receives(fn_sym, owner)
         if resources.len() != 1:
             self.emit_error_with_help("a retained variadic case needs one modeled resource for its retaining parameter (§16.2b.5)", node, "after 'retains by' name the parameter that receives the declared resource keeping the pointer: 'retains by param 0'")
@@ -2966,6 +2977,14 @@ impl Sema:
             var sized_without_ok = false
             for slot in self.foreign_contracts[ci].variadic_slots:
                 if slot.retained_form == .Sized and self.foreign_contracts[ci].ok_const == 0: sized_without_ok = true
+            // D235: a filled value means something only when the call took,
+            // so the function states its success status.
+            var fills_without_ok = false
+            for kind in self.foreign_contracts[ci].variadic_case_kinds:
+                if kind == .Fills and self.foreign_contracts[ci].ok_const == 0: fills_without_ok = true
+            if fills_without_ok:
+                self.emit_error_with_help(f"fn '{fname}': a 'fills' case presents the value the callee wrote, which it wrote only when the call succeeded, so '{fname}' states 'ok CONST' (§16.2b.5)", node, "add 'ok <CONST>' naming the status that means success")
+                continue
             if sized_without_ok:
                 self.emit_error_with_help(f"fn '{fname}': a retained byte case sets its length option and then its pointer as one operation, so '{fname}' states 'ok CONST': the pointer is set only when the length took (§16.2b.5)", node, f"add 'ok <CONST>' under 'fn {fname}', naming the status the library returns on success")
                 continue
