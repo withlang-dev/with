@@ -1153,6 +1153,17 @@ fn comp_spec_keywords(spec: &str) -> List[str]:
 fn comp_impl_keywords(fs: &ToolFs) -> List[str]:
     comp_collect_quoted_after(fs.read_text("src/Token.with"), "if s == \"")
 
+// §29.11's second list: the contextual declaration words, against the
+// lexer's own table of them.
+fn comp_spec_contextual_keywords(spec: &str) -> List[str]:
+    let section = comp_spec_subsection(spec, "### 29.11 Reserved Keywords")
+    let first_end = comp_find_from(section, "\n```", comp_index_of(section, "```\n") + 4)
+    if first_end < 0: return []
+    comp_add_words([], comp_first_fenced_block(section.slice(first_end + 4, section.len())))
+
+fn comp_impl_contextual_keywords(fs: &ToolFs) -> List[str]:
+    comp_collect_quoted_after(fs.read_text("src/Token.with"), "if word == \"")
+
 fn comp_spec_public_attributes(spec: &str) -> List[str]:
     let lines = comp_split_lines(comp_spec_subsection(spec, "### 29.14 Attribute Index"))
     var attrs: List[str] = List.new()
@@ -2021,6 +2032,7 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     var errors: List[str] = List.new()
 
     errors = comp_inventory_add_errors(errors, "keywords", comp_spec_keywords(spec), comp_impl_keywords(fs), "", "")
+    errors = comp_inventory_add_errors(errors, "contextual keywords", comp_spec_contextual_keywords(spec), comp_impl_contextual_keywords(fs), "", "")
 
     var allowed_attrs = comp_spec_public_attributes(spec)
     let internal_attrs = comp_spec_internal_attributes(spec)

@@ -9574,6 +9574,20 @@ impl Parser:
                     stmts.push(last_expr as i32)
                     last_expr = self.parse_expr()
                     continue
+                // Two names side by side are never an expression (§29.11). The
+                // statement ended at the first: say so here, where it is,
+                // and take the rest of the line with it. Left to end the
+                // block, the second name was read as a statement of the
+                // file ("file has both `fn main` and top-level executable
+                // statements").
+                if cur == TokenKind.TK_IDENT and self.pos > 0 and self.tokens.get_tag(self.pos - 1) == TokenKind.TK_IDENT:
+                    let first = self.source.slice(self.tokens.get_start(self.pos - 1), self.tokens.get_end(self.pos - 1))
+                    let second = self.source.slice(self.current_start(), self.current_end())
+                    let diag = Diagnostic.err(f"expected the end of the statement after `{first}`; `{first} {second}` is two names side by side, which is not an expression", Span { file: self.file_id, start: self.current_start(), end: self.current_end() })
+                    diag.add_help(f"if `{first}` was meant to open a declaration or modify one, check its spelling and its place; a call is `{first}({second})`")
+                    self.diags.emit(diag)
+                    while self.peek() != TokenKind.TK_NEWLINE and self.peek() != TokenKind.TK_EOF: self.advance()
+                    continue
                 break
 
             let save = self.pos

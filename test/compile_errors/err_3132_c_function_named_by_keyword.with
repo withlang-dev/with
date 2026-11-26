@@ -1,9 +1,9 @@
-//! expect-check-fail: expected expression: `spawn` is a reserved word and cannot name a value
+//! expect-check-fail: expected expression: `trait` is a reserved word and cannot name a value
 
 // A C function whose name is a With keyword is imported with a trailing
-// underscore (`spawn_`). Calling it by its C name said only "expected
+// underscore (`trait_`). Calling it by its C name said only "expected
 // expression" (#3132).
-use c_import("static inline int spawn(int x) { return x + 1; }\n")
+use c_import("static inline int trait(int x) { return x + 1; }\n")
 
 fn main:
-    print(spawn(1))
+    print(trait(1))

@@ -97,10 +97,76 @@ fn lexer_shebang_len(source: &str) -> i32:
 fn Lexer.init(source: &str, file_id: i32) -> Lexer:
     Lexer { source: with_str_clone_ref(source), pos: lexer_shebang_len(source), file_id, token_start: 0, emit_comments: 0, last_sig_tag: -1, line_start: 1, bracket_depth: 0 }
 
+// §29.11 (D235): ten words are keywords only where their construct can
+// begin, and names everywhere else. Each is decided by its neighbours:
+//   gen        before `fn` or a word that modifies one (`gen mut fn`)
+//   where, dyn before a name
+//   extend     before a name, or before type parameters and a name
+//   global     before a name or `var`
+//   module     at the start of a line, before a name
+//   opaque, union, ephemeral   in a `type` or `enum` declaration's line,
+//                              after the type's name, its `]` or its `=`
+//   c_import   between `use` and `(`
+// Two names side by side are never an expression, so no program that used
+// the word as a keyword reads differently. The parser sees a keyword token
+// only where the word is one.
+type WordSite {
+    prev: i32,
+    next: i32,
+    // What follows the `]` that closes a `[` right after the word.
+    after_brackets: i32,
+    in_type_decl: bool,
+}
+
+fn lexer_word_is_keyword_here(tag: i32, site: &WordSite) -> bool:
+    let before_name = site.next == TokenKind.TK_IDENT
+    if tag == TokenKind.TK_KW_GEN:
+        return site.next == TokenKind.TK_KW_FN or site.next == TokenKind.TK_KW_MUT or site.next == TokenKind.TK_KW_MOVE or site.next == TokenKind.TK_KW_ASYNC or site.next == TokenKind.TK_KW_UNSAFE or site.next == TokenKind.TK_KW_COMPTIME
+    if tag == TokenKind.TK_KW_WHERE or tag == TokenKind.TK_KW_DYN: return before_name
+    if tag == TokenKind.TK_KW_EXTEND: return before_name or (site.next == TokenKind.TK_L_BRACKET and site.after_brackets == TokenKind.TK_IDENT)
+    if tag == TokenKind.TK_KW_GLOBAL: return before_name or site.next == TokenKind.TK_KW_VAR
+    if tag == TokenKind.TK_KW_MODULE: return before_name and (site.prev == TokenKind.TK_EOF or site.prev == TokenKind.TK_NEWLINE or site.prev == TokenKind.TK_COMMENT)
+    if tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_EPHEMERAL:
+        return site.in_type_decl and (site.prev == TokenKind.TK_IDENT or site.prev == TokenKind.TK_R_BRACKET or site.prev == TokenKind.TK_EQ)
+    if tag == TokenKind.TK_KW_C_IMPORT: return site.prev == TokenKind.TK_KW_USE and site.next == TokenKind.TK_L_PAREN
+    true
+
+// The token after the `]` that closes the `[` at `open`; TK_EOF when the
+// bracket does not close on its line.
+fn lexer_after_brackets(tags: &List[i32], open: isize) -> i32:
+    var depth = 0
+    for (at, tag) in tags.enumerate():
+        if at < open: continue
+        if depth == 0 and tag != TokenKind.TK_L_BRACKET: return tag
+        if tag == TokenKind.TK_NEWLINE or tag == TokenKind.TK_EOF: return TokenKind.TK_EOF
+        if tag == TokenKind.TK_L_BRACKET: depth = depth + 1
+        if tag == TokenKind.TK_R_BRACKET: depth = depth - 1
+    TokenKind.TK_EOF
+
+// One walk, each word judged when the token after it is seen.
+fn lexer_contextual_words(mut tokens: TokenList):
+    let decided = []
+    var prev = TokenKind.TK_EOF
+    var held = TokenKind.TK_EOF
+    var holding = false
+    // Whether `type` or `enum` was seen on the line being walked.
+    var in_type_decl = false
+    for (at, next) in tokens.tags.enumerate():
+        if holding:
+            let after_brackets = if held == TokenKind.TK_KW_EXTEND and next == TokenKind.TK_L_BRACKET: lexer_after_brackets(tokens.tags, at) else: TokenKind.TK_EOF
+            decided.push(if lexer_word_is_keyword_here(held, WordSite { prev, next, after_brackets, in_type_decl }): held else: TokenKind.TK_IDENT)
+            if held == TokenKind.TK_KW_TYPE or held == TokenKind.TK_KW_ENUM: in_type_decl = true
+            if held == TokenKind.TK_NEWLINE: in_type_decl = false
+            prev = held
+        held = next
+        holding = true
+    if holding: decided.push(held)
+    tokens.tags = decided
+
 // Tokenize the entire source, returning a token list ending with EOF.
 impl Lexer:
     mut fn tokenize() -> TokenList:
-        let tokens = TokenList.new()
+        var tokens = TokenList.new()
         loop:
             let tag = self.next_token()
             tokens.append(tag, self.token_start, self.pos)
@@ -113,6 +179,7 @@ impl Lexer:
                 self.bracket_depth = self.bracket_depth - 1
             if tag == TokenKind.TK_EOF:
                 break
+        lexer_contextual_words(mut tokens)
         tokens
 
     mut fn tokenize_with_comments() -> TokenList:

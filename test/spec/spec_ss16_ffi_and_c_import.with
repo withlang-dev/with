@@ -55,10 +55,12 @@ fn test_c_import_callback_field_uses_extern_fn_pointer:
     assert(holder.cb.unwrap()(41) == 42)
 
 fn test_c_import_escapes_with_keyword_fields:
-    let fields = WithKeywordFields { opaque_: 10, no_suspend_: 20, c_import_: 30, null_: 40 }
-    assert(fields.opaque_ == 10)
+    let fields = WithKeywordFields { opaque: 10, no_suspend_: 20, c_import: 30, null_: 40 }
+    // `opaque` and `c_import` are contextual words (§29.11): a C field keeps
+    // those names. A reserved word still takes the underscore.
+    assert(fields.opaque == 10)
     assert(fields.no_suspend_ == 20)
-    assert(fields.c_import_ == 30)
+    assert(fields.c_import == 30)
     assert(fields.null_ == 40)
 
 fn test_c_import_system_prelude_collision_is_omitted:
