@@ -1,0 +1,15 @@
+//! expect-check-fail: b
+// #3624 (D172): while a generator that took `b` as a `mut` parameter runs,
+// `b` is the generator's. The loop body may not use it.
+type Box { n: i32 }
+
+gen fn walk(mut b: Box) -> i32:
+    while b.n > 0:
+        b.n = b.n - 1
+        yield b.n
+
+fn main:
+    var b = Box { n: 2 }
+    for x in walk(mut b):
+        b.n = 5
+        print(x)

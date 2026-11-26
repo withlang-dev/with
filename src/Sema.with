@@ -1376,7 +1376,7 @@ type Sema {
     // Gen fns whose generator value holds a view of the borrowed receiver
     // (field 0 is &Self): the constructor stores its place, `each` passes
     // that place to the producer.
-    generator_fn_receiver_views: HashMap[i32, i32, Minted],
+    generator_fn_view_params: HashMap[i32, i32, Minted],
     generator_mir_only_fns: HashMap[i32, i32, Minted],
     generator_state_yield_types: HashMap[i32, i32, Minted],
     // §13.6a: an NK_FOR whose iterable is an Option or Result is the
@@ -2835,6 +2835,8 @@ type Sema {
     // call node: gen_call_view_place_nodes[start..start+count].
     gen_call_view_place_starts: HashMap[i32, i32, Minted],
     gen_call_view_place_counts: HashMap[i32, i32, Minted],
+    // The view places of generator calls that the gen fn takes `mut`.
+    gen_call_mut_view_places: HashMap[i32, i32, Minted],
     gen_call_view_place_nodes: List[i32],
     stmt_pos_depth: i32,
     current_statement_expr_root: i32,
@@ -3765,7 +3767,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let generator_fn_state_syms = sema_new_map_i32_i32()
     let generator_fn_run_syms = sema_new_map_i32_i32()
     let generator_fn_each_syms = sema_new_map_i32_i32()
-    let generator_fn_receiver_views = sema_new_map_i32_i32()
+    let generator_fn_view_params = sema_new_map_i32_i32()
     let generator_mir_only_fns = sema_new_map_i32_i32()
     let generator_state_yield_types = sema_new_map_i32_i32()
     let for_carrier_matches = sema_new_map_i32_i32()
@@ -4097,7 +4099,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         generator_fn_state_syms,
         generator_fn_run_syms,
         generator_fn_each_syms,
-        generator_fn_receiver_views,
+        generator_fn_view_params,
         generator_mir_only_fns,
         generator_state_yield_types,
         for_carrier_matches,
@@ -4788,6 +4790,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         for_view_binding_gen_loops: [],
         gen_call_view_place_starts: sema_new_map_i32_i32(),
         gen_call_view_place_counts: sema_new_map_i32_i32(),
+        gen_call_mut_view_places: sema_new_map_i32_i32(),
         gen_call_view_place_nodes: [],
         stmt_pos_depth: 0,
         current_statement_expr_root: 0,

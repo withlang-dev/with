@@ -8539,8 +8539,9 @@ impl Sema:
                 with_eprint(f"[vra] mono={self.pool_resolve(mono_sym)} sig={sig_idx} param={abi_pi} vra={cfc_vra} owner={method_owner_sym} self_ty={self_type_id} kind={self.get_type_kind(self.resolve_alias(self_type_id as TypeId))}")
             if cfc_vra != 0:
                 self.set_sig_param_value_ref_abi(sig_idx, abi_pi, 1)
-        if is_gen and self.generator_borrows_receiver(param_start, param_count, ps):
-            self.set_sig_param_value_ref_abi(sig_idx, 0, 1)
+        if is_gen:
+            for vpi in 0..param_count:
+                if self.generator_param_is_view(param_start, param_count, ps, vpi): self.set_sig_param_value_ref_abi(sig_idx, vpi, 1)
 
         // Concrete generic validation must run in the callee's own lexical
         // environment, not inside the caller's active local scopes.
@@ -20796,7 +20797,11 @@ impl Sema:
             let arg_node = if arg_index < 0: (if pi == 0: recv_node else: 0) else if has_resolved: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
             if arg_node <= 0:
                 continue
-            self.gen_call_view_place_nodes.push(self.gen_view_arg_place(arg_node))
+            let view_place = self.gen_view_arg_place(arg_node)
+            // A place the gen fn takes `mut` (a `mut` parameter, a `mut fn`
+            // receiver) is the generator's alone while its loop runs (D172).
+            if self.sig_param_is_mut(sig_idx, pi): self.gen_call_mut_view_places.insert(view_place, 1)
+            self.gen_call_view_place_nodes.push(view_place)
             place_count += 1
             union_mask = union_mask | self.compute_expr_view_origin_mask(arg_node)
             let dep_len_before = concrete_deps.len()
@@ -20847,17 +20852,18 @@ impl Sema:
                     continue
                 let path_start = self.borrow_path_mark()
                 let path_count = self.borrow_collect_path(place_node)
-                self.register_gen_loop_view_borrow(ref_sym, root, self.borrow_field(place_node), path_start, path_count, iterable)
+                let kind = if self.gen_call_mut_view_places.contains(place_node): BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+                self.register_gen_loop_view_borrow(ref_sym, root, kind, self.borrow_field(place_node), path_start, path_count, iterable)
             return
         var deps: List[i32] = []
         deps = self.collect_expr_view_deps(node, deps)
         for dep in deps:
             if dep != 0 and dep != ref_sym:
-                self.register_gen_loop_view_borrow(ref_sym, dep, 0, self.borrow_path_mark(), 0, iterable)
+                self.register_gen_loop_view_borrow(ref_sym, dep, BorrowKind.SHARED, 0, self.borrow_path_mark(), 0, iterable)
 
-    mut fn register_gen_loop_view_borrow(ref_sym: i32, root: i32, field: i32, path_start: i32, path_count: i32, err_node: i32):
+    mut fn register_gen_loop_view_borrow(ref_sym: i32, root: i32, kind: i32, field: i32, path_start: i32, path_count: i32, err_node: i32):
         let before = self.borrow_refs.len()
-        self.check_borrow_create_direct(root, BorrowKind.SHARED, field, path_start, path_count, err_node)
+        self.check_borrow_create_direct(root, kind, field, path_start, path_count, err_node)
         if self.borrow_refs.len() > before:
             self.borrow_refs[before] = ref_sym
             self.for_view_binding_syms.push(ref_sym)
