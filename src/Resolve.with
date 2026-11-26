@@ -1678,7 +1678,7 @@ fn resolve_release_parse(text: &str) -> Option[Release]:
             if not resolve_is_digit(c): return None
         let value: i64 = part.parse() ?? 0
         parts.push(value)
-    Some(Release { parts, letters: head.slice(cut, head.len()), prerelease, has_prerelease: dash >= 0 })
+    Release { parts, letters: head.slice(cut, head.len()), prerelease, has_prerelease: dash >= 0 }
 
 // Whether release `a` comes before release `b`: numeric parts first (a
 // missing part is 0), then the letters (`1.1.1` < `1.1.1a` < `1.1.1w`), then
