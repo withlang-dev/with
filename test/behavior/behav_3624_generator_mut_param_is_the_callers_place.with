@@ -1,0 +1,27 @@
+//! expect-stdout: 1
+//! expect-stdout: 0
+//! expect-stdout: left 0
+//! expect-stdout: 2
+//! expect-stdout: left 1 kept 7
+
+// #3624 (D172, §3.8a): a gen fn's `mut` parameter is the caller's place, as
+// any function's is. The generator value held it by value: the body's
+// writes went to a copy, and `left` printed 2.
+type Box { n: i32, kept: i32 }
+
+gen fn walk(mut b: Box) -> i32:
+    while b.n > 0:
+        b.n = b.n - 1
+        yield b.n
+
+gen fn step(scale: i32, mut b: Box) -> i32:
+    b.n = b.n - 1
+    yield b.n * scale
+
+fn main:
+    var b = Box { n: 2, kept: 7 }
+    for x in walk(mut b): print(x)
+    print(f"left {b.n}")
+    b.n = 2
+    for x in step(2, mut b): print(x)
+    print(f"left {b.n} kept {b.kept}")

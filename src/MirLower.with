@@ -20058,10 +20058,10 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: &AstPool, pool: &InternPoo
     for pi in 0..param_count:
         let p_ty = sema.sig_param_type(sig_idx, pi)
         let param_place = builder.place_for_local(pi + 1)
-        if pi == 0 and sema.generator_fn_receiver_views.contains(fn_sym):
-            // A borrowed receiver is the caller's place (by-place ABI); the
-            // generator value keeps a view of it.
-            let view_ty = sema.type_extra[(sema.get_type_d1(state_tid) + 1)]
+        if ((sema.generator_fn_view_params.get(fn_sym) ?? 0) & sema_param_origin_bit(pi)) != 0:
+            // A borrowed receiver or a `mut` parameter is the caller's place
+            // (by-place ABI); the generator value keeps a view of it.
+            let view_ty = sema.type_extra[(sema.get_type_d1(state_tid) + pi * 3 + 1)]
             let view_local = builder.new_temp(view_ty)
             let view_place = builder.place_for_local(view_local)
             let view_rv = builder.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, param_place, 0)
@@ -20119,10 +20119,9 @@ fn lower_generator_each_body(sema: &Sema, ast_pool: &AstPool, pool: &InternPool,
         let field_sym: i32 = sema.type_extra[(field_start + fi * 3)]
         let field_ty: i32 = sema.type_extra[(field_start + fi * 3 + 1)]
         let field_place = builder.body.new_named_field_place(self_place, field_sym, fi, field_ty)
-        if fi == 0 and sema.generator_fn_receiver_views.contains(fn_sym):
-            // The producer takes the receiver by place: the place the view
-            // names.
-            let recv_ty = sema.sig_param_type(run_sig, 0)
+        if ((sema.generator_fn_view_params.get(fn_sym) ?? 0) & sema_param_origin_bit(fi)) != 0:
+            // The producer takes it by place: the place the view names.
+            let recv_ty = sema.sig_param_type(run_sig, fi)
             args.push(builder.body.new_operand(OperandKind.OK_COPY, builder.body.new_deref_place(field_place, recv_ty)))
         else:
             args.push(builder.operand_for_place(field_place, field_ty))

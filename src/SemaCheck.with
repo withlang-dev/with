@@ -8539,8 +8539,9 @@ impl Sema:
                 with_eprint(f"[vra] mono={self.pool_resolve(mono_sym)} sig={sig_idx} param={abi_pi} vra={cfc_vra} owner={method_owner_sym} self_ty={self_type_id} kind={self.get_type_kind(self.resolve_alias(self_type_id as TypeId))}")
             if cfc_vra != 0:
                 self.set_sig_param_value_ref_abi(sig_idx, abi_pi, 1)
-        if is_gen and self.generator_borrows_receiver(param_start, param_count, ps):
-            self.set_sig_param_value_ref_abi(sig_idx, 0, 1)
+        if is_gen:
+            for vpi in 0..param_count:
+                if self.generator_param_is_view(param_start, param_count, ps, vpi): self.set_sig_param_value_ref_abi(sig_idx, vpi, 1)
 
         // Concrete generic validation must run in the callee's own lexical
         // environment, not inside the caller's active local scopes.
