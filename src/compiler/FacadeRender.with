@@ -295,8 +295,8 @@ fn facade_render_message(pool: &AstPool, intern: &InternPool, ci: &List[i32], it
     var guard = ""
     if release_line != 0 and not resource_passed:
         let flag = "__with_message_" ++ name ++ "_polling"
-        guard_decl = "global var " ++ flag ++ " = false\n"
-        guard = "    if " ++ flag ++ ": panic(\"" ++ name ++ ".poll: a poll of this message is already running, and its release would end the payload that loop is reading\")\n    " ++ flag ++ " = true\n    defer: " ++ flag ++ " = false\n"
+        guard_decl = "global " ++ flag ++ ": Atomic[i64] = Atomic.new(0)\n"
+        guard = "    if " ++ flag ++ ".swap(1, .SeqCst) != 0: panic(\"" ++ name ++ ".poll: a poll of this message is already running, and its release would end the payload that loop is reading\")\n    defer: " ++ flag ++ ".store(0, .SeqCst)\n"
     var out = "enum " ++ name ++ " ephemeral:\n" ++ cases ++ "    Other(" ++ tag_type ++ ")\n" ++ viewers ++ guard_decl
     out = out ++ "gen fn " ++ name ++ ".poll(" ++ params ++ ") -> " ++ name ++ ":\n" ++ guard ++ "    var raw: " ++ record ++ "\n    while unsafe { " ++ producer ++ "(" ++ call_args ++ ") }:\n" ++ release ++ "        let tag = raw." ++ tag_field ++ "\n" ++ arms ++ "        else: yield " ++ name ++ ".Other(tag)\n"
     out

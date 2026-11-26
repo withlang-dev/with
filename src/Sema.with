@@ -5648,6 +5648,13 @@ impl Sema:
             return 1
         if sema_path_is_compiler_hook_runner(self.current_module_path):
             return 1
+        // The text the compiler renders from a contract (`<facade NAME>`) is
+        // checked in the module that states the contract, whose imports are
+        // the programmer's. What the rendering itself names from the standard
+        // library (an `Atomic` flag) is the compiler's to reach: the
+        // programmer wrote no line that could import it, and gains no name.
+        if is_pub != 0 and sema_tier_path_is_std_implementation(target_path) and self.source_text_name_of(self.local_file_id).starts_with("<facade "):
+            return 1
         let current_is_std = sema_tier_path_is_std_implementation(self.current_module_path)
         let target_is_std = sema_tier_path_is_std_implementation(target_path)
         self.vis_note("gate: current=" ++ self.current_module_path ++ " target=" ++ target_path ++ f" current-std={current_is_std} target-std={target_is_std} pub={is_pub}")

@@ -1,0 +1,33 @@
+//! expect-exit: 134
+//! expect-stdout: outer body
+//! expect-stderr: Callback.poll: a poll of this message is already running
+
+// D216 (#2425): the flag that refuses a second poll of a `release` message
+// is one atomic swap, so a poll begun on another thread while one is running
+// is refused as a nested one is. The guard is the rendering's own `Atomic`:
+// the program imports nothing for it.
+use std.thread
+use c_import("behav_d216_callbacks.h")
+
+c contract steamish:
+    message Callback wraps Msg
+        from msg_next(out param 1)
+        tag tag
+        case OverlayActivated when CB_OVERLAY : Overlay
+        case StatsStored when CB_STORED : Stored
+        payload data size size
+        release msg_free
+
+fn other_thread() -> i32:
+    var seen = 0
+    for cb in Callback.poll(3):
+        match cb:
+            _ => seen += 1
+    seen
+
+fn main:
+    for cb in Callback.poll(3):
+        match cb:
+            _ => print("outer body")
+        let h = spawn_os(other_thread)
+        print(join(&h))
