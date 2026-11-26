@@ -1138,6 +1138,7 @@ let POSIX_CAPTURE_TIMEOUT_RC: i32 = 124
 
 var posix_interrupt_flag: i32 = 0
 var posix_active_child_pgid: i32 = 0
+var posix_active_child_grouped: i32 = 0
 
 fn posix_store_i64(base: i64, offset: i64, value: i64):
     unsafe *((base + offset) as *mut i64) = value
@@ -1259,10 +1260,11 @@ fn posix_redirect_fd_from_path(path: *const c_char, fd: i32) -> i32:
     rt_close(in_fd)
     0
 
-fn posix_child_common(mask_rc: i32, prev_mask: *const PosixSigset):
+fn posix_child_common(mask_rc: i32, prev_mask: *const PosixSigset, isolate_pgid: bool):
     if mask_rc == 0:
         posix_restore_signal_mask(prev_mask)
-    rt_libc_setpgid(0, 0)
+    if isolate_pgid:
+        rt_libc_setpgid(0, 0)
     posix_restore_default_signal_handler(POSIX_SIGINT)
     posix_restore_default_signal_handler(POSIX_SIGTERM)
     posix_restore_default_signal_handler(POSIX_SIGHUP)
@@ -1294,13 +1296,25 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_
     if table as i64 == 0:
         rt_write(2, c"error: could not map the argument table for a command\n".ptr as *const u8, 54)
         return -1
+    // Captured, timed, or non-waiting children get their own process group so
+    // timeouts and interrupts signal their whole subtree. Interactive
+    // foreground children (inheriting stdio with no timeout) stay in the
+    // parent's process group so terminal ioctls (tcsetattr, read) do not stop
+    // them with SIGTTOU/SIGTTIN.
+    let isolate_pgid = stdout_path as i64 != 0 or stderr_path as i64 != 0 or timeout_ms > 0 or not wait
     var prev_mask = PosixSigset { words: [0 as u64; 16] }
     let mask_rc = posix_block_interrupt_signals(&raw mut prev_mask)
     let pid = rt_libc_fork()
     if pid == 0:
-        posix_child_common(mask_rc, &prev_mask as *const PosixSigset)
-        if stdin_path as i64 != 0 and posix_redirect_fd_from_path(stdin_path, 0) != 0:
-            posix_child_fail(c"error: could not open a command's standard input '".ptr, stdin_path)
+        posix_child_common(mask_rc, &prev_mask as *const PosixSigset, isolate_pgid)
+        if stdin_path as i64 != 0:
+            if posix_redirect_fd_from_path(stdin_path, 0) != 0:
+                posix_child_fail(c"error: could not open a command's standard input '".ptr, stdin_path)
+        else if isolate_pgid and rt_libc_isatty(0) != 0:
+            // A child in a background process group cannot read or tcsetattr
+            // the controlling terminal without stopping on SIGTTIN/SIGTTOU;
+            // detach TTY stdin to /dev/null while leaving pipes/files intact.
+            posix_redirect_fd_from_path(c"/dev/null".ptr, 0)
         if stdout_path as i64 != 0 and posix_redirect_fd_to_path(stdout_path, 1) != 0:
             posix_child_fail(c"error: could not open a command's standard output '".ptr, stdout_path)
         if stderr_path as i64 != 0 and posix_redirect_fd_to_path(stderr_path, 2) != 0:
@@ -1323,20 +1337,24 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_
         if mask_rc == 0:
             posix_restore_signal_mask(&prev_mask as *const PosixSigset)
         return -1
-    rt_libc_setpgid(pid, pid)
+    if isolate_pgid:
+        rt_libc_setpgid(pid, pid)
     if mask_rc == 0:
         posix_restore_signal_mask(&prev_mask as *const PosixSigset)
     if not wait:
         return pid
     posix_active_child_pgid = pid
+    posix_active_child_grouped = isolate_pgid as i32
     let rc = posix_wait_child(pid, timeout_ms)
     posix_active_child_pgid = 0
+    posix_active_child_grouped = 0
     rc
 
 fn posix_interrupt_signal_handler(signo: i32):
     posix_interrupt_flag = 1
     if posix_active_child_pgid > 0:
-        rt_libc_kill(-posix_active_child_pgid, signo)
+        let target = if posix_active_child_grouped != 0: -posix_active_child_pgid else: posix_active_child_pgid
+        rt_libc_kill(target, signo)
     rt_libc_exit(128 + signo)
 
 fn posix_interrupted() -> bool:
@@ -1474,8 +1492,10 @@ pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     if pid <= 0:
         return -1
     posix_active_child_pgid = pid
+    posix_active_child_grouped = 1
     let rc = posix_wait_child(pid, timeout_ms)
     posix_active_child_pgid = 0
+    posix_active_child_grouped = 0
     rc
 
 // #679/#702: peak RSS (bytes) of the most recently reaped child.
