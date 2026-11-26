@@ -35,14 +35,16 @@ use rt.rt_core
 
 // One report per violating step: the step's block and span source, and
 // what to say.
-const PAIRS_SITE_INVOKE: i32 = 1
-const PAIRS_SITE_HELPER: i32 = 2
-const PAIRS_SITE_EXPIRE: i32 = 3
-const PAIRS_SITE_MOVED: i32 = 4
-const PAIRS_SITE_ESCAPE: i32 = 5
+enum PairsSiteKind: i32:
+    Invoke = 1
+    Helper = 2
+    Expire = 3
+    Moved = 4
+    Escape = 5
+    NonPreserving = 6
 
 type PairsStepSite {
-    kind: i32,
+    kind: PairsSiteKind,
     bb: i32,
     stmt: i32,       // the statement, or -1 for the block's terminator
     key: i32,        // the place key the report names
@@ -107,7 +109,7 @@ fn pairs_keep(): pairs_block(FOREIGN_PAIR_KEEP, 0, -1, -1, false, false)
 fn pairs_step(action: i32, place: i32, source: i32, block: ForeignPairBlock) -> ForeignPairStep:
     ForeignPairStep { action, place, source, contract: block }
 
-fn pairs_site(kind: i32, bb: i32, stmt: i32, key: i32, op: i32) -> PairsStepSite:
+fn pairs_site(kind: PairsSiteKind, bb: i32, stmt: i32, key: i32, op: i32) -> PairsStepSite:
     PairsStepSite { kind, bb, stmt, key, op }
 
 // The value a switch's `otherwise` arm stands for when the switch is on a
@@ -149,6 +151,9 @@ type PairsBody {
     // 1 for keys a userdata setter retains (the referent of its `&U`
     // argument): their moves and deaths are steps.
     origin_key: List[i32],
+    // 1 for retained origins whose type is a facade resource (§16.2b.5,
+    // #3120): non-`preserves` operations on them are refused while held.
+    origin_is_resource: List[i32],
     // The block of the setter call that retained each origin: where a
     // dying or moving origin is reported.
     origin_bb: List[i32],
@@ -171,7 +176,7 @@ type PairsBody {
 fn pairs_body_new(body: &MirBody) -> PairsBody:
     let keys = mir_drop_state_keys_new(body)
     let width = keys.len() as i32
-    PairsBody { keys: keys, key_resource: pairs_list_i32(width, -1), key_alias: pairs_list_i32(width, -1), key_is_ref: pairs_list_i32(width, 0), ref_origin: pairs_list_i32(width, -2), origin_key: pairs_list_i32(width, 0), origin_bb: pairs_list_i32(width, -1), guard_alias: pairs_list_i32(width, -1), guard_ok: pairs_list_i64(width, -1), cond_guard: pairs_list_i32(width, -1), cond_is_eq: pairs_list_i32(width, 1), steps: [], sites: [], starts: [], counts: [], edges: [] }
+    PairsBody { keys: keys, key_resource: pairs_list_i32(width, -1), key_alias: pairs_list_i32(width, -1), key_is_ref: pairs_list_i32(width, 0), ref_origin: pairs_list_i32(width, -2), origin_key: pairs_list_i32(width, 0), origin_is_resource: pairs_list_i32(width, 0), origin_bb: pairs_list_i32(width, -1), guard_alias: pairs_list_i32(width, -1), guard_ok: pairs_list_i64(width, -1), cond_guard: pairs_list_i32(width, -1), cond_is_eq: pairs_list_i32(width, 1), steps: [], sites: [], starts: [], counts: [], edges: [] }
 
 impl PairsBody:
     fn width(): self.key_resource.len()
@@ -297,6 +302,10 @@ impl PairsBody:
                 if origin >= 0:
                     self.origin_key[origin] = 1
                     self.origin_bb[origin] = bb
+                    if action == FOREIGN_PAIR_RETAIN and origin < self.keys.base_local.len():
+                        let base_local = self.keys.base_local[origin]
+                        if base_local >= 0 and base_local < body.local_type_ids.len() and sema.facade_resource_index_for_type(body.local_type_ids[base_local]) >= 0:
+                            self.origin_is_resource[origin] = 1
         // A setter's status bound to a local (`let rc = h.set(…)`) or copied
         // on: the local stands for the call's status in a comparison.
         for stmt in 0..body.stmt_count():
@@ -354,31 +363,31 @@ impl PairsBody:
             return
         if self.is_resource(src):
             if dest_place >= 0 and pairs_place_escapes(body, dest_place):
-                self.push(pairs_step(FOREIGN_STEP_ESCAPE, src, -1, pairs_keep()), pairs_site(PAIRS_SITE_ESCAPE, bb, stmt, src, -1))
+                self.push(pairs_step(FOREIGN_STEP_ESCAPE, src, -1, pairs_keep()), pairs_site(PairsSiteKind.Escape, bb, stmt, src, -1))
             let dest = self.key_of(dest_place)
             if dest >= 0:
-                self.push(pairs_step(FOREIGN_STEP_MOVE, dest, src, pairs_keep()), pairs_site(PAIRS_SITE_MOVED, bb, stmt, src, -1))
-        else if self.is_origin(src):
-            self.push(pairs_step(FOREIGN_STEP_EXPIRE, src, -1, pairs_keep()), pairs_site(PAIRS_SITE_MOVED, bb, stmt, src, -1))
+                self.push(pairs_step(FOREIGN_STEP_MOVE, dest, src, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
+        if self.is_origin(src):
+            self.push(pairs_step(FOREIGN_STEP_EXPIRE, src, -1, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
 
     mut fn destroy(sema: &Sema, key: i32, bb: i32, stmt: i32):
         let invokes = sema.facade_pair_drop_invokes(self.key_resource[key])
-        self.push(pairs_step(FOREIGN_STEP_APPLY, key, -1, pairs_block(FOREIGN_PAIR_DESTROY, 0, -1, -1, false, invokes)), pairs_site(PAIRS_SITE_INVOKE, bb, stmt, key, -1))
+        self.push(pairs_step(FOREIGN_STEP_APPLY, key, -1, pairs_block(FOREIGN_PAIR_DESTROY, 0, -1, -1, false, invokes)), pairs_site(PairsSiteKind.Invoke, bb, stmt, key, -1))
 
     mut fn build_stmt(sema: &Sema, body: &MirBody, bb: i32, stmt: i32):
         let kind = body.stmt_kind(stmt)
         if kind == StmtKind.Drop:
             let key = self.key_of(body.stmt_data0(stmt))
             if self.is_resource(key): self.destroy(sema, key, bb, stmt)
-            // A dropped origin (a capturing callable ends by a drop, not
-            // only by its storage dying) dies here.
-            else if self.is_origin(key):
-                self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PAIRS_SITE_EXPIRE, bb, stmt, key, -1))
+            // A dropped origin (a capturing callable or retained resource
+            // ends by a drop, not only by its storage dying) dies here.
+            if self.is_origin(key):
+                self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PairsSiteKind.Expire, bb, stmt, key, -1))
             return
         if kind == StmtKind.StorageDead:
             let key = body.stmt_data0(stmt)
             if self.is_origin(key):
-                self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PAIRS_SITE_EXPIRE, bb, stmt, key, -1))
+                self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PairsSiteKind.Expire, bb, stmt, key, -1))
             return
         if kind != StmtKind.Assign:
             return
@@ -395,12 +404,12 @@ impl PairsBody:
             else:
                 let src = self.key_of(pairs_operand_place(body, op))
                 if self.is_ref(src) and self.is_ref(dest):
-                    self.push(pairs_step(FOREIGN_STEP_BORROW, dest, src, pairs_keep()), pairs_site(PAIRS_SITE_MOVED, bb, stmt, src, -1))
+                    self.push(pairs_step(FOREIGN_STEP_BORROW, dest, src, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
             return
         if rk == RvalueKind.RK_REF:
             let src = self.key_of(body.rval_d1[rv])
             if (self.is_resource(src) or self.is_ref(src)) and self.is_ref(dest):
-                self.push(pairs_step(FOREIGN_STEP_BORROW, dest, src, pairs_keep()), pairs_site(PAIRS_SITE_MOVED, bb, stmt, src, -1))
+                self.push(pairs_step(FOREIGN_STEP_BORROW, dest, src, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
             return
         if rk == RvalueKind.RK_AGGREGATE:
             let fields = body.rval_d1[rv]
@@ -416,21 +425,38 @@ impl PairsBody:
                     continue
                 let src = self.key_of(pairs_operand_place(body, op))
                 if self.is_resource(src):
-                    self.push(pairs_step(FOREIGN_STEP_ESCAPE, src, -1, pairs_keep()), pairs_site(PAIRS_SITE_ESCAPE, bb, stmt, src, -1))
-                    self.push(pairs_step(FOREIGN_STEP_MOVE, dest, src, pairs_keep()), pairs_site(PAIRS_SITE_MOVED, bb, stmt, src, -1))
-                else if self.is_origin(src):
-                    self.push(pairs_step(FOREIGN_STEP_EXPIRE, src, -1, pairs_keep()), pairs_site(PAIRS_SITE_MOVED, bb, stmt, src, -1))
+                    self.push(pairs_step(FOREIGN_STEP_ESCAPE, src, -1, pairs_keep()), pairs_site(PairsSiteKind.Escape, bb, stmt, src, -1))
+                    self.push(pairs_step(FOREIGN_STEP_MOVE, dest, src, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
+                if self.is_origin(src):
+                    self.push(pairs_step(FOREIGN_STEP_EXPIRE, src, -1, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
 
     // A resource born from a call's result (a constructor, `unwrap`, a
     // helper that returns one): the foreign defaults, a compatible pair.
     mut fn create_result(body: &MirBody, bb: i32):
         let dest = self.key_of(body.term_data2(bb))
         if self.is_resource(dest):
-            self.push(pairs_step(FOREIGN_STEP_APPLY, dest, -1, pairs_block(FOREIGN_PAIR_CREATE, 0, -1, -1, false, false)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, dest, -1))
+            self.push(pairs_step(FOREIGN_STEP_APPLY, dest, -1, pairs_block(FOREIGN_PAIR_CREATE, 0, -1, -1, false, false)), pairs_site(PairsSiteKind.Invoke, bb, -1, dest, -1))
 
     mut fn build_call(sema: &Sema, body: &MirBody, bb: i32):
         self.build_call_args(sema, body, bb)
         self.create_result(body, bb)
+
+    // §16.2b.5 (#3120): while a resource is held as a retained borrow, any
+    // call that receives it (borrowed or moved) without `preserves` is
+    // refused. `skip_arg` exempts the retaining setter's own retained
+    // argument so a second handle may share the same resource.
+    mut fn check_retained_resource_args(sema: &Sema, body: &MirBody, bb: i32, start: i32, count: i32, sig: i32, skip_arg: i32):
+        for ai in 0..count:
+            if ai == skip_arg: continue
+            let operand = body.call_arg_operands[(start + ai)]
+            let key = self.key_of(pairs_operand_place(body, operand))
+            if key < 0: continue
+            let origin = if self.ref_origin[key] >= 0: self.ref_origin[key] else: key
+            if origin < 0 or origin >= self.origin_is_resource.len() or self.origin_is_resource[origin] == 0: continue
+            if pairs_operand_is_move(body, operand):
+                self.push(pairs_step(FOREIGN_STEP_EXPIRE, origin, -1, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, -1, origin, -1))
+            else if not sema.facade_sig_preserves_param(sig, ai):
+                self.push(pairs_step(FOREIGN_STEP_EXPIRE, origin, -1, pairs_keep()), pairs_site(PairsSiteKind.NonPreserving, bb, -1, origin, sig))
 
     mut fn build_call_args(sema: &Sema, body: &MirBody, bb: i32):
         let call_id = body.term_data1(bb)
@@ -448,6 +474,8 @@ impl PairsBody:
             let subject = sema.facade_pair_ops[opi].subject_param
             if subject < 0 or subject >= count:
                 return
+            let skip_arg = if action == FOREIGN_PAIR_RETAIN: sema.facade_pair_ops[opi].retained_param else: -1
+            self.check_retained_resource_args(sema, body, bb, start, count, sig, skip_arg)
             let recv = self.key_of(pairs_operand_place(body, body.call_arg_operands[(start + subject)]))
             if recv < 0:
                 return
@@ -460,28 +488,30 @@ impl PairsBody:
                 // the slot's previous storage is released on the success
                 // edge only.
                 let origin = self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param)
-                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_retain_block(sema.facade_pair_ops[opi].slot, origin, guard, releases, invokes)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
+                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_retain_block(sema.facade_pair_ops[opi].slot, origin, guard, releases, invokes)), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
             else if action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA:
                 let origin = if action == FOREIGN_PAIR_USERDATA: self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param) else: -1
-                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_releasing(pairs_block(action, u_tid, origin, guard, true, invokes), releases, guard)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
+                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_releasing(pairs_block(action, u_tid, origin, guard, true, invokes), releases, guard)), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
             else:
-                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_releasing(pairs_block(action, 0, -1, -1, false, invokes), releases, guard)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
+                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_releasing(pairs_block(action, 0, -1, -1, false, invokes), releases, guard)), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
             return
         // Not a pair operation: a resource handed to it may be invoked and
         // changed in any way (checked as callback-capable, then unknown
         // until a reset); a resource moved into it is checked and gone; a
-        // retained origin moved into it dies here.
+        // retained origin moved into it dies here; a retained resource passed
+        // to an operation not marked `preserves` is refused.
+        self.check_retained_resource_args(sema, body, bb, start, count, sig, -1)
         for ai in 0..count:
             let operand = body.call_arg_operands[(start + ai)]
             let key = self.key_of(pairs_operand_place(body, operand))
             if key < 0:
                 continue
             if self.is_resource(key) and pairs_operand_is_move(body, operand):
-                self.push(pairs_step(FOREIGN_STEP_APPLY, key, -1, pairs_block(FOREIGN_PAIR_DESTROY, 0, -1, -1, false, true)), pairs_site(PAIRS_SITE_HELPER, bb, -1, key, -1))
+                self.push(pairs_step(FOREIGN_STEP_APPLY, key, -1, pairs_block(FOREIGN_PAIR_DESTROY, 0, -1, -1, false, true)), pairs_site(PairsSiteKind.Helper, bb, -1, key, -1))
             else if self.is_resource(key) or self.is_ref(key):
-                self.push(pairs_step(FOREIGN_STEP_APPLY, key, -1, pairs_block(FOREIGN_PAIR_UNKNOWN, 0, -1, -1, false, true)), pairs_site(PAIRS_SITE_HELPER, bb, -1, key, -1))
-            else if self.is_origin(key) and pairs_operand_is_move(body, operand):
-                self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PAIRS_SITE_MOVED, bb, -1, key, -1))
+                self.push(pairs_step(FOREIGN_STEP_APPLY, key, -1, pairs_block(FOREIGN_PAIR_UNKNOWN, 0, -1, -1, false, true)), pairs_site(PairsSiteKind.Helper, bb, -1, key, -1))
+            if self.is_origin(key) and self.origin_is_resource[key] == 0 and pairs_operand_is_move(body, operand):
+                self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, -1, key, -1))
 
     mut fn build_edges(body: &MirBody, bb: i32):
         let kind = body.term_kind(bb)
@@ -528,8 +558,8 @@ impl PairsBody:
             else if kind == TermKind.TK_DROP_AND_GOTO:
                 let key = self.key_of(body.term_data0(bb))
                 if self.is_resource(key): self.destroy(sema, key, bb, -1)
-                else if self.is_origin(key):
-                    self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PAIRS_SITE_EXPIRE, bb, -1, key, -1))
+                if self.is_origin(key):
+                    self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PairsSiteKind.Expire, bb, -1, key, -1))
             self.starts.push(first)
             self.counts.push((self.steps.len() - first) as i32)
             self.build_edges(body, bb)
@@ -537,7 +567,7 @@ impl PairsBody:
 fn pairs_site_span(ast: &AstPool, body: &MirBody, pb: &PairsBody, site: PairsStepSite) -> (i32, i32):
     // A retained origin that dies or moves is reported at the setter that
     // retained it: the death is a generated drop with no source of its own.
-    if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
+    if (site.kind == PairsSiteKind.Expire or site.kind == PairsSiteKind.Moved) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
         let retained_at = pb.origin_bb[site.key]
         if body.term_kind(retained_at) == TermKind.TK_CALL:
             let node = body.call_ast_node(body.term_data1(retained_at))
@@ -579,7 +609,7 @@ fn pairs_describe(ast: &AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, si
     // A dying or moving origin names the resource that retained it: the
     // subject of the setter that did.
     var named = site.key
-    if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
+    if (site.kind == PairsSiteKind.Expire or site.kind == PairsSiteKind.Moved or site.kind == PairsSiteKind.NonPreserving) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
         let call_id = body.term_data1(pb.origin_bb[site.key])
         let opi = if call_id >= 0 and call_id < body.call_sig_indices.len(): sema.facade_pair_op_for_sig(body.call_sig_indices[call_id]) else: -1
         let subject = if opi >= 0: sema.facade_pair_ops[opi].subject_param else: -1
@@ -589,16 +619,19 @@ fn pairs_describe(ast: &AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, si
     // What the resource holds the origin as: a retained pointer case's
     // storage (D194), named by its setter, or its callback userdata.
     var held_as = "callback userdata"
-    if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
+    if (site.kind == PairsSiteKind.Expire or site.kind == PairsSiteKind.Moved or site.kind == PairsSiteKind.NonPreserving) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
         let call_id = body.term_data1(pb.origin_bb[site.key])
         let opi = if call_id >= 0 and call_id < body.call_sig_indices.len(): sema.facade_pair_op_for_sig(body.call_sig_indices[call_id]) else: -1
         if opi >= 0 and sema.facade_pair_ops[opi].action == FOREIGN_PAIR_RETAIN: held_as = "the storage " ++ sema.facade_pair_op_display(opi) ++ " set"
-    if site.kind == PAIRS_SITE_INVOKE:
+    if site.kind == PairsSiteKind.NonPreserving:
+        let callee_name = if site.op >= 0 and site.op < sema.sig_names.len(): "'" ++ sema.pool_resolve(sema.sig_names[site.op]) ++ "'" else: "this operation"
+        return PairsFinding { fn_sym: body.fn_sym, start, end, message: pb.key_name(sema, body, site.key) ++ " cannot be passed to " ++ callee_name ++ " while " ++ resource ++ " holds a retained borrow of it (§16.2b.5, §16.2b.9)", note: "operations not marked 'preserves' may mutate or invalidate the borrowed resource", help: "release the retention or reset/destroy " ++ resource ++ " first, or mark " ++ callee_name ++ " 'preserves' in its contract if C does not mutate or invalidate it" }
+    if site.kind == PairsSiteKind.Invoke:
         return PairsFinding { fn_sym: body.fn_sym, start, end, message: pairs_op_name(sema, site.op) ++ " may invoke the callback pair of " ++ resource ++ ", and on this path the pair is not proven compatible (§16.2b.9)", note: "a callback set without its userdata, a setter whose failure was not handled, or a helper call that may have changed the pair leaves it unproven", help: "set both the callback and its userdata, branch on the setter's status against its 'ok' constant, or run the resource's abandonment path first" }
-    if site.kind == PAIRS_SITE_HELPER:
+    if site.kind == PairsSiteKind.Helper:
         return PairsFinding { fn_sym: body.fn_sym, start, end, message: "passing " ++ resource ++ " to a call the facade does not describe while its callback pair is not proven compatible; the callee may invoke it (§16.2b.9)", note: "", help: "complete the pair or run the abandonment path before the call" }
-    if site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED:
-        let what = if site.kind == PAIRS_SITE_EXPIRE: "dies" else: "moves"
+    if site.kind == PairsSiteKind.Expire or site.kind == PairsSiteKind.Moved:
+        let what = if site.kind == PairsSiteKind.Expire: "dies" else: "moves"
         return PairsFinding { fn_sym: body.fn_sym, start, end, message: pb.key_name(sema, body, site.key) ++ " " ++ what ++ " while " ++ resource ++ " still holds it as " ++ held_as ++ " (§16.2b.9)", note: "", help: "keep it alive until the retention is released or the resource is reset or destroyed, or reset the resource first" }
     PairsFinding { fn_sym: body.fn_sym, start, end, message: resource ++ " holds a retained borrow and cannot be returned or stored; it is ephemeral until the retention is released, or the resource reset or destroyed (§16.2b.9)", note: "", help: "release the retention or run the abandonment path first, or keep the resource in this frame" }
 
@@ -619,7 +652,7 @@ fn pairs_dump(sema: &Sema, body: &MirBody, pb: &PairsBody, flow: &ForeignPairPla
         for si in pb.starts[bb]..pb.starts[bb] + pb.counts[bb]:
             let s = &pb.steps[si]
             let c = &s.contract
-            eprint(f"  bb{bb} step{si} kind={s.action} place={s.place}:{pb.key_name(sema, body, s.place)} source={s.source} op={c.action} ty={c.ty} origin={c.origin} guard={c.guard} can_fail={c.can_fail} invokes={c.invokes} site={pb.sites[si].kind} tyname={sema.type_name(c.ty)}")
+            eprint(f"  bb{bb} step{si} kind={s.action} place={s.place}:{pb.key_name(sema, body, s.place)} source={s.source} op={c.action} ty={c.ty} origin={c.origin} guard={c.guard} can_fail={c.can_fail} invokes={c.invokes} site={pb.sites[si].kind as i32} tyname={sema.type_name(c.ty)}")
     for ei in 0..pb.edges.len():
         let e = &pb.edges[ei]
         eprint(f"  edge bb{e.from}->bb{e.to} guard={e.guard} succeeded={e.succeeded}")
@@ -657,11 +690,11 @@ impl PairsReport:
             let (start, _) = pairs_site_span(ast, body, pb, site)
             var seen = false
             for ri in 0..reported_starts.len():
-                if reported_starts[ri] == start and reported_kinds[ri] == site.kind: seen = true
+                if reported_starts[ri] == start and reported_kinds[ri] == site.kind as i32: seen = true
             if seen:
                 continue
             reported_starts.push(start)
-            reported_kinds.push(site.kind)
+            reported_kinds.push(site.kind as i32)
             self.findings.push(pairs_describe(ast, sema, body, pb, site))
             if pairs_dump_enabled():
                 let last = self.findings.len() - 1

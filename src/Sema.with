@@ -659,6 +659,7 @@ enum FacadeRetainedForm:
     Callback
     Text
     Sized
+    Resource
 
 // A callback method a facade rendered on a resource (stage 9, ruling
 // §44-§51; FacadeRender.with facade_render_callback_methods), keyed by the
@@ -2292,6 +2293,7 @@ type Sema {
     facade_c_invoked_userdata: HashMap[i32, i32, Minted],      // §12.4/§16.2b.9: a callback method's concrete signature -> its userdata parameter (signature index), which C invokes through the callback any number of times
     facade_pair_ops: List[FacadePairOp],                // D66 #1652: per concrete signature (facade_pair_op_by_sig)
     facade_pair_op_by_sig: HashMap[i32, i32, Minted],
+    facade_preserved_params: HashMap[i32, i32, Minted], // §16.2b.5 (#3120): presented sig -> param mask marked `preserves`
     facade_pair_setter_contract: HashMap[i32, i32, Minted],    // a pair setter's generic fn node -> foreign_contracts index …
     facade_pair_setter_case: HashMap[i32, i32, Minted],        // … and the case it renders (parallel)
     facade_pair_resources: HashMap[i32, i32, Minted],          // resource type symbol -> facade_resources index, for resources with a callback pair
@@ -4503,6 +4505,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         facade_c_invoked_userdata: sema_new_map_i32_i32(),
         facade_pair_ops: [],
         facade_pair_op_by_sig: sema_new_map_i32_i32(),
+        facade_preserved_params: sema_new_map_i32_i32(),
         facade_pair_setter_contract: sema_new_map_i32_i32(),
         facade_pair_setter_case: sema_new_map_i32_i32(),
         facade_pair_resources: sema_new_map_i32_i32(),

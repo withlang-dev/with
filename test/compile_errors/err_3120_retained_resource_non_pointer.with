@@ -1,0 +1,25 @@
+//! expect-check-fail: a retained resource case requires a facade resource whose representation is a pointer (§16.2b.5)
+//! expect-check-fail: = help: state '&R' only for a pointer-wrapping resource such as 'resource HeaderList wraps *mut curl_slist'
+
+// #3120 (D235, spec §16.2b.5): a retained variadic case may name `&R` only
+// when `R` is a facade resource whose representation is a pointer; a
+// scalar-wrapping resource (such as an `int` descriptor) is refused.
+use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nint h_set(h *x, int opt, ...);\nint fd_open(void);\nvoid fd_close(int fd);\n#define OPT_BAD 1\n#define H_OK 0\n")
+
+c contract hlib:
+    resource Easy wraps *mut h
+        from h_new
+        drop h_free
+    resource Fd wraps c_int
+        from fd_open
+        drop fd_close
+    fn h_set
+        rename setopt
+        lend
+        callbacks none
+        ok H_OK
+        variadic param 2 selected by param opt:
+            case OPT_BAD: &Fd retains by param 0
+
+fn main:
+    let _ = Easy.new()

@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.95
+# The With Programming Language — Specification v7.96
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+
+**Changelog v7.96:** D240 (delegated, D237/D98; direction ruled in D235, 2026-11-26, #3120). §16.2b.5: a retained variadic case may name `&R`, a shared borrow of a pointer-wrapping facade resource (for example `case CURLOPT_HTTPHEADER: &HeaderList retains by param 0 until curl_easy_reset`); the call passes the borrowed resource's representation, two handles may share the same resource, and while held the borrowed resource cannot be dropped, moved, or passed to a consuming or non-`preserves` operation. Implemented.
 
 **Changelog v7.95:** D238 / Law 13 (Eric, 2026-11-26, #2519). §29.13: line width is not enforced by the compiler; `with fmt` defaults to 100 columns and is configurable (`--max-width N` and `[fmt] max_width` in `with.toml`, CLI overriding `with.toml`); a comment-free block body holding a single plain expression folds onto the header line when the folded line fits within the configured width, and an over-width inline single-expression body unfolds into a multi-line body (preserving any trailing comment and staying idempotent). Proposal `docs/proposals/with-fmt.md` and D235 note revised to follow Law 13. Implemented.
 

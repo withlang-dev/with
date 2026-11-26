@@ -1118,6 +1118,11 @@ fn facade_render_detach_methods(pool: &AstPool, intern: &InternPool, ci: &List[i
 
 fn facade_render_borrowed_name(name: &str): "Borrowed" ++ name
 
+fn facade_render_is_resource_name(pool: &AstPool, intern: &InternPool, name: &str) -> bool:
+    for item in facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE):
+        if intern.resolve(pool.get_data0(item as NodeId)) == name: return true
+    false
+
 // The one resource whose representation is `repr`; "" when none wraps it
 // or several do (the type then names no single resource).
 fn facade_render_resource_wrapping(pool: &AstPool, intern: &InternPool, repr: &str) -> str:
@@ -3655,7 +3660,8 @@ fn facade_render_variadic_cases(pool: &AstPool, intern: &InternPool, decl: i32, 
             let length_ref = pool.get_extra(ops + 5)
             params = params ++ value ++ ": " ++ ty
             if length_ref == 0:
-                args = args ++ (if referent == "CStr": value ++ ".ptr()" else: value ++ ".as_cstr().ptr()")
+                let ptr_expr = if referent == "CStr": value ++ ".ptr()" else if facade_render_is_resource_name(pool, intern, referent): value ++ ".repr" else: value ++ ".as_cstr().ptr()"
+                args = args ++ ptr_expr
                 out = out ++ mhead ++ facade_render_variadic_case_name(base, sel) ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, repr_arg ++ ", " ++ args) ++ "\n"
                 continue
             let ok = facade_render_fn_ok(pool, intern, decl)

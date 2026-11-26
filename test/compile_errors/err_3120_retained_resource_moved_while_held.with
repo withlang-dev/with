@@ -1,0 +1,39 @@
+//! expect-check-fail: 'headers' moves while 'Easy' still holds it as the storage 'Easy.setopt' set
+//! expect-check-fail: = help: keep it alive until the retention is released or the resource is reset or destroyed, or reset the resource first
+
+// #3120 (D235, spec §16.2b.5, §16.2b.9): a facade resource held as a
+// retained borrow cannot be moved while the retention is live.
+use c_import("typedef struct h h;\ntypedef struct slist slist;\nh *h_new(void);\nvoid h_free(h *x);\nvoid h_reset(h *x);\nint h_set(h *x, int opt, ...);\nint h_run(h *x);\nslist *slist_new(void);\nvoid slist_free(slist *s);\n#define OPT_HEADERS 1\n#define H_OK 0\n")
+
+c contract hlib:
+    resource Easy wraps *mut h
+        from h_new
+        drop h_free
+        abandon h_reset
+    resource HeaderList wraps *mut slist
+        from slist_new
+        drop slist_free
+    fn h_reset
+        rename reset
+        lend
+        callbacks none
+    fn h_set
+        rename setopt
+        lend
+        callbacks none
+        ok H_OK
+        variadic param 2 selected by param opt:
+            case OPT_HEADERS: &HeaderList retains by param 0
+    fn h_run
+        rename perform
+        lend
+
+fn take_headers(h: HeaderList):
+    let _ = h
+
+fn main:
+    let headers = HeaderList.new().unwrap()
+    let easy = Easy.new().unwrap()
+    if easy.setopt(OPT_HEADERS, headers) != H_OK: return
+    take_headers(headers)
+    print(f"{easy.perform()}")

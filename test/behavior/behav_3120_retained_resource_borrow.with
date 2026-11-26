@@ -1,0 +1,108 @@
+//! expect-stdout: single 23 preserves 2 3 after 3 4
+//! expect-stdout: shared 20 20 after 3
+//! expect-stdout: scoped 20 after 3
+//! expect-stdout: live 0
+
+// #3120 (D235, spec §16.2b.5 "Retained pointer cases", §16.2b.9 "Retained
+// borrows"): a retained variadic case may name `&R` for a pointer-wrapping
+// facade resource (`HeaderList`, `Mime`). The retaining handle holds a shared
+// borrow of `R` for the retention window: `preserves` operations on `R` are
+// allowed while held, two handles may share one `R`, and non-`preserves`
+// operations succeed again once `until`, `abandon`, or handle destruction
+// releases the retention.
+use c_import("behav_3120_retained_resource_borrow.h")
+
+c contract hlib:
+    resource Easy wraps *mut easy
+        from easy_new
+        drop easy_free
+        abandon easy_reset
+    resource HeaderList wraps *mut slist
+        from slist_new
+        drop slist_free
+    resource Mime wraps *mut mime
+        from mime_new
+        drop mime_free
+    fn easy_new
+        rename new
+    fn easy_reset
+        rename reset
+        lend
+        callbacks none
+    fn easy_setopt
+        rename setopt
+        lend
+        callbacks none
+        ok H_OK
+        variadic param 2 selected by param opt:
+            case OPT_HEADERS: &HeaderList retains by param 0 until OPT_CLEAR_HEADERS
+            case OPT_CLEAR_HEADERS: c_int
+            case OPT_MIME: &Mime retains by param 0 until easy_reset
+    fn easy_perform
+        rename perform
+        lend
+    fn slist_new
+        rename new
+    fn slist_count
+        rename count
+        lend
+        preserves param 0
+    fn slist_push
+        rename push
+        lend
+    fn mime_new
+        rename new
+    fn mime_parts
+        rename parts
+        lend
+        preserves param 0
+    fn mime_add
+        rename add
+        lend
+    fn live_count
+        lend
+
+fn run_single():
+    let headers = HeaderList.new().unwrap()
+    let mime = Mime.new().unwrap()
+    let easy = Easy.new().unwrap()
+    if easy.setopt(OPT_HEADERS, headers) != H_OK: return
+    if easy.setopt(OPT_MIME, mime) != H_OK: return
+    let hc = headers.count()
+    let mp = mime.parts()
+    let res = easy.perform()
+    if easy.setopt(OPT_CLEAR_HEADERS, 1) != H_OK: return
+    let h_after = headers.push()
+    easy.reset()
+    let m_after = mime.add()
+    print(f"single {res} preserves {hc} {mp} after {h_after} {m_after}")
+
+fn run_shared():
+    let headers = HeaderList.new().unwrap()
+    let e1 = Easy.new().unwrap()
+    let e2 = Easy.new().unwrap()
+    if e1.setopt(OPT_HEADERS, headers) != H_OK: return
+    if e2.setopt(OPT_HEADERS, headers) != H_OK: return
+    let r1 = e1.perform()
+    let r2 = e2.perform()
+    e1.reset()
+    let _ = headers.count()
+    e2.reset()
+    let h_after = headers.push()
+    print(f"shared {r1} {r2} after {h_after}")
+
+fn run_scoped():
+    let headers = HeaderList.new().unwrap()
+    var res: i32 = 0
+    if true:
+        let easy = Easy.new().unwrap()
+        if easy.setopt(OPT_HEADERS, headers) == H_OK:
+            res = easy.perform()
+    let h_after = headers.push()
+    print(f"scoped {res} after {h_after}")
+
+fn main:
+    run_single()
+    run_shared()
+    run_scoped()
+    print(f"live {live_count()}")
