@@ -46,12 +46,16 @@ safety). One clause saying why it was dropped is enough.
 Then Eric rules; blessed wording lands immediately as the ruling and the
 implementation is non-compliant until it conforms.
 
-**Delegated decisions (D98).** A question that is not about C interop,
-ownership or safety, is easy to reverse, and has a prediction of 75% or higher
-does not wait: implement the prediction, spec words included, and record the
-brief in the decision log as **delegated**. Eric vetoes afterwards; a veto is a
-revert. UAT fixtures, examples, published programs, C interop, ownership,
-safety and anything hard to reverse stay his.
+**Delegated decisions (D98, amended by D237).** If `docs/mission.md` settles
+a brief (and there is no clearly articulated argument for changing
+`docs/mission.md`), take it as Eric's ruling without asking: implement it,
+land the normative spec words (and any contract-program updates required by
+the settled spec change), and record the brief in the decision log as
+**delegated**. Eric vetoes afterwards; a veto is a revert. When
+`docs/mission.md` does not settle the question, a question that is not about
+C interop, ownership, safety, or contract programs, is easy to reverse, and
+has a prediction of 75% or higher is likewise delegated (D98); anything else
+stops for Eric.
 
 
 ## Filing Bugs

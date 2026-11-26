@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D237 — If `docs/mission.md` settles a brief, take it as Eric's ruling without asking (ruled; amends D98)](2026-11-26-D237-mission-settled-questions-are-delegated.md)
 - [D236 — §29.11's words for the ten contextual declaration words and the unreserved `spawn` (delegated; the choice itself is D235's)](2026-11-25-D236-contextual-declaration-words.md)
 - [D235 — Rulings on the eighteen briefs of 2026-11-25: proofs through function-pointer fields, own-state stores, out-parameters; `case K: fills T`; a retained resource is borrowed; contextual keywords; and twelve more (ruled)](2026-11-25-D235-rulings-on-the-briefs-of-2026-11-25.md)
 - [D234 — A `main` that declares a `Result` and returns an `Err` ends the program as `?` in main does (delegated)](2026-11-24-D234-a-main-that-returns-err-ends-the-program-as-question-does.md)
