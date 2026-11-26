@@ -1,0 +1,134 @@
+//! expect-stdout: ok
+
+// §29.13 (#2519): `with fmt` defaults to 100 columns and is configurable via
+// `--max-width N` and `[fmt] max_width` in `with.toml` (CLI overrides
+// `with.toml`). Symmetric folding of comment-free single plain-expression
+// bodies, never enforced by the compiler.
+use pre_d_build_runner
+use std.fs
+
+fn assert_eq_str(actual: &str, expected: &str, label: &str):
+    if actual != expected:
+        eprint(f"FAIL {label}:\n--- actual ---\n{actual}--- expected ---\n{expected}")
+        assert(false)
+
+fn main:
+    let case_dir = p7_prepare_case("fmt_width_and_folding", "fmt2519")
+
+    // 1. Default 100-col boundary: 100 folds, 101 stays multi-line; 100 inline stays, 101 inline unfolds.
+    // Header "fn a(" + 75 'a's + ": i32) -> i32:" = 5 + 75 + 14 = 94 chars; " 12345" = +6 -> 100 chars.
+    let p75 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    let fold_100_in = "fn a(" ++ p75 ++ ": i32) -> i32:\n    12345\n"
+    let fold_100_out = "fn a(" ++ p75 ++ ": i32) -> i32: 12345\n"
+    assert(fold_100_out.len() - 1 == 100)
+    let fold_101_in = "fn a(" ++ p75 ++ ": i32) -> i32:\n    123456\n"
+    let unfold_101_in = "fn a(" ++ p75 ++ ": i32) -> i32: 123456\n"
+    assert(unfold_101_in.len() - 1 == 101)
+
+    p7_write(case_dir, "b100.with", fold_100_in)
+    let r1 = p7_run(case_dir, "fmt_100", "fmt\0b100.with\0")
+    p7_assert_success(r1, "fmt 100-col fold")
+    assert_eq_str(r1.stdout, fold_100_out, "100-col folds")
+
+    p7_write(case_dir, "b101.with", fold_101_in)
+    let r2 = p7_run(case_dir, "fmt_101_keep", "fmt\0b101.with\0")
+    p7_assert_success(r2, "fmt 101-col stays")
+    assert_eq_str(r2.stdout, fold_101_in, "101-col stays multi-line")
+
+    p7_write(case_dir, "u101.with", unfold_101_in)
+    let r3 = p7_run(case_dir, "fmt_101_unfold", "fmt\0u101.with\0")
+    p7_assert_success(r3, "fmt 101-col unfolds")
+    assert_eq_str(r3.stdout, fold_101_in, "101-col inline unfolds")
+
+    // Idempotent second pass on unfolded 101-col file.
+    p7_write(case_dir, "u101_2.with", r3.stdout)
+    let r3b = p7_run(case_dir, "fmt_101_unfold_2", "fmt\0u101_2.with\0")
+    p7_assert_success(r3b, "fmt 101-col idempotent")
+    assert_eq_str(r3b.stdout, r3.stdout, "101-col unfold idempotent")
+
+    // 2. Custom width override: --max-width 60, [fmt] max_width in with.toml, CLI overrides with.toml.
+    // "fn short_name(val: i32) -> i32: val + 1000000000000000000000" -> 60 chars
+    let w60_in = "fn short_name(val: i32) -> i32:\n    val + 1000000000000000000000\n"
+    let w60_out = "fn short_name(val: i32) -> i32: val + 1000000000000000000000\n"
+    assert(w60_out.len() - 1 == 60)
+    let w61_in = "fn short_name(val: i32) -> i32: val + 10000000000000000000000\n"
+    let w61_out = "fn short_name(val: i32) -> i32:\n    val + 10000000000000000000000\n"
+    assert(w61_in.len() - 1 == 61)
+
+    p7_write(case_dir, "w60.with", w60_in)
+    let r4 = p7_run(case_dir, "fmt_mw60_fold", "fmt\0--max-width\060\0w60.with\0")
+    p7_assert_success(r4, "fmt --max-width 60 fold")
+    assert_eq_str(r4.stdout, w60_out, "--max-width 60 folds 60-col")
+
+    p7_write(case_dir, "w61.with", w61_in)
+    let r5 = p7_run(case_dir, "fmt_mw60_unfold", "fmt\0--max-width\060\0w61.with\0")
+    p7_assert_success(r5, "fmt --max-width 60 unfold")
+    assert_eq_str(r5.stdout, w61_out, "--max-width 60 unfolds 61-col")
+
+    // [fmt] max_width = 50 in with.toml, overridden by --max-width 60.
+    p7_write(case_dir, "proj/with.toml", "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n\n[fmt]\nmax_width = 50\n")
+    p7_write(case_dir, "proj/a.with", w60_out)
+    let r6 = p7_run(case_dir, "fmt_toml_50", "fmt\0proj/a.with\0")
+    p7_assert_success(r6, "fmt with.toml max_width=50")
+    assert_eq_str(r6.stdout, w60_in, "with.toml max_width=50 unfolds 60-col")
+
+    let r7 = p7_run(case_dir, "fmt_cli_overrides_toml", "fmt\0--max-width\060\0proj/a.with\0")
+    p7_assert_success(r7, "fmt CLI overrides with.toml")
+    assert_eq_str(r7.stdout, w60_out, "CLI --max-width 60 overrides with.toml 50")
+
+    // 3. Indented method near the boundary (leading 4 spaces count toward width).
+    // "    fn m(" + 31 'x's + ": i32) -> i32: 12345" = 9 + 31 + 20 = 60 cols; +1 = 61 cols.
+    let x31 = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    let ind_60_line = "    fn m(" ++ x31 ++ ": i32) -> i32: 12345"
+    assert(ind_60_line.len() == 60)
+    let ind_60_in = "impl Foo:\n    fn m(" ++ x31 ++ ": i32) -> i32:\n        12345\n"
+    let ind_60_out = "impl Foo:\n" ++ ind_60_line ++ "\n"
+    let ind_61_in = "impl Foo:\n    fn m(" ++ x31 ++ ": i32) -> i32:\n        123456\n"
+    p7_write(case_dir, "ind60.with", ind_60_in)
+    let r8 = p7_run(case_dir, "fmt_ind60", "fmt\0--max-width\060\0ind60.with\0")
+    p7_assert_success(r8, "fmt indented 60-col folds")
+    assert_eq_str(r8.stdout, ind_60_out, "indented method at 60 folds")
+
+    p7_write(case_dir, "ind61.with", ind_61_in)
+    let r9 = p7_run(case_dir, "fmt_ind61", "fmt\0--max-width\060\0ind61.with\0")
+    p7_assert_success(r9, "fmt indented 61-col stays")
+    assert_eq_str(r9.stdout, ind_61_in, "indented method at 61 stays multi-line")
+
+    // 4. Comment-bearing body untouched.
+    let cmt_body = "fn f() -> i32:\n    // keep comment\n    1\n"
+    let cmt_inline = "fn g() -> i32:\n    1 // keep inline\n"
+    let cmt_hdr = "fn h() -> i32: // keep header\n    1\n"
+    p7_write(case_dir, "cmt_body.with", cmt_body)
+    let r10a = p7_run(case_dir, "fmt_cmt_body", "fmt\0cmt_body.with\0")
+    p7_assert_success(r10a, "fmt comment line in body untouched")
+    assert_eq_str(r10a.stdout, cmt_body, "comment line in body untouched")
+
+    p7_write(case_dir, "cmt_inline.with", cmt_inline)
+    let r10b = p7_run(case_dir, "fmt_cmt_inline", "fmt\0cmt_inline.with\0")
+    p7_assert_success(r10b, "fmt trailing comment on body untouched")
+    assert_eq_str(r10b.stdout, cmt_inline, "trailing comment on body untouched")
+
+    p7_write(case_dir, "cmt_hdr.with", cmt_hdr)
+    let r10c = p7_run(case_dir, "fmt_cmt_hdr", "fmt\0cmt_hdr.with\0")
+    p7_assert_success(r10c, "fmt trailing comment on header untouched")
+    assert_eq_str(r10c.stdout, cmt_hdr, "trailing comment on header untouched")
+
+    // 5. Over-width inline body with trailing comment unfolds preserving comment and stays idempotent.
+    let tc_in = "fn compute_value(x: i32) -> i32: x + 1 // a trailing comment pushing past sixty\n"
+    let tc_expected = "fn compute_value(x: i32) -> i32:\n    x + 1 // a trailing comment pushing past sixty\n"
+    p7_write(case_dir, "tc.with", tc_in)
+    let r11 = p7_run(case_dir, "fmt_tc_1", "fmt\0--max-width\060\0tc.with\0")
+    p7_assert_success(r11, "fmt trailing comment unfold")
+    assert_eq_str(r11.stdout, tc_expected, "over-width inline with trailing comment unfolds")
+
+    p7_write(case_dir, "tc2.with", r11.stdout)
+    let r12 = p7_run(case_dir, "fmt_tc_2", "fmt\0--max-width\060\0tc2.with\0")
+    p7_assert_success(r12, "fmt trailing comment idempotent")
+    assert_eq_str(r12.stdout, tc_expected, "over-width inline with trailing comment idempotent")
+
+    // 6. Compiler never enforces line width: a >100-col inline function checks cleanly.
+    p7_write(case_dir, "long_ok.with", unfold_101_in ++ "fn main:\n    let _ = a(1)\n")
+    let r13 = p7_run(case_dir, "check_long_line", "check\0long_ok.with\0")
+    p7_assert_success(r13, "compiler accepts >100-col line without complaint")
+
+    print("ok")

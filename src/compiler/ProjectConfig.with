@@ -40,6 +40,7 @@ type ProjectConfig {
     overflow_mode: i32,
     strict_effects: bool,
     lint_partial_statement_match: bool,
+    fmt_max_width: i32,
 }
 
 fn project_config_default -> ProjectConfig:
@@ -77,6 +78,7 @@ fn project_config_default -> ProjectConfig:
         overflow_mode: overflow_mode_default(),
         strict_effects: false,
         lint_partial_statement_match: false,
+        fmt_max_width: 100,
     }
 
 fn project_config_clone_str(s: &str) -> str:
@@ -125,6 +127,7 @@ fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         overflow_mode: cfg.overflow_mode,
         strict_effects: cfg.strict_effects,
         lint_partial_statement_match: cfg.lint_partial_statement_match,
+        fmt_max_width: cfg.fmt_max_width,
     }
 
 fn project_config_file_exists(path: &str) -> bool:
@@ -262,6 +265,13 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: &str, key: &str, valu
                 out.manifest_error = "lint.partial_statement_match must be true or false"
         else:
             out.lint_partial_statement_match = parsed_lint != 0
+    else if section == "fmt" and key == "max_width":
+        let parsed_width = project_config_parse_positive_i64(value)
+        if parsed_width <= 0 or parsed_width > 2147483647:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "fmt.max_width must be a positive integer"
+        else:
+            out.fmt_max_width = parsed_width as i32
     else if section == "runtime" and key == "fiber_stack_size":
         let parsed_stack = project_config_parse_positive_i64(value)
         if parsed_stack <= 0:
@@ -619,6 +629,8 @@ fn project_config_wants_key(section: &str, key: &str) -> bool:
         return true
     if section == "lint" and key == "partial_statement_match":
         return true
+    if section == "fmt" and key == "max_width":
+        return true
     if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size" or key == "fiber_worker_count"):
         return true
     if section == "features":
@@ -638,6 +650,10 @@ fn project_config_forbidden_entry(section: &str, key: &str) -> str:
         return ""
     if section == "lint":
         return "unknown key '" ++ key ++ "' in [lint]; expected partial_statement_match"
+    if section == "fmt" and key == "max_width":
+        return ""
+    if section == "fmt":
+        return "unknown key '" ++ key ++ "' in [fmt]; expected max_width"
     if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size" or key == "fiber_worker_count"):
         return ""
     if section == "runtime":
