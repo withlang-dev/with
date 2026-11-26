@@ -41427,6 +41427,17 @@ impl Sema:
             if ref_sym == 0 or ref_sym == sym:
                 i = i + 1
                 continue
+            // A generator that took the place `mut` holds it for its whole
+            // loop: it writes the place between the body's runs, so the body
+            // does not read it by name (D172). Nothing names the generator
+            // again, so its hold has no last use to wait for.
+            if self.for_view_binding_is_gen_loop(ref_sym):
+                let held = self.pool_resolve(sym)
+                let holder = with_str_clone_ref(self.pool_resolve(ref_sym))
+                let diag = Diagnostic.err(f"cannot read `{held}` while `{holder}` holds it `mut`", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+                diag.add_help(f"`{holder}` takes `{held}` as a `mut` place for as long as its loop runs; read what the body needs into a `let` before the loop, or use what the generator yields")
+                self.diags.emit(diag)
+                return
             let stmt_root = self.current_statement_expr_root
             let last_use = self.view_last_use(ref_sym, node, self.borrow_scope_depths[i])
             let used_here = stmt_root != 0 and self.view_used_in(stmt_root, ref_sym)
