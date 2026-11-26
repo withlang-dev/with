@@ -2804,16 +2804,21 @@ impl Sema:
             let referent_name = if self.get_type_name(referent) != 0: self.pool_resolve(self.get_type_name(referent)) else: ""
             let text_form = is_ref and (referent == self.ty_cstr or referent_name == "CString")
             let sized_form = (self.get_type_kind(referent) == TypeKind.TY_SLICE and self.resolve_alias(self.get_type_d0(referent) as TypeId) == self.ty_u8) or (is_ref and referent == self.ty_str)
-            if not text_form and not sized_form:
-                self.emit_error_with_help("a retained pointer case's type is caller-managed storage (§16.2b.5, §16.3c)", node, "'&CString' or '&CStr' for a NUL-terminated string; '&[u8]' or '&str' with 'length param CONST as T' for bytes read to a length")
+            let retained_ri = if is_ref: self.facade_resource_index_for_type(referent as i32) else: -1
+            let resource_form = retained_ri >= 0 and self.get_type_kind(self.resolve_alias(self.facade_resources[retained_ri].repr_tid as TypeId)) == TypeKind.TY_PTR
+            if retained_ri >= 0 and not resource_form:
+                self.emit_error_with_help("a retained resource case requires a facade resource whose representation is a pointer (§16.2b.5)", node, "state '&R' only for a pointer-wrapping resource such as 'resource HeaderList wraps *mut curl_slist'")
+                return result
+            if not text_form and not sized_form and not resource_form:
+                self.emit_error_with_help("a retained pointer case's type is caller-managed storage or a borrow of a pointer-wrapping facade resource (§16.2b.5, §16.3c)", node, "'&CString' or '&CStr' for a NUL-terminated string; '&[u8]' or '&str' with 'length param CONST as T' for bytes read to a length; or '&Resource' for a pointer-wrapping facade resource")
                 return result
             if sized_form and length_ref == 0:
                 self.emit_error_with_help("a retained byte case states the option its length is set through, so the pointer and its length are one operation (§16.2b.5, §16.2b.8)", node, "add 'length param CONST as T' after 'retains by param N', or state '&CString' when C reads the pointer as a NUL-terminated string")
                 return result
-            if text_form and length_ref != 0:
-                self.emit_error_with_help("a NUL-terminated retained case has no length option; state '&[u8]' or '&str' for bytes read to a length (§16.2b.5)", node, "delete 'length param …', or write '&[u8]' or '&str' as the case's type")
+            if (text_form or resource_form) and length_ref != 0:
+                self.emit_error_with_help("a NUL-terminated or resource retained case has no length option; state '&[u8]' or '&str' for bytes read to a length (§16.2b.5)", node, "delete 'length param …', or write '&[u8]' or '&str' as the case's type")
                 return result
-            result.retained_form = if text_form: .Text else: .Sized
+            result.retained_form = if text_form: .Text else if resource_form: .Resource else: .Sized
             if length_ref != 0:
                 if self.ast.get_data0(length_ref) != FACADE_PARAM_REF_NAME:
                     self.emit_error_with_help("a retained case's length option names an imported selector constant, not a parameter index (§16.2b.5)", node, "after 'length param' write the option constant that sets the length (CURLOPT_POSTFIELDSIZE_LARGE)")
@@ -6276,7 +6281,67 @@ impl Sema:
             if self.facade_same_fn(self.facade_resources[ri].abandon, fn_sym): action = FOREIGN_PAIR_RESET
             else if self.foreign_contracts[ci].destroys != 0: action = FOREIGN_PAIR_DESTROY
             self.facade_add_pair_op(sig, ci, ri, action, -1, 0, -1, invokes)
+        self.facade_index_preserved_params()
         self.facade_index_retention_releases()
+
+    // §16.2b.5 (#3120): record which parameters each presented facade
+    // signature marks `preserves`, so MIR allows read-only operations on a
+    // retained resource and refuses non-preserving ones while held.
+    mut fn facade_index_preserved_params():
+        var ci: i32 = -1
+        for contract in self.foreign_contracts:
+            ci += 1
+            if contract.preserves_params.len() == 0: continue
+            let fn_sym = contract.fn_sym
+            let mask = self.facade_presented_preserved_mask(fn_sym, ci)
+            if mask == 0: continue
+            let raw_sig = self.get_sig(fn_sym)
+            if raw_sig >= 0:
+                var raw_mask: i32 = 0
+                for pi in contract.preserves_params: raw_mask = raw_mask | sema_param_origin_bit(pi)
+                self.facade_preserved_params.insert(raw_sig, raw_mask)
+            for bridge_sig in self.facade_free_bridge_sigs(ci):
+                self.facade_preserved_params.insert(bridge_sig, mask)
+            let hosts = self.facade_method_host(fn_sym)
+            if hosts.len() == 1:
+                let ri = hosts[0]
+                let host = self.pool_resolve(self.facade_resources[ri].name)
+                let mname = self.facade_presented(ri, self.pool_resolve(fn_sym))
+                if mname.len() > 0:
+                    let mtext = host ++ "." ++ mname
+                    if self.sig_text_index.contains(mtext):
+                        self.facade_preserved_params.insert(self.sig_text_index.get(mtext).unwrap(), mask)
+                    let btext = facade_render_borrowed_name(host) ++ "." ++ mname
+                    if self.sig_text_index.contains(btext):
+                        self.facade_preserved_params.insert(self.sig_text_index.get(btext).unwrap(), mask)
+
+    fn facade_presented_preserved_mask(fn_sym: i32, ci: i32) -> i32:
+        let sig = self.get_sig(fn_sym)
+        if sig < 0: return 0
+        var mask: i32 = 0
+        for pi in self.foreign_contracts[ci].preserves_params:
+            let projected = self.facade_presented_param_index(ci, pi)
+            if projected >= 0: mask = mask | sema_param_origin_bit(projected)
+        mask
+
+    fn facade_sig_preserves_param(sig: i32, param_idx: i32) -> bool:
+        if sig < 0 or param_idx < 0 or not self.facade_preserved_params.contains(sig): return false
+        (self.facade_preserved_params.get(sig).unwrap() & sema_param_origin_bit(param_idx)) != 0
+
+    // Index in `self.facade_resources` for a declared facade resource type
+    // (unwrapping `&R`), or -1 when `tid` is not a facade resource.
+    fn facade_resource_index_for_type(tid: i32) -> i32:
+        if tid == 0 or self.facade_resources.len() == 0: return -1
+        var r = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(r) == TypeKind.TY_REF:
+            r = self.resolve_alias(self.get_type_d0(r) as TypeId)
+        let name = self.get_type_name(r)
+        if name == 0: return -1
+        var ri: i32 = -1
+        for res in self.facade_resources:
+            ri += 1
+            if res.name == name: return ri
+        -1
 
     mut fn facade_add_pair_op(sig: i32, ci: i32, ri: i32, action: i32, slot: i32, userdata_tid: i32, guard_ok: i64, invokes: i32):
         if sig < 0 or self.facade_pair_op_by_sig.contains(sig):
