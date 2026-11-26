@@ -5454,7 +5454,7 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-global-init-list", args)
     if result.rc != 0: return result.rc
     // D102: a function in a C record's function-pointer slot is `Some` of it.
-    rc = bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: Some(add1), data: null }, limit: 7 }", "global_init_list")
+    rc = bs_file_contains(ctx, out_w, "var g: outer = outer { in: inner { cb: Some(add1), data: null }, limit: 7 }", "global_init_list")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "let table: List[config_s]", "global_init_list")
     if rc != 0: return rc

@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D239 — A reserved word may name a record field; imported C fields keep their names (delegated; #3629)](2026-11-26-D239-reserved-word-field-names.md)
 - [D238 — Law 13: meaning belongs to the compiler; presentation belongs to the formatter (ruled; #2519)](2026-11-26-D238-law-13-meaning-and-presentation.md)
 - [D237 — If `docs/mission.md` settles a brief, take it as Eric's ruling without asking (ruled; amends D98)](2026-11-26-D237-mission-settled-questions-are-delegated.md)
 - [D236 — §29.11's words for the ten contextual declaration words and the unreserved `spawn` (delegated; the choice itself is D235's)](2026-11-25-D236-contextual-declaration-words.md)

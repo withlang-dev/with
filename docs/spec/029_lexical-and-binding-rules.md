@@ -215,8 +215,12 @@ Notes:
 - `else if` is a two-token keyword pair (§9.1), not a single
   keyword.
 - `spawn` is not reserved: it has no construct in §14.
+- A reserved word may name a record field: in a declaration, literal
+  or pattern a `:` after the word decides, and after `.` or in
+  `offsetof[T](field)` the member position decides; imported C fields
+  keep their C names (D239).
 
-*Status (D235): implemented.*
+*Status (D235, D239): implemented.*
 
 ### 29.12 Error Codes
 

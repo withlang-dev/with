@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.93
+# The With Programming Language — Specification v7.94
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+
+**Changelog v7.94:** D239 (delegated, D237/D98; 2026-11-26, #3629). §29.11: a reserved word may name a record field (`type: T`, `Ev { type: 3 }`, `Ev { type: t }`, `e.type`, `offsetof[Ev](type)`), with `:` deciding in declarations, literals and patterns and member position deciding after `.` and in `offsetof`; imported C fields keep their C names without a trailing underscore. Implemented.
 
 **Changelog v7.93:** D216 (Eric, 2026-11-18; words blessed 2026-11-25). §16.2b.9a, new: polled messages. A `message` item states the function that fills a record, the tag field and each case; it presents an open sum and `Name.poll(…)`, iterated with `for`. A message with `release` takes the resource its producer receives `mut`; one whose producer receives none refuses a second running poll with a panic. Implemented.
 

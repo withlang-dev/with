@@ -502,6 +502,20 @@ impl Parser:
         self.advance()
         sym
 
+    // §29.11: a field may be named by a reserved word (`type`, the name C
+    // gives an event's tag). The `:` after it decides: a declaration's
+    // `type: T`, a literal's `type: 3`, a pattern's `type: t`. A member
+    // after `.` already may be one (expect_ident_or_keyword).
+    fn at_field_name() -> bool:
+        let t = self.peek()
+        t == TokenKind.TK_IDENT or (parser_is_keyword_tag(t) and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON)
+
+    mut fn expect_field_name() -> i32:
+        if not self.at_field_name(): return self.expect_ident()
+        let sym = self.intern_current()
+        self.advance()
+        sym
+
     mut fn expect_ident_or_keyword() -> i32:
         let t = self.peek()
         if t == TokenKind.TK_IDENT or parser_is_keyword_tag(t):
@@ -514,9 +528,13 @@ impl Parser:
 fn parser_is_keyword_tag(tag: i32) -> bool:
     if tag >= TokenKind.TK_KW_FN and tag <= TokenKind.TK_KW_OR:
         return true
+    if tag == TokenKind.TK_TRUE or tag == TokenKind.TK_FALSE:
+        return true
     if tag == TokenKind.TK_KW_CONST or tag == TokenKind.TK_KW_IT or tag == TokenKind.TK_KW_ERRDEFER or tag == TokenKind.TK_KW_MOVE or tag == TokenKind.TK_KW_COPY:
         return true
     if tag == TokenKind.TK_KW_WHERE or tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_NULL or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_ENUM or tag == TokenKind.TK_KW_GOTO:
+        return true
+    if tag == TokenKind.TK_KW_ASM or tag == TokenKind.TK_KW_GLOBAL or tag == TokenKind.TK_KW_DO or tag == TokenKind.TK_KW_NO_SUSPEND:
         return true
     false
 
@@ -2372,7 +2390,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_KW_PUB:
                 field_pub = 1
                 self.advance()
-            let field_name = self.expect_ident()
+            let field_name = self.expect_field_name()
             if field_name == 0:
                 break
             let (field_type, field_default) = self.parse_field_type_and_default()
@@ -2440,9 +2458,9 @@ impl Parser:
             if self.peek() == TokenKind.TK_KW_PUB:
                 field_pub = 1
                 self.advance()
-            if self.peek() != TokenKind.TK_IDENT:
+            if not self.at_field_name():
                 break
-            let field_name = self.expect_ident()
+            let field_name = self.expect_field_name()
             let (field_type, field_default) = self.parse_field_type_and_default()
             if field_type == 0:
                 break
@@ -6869,7 +6887,19 @@ impl Parser:
         let it_args: List[i32] = []
         var has_named = 0
         var seen_named = 0
-        if self.peek() != TokenKind.TK_R_PAREN:
+        // §29.11: `offsetof[T](field)` takes a field name, which may be a
+        // reserved word (`offsetof[Ev](type)`).
+        let callee_kind = self.pool.kind(callee)
+        let callee_base = self.pool.get_data0(callee)
+        let offsetof_name = if callee_kind == NodeKind.NK_TYPE_GENERIC: self.intern.resolve(callee_base) else if callee_kind == NodeKind.NK_INDEX and self.pool.kind(callee_base) == NodeKind.NK_IDENT: self.intern.resolve(self.pool.get_data0(callee_base)) else: ""
+        if (offsetof_name == "offsetof" or offsetof_name == "offset_of") and parser_is_keyword_tag(self.peek()) and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_R_PAREN:
+            let kw_start = self.current_start()
+            let kw_end = self.current_end()
+            let kw_sym = self.intern_current()
+            self.advance()
+            arg_names.push(0)
+            args.push(self.pool.add_node(NodeKind.NK_IDENT, kw_start, kw_end, kw_sym, 0, 0) as i32)
+        else if self.peek() != TokenKind.TK_R_PAREN:
             while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                 // Named argument: name: value
                 var arg_name_sym: i32 = 0
@@ -7008,7 +7038,7 @@ impl Parser:
     fn is_positional_struct_literal() -> bool:
         if self.peek() == TokenKind.TK_R_BRACE:
             return false
-        if self.peek() != TokenKind.TK_IDENT:
+        if not self.at_field_name():
             return true
         if self.pos + 1 >= self.tokens.len():
             return false
@@ -7028,7 +7058,7 @@ impl Parser:
         let fields: List[i32] = []
         var field_count: i32 = 0
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
-            let fname = self.expect_ident()
+            let fname = self.expect_field_name()
             if fname == 0:
                 break
             if self.peek() == TokenKind.TK_COLON:
@@ -7089,9 +7119,9 @@ impl Parser:
             let cur_col = column_of(self.source, self.current_start())
             if cur_col < block_col:
                 break
-            if self.peek() != TokenKind.TK_IDENT:
+            if not self.at_field_name():
                 break
-            let fname = self.expect_ident()
+            let fname = self.expect_field_name()
             if fname == 0:
                 break
             if self.peek() == TokenKind.TK_COLON:
@@ -8898,7 +8928,7 @@ impl Parser:
                     self.advance()
                 self.skip_newlines()
                 continue
-            let fname = self.expect_ident()
+            let fname = self.expect_field_name()
             // A failed name consumed nothing: leave, or this loop re-reads
             // the same token forever (`match o: { Some(x) => x }` hung).
             if fname == 0 and self.peek() != TokenKind.TK_IDENT: break
@@ -9276,7 +9306,7 @@ impl Parser:
         let fields: List[i32] = []
         var field_count: i32 = 0
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
-            let fname = self.expect_ident()
+            let fname = self.expect_field_name()
             var val = 0 as NodeId
             if self.peek() == TokenKind.TK_COLON:
                 self.advance()

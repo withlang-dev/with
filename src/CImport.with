@@ -1711,9 +1711,9 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
             let field_ty_render = ci_unsafe_fn_ptr_type(field_ty)
             let field_vis = if bit_plan.units.len() > 0: "pub " else: ""
             if default_val.len() > 0:
-                fields = fields ++ field_vis ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty_render ++ " = " ++ default_val
+                fields = fields ++ field_vis ++ actual_name ++ ": " ++ field_ty_render ++ " = " ++ default_val
             else:
-                fields = fields ++ field_vis ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty_render
+                fields = fields ++ field_vis ++ actual_name ++ ": " ++ field_ty_render
             field_count = field_count + 1
         i = i + 1
 
@@ -3166,7 +3166,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
             let fname = with_cimport_struct_field_name(session, idx, fi)
             let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: f"{name}_anon_{anon_idx2}"
             let actual_name = if fname.len() > 0: fname else: f"anon_{anon_idx2}"
-            field_str = field_str ++ "pub " ++ ci_escape_reserved(actual_name) ++ ": " ++ ci_escape_reserved(synth_name)
+            field_str = field_str ++ "pub " ++ actual_name ++ ": " ++ ci_escape_reserved(synth_name)
             anon_idx2 = anon_idx2 + 1
         else:
             field_str = field_str ++ ci_build_one_field(session, idx, fi, known_structs)
@@ -3181,7 +3181,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
             let last_fname = with_cimport_struct_field_name(session, idx, field_count - 1)
             let accessor_name = if last_fname.len() > 0: last_fname else: "data"
             // Rename the field to _name in field_str by replacing the last occurrence
-            field_str = ci_str_replace_last_field(field_str, ci_escape_reserved(accessor_name), "_" ++ ci_escape_reserved(accessor_name))
+            field_str = ci_str_replace_last_field(field_str, accessor_name, "_" ++ ci_escape_reserved(accessor_name))
             // Emit accessor method (D7: impl-block method with keyword mode;
             // the legacy top-level explicit-self form fails receiver-mode
             // enforcement).
@@ -3385,7 +3385,8 @@ fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: &str) -> s
     let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
     let actual_name = if fname.len() == 0: f"unnamed_{fi}" else: fname
     // D100 (§18.3): every C field is public; the record leaves its package whole.
-    let safe_fname = "pub " ++ ci_escape_reserved(actual_name)
+    // §29.11: a field keeps its C name even when it is a reserved word.
+    let safe_fname = "pub " ++ actual_name
     let default_val = ci_default_for_type(ftype)
     let ftype_render = ci_unsafe_fn_ptr_type(ftype)
     if default_val.len() > 0:
@@ -3710,9 +3711,9 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
             let default_val = ci_default_for_type(ftype)
             let ftype_render = ci_unsafe_fn_ptr_type(ftype)
             if default_val.len() > 0:
-                fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype_render ++ " = " ++ default_val
+                fields = fields ++ actual_fname ++ ": " ++ ftype_render ++ " = " ++ default_val
             else:
-                fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype_render
+                fields = fields ++ actual_fname ++ ": " ++ ftype_render
             afi = afi + 1
         with_cimport_mark_name_emitted(name)
         ci_mark_type_name_emitted(name)
@@ -3864,7 +3865,7 @@ fn ci_offsetof_text_args(expr: &str) -> List[str]:
 fn ci_offsetof_field_emitted_name(session: i64, field: &str, ty: &str, fi: i32, count: i32, is_union: bool) -> str:
     if not is_union and fi == count - 1 and ci_array_is_flexible(session, ty):
         return "_" ++ ci_escape_reserved(field)
-    ci_escape_reserved(field)
+    field
 
 // A trailing `[T; 0]` (and C99's `[]`, which imports as one): the C
 // flexible array member idiom. A `[T; 1]` is a one-element array: STC's
@@ -3995,7 +3996,7 @@ fn ci_null_deref_member_chain(session: i64, cursor: i32) -> List[str]:
             spelled = false
             why = f"'{cur_name}' has no member '{step}'"
             continue
-        let step_text = "offsetof[" ++ ci_escape_reserved(cur_name) ++ "](" ++ ci_escape_reserved(step) ++ ")"
+        let step_text = "offsetof[" ++ ci_escape_reserved(cur_name) ++ "](" ++ step ++ ")"
         text = if text.len() == 0: step_text else: text ++ " + " ++ step_text
         let field_cursor = ci_decl_field_cursor(session, decl, found)
         // The next record: a member record under the renderer's name
@@ -5440,7 +5441,7 @@ fn ci_translate_postfix(base: &str, rest: &str, params: &str, known: &str) -> st
             if field_len == 0:
                 return ""
             let field = rest.slice(pos, (pos + field_len))
-            result = result ++ "." ++ ci_escape_reserved(field)
+            result = result ++ "." ++ field
             pos = pos + field_len
         // Dot .field
         else if c == 46:
@@ -5449,7 +5450,7 @@ fn ci_translate_postfix(base: &str, rest: &str, params: &str, known: &str) -> st
             if field_len == 0:
                 return ""
             let field = rest.slice(pos, (pos + field_len))
-            result = result ++ "." ++ ci_escape_reserved(field)
+            result = result ++ "." ++ field
             pos = pos + field_len
         // Subscript [expr]
         else if c == 91:
@@ -6712,7 +6713,7 @@ fn ci_translate_designated_init(s: &str, params: &str, known: &str) -> str:
             return ""
         if result.len() > 0:
             result = result ++ ", "
-        result = result ++ "." ++ ci_escape_reserved(field_name) ++ " = " ++ val
+        result = result ++ "." ++ field_name ++ " = " ++ val
         // Skip comma
         if pos < slen and s[pos] == 44:
             pos = pos + 1
@@ -9493,7 +9494,7 @@ impl CiExprPool:
             i = i + 1
         if arm_cursor < 0:
             return 0
-        let arm_name = ci_escape_reserved(with_ci_cursor_spelling(session, arm_cursor))
+        let arm_name = with_ci_cursor_spelling(session, arm_cursor)
         let arm_ty = with_ci_type_translated(session, with_ci_cursor_type(session, arm_cursor))
         // #886: C initializes a union member with a braced value — `{12}` for
         // `union {…} fc`. value_cursor is that InitListExpr, not the scalar, so
@@ -9673,12 +9674,12 @@ impl CiExprPool:
     fn member_slot_emitted_name(session: i64, decl_cursor: i32, slot: i32) -> str:
         let field_name = with_ci_cursor_spelling(session, ci_decl_field_cursor(session, decl_cursor, slot))
         if field_name.len() > 0:
-            return ci_escape_reserved(field_name)
+            return field_name
         var ordinal = 0
         for fi in 0..slot:
             if ci_field_cursor_anon_record_decl(session, ci_decl_field_cursor(session, decl_cursor, fi)) >= 0:
                 ordinal = ordinal + 1
-        ci_escape_reserved(f"anon_{ordinal}")
+        f"anon_{ordinal}"
 
     // `Member { arm: value }` for the unnamed member record `member_decl`,
     // rendered as `member_name` (the cursor twin of lower_anon_member_arm_init).
@@ -9686,7 +9687,7 @@ impl CiExprPool:
         let arm_cursor = ci_decl_field_cursor(session, member_decl, arm_idx)
         if arm_cursor < 0:
             return 0
-        let arm_name = ci_escape_reserved(with_ci_cursor_spelling(session, arm_cursor))
+        let arm_name = with_ci_cursor_spelling(session, arm_cursor)
         let arm_ty = with_ci_type_translated(session, with_ci_cursor_type(session, arm_cursor))
         // #886: a braced arm value (`{12}`) initializes the arm with its inner expression.
         var arm_value_cursor = value_cursor
@@ -10016,13 +10017,12 @@ impl CiExprPool:
                     base_id = ci_member_base_first_element(session, base_cursor, base_id, self.val(), types)
                 let field = with_ci_member_field_name(session, cursor)
                 if base_id != 0 and field.len() > 0:
-                    let escaped = ci_escape_reserved(field)
-                    let field_idx = self.add_string(escaped)
+                    let field_idx = self.add_string(field)
                     var field_ty = types.member_field_type_from_base(session, self.get_type(base_id), field)
                     if field_ty == 0:
                         field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                     if ci_translate_in_migrate_mode() and with_ci_member_is_bitfield(session, cursor) != 0:
-                        return self.bitfield_getter_call(base_id, escaped, field_ty)
+                        return self.bitfield_getter_call(base_id, field, field_ty)
                     return self.add(CiExprKind.CIE_FIELD, base_id as i32, field_idx, 0, field_ty)
             return 0
 
@@ -13018,7 +13018,7 @@ impl CiExprPool:
         let parts = member.split(".")
         if parts.len() > 1:
             for pi in 0..parts.len() - 1:
-                recv = self.add(CiExprKind.CIE_FIELD, recv as i32, self.add_string(ci_escape_reserved(parts[pi])), 0, 0)
+                recv = self.add(CiExprKind.CIE_FIELD, recv as i32, self.add_string(parts[pi]), 0, 0)
             leaf = ci_escape_reserved(parts[parts.len() - 1])
         let callee = self.add(CiExprKind.CIE_FIELD, recv as i32, self.add_string(leaf), 3, 0)
         self.add(CiExprKind.CIE_CALL, callee as i32, self.extra_len() as i32, 0, field_ty)
@@ -13056,12 +13056,12 @@ impl CiStmtPool:
                 base.value_expr = exprs.add(CiExprKind.CIE_DEREF, base.value_expr as i32, 0, 0, 0)
             let field = with_ci_member_field_name(session, cursor)
             if ci_value_ir_valid(base) and field.len() > 0:
-                let field_idx = exprs.add_string(ci_escape_reserved(field))
+                let field_idx = exprs.add_string(field)
                 var field_ty = types.member_field_type_from_base(session, exprs.get_type(base.value_expr), field)
                 if field_ty == 0:
                     field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                 let bitfield = ci_translate_in_migrate_mode() and with_ci_member_is_bitfield(session, cursor) != 0
-                let field_id = if bitfield: exprs.bitfield_getter_call(base.value_expr, ci_escape_reserved(field), field_ty) else: exprs.add(CiExprKind.CIE_FIELD, base.value_expr as i32, field_idx, 0, field_ty)
+                let field_id = if bitfield: exprs.bitfield_getter_call(base.value_expr, field, field_ty) else: exprs.add(CiExprKind.CIE_FIELD, base.value_expr as i32, field_idx, 0, field_ty)
                 return CiValueExprIR {
                     setup_stmt: base.setup_stmt,
                     value_expr: field_id,
@@ -13907,14 +13907,14 @@ impl CiStmtPool:
                 base.value_expr = ci_member_base_first_element(session, base_cursor, base.value_expr, exprs, types)
             let field = with_ci_member_field_name(session, cursor)
             if ci_value_ir_valid(base) and field.len() > 0:
-                let field_idx = exprs.add_string(ci_escape_reserved(field))
+                let field_idx = exprs.add_string(field)
                 let field_cxtype = with_ci_cursor_type(session, cursor)
                 var field_ty = types.type_from_libclang(session, field_cxtype)
                 // D102: a function-pointer field is `Option` of the pointer.
                 if with_ci_type_is_fn_pointer(session, field_cxtype): field_ty = ci_nullable_fn_type(types, field_ty)
                 return CiValueExprIR {
                     setup_stmt: base.setup_stmt,
-                    value_expr: if ci_translate_in_migrate_mode() and with_ci_member_is_bitfield(session, cursor) != 0: exprs.bitfield_getter_call(base.value_expr, ci_escape_reserved(field), field_ty) else: exprs.add(CiExprKind.CIE_FIELD, base.value_expr as i32, field_idx, 0, field_ty),
+                    value_expr: if ci_translate_in_migrate_mode() and with_ci_member_is_bitfield(session, cursor) != 0: exprs.bitfield_getter_call(base.value_expr, field, field_ty) else: exprs.add(CiExprKind.CIE_FIELD, base.value_expr as i32, field_idx, 0, field_ty),
                 }
             return ci_value_ir_invalid()
 
@@ -22407,7 +22407,7 @@ fn ci_struct_field_emitted_name(session: i64, idx: i32, fi: i32) -> str:
     let fname = with_cimport_struct_field_name(session, idx, fi)
     if anon_kind != 0:
         if fname.len() > 0:
-            return ci_escape_reserved(fname)
+            return fname
         var anon_idx = 0
         var ai = 0
         while ai <= fi:
@@ -22416,8 +22416,7 @@ fn ci_struct_field_emitted_name(session: i64, idx: i32, fi: i32) -> str:
                     return "anon_" ++ i64_to_string(anon_idx)
                 anon_idx = anon_idx + 1
             ai = ai + 1
-    let actual_name = if fname.len() == 0: f"unnamed_{fi}" else: fname
-    ci_escape_reserved(actual_name)
+    if fname.len() == 0: f"unnamed_{fi}" else: fname
 
 // #744/#749: the record-lookup family below replays the old scan's branch
 // order against the indexed first struct-with-fields and first typedef —
@@ -22452,8 +22451,7 @@ fn ci_type_field_name(session: i64, ty_name: &str, field_idx: i32) -> str:
             if field_idx >= anon_count:
                 return ""
             let fname = with_cimport_typedef_anon_field_name(session, tidx, field_idx)
-            let actual_fname = if fname.len() == 0: f"unnamed_{field_idx}" else: fname
-            return ci_escape_reserved(actual_fname)
+            return if fname.len() == 0: f"unnamed_{field_idx}" else: fname
         let underlying = with_cimport_typedef_underlying_translated(session, tidx)
         if underlying.len() > 0 and underlying != ty_name:
             return ci_type_field_name(session, underlying, field_idx)
