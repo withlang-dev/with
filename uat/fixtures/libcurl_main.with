@@ -21,19 +21,19 @@ fn on_data(ptr: *mut c_char, size: u64, nmemb: u64, sink: &fn(i32) -> Unit) -> u
 // The number of bytes the transfer of `path` handed the callback, or -1.
 // The sink is declared before the handle: the handle holds it until the
 // handle is dropped at the end of this scope.
-fn fetch_bytes(path: &str) -> i32:
+fn fetch_bytes(path: &str) -> Result[i32, SetoptError]:
     var total = 0
     let sink = n => total = total + n
     let made = Easy.new()
     if made.is_none():
         print("libcurl easy init failed")
-        return -1
+        return Ok(-1)
     var easy = made.unwrap()
-    if easy.setopt(CURLOPT_NOSIGNAL, 1) != CURLE_OK: return -1
-    if easy.setopt(CURLOPT_URL, "file://" ++ path) != CURLE_OK: return -1
-    if easy.setopt(CURLOPT_WRITEFUNCTION, on_data) != CURLE_OK: return -1
-    if easy.setopt(CURLOPT_WRITEDATA, sink) != CURLE_OK: return -1
-    if easy.perform() != CURLE_OK: return -1
+    easy.nosignal(1)?
+    easy.url("file://" ++ path)?
+    easy.writefunction(on_data)?
+    easy.writedata(sink)?
+    if easy.perform() != CURLE_OK: return Ok(-1)
     total
 
 // The version number of the running library, read through the borrowed
@@ -54,7 +54,10 @@ fn main:
         print("libcurl UAT could not write its file")
         curl_global_cleanup()
         return 1
-    if fetch_bytes(path) != body.len() as i32:
+    let fetched = match fetch_bytes(path):
+        Ok(n) => n
+        Err(_) => -1
+    if fetched != body.len() as i32:
         print("libcurl transfer failed")
         curl_global_cleanup()
         return 1

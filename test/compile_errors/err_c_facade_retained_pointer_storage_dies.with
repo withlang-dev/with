@@ -29,5 +29,5 @@ c contract hlib:
 fn main:
     let h = Req.new().unwrap()
     let body = "a=1".to_cstring().unwrap()
-    if h.set(OPT_BODY, body) != H_OK: return
+    if h.set(OPT_BODY, body).is_err(): return
     print(f"{h.run()}")

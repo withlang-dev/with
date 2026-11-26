@@ -1,0 +1,94 @@
+//! expect-stdout: via_q 42
+//! expect-stdout: via_match 11
+//! expect-stdout: via_curl_present 200 true
+//! expect-stdout: ok
+//! skip-on: windows issue #800: action/capability/net/process/fs OS-surface fails on native Windows
+
+// #3128 (D242, spec §16.2b.5):
+// 1. `ok CONST` on a variadic operation unconditionally presents `Result[Unit, E]`
+//    (and `Result[T, E]` for `fills T`), with MIR pair-flow reading `?`, `match`,
+//    `.is_ok()` / `.is_err()`, and `.unwrap()`.
+// 2. `present cases [stripping PREFIX]` presents typed per-option methods
+//    omitting the selector parameter for scalar, `str`, `fills`, callback,
+//    implied userdata, and retained pointer cases (including `until` releases).
+use contracts.libcurl
+use c_import("curl/curl.h", link: "curl")
+use c_import("behav_3128_variadic_ok_result_and_present_cases.h")
+
+c contract reqlib:
+    runs no threads
+    resource Req wraps *mut req
+        from req_new
+        drop req_free
+        abandon req_reset
+    fn req_new
+        rename new
+    fn req_reset
+        rename reset
+        lend
+        callbacks none
+    fn req_set
+        rename set
+        lend
+        callbacks none
+        callback_thread registering
+        ok R_OK
+        present cases stripping ROPT_
+        variadic param 2 selected by param opt:
+            case ROPT_COUNT: c_int
+            case ROPT_CB: callback param 2 as req_cb userdata param ROPT_UD retains by param 0
+            case ROPT_BODY: &str retains by param 0 length param ROPT_BODY_LEN as c_long until ROPT_CLEAR
+            case ROPT_CLEAR: c_int
+            case ROPT_GET_COUNT: fills c_int
+    fn req_run
+        rename run
+        lend
+
+fn on_count(n: c_int, sink: &fn(i32) -> Unit) -> c_int:
+    sink(n)
+    n
+
+// Per-option setters composing with `?`, including callback pair, retained
+// sized `&str` released by per-option `clear(1)?`, and `fills` getter.
+fn run_with_question() -> Result[i32, SetError]:
+    var captured: i32 = 0
+    let sink = n => captured = captured + n
+    let body = "hello"
+    var r = Req.new().unwrap()
+    r.count(16)?
+    r.cb(on_count)?
+    r.ud(sink)?
+    r.body(body)?
+    let ran = r.run()
+    r.clear(1)?
+    let got = r.get_count()?
+    // ran = 16 + 5 + 16 = 37; got = 16; captured = 16 -> 37 + (16 - 11) = 42
+    ran + (got - 11)
+
+// `match` on `Result[Unit, SetError]` + error carrying C's status.
+fn run_with_match() -> i32:
+    var r = Req.new().unwrap()
+    let fail_code = match r.count(-5):
+        Ok(_) => 0
+        Err(SetError.Failed(code)) => code
+    match r.set(ROPT_COUNT, 10):
+        Ok(_) => r.run() + fail_code
+        Err(_) => -1
+
+fn run_real_libcurl() -> Result[(i32, bool), SetoptError]:
+    var easy = Easy.new().unwrap()
+    easy.nosignal(1)?
+    easy.url("http://example.invalid/path")?
+    easy.timeout(5)?
+    easy.useragent("with-3128/1.0")?
+    (200 as i32, true)
+
+fn main:
+    let q = run_with_question().unwrap()
+    print(f"via_q {q}")
+    print(f"via_match {run_with_match()}")
+    if curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK: return 1
+    let (code, ok_flag) = run_real_libcurl().unwrap()
+    print(f"via_curl_present {code} {ok_flag}")
+    curl_global_cleanup()
+    print("ok")

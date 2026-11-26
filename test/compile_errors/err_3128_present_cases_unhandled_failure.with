@@ -1,0 +1,41 @@
+//! expect-check-fail: 'Handle.run' may invoke the callback pair of 'Handle', and on this path the pair is not proven compatible
+//! expect-check-fail: = help: set both the callback and its userdata, handle the setter's Result (for example with '?') or branch on its status against its 'ok' constant, or run the resource's abandonment path first
+
+// #3128 (D242, spec §16.2b.5, §16.2b.9): a per-option setter presented by
+// `present cases` participates identically in MIR pair-flow — ignoring its
+// Result leaves the pair unproven and refuses callback-capable operations.
+use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nvoid h_reset(h *x);\nint h_set(h *x, int opt, ...);\nint h_run(h *x);\ntypedef int (*h_cb)(int n, void *ud);\n#define OPT_CB 1\n#define OPT_UD 2\n#define H_OK 0\n")
+
+c contract hlib:
+    resource Handle wraps *mut h
+        from h_new
+        drop h_free
+        abandon h_reset
+    fn h_reset
+        rename reset
+        lend
+        callbacks none
+    fn h_set
+        callback_thread registering
+        rename set
+        lend
+        callbacks none
+        ok H_OK
+        present cases stripping OPT_
+        variadic param 2 selected by param opt:
+            case OPT_CB: callback param 2 as h_cb userdata param OPT_UD retains by param 0
+    fn h_run
+        rename run
+        lend
+
+fn on_n(n: c_int, sink: &fn(i32) -> Unit) -> c_int:
+    sink(n)
+    0
+
+fn main:
+    var total = 0
+    let sink = n => total = total + n
+    var h = Handle.new().unwrap()
+    if h.cb(on_n).is_err(): return 1
+    let _ = h.ud(sink)
+    print(f"{h.run()}")

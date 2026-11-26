@@ -43,11 +43,11 @@ fn configure() -> bool:
     var easy = made.unwrap()
     let h1 = easy.setopt(CURLOPT_HEADERFUNCTION, on_chunk)
     let h2 = easy.setopt(CURLOPT_HEADERDATA, head_sink)
-    print(f"header pair: {h1 == CURLE_OK} {h2 == CURLE_OK}")
+    print(f"header pair: {h1.is_ok()} {h2.is_ok()}")
     let w1 = easy.setopt(CURLOPT_WRITEFUNCTION, on_chunk)
     let w2 = easy.setopt(CURLOPT_WRITEDATA, body_sink)
-    print(f"write pair: {w1 == CURLE_OK} {w2 == CURLE_OK}")
-    h1 == CURLE_OK and h2 == CURLE_OK and w1 == CURLE_OK and w2 == CURLE_OK
+    print(f"write pair: {w1.is_ok()} {w2.is_ok()}")
+    h1.is_ok() and h2.is_ok() and w1.is_ok() and w2.is_ok()
 
 fn main:
     if curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK:

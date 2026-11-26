@@ -36,6 +36,6 @@ c contract hlib:
 fn main:
     let headers = HeaderList.new().unwrap()
     let easy = Easy.new().unwrap()
-    if easy.setopt(OPT_HEADERS, headers) != H_OK: return
+    if easy.setopt(OPT_HEADERS, headers).is_err(): return
     let _ = headers.mutate()
     print(f"{easy.perform()}")

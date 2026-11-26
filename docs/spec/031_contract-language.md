@@ -184,6 +184,7 @@ retention       = "retains" "by" param_ref
                   [ "until" name { "," name } ]
 domain_clause   = "establishes" "domain" name | "ends" "domain" name | "requires" "domain" name
 presentation    = "of" TypeName | "rename" name | param_ref "fixed" fixed_value | param_ref "discarded"
+                | "present" "cases" [ "stripping" name ]
 fixed_value     = literal | CONST | "sizeof" "(" type ")"
 
 param_ref       = "param" ( name | INTEGER | "type" type )
@@ -529,6 +530,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `rename n` | the With name of the operation. | P | the convention's shortening of the C name | §16.2b.11 |
 | `param p fixed V` | the presented operation omits `p` and always passes `V`: a literal, a named constant of the library, or `sizeof(T)`. | P | | §16.2b.11 |
 | `param p discarded` | `p` is an out-pointer fixed as discarded: the wrapper passes scratch storage and ignores what C writes. | P | | §16.2b.11 |
+| `present cases [stripping PREFIX]` | on a variadic `fn` item, presents each listed case (and implied userdata case) as a typed per-option method or function whose name strips leading `PREFIX` and lowercases ASCII, omitting the selector parameter and returning the same `Result` (under `ok`) or C return (without `ok`). | P | selector-taking form only | §16.2b.5 |
 
 **Value records** (`reads`, `fills`, `updates`). The parameter points to one
 complete record that is not a resource's representation. Three conditions,

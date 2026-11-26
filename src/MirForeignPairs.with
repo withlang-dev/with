@@ -161,9 +161,12 @@ type PairsBody {
     // for in a comparison (-1: none).
     guard_alias: List[i32],
     // Keys holding a setter's status, and the success value each compares
-    // against (-1: none).
+    // against (-1: none). For a `Result` setter (§16.2b.5, #3128), `guard_ok`
+    // is the `Ok` discriminant and `guard_err` the `Err` discriminant.
     guard_ok: List[i64],
-    // Keys holding `status == OK` / `status != OK`: the guard and the sense.
+    guard_err: List[i64],
+    // Keys holding `status == OK` / `status != OK` (or `.is_ok()` / `.is_err()`):
+    // the guard and the sense.
     cond_guard: List[i32],
     cond_is_eq: List[i32],
     steps: List[ForeignPairStep],
@@ -176,7 +179,7 @@ type PairsBody {
 fn pairs_body_new(body: &MirBody) -> PairsBody:
     let keys = mir_drop_state_keys_new(body)
     let width = keys.len() as i32
-    PairsBody { keys: keys, key_resource: pairs_list_i32(width, -1), key_alias: pairs_list_i32(width, -1), key_is_ref: pairs_list_i32(width, 0), ref_origin: pairs_list_i32(width, -2), origin_key: pairs_list_i32(width, 0), origin_is_resource: pairs_list_i32(width, 0), origin_bb: pairs_list_i32(width, -1), guard_alias: pairs_list_i32(width, -1), guard_ok: pairs_list_i64(width, -1), cond_guard: pairs_list_i32(width, -1), cond_is_eq: pairs_list_i32(width, 1), steps: [], sites: [], starts: [], counts: [], edges: [] }
+    PairsBody { keys: keys, key_resource: pairs_list_i32(width, -1), key_alias: pairs_list_i32(width, -1), key_is_ref: pairs_list_i32(width, 0), ref_origin: pairs_list_i32(width, -2), origin_key: pairs_list_i32(width, 0), origin_is_resource: pairs_list_i32(width, 0), origin_bb: pairs_list_i32(width, -1), guard_alias: pairs_list_i32(width, -1), guard_ok: pairs_list_i64(width, -1), guard_err: pairs_list_i64(width, -1), cond_guard: pairs_list_i32(width, -1), cond_is_eq: pairs_list_i32(width, 1), steps: [], sites: [], starts: [], counts: [], edges: [] }
 
 impl PairsBody:
     fn width(): self.key_resource.len()
@@ -293,10 +296,16 @@ impl PairsBody:
                 continue
             let action = sema.facade_pair_ops[opi].action
             let ok = sema.facade_pair_ops[opi].guard_ok
-            let dest = self.key_of(body.term_data2(bb))
+            let dest_place = body.term_data2(bb)
+            let dest = self.key_of(dest_place)
             let reads_status = action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA or action == FOREIGN_PAIR_RETAIN or sema.facade_pair_ops[opi].releases != 0
             if reads_status and ok >= 0 and dest >= 0:
-                self.guard_ok[dest] = ok
+                let dest_ty = if dest_place >= 0 and dest_place < body.place_sema_types.len(): body.place_sema_types[dest_place] else: 0
+                if dest_ty != 0 and sema.enum_variant_index_for_type(dest_ty, sema.syms.ok) >= 0 and sema.enum_variant_index_for_type(dest_ty, sema.syms.err) >= 0:
+                    self.guard_ok[dest] = sema.enum_variant_discriminant_for_type(dest_ty, sema.syms.ok)
+                    self.guard_err[dest] = sema.enum_variant_discriminant_for_type(dest_ty, sema.syms.err)
+                else:
+                    self.guard_ok[dest] = ok
             if action == FOREIGN_PAIR_USERDATA or action == FOREIGN_PAIR_RETAIN:
                 let origin = self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param)
                 if origin >= 0:
@@ -306,28 +315,50 @@ impl PairsBody:
                         let base_local = self.keys.base_local[origin]
                         if base_local >= 0 and base_local < body.local_type_ids.len() and sema.facade_resource_index_for_type(body.local_type_ids[base_local]) >= 0:
                             self.origin_is_resource[origin] = 1
-        // A setter's status bound to a local (`let rc = h.set(…)`) or copied
-        // on: the local stands for the call's status in a comparison.
+        // A setter's status or Result bound to a local (`let r = h.set(…)`),
+        // moved/copied into a temporary (`?`), or its enum discriminant read
+        // (`RK_DISCRIMINANT`): each stands for the call's status in a branch.
         for stmt in 0..body.stmt_count():
             if body.stmt_kind(stmt) != StmtKind.Assign:
                 continue
             let dest = self.key_of(body.stmt_data0(stmt))
             let rv = body.stmt_data1(stmt)
-            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() or body.rval_kinds[rv] != RvalueKind.RK_USE:
+            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len():
                 continue
-            let src = self.key_of(pairs_operand_place(body, body.rval_d0[rv]))
+            let rk = body.rval_kinds[rv]
+            var src: i32 = -1
+            if rk == RvalueKind.RK_USE:
+                src = self.key_of(pairs_operand_place(body, body.rval_d0[rv]))
+            else if rk == RvalueKind.RK_DISCRIMINANT:
+                src = self.key_of(body.rval_d0[rv])
             if src < 0:
                 continue
             if self.guard_alias[src] >= 0: self.guard_alias[dest] = self.guard_alias[src]
             else if self.guard_ok[src] >= 0: self.guard_alias[dest] = src
-        // `status == OK` and `status != OK` (Ast BinaryOp): the branch they
+        // `status == OK`, `status != OK`, `disc == ok_tag` (`.is_ok()`),
+        // `disc == err_tag` (`.is_err()`), and `not cond`: the branch they
         // decide refines the setter's outcome along its edges.
         for stmt in 0..body.stmt_count():
             if body.stmt_kind(stmt) != StmtKind.Assign:
                 continue
             let dest = self.key_of(body.stmt_data0(stmt))
             let rv = body.stmt_data1(stmt)
-            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() or body.rval_kinds[rv] != RvalueKind.RK_BIN_OP:
+            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len():
+                continue
+            let rk = body.rval_kinds[rv]
+            if rk == RvalueKind.RK_USE:
+                let src = self.key_of(pairs_operand_place(body, body.rval_d0[rv]))
+                if src >= 0 and self.cond_guard[src] >= 0:
+                    self.cond_guard[dest] = self.cond_guard[src]
+                    self.cond_is_eq[dest] = self.cond_is_eq[src]
+                continue
+            if rk == RvalueKind.RK_UN_OP and body.rval_d0[rv] == UnaryOp.UOP_NOT:
+                let src = self.key_of(pairs_operand_place(body, body.rval_d1[rv]))
+                if src >= 0 and self.cond_guard[src] >= 0:
+                    self.cond_guard[dest] = self.cond_guard[src]
+                    self.cond_is_eq[dest] = (self.cond_is_eq[src] == 0) as i32
+                continue
+            if rk != RvalueKind.RK_BIN_OP:
                 continue
             let bop = body.rval_d0[rv]
             if bop != BinaryOp.OP_EQ and bop != BinaryOp.OP_NEQ:
@@ -347,10 +378,14 @@ impl PairsBody:
                 guard = self.key_of(rp)
                 value = lvalue
             if guard >= 0 and self.guard_alias[guard] >= 0: guard = self.guard_alias[guard]
-            if guard < 0 or self.guard_ok[guard] < 0 or self.guard_ok[guard] != value:
+            if guard < 0 or self.guard_ok[guard] < 0:
                 continue
-            self.cond_guard[dest] = guard
-            self.cond_is_eq[dest] = (bop == BinaryOp.OP_EQ) as i32
+            if self.guard_ok[guard] == value:
+                self.cond_guard[dest] = guard
+                self.cond_is_eq[dest] = (bop == BinaryOp.OP_EQ) as i32
+            else if self.guard_err[guard] >= 0 and self.guard_err[guard] == value:
+                self.cond_guard[dest] = guard
+                self.cond_is_eq[dest] = (bop == BinaryOp.OP_NEQ) as i32
 
     // A moved operand: a resource's state moves with it (and escapes with
     // it into the return place or a projection); a retained origin cannot
@@ -528,20 +563,43 @@ impl PairsBody:
         else if kind == TermKind.TK_SWITCH_INT:
             var guard: i32 = -1
             var is_eq = true
+            var direct_disc = false
             let cond = self.key_of(pairs_operand_place(body, d0))
             if cond >= 0 and self.cond_guard[cond] >= 0:
                 guard = self.cond_guard[cond]
                 is_eq = self.cond_is_eq[cond] != 0
+            else if cond >= 0:
+                let raw_g = if self.guard_alias[cond] >= 0: self.guard_alias[cond] else: cond
+                if raw_g >= 0 and self.guard_ok[raw_g] >= 0:
+                    guard = raw_g
+                    direct_disc = true
             if d1 >= 0 and d1 < body.switch_table_starts.len():
                 let start = body.switch_table_starts[d1]
                 let count = body.switch_table_counts[d1]
-                for i in 0..count:
-                    let value = body.switch_table_vals[(start + i)]
-                    let succeeded = if guard < 0: true else: (value != 0) == is_eq
-                    self.edges.push(ForeignPairEdge { from: bb, to: body.switch_table_targets[(start + i)], guard, succeeded })
-                let other = pairs_switch_otherwise_value(body, d1)
-                let succeeded = if guard < 0: true else: (other != 0) == is_eq
-                self.edges.push(ForeignPairEdge { from: bb, to: d2, guard, succeeded })
+                if direct_disc:
+                    let ok_val = self.guard_ok[guard]
+                    let err_val = self.guard_err[guard]
+                    var ok_in_table = false
+                    var err_in_table = false
+                    for i in 0..count:
+                        let value = body.switch_table_vals[(start + i)]
+                        if value == ok_val: ok_in_table = true
+                        if err_val >= 0 and value == err_val: err_in_table = true
+                        self.edges.push(ForeignPairEdge { from: bb, to: body.switch_table_targets[(start + i)], guard, succeeded: value == ok_val })
+                    if ok_in_table:
+                        self.edges.push(ForeignPairEdge { from: bb, to: d2, guard, succeeded: false })
+                    else if err_val >= 0 and err_in_table:
+                        self.edges.push(ForeignPairEdge { from: bb, to: d2, guard, succeeded: true })
+                    else:
+                        self.edges.push(ForeignPairEdge { from: bb, to: d2, guard: -1, succeeded: true })
+                else:
+                    for i in 0..count:
+                        let value = body.switch_table_vals[(start + i)]
+                        let succeeded = if guard < 0: true else: (value != 0) == is_eq
+                        self.edges.push(ForeignPairEdge { from: bb, to: body.switch_table_targets[(start + i)], guard, succeeded })
+                    let other = pairs_switch_otherwise_value(body, d1)
+                    let succeeded = if guard < 0: true else: (other != 0) == is_eq
+                    self.edges.push(ForeignPairEdge { from: bb, to: d2, guard, succeeded })
             else:
                 self.edges.push(ForeignPairEdge { from: bb, to: d2, guard: -1, succeeded: true })
 
@@ -627,7 +685,7 @@ fn pairs_describe(ast: &AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, si
         let callee_name = if site.op >= 0 and site.op < sema.sig_names.len(): "'" ++ sema.pool_resolve(sema.sig_names[site.op]) ++ "'" else: "this operation"
         return PairsFinding { fn_sym: body.fn_sym, start, end, message: pb.key_name(sema, body, site.key) ++ " cannot be passed to " ++ callee_name ++ " while " ++ resource ++ " holds a retained borrow of it (§16.2b.5, §16.2b.9)", note: "operations not marked 'preserves' may mutate or invalidate the borrowed resource", help: "release the retention or reset/destroy " ++ resource ++ " first, or mark " ++ callee_name ++ " 'preserves' in its contract if C does not mutate or invalidate it" }
     if site.kind == PairsSiteKind.Invoke:
-        return PairsFinding { fn_sym: body.fn_sym, start, end, message: pairs_op_name(sema, site.op) ++ " may invoke the callback pair of " ++ resource ++ ", and on this path the pair is not proven compatible (§16.2b.9)", note: "a callback set without its userdata, a setter whose failure was not handled, or a helper call that may have changed the pair leaves it unproven", help: "set both the callback and its userdata, branch on the setter's status against its 'ok' constant, or run the resource's abandonment path first" }
+        return PairsFinding { fn_sym: body.fn_sym, start, end, message: pairs_op_name(sema, site.op) ++ " may invoke the callback pair of " ++ resource ++ ", and on this path the pair is not proven compatible (§16.2b.9)", note: "a callback set without its userdata, a setter whose failure was not handled, or a helper call that may have changed the pair leaves it unproven", help: "set both the callback and its userdata, handle the setter's Result (for example with '?') or branch on its status against its 'ok' constant, or run the resource's abandonment path first" }
     if site.kind == PairsSiteKind.Helper:
         return PairsFinding { fn_sym: body.fn_sym, start, end, message: "passing " ++ resource ++ " to a call the facade does not describe while its callback pair is not proven compatible; the callee may invoke it (§16.2b.9)", note: "", help: "complete the pair or run the abandonment path before the call" }
     if site.kind == PairsSiteKind.Expire or site.kind == PairsSiteKind.Moved:

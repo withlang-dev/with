@@ -31,7 +31,7 @@ c contract hlib:
 fn request() -> Req:
     let body = "a=1".to_cstring().unwrap()
     let h = Req.new().unwrap()
-    if h.set(OPT_BODY, body) != H_OK: return h
+    if h.set(OPT_BODY, body).is_err(): return h
     h
 
 fn main:

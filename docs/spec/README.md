@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.97
+# The With Programming Language — Specification v7.98
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+
+**Changelog v7.98:** D242 (delegated, D237/D98; direction ruled in D235 item 9a, 2026-11-26, #3128). §16.2b.5, §31.5, §31.8.3: `ok CONST` on a variadic operation unconditionally presents `Result[T, E]` for `fills T` cases and `Result[Unit, E]` for all other listed cases, with MIR pair-flow reading `Result` branches (`?`, `match`, `if let`, `.is_ok()`, `.is_err()`, `.unwrap()`, `.expect()`); `present cases [stripping PREFIX]` presents each listed case (and implied userdata case) as a typed per-option method or function omitting the selector parameter. Implemented.
 
 **Changelog v7.97:** D241 (delegated, D237/D98; direction ruled in D235, 2026-11-26, #3121). §16.2b.4, §31.5, §31.8.3: a direct-return pointer producer stating `consumes param N` for its own resource `R` requires `null status CONST` and presents `move fn <name>(...) -> Result[R, E]`, returning the consumed input intact in `FailedWithResource(status, resource: R)` in a good state on `NULL`. Implemented.
 

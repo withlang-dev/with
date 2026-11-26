@@ -1,5 +1,5 @@
 //! expect-check-fail: 'Handle.run' may invoke the callback pair of 'Handle', and on this path the pair is not proven compatible
-//! expect-check-fail: = help: set both the callback and its userdata, branch on the setter's status against its 'ok' constant, or run the resource's abandonment path first
+//! expect-check-fail: = help: set both the callback and its userdata, handle the setter's Result (for example with '?') or branch on its status against its 'ok' constant, or run the resource's abandonment path first
 
 // D66 (spec §16.2b.9): the pair's state includes setter failures. A
 // userdata setter whose status is never compared against the operation's
@@ -37,6 +37,6 @@ fn main:
     var total = 0
     let sink = n => total = total + n
     var h = Handle.new().unwrap()
-    if h.set(OPT_CB, on_n) != H_OK: return 1
+    if h.set(OPT_CB, on_n).is_err(): return 1
     let _ = h.set(OPT_UD, sink)
     print(f"{h.run()}")

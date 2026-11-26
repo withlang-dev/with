@@ -53,11 +53,11 @@ fn configure() -> bool:
     if made.is_none(): return false
     var easy = made.unwrap()
     let first = easy.setopt(CURLOPT_WRITEFUNCTION, on_data)
-    print(f"first: {first == CURLE_OK}")
-    if first != CURLE_OK: return false
+    print(f"first: {first.is_ok()}")
+    if first.is_err(): return false
     let second = easy.setopt(CURLOPT_LASTENTRY, sink)
-    print(f"second: {second == CURLE_OK}")
-    if second != CURLE_OK: return false
+    print(f"second: {second.is_ok()}")
+    if second.is_err(): return false
     easy.perform() == CURLE_OK
 
 fn main:

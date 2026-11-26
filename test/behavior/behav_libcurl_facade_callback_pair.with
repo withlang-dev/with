@@ -28,9 +28,9 @@ fn fetch(path: &str) -> i32:
     let made = Easy.new()
     if made.is_none(): return -1
     var easy = made.unwrap()
-    if easy.setopt(CURLOPT_URL, "file://" ++ path) != CURLE_OK: return -1
-    if easy.setopt(CURLOPT_WRITEFUNCTION, on_data) != CURLE_OK: return -1
-    if easy.setopt(CURLOPT_WRITEDATA, sink) != CURLE_OK: return -1
+    if easy.setopt(CURLOPT_URL, "file://" ++ path).is_err(): return -1
+    if easy.setopt(CURLOPT_WRITEFUNCTION, on_data).is_err(): return -1
+    if easy.setopt(CURLOPT_WRITEDATA, sink).is_err(): return -1
     if easy.perform() != CURLE_OK: return -1
     total
 
