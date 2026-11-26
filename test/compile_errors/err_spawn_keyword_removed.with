@@ -1,4 +1,5 @@
-//! expect-check-fail: expected expression
+//! expect-check-fail: expected the end of the statement after `spawn`; `spawn work` is two names side by side
+// `spawn` has no construct and is an ordinary name (§29.11, D235).
 
 async fn work() -> i32:
     1

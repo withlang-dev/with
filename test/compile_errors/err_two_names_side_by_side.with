@@ -1,0 +1,9 @@
+//! expect-check-fail: expected the end of the statement after `foo`; `foo work` is two names side by side
+// Two names side by side in a body were reported as "file has both `fn main`
+// and top-level executable statements": the block ended silently at the
+// second name.
+fn work() -> i32: 1
+
+fn main:
+    foo work()
+    print("x")
