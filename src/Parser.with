@@ -5935,6 +5935,11 @@ impl Parser:
                         self.emit_error("a variadic callback requires its C type: 'callback param N as T userdata param CONST' (§16.2b.5)")
                         return 0
                     self.advance()
+                // `case K: fills T` (D235, §16.2b.5): the argument is a pointer
+                // to one `T` the callee writes; the case presents the value.
+                let after_fills = self.tokens.get_tag(self.pos + 1)
+                let fills = callback_ref == 0 and self.current_ident_is("fills") and after_fills != TokenKind.TK_NEWLINE and after_fills != TokenKind.TK_EOF and after_fills != TokenKind.TK_COMMENT
+                if fills: self.advance()
                 let ty = self.parse_type_expr()
                 if ty == 0: return 0
                 if callback_ref != 0:
@@ -5987,6 +5992,7 @@ impl Parser:
                 self.pool.add_extra(retainer_ref)
                 self.pool.add_extra(length_ref)
                 self.pool.add_extra(length_ty)
+                self.pool.add_extra(fills as i32)
                 for sym in until_syms: self.pool.add_extra(sym)
                 cases.push(self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, cstart, self.prev_end(), FACADE_CLAUSE_VARIADIC_CASE, case_extra, self.pool.extra_len() - case_extra) as i32)
                 self.skip_newlines()

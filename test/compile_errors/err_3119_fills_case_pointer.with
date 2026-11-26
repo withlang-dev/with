@@ -1,0 +1,12 @@
+//! expect-check-fail: a filled value is an integer, a float or a C record whose all-zero bytes are a value
+// #3119 (D235): a case that hands back a pointer is not `fills`.
+use c_import("../behavior/behav_3119_variadic_case_fills.h")
+
+c contract probes:
+    fn limit_get
+        ok PROBE_OK
+        variadic param 1 selected by param info:
+            case INFO_CODE: fills *const c_char
+
+fn main:
+    print("x")

@@ -1,0 +1,11 @@
+//! expect-check-fail: a 'fills' case presents the value the callee wrote
+// #3119 (D235): a function with no `ok` contract cannot state a `fills` case.
+use c_import("../behavior/behav_3119_variadic_case_fills.h")
+
+c contract probes:
+    fn limit_get
+        variadic param 1 selected by param info:
+            case INFO_CODE: fills c_long
+
+fn main:
+    print("x")

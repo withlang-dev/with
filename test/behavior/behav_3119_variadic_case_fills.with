@@ -1,0 +1,44 @@
+//! expect-stdout: 404 1.5 3..9
+//! expect-stdout: missing 7
+//! expect-stdout: limit 64
+//! expect-stdout: asked 4
+
+// #3119 (D235, §16.2b.5): `case K: fills T`. The variadic argument is a
+// pointer to one `T` the callee writes; With passes the address of a zeroed
+// `T` and the case presents the value, as a `Result` under the function's
+// `ok`. An integer, a float and a flat record; a method and a free function.
+use c_import("behav_3119_variadic_case_fills.h")
+
+c contract probes:
+    resource Probe wraps *mut probe
+        from probe_open
+        drop probe_close
+    fn probe_open
+        rename new
+    fn probe_asked
+        lend
+    fn probe_getinfo
+        rename getinfo
+        lend
+        ok PROBE_OK
+        variadic param 2 selected by param info:
+            case INFO_CODE: fills c_long
+            case INFO_SECONDS: fills f64
+            case INFO_SPAN: fills span_t
+            case INFO_MISSING: fills c_long
+    fn limit_get
+        ok PROBE_OK
+        variadic param 1 selected by param info:
+            case INFO_CODE: fills c_long
+
+fn main:
+    let p = Probe.new().unwrap()
+    let code = p.getinfo(INFO_CODE).unwrap()
+    let seconds = p.getinfo(INFO_SECONDS).unwrap()
+    let span = p.getinfo(INFO_SPAN).unwrap()
+    print(f"{code} {seconds} {span.lo}..{span.hi}")
+    match p.getinfo(INFO_MISSING):
+        Ok(v) => print(f"unexpected {v}")
+        Err(GetinfoError.Failed(status)) => print(f"missing {status}")
+    print(f"limit {limit_get(INFO_CODE).unwrap()}")
+    print(f"asked {p.asked()}")
