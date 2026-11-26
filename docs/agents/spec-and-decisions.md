@@ -28,7 +28,7 @@ all four in one brief, then wait for the ruling:
 2. **What the spec currently says.** Quote it. Check whether the spec already
    rules the question and whether the proposal duplicates an existing rule.
 3. **Mission fit.** Read `docs/mission.md` first (not the `CLAUDE.md` summary).
-   Cite the governing Law(s) by number (Laws 1–12), quote each Law's *Test*
+   Cite the governing Law(s) by number (Laws 1–13), quote each Law's *Test*
    question verbatim, and answer it for each option; cross-check
    `docs/meetings/README.md` and say which option is most with-y. A brief
    without cited Law numbers and *Test* answers is incomplete.

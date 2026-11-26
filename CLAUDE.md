@@ -7,7 +7,7 @@ small mistakes corrupt the stage chain, so strict discipline is required.
 
 ## Mission
 
-(Summary only; the 12 Laws and their tests live in `docs/mission.md`. Never write a Mission fit section from this summary.)
+(Summary only; the 13 Laws and their tests live in `docs/mission.md`. Never write a Mission fit section from this summary.)
 
 With is an ergonomics-first systems language: close to the machine, native by
 default, exactly as safe as Rust, built to remove the suffering. Every
