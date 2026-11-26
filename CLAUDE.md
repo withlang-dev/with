@@ -47,24 +47,27 @@ read the annex file for the situation you are in **before** you act in it.
 
 **Declare the guarantees that must remain stable; infer what can safely
 improve the programmer's experience (D172).** Apply it before bringing a
-question: if the laws and this test decide it, it is not a ruling. Do the
-work and say so in one line.
+question: if `docs/mission.md` and this test decide it, do not ask — take it
+as Eric's ruling, delegate and implement it (D237, amending D98).
 
-A question stops for Eric only when it changes what safe code may do,
-touches a contract program (UAT fixture, example, published code), or needs
-normative spec words. Before writing a brief, read `docs/mission.md`. It
-arrives as a finished brief (what the others do, what the spec says, mission
-fit citing the governing Law(s) by number and answering each Law's *Test*
-question verbatim, and one committed prediction) while other work continues.
-A brief without cited Law numbers and *Test* answers is incomplete. A question that is not C interop, ownership or safety, is easy
-to reverse, and has a prediction of 75% or higher is delegated (D98):
-implement it, spec words included, and record it in the decision log as
-delegated. That is the one case in which an agent lands normative words;
-Eric vetoes by revert.
-
-The stop list wins: a question on it is never delegated, even when a law
-seems to decide it. Delegated words state a rule the laws already decide;
+**Mission-settled questions are delegated (D237).** Unless there is a clearly
+articulated argument for changing `docs/mission.md`, if `docs/mission.md`
+settles a brief, treat it as Eric's ruling without asking: implement it, land
+the normative spec words (and any contract-program updates required by the
+settled spec change), and record the brief in the decision log as delegated.
+Eric vetoes by revert. Delegated words state a rule the laws already decide;
 writing them is not editing the spec to match the code.
+
+A question stops for Eric only when `docs/mission.md` does **not** settle it
+(genuine open taste, trade-off, or unspecified choice) or when there is a
+clearly articulated argument for changing `docs/mission.md` itself — or, for
+non-mission-settled questions that are not C interop, ownership, safety, or
+contract programs, easy to reverse, and predicted at 75% or higher, delegate
+under D98. Before writing a brief, read `docs/mission.md`. It arrives as a
+finished brief (what the others do, what the spec says, mission fit citing
+the governing Law(s) by number and answering each Law's *Test* question
+verbatim, and one committed prediction) while other work continues. A brief
+without cited Law numbers and *Test* answers is incomplete.
 
 ## Bugs
 
