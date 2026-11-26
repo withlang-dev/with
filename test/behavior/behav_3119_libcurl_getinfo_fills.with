@@ -1,0 +1,30 @@
+//! expect-stdout: response code 0
+//! expect-stdout: ok
+//! skip-on: windows issue #800: action/capability/net/process/fs OS-surface fails on native Windows
+
+// #3119 (D235, §16.2b.5): libcurl's `curl_easy_getinfo` writes its answer
+// through a pointer chosen by the selector. `case K: fills T` presents the
+// value: no slot to declare, no raw call. A fresh handle has made no
+// transfer, so its response code is 0.
+use c_import("curl/curl.h", link: "curl")
+
+c contract curl_info:
+    resource Easy wraps *mut CURL
+        from curl_easy_init
+        drop curl_easy_cleanup
+    fn curl_easy_init
+        rename new
+    fn curl_easy_getinfo
+        rename getinfo
+        lend
+        callbacks none
+        ok CURLE_OK
+        variadic param 2 selected by param info:
+            case CURLINFO_RESPONSE_CODE: fills c_long
+
+fn main:
+    let easy = Easy.new().unwrap()
+    match easy.getinfo(CURLINFO_RESPONSE_CODE):
+        Ok(code) => print(f"response code {code}")
+        Err(_) => print("getinfo failed")
+    print("ok")
