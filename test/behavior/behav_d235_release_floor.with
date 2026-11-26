@@ -6,19 +6,41 @@ use pre_d_build_runner
 // from release V of the package. A project that pins an older release is
 // refused, naming both releases; one that pins V or later builds. And the
 // name after `rename` may be a keyword, as a member name may: `rename with`.
-fn release_floor_project(dir: &str, pinned: &str):
-    p7_write(dir, "with.toml", "[package]\nname = \"release_floor\"\nversion = \"0.1.0\"\n\n[deps]\nc.mimelib = \"" ++ pinned ++ "\"\n")
-    p7_write(dir, ".with/deps/c/mimelib/" ++ pinned ++ "/metadata.json", "{\n  \"name\": \"mimelib\",\n  \"version\": \"" ++ pinned ++ "\",\n  \"include_paths\": [\"include\"],\n  \"lib_paths\": [],\n  \"libs\": [],\n  \"defines\": [],\n  \"link_args\": [],\n  \"components\": []\n}\n")
-    p7_write(dir, ".with/deps/c/mimelib/" ++ pinned ++ "/include/mime.h", "typedef struct easy { int count; } easy;\ntypedef struct mime { int parts; } mime;\nstatic inline easy *easy_init(void) { static easy e; e.count = 7; return &e; }\nstatic inline void easy_cleanup(easy *e) { (void)e; }\nstatic inline int easy_count(easy *e) { return e->count; }\nstatic inline mime *mime_init(easy *e) { static mime m; m.parts = e ? 2 : 1; return &m; }\nstatic inline void mime_free(mime *m) { (void)m; }\nstatic inline int mime_parts(mime *m) { return m->parts; }\n")
-    p7_write(dir, "src/contracts/mimelib.with", "use c_import(\"mime.h\")\n\nc contract mimelib:\n    resource Easy wraps *mut easy\n        from easy_init\n        drop easy_cleanup\n    resource Mime wraps *mut mime\n        from mime_init\n        drop mime_free\n    fn mime_init\n        rename new\n        param 0 fixed null since 7.87.0    // mime.h: a null parent is accepted from 7.87.0\n    fn mime_parts\n        lend\n    fn easy_count\n        rename with\n        lend\n    fn easy_init\n        rename new\n")
+// Releases order by their dotted numbers, then trailing letters (OpenSSL's
+// `1.1.1w`), with a `-prerelease` before the bare release; a release in no
+// such form, and a package with no pinned release, are refused.
+fn release_floor_project(dir: &str, pinned: &str, floor: &str):
+    p7_write(dir, "with.toml", "[package]\nname = \"release_floor\"\nversion = \"0.1.0\"\n" ++ (if pinned.len() > 0: "\n[deps]\nc.mimelib = \"" ++ pinned ++ "\"\n" else: ""))
+    if pinned.len() > 0: p7_write(dir, ".with/deps/c/mimelib/" ++ pinned ++ "/metadata.json", "{\n  \"name\": \"mimelib\",\n  \"version\": \"" ++ pinned ++ "\",\n  \"include_paths\": [\"include\"],\n  \"lib_paths\": [],\n  \"libs\": [],\n  \"defines\": [],\n  \"link_args\": [],\n  \"components\": []\n}\n")
+    let header = ("typedef struct easy { int count; } easy;\ntypedef struct mime { int parts; } mime;\nstatic inline easy *easy_init(void) { static easy e; e.count = 7; return &e; }\nstatic inline void easy_cleanup(easy *e) { (void)e; }\nstatic inline int easy_count(easy *e) { return e->count; }\nstatic inline mime *mime_init(easy *e) { static mime m; m.parts = e ? 2 : 1; return &m; }\nstatic inline void mime_free(mime *m) { (void)m; }\nstatic inline int mime_parts(mime *m) { return m->parts; }\n")
+    // With no pinned package the header is the project's own file.
+    if pinned.len() > 0: p7_write(dir, ".with/deps/c/mimelib/" ++ pinned ++ "/include/mime.h", header)
+    else:
+        p7_write(dir, "src/mime.h", header)
+        p7_write(dir, "src/contracts/mime.h", header)
+    p7_write(dir, "src/contracts/mimelib.with", "use c_import(\"mime.h\")\n\nc contract mimelib:\n    resource Easy wraps *mut easy\n        from easy_init\n        drop easy_cleanup\n    resource Mime wraps *mut mime\n        from mime_init\n        drop mime_free\n    fn mime_init\n        rename new\n        param 0 fixed null since " ++ floor ++ "    // mime.h: a null parent is accepted from this release\n    fn mime_parts\n        lend\n    fn easy_count\n        rename with\n        lend\n    fn easy_init\n        rename new\n")
     p7_write(dir, "src/main.with", "use contracts.mimelib\nuse c_import(\"mime.h\")\n\nfn solo() -> Mime: Mime.new().unwrap()\n\nfn main:\n    let e = Easy.new().unwrap()\n    let m = solo()\n    print(f\"{m.parts()} {e.with()}\")\n")
     p7_write(dir, "build.with", "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let out = ctx.new_build().executable(\"release_floor\", \"src/main.with\")\n    out.default(\"release_floor\")\n")
 
+// One project with `pinned` and a claim that holds from `floor`; `refusal`
+// is what the build must say, or "" when it must succeed.
+fn release_case(name: &str, pinned: &str, floor: &str, refusal: &str):
+    let dir = p7_prepare_case("d235_release_floor_" ++ name, "release_floor")
+    release_floor_project(dir, pinned, floor)
+    let built = p7_run(dir, "build", p7_build_args())
+    if refusal.len() > 0: p7_assert_failure_contains(built, refusal, name)
+    else: p7_assert_success(built, name)
+
 fn main:
-    let old = p7_prepare_case("d235_release_floor_old", "release_floor")
-    release_floor_project(old, "7.80.0")
-    p7_assert_failure_contains(p7_run(old, "build", p7_build_args()), "holds from mimelib 7.87.0, and this project pins mimelib 7.80.0", "a claim with a floor is refused against an older pinned release")
-    let new = p7_prepare_case("d235_release_floor_new", "release_floor")
-    release_floor_project(new, "7.90.1")
-    p7_assert_success(p7_run(new, "build", p7_build_args()), "a release at or past the floor builds")
+    release_case("old", "7.80.0", "7.87.0", "holds from mimelib 7.87.0, and this project pins mimelib 7.80.0")
+    release_case("new", "7.90.1", "7.87.0", "")
+    release_case("short", "7.9", "7.87.0", "this project pins mimelib 7.9")
+    release_case("letters_old", "1.1.1", "1.1.1a", "this project pins mimelib 1.1.1 ")
+    release_case("letters_new", "1.1.1w", "1.1.1a", "")
+    release_case("letters_same", "1.1.1a", "1.1.1a", "")
+    release_case("prerelease_old", "3.0.0-beta2", "3.0.0", "this project pins mimelib 3.0.0-beta2")
+    release_case("prerelease_new", "3.0.0", "3.0.0-beta2", "")
+    release_case("unordered_floor", "7.90.1", "7.x", "'7.x' is not a release this clause can order")
+    release_case("unordered_pin", "cci.20200203", "7.87.0", "pins mimelib cci.20200203, which is not a release this clause can order")
+    release_case("unpinned", "", "7.87.0", "this project pins no release of mimelib")
     print("ok")

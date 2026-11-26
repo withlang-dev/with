@@ -1624,14 +1624,29 @@ impl Sema:
     // refused; where no release is pinned there is nothing to compare, and
     // the claim stands as the contract states it.
     mut fn facade_check_release_floor(fname: &str, facade: i32, pi: i32, floor_sym: i32, clause: i32):
-        let floor = self.pool_resolve(floor_sym)
-        let package = self.pool_resolve(facade)
+        let floor = with_str_clone_ref(self.pool_resolve(floor_sym))
+        let package = with_str_clone_ref(self.pool_resolve(facade))
+        let said = f"fn '{fname}': 'param {pi} fixed … since {floor}'"
+        let wanted = resolve_release_parse(floor)
+        if wanted.is_none():
+            self.emit_error_with_help(f"{said}: '{floor}' is not a release this clause can order (§16.2b.11)", clause, "a release is dotted numbers, then optional letters, then an optional '-prerelease': 7.87.0, 1.1.1w, 3.0.0-beta2")
+            return
+        var pinned = ""
         for fetched in resolve_fetched_packages(resolve_dirname(self.current_module_path)):
             if fetched.name != package: continue
             let parts = fetched.dir.split("/")
-            let pinned = parts[parts.len() - 1]
-            if resolve_release_before(pinned, floor):
-                self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed … since {floor}' holds from {package} {floor}, and this project pins {package} {pinned} (§16.2b.11)", clause, f"pin {package} {floor} or later in with.toml, or drop the presentation that needs it")
+            pinned = with_str_clone_ref(parts[parts.len() - 1])
+        // No pinned release: the floor cannot be checked, and an unchecked
+        // floor is not accepted (D235).
+        if pinned.len() == 0:
+            self.emit_error_with_help(f"{said} holds from {package} {floor}, and this project pins no release of {package} to check that against (§16.2b.11)", clause, f"pin it in with.toml (`c.{package} = \"{floor}\"` or later), or drop the presentation that needs it")
+            return
+        let have = resolve_release_parse(pinned)
+        if have.is_none():
+            self.emit_error_with_help(f"{said}: this project pins {package} {pinned}, which is not a release this clause can order (§16.2b.11)", clause, "a release is dotted numbers, then optional letters, then an optional '-prerelease'")
+            return
+        if resolve_release_before(have.unwrap(), wanted.unwrap()):
+            self.emit_error_with_help(f"{said} holds from {package} {floor}, and this project pins {package} {pinned} (§16.2b.11)", clause, f"pin {package} {floor} or later in with.toml, or drop the presentation that needs it")
 
     mut fn collect_fn_clause(fname: &str, c0: ForeignContract, sig: i32, clause: i32) -> ForeignContract:
         if self.ast.get_data0(clause) == FACADE_CLAUSE_CALLBACK_ARGV:

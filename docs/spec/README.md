@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.90
+# The With Programming Language — Specification v7.91
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,8 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.91:** D235 (Eric, 2026-11-25). §16.2b.11: a `param N fixed` clause may end with `since V`, the release its claim holds from; releases compare by dotted numeric parts, then trailing letters, with a `-prerelease` before the bare release; a project that pins an earlier release, or none, is refused; a release in no such form is refused. The name after `rename` may be a keyword. Implemented.
+
 **Changelog v7.90:** D235 (Eric, 2026-11-25). §16.2b.5: a variadic case may state `fills T`, an out-pointer the callee writes without reading and does not keep; With passes a zeroed `T` and presents the value as the result under the function's `ok` contract (#3119; not yet implemented). §16.2b.11: on a producer, `param N fixed null` on a parameter that receives a resource states the absent parent, and a second presentation of a producer is itself a producer (D214's words; implemented).
 
 **Changelog v7.89:** D234 (delegated, D98; 2026-11-24). §10.2: a `main` that declares `-> Result[T, E]` and returns an `Err` ends the program as `?` in main does (the error's `Debug` form on stderr, exit status 1, after the return's defers and drops); an `Ok` exits with status 0. It was accepted and its `Err` discarded (exit status 0), and a `Result` returned through a slot failed in code generation.

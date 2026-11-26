@@ -5243,14 +5243,15 @@ impl Parser:
     // The literal a fixed argument binds (§16.2b.11): an integer literal,
     // negated or not, `null`, `true` or `false` — a value whose C type Sema
     // can check against the parameter's, never an expression.
-    // A release of a package as its maker writes it (`7.87.0`): the digits
-    // and dots up to the next blank, as one name.
+    // A release of a package as its maker writes it (`7.87.0`, `1.1.1w`,
+    // `3.0.0-beta2`): the text up to the next blank, as one name. Whether
+    // it is a release Sema can order is Sema's to say.
     mut fn parse_facade_release() -> i32:
         let start = self.current_start()
         var end = start
-        while (self.peek() == TokenKind.TK_INT_LIT or self.peek() == TokenKind.TK_FLOAT_LIT or self.peek() == TokenKind.TK_DOT) and (end == start or self.current_start() == end):
-            end = self.current_end()
-            self.advance()
+        while end < self.source.len() and self.source[end] != ' ' and self.source[end] != '\t' and self.source[end] != '\n' and self.source[end] != '\r': end = end + 1
+        if self.peek() != TokenKind.TK_INT_LIT and self.peek() != TokenKind.TK_FLOAT_LIT: end = start
+        while end > start and self.current_start() < end and self.peek() != TokenKind.TK_NEWLINE and self.peek() != TokenKind.TK_EOF: self.advance()
         if end == start:
             self.emit_error("'since' names the release the claim holds from: 'param 0 fixed null since 7.87.0' (§16.2b.11)")
             return 0
