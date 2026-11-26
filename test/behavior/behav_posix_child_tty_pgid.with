@@ -1,0 +1,58 @@
+//! expect-stdout: fg-pgid-ok
+//! expect-stdout: captured-tty-detached-ok
+//! skip-on: windows POSIX process-group and PTY semantics only
+
+// Foreground `std.process.run` children stay in the parent's process group so
+// terminal ioctls (tcsetattr, read) do not stop them with SIGTTOU/SIGTTIN,
+// while isolated (captured/timed) children that inherit a TTY stdin detach
+// fd 0 to /dev/null so backgrounded processes (like raylib's memory backend
+// under UAT) never hang on SIGTTOU.
+use std.process
+use std.fs
+use c_import("fcntl.h")
+use c_import("stdlib.h")
+use c_import("unistd.h")
+
+fn main:
+    let argv = args()
+    if argv.len() >= 3 and argv[1] == "--child-pgid":
+        let got = f"{getpgrp()}"
+        if got == argv[2]: exit_code(0)
+        exit_code(1)
+    if argv.len() >= 2 and argv[1] == "--child-isatty":
+        if isatty(0) == 0: exit_code(0)
+        exit_code(1)
+
+    let my_pgid = f"{getpgrp()}"
+    let fg_rc = run([argv[0], "--child-pgid", my_pgid])
+    if fg_rc != 0:
+        print(f"fg-pgid-fail rc={fg_rc}")
+        exit_code(1)
+    print("fg-pgid-ok")
+
+    let master = posix_openpt(O_RDWR | O_NOCTTY)
+    if master < 0 or grantpt(master) != 0 or unlockpt(master) != 0:
+        print("pty-open-fail")
+        exit_code(1)
+    let slave_name = ptsname(master)
+    let slave = unsafe { open(slave_name, O_RDWR | O_NOCTTY) }
+    if slave < 0:
+        close(master)
+        print("pty-slave-fail")
+        exit_code(1)
+    let saved_in = dup(0)
+    dup2(slave, 0)
+    let parent_tty = isatty(0)
+    let out_path = f"/tmp/with_tty_pgid_test_{pid()}.out"
+    let err_path = f"/tmp/with_tty_pgid_test_{pid()}.err"
+    let res = run_to_files([argv[0], "--child-isatty"], out_path, err_path, 5000)
+    dup2(saved_in, 0)
+    close(saved_in)
+    close(slave)
+    close(master)
+    remove_file(out_path)
+    remove_file(err_path)
+    if parent_tty == 0 or res.code != 0:
+        print(f"captured-tty-fail parent_tty={parent_tty} rc={res.code}")
+        exit_code(1)
+    print("captured-tty-detached-ok")
