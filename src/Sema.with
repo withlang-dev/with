@@ -2837,6 +2837,11 @@ type Sema {
     gen_call_view_place_counts: HashMap[i32, i32, Minted],
     // The view places of generator calls that the gen fn takes `mut`.
     gen_call_mut_view_places: HashMap[i32, i32, Minted],
+    // Set while a borrow is registered for a view derived from another view
+    // (a loop's element, a pattern's binding), not for one that names the
+    // place: under a generator's `mut` hold the first reads through the
+    // generator's lend.
+    borrow_through_yielded_view: bool,
     gen_call_view_place_nodes: List[i32],
     stmt_pos_depth: i32,
     current_statement_expr_root: i32,
@@ -4791,6 +4796,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         gen_call_view_place_starts: sema_new_map_i32_i32(),
         gen_call_view_place_counts: sema_new_map_i32_i32(),
         gen_call_mut_view_places: sema_new_map_i32_i32(),
+        borrow_through_yielded_view: false,
         gen_call_view_place_nodes: [],
         stmt_pos_depth: 0,
         current_statement_expr_root: 0,

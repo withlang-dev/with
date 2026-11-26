@@ -1,0 +1,18 @@
+//! expect-check-fail: cannot read `b` while `walk(…)` holds it `mut`
+// The place a generator holds `mut` is not read by name in the loop body: a
+// field read and a method call, like an argument, would see it between the
+// generator's writes.
+type Box { n: i32 }
+
+impl Box:
+    fn doubled() -> i32: self.n * 2
+
+gen fn walk(mut b: Box) -> i32:
+    while b.n > 0:
+        b.n = b.n - 1
+        yield b.n
+
+fn main:
+    var b = Box { n: 2 }
+    for x in walk(mut b):
+        print(b.n + b.doubled() + x)

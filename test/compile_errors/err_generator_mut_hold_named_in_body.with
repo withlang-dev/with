@@ -1,0 +1,15 @@
+//! expect-check-fail: already mutably borrowed
+// The place a generator holds `mut` is not viewed by name in the loop body,
+// even beside a use of the views the generator handed out.
+type Bag { items: List[str], taken: i32 }
+
+gen fn words(mut b: Bag) -> &str:
+    for s in b.items:
+        b.taken = b.taken + 1
+        yield s
+
+fn main:
+    var b = Bag { items: ["a", "b"], taken: 0 }
+    for w in words(mut b):
+        let first = &b.items[0]
+        print(w.len() + first.len())

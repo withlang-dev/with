@@ -22286,7 +22286,10 @@ impl Sema:
         let before = self.borrow_refs.len()
         let path_start = self.borrow_path_mark()
         let path_count = self.borrow_collect_path(place_node)
+        // The loop's own element views what its generator holds.
+        self.borrow_through_yielded_view = true
         self.check_borrow_create_direct(root, BorrowKind.SHARED, self.borrow_field(place_node), path_start, path_count, iterable)
+        self.borrow_through_yielded_view = false
         if self.borrow_refs.len() > before:
             self.borrow_refs[before] = sym
             self.for_view_binding_syms.push(sym)
@@ -41141,6 +41144,13 @@ impl Sema:
             let existing_kind = self.borrow_kinds[i]
             if kind == BorrowKind.SHARED:
                 if existing_kind == BorrowKind.EXCLUSIVE:
+                    // A generator that took the place `mut` hands the loop
+                    // body views of it (`for t in toks(mut b)`, where `t`
+                    // views `b`). Reading through such a view is the
+                    // generator's own lend; naming the place itself is not.
+                    if self.for_view_binding_is_gen_loop(self.borrow_refs[i]) and self.place_root_sym(operand_node) != place:
+                        i = i + 1
+                        continue
                     self.emit_error("cannot borrow: already mutably borrowed", err_node)
                     return
                 i = i + 1
@@ -41216,7 +41226,9 @@ impl Sema:
             // exclusive view of it for as long as the binding is alive; its
             // capture summary says which places its body writes.
             let kind = if self.closure_capture_writes(creation_node, origin_sym): BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+            self.borrow_through_yielded_view = self.place_root_sym(creation_node) != origin_sym
             self.check_borrow_create_direct(origin_sym, kind, 0, path_start, path_count, creation_node)
+            self.borrow_through_yielded_view = false
             if self.borrow_refs.len() > before:
                 self.borrow_refs[before] = view_sym
 
@@ -41415,6 +41427,17 @@ impl Sema:
             if ref_sym == 0 or ref_sym == sym:
                 i = i + 1
                 continue
+            // A generator that took the place `mut` holds it for its whole
+            // loop: it writes the place between the body's runs, so the body
+            // does not read it by name (D172). Nothing names the generator
+            // again, so its hold has no last use to wait for.
+            if self.for_view_binding_is_gen_loop(ref_sym):
+                let held = self.pool_resolve(sym)
+                let holder = with_str_clone_ref(self.pool_resolve(ref_sym))
+                let diag = Diagnostic.err(f"cannot read `{held}` while `{holder}` holds it `mut`", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+                diag.add_help(f"`{holder}` takes `{held}` as a `mut` place for as long as its loop runs; read what the body needs into a `let` before the loop, or use what the generator yields")
+                self.diags.emit(diag)
+                return
             let stmt_root = self.current_statement_expr_root
             let last_use = self.view_last_use(ref_sym, node, self.borrow_scope_depths[i])
             let used_here = stmt_root != 0 and self.view_used_in(stmt_root, ref_sym)
@@ -41761,6 +41784,13 @@ impl Sema:
             let existing_kind = self.borrow_kinds[i]
             if kind == BorrowKind.SHARED:
                 if existing_kind == BorrowKind.EXCLUSIVE:
+                    // The same lend as in check_borrow_create: a view derived
+                    // from one the generator handed out (the loop's element,
+                    // a binding a pattern takes from it) reads the place the
+                    // generator holds; a view that names the place does not.
+                    if self.borrow_through_yielded_view and self.for_view_binding_is_gen_loop(self.borrow_refs[i]):
+                        i = i + 1
+                        continue
                     self.emit_error("cannot borrow: already mutably borrowed", err_node)
                     return
                 i = i + 1
