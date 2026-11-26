@@ -1,0 +1,19 @@
+//! expect-check-fail: 'Atomic' requires an explicit import
+// D216 (#2425): the rendering of a `release` message names std's `Atomic`
+// for its own flag. That gives the program no name: its own use of `Atomic`
+// still needs the import.
+use c_import("err_d216_message.h")
+
+c contract msgs:
+    message Note wraps Msg
+        from msg_next(out param 0)
+        tag tag
+        case First when EV_KEY : KeyEv
+        payload data size size
+        release msg_free
+
+fn main:
+    let flag: Atomic[i64] = Atomic.new(0)
+    for n in Note.poll():
+        match n:
+            _ => print(flag.load(.SeqCst))

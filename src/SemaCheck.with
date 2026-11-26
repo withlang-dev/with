@@ -25050,6 +25050,31 @@ impl Sema:
                 return true
         false
 
+    // D216: an `.Other(tag)` arm that compares the tag with a constant a
+    // named case claims. The tag never equals it there (the named case took
+    // it), and code written before the contract named the case goes quiet
+    // when it does. Found in the arm's own text, as whole words.
+    mut fn warn_message_other_compares(enum_resolved: i32, extra_start: i32, arm_count: i32):
+        let sum = self.pool_resolve(self.get_type_d0(enum_resolved))
+        if not self.facade_message_sums.contains(sum): return
+        let other = self.pool_lookup_symbol("Other")
+        if other == 0: return
+        for ai in 0..arm_count:
+            let arm_node = self.ast.get_extra(extra_start + ai)
+            if not sema_pattern_covers_variant(self.ast, self.ast.get_data0(arm_node), other) or sema_pattern_is_catchall(self.ast, self.ast.get_data0(arm_node)): continue
+            let text = self.call_node_text(arm_node)
+            for entry in self.facade_message_case_consts:
+                let parts = entry.split("\t")
+                if parts.len() != 3 or parts[0] != sum: continue
+                let at = text.find(parts[1])
+                if at < 0: continue
+                let before_ok = at == 0 or not sema_is_name_byte(text[at - 1])
+                let end = at + parts[1].len()
+                let after_ok = end >= text.len() or not sema_is_name_byte(text[end])
+                if before_ok and after_ok and (text.contains("== " ++ parts[1]) or text.contains(parts[1] ++ " ==")):
+                    self.emit_warning(f"this `.Other` arm compares the tag with `{parts[1]}`, which the contract names as case `{parts[2]}`: the tag is never that here (D216)", arm_node)
+                    break
+
     mut fn emit_partial_statement_match_warning(message: &str, node: i32):
         self.emit_warning_code(message, node, "partial-statement-match")
 
@@ -25083,6 +25108,7 @@ impl Sema:
                     enum_resolved = base_resolved
                     tk = TypeKind.TY_ENUM
 
+        if tk == TypeKind.TY_ENUM and self.facade_message_sums.len() > 0: self.warn_message_other_compares(enum_resolved as i32, extra_start, arm_count)
         // Check if any arm is a catch-all (wildcard or binding pattern without guard)
         var has_catchall = 0
         for ai in 0..arm_count:
@@ -25096,6 +25122,15 @@ impl Sema:
                 break
         if has_catchall != 0:
             return
+
+        // D216: a message's sum is open. `Other(tag)` covers a tag the library
+        // adds; it does not cover a case a later contract names, which would
+        // break every match that listed the cases. So the match keeps a `_`.
+        if tk == TypeKind.TY_ENUM and self.facade_message_sums.len() > 0:
+            let sum = self.pool_resolve(self.get_type_d0(enum_resolved as i32))
+            if self.facade_message_sums.contains(sum):
+                self.emit_error_with_help(f"match on message '{sum}' has no `_` arm: a message's cases are open, a later contract may name more (D216)", node, "add a `_` arm")
+                return
 
         // Bool exhaustiveness
         if tk == TypeKind.TY_BOOL:
@@ -25226,6 +25261,8 @@ fn sema_pattern_is_catchall(ast: &AstPool, pat: i32) -> bool:
     if kind == NodeKind.NK_PAT_AT_BINDING:
         return sema_pattern_is_catchall(ast, ast.get_data1(pat))
     false
+
+fn sema_is_name_byte(c: u8) -> bool: (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_'
 
 fn sema_pattern_covers_variant(ast: &AstPool, pat: i32, variant_sym: i32) -> bool:
     if pat == 0:
@@ -44816,6 +44853,10 @@ impl Sema:
         if pc == 0:
             return false
         let ps = self.ast.fn_meta_param_start(meta)
+        // The mode is the receiver's only when parameter 0 is the receiver:
+        // a function called on the type (`Tag.bump(mut b)`) has none, and
+        // its first parameter's `mut` is that parameter's own (D172).
+        if self.pool_resolve(self.ast.fn_param_name(ps, 0)) != "self": return false
         let pflags = self.ast.fn_param_flags(ps, 0)
         fn_param_is_mut_self(pflags) != 0
 
@@ -44840,6 +44881,7 @@ impl Sema:
         if pc == 0:
             return 0
         let ps = self.ast.fn_meta_param_start(meta)
+        if self.pool_resolve(self.ast.fn_param_name(ps, 0)) != "self": return 0
         let pflags = self.ast.fn_param_flags(ps, 0)
         fn_param_is_move_self(pflags)
 

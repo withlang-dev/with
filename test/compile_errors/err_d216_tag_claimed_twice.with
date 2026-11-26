@@ -1,0 +1,13 @@
+//! expect-check-fail: case 'Again' claims a tag value that case 'Key' already has
+// D216 (#2425): each tag value belongs to one case.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Key when EV_KEY field key
+        case Again when EV_KEY field motion
+
+fn main:
+    print("x")

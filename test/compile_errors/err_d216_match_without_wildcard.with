@@ -1,0 +1,17 @@
+//! expect-check-fail: match on message 'Event' has no `_` arm
+// D216 (#2425): a message's sum is open.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Key when EV_KEY field key
+        case Motion when EV_MOVE field motion
+
+fn main:
+    for ev in Event.poll():
+        match ev:
+            .Key(k) => print(k.key)
+            .Motion(m) => print(m.x)
+            .Other(tag) => print(tag)

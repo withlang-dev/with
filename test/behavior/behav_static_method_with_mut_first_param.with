@@ -1,0 +1,25 @@
+//! expect-stdout: 3
+//! expect-stdout: 2
+//! expect-stdout: 1
+//! expect-stdout: 0
+
+// A function declared on a type that takes no receiver is called on the type
+// (`Tag.bump(mut b)`), whatever its first parameter's mode. A `mut` first
+// parameter was read as a `mut` receiver, and the call was refused:
+// "mutating method requires a place receiver".
+type Box { n: i32 }
+type Tag { t: i32 }
+
+fn Tag.bump(mut b: Box) -> i32:
+    b.n = b.n + 1
+    b.n
+
+gen fn Tag.walk(mut b: Box) -> i32:
+    while b.n > 0:
+        b.n = b.n - 1
+        yield b.n
+
+fn main:
+    var b = Box { n: 2 }
+    print(Tag.bump(mut b))
+    for x in Tag.walk(mut b): print(x)

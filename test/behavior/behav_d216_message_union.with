@@ -1,0 +1,27 @@
+//! expect-stdout: key 65
+//! expect-stdout: move 7
+//! expect-stdout: window
+//! expect-stdout: other 99
+//! expect-build-stderr: this `.Other` arm compares the tag with `EV_MOVE`, which the contract names as case `Motion`
+// D216 (#2425): a polled tagged message over a C union. The program polls
+// and matches with no `unsafe`; a range names a family of tags; a tag no
+// line names is `Other(tag)`; the `.Other` arm's comparison with a constant
+// that has a named case is warned.
+use c_import("behav_d216_events.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Key when EV_KEY field key
+        case Motion when EV_MOVE field motion
+        case Window when EV_WIN_A..EV_WIN_B
+
+fn main:
+    for ev in Event.poll():
+        match ev:
+            .Key(k) => print(f"key {k.key}")
+            .Motion(m) => print(f"move {m.x}")
+            .Window => print("window")
+            .Other(tag) => { if tag == EV_MOVE: print("never") else: print(f"other {tag}") }
+            _ => {}

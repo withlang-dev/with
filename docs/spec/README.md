@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.92
+# The With Programming Language — Specification v7.93
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,9 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+
+**Changelog v7.93:** D216 (Eric, 2026-11-18; words blessed 2026-11-25). §16.2b.9a, new: polled messages. A `message` item states the function that fills a record, the tag field and each case; it presents an open sum and `Name.poll(…)`, iterated with `for`. A message with `release` takes the resource its producer receives `mut`; one whose producer receives none refuses a second running poll with a panic. Implemented.
+
 **Changelog v7.92:** D235 (Eric, 2026-11-25; the words delegated, D98). §29.11: ten words that only open or modify a declaration are contextual (`c_import`, `dyn`, `ephemeral`, `extend`, `gen`, `global`, `module`, `opaque`, `union`, `where`), each a keyword only where its construct can begin; `spawn`, which has no construct, is not reserved (#3132). Implemented.
 
 **Changelog v7.91:** D235 (Eric, 2026-11-25). §16.2b.11: a `param N fixed` clause may end with `since V`, the release its claim holds from; releases compare by dotted numeric parts, then trailing letters, with a `-prerelease` before the bare release; a project that pins an earlier release, or none, is refused; a release in no such form is refused. The name after `rename` may be a keyword. Implemented.

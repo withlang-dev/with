@@ -1,0 +1,13 @@
+//! expect-check-fail: ends the life of a payload, and the message states none
+// D216 (#2425): release belongs to the pointer form.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Key when EV_KEY field key
+        release msg_free
+
+fn main:
+    print("x")

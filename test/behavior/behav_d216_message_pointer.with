@@ -1,0 +1,32 @@
+//! expect-stdout: overlay 1
+//! expect-stdout: stored 77
+//! expect-stdout: other 1102
+//! expect-stdout: other 331
+//! expect-stdout: freed 4 of 4
+// D216 (#2425): the pointer form. A typed case is entered only when the
+// payload pointer is non-null, large enough and aligned (the third message
+// is too small, the fourth is null: both are `Other`); the producer's other
+// parameter is the poll's; `release` runs after each body, an early `break`
+// included.
+use c_import("behav_d216_callbacks.h")
+
+c contract steamish:
+    message Callback wraps Msg
+        from msg_next(out param 1)
+        tag tag
+        case OverlayActivated when CB_OVERLAY : Overlay
+        case StatsStored when CB_STORED : Stored
+        payload data size size
+        release msg_free
+
+fn main:
+    var seen = 0
+    for cb in Callback.poll(3):
+        seen += 1
+        match cb:
+            .OverlayActivated(o) => print(f"overlay {o.active}")
+            .StatsStored(s) => print(f"stored {s.id}")
+            .Other(tag) => print(f"other {tag}")
+            _ => {}
+        if seen == 4: break
+    print(f"freed {msg_freed()} of {seen}")

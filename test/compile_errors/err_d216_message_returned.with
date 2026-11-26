@@ -1,0 +1,18 @@
+//! expect-check-fail: returned ephemeral value may outlive its origin 'ev'
+// D216 (#2425): a message is a view of the record the poll holds.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Key when EV_KEY field key
+        case Motion when EV_MOVE field motion
+
+fn first() -> Event:
+    for ev in Event.poll():
+        return ev
+    panic("none")
+
+fn main:
+    print(1)

@@ -1,0 +1,13 @@
+//! expect-check-fail: and the message is the pointer form
+// D216 (#2425): the pointer form's cases carry a type.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Msg
+        from msg_next(out param 0)
+        tag tag
+        case K when EV_KEY field data
+        payload data size size
+
+fn main:
+    print("x")

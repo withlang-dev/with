@@ -4,8 +4,15 @@
 states the pairing once), safety (a payload is read only as the member its
 tag selects, and never after it is released).
 
-**Date:** 2026-11-18. **Status:** ruled by Eric. The spec words are derived
-and come to him as a diff with the implementation.
+**Date:** 2026-11-18. **Status:** ruled by Eric; implemented, and the words
+(§16.2b.9a, spec v7.92) blessed by him on 2026-11-25 with five edits.
+
+**Amendment (Eric, 2026-11-25).** A message with `release` takes the facade
+resource its producer receives `mut`; a union-form message does not (its
+record is a copy, and the loop body may call the resource). A `release`
+message whose producer receives no resource refuses a second running poll
+with a panic: one atomic flag per message, taken with a swap. The poll is
+presented without thread affinity; that gap is stated in the subsection.
 
 **Context.** #2425: `SDL_PollEvent` fills a caller-owned union whose first
 member, `type`, says which member is active; Steam's manual dispatch fills a

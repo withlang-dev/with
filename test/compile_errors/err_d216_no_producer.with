@@ -1,0 +1,11 @@
+//! expect-check-fail: states no 'from f(out param N)'
+// D216 (#2425): a message states its producer.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        tag type
+        case Key when EV_KEY field key
+
+fn main:
+    print("x")

@@ -1,0 +1,14 @@
+//! expect-check-fail: and its parameters are not those
+// D216 (#2425): release takes what the producer took besides the record.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Msg
+        from msg_next(out param 0)
+        tag tag
+        case K when EV_KEY : KeyEv
+        payload data size size
+        release msg_release
+
+fn main:
+    print("x")

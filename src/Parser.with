@@ -5056,6 +5056,28 @@ impl Parser:
             self.pool.add_extra(repr as i32)
             self.pool.add_extra(marker as i32)
             return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.prev_end(), name, extra_start, 1) as i32
+        if self.current_ident_is("message"):
+            // D216: `message Name wraps CRecord`, a polled tagged message. It
+            // has no producer-and-drop lifecycle, so it is its own item.
+            self.advance()
+            let name = self.expect_ident()
+            if name == 0: return 0
+            if not self.current_ident_is("wraps"):
+                self.emit_error("expected 'wraps <C record>' after the message name (D216)")
+                return 0
+            self.advance()
+            let repr = self.parse_type_expr()
+            if repr == 0: return 0
+            let head_end = self.prev_end()
+            let (lines, ok) = self.parse_facade_message_lines(col)
+            if not ok: return 0
+            let extra_start = self.pool.extra_len()
+            self.pool.add_extra(repr as i32)
+            var line_count = 0
+            for line in lines:
+                self.pool.add_extra(line)
+                line_count += 1
+            return self.pool.add_node(NodeKind.NK_FACADE_MESSAGE, start, self.facade_item_end(head_end, lines), name, extra_start, line_count) as i32
         if self.current_ident_is("domain"):
             self.advance()
             let name = self.expect_ident()
@@ -5135,7 +5157,117 @@ impl Parser:
         if self.current_ident_is("error"):
             self.emit_error("a facade-wide error type is stated in the header, `c contract F error E:`, not as an item (§16.2b.4)")
             return 0
-        self.emit_error("expected 'resource', 'handle', 'fn', 'domain', 'text utf8', 'runs threads' or 'use convention' in c contract (§16.2b)")
+        self.emit_error("expected 'resource', 'handle', 'message', 'fn', 'domain', 'text utf8', 'runs threads' or 'use convention' in c contract (§16.2b)")
+        0
+
+    // The lines of a `message` item (D216), each its own clause node:
+    //   from f(out param N)                     the poll that fills the record
+    //   tag F                                   the field that says which case
+    //   case Name when CONST [..CONST] [field f | : Type]
+    //   payload P size N                        the pointer form's two fields
+    //   release f                               what ends the payload's life
+    mut fn parse_facade_message_lines(item_col: i32) -> (List[i32], bool):
+        self.skip_newlines()
+        let lines = []
+        while self.peek() != TokenKind.TK_EOF:
+            if column_of(self.source, self.current_start()) <= item_col: break
+            let line = self.parse_facade_message_line()
+            if line == 0: return (lines, false)
+            lines.push(line)
+            self.skip_newlines()
+        (lines, true)
+
+    mut fn parse_facade_message_line() -> i32:
+        let start = self.current_start()
+        if self.current_ident_is("from"):
+            self.advance()
+            let producer = self.expect_ident()
+            if producer == 0: return 0
+            if self.peek() != TokenKind.TK_L_PAREN:
+                self.emit_error("a message's producer names the parameter it fills: 'from f(out param N)' (D216)")
+                return 0
+            self.advance()
+            if not self.current_ident_is("out"):
+                self.emit_error("a message's producer names the parameter it fills: 'from f(out param N)' (D216)")
+                return 0
+            self.advance()
+            let filled = self.parse_facade_param_ref()
+            if filled == 0: return 0
+            if self.peek() != TokenKind.TK_R_PAREN:
+                self.emit_error("expected ')' after the parameter a message's producer fills (D216)")
+                return 0
+            self.advance()
+            let at = self.pool.extra_len()
+            self.pool.add_extra(producer)
+            self.pool.add_extra(filled)
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FacadeMessageLine.From, at, 2) as i32
+        if self.current_ident_is("tag"):
+            self.advance()
+            // C's own name for the field, which may be a With keyword
+            // (SDL's tag is `type`).
+            let field = self.expect_ident_or_keyword()
+            if field == 0: return 0
+            let at = self.pool.extra_len()
+            self.pool.add_extra(field)
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FacadeMessageLine.Tag, at, 1) as i32
+        if self.current_ident_is("case"):
+            self.advance()
+            let name = self.expect_ident()
+            if name == 0: return 0
+            if not self.current_ident_is("when"):
+                self.emit_error("a message case names its tag: 'case Name when CONST' (D216)")
+                return 0
+            self.advance()
+            let low = self.expect_ident()
+            if low == 0: return 0
+            var high = 0
+            if self.peek() == TokenKind.TK_DOT_DOT:
+                self.advance()
+                high = self.expect_ident()
+                if high == 0: return 0
+            // What the case carries: nothing, a member of the record
+            // (`field f`), or the record a payload pointer points to (`: T`).
+            var form = FacadeMessageCase.Bare
+            var carried = 0
+            if self.current_ident_is("field"):
+                self.advance()
+                carried = self.expect_ident_or_keyword()
+                if carried == 0: return 0
+                form = FacadeMessageCase.Member
+            else if self.peek() == TokenKind.TK_COLON:
+                self.advance()
+                carried = self.parse_type_expr() as i32
+                if carried == 0: return 0
+                form = FacadeMessageCase.Payload
+            let at = self.pool.extra_len()
+            self.pool.add_extra(name)
+            self.pool.add_extra(low)
+            self.pool.add_extra(high)
+            self.pool.add_extra(form)
+            self.pool.add_extra(carried)
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FacadeMessageLine.Case, at, 5) as i32
+        if self.current_ident_is("payload"):
+            self.advance()
+            let pointer = self.expect_ident_or_keyword()
+            if pointer == 0: return 0
+            if not self.current_ident_is("size"):
+                self.emit_error("a message's payload names its pointer and its size: 'payload P size N' (D216)")
+                return 0
+            self.advance()
+            let size = self.expect_ident_or_keyword()
+            if size == 0: return 0
+            let at = self.pool.extra_len()
+            self.pool.add_extra(pointer)
+            self.pool.add_extra(size)
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FacadeMessageLine.Payload, at, 2) as i32
+        if self.current_ident_is("release"):
+            self.advance()
+            let releaser = self.expect_ident()
+            if releaser == 0: return 0
+            let at = self.pool.extra_len()
+            self.pool.add_extra(releaser)
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FacadeMessageLine.Release, at, 1) as i32
+        self.emit_error("a message states 'from f(out param N)', 'tag F', 'case Name when CONST', 'payload P size N' or 'release f' (D216)")
         0
 
     // `(param N)` after `drop f` or `destroys f` (D209, §31): the parameter
@@ -5705,7 +5837,7 @@ impl Parser:
             // or writes through. The pairing is stated, never inferred.
             kind = FACADE_CLAUSE_BUFFER_FIELD
             self.advance()
-            let pointer = self.expect_ident()
+            let pointer = self.expect_ident_or_keyword()
             if pointer == 0: return 0
             if not self.current_ident_is("remaining"):
                 self.emit_error("a buffer held in the resource's record is written 'buffer field <P> remaining field <N>' (§16.2b.8)")

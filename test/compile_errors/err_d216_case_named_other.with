@@ -1,0 +1,12 @@
+//! expect-check-fail: 'Other' is the case every message has
+// D216 (#2425): Other is the sum's own.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Other when EV_KEY
+
+fn main:
+    print("x")

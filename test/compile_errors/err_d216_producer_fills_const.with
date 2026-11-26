@@ -1,0 +1,12 @@
+//! expect-check-fail: which is not a writable pointer to Ev
+// D216 (#2425): the producer fills the record.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_peek(out param 0)
+        tag type
+        case Key when EV_KEY field key
+
+fn main:
+    print("x")

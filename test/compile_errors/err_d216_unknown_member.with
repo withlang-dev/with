@@ -1,0 +1,12 @@
+//! expect-check-fail: carries 'field nope', which is no member of Ev
+// D216 (#2425): a case's member is a member of the record.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Key when EV_KEY field nope
+
+fn main:
+    print("x")

@@ -1,0 +1,12 @@
+//! expect-check-fail: whose end (10) is below its start (12)
+// D216 (#2425): a range runs upward.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        case Win when EV_B..EV_A
+
+fn main:
+    print("x")

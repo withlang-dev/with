@@ -1,0 +1,13 @@
+//! expect-check-fail: 'tag' is stated twice
+// D216 (#2425): one line of each kind.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll(out param 0)
+        tag type
+        tag type
+        case Key when EV_KEY field key
+
+fn main:
+    print("x")

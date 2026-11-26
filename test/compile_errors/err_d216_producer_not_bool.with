@@ -1,0 +1,12 @@
+//! expect-check-fail: a message's producer returns bool
+// D216 (#2425): a bool return means produced.
+use c_import("err_d216_message.h")
+
+c contract evs:
+    message Event wraps Ev
+        from ev_poll_int(out param 0)
+        tag type
+        case Key when EV_KEY field key
+
+fn main:
+    print("x")
