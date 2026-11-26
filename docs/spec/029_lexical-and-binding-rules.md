@@ -174,15 +174,13 @@ lexer keyword table:
 
 ```
 and       as        asm       async     await     break
-c_import  comptime  const     continue  copy      defer
-do        dyn       else      enum      ephemeral errdefer
-extend    extern    false     fn        for       gen
-global    goto      if        impl      in        it
-let       loop      match     module    move      mut
-no_suspend not      null      opaque    or        pub
-return    select    spawn     trait     true      type
-union     unsafe    use       var       where     while
-with      yield
+comptime  const     continue  copy      defer     do
+else      enum      errdefer  extern    false     fn
+for       goto      if        impl      in        it
+let       loop      match     move      mut       no_suspend
+not       null      or        pub       return    select
+trait     true      type      unsafe    use       var
+while     with      yield
 ```
 
 Notes:
@@ -196,10 +194,22 @@ Notes:
 - `error` is **contextual**: before a name it opens an error
   declaration (§10.8) or states a facade's error type (§16.2b.4),
   and it remains usable as an ordinary identifier elsewhere.
+- Ten words are **contextual**: each is a keyword only where its
+  construct can begin, and an ordinary identifier everywhere else.
+  Two names side by side are never an expression, so the position
+  decides:
+  - `gen` before `fn`;
+  - `where`, `dyn` and `extend` before a name;
+  - `global` before a name or `var`;
+  - `module` at the start of a line, before a name;
+  - `opaque`, `union` and `ephemeral` in a `type` or `enum`
+    declaration, after the type's name, its type parameters or its `=`;
+  - `c_import` between `use` and `(`.
 - `else if` is a two-token keyword pair (§9.1), not a single
   keyword.
-- `spawn` is reserved; it currently has no construct in §14 and its
-  surface is under review.
+- `spawn` is not reserved: it has no construct in §14.
+
+*Status (D235): implemented.*
 
 ### 29.12 Error Codes
 
