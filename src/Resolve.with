@@ -1646,16 +1646,52 @@ fn resolve_facade_report_line(report: &str, name: &str) -> str:
 
 type FetchedPackage { name: str, dir: str }
 
-// Whether release `a` of a package comes before release `b`: their dotted
-// parts compared as numbers, a missing part as 0 (`7.9` is before `7.87.0`).
-fn resolve_release_before(a: &str, b: &str) -> bool:
-    let left = a.split(".")
-    let right = b.split(".")
-    for (i, part) in right.enumerate():
-        let have: i64 = if i < left.len(): left[i].parse() ?? 0 else: 0
-        let want: i64 = part.parse() ?? 0
-        if have != want: return have < want
-    false
+// A release of a package, as D235 orders them: dotted numeric parts, then
+// an optional run of ASCII letters (`1.1.1w`), then an optional `-prerelease`
+// (`3.0.0-beta2`).
+type Release {
+    parts: List[i64],
+    letters: str,
+    prerelease: str,
+    has_prerelease: bool,
+}
+
+fn resolve_is_letter(c: u8): (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z')
+fn resolve_is_digit(c: u8): c >= '0' and c <= '9'
+
+// `text` as a release, or None when it is not written in that form. Nothing
+// is trimmed to make it fit: a release that cannot be ordered is refused by
+// the caller.
+fn resolve_release_parse(text: &str) -> Option[Release]:
+    let dash = text.find("-")
+    let head = if dash >= 0: text.slice(0, dash) else: text.to_owned()
+    let prerelease = if dash >= 0: text.slice(dash + 1, text.len()) else: ""
+    if dash >= 0 and prerelease.len() == 0: return None
+    for c in prerelease.bytes():
+        if not resolve_is_letter(c) and not resolve_is_digit(c) and c != '.': return None
+    var cut = head.len()
+    while cut > 0 and resolve_is_letter(head[cut - 1]): cut = cut - 1
+    let parts = []
+    for part in head.slice(0, cut).split("."):
+        if part.len() == 0 or part.len() > 9: return None
+        for c in part.bytes():
+            if not resolve_is_digit(c): return None
+        let value: i64 = part.parse() ?? 0
+        parts.push(value)
+    Some(Release { parts, letters: head.slice(cut, head.len()), prerelease, has_prerelease: dash >= 0 })
+
+// Whether release `a` comes before release `b`: numeric parts first (a
+// missing part is 0), then the letters (`1.1.1` < `1.1.1a` < `1.1.1w`), then
+// a prerelease before the bare release (`3.0.0-beta2` < `3.0.0`).
+fn resolve_release_before(a: &Release, b: &Release) -> bool:
+    let count = if a.parts.len() > b.parts.len(): a.parts.len() else: b.parts.len()
+    for i in 0..count:
+        let left = if i < a.parts.len(): a.parts[i] else: 0
+        let right = if i < b.parts.len(): b.parts[i] else: 0
+        if left != right: return left < right
+    if a.letters != b.letters: return a.letters < b.letters
+    if a.has_prerelease != b.has_prerelease: return a.has_prerelease
+    a.prerelease < b.prerelease
 
 // The `c.<name> = "<version>"` packages of the project that holds
 // `module_dir`, each with its directory under `.with/deps/c`.
