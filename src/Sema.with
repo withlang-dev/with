@@ -2835,6 +2835,8 @@ type Sema {
     // call node: gen_call_view_place_nodes[start..start+count].
     gen_call_view_place_starts: HashMap[i32, i32, Minted],
     gen_call_view_place_counts: HashMap[i32, i32, Minted],
+    // The view places of generator calls that the gen fn takes `mut`.
+    gen_call_mut_view_places: HashMap[i32, i32, Minted],
     gen_call_view_place_nodes: List[i32],
     stmt_pos_depth: i32,
     current_statement_expr_root: i32,
@@ -4788,6 +4790,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         for_view_binding_gen_loops: [],
         gen_call_view_place_starts: sema_new_map_i32_i32(),
         gen_call_view_place_counts: sema_new_map_i32_i32(),
+        gen_call_mut_view_places: sema_new_map_i32_i32(),
         gen_call_view_place_nodes: [],
         stmt_pos_depth: 0,
         current_statement_expr_root: 0,
