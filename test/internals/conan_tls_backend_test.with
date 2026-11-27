@@ -1,0 +1,165 @@
+//! expect-stdout: ok
+// #2757: TLS backend selection, user pinning, mbedtls 3.6 upgrade, and
+// per-platform backend recording in .with/lock.json.
+use compiler.RecipeInterp
+use compiler.ConanClient
+use compiler.LockFile
+use compiler.ProjectConfig
+use std.fs
+
+fn curl_like_recipe() -> str:
+    "class LibcurlConan(ConanFile):\n" ++
+    "    options = {\n" ++
+    "        \"shared\": [True, False],\n" ++
+    "        \"with_ssl\": [False, \"openssl\", \"wolfssl\", \"schannel\", \"mbedtls\", \"libressl\"],\n" ++
+    "        \"with_zlib\": [True, False],\n" ++
+    "    }\n" ++
+    "    default_options = {\n" ++
+    "        \"shared\": False,\n" ++
+    "        \"with_ssl\": \"openssl\",\n" ++
+    "        \"with_zlib\": True,\n" ++
+    "    }\n" ++
+    "    def requirements(self):\n" ++
+    "        if self.options.with_ssl == \"openssl\":\n" ++
+    "            self.requires(\"openssl/[>=3 <4]\")\n" ++
+    "        elif self.options.with_ssl == \"mbedtls\":\n" ++
+    "            self.requires(\"mbedtls/3.5.0\")\n" ++
+    "        if self.options.with_zlib:\n" ++
+    "            self.requires(\"zlib/[>=1.2.11 <2]\")\n" ++
+    "    def _generate_with_cmake(self):\n" ++
+    "        tc = CMakeToolchain(self)\n" ++
+    "        tc.variables[\"CURL_USE_OPENSSL\"] = self.options.with_ssl in (\"openssl\", \"libressl\")\n" ++
+    "        tc.variables[\"CURL_USE_MBEDTLS\"] = self.options.with_ssl == \"mbedtls\"\n" ++
+    "    def package_info(self):\n" ++
+    "        self.cpp_info.components[\"curl\"].libs = [\"curl\"]\n" ++
+    "        if self.options.with_ssl == \"openssl\":\n" ++
+    "            self.cpp_info.components[\"curl\"].requires.append(\"openssl::openssl\")\n" ++
+    "        if self.options.with_ssl == \"mbedtls\":\n" ++
+    "            self.cpp_info.components[\"curl\"].requires.append(\"mbedtls::mbedtls\")\n" ++
+    "        if self.options.with_zlib:\n" ++
+    "            self.cpp_info.components[\"curl\"].requires.append(\"zlib::zlib\")\n"
+
+fn main:
+    let recipe = curl_like_recipe()
+    let choices = recipe_option_choices(recipe, "with_ssl")
+    assert(choices.contains("openssl"))
+    assert(choices.contains("mbedtls"))
+    assert(choices.contains("False"))
+    assert(not choices.contains("bogus"))
+
+    // Default env resolves with_ssl=openssl.
+    let default_env = conan_built_recipe_env("8.18.0", "")
+    assert(recipe_option_value(recipe, default_env, "with_ssl") == "openssl")
+    let def_reqs = recipe_requirements(recipe, default_env)
+    assert(def_reqs.ok and def_reqs.requires.len() == 2)
+    assert(def_reqs.requires[0] == "openssl/[>=3 <4]")
+    assert(def_reqs.requires[1] == "zlib/[>=1.2.11 <2]")
+
+    // Overridden env with with_ssl=mbedtls switches requirements, CMake vars,
+    // and package_info component requires.
+    let mbed_opts: List[str] = ["with_ssl=mbedtls"]
+    let mbed_env = conan_built_recipe_env_with_options("8.18.0", "", mbed_opts)
+    assert(recipe_option_value(recipe, mbed_env, "with_ssl") == "mbedtls")
+    let mbed_reqs = recipe_requirements(recipe, mbed_env)
+    assert(mbed_reqs.ok and mbed_reqs.requires.len() == 2)
+    assert(mbed_reqs.requires[0] == "mbedtls/3.5.0")
+    assert(mbed_reqs.requires[1] == "zlib/[>=1.2.11 <2]")
+    let mbed_cmake = recipe_cmake_variables(recipe, mbed_env)
+    assert(mbed_cmake.ok)
+    var saw_mbed_on = false
+    var saw_ossl_off = false
+    for i in 0..mbed_cmake.names.len():
+        if mbed_cmake.names[i] == "CURL_USE_MBEDTLS" and mbed_cmake.values[i] == "ON": saw_mbed_on = true
+        if mbed_cmake.names[i] == "CURL_USE_OPENSSL" and mbed_cmake.values[i] == "OFF": saw_ossl_off = true
+    assert(saw_mbed_on and saw_ossl_off)
+    let mbed_info = recipe_package_info(recipe, mbed_env)
+    assert(mbed_info.ok and mbed_info.components.len() == 1)
+    assert(mbed_info.components[0].requires.join(",") == "mbedtls::mbedtls,zlib::zlib")
+
+    // Condition 2: unpinned may fall back to mbedtls; explicit pin to openssl
+    // refuses substitution.
+    let no_pins: List[str] = []
+    let pin_openssl: List[str] = ["with_ssl=openssl"]
+    let pin_mbedtls: List[str] = ["with_ssl=mbedtls"]
+    let pin_bogus: List[str] = ["with_ssl=bogus"]
+    let pin_unknown: List[str] = ["no_such_opt=1"]
+    assert(conan_can_fallback_tls_to_mbedtls(recipe, default_env, no_pins))
+    assert(not conan_can_fallback_tls_to_mbedtls(recipe, default_env, pin_openssl))
+    assert(not conan_can_fallback_tls_to_mbedtls(recipe, mbed_env, pin_mbedtls))
+    assert(conan_options_validate("libcurl", "8.18.0", recipe, pin_openssl) == "")
+    assert(conan_options_validate("libcurl", "8.18.0", recipe, pin_mbedtls) == "")
+    assert(conan_options_validate("libcurl", "8.18.0", recipe, pin_bogus).contains("allowed:"))
+    assert(conan_options_validate("libcurl", "8.18.0", recipe, pin_unknown).contains("has no option"))
+
+    // with.toml [deps.options.c.<pkg>] parsing.
+    let toml = "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[deps]\nc.libcurl = \"8.18.0\"\n\n[deps.options.c.libcurl]\nwith_ssl = \"openssl\"\nwith_zlib = false\n"
+    let parsed_opts = project_config_c_dep_options_from_toml(toml)
+    assert(parsed_opts.len() == 2)
+    assert(parsed_opts[0] == "libcurl:with_ssl=openssl")
+    assert(parsed_opts[1] == "libcurl:with_zlib=False")
+    let curl_opts = conan_options_for_pkg(parsed_opts, "libcurl")
+    assert(curl_opts.len() == 2 and curl_opts[0] == "with_ssl=openssl" and curl_opts[1] == "with_zlib=False")
+
+    // Condition 3: move mbedtls/3.5.0 off onto the 3.6 line.
+    let upgraded = conan_adjust_requirement_version("mbedtls", "3.5.0")
+    assert(upgraded == "[>=3.6 <4]")
+    assert(conan_version_in_range("3.6.8", upgraded))
+    assert(not conan_version_in_range("3.5.0", upgraded))
+    assert(conan_adjust_requirement_version("mbedtls", "3.6.8") == "3.6.8")
+    assert(conan_adjust_requirement_version("zlib", "[>=1.2.11 <2]") == "[>=1.2.11 <2]")
+
+    // Condition 1: lock records backend per platform (even where openssl is
+    // the default) and preserves/diffs across platforms.
+    let rec_ossl = conan_recorded_options(recipe, default_env, no_pins)
+    assert(rec_ossl.len() == 1 and rec_ossl[0] == "with_ssl=openssl")
+    let rec_mbed = conan_recorded_options(recipe, mbed_env, no_pins)
+    assert(rec_mbed.len() == 1 and rec_mbed[0] == "with_ssl=mbedtls")
+
+    let tmp = "out/tmp/conan_tls_backend_test"
+    let _rm = remove_tree(tmp)
+    assert(mkdir_p(tmp) == 0)
+    var mac_entry = lock_entry_none()
+    mac_entry.name = "c.libcurl"
+    mac_entry.source = "built"
+    mac_entry.version = "8.18.0"
+    mac_entry.sha256 = "deadbeef"
+    mac_entry.platform_options = lock_platform_options_upsert([], "macos-aarch64", "with_ssl=openssl")
+    var lock = lock_upsert(lock_empty(), mac_entry)
+    assert(lock_write(tmp, lock) == 0)
+
+    // Reload and verify macos-aarch64 entry survived round-trip.
+    let reloaded1 = lock_load(tmp)
+    assert(reloaded1.entries.len() == 1)
+    assert(lock_platform_options_for(reloaded1.entries[0].platform_options, "macos-aarch64") == "with_ssl=openssl")
+    assert(lock_platform_diff_note(reloaded1.entries[0], "linux-aarch64", "with_ssl=mbedtls").contains("with_ssl=openssl on macos-aarch64"))
+    assert(lock_platform_diff_note(reloaded1.entries[0], "macos-aarch64", "with_ssl=openssl") == "")
+
+    // Upsert linux-aarch64 mbedtls entry into the same lock; both platforms stay.
+    var arm_entry = lock_entry_none()
+    arm_entry.name = "c.libcurl"
+    arm_entry.source = "built"
+    arm_entry.version = "8.18.0"
+    arm_entry.sha256 = "deadbeef"
+    arm_entry.platform_options = lock_platform_options_upsert([], "linux-aarch64", "with_ssl=mbedtls")
+    lock = lock_upsert(reloaded1, arm_entry)
+    assert(lock_write(tmp, lock) == 0)
+    let reloaded2 = lock_load(tmp)
+    assert(reloaded2.entries.len() == 1)
+    assert(reloaded2.entries[0].platform_options.len() == 2)
+    assert(lock_platform_options_for(reloaded2.entries[0].platform_options, "linux-aarch64") == "with_ssl=mbedtls")
+    assert(lock_platform_options_for(reloaded2.entries[0].platform_options, "macos-aarch64") == "with_ssl=openssl")
+    let raw_lock = read_file(tmp ++ "/.with/lock.json") ?? ""
+    assert(raw_lock.contains("\"linux-aarch64\": \"with_ssl=mbedtls\""))
+    assert(raw_lock.contains("\"macos-aarch64\": \"with_ssl=openssl\""))
+
+    // lock_holds_options checks current platform's options.
+    var cur_entry = lock_entry_none()
+    cur_entry.name = "c.libcurl"
+    cur_entry.source = "built"
+    cur_entry.version = "8.18.0"
+    cur_entry.sha256 = "deadbeef"
+    cur_entry.platform_options = lock_platform_options_upsert([], lock_platform_id(), "with_ssl=mbedtls")
+    let cur_lock = lock_upsert(lock_empty(), cur_entry)
+    assert(lock_holds_options(cur_lock, "libcurl", pin_mbedtls))
+    assert(not lock_holds_options(cur_lock, "libcurl", pin_openssl))
+    print("ok")

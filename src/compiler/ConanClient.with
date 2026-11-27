@@ -715,14 +715,14 @@ fn conan_json_array(values: &List[str]):
 
 fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, include_paths: &List[str], lib_paths: &List[str], libs: &List[str], defines: &List[str], link_args: &List[str], requires: &List[str]):
     let none: List[ConanComponentLink] = []
-    conan_write_metadata_components(dest_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requires, none)
+    conan_write_metadata_components(dest_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requires, none, [])
 
 // `components`, when the package has them, are written beside the package's
 // own lists as `libs:<name>`, `lib_paths:<name>`, `link_args:<name>` and
 // `requires:<name>`: the build links a package by its components and what
 // each requires (compiler.ProjectConfig), and the package-level lists stay
 // what c_import and the lock read.
-fn conan_write_metadata_components(dest_dir: &str, name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, include_paths: &List[str], lib_paths: &List[str], libs: &List[str], defines: &List[str], link_args: &List[str], requires: &List[str], components: &List[ConanComponentLink]) -> i32:
+fn conan_write_metadata_components(dest_dir: &str, name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, include_paths: &List[str], lib_paths: &List[str], libs: &List[str], defines: &List[str], link_args: &List[str], requires: &List[str], components: &List[ConanComponentLink], recorded_options: &List[str]) -> i32:
     let q = "\x22"
     let nl = "\n"
     var meta = "{" ++ nl
@@ -769,6 +769,8 @@ fn conan_write_metadata_components(dest_dir: &str, name: &str, version: &str, re
             meta = meta ++ "  " ++ q ++ "lib_paths:" ++ c.name ++ q ++ ": " ++ conan_json_array(paths) ++ "," ++ nl
             meta = meta ++ "  " ++ q ++ "link_args:" ++ c.name ++ q ++ ": " ++ conan_json_array(c.link_args) ++ "," ++ nl
             meta = meta ++ "  " ++ q ++ "requires:" ++ c.name ++ q ++ ": " ++ conan_json_array(c.requires) ++ "," ++ nl
+    if recorded_options.len() > 0:
+        meta = meta ++ "  " ++ q ++ "options" ++ q ++ ": " ++ conan_json_array(recorded_options) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "requires" ++ q ++ ": " ++ conan_json_array(requires) ++ nl
     meta = meta ++ "}" ++ nl
     runtime_write_file(dest_dir ++ "/metadata.json", meta)
@@ -878,10 +880,129 @@ fn conan_binary_recipe_env(info: &str, version: &str, dep_dir: &str) -> RecipeEn
     RecipeEnv { os: conan_info_setting(info, "os"), arch: conan_info_setting(info, "arch"), compiler: conan_info_setting(info, "compiler"), compiler_version: conan_info_setting(info, "compiler.version"), build_type: conan_info_setting(info, "build_type"), version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: conan_parse_options_from_info(info), options_known: true }
 
 // What a package built here is built with: this platform, the SDK's clang,
-// and the recipe's own default options.
+// and the recipe's own default options, plus any explicit option overrides.
 fn conan_built_recipe_env(version: &str, dep_dir: &str) -> RecipeEnv:
+    conan_built_recipe_env_with_options(version, dep_dir, [])
+
+fn conan_built_recipe_env_with_options(version: &str, dep_dir: &str, options: &List[str]) -> RecipeEnv:
     let os = conan_detect_os()
-    RecipeEnv { os: os, arch: conan_detect_arch(), compiler: if os == "Macos": "apple-clang" else: "clang", compiler_version: "", build_type: "Release", version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: [], options_known: false }
+    let copied = []
+    for opt in options: copied.push(opt.to_owned())
+    RecipeEnv { os: os, arch: conan_detect_arch(), compiler: if os == "Macos": "apple-clang" else: "clang", compiler_version: "", build_type: "Release", version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: copied, options_known: false }
+
+// User-pinned options (`with.toml` `[deps.options.c.<pkg>]` and CLI
+// `--option`) and lock-restored options for the current platform, stored as
+// newline-separated `"<pkg>:<key>=<value>"` entries.
+var g_conan_pinned_options: str = ""
+var g_conan_restore_options: str = ""
+var g_conan_suppress_errors: bool = false
+var g_conan_suppressed_error: str = ""
+
+fn conan_set_pinned_options(entries: List[str]):
+    g_conan_pinned_options = entries.join("\n")
+
+fn conan_set_restore_options(entries: List[str]):
+    g_conan_restore_options = entries.join("\n")
+
+fn conan_options_for_pkg_blob(blob: &str, name: &str) -> List[str]:
+    let out = []
+    if blob.len() == 0: return out
+    let prefix = name ++ ":"
+    for entry in blob.split("\n"):
+        if entry.starts_with(prefix):
+            out.push(entry.slice(prefix.len(), entry.len()))
+    out
+
+fn conan_options_for_pkg(entries: &List[str], name: &str) -> List[str]:
+    let out = []
+    let prefix = name ++ ":"
+    for entry in entries:
+        if entry.starts_with(prefix):
+            out.push(entry.slice(prefix.len(), entry.len()))
+    out
+
+fn conan_options_has_key(opts: &List[str], key: &str) -> bool:
+    let prefix = key ++ "="
+    for opt in opts:
+        if opt.starts_with(prefix): return true
+    false
+
+fn conan_options_set(opts: &List[str], key: &str, value: &str) -> List[str]:
+    let out = []
+    let prefix = key ++ "="
+    var replaced = false
+    for opt in opts:
+        if opt.starts_with(prefix):
+            if not replaced:
+                out.push(prefix ++ value)
+                replaced = true
+        else:
+            out.push(opt.to_owned())
+    if not replaced: out.push(prefix ++ value)
+    out
+
+fn conan_options_merge(base: &List[str], overlay: &List[str]) -> List[str]:
+    var out = []
+    for opt in base: out.push(opt.to_owned())
+    for opt in overlay:
+        let eq = opt.find("=")
+        if eq > 0:
+            out = conan_options_set(out, opt.slice(0, eq), opt.slice(eq + 1, opt.len()))
+    out
+
+fn conan_options_sort(opts: &List[str]) -> List[str]:
+    var out = []
+    for opt in opts:
+        out = conan_sorted_insert_unique(out, opt)
+    out
+
+fn conan_options_validate(name: &str, version: &str, recipe: &str, pinned: &List[str]) -> str:
+    for opt in pinned:
+        let eq = opt.find("=")
+        if eq <= 0: return "invalid option '" ++ opt ++ "' for " ++ name ++ "/" ++ version ++ " (expected key=value)"
+        let key = opt.slice(0, eq)
+        let val = opt.slice(eq + 1, opt.len())
+        let choices = recipe_option_choices(recipe, key)
+        if choices.len() == 0:
+            return "recipe " ++ name ++ "/" ++ version ++ " has no option '" ++ key ++ "'"
+        if not conan_list_contains(choices, val) and not conan_list_contains(choices, "ANY"):
+            return "invalid value '" ++ val ++ "' for option '" ++ key ++ "' of " ++ name ++ "/" ++ version ++ "; allowed: " ++ choices.join(", ")
+    ""
+
+// Options recorded into `metadata.json` and `.with/lock.json` for a package:
+// every user-pinned option, plus `with_ssl=<backend>` whenever the recipe
+// declares a `with_ssl` option (so the lock records the TLS backend per
+// platform even where `openssl` is the default, #2757).
+fn conan_recorded_options(recipe: &str, env: &RecipeEnv, pinned: &List[str]) -> List[str]:
+    var out = []
+    for opt in pinned: out.push(opt.to_owned())
+    let ssl = recipe_option_value(recipe, env, "with_ssl")
+    if ssl.len() > 0:
+        out = conan_options_set(out, "with_ssl", ssl)
+    conan_options_sort(out)
+
+// Whether the already-installed `metadata.json` satisfies every option in `wanted`.
+fn conan_installed_options_match(meta_path: &str, wanted: &List[str]) -> bool:
+    if wanted.len() == 0: return true
+    let have = json_extract_string_array(runtime_read_file(meta_path), "options")
+    for opt in wanted:
+        if not conan_list_contains(have, opt): return false
+    true
+
+// #2757: Conan Center's libcurl recipe pins `mbedtls/3.5.0` while
+// `with get c.mbedtls` already takes the `3.6` LTS line. Move off `3.5.0`
+// onto `[>=3.6 <4]`.
+fn conan_adjust_requirement_version(required: &str, written: &str) -> str:
+    if required == "mbedtls" and written == "3.5.0": return "[>=3.6 <4]"
+    written.to_owned()
+
+// #2757: whether a recipe whose `with_ssl` resolved to `openssl` may fall
+// back to `mbedtls` when `openssl` cannot be built or fetched as a binary.
+// Never falls back when the user explicitly pinned `with_ssl`.
+fn conan_can_fallback_tls_to_mbedtls(recipe: &str, recipe_env: &RecipeEnv, pinned: &List[str]) -> bool:
+    if conan_options_has_key(pinned, "with_ssl"): return false
+    if recipe_option_value(recipe, recipe_env, "with_ssl") != "openssl": return false
+    conan_list_contains(recipe_option_choices(recipe, "with_ssl"), "mbedtls")
 
 // One component of a package, as the build links it: `requires` names a
 // sibling component, or `name/version:component` of another package.
@@ -1235,7 +1356,9 @@ fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, pack
                 link_args.push(c.link_args[i])
                 link_args.push(c.link_args[i + 1])
             i = i + 2
-    conan_write_metadata_components(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requirements, link.components)
+    let pinned = conan_options_for_pkg_blob(g_conan_pinned_options, name)
+    let recorded_options = conan_recorded_options(recipe, env, pinned)
+    conan_write_metadata_components(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requirements, link.components, recorded_options)
 
 // On Windows every C package is built from source with the SDK's toolchain
 // (#1915; Eric, 2026-09-30: "with get builds packages from source in
@@ -1423,6 +1546,7 @@ fn conan_set_binary(enabled: bool):
 
 fn conan_source_fail(dep_dir: &str, message: &str):
     if g_conan_source_optional: g_conan_source_declined = message.to_owned()
+    else if g_conan_suppress_errors: g_conan_suppressed_error = "error: " ++ message
     else: runtime_eprint("error: " ++ message)
     if dep_dir.len() > 0:
         let _remove = runtime_remove_tree(dep_dir)
@@ -1505,7 +1629,7 @@ fn conan_setting_names(settings: &List[str]):
 // gave, and the registry's facts for the package and for the platform C
 // library. "" when this compiler has no identity to
 // key on (an unstamped development build), which builds every time.
-fn conan_source_cache_dir(name: &str, version: &str, fetched: &ConanFetchedRecipe, cmake_env_text: &str) -> str:
+fn conan_source_cache_dir(name: &str, version: &str, fetched: &ConanFetchedRecipe, cmake_env_text: &str, recorded_options: &List[str]) -> str:
     if not compiler_self_id_is_stamped() or runtime_getenv("WITH_NO_BUILD_CACHE").len() > 0: return ""
     let root = with_user_cache_dir() ++ "/with/c-builds"
     let scratch = root ++ "/.facts-" ++ f"{runtime_getpid()}"
@@ -1513,7 +1637,7 @@ fn conan_source_cache_dir(name: &str, version: &str, fetched: &ConanFetchedRecip
     let facts = conan_registry_facts(name, scratch)
     let platform = conan_registry_facts(CONAN_PLATFORM_FACTS(), scratch)
     let _gone = runtime_remove_tree(scratch)
-    let key = "v1|" ++ name ++ "|" ++ version ++ "|" ++ fetched.source.sha256 ++ "|" ++ conan_sha256_text(fetched.recipe ++ "\n" ++ fetched.data ++ "\n" ++ fetched.recipe_cmake) ++ "|" ++ conan_detect_os() ++ "/" ++ conan_detect_arch() ++ "|" ++ compiler_self_id() ++ "|" ++ cmake_env_text ++ "|" ++ facts.sha256 ++ "|" ++ facts.note ++ "|" ++ platform.sha256
+    let key = "v1|" ++ name ++ "|" ++ version ++ "|" ++ fetched.source.sha256 ++ "|" ++ conan_sha256_text(fetched.recipe ++ "\n" ++ fetched.data ++ "\n" ++ fetched.recipe_cmake) ++ "|" ++ conan_detect_os() ++ "/" ++ conan_detect_arch() ++ "|" ++ compiler_self_id() ++ "|" ++ cmake_env_text ++ "|" ++ recorded_options.join(",") ++ "|" ++ facts.sha256 ++ "|" ++ facts.note ++ "|" ++ platform.sha256
     root ++ "/" ++ name ++ "-" ++ version ++ "-" ++ conan_sha256_text(key).slice(0, 16)
 
 // This executable, for the `cc` / `ar` / `ranlib` launchers.
@@ -1865,22 +1989,29 @@ fn conan_fetch_source_tree(name: &str, version: &str, fetched: &ConanFetchedReci
         if problem.len() > 0: return ConanSourceTree { source_dir: "", problem: patch_file ++ ": " ++ problem }
     ConanSourceTree { source_dir, problem: "" }
 
+type ConanReqResult { ok: bool, resolved: List[str], failed_pkg: str, problem: str }
+
 // The packages the recipe requires, each installed (a version range asks
 // for the newest release Conan Center has in it), as `name/version`.
-fn conan_install_recipe_requirements(name: &str, version: &str, recipe: &str, recipe_env: &RecipeEnv, project_root: &str, depth: i32) -> Result[List[str], str]:
+fn conan_install_recipe_requirements(name: &str, version: &str, recipe: &str, recipe_env: &RecipeEnv, project_root: &str, depth: i32, suppress_openssl_error: bool) -> ConanReqResult:
     let requires = recipe_requirements(recipe, recipe_env)
-    if not requires.ok: return Err(name ++ "/" ++ version ++ ": " ++ requires.problem)
+    if not requires.ok: return ConanReqResult { ok: false, resolved: [], failed_pkg: "", problem: name ++ "/" ++ version ++ ": " ++ requires.problem }
     for undecided in requires.notes:
         runtime_eprint("  note: " ++ name ++ " recipe " ++ undecided ++ "; a requirement under it is not installed")
-    let resolved: List[str] = []
+    let resolved = []
     for reference in requires.requires:
         let required = conan_ref_name(reference)
-        let written = conan_ref_version(reference)
+        let written = conan_adjust_requirement_version(required, conan_ref_version(reference))
+        let prev_suppress = g_conan_suppress_errors
+        if suppress_openssl_error and required == "openssl":
+            g_conan_suppress_errors = true
+            g_conan_suppressed_error = ""
         let installed = conan_install_internal(required, written, project_root, depth + 1, false)
+        g_conan_suppress_errors = prev_suppress
         if installed.len() == 0:
-            return Err(name ++ "/" ++ version ++ " requires " ++ reference ++ ", which could not be installed (above)")
+            return ConanReqResult { ok: false, resolved: [], failed_pkg: required, problem: name ++ "/" ++ version ++ " requires " ++ reference ++ ", which could not be installed (above)" }
         resolved.push(required ++ "/" ++ installed)
-    Ok(resolved)
+    ConanReqResult { ok: true, resolved, failed_pkg: "", problem: "" }
 
 // Configures the package's CMake build into `work/b` with this toolchain as
 // the compiler and every requirement's package config in reach, exporting
@@ -2415,11 +2546,11 @@ fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir
     let work = dep_dir ++ "/.build"
     let _clean = runtime_remove_tree(work)
     let recipe_env = conan_built_recipe_env(version, "")
-    let resolved = match conan_install_recipe_requirements(name, version, fetched.recipe, recipe_env, project_root, depth):
-        Ok(r) => r
-        Err(problem) =>
-            runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ problem)
-            return
+    let req_res = conan_install_recipe_requirements(name, version, fetched.recipe, recipe_env, project_root, depth, false)
+    if not req_res.ok:
+        runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ req_res.problem)
+        return
+    let resolved = req_res.resolved
     let tree = conan_fetch_source_tree(name, version, fetched, work)
     if tree.problem.len() > 0:
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ tree.problem)
@@ -2523,14 +2654,31 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     let tools = conan_source_tools(name)
     if tools.problem.len() > 0: return conan_source_fail("", tools.problem)
 
-    let recipe_env = conan_built_recipe_env(version, "")
-    let resolved = match conan_install_recipe_requirements(name, version, recipe, recipe_env, project_root, depth):
-        Ok(r) => r
-        Err(problem) => return conan_source_fail("", problem)
+    let pinned = conan_options_for_pkg_blob(g_conan_pinned_options, name)
+    let opt_problem = conan_options_validate(name, version, recipe, pinned)
+    if opt_problem.len() > 0: return conan_source_fail("", opt_problem)
+    let restored = conan_options_for_pkg_blob(g_conan_restore_options, name)
+    var effective_options = conan_options_merge(restored, pinned)
+    var recipe_env = conan_built_recipe_env_with_options(version, "", effective_options)
+    let can_fallback = conan_can_fallback_tls_to_mbedtls(recipe, recipe_env, pinned)
+    var req_res = conan_install_recipe_requirements(name, version, recipe, recipe_env, project_root, depth, can_fallback)
+    if not req_res.ok and req_res.failed_pkg == "openssl" and can_fallback:
+        g_conan_suppressed_error = ""
+        runtime_eprint("  c." ++ name ++ "@" ++ version ++ ": openssl cannot be built on " ++ platform ++ "; using with_ssl=mbedtls (pin [deps.options.c." ++ name ++ "] with_ssl = \"openssl\" to refuse instead)")
+        effective_options = conan_options_set(effective_options, "with_ssl", "mbedtls")
+        recipe_env = conan_built_recipe_env_with_options(version, "", effective_options)
+        req_res = conan_install_recipe_requirements(name, version, recipe, recipe_env, project_root, depth, false)
+    if not req_res.ok:
+        if g_conan_suppressed_error.len() > 0 and not g_conan_source_optional:
+            runtime_eprint(g_conan_suppressed_error)
+            g_conan_suppressed_error = ""
+        return conan_source_fail("", req_res.problem)
+    let resolved = req_res.resolved
+    let recorded_options = conan_recorded_options(recipe, recipe_env, pinned)
 
     let dep_dir = conan_absolute(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version)
     let _clean = runtime_remove_tree(dep_dir)
-    let cached = conan_source_cache_dir(name, version, fetched, runtime_getenv(cmake_env_name))
+    let cached = conan_source_cache_dir(name, version, fetched, runtime_getenv(cmake_env_name), recorded_options)
     if cached.len() > 0 and runtime_file_exists(cached ++ "/.complete") != 0:
         // The package's directory in a fresh project does not exist yet.
         if runtime_mkdir_p(conan_absolute(project_root ++ "/.with/deps/c/" ++ name)) == 0 and with_fs_copy_tree(cached, dep_dir) == 0:
@@ -2578,7 +2726,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     install = conan_argv_append(install, work ++ "/b")
     if conan_run_tool(install, 300000) != 0:
         return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " did not build (the compiler's output is above" ++ (if build_rc != 0: "; the build step failed" else: "") ++ ")")
-    let package_env = conan_built_recipe_env(version, dep_dir)
+    let package_env = conan_built_recipe_env_with_options(version, dep_dir, effective_options)
     if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, package_env, recipe, true) != 0:
         return conan_source_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ version)
     for setting in settings:
@@ -2615,7 +2763,9 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
 // A lock entry that was built from source: reuse the build, or build the same
 // version again; the recipe's digest for it must still be the locked one.
 fn conan_restore_locked_source(name: &str, version: &str, sha256: &str, project_root: &str) -> bool:
-    if runtime_file_exists(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json") != 0: return true
+    let meta_path = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json"
+    let wanted = conan_options_merge(conan_options_for_pkg_blob(g_conan_restore_options, name), conan_options_for_pkg_blob(g_conan_pinned_options, name))
+    if runtime_file_exists(meta_path) != 0 and conan_installed_options_match(meta_path, wanted): return true
     let folder = conan_recipe_folder(name, version)
     let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
     let pinned = conan_data_source(data, version)
@@ -2640,7 +2790,9 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         runtime_eprint("error: could not resolve package " ++ name ++ "/" ++ version_hint ++ " on Conan Center" ++ (if twin.len() > 0: "; the package is `" ++ twin ++ "`: `with get c." ++ twin ++ "`" else if near.len() > 0: "; its search finds " ++ near ++ " (`with get c.<name>`)" else: ""))
         return ""
     let meta_path = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json"
-    if not force_reinstall and runtime_file_exists(meta_path) != 0:
+    let pinned_opts = conan_options_for_pkg_blob(g_conan_pinned_options, name)
+    let wanted_opts = conan_options_merge(conan_options_for_pkg_blob(g_conan_restore_options, name), pinned_opts)
+    if not force_reinstall and runtime_file_exists(meta_path) != 0 and conan_installed_options_match(meta_path, wanted_opts):
         return version
     if conan_write_known_system_package(name, version, project_root):
         runtime_eprint("  using system package " ++ name ++ "/" ++ version)
@@ -2652,7 +2804,7 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         return ""
     runtime_eprint("  revision: " ++ recipe_rev.slice(0, if recipe_rev.len() > 12: 12 else: recipe_rev.len()))
     let cmake_env = conan_package_cmake_env(name)
-    if g_conan_from_source or conan_builds_from_source_only() or cmake_env.defines.len() > 0 or cmake_env.problem.len() > 0:
+    if g_conan_from_source or conan_builds_from_source_only() or cmake_env.defines.len() > 0 or cmake_env.problem.len() > 0 or pinned_opts.len() > 0:
         return conan_install_from_source(name, version, project_root, depth)
     if not g_conan_binary:
         // D212: the package is built from source; only one that cannot be
@@ -2671,7 +2823,9 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         if fallback.len() > 0:
             runtime_eprint("  c." ++ name ++ "@" ++ version ++ ": a prebuilt binary, with no proofs; it was not built from source: " ++ declined ++ " (`with contract report c." ++ name ++ "`)")
             return fallback
-        runtime_eprint("error: " ++ name ++ "/" ++ version ++ " was not built from source (" ++ declined ++ ") and Conan Center has no binary of it for this platform")
+        let err_msg = "error: " ++ name ++ "/" ++ version ++ " was not built from source (" ++ declined ++ ") and Conan Center has no binary of it for this platform"
+        if g_conan_suppress_errors: g_conan_suppressed_error = err_msg
+        else: runtime_eprint(err_msg)
         return ""
     migrate_set_unapplied_settings(conan_setting_names(conan_package_settings(name)))
     let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)

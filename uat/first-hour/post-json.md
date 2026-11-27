@@ -6,4 +6,4 @@
 
 **Done when** the program prints the status code and the body for a URL given on the command line, and exits non-zero with a message when the request fails.
 
-**Platforms.** darwin and linux-x86_64 (uat/README.md: openssl builds with Perl where it is built from source).
+**Platforms.** darwin and linux (`linux-aarch64` builds libcurl against mbedtls 3.6 from source, #2757).

@@ -1912,8 +1912,53 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
         // A package built here is a static library.
         if ip.obj_find(options, "shared") >= 0: ip.obj_set(options, "shared", pv(V_OPT, 0, "False"))
         let _c = ip.run_method("config_options")
+        // Explicit option overrides (pinned by the user or chosen as a
+        // platform fallback) apply after config_options and before configure.
+        for line in env.options:
+            let eq = line.find("=")
+            if eq > 0: ip.obj_set(options, line.slice(0, eq), pv(V_OPT, 0, line.slice(eq + 1, line.len())))
         let _d = ip.run_method("configure")
     (ip, "")
+
+// The allowed values a recipe declares in `options = { "<option_name>": [...] }`,
+// as conaninfo spells them; empty when the recipe declares no such option.
+fn recipe_option_choices(recipe: &str, option_name: &str) -> List[str]:
+    let out = []
+    let env = RecipeEnv { os: "", arch: "", compiler: "", compiler_version: "", build_type: "", version: "", package_folder: "", source_folder: "", options: [], options_known: false }
+    let (ip, problem) = recipe_interp(recipe, env)
+    if problem.len() > 0: return out
+    var dict = pv_unknown()
+    var ai = 0
+    for attr_name in ip.attr_names:
+        if attr_name == "options": dict = pv_copy(ip.attr_vals[ai])
+        ai = ai + 1
+    if dict.k != V_DICT: return out
+    let d = dict.n as i32
+    var di = 0
+    for key in ip.dkeys[d].items:
+        if key.k == V_STR and key.s == option_name:
+            let val = ip.dvals[d].items[di]
+            if val.k != V_LIST: return out
+            let l = val.n as i32
+            for item in ip.lists[l].items:
+                let text = py_option_text(item)
+                if text.len() > 0 and not out.contains(text): out.push(text)
+            return out
+        di = di + 1
+    out
+
+// The resolved value of `self.options.<option_name>` under `env`, or "" when
+// the recipe has no such option.
+fn recipe_option_value(recipe: &str, env: &RecipeEnv, option_name: &str) -> str:
+    let (ip, problem) = recipe_interp(recipe, env)
+    if problem.len() > 0: return ""
+    let self_obj = ip.self_obj
+    let at = ip.obj_find(self_obj, "options")
+    if at < 0: return ""
+    let options = ip.objs[self_obj].vals[at].n as i32
+    let opt = ip.obj_find(options, option_name)
+    if opt < 0: return ""
+    ip.objs[options].vals[opt].s.to_owned()
 
 // The options a package built here is made with, as conaninfo spells them:
 // the recipe's defaults after its `config_options` and `configure`.

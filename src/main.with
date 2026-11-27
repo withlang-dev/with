@@ -7076,10 +7076,86 @@ fn cli_update_manifest_dep(toml: &str, pkg_name: &str, pkg_version: &str) -> str
         out = out ++ "\n[deps]\n"
     out ++ dep_line ++ "\n"
 
+fn cli_format_toml_option_value(val: &str) -> str:
+    if val == "True": return "true"
+    if val == "False": return "false"
+    "\"" ++ val ++ "\""
+
+fn cli_update_manifest_dep_options(toml: &str, pkg_name: &str, opts: &List[str]) -> str:
+    if opts.len() == 0: return with_str_clone_ref(toml)
+    let header = "[deps.options.c." ++ pkg_name ++ "]"
+    var out = ""
+    var in_section = false
+    var found_section = false
+    let written = []
+    var start = 0
+    var i = 0
+    let n = toml.len()
+    while i <= n:
+        let at_end = i == n
+        let ch = if at_end: 10 else: toml[i]
+        if ch == 10:
+            let line = toml.slice(start, i)
+            let trimmed = cli_trim_line(line)
+            if cli_line_is_section(line) and in_section:
+                for opt in opts:
+                    let eq = opt.find("=")
+                    if eq > 0:
+                        let k = opt.slice(0, eq)
+                        let v = opt.slice(eq + 1, opt.len())
+                        if not written.contains(k):
+                            out = out ++ k ++ " = " ++ cli_format_toml_option_value(v) ++ "\n"
+                            written.push(k)
+                in_section = false
+            if trimmed == header:
+                found_section = true
+                in_section = true
+                out = out ++ line ++ "\n"
+            else if in_section:
+                var replaced = false
+                let line_eq = trimmed.find("=")
+                if line_eq > 0:
+                    let line_key = cli_trim_line(trimmed.slice(0, line_eq))
+                    for opt in opts:
+                        let eq = opt.find("=")
+                        if eq > 0 and opt.slice(0, eq) == line_key:
+                            out = out ++ line_key ++ " = " ++ cli_format_toml_option_value(opt.slice(eq + 1, opt.len())) ++ "\n"
+                            if not written.contains(line_key): written.push(line_key)
+                            replaced = true
+                            break
+                if not replaced:
+                    out = out ++ line
+                    if not at_end or line.len() > 0: out = out ++ "\n"
+            else:
+                out = out ++ line
+                if not at_end or line.len() > 0: out = out ++ "\n"
+            start = i + 1
+        i = i + 1
+    if in_section:
+        for opt in opts:
+            let eq = opt.find("=")
+            if eq > 0:
+                let k = opt.slice(0, eq)
+                let v = opt.slice(eq + 1, opt.len())
+                if not written.contains(k):
+                    out = out ++ k ++ " = " ++ cli_format_toml_option_value(v) ++ "\n"
+                    written.push(k)
+        return out
+    if found_section: return out
+    if out.len() > 0 and not out.ends_with("\n"): out = out ++ "\n"
+    out = out ++ "\n" ++ header ++ "\n"
+    for opt in opts:
+        let eq = opt.find("=")
+        if eq > 0:
+            out = out ++ opt.slice(0, eq) ++ " = " ++ cli_format_toml_option_value(opt.slice(eq + 1, opt.len())) ++ "\n"
+    out
+
 fn cli_remove_manifest_dep(toml: &str, pkg_name: &str) -> CliManifestRemoveResult:
     var out = ""
     var removed = false
     var in_deps = false
+    var in_opts = false
+    let opts_header = "[deps.options.c." ++ pkg_name ++ "]"
     var start = 0
     var i = 0
     let n = toml.len()
@@ -7091,8 +7167,20 @@ fn cli_remove_manifest_dep(toml: &str, pkg_name: &str) -> CliManifestRemoveResul
             let trimmed = cli_trim_line(line)
             if trimmed == "[deps]":
                 in_deps = true
+                in_opts = false
+            else if trimmed == opts_header:
+                in_deps = false
+                in_opts = true
+                start = i + 1
+                i = i + 1
+                continue
             else if cli_line_is_section(line):
                 in_deps = false
+                in_opts = false
+            if in_opts:
+                start = i + 1
+                i = i + 1
+                continue
             if in_deps and cli_dep_line_matches(line, pkg_name):
                 removed = true
             else:
@@ -7385,13 +7473,16 @@ fn cli_init_uat_readme_template(name: &str):
 type GetCommandOptions {
     spec: str,
     force_reinstall: bool,
+    cli_options: List[str],
+    failed: bool,
 }
 
 fn get_command_usage():
-    with_eprint("usage: with get [--force-reinstall] [--binary] [--from-source] [c.<package>[@version] | <package>[@version]]")
+    with_eprint("usage: with get [--force-reinstall] [--binary] [--from-source] [--option key=value] [c.<package>[@version] | <package>[@version]]")
     with_eprint("  c.<package>     C dependency via Conan Center")
     with_eprint("  <package>       With package (registry not yet available)")
     with_eprint("  (no arguments)  restore dependencies from lock file")
+    with_eprint("  --option k=v    pin a Conan recipe option in [deps.options.c.<package>] (e.g. --option with_ssl=openssl)")
     with_eprint("  WITH_GET_CMAKE_<PACKAGE>=NAME=VALUE;...  CMake variables for the package's source build (builds it from source)")
 
 fn get_command_registry_unavailable(name: &str):
@@ -7425,9 +7516,19 @@ fn get_command_with_pkg_name(spec: &str) -> str:
         return ""
     spec.slice(0, name_end)
 
+fn normalize_get_option_pair(raw: &str) -> str:
+    let eq = raw.find("=")
+    if eq <= 0 or eq + 1 >= raw.len(): return ""
+    let key = raw.slice(0, eq).trim()
+    let val_raw = raw.slice(eq + 1, raw.len()).trim()
+    if key.len() == 0 or val_raw.len() == 0: return ""
+    let val = if val_raw == "true": "True" else if val_raw == "false": "False" else: val_raw
+    key ++ "=" ++ val
+
 fn parse_get_command_options(argc: i32) -> GetCommandOptions:
     var spec = ""
     var force_reinstall = false
+    let cli_options = []
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -7437,32 +7538,57 @@ fn parse_get_command_options(argc: i32) -> GetCommandOptions:
             conan_set_from_source(true)
         else if arg == "--binary":
             conan_set_binary(true)
+        else if arg == "--option" or arg == "-o":
+            if i + 1 >= argc:
+                with_eprint("error: " ++ arg ++ " requires a key=value argument")
+                return GetCommandOptions { spec: "", force_reinstall, cli_options, failed: true }
+            i = i + 1
+            let pair = normalize_get_option_pair(with_arg_at(i))
+            if pair.len() == 0:
+                with_eprint("error: invalid --option '" ++ with_arg_at(i) ++ "' (expected key=value)")
+                return GetCommandOptions { spec: "", force_reinstall, cli_options, failed: true }
+            cli_options.push(pair)
+        else if arg.starts_with("--option="):
+            let pair = normalize_get_option_pair(arg.slice(9, arg.len()))
+            if pair.len() == 0:
+                with_eprint("error: invalid option '" ++ arg ++ "' (expected --option=key=value)")
+                return GetCommandOptions { spec: "", force_reinstall, cli_options, failed: true }
+            cli_options.push(pair)
         else if arg.starts_with("-"):
             with_eprint("error: unknown with get option '" ++ arg ++ "'")
-            return GetCommandOptions { spec: "", force_reinstall }
+            return GetCommandOptions { spec: "", force_reinstall, cli_options, failed: true }
         else if spec.len() == 0:
             spec = arg
         else:
             with_eprint("error: unexpected with get argument '" ++ arg ++ "'")
-            return GetCommandOptions { spec: "", force_reinstall }
+            return GetCommandOptions { spec: "", force_reinstall, cli_options, failed: true }
         i = i + 1
-    GetCommandOptions { spec, force_reinstall }
+    GetCommandOptions { spec, force_reinstall, cli_options, failed: false }
 
 fn run_get_command(argc: i32) -> i32:
     let options = parse_get_command_options(argc)
+    if options.failed: return 1
     let root = project_config_find_root(".")
     if root.len() == 0:
         with_eprint("error: no with.toml found. Run 'with init' first.")
         return 1
     if options.spec.len() == 0:
+        if options.cli_options.len() > 0:
+            with_eprint("error: --option requires a package (e.g. with get --option with_ssl=openssl c.libcurl)")
+            return 1
         // #2355: with.toml says what the project depends on; the lock records
         // how. A pin the lock does not hold (an edited with.toml) is
         // installed and locked first, so the lock never overrides it.
-        let pins = cli_manifest_c_deps(with_fs_read_file(root ++ "/with.toml"))
+        let toml = with_fs_read_file(root ++ "/with.toml")
+        let pinned_all = project_config_c_dep_options_from_toml(toml)
+        let pins = cli_manifest_c_deps(toml)
         let lock = lock_load(root)
         for pin in pins:
-            if lock_pin_is_exact(pin.constraint) and not lock_holds_pin(lock, pin.name, pin.constraint):
-                let rc = get_install_c_dep(root, pin.name, pin.constraint, options.force_reinstall)
+            let pkg_opts = conan_options_for_pkg(pinned_all, pin.name)
+            let version_changed = lock_pin_is_exact(pin.constraint) and not lock_holds_pin(lock, pin.name, pin.constraint)
+            let opts_changed = pkg_opts.len() > 0 and not lock_holds_options(lock, pin.name, pkg_opts)
+            if version_changed or opts_changed:
+                let rc = get_install_c_dep(root, pin.name, pin.constraint, options.force_reinstall, [])
                 if rc != 0: return rc
         return lock_restore(root)
     let spec = options.spec
@@ -7495,7 +7621,7 @@ fn run_get_command(argc: i32) -> i32:
             if pin.name == pkg_name and pin.constraint.len() > 0:
                 pkg_version = pin.constraint
                 with_eprint("c." ++ pkg_name ++ " is pinned at " ++ pin.constraint ++ " in with.toml; `with get c." ++ pkg_name ++ "@<version>` changes the pin")
-    get_install_c_dep(root, pkg_name, pkg_version, options.force_reinstall)
+    get_install_c_dep(root, pkg_name, pkg_version, options.force_reinstall, options.cli_options)
 
 // Install `c.<pkg_name>` at `pkg_version` ("" for the newest), lock it and
 // pin it in with.toml.
@@ -7503,8 +7629,21 @@ fn run_get_command(argc: i32) -> i32:
 // (build/compiler.with), so the slot is spelled once.
 fn compiler_version_text(): with_str_from_cstr(c"WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
 
-fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinstall: bool) -> i32:
+fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinstall: bool, cli_options: &List[str]) -> i32:
     conan_set_compiler_version(compiler_version_text())
+    let manifest_path = root ++ "/with.toml"
+    let existing_toml = with_fs_read_file(manifest_path)
+    var pinned_all = project_config_c_dep_options_from_toml(existing_toml)
+    if cli_options.len() > 0:
+        let merged_pkg = conan_options_merge(conan_options_for_pkg(pinned_all, pkg_name), cli_options)
+        let next_all = []
+        let prefix = pkg_name ++ ":"
+        for entry in pinned_all:
+            if not entry.starts_with(prefix): next_all.push(entry)
+        for opt in merged_pkg: next_all.push(prefix ++ opt)
+        pinned_all = next_all
+    conan_set_pinned_options(pinned_all)
+    conan_set_restore_options([])
     let resolved_version = conan_install(pkg_name, pkg_version, root, force_reinstall)
     if resolved_version.len() == 0:
         return 1
@@ -7527,10 +7666,11 @@ fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinst
         return 1
     if lock_write(root, updated_lock) != 0:
         return 1
-    let manifest_path = root ++ "/with.toml"
     let toml = with_fs_read_file(manifest_path)
     if toml.len() > 0:
-        let updated = cli_update_manifest_dep(toml, pkg_name, resolved_version)
+        var updated = cli_update_manifest_dep(toml, pkg_name, resolved_version)
+        if cli_options.len() > 0:
+            updated = cli_update_manifest_dep_options(updated, pkg_name, cli_options)
         with_fs_write_file(manifest_path, updated)
     with_eprint("added c." ++ pkg_name ++ "@" ++ resolved_version)
     0
@@ -7584,6 +7724,8 @@ fn run_update_command(argc: i32) -> i32:
         return 1
     let manifest_path = root ++ "/with.toml"
     var toml = with_fs_read_file(manifest_path)
+    conan_set_pinned_options(project_config_c_dep_options_from_toml(toml))
+    conan_set_restore_options([])
     let deps = cli_manifest_c_deps(toml)
     if deps.len() == 0:
         with_eprint("no C dependencies to update")

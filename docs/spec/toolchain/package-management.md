@@ -91,11 +91,35 @@ link = ["custom"]
 | `with init` | Create new project with `with.toml`, `src/main.with`, `test/`, and `uat/hello.uat` (§18.5d) |
 | `with get c.X` | Add C dependency via Conan |
 | `with get c.X@2.78` | Pin specific version |
+| `with get --option k=v c.X` | Pin a Conan recipe option in `[deps.options.c.X]` (e.g. `--option with_ssl=openssl`) |
 | `with get --force-reinstall c.X@2.78` | Delete and recreate the local installed C package |
 | `with get --from-source c.X` | Build the C package from source even when a binary exists |
 | `with remove c.X` | Remove dependency |
 | `with update` | Update all deps to latest compatible |
 | `with get` (no args) | Restore deps from lock file |
+
+**Recipe options and TLS backend selection (#2757).** A project may pin Conan
+recipe options for a fetched C package in `with.toml` (or via `with get --option
+key=value c.<name>`):
+
+```toml
+[deps]
+c.libcurl = "8.23.0"
+
+[deps.options.c.libcurl]
+with_ssl = "openssl"
+```
+
+When a recipe defaults `with_ssl` to `openssl` and declares `mbedtls` as an
+option (such as `libcurl`), and `openssl` has neither a binary nor a CMake
+source build on the host (for example on `linux-aarch64`), `with get` selects
+`with_ssl=mbedtls` (upgrading `mbedtls/3.5.0` onto the `3.6` LTS line) and
+reports the choice. An explicit pin (`with_ssl = "openssl"`) is never
+substituted: if `openssl` cannot be installed on that platform, `with get`
+refuses. Effective per-platform options (including `with_ssl` even when
+default) are recorded under `"options"` in `.with/lock.json` keyed by platform
+(e.g. `"macos-aarch64": "with_ssl=openssl"`, `"linux-aarch64": "with_ssl=mbedtls"`),
+so cross-platform differences are visible in the lock and reported on restore.
 
 **Build variables for a source build.** `WITH_GET_CMAKE_<PACKAGE>` (the
 package name uppercased, `-` as `_`) carries CMake cache variables into that
