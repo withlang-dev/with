@@ -1,0 +1,10 @@
+scenario: pcre2 from a fresh project
+requires: network
+
+new directory
+run: with init .
+run: with get c.pcre2
+expect stderr contains: facade pcre2:
+write src/main.with from pcre2_main.with
+run: with run
+expect stdout: pcre2 UAT passed

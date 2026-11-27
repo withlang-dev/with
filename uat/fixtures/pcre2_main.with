@@ -1,0 +1,63 @@
+// Release UAT: pcre2 through its registry facade (#3152). Zero `unsafe`, zero
+// project facade: compile, match with match_data and ovector count, named
+// capture groups, and substitute.
+use contracts.pcre2
+
+fn main:
+    // 1. Compile pattern with named groups and match against subject.
+    let pat = "(?<lang>[a-z]+)-(?<ver>[0-9]+)"
+    let subj = "hello with-2026 world"
+    let Some(cctx) = Pcre2RealCompileContext8.compile_context_create_8() else:
+        print("pcre2 compile_context failed")
+        return 1
+    let Some(mctx) = Pcre2RealMatchContext8.match_context_create_8() else:
+        print("pcre2 match_context failed")
+        return 1
+    let Some(re) = Pcre2RealCode8.compile_8(pat as []u8, 0, &cctx) else:
+        print("pcre2 compile failed")
+        return 1
+    let Some(md) = re.match_data_create_from_pattern_8() else:
+        print("pcre2 match_data failed")
+        return 1
+    let rc = re.match_8(subj as []u8, 0, 0, &md, &mctx)
+    if rc < 3 or md.get_ovector_count_8() < 3:
+        print("pcre2 match failed")
+        return 1
+
+    // 2. Named group lookup and extraction.
+    let lang_num = re.substring_number_from_name_8("lang")
+    let ver_num = re.substring_number_from_name_8("ver")
+    if lang_num != 1 or ver_num != 2:
+        print("pcre2 group number mismatch")
+        return 1
+    let Ok(ver_len) = md.substring_length_byname_8("ver") else:
+        print("pcre2 substring_length_byname failed")
+        return 1
+    if ver_len != 4:
+        print("pcre2 ver length mismatch")
+        return 1
+    var lang_buf: [u8; 32] = [0 as u8; 32]
+    let Ok(lang_len) = md.substring_copy_byname_8("lang", lang_buf) else:
+        print("pcre2 substring_copy_byname failed")
+        return 1
+    if lang_len != 4 or lang_buf[0] != 'w' as u8 or lang_buf[3] != 'h' as u8:
+        print("pcre2 lang mismatch")
+        return 1
+
+    // 3. Substitute using named group backreference.
+    let repl = "${lang}_v${ver}"
+    var sub_buf: [u8; 64] = [0 as u8; 64]
+    let Ok(sub_len) = re.substitute_8(subj as []u8, 0, PCRE2_SUBSTITUTE_GLOBAL, &md, &mctx, repl as []u8, sub_buf) else:
+        print("pcre2 substitute failed")
+        return 1
+    let want = "hello with_v2026 world"
+    let want_bytes = want as []u8
+    if sub_len != want_bytes.len() as usize:
+        print(f"pcre2 substitute length mismatch: {sub_len}")
+        return 1
+    for i in 0..sub_len as i32:
+        if sub_buf[i] != want_bytes[i]:
+            print("pcre2 substitute content mismatch")
+            return 1
+
+    print("pcre2 UAT passed")
