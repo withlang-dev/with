@@ -44,9 +44,9 @@ fn callback_first() -> i32:
     var total: i32 = 0
     let sink = n => total = total + n
     var h = Handle.new().unwrap()
-    if h.set(OPT_CB, on_n) != H_OK: return -1
-    if h.set(OPT_UD, sink) != H_OK: return -1
-    if h.set(OPT_N, 3) != H_OK: return -1
+    if h.set(OPT_CB, on_n).is_err(): return -1
+    if h.set(OPT_UD, sink).is_err(): return -1
+    if h.set(OPT_N, 3).is_err(): return -1
     // `total` is held by `sink`, which `h` retains until its last
     // callback-capable operation: readable only after the run (§16.2b.9).
     if h.run() != 0: return -1
@@ -56,13 +56,13 @@ fn userdata_first() -> i32:
     var total: i32 = 0
     let sink = n => total = total + n
     var h = Handle.new().unwrap()
-    if h.set(OPT_UD, sink) != H_OK: return -1
-    if h.set(OPT_CB, on_n) != H_OK: return -1
+    if h.set(OPT_UD, sink).is_err(): return -1
+    if h.set(OPT_CB, on_n).is_err(): return -1
     if run_twice(h) != 0: return -1
     // The helper may have changed the pair: reset before running again.
     h.reset()
-    if h.set(OPT_CB, on_n) != H_OK: return -1
-    if h.set(OPT_UD, sink) != H_OK: return -1
+    if h.set(OPT_CB, on_n).is_err(): return -1
+    if h.set(OPT_UD, sink).is_err(): return -1
     if h.run() != 0: return -1
     total
 

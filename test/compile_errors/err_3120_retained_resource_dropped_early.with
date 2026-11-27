@@ -32,5 +32,5 @@ c contract hlib:
 fn main:
     let easy = Easy.new().unwrap()
     let headers = HeaderList.new().unwrap()
-    if easy.setopt(OPT_HEADERS, headers) != H_OK: return
+    if easy.setopt(OPT_HEADERS, headers).is_err(): return
     print(f"{easy.perform()}")

@@ -34,6 +34,6 @@ fn take_headers(h: HeaderList):
 fn main:
     let headers = HeaderList.new().unwrap()
     let easy = Easy.new().unwrap()
-    if easy.setopt(OPT_HEADERS, headers) != H_OK: return
+    if easy.setopt(OPT_HEADERS, headers).is_err(): return
     take_headers(headers)
     print(f"{easy.perform()}")

@@ -32,12 +32,12 @@ fn configure_handle() -> i32:
         print("libcurl easy init failed")
         return 1
     let easy = made.unwrap()
-    print(f"nosignal: {easy.setopt(CURLOPT_NOSIGNAL, 1) == CURLE_OK}")
+    print(f"nosignal: {easy.setopt(CURLOPT_NOSIGNAL, 1).is_ok()}")
     let url = "http://example.invalid/" ++ "path"
-    print(f"url: {easy.setopt(CURLOPT_URL, url) == CURLE_OK}")
-    print(f"timeout: {easy.setopt(CURLOPT_TIMEOUT, 5) == CURLE_OK}")
-    print(f"maxfilesize: {easy.setopt(CURLOPT_MAXFILESIZE_LARGE, 1048576) == CURLE_OK}")
-    print(f"useragent: {easy.setopt(CURLOPT_USERAGENT, "with-uat/1.0") == CURLE_OK}")
+    print(f"url: {easy.setopt(CURLOPT_URL, url).is_ok()}")
+    print(f"timeout: {easy.setopt(CURLOPT_TIMEOUT, 5).is_ok()}")
+    print(f"maxfilesize: {easy.setopt(CURLOPT_MAXFILESIZE_LARGE, 1048576).is_ok()}")
+    print(f"useragent: {easy.setopt(CURLOPT_USERAGENT, "with-uat/1.0").is_ok()}")
     0
 
 fn main:

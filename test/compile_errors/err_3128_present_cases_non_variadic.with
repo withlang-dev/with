@@ -1,0 +1,16 @@
+//! expect-check-fail: 'present cases' applies only to a variadic contract
+
+// #3128 (D242, spec §16.2b.5): `present cases` on a non-variadic fn item is refused.
+use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nint h_run(h *x);\n")
+
+c contract hlib:
+    resource Handle wraps *mut h
+        from h_new
+        drop h_free
+    fn h_run
+        rename run
+        lend
+        present cases
+
+fn main:
+    let _ = Handle.new()

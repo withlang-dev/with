@@ -36,7 +36,7 @@ fn configured() -> Handle:
     var total = 0
     let sink = n => total = total + n
     var h = Handle.new().unwrap()
-    if h.set(OPT_CB, on_n) == H_OK and h.set(OPT_UD, sink) == H_OK: h else: h
+    if h.set(OPT_CB, on_n).is_ok() and h.set(OPT_UD, sink).is_ok(): h else: h
 
 fn main:
     let h = configured()

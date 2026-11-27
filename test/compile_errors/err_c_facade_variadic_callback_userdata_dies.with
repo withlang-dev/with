@@ -35,8 +35,8 @@ fn on_n(n: c_int, sink: &fn(i32) -> Unit) -> c_int:
 fn main:
     var total = 0
     var h = Handle.new().unwrap()
-    if h.set(OPT_CB, on_n) != H_OK: return 1
+    if h.set(OPT_CB, on_n).is_err(): return 1
     if true:
         let sink = n => total = total + n
-        if h.set(OPT_UD, sink) != H_OK: return 1
+        if h.set(OPT_UD, sink).is_err(): return 1
     print(f"{h.run()}")

@@ -1,5 +1,5 @@
 //! expect-check-fail: 'Handle.run' may invoke the callback pair of 'Handle', and on this path the pair is not proven compatible
-//! expect-check-fail: = help: set both the callback and its userdata, branch on the setter's status against its 'ok' constant, or run the resource's abandonment path first
+//! expect-check-fail: = help: set both the callback and its userdata, handle the setter's Result (for example with '?') or branch on its status against its 'ok' constant, or run the resource's abandonment path first
 
 // D66 (spec §16.2b.9): a callback set without its userdata is an
 // incompatible pair — C would hand the callback the foreign default — and
@@ -33,5 +33,5 @@ fn on_n(n: c_int, sink: &fn(i32) -> Unit) -> c_int:
 
 fn main:
     var h = Handle.new().unwrap()
-    if h.set(OPT_CB, on_n) != H_OK: return 1
+    if h.set(OPT_CB, on_n).is_err(): return 1
     print(f"{h.run()}")

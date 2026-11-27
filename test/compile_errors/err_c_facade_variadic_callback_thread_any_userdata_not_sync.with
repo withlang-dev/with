@@ -38,7 +38,7 @@ fn main:
     var total: i32 = 0
     let sink = n => total = total + n
     var h = Handle.new().unwrap()
-    if h.set(OPT_CB, on_n) != H_OK: return 1
-    if h.set(OPT_UD, sink) != H_OK: return 1
+    if h.set(OPT_CB, on_n).is_err(): return 1
+    if h.set(OPT_UD, sink).is_err(): return 1
     if h.run() != 0: return 1
     print(f"{total}")

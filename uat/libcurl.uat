@@ -188,6 +188,7 @@ write src/contracts/libcurl.with:
             callbacks none
             callback_thread registering
             ok CURLE_OK
+            present cases stripping CURLOPT_
             variadic param 2 selected by param option:
                 case CURLOPT_WRITEFUNCTION: callback param 2 as curl_write_callback userdata param CURLOPT_WRITEDATA retains by param 0
                 case CURLOPT_NOSIGNAL: c_long

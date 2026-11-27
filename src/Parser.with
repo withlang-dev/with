@@ -6032,6 +6032,21 @@ impl Parser:
             ops.push(n)
             ops.push(p)
             for case in cases: ops.push(case)
+        else if word == "present":
+            // `present cases [stripping PREFIX]` (D242, #3128, §16.2b.5):
+            // present each listed variadic case (and implied userdata case)
+            // as a typed per-option method or function.
+            kind = FacadeVariadicPresentClause.PresentCases as i32
+            if not self.current_ident_is("cases"):
+                self.emit_error("expected 'present cases' or 'present cases stripping <PREFIX>' (§16.2b.5)")
+                return 0
+            self.advance()
+            var prefix: i32 = 0
+            if self.current_ident_is("stripping"):
+                self.advance()
+                prefix = self.expect_ident()
+                if prefix == 0: return 0
+            ops.push(prefix)
         else if word == "param":
             // `param N fixed <literal>` (D64, §16.2b.11): the C parameter is
             // bound to the literal and leaves the presented signature.

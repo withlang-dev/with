@@ -36,7 +36,7 @@ c contract hlib:
 fn body_outlives_handle():
     let body = "a=1&b=2".to_cstring().unwrap()
     let h = Req.new().unwrap()
-    if h.set(OPT_BODY, body) != H_OK: return -1
+    if h.set(OPT_BODY, body).is_err(): return -1
     if h.run() != 0: return -1
     h.run()
 
@@ -48,8 +48,8 @@ fn released_then_returned():
     // Each status is read in its own branch: a release pending on a status
     // read only through a compound condition stays pending, as a pair
     // setter's status does (§16.2b.9).
-    if h.set(OPT_BODY, body) != H_OK: h.reset()
-    else if h.set(OPT_CLEAR, 1) != H_OK: h.reset()
+    if h.set(OPT_BODY, body).is_err(): h.reset()
+    else if h.set(OPT_CLEAR, 1).is_err(): h.reset()
     h
 
 fn reset_then_returned():
@@ -57,14 +57,14 @@ fn reset_then_returned():
     let h = Req.new().unwrap()
     // The handle holds the body whatever the setter's status; the reset
     // releases it, so the handle may leave the frame.
-    h.set(OPT_BODY, body)
+    let _ = h.set(OPT_BODY, body)
     h.reset()
     h
 
 fn sized_bytes():
     let data = "raw\0bytes"
     let h = Req.new().unwrap()
-    if h.set(OPT_DATA, data) != H_OK: return -1
+    if h.set(OPT_DATA, data).is_err(): return -1
     h.run()
 
 fn main:

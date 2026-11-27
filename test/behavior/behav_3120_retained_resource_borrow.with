@@ -66,12 +66,12 @@ fn run_single():
     let headers = HeaderList.new().unwrap()
     let mime = Mime.new().unwrap()
     let easy = Easy.new().unwrap()
-    if easy.setopt(OPT_HEADERS, headers) != H_OK: return
-    if easy.setopt(OPT_MIME, mime) != H_OK: return
+    if easy.setopt(OPT_HEADERS, headers).is_err(): return
+    if easy.setopt(OPT_MIME, mime).is_err(): return
     let hc = headers.count()
     let mp = mime.parts()
     let res = easy.perform()
-    if easy.setopt(OPT_CLEAR_HEADERS, 1) != H_OK: return
+    if easy.setopt(OPT_CLEAR_HEADERS, 1).is_err(): return
     let h_after = headers.push()
     easy.reset()
     let m_after = mime.add()
@@ -81,8 +81,8 @@ fn run_shared():
     let headers = HeaderList.new().unwrap()
     let e1 = Easy.new().unwrap()
     let e2 = Easy.new().unwrap()
-    if e1.setopt(OPT_HEADERS, headers) != H_OK: return
-    if e2.setopt(OPT_HEADERS, headers) != H_OK: return
+    if e1.setopt(OPT_HEADERS, headers).is_err(): return
+    if e2.setopt(OPT_HEADERS, headers).is_err(): return
     let r1 = e1.perform()
     let r2 = e2.perform()
     e1.reset()
@@ -96,7 +96,7 @@ fn run_scoped():
     var res: i32 = 0
     if true:
         let easy = Easy.new().unwrap()
-        if easy.setopt(OPT_HEADERS, headers) == H_OK:
+        if easy.setopt(OPT_HEADERS, headers).is_ok():
             res = easy.perform()
     let h_after = headers.push()
     print(f"scoped {res} after {h_after}")

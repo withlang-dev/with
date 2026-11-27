@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D242 — Variadic `ok` presents `Result` unconditionally; `present cases [stripping PREFIX]` presents typed per-option setters (delegated; #3128)](2026-11-26-D242-variadic-ok-result-and-present-cases.md)
 - [D241 — Consuming same-type pointer producer (`consumes param N` + `null status CONST`) (delegated; #3121)](2026-11-26-D241-consuming-same-type-pointer-producer.md)
 - [D240 — Retained variadic case naming a pointer-wrapping facade resource `&R` (delegated; #3120)](2026-11-26-D240-retained-variadic-resource-borrow.md)
 - [D239 — A reserved word may name a record field; imported C fields keep their names (delegated; #3629)](2026-11-26-D239-reserved-word-field-names.md)

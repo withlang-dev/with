@@ -1,0 +1,23 @@
+//! expect-check-fail: 'present cases' gives case 'OPT_RUN' the name 'run', which collides with an existing method on 'Handle'
+
+// #3128 (D242, spec §16.2b.5): a per-option name derived by `present cases`
+// that collides with another method on the same resource is refused.
+use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nint h_set(h *x, int opt, ...);\nint h_run(h *x);\n#define OPT_RUN 1\n#define H_OK 0\n")
+
+c contract hlib:
+    resource Handle wraps *mut h
+        from h_new
+        drop h_free
+    fn h_set
+        rename set
+        lend
+        ok H_OK
+        present cases stripping OPT_
+        variadic param 2 selected by param opt:
+            case OPT_RUN: c_int
+    fn h_run
+        rename run
+        lend
+
+fn main:
+    let _ = Handle.new()
