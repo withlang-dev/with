@@ -1,10 +1,11 @@
-//! expect-check-fail: 'returns borrow Part' borrows a resource that states no producer and no 'drop'
-// #3114: a resource with neither a producer nor a `drop` renders nothing;
-// an item that hands out a borrow of it generated code naming an undefined
-// `BorrowedPart`. The facade is refused at the item, by name.
+//! expect-check-fail: producer 'part_new' with no 'drop' and no 'destroys'
+// #3114 / D246: a borrow-only resource (no producer, no drop) is valid under
+// D246, whereas a resource that declares a producer without a `drop` is still
+// refused and renders no `BorrowedPart`.
 use c_import("typedef struct mime mime; typedef struct part part;
 mime *mime_new(void);
 void mime_free(mime *m);
+part *part_new(void);
 part *mime_addpart(mime *m);
 ")
 
@@ -13,6 +14,7 @@ c contract mimes:
         from mime_new
         drop mime_free
     resource Part wraps *mut part
+        from part_new
     fn mime_addpart
         rename add_part
         returns borrow Part from param 0
