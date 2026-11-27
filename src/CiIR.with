@@ -1220,6 +1220,11 @@ type CiProject {
     static_callees: List[List[str]],
     fnptr_verdicts: HashMap[str, str],
     fnptr_verdicts_drawn: bool,
+    // #3124 (Eric's ruling, 2026-11-25): `Record.field` entries proven to hold
+    // an exclusively owned sub-record destroyed by `Record`'s destroyer and
+    // never escaping the package; storing a `Record *` into its own `Record.field`
+    // is not retention.
+    owned_subrecord_fields: HashMap[str, bool],
     // D198 (§16.2b.5): the records with their fields and the file that
     // defines each; those a header the package installs defines; and the
     // records with identity (some function produces, destroys or retains a
@@ -1285,6 +1290,7 @@ fn CiProject.new -> CiProject:
         static_callees: [],
         fnptr_verdicts: [:],
         fnptr_verdicts_drawn: false,
+        owned_subrecord_fields: [:],
         complete_records: [:],
         pointer_records: [:],
         installed_records: [:],

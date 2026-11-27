@@ -362,7 +362,9 @@ impl CiProject:
         for line in self.symbols[si].own_evidence.split("\n"):
             let parts = line.split(":")
             if parts.len() < 2 or parts[1] != local: continue
-            if parts[0] == "localstore": return "unknown:local " ++ local ++ " is stored or its address taken"
+            if parts[0] == "localstore":
+                if self.owned_subrecord_fields.len() > 0 and self.fd_3124_local_stores_all_self_owned(si, local): continue
+                return "unknown:local " ++ local ++ " is stored or its address taken"
             if parts[0] == "localout" and parts.len() == 3:
                 if fd_i32(parts[2]) == out_ctx: continue
                 return "unknown:local " ++ local ++ " is also stored through an out parameter"
@@ -373,7 +375,9 @@ impl CiProject:
                 else if verdict != "owned": return "unknown:local " ++ local ++ " has more than one source"
                 continue
             if parts[0] == "localsink" and parts.len() == 4:
-                if self.fd_callee_retains(parts[2], fd_i32(parts[3])): return "unknown:local " ++ local ++ " is passed to " ++ parts[2] ++ ", which retains it"
+                if self.fd_callee_retains(parts[2], fd_i32(parts[3])):
+                    if self.owned_subrecord_fields.len() > 0 and self.fd_3124_local_sink_is_self_owned(si, local, parts[2], fd_i32(parts[3])): continue
+                    return "unknown:local " ++ local ++ " is passed to " ++ parts[2] ++ ", which retains it"
             if parts[0] == "localsrc" and parts.len() >= 3:
                 let src = line.slice(("localsrc:" ++ local ++ ":").len(), line.len())
                 // A local assigned from itself or a part of itself (`ret =
@@ -1209,7 +1213,48 @@ impl CiProject:
     mut fn resolve_ownership():
         // D198: which function-pointer fields have a proven callee.
         self.fd_draw_fnptr_verdicts()
+        self.fd_resolve_retention_and_destruction(false)
+        self.resolve_ownership_after_retention(false)
+        // #3124 (Eric's ruling, 2026-11-25): prove exclusively owned sub-record
+        // fields `R.F -> S` under all four conditions. When any are proven,
+        // re-run retention and returns with stores of a resource pointer into
+        // its own proven `R.F` exempted.
+        let proven_owned = self.fd_prove_owned_fields_3124()
+        if proven_owned.len() > 0:
+            self.owned_subrecord_fields = proven_owned
+            let n = self.symbols.len()
+            for si in 0..n:
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
+                let pcount = self.symbols[si].param_stores.len()
+                for pi in 0..pcount: self.symbols[si].param_stores[pi] = 0
+                let ocount = self.symbols[si].param_out_returns.len()
+                for pi in 0..ocount: self.symbols[si].param_out_returns[pi] = ""
+                self.symbols[si].owns_return = 0
+                self.symbols[si].borrow_from = -1
+                self.symbols[si].borrow_from2 = -1
+                self.symbols[si].own_reason = ""
+            self.fd_resolve_retention_and_destruction(true)
+            self.resolve_ownership_after_retention(true)
+        // WITH_DEBUG_MIGRATE_FACADE=1: every definition's evidence and
+        // verdicts, for reading a verdict back to the line that gave it.
+        if with_getenv_str("WITH_DEBUG_MIGRATE_FACADE").len() > 0:
+            let n = self.symbols.len()
+            for si in 0..n:
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
+                var stores = ""
+                var destroys = ""
+                for pi in 0..self.symbols[si].param_ty.len():
+                    stores = stores ++ (if self.symbols[si].param_stores[pi] != 0: "1" else: "0")
+                    destroys = destroys ++ (if self.symbols[si].param_destroys[pi] != 0: "1" else: "0")
+                eprint("facade: " ++ self.symbols[si].name ++ " -> " ++ self.symbols[si].ret_ty ++ (if self.symbols[si].header_declared != 0: " (declared)" else: " (internal)") ++ " stores=" ++ stores ++ " destroys=" ++ destroys ++ f" owns={self.symbols[si].owns_return} borrow_from={self.symbols[si].borrow_from}" ++ (if self.symbols[si].borrow_from2 >= 0: f",{self.symbols[si].borrow_from2}" else: "") ++ ": " ++ self.symbols[si].own_reason ++ (if self.symbols[si].gir.len() > 0: " gir=" ++ self.symbols[si].gir else: ""))
+                for line in self.symbols[si].own_evidence.split("\n"):
+                    if line.len() > 0: eprint("    " ++ line)
+                for pi in 0..self.symbols[si].param_sinks.len():
+                    if self.symbols[si].param_sinks[pi].len() > 0: eprint(f"    sinks of param {pi}: " ++ self.symbols[si].param_sinks[pi])
+
+    mut fn fd_resolve_retention_and_destruction(skip_destruction: bool):
         let n = self.symbols.len()
+        let use_3124 = self.owned_subrecord_fields.len() > 0
         // #3175: per-function local-to-param and param-to-param alias sets,
         // updated by `localsrc:` and by direct `*out = p` out-parameter calls.
         var local_params: HashMap[str, str] = [:]
@@ -1225,7 +1270,10 @@ impl CiProject:
                 // counts here: the record may be copied out or read by a
                 // callee, so a drawn contract keeps the parameter raw. It is
                 // no proof of a store (fd_retain_reason, #3374).
-                if self.symbols[si].param_sinks[pi].contains("field;") or self.symbols[si].param_sinks[pi].contains("global;") or self.symbols[si].param_sinks[pi].contains("frame;"): self.symbols[si].param_stores[pi] = 1
+                let has_global_or_frame = self.symbols[si].param_sinks[pi].contains("global;") or self.symbols[si].param_sinks[pi].contains("frame;")
+                let has_field = self.symbols[si].param_sinks[pi].contains("field;")
+                if has_global_or_frame or (has_field and not (use_3124 and self.fd_3124_param_stores_all_self_owned(si as i32, pi as i32))):
+                    self.symbols[si].param_stores[pi] = 1
             for line in self.symbols[si].own_evidence.split("\n"):
                 if line.starts_with("localsrc:"):
                     let rest = line.slice(9, line.len())
@@ -1257,16 +1305,19 @@ impl CiProject:
                                 self.symbols[si].param_out_returns[src_pi] = self.symbols[si].param_out_returns[src_pi] ++ tag
                 if line.starts_with("paramstore:"):
                     let pi = fd_i32(line.slice(11, line.len()))
-                    if self.fd_param_is_pointer(si as i32, pi): self.symbols[si].param_stores[pi] = 1
+                    if self.fd_param_is_pointer(si as i32, pi) and not (use_3124 and self.fd_3124_param_stores_all_self_owned(si as i32, pi)):
+                        self.symbols[si].param_stores[pi] = 1
                 if line.starts_with("localstore:"):
-                    let pi = self.fd_local_alias_param(si as i32, line.slice(11, line.len()))
-                    if pi >= 0: self.symbols[si].param_stores[pi] = 1
+                    let loc = line.slice(11, line.len())
+                    let pi = self.fd_local_alias_param(si as i32, loc)
+                    if pi >= 0 and not (use_3124 and self.fd_3124_local_stores_all_self_owned(si as i32, loc)):
+                        self.symbols[si].param_stores[pi] = 1
         self.fd_propagate_retention_with_out(local_params, local_derived, param_aliases)
         // 2. Destruction: the bodies' proofs first; then the introspection
         // file's `free-function` seeds a unary pointer-parameter function
         // no body proved (D121 step 3), and the fixed point reaches its
         // callers.
-        self.fd_propagate_destruction()
+        if not skip_destruction: self.fd_propagate_destruction()
         // #3123 & #3175: the address of a local that stands for a parameter,
         // passed to a callee neither proven to free what the slot holds nor
         // a pure direct out-return slot (`*out = p`), is the store it always
@@ -1298,12 +1349,12 @@ impl CiProject:
                 pi += 1
                 if out_slots.len() > 0 and self.symbols[si].param_stores[pi] == 0:
                     self.symbols[si].param_stores[pi] = 1
-        self.resolve_ownership_after_retention()
 
     // Retention and direct out-parameter returns (`*out = p`) to a joint
     // fixed point over the corpus.
     mut fn fd_propagate_retention_with_out(mut local_params: HashMap[str, str], mut local_derived: HashMap[str, str], mut param_aliases: HashMap[str, str]):
         let n = self.symbols.len()
+        let use_3124 = self.owned_subrecord_fields.len() > 0
         var changed = true
         while changed:
             changed = false
@@ -1316,6 +1367,7 @@ impl CiProject:
                         if not sink.contains(":"): continue
                         let kv = sink.split(":")
                         if self.fd_callee_retains(kv[0], fd_i32(kv[1])):
+                            if use_3124 and self.fd_3124_param_sink_is_self_owned(si as i32, pi as i32, kv[0], fd_i32(kv[1])): continue
                             self.symbols[si].param_stores[pi] = 1
                             changed = true
                             break
@@ -1354,6 +1406,7 @@ impl CiProject:
                                         changed = true
                     else if line.starts_with("localstore:"):
                         let loc = line.slice(11, line.len())
+                        if use_3124 and self.fd_3124_local_stores_all_self_owned(si as i32, loc): continue
                         for pi in fd_copy_i32_map(local_params, f"{si}:" ++ loc):
                             if self.symbols[si].param_stores[pi] == 0:
                                 self.symbols[si].param_stores[pi] = 1
@@ -1362,6 +1415,7 @@ impl CiProject:
                         let parts = line.split(":")
                         if parts.len() != 4: continue
                         if not self.fd_callee_retains(parts[2], fd_i32(parts[3])): continue
+                        if use_3124 and self.fd_3124_local_sink_is_self_owned(si as i32, parts[1], parts[2], fd_i32(parts[3])): continue
                         let alias_pi = self.fd_local_alias_param(si as i32, parts[1])
                         if alias_pi >= 0 and self.symbols[si].param_stores[alias_pi] == 0:
                             self.symbols[si].param_stores[alias_pi] = 1
@@ -1449,29 +1503,30 @@ impl CiProject:
                             changed = true
 
     // The seeds of destruction that are not body proofs, then returns.
-    mut fn resolve_ownership_after_retention():
+    mut fn resolve_ownership_after_retention(skip_destruction_seeds: bool):
         let n = self.symbols.len()
-        var seeded = false
-        for si in 0..n:
-            if not self.fd_subject(si as i32) or not self.symbols[si].gir.contains("drop=1"): continue
-            if self.symbols[si].param_ty.len() != 1 or not self.fd_param_is_pointer(si as i32, 0) or self.symbols[si].param_destroys[0] != 0: continue
-            self.symbols[si].param_destroys[0] = 1
-            self.symbols[si].gir = self.symbols[si].gir ++ ";dropby=gir"
-            seeded = true
-        // The registry's `drop F` / `destroys F` on a resource: F destroys
-        // its parameter of that record (D121 step 4), where nothing above
-        // proved it.
-        for si in 0..n:
-            let kind = facts_kind(self.symbols[si].registry)
-            if not self.fd_subject(si as i32) or not (kind == "drop" or kind == "destroys"): continue
-            let record = facts_record(self.symbols[si].registry)
-            for pi in 0..self.symbols[si].param_ty.len():
-                if self.symbols[si].param_destroys[pi] != 0 or fd_record_pointee(self.symbols[si].param_ty[pi]) != record: continue
-                self.symbols[si].param_destroys[pi] = 1
-                self.symbols[si].registry = self.symbols[si].registry ++ "|by=registry"
+        if not skip_destruction_seeds:
+            var seeded = false
+            for si in 0..n:
+                if not self.fd_subject(si as i32) or not self.symbols[si].gir.contains("drop=1"): continue
+                if self.symbols[si].param_ty.len() != 1 or not self.fd_param_is_pointer(si as i32, 0) or self.symbols[si].param_destroys[0] != 0: continue
+                self.symbols[si].param_destroys[0] = 1
+                self.symbols[si].gir = self.symbols[si].gir ++ ";dropby=gir"
                 seeded = true
-                break
-        if seeded: self.fd_propagate_destruction()
+            // The registry's `drop F` / `destroys F` on a resource: F destroys
+            // its parameter of that record (D121 step 4), where nothing above
+            // proved it.
+            for si in 0..n:
+                let kind = facts_kind(self.symbols[si].registry)
+                if not self.fd_subject(si as i32) or not (kind == "drop" or kind == "destroys"): continue
+                let record = facts_record(self.symbols[si].registry)
+                for pi in 0..self.symbols[si].param_ty.len():
+                    if self.symbols[si].param_destroys[pi] != 0 or fd_record_pointee(self.symbols[si].param_ty[pi]) != record: continue
+                    self.symbols[si].param_destroys[pi] = 1
+                    self.symbols[si].registry = self.symbols[si].registry ++ "|by=registry"
+                    seeded = true
+                    break
+            if seeded: self.fd_propagate_destruction()
         // 3. Returns.
         var changed = true
         while changed:
@@ -1562,21 +1617,6 @@ impl CiProject:
                     self.symbols[si].own_reason = if reason.starts_with("annotation:") or reason.starts_with("registry:"): reason else: "proof: " ++ reason
                     changed = true
                 else: self.symbols[si].own_reason = verdict.slice(8, verdict.len()).to_owned()
-        // WITH_DEBUG_MIGRATE_FACADE=1: every definition's evidence and
-        // verdicts, for reading a verdict back to the line that gave it.
-        if with_getenv_str("WITH_DEBUG_MIGRATE_FACADE").len() > 0:
-            for si in 0..n:
-                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
-                var stores = ""
-                var destroys = ""
-                for pi in 0..self.symbols[si].param_ty.len():
-                    stores = stores ++ (if self.symbols[si].param_stores[pi] != 0: "1" else: "0")
-                    destroys = destroys ++ (if self.symbols[si].param_destroys[pi] != 0: "1" else: "0")
-                eprint("facade: " ++ self.symbols[si].name ++ " -> " ++ self.symbols[si].ret_ty ++ (if self.symbols[si].header_declared != 0: " (declared)" else: " (internal)") ++ " stores=" ++ stores ++ " destroys=" ++ destroys ++ f" owns={self.symbols[si].owns_return} borrow_from={self.symbols[si].borrow_from}" ++ (if self.symbols[si].borrow_from2 >= 0: f",{self.symbols[si].borrow_from2}" else: "") ++ ": " ++ self.symbols[si].own_reason ++ (if self.symbols[si].gir.len() > 0: " gir=" ++ self.symbols[si].gir else: ""))
-                for line in self.symbols[si].own_evidence.split("\n"):
-                    if line.len() > 0: eprint("    " ++ line)
-                for pi in 0..self.symbols[si].param_sinks.len():
-                    if self.symbols[si].param_sinks[pi].len() > 0: eprint(f"    sinks of param {pi}: " ++ self.symbols[si].param_sinks[pi])
 
     // The pointer-to-record representations the corpus produces or
     // destroys, in first-seen order of the symbol table.
@@ -2185,6 +2225,527 @@ impl CiProject:
                 for di in self.fd_destroyers_of(record, true): unaries = unaries ++ (if unaries.len() > 0: ", " else: "") ++ self.symbols[di].name
                 head = head ++ "  " ++ record ++ f": {producers} producer(s) and {unary} unary destroyers ({unaries}); a registry fact names which one is the drop (§16.2b.3)\n"
         head ++ lines
+
+    // #3124 (Eric's ruling, 2026-11-25): proof of exclusively owned sub-record
+    // fields `R.F -> S` and exemption of stores of a resource's pointer into its
+    // own proven `R.F`.
+    fn fd_3124_fn_destroys_rf_on_root(si: i32, root: &str, rf: &str) -> bool:
+        let ev = self.symbols[si].own_evidence
+        let sink_head = "rfsink:" ++ rf ++ ":" ++ root ++ ":"
+        let addr_head = "rfaddr:" ++ rf ++ ":" ++ root ++ ":"
+        let load_tail = ":" ++ rf ++ ":" ++ root
+        for line in ev.split("\n"):
+            if line.starts_with(sink_head):
+                let rest = line.slice(sink_head.len(), line.len())
+                let parts = rest.split(":")
+                if parts.len() == 2 and self.fd_callee_destroys(parts[0], fd_i32(parts[1])): return true
+            else if line.starts_with(addr_head):
+                let rest = line.slice(addr_head.len(), line.len())
+                let parts = rest.split(":")
+                if parts.len() == 2 and self.fd_slot_destroys(parts[0], fd_i32(parts[1])): return true
+            else if line.starts_with("rfload:") and line.ends_with(load_tail):
+                let mid = line.slice(7, line.len() - load_tail.len())
+                if mid.len() > 0 and not mid.contains(":"):
+                    for other in ev.split("\n"):
+                        if other.starts_with("localsink:" ++ mid ++ ":"):
+                            let sp = other.split(":")
+                            if sp.len() == 4 and self.fd_callee_destroys(sp[2], fd_i32(sp[3])): return true
+                        else if other.starts_with("localaddr:" ++ mid ++ ":"):
+                            let sp = other.split(":")
+                            if sp.len() == 4 and self.fd_slot_destroys(sp[2], fd_i32(sp[3])): return true
+        false
+
+    fn fd_3124_local_is_self_reload(si: i32, loc: &str, rf: &str, base: &str) -> bool:
+        let ev = self.symbols[si].own_evidence
+        let expected_load = "rfload:" ++ loc ++ ":" ++ rf ++ ":" ++ base
+        var saw_load = false
+        var saw_src = false
+        for line in ev.split("\n"):
+            if line == expected_load: saw_load = true
+            else if line.starts_with("localsrc:" ++ loc ++ ":"):
+                let src = line.slice(("localsrc:" ++ loc ++ ":").len(), line.len())
+                if src == "null": continue
+                saw_src = true
+                if src == "field:" ++ base and ev.contains(expected_load ++ "\n"): continue
+                if self.fd_source_verdict(si, src, 0, -1) == "owned": continue
+                return false
+            else if line.starts_with("localout:" ++ loc ++ ":"): return false
+            else if line.starts_with("localaddr:" ++ loc ++ ":"):
+                let sp = line.split(":")
+                if sp.len() != 4 or (not self.fd_slot_destroys(sp[2], fd_i32(sp[3])) and not self.fd_out_fresh(sp[2], fd_i32(sp[3]), 0)): return false
+            else if line.starts_with("localsink:" ++ loc ++ ":"):
+                let sp = line.split(":")
+                if sp.len() == 4 and self.fd_callee_retains(sp[2], fd_i32(sp[3])) and not self.fd_callee_destroys(sp[2], fd_i32(sp[3])): return false
+        saw_src and saw_load
+
+    // Whether `loc` in `si` is a freshly allocated local (used for Condition 4's
+    // constructor check, allowing `loc` to be stored into its own `rf` before
+    // `owned_subrecord_fields` is applied).
+    fn fd_3124_local_is_fresh_alloc(si: i32, loc: &str, rf: &str) -> bool:
+        let ev = self.symbols[si].own_evidence
+        var saw_owned = false
+        var stores = 0
+        var self_stores = 0
+        for line in ev.split("\n"):
+            if line.starts_with("localsrc:" ++ loc ++ ":"):
+                let src = line.slice(("localsrc:" ++ loc ++ ":").len(), line.len())
+                if src == "null": continue
+                if self.fd_source_verdict(si, src, 0, -1) != "owned": return false
+                saw_owned = true
+            else if line.starts_with("localout:" ++ loc ++ ":"): return false
+            else if line.starts_with("localaddr:" ++ loc ++ ":"):
+                let sp = line.split(":")
+                if sp.len() != 4 or not self.fd_out_fresh(sp[2], fd_i32(sp[3]), 0): return false
+                saw_owned = true
+            else if line == "localstore:" ++ loc: stores += 1
+            else if line.starts_with("localstoreinto:" ++ loc ++ ":"):
+                if line.starts_with("localstoreinto:" ++ loc ++ ":local:" ++ loc ++ ":" ++ rf ++ ":"): self_stores += 1
+        saw_owned and stores == self_stores
+
+    // Whether local `loc` in `si` comes exclusively from a proven owned field
+    // `R.F` of `want_root` (either loaded via `rfload`, or freshly allocated and
+    // assigned into `R.F` of `want_root`).
+    fn fd_3124_local_from_rf_of(si: i32, loc: &str, want_root: &str) -> bool:
+        let ev = self.symbols[si].own_evidence
+        var matched_rf = ""
+        for line in ev.split("\n"):
+            if line.starts_with("rfload:" ++ loc ++ ":") and line.ends_with(":" ++ want_root):
+                let rf = line.slice(("rfload:" ++ loc ++ ":").len(), line.len() - want_root.len() - 1)
+                if self.owned_subrecord_fields.contains(rf):
+                    matched_rf = rf
+                    break
+        if matched_rf.len() == 0:
+            for line in ev.split("\n"):
+                if not line.starts_with("rfset:"): continue
+                let parts = line.split(":")
+                if parts.len() < 5: continue
+                let rf = parts[1]
+                if not self.owned_subrecord_fields.contains(rf): continue
+                if line.ends_with(":" ++ want_root ++ ":local:" ++ loc):
+                    matched_rf = rf
+                    break
+        if matched_rf.len() == 0: return false
+        var saw_src = false
+        for line in ev.split("\n"):
+            if not line.starts_with("localsrc:" ++ loc ++ ":"): continue
+            let src = line.slice(("localsrc:" ++ loc ++ ":").len(), line.len())
+            if src == "null": continue
+            saw_src = true
+            if src == "field:" ++ want_root and ev.contains("rfload:" ++ loc ++ ":" ++ matched_rf ++ ":" ++ want_root ++ "\n"): continue
+            if self.fd_source_verdict(si, src, 0, -1) == "owned": continue
+            return false
+        saw_src
+
+    // Split `<lhs_root>:<via_rf>[:...]` into `(lhs_root, via_rf)` where `lhs_root`
+    // may itself contain one colon (`param:<i>` or `local:<name>`).
+    fn fd_3124_split_root_via(rest: &str) -> (str, str):
+        if rest.starts_with("param:") or rest.starts_with("local:"):
+            let c1 = rest.find(":")
+            let rem = rest.slice(c1 + 1, rest.len())
+            let c2 = rem.find(":")
+            if c2 < 0: return (rest.to_owned(), "")
+            let lhs_root = rest.slice(0, c1 + 1 + c2).to_owned()
+            let tail = rem.slice(c2 + 1, rem.len())
+            let c3 = tail.find(":")
+            let via = if c3 >= 0: tail.slice(0, c3).to_owned() else: tail.to_owned()
+            return (lhs_root, via)
+        let c1 = rest.find(":")
+        if c1 < 0: return (rest.to_owned(), "")
+        let lhs_root = rest.slice(0, c1).to_owned()
+        let tail = rest.slice(c1 + 1, rest.len())
+        let c2 = tail.find(":")
+        let via = if c2 >= 0: tail.slice(0, c2).to_owned() else: tail.to_owned()
+        (lhs_root, via)
+
+    // Whether EVERY direct store of `param:pi` in `si` targets a proven owned
+    // sub-record field `R.F` of `param:pi`.
+    fn fd_3124_param_stores_all_self_owned(si: i32, pi: i32) -> bool:
+        let ev = self.symbols[si].own_evidence
+        if ev.contains(f"paramunnamed:{pi}:"): return false
+        var total = 0
+        var exempt = 0
+        let exact = f"paramstore:{pi}"
+        let head = f"paramstoreinto:{pi}:"
+        let want_root = f"param:{pi}"
+        for line in ev.split("\n"):
+            if line == exact: total += 1
+            else if line.starts_with(head):
+                let (lhs_root, via_rf) = self.fd_3124_split_root_via(line.slice(head.len(), line.len()))
+                if via_rf.len() > 0 and lhs_root == want_root and self.owned_subrecord_fields.contains(via_rf):
+                    exempt += 1
+                else if lhs_root.starts_with("local:") and self.fd_3124_local_from_rf_of(si, lhs_root.slice(6, lhs_root.len()), want_root):
+                    exempt += 1
+        total > 0 and exempt == total
+
+    // Whether EVERY direct store of `local:loc` in `si` targets a proven owned
+    // sub-record field `R.F` of `loc` itself (or of the parameter `loc` aliases).
+    fn fd_3124_local_stores_all_self_owned(si: i32, loc: &str) -> bool:
+        let ev = self.symbols[si].own_evidence
+        let exact = "localstore:" ++ loc
+        let head = "localstoreinto:" ++ loc ++ ":"
+        let own_root = "local:" ++ loc
+        let alias_pi = self.fd_local_alias_param(si, loc)
+        let alias_root = if alias_pi >= 0: f"param:{alias_pi}" else: ""
+        var total = 0
+        var exempt = 0
+        for line in ev.split("\n"):
+            if line == exact: total += 1
+            else if line.starts_with(head):
+                let (lhs_root, via_rf) = self.fd_3124_split_root_via(line.slice(head.len(), line.len()))
+                var ok = false
+                if via_rf.len() > 0 and (lhs_root == own_root or (alias_root.len() > 0 and lhs_root == alias_root)) and self.owned_subrecord_fields.contains(via_rf):
+                    ok = true
+                else if lhs_root.starts_with("local:"):
+                    let dloc = lhs_root.slice(6, lhs_root.len())
+                    if self.fd_3124_local_from_rf_of(si, dloc, own_root): ok = true
+                    else if alias_root.len() > 0 and self.fd_3124_local_from_rf_of(si, dloc, alias_root): ok = true
+                if ok: exempt += 1
+        total > 0 and exempt == total
+
+    // If helper `gi` retains `src_pi` ONLY by storing it into `param:dst_pi`
+    // (directly or transitively through another such helper), returns `dst_pi`;
+    // otherwise returns -1.
+    fn fd_3124_helper_dst_param(gi: i32, src_pi: i32, depth: i32) -> i32:
+        if depth > 8 or gi < 0 or self.symbols[gi].has_definition == 0: return -1
+        if src_pi < 0 or src_pi >= self.symbols[gi].param_stores.len(): return -1
+        if self.symbols[gi].param_stores[src_pi] == 0 or self.symbols[gi].param_destroys[src_pi] != 0: return -1
+        let sinks = self.symbols[gi].param_sinks[src_pi]
+        if sinks.contains("global;") or sinks.contains("frame;"): return -1
+        let ev = self.symbols[gi].own_evidence
+        if ev.contains(f"paramunnamed:{src_pi}:"): return -1
+        var dst = -1
+        var pstores = 0
+        var pinto_ok = 0
+        let exact = f"paramstore:{src_pi}"
+        let head = f"paramstoreinto:{src_pi}:"
+        for line in ev.split("\n"):
+            if line == exact: pstores += 1
+            else if line.starts_with(head):
+                let (lhs_root, _) = self.fd_3124_split_root_via(line.slice(head.len(), line.len()))
+                if not lhs_root.starts_with("param:"): return -1
+                let dpi = fd_i32(lhs_root.slice(6, lhs_root.len()))
+                if dpi == src_pi: return -1
+                if dst >= 0 and dst != dpi: return -1
+                dst = dpi
+                pinto_ok += 1
+            else if line.starts_with("localstore:"):
+                if self.fd_local_alias_param(gi, line.slice(11, line.len())) == src_pi: return -1
+        if pstores != pinto_ok: return -1
+        for sink in sinks.split(";"):
+            if not sink.contains(":"): continue
+            let kv = sink.split(":")
+            let cpos = fd_i32(kv[1])
+            if not self.fd_callee_retains(kv[0], cpos): continue
+            if kv[0].starts_with("*"): return -1
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
+            if ci < 0 or ci == gi: return -1
+            let cdst = self.fd_3124_helper_dst_param(ci, cpos, depth + 1)
+            if cdst < 0: return -1
+            var matched = 0
+            let call_head = "rfcall:" ++ kv[0] ++ ":"
+            for line in ev.split("\n"):
+                if not line.starts_with(call_head): continue
+                let amap = line.slice(call_head.len(), line.len())
+                if fd_outcall_arg(amap, cpos) != f"p{src_pi}": continue
+                let dval = fd_outcall_arg(amap, cdst)
+                var dpi = -1
+                if dval.starts_with("p"): dpi = fd_i32(dval.slice(1, dval.len()))
+                else if dval.starts_with("rf:") and dval.contains("@param:"):
+                    dpi = fd_i32(dval.slice(dval.find("@param:") + 7, dval.len()))
+                if dpi < 0 or dpi == src_pi: return -1
+                if dst >= 0 and dst != dpi: return -1
+                dst = dpi
+                matched += 1
+            if matched == 0: return -1
+        dst
+
+    // Whether EVERY call in `si` to `callee` passing `want_arg` (`p<i>` or
+    // `l<loc>`) at `pos` passes a proven owned sub-record `R.F` of `want_root`
+    // (`param:<i>` or `local:<loc>`) at the helper's `dst_pos`.
+    fn fd_3124_call_sink_is_self_owned(si: i32, want_arg: &str, want_root: &str, alt_root: &str, callee: &str, pos: i32) -> bool:
+        if callee.starts_with("*"): return false
+        let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
+        if ci < 0: return false
+        let dst_pos = self.fd_3124_helper_dst_param(ci, pos, 0)
+        if dst_pos < 0: return false
+        let ev = self.symbols[si].own_evidence
+        let call_head = "rfcall:" ++ callee ++ ":"
+        var matched = 0
+        for line in ev.split("\n"):
+            if not line.starts_with(call_head): continue
+            let amap = line.slice(call_head.len(), line.len())
+            if fd_outcall_arg(amap, pos) != want_arg: continue
+            matched += 1
+            let dval = fd_outcall_arg(amap, dst_pos)
+            var ok = false
+            if dval.starts_with("rf:"):
+                let at = dval.find("@")
+                if at > 3:
+                    let hrf = dval.slice(3, at)
+                    let base = dval.slice(at + 1, dval.len())
+                    if self.owned_subrecord_fields.contains(hrf) and (base == want_root or (alt_root.len() > 0 and base == alt_root)):
+                        ok = true
+            else if dval.starts_with("l"):
+                let dloc = dval.slice(1, dval.len())
+                if self.fd_3124_local_from_rf_of(si, dloc, want_root): ok = true
+                else if alt_root.len() > 0 and self.fd_3124_local_from_rf_of(si, dloc, alt_root): ok = true
+            if not ok: return false
+        matched > 0
+
+    fn fd_3124_param_sink_is_self_owned(si: i32, pi: i32, callee: &str, pos: i32) -> bool:
+        self.fd_3124_call_sink_is_self_owned(si, f"p{pi}", f"param:{pi}", "", callee, pos)
+
+    fn fd_3124_local_sink_is_self_owned(si: i32, loc: &str, callee: &str, pos: i32) -> bool:
+        let alias_pi = self.fd_local_alias_param(si, loc)
+        let alt_root = if alias_pi >= 0: f"param:{alias_pi}" else: ""
+        self.fd_3124_call_sink_is_self_owned(si, "l" ++ loc, "local:" ++ loc, alt_root, callee, pos)
+
+    // #3124: return the set of `R.F` fields proven to satisfy Conditions 2, 3,
+    // and 4 across the corpus (every unit read, destroyed by R's destroyer,
+    // never escaping, exclusively owned and destroyed on overwrite).
+    fn fd_prove_owned_fields_3124() -> HashMap[str, bool]:
+        let proven: HashMap[str, bool] = [:]
+        if self.unread.len() > 0: return proven
+        let n = self.symbols.len()
+        let all_rfs = []
+        let rf_seen: HashMap[str, bool] = [:]
+        for sym in self.symbols:
+            if sym.kind != CiProjectSymbolKind.CIPS_FN or sym.has_definition == 0: continue
+            for line in sym.own_evidence.split("\n"):
+                if not line.starts_with("rfset:"): continue
+                let parts = line.split(":")
+                if parts.len() < 4: continue
+                let rf = parts[1]
+                if not rf_seen.contains(rf):
+                    rf_seen.insert(rf.to_owned(), true)
+                    all_rfs.push(rf.to_owned())
+        if all_rfs.len() == 0: return proven
+        // Condition 2: fixed point of functions destroying `R.F` of parameter `pi`.
+        let destroys_rf: HashMap[str, bool] = [:]
+        let slot_destroys_rf: HashMap[str, bool] = [:]
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+            let ev = self.symbols[si].own_evidence
+            if not ev.contains("rfsink:") and not ev.contains("rfaddr:") and not ev.contains("rfload:"): continue
+            let pcount = self.symbols[si].param_ty.len()
+            for rf in all_rfs:
+                if not ev.contains(rf): continue
+                for pi in 0..pcount:
+                    if not self.fd_param_is_pointer(si as i32, pi as i32): continue
+                    if self.fd_3124_fn_destroys_rf_on_root(si as i32, f"param:{pi}", rf):
+                        destroys_rf.insert(f"{si}:{pi}:" ++ rf, true)
+                for line in ev.split("\n"):
+                    if line.starts_with("localsrc:"):
+                        let loc = line.slice(9, line.len()).split(":")[0]
+                        let api = self.fd_local_alias_param(si as i32, loc)
+                        if api >= 0 and self.fd_3124_fn_destroys_rf_on_root(si as i32, "local:" ++ loc, rf):
+                            destroys_rf.insert(f"{si}:{api}:" ++ rf, true)
+                    else if line.starts_with("localslot:"):
+                        let sp = line.split(":")
+                        if sp.len() == 3 and self.fd_3124_fn_destroys_rf_on_root(si as i32, "local:" ++ sp[1], rf):
+                            slot_destroys_rf.insert(f"{si}:{sp[2]}:" ++ rf, true)
+        var dchanged = true
+        while dchanged:
+            dchanged = false
+            for si in 0..n:
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+                let pcount = self.symbols[si].param_sinks.len()
+                for pi in 0..pcount:
+                    if not self.fd_param_is_pointer(si as i32, pi as i32): continue
+                    for sink in self.symbols[si].param_sinks[pi].split(";"):
+                        if not sink.contains(":"): continue
+                        let kv = sink.split(":")
+                        let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
+                        if ci < 0: continue
+                        let cpos = fd_i32(kv[1])
+                        for rf in all_rfs:
+                            let key = f"{si}:{pi}:" ++ rf
+                            if not destroys_rf.contains(key) and destroys_rf.contains(f"{ci}:{cpos}:" ++ rf):
+                                destroys_rf.insert(key, true)
+                                dchanged = true
+                for line in self.symbols[si].own_evidence.split("\n"):
+                    if line.starts_with("localsink:"):
+                        let sp = line.split(":")
+                        if sp.len() != 4: continue
+                        let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, sp[2])
+                        if ci < 0: continue
+                        let cpos = fd_i32(sp[3])
+                        let api = self.fd_local_alias_param(si as i32, sp[1])
+                        if api >= 0:
+                            for rf in all_rfs:
+                                let key = f"{si}:{api}:" ++ rf
+                                if not destroys_rf.contains(key) and destroys_rf.contains(f"{ci}:{cpos}:" ++ rf):
+                                    destroys_rf.insert(key, true)
+                                    dchanged = true
+                    else if line.starts_with("localaddr:"):
+                        let sp = line.split(":")
+                        if sp.len() != 4: continue
+                        let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, sp[2])
+                        if ci < 0: continue
+                        let cpos = fd_i32(sp[3])
+                        let api = self.fd_local_alias_param(si as i32, sp[1])
+                        if api >= 0:
+                            for rf in all_rfs:
+                                let key = f"{si}:{api}:" ++ rf
+                                if not destroys_rf.contains(key) and slot_destroys_rf.contains(f"{ci}:{cpos}:" ++ rf):
+                                    destroys_rf.insert(key, true)
+                                    dchanged = true
+                    else if line.starts_with("localslot:"):
+                        let sp = line.split(":")
+                        if sp.len() != 3: continue
+                        let loc = sp[1]
+                        let slot = fd_i32(sp[2])
+                        for other in self.symbols[si].own_evidence.split("\n"):
+                            if not other.starts_with("localsink:" ++ loc ++ ":"): continue
+                            let osp = other.split(":")
+                            if osp.len() != 4: continue
+                            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, osp[2])
+                            if ci < 0: continue
+                            let cpos = fd_i32(osp[3])
+                            for rf in all_rfs:
+                                let key = f"{si}:{slot}:" ++ rf
+                                if not slot_destroys_rf.contains(key) and destroys_rf.contains(f"{ci}:{cpos}:" ++ rf):
+                                    slot_destroys_rf.insert(key, true)
+                                    dchanged = true
+        for rf in all_rfs:
+            let dot = rf.find(".")
+            if dot <= 0: continue
+            let rec = rf.slice(0, dot)
+            // Condition 2: every public unary destroyer of `rec` destroys `rf`.
+            let destroyers = self.fd_destroyers_of(rec, true)
+            if destroyers.len() == 0:
+                for si in 0..n:
+                    if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].header_declared == 0: continue
+                    if self.symbols[si].param_ty.len() == 1 and self.symbols[si].param_destroys[0] != 0:
+                        let pt = fd_record_pointee(self.symbols[si].param_ty[0])
+                        if self.void_typedefs.contains(pt) and destroys_rf.contains(f"{si}:0:" ++ rf):
+                            destroyers.push(si as i32)
+            if destroyers.len() == 0: continue
+            var c2_ok = true
+            for di in destroyers:
+                if not destroys_rf.contains(f"{di}:0:" ++ rf):
+                    c2_ok = false
+                    break
+            if not c2_ok: continue
+            // Conditions 3 (no escape) & 4 (exclusivity).
+            var ok = true
+            for si in 0..n:
+                if not ok: break
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+                let ev = self.symbols[si].own_evidence
+                if not ev.contains(rf): continue
+                let rf_locs = []
+                let rf_loc_base: HashMap[str, str] = [:]
+                for line in ev.split("\n"):
+                    if line.starts_with("rfload:"):
+                        let sp = line.split(":")
+                        if sp.len() >= 5 and sp[2] == rf:
+                            let loc = sp[1]
+                            if not rf_locs.contains(loc): rf_locs.push(loc.to_owned())
+                            rf_loc_base.insert(loc.to_owned(), sp[3] ++ ":" ++ sp[4])
+                var lchanged = true
+                while lchanged:
+                    lchanged = false
+                    for line in ev.split("\n"):
+                        if not line.starts_with("localsrc:"): continue
+                        let rest = line.slice(9, line.len())
+                        let colon = rest.find(":")
+                        if colon <= 0: continue
+                        let dst_l = rest.slice(0, colon)
+                        let src_l = rest.slice(colon + 1, rest.len())
+                        var from_l = ""
+                        if src_l.starts_with("local:"): from_l = src_l.slice(6, src_l.len())
+                        else if src_l.starts_with("field:local:"): from_l = src_l.slice(12, src_l.len())
+                        if from_l.len() > 0 and rf_locs.contains(from_l) and not rf_locs.contains(dst_l):
+                            rf_locs.push(dst_l.to_owned())
+                            lchanged = true
+                for line in ev.split("\n"):
+                    if not ok: break
+                    if line.starts_with("rfescape:" ++ rf ++ ":"):
+                        ok = false
+                    else if line.starts_with("rfsink:" ++ rf ++ ":"):
+                        let sp = line.slice(("rfsink:" ++ rf ++ ":").len(), line.len()).split(":")
+                        let callee = sp[sp.len() - 2]
+                        let pos = fd_i32(sp[sp.len() - 1])
+                        if self.fd_callee_retains(callee, pos) and not self.fd_callee_destroys(callee, pos): ok = false
+                    else if line.starts_with("rfsubsink:" ++ rf ++ ":"):
+                        let sp = line.slice(("rfsubsink:" ++ rf ++ ":").len(), line.len()).split(":")
+                        if sp.len() == 2 and self.fd_callee_retains(sp[0], fd_i32(sp[1])): ok = false
+                    else if line.starts_with("rfaddr:" ++ rf ++ ":"):
+                        let sp = line.slice(("rfaddr:" ++ rf ++ ":").len(), line.len()).split(":")
+                        let callee = sp[sp.len() - 2]
+                        let pos = fd_i32(sp[sp.len() - 1])
+                        if not self.fd_slot_destroys(callee, pos) and not self.fd_out_fresh(callee, pos, 0) and self.fd_callee_retains(callee, pos): ok = false
+                    else if line.starts_with("rfset:" ++ rf ++ ":"):
+                        let after_rf = line.slice(("rfset:" ++ rf ++ ":").len(), line.len())
+                        let c1 = after_rf.find(":")
+                        if c1 < 0: continue
+                        let after_s = after_rf.slice(c1 + 1, after_rf.len())
+                        var base = ""
+                        var src = ""
+                        if after_s.starts_with("param:") or after_s.starts_with("local:"):
+                            let c2 = after_s.find(":")
+                            let rem = after_s.slice(c2 + 1, after_s.len())
+                            let c3 = rem.find(":")
+                            if c3 < 0: continue
+                            base = after_s.slice(0, c2 + 1 + c3)
+                            src = rem.slice(c3 + 1, rem.len())
+                        else:
+                            let c2 = after_s.find(":")
+                            if c2 < 0: continue
+                            base = after_s.slice(0, c2)
+                            src = after_s.slice(c2 + 1, after_s.len())
+                        if src == "null": continue
+                        var is_reload = false
+                        var src_ok = self.fd_source_verdict(si as i32, src, 0, -1) == "owned"
+                        if not src_ok and src.starts_with("local:"):
+                            let sloc = src.slice(6, src.len())
+                            if self.fd_3124_local_is_self_reload(si as i32, sloc, rf, base):
+                                src_ok = true
+                                is_reload = true
+                        if not src_ok:
+                            ok = false
+                            break
+                        if not is_reload:
+                            var is_ctor = false
+                            if base.starts_with("local:"):
+                                let bloc = base.slice(6, base.len())
+                                if self.fd_local_verdict(si as i32, bloc, 0, -1) == "owned" or self.fd_3124_local_is_fresh_alloc(si as i32, bloc, rf):
+                                    is_ctor = true
+                            var frees_old = self.fd_3124_fn_destroys_rf_on_root(si as i32, base, rf)
+                            if not frees_old and base.starts_with("param:"):
+                                frees_old = destroys_rf.contains(f"{si}:" ++ base.slice(6, base.len()) ++ ":" ++ rf)
+                            if not is_ctor and not frees_old: ok = false
+                if ok:
+                    for loc in rf_locs:
+                        var loc_stores = 0
+                        var loc_self_stores = 0
+                        let orig_base = rf_loc_base.get(loc).cloned() ?? ""
+                        for line in ev.split("\n"):
+                            if line == "ret:local:" ++ loc or line == "ret:field:local:" ++ loc:
+                                ok = false
+                                break
+                            else if line.starts_with("localout:" ++ loc ++ ":"):
+                                ok = false
+                                break
+                            else if line.starts_with("localsink:" ++ loc ++ ":"):
+                                let sp = line.split(":")
+                                if sp.len() == 4 and self.fd_callee_retains(sp[2], fd_i32(sp[3])) and not self.fd_callee_destroys(sp[2], fd_i32(sp[3])):
+                                    ok = false
+                                    break
+                            else if line.starts_with("localaddr:" ++ loc ++ ":"):
+                                let sp = line.split(":")
+                                if sp.len() == 4 and not self.fd_slot_destroys(sp[2], fd_i32(sp[3])) and not self.fd_out_fresh(sp[2], fd_i32(sp[3]), 0):
+                                    ok = false
+                                    break
+                            else if line == "localstore:" ++ loc: loc_stores += 1
+                            else if line.starts_with("localstoreinto:" ++ loc ++ ":"):
+                                if orig_base.len() > 0 and line.ends_with(":" ++ rf) and line.starts_with("localstoreinto:" ++ loc ++ ":" ++ orig_base ++ ":"):
+                                    loc_self_stores += 1
+                        if ok and loc_stores > loc_self_stores: ok = false
+                        if not ok: break
+            if ok: proven.insert(rf.to_owned(), true)
+        proven
 
 // The field of a `Record.field` (or `*Record.field`) callee.
 // A pointer to `record` handed to `callee` (`*Record.field` for a call

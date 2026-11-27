@@ -1,0 +1,204 @@
+//! expect-stdout: ok
+// #3124 (Eric's ruling, 2026-11-25): a store of a resource's pointer is not
+// retention when all four conditions hold:
+//   1. the store's target is a field of a record reachable only through a field
+//      `R.F` of the resource's own record (directly, via a local loaded from
+//      `R.F`, or via a helper that stores `src` only into `dst`);
+//   2. the resource's destroyer destroys that record;
+//   3. no function of the package returns that record or a pointer into it,
+//      and none stores it anywhere else;
+//   4. exclusivity: `R.F` is assigned only a fresh allocation (or NULL / self-
+//      reload), is never copied to another resource, and the old record is
+//      destroyed if `R.F` is overwritten.
+use compiler.ConanClient
+use std.fs
+use std.process
+
+fn main:
+    let root = "out/tmp/conan_facade_self_owned_store_test"
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    var header = ""
+    header = header ++ "typedef struct Handle Handle;\n"
+    header = header ++ "Handle *handle_new(void);\n"
+    header = header ++ "void handle_free(Handle *h);\n"
+    header = header ++ "void handle_sync(Handle *h);\n"
+    header = header ++ "void handle_sync_local(Handle *h);\n"
+    header = header ++ "void handle_bind(Handle *h);\n"
+    header = header ++ "void handle_bind2(Handle *h);\n"
+    header = header ++ "void handle_reset(Handle *h);\n"
+    header = header ++ "void handle_cross(Handle *a, Handle *b);\n"
+    header = header ++ "void handle_cross_helper(Handle *a, Handle *b);\n"
+    header = header ++ "void handle_mixed_helper(Handle *a, Handle *b);\n"
+    header = header ++ "typedef struct NoFree NoFree;\n"
+    header = header ++ "NoFree *nofree_new(void);\n"
+    header = header ++ "void nofree_free(NoFree *n);\n"
+    header = header ++ "void nofree_sync(NoFree *n);\n"
+    header = header ++ "typedef struct EscRet EscRet;\n"
+    header = header ++ "typedef struct EscRetState EscRetState;\n"
+    header = header ++ "EscRet *escret_new(void);\n"
+    header = header ++ "void escret_free(EscRet *e);\n"
+    header = header ++ "EscRetState *escret_get_state(EscRet *e);\n"
+    header = header ++ "void escret_sync(EscRet *e);\n"
+    header = header ++ "typedef struct EscGlob EscGlob;\n"
+    header = header ++ "EscGlob *escglob_new(void);\n"
+    header = header ++ "void escglob_free(EscGlob *e);\n"
+    header = header ++ "void escglob_leak(EscGlob *e);\n"
+    header = header ++ "void escglob_sync(EscGlob *e);\n"
+    header = header ++ "typedef struct Shared Shared;\n"
+    header = header ++ "Shared *shared_new(void);\n"
+    header = header ++ "Shared *shared_clone(Shared *parent);\n"
+    header = header ++ "void shared_free(Shared *s);\n"
+    header = header ++ "void shared_sync(Shared *s);\n"
+    header = header ++ "typedef struct Overwrite Overwrite;\n"
+    header = header ++ "Overwrite *overwrite_new(void);\n"
+    header = header ++ "void overwrite_free(Overwrite *o);\n"
+    header = header ++ "void overwrite_replace(Overwrite *o);\n"
+    header = header ++ "void overwrite_sync(Overwrite *o);\n"
+    assert(write_file(dep ++ "/include/ownstate.h", header) == 0)
+    assert(write_file(src ++ "/ownstate.h", header) == 0)
+
+    var unit = "#include <stdlib.h>\n#include \"ownstate.h\"\n"
+    // 1. Positive: Handle owns `state` exclusively; freed by handle_free; never escapes.
+    unit = unit ++ "struct HandleState { Handle *owner; int tag; };\n"
+    unit = unit ++ "struct Handle { struct HandleState *state; int id; };\n"
+    unit = unit ++ "static void state_bind(struct HandleState *s, Handle *h) { s->owner = h; }\n"
+    unit = unit ++ "static void state_bind_outer(struct HandleState *s, Handle *h) { state_bind(s, h); }\n"
+    unit = unit ++ "Handle *handle_new(void) {\n"
+    unit = unit ++ "    Handle *h = (Handle *)malloc(sizeof(Handle));\n"
+    unit = unit ++ "    if (!h) return NULL;\n"
+    unit = unit ++ "    h->state = (struct HandleState *)malloc(sizeof(struct HandleState));\n"
+    unit = unit ++ "    if (h->state) h->state->owner = h;\n"
+    unit = unit ++ "    return h;\n"
+    unit = unit ++ "}\n"
+    unit = unit ++ "void handle_free(Handle *h) {\n"
+    unit = unit ++ "    if (!h) return;\n"
+    unit = unit ++ "    if (h->state) { h->state->owner = h; free(h->state); }\n"
+    unit = unit ++ "    free(h);\n"
+    unit = unit ++ "}\n"
+    unit = unit ++ "void handle_sync(Handle *h) { if (h && h->state) h->state->owner = h; }\n"
+    unit = unit ++ "void handle_sync_local(Handle *h) { if (!h) return; struct HandleState *s = h->state; if (s) s->owner = h; }\n"
+    unit = unit ++ "void handle_bind(Handle *h) { if (h && h->state) state_bind(h->state, h); }\n"
+    unit = unit ++ "void handle_bind2(Handle *h) { if (h && h->state) state_bind_outer(h->state, h); }\n"
+    unit = unit ++ "void handle_reset(Handle *h) {\n"
+    unit = unit ++ "    if (!h) return;\n"
+    unit = unit ++ "    free(h->state);\n"
+    unit = unit ++ "    h->state = (struct HandleState *)malloc(sizeof(struct HandleState));\n"
+    unit = unit ++ "    if (h->state) h->state->owner = h;\n"
+    unit = unit ++ "}\n"
+    // Negative: truly retains caller pointer `b` inside `a`'s state (different handle).
+    unit = unit ++ "void handle_cross(Handle *a, Handle *b) { if (a && a->state) a->state->owner = b; }\n"
+    unit = unit ++ "void handle_cross_helper(Handle *a, Handle *b) { if (a && a->state) state_bind(a->state, b); }\n"
+    unit = unit ++ "void handle_mixed_helper(Handle *a, Handle *b) { if (a && a->state && b && b->state) { state_bind(a->state, a); state_bind(b->state, a); } }\n"
+
+    // 2. Negative (Condition 2): destroyer does NOT destroy `state`.
+    unit = unit ++ "struct NoFreeState { NoFree *owner; };\n"
+    unit = unit ++ "struct NoFree { struct NoFreeState *state; };\n"
+    unit = unit ++ "NoFree *nofree_new(void) {\n"
+    unit = unit ++ "    NoFree *n = (NoFree *)malloc(sizeof(NoFree));\n"
+    unit = unit ++ "    if (!n) return NULL;\n"
+    unit = unit ++ "    n->state = (struct NoFreeState *)malloc(sizeof(struct NoFreeState));\n"
+    unit = unit ++ "    return n;\n"
+    unit = unit ++ "}\n"
+    unit = unit ++ "void nofree_free(NoFree *n) { free(n); }\n"
+    unit = unit ++ "void nofree_sync(NoFree *n) { if (n && n->state) n->state->owner = n; }\n"
+
+    // 3a. Negative (Condition 3): a function returns `state`.
+    unit = unit ++ "struct EscRetState { EscRet *owner; };\n"
+    unit = unit ++ "struct EscRet { struct EscRetState *state; };\n"
+    unit = unit ++ "EscRet *escret_new(void) {\n"
+    unit = unit ++ "    EscRet *e = (EscRet *)malloc(sizeof(EscRet));\n"
+    unit = unit ++ "    if (!e) return NULL;\n"
+    unit = unit ++ "    e->state = (struct EscRetState *)malloc(sizeof(struct EscRetState));\n"
+    unit = unit ++ "    return e;\n"
+    unit = unit ++ "}\n"
+    unit = unit ++ "void escret_free(EscRet *e) { if (!e) return; free(e->state); free(e); }\n"
+    unit = unit ++ "EscRetState *escret_get_state(EscRet *e) { return e ? e->state : NULL; }\n"
+    unit = unit ++ "void escret_sync(EscRet *e) { if (e && e->state) e->state->owner = e; }\n"
+
+    // 3b. Negative (Condition 3): a function stores `state` in a global.
+    unit = unit ++ "struct EscGlobState { EscGlob *owner; };\n"
+    unit = unit ++ "struct EscGlob { struct EscGlobState *state; };\n"
+    unit = unit ++ "static struct EscGlobState *g_leaked_state;\n"
+    unit = unit ++ "EscGlob *escglob_new(void) {\n"
+    unit = unit ++ "    EscGlob *e = (EscGlob *)malloc(sizeof(EscGlob));\n"
+    unit = unit ++ "    if (!e) return NULL;\n"
+    unit = unit ++ "    e->state = (struct EscGlobState *)malloc(sizeof(struct EscGlobState));\n"
+    unit = unit ++ "    return e;\n"
+    unit = unit ++ "}\n"
+    unit = unit ++ "void escglob_free(EscGlob *e) { if (!e) return; free(e->state); free(e); }\n"
+    unit = unit ++ "void escglob_leak(EscGlob *e) { if (e) g_leaked_state = e->state; }\n"
+    unit = unit ++ "void escglob_sync(EscGlob *e) { if (e && e->state) e->state->owner = e; }\n"
+
+    // 4a. Negative (Condition 4): `state` is shared with another resource (expat m_dtd shape).
+    unit = unit ++ "struct SharedState { Shared *owner; };\n"
+    unit = unit ++ "struct Shared { struct SharedState *state; int is_child; };\n"
+    unit = unit ++ "Shared *shared_new(void) {\n"
+    unit = unit ++ "    Shared *s = (Shared *)malloc(sizeof(Shared));\n"
+    unit = unit ++ "    if (!s) return NULL;\n"
+    unit = unit ++ "    s->state = (struct SharedState *)malloc(sizeof(struct SharedState));\n"
+    unit = unit ++ "    s->is_child = 0;\n"
+    unit = unit ++ "    return s;\n"
+    unit = unit ++ "}\n"
+    unit = unit ++ "Shared *shared_clone(Shared *parent) {\n"
+    unit = unit ++ "    Shared *c = (Shared *)malloc(sizeof(Shared));\n"
+    unit = unit ++ "    if (!c) return NULL;\n"
+    unit = unit ++ "    c->state = parent->state;\n"
+    unit = unit ++ "    c->is_child = 1;\n"
+    unit = unit ++ "    return c;\n"
+    unit = unit ++ "}\n"
+    unit = unit ++ "void shared_free(Shared *s) { if (!s) return; if (!s->is_child) free(s->state); free(s); }\n"
+    unit = unit ++ "void shared_sync(Shared *s) { if (s && s->state) s->state->owner = s; }\n"
+
+    // 4b. Negative (Condition 4): `state` is overwritten without destroying the old one.
+    unit = unit ++ "struct OverwriteState { Overwrite *owner; };\n"
+    unit = unit ++ "struct Overwrite { struct OverwriteState *state; };\n"
+    unit = unit ++ "Overwrite *overwrite_new(void) {\n"
+    unit = unit ++ "    Overwrite *o = (Overwrite *)malloc(sizeof(Overwrite));\n"
+    unit = unit ++ "    if (!o) return NULL;\n"
+    unit = unit ++ "    o->state = (struct OverwriteState *)malloc(sizeof(struct OverwriteState));\n"
+    unit = unit ++ "    return o;\n"
+    unit = unit ++ "}\n"
+    unit = unit ++ "void overwrite_free(Overwrite *o) { if (!o) return; free(o->state); free(o); }\n"
+    unit = unit ++ "void overwrite_replace(Overwrite *o) { if (o) o->state = (struct OverwriteState *)malloc(sizeof(struct OverwriteState)); }\n"
+    unit = unit ++ "void overwrite_sync(Overwrite *o) { if (o && o->state) o->state->owner = o; }\n"
+
+    assert(write_file(src ++ "/ownstate.c", unit) == 0)
+    let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c ownstate.c\",\n  \"file\": \"ownstate.c\"\n}\n]\n"
+    assert(write_file(build ++ "/compile_commands.json", commands) == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"ownstate\"]}\n") == 0)
+    assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
+    conan_write_facade("ownstate", "1.0", dep, src, build)
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    let wanted = [
+        "  handle_new: owned producer of Handle",
+        "  handle_free: destroyer, param 0",
+        "  handle_sync: lend",
+        "  handle_sync_local: lend",
+        "  handle_bind: lend",
+        "  handle_bind2: lend",
+        "  handle_reset: lend",
+        "  handle_cross: raw: retains param 1",
+        "  handle_cross_helper: raw: retains param 1",
+        "  handle_mixed_helper: raw: retains param 0",
+        "  nofree_sync: raw: retains param 0",
+        "  escret_sync: raw: retains param 0",
+        "  escglob_sync: raw: retains param 0",
+        "  shared_sync: raw: retains param 0",
+        "  overwrite_sync: raw: retains param 0",
+    ]
+    var missing = 0
+    for want in wanted:
+        var found = false
+        for line in report.split("\n"):
+            if line.starts_with(want): found = true
+        if not found:
+            missing = missing + 1
+            print("missing: " ++ want)
+    if missing > 0: print(report)
+    assert(missing == 0)
+    print("ok")
