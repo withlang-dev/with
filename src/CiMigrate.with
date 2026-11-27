@@ -85,6 +85,7 @@ type CiMigratePendingSharedExternVar {
 var g_migrate_shared_pending_extern_vars: List[CiMigratePendingSharedExternVar] = []
 var g_migrate_shared_usage_idents: str = ""
 var g_migrate_libc_symbols_used: str = ""
+var g_migrate_complex_symbols_used: str = ""
 // D29 (#750): discriminates migrate translation from in-place c_import. The
 // std.libc record dedup is only sound for migrate output, whose preamble
 // imports std.libc; a c_import expansion has no importer, so it keeps
@@ -294,6 +295,7 @@ fn ci_migrate_shared_note_output_uses(output: &str):
 
 fn ci_migrate_libc_reset:
     g_migrate_libc_symbols_used = ""
+    g_migrate_complex_symbols_used = ""
     return
 
 fn ci_migrate_note_libc_symbol(name: &str):
@@ -306,6 +308,17 @@ fn ci_migrate_note_libc_symbol(name: &str):
 
 fn ci_migrate_needs_libc -> bool:
     g_migrate_libc_symbols_used.len() > 0
+
+fn ci_migrate_note_complex_symbol(name: &str):
+    if name.len() == 0:
+        return
+    let key = "|" ++ name ++ "|"
+    if ci_find_str(g_migrate_complex_symbols_used, key) < 0:
+        g_migrate_complex_symbols_used = g_migrate_complex_symbols_used ++ key
+    return
+
+fn ci_migrate_needs_complex -> bool:
+    g_migrate_complex_symbols_used.len() > 0
 
 fn ci_migrate_reset_unsafe_extern_fns():
     g_migrate_unsafe_extern_fn_names = ""
@@ -350,6 +363,17 @@ fn ci_migrate_insert_libc_use(output: &str) -> str:
         output.slice(0, header_end) ++ "\nuse std.libc" ++ output.slice(header_end, output.len())
     else:
         "use std.libc\n\n" ++ output
+
+fn ci_migrate_insert_complex_use(output: &str) -> str:
+    if not ci_migrate_needs_complex() and ci_find_str(output, "Complex32") < 0 and ci_find_str(output, "Complex64") < 0:
+        return with_str_clone_ref(output)
+    if ci_find_str(output, "\nuse std.complex\n") >= 0 or ci_starts_with(output, "use std.complex\n"):
+        return with_str_clone_ref(output)
+    let header_end = ci_find_str(output, "\n\n")
+    if header_end >= 0:
+        output.slice(0, header_end) ++ "\nuse std.complex" ++ output.slice(header_end, output.len())
+    else:
+        "use std.complex\n\n" ++ output
 
 // D102 (§16.6): a migrated module names `Option`, `Some` and `None` for its
 // nullable function pointers; a corpus module has no prelude, so it imports
@@ -679,7 +703,7 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
             defs.push_str("\n")
         pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.with"
-    let rc = with_fs_write_file(defs_path, ci_migrate_insert_rt_use(ci_migrate_insert_collections_use(ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str()))))))
+    let rc = with_fs_write_file(defs_path, ci_migrate_insert_rt_use(ci_migrate_insert_complex_use(ci_migrate_insert_collections_use(ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str())))))))
     if rc != 0:
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
@@ -1530,6 +1554,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
 
     var output = output_parts.join("")
     output = ci_migrate_insert_libc_use(output)
+    output = ci_migrate_insert_complex_use(output)
     output = ci_migrate_insert_option_use(output)
     output = ci_migrate_insert_collections_use(output)
     output = ci_migrate_insert_atomic_support(output)

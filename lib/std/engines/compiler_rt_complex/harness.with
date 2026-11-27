@@ -1,0 +1,153 @@
+// Migrated from C
+use std.engines.compiler_rt_complex.defs
+use std.engines.compiler_rt_complex.divdc3
+use std.engines.compiler_rt_complex.divsc3
+use std.engines.compiler_rt_complex.mulsc3
+use std.engines.compiler_rt_complex.muldc3
+use std.libc
+
+fn make_ti(__param_h: i64, __param_l: i64) -> i128 {
+    var __local_r: twords
+
+    (__local_r.s.high = (((__param_h as u64) as i64)))
+
+    (__local_r.s.low = ((__param_l as u64)))
+
+    return (unsafe *(&raw const __local_r as *const twords)).all
+
+}
+
+fn make_tu(__param_h: u64, __param_l: u64) -> u128 {
+    var __local_r: utwords
+
+    (__local_r.s.high = __param_h)
+
+    (__local_r.s.low = __param_l)
+
+    return (unsafe *(&raw const __local_r as *const utwords)).all
+
+}
+
+extern fn __compilerrt_abort_impl(__param_file: *const c_char, __param_line: i32, __param_function: *const c_char) -> Never
+extern fn __paritysi2(__param_a: i32) -> i32
+extern fn __paritydi2(__param_a: i64) -> i32
+extern fn __divdi3(__param_a: i64, __param_b: i64) -> i64
+extern fn __divsi3(__param_a: i32, __param_b: i32) -> i32
+extern fn __udivsi3(__param_n: u32, __param_d: u32) -> u32
+extern fn __udivmodsi4(__param_a: u32, __param_b: u32, __param_rem: *mut u32) -> u32
+extern fn __udivmoddi4(__param_a: u64, __param_b: u64, __param_rem: *mut u64) -> u64
+extern fn __clzti2(__param_a: i128) -> i32
+extern fn __udivmodti4(__param_a: u128, __param_b: u128, __param_rem: *mut u128) -> u128
+pub fn main() -> i32 {
+    var __local_mf: Fcomplex = __mulsc3((3.0 as f32), (4.0 as f32), (1.0 as f32), (2.0 as f32))
+
+    var __ci_expr_logic_0: i32
+
+    if ((unsafe *(&raw const __local_mf as *const Fcomplex)).real != -5.0) {
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_0 = (if (unsafe *(&raw const __local_mf as *const Fcomplex)).imaginary != 10.0: 1 else: 0))
+    }
+
+    if __ci_expr_logic_0 {
+        return 1
+    }
+
+
+    var __local_md: Dcomplex = __muldc3((3.0 as f64), (4.0 as f64), (1.0 as f64), (2.0 as f64))
+
+    var __ci_expr_logic_1: i32
+
+    if ((unsafe *(&raw const __local_md as *const Dcomplex)).real != -5.0) {
+        (__ci_expr_logic_1 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_1 = (if (unsafe *(&raw const __local_md as *const Dcomplex)).imaginary != 10.0: 1 else: 0))
+    }
+
+    if __ci_expr_logic_1 {
+        return 2
+    }
+
+
+    var __local_df: Fcomplex = __divsc3((-5.0 as f32), (10.0 as f32), (1.0 as f32), (2.0 as f32))
+
+    var __ci_expr_logic_2: i32
+
+    if ((unsafe *(&raw const __local_df as *const Fcomplex)).real != 3.0) {
+        (__ci_expr_logic_2 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_2 = (if (unsafe *(&raw const __local_df as *const Fcomplex)).imaginary != 4.0: 1 else: 0))
+    }
+
+    if __ci_expr_logic_2 {
+        return 3
+    }
+
+
+    var __local_dd: Dcomplex = __divdc3((-5.0 as f64), (10.0 as f64), (1.0 as f64), (2.0 as f64))
+
+    var __ci_expr_logic_3: i32
+
+    if ((unsafe *(&raw const __local_dd as *const Dcomplex)).real != 3.0) {
+        (__ci_expr_logic_3 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_3 = (if (unsafe *(&raw const __local_dd as *const Dcomplex)).imaginary != 4.0: 1 else: 0))
+    }
+
+    if __ci_expr_logic_3 {
+        return 4
+    }
+
+
+    var __local_inf: f64 = (((1.0 / 0.0) as f64))
+
+    var __local_mi: Dcomplex = __muldc3(__local_inf, (0.0 as f64), (1.0 as f64), (1.0 as f64))
+
+    var __ci_expr_logic_4: i32
+
+    if (not (if (sizeof[f64]() as usize) == 4: isinf(((unsafe *(&raw const __local_mi as *const Dcomplex)).real as f32)) else: ((if (sizeof[f64]() as usize) == 8: isinf((unsafe *(&raw const __local_mi as *const Dcomplex)).real) else: isinf((unsafe *(&raw const __local_mi as *const Dcomplex)).real)) as i32))) {
+        (__ci_expr_logic_4 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_4 = (if not (if (sizeof[f64]() as usize) == 4: isinf(((unsafe *(&raw const __local_mi as *const Dcomplex)).imaginary as f32)) else: ((if (sizeof[f64]() as usize) == 8: isinf((unsafe *(&raw const __local_mi as *const Dcomplex)).imaginary) else: isinf((unsafe *(&raw const __local_mi as *const Dcomplex)).imaginary)) as i32)): 1 else: 0))
+    }
+
+    if __ci_expr_logic_4 {
+        return 5
+    }
+
+
+    var __local_di: Dcomplex = __divdc3((1.0 as f64), (1.0 as f64), (0.0 as f64), (0.0 as f64))
+
+    var __ci_expr_logic_5: i32
+
+    if (not (if (sizeof[f64]() as usize) == 4: isinf(((unsafe *(&raw const __local_di as *const Dcomplex)).real as f32)) else: ((if (sizeof[f64]() as usize) == 8: isinf((unsafe *(&raw const __local_di as *const Dcomplex)).real) else: isinf((unsafe *(&raw const __local_di as *const Dcomplex)).real)) as i32))) {
+        (__ci_expr_logic_5 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_5 = (if not (if (sizeof[f64]() as usize) == 4: isinf(((unsafe *(&raw const __local_di as *const Dcomplex)).imaginary as f32)) else: ((if (sizeof[f64]() as usize) == 8: isinf((unsafe *(&raw const __local_di as *const Dcomplex)).imaginary) else: isinf((unsafe *(&raw const __local_di as *const Dcomplex)).imaginary)) as i32)): 1 else: 0))
+    }
+
+    if __ci_expr_logic_5 {
+        return 6
+    }
+
+
+    var __local_big: Dcomplex = __divdc3((1e300 as f64), (1e300 as f64), (1e300 as f64), (1e300 as f64))
+
+    var __ci_expr_logic_6: i32
+
+    if ((unsafe *(&raw const __local_big as *const Dcomplex)).real != 1.0) {
+        (__ci_expr_logic_6 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_6 = (if (unsafe *(&raw const __local_big as *const Dcomplex)).imaginary != 0.0: 1 else: 0))
+    }
+
+    if __ci_expr_logic_6 {
+        return 7
+    }
+
+
+    printf(c"compiler_rt_complex ok\n".ptr)
+
+    return 0
+
+}

@@ -403,6 +403,7 @@ impl Zcu:
         let ordered_paths = frontend_new_list_str()
         let ordered_file_ids: List[i32] = []
         let ordered_ci: List[i32] = []
+        let complex_importers = frontend_new_list_str()
         let base_count = out.decl_count()
         var has_c_import = 0
         var c_import_count = 0
@@ -621,6 +622,12 @@ impl Zcu:
             var di = before
             while di < after:
                 let dnode = out.get_decl(di)
+                if out.kind(dnode) == NodeKind.NK_USE_DECL:
+                    let upname = self.use_path_name_frontend(out, out.get_data0(dnode), out.get_data1(dnode))
+                    if upname == "std/complex" and not complex_importers.contains(ci_owner_path):
+                        complex_importers.push(frontend_owned_text(ci_owner_path))
+                    di = di + 1
+                    continue
                 var include = true
                 if only_count > 0:
                     let dname = self.c_import_decl_bound_name_frontend(out, dnode)
@@ -680,6 +687,125 @@ impl Zcu:
         self.decl_source_file_ids = kept_file_ids
         self.decl_is_c_import = kept_ci
         frontend_cimport_unlock()
+        if complex_importers.len() > 0:
+            out = self.import_std_complex_for_c_imports_frontend(out, complex_importers)
+        out
+
+    mut fn find_or_add_resolved_module_frontend(path: &str) -> i32:
+        for mod in self.last_resolved.modules:
+            if mod.path == path:
+                return mod.module_id
+        let mid: i32 = self.last_resolved.modules.len()
+        let import_start: i32 = self.last_resolved.imports.len()
+        self.last_resolved.modules.push(ResolvedModule {
+            module_id: mid,
+            file_id: 0,
+            path: frontend_owned_text(path),
+            import_start: import_start,
+            import_count: 0,
+            decl_count: 0,
+        })
+        mid
+
+    mut fn add_resolved_import_edge_frontend(from_mid: i32, to_mid: i32, path_text: &str):
+        let mod_count: i32 = self.last_resolved.modules.len()
+        if from_mid < 0 or from_mid >= mod_count:
+            return
+        let existing_start = self.last_resolved.modules[from_mid].import_start
+        let existing_count = self.last_resolved.modules[from_mid].import_count
+        for ii in 0..existing_count:
+            let imp = self.last_resolved.imports[existing_start + ii]
+            if imp.target_module == to_mid and imp.selected.len() == 0:
+                return
+        let new_start: i32 = self.last_resolved.imports.len()
+        for ii in 0..existing_count:
+            let copy_imp = ResolvedImport {
+                module_id: self.last_resolved.imports[existing_start + ii].module_id,
+                index_in_module: self.last_resolved.imports[existing_start + ii].index_in_module,
+                kind: self.last_resolved.imports[existing_start + ii].kind,
+                path_text: frontend_owned_text(self.last_resolved.imports[existing_start + ii].path_text),
+                selected: frontend_owned_text(self.last_resolved.imports[existing_start + ii].selected),
+                namespace: frontend_owned_text(self.last_resolved.imports[existing_start + ii].namespace),
+                module_text: frontend_owned_text(self.last_resolved.imports[existing_start + ii].module_text),
+                target_module: self.last_resolved.imports[existing_start + ii].target_module,
+                span_start: self.last_resolved.imports[existing_start + ii].span_start,
+                span_end: self.last_resolved.imports[existing_start + ii].span_end,
+            }
+            self.last_resolved.imports.push(copy_imp)
+        let dotted = path_text.replace("/", ".")
+        let segs = dotted.split(".")
+        let ns = if segs.len() > 0: segs[segs.len() - 1] else: ""
+        self.last_resolved.imports.push(ResolvedImport {
+            module_id: from_mid,
+            index_in_module: existing_count,
+            kind: 0,
+            path_text: frontend_owned_text(dotted),
+            selected: "",
+            namespace: frontend_owned_text(ns),
+            module_text: frontend_owned_text(dotted),
+            target_module: to_mid,
+            span_start: 0,
+            span_end: 0,
+        })
+        self.last_resolved.modules[from_mid].import_start = new_start
+        self.last_resolved.modules[from_mid].import_count = existing_count + 1
+
+    // #2817: a c_import header that uses `_Complex` imports std.complex on demand
+    // so Complex32/Complex64 are the single std.complex types (one type per meaning).
+    mut fn import_std_complex_for_c_imports_frontend(pool: AstPool, importers: &List[str]) -> AstPool:
+        var out = pool
+        let complex_fpath = self.resolve_module_path_frontend("std/complex", "")
+        if complex_fpath.len() == 0:
+            return out
+        let complex_mid = self.find_or_add_resolved_module_frontend(complex_fpath)
+        if not self.has_imported_path(complex_fpath):
+            self.add_imported_path(complex_fpath)
+            let pre_decls = out.decl_count()
+            let existing_fns: HashMap[i32, i32] = [:]
+            for ei in 0..pre_decls:
+                let edecl = out.get_decl(ei)
+                let ek = out.kind(edecl)
+                if ek == NodeKind.NK_FN_DECL or ek == NodeKind.NK_EXTERN_FN:
+                    existing_fns.insert(out.get_data0(edecl), 1)
+            out = self.parse_imported_file_frontend(complex_fpath, out)
+            var ui = pre_decls
+            while ui < out.decl_count():
+                let udecl = out.get_decl(ui)
+                if out.kind(udecl) == NodeKind.NK_USE_DECL:
+                    let ups = out.get_data0(udecl)
+                    let upc = out.get_data1(udecl)
+                    if upc > 0 and not self.use_decl_is_local_type_selector_frontend(out, udecl):
+                        let upname = self.use_path_name_frontend(out, ups, upc)
+                        let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui))
+                        if upfpath.len() > 0:
+                            let from_mid = self.find_or_add_resolved_module_frontend(self.decl_source_path_frontend(ui))
+                            let to_mid = self.find_or_add_resolved_module_frontend(upfpath)
+                            self.add_resolved_import_edge_frontend(from_mid, to_mid, upname)
+                            if not self.has_imported_path(upfpath):
+                                self.add_imported_path(upfpath)
+                                out = self.parse_imported_file_frontend(upfpath, out)
+                ui = ui + 1
+            out = self.strip_use_decls_frontend(out)
+            if self.pending_iface_paths.len() > 0:
+                let pending_paths = move self.pending_iface_paths
+                let pending_texts = move self.pending_iface_texts
+                self.pending_iface_paths = frontend_new_list_str()
+                self.pending_iface_texts = frontend_new_list_str()
+                out = self.merge_interface_sections_on_demand(out, pending_paths, pending_texts, 0)
+            for ni in pre_decls..out.decl_count():
+                let ndecl = out.get_decl(ni)
+                let nk = out.kind(ndecl)
+                if nk == NodeKind.NK_FN_DECL or nk == NodeKind.NK_EXTERN_FN:
+                    let nsym = out.get_data0(ndecl)
+                    if existing_fns.contains(nsym):
+                        frontend_displace_fn_decl(out, self.pool, ndecl, self.decl_source_path_frontend(ni))
+                    else:
+                        existing_fns.insert(nsym, 1)
+            while self.decl_is_c_import.len() < out.decl_count():
+                self.decl_is_c_import.push(0)
+        for imp_path in importers:
+            let imp_mid = self.find_or_add_resolved_module_frontend(imp_path)
+            self.add_resolved_import_edge_frontend(imp_mid, complex_mid, "std.complex")
         out
 
     // The toolchain libc facade (compiler/LibcFacade.with; ruling §5, spec
