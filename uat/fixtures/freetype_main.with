@@ -1,0 +1,38 @@
+// Release UAT: FreeType through its registry facade (#3155). Zero `unsafe`,
+// zero project facade: Library.init, version, new_face on a self-contained BDF
+// font, select_size, char_index, load_char with FT_LOAD_RENDER, and strict
+// Face/Library teardown order.
+use contracts.freetype
+use c_import("freetype/freetype.h")
+use std.fs
+
+fn main:
+    let bdf_path = "/tmp/with-freetype-uat.bdf"
+    let bdf = "STARTFONT 2.1\nFONT -With-UAT-Medium-R-Normal--8-80-75-75-C-80-ISO8859-1\nSIZE 8 75 75\nFONTBOUNDINGBOX 8 8 0 0\nSTARTPROPERTIES 2\nFONT_ASCENT 8\nFONT_DESCENT 0\nENDPROPERTIES\nCHARS 1\nSTARTCHAR A\nENCODING 65\nSWIDTH 500 0\nDWIDTH 8 0\nBBX 8 8 0 0\nBITMAP\n18\n24\n42\n7E\n42\n42\n42\n00\nENDCHAR\nENDFONT\n"
+    if write_file(bdf_path, bdf) != 0:
+        print("freetype UAT could not write font file")
+        return 1
+
+    let Ok(lib) = Library.init() else:
+        print("freetype Library.init failed")
+        return 1
+    let (major, minor, patch) = lib.version()
+    if major < 2:
+        print(f"freetype unexpected version {major}.{minor}.{patch}")
+        return 1
+
+    let Ok(face) = lib.new_face(bdf_path, 0) else:
+        print("freetype new_face failed")
+        return 1
+    if face.select_size(0).is_err():
+        print("freetype select_size failed")
+        return 1
+    let gidx = face.char_index(65)
+    if gidx == 0:
+        print("freetype char_index('A') returned 0")
+        return 1
+    if face.load_char(65, FT_LOAD_RENDER as i32).is_err():
+        print("freetype load_char failed")
+        return 1
+    let _ = FT_Error_String(0)
+    print(f"freetype UAT passed ({major}.{minor}.{patch}, glyph={gidx})")
