@@ -25595,14 +25595,31 @@ impl Sema:
         // Column 0's heads, one per or-alternative, and the row each came from.
         let heads: List[i32] = []
         let origins: List[i32] = []
+        var any_non_wild = false
         for ri in 0..m.count:
             let alts = self.exh_alternatives(m.cells[ri * width], ty)
             for alt in alts:
+                if alt != 0: any_non_wild = true
                 heads.push(alt)
                 origins.push(ri)
         let rest_tys: List[i32] = []
         for ci in 1..width:
             rest_tys.push(tys[ci])
+
+        // If every row has a wildcard/binding in column 0, do not split
+        // column 0 into constructors (which would expand a struct's fields and
+        // branch 2^N times over its List/slice fields). Check the remaining
+        // columns directly; if they are covered, this matrix is covered even
+        // when `ty` is uninhabited.
+        if not any_non_wild:
+            let dflt = self.exh_default_rows(m, heads, origins, width)
+            let sub = self.exh_missing(dflt, rest_tys)
+            if not sub.missing:
+                return sub
+            if cls != SemaExhClass.Enum and cls != SemaExhClass.Struct and cls != SemaExhClass.Tuple:
+                let w = ["_"]
+                for cw in sub.witness: w.push(cw)
+                return SemaPatMissing { missing: true, witness: w }
 
         if cls == SemaExhClass.Int and not self.exh_int_domain_open(ty):
             return self.exh_missing_int(m, heads, origins, rest_tys, ty)
