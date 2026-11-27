@@ -2486,7 +2486,25 @@ fn ci_facade_import_spelling(header: &str, import_dirs: &List[str], declares: &s
             if same_name_count == 0 or same_name != rel: same_name_count = same_name_count + 1
             same_name = rel
             same_path = path.to_owned()
-    if same_name_count == 1 and (declares.len() == 0 or with_fs_read_file(same_path).contains(declares)): same_name else: ""
+    if same_name_count == 1 and (declares.len() == 0 or with_fs_read_file(same_path).contains(declares)): return same_name
+    // Amalgamation units (`sqlite3.c`) embed their public prototypes inline
+    // instead of `#include "sqlite3.h"` while installing `<stem>.h`. Match a
+    // unique installed `<stem>.h` that mentions `declares`; the caller verifies
+    // the declaration by importing the header with clang.
+    if same_name_count == 0 and declares.len() > 0 and base.ends_with(".c"):
+        let stem_h = base.slice(0, base.len() - 2) ++ ".h"
+        var h_rel = ""
+        var h_path = ""
+        var h_count = 0
+        for dir in import_dirs:
+            for path in with_fs_list_files(dir).split("\n"):
+                if path.len() <= dir.len() + 1 or ci_migrate_path_basename(path) != stem_h or not path.starts_with(dir): continue
+                let rel = path.slice(dir.len() + 1, path.len())
+                if h_count == 0 or h_rel != rel: h_count = h_count + 1
+                h_rel = rel
+                h_path = path.to_owned()
+        if h_count == 1 and with_fs_read_file(h_path).contains(declares): return h_rel
+    ""
 
 // D121 step 5: the facade and the report of a fetched package, written by
 // `with get` (compiler.ConanClient). The corpus is the units the package's
@@ -2531,8 +2549,11 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     for si in 0..project.symbols.len():
         if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or project.symbols[si].header_declared == 0: continue
         // A prototype written in a source file (qoaplay.c's forward
-        // declarations) is in no header at all.
-        let rel = if project.symbols[si].header_file.len() == 0: "" else: ci_facade_import_spelling(project.symbols[si].header_file, import_dirs, project.symbols[si].name)
+        // declarations, or an amalgamation like sqlite3.c that embeds its
+        // public header inline) leaves `header_file` empty; fall back to the
+        // owning `.c` unit so `<stem>.h` in `import_dirs` is checked via clang.
+        let src_header = if project.symbols[si].header_file.len() > 0: with_str_clone_ref(project.symbols[si].header_file) else: project.owner_module_path(si as i32)
+        let rel = if src_header.len() == 0: "" else: ci_facade_import_spelling(src_header, import_dirs, project.symbols[si].name)
         if rel.len() > 0:
             // The facade imports each header by itself, so a header that
             // does not compile alone (raylib's rcamera.h uses raylib.h's
@@ -2559,6 +2580,7 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
                 dependent_count = dependent_count + 1
                 continue
             if not alone: project.symbols[si].header_file = through
+            else if project.symbols[si].header_file.len() == 0: project.symbols[si].header_file = rel
             // A prototype behind a build-only `#ifdef` (or omitted by c_import
             // under the package's import defines) is not declared when a
             // program imports the header, so the contract cannot name it.

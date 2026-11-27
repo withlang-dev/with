@@ -1,0 +1,59 @@
+//! expect-stdout: ok
+// Amalgamation C libraries (sqlite3.c) embed their public prototypes inline in
+// the `.c` unit instead of `#include "sqlite3.h"`, while installing the public
+// header (`include/sqlite3.h`). Functions declared by the installed `<stem>.h`
+// header are presented and the facade imports that header; forward declarations
+// present only in the `.c` file stay excluded.
+use compiler.ConanClient
+use std.fs
+use std.process
+
+fn main:
+    let root = "out/tmp/conan_facade_amalgamation_header_test"
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    let header = "typedef struct Amalg Amalg;\nAmalg *amalg_new(void);\nint amalg_read(Amalg *a);\nvoid amalg_free(Amalg *a);\n"
+    assert(write_file(dep ++ "/include/amalg.h", header) == 0)
+    var unit = "#include <stdlib.h>\n"
+    unit = unit ++ "typedef struct Amalg Amalg;\n"
+    unit = unit ++ "Amalg *amalg_new(void);\n"
+    unit = unit ++ "int amalg_read(Amalg *a);\n"
+    unit = unit ++ "void amalg_free(Amalg *a);\n"
+    unit = unit ++ "int amalg_internal_only(Amalg *a);\n"
+    unit = unit ++ "struct Amalg { int v; };\n"
+    unit = unit ++ "Amalg *amalg_new(void) { Amalg *a = (Amalg *)malloc(sizeof(Amalg)); if (a) a->v = 7; return a; }\n"
+    unit = unit ++ "int amalg_read(Amalg *a) { return a ? a->v : 0; }\n"
+    unit = unit ++ "void amalg_free(Amalg *a) { free(a); }\n"
+    unit = unit ++ "int amalg_internal_only(Amalg *a) { return a ? a->v + 1 : 0; }\n"
+    assert(write_file(src ++ "/amalg.c", unit) == 0)
+    let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -c amalg.c\",\n  \"file\": \"amalg.c\"\n}\n]\n"
+    assert(write_file(build ++ "/compile_commands.json", commands) == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"amalg\"]}\n") == 0)
+    assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
+    conan_write_facade("amalg", "1.0", dep, src, build)
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    let contract = read_file(dep ++ "/contract.with") ?? ""
+    let wanted = [
+        "  amalg_new: owned producer of AmalgHandle",
+        "  amalg_read: lend",
+        "  amalg_free: destroyer, param 0",
+    ]
+    var missing = 0
+    for want in wanted:
+        var found = false
+        for line in report.split("\n"):
+            if line.starts_with(want): found = true
+        if not found:
+            missing += 1
+            print("missing: " ++ want)
+    if missing > 0 or report.contains("  amalg_internal_only:") or not contract.contains("use c_import(\"amalg.h\""):
+        print(report)
+        print(contract)
+    assert(missing == 0)
+    assert(not report.contains("  amalg_internal_only:"))
+    assert(contract.contains("use c_import(\"amalg.h\""))
+    print("ok")
