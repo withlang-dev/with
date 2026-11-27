@@ -1,0 +1,11 @@
+scenario: c.libevent runs event_base timers, evhttp server, evbuffer, and bufferevent without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.libevent
+write src/main.with from libevent_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libevent ok

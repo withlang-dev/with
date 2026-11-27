@@ -1,0 +1,93 @@
+// Zero-unsafe UAT for c.libevent (#3161): EventBase + EventConfig, EvBuffer,
+// one-shot timer via event_base_once, EvHttp server answering a real loopback
+// HTTP request, and BufferEvent on a socket.
+use contracts.libevent
+use c_import("event2/event.h")
+use c_import("event2/bufferevent.h")
+use std.net
+use std.sync
+use std.thread
+
+var g_http_port: AtomicI64 = atomic_new(0)
+var g_http_ok: AtomicI64 = atomic_new(0)
+var g_timer_hits: AtomicI64 = atomic_new(0)
+var g_http_hits: AtomicI64 = atomic_new(0)
+
+fn on_timer(fd: i32, what: i16, tag: &i64):
+    let _ = fd
+    let _ = what
+    assert(*tag == 101)
+    let _ = g_timer_hits.fetch_add(1, Order.SeqCst)
+
+fn on_http_req(req: EvHttpRequest, tag: &i64):
+    assert(*tag == 202)
+    let uri = req.get_uri().unwrap().to_str_lossy()
+    let _ = g_http_hits.fetch_add(1, Order.SeqCst)
+    let out = EvBuffer.new().unwrap()
+    let body = "pong:" ++ uri
+    assert(out.add(body as []u8) == 0)
+    req.send_reply(200, "OK", out)
+
+fn client_worker() -> i32:
+    let port = g_http_port.load(Order.SeqCst) as i32
+    let fd = tcp_connect_timeout("127.0.0.1", port, 2000)
+    if fd < 0: return 1
+    set_timeout(fd, 2000)
+    let _ = send(fd, "GET /ping HTTP/1.0\r\nHost: localhost\r\n\r\n")
+    let resp = recv(fd, 4096)
+    socket_close(fd)
+    if resp.contains("200 OK") and resp.contains("pong:/ping"):
+        g_http_ok.store(1, Order.SeqCst)
+        return 0
+    1
+
+fn main:
+    // 1. EventConfig + EventBase.
+    let cfg = EventConfig.new().unwrap()
+    assert(cfg.set_num_cpus_hint(1) == 0)
+    var base = cfg.base_new_with_config().unwrap()
+    let method = base.get_method().unwrap().to_str_lossy()
+    assert(method.len() > 0)
+
+    // 2. EvBuffer add/length/copyout/remove.
+    let buf = EvBuffer.new().unwrap()
+    let msg = "hello libevent"
+    assert(buf.add(msg as []u8) == 0)
+    assert(buf.get_length() == msg.len() as u64)
+    var peek: [u8; 5] = [0 as u8; 5]
+    assert(buf.copyout(peek) == 5)
+    assert(peek[0] == 'h' as u8 and peek[4] == 'o' as u8)
+    var drained: [u8; 14] = [0 as u8; 14]
+    assert(buf.remove(drained) == 14)
+    assert(buf.get_length() == 0)
+
+    // 3. BufferEvent on a socket.
+    let bev = base.bufferevent_socket_new(-1, BEV_OPT_CLOSE_ON_FREE as i32).unwrap()
+    assert(bev.enable(EV_READ as i16) == 0)
+    assert(bev.write("abc" as []u8) == 0)
+    assert(bev.get_output().unwrap().get_length() == 3)
+    assert(bev.disable(EV_READ as i16) == 0)
+
+    // 4. One-shot timer via event_base_once.
+    let timer_tag: i64 = 101
+    let tv_short = timeval { tv_sec: 0, tv_usec: 10000 }
+    assert(base.once(-1, EV_TIMEOUT as i16, on_timer, timer_tag, &tv_short) == 0)
+
+    // 5. EvHttp server answering a real HTTP request on an ephemeral loopback port.
+    var http = base.evhttp_new().unwrap()
+    let bound = http.bind_socket_with_handle("127.0.0.1", 0).unwrap()
+    let port = sock_port(bound.get_fd())
+    assert(port > 0)
+    g_http_port.store(port as i64, Order.SeqCst)
+    let http_tag: i64 = 202
+    http.set_gencb(on_http_req, http_tag)
+
+    let client = spawn_os(client_worker)
+    let tv_exit = timeval { tv_sec: 0, tv_usec: 250000 }
+    assert(base.loopexit(Some(&tv_exit)) == 0)
+    assert(base.dispatch() == 0)
+    assert(join(client) == 0)
+    assert(g_http_ok.load(Order.SeqCst) == 1)
+    assert(g_http_hits.load(Order.SeqCst) == 1)
+    assert(g_timer_hits.load(Order.SeqCst) == 1)
+    print("libevent ok")
