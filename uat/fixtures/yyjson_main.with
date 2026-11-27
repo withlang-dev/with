@@ -1,0 +1,74 @@
+// Zero-unsafe UAT for c.yyjson (#3150): parse JSON with yyjson_read,
+// walk objects and arrays with iterators, read typed values, build a
+// mutable document and serialize it with yyjson_mut_write.
+use contracts.yyjson
+
+fn main:
+    let src = "{\"name\":\"with\",\"count\":3,\"pi\":3.5,\"ok\":true,\"items\":[10,20,30]}"
+    let doc = Doc.read(src, 0).unwrap()
+    let root = doc.get_root().unwrap()
+    assert(root.is_obj())
+    assert(root.obj_size() == 5)
+
+    // Walk object with yyjson_obj_iter and read typed values.
+    var oit = root.obj_iter_with()
+    var keys_seen = 0
+    var name_val = ""
+    var count_val: i64 = 0
+    var pi_val: f64 = 0.0
+    var ok_val = false
+    var arr_sum: i64 = 0
+    while oit.has_next():
+        let key = oit.next().unwrap()
+        let kname = key.get_str().unwrap().to_str_lossy()
+        let val = key.obj_iter_get_val().unwrap()
+        keys_seen += 1
+        if kname == "name":
+            assert(val.is_str())
+            name_val = val.get_str().unwrap().to_str_lossy()
+        else if kname == "count":
+            assert(val.is_int())
+            count_val = val.get_sint()
+        else if kname == "pi":
+            assert(val.is_real())
+            pi_val = val.get_real()
+        else if kname == "ok":
+            assert(val.is_bool())
+            ok_val = val.get_bool()
+        else if kname == "items":
+            assert(val.is_arr())
+            assert(val.arr_size() == 3)
+            var ait = val.arr_iter_with()
+            while ait.has_next():
+                let elem = ait.next().unwrap()
+                arr_sum += elem.get_sint()
+    assert(keys_seen == 5)
+    assert(name_val == "with")
+    assert(count_val == 3)
+    assert(pi_val > 3.4 and pi_val < 3.6)
+    assert(ok_val)
+    assert(arr_sum == 60)
+
+    // Build a mutable document and serialize it with yyjson_mut_write.
+    let mdoc = MutDoc.new().unwrap()
+    let mroot = mdoc.obj().unwrap()
+    mdoc.set_root(mroot)
+    let k_lang = mdoc.strcpy("lang").unwrap()
+    let v_lang = mdoc.strcpy("with").unwrap()
+    assert(mroot.obj_add(k_lang, v_lang))
+    let k_nums = mdoc.strcpy("nums").unwrap()
+    let marr = mdoc.arr().unwrap()
+    assert(mdoc.arr_add_int(marr, 1))
+    assert(mdoc.arr_add_int(marr, 2))
+    assert(mdoc.arr_add_int(marr, 3))
+    assert(mroot.obj_add(k_nums, marr))
+    let out = mdoc.write(0).unwrap()
+    assert(out.contains("\"lang\":\"with\""))
+    assert(out.contains("\"nums\":[1,2,3]"))
+
+    // Round-trip the emitted JSON back through Doc.read.
+    let rt = Doc.read(out, 0).unwrap()
+    let rt_root = rt.get_root().unwrap()
+    let rt_lang = rt_root.obj_get("lang").unwrap()
+    assert(rt_lang.equals_str("with"))
+    print("yyjson ok")
