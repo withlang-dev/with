@@ -22948,6 +22948,7 @@ fn ci_is_prelude_surface_name(name: &str) -> bool:
     if name == "print_i32" or name == "print_i64" or name == "print_bool": return true
     if name == "assert" or name == "require" or name == "check": return true
     if name == "assert_eq" or name == "assert_ne" or name == "assert_matches_failed": return true
+    if name == "panic" or name == "unreachable" or name == "todo": return true
     if name == "drop" or name == "int_to_string": return true
     false
 

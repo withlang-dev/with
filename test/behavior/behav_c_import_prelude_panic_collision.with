@@ -1,0 +1,16 @@
+//! expect-stdout: ok 7
+// A C header that declares a function named `panic` (macOS <mach/mach.h>,
+// pulled in by libuv's uv.h) must not shadow With's prelude `panic` in user
+// code or in std modules.
+use c_import("behav_c_import_prelude_panic_collision.h")
+use std.string
+
+fn check_nonzero(x: i32) -> i32:
+    if x == 0:
+        panic("unexpected zero")
+    x
+
+fn main:
+    let n = parse("7")
+    let v = check_nonzero(ci_prelude_panic_add(n - 3, 3))
+    print(f"ok {v}")

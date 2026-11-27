@@ -1009,7 +1009,11 @@ fn conan_pc_link(dep_dir: &str, requirements: &List[str], pc_texts: &List[str]):
                     link.link_args.push(token)
             else if token == "-framework": framework_next = true
             else if token.starts_with("-l") and token.len() > 2:
-                let lib = token.slice(2, token.len())
+                var lib = token.slice(2, token.len())
+                // GNU ld `-l:libfoo.a` is not accepted by ld64.lld (macOS) or
+                // lld-link (Windows); normalize to `foo` so every linker finds it.
+                if lib.starts_with(":lib") and lib.ends_with(".a") and lib.len() > 6:
+                    lib = lib.slice(4, lib.len() - 2)
                 if not conan_list_contains(link.libs, lib): link.libs.push(lib.to_owned())
             else if token.starts_with("-L"): continue
             else if token == "-pthread":

@@ -3146,7 +3146,7 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
     // type takes a `str`, copied to a NUL-terminated temporary for the
     // call; an interior NUL is refused as §16.3c refuses it for `const
     // char *`, since C would read it as the end.
-    if facade_render_param_is_text(pool, intern, decl, pi):
+    if facade_render_param_is_text(pool, intern, decl, pi) and not facade_render_param_is_nullable(pool, intern, decl, pi):
         let fname = intern.resolve(pool.get_data0(decl as NodeId))
         let local = facade_render_fresh(pname ++ "_text", taken)
         b.prologue = "let " ++ local ++ " = " ++ pname ++ ".to_cstring().expect(\"" ++ fname ++ ": the text has an interior NUL byte, which C would read as its end (§16.3c)\")\n"
@@ -3155,10 +3155,10 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         return b
     var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype
     var arg = pname
-    // D121 step 6 (§16.2b.8): `nullable param N` on a C string presents
-    // `Option[&str]`; the text crosses as a NUL-terminated temporary that
-    // outlives the call, None as NULL (libxml2's optional encoding).
-    if shown == "&str" and facade_render_param_is_nullable(pool, intern, decl, pi):
+    // D121 step 6 (§16.2b.8): `nullable param N` on a C string (or `text
+    // param N`) presents `Option[&str]`; the text crosses as a NUL-terminated
+    // temporary that outlives the call, None as NULL (libxml2's optional encoding).
+    if (shown == "&str" or facade_render_param_is_text(pool, intern, decl, pi)) and facade_render_param_is_nullable(pool, intern, decl, pi):
         let fname = intern.resolve(pool.get_data0(decl as NodeId))
         let local = facade_render_fresh(pname ++ "_text", taken)
         let ptr = facade_render_fresh(pname ++ "_ptr", taken)

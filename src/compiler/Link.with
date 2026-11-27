@@ -214,6 +214,9 @@ fn link_stage_lib_args(lib: &str, is_darwin: i32) -> List[str]:
         out.push("-framework")
         out.push(fw)
         return out
+    if is_darwin != 0 and lib.starts_with(":lib") and lib.ends_with(".a") and lib.len() > 6:
+        out.push("-l" ++ lib.slice(4, lib.len() - 2))
+        return out
     out.push("-l" ++ lib)
     out
 

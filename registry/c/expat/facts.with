@@ -1,0 +1,18 @@
+// expat 2.11.0, the version `with get c.expat` pins. Every citation is a line
+// of the package's installed header, include/expat.h.
+//
+// XML_Parser (`struct XML_ParserStruct *`) is allocated by XML_ParserCreate or
+// XML_ParserCreateNS and freed by XML_ParserFree. The source proof does not
+// close XML_ParserCreate on its own because parserCreate stores a back-pointer
+// to the parser inside the DTD owned by the same parser (#3124), so the pair
+// is stated here.
+c facade expat:
+    define XML_GE=1    // expat_config.h 2.11.0 line 105 (`#define XML_GE 1`) and expat.h 2.11.0 line 1125 (XML_DTD or XML_GE == 1): enables the billion-laughs and allocation-tracker APIs compiled into libexpat
+    resource Parser wraps *mut XML_ParserStruct
+        from XML_ParserCreate    // expat.h 2.11.0 lines 258 to 262: "Constructs a new parser; encoding is the encoding specified by the external protocol or NULL if there is none specified."
+        from XML_ParserCreateNS    // expat.h 2.11.0 lines 264 to 287: "Constructs a new parser and namespace processor."
+        drop XML_ParserFree    // expat.h 2.11.0 lines 1029 to 1031: "Frees memory used by the parser."
+    fn XML_ParserCreate
+        nullable param 0    // expat.h 2.11.0 lines 258 to 259: "encoding is the encoding specified by the external protocol or NULL if there is none specified."
+    fn XML_ParserCreateNS
+        nullable param 0    // expat.h 2.11.0 lines 264 to 287: `const XML_Char *encoding` follows XML_ParserCreate and accepts NULL
