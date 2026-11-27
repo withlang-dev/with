@@ -1,0 +1,60 @@
+// Release UAT: GLFW through its registry facade (#3158). Zero `unsafe`, zero
+// project facade: headless null platform, glfwInit, Window.create, key &
+// framebuffer-size & error callbacks, size/input queries, glfwPollEvents, and
+// clean Window -> glfwTerminate teardown order.
+use contracts.glfw
+use c_import("GLFW/glfw3.h")
+
+fn on_error(code: i32, desc: *const c_char):
+    let _ = code
+    let _ = desc
+
+fn on_key(win: *mut GLFWwindow, key: i32, scancode: i32, action: i32, mods: i32):
+    let _ = win
+    let _ = key
+    let _ = scancode
+    let _ = action
+    let _ = mods
+
+fn on_fb_size(win: *mut GLFWwindow, w: i32, h: i32):
+    let _ = win
+    let _ = w
+    let _ = h
+
+fn run_window() -> i32:
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API)
+    let Some(win) = Window.create(640, 480, "with glfw uat") else:
+        print("glfw Window.create failed")
+        return 1
+    let _ = win.glfwSetKeyCallback(on_key)
+    let _ = win.glfwSetFramebufferSizeCallback(on_fb_size)
+    let (w, h) = win.glfwGetWindowSize()
+    if w != 640 or h != 480:
+        print(f"glfw window size mismatch: {w}x{h}")
+        return 1
+    let (fbw, fbh) = win.glfwGetFramebufferSize()
+    if fbw <= 0 or fbh <= 0:
+        print(f"glfw framebuffer size invalid: {fbw}x{fbh}")
+        return 1
+    let _ = win.glfwGetKey(GLFW_KEY_SPACE)
+    glfwPollEvents()
+    win.glfwSetWindowShouldClose(1)
+    if win.glfwWindowShouldClose() != 1:
+        print("glfw WindowShouldClose flag did not stick")
+        return 1
+    0
+
+fn main:
+    let _ = glfwSetErrorCallback(on_error)
+    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_NULL)
+    if glfwInit() == 0:
+        print("glfwInit failed")
+        return 1
+    defer: glfwTerminate()
+    let (maj, min, rev) = glfwGetVersion()
+    if maj < 3:
+        print(f"glfw unexpected version {maj}.{min}.{rev}")
+        return 1
+    let rc = run_window()
+    if rc != 0: return rc
+    print(f"glfw UAT passed ({maj}.{min}.{rev})")

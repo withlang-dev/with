@@ -1,0 +1,11 @@
+scenario: c.glfw creates a window, registers callbacks, and polls events through its registry facade without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.glfw
+write src/main.with from glfw_main.with
+run: with run
+expect exit: 0
+expect stdout contains: glfw UAT passed
