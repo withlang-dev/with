@@ -393,7 +393,8 @@ impl PairsBody:
     mut fn move_operand(body: &MirBody, operand_id: i32, dest_place: i32, bb: i32, stmt: i32):
         if not pairs_operand_is_move(body, operand_id):
             return
-        let src = self.key_of(pairs_operand_place(body, operand_id))
+        let src_place = pairs_operand_place(body, operand_id)
+        let src = self.key_of(src_place)
         if src < 0:
             return
         if self.is_resource(src):
@@ -401,7 +402,16 @@ impl PairsBody:
                 self.push(pairs_step(FOREIGN_STEP_ESCAPE, src, -1, pairs_keep()), pairs_site(PairsSiteKind.Escape, bb, stmt, src, -1))
             let dest = self.key_of(dest_place)
             if dest >= 0:
-                self.push(pairs_step(FOREIGN_STEP_MOVE, dest, src, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
+                // Extracting a resource out of a non-resource container (such as
+                // `let Some(h) = opt` or `match res: Ok(h) => ...`) is the same
+                // birth as `Option.unwrap()` / `Result.unwrap()`: a container
+                // cannot hold a retaining resource (FOREIGN_STEP_ESCAPE), so the
+                // extracted resource starts with a compatible pair.
+                let from_container = src_place >= 0 and src_place < body.place_proj_counts.len() and body.place_proj_counts[src_place] != 0 and not self.is_resource(body.place_locals[src_place])
+                if from_container:
+                    self.push(pairs_step(FOREIGN_STEP_APPLY, dest, -1, pairs_block(FOREIGN_PAIR_CREATE, 0, -1, -1, false, false)), pairs_site(PairsSiteKind.Invoke, bb, stmt, dest, -1))
+                else:
+                    self.push(pairs_step(FOREIGN_STEP_MOVE, dest, src, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
         if self.is_origin(src):
             self.push(pairs_step(FOREIGN_STEP_EXPIRE, src, -1, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, stmt, src, -1))
 
@@ -526,7 +536,9 @@ impl PairsBody:
                 self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_retain_block(sema.facade_pair_ops[opi].slot, origin, guard, releases, invokes)), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
             else if action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA:
                 let origin = if action == FOREIGN_PAIR_USERDATA: self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param) else: -1
-                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_releasing(pairs_block(action, u_tid, origin, guard, true, invokes), releases, guard)), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
+                var cb_block = pairs_releasing(pairs_block(action, u_tid, origin, guard, true, invokes), releases, guard)
+                cb_block.slot = sema.facade_pair_ops[opi].slot
+                self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, cb_block), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
             else:
                 self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_releasing(pairs_block(action, 0, -1, -1, false, invokes), releases, guard)), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
             return
