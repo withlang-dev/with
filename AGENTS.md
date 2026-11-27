@@ -158,9 +158,17 @@ without cited Law numbers and *Test* answers is incomplete.
   the seed, the installed compiler and the releases are all broken, the
   compiler cannot be recovered.
 - **Tiers.** Per change: `with check`, `with build :dev`, the targeted
-  tests. Per layer: `src/main build :gate`. Per stack: one battery
-  (`with run tools/battery.with`) on its top commit. Before a seed cut or a
-  release: `:release-checks`.
+  tests / UAT scenario. Per layer: `src/main build :gate`. Per bundle or
+  stack: **one** battery (`with run tools/battery.with`) on its top commit.
+  **`:release-checks` is for seed cuts and releases only (D131)** — never
+  run it on ordinary PRs.
+- **Bundle related issues under one battery.** Do not run a full battery
+  for one small issue at a time when sibling issues can be fixed together
+  (for example, a batch of registry facades, related bug fixes, or a
+  multi-step campaign). Keep one clean commit per logical issue, verify
+  each locally at the iterate tier (`:dev` + targeted tests / `with uat
+  <name>`), and land the whole bundle in one PR or one `gh stack` blessed
+  by a single battery run on the top commit.
 - **Changes land by pull request**; dependent ones are a `gh stack`. A PR
   is a draft until its battery is green. CI is not a merge signal (D56).
 - **Other hosts (`eric-5090` Linux, `win10` Windows VM):** `eric-5090` is
