@@ -1,0 +1,114 @@
+//! expect-stdout: ok
+
+// #727: `with fix-ceremony` rewrites explicit `self` receiver parameters in
+// `impl`/`extend` blocks and non-read (`mut`/`move`) `trait` declarations to
+// the implicit keyword form (`fn` / `mut fn` / `move fn`), preserves the D7
+// trait-body read carve-out (`fn m(self: &Self)`), and reports top-level
+// dotted methods (`fn T.m(self: ...)`) without breaking them in place.
+use std.fs
+use std.process
+
+fn main:
+    let compiler = env("WITH_TEST_COMPILER")
+    assert(compiler.len() > 0)
+    let dir = f"out/tmp/fix-ceremony-self-727-{pid()}"
+    assert(mkdir_p(dir) == 0)
+
+    let program = dir ++ "/recv.with"
+    let source =
+        "pub trait Widget:\n" ++
+        "    fn label(self: &Self) -> str\n" ++
+        "    fn reset(mut self: Self)\n" ++
+        "    fn finish(move self: Self) -> i32\n" ++
+        "\n" ++
+        "pub type Counter {\n" ++
+        "    pub value: i32,\n" ++
+        "}\n" ++
+        "\n" ++
+        "impl Counter:\n" ++
+        "    pub fn get(self: &Self) -> i32: self.value\n" ++
+        "    pub fn plus(self: &Self, delta: i32) -> i32: self.value + delta\n" ++
+        "    pub fn bump(mut self: Self): self.value = self.value + 1\n" ++
+        "    pub fn add_mut(mut self: Self, delta: i32): self.value = self.value + delta\n" ++
+        "    pub fn into_val(move self: Self) -> i32: self.value\n" ++
+        "    pub fn into_sum(move self: Self, bias: i32) -> i32: self.value + bias\n" ++
+        "    pub fn pick[T](self: &Self, x: T) -> T: x\n" ++
+        "\n" ++
+        "impl Widget for Counter:\n" ++
+        "    fn label(self: &Self) -> str: \"c\"\n" ++
+        "    fn reset(mut self: Self): self.value = 0\n" ++
+        "    fn finish(move self: Self) -> i32: self.value\n" ++
+        "\n" ++
+        "pub fn Counter.legacy_peek(self: &Self) -> i32: self.value\n" ++
+        "\n" ++
+        "fn main:\n" ++
+        "    var c = Counter { value: 10 }\n" ++
+        "    c.bump()\n" ++
+        "    c.add_mut(4)\n" ++
+        "    let a = c.get()\n" ++
+        "    let b = c.plus(2)\n" ++
+        "    let p = c.pick(7)\n" ++
+        "    let l = c.label()\n" ++
+        "    let k = c.legacy_peek()\n" ++
+        "    c.reset()\n" ++
+        "    let c2 = Counter { value: 5 }\n" ++
+        "    let d = c2.into_val()\n" ++
+        "    let c3 = Counter { value: 6 }\n" ++
+        "    let e = c3.into_sum(3)\n" ++
+        "    let c4 = Counter { value: 8 }\n" ++
+        "    let f = c4.finish()\n" ++
+        "    print(f\"{a} {b} {p} {l} {k} {c.value} {d} {e} {f}\")\n"
+    assert(write_file(program, source) == 0)
+
+    // Baseline output before rewrite.
+    let before_run = run_to_files(&[compiler, "run", program], dir ++ "/before.out", dir ++ "/before.err", 600000)
+    assert(before_run.code == 0)
+    let expected = read_file(dir ++ "/before.out").unwrap()
+    assert(expected == "15 17 7 c 15 0 5 9 8\n")
+
+    // Report lists explicit-self rewrites AND the top-level dotted method note.
+    let report = run_to_files(&[compiler, "fix-ceremony", "--report", program], dir ++ "/report.out", dir ++ "/report.err", 600000)
+    assert(report.code == 0)
+    let report_text = read_file(dir ++ "/report.out").unwrap()
+    assert(report_text.contains("explicit `self` parameter"))
+    assert(report_text.contains("explicit `mut self` parameter"))
+    assert(report_text.contains("explicit `move self` parameter"))
+    assert(report_text.contains("explicit `self` on top-level dotted method `Counter.legacy_peek`"))
+
+    // Apply rewrites and verify every rewritten shape.
+    let applied = run_to_files(&[compiler, "fix-ceremony", "--apply", program], dir ++ "/apply.out", dir ++ "/apply.err", 600000)
+    assert(applied.code == 0)
+    let after = read_file(program).unwrap()
+
+    // Trait body: read carve-out kept; mut/move rewritten.
+    assert(after.contains("    fn label(self: &Self) -> str\n"))
+    assert(after.contains("    mut fn reset()\n"))
+    assert(after.contains("    move fn finish() -> i32\n"))
+
+    // Impl methods rewritten cleanly.
+    assert(after.contains("    pub fn get() -> i32: self.value\n"))
+    assert(after.contains("    pub fn plus(delta: i32) -> i32: self.value + delta\n"))
+    assert(after.contains("    pub mut fn bump(): self.value = self.value + 1\n"))
+    assert(after.contains("    pub mut fn add_mut(delta: i32): self.value = self.value + delta\n"))
+    assert(after.contains("    pub move fn into_val() -> i32: self.value\n"))
+    assert(after.contains("    pub move fn into_sum(bias: i32) -> i32: self.value + bias\n"))
+    assert(after.contains("    pub fn pick[T](x: T) -> T: x\n"))
+
+    // Trait impl methods rewritten cleanly (including restated return type).
+    assert(after.contains("    fn label(): \"c\"\n"))
+    assert(after.contains("    mut fn reset(): self.value = 0\n"))
+    assert(after.contains("    move fn finish(): self.value\n"))
+
+    // Top-level dotted method preserved intact.
+    assert(after.contains("pub fn Counter.legacy_peek(self: &Self) -> i32: self.value\n"))
+
+    // Rewritten program compiles and produces the exact same output.
+    let after_run = run_to_files(&[compiler, "run", program], dir ++ "/after.out", dir ++ "/after.err", 600000)
+    assert(after_run.code == 0)
+    assert(read_file(dir ++ "/after.out").unwrap() == expected)
+
+    // Idempotent: second report has 0 rewrites.
+    let again = run_to_files(&[compiler, "fix-ceremony", "--report", program], dir ++ "/again.out", dir ++ "/again.err", 600000)
+    assert(again.code == 0)
+    assert(read_file(dir ++ "/again.out").unwrap().contains("fix-ceremony: 0 rewrite(s)"))
+    print("ok")
