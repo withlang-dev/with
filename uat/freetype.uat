@@ -1,0 +1,11 @@
+scenario: c.freetype initializes, loads a font face, and renders a glyph through its registry facade without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.freetype
+write src/main.with from freetype_main.with
+run: with run
+expect exit: 0
+expect stdout contains: freetype UAT passed

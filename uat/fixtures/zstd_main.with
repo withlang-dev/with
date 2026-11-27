@@ -1,0 +1,77 @@
+// Release UAT: zstd through its registry facade (#3136). Zero `unsafe`, zero
+// project facade: one-shot ZSTD_compress/ZSTD_decompress, reusable CCtx/DCtx
+// with set_parameter/compress2/decompress, and digested dictionary CDict/DDict
+// round-trip.
+use contracts.zstd
+use c_import("zstd.h")
+
+fn main:
+    let payload = "with zstd UAT payload repeated repeated repeated repeated 1234567890"
+    let src = payload as []u8
+    var compressed: [u8; 256] = [0 as u8; 256]
+    let csize = ZSTD_compress(compressed, src, 3)
+    if ZSTD_isError(csize) != 0:
+        print("zstd one-shot compress failed")
+        return 1
+    let fsize = ZSTD_getFrameContentSize(compressed[..csize])
+    if fsize != src.len() as u64:
+        print("zstd frame content size mismatch")
+        return 1
+    var restored: [u8; 128] = [0 as u8; 128]
+    let dsize = ZSTD_decompress(restored, compressed[..csize])
+    if ZSTD_isError(dsize) != 0 or dsize != src.len() as u64:
+        print("zstd one-shot decompress failed")
+        return 1
+
+    // Reusable CCtx + DCtx with explicit parameters.
+    let Some(cctx) = CCtx.new() else:
+        print("zstd CCtx.new failed")
+        return 1
+    let Some(dctx) = DCtx.new() else:
+        print("zstd DCtx.new failed")
+        return 1
+    if ZSTD_isError(cctx.set_parameter(ZSTD_c_compressionLevel, 3)) != 0:
+        print("zstd set_parameter failed")
+        return 1
+    if ZSTD_isError(cctx.set_parameter(ZSTD_c_checksumFlag, 1)) != 0:
+        print("zstd set checksum failed")
+        return 1
+    var ctx_out: [u8; 256] = [0 as u8; 256]
+    let ctx_csize = cctx.compress2(ctx_out, src)
+    if ZSTD_isError(ctx_csize) != 0:
+        print("zstd compress2 failed")
+        return 1
+    var ctx_back: [u8; 128] = [0 as u8; 128]
+    let ctx_dsize = dctx.decompress(ctx_back, ctx_out[..ctx_csize])
+    if ZSTD_isError(ctx_dsize) != 0 or ctx_dsize != src.len() as u64:
+        print("zstd decompress failed")
+        return 1
+
+    // Digested CDict + DDict round-trip.
+    let dict_str = "with zstd UAT payload repeated dictionary prefix 1234567890"
+    let dict_bytes = dict_str as []u8
+    let Some(cdict) = CDict.new(dict_bytes, 3) else:
+        print("zstd CDict.new failed")
+        return 1
+    let Some(ddict) = DDict.new(dict_bytes) else:
+        print("zstd DDict.new failed")
+        return 1
+    var dict_out: [u8; 256] = [0 as u8; 256]
+    let dict_csize = cctx.compress_using_cdict(dict_out, src, &cdict)
+    if ZSTD_isError(dict_csize) != 0:
+        print("zstd compress_using_cdict failed")
+        return 1
+    var dict_back: [u8; 128] = [0 as u8; 128]
+    let dict_dsize = dctx.decompress_using_ddict(dict_back, dict_out[..dict_csize], &ddict)
+    if ZSTD_isError(dict_dsize) != 0 or dict_dsize != src.len() as u64:
+        print("zstd decompress_using_ddict failed")
+        return 1
+    for i in 0..src.len():
+        if dict_back[i] != src[i]:
+            print("zstd dictionary round-trip byte mismatch")
+            return 1
+
+    if ZSTD_getErrorName(0).is_none():
+        print("zstd error name missing")
+        return 1
+    print("zstd UAT passed")

@@ -1,0 +1,11 @@
+scenario: c.zstd compresses and decompresses through its registry facade without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.zstd
+write src/main.with from zstd_main.with
+run: with run
+expect exit: 0
+expect stdout contains: zstd UAT passed

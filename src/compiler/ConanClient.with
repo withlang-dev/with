@@ -1135,6 +1135,9 @@ fn conan_pc_link(dep_dir: &str, requirements: &List[str], pc_texts: &List[str]):
                 // lld-link (Windows); normalize to `foo` so every linker finds it.
                 if lib.starts_with(":lib") and lib.ends_with(".a") and lib.len() > 6:
                     lib = lib.slice(4, lib.len() - 2)
+                // CMake imported target names (`ZLIB::ZLIB`) occasionally leak into
+                // generated `.pc` `Libs.private`; their packages are already in `requires`.
+                if lib.contains("::"): continue
                 if not conan_list_contains(link.libs, lib): link.libs.push(lib.to_owned())
             else if token.starts_with("-L"): continue
             else if token == "-pthread":
@@ -1144,8 +1147,29 @@ fn conan_pc_link(dep_dir: &str, requirements: &List[str], pc_texts: &List[str]):
                 if args.len() == 0: out.warnings.push("link flag '" ++ token ++ "' of its pkg-config file is not passed on")
                 else if not conan_list_contains(link.link_args, args[1]):
                     for a in args: link.link_args.push(a)
+    for tbd_lib in conan_cmake_tbd_libs(dep_dir):
+        if not conan_list_contains(link.libs, tbd_lib): link.libs.push(tbd_lib)
     for req in requirements: link.requires.push(conan_ref_name(req) ++ "/" ++ conan_ref_version(req))
     out.components.push(link)
+    out
+
+// System `.tbd` libraries listed in installed CMake `INTERFACE_LINK_LIBRARIES`
+// (e.g., Apple SDK `libhvf.tbd` linked by FreeType 2.15.0 on macOS) that the
+// package's pkg-config file omits.
+fn conan_cmake_tbd_libs(dep_dir: &str) -> List[str]:
+    let out = []
+    for file in conan_split_nonempty_lines(runtime_list_files(dep_dir)):
+        if not (file.ends_with(".cmake") and file.contains("/cmake/")): continue
+        let text = runtime_read_file(file)
+        for line in text.split("\n"):
+            if not line.contains("INTERFACE_LINK_LIBRARIES"): continue
+            for item in line.replace("\"", ";").replace(" ", ";").split(";"):
+                if not item.ends_with(".tbd"): continue
+                let parts = item.split("/")
+                let base = parts[parts.len() - 1]
+                if base.starts_with("lib") and base.len() > 7:
+                    let lib = base.slice(3, base.len() - 4)
+                    if not conan_list_contains(out, lib): out.push(lib.to_owned())
     out
 
 // The pkg-config files the package in `dep_dir` holds.

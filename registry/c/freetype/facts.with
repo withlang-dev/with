@@ -1,0 +1,103 @@
+// freetype 2.15.0 (conan-center-index recipes/freetype). Every clause cites
+// freetype/freetype.h or freetype/fterrors.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - FT_New_Memory_Face: retains caller's file_base byte buffer for the entire
+//   lifetime of the returned FT_Face (caller must keep buffer alive past
+//   FT_Done_Face).
+// - FT_Open_Face / FT_Attach_Stream: accept FT_Open_Args / FT_Stream structs
+//   containing raw I/O callback pointers and retained memory buffers.
+// - FT_New_Library / FT_Done_Library / FT_Add_Module / FT_Remove_Module /
+//   FT_Set_Renderer / FT_Property_Set/Get: custom allocator and module vtable
+//   plugin APIs taking untyped void* pointers.
+// - FT_Outline_Decompose / FT_Outline_Render: function-pointer callback tables
+//   with untyped void* user pointers.
+// - FT_Get_Sfnt_Table / FT_Face_GetVariantSelectors/VariantsOfChar/CharsOfVariant:
+//   return raw unowned pointers into internal font tables.
+// - FT_Glyph_To_Bitmap: in-place pointer-to-pointer replacement of FT_Glyph.
+c facts freetype error FreeTypeError:
+    resource Library wraps *mut FT_LibraryRec_
+        from FT_Init_FreeType(out param 0)    // freetype.h 2.15.0:2351: initializes FreeType library handle into *alibrary
+        drop FT_Done_FreeType    // freetype.h 2.15.0:2371: destroys FreeType library handle and all its children
+        ok 0    // freetype.h 2.15.0: FT_Err_Ok (0) signals success
+    resource Face wraps *mut FT_FaceRec_
+        from FT_New_Face(out param 3)    // freetype.h 2.15.0:2574: opens font file and writes handle into *aface
+        drop FT_Done_Face    // freetype.h 2.15.0:2879: discards face object and all child slots/sizes
+        borrows param 0    // freetype.h 2.15.0:2371,2574: face belongs to its FT_Library and must be freed before FT_Done_FreeType
+        ok 0    // freetype.h 2.15.0: FT_Err_Ok (0) signals success
+    fn FT_Init_FreeType
+        rename init    // freetype.h 2.15.0:2351: Library.init()
+    fn FT_New_Face
+        rename new_face    // freetype.h 2.15.0:2574: lib.new_face(path, index)
+        lend    // freetype.h 2.15.0:2574: borrows library
+    fn FT_Library_Version
+        of Library    // freetype.h 2.15.0:5209: queries library major/minor/patch version
+        rename version    // freetype.h 2.15.0:5209: lib.version()
+        lend    // freetype.h 2.15.0:5209: borrows library
+        fills param 1    // freetype.h 2.15.0:5210: writes *amajor
+        fills param 2    // freetype.h 2.15.0:5211: writes *aminor
+        fills param 3    // freetype.h 2.15.0:5212: writes *apatch
+    fn FT_Error_String
+        returns static CStr    // fterrors.h 2.15.0:282: static string describing FT_Error code (or NULL)
+    fn FT_Set_Char_Size
+        of Face    // freetype.h 2.15.0:3139: sets nominal character dimensions
+        rename set_char_size    // freetype.h 2.15.0:3139: face.set_char_size(...)
+        lend    // freetype.h 2.15.0:3139: borrows face
+        ok 0    // freetype.h 2.15.0: returns 0 on success
+    fn FT_Set_Pixel_Sizes
+        of Face    // freetype.h 2.15.0:3176: sets nominal pixel dimensions
+        rename set_pixel_sizes    // freetype.h 2.15.0:3176: face.set_pixel_sizes(...)
+        lend    // freetype.h 2.15.0:3176: borrows face
+        ok 0    // freetype.h 2.15.0: returns 0 on success
+    fn FT_Select_Size
+        of Face    // freetype.h 2.15.0:2926: selects fixed bitmap strike
+        rename select_size    // freetype.h 2.15.0:2926: face.select_size(idx)
+        lend    // freetype.h 2.15.0:2926: borrows face
+        ok 0    // freetype.h 2.15.0: returns 0 on success
+    fn FT_Load_Glyph
+        of Face    // freetype.h 2.15.0:3231: loads glyph into face glyph slot
+        rename load_glyph    // freetype.h 2.15.0:3231: face.load_glyph(index, flags)
+        lend    // freetype.h 2.15.0:3231: borrows face
+        ok 0    // freetype.h 2.15.0: returns 0 on success
+    fn FT_Load_Char
+        of Face    // freetype.h 2.15.0:3281: loads glyph for character code into face glyph slot
+        rename load_char    // freetype.h 2.15.0:3281: face.load_char(code, flags)
+        lend    // freetype.h 2.15.0:3281: borrows face
+        ok 0    // freetype.h 2.15.0: returns 0 on success
+    fn FT_Select_Charmap
+        of Face    // freetype.h 2.15.0:4110: selects character map encoding
+        rename select_charmap    // freetype.h 2.15.0:4110: face.select_charmap(enc)
+        lend    // freetype.h 2.15.0:4110: borrows face
+        ok 0    // freetype.h 2.15.0: returns 0 on success
+    fn FT_Get_Char_Index
+        of Face    // freetype.h 2.15.0:4198: maps character code to glyph index
+        rename char_index    // freetype.h 2.15.0:4198: face.char_index(code)
+        lend    // freetype.h 2.15.0:4198: borrows face
+    fn FT_Get_First_Char
+        of Face    // freetype.h 2.15.0: returns first character code in active charmap
+        lend    // freetype.h 2.15.0: borrows face
+        fills param 1    // freetype.h 2.15.0: writes *agindex
+    fn FT_Get_Next_Char
+        of Face    // freetype.h 2.15.0: returns next character code in active charmap
+        lend    // freetype.h 2.15.0: borrows face
+        fills param 2    // freetype.h 2.15.0: writes *agindex
+    fn FT_Get_Kerning
+        of Face    // freetype.h 2.15.0:4022: returns kerning vector between two glyphs
+        lend    // freetype.h 2.15.0:4022: borrows face
+        fills param 4    // freetype.h 2.15.0:4026: writes *akerning FT_Vector
+        ok 0    // freetype.h 2.15.0: returns 0 on success
+    fn FT_Get_Postscript_Name
+        of Face    // freetype.h 2.15.0:4515: returns ASCII PostScript name of face
+        returns borrow CStr from param 0    // freetype.h 2.15.0:4515: string owned by face
+        lend    // freetype.h 2.15.0:4515: borrows face
+    fn FT_Face_CheckTrueTypePatents
+        of Face    // freetype.h 2.15.0: legacy patent query
+        lend    // freetype.h 2.15.0: borrows face
+    fn FT_Face_SetUnpatentedHinting
+        of Face    // freetype.h 2.15.0: legacy hinting toggle
+        lend    // freetype.h 2.15.0: borrows face
+    fn FT_Get_Advance
+        of Face    // ftadvanc.h 2.15.0: queries glyph advance value
+        lend    // ftadvanc.h 2.15.0: borrows face
+        fills param 3    // ftadvanc.h 2.15.0: writes *padvance
+        ok 0    // ftadvanc.h 2.15.0: returns 0 on success

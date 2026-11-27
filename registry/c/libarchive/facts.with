@@ -1,0 +1,121 @@
+// libarchive 3.8.7 (conan-center-index recipes/libarchive). Every clause cites
+// archive.h or archive_entry.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - archive_read_set_*_callback, archive_read_open/open2,
+//   archive_write_open/open2: multi-callback custom I/O vtables with untyped
+//   client_data pointers retained across reader/writer lifetimes.
+// - archive_read_open_memory/memory2, archive_write_open_memory: retain raw
+//   caller memory buffer pointers across the entire archive lifecycle.
+// - archive_read_next_header (double-pointer borrowed entry out-param; use
+//   archive_read_next_header2 with caller-owned ArchiveEntry instead).
+// - archive_read_data_block (writes raw borrowed pointer + size + offset).
+// - archive_read_open_filenames / *_w (null-terminated pointer arrays / wchar_t).
+// - archive_set_error (printf-style variadic).
+// - archive_match_* / archive_read_disk_* / deprecated compression_* aliases.
+c facts libarchive:
+    resource ArchiveReader wraps *mut archive
+        from archive_read_new    // archive.h 3.8.7:423: allocates archive reader freed by archive_read_free
+        drop archive_read_free    // archive.h 3.8.7:764: closes and frees archive reader
+        destroys archive_read_finish    // archive.h 3.8.7:766: legacy synonym for archive_read_free
+    resource ArchiveWriter wraps *mut archive
+        from archive_write_new    // archive.h 3.8.7:785: allocates archive writer freed by archive_write_free
+        from archive_write_disk_new    // archive.h 3.8.7:965: allocates disk extraction writer freed by archive_write_free
+        drop archive_write_free    // archive.h 3.8.7:917: closes and frees archive writer
+        destroys archive_write_finish    // archive.h 3.8.7:919: legacy synonym for archive_write_free
+    fn archive_read_new
+        rename new    // archive.h 3.8.7:423: ArchiveReader.new()
+    fn archive_write_new
+        rename new    // archive.h 3.8.7:785: ArchiveWriter.new()
+    fn archive_write_disk_new
+        rename disk_new    // archive.h 3.8.7:965: ArchiveWriter.disk_new()
+    fn archive_read_support_filter_all
+        of ArchiveReader    // archive.h 3.8.7:462: enables all read filters
+        lend    // archive.h 3.8.7:462: borrows reader
+    fn archive_read_support_filter_bzip2
+        of ArchiveReader    // archive.h 3.8.7:464: enables bzip2 read filter
+        lend    // archive.h 3.8.7:464: borrows reader
+    fn archive_read_support_filter_gzip
+        of ArchiveReader    // archive.h 3.8.7:466: enables gzip read filter
+        lend    // archive.h 3.8.7:466: borrows reader
+    fn archive_read_support_filter_xz
+        of ArchiveReader    // archive.h 3.8.7:481: enables xz read filter
+        lend    // archive.h 3.8.7:481: borrows reader
+    fn archive_read_support_filter_zstd
+        of ArchiveReader    // archive.h 3.8.7:482: enables zstd read filter
+        lend    // archive.h 3.8.7:482: borrows reader
+    fn archive_read_support_format_all
+        of ArchiveReader    // archive.h 3.8.7:485: enables all archive formats
+        lend    // archive.h 3.8.7:485: borrows reader
+    fn archive_read_support_format_tar
+        of ArchiveReader    // archive.h 3.8.7:500: enables tar format
+        lend    // archive.h 3.8.7:500: borrows reader
+    fn archive_read_support_format_zip
+        of ArchiveReader    // archive.h 3.8.7:505: enables zip format
+        lend    // archive.h 3.8.7:505: borrows reader
+    fn archive_read_open_filename
+        of ArchiveReader    // archive.h 3.8.7:569: opens archive file for reading
+        nullable param 1    // archive.h 3.8.7:569: NULL reads stdin
+        lend    // archive.h 3.8.7:569: copies filename and borrows reader
+    fn archive_read_next_header2
+        of ArchiveReader    // archive.h 3.8.7:602: reads next entry header into caller-owned ArchiveEntry
+        lend    // archive.h 3.8.7:602: borrows reader and populates entry
+    fn archive_read_data
+        of ArchiveReader    // archive.h 3.8.7:638: reads entry data into caller buffer
+        lend    // archive.h 3.8.7:638: borrows reader, retains no buffer
+        buffer param 1 capacity param 2    // archive.h 3.8.7:638: writes at most len bytes into buff
+    fn archive_read_data_skip
+        of ArchiveReader    // archive.h 3.8.7:659: skips remaining bytes of current entry
+        lend    // archive.h 3.8.7:659: borrows reader
+    fn archive_read_close
+        of ArchiveReader    // archive.h 3.8.7:761: closes reader input without freeing handle
+        lend    // archive.h 3.8.7:761: borrows reader
+    fn archive_write_add_filter_gzip
+        of ArchiveWriter    // archive.h 3.8.7:826: adds gzip compression filter
+        lend    // archive.h 3.8.7:826: borrows writer
+    fn archive_write_add_filter_bzip2
+        of ArchiveWriter    // archive.h 3.8.7: adds bzip2 compression filter
+        lend    // archive.h 3.8.7: borrows writer
+    fn archive_write_add_filter_xz
+        of ArchiveWriter    // archive.h 3.8.7: adds xz compression filter
+        lend    // archive.h 3.8.7: borrows writer
+    fn archive_write_add_filter_zstd
+        of ArchiveWriter    // archive.h 3.8.7: adds zstd compression filter
+        lend    // archive.h 3.8.7: borrows writer
+    fn archive_write_add_filter_none
+        of ArchiveWriter    // archive.h 3.8.7: adds no-op compression filter
+        lend    // archive.h 3.8.7: borrows writer
+    fn archive_write_set_format_pax_restricted
+        of ArchiveWriter    // archive.h 3.8.7:859: selects POSIX pax/ustar tar format
+        lend    // archive.h 3.8.7:859: borrows writer
+    fn archive_write_set_format_zip
+        of ArchiveWriter    // archive.h 3.8.7:867: selects zip format
+        lend    // archive.h 3.8.7:867: borrows writer
+    fn archive_write_open_filename
+        of ArchiveWriter    // archive.h 3.8.7:884: opens output archive file
+        nullable param 1    // archive.h 3.8.7:884: NULL writes stdout
+        lend    // archive.h 3.8.7:884: copies filename and borrows writer
+    fn archive_write_header
+        of ArchiveWriter    // archive.h 3.8.7:900: writes entry header (or creates disk object)
+        lend    // archive.h 3.8.7:900: borrows writer and entry
+    fn archive_write_data
+        of ArchiveWriter    // archive.h 3.8.7:902: writes entry payload bytes
+        lend    // archive.h 3.8.7:902: borrows writer, retains no buffer
+        buffer param 1 len param 2    // archive.h 3.8.7:902: reads size bytes from data
+    fn archive_write_finish_entry
+        of ArchiveWriter    // archive.h 3.8.7: finishes writing current entry
+        lend    // archive.h 3.8.7: borrows writer
+    fn archive_write_close
+        of ArchiveWriter    // archive.h 3.8.7:910: flushes and closes archive writer
+        lend    // archive.h 3.8.7:910: borrows writer
+    fn archive_write_disk_set_options
+        of ArchiveWriter    // archive.h 3.8.7:971: sets disk extraction flags
+        lend    // archive.h 3.8.7:971: borrows disk writer
+    fn archive_write_disk_set_standard_lookup
+        of ArchiveWriter    // archive.h 3.8.7:990: installs standard uid/gid lookup on disk writer
+        lend    // archive.h 3.8.7:990: borrows disk writer
+    fn archive_entry_pathname
+        returns borrow CStr from param 0    // archive_entry.h 3.8.7:306: pathname string owned by archive_entry
+        lend    // archive_entry.h 3.8.7:306: borrows entry
+    fn archive_version_details
+        returns static CStr    // archive.h 3.8.7: static version details string

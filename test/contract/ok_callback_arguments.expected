@@ -19,25 +19,25 @@ handle Arg wraps *mut val; representation: callback-scope, borrowed for the call
 fn eng_register; contract:engines@test/contract/ok_callback_arguments.with; clause:fn@test/contract/ok_callback_arguments.with:18
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut eng e: lend, the described fn's assertion; receives Engine  [claim: stated@test/contract/ok_callback_arguments.with:18]
-    effect: param 1: *mut c_void ud: consumes; destroyed by the callback param 4: extern "C" fn(*mut c_void) -> Unit destroy  [claim: stated@test/contract/ok_callback_arguments.with:19]
-    effect: param 2: extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step: retained by Engine (param 0: *mut eng e)  [claim: stated@test/contract/ok_callback_arguments.with:20]
-    effect: param 3: extern "C" fn(*mut ctx) -> Unit fin: retained by Engine (param 0: *mut eng e)  [claim: stated@test/contract/ok_callback_arguments.with:21]
-    effect: param 4: extern "C" fn(*mut c_void) -> Unit destroy: callback, the destroy path of the consumed param 1: *mut c_void ud  [claim: stated@test/contract/ok_callback_arguments.with:19]
+    effect: param 1: *mut c_void ud: consumes; destroyed by the callback param 4: unsafe extern "C" fn(*mut c_void) -> Unit destroy  [claim: stated@test/contract/ok_callback_arguments.with:19]
+    effect: param 2: unsafe extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step: retained by Engine (param 0: *mut eng e)  [claim: stated@test/contract/ok_callback_arguments.with:20]
+    effect: param 3: unsafe extern "C" fn(*mut ctx) -> Unit fin: retained by Engine (param 0: *mut eng e)  [claim: stated@test/contract/ok_callback_arguments.with:21]
+    effect: param 4: unsafe extern "C" fn(*mut c_void) -> Unit destroy: callback, the destroy path of the consumed param 1: *mut c_void ud  [claim: stated@test/contract/ok_callback_arguments.with:19]
     returns: i32  [default:as declared]
     invalidates: Engine (param 0: *mut eng e)  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Engine.register  [default:presentation sugar from the resource prefix (§16.2b.11)]
-callback param 2: extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step of eng_register; clause:fn@test/contract/ok_callback_arguments.with:18
+callback param 2: unsafe extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step of eng_register; clause:fn@test/contract/ok_callback_arguments.with:18
     role: retained by Engine (param 0: *mut eng e); it lives as long as its owner  [claim: stated@test/contract/ok_callback_arguments.with:20]
     arguments: its param 2 paired with its param 1, presented as a slice of Arg; valid for the invocation only  [claim: stated@test/contract/ok_callback_arguments.with:22]
     user data: the value the facade boxed, read back through ctx_user_data and presented as &U; valid for the invocation only; the compiler generates the wrapper C calls  [claim: stated@test/contract/ok_callback_arguments.with:23]
     thread: any, where the callback is retained; captured With state must be Send and Sync  [default:no `callback_thread registering` (§31.6.2)]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
-callback param 3: extern "C" fn(*mut ctx) -> Unit fin of eng_register; clause:fn@test/contract/ok_callback_arguments.with:18
+callback param 3: unsafe extern "C" fn(*mut ctx) -> Unit fin of eng_register; clause:fn@test/contract/ok_callback_arguments.with:18
     role: retained by Engine (param 0: *mut eng e); it lives as long as its owner  [claim: stated@test/contract/ok_callback_arguments.with:21]
     user data: the value the facade boxed, read back through ctx_user_data and presented as &U; valid for the invocation only; the compiler generates the wrapper C calls  [claim: stated@test/contract/ok_callback_arguments.with:23]
     thread: any, where the callback is retained; captured With state must be Send and Sync  [default:no `callback_thread registering` (§31.6.2)]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
-callback param 4: extern "C" fn(*mut c_void) -> Unit destroy of eng_register; clause:fn@test/contract/ok_callback_arguments.with:18
+callback param 4: unsafe extern "C" fn(*mut c_void) -> Unit destroy of eng_register; clause:fn@test/contract/ok_callback_arguments.with:18
     role: destroy path of the consumed param 1: *mut c_void ud; With destroys it through no other path  [claim: stated@test/contract/ok_callback_arguments.with:19]
     thread: any, where the callback is retained; captured With state must be Send and Sync  [default:no `callback_thread registering` (§31.6.2)]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]

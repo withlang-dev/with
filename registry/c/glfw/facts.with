@@ -1,0 +1,155 @@
+// glfw 3.4 (conan-center-index recipes/glfw). Every clause cites GLFW/glfw3.h
+// installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - glfwInitAllocator: custom malloc/realloc/free function-pointer table.
+// - glfwSetWindowUserPointer, glfwGetWindowUserPointer,
+//   glfwSetMonitorUserPointer, glfwGetMonitorUserPointer,
+//   glfwSetJoystickUserPointer, glfwGetJoystickUserPointer: untyped void*
+//   user-pointer storage with no type pairing.
+// - glfwGetMonitors, glfwGetVideoModes, glfwGetJoystickAxes/Buttons/Hats,
+//   glfwGetRequiredInstanceExtensions, glfwGetError: return raw unowned array
+//   or string pointers via out-parameters.
+// - glfwGetMonitor*, glfwSetGamma*, glfwGetGammaRamp, glfwSetWindowMonitor:
+//   operate on global borrowed GLFWmonitor* handles invalidated on hotplug.
+// - glfwSetWindowIcon, glfwCreateCursor: accept GLFWimage structs holding raw
+//   unsigned char *pixels pointers.
+// - glfwGetProcAddress, glfwGetCurrentContext: raw OpenGL/context pointers.
+c facts glfw:
+    resource Window wraps *mut GLFWwindow
+        from glfwCreateWindow    // glfw3.h 3.4:3235: creates window and OpenGL context freed by glfwDestroyWindow
+        drop glfwDestroyWindow    // glfw3.h 3.4:3264: destroys window and its context
+    resource Cursor wraps *mut GLFWcursor
+        from glfwCreateStandardCursor    // glfw3.h 3.4:5094: creates standard cursor freed by glfwDestroyCursor
+        drop glfwDestroyCursor    // glfw3.h 3.4:5121: destroys cursor
+    fn glfwCreateWindow
+        rename create    // glfw3.h 3.4:3235: Window.create(width, height, title)
+        param 3 fixed null    // glfw3.h 3.4:3235: NULL monitor selects windowed mode
+        param 4 fixed null    // glfw3.h 3.4:3235: NULL share selects unshared context
+    fn glfwGetVersion
+        fills param 0    // glfw3.h 3.4:2392: writes *major
+        fills param 1    // glfw3.h 3.4:2392: writes *minor
+        fills param 2    // glfw3.h 3.4:2392: writes *rev
+    fn glfwSetErrorCallback
+        callback param 0    // glfw3.h 3.4:2503: global error callback with no userdata parameter
+        callback_thread any    // glfw3.h 3.4:2503: may be called from any thread reporting a GLFW error
+    fn glfwWindowShouldClose
+        of Window    // glfw3.h 3.4:3284: queries window close flag
+        lend    // glfw3.h 3.4:3284: borrows window
+    fn glfwSetWindowShouldClose
+        of Window    // glfw3.h 3.4:3306: sets window close flag
+        lend    // glfw3.h 3.4:3306: borrows window
+    fn glfwSetWindowTitle
+        of Window    // glfw3.h 3.4:3364: sets UTF-8 window title (copied by GLFW)
+        lend    // glfw3.h 3.4:3364: borrows window
+    fn glfwGetWindowPos
+        of Window    // glfw3.h 3.4:3445: queries window screen coordinates
+        lend    // glfw3.h 3.4:3445: borrows window
+        fills param 1    // glfw3.h 3.4:3445: writes *xpos
+        fills param 2    // glfw3.h 3.4:3445: writes *ypos
+    fn glfwSetWindowPos
+        of Window    // glfw3.h 3.4:3480: moves window
+        lend    // glfw3.h 3.4:3480: borrows window
+    fn glfwGetWindowSize
+        of Window    // glfw3.h 3.4:3510: queries window size in screen coordinates
+        lend    // glfw3.h 3.4:3510: borrows window
+        fills param 1    // glfw3.h 3.4:3510: writes *width
+        fills param 2    // glfw3.h 3.4:3510: writes *height
+    fn glfwSetWindowSize
+        of Window    // glfw3.h 3.4:3634: resizes window
+        lend    // glfw3.h 3.4:3634: borrows window
+    fn glfwGetFramebufferSize
+        of Window    // glfw3.h 3.4:3663: queries framebuffer size in pixels
+        lend    // glfw3.h 3.4:3663: borrows window
+        fills param 1    // glfw3.h 3.4:3663: writes *width
+        fills param 2    // glfw3.h 3.4:3663: writes *height
+    fn glfwGetWindowContentScale
+        of Window    // glfw3.h 3.4:3733: queries window DPI content scale
+        lend    // glfw3.h 3.4:3733: borrows window
+        fills param 1    // glfw3.h 3.4:3733: writes *xscale
+        fills param 2    // glfw3.h 3.4:3733: writes *yscale
+    fn glfwGetWindowOpacity
+        of Window    // glfw3.h 3.4:3760: queries window opacity
+        lend    // glfw3.h 3.4:3760: borrows window
+    fn glfwSetWindowOpacity
+        of Window    // glfw3.h 3.4:3792: sets window opacity
+        lend    // glfw3.h 3.4:3792: borrows window
+    fn glfwIconifyWindow
+        of Window    // glfw3.h 3.4:3824: iconifies window
+        lend    // glfw3.h 3.4:3824: borrows window
+    fn glfwRestoreWindow
+        of Window    // glfw3.h 3.4:3851: restores window
+        lend    // glfw3.h 3.4:3851: borrows window
+    fn glfwMaximizeWindow
+        of Window    // glfw3.h 3.4:3876: maximizes window
+        lend    // glfw3.h 3.4:3876: borrows window
+    fn glfwShowWindow
+        of Window    // glfw3.h 3.4:3908: makes window visible
+        lend    // glfw3.h 3.4:3908: borrows window
+    fn glfwHideWindow
+        of Window    // glfw3.h 3.4:3930: hides window
+        lend    // glfw3.h 3.4:3930: borrows window
+    fn glfwFocusWindow
+        of Window    // glfw3.h 3.4:3969: focuses window
+        lend    // glfw3.h 3.4:3969: borrows window
+    fn glfwGetWindowAttrib
+        of Window    // glfw3.h 3.4:4111: queries window attribute
+        lend    // glfw3.h 3.4:4111: borrows window
+    fn glfwSetWindowAttrib
+        of Window    // glfw3.h 3.4:4153: sets window attribute
+        lend    // glfw3.h 3.4:4153: borrows window
+    fn glfwGetInputMode
+        of Window    // glfw3.h 3.4:4673: queries input mode
+        lend    // glfw3.h 3.4:4673: borrows window
+    fn glfwSetInputMode
+        of Window    // glfw3.h 3.4:4738: sets input mode
+        lend    // glfw3.h 3.4:4738: borrows window
+    fn glfwGetKey
+        of Window    // glfw3.h 3.4:4901: queries last state reported for key
+        lend    // glfw3.h 3.4:4901: borrows window
+    fn glfwGetMouseButton
+        of Window    // glfw3.h 3.4:4930: queries last state reported for mouse button
+        lend    // glfw3.h 3.4:4930: borrows window
+    fn glfwGetCursorPos
+        of Window    // glfw3.h 3.4:4968: queries cursor coordinates
+        lend    // glfw3.h 3.4:4968: borrows window
+        fills param 1    // glfw3.h 3.4:4968: writes *xpos
+        fills param 2    // glfw3.h 3.4:4968: writes *ypos
+    fn glfwSetCursorPos
+        of Window    // glfw3.h 3.4:5008: sets cursor position
+        lend    // glfw3.h 3.4:5008: borrows window
+    fn glfwSetCursor
+        of Window    // glfw3.h 3.4:5148: sets window cursor
+        lend    // glfw3.h 3.4:5148: borrows window and cursor
+    fn glfwMakeContextCurrent
+        of Window    // glfw3.h 3.4:6109: binds window context to calling thread
+        lend    // glfw3.h 3.4:6109: borrows window
+    fn glfwSwapBuffers
+        of Window    // glfw3.h 3.4:6164: swaps front and back buffers
+        lend    // glfw3.h 3.4:6164: borrows window
+    fn glfwSetKeyCallback
+        of Window    // glfw3.h 3.4:5198: registers key callback on window
+        lend    // glfw3.h 3.4:5198: borrows window
+        callback param 1    // glfw3.h 3.4:5198: stateless key callback (no void* userdata param)
+        retains param 1 by param 0    // glfw3.h 3.4:5198: retained by window until replaced or destroyed
+        callback_thread registering    // glfw3.h 3.4:5198: invoked on main thread during glfwPollEvents
+    fn glfwSetWindowSizeCallback
+        of Window    // glfw3.h 3.4:4264: registers window resize callback
+        lend    // glfw3.h 3.4:4264: borrows window
+        callback param 1    // glfw3.h 3.4:4264: stateless resize callback
+        retains param 1 by param 0    // glfw3.h 3.4:4264: retained by window until replaced or destroyed
+        callback_thread registering    // glfw3.h 3.4:4264: invoked on main thread during glfwPollEvents
+    fn glfwSetWindowCloseCallback
+        of Window    // glfw3.h 3.4:4304: registers window close callback
+        lend    // glfw3.h 3.4:4304: borrows window
+        callback param 1    // glfw3.h 3.4:4304: stateless close callback
+        retains param 1 by param 0    // glfw3.h 3.4:4304: retained by window until replaced or destroyed
+        callback_thread registering    // glfw3.h 3.4:4304: invoked on main thread during glfwPollEvents
+    fn glfwSetFramebufferSizeCallback
+        of Window    // glfw3.h 3.4:4465: registers framebuffer resize callback
+        lend    // glfw3.h 3.4:4465: borrows window
+        callback param 1    // glfw3.h 3.4:4465: stateless framebuffer resize callback
+        retains param 1 by param 0    // glfw3.h 3.4:4465: retained by window until replaced or destroyed
+        callback_thread registering    // glfw3.h 3.4:4465: invoked on main thread during glfwPollEvents
+    fn glfwGetKeyName
+        returns static CStr    // glfw3.h 3.4: layout-specific key name string
