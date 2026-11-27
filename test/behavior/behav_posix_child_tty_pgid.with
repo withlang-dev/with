@@ -9,9 +9,7 @@
 // under UAT) never hang on SIGTTOU.
 use std.process
 use std.fs
-use c_import("fcntl.h")
-use c_import("stdlib.h")
-use c_import("unistd.h")
+use c_import("#define _XOPEN_SOURCE 600\n#include <fcntl.h>\n#include <stdlib.h>\n#include <unistd.h>\n")
 
 fn main:
     let argv = args()
