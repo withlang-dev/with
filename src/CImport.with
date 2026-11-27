@@ -19532,6 +19532,72 @@ fn ci_own_param_field(session: i64, expr: i32, params: &List[str]) -> str:
         pi += 1
     ""
 
+// #3124: `Record.field:PointeeRecord` when `expr` is a member ref whose type
+// is a pointer to a record (`data->multi_easy`, `parser->m_dtd`); "" otherwise.
+fn ci_own_record_ptr_field(session: i64, expr: i32) -> str:
+    let e = ci_own_peel(session, expr)
+    if with_ci_cursor_kind(session, e) != CXK_MEMBER_REF or with_ci_num_children(session, e) < 1: return ""
+    let rec = ci_fp_member_record(session, e)
+    let target = ci_fp_pointee_record(session, with_ci_cursor_type(session, e))
+    if rec.len() == 0 or target.len() == 0: return ""
+    rec ++ "." ++ with_ci_cursor_spelling(session, e) ++ ":" ++ target
+
+// #3124: the innermost `Record.field:PointeeRecord` dereferenced along a place
+// expression (`r->state->owner` -> `Handle.state:State`, `r->state->rows[k]` ->
+// `Handle.state:State`); "" when none.
+fn ci_own_place_via_rf(session: i64, expr: i32, depth: i32) -> str:
+    if expr < 0 or depth > 16: return ""
+    let e = ci_own_peel(session, expr)
+    let kind = with_ci_cursor_kind(session, e)
+    let nc = with_ci_num_children(session, e)
+    if kind == CXK_MEMBER_REF and nc >= 1:
+        let inner = ci_own_place_via_rf(session, with_ci_child(session, e, 0), depth + 1)
+        if inner.len() > 0: return inner
+        return ci_own_record_ptr_field(session, e)
+    if kind == CXK_ARRAY_SUBSCRIPT and nc >= 1:
+        return ci_own_place_via_rf(session, with_ci_child(session, e, 0), depth + 1)
+    if kind == CXK_UNARY_OP and nc == 1:
+        let op = with_ci_unary_op(session, e)
+        if op == UO_DEREF or op == UO_ADDR: return ci_own_place_via_rf(session, with_ci_child(session, e, 0), depth + 1)
+    if kind == CXK_BINARY_OP and nc == 2:
+        let op = with_ci_binary_op(session, e)
+        if op == BO_ADD or op == BO_SUB: return ci_own_place_via_rf(session, with_ci_child(session, e, 0), depth + 1)
+    if kind == CXK_CONDITIONAL_OP and nc == 3:
+        let t = ci_own_place_via_rf(session, with_ci_child(session, e, 1), depth + 1)
+        if t.len() > 0: return t
+        return ci_own_place_via_rf(session, with_ci_child(session, e, 2), depth + 1)
+    ""
+
+// #3124: emit `rfescape:<R.F>:<tag>\n` for every record-pointer field reached
+// in `expr`, including both arms of a conditional operator (`e ? e->s : NULL`).
+fn ci_own_rf_escapes(session: i64, expr: i32, tag: &str, depth: i32) -> str:
+    if expr < 0 or depth > 16: return ""
+    let e = ci_own_peel(session, expr)
+    if with_ci_cursor_kind(session, e) == CXK_CONDITIONAL_OP and with_ci_num_children(session, e) == 3:
+        return ci_own_rf_escapes(session, with_ci_child(session, e, 1), tag, depth + 1) ++ ci_own_rf_escapes(session, with_ci_child(session, e, 2), tag, depth + 1)
+    let rf = ci_own_place_via_rf(session, e, 0)
+    if rf.len() > 0: "rfescape:" ++ rf.slice(0, rf.find(":")) ++ ":" ++ tag ++ "\n" else: ""
+
+// #3124: the `Record.field` base root (`param:<i>` or `local:<name>` or `other`).
+fn ci_own_member_base_root(session: i64, expr: i32, params: &List[str], locals: &List[str]) -> str:
+    let e = ci_own_peel(session, expr)
+    if with_ci_cursor_kind(session, e) != CXK_MEMBER_REF or with_ci_num_children(session, e) < 1: return "other"
+    let base = ci_own_peel(session, with_ci_child(session, e, 0))
+    if with_ci_cursor_kind(session, base) != CXK_DECL_REF: return "other"
+    ci_own_place_root(session, base, params, locals)
+
+// #3124: `Record.field:PointeeRecord` when `expr` is `&base->field` and `base`
+// is a DeclRef; "" otherwise.
+fn ci_own_addr_of_rf(session: i64, expr: i32) -> str:
+    let a = ci_own_peel(session, expr)
+    if with_ci_cursor_kind(session, a) != CXK_UNARY_OP or with_ci_unary_op(session, a) != UO_ADDR or with_ci_num_children(session, a) != 1: return ""
+    let inner = ci_own_peel(session, with_ci_child(session, a, 0))
+    let rf = ci_own_record_ptr_field(session, inner)
+    if rf.len() == 0: return ""
+    let base = ci_own_peel(session, with_ci_child(session, inner, 0))
+    if with_ci_cursor_kind(session, base) != CXK_DECL_REF: return ""
+    rf
+
 fn ci_own_record_store(session: i64, value: i32, params: &List[str], locals: &List[str]) -> str:
     let root = ci_own_place_root(session, value, params, locals)
     let v = ci_own_peel(session, value)
@@ -19545,7 +19611,9 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
     if kind == CXK_RETURN_STMT and nc >= 1:
-        out = out ++ "ret:" ++ ci_own_source(session, with_ci_child(session, cursor, 0), params, locals) ++ "\n"
+        let ret_e = with_ci_child(session, cursor, 0)
+        out = out ++ "ret:" ++ ci_own_source(session, ret_e, params, locals) ++ "\n"
+        out = out ++ ci_own_rf_escapes(session, ret_e, "return", 0)
     if kind == CXK_VAR_DECL:
         // #3127: a `static` array of the body is storage the function owns
         // for the life of the program and writes on each call.
@@ -19553,23 +19621,40 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             out = out ++ "localstatic:" ++ with_ci_cursor_spelling(session, cursor) ++ "\n"
         let init = with_ci_var_initializer(session, cursor)
         if init >= 0:
-            out = out ++ "localsrc:" ++ with_ci_cursor_spelling(session, cursor) ++ ":" ++ ci_own_source(session, init, params, locals) ++ "\n"
+            let vname = with_ci_cursor_spelling(session, cursor)
+            out = out ++ "localsrc:" ++ vname ++ ":" ++ ci_own_source(session, init, params, locals) ++ "\n"
             let slot = ci_own_deref_param(session, init, params)
-            if slot >= 0: out = out ++ "localslot:" ++ with_ci_cursor_spelling(session, cursor) ++ f":{slot}\n"
+            if slot >= 0: out = out ++ "localslot:" ++ vname ++ f":{slot}\n"
+            let init_rf = ci_own_record_ptr_field(session, init)
+            if init_rf.len() > 0: out = out ++ "rfload:" ++ vname ++ ":" ++ init_rf.slice(0, init_rf.find(":")) ++ ":" ++ ci_own_member_base_root(session, init, params, locals) ++ "\n"
     if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
         let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
         let rhs = with_ci_child(session, cursor, 1)
         let lhs_root = ci_own_place_root(session, lhs, params, locals)
         if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("local:"):
-            out = out ++ "localsrc:" ++ lhs_root.slice(6, lhs_root.len()) ++ ":" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
+            let lname = lhs_root.slice(6, lhs_root.len())
+            out = out ++ "localsrc:" ++ lname ++ ":" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
             let slot = ci_own_deref_param(session, rhs, params)
-            if slot >= 0: out = out ++ "localslot:" ++ lhs_root.slice(6, lhs_root.len()) ++ f":{slot}\n"
+            if slot >= 0: out = out ++ "localslot:" ++ lname ++ f":{slot}\n"
+            let rhs_rf = ci_own_record_ptr_field(session, rhs)
+            if rhs_rf.len() > 0: out = out ++ "rfload:" ++ lname ++ ":" ++ rhs_rf.slice(0, rhs_rf.find(":")) ++ ":" ++ ci_own_member_base_root(session, rhs, params, locals) ++ "\n"
         else if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("param:"):
             // #3175: a write to the parameter's own variable (`buf = (const
             // unsigned char *)words` at the end of zlib's crc32_z) lands in
             // the callee's frame; nothing outside it keeps the value.
             ()
         else:
+            // #3124: track writes to and escapes of record-pointer fields `R.F`.
+            let lhs_rf = ci_own_record_ptr_field(session, lhs)
+            let lhs_rf_name = if lhs_rf.len() > 0: lhs_rf.slice(0, lhs_rf.find(":")) else: ""
+            let lhs_base = if lhs_rf.len() > 0: ci_own_member_base_root(session, lhs, params, locals) else: "other"
+            if lhs_rf.len() > 0:
+                out = out ++ "rfset:" ++ lhs_rf ++ ":" ++ lhs_base ++ ":" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
+            let rhs_rf = ci_own_place_via_rf(session, rhs, 0)
+            if rhs_rf.len() > 0:
+                let rhs_rf_name = rhs_rf.slice(0, rhs_rf.find(":"))
+                let same_rf = lhs_rf_name.len() > 0 and lhs_rf_name == rhs_rf_name and lhs_base == ci_own_member_base_root(session, rhs, params, locals)
+                if not same_rf: out = out ++ "rfescape:" ++ rhs_rf_name ++ ":store\n"
             // `*out = value`: a store through the slot a parameter points
             // at. Whether that hands the caller a fresh allocation is the
             // proof's to say (fd_out_fresh); the local is recorded as
@@ -19596,7 +19681,18 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             // out-returning functions stay raw in CiFacadeDraft.with). Scalar
             // and struct out-params (`int *out`) never store a pointer here.
             let ptr_slot = if slot >= 0 and ci_cursor_type_is_pointerish(session, lhs): slot else: -1
-            if ptr_slot < 0 and store.starts_with("paramstore:"): out = out ++ "paramstoreat:" ++ store.slice(11, store.len() - 1) ++ ":" ++ with_ci_cursor_source_text(session, lhs).replace("\n", " ").replace(":", " ") ++ "\n"
+            if ptr_slot < 0 and store.starts_with("paramstore:"):
+                let src_pi_str = store.slice(11, store.len() - 1)
+                out = out ++ "paramstoreat:" ++ src_pi_str ++ ":" ++ with_ci_cursor_source_text(session, lhs).replace("\n", " ").replace(":", " ") ++ "\n"
+                // #3124: record where the parameter was stored (`lhs_root` and any owned `R.F` dereferenced).
+                let via_rf = ci_own_place_via_rf(session, lhs, 0)
+                let via_name = if via_rf.len() > 0: via_rf.slice(0, via_rf.find(":")) else: ""
+                out = out ++ "paramstoreinto:" ++ src_pi_str ++ ":" ++ lhs_root ++ ":" ++ via_name ++ "\n"
+            if ptr_slot < 0 and store.starts_with("localstore:"):
+                let src_loc = store.slice(11, store.len() - 1)
+                let via_rf = ci_own_place_via_rf(session, lhs, 0)
+                let via_name = if via_rf.len() > 0: via_rf.slice(0, via_rf.find(":")) else: ""
+                out = out ++ "localstoreinto:" ++ src_loc ++ ":" ++ lhs_root ++ ":" ++ via_name ++ ":" ++ lhs_rf_name ++ "\n"
             if ptr_slot >= 0:
                 out = out ++ f"outstore:{ptr_slot}:" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
                 if store.starts_with("localstore:"): out = out ++ "localout:" ++ store.slice(11, store.len() - 1) ++ f":{ptr_slot}\n"
@@ -19607,11 +19703,14 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
         let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
         let callee = if field.len() > 0: "*" ++ field else: ci_call_callee_name(session, with_ci_child(session, cursor, 0))
         var outcall_args = ""
+        var rfcall_args = ""
+        var rfcall_has_rf = false
         var ai = 1
         while ai < nc:
             let arg = with_ci_child(session, cursor, ai)
             let root = ci_own_place_root(session, arg, params, locals)
             let a = ci_own_peel(session, arg)
+            let arg_rf = ci_own_record_ptr_field(session, arg)
             if callee.len() > 0 and not callee.starts_with("*"):
                 let addr_loc = ci_own_addr_of_local(session, arg, params, locals)
                 let addr_param = if addr_loc.len() == 0: ci_own_addr_of_param(session, arg, params) else: -1
@@ -19627,11 +19726,36 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
                 if tag.len() > 0:
                     if outcall_args.len() > 0: outcall_args = outcall_args ++ ","
                     outcall_args = outcall_args ++ f"{ai - 1}=" ++ tag
+                var rftag = ""
+                if arg_rf.len() > 0:
+                    rftag = "rf:" ++ arg_rf.slice(0, arg_rf.find(":")) ++ "@" ++ ci_own_member_base_root(session, arg, params, locals)
+                    rfcall_has_rf = true
+                else if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("param:"):
+                    rftag = "p" ++ root.slice(6, root.len())
+                else if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("local:"):
+                    rftag = "l" ++ root.slice(6, root.len())
+                if rftag.len() > 0:
+                    if rfcall_args.len() > 0: rfcall_args = rfcall_args ++ ","
+                    rfcall_args = rfcall_args ++ f"{ai - 1}=" ++ rftag
             // #3173: `fieldsink:<i>:<field>:<callee>:<pos>`: a field of the
             // record parameter i names, handed to a call. An end function
             // hands one to `free`; that is the other half of the proof.
             let sunk_field = ci_own_param_field(session, arg, params)
             if sunk_field.len() > 0 and callee.len() > 0: out = out ++ "fieldsink:" ++ sunk_field ++ ":" ++ callee ++ f":{ai - 1}\n"
+            // #3124: record-pointer field `R.F` passed to a callee (or `&r->F`, or pointer into `R.F`).
+            if arg_rf.len() > 0:
+                if callee.len() > 0: out = out ++ "rfsink:" ++ arg_rf.slice(0, arg_rf.find(":")) ++ ":" ++ ci_own_member_base_root(session, arg, params, locals) ++ ":" ++ callee ++ f":{ai - 1}\n"
+                else: out = out ++ "rfescape:" ++ arg_rf.slice(0, arg_rf.find(":")) ++ ":call\n"
+            else:
+                let addr_rf = ci_own_addr_of_rf(session, arg)
+                if addr_rf.len() > 0:
+                    if callee.len() > 0 and not callee.starts_with("*"): out = out ++ "rfaddr:" ++ addr_rf.slice(0, addr_rf.find(":")) ++ ":" ++ ci_own_member_base_root(session, with_ci_child(session, a, 0), params, locals) ++ ":" ++ callee ++ f":{ai - 1}\n"
+                    else: out = out ++ "rfescape:" ++ addr_rf.slice(0, addr_rf.find(":")) ++ ":addr\n"
+                else:
+                    let sub_rf = ci_own_place_via_rf(session, arg, 0)
+                    if sub_rf.len() > 0:
+                        if callee.len() > 0: out = out ++ "rfsubsink:" ++ sub_rf.slice(0, sub_rf.find(":")) ++ ":" ++ callee ++ f":{ai - 1}\n"
+                        else: out = out ++ "rfescape:" ++ sub_rf.slice(0, sub_rf.find(":")) ++ ":subcall\n"
             if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("local:"):
                 if callee.len() > 0: out = out ++ "localsink:" ++ root.slice(6, root.len()) ++ ":" ++ callee ++ f":{ai - 1}\n"
                 else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
@@ -19659,12 +19783,13 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
                 else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
             ai = ai + 1
         if outcall_args.len() > 0: out = out ++ "outcall:" ++ callee ++ ":" ++ outcall_args ++ "\n"
-        // The arguments recorded as `localaddr` are not also the bare
+        if rfcall_args.len() > 0: out = out ++ "rfcall:" ++ callee ++ ":" ++ rfcall_args ++ "\n"
+        // The arguments recorded as `localaddr` / `rfaddr` are not also the bare
         // address-of below.
         if callee.len() > 0 and not callee.starts_with("*"):
             for ci in 0..nc:
                 let child = with_ci_child(session, cursor, ci)
-                if ci >= 1 and ci_own_addr_of_local(session, child, params, locals).len() > 0: continue
+                if ci >= 1 and (ci_own_addr_of_local(session, child, params, locals).len() > 0 or ci_own_addr_of_rf(session, child).len() > 0): continue
                 out = out ++ ci_own_walk(session, child, params, locals, frame)
             return out
     if kind == CXK_UNARY_OP and nc == 1 and with_ci_unary_op(session, cursor) == UO_ADDR:
@@ -19672,6 +19797,8 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
         let operand = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
         if with_ci_cursor_kind(session, operand) == CXK_DECL_REF and root.starts_with("local:"):
             out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
+        let addr_rf = ci_own_record_ptr_field(session, operand)
+        if addr_rf.len() > 0: out = out ++ "rfescape:" ++ addr_rf.slice(0, addr_rf.find(":")) ++ ":addr\n"
     // #3195: a for statement's increment runs after its body; recorded in
     // that order, `for (cur = t; cur; cur = next) { next = cur->next;
     // free(cur); }` reads as the walk it is (fd_local_alias_param).
