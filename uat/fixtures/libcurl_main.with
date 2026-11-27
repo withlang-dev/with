@@ -1,43 +1,68 @@
-// The libcurl release UAT, written against the facade surface (spec
-// §16.2b, ruling §66, D66): the program an application developer writes. It
-// initializes libcurl, makes an easy handle, sets options through the
-// discriminated variadic contract — a long, a copied string, and the write
-// callback with its userdata (the pair configured across two calls, D66
-// §16.2b.9) — transfers a local file through that callback, reads the
-// running library's version — the record through its scalar field, the
-// text through curl_version — and tears down in order: the handle first
-// (its Drop resets the handle, the abandonment path, before cleanup), then
-// the library.
+// Release UAT: libcurl through its registry facade (#3143, #3111). Zero
+// `unsafe`, zero project facade: Easy handle, HeaderList (CURLOPT_HTTPHEADER),
+// Mime + Part (CURLOPT_MIMEPOST), basic auth & timeout options, WRITEFUNCTION
+// + HEADERFUNCTION callbacks, getinfo (CURLINFO_RESPONSE_CODE), file transfer,
+// curl_version_info, and curl_version.
 use contracts.libcurl
 use c_import("curl/curl.h")
 use std.fs
 
-// libcurl calls this once per chunk of the response body; the userdata is
-// the program's own sink, typed by the facade over what it passed.
 fn on_data(ptr: *mut c_char, size: u64, nmemb: u64, sink: &fn(i32) -> Unit) -> u64:
     sink((size * nmemb) as i32)
     size * nmemb
 
-// The number of bytes the transfer of `path` handed the callback, or -1.
-// The sink is declared before the handle: the handle holds it until the
-// handle is dropped at the end of this scope.
+fn on_header(ptr: *mut c_char, size: u64, nmemb: u64, sink: &fn(i32) -> Unit) -> u64:
+    sink((size * nmemb) as i32)
+    size * nmemb
+
 fn fetch_bytes(path: &str) -> Result[i32, SetoptError]:
-    var total = 0
-    let sink = n => total = total + n
-    let made = Easy.new()
-    if made.is_none():
+    var total: i32 = 0
+    var hdr_bytes: i32 = 0
+    let body_sink = n => total = total + n
+    let hdr_sink = n => hdr_bytes = hdr_bytes + n
+    let Some(headers) = HeaderList.new("Accept: application/json") else:
+        print("libcurl slist new failed")
+        return Ok(-1)
+    let headers = match headers.append("X-With-UAT: 1"):
+        Ok(h) => h
+        Err(HeaderListError.FailedWithResource(_, old)) => old
+    let Some(easy_val) = Easy.new() else:
         print("libcurl easy init failed")
         return Ok(-1)
-    var easy = made.unwrap()
+    var easy = easy_val
     easy.nosignal(1)?
+    easy.timeout(10)?
+    easy.connecttimeout(5)?
+    easy.userpwd("user:pass")?
+    easy.httpheader(&headers)?
     easy.url("file://" ++ path)?
     easy.writefunction(on_data)?
-    easy.writedata(sink)?
+    easy.writedata(body_sink)?
+    easy.headerfunction(on_header)?
+    easy.headerdata(hdr_sink)?
     if easy.perform() != CURLE_OK: return Ok(-1)
+    match easy.getinfo(CURLINFO_RESPONSE_CODE):
+        Ok(_) => {}
+        Err(_) => return Ok(-1)
+    // Exercise multipart Mime + Part builder and CURLOPT_MIMEPOST retention.
+    easy.reset()
+    let Some(mime) = easy.mime() else:
+        print("libcurl mime create failed")
+        return Ok(-1)
+    let Some(part) = mime.addpart() else:
+        print("libcurl mime addpart failed")
+        return Ok(-1)
+    let _ = part.name("payload")
+    let _ = part.filename("data.json")
+    let _ = part.mime_type("application/json")
+    let payload = "{\"ok\":true}"
+    let _ = part.data(payload as []u8)
+    let mime_res = easy.mimepost(&mime)
+    easy.reset()
+    mime_res?
+    if hdr_bytes <= 0: return Ok(-1)
     total
 
-// The version number of the running library, read through the borrowed
-// version record; 0 when libcurl hands back none.
 fn version_number() -> u32:
     let info = curl_version_info(CURLVERSION_NOW)
     if info.is_none(): 0 else: info.unwrap().version_num
