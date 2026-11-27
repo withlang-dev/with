@@ -965,6 +965,7 @@ type CiProjectSymbol {
     param_ty: List[str],
     own_evidence: str,
     param_stores: List[i32],
+    param_out_returns: List[str],   // #3175: `;`-separated out-param slot indices through which param i (or a derived pointer) is directly written (`*out = p`)
     param_destroys: List[i32],
     owns_return: i32,
     borrow_from: i32,
@@ -1072,6 +1073,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         param_ty: [],
         own_evidence: "",
         param_stores: [],
+        param_out_returns: [],
         param_destroys: [],
         owns_return: 0,
         borrow_from: -1,
@@ -1149,6 +1151,7 @@ impl CiProjectSymbol:
         while self.param_reason.len() < n: self.param_reason.push("")
         while self.param_ty.len() < n: self.param_ty.push("")
         while self.param_stores.len() < n: self.param_stores.push(0)
+        while self.param_out_returns.len() < n: self.param_out_returns.push("")
         while self.param_destroys.len() < n: self.param_destroys.push(0)
         while self.param_mutates.len() < n: self.param_mutates.push(0)
         while self.param_array.len() < n: self.param_array.push(0)

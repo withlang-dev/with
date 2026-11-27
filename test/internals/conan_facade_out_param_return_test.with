@@ -1,0 +1,93 @@
+//! expect-stdout: ok
+// #3175 (ruled by Eric, 2026-11-25): a parameter (or a pointer derived from
+// it) written directly through another parameter's slot (`*out = p`) is
+// returned through that parameter, not stored; callers are judged by what
+// they pass for the slot:
+//   - `&local` or `&param` in caller's own frame -> alias (not stored unless
+//     the alias later escapes)
+//   - caller's own out-parameter -> transitive out-return
+//   - `&global`, `&s->field`, etc. -> retained
+//   - `out->field = p` -> stays a store
+//   - public function returning a parameter through `*out = p` -> stays raw
+use compiler.ConanClient
+use std.fs
+use std.process
+
+fn main:
+    let root = "out/tmp/conan_facade_out_param_return_test"
+    remove_tree(root)
+    let dep = root ++ "/dep"
+    let src = root ++ "/src"
+    let build = root ++ "/build"
+    assert(mkdir_p(dep ++ "/include") == 0)
+    assert(mkdir_p(src) == 0)
+    assert(mkdir_p(build) == 0)
+    let header = "typedef struct holder { const char *saved; } holder;\nint parse_self_param(const char *fmt);\nint parse_local_ok(const char *fmt);\nint parse_transitive_ok(const char *fmt);\nint parse_derived_global_bad(const char *fmt);\nint parse_global_bad(const char *fmt);\nint parse_field_bad(holder *h, const char *fmt);\nint parse_local_escapes_bad(const char *fmt);\nint parse_field_store_bad(holder *h, const char *fmt);\nint public_out_return(const char *p, const char **end);\n"
+    assert(write_file(dep ++ "/include/outp.h", header) == 0)
+    assert(write_file(src ++ "/outp.h", header) == 0)
+    var unit = "#include \"outp.h\"\n"
+    unit = unit ++ "static const char *g_saved = 0;\n"
+    // Internal helper matching libcurl's dollarstring(fmt, &fmt) / strtol endptr.
+    unit = unit ++ "static int dollarstring(const char *p, const char **end) { if (*p) p = p + 1; *end = p; return (int)*p; }\n"
+    // Helper returning a pointer derived via pointer arithmetic into a local.
+    unit = unit ++ "static int step_ptr(const char *p, const char **end) { const char *q = p + 1; *end = q; return (int)*q; }\n"
+    // Transitive internal helper forwarding its own out-parameter.
+    unit = unit ++ "static int wrap_dollar(const char *p, const char **out) { return dollarstring(p, out); }\n"
+    // Direct field store (`out->saved = p`) MUST stay a store.
+    unit = unit ++ "static int store_in_field(const char *p, holder *out) { out->saved = p; return 0; }\n"
+    // 1. Caller passes &fmt (own parameter variable, libcurl's exact line): NOT retained.
+    unit = unit ++ "int parse_self_param(const char *fmt) { return dollarstring(fmt, &fmt); }\n"
+    // 2. Caller passes &local that stays in frame: NOT retained.
+    unit = unit ++ "int parse_local_ok(const char *fmt) { const char *cur = 0; int n = dollarstring(fmt, &cur); return n + (cur ? (int)*cur : 0); }\n"
+    // 3. Caller passes &local through transitive wrapper: NOT retained.
+    unit = unit ++ "int parse_transitive_ok(const char *fmt) { const char *cur = 0; return wrap_dollar(fmt, &cur); }\n"
+    // 4. Derived pointer returned through *end into &global: MUST be retained.
+    unit = unit ++ "int parse_derived_global_bad(const char *fmt) { return step_ptr(fmt, &g_saved); }\n"
+    // 5. Caller passes &global: MUST be retained.
+    unit = unit ++ "int parse_global_bad(const char *fmt) { return dollarstring(fmt, &g_saved); }\n"
+    // 6. Caller passes &h->saved: MUST be retained.
+    unit = unit ++ "int parse_field_bad(holder *h, const char *fmt) { return dollarstring(fmt, &h->saved); }\n"
+    // 7. Caller passes &local, then stores local into global: MUST be retained.
+    unit = unit ++ "int parse_local_escapes_bad(const char *fmt) { const char *cur = 0; int n = dollarstring(fmt, &cur); g_saved = cur; return n; }\n"
+    // 8. Callee writes `out->saved = p` (field store, not `*out = p`): MUST stay retained.
+    unit = unit ++ "int parse_field_store_bad(holder *h, const char *fmt) { return store_in_field(fmt, h); }\n"
+    // 9. Public function returning param through `*end = p`: MUST stay raw.
+    unit = unit ++ "int public_out_return(const char *p, const char **end) { *end = p; return 0; }\n"
+    assert(write_file(src ++ "/outp.c", unit) == 0)
+    let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c outp.c\",\n  \"file\": \"outp.c\"\n}\n]\n"
+    assert(write_file(build ++ "/compile_commands.json", commands) == 0)
+    assert(write_file(dep ++ "/metadata.json", "{\"include_paths\": [\"include\"], \"libs\": [\"outp\"]}\n") == 0)
+    assert(set_env("WITH_REGISTRY", "file:///nonexistent-registry") == 0)
+    conan_write_facade("outp", "1.0", dep, src, build)
+    let report = read_file(dep ++ "/contract-report.txt") ?? ""
+    var l_self = ""
+    var l_local = ""
+    var l_trans = ""
+    var l_dglob = ""
+    var l_global = ""
+    var l_field = ""
+    var l_esc = ""
+    var l_fstore = ""
+    var l_pub = ""
+    for line in report.split("\n"):
+        if line.starts_with("  parse_self_param:"): l_self = line.to_owned()
+        if line.starts_with("  parse_local_ok:"): l_local = line.to_owned()
+        if line.starts_with("  parse_transitive_ok:"): l_trans = line.to_owned()
+        if line.starts_with("  parse_derived_global_bad:"): l_dglob = line.to_owned()
+        if line.starts_with("  parse_global_bad:"): l_global = line.to_owned()
+        if line.starts_with("  parse_field_bad:"): l_field = line.to_owned()
+        if line.starts_with("  parse_local_escapes_bad:"): l_esc = line.to_owned()
+        if line.starts_with("  parse_field_store_bad:"): l_fstore = line.to_owned()
+        if line.starts_with("  public_out_return:"): l_pub = line.to_owned()
+    let ok = l_self.contains("lend") and l_local.contains("lend") and l_trans.contains("lend") and l_dglob.contains("retains param 0") and l_global.contains("retains param 0") and l_field.contains("retains param 1") and l_esc.contains("retains param 0") and l_fstore.contains("retains param 1") and l_pub.contains("retains param 0")
+    if not ok: print(report)
+    assert(l_self.contains("lend"), l_self)
+    assert(l_local.contains("lend"), l_local)
+    assert(l_trans.contains("lend"), l_trans)
+    assert(l_dglob.contains("retains param 0"), l_dglob)
+    assert(l_global.contains("retains param 0"), l_global)
+    assert(l_field.contains("retains param 1"), l_field)
+    assert(l_esc.contains("retains param 0"), l_esc)
+    assert(l_fstore.contains("retains param 1"), l_fstore)
+    assert(l_pub.contains("retains param 0"), l_pub)
+    print("ok")

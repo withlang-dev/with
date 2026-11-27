@@ -19505,6 +19505,19 @@ fn ci_own_addr_of_local(session: i64, cursor: i32, params: &List[str], locals: &
     let root = ci_own_place_root(session, a, params, locals)
     if root.starts_with("local:"): root.slice(6, root.len()) else: ""
 
+// #3175: the parameter whose address `cursor` takes, when it is exactly `&param`; -1 otherwise.
+fn ci_own_addr_of_param(session: i64, cursor: i32, params: &List[str]) -> i32:
+    let a = ci_own_peel(session, cursor)
+    if with_ci_cursor_kind(session, a) != CXK_UNARY_OP or with_ci_num_children(session, a) != 1 or with_ci_unary_op(session, a) != UO_ADDR: return -1
+    let inner = ci_peel_transparent(session, with_ci_child(session, a, 0))
+    if with_ci_cursor_kind(session, inner) != CXK_DECL_REF: return -1
+    let spelled = with_ci_cursor_spelling(session, inner)
+    var at = 0
+    for param in params:
+        if spelled == param or ci_escape_reserved(spelled) == param: return at
+        at += 1
+    -1
+
 // #3173: `<i>:<field>` when `expr` is a field of the record parameter i
 // points at or holds (`p->state`, `p.state`), one level deep; "" otherwise.
 fn ci_own_param_field(session: i64, expr: i32, params: &List[str]) -> str:
@@ -19576,22 +19589,44 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
             if set_field.len() > 0 and recorded.starts_with("localstore:"): out = out ++ "localfield:" ++ recorded.slice(11, recorded.len() - 1) ++ ":" ++ set_field ++ "\n"
             let store = if recorded.starts_with("paramstore:") and ci_place_in_frame_record(session, lhs, frame): "" else: recorded
             // #3175: where the parameter was stored, for the report: the
-            // place as the source spells it and its location. The verdict
-            // reads `paramstore:` alone.
-            if store.starts_with("paramstore:"): out = out ++ "paramstoreat:" ++ store.slice(11, store.len() - 1) ++ ":" ++ with_ci_cursor_source_text(session, lhs).replace("\n", " ").replace(":", " ") ++ "\n"
-            if slot >= 0:
-                out = out ++ f"outstore:{slot}:" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
-                out = out ++ (if store.starts_with("localstore:"): "localout:" ++ store.slice(11, store.len() - 1) ++ f":{slot}\n" else: store)
+            // place as the source spells it and its location. Direct `*out = p`
+            // through a pointer-to-pointer slot (`*out` has pointer type) is
+            // recorded by `outstore:<slot>:<src>` rather than `paramstore:` so
+            // callers are judged by what they pass for `slot` (public
+            // out-returning functions stay raw in CiFacadeDraft.with). Scalar
+            // and struct out-params (`int *out`) never store a pointer here.
+            let ptr_slot = if slot >= 0 and ci_cursor_type_is_pointerish(session, lhs): slot else: -1
+            if ptr_slot < 0 and store.starts_with("paramstore:"): out = out ++ "paramstoreat:" ++ store.slice(11, store.len() - 1) ++ ":" ++ with_ci_cursor_source_text(session, lhs).replace("\n", " ").replace(":", " ") ++ "\n"
+            if ptr_slot >= 0:
+                out = out ++ f"outstore:{ptr_slot}:" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
+                if store.starts_with("localstore:"): out = out ++ "localout:" ++ store.slice(11, store.len() - 1) ++ f":{ptr_slot}\n"
+                else if not store.starts_with("paramstore:"): out = out ++ store
             else: out = out ++ store
     if kind == CXK_CALL_EXPR and nc >= 1:
         // #3174: through a function-pointer field, the sink names the field, marked.
         let field = ci_call_field_callee(session, with_ci_child(session, cursor, 0))
         let callee = if field.len() > 0: "*" ++ field else: ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+        var outcall_args = ""
         var ai = 1
         while ai < nc:
             let arg = with_ci_child(session, cursor, ai)
             let root = ci_own_place_root(session, arg, params, locals)
             let a = ci_own_peel(session, arg)
+            if callee.len() > 0 and not callee.starts_with("*"):
+                let addr_loc = ci_own_addr_of_local(session, arg, params, locals)
+                let addr_param = if addr_loc.len() == 0: ci_own_addr_of_param(session, arg, params) else: -1
+                var tag = ""
+                if addr_loc.len() > 0: tag = "&l" ++ addr_loc
+                else if addr_param >= 0: tag = f"&p{addr_param}"
+                else:
+                    let src = ci_own_source(session, arg, params, locals)
+                    if src.starts_with("param:"): tag = "p" ++ src.slice(6, src.len())
+                    else if src.starts_with("field:param:"): tag = "p" ++ src.slice(12, src.len())
+                    else if src.starts_with("local:"): tag = "l" ++ src.slice(6, src.len())
+                    else if src.starts_with("field:local:"): tag = "l" ++ src.slice(12, src.len())
+                if tag.len() > 0:
+                    if outcall_args.len() > 0: outcall_args = outcall_args ++ ","
+                    outcall_args = outcall_args ++ f"{ai - 1}=" ++ tag
             // #3173: `fieldsink:<i>:<field>:<callee>:<pos>`: a field of the
             // record parameter i names, handed to a call. An end function
             // hands one to `free`; that is the other half of the proof.
@@ -19623,6 +19658,7 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
                 if callee.len() > 0 and not callee.starts_with("*"): out = out ++ "localaddr:" ++ root.slice(6, root.len()) ++ ":" ++ callee ++ f":{ai - 1}\n"
                 else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
             ai = ai + 1
+        if outcall_args.len() > 0: out = out ++ "outcall:" ++ callee ++ ":" ++ outcall_args ++ "\n"
         // The arguments recorded as `localaddr` are not also the bare
         // address-of below.
         if callee.len() > 0 and not callee.starts_with("*"):
