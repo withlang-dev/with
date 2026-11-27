@@ -1,0 +1,137 @@
+// pcre2 10.49, the version `with get c.pcre2` pins. Every citation is a line
+// of the package's installed header, include/pcre2.h.
+//
+// Setting PCRE2_CODE_UNIT_WIDTH=8 exposes the UTF-8 8-bit API (`pcre2_*_8`).
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - pcre2_config_8, pcre2_pattern_info_8: untyped `void *where` out-parameter
+//   whose target type varies dynamically by selector integer.
+// - pcre2_general_context_*: custom malloc/free/userdata allocator table.
+// - pcre2_set_character_tables_8, pcre2_maketables_8, pcre2_maketables_free_8:
+//   raw uncounted character-table pointer retained inside compile_context.
+// - pcre2_set_compile_recursion_guard_8, pcre2_set_callout_8,
+//   pcre2_set_substitute_callout_8, pcre2_set_substitute_case_callout_8,
+//   pcre2_callout_enumerate_8, pcre2_set_recursion_memory_management_8,
+//   pcre2_jit_stack_*: callbacks with retained userdata or custom JIT stack allocators.
+// - pcre2_get_mark_8, pcre2_get_ovector_pointer_8, pcre2_substring_nametable_scan_8:
+//   return raw uncounted interior pointers into match_data / compiled code.
+// - pcre2_substring_get_*, pcre2_substring_free_8, pcre2_substring_list_*,
+//   pcre2_pattern_convert_8, pcre2_converted_pattern_free_8, pcre2_serialize_*:
+//   double-pointer (`**` / `***`) heap output buffers.
+// - pcre2_regcomp, pcre2_regexec, pcre2_regerror, pcre2_regfree: POSIX regex
+//   compatibility shim (regex_t).
+c facts pcre2:
+    define PCRE2_CODE_UNIT_WIDTH=8    // pcre2.h 10.49 lines 1052 to 1065: selects 8-bit UTF-8 code units and exposes the pcre2_*_8 API
+    resource Code wraps *mut pcre2_real_code_8
+        from pcre2_compile_8    // pcre2.h 10.49 lines 725 to 727: compiles pattern into heap-allocated pcre2_code_8 freed by pcre2_code_free_8
+        drop pcre2_code_free_8    // pcre2.h 10.49 lines 728 to 729: frees compiled pattern
+    resource MatchData wraps *mut pcre2_real_match_data_8
+        from pcre2_match_data_create_8    // pcre2.h 10.49 lines 749 to 750: allocates match data block freed by pcre2_match_data_free_8
+        from pcre2_match_data_create_from_pattern_8    // pcre2.h 10.49 lines 751 to 753: allocates match data sized for pattern, freed by pcre2_match_data_free_8
+        drop pcre2_match_data_free_8    // pcre2.h 10.49 lines 754 to 755: frees match data block
+    resource CompileContext wraps *mut pcre2_real_compile_context_8
+        from pcre2_compile_context_create_8    // pcre2.h 10.49 lines 651 to 652: allocates compile context freed by pcre2_compile_context_free_8
+        drop pcre2_compile_context_free_8    // pcre2.h 10.49 lines 653 to 654: frees compile context
+    resource MatchContext wraps *mut pcre2_real_match_context_8
+        from pcre2_match_context_create_8    // pcre2.h 10.49 lines 680 to 681: allocates match context freed by pcre2_match_context_free_8
+        drop pcre2_match_context_free_8    // pcre2.h 10.49 lines 682 to 683: frees match context
+    resource ConvertContext wraps *mut pcre2_real_convert_context_8
+        from pcre2_convert_context_create_8    // pcre2.h 10.49 lines 712 to 713: allocates convert context freed by pcre2_convert_context_free_8
+        drop pcre2_convert_context_free_8    // pcre2.h 10.49 lines 714 to 715: frees convert context
+    fn pcre2_compile_8
+        buffer param 0 len param 1    // pcre2.h 10.49 line 726: reads length code units from pattern
+        param 3 discarded    // pcre2.h 10.49 line 726: int *errorcode out parameter
+        param 4 discarded    // pcre2.h 10.49 line 726: PCRE2_SIZE *erroroffset out parameter
+    fn pcre2_match_data_create_8
+        param 1 fixed null    // pcre2.h 10.49 line 750: NULL selects default general context
+    fn pcre2_match_data_create_from_pattern_8
+        param 1 fixed null    // pcre2.h 10.49 line 753: NULL selects default general context
+    fn pcre2_compile_context_create_8
+        param 0 fixed null    // pcre2.h 10.49 line 652: NULL selects default general context
+    fn pcre2_match_context_create_8
+        param 0 fixed null    // pcre2.h 10.49 line 681: NULL selects default general context
+    fn pcre2_convert_context_create_8
+        param 0 fixed null    // pcre2.h 10.49 line 713: NULL selects default general context
+    fn pcre2_match_8
+        buffer param 1 len param 2    // pcre2.h 10.49 line 760: reads subject[0..length] without retaining subject
+        lend    // pcre2.h 10.49 lines 760 to 761: borrows code, match_data, and match_context
+    fn pcre2_jit_compile_8
+        lend    // pcre2.h 10.49 line 848: JIT-compiles pattern in place on code
+    fn pcre2_jit_match_8
+        buffer param 1 len param 2    // pcre2.h 10.49 line 850: reads subject[0..length]
+        lend    // pcre2.h 10.49 lines 850 to 851: borrows code, match_data, and match_context
+    fn pcre2_dfa_match_8
+        buffer param 1 len param 2    // pcre2.h 10.49 line 757: reads subject[0..length]
+        buffer param 7 capacity param 8 elements    // pcre2.h 10.49 line 758: workspace int array of wscount ints
+        lend    // pcre2.h 10.49 lines 757 to 758: borrows code, match_data, and match_context
+    fn pcre2_substitute_8
+        buffer param 1 len param 2    // pcre2.h 10.49 line 829: reads subject[0..length]
+        buffer param 7 len param 8    // pcre2.h 10.49 lines 830 to 831: reads replacement[0..rlength]
+        buffer param 9 capacity param 10 inout    // pcre2.h 10.49 line 831: outputbuffer capacity on entry, written length on exit
+        ok >= 0    // pcre2.h 10.49 line 829: returns number of substitutions (>= 0) on success, negative error code on failure
+        lend    // pcre2.h 10.49 lines 829 to 831: borrows code, match_data, and match_context
+    fn pcre2_get_match_data_size_8
+        lend    // pcre2.h 10.49 line 765: queries match_data size
+    fn pcre2_get_match_data_heapframes_size_8
+        lend    // pcre2.h 10.49 line 767: queries match_data heapframes size
+    fn pcre2_get_ovector_count_8
+        lend    // pcre2.h 10.49 line 769: returns number of ovector offset pairs
+    fn pcre2_get_startchar_8
+        lend    // pcre2.h 10.49 line 773: returns starting offset of match
+    fn pcre2_next_match_8
+        fills param 1    // pcre2.h 10.49 line 775: writes next start offset
+        fills param 2    // pcre2.h 10.49 line 775: writes next match options
+        lend    // pcre2.h 10.49 line 775: borrows match_data
+    fn pcre2_substring_copy_byname_8
+        text param 1    // pcre2.h 10.49 line 782: NUL-terminated group name
+        buffer param 2 capacity param 3 inout    // pcre2.h 10.49 lines 782 to 783: writes matched group into buffer and updates *bufflen
+        ok 0    // pcre2.h 10.49 line 782: returns 0 on success
+        lend    // pcre2.h 10.49 line 782: borrows match_data
+    fn pcre2_substring_copy_bynumber_8
+        buffer param 2 capacity param 3 inout    // pcre2.h 10.49 lines 785 to 786: writes matched group into buffer and updates *bufflen
+        ok 0    // pcre2.h 10.49 line 785: returns 0 on success
+        lend    // pcre2.h 10.49 line 785: borrows match_data
+    fn pcre2_substring_length_byname_8
+        text param 1    // pcre2.h 10.49 line 796: NUL-terminated group name
+        fills param 2    // pcre2.h 10.49 line 796: writes matched substring length
+        ok 0    // pcre2.h 10.49 line 796: returns 0 on success
+        lend    // pcre2.h 10.49 line 796: borrows match_data
+    fn pcre2_substring_length_bynumber_8
+        fills param 2    // pcre2.h 10.49 line 798: writes matched substring length
+        ok 0    // pcre2.h 10.49 line 798: returns 0 on success
+        lend    // pcre2.h 10.49 line 798: borrows match_data
+    fn pcre2_substring_number_from_name_8
+        text param 1    // pcre2.h 10.49 line 803: NUL-terminated group name
+        lend    // pcre2.h 10.49 line 803: borrows const code
+    fn pcre2_get_error_message_8
+        buffer param 1 capacity param 2    // pcre2.h 10.49 line 866: writes error message into buffer of bufflen bytes
+    fn pcre2_set_bsr_8
+        lend    // pcre2.h 10.49 line 656: sets BSR option on compile context
+    fn pcre2_set_compile_extra_options_8
+        lend    // pcre2.h 10.49 line 660: sets extra compile options on compile context
+    fn pcre2_set_max_pattern_length_8
+        lend    // pcre2.h 10.49 line 662: sets max pattern length on compile context
+    fn pcre2_set_max_pattern_compiled_length_8
+        lend    // pcre2.h 10.49 line 664: sets max compiled length on compile context
+    fn pcre2_set_max_varlookbehind_8
+        lend    // pcre2.h 10.49 line 666: sets max varlookbehind on compile context
+    fn pcre2_set_newline_8
+        lend    // pcre2.h 10.49 line 668: sets newline convention on compile context
+    fn pcre2_set_parens_nest_limit_8
+        lend    // pcre2.h 10.49 line 670: sets parens nest limit on compile context
+    fn pcre2_set_optimize_8
+        lend    // pcre2.h 10.49 line 675: sets optimization directive on compile context
+    fn pcre2_set_depth_limit_8
+        lend    // pcre2.h 10.49 line 696: sets depth limit on match context
+    fn pcre2_set_heap_limit_8
+        lend    // pcre2.h 10.49 line 698: sets heap limit on match context
+    fn pcre2_set_match_limit_8
+        lend    // pcre2.h 10.49 line 700: sets match limit on match context
+    fn pcre2_set_offset_limit_8
+        lend    // pcre2.h 10.49 line 702: sets offset limit on match context
+    fn pcre2_set_recursion_limit_8
+        lend    // pcre2.h 10.49 line 704: sets recursion limit on match context
+    fn pcre2_set_glob_escape_8
+        lend    // pcre2.h 10.49 line 717: sets glob escape on convert context
+    fn pcre2_set_glob_separator_8
+        lend    // pcre2.h 10.49 line 719: sets glob separator on convert context

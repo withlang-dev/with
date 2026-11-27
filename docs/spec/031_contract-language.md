@@ -447,7 +447,7 @@ produced. (§16.2b.15.)
 | `drop f` | `f`, taking only the representation, destroys it; `Drop` calls it. `drop f(param N)`: the representation is parameter N, and every other parameter is fixed on `fn f`. | G | a resource with a producer and no destruction path is refused | §16.2b.3 |
 | `destroys f` | `f` destroys the resource and takes further arguments; `destroys f(param N)`: the resource is parameter N, the first when the parentheses are absent; called explicitly, consuming. A resource with `destroys` and no `drop` is refused. The resource owns this fact, with `from`, `init`, `drop` and `abandon`. | G | | §16.2b.3 |
 | `abandon f` | `f`, which invokes no callbacks, runs before the destroyer on a drop path that abandons a half-configured callback pair. `abandon f(param N)`: the representation is parameter N, the first when the parentheses are absent, and every other parameter is fixed or discarded on `fn f`. | G | | §16.2b.9 |
-| `ok C1, C2` | the producers' status is success when it is one of these constants; with several, the `Ok` side carries the one that matched. A status is a constant's name or an integer literal. A success status with nothing produced is `NothingProduced`, an error. | G | the status is uninterpreted: the constructor's result is `(status, Option[N])`. There is no rule that 0 means success | §16.2b.4 |
+| `ok C1, C2` / `ok >= C` | the producers' status is success when it is one of these constants or satisfies `>= C`; with several constants or `>= C`, the `Ok` side carries the status that matched. A status is a constant's name or an integer literal. A success status with nothing produced is `NothingProduced`, an error. | G | the status is uninterpreted: the constructor's result is `(status, Option[N])`. There is no rule that 0 means success | §16.2b.4 |
 | `message f` | `f` describes the resource's most recent failure; an error from an operation on the resource carries `message: str`, an owned copy read before any other operation on it. | G | | §16.2b.4 |
 | `borrows param p` | the product depends on the resource received at `p` and cannot outlive it. | R | every resource parameter of a producer is a dependency | §16.2b.6 |
 | `independent` | the product depends on no parameter. | G | dependent | §16.2b.6 |
@@ -498,9 +498,9 @@ and a call of the `drop` by its imported name consumes the resource:
 | `consumes param p` | the callee takes ownership of what `p` receives. `destroyed_by param q` names the callback C later invokes to destroy it. If registration can fail without taking ownership the contract says when transfer occurs; absent that, the caller keeps ownership. | G | observed | §16.2b.5 |
 | `detaches param p` | removes the value `p` borrows from its origin and yields it owned, dependent on that origin as a `borrows` child is. | G | | §16.2b.6 |
 | `retains param p by param q` | the value at `p` must outlive the resource at `q`; ownership stays outside C. A modeled unregister may release it. | G | a retained pointer makes the function raw | §16.2b.5 |
-| `reads param p` | `p` points to one value record the callee only reads; presents `&T`. | G | raw | §16.2b.5 |
-| `fills param p` | the callee writes the record without reading it first; presents the operation's result. With passes `T.zeroed()`, so `T` must be zero-valid. | G | raw | §16.2b.5 |
-| `updates param p` | the callee reads and writes the record; presents a `mut` parameter. | G | raw | §16.2b.5 |
+| `reads param p` | `p` points to one flat value (complete record or scalar) the callee only reads; presents `&T`. | G | raw | §16.2b.5 |
+| `fills param p` | the callee writes the flat value (record or scalar) without reading it first; presents the operation's result. With passes a zero-initialized `T` (`T.zeroed()` for a record, `0`/`false` for a scalar), so a record `T` must be zero-valid. | G | raw | §16.2b.5 |
+| `updates param p` | the callee reads and writes the flat value (record or scalar); presents a `mut` parameter. | G | raw | §16.2b.5 |
 | `nullable param p` | NULL is accepted at `p`; presents `Option`. Composes with `reads`: `Option[&T]`. | G | an input pointer the contract presents is non-null | §16.2b.8 |
 | `returns borrow R from param p` | the result is a view of the resource at `p` and cannot outlive it. `from params p, q`: of both. `from parent T of param p`: of the resource `p`'s resource itself borrows from. `from domain D`: of that foreign state. | G | the call is safe and the result is a raw pointer | §16.2b.6 |
 | `returns static T` | the result lives for the whole program. Never inferred from the absence of a visible owner. | G | the call is safe and the result is a raw pointer | §16.2b.7 |
@@ -523,7 +523,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `establishes domain D` | after the call returns, `D` is established. Wrong, every later `requires` passes against state that does not exist. | G | | §16.2b.7 |
 | `ends domain D` | after the call, `D` is not established. | R | | §16.2b.7 |
 | `requires domain D` | the operation needs `D` established. | R | | §16.2b.7 |
-| `ok C` | this operation's status convention. | G | none | §16.2b.4 |
+| `ok C` / `ok >= C` | this operation's status convention (an equality list or lower bound `>= C`). | G | none | §16.2b.4 |
 | `null status C` | status carried in `FailedWithResource` when a consuming same-type pointer producer returns `NULL` (returning the input resource intact in a good state). Required with `consumes param N` on such a producer; the facade never invents a status. | G | none | §16.2b.4 |
 | `valid on failed` | the operation may be called on a resource whose production failed. | G | an operation needs a produced resource | §16.2b.4 |
 | `of R` / `of R(param p)` | the operation is presented on resource `R`, receiving it at parameter `p` (parameter 0 when the parentheses are absent). Required when its resource parameter's representation is wrapped by more than one resource, or when the resource parameter is not parameter 0. | P | the one resource that wraps parameter 0's representation | §16.2b.3 |

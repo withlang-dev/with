@@ -2132,8 +2132,11 @@ impl Sema:
             let shown = self.facade_param_display(fn_sym, sig, pi)
             let ptype = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
             let record = if self.get_type_kind(ptype) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(ptype) as TypeId) as i32 else: 0
-            if record == 0 or self.get_type_kind(record as TypeId) != TypeKind.TY_STRUCT or self.is_opaque_value_type(record):
-                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value record is a pointer to one complete record; this is not one (§16.2b.5)", clause, "a pointer with a count is 'buffer param P len param L'; text is 'text param P'; an opaque record is a resource ('resource Name wraps *mut T')")
+            let rk = if record != 0: self.get_type_kind(self.numeric_operand_type(record)) else: TypeKind.TY_VOID
+            let is_flat_scalar = rk == TypeKind.TY_INT or rk == TypeKind.TY_FLOAT or rk == TypeKind.TY_BOOL
+            let is_complete_record = record != 0 and self.get_type_kind(record as TypeId) == TypeKind.TY_STRUCT and not self.is_opaque_value_type(record)
+            if not is_complete_record and not is_flat_scalar:
+                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value parameter is a pointer to one complete record or scalar; this is not one (§16.2b.5)", clause, "a pointer with a count is 'buffer param P len param L'; text is 'text param P'; an opaque record is a resource ('resource Name wraps *mut T')")
                 return c
             if self.facade_param_takes_resource(fn_sym, pi):
                 self.emit_error_with_help(f"fn '{fname}': {word} {shown}: the record is a resource's representation, so the operation borrows that resource; it is not a value record (§16.2b.5)", clause, f"delete the `{word}` clause: the operation is presented on the resource and borrows it")
@@ -2141,14 +2144,15 @@ impl Sema:
             if self.facade_contract_pairs_buffer(c, pi):
                 self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a pointer paired with a count is a buffer (§16.2b.8), not a value record (§16.2b.5)", clause, f"delete the `{word}` clause and keep the buffer clause")
                 return c
-            let held = self.pointer_holding_part(record, "")
-            if held.len() > 0:
-                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value record is flat, and {held} is a pointer the program could set to any address; such a record is a resource, a buffer, or stays raw (§16.2b.5)", clause, "declare the record a resource ('resource Name wraps *mut T' with its producer and 'drop'), or leave the function raw")
-                return c
+            if is_complete_record:
+                let held = self.pointer_holding_part(record, "")
+                if held.len() > 0:
+                    self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value record is flat, and {held} is a pointer the program could set to any address; such a record is a resource, a buffer, or stays raw (§16.2b.5)", clause, "declare the record a resource ('resource Name wraps *mut T' with its producer and 'drop'), or leave the function raw")
+                    return c
             if word != "reads" and self.get_type_d1(ptype) == 0:
                 self.emit_error_with_help(f"fn '{fname}': {word} {shown}: the pointer is `const`, so the callee cannot write the record; `reads` is the clause (§16.2b.5)", clause, f"write `reads` in place of `{word}`")
                 return c
-            if word == "fills":
+            if word == "fills" and is_complete_record:
                 let culprit = self.zero_invalid_part(record, "")
                 if culprit.len() > 0:
                     self.emit_error_with_help(f"fn '{fname}': fills {shown}: With passes `{self.type_name(record)}.zeroed()`, and {culprit} has no all-zero value (§16.2b.3, §16.2b.5)", clause, "write `updates`: the caller then passes a record it built")
@@ -2586,10 +2590,18 @@ impl Sema:
     // not the facade's symbol for the same name: when the symbol lookup
     // misses, find the declaration by its text, as the raw-ABI classifier does.
     fn facade_fn_decl_node(fn_sym: i32) -> i32:
+        let want = self.safe_symbol_text(fn_sym)
+        // Prefer an extern declaration from this facade's own module (e.g.
+        // `c_import`) over a same-named With function in an unrelated module.
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() or self.decl_is_c_import[di] == 0: continue
+            if di >= self.decl_source_paths.len() or self.decl_source_paths[di] != self.current_module_path: continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_EXTERN_FN and self.safe_symbol_text(self.ast.get_data0(decl)) == want:
+                return decl
         let direct = self.fn_symbol_decl_node(fn_sym)
         if direct != 0:
             return direct
-        let want = self.safe_symbol_text(fn_sym)
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
@@ -2764,12 +2776,21 @@ impl Sema:
 
     // A status constant is a c_import `let` (or a `const`) with a literal
     // initializer: a materialized compile-time value, never a runtime read.
+    // D245: `ok >= C` interns `>=C`; validate `C`.
     fn facade_status_constant_ok(sym: i32) -> bool:
-        // An integer literal is its own value (§16.2b.4: `ok 0`).
-        if facade_status_is_literal(self.pool_resolve(sym)): return true
+        let raw = self.pool_resolve(sym)
+        let is_ge = raw.starts_with(">=")
+        let text = if is_ge: raw.slice(2, raw.len()) else: raw
+        // An integer literal is its own value (§16.2b.4: `ok 0`, `ok >= 0`).
+        if facade_status_is_literal(text): return true
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_LET_DECL or self.ast.get_data0(decl) != sym:
+            if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
+                continue
+            let decl_sym = self.ast.get_data0(decl)
+            if is_ge:
+                if self.pool_resolve(decl_sym) != text: continue
+            else if decl_sym != sym:
                 continue
             var value = self.ast.get_data1(decl)
             if value != 0 and self.ast.kind(value) == NodeKind.NK_COMPTIME:
@@ -4114,7 +4135,7 @@ impl Sema:
     // Whether a callback, retention or consumption clause models `pi`.
     fn facade_contract_models_param(ci: i32, pi: i32) -> bool:
         let c = &self.foreign_contracts[ci]
-        c.callback_userdata_cb.contains(pi) or c.callback_userdata_of.contains(pi) or c.retains.contains(pi) or c.consumes.contains(pi) or c.consumes_destroyed_by.contains(pi) or c.callback_consumes.contains(pi)
+        c.bare_callbacks.contains(pi) or c.callback_userdata_cb.contains(pi) or c.callback_userdata_of.contains(pi) or c.retains.contains(pi) or c.consumes.contains(pi) or c.consumes_destroyed_by.contains(pi) or c.callback_consumes.contains(pi)
 
     // Sema owns the C-to-presented parameter projection. Effects and
     // callback argument indices use this same mapping; collapsing a buffer
@@ -4261,7 +4282,7 @@ impl Sema:
         let inout = self.facade_contract_inout(ci)
         let ok_const = self.foreign_contracts[ci].ok_const
         let resource_op = self.facade_fn_is_resource_op(fn_sym)
-        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0
+        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].bare_callbacks.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0
         let callback_item = self.facade_contract_is_callback_item(ci)
         // D122 (§16.2b.8): a producer's buffer-plus-length input
         // (xmlReadMemory's buffer and size) is paired like a lend's; the
@@ -4307,6 +4328,9 @@ impl Sema:
         if self.foreign_contracts[ci].ok_count > 1 and (inout >= 0 or self.foreign_contracts[ci].variadic_node != 0):
             let shape = if inout >= 0: "a copied-back length is presented under one success status" else: "a variadic setter has one success status"
             self.emit_error_with_help(f"fn '{fname}': 'ok' lists several success statuses, and {shape} (§16.2b.4)", node, "list one success status: 'ok <CONST>'")
+            return
+        if ok_const != 0 and self.foreign_contracts[ci].variadic_node != 0 and self.pool_resolve(ok_const).starts_with(">="):
+            self.emit_error_with_help(f"fn '{fname}': a variadic setter's 'ok' names one equality status constant, not a lower bound (§16.2b.4, §16.2b.5)", node, "state the setter's single success constant: 'ok <CONST>'")
             return
         // A resource's own operation renders as its constructor or destroyer,
         // a callback contract as its callback method (stage 9): their

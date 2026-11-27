@@ -1,0 +1,59 @@
+//! expect-stdout: sub_ok len 5
+//! expect-stdout: sub_err -1
+//! expect-stdout: match_ok 3
+//! expect-stdout: match_err -2
+//! expect-stdout: fill_ok 2 99
+//! expect-stdout: fill_err -3
+// D245 (§16.2b.4): `ok >= C` status predicate for non-negative-count C APIs.
+use c_import("
+#include <stddef.h>
+static inline int sub_copy(const unsigned char *src_buf, size_t in_len, unsigned char *out, size_t *out_len) {
+    if (in_len == 0) return -1;
+    if (*out_len < in_len) return -2;
+    for (size_t i = 0; i < in_len; i++) out[i] = src_buf[i];
+    *out_len = in_len;
+    return 1;
+}
+static inline int count_matches(int n) {
+    return n < 0 ? -2 : n;
+}
+static inline int fill_count(int n, int *out) {
+    if (n < 0) return -3;
+    *out = 99;
+    return n;
+}
+")
+
+c contract nonneg:
+    fn sub_copy
+        buffer param src_buf len param in_len
+        buffer param out capacity param out_len inout
+        ok >= 0
+    fn count_matches
+        ok >= 0
+    fn fill_count
+        fills param out
+        ok >= 0
+
+fn main:
+    var out: [u8; 16] = [0 as u8; 16]
+    let src: [u8; 5] = [65, 66, 67, 68, 69]
+    match sub_copy(src, out):
+        Ok(n) => print(f"sub_ok len {n}")
+        Err(.Failed(st)) => print(f"sub_err {st}")
+    let empty: [u8; 0] = []
+    match sub_copy(empty, out):
+        Ok(n) => print(f"sub_ok len {n}")
+        Err(.Failed(st)) => print(f"sub_err {st}")
+    match count_matches(3):
+        Ok(n) => print(f"match_ok {n}")
+        Err(.Failed(st)) => print(f"match_err {st}")
+    match count_matches(-5):
+        Ok(n) => print(f"match_ok {n}")
+        Err(.Failed(st)) => print(f"match_err {st}")
+    match fill_count(2):
+        Ok((n, v)) => print(f"fill_ok {n} {v}")
+        Err(.Failed(st)) => print(f"fill_err {st}")
+    match fill_count(-1):
+        Ok((n, v)) => print(f"fill_ok {n} {v}")
+        Err(.Failed(st)) => print(f"fill_err {st}")

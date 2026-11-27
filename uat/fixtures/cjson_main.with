@@ -1,0 +1,70 @@
+// Release UAT: cJSON through its registry facade (#3151). Zero `unsafe`, zero
+// project facade: cJSON_Parse, typed item access, cJSON_CreateObject /
+// cJSON_AddItemToObject ownership transfer, cJSON_Print owned text, and
+// automatic cJSON_Delete on scope exit.
+use contracts.cjson
+use c_import("cjson/cJSON.h")
+
+fn main:
+    // 1. Parse JSON and verify typed item access.
+    let raw = "{\"name\":\"with\",\"year\":2026,\"tags\":[\"native\",\"safe\"]}"
+    let Some(doc) = CJSON.parse(raw) else:
+        print("cjson parse failed")
+        return 1
+    let Some(name_item) = doc.get_object_item_case_sensitive("name") else:
+        print("cjson name missing")
+        return 1
+    if name_item.is_string() == 0:
+        print("cjson name not string")
+        return 1
+    let Some(name_cs) = name_item.get_string_value() else:
+        print("cjson name string null")
+        return 1
+    if name_cs.to_str_lossy() != "with":
+        print("cjson name mismatch")
+        return 1
+    let Some(year_item) = doc.get_object_item_case_sensitive("year") else:
+        print("cjson year missing")
+        return 1
+    if year_item.is_number() == 0 or year_item.get_number_value() != 2026.0:
+        print("cjson year mismatch")
+        return 1
+    let Some(tags) = doc.get_object_item_case_sensitive("tags") else:
+        print("cjson tags missing")
+        return 1
+    if tags.is_array() == 0 or tags.get_array_size() != 2:
+        print("cjson tags mismatch")
+        return 1
+
+    // 2. Build an object, transfer ownership of children via AddItemToObject,
+    //    print to an owned string, and re-parse to compare.
+    let Some(built) = CJSON.create_object() else:
+        print("cjson create_object failed")
+        return 1
+    let Some(v_name) = CJSON.create_string("with") else:
+        print("cjson create_string failed")
+        return 1
+    if built.add_item_to_object("name", v_name) == 0:
+        print("cjson add_item_to_object failed")
+        return 1
+    let Some(v_num) = CJSON.create_number(42.0) else:
+        print("cjson create_number failed")
+        return 1
+    if built.add_item_to_object("answer", v_num) == 0:
+        print("cjson add_item_to_object number failed")
+        return 1
+    let Some(printed) = built.print_unformatted() else:
+        print("cjson print_unformatted failed")
+        return 1
+    let Some(reparsed) = CJSON.parse_with_length(printed as []u8) else:
+        print("cjson reparse failed")
+        return 1
+    if built.compare(&reparsed, 1) == 0:
+        print("cjson compare mismatch")
+        return 1
+
+    if cJSON_Version().is_none():
+        print("cjson version missing")
+        return 1
+
+    print("cjson UAT passed")

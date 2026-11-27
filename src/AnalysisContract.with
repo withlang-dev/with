@@ -390,9 +390,9 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
         var c = ""
         for k in 0..r.ok_consts.len():
             c = c ++ (if k > 0: ", " else: "") ++ sema.safe_symbol_text(r.ok_consts[k])
-        // Several success statuses: the Ok side carries the one that matched
-        // beside the produced value (§16.2b.4).
-        let ok_side = if r.ok_consts.len() > 1: f"(status, {rname})" else: rname
+        // Several success statuses or `ok >= C` (D245): the Ok side carries
+        // the status that matched beside the produced value (§16.2b.4).
+        let ok_side = if r.ok_consts.len() > 1 or sema.safe_symbol_text(r.ok_consts[0]).starts_with(">="): f"(status, {rname})" else: rname
         contract_row(report, sema, site, subject, CONTRACT_RESOURCE, clause, r.ok_consts[0], owner, -1, "status", f"ok {c}; a status-returning producer is Result[{ok_side}, {rname}Error]", contract_clause_at(sema, site, clause))
     else if r.handle == 0 and not init_states_ok:
         contract_row(report, sema, site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "status", "none; a producer's failure is None, or (status, None) through an out parameter", "default:no status convention is inferred (§16.2b.4)")

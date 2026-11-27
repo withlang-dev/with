@@ -1,0 +1,93 @@
+// Release UAT: xz_utils (liblzma) through its registry facade (#3139). Zero
+// `unsafe`, zero project facade: lzma_easy_encoder / lzma_stream_decoder with
+// lzma_code, lzma_easy_buffer_encode / lzma_stream_buffer_decode, and .xz file
+// roundtrip via std.fs.
+use contracts.xz_utils
+use c_import("lzma.h")
+use std.fs
+use std.string
+
+fn main:
+    let input = "with xz_utils roundtrip payload for liblzma streaming and buffer encode"
+    let bytes = input as []u8
+
+    // 1. Streaming lzma_easy_encoder / lzma_code -> .xz file -> lzma_stream_decoder / lzma_code.
+    let Ok(enc) = Stream.easy_encoder(6, LZMA_CHECK_CRC64) else:
+        print("xz_utils easy_encoder failed")
+        return 1
+    var stream_packed: [u8; 512] = [0 as u8; 512]
+    let estep = enc.code(bytes, stream_packed, LZMA_FINISH)
+    if estep.status != LZMA_STREAM_END or estep.consumed != bytes.len() as usize or estep.produced == 0:
+        print("xz_utils encode stream failed")
+        return 1
+
+    // Write .xz file and read it back via std.fs.
+    let path = "roundtrip.xz"
+    var sb = StringBuilder.new()
+    for i in 0..estep.produced as i32:
+        sb.push_byte(stream_packed[i])
+    if write_file(path, sb.to_str()) != 0:
+        print("xz_utils write_file failed")
+        return 1
+    let Ok(file_data) = read_file(path) else:
+        print("xz_utils read_file failed")
+        return 1
+
+    let Ok(dec) = Stream.decoder(18446744073709551615 as u64, 0) else:
+        print("xz_utils stream_decoder failed")
+        return 1
+    var stream_out: [u8; 256] = [0 as u8; 256]
+    let dstep = dec.code(file_data as []u8, stream_out, LZMA_FINISH)
+    if dstep.status != LZMA_STREAM_END or dstep.produced != bytes.len() as usize:
+        print("xz_utils decode stream failed")
+        return 1
+    for i in 0..dstep.produced as i32:
+        if stream_out[i] != bytes[i]:
+            print("xz_utils stream content mismatch")
+            return 1
+
+    // 2. Single-call lzma_easy_buffer_encode and lzma_stream_buffer_decode.
+    var buf_packed: [u8; 512] = [0 as u8; 512]
+    var out_pos: usize = 0
+    let Ok(()) = lzma_easy_buffer_encode(6, LZMA_CHECK_CRC64, bytes, buf_packed, mut out_pos) else:
+        print("xz_utils easy_buffer_encode failed")
+        return 1
+    if out_pos == 0:
+        print("xz_utils easy_buffer_encode empty")
+        return 1
+
+    var memlimit: u64 = 67108864 as u64
+    var in_pos: usize = 0
+    var dec_pos: usize = 0
+    var buf_out: [u8; 256] = [0 as u8; 256]
+    let Ok(()) = lzma_stream_buffer_decode(mut memlimit, 0, buf_packed[..out_pos], mut in_pos, buf_out, mut dec_pos) else:
+        print("xz_utils stream_buffer_decode failed")
+        return 1
+    if dec_pos != bytes.len() as usize:
+        print("xz_utils buffer decode length mismatch")
+        return 1
+    for i in 0..dec_pos as i32:
+        if buf_out[i] != bytes[i]:
+            print("xz_utils buffer decode content mismatch")
+            return 1
+
+    // 3. Checksums and VLI roundtrip.
+    let c32 = lzma_crc32(bytes, 0)
+    let c64 = lzma_crc64(bytes, 0)
+    if c32 == 0 or c64 == 0:
+        print("xz_utils crc failed")
+        return 1
+    var vli_buf: [u8; 16] = [0 as u8; 16]
+    var vpos: usize = 0
+    let Ok(()) = lzma_vli_encode(123456789 as u64, vli_buf, mut vpos) else:
+        print("xz_utils vli_encode failed")
+        return 1
+    var rpos: usize = 0
+    let Ok(vdec) = lzma_vli_decode(vli_buf[..vpos], mut rpos) else:
+        print("xz_utils vli_decode failed")
+        return 1
+    if vdec != 123456789 as u64:
+        print("xz_utils vli mismatch")
+        return 1
+
+    print("xz_utils UAT passed")
