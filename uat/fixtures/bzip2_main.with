@@ -1,12 +1,13 @@
-// Release UAT: bzip2 through its facade (D64, spec §16.2b.8). The program an
-// application developer writes over `with get c.bzip2`: the facade
-// `facades.bzip2` is the project's own (§16.2b.1). No `unsafe`, no pointer,
-// no length: the one-shot calls take two slices and the tuning integers,
-// return the bytes they wrote, and leave the caller's buffers as they were.
+// Release UAT: bzip2 through its registry facade (#3138). The program an
+// application developer writes over `with get c.bzip2` — zero `unsafe`, zero
+// project facade: one-shot BZ2_bzBuffToBuffCompress/Decompress, the in-place
+// BZ2_bzCompress/BZ2_bzDecompress stream loop, and FILE*-backed
+// BZ2_bzWriteOpen/BZ2_bzWrite + BZ2_bzReadOpen/BZ2_bzRead on a file.
 use contracts.bzip2
 use c_import("bzlib.h")
 
 fn main:
+    // 1. One-shot buffer-to-buffer roundtrip.
     let input = "with bzip2 roundtrip"
     var compressed: [u8; 512] = [0 as u8; 512]
     var output: [u8; 128] = [0 as u8; 128]
@@ -26,4 +27,59 @@ fn main:
         if output[i] != bytes[i]:
             print("bzip2 content mismatch")
             return 1
+
+    // 2. Streaming BZ2_bzCompress / BZ2_bzDecompress loop over bz_stream.
+    let Ok(comp) = Compressor.BZ2_bzCompressInit(9, 0, 30) else:
+        print("bzip2 stream init failed")
+        return 1
+    var stream_in: [u8; 20] = [0 as u8; 20]
+    for i in 0..20:
+        stream_in[i] = bytes[i]
+    var stream_packed: [u8; 512] = [0 as u8; 512]
+    let cstep = comp.BZ2_bzCompress(stream_in, stream_packed, BZ_FINISH)
+    if cstep.status != BZ_STREAM_END or cstep.next_in_produced != 20 or cstep.next_out_produced == 0:
+        print("bzip2 stream compress failed")
+        return 1
+
+    let Ok(decomp) = Decompressor.BZ2_bzDecompressInit(0, 0) else:
+        print("bzip2 stream decompress init failed")
+        return 1
+    var stream_out: [u8; 128] = [0 as u8; 128]
+    let dstep = decomp.BZ2_bzDecompress(stream_packed, stream_out)
+    if dstep.status != BZ_STREAM_END or dstep.next_in_produced != cstep.next_out_produced or dstep.next_out_produced != 20:
+        print("bzip2 stream decompress failed")
+        return 1
+    for i in 0..20:
+        if stream_out[i] != bytes[i]:
+            print("bzip2 stream content mismatch")
+            return 1
+
+    // 3. FILE*-backed BZ2_bzWriteOpen/BZ2_bzWrite and BZ2_bzReadOpen/BZ2_bzRead.
+    let path = "roundtrip.bz2"
+    if true:
+        let Some(wf) = CFile.fopen(path, "wb") else:
+            print("bzip2 fopen write failed")
+            return 1
+        let Some(ws) = WriteStream.BZ2_bzWriteOpen(&wf, 9, 0, 30) else:
+            print("bzip2 BZ2_bzWriteOpen failed")
+            return 1
+        ws.BZ2_bzWrite(bytes)
+    if true:
+        let Some(rf) = CFile.fopen(path, "rb") else:
+            print("bzip2 fopen read failed")
+            return 1
+        let empty: [u8; 0] = []
+        let Some(rs) = ReadStream.BZ2_bzReadOpen(&rf, 0, 0, empty) else:
+            print("bzip2 BZ2_bzReadOpen failed")
+            return 1
+        var file_out: [u8; 128] = [0 as u8; 128]
+        let nread = rs.BZ2_bzRead(file_out)
+        if nread != 20:
+            print(f"bzip2 BZ2_bzRead length mismatch: {nread}")
+            return 1
+        for i in 0..20:
+            if file_out[i] != bytes[i]:
+                print("bzip2 file content mismatch")
+                return 1
+
     print("bzip2 UAT passed")

@@ -1,0 +1,13 @@
+//! expect-check-fail: const pointer
+
+// #3138, D243 (§16.2b.8): `buffer param P capacity param L` requires a
+// writable pointer (`*mut`), never `*const`.
+use c_import("static inline int read_ro(const char *buf, int len) { (void)buf; return len; }")
+
+c contract ro:
+    fn read_ro
+        buffer param 0 capacity param 1
+
+fn main:
+    var out: [u8; 4] = [0 as u8; 4]
+    let _ = read_ro(out)

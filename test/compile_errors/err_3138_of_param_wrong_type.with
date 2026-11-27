@@ -1,0 +1,22 @@
+//! expect-check-fail: does not receive
+
+// #3138, D243 (§16.2b.3): `of R(param N)` is refused when parameter N does
+// not receive R's representation.
+use c_import("typedef struct { int x; } Handle;
+static Handle g_h;
+static inline Handle *h_open(void) { return &g_h; }
+static inline void h_close(Handle *h) { (void)h; }
+static inline int h_op(int tag, Handle *h) { (void)h; return tag; }
+")
+
+c contract bad:
+    resource H wraps *mut Handle
+        from h_open
+        drop h_close
+    fn h_op
+        of H(param 0)
+        lend
+
+fn main:
+    let h = H.open().unwrap()
+    let _ = h.op(1)

@@ -1495,7 +1495,7 @@ impl Sema:
                 return
             self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: [], consumes_destroyed_by: [], retains: [], retains_by: [], returns_borrow_resource: 0, returns_borrow_from: [], returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: [], preserves_domains: [], of_resource: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: [], bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], field_buffer_reads: [], callback_userdata_cb: [], callback_userdata_of: [], valid_on_failed: 0, nullable_params: [], value_records: [], value_record_words: [], text_params: [], text_return_free: 0, bridged: 0, buffer_ptr: [], buffer_len: [], buffer_inout: [], buffer_elements: [], fixed_params: [], fixed_literals: [], ok_const: 0, ok_count: 0, null_status_const: 0, null_status_node: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: [], variadic_case_values: [], variadic_case_tids: [], variadic_case_kinds: [], variadic_slots: [], present_cases_node: 0, present_cases_prefix: 0, returns_borrow_record: 0, argv_cb: [], argv_index: [], argc_index: [], argv_handle: [], argv_nodes: [], user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: [], consumes_destroyed_by: [], retains: [], retains_by: [], returns_borrow_resource: 0, returns_borrow_from: [], returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: [], preserves_domains: [], of_resource: 0, of_param: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: [], bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], field_buffer_reads: [], callback_userdata_cb: [], callback_userdata_of: [], valid_on_failed: 0, nullable_params: [], value_records: [], value_record_words: [], text_params: [], text_return_free: 0, bridged: 0, buffer_ptr: [], buffer_len: [], buffer_inout: [], buffer_elements: [], fixed_params: [], fixed_literals: [], ok_const: 0, ok_count: 0, null_status_const: 0, null_status_node: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: [], variadic_case_values: [], variadic_case_tids: [], variadic_case_kinds: [], variadic_slots: [], present_cases_node: 0, present_cases_prefix: 0, returns_borrow_record: 0, argv_cb: [], argv_index: [], argc_index: [], argv_handle: [], argv_nodes: [], user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -2007,6 +2007,9 @@ impl Sema:
                 self.emit_error_with_help(f"fn '{fname}': unknown resource '{rn}' (§16.2b.3)", clause, f"declare it above this item ('resource {rn} wraps *mut T'), or name a resource the contract declares")
                 return c
             c.of_resource = res
+            if self.ast.get_data2(clause) >= 2:
+                let pi = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+                if pi >= 0: c.of_param = pi
             return c
         if kind == FACADE_CLAUSE_RENAME:
             c.rename = self.ast.get_extra(ops)
@@ -2197,7 +2200,9 @@ impl Sema:
                 if described == p or described == l:
                     self.emit_error_with_help(f"fn '{fname}': a pointer paired with a count is a buffer (§16.2b.8), not a value record; the `reads`/`fills`/`updates` clause on it does not apply (§16.2b.5)", clause, "delete the `reads`/`fills`/`updates` clause and keep 'buffer param P len param L'")
                     return c
-            let inout = self.ast.get_extra(ops + 2)
+            let mode = self.ast.get_extra(ops + 2)
+            let is_capacity = mode != 0
+            let is_inout = mode == 1
             let elements = self.ast.get_extra(ops + 3)
             let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
             if self.get_type_kind(ptype) != TypeKind.TY_PTR or (elements == 0 and not self.facade_type_is_byte(self.get_type_d0(ptype))):
@@ -2215,23 +2220,25 @@ impl Sema:
                     let shown = self.facade_param_display(fn_sym, sig, p)
                     self.emit_error_with_help(f"fn '{fname}': 'buffer param {p} … elements' names {shown}: an element-count buffer's elements are flat, and {held} is a pointer the program could set to any address (§16.2b.5, §16.2b.8)", clause, "model the element's pointer as a resource, or leave the function raw: no buffer clause describes records that hold pointers")
                     return c
-            if inout != 0 and self.get_type_d1(ptype) == 0:
+            if is_capacity and self.get_type_d1(ptype) == 0:
                 let shown = self.facade_param_display(fn_sym, sig, p)
-                self.emit_error_with_help(f"fn '{fname}': 'buffer param {p} capacity … inout' names {shown}, a const pointer; C cannot write into it — a buffer C fills is 'T *', and an input buffer is paired with 'len' (§16.2b.8)", clause, f"an input buffer is 'buffer param {p} len param N', with N the integer parameter that carries its length")
+                let cap_spell = if is_inout: "capacity … inout" else: "capacity"
+                self.emit_error_with_help(f"fn '{fname}': 'buffer param {p} {cap_spell}' names {shown}, a const pointer; C cannot write into it — a buffer C fills is 'T *', and an input buffer is paired with 'len' (§16.2b.8)", clause, f"an input buffer is 'buffer param {p} len param N', with N the integer parameter that carries its length")
                 return c
             if p == l:
                 let shown = self.facade_param_display(fn_sym, sig, p)
                 self.emit_error_with_help(f"fn '{fname}': 'buffer param {p}' pairs {shown} with itself; a pairing names the pointer and the distinct integer that carries its length (§16.2b.8)", clause, f"'buffer param {p} len param N', with N the integer parameter that carries the length")
                 return c
             let ltype = self.resolve_alias(self.sig_param_type(sig, l) as TypeId)
-            if inout == 0:
+            if not is_inout:
                 if self.get_type_kind(self.numeric_operand_type(ltype as i32)) != TypeKind.TY_INT:
                     let shown = self.facade_param_display(fn_sym, sig, l)
-                    self.emit_error_with_help(f"fn '{fname}': 'len param {l}' names {shown}, which is not an integer; the length parameter carries the byte count C reads (§16.2b.8)", clause, f"name the integer parameter after 'len'; when C reads the capacity through a pointer and writes the length back, write 'capacity param {l} inout'")
+                    let label = if is_capacity: "capacity" else: "len"
+                    self.emit_error_with_help(f"fn '{fname}': '{label} param {l}' names {shown}, which is not an integer; the count parameter carries the byte count C reads (§16.2b.8)", clause, f"name the integer parameter after '{label}'; when C reads the capacity through a pointer and writes the length back, write 'capacity param {l} inout'")
                     return c
             else if self.get_type_kind(ltype) != TypeKind.TY_PTR or self.get_type_d1(ltype) == 0 or self.get_type_kind(self.numeric_operand_type(self.get_type_d0(ltype))) != TypeKind.TY_INT:
                 let shown = self.facade_param_display(fn_sym, sig, l)
-                self.emit_error_with_help(f"fn '{fname}': 'capacity param {l} inout' names {shown}, which is not a pointer to an integer; C reads the capacity through it and writes the produced length back (§16.2b.8)", clause, f"when the count is passed by value, write 'len param {l}'")
+                self.emit_error_with_help(f"fn '{fname}': 'capacity param {l} inout' names {shown}, which is not a pointer to an integer; C reads the capacity through it and writes the produced length back (§16.2b.8)", clause, f"when the count is passed by value, write 'capacity param {l}' or 'len param {l}'")
                 return c
             for k in 0..c.buffer_ptr.len():
                 let taken = if c.buffer_ptr[k] == p or c.buffer_len[k] == p: p else if c.buffer_ptr[k] == l or c.buffer_len[k] == l: l else: -1
@@ -2246,7 +2253,7 @@ impl Sema:
                     return c
             c.buffer_ptr.push(p)
             c.buffer_len.push(l)
-            c.buffer_inout.push(inout)
+            c.buffer_inout.push(mode)
             c.buffer_elements.push(elements)
             return c
         if kind == FACADE_CLAUSE_FIXED:
@@ -3567,9 +3574,9 @@ impl Sema:
         if ci >= 0:
             for k in 0..self.foreign_contracts[ci].buffer_ptr.len():
                 if self.foreign_contracts[ci].buffer_ptr[k] == pi: return out
-            // A parameter the contract fixes is passed by the facade, not
-            // received from the caller (D214: a producer's absent parent).
-            if self.foreign_contracts[ci].fixed_params.contains(pi): return out
+            // A parameter the contract fixes or discards is passed by the
+            // facade, not received from the caller (D214/D209).
+            if self.foreign_contracts[ci].fixed_params.contains(pi) or self.foreign_contracts[ci].discarded_params.contains(pi): return out
         let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
         let pointee = if self.get_type_kind(p) == TypeKind.TY_PTR: self.get_type_d0(p) else: 0
         for i in 0..self.facade_resources.len():
@@ -3623,8 +3630,13 @@ impl Sema:
     // resource only after the facade assigns it"). Several left means the
     // facade has not assigned it (verify_facade_assignments); an `of`
     // naming a resource the parameter does not receive is that error too.
+    fn facade_of_param(fn_sym: i32) -> i32:
+        let ci = self.facade_contract_for(fn_sym)
+        if ci < 0: 0 else: self.foreign_contracts[ci].of_param
+
     fn facade_method_host(fn_sym: i32) -> List[i32]:
-        let recv = self.facade_param_receives(fn_sym, 0)
+        let at = self.facade_of_param(fn_sym)
+        let recv = self.facade_param_receives(fn_sym, at)
         let ci = self.facade_contract_for(fn_sym)
         // A by-value token is never recognized by its type (`int` is an `Fd`
         // and every other integer, facade_param_receives), so only the
@@ -3645,7 +3657,7 @@ impl Sema:
         recv
 
     // The by-value token (a resource wrapping neither a pointer nor in-place
-    // storage) the fn item's `of` names, when the operation's first
+    // storage) the fn item's `of` names, when the operation's hosted
     // parameter takes its representation — by value, or by address, which C
     // writes through — or -1 (§16.2b.3; FacadeRender.with
     // facade_render_lend_hosted draws the same line).
@@ -3658,9 +3670,10 @@ impl Sema:
         if self.get_type_kind(repr) == TypeKind.TY_PTR or self.facade_resources[ri].init != 0:
             return -1
         let sig = self.get_sig(fn_sym)
-        if sig < 0 or self.sig_get_param_count(sig) == 0:
+        let at = self.foreign_contracts[ci].of_param
+        if sig < 0 or at < 0 or at >= self.sig_get_param_count(sig):
             return -1
-        let p = self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)
+        let p = self.resolve_alias(self.sig_param_type(sig, at) as TypeId)
         if self.facade_same_type(p as i32, repr as i32):
             return ri
         if self.get_type_kind(p) == TypeKind.TY_PTR and self.facade_same_type(self.get_type_d0(p), repr as i32):
@@ -3671,7 +3684,7 @@ impl Sema:
     // resources, an operation is callable through a modeled resource only
     // after resource assignment is known. An unassigned `z_stream *`
     // operation is rejected on both modeled resources, with a diagnostic
-    // naming the candidates." An fn item whose first parameter receives a
+    // naming the candidates." An fn item whose hosted parameter receives a
     // representation several resources wrap states `of` naming one of them,
     // or it is not presented on any — and the raw call stays raw (§16.2b.5).
     // An item describing a resource's own clause operation (its producer,
@@ -3684,7 +3697,8 @@ impl Sema:
             let sig = self.get_sig(fn_sym)
             if sig < 0 or self.facade_fn_is_resource_op(fn_sym):
                 continue
-            let recv = self.facade_param_receives(fn_sym, 0)
+            let at = self.foreign_contracts[ci].of_param
+            let recv = self.facade_param_receives(fn_sym, at)
             let of_res = self.foreign_contracts[ci].of_resource
             // An `of` is checked even when the parameter receives no pointer
             // or in-place resource: accepted silently, an `of` naming a
@@ -3693,7 +3707,7 @@ impl Sema:
             if recv.len() == 0 and of_res == 0:
                 continue
             self.update_decl_source_context(self.foreign_contracts[ci].decl)
-            let shown = self.facade_param_display(fn_sym, sig, 0)
+            let shown = self.facade_param_display(fn_sym, sig, at)
             var names = ""
             var ofs = ""
             for k in 0..recv.len():
@@ -4109,6 +4123,16 @@ impl Sema:
         if source < 0: return -1
         if ci < 0: return source
         let c = &self.foreign_contracts[ci]
+        if c.of_param > 0:
+            if source == c.of_param: return 0
+            var presented: i32 = 1
+            for pi in 0..(source + 1):
+                if pi == c.of_param or c.fixed_params.contains(pi) or c.discarded_params.contains(pi) or c.buffer_len.contains(pi) or c.consumes_destroyed_by.contains(pi):
+                    if pi == source: return -1
+                    continue
+                if pi == source: return presented
+                presented = presented + 1
+            return -1
         var presented: i32 = 0
         for pi in 0..(source + 1):
             if c.fixed_params.contains(pi) or c.discarded_params.contains(pi) or c.buffer_len.contains(pi) or c.consumes_destroyed_by.contains(pi):
@@ -4149,7 +4173,7 @@ impl Sema:
     fn facade_contract_inout(ci: i32) -> i32:
         let c = &self.foreign_contracts[ci]
         for k in 0..c.buffer_ptr.len():
-            if c.buffer_inout[k] != 0: return k as i32
+            if c.buffer_inout[k] == 1: return k as i32
         -1
 
     // The out-parameter slot a resource's producer `fn_sym` writes, or -1.
@@ -4308,7 +4332,7 @@ impl Sema:
             if self.facade_param_receives(fn_sym, pi).len() > 0 or self.facade_param_receives_record(fn_sym, pi) != 0:
                 continue
             // A by-value token's receiver by address (#1669): the `of` host.
-            if pi == 0 and self.facade_by_value_of_host(fn_sym) >= 0:
+            if pi == self.foreign_contracts[ci].of_param and self.facade_by_value_of_host(fn_sym) >= 0:
                 continue
             // A pointer to bytes, scalars, `void` or pointers is
             // verify_facade_buffer_params's (12b): it names the buffer. A
@@ -4543,16 +4567,19 @@ impl Sema:
             if facade_dep_is_init(owner) and self.facade_resources[ri].preinit != 0:
                 shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
             let slot = self.facade_owner_skip(ri, owner)
+            let fci = self.facade_contract_for(f)
             let sigs = self.facade_producer_sigs(ri, owner, f)
             for si in 0..sigs.len():
                 let sig = sigs[si]
                 for parent in parents:
                     let c_pi = parent
-                    var pi = c_pi
-                    if facade_dep_is_init(owner):
-                        pi = shift + c_pi - 1
-                    else if slot >= 0 and c_pi > slot:
-                        pi = c_pi - 1
+                    var pi: i32 = 0
+                    let start_pi: i32 = facade_dep_is_init(owner) as i32
+                    for k in start_pi..c_pi:
+                        if k == slot: continue
+                        if fci >= 0 and (self.foreign_contracts[fci].fixed_params.contains(k) or self.foreign_contracts[fci].discarded_params.contains(k) or self.foreign_contracts[fci].buffer_len.contains(k) or self.foreign_contracts[fci].consumes_destroyed_by.contains(k)): continue
+                        pi = pi + 1
+                    if facade_dep_is_init(owner): pi = shift + pi
                     self.facade_declare_view_of_param(sig, pi)
 
     // The signature of a rendered constructor `R.p`, or -1.
