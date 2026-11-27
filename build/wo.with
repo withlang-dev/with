@@ -73,6 +73,8 @@ pub type WoBundle {
     // the same slot as the .Install kind spells a destination: `$HOME/…`
     // for a store under the home directory, project-relative otherwise
     install_slot: str,
+    // other registered bundles this bundle imports (linked via --link-bundle)
+    bundle_deps: List[str],
 }
 
 fn wo_fail(ctx: &ActionCtx, message: &str) -> i32:
@@ -103,6 +105,13 @@ pub fn wo_arg_value(args: &List[str], prefix: &str) -> str:
         if arg.starts_with(prefix):
             return wo_owned_text(arg.slice(prefix.len(), arg.len()))
     ""
+
+pub fn wo_arg_values(args: &List[str], prefix: &str) -> List[str]:
+    let out = []
+    for arg in args:
+        if arg.starts_with(prefix):
+            out.push(wo_owned_text(arg.slice(prefix.len(), arg.len())))
+    out
 
 fn wo_dirname(path: &str) -> str:
     var last: i64 = -1
@@ -176,14 +185,14 @@ pub fn wo_host_target() -> str:
 
 // The bundle's plan for the host: everything the graph needs to name its
 // targets and paths, none of it hashed text.
-pub fn wo_bundle_plan(ctx: &BuildCtx, name: &str, corpus_rel: &str, root: &str) -> WoBundle:
-    wo_bundle_plan_for_target(ctx, name, corpus_rel, root, wo_host_target(), "")
+pub fn wo_bundle_plan(ctx: &BuildCtx, name: &str, corpus_rel: &str, root: &str, bundle_deps: List[str]) -> WoBundle:
+    wo_bundle_plan_for_target(ctx, name, corpus_rel, root, wo_host_target(), "", bundle_deps)
 
 // The plan for one target: `target_name` in the compiler's spelling (the
 // slot's key and the manifest's `target` line, which the build action
 // checks), `triple` the `--target` the release compiler takes to compile
 // for it — "" is the host plan.
-pub fn wo_bundle_plan_for_target(ctx: &BuildCtx, name: &str, corpus_rel: &str, root: &str, target_name: &str, triple: &str) -> WoBundle:
+pub fn wo_bundle_plan_for_target(ctx: &BuildCtx, name: &str, corpus_rel: &str, root: &str, target_name: &str, triple: &str, bundle_deps: List[str]) -> WoBundle:
     let abi_sha = ctx.fs().sha256_file("docs/with-abi.sha256")
     let slot_rel = "/" ++ name ++ "/" ++ target_name ++ "-" ++ abi_sha
     WoBundle {
@@ -197,6 +206,7 @@ pub fn wo_bundle_plan_for_target(ctx: &BuildCtx, name: &str, corpus_rel: &str, r
         tree_dir: if triple.len() > 0: "out/wo/" ++ target_name else: "out/wo",
         slot: wo_store_dir(ctx) ++ slot_rel,
         install_slot: wo_store_install_dir(ctx) ++ slot_rel,
+        bundle_deps,
     }
 
 // out/wo/<name> (out/wo/<target>/<name> for a cross bundle): the tree's copy
@@ -266,6 +276,14 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
     build_target = build_target.write_scope("out/command/" ++ build_name)
     build_target = build_target.timeout(900000)
     build_target = build_target.dep(wo_owned_text(compiler_dep))
+    for dep in plan.bundle_deps:
+        let dep_prefix = plan.tree_dir ++ "/" ++ dep
+        let dep_group = if plan.triple.len() == 0: dep ++ "-wo" else: dep ++ "-wo-" ++ wo_target_label(plan.target)
+        build_target = build_target.dep(dep_group)
+        build_target = build_target.input(dep_prefix ++ ".o")
+        build_target = build_target.input(dep_prefix ++ ".wi")
+        build_target = build_target.input(dep_prefix ++ ".manifest")
+        build_target = build_target.arg("link-bundle=" ++ dep_prefix)
     graph = graph.add_target(build_target)
 
     // Published in this order so the manifest — the record the presence
@@ -357,6 +375,13 @@ pub fn wo_drift_target(ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler
     target = target.timeout(900000)
     target = target.dep(wo_owned_text(compiler_dep))
     target = target.dep(wo_group_target_name(plan))
+    for dep in plan.bundle_deps:
+        let dep_prefix = "out/wo/" ++ dep
+        target = target.dep(dep ++ "-wo")
+        target = target.input(dep_prefix ++ ".o")
+        target = target.input(dep_prefix ++ ".wi")
+        target = target.input(dep_prefix ++ ".manifest")
+        target = target.arg("link-bundle=" ++ dep_prefix)
     target
 
 pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
@@ -368,6 +393,7 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
     let harness_arg = wo_arg_value(args, "harness-arg=")
     let dir = wo_arg_value(args, "dir=")
     let compiler = wo_arg_value(args, "compiler=")
+    let link_bundles = wo_arg_values(args, "link-bundle=")
     if name.len() == 0 or corpus.len() == 0 or root_path.len() == 0 or harness.len() == 0 or dir.len() == 0 or compiler.len() == 0:
         return wo_fail(ctx, "requires name=, corpus=, root=, harness=, harness-arg=, dir= and compiler= arguments")
     let fs = ctx.fs()
@@ -390,6 +416,9 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
     build_args.push("--no-prelude")
     build_args.push("--bundle-corpus")
     build_args.push(wo_owned_text(corpus))
+    for lb in link_bundles:
+        build_args.push("--link-bundle")
+        build_args.push(wo_abs(root, lb))
     build_args.push("--emit-bundle-interface")
     build_args.push(wo_abs(root, scratch ++ ".wi"))
     build_args.push("--emit-bundle-manifest")
@@ -607,6 +636,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     let prefix = wo_arg_value(args, "prefix=")
     let compiler = wo_arg_value(args, "compiler=")
     let rt_manifest_path = wo_arg_value(args, "rt-manifest=")
+    let link_bundles = wo_arg_values(args, "link-bundle=")
     if name.len() == 0 or corpus.len() == 0 or corpus_dir.len() == 0 or root_path.len() == 0 or target.len() == 0 or abi_sha.len() != 64 or slot.len() == 0 or prefix.len() == 0 or compiler.len() == 0 or rt_manifest_path.len() == 0:
         return wo_fail(ctx, "requires name=, corpus=, corpus-dir=, root=, target=, triple=, abi-sha=, slot=, prefix=, rt-manifest= and compiler= arguments")
     let fs = ctx.fs()
@@ -683,6 +713,9 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
         build_args.push("--target=" ++ triple)
     build_args.push("--bundle-corpus")
     build_args.push(wo_owned_text(corpus))
+    for lb in link_bundles:
+        build_args.push("--link-bundle")
+        build_args.push(wo_abs(root, lb))
     build_args.push("--emit-bundle-interface")
     build_args.push(wo_abs(root, tmp_wi))
     build_args.push("--emit-bundle-manifest")
@@ -710,6 +743,9 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
         check_args.push("--target=" ++ triple)
     check_args.push("--bundle-corpus")
     check_args.push(wo_owned_text(corpus))
+    for lb in link_bundles:
+        check_args.push("--link-bundle")
+        check_args.push(wo_abs(root, lb))
     check_args.push("--bundle-fingerprint")
     check_args.push(wo_abs(root, fp_wi))
     let checked = wo_run(ctx, "check-wi", &check_args, ctx.timeout())

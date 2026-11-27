@@ -266,6 +266,7 @@ pub fn lseek(fd: i32, offset: i64, whence: i32) -> i64:
     with_libc_lseek(fd, offset, whence)
 pub fn unlink(path: *const c_char) -> i32:
     with_libc_unlink(path)
+pub fn abs(x: i32) -> i32: if x < 0: 0 -% x else: x
 pub extern fn rand() -> i32
 pub extern fn srand(seed: u32) -> Unit
 pub extern fn qsort(base: *mut c_void, count: u64, size: u64, compare: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) -> Unit
@@ -322,6 +323,7 @@ pub fn setrlimit(resource: i32, rlp: *const rlimit) -> i32: with_libc_setrlimit(
 
 // limits.h, stdint.h, stdlib.h: the same on every supported target.
 pub const INT_MAX: i32 = 2147483647
+pub const INT32_MAX: i32 = 2147483647
 pub const UINT_MAX: u32 = 4294967295
 pub const UINT8_MAX: i32 = 255
 pub const UINT16_MAX: i32 = 65535

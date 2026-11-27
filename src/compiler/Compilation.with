@@ -1616,10 +1616,11 @@ impl Compilation:
                 symbol = symbol.slice(1, symbol.len())
             // A module-link-named With symbol: a module the object should
             // have carried, which nothing at a consumer's link defines.
-            // #3351: a tree bundle is linked by the compiler that built it,
-            // whose embedded bundles define their modules' symbols; that
-            // link selects them on demand, as it does for a program.
-            if bundle_corpus_is_tree(self.bundle_corpus) and (embedded_bundle_prefixes() |> any(symbol.starts_with(it))): continue
+            // #3351, #3013: a bundle that imports another bundle (linked via
+            // --link-bundle or embedded in the compiler) leaves those symbols
+            // declared-only; Link.with's transitive bundle selection links the
+            // dependency bundle on demand at every consumer's link.
+            if (self.zcu.link_bundle_prefixes |> any(symbol.starts_with(it))) or (embedded_bundle_prefixes() |> any(symbol.starts_with(it))): continue
             if symbol.starts_with("__with_mod_"):
                 with_eprint("error: --emit-bundle-manifest: " ++ obj_path ++ " references `" ++ symbol ++ "`, a module-link-named symbol of a module the object does not carry: nothing at a consumer's link defines it (wo_bundles.md, carried copies)")
                 return "<failed>"

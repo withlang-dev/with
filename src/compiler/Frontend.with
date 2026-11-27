@@ -3742,10 +3742,12 @@ impl Zcu:
         // them. Read whole, the Windows runtime's `pthread_self` took the
         // name LlvmBridge's own extern declares, and the bundle did not
         // build there.
-        // The interface's own check reads the bundle's sections whole and
-        // the others on demand too, so both passes see one set of
-        // declarations.
-        let read_whole = if bundle_corpus_is_tree(self.bundle_corpus): self.interface_eager and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(path)) else: self.interface_eager or self.bundle_corpus.len() > 0
+        // The interface's own check reads the bundle's sections (and the
+        // runtime bundle's sections for non-tree corpus bundles) whole, and
+        // other imported corpus interfaces on demand so colliding names
+        // displace cleanly (#3013).
+        let canonical = codegen_canonical_module_path(path)
+        let read_whole = if bundle_corpus_is_tree(self.bundle_corpus): self.interface_eager and bundle_corpus_contains(self.bundle_corpus, canonical) else if self.bundle_corpus.len() > 0: bundle_corpus_contains(self.bundle_corpus, canonical) or bundle_corpus_contains("rt", canonical) else: self.interface_eager
         let on_demand = src.interface and not read_whole
         if on_demand:
             let section_file_id = self.next_file_id

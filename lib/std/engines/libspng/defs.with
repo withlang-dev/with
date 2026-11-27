@@ -1,0 +1,778 @@
+// std.engines.libspng.defs — shared definitions for migrated PCRE2
+use std.option
+use rt.rt_core
+
+pub fn is_alpha(__with_c: i32) -> bool {
+    (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
+}
+pub fn is_digit(__with_c: i32) -> bool {
+    __with_c >= 48 and __with_c <= 57
+}
+pub fn is_space(__with_c: i32) -> bool {
+    __with_c == 32 or __with_c == 9 or __with_c == 10 or __with_c == 13 or __with_c == 12 or __with_c == 11
+}
+pub fn is_alnum(__with_c: i32) -> bool {
+    is_alpha(__with_c) or is_digit(__with_c)
+}
+pub fn is_upper(__with_c: i32) -> bool {
+    __with_c >= 65 and __with_c <= 90
+}
+pub fn is_lower(__with_c: i32) -> bool {
+    __with_c >= 97 and __with_c <= 122
+}
+pub fn is_xdigit(__with_c: i32) -> bool {
+    (__with_c >= 48 and __with_c <= 57) or (__with_c >= 65 and __with_c <= 70) or (__with_c >= 97 and __with_c <= 102)
+}
+pub fn is_print(__with_c: i32) -> bool {
+    __with_c >= 32 and __with_c <= 126
+}
+pub fn to_lower(__with_c: i32) -> i32 {
+    if __with_c >= 65 and __with_c <= 90 { __with_c + 32 } else { __with_c }
+}
+pub fn to_upper(__with_c: i32) -> i32 {
+    if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
+}
+pub extern fn strlen(s: *const c_char) -> u64
+pub extern fn strcmp(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32
+pub extern fn strchr(s: *const c_char, c: i32) -> *mut c_char
+pub extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
+pub extern fn isalpha(c: i32) -> i32
+pub extern fn isdigit(c: i32) -> i32
+pub extern fn isalnum(c: i32) -> i32
+pub extern fn isspace(c: i32) -> i32
+pub extern fn isupper(c: i32) -> i32
+pub extern fn islower(c: i32) -> i32
+pub extern fn isxdigit(c: i32) -> i32
+pub extern fn isprint(c: i32) -> i32
+pub extern fn isgraph(c: i32) -> i32
+pub extern fn ispunct(c: i32) -> i32
+pub extern fn iscntrl(c: i32) -> i32
+pub extern fn tolower(c: i32) -> i32
+pub extern fn toupper(c: i32) -> i32
+
+pub type c_void = opaque
+pub extern fn abort() -> Never
+pub fn __ci_unreachable() -> Never: abort()
+
+// data model: LP64 (arm64-apple-macosx11.0)
+pub const C_DATA_MODEL: str = "LP64 (arm64-apple-macosx11.0)"
+pub unsafe fn __with_migrate_malloc(__with_n: u64) -> *mut c_void {
+    with_alloc(__with_n as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_calloc(__with_n: u64, __with_size: u64) -> *mut c_void {
+    with_alloc_zeroed(__with_n as i64, __with_size as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_realloc(__with_p: *mut c_void, __with_n: u64) -> *mut c_void {
+    with_realloc(__with_p as *mut u8, 0, __with_n as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_free(__with_p: *mut c_void) {
+    with_free(__with_p as *mut u8)
+}
+pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+// The 128-bit overflow checks stay division-free on purpose: `/` on i128/u128
+// lowers to the __divti3/__udivti3 compiler-rt libcalls, and this shim is
+// compiled into freestanding runtime objects whose COFF link has no builtins
+// library to resolve them from. Limb decomposition keeps the check to multiplies
+// and shifts, which lower inline on every target and at every -O level.
+pub fn u128_mul_would_overflow(__with_a: u128, __with_b: u128) -> bool {
+    let __with_a_hi = (__with_a >> 64) as u64
+    let __with_b_hi = (__with_b >> 64) as u64
+    if __with_a_hi != 0 and __with_b_hi != 0: return true
+    let __with_a_lo = (__with_a as u64) as u128
+    let __with_b_lo = (__with_b as u64) as u128
+    let __with_cross = (__with_a_hi as u128) *% __with_b_lo +% (__with_b_hi as u128) *% __with_a_lo
+    if (__with_cross >> 64) != 0: return true
+    let __with_low = __with_a_lo *% __with_b_lo
+    ((__with_low >> 64) +% __with_cross) >> 64 != 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    unsafe { (*__with_out = __with_a *% __with_b) }
+    if __with_a == 0 or __with_b == 0: return false
+    let __with_neg = (__with_a < 0) != (__with_b < 0)
+    let __with_ua = if __with_a < 0: (0 as u128) -% (__with_a as u128) else: __with_a as u128
+    let __with_ub = if __with_b < 0: (0 as u128) -% (__with_b as u128) else: __with_b as u128
+    if u128_mul_would_overflow(__with_ua, __with_ub): return true
+    let __with_limit = if __with_neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1
+    __with_ua *% __with_ub > __with_limit
+}
+pub unsafe fn __with_builtin_add_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    unsafe { (*__with_out = __with_a *% __with_b) }
+    u128_mul_would_overflow(__with_a, __with_b)
+}
+
+pub type spng_errno = i32
+
+pub let SPNG_IO_ERROR: i32 = -2
+pub let SPNG_IO_EOF: i32 = -1
+pub let SPNG_OK: i32 = 0
+pub let SPNG_EINVAL: i32 = 1
+pub let SPNG_EMEM: i32 = 2
+pub let SPNG_EOVERFLOW: i32 = 3
+pub let SPNG_ESIGNATURE: i32 = 4
+pub let SPNG_EWIDTH: i32 = 5
+pub let SPNG_EHEIGHT: i32 = 6
+pub let SPNG_EUSER_WIDTH: i32 = 7
+pub let SPNG_EUSER_HEIGHT: i32 = 8
+pub let SPNG_EBIT_DEPTH: i32 = 9
+pub let SPNG_ECOLOR_TYPE: i32 = 10
+pub let SPNG_ECOMPRESSION_METHOD: i32 = 11
+pub let SPNG_EFILTER_METHOD: i32 = 12
+pub let SPNG_EINTERLACE_METHOD: i32 = 13
+pub let SPNG_EIHDR_SIZE: i32 = 14
+pub let SPNG_ENOIHDR: i32 = 15
+pub let SPNG_ECHUNK_POS: i32 = 16
+pub let SPNG_ECHUNK_SIZE: i32 = 17
+pub let SPNG_ECHUNK_CRC: i32 = 18
+pub let SPNG_ECHUNK_TYPE: i32 = 19
+pub let SPNG_ECHUNK_UNKNOWN_CRITICAL: i32 = 20
+pub let SPNG_EDUP_PLTE: i32 = 21
+pub let SPNG_EDUP_CHRM: i32 = 22
+pub let SPNG_EDUP_GAMA: i32 = 23
+pub let SPNG_EDUP_ICCP: i32 = 24
+pub let SPNG_EDUP_SBIT: i32 = 25
+pub let SPNG_EDUP_SRGB: i32 = 26
+pub let SPNG_EDUP_BKGD: i32 = 27
+pub let SPNG_EDUP_HIST: i32 = 28
+pub let SPNG_EDUP_TRNS: i32 = 29
+pub let SPNG_EDUP_PHYS: i32 = 30
+pub let SPNG_EDUP_TIME: i32 = 31
+pub let SPNG_EDUP_OFFS: i32 = 32
+pub let SPNG_EDUP_EXIF: i32 = 33
+pub let SPNG_ECHRM: i32 = 34
+pub let SPNG_EPLTE_IDX: i32 = 35
+pub let SPNG_ETRNS_COLOR_TYPE: i32 = 36
+pub let SPNG_ETRNS_NO_PLTE: i32 = 37
+pub let SPNG_EGAMA: i32 = 38
+pub let SPNG_EICCP_NAME: i32 = 39
+pub let SPNG_EICCP_COMPRESSION_METHOD: i32 = 40
+pub let SPNG_ESBIT: i32 = 41
+pub let SPNG_ESRGB: i32 = 42
+pub let SPNG_ETEXT: i32 = 43
+pub let SPNG_ETEXT_KEYWORD: i32 = 44
+pub let SPNG_EZTXT: i32 = 45
+pub let SPNG_EZTXT_COMPRESSION_METHOD: i32 = 46
+pub let SPNG_EITXT: i32 = 47
+pub let SPNG_EITXT_COMPRESSION_FLAG: i32 = 48
+pub let SPNG_EITXT_COMPRESSION_METHOD: i32 = 49
+pub let SPNG_EITXT_LANG_TAG: i32 = 50
+pub let SPNG_EITXT_TRANSLATED_KEY: i32 = 51
+pub let SPNG_EBKGD_NO_PLTE: i32 = 52
+pub let SPNG_EBKGD_PLTE_IDX: i32 = 53
+pub let SPNG_EHIST_NO_PLTE: i32 = 54
+pub let SPNG_EPHYS: i32 = 55
+pub let SPNG_ESPLT_NAME: i32 = 56
+pub let SPNG_ESPLT_DUP_NAME: i32 = 57
+pub let SPNG_ESPLT_DEPTH: i32 = 58
+pub let SPNG_ETIME: i32 = 59
+pub let SPNG_EOFFS: i32 = 60
+pub let SPNG_EEXIF: i32 = 61
+pub let SPNG_EIDAT_TOO_SHORT: i32 = 62
+pub let SPNG_EIDAT_STREAM: i32 = 63
+pub let SPNG_EZLIB: i32 = 64
+pub let SPNG_EFILTER: i32 = 65
+pub let SPNG_EBUFSIZ: i32 = 66
+pub let SPNG_EIO: i32 = 67
+pub let SPNG_EOF: i32 = 68
+pub let SPNG_EBUF_SET: i32 = 69
+pub let SPNG_EBADSTATE: i32 = 70
+pub let SPNG_EFMT: i32 = 71
+pub let SPNG_EFLAGS: i32 = 72
+pub let SPNG_ECHUNKAVAIL: i32 = 73
+pub let SPNG_ENCODE_ONLY: i32 = 74
+pub let SPNG_EOI: i32 = 75
+pub let SPNG_ENOPLTE: i32 = 76
+pub let SPNG_ECHUNK_LIMITS: i32 = 77
+pub let SPNG_EZLIB_INIT: i32 = 78
+pub let SPNG_ECHUNK_STDLEN: i32 = 79
+pub let SPNG_EINTERNAL: i32 = 80
+pub let SPNG_ECTXTYPE: i32 = 81
+pub let SPNG_ENOSRC: i32 = 82
+pub let SPNG_ENODST: i32 = 83
+pub let SPNG_EOPSTATE: i32 = 84
+pub let SPNG_ENOTFINAL: i32 = 85
+pub type spng_text_type = i32
+
+pub let SPNG_TEXT: i32 = 1
+pub let SPNG_ZTXT: i32 = 2
+pub let SPNG_ITXT: i32 = 3
+pub type spng_color_type = i32
+
+pub let SPNG_COLOR_TYPE_GRAYSCALE: i32 = 0
+pub let SPNG_COLOR_TYPE_TRUECOLOR: i32 = 2
+pub let SPNG_COLOR_TYPE_INDEXED: i32 = 3
+pub let SPNG_COLOR_TYPE_GRAYSCALE_ALPHA: i32 = 4
+pub let SPNG_COLOR_TYPE_TRUECOLOR_ALPHA: i32 = 6
+pub type spng_filter = i32
+
+pub let SPNG_FILTER_NONE: i32 = 0
+pub let SPNG_FILTER_SUB: i32 = 1
+pub let SPNG_FILTER_UP: i32 = 2
+pub let SPNG_FILTER_AVERAGE: i32 = 3
+pub let SPNG_FILTER_PAETH: i32 = 4
+pub type spng_filter_choice = i32
+
+pub let SPNG_DISABLE_FILTERING: i32 = 0
+pub let SPNG_FILTER_CHOICE_NONE: i32 = 8
+pub let SPNG_FILTER_CHOICE_SUB: i32 = 16
+pub let SPNG_FILTER_CHOICE_UP: i32 = 32
+pub let SPNG_FILTER_CHOICE_AVG: i32 = 64
+pub let SPNG_FILTER_CHOICE_PAETH: i32 = 128
+pub let SPNG_FILTER_CHOICE_ALL: i32 = 248
+pub type spng_interlace_method = i32
+
+pub let SPNG_INTERLACE_NONE: i32 = 0
+pub let SPNG_INTERLACE_ADAM7: i32 = 1
+pub type spng_format = i32
+
+pub let SPNG_FMT_RGBA8: i32 = 1
+pub let SPNG_FMT_RGBA16: i32 = 2
+pub let SPNG_FMT_RGB8: i32 = 4
+pub let SPNG_FMT_GA8: i32 = 16
+pub let SPNG_FMT_GA16: i32 = 32
+pub let SPNG_FMT_G8: i32 = 64
+pub let SPNG_FMT_PNG: i32 = 256
+pub let SPNG_FMT_RAW: i32 = 512
+pub type spng_ctx_flags = i32
+
+pub let SPNG_CTX_IGNORE_ADLER32: i32 = 1
+pub let SPNG_CTX_ENCODER: i32 = 2
+pub type spng_decode_flags = i32
+
+pub let SPNG_DECODE_USE_TRNS: i32 = 1
+pub let SPNG_DECODE_USE_GAMA: i32 = 2
+pub let SPNG_DECODE_USE_SBIT: i32 = 8
+pub let SPNG_DECODE_TRNS: i32 = 1
+pub let SPNG_DECODE_GAMMA: i32 = 2
+pub let SPNG_DECODE_PROGRESSIVE: i32 = 256
+pub type spng_crc_action = i32
+
+pub let SPNG_CRC_ERROR: i32 = 0
+pub let SPNG_CRC_DISCARD: i32 = 1
+pub let SPNG_CRC_USE: i32 = 2
+pub type spng_encode_flags = i32
+
+pub let SPNG_ENCODE_PROGRESSIVE: i32 = 1
+pub let SPNG_ENCODE_FINALIZE: i32 = 2
+@[repr(C)]
+pub type spng_ihdr { pub width: u32 = 0, pub height: u32 = 0, pub bit_depth: u8 = 0, pub color_type: u8 = 0, pub compression_method: u8 = 0, pub filter_method: u8 = 0, pub interlace_method: u8 = 0 }
+impl Copy for spng_ihdr
+
+@[packed]
+pub type spng_plte_entry { pub red: u8 = 0, pub green: u8 = 0, pub blue: u8 = 0, pub alpha: u8 = 0 }
+impl Copy for spng_plte_entry
+
+@[repr(C)]
+pub type spng_plte { pub n_entries: u32 = 0, pub entries: [spng_plte_entry; 256] }
+impl Copy for spng_plte
+
+@[repr(C)]
+pub type spng_trns { pub gray: u16 = 0, pub red: u16 = 0, pub green: u16 = 0, pub blue: u16 = 0, pub n_type3_entries: u32 = 0, pub type3_alpha: [u8; 256] = [0 as u8; 256] }
+impl Copy for spng_trns
+
+@[repr(C)]
+pub type spng_chrm_int { pub white_point_x: u32 = 0, pub white_point_y: u32 = 0, pub red_x: u32 = 0, pub red_y: u32 = 0, pub green_x: u32 = 0, pub green_y: u32 = 0, pub blue_x: u32 = 0, pub blue_y: u32 = 0 }
+impl Copy for spng_chrm_int
+
+@[repr(C)]
+pub type spng_chrm { pub white_point_x: f64 = 0.0, pub white_point_y: f64 = 0.0, pub red_x: f64 = 0.0, pub red_y: f64 = 0.0, pub green_x: f64 = 0.0, pub green_y: f64 = 0.0, pub blue_x: f64 = 0.0, pub blue_y: f64 = 0.0 }
+impl Copy for spng_chrm
+
+@[repr(C)]
+pub type spng_iccp { pub profile_name: [c_char; 80] = [0 as c_char; 80], pub profile_len: u64 = 0, pub profile: *mut c_char = null }
+impl Copy for spng_iccp
+
+@[packed]
+pub type spng_sbit { pub grayscale_bits: u8 = 0, pub red_bits: u8 = 0, pub green_bits: u8 = 0, pub blue_bits: u8 = 0, pub alpha_bits: u8 = 0 }
+impl Copy for spng_sbit
+
+@[repr(C)]
+pub type spng_text { pub keyword: [c_char; 80] = [0 as c_char; 80], pub type: i32 = 0, pub length: u64 = 0, pub text: *mut c_char = null, pub compression_flag: u8 = 0, pub compression_method: u8 = 0, pub language_tag: *mut c_char = null, pub translated_keyword: *mut c_char = null }
+impl Copy for spng_text
+
+@[repr(C)]
+pub type spng_bkgd { pub gray: u16 = 0, pub red: u16 = 0, pub green: u16 = 0, pub blue: u16 = 0, pub plte_index: u16 = 0 }
+impl Copy for spng_bkgd
+
+@[repr(C)]
+pub type spng_hist { pub frequency: [u16; 256] = [0 as u16; 256] }
+impl Copy for spng_hist
+
+@[repr(C)]
+pub type spng_phys { pub ppu_x: u32 = 0, pub ppu_y: u32 = 0, pub unit_specifier: u8 = 0 }
+impl Copy for spng_phys
+
+@[repr(C)]
+pub type spng_splt_entry { pub red: u16 = 0, pub green: u16 = 0, pub blue: u16 = 0, pub alpha: u16 = 0, pub frequency: u16 = 0 }
+impl Copy for spng_splt_entry
+
+@[repr(C)]
+pub type spng_splt { pub name: [c_char; 80] = [0 as c_char; 80], pub sample_depth: u8 = 0, pub n_entries: u32 = 0, pub entries: *mut spng_splt_entry = null }
+impl Copy for spng_splt
+
+@[repr(C)]
+pub type spng_time { pub year: u16 = 0, pub month: u8 = 0, pub day: u8 = 0, pub hour: u8 = 0, pub minute: u8 = 0, pub second: u8 = 0 }
+impl Copy for spng_time
+
+@[repr(C)]
+pub type spng_offs { pub x: i32 = 0, pub y: i32 = 0, pub unit_specifier: u8 = 0 }
+impl Copy for spng_offs
+
+@[repr(C)]
+pub type spng_exif { pub length: u64 = 0, pub data: *mut c_char = null }
+impl Copy for spng_exif
+
+@[repr(C)]
+pub type spng_chunk { pub offset: u64 = 0, pub length: u32 = 0, pub type: [u8; 4] = [0 as u8; 4], pub crc: u32 = 0 }
+impl Copy for spng_chunk
+
+pub type spng_location = i32
+
+pub let SPNG_AFTER_IHDR: i32 = 1
+pub let SPNG_AFTER_PLTE: i32 = 2
+pub let SPNG_AFTER_IDAT: i32 = 8
+@[repr(C)]
+pub type spng_unknown_chunk { pub type: [u8; 4] = [0 as u8; 4], pub length: u64 = 0, pub data: *mut c_void = null, pub location: i32 = 0 }
+impl Copy for spng_unknown_chunk
+
+pub type spng_option = i32
+
+pub let SPNG_KEEP_UNKNOWN_CHUNKS: i32 = 1
+pub let SPNG_IMG_COMPRESSION_LEVEL: i32 = 2
+pub let SPNG_IMG_WINDOW_BITS: i32 = 3
+pub let SPNG_IMG_MEM_LEVEL: i32 = 4
+pub let SPNG_IMG_COMPRESSION_STRATEGY: i32 = 5
+pub let SPNG_TEXT_COMPRESSION_LEVEL: i32 = 6
+pub let SPNG_TEXT_WINDOW_BITS: i32 = 7
+pub let SPNG_TEXT_MEM_LEVEL: i32 = 8
+pub let SPNG_TEXT_COMPRESSION_STRATEGY: i32 = 9
+pub let SPNG_FILTER_CHOICE: i32 = 10
+pub let SPNG_CHUNK_COUNT_LIMIT: i32 = 11
+pub let SPNG_ENCODE_TO_BUFFER: i32 = 12
+pub type spng_malloc_fn = unsafe extern "C" fn(u64) -> *mut c_void
+
+pub type spng_realloc_fn = unsafe extern "C" fn(*mut c_void, u64) -> *mut c_void
+
+pub type spng_calloc_fn = unsafe extern "C" fn(u64, u64) -> *mut c_void
+
+pub type spng_free_fn = unsafe extern "C" fn(*mut c_void) -> Unit
+
+@[repr(C)]
+pub type spng_alloc { pub malloc_fn: Option[unsafe extern "C" fn(u64) -> *mut c_void] = null, pub realloc_fn: Option[unsafe extern "C" fn(*mut c_void, u64) -> *mut c_void] = null, pub calloc_fn: Option[unsafe extern "C" fn(u64, u64) -> *mut c_void] = null, pub free_fn: Option[unsafe extern "C" fn(*mut c_void) -> Unit] = null }
+impl Copy for spng_alloc
+
+@[repr(C)]
+pub type spng_row_info { pub scanline_idx: u32 = 0, pub row_num: u32 = 0, pub pass: i32 = 0, pub filter: u8 = 0 }
+impl Copy for spng_row_info
+
+@[repr(C)]
+pub type spng_ctx { pub data_size: u64 = 0, pub bytes_read: u64 = 0, pub stream_buf_size: u64 = 0, pub stream_buf: *mut u8 = null, pub data: *const u8 = null, pub read_fn: Option[unsafe extern "C" fn(*mut spng_ctx, *mut c_void, *mut c_void, u64) -> i32] = null, pub write_fn: Option[unsafe extern "C" fn(*mut spng_ctx, *mut c_void, *mut c_void, u64) -> i32] = null, pub stream_user_ptr: *mut c_void = null, pub png_base: *const u8 = null, pub bytes_left: u64 = 0, pub last_read_size: u64 = 0, pub user_owns_out_png: i32 = 0, pub out_png: *mut u8 = null, pub write_ptr: *mut u8 = null, pub out_png_size: u64 = 0, pub bytes_encoded: u64 = 0, pub current_chunk: spng_chunk, pub cur_chunk_bytes_left: u32 = 0, pub cur_actual_crc: u32 = 0, pub alloc: spng_alloc, pub flags: i32 = 0, pub fmt: i32 = 0, pub state: i32 = 0, pub __bits_0: u32 = 0, pub image_options: spng__zlib_options, pub text_options: spng__zlib_options, pub undo: Option[unsafe extern "C" fn(*mut spng_ctx) -> Unit] = null, pub file: spng_chunk_bitfield, pub user: spng_chunk_bitfield, pub stored: spng_chunk_bitfield, pub prev_stored: spng_chunk_bitfield, pub first_idat: spng_chunk, pub last_idat: spng_chunk, pub max_width: u32 = 0, pub max_height: u32 = 0, pub max_chunk_size: u64 = 0, pub chunk_cache_limit: u64 = 0, pub chunk_cache_usage: u64 = 0, pub chunk_count_limit: u32 = 0, pub chunk_count_total: u32 = 0, pub crc_action_critical: i32 = 0, pub crc_action_ancillary: i32 = 0, pub optimize_option: u32 = 0, pub ihdr: spng_ihdr, pub plte: spng_plte, pub chrm_int: spng_chrm_int, pub iccp: spng_iccp, pub gama: u32 = 0, pub sbit: spng_sbit, pub srgb_rendering_intent: u8 = 0, pub n_text: u32 = 0, pub text_list: *mut spng_text2 = null, pub bkgd: spng_bkgd, pub hist: spng_hist, pub trns: spng_trns, pub phys: spng_phys, pub n_splt: u32 = 0, pub splt_list: *mut spng_splt = null, pub time: spng_time, pub offs: spng_offs, pub exif: spng_exif, pub n_chunks: u32 = 0, pub chunk_list: *mut spng_unknown_chunk = null, pub subimage: [spng_subimage; 7], pub zstream: spng_z_stream_s, pub scanline_buf: *mut u8 = null, pub prev_scanline_buf: *mut u8 = null, pub row_buf: *mut u8 = null, pub filtered_scanline_buf: *mut u8 = null, pub scanline: *mut u8 = null, pub prev_scanline: *mut u8 = null, pub row: *mut u8 = null, pub filtered_scanline: *mut u8 = null, pub image_size: u64 = 0, pub image_width: u64 = 0, pub bytes_per_pixel: u32 = 0, pub pixel_size: u32 = 0, pub widest_pass: i32 = 0, pub last_pass: i32 = 0, pub gamma_lut: *mut u16 = null, pub gamma_lut16: *mut u16 = null, pub gamma_lut8: [u16; 256] = [0 as u16; 256], pub trns_px: [u8; 8] = [0 as u8; 8], pub decode_plte: spng__decode_plte, pub decode_sb: spng_sbit, pub decode_flags: decode_flags, pub row_info: spng_row_info, pub encode_flags: encode_flags }
+impl Copy for spng_ctx
+impl spng_ctx:
+    pub fn streaming() -> u32: ((self.__bits_0 >> 0) & 1) as u32
+    pub mut fn set_streaming(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 0)) | (((v as u32) & 1) << 0)
+    pub fn internal_buffer() -> u32: ((self.__bits_0 >> 1) & 1) as u32
+    pub mut fn set_internal_buffer(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 1)) | (((v as u32) & 1) << 1)
+    pub fn inflate() -> u32: ((self.__bits_0 >> 2) & 1) as u32
+    pub mut fn set_inflate(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 2)) | (((v as u32) & 1) << 2)
+    pub fn deflate() -> u32: ((self.__bits_0 >> 3) & 1) as u32
+    pub mut fn set_deflate(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 3)) | (((v as u32) & 1) << 3)
+    pub fn encode_only() -> u32: ((self.__bits_0 >> 4) & 1) as u32
+    pub mut fn set_encode_only(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 4)) | (((v as u32) & 1) << 4)
+    pub fn strict() -> u32: ((self.__bits_0 >> 5) & 1) as u32
+    pub mut fn set_strict(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 5)) | (((v as u32) & 1) << 5)
+    pub fn discard() -> u32: ((self.__bits_0 >> 6) & 1) as u32
+    pub mut fn set_discard(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 6)) | (((v as u32) & 1) << 6)
+    pub fn skip_crc() -> u32: ((self.__bits_0 >> 7) & 1) as u32
+    pub mut fn set_skip_crc(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 7)) | (((v as u32) & 1) << 7)
+    pub fn keep_unknown() -> u32: ((self.__bits_0 >> 8) & 1) as u32
+    pub mut fn set_keep_unknown(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 8)) | (((v as u32) & 1) << 8)
+    pub fn prev_was_idat() -> u32: ((self.__bits_0 >> 9) & 1) as u32
+    pub mut fn set_prev_was_idat(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 9)) | (((v as u32) & 1) << 9)
+comptime fn __ci_layout_spng_ctx() -> Unit:
+    if sizeof[*const u8]() == 8 and (sizeof[spng_ctx]() != 4416 or offsetof[spng_ctx](__bits_0) != 204): comptime_error("spng_ctx: the bitfield layout this migration recorded (D147) differs on this target")
+const __ci_layout_spng_ctx_check: Unit = __ci_layout_spng_ctx()
+
+pub type spng_read_fn = unsafe extern "C" fn(*mut spng_ctx, *mut c_void, *mut c_void, u64) -> i32
+
+pub type spng_write_fn = unsafe extern "C" fn(*mut spng_ctx, *mut c_void, *mut c_void, u64) -> i32
+
+pub type spng_rw_fn = unsafe extern "C" fn(*mut spng_ctx, *mut c_void, *mut c_void, u64) -> i32
+
+pub let SPNG_VERSION_MAJOR: i32 = 0
+pub let SPNG_VERSION_MINOR: i32 = 7
+pub let SPNG_VERSION_PATCH: i32 = 4
+pub type z_size_t = u64
+
+pub type Byte = u8
+
+pub type uInt = u32
+
+pub type uLong = u64
+
+pub type Bytef = u8
+
+pub type charf = c_char
+
+pub type intf = i32
+
+pub type uIntf = u32
+
+pub type uLongf = u64
+
+pub type voidpc = *const c_void
+
+pub type voidpf = *mut c_void
+
+pub type voidp = *mut c_void
+
+pub type z_crc_t = u32
+
+pub type alloc_func = unsafe extern "C" fn(*mut c_void, u32, u32) -> *mut c_void
+
+pub type free_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit
+
+// zlib.h:88:8: demoted to opaque
+pub type spng_z_internal_state = opaque
+
+@[repr(C)]
+pub type spng_z_stream_s { pub next_in: *const u8 = null, pub avail_in: u32 = 0, pub total_in: u64 = 0, pub next_out: *mut u8 = null, pub avail_out: u32 = 0, pub total_out: u64 = 0, pub msg: *const c_char = null, pub state: *mut spng_z_internal_state = null, pub zalloc: Option[unsafe extern "C" fn(*mut c_void, u32, u32) -> *mut c_void] = null, pub zfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit] = null, pub opaque: *mut c_void = null, pub data_type: i32 = 0, pub adler: u64 = 0, pub reserved: u64 = 0 }
+impl Copy for spng_z_stream_s
+
+pub type z_stream = spng_z_stream_s
+
+pub type z_streamp = *mut spng_z_stream_s
+
+@[repr(C)]
+pub type spng_gz_header_s { pub text: i32 = 0, pub time: u64 = 0, pub xflags: i32 = 0, pub os: i32 = 0, pub extra: *mut u8 = null, pub extra_len: u32 = 0, pub extra_max: u32 = 0, pub name: *mut u8 = null, pub name_max: u32 = 0, pub comment: *mut u8 = null, pub comm_max: u32 = 0, pub hcrc: i32 = 0, pub done: i32 = 0 }
+impl Copy for spng_gz_header_s
+
+pub type gz_header = spng_gz_header_s
+
+pub type gz_headerp = *mut spng_gz_header_s
+
+pub type in_func = unsafe extern "C" fn(*mut c_void, *mut *const u8) -> u32
+
+pub type out_func = unsafe extern "C" fn(*mut c_void, *mut u8, u32) -> i32
+
+pub type gzFile = *mut spng_gzFile_s
+
+@[repr(C)]
+pub type spng_gzFile_s { pub have: u32 = 0, pub next: *mut u8 = null, pub pos: i64 = 0 }
+impl Copy for spng_gzFile_s
+
+pub type spng_state = i32
+
+pub let SPNG_STATE_INVALID: i32 = 0
+pub let SPNG_STATE_INIT: i32 = 1
+pub let SPNG_STATE_INPUT: i32 = 2
+pub let SPNG_STATE_OUTPUT: i32 = 2
+pub let SPNG_STATE_IHDR: i32 = 3
+pub let SPNG_STATE_FIRST_IDAT: i32 = 4
+pub let SPNG_STATE_DECODE_INIT: i32 = 5
+pub let SPNG_STATE_ENCODE_INIT: i32 = 5
+pub let SPNG_STATE_EOI: i32 = 6
+pub let SPNG_STATE_LAST_IDAT: i32 = 7
+pub let SPNG_STATE_AFTER_IDAT: i32 = 8
+pub let SPNG_STATE_IEND: i32 = 9
+pub type spng__internal = i32
+
+pub let SPNG__IO_SIGNAL: i32 = 512
+pub let SPNG__CTX_FLAGS_ALL: i32 = 3
+@[repr(C)]
+pub type spng_subimage { pub width: u32 = 0, pub height: u32 = 0, pub out_width: u64 = 0, pub scanline_width: u64 = 0 }
+impl Copy for spng_subimage
+
+@[repr(C)]
+pub type spng_text2 { pub type: i32 = 0, pub keyword: *mut c_char = null, pub text: *mut c_char = null, pub text_length: u64 = 0, pub compression_flag: u8 = 0, pub language_tag: *mut c_char = null, pub translated_keyword: *mut c_char = null, pub cache_usage: u64 = 0, pub user_keyword_storage: [c_char; 80] = [0 as c_char; 80] }
+impl Copy for spng_text2
+
+@[repr(C)]
+pub type decode_flags { pub __bits_0: u32 = 0 }
+impl Copy for decode_flags
+impl decode_flags:
+    pub fn apply_trns() -> u32: ((self.__bits_0 >> 0) & 1) as u32
+    pub mut fn set_apply_trns(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 0)) | (((v as u32) & 1) << 0)
+    pub fn apply_gamma() -> u32: ((self.__bits_0 >> 1) & 1) as u32
+    pub mut fn set_apply_gamma(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 1)) | (((v as u32) & 1) << 1)
+    pub fn use_sbit() -> u32: ((self.__bits_0 >> 2) & 1) as u32
+    pub mut fn set_use_sbit(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 2)) | (((v as u32) & 1) << 2)
+    pub fn indexed() -> u32: ((self.__bits_0 >> 3) & 1) as u32
+    pub mut fn set_indexed(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 3)) | (((v as u32) & 1) << 3)
+    pub fn do_scaling() -> u32: ((self.__bits_0 >> 4) & 1) as u32
+    pub mut fn set_do_scaling(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 4)) | (((v as u32) & 1) << 4)
+    pub fn interlaced() -> u32: ((self.__bits_0 >> 5) & 1) as u32
+    pub mut fn set_interlaced(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 5)) | (((v as u32) & 1) << 5)
+    pub fn same_layout() -> u32: ((self.__bits_0 >> 6) & 1) as u32
+    pub mut fn set_same_layout(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 6)) | (((v as u32) & 1) << 6)
+    pub fn zerocopy() -> u32: ((self.__bits_0 >> 7) & 1) as u32
+    pub mut fn set_zerocopy(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 7)) | (((v as u32) & 1) << 7)
+    pub fn unpack() -> u32: ((self.__bits_0 >> 8) & 1) as u32
+    pub mut fn set_unpack(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 8)) | (((v as u32) & 1) << 8)
+comptime fn __ci_layout_decode_flags() -> Unit:
+    if sizeof[*const u8]() == 8 and (sizeof[decode_flags]() != 4 or offsetof[decode_flags](__bits_0) != 0): comptime_error("decode_flags: the bitfield layout this migration recorded (D147) differs on this target")
+const __ci_layout_decode_flags_check: Unit = __ci_layout_decode_flags()
+
+@[repr(C)]
+pub type encode_flags { pub __bits_0: u32 = 0, pub filter_choice: i32 = 0 }
+impl Copy for encode_flags
+impl encode_flags:
+    pub fn interlace() -> u32: ((self.__bits_0 >> 0) & 1) as u32
+    pub mut fn set_interlace(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 0)) | (((v as u32) & 1) << 0)
+    pub fn same_layout() -> u32: ((self.__bits_0 >> 1) & 1) as u32
+    pub mut fn set_same_layout(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 1)) | (((v as u32) & 1) << 1)
+    pub fn to_bigendian() -> u32: ((self.__bits_0 >> 2) & 1) as u32
+    pub mut fn set_to_bigendian(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 2)) | (((v as u32) & 1) << 2)
+    pub fn progressive() -> u32: ((self.__bits_0 >> 3) & 1) as u32
+    pub mut fn set_progressive(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 3)) | (((v as u32) & 1) << 3)
+    pub fn finalize() -> u32: ((self.__bits_0 >> 4) & 1) as u32
+    pub mut fn set_finalize(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 4)) | (((v as u32) & 1) << 4)
+comptime fn __ci_layout_encode_flags() -> Unit:
+    if sizeof[*const u8]() == 8 and (sizeof[encode_flags]() != 8 or offsetof[encode_flags](__bits_0) != 0): comptime_error("encode_flags: the bitfield layout this migration recorded (D147) differs on this target")
+const __ci_layout_encode_flags_check: Unit = __ci_layout_encode_flags()
+
+@[repr(C)]
+pub type spng_chunk_bitfield { pub __bits_0: u32 = 0 }
+impl Copy for spng_chunk_bitfield
+impl spng_chunk_bitfield:
+    pub fn ihdr() -> u32: ((self.__bits_0 >> 0) & 1) as u32
+    pub mut fn set_ihdr(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 0)) | (((v as u32) & 1) << 0)
+    pub fn plte() -> u32: ((self.__bits_0 >> 1) & 1) as u32
+    pub mut fn set_plte(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 1)) | (((v as u32) & 1) << 1)
+    pub fn chrm() -> u32: ((self.__bits_0 >> 2) & 1) as u32
+    pub mut fn set_chrm(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 2)) | (((v as u32) & 1) << 2)
+    pub fn iccp() -> u32: ((self.__bits_0 >> 3) & 1) as u32
+    pub mut fn set_iccp(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 3)) | (((v as u32) & 1) << 3)
+    pub fn gama() -> u32: ((self.__bits_0 >> 4) & 1) as u32
+    pub mut fn set_gama(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 4)) | (((v as u32) & 1) << 4)
+    pub fn sbit() -> u32: ((self.__bits_0 >> 5) & 1) as u32
+    pub mut fn set_sbit(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 5)) | (((v as u32) & 1) << 5)
+    pub fn srgb() -> u32: ((self.__bits_0 >> 6) & 1) as u32
+    pub mut fn set_srgb(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 6)) | (((v as u32) & 1) << 6)
+    pub fn text() -> u32: ((self.__bits_0 >> 7) & 1) as u32
+    pub mut fn set_text(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 7)) | (((v as u32) & 1) << 7)
+    pub fn bkgd() -> u32: ((self.__bits_0 >> 8) & 1) as u32
+    pub mut fn set_bkgd(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 8)) | (((v as u32) & 1) << 8)
+    pub fn hist() -> u32: ((self.__bits_0 >> 9) & 1) as u32
+    pub mut fn set_hist(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 9)) | (((v as u32) & 1) << 9)
+    pub fn trns() -> u32: ((self.__bits_0 >> 10) & 1) as u32
+    pub mut fn set_trns(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 10)) | (((v as u32) & 1) << 10)
+    pub fn phys() -> u32: ((self.__bits_0 >> 11) & 1) as u32
+    pub mut fn set_phys(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 11)) | (((v as u32) & 1) << 11)
+    pub fn splt() -> u32: ((self.__bits_0 >> 12) & 1) as u32
+    pub mut fn set_splt(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 12)) | (((v as u32) & 1) << 12)
+    pub fn time() -> u32: ((self.__bits_0 >> 13) & 1) as u32
+    pub mut fn set_time(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 13)) | (((v as u32) & 1) << 13)
+    pub fn offs() -> u32: ((self.__bits_0 >> 14) & 1) as u32
+    pub mut fn set_offs(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 14)) | (((v as u32) & 1) << 14)
+    pub fn exif() -> u32: ((self.__bits_0 >> 15) & 1) as u32
+    pub mut fn set_exif(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 15)) | (((v as u32) & 1) << 15)
+    pub fn unknown() -> u32: ((self.__bits_0 >> 16) & 1) as u32
+    pub mut fn set_unknown(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 16)) | (((v as u32) & 1) << 16)
+comptime fn __ci_layout_spng_chunk_bitfield() -> Unit:
+    if sizeof[*const u8]() == 8 and (sizeof[spng_chunk_bitfield]() != 4 or offsetof[spng_chunk_bitfield](__bits_0) != 0): comptime_error("spng_chunk_bitfield: the bitfield layout this migration recorded (D147) differs on this target")
+const __ci_layout_spng_chunk_bitfield_check: Unit = __ci_layout_spng_chunk_bitfield()
+
+@[repr(C)]
+pub type spng__iter { pub mask: u8 = 0, pub shift_amount: u32 = 0, pub initial_shift: u32 = 0, pub bit_depth: u32 = 0, pub samples: *const u8 = null }
+impl Copy for spng__iter
+
+@[repr(C)]
+pub type spng__decode_plte = union { pub rgba: [spng_plte_entry; 256], pub rgb: [u8; 768] = [0 as u8; 768], pub raw: [u8; 1024] = [0 as u8; 1024], pub align_this: u32 = 0 }
+impl Copy for spng__decode_plte
+
+@[repr(C)]
+pub type spng__zlib_options { pub compression_level: i32 = 0, pub window_bits: i32 = 0, pub mem_level: i32 = 0, pub strategy: i32 = 0, pub data_type: i32 = 0 }
+impl Copy for spng__zlib_options
+
+pub type spng__undo = unsafe extern "C" fn(*mut spng_ctx) -> Unit
+
+pub let MAX_MEM_LEVEL: i32 = 9
+pub let MAX_WBITS: i32 = 15
+pub fn OF[T](args: T) -> T {
+    args
+}
+pub let ZLIB_VERSION = "1.3.2"
+pub let ZLIB_VERNUM: i32 = 0x1320
+pub let ZLIB_VER_MAJOR: i32 = 1
+pub let ZLIB_VER_MINOR: i32 = 3
+pub let ZLIB_VER_REVISION: i32 = 2
+pub let ZLIB_VER_SUBREVISION: i32 = 0
+pub let Z_NO_FLUSH: i32 = 0
+pub let Z_PARTIAL_FLUSH: i32 = 1
+pub let Z_SYNC_FLUSH: i32 = 2
+pub let Z_FULL_FLUSH: i32 = 3
+pub let Z_FINISH: i32 = 4
+pub let Z_BLOCK: i32 = 5
+pub let Z_TREES: i32 = 6
+pub let Z_OK: i32 = 0
+pub let Z_STREAM_END: i32 = 1
+pub let Z_NEED_DICT: i32 = 2
+pub let Z_ERRNO: i32 = -1
+pub let Z_STREAM_ERROR: i32 = -2
+pub let Z_DATA_ERROR: i32 = -3
+pub let Z_MEM_ERROR: i32 = -4
+pub let Z_BUF_ERROR: i32 = -5
+pub let Z_VERSION_ERROR: i32 = -6
+pub let Z_NO_COMPRESSION: i32 = 0
+pub let Z_BEST_SPEED: i32 = 1
+pub let Z_BEST_COMPRESSION: i32 = 9
+pub let Z_DEFAULT_COMPRESSION: i32 = -1
+pub let Z_FILTERED: i32 = 1
+pub let Z_HUFFMAN_ONLY: i32 = 2
+pub let Z_RLE: i32 = 3
+pub let Z_FIXED: i32 = 4
+pub let Z_DEFAULT_STRATEGY: i32 = 0
+pub let Z_BINARY: i32 = 0
+pub let Z_TEXT: i32 = 1
+pub let Z_ASCII: i32 = 1
+pub let Z_UNKNOWN: i32 = 2
+pub let Z_DEFLATED: i32 = 8
+pub let Z_NULL: i32 = 0
+pub let SPNG_READ_SIZE: i32 = 8192
+pub let SPNG_WRITE_SIZE: i32 = 8192
+pub let SPNG_MAX_CHUNK_COUNT: i32 = 1000
+pub fn SPNG_TARGET_CLONES(x: i32) {
+    return
+}
+pub let SPNG_VERSION_STRING: [c_char; 6] = [48, 46, 55, 46, 52, 0]
+

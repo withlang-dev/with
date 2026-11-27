@@ -1,0 +1,53 @@
+//! expect-stdout: ok
+
+// #3013: std.png encodes and decodes 8-bit RGBA PNGs through the migrated
+// libspng engine backed by std.engines.zlib, including binary file I/O and
+// error reporting on corrupt or mismatched inputs.
+use std.fs
+use std.png
+use std.process
+
+fn main:
+    let width: u32 = 16
+    let height: u32 = 12
+    let pixels: List[u8] = []
+    for y in 0..height as i32:
+        for x in 0..width as i32:
+            pixels.push(((x * 16) % 256) as u8)
+            pixels.push(((y * 21) % 256) as u8)
+            pixels.push((((x + y) * 9) % 256) as u8)
+            pixels.push((255 - x * 8) as u8)
+
+    // In-memory encode -> PNG signature -> decode round-trip.
+    let encoded = encode_rgba(width, height, pixels).unwrap()
+    assert(encoded.len() > 32)
+    assert(encoded[0] == 137 as u8 and encoded[1] == 80 as u8 and encoded[2] == 78 as u8 and encoded[3] == 71 as u8)
+
+    let decoded = decode_rgba(encoded).unwrap()
+    assert(decoded.width == width)
+    assert(decoded.height == height)
+    assert(decoded.rgba.len() == pixels.len())
+    for i in 0..pixels.len():
+        assert(decoded.rgba[i] == pixels[i])
+
+    // Disk write -> read binary round-trip (exercises NUL bytes in PNG header/chunks).
+    let dir = f"out/tmp/std-png-3013-{pid()}"
+    assert(mkdir_p(dir) == 0)
+    let png_path = dir ++ "/gradient.png"
+    let img = Image { width, height, rgba: pixels }
+    assert(write_rgba(png_path, img).is_ok())
+    let from_disk = read_rgba(png_path).unwrap()
+    assert(from_disk.width == width and from_disk.height == height)
+    assert(from_disk.rgba.len() == img.rgba.len())
+    for i in 0..img.rgba.len():
+        assert(from_disk.rgba[i] == img.rgba[i])
+
+    // Error paths: corrupt bytes, empty buffer, mismatched RGBA length.
+    let corrupt: List[u8] = [1 as u8, 2 as u8, 3 as u8, 4 as u8, 5 as u8, 6 as u8, 7 as u8, 8 as u8]
+    assert(decode_rgba(corrupt).is_err())
+    let empty: List[u8] = []
+    assert(decode_rgba(empty).is_err())
+    assert(encode_rgba(4, 4, corrupt).is_err())
+    assert(encode_rgba(0, 4, empty).is_err())
+
+    print("ok")

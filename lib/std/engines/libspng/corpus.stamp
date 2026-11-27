@@ -1,0 +1,7 @@
+# D112: written by promotion, never by hand. The migrator generation that
+# produced these modules (a hash of the migrator's sources), a hash of the
+# modules (the integrity check compares it) and the trigger that justified
+# the promotion (the pin moved, a migrator-pin bump, a ruling).
+migrated_by 3e9e43354be29989509c1456a42c37a21dca69a3cc21d5b9a28fef73c8b97a68
+modules 604746329aa01a7f966bd6828777cbf9aaaeabf0fe9876d50d34567b86f48a1a
+promoted_for first promotion

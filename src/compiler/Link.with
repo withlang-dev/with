@@ -2034,82 +2034,110 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
     if count == 0:
         return out
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
-    for bi in 0..count:
-        // #2131: a slot carried for another target is not this link's. One
-        // slot per bundle is this target's (embedded_bundle_for_this_target),
-        // so the runtime joins once.
-        if not embedded_bundle_for_this_target(bi):
-            continue
-        if not embedded_bundle_present(bi):
-            // An empty `rt` slot under the lane: the runtime root's bundle.
-            if embedded_bundle_name(bi) == "rt" and needs_runtime:
-                let from_root = link_stage_runtime_root_bundle_object()
-                if from_root.len() > 0:
-                    out.push(from_root)
-            continue
-        let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
-        let name = embedded_bundle_name(bi)
-        // D30 R3: the runtime bundle joins every link of a unit compiled
-        // against its interface (the lane) and no other: its symbols are the
-        // flat `with_*` names, not module prefixes, and the object world
-        // links the rt objects instead. Like them it must be this
-        // compiler's own generation (D132).
-        if name == "rt":
-            if not needs_runtime or link_stage_bundle_provided_explicitly(manifest):
+    // Transitive closure (#3013): a corpus bundle (libspng) can import another
+    // corpus bundle (zlib), so every selected bundle's own undefined symbols
+    // feed back into the loop until no further embedded bundle is needed.
+    let selected = []
+    for _ in 0..count:
+        selected.push(false)
+    var all_undef = with_str_clone_ref(undef)
+    var need_rt = needs_runtime
+    var changed = true
+    while changed:
+        changed = false
+        for bi in 0..count:
+            if selected[bi]:
                 continue
-            if not link_stage_embedded_runtime_is_this_generation():
-                with_eprint(link_stage_runtime_generation_refusal())
+            // #2131: a slot carried for another target is not this link's. One
+            // slot per bundle is this target's (embedded_bundle_for_this_target),
+            // so the runtime joins once.
+            if not embedded_bundle_for_this_target(bi):
+                selected[bi] = true
+                continue
+            if not embedded_bundle_present(bi):
+                // An empty `rt` slot under the lane: the runtime root's bundle.
+                if embedded_bundle_name(bi) == "rt" and need_rt:
+                    let from_root = link_stage_runtime_root_bundle_object()
+                    if from_root.len() > 0:
+                        out.push(from_root)
+                        selected[bi] = true
+                        changed = true
+                continue
+            let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
+            let name = embedded_bundle_name(bi)
+            // D30 R3: the runtime bundle joins every link of a unit compiled
+            // against its interface (the lane) and no other: its symbols are the
+            // flat `with_*` names, not module prefixes, and the object world
+            // links the rt objects instead. Like them it must be this
+            // compiler's own generation (D132).
+            if name == "rt":
+                if not need_rt or link_stage_bundle_provided_explicitly(manifest):
+                    continue
+                if not link_stage_embedded_runtime_is_this_generation():
+                    with_eprint(link_stage_runtime_generation_refusal())
+                    let failed: List[str] = []
+                    failed.push(LINK_BUNDLE_FAILED())
+                    return failed
+            else if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, all_undef):
+                continue
+            let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
+            if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
+                with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
                 let failed: List[str] = []
                 failed.push(LINK_BUNDLE_FAILED())
                 return failed
-        else if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
-            continue
-        let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
-        if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
-            with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
-            let failed: List[str] = []
-            failed.push(LINK_BUNDLE_FAILED())
-            return failed
-        // A bundle is compiled for one platform; a cross link of a program
-        // that needs it has no bundle for its target (§18.5: never link
-        // native output into a cross binary).
-        let bundle_target = link_stage_bundle_manifest_field(manifest, "target")
-        if bundle_target != target_spec_resolved_name():
-            with_eprint("error: embedded bundle '" ++ name ++ "' was built for target " ++ bundle_target ++ " but this link targets " ++ target_spec_resolved_name() ++ " (this compiler embeds no " ++ name ++ " bundle for that target)")
-            let failed: List[str] = []
-            failed.push(LINK_BUNDLE_FAILED())
-            return failed
-        // D138: every runtime symbol the bundle imports is provided under
-        // the contract it was compiled against.
-        let drift = link_stage_bundle_import_drift(name, manifest)
-        if drift.len() > 0:
-            with_eprint(drift)
-            let failed: List[str] = []
-            failed.push(LINK_BUNDLE_FAILED())
-            return failed
-        // D39 pairing: the embedded interface is the one the object was
-        // built with, or the binary's embedded bundles are corrupt.
-        let manifest_wi_sha = link_stage_bundle_manifest_field(manifest, "interface-sha")
-        let embedded_wi_sha = bundle_text_sha256(embedded_bundle_interface_text(bi))
-        if manifest_wi_sha.len() == 0 or embedded_wi_sha != manifest_wi_sha:
-            with_eprint("error: embedded bundle '" ++ name ++ "': its interface (sha256 " ++ embedded_wi_sha ++ ") is not the one its manifest was built with (" ++ manifest_wi_sha ++ "); this compiler's embedded bundles are corrupt")
-            let failed: List[str] = []
-            failed.push(LINK_BUNDLE_FAILED())
-            return failed
-        // The extracted object is named by the bundle it is (its interface
-        // sha): every compiler process shares this directory, two generations
-        // included (the drop audit runs the seed beside the candidate), and one
-        // path for both handed a link the other generation's object (#761's
-        // mixed-generation class; on one layout the module hashes agreed and
-        // hid it).
-        let obj_path = tmp_dir ++ "/wo_" ++ name ++ "_" ++ manifest_wi_sha.slice(0, 16) ++ ".o"
-        let data = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
-        if runtime_mkdir_p(tmp_dir) != 0 or link_stage_extract_blob(data, obj_path):
-            with_eprint("error: could not extract embedded bundle '" ++ name ++ "' to " ++ obj_path)
-            let failed: List[str] = []
-            failed.push(LINK_BUNDLE_FAILED())
-            return failed
-        out.push(obj_path)
+            // A bundle is compiled for one platform; a cross link of a program
+            // that needs it has no bundle for its target (§18.5: never link
+            // native output into a cross binary).
+            let bundle_target = link_stage_bundle_manifest_field(manifest, "target")
+            if bundle_target != target_spec_resolved_name():
+                with_eprint("error: embedded bundle '" ++ name ++ "' was built for target " ++ bundle_target ++ " but this link targets " ++ target_spec_resolved_name() ++ " (this compiler embeds no " ++ name ++ " bundle for that target)")
+                let failed: List[str] = []
+                failed.push(LINK_BUNDLE_FAILED())
+                return failed
+            // D138: every runtime symbol the bundle imports is provided under
+            // the contract it was compiled against.
+            let drift = link_stage_bundle_import_drift(name, manifest)
+            if drift.len() > 0:
+                with_eprint(drift)
+                let failed: List[str] = []
+                failed.push(LINK_BUNDLE_FAILED())
+                return failed
+            // D39 pairing: the embedded interface is the one the object was
+            // built with, or the binary's embedded bundles are corrupt.
+            let manifest_wi_sha = link_stage_bundle_manifest_field(manifest, "interface-sha")
+            let embedded_wi_sha = bundle_text_sha256(embedded_bundle_interface_text(bi))
+            if manifest_wi_sha.len() == 0 or embedded_wi_sha != manifest_wi_sha:
+                with_eprint("error: embedded bundle '" ++ name ++ "': its interface (sha256 " ++ embedded_wi_sha ++ ") is not the one its manifest was built with (" ++ manifest_wi_sha ++ "); this compiler's embedded bundles are corrupt")
+                let failed: List[str] = []
+                failed.push(LINK_BUNDLE_FAILED())
+                return failed
+            // The extracted object is named by the bundle it is (its interface
+            // sha): every compiler process shares this directory, two generations
+            // included (the drop audit runs the seed beside the candidate), and one
+            // path for both handed a link the other generation's object (#761's
+            // mixed-generation class; on one layout the module hashes agreed and
+            // hid it).
+            let obj_path = tmp_dir ++ "/wo_" ++ name ++ "_" ++ manifest_wi_sha.slice(0, 16) ++ ".o"
+            let data = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
+            if runtime_mkdir_p(tmp_dir) != 0 or link_stage_extract_blob(data, obj_path):
+                with_eprint("error: could not extract embedded bundle '" ++ name ++ "' to " ++ obj_path)
+                let failed: List[str] = []
+                failed.push(LINK_BUNDLE_FAILED())
+                return failed
+            out.push(obj_path)
+            selected[bi] = true
+            changed = true
+            if name != "rt":
+                let bundle_undef = link_stage_undefined_symbols_for_object(obj_path)
+                if bundle_undef == "<probe-failed>":
+                    all_undef = "<probe-failed>"
+                    need_rt = true
+                else:
+                    if all_undef != "<probe-failed>":
+                        all_undef = all_undef ++ bundle_undef
+                    if not need_rt and link_stage_undefined_symbols_need_helpers_runtime(bundle_undef):
+                        need_rt = true
     out
 
 // The compiler's own directory: argv[0] is a bare `with` when it runs from

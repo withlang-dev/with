@@ -1,0 +1,206 @@
+module build.libspng
+
+use std.build
+use build.corpus
+use build.wo
+
+// libspng 0.7.4 (randy408/libspng release tarball, BSD-2-Clause AND libpng-2.0,
+// LICENSE ships beside the migration). Backing engine for `std.png` (#3013):
+// decodes and encodes PNGs through `std.engines.zlib` so the standard library
+// carries one inflate/deflate engine.
+
+const LIBSPNG_RELEASE: str = "libspng-0.7.4"
+const LIBSPNG_URL: str = "https://github.com/randy408/libspng/archive/refs/tags/v0.7.4.tar.gz"
+const LIBSPNG_SHA256: str = "47ec02be6c0a6323044600a9221b049f63e1953faf816903e7383d4dc4234487"
+const LIBSPNG_ZLIB_REF: str = "out/zlib_reference/zlib-1.3.2"
+
+pub fn libspng_corpus() -> Corpus:
+    Corpus {
+        name: "libspng", stem: "libspng", package: "std.engines.libspng",
+        corpus_rel: "std/engines/libspng", corpus_dir: "lib/std/engines/libspng",
+        upstream: upstream_release("libspng", LIBSPNG_RELEASE, LIBSPNG_URL, LIBSPNG_SHA256),
+        license: "LICENSE",
+        harness: ["harness"], drift_harness: "harness.with", drift_harness_arg: "",
+        module_floor: 3,
+        // SPNG_DISABLE_OPT keeps the migrated C 100% portable across all 6
+        // targets (no x86 SSE or ARM NEON intrinsics). The zlib struct-tag
+        // renames keep libspng's ZLIB_CONST z_stream layout separate from
+        // std.engines.zlib.defs's names while preserving identical ABI layout.
+        defines: [
+            "SPNG_DISABLE_OPT",
+            "z_stream_s=spng_z_stream_s",
+            "internal_state=spng_z_internal_state",
+            "gz_header_s=spng_gz_header_s",
+            "gzFile_s=spng_gzFile_s",
+        ],
+        excludes: [],
+        include_dirs: [],
+        declared_externs: [],
+        forced_includes: [],
+        promote_after: [],
+        test_lane: "libspng-test",
+        extra_generated_dirs: [],
+        bundle_deps: ["zlib"],
+        prepare_reference: corpus_no_prepare,
+        stage: libspng_stage,
+        migrate: corpus_migrate_directory,
+        finish_generated: libspng_finish,
+        verify_generated: corpus_no_verify,
+        lanes: libspng_lanes,
+    }
+
+fn libspng_harness_source() -> str:
+    "#include <stdio.h>\n" ++
+    "#include <stdlib.h>\n" ++
+    "#include <string.h>\n" ++
+    "#include \"spng.h\"\n" ++
+    "int main(void) {\n" ++
+    "    const uint32_t w = 8, h = 6;\n" ++
+    "    unsigned char src[8 * 6 * 4];\n" ++
+    "    for (uint32_t y = 0; y < h; y++) {\n" ++
+    "        for (uint32_t x = 0; x < w; x++) {\n" ++
+    "            size_t idx = ((size_t)y * w + x) * 4;\n" ++
+    "            src[idx + 0] = (unsigned char)(x * 31);\n" ++
+    "            src[idx + 1] = (unsigned char)(y * 41);\n" ++
+    "            src[idx + 2] = (unsigned char)((x + y) * 17);\n" ++
+    "            src[idx + 3] = (unsigned char)(255 - x * 10);\n" ++
+    "        }\n" ++
+    "    }\n" ++
+    "    spng_ctx *enc = spng_ctx_new(SPNG_CTX_ENCODER);\n" ++
+    "    if (!enc) return 1;\n" ++
+    "    if (spng_set_option(enc, SPNG_ENCODE_TO_BUFFER, 1) != 0) return 2;\n" ++
+    "    struct spng_ihdr ihdr;\n" ++
+    "    memset(&ihdr, 0, sizeof(ihdr));\n" ++
+    "    ihdr.width = w;\n" ++
+    "    ihdr.height = h;\n" ++
+    "    ihdr.bit_depth = 8;\n" ++
+    "    ihdr.color_type = SPNG_COLOR_TYPE_TRUECOLOR_ALPHA;\n" ++
+    "    if (spng_set_ihdr(enc, &ihdr) != 0) return 3;\n" ++
+    "    if (spng_encode_image(enc, src, sizeof(src), SPNG_FMT_PNG, SPNG_ENCODE_FINALIZE) != 0) return 4;\n" ++
+    "    size_t png_len = 0;\n" ++
+    "    int err = 0;\n" ++
+    "    void *png_buf = spng_get_png_buffer(enc, &png_len, &err);\n" ++
+    "    spng_ctx_free(enc);\n" ++
+    "    if (!png_buf || err != 0 || png_len < 32) return 5;\n" ++
+    "    const unsigned char *pb = (const unsigned char *)png_buf;\n" ++
+    "    if (pb[0] != 137 || pb[1] != 80 || pb[2] != 78 || pb[3] != 71) return 6;\n" ++
+    "    spng_ctx *dec = spng_ctx_new(0);\n" ++
+    "    if (!dec) return 7;\n" ++
+    "    if (spng_set_png_buffer(dec, png_buf, png_len) != 0) return 8;\n" ++
+    "    struct spng_ihdr out_ihdr;\n" ++
+    "    if (spng_get_ihdr(dec, &out_ihdr) != 0) return 9;\n" ++
+    "    if (out_ihdr.width != w || out_ihdr.height != h) return 10;\n" ++
+    "    size_t out_len = 0;\n" ++
+    "    if (spng_decoded_image_size(dec, SPNG_FMT_RGBA8, &out_len) != 0) return 11;\n" ++
+    "    if (out_len != sizeof(src)) return 12;\n" ++
+    "    unsigned char dst[8 * 6 * 4];\n" ++
+    "    if (spng_decode_image(dec, dst, out_len, SPNG_FMT_RGBA8, 0) != 0) return 13;\n" ++
+    "    spng_ctx_free(dec);\n" ++
+    "    free(png_buf);\n" ++
+    "    if (memcmp(src, dst, sizeof(src)) != 0) return 14;\n" ++
+    "    spng_ctx *bad = spng_ctx_new(0);\n" ++
+    "    if (!bad) return 15;\n" ++
+    "    unsigned char junk[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };\n" ++
+    "    spng_set_png_buffer(bad, junk, sizeof(junk));\n" ++
+    "    if (spng_get_ihdr(bad, &out_ihdr) == 0) return 16;\n" ++
+    "    spng_ctx_free(bad);\n" ++
+    "    printf(\"libspng ok\\n\");\n" ++
+    "    return 0;\n" ++
+    "}\n"
+
+fn libspng_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -> i32:
+    if corpus_copy(ctx, reference ++ "/spng/spng.c", source ++ "/spng.c") != 0: return 1
+    if corpus_copy(ctx, reference ++ "/spng/spng.h", source ++ "/spng.h") != 0: return 1
+    if corpus_copy(ctx, LIBSPNG_ZLIB_REF ++ "/zlib.h", source ++ "/zlib.h") != 0: return 1
+    if corpus_copy(ctx, LIBSPNG_ZLIB_REF ++ "/zconf.h", source ++ "/zconf.h") != 0: return 1
+    if ctx.fs().write_text(source ++ "/harness.c", libspng_harness_source()) != 0:
+        return corpus_fail(ctx, "cannot write harness.c")
+    0
+
+fn libspng_zlib_bridge_source() -> str:
+    "// Generated by build/libspng.with (libspng_finish): binds libspng's zlib\n" ++
+    "// calls to std.engines.zlib so std carries one inflate/deflate engine.\n" ++
+    "use std.engines.libspng.defs\n" ++
+    "use std.engines.zlib.defs as zdefs\n" ++
+    "use std.engines.zlib.crc32 as zcrc\n" ++
+    "use std.engines.zlib.deflate as zdef\n" ++
+    "use std.engines.zlib.inflate as zinf\n\n" ++
+    "pub unsafe fn crc32(crc: u64, buf: *const u8, len: u32) -> u64 { zcrc.crc32(crc, buf, len) }\n" ++
+    "pub unsafe fn inflateInit2_(strm: *mut spng_z_stream_s, windowBits: i32, version: *const c_char, stream_size: i32) -> i32 { zinf.inflateInit2_(strm as *mut zdefs.z_stream_s, windowBits, version, stream_size) }\n" ++
+    "pub unsafe fn inflateValidate(strm: *mut spng_z_stream_s, check_: i32) -> i32 { zinf.inflateValidate(strm as *mut zdefs.z_stream_s, check_) }\n" ++
+    "pub unsafe fn inflate(strm: *mut spng_z_stream_s, flush: i32) -> i32 { zinf.inflate(strm as *mut zdefs.z_stream_s, flush) }\n" ++
+    "pub unsafe fn inflateEnd(strm: *mut spng_z_stream_s) -> i32 { zinf.inflateEnd(strm as *mut zdefs.z_stream_s) }\n" ++
+    "pub unsafe fn deflateInit2_(strm: *mut spng_z_stream_s, level: i32, method: i32, windowBits: i32, memLevel: i32, strategy: i32, version: *const c_char, stream_size: i32) -> i32 { zdef.deflateInit2_(strm as *mut zdefs.z_stream_s, level, method, windowBits, memLevel, strategy, version, stream_size) }\n" ++
+    "pub unsafe fn deflateBound(strm: *mut spng_z_stream_s, sourceLen: u64) -> u64 { zdef.deflateBound(strm as *mut zdefs.z_stream_s, sourceLen) }\n" ++
+    "pub unsafe fn deflate(strm: *mut spng_z_stream_s, flush: i32) -> i32 { zdef.deflate(strm as *mut zdefs.z_stream_s, flush) }\n" ++
+    "pub unsafe fn deflateEnd(strm: *mut spng_z_stream_s) -> i32 { zdef.deflateEnd(strm as *mut zdefs.z_stream_s) }\n"
+
+fn libspng_finish(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
+    let fs = ctx.fs()
+    // Strip the unused zlib.h macro wrapper functions from defs.with (spng.c
+    // expands inflateInit2/deflateInit2 directly to inflateInit2_/deflateInit2_).
+    let defs_path = generated ++ "/defs.with"
+    var defs_out = ""
+    var skip_fn = false
+    for line in fs.read_text(defs_path).split("\n"):
+        if line.starts_with("pub fn deflateInit") or line.starts_with("pub fn inflateInit") or line.starts_with("pub fn inflateBackInit"):
+            skip_fn = true
+            continue
+        if skip_fn:
+            if line == "}": skip_fn = false
+            continue
+        defs_out = defs_out ++ line ++ "\n"
+    if fs.write_text(defs_path, defs_out) != 0:
+        return corpus_fail(ctx, "cannot rewrite " ++ defs_path)
+
+    // Strip the raw `extern fn` zlib declarations from spng.with (and any
+    // non-spng externs in harness.with) and bind spng.with to zlib_bridge.
+    let spng_path = generated ++ "/spng.with"
+    var spng_out = ""
+    var inserted = false
+    for line in fs.read_text(spng_path).split("\n"):
+        if line.starts_with("extern fn "): continue
+        spng_out = spng_out ++ line ++ "\n"
+        if not inserted and line == "use std.engines.libspng.defs":
+            spng_out = spng_out ++ "use std.engines.libspng.zlib_bridge\n"
+            inserted = true
+    if fs.write_text(spng_path, spng_out) != 0:
+        return corpus_fail(ctx, "cannot rewrite " ++ spng_path)
+
+    if fs.write_text(generated ++ "/zlib_bridge.with", libspng_zlib_bridge_source()) != 0:
+        return corpus_fail(ctx, "cannot write zlib_bridge.with")
+    0
+
+pub fn run_libspng_test_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let output = ctx.output()
+    if corpus_reset_dir(ctx, output) != 0: return 1
+    let compiler = corpus_abs(ctx, ctx.inputs()[0])
+    let binary = output ++ "/harness"
+    let compile_args = [
+        compiler,
+        "build",
+        "-O1",
+        "lib/std/engines/libspng/harness.with",
+        "-o",
+        corpus_abs(ctx, binary),
+    ]
+    let compiled = ctx.process_runner().run_capture_cwd(compile_args, corpus_abs(ctx, binary ++ ".compile.stdout"), corpus_abs(ctx, binary ++ ".compile.stderr"), 600000, corpus_abs(ctx, "."))
+    if compiled.rc != 0: return corpus_fail(ctx, f"compile harness exited {compiled.rc}\n" ++ fs.read_text(binary ++ ".compile.stderr"))
+    if corpus_provenance(ctx, output, ctx.inputs()[0]) != 0: return 1
+    if corpus_provenance(ctx, output, binary) != 0: return 1
+    let argv = [corpus_abs(ctx, binary)]
+    let result = ctx.process_runner().run_capture(argv, corpus_abs(ctx, binary ++ ".stdout"), corpus_abs(ctx, binary ++ ".stderr"), 600000)
+    if result.rc != 0: return corpus_fail(ctx, f"harness exited {result.rc}\n" ++ result.stdout ++ result.stderr)
+    if not result.stdout.contains("libspng ok"): return corpus_fail(ctx, "harness output missing ok line\n" ++ result.stdout)
+    if fs.write_text(output ++ "/report.txt", "upstream=" ++ LIBSPNG_RELEASE ++ "\nPASS harness\n") != 0: return 1
+    print("libspng harness passed")
+    0
+
+fn libspng_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str) -> Build:
+    var test = target_new(.Action, "libspng-test", "").output("out/libspng_test").timeout(3600000)
+    test.action = run_libspng_test_action
+    test = test.input(release_compiler ++ "").dep("build")
+    test = test.input(corpus.corpus_dir ++ "/harness.with").input(corpus.corpus_dir ++ "/bundle.with")
+    test = test.write_scope("out/libspng_test")
+    out.add_target(test)

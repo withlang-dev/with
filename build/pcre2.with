@@ -895,6 +895,7 @@ pub fn pcre2_corpus() -> Corpus:
         include_dirs: List.new(), declared_externs: List.new(), forced_includes: List.new(),
         promote_after: ["pcre2-test"], test_lane: "",
         extra_generated_dirs: List.new(),
+        bundle_deps: [],
         prepare_reference: pcre2_prepare, stage: pcre2_stage,
         migrate: corpus_migrate_directory, finish_generated: pcre2_finish,
         verify_generated: pcre2_verify, lanes: pcre2_lanes,
@@ -953,7 +954,7 @@ fn pcre2_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &s
     // lane built it. The root file, never the directory, names the corpus
     // (lib/std/engines/pcre2 is pcre2-promote's output; naming it would pull the whole
     // migration pipeline in as a producer, D36).
-    let plan = wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.with")
+    let plan = wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.with", [])
     var wo_test = target_new(.Action, "pcre2-wo-test", "").output("out/corpus/pcre2-wo-test")
     wo_test.action = run_pcre2_test_action
     wo_test = wo_test.input(corpus.corpus_dir ++ "/bundle.with").input(wo_drift_harness_bin(&plan, "lib/std/engines/pcre2/pcre2test.with")).input(reference ++ "/RunTest").arg(reference.clone())

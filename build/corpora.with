@@ -10,6 +10,7 @@ use build.tommyds
 use build.stc
 use build.mlib
 use build.compiler_rt_complex
+use build.libspng
 use std.crypto.sha256
 
 // The corpus registry (wo_bundles.md, stdlib_sourcing_plan.md):
@@ -20,7 +21,7 @@ use std.crypto.sha256
 // module under build/; nothing else names it. Indexed, not a List: a Corpus
 // is ephemeral (its hooks take references), and the seed's comptime
 // evaluator iterates a List of ephemeral records as strings.
-pub fn corpus_count() -> i32: 7
+pub fn corpus_count() -> i32: 8
 
 pub fn corpus_at(index: i32) -> Corpus:
     if index == 0: return pcre2_corpus()
@@ -29,7 +30,8 @@ pub fn corpus_at(index: i32) -> Corpus:
     if index == 3: return tommyds_corpus()
     if index == 4: return stc_corpus()
     if index == 5: return mlib_corpus()
-    compiler_rt_complex_corpus()
+    if index == 6: return compiler_rt_complex_corpus()
+    libspng_corpus()
 
 pub fn corpus_by_name(name: &str) -> Corpus:
     for i in 0..corpus_count():
@@ -52,7 +54,10 @@ pub fn corpora_exclude_args(target: Target) -> Target:
     out
 
 pub fn corpus_bundle_plan(ctx: &BuildCtx, corpus: &Corpus) -> WoBundle:
-    wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.with")
+    var deps = []
+    for dep in corpus.bundle_deps:
+        deps.push(dep ++ "")
+    wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.with", deps)
 
 /// One host bundle plan per corpus, in registry order.
 pub fn corpora_bundle_plans(ctx: &BuildCtx) -> List[WoBundle]:
@@ -366,6 +371,8 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     if up.url.len() > 0:
         migrate = migrate.input(up.reference.clone())
     migrate = migrate.dep(corpus.stem ++ "-prepare-reference")
+    for dep in corpus.bundle_deps:
+        migrate = migrate.dep(dep ++ "-reference")
     migrate = corpus_migrating_target(migrate, release_compiler)
     graph = graph.add_target(migrate)
 

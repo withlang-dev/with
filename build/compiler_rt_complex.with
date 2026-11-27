@@ -66,6 +66,7 @@ pub fn compiler_rt_complex_corpus() -> Corpus:
         promote_after: [],
         test_lane: "compiler-rt-complex-test",
         extra_generated_dirs: [],
+        bundle_deps: [],
         prepare_reference: corpus_no_prepare,
         stage: crt_complex_stage,
         migrate: corpus_migrate_directory,

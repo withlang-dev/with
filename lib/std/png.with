@@ -1,0 +1,138 @@
+// std.png — safe PNG decoding and encoding over the migrated libspng engine
+// (backed by std.engines.zlib for inflate/deflate).
+
+use rt.rt_core
+use std.collections
+use std.fs
+use std.result
+use std.engines.libspng.defs
+use std.engines.libspng.spng
+
+pub type PngError {
+    pub code: i32,
+    pub message: str,
+}
+
+/// Decoded 8-bit RGBA image (`rgba.len() == width * height * 4`, row-major).
+pub type Image {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: List[u8],
+}
+
+fn png_error(code: i32, message: str) -> PngError:
+    PngError { code, message }
+
+fn png_code_error(code: i32) -> PngError:
+    let msg = with_str_from_cstr(spng_strerror(code))
+    PngError { code, message: if msg.len() > 0: msg else: f"libspng error {code}" }
+
+fn png_copy_from_raw(ptr: *const u8, len: i64) -> List[u8]:
+    let out = []
+    var i: i64 = 0
+    while i < len:
+        out.push(unsafe *((ptr as i64 + i) as *const u8))
+        i = i + 1
+    out
+
+/// Decode a PNG byte buffer into 8-bit RGBA pixels.
+pub fn decode_rgba(data: &List[u8]) -> Result[Image, PngError]:
+    let data_len = data.len()
+    if data_len == 0:
+        return Err(png_error(-1, "empty PNG buffer"))
+    let ctx = spng_ctx_new(0)
+    if ctx as i64 == 0:
+        return Err(png_error(-1, "could not allocate PNG decoder context"))
+    let set_rc = unsafe { spng_set_png_buffer(ctx, data.ptr as *const c_void, data_len as u64) }
+    if set_rc != 0:
+        unsafe { spng_ctx_free(ctx) }
+        return Err(png_code_error(set_rc))
+    var ihdr = spng_ihdr {}
+    let ihdr_rc = unsafe { spng_get_ihdr(ctx, &raw mut ihdr) }
+    if ihdr_rc != 0:
+        unsafe { spng_ctx_free(ctx) }
+        return Err(png_code_error(ihdr_rc))
+    var out_size: u64 = 0
+    let size_rc = unsafe { spng_decoded_image_size(ctx, SPNG_FMT_RGBA8, &raw mut out_size) }
+    if size_rc != 0:
+        unsafe { spng_ctx_free(ctx) }
+        return Err(png_code_error(size_rc))
+    let out_ptr = with_alloc(out_size as i64) as *mut u8
+    if out_ptr as i64 == 0:
+        unsafe { spng_ctx_free(ctx) }
+        return Err(png_error(-1, "could not allocate RGBA pixel buffer"))
+    let dec_rc = unsafe { spng_decode_image(ctx, out_ptr as *mut c_void, out_size, SPNG_FMT_RGBA8, 0) }
+    unsafe { spng_ctx_free(ctx) }
+    if dec_rc != 0:
+        with_free(out_ptr)
+        return Err(png_code_error(dec_rc))
+    let rgba = png_copy_from_raw(out_ptr as *const u8, out_size as i64)
+    with_free(out_ptr)
+    Ok(Image { width: ihdr.width, height: ihdr.height, rgba })
+
+/// Encode 8-bit RGBA pixels (`rgba.len() == width * height * 4`) to a PNG byte buffer.
+pub fn encode_rgba(width: u32, height: u32, rgba: &List[u8]) -> Result[List[u8], PngError]:
+    if width == 0 or height == 0:
+        return Err(png_error(-1, "PNG width and height must be non-zero"))
+    let expected: i64 = (width as i64) * (height as i64) * 4
+    let rgba_len = rgba.len()
+    if rgba_len != expected:
+        return Err(png_error(-1, f"RGBA buffer length {rgba_len} does not match {width}x{height}x4 ({expected})"))
+    let ctx = spng_ctx_new(SPNG_CTX_ENCODER)
+    if ctx as i64 == 0:
+        return Err(png_error(-1, "could not allocate PNG encoder context"))
+    let opt_rc = unsafe { spng_set_option(ctx, SPNG_ENCODE_TO_BUFFER, 1) }
+    if opt_rc != 0:
+        unsafe { spng_ctx_free(ctx) }
+        return Err(png_code_error(opt_rc))
+    var ihdr = spng_ihdr {
+        width: width,
+        height: height,
+        bit_depth: 8 as u8,
+        color_type: SPNG_COLOR_TYPE_TRUECOLOR_ALPHA as u8,
+        compression_method: 0 as u8,
+        filter_method: 0 as u8,
+        interlace_method: 0 as u8,
+    }
+    let ihdr_rc = unsafe { spng_set_ihdr(ctx, &raw mut ihdr) }
+    if ihdr_rc != 0:
+        unsafe { spng_ctx_free(ctx) }
+        return Err(png_code_error(ihdr_rc))
+    let enc_rc = unsafe { spng_encode_image(ctx, rgba.ptr as *const c_void, expected as u64, SPNG_FMT_PNG, SPNG_ENCODE_FINALIZE) }
+    if enc_rc != 0:
+        unsafe { spng_ctx_free(ctx) }
+        return Err(png_code_error(enc_rc))
+    var out_len: u64 = 0
+    var err_code: i32 = 0
+    let out_buf = unsafe { spng_get_png_buffer(ctx, &raw mut out_len, &raw mut err_code) }
+    unsafe { spng_ctx_free(ctx) }
+    if out_buf as i64 == 0 or err_code != 0:
+        if out_buf as i64 != 0: with_free(out_buf as *mut u8)
+        return Err(if err_code != 0: png_code_error(err_code) else: png_error(-1, "libspng returned no PNG buffer"))
+    let out = png_copy_from_raw(out_buf as *const u8, out_len as i64)
+    with_free(out_buf as *mut u8)
+    Ok(out)
+
+/// Read and decode a PNG file from disk into 8-bit RGBA pixels.
+pub fn read_rgba(path: &str) -> Result[Image, PngError]:
+    let raw = match read_file(path):
+        Ok(text) => text
+        Err(err) => return Err(png_error(-1, f"could not read {path}: {err.message()}"))
+    let bytes = []
+    var i: i64 = 0
+    let raw_len = raw.len()
+    while i < raw_len:
+        bytes.push(raw[i] as u8)
+        i = i + 1
+    decode_rgba(bytes)
+
+/// Encode an 8-bit RGBA image and write the PNG file to disk.
+pub fn write_rgba(path: &str, image: &Image) -> Result[Unit, PngError]:
+    let encoded = match encode_rgba(image.width, image.height, image.rgba):
+        Ok(b) => b
+        Err(err) => return Err(err)
+    let encoded_len = encoded.len()
+    let blob = with_str_from_bytes(encoded.ptr as *const u8, encoded_len)
+    if write_file(path, blob) != 0:
+        return Err(png_error(-1, f"could not write PNG file {path}"))
+    Ok(())

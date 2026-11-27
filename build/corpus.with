@@ -71,6 +71,8 @@ pub type Corpus ephemeral {
     // D112: generated directories beside corpus_dir that promotion writes
     // and the corpus stamp covers (c-algorithms' migrated test programs)
     extra_generated_dirs: List[str],
+    // other registered corpus bundles this corpus imports (e.g., libspng -> ["zlib"])
+    bundle_deps: List[str],
     // ── hooks ────────────────────────────────────────────────────
     // adjust the extracted reference tree (pcre2 generates config.h)
     prepare_reference: fn(&ActionCtx, &Corpus, &str) -> i32,
