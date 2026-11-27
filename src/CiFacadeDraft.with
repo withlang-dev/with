@@ -699,6 +699,10 @@ impl CiProject:
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, self.fd_sink_callee(parts[2], fd_i32(parts[3])))
             if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ parts[2] ++ ", which no unit defines"
             return self.fd_retain_hop(self.fd_sink_text(parts[2], fd_i32(parts[3])), parts[3], self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1, places), depth)
+        // #3175: a parameter returned through an out-parameter (public fn,
+        // or passed a non-local slot by this caller).
+        let out_why = self.fd_out_param_return_reason(si, pi)
+        if out_why.len() > 0: return out_why
         // #3374: last, so a store the bodies do show is the one reported.
         // Whether the frame's record outlives the call is not followed:
         // weaker than a grant, and it contradicts nothing (§31.7).
@@ -1139,6 +1143,65 @@ impl CiProject:
                         self.symbols[si].param_destroys[pi] = 1
                         changed = true
 
+    // #3175: whether `callee`'s parameter `slot` is a pure direct write-only
+    // out-return slot (never stored, never read via `*slot`, only written via
+    // `*slot = ...` or forwarded to another pure out-return slot). Passing
+    // `&local` to such a slot does not retain `local` on its own.
+    fn fd_out_slot_safe_for_addr(callee: &str, slot: i32, depth: i32) -> bool:
+        if depth > 8: return false
+        let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
+        if ci < 0 or not self.fd_subject(ci) or self.symbols[ci].has_definition == 0: return false
+        if slot < 0 or slot >= self.symbols[ci].param_stores.len() or self.symbols[ci].param_stores[slot] != 0: return false
+        let needle = f"{slot};"
+        var has_out = false
+        for out_slots in self.symbols[ci].param_out_returns:
+            if (";" ++ out_slots).contains(";" ++ needle): has_out = true
+        if not has_out: return false
+        for line in self.symbols[ci].own_evidence.split("\n"):
+            if line.starts_with("localslot:"):
+                let parts = line.split(":")
+                if parts.len() == 3 and fd_i32(parts[2]) == slot: return false
+        if slot < self.symbols[ci].param_sinks.len():
+            for sink in self.symbols[ci].param_sinks[slot].split(";"):
+                if sink.len() == 0: continue
+                if not sink.contains(":"): return false
+                let kv = sink.split(":")
+                if kv[0].starts_with("*"): return false
+                if not self.fd_out_slot_safe_for_addr(kv[0], fd_i32(kv[1]), depth + 1): return false
+        true
+
+    // #3175: report reason when `pi` is refused because it is returned through
+    // an out-parameter (public function, or passed to a callee with a non-local
+    // slot).
+    fn fd_out_param_return_reason(si: i32, pi: i32) -> str:
+        if self.symbols[si].header_declared != 0 and pi < self.symbols[si].param_out_returns.len() and self.symbols[si].param_out_returns[pi].len() > 0:
+            let first = self.symbols[si].param_out_returns[pi].split(";")[0]
+            return f"returned through out-parameter param {first}"
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if not line.starts_with("outcall:"): continue
+            let rest = line.slice(8, line.len())
+            let colon = rest.find(":")
+            if colon < 0: continue
+            let callee = rest.slice(0, colon)
+            let argmap = rest.slice(colon + 1, rest.len())
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
+            if ci < 0 or not self.fd_subject(ci) or self.symbols[ci].has_definition == 0: continue
+            var p_idx: i32 = -1
+            for out_slots in self.symbols[ci].param_out_returns:
+                p_idx += 1
+                if out_slots.len() == 0: continue
+                let val_arg = fd_outcall_arg(argmap, p_idx)
+                var matches = val_arg == f"p{pi}"
+                if not matches and val_arg.starts_with("l") and self.fd_local_alias_param(si, val_arg.slice(1, val_arg.len())) == pi: matches = true
+                if not matches: continue
+                for slot_str in out_slots.split(";"):
+                    if slot_str.len() == 0: continue
+                    let slot_idx = fd_i32(slot_str)
+                    let slot_arg = fd_outcall_arg(argmap, slot_idx)
+                    if not slot_arg.starts_with("&l") and not slot_arg.starts_with("&p") and not slot_arg.starts_with("p"):
+                        return "passed to " ++ callee ++ f" at param {p_idx}, returned through out-parameter param {slot_idx} into a non-local place"
+        ""
+
     // D121: the corpus-wide ownership proofs, drawn once after every unit
     // is scanned. Each phase is a monotone fixed point; the order of units
     // never enters. Retention and destruction are facts about pointer
@@ -1147,7 +1210,12 @@ impl CiProject:
         // D198: which function-pointer fields have a proven callee.
         self.fd_draw_fnptr_verdicts()
         let n = self.symbols.len()
-        // 1. Retention.
+        // #3175: per-function local-to-param and param-to-param alias sets,
+        // updated by `localsrc:` and by direct `*out = p` out-parameter calls.
+        var local_params: HashMap[str, str] = [:]
+        var local_derived: HashMap[str, str] = [:]
+        var param_aliases: HashMap[str, str] = [:]
+        // 1. Retention and direct out-parameter returns (`*out = p`).
         for si in 0..n:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
             let count = self.symbols[si].param_sinks.len()
@@ -1159,21 +1227,50 @@ impl CiProject:
                 // no proof of a store (fd_retain_reason, #3374).
                 if self.symbols[si].param_sinks[pi].contains("field;") or self.symbols[si].param_sinks[pi].contains("global;") or self.symbols[si].param_sinks[pi].contains("frame;"): self.symbols[si].param_stores[pi] = 1
             for line in self.symbols[si].own_evidence.split("\n"):
+                if line.starts_with("localsrc:"):
+                    let rest = line.slice(9, line.len())
+                    let colon = rest.find(":")
+                    if colon > 0:
+                        let loc = rest.slice(0, colon)
+                        let src = rest.slice(colon + 1, rest.len())
+                        if src.starts_with("param:"):
+                            let src_pi = fd_i32(src.slice(6, src.len()))
+                            if src_pi >= 0 and self.fd_param_is_pointer(si as i32, src_pi):
+                                fd_put_i32_map(local_params, f"{si}:" ++ loc, src_pi)
+                                fd_put_i32_map(local_derived, f"{si}:" ++ loc, src_pi)
+                        else if src.starts_with("field:param:"):
+                            let src_pi = fd_i32(src.slice(12, src.len()))
+                            if src_pi >= 0 and self.fd_param_is_pointer(si as i32, src_pi):
+                                fd_put_i32_map(local_derived, f"{si}:" ++ loc, src_pi)
+                if line.starts_with("outstore:"):
+                    let rest = line.slice(9, line.len())
+                    let colon = rest.find(":")
+                    if colon > 0:
+                        let slot = fd_i32(rest.slice(0, colon))
+                        let src = rest.slice(colon + 1, rest.len())
+                        var src_pi = -1
+                        if src.starts_with("param:"): src_pi = fd_i32(src.slice(6, src.len()))
+                        else if src.starts_with("field:param:"): src_pi = fd_i32(src.slice(12, src.len()))
+                        if slot >= 0 and src_pi >= 0 and (src.starts_with("param:") or slot != src_pi) and self.fd_param_is_pointer(si as i32, src_pi):
+                            let tag = f"{slot};"
+                            if not (";" ++ self.symbols[si].param_out_returns[src_pi]).contains(";" ++ tag):
+                                self.symbols[si].param_out_returns[src_pi] = self.symbols[si].param_out_returns[src_pi] ++ tag
                 if line.starts_with("paramstore:"):
                     let pi = fd_i32(line.slice(11, line.len()))
                     if self.fd_param_is_pointer(si as i32, pi): self.symbols[si].param_stores[pi] = 1
                 if line.starts_with("localstore:"):
                     let pi = self.fd_local_alias_param(si as i32, line.slice(11, line.len()))
                     if pi >= 0: self.symbols[si].param_stores[pi] = 1
-        self.fd_propagate_retention()
+        self.fd_propagate_retention_with_out(local_params, local_derived, param_aliases)
         // 2. Destruction: the bodies' proofs first; then the introspection
         // file's `free-function` seeds a unary pointer-parameter function
         // no body proved (D121 step 3), and the fixed point reaches its
         // callers.
         self.fd_propagate_destruction()
-        // #3123: the address of a local that stands for a parameter, passed
-        // to a callee not proven to free what the slot holds, is the store
-        // it always was. Judged here, once destruction is known.
+        // #3123 & #3175: the address of a local that stands for a parameter,
+        // passed to a callee neither proven to free what the slot holds nor
+        // a pure direct out-return slot (`*out = p`), is the store it always
+        // was. Judged here, once destruction and out-returns are known.
         var late_store = false
         for si in 0..n:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
@@ -1181,16 +1278,31 @@ impl CiProject:
                 if not line.starts_with("localaddr:"): continue
                 let parts = line.split(":")
                 if parts.len() != 4: continue
-                let pi = self.fd_local_alias_param(si as i32, parts[1])
-                if pi < 0 or self.symbols[si].param_stores[pi] != 0 or self.symbols[si].param_destroys[pi] != 0: continue
-                self.symbols[si].param_stores[pi] = 1
-                late_store = true
-        if late_store: self.fd_propagate_retention()
+                if self.fd_out_slot_safe_for_addr(parts[2], fd_i32(parts[3]), 0): continue
+                let alias_pi = self.fd_local_alias_param(si as i32, parts[1])
+                if alias_pi >= 0 and self.symbols[si].param_stores[alias_pi] == 0 and self.symbols[si].param_destroys[alias_pi] == 0:
+                    self.symbols[si].param_stores[alias_pi] = 1
+                    late_store = true
+                for pi in fd_copy_i32_map(local_params, f"{si}:" ++ parts[1]):
+                    if self.symbols[si].param_stores[pi] == 0 and self.symbols[si].param_destroys[pi] == 0:
+                        self.symbols[si].param_stores[pi] = 1
+                        late_store = true
+        if late_store: self.fd_propagate_retention_with_out(local_params, local_derived, param_aliases)
+        // #3175 (Eric's ruling, 2026-11-25): public functions that return a
+        // parameter through `*out = p` stay raw; internal callers above were
+        // judged by what they passed for the slot.
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0: continue
+            var pi: i32 = -1
+            for out_slots in self.symbols[si].param_out_returns:
+                pi += 1
+                if out_slots.len() > 0 and self.symbols[si].param_stores[pi] == 0:
+                    self.symbols[si].param_stores[pi] = 1
         self.resolve_ownership_after_retention()
 
-    // Retention reaches callers: a parameter passed, itself or through a
-    // local that stands for it, to a callee that retains it.
-    mut fn fd_propagate_retention():
+    // Retention and direct out-parameter returns (`*out = p`) to a joint
+    // fixed point over the corpus.
+    mut fn fd_propagate_retention_with_out(mut local_params: HashMap[str, str], mut local_derived: HashMap[str, str], mut param_aliases: HashMap[str, str]):
         let n = self.symbols.len()
         var changed = true
         while changed:
@@ -1208,14 +1320,133 @@ impl CiProject:
                             changed = true
                             break
                 for line in self.symbols[si].own_evidence.split("\n"):
-                    if not line.starts_with("localsink:"): continue
-                    let parts = line.split(":")
-                    if parts.len() != 4: continue
-                    let pi = self.fd_local_alias_param(si as i32, parts[1])
-                    if pi < 0 or self.symbols[si].param_stores[pi] != 0: continue
-                    if self.fd_callee_retains(parts[2], fd_i32(parts[3])):
-                        self.symbols[si].param_stores[pi] = 1
-                        changed = true
+                    if line.starts_with("localsrc:"):
+                        let rest = line.slice(9, line.len())
+                        let colon = rest.find(":")
+                        if colon > 0:
+                            let loc = rest.slice(0, colon)
+                            let src = rest.slice(colon + 1, rest.len())
+                            if src.starts_with("local:"):
+                                let other = src.slice(6, src.len())
+                                for pi in fd_copy_i32_map(local_params, f"{si}:" ++ other):
+                                    if fd_add_i32_map(local_params, f"{si}:" ++ loc, pi): changed = true
+                                for pi in fd_copy_i32_map(local_derived, f"{si}:" ++ other):
+                                    if fd_add_i32_map(local_derived, f"{si}:" ++ loc, pi): changed = true
+                            else if src.starts_with("field:local:"):
+                                let other = src.slice(12, src.len())
+                                for pi in fd_copy_i32_map(local_derived, f"{si}:" ++ other):
+                                    if fd_add_i32_map(local_derived, f"{si}:" ++ loc, pi): changed = true
+                    else if line.starts_with("outstore:"):
+                        let rest = line.slice(9, line.len())
+                        let colon = rest.find(":")
+                        if colon > 0:
+                            let slot = fd_i32(rest.slice(0, colon))
+                            let src = rest.slice(colon + 1, rest.len())
+                            var loc = ""
+                            if src.starts_with("local:"): loc = src.slice(6, src.len())
+                            else if src.starts_with("field:local:"): loc = src.slice(12, src.len())
+                            if slot >= 0 and loc.len() > 0:
+                                let tag = f"{slot};"
+                                for pi in fd_copy_i32_map(local_derived, f"{si}:" ++ loc):
+                                    if pi == slot and not fd_copy_i32_map(local_params, f"{si}:" ++ loc).contains(pi): continue
+                                    if not (";" ++ self.symbols[si].param_out_returns[pi]).contains(";" ++ tag):
+                                        self.symbols[si].param_out_returns[pi] = self.symbols[si].param_out_returns[pi] ++ tag
+                                        changed = true
+                    else if line.starts_with("localstore:"):
+                        let loc = line.slice(11, line.len())
+                        for pi in fd_copy_i32_map(local_params, f"{si}:" ++ loc):
+                            if self.symbols[si].param_stores[pi] == 0:
+                                self.symbols[si].param_stores[pi] = 1
+                                changed = true
+                    else if line.starts_with("localsink:"):
+                        let parts = line.split(":")
+                        if parts.len() != 4: continue
+                        if not self.fd_callee_retains(parts[2], fd_i32(parts[3])): continue
+                        let alias_pi = self.fd_local_alias_param(si as i32, parts[1])
+                        if alias_pi >= 0 and self.symbols[si].param_stores[alias_pi] == 0:
+                            self.symbols[si].param_stores[alias_pi] = 1
+                            changed = true
+                        for pi in fd_copy_i32_map(local_params, f"{si}:" ++ parts[1]):
+                            if self.symbols[si].param_stores[pi] == 0:
+                                self.symbols[si].param_stores[pi] = 1
+                                changed = true
+                    else if line.starts_with("localslot:"):
+                        // A local loaded from `*slot` (`x = *slot`) that is
+                        // stored or handed to a retaining callee means `slot`
+                        // itself retains what it points to.
+                        let parts = line.split(":")
+                        if parts.len() != 3: continue
+                        let loc = parts[1]
+                        let slot = fd_i32(parts[2])
+                        if slot < 0 or slot >= self.symbols[si].param_stores.len() or self.symbols[si].param_stores[slot] != 0: continue
+                        for ev in self.symbols[si].own_evidence.split("\n"):
+                            if ev == "localstore:" ++ loc:
+                                self.symbols[si].param_stores[slot] = 1
+                                changed = true
+                                break
+                            if ev.starts_with("localsink:" ++ loc ++ ":"):
+                                let sp = ev.split(":")
+                                if sp.len() == 4 and self.fd_callee_retains(sp[2], fd_i32(sp[3])):
+                                    self.symbols[si].param_stores[slot] = 1
+                                    changed = true
+                                    break
+                    else if line.starts_with("outcall:"):
+                        let rest = line.slice(8, line.len())
+                        let colon = rest.find(":")
+                        if colon < 0: continue
+                        let callee = rest.slice(0, colon)
+                        let argmap = rest.slice(colon + 1, rest.len())
+                        let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
+                        if ci < 0 or not self.fd_subject(ci) or self.symbols[ci].has_definition == 0: continue
+                        let ci_outs = [with_str_clone_ref(s) for s in self.symbols[ci].param_out_returns]
+                        var p_idx: i32 = -1
+                        for out_slots in ci_outs:
+                            p_idx += 1
+                            if out_slots.len() == 0: continue
+                            let val_arg = fd_outcall_arg(argmap, p_idx)
+                            if val_arg.len() == 0: continue
+                            let src_params = []
+                            if val_arg.starts_with("p"):
+                                let k = fd_i32(val_arg.slice(1, val_arg.len()))
+                                if self.fd_param_is_pointer(si as i32, k): src_params.push(k)
+                                for ak in fd_copy_i32_map(param_aliases, f"{si}:{k}"):
+                                    if not src_params.contains(ak): src_params.push(ak)
+                            else if val_arg.starts_with("l"):
+                                for k in fd_copy_i32_map(local_params, f"{si}:" ++ val_arg.slice(1, val_arg.len())):
+                                    if not src_params.contains(k): src_params.push(k)
+                            if src_params.len() == 0: continue
+                            for slot_str in out_slots.split(";"):
+                                if slot_str.len() == 0: continue
+                                let slot_idx = fd_i32(slot_str)
+                                let slot_arg = fd_outcall_arg(argmap, slot_idx)
+                                if slot_arg.starts_with("&l"):
+                                    let dst = slot_arg.slice(2, slot_arg.len())
+                                    for k in src_params:
+                                        if fd_add_i32_map(local_params, f"{si}:" ++ dst, k): changed = true
+                                        if fd_add_i32_map(local_derived, f"{si}:" ++ dst, k): changed = true
+                                else if slot_arg.starts_with("&p"):
+                                    let m = fd_i32(slot_arg.slice(2, slot_arg.len()))
+                                    for k in src_params:
+                                        if k != m and fd_add_i32_map(param_aliases, f"{si}:{m}", k): changed = true
+                                else if slot_arg.starts_with("p"):
+                                    let caller_slot = fd_i32(slot_arg.slice(1, slot_arg.len()))
+                                    let tag = f"{caller_slot};"
+                                    for k in src_params:
+                                        if caller_slot >= 0 and not (";" ++ self.symbols[si].param_out_returns[k]).contains(";" ++ tag):
+                                            self.symbols[si].param_out_returns[k] = self.symbols[si].param_out_returns[k] ++ tag
+                                            changed = true
+                                else:
+                                    for k in src_params:
+                                        if self.symbols[si].param_stores[k] == 0:
+                                            self.symbols[si].param_stores[k] = 1
+                                            changed = true
+                // If param m is stored and param k flowed into `&param_m`, k is stored too.
+                for m in 0..count:
+                    if self.symbols[si].param_stores[m] == 0: continue
+                    for k in fd_copy_i32_map(param_aliases, f"{si}:{m}"):
+                        if self.symbols[si].param_stores[k] == 0:
+                            self.symbols[si].param_stores[k] = 1
+                            changed = true
 
     // The seeds of destruction that are not body proofs, then returns.
     mut fn resolve_ownership_after_retention():
@@ -1975,3 +2206,33 @@ fn fd_name_list_has(names: &str, name: &str) -> bool:
 fn fd_field_of(record_field: &str) -> str:
     let dot = record_field.rfind(".")
     if dot >= 0: record_field.slice(dot + 1, record_field.len()) else: record_field.to_owned()
+
+// #3175: lookup position `pos` in an `outcall` argument map (`0=p0,1=&lcur`).
+fn fd_outcall_arg(argmap: &str, pos: i32) -> str:
+    let head = f"{pos}="
+    for entry in argmap.split(","):
+        if entry.starts_with(head): return entry.slice(head.len(), entry.len()).to_owned()
+    ""
+
+fn fd_add_i32_map(mut map: HashMap[str, str], key: &str, value: i32) -> bool:
+    let tag = f"{value};"
+    var prev = ""
+    match map.get(key):
+        Some(v) => prev = v.to_owned()
+        None => {}
+    if (";" ++ prev).contains(";" ++ tag): return false
+    map.insert(key.to_owned(), prev ++ tag)
+    true
+
+fn fd_put_i32_map(mut map: HashMap[str, str], key: &str, value: i32):
+    if fd_add_i32_map(map, key, value): {}
+
+fn fd_copy_i32_map(map: &HashMap[str, str], key: &str) -> List[i32]:
+    let out = []
+    var raw = ""
+    match map.get(key):
+        Some(v) => raw = v.to_owned()
+        None => {}
+    for part in raw.split(";"):
+        if part.len() > 0: out.push(fd_i32(part))
+    out
