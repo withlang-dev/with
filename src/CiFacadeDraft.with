@@ -1972,9 +1972,13 @@ impl CiProject:
         out
 
     fn fd_named_resource(record: &str) -> str:
+        if self.fd_drop_of(record) >= 0: return fd_resource_name(record)
+        var found = ""
         for (rec, rname) in self.registry_value_record_names:
-            if rec == record: return rname.to_owned()
-        fd_resource_name(record)
+            if rec != record: continue
+            if found.len() > 0 and found != rname: return fd_resource_name(record)
+            found = rname.to_owned()
+        if found.len() > 0: found else: fd_resource_name(record)
 
     // #3123: every typedef of `void` is one representation to the checker
     // (`*mut c_void`), so an operation on a handle of one names its resource:
@@ -2006,10 +2010,10 @@ impl CiProject:
         self.draft_name = name
         let inplace = self.fd_inplace_records()
         for record in modeled:
-            if self.registry_value_records.contains(record): continue
             // #3173: the record itself, in storage With provides, between
             // its proven init and end.
             if inplace.contains(record):
+                if self.registry_value_records.contains(record): continue
                 let pair = self.fd_inplace_pair(record)
                 let field = self.fd_inplace_field(record)
                 self.presented.push(pair[0])
@@ -2018,12 +2022,14 @@ impl CiProject:
                 let ok_line = if status == "void": "" else: "        ok " ++ (if status.starts_with("literal:"): status.slice(8, status.len()) else: status) ++ "    // proof: returned only after the " ++ field ++ " field is filled; every return before that is another constant\n"
                 text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps " ++ record ++ "\n        init " ++ self.symbols[pair[0]].name ++ "(self)    // proof: gives the record's " ++ field ++ " field a fresh allocation nothing else keeps\n" ++ ok_line ++ "        drop " ++ self.symbols[pair[2]].name ++ "    // proof: frees the " ++ field ++ " field " ++ self.symbols[pair[0]].name ++ " filled\n"
                 continue
-            text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
+            let drop = self.fd_drop_of(record)
+            if drop < 0: continue
             let producers = self.fd_presentable_producers_of(record, modeled)
+            if producers.len() == 0 and self.fd_borrow_candidates_from(record, modeled).len() == 0: continue
+            text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
             for si in producers:
                 self.presented.push(si)
                 text = text ++ "        from " ++ self.symbols[si].name ++ "    // " ++ self.symbols[si].own_reason ++ "\n"
-            let drop = self.fd_drop_of(record)
             self.presented.push(drop)
             text = text ++ "        drop " ++ self.symbols[drop].name ++ "    // " ++ self.fd_destroy_reason(drop, "param 0") ++ "\n"
             for si in self.fd_presentable_destroyers_of(record, true, modeled):

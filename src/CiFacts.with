@@ -181,9 +181,20 @@ fn facts_flush_fn(mut facts: Facts, fn_name: &str, carry: bool, clauses: &List[s
             facts.entries.push(FactsEntry { fn_name: fn_name.to_owned(), kind: k.to_owned(), record: "", cite: cites[fk].to_owned() })
             fk += 1
 
+fn facts_default_resource_name(record: &str) -> str:
+    var camel = ""
+    for part in record.split("_"):
+        if part.len() == 0: continue
+        camel = camel ++ part.slice(0, 1).to_upper() ++ part.slice(1, part.len())
+    if camel == record: camel ++ "Handle" else: camel
+
 fn facts_flush_ptr(mut facts: Facts, ptr_header: &str, ptr_name: &str, ptr_record: &str, ptr_carry: bool, ptr_rec_multi: &List[str], named_refs: &List[str], ptr_clauses: &List[str], ptr_fns: &List[str], ptr_kinds: &List[str], ptr_cites: &List[str]):
     if ptr_header.len() == 0: return
-    if ptr_carry or ptr_rec_multi.contains(ptr_record) or named_refs.contains(ptr_name) or ptr_clauses.len() == 0:
+    var has_from = false
+    for k in ptr_kinds:
+        if k == "owned": has_from = true
+    let custom_named = has_from and ptr_name != facts_default_resource_name(ptr_record) and named_refs.contains(ptr_name)
+    if ptr_carry or ptr_rec_multi.contains(ptr_record) or custom_named or ptr_clauses.len() == 0:
         facts_push_unique(facts.value_resources, ptr_name)
         facts_push_unique(facts.value_records, ptr_record)
         facts.value_record_names.push((ptr_record.to_owned(), ptr_name.to_owned()))
