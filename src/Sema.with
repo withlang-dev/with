@@ -570,8 +570,7 @@ type ForeignContract {
     retains: List[i32],
     retains_by: List[i32],
     returns_borrow_resource: i32,   // a resource, or `CStr` (the borrowed modeled text, §16.2b.8)
-    returns_borrow_from: i32,       // the origin parameter, or -1
-    returns_borrow_from2: i32,      // D187 (§16.2b.6): `from params N, M` — the second origin parameter, or -1
+    returns_borrow_from: List[i32], // #3022 / D187 (§16.2b.6): origin parameters (`from param N` / `from params N, M`); empty when none
     returns_borrow_domain: i32,     // the origin foreign-state domain (`from domain D`, §16.2b.7), or 0
     returns_borrow_parent: i32,     // D85 (§16.2b.6): `from parent P of param N` — the parent resource P of the resource param N receives, or 0
     returns_static_tid: i32,
@@ -763,8 +762,7 @@ type FacadeCallEffect {
     touch_params: i32,
     touch_domains: List[i32], // facade_domain_list indices
     borrow_domain: i32,      // facade_domain_list index, or -1
-    borrow_param: i32,       // a presented call's origin parameter (a C string it is lent), or -1
-    borrow_param2: i32,      // D187: its second origin parameter (`from params N, M`), or -1
+    borrow_params: List[i32], // #3022 / D187: a presented call's origin parameters (`from param N` / `from params N, M`)
     // A producer sig's C parameter per presented one (its out slot gone, an
     // init's preinit parameters ahead), as the mask was projected; empty for
     // every other call (facade_effect_source_param inverts their projection).

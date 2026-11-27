@@ -431,12 +431,11 @@ impl CiProject:
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
             if ci < 0 or not self.fd_subject(ci): return "unknown:" ++ callee ++ " is not defined in the package"
             if self.symbols[ci].owns_return != 0: return "owned"
-            if self.symbols[ci].borrow_from >= 0:
-                // D187: a callee borrowing from two parameters borrows from
-                // what both arguments are.
+            if self.symbols[ci].borrow_from.len() > 0:
+                // D187: a callee borrowing from multiple parameters borrows from
+                // what all of those arguments are.
                 var joined = ""
-                for origin in [self.symbols[ci].borrow_from, self.symbols[ci].borrow_from2]:
-                    if origin < 0: continue
+                for origin in self.symbols[ci].borrow_from:
                     let arg = fd_argmap_at(argmap, origin)
                     var v = ""
                     if arg.starts_with("p"): v = "borrow:" ++ arg.slice(1, arg.len())
@@ -539,7 +538,8 @@ impl CiProject:
                 if kept == 0 or (pi < symbol.param_destroys.len() and symbol.param_destroys[pi] != 0): continue
                 let why = self.fd_retain_reason(si, pi, 0, false)
                 if why.ends_with("stored in a field") or why.ends_with("stored in a global") or why.ends_with("stored") or why.contains("stored through local "): out = out ++ f"{symbol.name}\tstores\t{pi}\t{why}\n"
-            if symbol.borrow_from >= 0 and symbol.own_reason.starts_with("proof: "): out = out ++ f"{symbol.name}\treturns-part\t{symbol.borrow_from}\t{symbol.own_reason.slice(7, symbol.own_reason.len())}\n"
+            if symbol.borrow_from.len() > 0 and symbol.own_reason.starts_with("proof: "):
+                for origin in symbol.borrow_from: out = out ++ f"{symbol.name}\treturns-part\t{origin}\t{symbol.own_reason.slice(7, symbol.own_reason.len())}\n"
             // §31.8.6: the third column is the global, not a parameter.
             for assigned in symbol.assigned_globals: out = out ++ f"{symbol.name}\tassigns\t{assigned}\tthe body of {symbol.name} assigns {assigned}\n"
         // A function that reaches an assigner assigns (#3338). The walk goes
@@ -609,7 +609,7 @@ impl CiProject:
         var parts = ""
         if r.len() > 0:
             parts = facts_kind(r) ++ ": " ++ facts_cite(r)
-            if self.symbols[si].borrow_from >= 0 and facts_kind(r) == "owned" and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a borrow"
+            if self.symbols[si].borrow_from.len() > 0 and facts_kind(r) == "owned" and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a borrow"
             if self.symbols[si].owns_return != 0 and facts_kind(r).starts_with("borrow:") and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a fresh allocation"
         for line in self.symbols[si].registry_more.split("\n"):
             if line.len() == 0: continue
@@ -914,7 +914,7 @@ impl CiProject:
         if g.contains("drop=1"): parts = parts ++ (if parts.len() > 0: ", " else: "") ++ "a record's free function"
         // A proof and the file disagreeing is worth a loud line: one of
         // them is wrong, and the proof stands (§16.2b.2).
-        if self.symbols[si].borrow_from >= 0 and ret == "full" and not self.symbols[si].own_reason.starts_with("annotation:"): parts = parts ++ "; DISAGREES: the proof returns a borrow"
+        if self.symbols[si].borrow_from.len() > 0 and ret == "full" and not self.symbols[si].own_reason.starts_with("annotation:"): parts = parts ++ "; DISAGREES: the proof returns a borrow"
         if self.symbols[si].owns_return != 0 and ret == "none" and not self.symbols[si].own_reason.starts_with("annotation:"): parts = parts ++ "; DISAGREES: the proof returns a fresh allocation"
         if parts.len() == 0: "" else: " [gir: " ++ parts ++ "]"
 
@@ -1040,11 +1040,16 @@ impl CiProject:
         what ++ f"; a contract describes it with 'callback param {pi} userdata param {userdata}', and 'retains param {pi} by param N', N the resource that keeps it, when the library keeps it (§16.2b.9)"
 
     fn fd_is_lend(si: i32, modeled: &List[str]) -> bool:
-        self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si, modeled).starts_with("lend")
+        self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from.len() == 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si, modeled).starts_with("lend")
 
     // The clause's origin spelling: `param N`, or `params N, M` (D187).
     fn fd_borrow_origin_text(si: i32) -> str:
-        if self.symbols[si].borrow_from2 >= 0: f"params {self.symbols[si].borrow_from}, {self.symbols[si].borrow_from2}" else: f"param {self.symbols[si].borrow_from}"
+        let origins = &self.symbols[si].borrow_from
+        if origins.len() <= 1: return f"param {origins[0]}"
+        var text = "params "
+        for (i, o) in origins.enumerate():
+            text = text ++ (if i > 0: ", " else: "") ++ f"{o}"
+        text
 
     fn fd_src_text(src: &str) -> str:
         if src.starts_with("call:"):
@@ -1230,8 +1235,7 @@ impl CiProject:
                 let ocount = self.symbols[si].param_out_returns.len()
                 for pi in 0..ocount: self.symbols[si].param_out_returns[pi] = ""
                 self.symbols[si].owns_return = 0
-                self.symbols[si].borrow_from = -1
-                self.symbols[si].borrow_from2 = -1
+                self.symbols[si].borrow_from = []
                 self.symbols[si].own_reason = ""
             self.fd_resolve_retention_and_destruction(true)
             self.resolve_ownership_after_retention(true)
@@ -1246,7 +1250,10 @@ impl CiProject:
                 for pi in 0..self.symbols[si].param_ty.len():
                     stores = stores ++ (if self.symbols[si].param_stores[pi] != 0: "1" else: "0")
                     destroys = destroys ++ (if self.symbols[si].param_destroys[pi] != 0: "1" else: "0")
-                eprint("facade: " ++ self.symbols[si].name ++ " -> " ++ self.symbols[si].ret_ty ++ (if self.symbols[si].header_declared != 0: " (declared)" else: " (internal)") ++ " stores=" ++ stores ++ " destroys=" ++ destroys ++ f" owns={self.symbols[si].owns_return} borrow_from={self.symbols[si].borrow_from}" ++ (if self.symbols[si].borrow_from2 >= 0: f",{self.symbols[si].borrow_from2}" else: "") ++ ": " ++ self.symbols[si].own_reason ++ (if self.symbols[si].gir.len() > 0: " gir=" ++ self.symbols[si].gir else: ""))
+                var bf = ""
+                for (bi, o) in self.symbols[si].borrow_from.enumerate(): bf = bf ++ (if bi > 0: "," else: "") ++ f"{o}"
+                if bf.len() == 0: bf = "-1"
+                eprint("facade: " ++ self.symbols[si].name ++ " -> " ++ self.symbols[si].ret_ty ++ (if self.symbols[si].header_declared != 0: " (declared)" else: " (internal)") ++ " stores=" ++ stores ++ " destroys=" ++ destroys ++ f" owns={self.symbols[si].owns_return} borrow_from=" ++ bf ++ ": " ++ self.symbols[si].own_reason ++ (if self.symbols[si].gir.len() > 0: " gir=" ++ self.symbols[si].gir else: ""))
                 for line in self.symbols[si].own_evidence.split("\n"):
                     if line.len() > 0: eprint("    " ++ line)
                 for pi in 0..self.symbols[si].param_sinks.len():
@@ -1533,7 +1540,7 @@ impl CiProject:
             changed = false
             for si in 0..n:
                 if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
-                if self.symbols[si].owns_return != 0 or self.symbols[si].borrow_from >= 0: continue
+                if self.symbols[si].owns_return != 0 or self.symbols[si].borrow_from.len() > 0: continue
                 if fd_record_pointee(self.symbols[si].ret_ty).len() == 0:
                     self.symbols[si].own_reason = "returns no pointer to a record"
                     continue
@@ -1611,9 +1618,7 @@ impl CiProject:
                     self.symbols[si].own_reason = if reason.starts_with("annotation:") or reason.starts_with("registry:"): reason else: "proof: " ++ reason ++ ", a fresh allocation never retained"
                     changed = true
                 else if verdict.starts_with("borrow:"):
-                    let members = fd_borrow_members(verdict)
-                    self.symbols[si].borrow_from = members[0]
-                    self.symbols[si].borrow_from2 = if members.len() > 1: members[1] else: -1
+                    self.symbols[si].borrow_from = fd_borrow_members(verdict)
                     self.symbols[si].own_reason = if reason.starts_with("annotation:") or reason.starts_with("registry:"): reason else: "proof: " ++ reason
                     changed = true
                 else: self.symbols[si].own_reason = verdict.slice(8, verdict.len()).to_owned()
@@ -1908,11 +1913,14 @@ impl CiProject:
     fn fd_borrow_candidates_from(record: &str, origins: &List[str]) -> List[i32]:
         let out: List[i32] = []
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.symbols[si].borrow_from < 0: continue
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.symbols[si].borrow_from.len() == 0: continue
             if fd_record_pointee(self.symbols[si].ret_ty) != record or self.fd_retains_any(si as i32): continue
-            if not origins.contains(fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])): continue
-            // D187: both origins of a two-parameter borrow are modeled.
-            if self.symbols[si].borrow_from2 >= 0 and not origins.contains(fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from2])): continue
+            var all_modeled = true
+            for origin in self.symbols[si].borrow_from:
+                if not origins.contains(fd_record_pointee(self.symbols[si].param_ty[origin])):
+                    all_modeled = false
+                    break
+            if not all_modeled: continue
             if self.fd_presentable(si as i32, -1, true, origins): out.push(si as i32)
         out
 
@@ -2053,7 +2061,7 @@ impl CiProject:
                 self.presented.push(si as i32)
                 blocks.push(si as i32)
                 text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_callback_lines(si as i32)
-            else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
+            else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from.len() == 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
                 self.presented.push(si as i32)
                 blocks.push(si as i32)
                 let consumed = self.fd_consumed_param(si as i32, modeled)
@@ -2156,7 +2164,7 @@ impl CiProject:
                 let consumed = self.fd_consumed_param(si as i32, modeled)
                 if ret.len() == 0 and consumed == retained: verdict = self.fd_lend_verdict(si as i32, modeled)
                 else: verdict = self.fd_retains_verdict(si as i32, retained)
-            else if self.symbols[si].borrow_from >= 0 and (self.fd_destroys_any(si as i32) or self.fd_retains_any(si as i32)):
+            else if self.symbols[si].borrow_from.len() > 0 and (self.fd_destroys_any(si as i32) or self.fd_retains_any(si as i32)):
                 // A borrow of what it also frees or keeps (libxml2's
                 // xmlTextMerge returns one node and frees the other): never
                 // presented (fd_borrow_candidates_from), and said so, not
@@ -2169,10 +2177,13 @@ impl CiProject:
                         held = pi as i32
                         break
                 verdict = "raw: " ++ self.symbols[si].own_reason ++ ", but it " ++ (if frees: "frees" else: "retains") ++ f" param {held}, which a borrowed return cannot state"
-            else if self.symbols[si].borrow_from >= 0:
-                let origin = fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])
-                let origin2_modeled = self.symbols[si].borrow_from2 < 0 or modeled.contains(fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from2]))
-                if modeled.contains(ret) and modeled.contains(origin) and origin2_modeled: verdict = "borrows " ++ fd_resource_name(ret) ++ " from " ++ self.fd_borrow_origin_text(si as i32) ++ " (" ++ self.symbols[si].own_reason ++ ")"
+            else if self.symbols[si].borrow_from.len() > 0:
+                var origins_modeled = true
+                for o in self.symbols[si].borrow_from:
+                    if not modeled.contains(fd_record_pointee(self.symbols[si].param_ty[o])):
+                        origins_modeled = false
+                        break
+                if modeled.contains(ret) and origins_modeled: verdict = "borrows " ++ fd_resource_name(ret) ++ " from " ++ self.fd_borrow_origin_text(si as i32) ++ " (" ++ self.symbols[si].own_reason ++ ")"
                 else: verdict = "raw: " ++ self.symbols[si].own_reason ++ ", but " ++ self.fd_borrow_origin_text(si as i32) ++ " or the return is not a modeled resource"
             else if ret.len() > 0:
                 verdict = "raw: returns " ++ self.symbols[si].ret_ty ++ " unproven: " ++ self.symbols[si].own_reason

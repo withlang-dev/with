@@ -20646,9 +20646,8 @@ impl Sema:
         // (`returns borrow CStr from param N` on `strchr`): the argument's
         // own storage when it is a value, its origins through a reference.
         // D187: `from params N, M` names two; the result views both.
-        if fx >= 0 and self.facade_call_effects[fx].borrow_param >= 0 and self.facade_presented_calls.contains(call_node):
-            let borrow_params = [self.facade_call_effects[fx].borrow_param, self.facade_call_effects[fx].borrow_param2]
-            for bp in borrow_params:
+        if fx >= 0 and self.facade_call_effects[fx].borrow_params.len() > 0 and self.facade_presented_calls.contains(call_node):
+            for bp in self.facade_call_effects[fx].borrow_params:
                 let origin_arg = if bp >= 0 and bp < args.len(): args[bp] else: 0
                 if origin_arg > 0:
                     union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
